@@ -2,6 +2,7 @@ import { Repository } from '../types';
 import { AIService } from './aiService';
 import { GitHubApiService } from './githubApi';
 import { backend } from './backendAdapter';
+import { shouldBypassBackend } from './routeMode';
 import { AIRateLimiter, AIRateLimitConfig } from './aiRequestLimiter';
 import { isRateLimitedError, getRetryAfterMsFromError } from './aiService';
 
@@ -179,7 +180,7 @@ export class AIAnalysisOptimizer {
     if (this.aborted || signal?.aborted) return '';
 
     try {
-      if (backend.isAvailable) {
+      if (!shouldBypassBackend() && backend.isAvailable) {
         const [owner, name] = repo.full_name.split('/');
         return await backend.getRepositoryReadme(owner, name, signal);
       }

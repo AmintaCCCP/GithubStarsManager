@@ -20,7 +20,7 @@ import { debouncedPersistStorage } from './storage';
 
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
   name: 'github-stars-manager',
-  version: 12,
+  version: 13,
   storage: debouncedPersistStorage as PersistStorage<PersistedAppState>,
 partialize: (state) => ({
   // 持久化用户信息和认证状态
@@ -162,6 +162,7 @@ rpcDownloadConfig: {
   port: state.rpcDownloadConfig.port,
   secret: state.rpcDownloadConfig.secret,
 },
+routeMode: state.routeMode,
 }),
 migrate: (persistedState) => {
   // 版本升级适配处理
@@ -314,6 +315,14 @@ state.discoverySortOrder = 'Descending';
   // 初始化 rpcDownloadConfig
   if (state && !(state as Record<string, unknown>).rpcDownloadConfig) {
 (state as Record<string, unknown>).rpcDownloadConfig = { enabled: false, host: '', port: 6800 };
+  }
+
+  // v12→v13: 初始化 routeMode（纯本地偏好，缺失或非法时回退 auto，不参与后端/autoSync 同步）
+  if (state) {
+    const stateRecord = state as Record<string, unknown>;
+    if (stateRecord.routeMode !== 'backend' && stateRecord.routeMode !== 'browser') {
+      stateRecord.routeMode = 'auto';
+    }
   }
 
   // v8→v9: 初始化 headerMenuConfig

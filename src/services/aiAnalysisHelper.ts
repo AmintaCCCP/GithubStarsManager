@@ -2,6 +2,7 @@ import { Repository, AIConfig, Category, DiscoveryRepo } from '../types';
 import { GitHubApiService } from './githubApi';
 import { AIService } from './aiService';
 import { backend } from './backendAdapter';
+import { shouldBypassBackend } from './routeMode';
 import { resolveCategoryAssignment, buildCategoryHints } from '../utils/categoryUtils';
 
 export interface AIAnalysisResult {
@@ -38,9 +39,9 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
   onProgress?.('Fetching README...');
   let readmeContent = '';
   try {
-    readmeContent = backend.isAvailable
-      ? await backend.getRepositoryReadme(owner, name, signal)
-      : await githubApi.getRepositoryReadme(owner, name, signal);
+    readmeContent = (shouldBypassBackend() || !backend.isAvailable)
+      ? await githubApi.getRepositoryReadme(owner, name, signal)
+      : await backend.getRepositoryReadme(owner, name, signal);
   } catch (error) {
     if (signal?.aborted || (error as { name?: string })?.name === 'AbortError') {
       throw error;
