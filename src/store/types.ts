@@ -191,6 +191,7 @@ export interface AppActions {
 
   // Proxy actions
   setProxyConfig: (updates: Partial<ProxyConfig>) => void;
+  setRouteMode: (mode: import('../types').RouteMode) => void;
 
   // RPC Download actions
   setRpcDownloadConfig: (updates: Partial<RpcDownloadConfig>) => void;

@@ -32,6 +32,7 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
     activeWebDAVConfig: store.activeWebDAVConfig,
     proxyConfig: store.proxyConfig,
     rpcDownloadConfig: store.rpcDownloadConfig,
+    routeMode: store.routeMode,
     backendApiSecret: store.backendApiSecret,
     includeKeysInBackup: store.includeKeysInBackup,
     setLastBackup: store.setLastBackup,
@@ -49,6 +50,7 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
     deleteWebDAVConfig: store.deleteWebDAVConfig,
     setProxyConfig: store.setProxyConfig,
     setRpcDownloadConfig: store.setRpcDownloadConfig,
+    setRouteMode: store.setRouteMode,
     setBackendApiSecret: store.setBackendApiSecret,
     setReleaseSourceSettings: store.setReleaseSourceSettings,
   })));
@@ -88,13 +90,14 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
           ...state.rpcDownloadConfig,
           secret: state.includeKeysInBackup ? state.rpcDownloadConfig.secret : (state.rpcDownloadConfig.secret ? '***' : ''),
         },
+        routeMode: state.routeMode,
         backendApiSecret: state.includeKeysInBackup ? state.backendApiSecret : (state.backendApiSecret ? '***' : null),
         releaseSubscriptions: Array.from(useAppStore.getState().releaseSubscriptions),
         releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
         readReleases: Array.from(useAppStore.getState().readReleases),
         includeKeysInBackup: state.includeKeysInBackup,
         exportedAt: new Date().toISOString(),
-        version: '1.1',
+        version: '1.2',
       };
       const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
       const success = await new WebDAVService(activeConfig).uploadFile(filename, JSON.stringify(backupData, null, 2));
@@ -244,6 +247,18 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
         }
       } catch (error) {
         console.warn('恢复远程下载配置时发生问题：', error);
+      }
+      // routeMode 是本地偏好：仅接受合法枚举，缺失/非法回退 auto（随 1.2 备份导出）
+      try {
+        const restored = backupData.routeMode;
+        const next: 'auto' | 'backend' | 'browser' = restored === 'backend' || restored === 'browser' || restored === 'auto'
+          ? restored
+          : 'auto';
+        if (useAppStore.getState().routeMode !== next) {
+          useAppStore.getState().setRouteMode(next);
+        }
+      } catch (error) {
+        console.warn('恢复网络路由偏好时发生问题：', error);
       }
       try {
         if (backupIncludedKeys && backupData.backendApiSecret !== undefined && backupData.backendApiSecret !== '***') {

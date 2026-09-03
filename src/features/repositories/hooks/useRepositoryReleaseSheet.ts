@@ -5,6 +5,7 @@ import { backend } from '../../../services/backendAdapter';
 import { GitHubApiService } from '../../../services/githubApi';
 import { sendToRpcDownload } from '../../../services/rpcDownloadService';
 import { AIService } from '../../../services/aiService';
+import { shouldBypassBackend } from '../../../services/routeMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import type { ReleaseDownloadLink } from '../../../utils/releaseDownloadLinks';
@@ -185,7 +186,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
       let liveReleases: Release[] | null = null;
       let backendError: unknown;
 
-      if (backend.isAvailable) {
+      if (!shouldBypassBackend() && backend.isAvailable) {
         try {
           liveReleases = await fetchAllPages(async (page, signal) => {
             const records = await backend.getRepositoryReleases(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal);
@@ -269,7 +270,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
           throw new Error(`${t('下载失败', 'Download failed')} (${response.status})`);
         }
         blob = await response.blob();
-      } else if (backend.isAvailable && link.authenticatedPath) {
+      } else if (!shouldBypassBackend() && backend.isAvailable && link.authenticatedPath) {
         blob = await backend.downloadGitHubResource(link.authenticatedPath);
       } else {
         window.open(link.url, '_blank', 'noopener,noreferrer');

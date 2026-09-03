@@ -965,6 +965,7 @@ describe('useAppStore persistence contracts', () => {
       discoveryRepos: buildTransientDiscoverySnapshot().discoveryRepos as ReturnType<typeof useAppStore.getState>['discoveryRepos'],
       proxyConfig: { enabled: true, type: 'http', host: 'proxy.example.com', port: 7890, username: 'user', password: 'proxy-password' },
       rpcDownloadConfig: { enabled: true, host: 'rpc.example.com', port: 6800, secret: 'rpc-secret' },
+      routeMode: 'browser',
     });
 
     expect(persisted).not.toHaveProperty('discoveryRepos');
@@ -982,6 +983,21 @@ describe('useAppStore persistence contracts', () => {
       port: 6800,
       secret: 'rpc-secret',
     });
+    expect(persisted.routeMode).toBe('browser');
+  });
+
+  it('falls back to auto for missing or invalid routeMode during hydration', () => {
+    const normalized = normalizePersistedState(
+      buildPersistedSnapshot({ routeMode: 'not-a-mode' as unknown as never }),
+      useAppStore.getInitialState(),
+    );
+    expect(normalized.routeMode).toBe('auto');
+
+    const legacy = normalizePersistedState(
+      buildPersistedSnapshot() as unknown as Record<string, unknown>,
+      useAppStore.getInitialState(),
+    );
+    expect(legacy.routeMode).toBe('auto');
   });
 
   it('restores the full proxy credential set after hydration', () => {
