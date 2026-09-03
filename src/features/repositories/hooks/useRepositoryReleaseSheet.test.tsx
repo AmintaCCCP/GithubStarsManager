@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
     backendApiSecret: null as string | null,
     aiConfigs: [],
     activeAIConfig: null as string | null,
+    routeMode: 'auto' as const,
   },
 }));
 
@@ -31,7 +32,10 @@ vi.mock('../../../hooks/useDialog', () => ({
   useDialog: () => ({ toast: mocks.toast, confirm: vi.fn() }),
 }));
 vi.mock('../../../store/useAppStore', () => ({
-  useAppStore: (selector: (state: typeof mocks.store) => unknown) => selector(mocks.store),
+  useAppStore: Object.assign(
+    (selector: (state: typeof mocks.store) => unknown) => selector(mocks.store),
+    { getState: () => mocks.store },
+  ),
 }));
 
 const repository: Repository = {

@@ -30,8 +30,15 @@ vi.mock('../services/githubApi', () => ({
   GitHubApiService: vi.fn(),
 }));
 
+let mockStoreState: { language: 'zh' | 'en'; githubToken: string | null; routeMode: 'auto' | 'backend' | 'browser'; setReadmeModalOpen: () => void } = {
+  language: 'zh',
+  githubToken: null,
+  routeMode: 'auto',
+  setReadmeModalOpen: vi.fn(),
+};
+
 vi.mock('../store/useAppStore', () => ({
-  useAppStore: vi.fn(),
+  useAppStore: Object.assign(vi.fn(), { getState: () => mockStoreState }),
 }));
 
 const mockGitHubApi = {
@@ -41,14 +48,13 @@ const mockGitHubApi = {
 };
 
 const setMockStore = (githubToken: string | null = null) => {
-  (useAppStore as unknown as ReturnType<typeof vi.fn>).mockImplementation((selector?: (state: unknown) => unknown) => {
-    const state = {
-      language: 'zh',
-      githubToken,
-      setReadmeModalOpen: vi.fn(),
-    };
-    return selector ? selector(state) : state;
-  });
+  mockStoreState = {
+    language: 'zh',
+    githubToken,
+    routeMode: 'auto',
+    setReadmeModalOpen: vi.fn(),
+  };
+  (useAppStore as unknown as ReturnType<typeof vi.fn>).mockImplementation((selector?: (state: unknown) => unknown) => selector ? selector(mockStoreState) : mockStoreState);
 };
 
 const mockedGitHubApiService = GitHubApiService as unknown as ReturnType<typeof vi.fn>;

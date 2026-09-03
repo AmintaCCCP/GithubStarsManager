@@ -5,6 +5,10 @@ import type { GitHubApiService } from './githubApi';
 import { AIRequestError } from './aiService';
 import type { Repository } from '../types';
 
+vi.mock('../store/useAppStore', () => ({
+  useAppStore: { getState: () => ({ routeMode: 'auto' }) },
+}));
+
 function makeRepo(id: number): Repository {
   return {
     id,

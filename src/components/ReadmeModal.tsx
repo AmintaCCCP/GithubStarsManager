@@ -7,6 +7,7 @@ import { stripMarkdownFormatting } from '../utils/markdownUtils';
 import { Repository } from '../types';
 import { GitHubApiService } from '../services/githubApi';
 import { backend } from '../services/backendAdapter';
+import { shouldBypassBackend } from '../services/routeMode';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { buildReadmeVariants, DEFAULT_README_VARIANT, type GitHubReadmeCandidateItem, type ReadmeVariant } from '../utils/readmeVariants';
@@ -344,7 +345,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
         : githubApi.getRepositoryReadmeByPath(owner, name, variant.path, signal);
     };
 
-    if (!backend.isAvailable) {
+    if (shouldBypassBackend() || !backend.isAvailable) {
       return fetchFromGitHubApi();
     }
 
@@ -374,7 +375,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       return githubApi.listRepositoryReadmeCandidates(owner, name, defaultBranch, signal);
     };
 
-    if (!backend.isAvailable) {
+    if (shouldBypassBackend() || !backend.isAvailable) {
       return fetchFromGitHubApi();
     }
 

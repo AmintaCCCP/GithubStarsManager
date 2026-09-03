@@ -330,6 +330,9 @@ export interface WebDAVConfig {
 
 export type ProxyType = 'http' | 'socks5';
 
+/** GitHub/Release 数据面请求出口偏好；仅影响本设备，不参与后端/autoSync 同步。 */
+export type RouteMode = 'auto' | 'backend' | 'browser';
+
 export interface ProxyConfig {
   enabled: boolean;
   type: ProxyType;
@@ -494,6 +497,8 @@ export interface AppState {
   // Network Proxy
   proxyConfig: ProxyConfig;
   rpcDownloadConfig: RpcDownloadConfig;
+  /** 本地路由偏好；不参与后端/autoSync 同步 */
+  routeMode: RouteMode;
 
   // Fork Timeline View
   forks: ForkRepo[];
