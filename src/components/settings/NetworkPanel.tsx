@@ -302,6 +302,12 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 'Requires aria2 with RPC enabled (aria2c --enable-rpc --rpc-listen-port=6800)'
               )}
             </p>
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+              {t(
+                'RPC 下载与 GitHub 请求出口可在「设置 → 后端同步 → 网络请求路由」调整。aria2 的下载流量由 aria2 进程所在机器发出，与本设置无关。',
+                'RPC download and GitHub request egress can be adjusted under "Settings → Backend Sync → Network Request Routing". aria2 download traffic leaves from wherever aria2 runs and is unaffected.'
+              )}
+            </p>
 
             {/* Actions */}
             <div className="flex items-center space-x-3 pt-2">

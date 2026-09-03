@@ -1,9 +1,12 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import React from 'react';
-import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle } from 'lucide-react';
+import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle, Route } from 'lucide-react';
 import { useBackendSettingsActions } from '../../features/settings/hooks/useBackendSettingsActions';
+import { useAppStore } from '../../store/useAppStore';
+import type { RouteMode } from '../../types';
 
 interface BackendPanelProps {
   t: (zh: string, en: string) => string;
@@ -22,6 +25,26 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     syncToBackend: handleSyncToBackend,
     syncFromBackend: handleSyncFromBackend,
   } = useBackendSettingsActions({ t });
+  const routeMode = useAppStore((state) => state.routeMode);
+  const setRouteMode = useAppStore((state) => state.setRouteMode);
+
+  const routeOptions: Array<{ value: RouteMode; label: string; hint: string }> = [
+    {
+      value: 'auto',
+      label: t('智能', 'Auto'),
+      hint: t('有后端走后端，无后端走本机网络', 'Use backend when available, otherwise this device'),
+    },
+    {
+      value: 'backend',
+      label: t('优先走后端', 'Prefer backend'),
+      hint: t('支持后端代理的请求族优先经后端服务器出站', 'Backend-proxied request families prefer the backend egress'),
+    },
+    {
+      value: 'browser',
+      label: t('浏览器直连', 'Browser direct'),
+      hint: t('跳过后端代理，走当前设备网络', 'Skip backend proxying and use this device network'),
+    },
+  ];
 
   const getStatusIcon = () => {
     switch (status) {
@@ -76,6 +99,54 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           </p>
         </div>
       )}
+
+      <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
+        <div className="flex items-center space-x-2 mb-1">
+          <Route className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+          <h4 className="text-sm font-medium text-foreground dark:text-foreground">
+            {t('网络请求路由', 'Network Request Routing')}
+          </h4>
+        </div>
+        <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-3">
+          {t(
+            '选择支持后端代理的 GitHub/Release 请求从哪里发出。此项仅影响本设备，不参与后端与自动同步。',
+            'Choose where backend-proxied GitHub/Release requests originate. This only affects this device and is never synced.'
+          )}
+        </p>
+        <RadioGroup
+          value={routeMode}
+          onValueChange={(value) => setRouteMode(value as RouteMode)}
+          className="gap-3"
+        >
+          {routeOptions.map((option) => (
+            <label
+              key={option.value}
+              htmlFor={`route-mode-${option.value}`}
+              className="flex items-start space-x-3 rounded-lg p-2 hover:bg-muted/50 dark:hover:bg-muted/30 cursor-pointer"
+            >
+              <RadioGroupItem value={option.value} id={`route-mode-${option.value}`} className="mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground dark:text-foreground">{option.label}</div>
+                <div className="text-xs text-muted-foreground dark:text-muted-foreground">{option.hint}</div>
+              </div>
+            </label>
+          ))}
+        </RadioGroup>
+        {!backendAvailable && (
+          <p className="text-xs text-warning mt-3">
+            {t(
+              '当前后端不可达，「智能 / 优先走后端」与「浏览器直连」实际效果一致（都从本设备网络发出），切换不会改变现状。',
+              'The backend is unreachable right now, so "Auto / Prefer backend" and "Browser direct" behave identically (both use this device). Switching will not change current behavior.'
+            )}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-3">
+          {t(
+            '提示：服务器（如境内 VPS）访问不了 GitHub 时选「浏览器直连」。aria2 的下载流量由 aria2 进程所在机器发出，与本设置无关。浏览器直连下载有鉴权的大体积资产会占用标签页内存。',
+            'Tip: pick "Browser direct" when the server (e.g. a mainland-China VPS) cannot reach GitHub. aria2 download traffic leaves from wherever aria2 runs and is unaffected. Authenticated large assets downloaded via browser direct consume tab memory.'
+          )}
+        </p>
+      </div>
 
       <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
         <label htmlFor="backend-api-secret" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">

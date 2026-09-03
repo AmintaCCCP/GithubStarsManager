@@ -72,6 +72,7 @@ export const createInitialState = (): AppState => ({
       backendApiSecret: readSessionBackendSecret(),
       proxyConfig: { enabled: false, type: 'http', host: '', port: 7890 },
       rpcDownloadConfig: { enabled: false, host: '', port: 6800 },
+      routeMode: 'auto',
       isSidebarCollapsed: false,
       readmeModalOpen: false,
       repositoryViewMode: 'grid',

@@ -17,6 +17,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'dismissUpdateNotification'
   | 'setAnalysisProgress'
   | 'setProxyConfig'
+  | 'setRouteMode'
   | 'setRpcDownloadConfig'
   | 'setRepositoryViewMode'
   | 'setReleaseViewMode'
@@ -57,6 +58,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       setProxyConfig: (updates) => set((state) => ({
         proxyConfig: { ...state.proxyConfig, ...updates }
       })),
+      setRouteMode: (routeMode) => set({ routeMode }),
       setRpcDownloadConfig: (updates) => set((state) => ({
         rpcDownloadConfig: { ...state.rpcDownloadConfig, ...updates }
       })),

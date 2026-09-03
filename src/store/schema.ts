@@ -111,6 +111,7 @@ export type PersistedAppState = Partial<
     | 'discoverySelectedTopic'
     | 'proxyConfig'
     | 'rpcDownloadConfig'
+    | 'routeMode'
     | 'subscriptionRepos'
     | 'subscriptionLastRefresh'
     | 'subscriptionIsLoading'
