@@ -13,8 +13,6 @@
 
 **星标太多找不到？GitHub Stars Manager 自动同步您的星标仓库，使用 AI 进行摘要和分类，支持语义搜索。追踪 Release、过滤资产、一键下载——比手动标签更智能，比 GitHub 更简单。**
 
-🎥 [观看产品演示](https://pub-90c4a4511e8a4914b7992c5b905803ae.r2.dev/video/demo.mp4)
-
 <p align="center">
   <a href="README.md"><img src="./assets/readme/sections/lang-zh.svg" width="100%" alt="当前语言：中文。点击打开英文 README。"></a>
 </p>
@@ -26,6 +24,8 @@
 <p align="center">
   <img src="./assets/readme/sections/see-it.zh.svg" width="100%" alt="先看界面 — Stars、搜索、Release 与仓库问答的产品截图。">
 </p>
+
+<https://github.com/user-attachments/assets/2f7e44c9-7a7e-40dc-9601-269b27c1ec6e>
 
 <table>
   <tr>
