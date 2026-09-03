@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RouteMode } from '../types';
 
 const mocks = vi.hoisted(() => ({
   setBackendUrl: vi.fn(),
   setBackendAuthToken: vi.fn(),
   backendUrlGet: vi.fn<() => string | null>(() => null),
   isAvailableGet: vi.fn<() => boolean>(() => false),
-  routeMode: 'auto' as 'auto' | 'backend' | 'browser',
+  routeMode: 'auto' as RouteMode,
 }));
 
 vi.mock('./githubApi', () => ({

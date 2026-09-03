@@ -5,7 +5,7 @@ import { ReadmeModal } from './ReadmeModal';
 import { backend } from '../services/backendAdapter';
 import { GitHubApiService } from '../services/githubApi';
 import { useAppStore } from '../store/useAppStore';
-import type { Repository } from '../types';
+import type { Repository, RouteMode } from '../types';
 
 vi.mock('./BilingualMarkdownRenderer', async () => {
   const React = await import('react');
@@ -30,7 +30,7 @@ vi.mock('../services/githubApi', () => ({
   GitHubApiService: vi.fn(),
 }));
 
-let mockStoreState: { language: 'zh' | 'en'; githubToken: string | null; routeMode: 'auto' | 'backend' | 'browser'; setReadmeModalOpen: () => void } = {
+let mockStoreState: { language: 'zh' | 'en'; githubToken: string | null; routeMode: RouteMode; setReadmeModalOpen: () => void } = {
   language: 'zh',
   githubToken: null,
   routeMode: 'auto',
@@ -51,7 +51,7 @@ const setMockStore = (githubToken: string | null = null) => {
   mockStoreState = {
     language: 'zh',
     githubToken,
-    routeMode: 'auto',
+    routeMode: 'auto' as RouteMode,
     setReadmeModalOpen: vi.fn(),
   };
   (useAppStore as unknown as ReturnType<typeof vi.fn>).mockImplementation((selector?: (state: unknown) => unknown) => selector ? selector(mockStoreState) : mockStoreState);
