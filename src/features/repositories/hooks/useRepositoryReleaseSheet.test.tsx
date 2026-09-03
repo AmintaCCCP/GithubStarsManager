@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Repository } from '../../../types';
+import type { Repository, RouteMode } from '../../../types';
 import { useRepositoryReleaseSheet } from './useRepositoryReleaseSheet';
 
 const mocks = vi.hoisted(() => ({
@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
     backendApiSecret: null as string | null,
     aiConfigs: [],
     activeAIConfig: null as string | null,
-    routeMode: 'auto' as const,
+    routeMode: 'auto' as RouteMode,
   },
 }));
 
@@ -71,6 +71,7 @@ describe('useRepositoryReleaseSheet', () => {
     vi.clearAllMocks();
     mocks.backend.isAvailable = false;
     mocks.store.githubToken = 'token';
+    mocks.store.routeMode = 'auto';
   });
 
   it('uses the live backend GitHub proxy when available and maps repository identity locally', async () => {
@@ -181,5 +182,47 @@ describe('useRepositoryReleaseSheet', () => {
 
     expect(mocks.backend.downloadGitHubResource).toHaveBeenCalledWith('/repos/owner/repo/releases/assets/2');
     expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('skips the backend proxy and fetches releases directly in browser route mode', async () => {
+    mocks.store.routeMode = 'browser';
+    mocks.backend.isAvailable = true;
+    mocks.githubGetRepositoryReleasesPage.mockResolvedValue({
+      releases: [{ ...rawRelease, repository: { id: 0, name: 'repo', full_name: 'owner/repo' } }],
+      hasMore: false,
+    });
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => {
+      await result.current.loadReleases();
+    });
+
+    expect(mocks.backend.getRepositoryReleases).not.toHaveBeenCalled();
+    expect(mocks.githubGetRepositoryReleasesPage).toHaveBeenCalledWith('owner', 'repo', 1, 100, expect.any(AbortSignal));
+    expect(result.current.error).toBeNull();
+  });
+
+  it('opens a new window instead of the backend proxy for tokenless downloads in browser route mode', async () => {
+    mocks.store.routeMode = 'browser';
+    mocks.store.githubToken = null;
+    mocks.backend.isAvailable = true;
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => {
+      await result.current.downloadAsset({
+        id: 'asset-3',
+        name: 'browser-fallback.zip',
+        url: 'https://github.com/owner/repo/releases/download/v1/browser-fallback.zip',
+        authenticatedPath: '/repos/owner/repo/releases/assets/3',
+        size: 10,
+        isSourceCode: false,
+        assetId: 3,
+      });
+    });
+
+    expect(mocks.backend.downloadGitHubResource).not.toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/owner/repo/releases/download/v1/browser-fallback.zip', '_blank', 'noopener,noreferrer');
+    openSpy.mockRestore();
   });
 });
