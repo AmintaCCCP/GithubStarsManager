@@ -15,12 +15,9 @@
 
 GitHub Stars Manager automatically syncs your starred repos, uses AI to summarize and categorize them, and lets you find anything with semantic search. Track releases, filter assets, and one-click download — smarter than manual tags, simpler than GitHub.
 
-🎥 [Watch the product demo](https://pub-90c4a4511e8a4914b7992c5b905803ae.r2.dev/video/demo.mp4)
-
 <p align="center">
   <a href="README_zh.md"><img src="./assets/readme/sections/lang-en.svg" width="100%" alt="Current language: English. Click to open the Chinese README."></a>
 </p>
-
 </div>
 
 ## See it
@@ -28,6 +25,8 @@ GitHub Stars Manager automatically syncs your starred repos, uses AI to summariz
 <p align="center">
   <img src="./assets/readme/sections/see-it.svg" width="100%" alt="See it — product screenshots of Stars, search, releases, and repository Q&amp;A.">
 </p>
+
+<https://github.com/user-attachments/assets/2f7e44c9-7a7e-40dc-9601-269b27c1ec6e>
 
 <table>
   <tr>
