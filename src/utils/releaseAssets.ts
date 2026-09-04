@@ -54,9 +54,14 @@ export function changedAssetIds(
 }
 
 /**
- * 从最新拉取的 Release 中筛出“资产相对本地已变化”的条目。
+ * 从最新拉取的 Release 中筛出“相对本地已变化”的条目。
  * 只比对本地已存在 id 的 Release（新增条目由调用方 addReleases 处理）；
- * 资产指纹未变化则跳过，保证幂等，避免重复触发 store/后端写入。
+ * 触发条件为资产指纹变化 **或** 发布内容（body/name/tag_name）变化：
+ * 增量同步按 published_at 水印只拉取新 Release，已存在 Release 的 body 若在
+ * 首次同步时为空（或上游事后补了 release notes）将永远得不到更新，导致
+ * 日志/总结按钮缺失。最新 Release 的完整对象在每次刷新都会重新拉取，
+ * 因此在这里顺带比对 body，保证空日志能被回填。
+ * 无任何变化则跳过，保证幂等，避免重复触发 store/后端写入。
  * 供刷新入口（ReleaseTimeline.handleRefresh）与测试复用。
  */
 export function findReleasesWithChangedAssets(
@@ -66,7 +71,14 @@ export function findReleasesWithChangedAssets(
   const byId = new Map(currentReleases.map(r => [r.id, r]));
   return (latestReleases || []).flatMap((latest) => {
     const local = byId.get(latest.id);
-    if (!local || !hasAssetsChanged(local.assets, latest.assets)) return [];
+    if (!local) return [];
+    const assetsChanged = hasAssetsChanged(local.assets, latest.assets);
+    // body 可能为 null/''：统一按空字符串比对，避免 null 与 '' 的抖动；
+    // name 同理归一化（后端旧数据可能存 null，而 API 层回退为 tag_name）。
+    const bodyChanged = (local.body ?? '') !== (latest.body ?? '');
+    const metaChanged =
+      (local.name ?? '') !== (latest.name ?? '') || local.tag_name !== latest.tag_name;
+    if (!assetsChanged && !bodyChanged && !metaChanged) return [];
 
     return [{
       ...latest,

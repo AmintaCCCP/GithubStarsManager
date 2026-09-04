@@ -118,8 +118,11 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const [, forceUpdate] = useState(0);
 
   const handleRpcDownload = useCallback(async (link: DownloadLink) => {
-    const key = link.url;
-    if (downloadingRef.current[key] || downloadedRef.current[key]) return;
+    // 同一资产更新后 URL 不变但 updatedAt 会变，key 带上版本，
+    // 否则旧版本的"已发送 ✓"会错误地残留在新版本上。
+    const key = `${link.url}@${link.updatedAt ?? ''}`;
+    // 仅在下载进行中时短路，允许下载完成后再次点击重新发送
+    if (downloadingRef.current[key]) return;
 
     downloadingRef.current = { ...downloadingRef.current, [key]: true };
     forceUpdate(n => n + 1);
@@ -251,8 +254,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
             </div>
           </div>
 
-          <div className="flex items-center gap-4 flex-shrink-0 self-stretch">
-            <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
+          <div className="flex items-center gap-3 flex-shrink-0 self-center md:w-[440px] md:justify-end">
+            <div className="hidden md:flex w-[140px] shrink-0 flex-col justify-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
                 <span>
@@ -278,7 +281,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </div>
               )}
             </div>
-            <div className="flex items-center space-x-1 flex-shrink-0">
+            <div className="flex items-center justify-end gap-1 flex-shrink-0 md:w-[288px] md:min-w-[288px]">
             {downloadLinks.length > 0 && (
               <Button
                 onClick={(e) => {
@@ -387,8 +390,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               <div className="ui-inset-surface max-h-72 overflow-hidden overflow-y-auto">
                 {downloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
-                  const isDownloading = downloadingRef.current[link.url];
-                  const isDownloaded = downloadedRef.current[link.url];
+                  // 与 handleRpcDownload 使用相同的版本化 key
+                  const rpcKey = `${link.url}@${link.updatedAt ?? ''}`;
+                  const isDownloading = downloadingRef.current[rpcKey];
+                  const isDownloaded = downloadedRef.current[rpcKey];
                   const isAssetUpdated = link.assetId !== undefined
                     && release.updated_asset_ids?.includes(link.assetId) === true;
 
@@ -402,7 +407,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           if (link.assetId !== undefined) onMarkAssetAsRead(link.assetId);
                           handleRpcDownload(link);
                         }}
-                        disabled={isDownloading || isDownloaded}
+                        disabled={isDownloading}
                         className={`h-auto flex items-center justify-between rounded-none px-4 py-3 w-full text-left hover:bg-muted dark:hover:bg-accent transition-colors border-b border-border last:border-b-0 disabled:opacity-60 ${
                           link.isSourceCode ? 'bg-accent/60' : ''
                         }`}
