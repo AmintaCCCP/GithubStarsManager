@@ -40,22 +40,21 @@ const BANNED_COMPONENT_SERVICES = [
   'backendAdapter',
   'rpcDownloadService',
   'githubApiFactory',
+  'updateService',
+  'translateService',
 ];
 
 // Mirror of COMPONENT_BOUNDARY_ALLOWLIST in eslint.config.js. Keep in sync.
 const COMPONENT_ALLOWLIST = new Set([
   'src/components/SearchBar.tsx',
   'src/components/ReadmeModal.tsx',
-  'src/components/LoginScreen.tsx',
   'src/components/GistCard.tsx',
   'src/components/GistDetailModal.tsx',
   'src/components/GistEditorModal.tsx',
   'src/components/ReleaseCard.tsx',
   'src/components/ReleaseSourceSettingsModal.tsx',
   'src/components/SubscriptionRepoCard.tsx',
-  'src/components/CategorySidebar.tsx',
   'src/components/RepositoryEditModal.tsx',
-  'src/components/DebugModeIndicator.tsx',
   'src/components/SettingsPanel.tsx',
 ]);
 

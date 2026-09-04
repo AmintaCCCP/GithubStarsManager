@@ -1,7 +1,7 @@
 import { Calendar, Download, Package, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { UpdateService } from '../services/updateService';
+import { useUpdateActions } from '../features/settings/hooks/useUpdateActions';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
@@ -12,11 +12,12 @@ export const UpdateNotificationBanner: React.FC = () => {
     language: state.language,
   })));
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const { openDownloadUrl } = useUpdateActions();
 
   if (!updateNotification || updateNotification.dismissed) return null;
 
   const handleDownload = () => {
-    UpdateService.openDownloadUrl(updateNotification.downloadUrl);
+    openDownloadUrl(updateNotification.downloadUrl);
     dismissUpdateNotification();
   };
 
