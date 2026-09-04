@@ -172,7 +172,10 @@ export const ReleaseTimeline: React.FC = () => {
         url: release.zipball_url,
         size: 0,
         downloadCount: 0,
-        isSourceCode: true
+        isSourceCode: true,
+        // 源码归档没有独立的 updated_at：用 Release 有效时间做版本戳，
+        // 使 RPC 状态 key 随资源替换而变化，避免旧的"已发送 ✓"残留。
+        updatedAt: effectiveReleaseTime(release),
       });
     }
 
@@ -182,7 +185,8 @@ export const ReleaseTimeline: React.FC = () => {
         url: release.tarball_url,
         size: 0,
         downloadCount: 0,
-        isSourceCode: true
+        isSourceCode: true,
+        updatedAt: effectiveReleaseTime(release),
       });
     }
 
@@ -195,7 +199,7 @@ export const ReleaseTimeline: React.FC = () => {
           name.toLowerCase().includes('download') ||
           /\.(exe|dmg|deb|rpm|apk|ipa|zip|tar\.gz|msi|pkg|appimage)$/i.test(url)) {
         if (!links.some(link => link.url === url || link.name === name)) {
-          links.push({ name, url, size: 0, downloadCount: 0 });
+          links.push({ name, url, size: 0, downloadCount: 0, updatedAt: effectiveReleaseTime(release) });
         }
       }
     }
