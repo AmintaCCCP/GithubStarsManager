@@ -145,6 +145,37 @@ describe('ReleaseCard asset updated indicator', () => {
     await waitFor(() => expect(sendToRpcDownload).toHaveBeenCalledTimes(2));
   });
 
+  it('regression: a failed RPC retry clears the previous success check', async () => {
+    const { sendToRpcDownload } = await import('../services/rpcDownloadService');
+    const mocked = vi.mocked(sendToRpcDownload);
+    mocked.mockReset();
+    mocked.mockResolvedValueOnce({ success: true });
+    mocked.mockResolvedValueOnce({ success: false, error: 'boom' });
+
+    renderCard({});
+    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
+    fireEvent.click(assetRow);
+    // 首次成功后显示 ✓（CheckCircle2 带 text-success）
+    await waitFor(() => expect(assetRow.querySelector('.text-success')).not.toBeNull());
+
+    fireEvent.click(assetRow);
+    await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
+    // 重试失败后不得残留 ✓
+    await waitFor(() => expect(assetRow.querySelector('.text-success')).toBeNull());
+  });
+
+  it('renders all five English header controls when body and download links exist', () => {
+    renderCard({
+      language: 'en',
+      release: makeRelease(1, { body: 'release notes', updated_asset_ids: [101] }),
+    });
+    expect(screen.getByRole('button', { name: 'Hide Assets' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show Changelog' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI Summary of this update' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unsubscribe from releases' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View on GitHub' })).toBeInTheDocument();
+  });
+
   it('renders relative times in Chinese (release header and asset row) when language is zh', () => {
     // 资产 updated_at 为 2026-01-02，早于当前时间；头部 effectiveTime 同理，
     // 相对时间必然以 “…前” 结尾

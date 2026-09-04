@@ -125,6 +125,13 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
     if (downloadingRef.current[key]) return;
 
     downloadingRef.current = { ...downloadingRef.current, [key]: true };
+    // 重试开始即清除旧的成功态：若本次失败/异常，行内不得残留 ✓，
+    // 否则卡片会把失败的重试报告成成功。
+    if (key in downloadedRef.current) {
+      const next = { ...downloadedRef.current };
+      delete next[key];
+      downloadedRef.current = next;
+    }
     forceUpdate(n => n + 1);
     try {
       const result = await sendToRpcDownload(link.url, link.name, backendApiSecret || undefined);
@@ -254,7 +261,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-shrink-0 self-center md:w-[440px] md:justify-end">
+          <div className="flex items-center gap-3 flex-shrink-0 self-center md:w-[496px] md:justify-end">
             <div className="hidden md:flex w-[140px] shrink-0 flex-col justify-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
@@ -281,7 +288,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-end gap-1 flex-shrink-0 md:w-[288px] md:min-w-[288px]">
+            {/* 固定宽度需容纳英文五控件（Assets/Notes/Summary+2图标，约340px），否则换行按钮会溢出头部 */}
+            <div className="flex items-center justify-end gap-1 flex-shrink-0 md:w-[344px] md:min-w-[344px]">
             {downloadLinks.length > 0 && (
               <Button
                 onClick={(e) => {
