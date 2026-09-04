@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Calendar, Download, ExternalLink, Package, RefreshCw } from 'lucide-react';
-import { UpdateService, VersionInfo } from '../services/updateService';
+import { useUpdateActions, type VersionInfo } from '../features/settings/hooks/useUpdateActions';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
@@ -17,6 +17,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
     setUpdateNotification: state.setUpdateNotification,
   })));
   const { toast } = useDialog();
+  const { checkForUpdates: checkForUpdatesRemote, openDownloadUrl } = useUpdateActions();
   const [isChecking, setIsChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<VersionInfo | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -28,7 +29,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
     setIsChecking(true);
     setError(null);
     try {
-      const result = await UpdateService.checkForUpdates();
+      const result = await checkForUpdatesRemote();
       if (result.hasUpdate && result.latestVersion) {
         setUpdateInfo(result.latestVersion);
         setShowUpdateDialog(true);
@@ -55,7 +56,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
 
   const handleDownload = () => {
     if (updateInfo?.downloadUrl) {
-      UpdateService.openDownloadUrl(updateInfo.downloadUrl);
+      openDownloadUrl(updateInfo.downloadUrl);
       setShowUpdateDialog(false);
     }
   };
