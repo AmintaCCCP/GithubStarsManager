@@ -93,7 +93,9 @@ export const useReleaseTimelineActions = () => {
 
       // updatedReleases 既含资产变化也含正文回填（空日志补回），文案不再只提资产。
       const updatedPart = updatedReleases.length > 0
-        ? (language === 'zh' ? `，${updatedReleases.length} 个Release有更新` : `, ${updatedReleases.length} releases updated`)
+        ? (language === 'zh'
+          ? `，${updatedReleases.length} 个Release有更新`
+          : `, ${updatedReleases.length} release${updatedReleases.length === 1 ? '' : 's'} updated`)
         : '';
       const message = failedRepos.length > 0
         ? (language === 'zh'
