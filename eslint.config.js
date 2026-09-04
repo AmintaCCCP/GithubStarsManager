@@ -24,6 +24,8 @@ const BANNED_COMPONENT_SERVICES = [
   'backendAdapter',
   'rpcDownloadService',
   'githubApiFactory',
+  'updateService',
+  'translateService',
 ];
 
 // Static-import ban patterns for no-restricted-imports.
@@ -50,16 +52,13 @@ const BANNED_COMPONENT_SERVICE_DYNAMIC_SELECTORS = BANNED_COMPONENT_SERVICES.map
 const COMPONENT_BOUNDARY_ALLOWLIST = [
   'src/components/SearchBar.tsx',
   'src/components/ReadmeModal.tsx',
-  'src/components/LoginScreen.tsx',
   'src/components/GistCard.tsx',
   'src/components/GistDetailModal.tsx',
   'src/components/GistEditorModal.tsx',
   'src/components/ReleaseCard.tsx',
   'src/components/ReleaseSourceSettingsModal.tsx',
   'src/components/SubscriptionRepoCard.tsx',
-  'src/components/CategorySidebar.tsx',
   'src/components/RepositoryEditModal.tsx',
-  'src/components/DebugModeIndicator.tsx',
   'src/components/SettingsPanel.tsx',
 ];
 

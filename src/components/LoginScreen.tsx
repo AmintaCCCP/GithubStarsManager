@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { AlertCircle, ArrowRight, Github, Key, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { GitHubApiService } from '../services/githubApi';
-import { backend } from '../services/backendAdapter';
+import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -25,6 +24,7 @@ export const LoginScreen: React.FC = () => {
     theme: state.theme,
     setTheme: state.setTheme,
   })));
+  const { authenticateWithGitHub, syncTokenToBackend } = useLoginActions();
 
   const handleConnect = async () => {
     if (!token.trim()) {
@@ -36,20 +36,18 @@ export const LoginScreen: React.FC = () => {
     setError('');
 
     try {
-      const githubApi = new GitHubApiService(token);
-      const user = await githubApi.getCurrentUser();
+      const user = await authenticateWithGitHub(token);
       setGitHubToken(token);
       setUser(user);
 
-      if (backend.isAvailable) {
-        try {
-          await backend.syncSettings({ github_token: token });
-        } catch (backendError) {
-          console.warn('Failed to save GitHub token to backend:', backendError);
-          setError(language === 'zh'
-            ? '已登录，但 GitHub Token 未能保存到后端，README 等后端代理功能可能不可用。'
-            : 'Signed in, but failed to save GitHub token to backend. README and other backend proxy features may be unavailable.');
-        }
+      // syncTokenToBackend checks backend availability itself at call time and
+      // returns { ok: true } when the backend is unreachable-by-design; only a
+      // real failure surfaces the warning banner below.
+      const { ok } = await syncTokenToBackend(token);
+      if (!ok) {
+        setError(language === 'zh'
+          ? '已登录，但 GitHub Token 未能保存到后端，README 等后端代理功能可能不可用。'
+          : 'Signed in, but failed to save GitHub token to backend. README and other backend proxy features may be unavailable.');
       }
 
       console.log('Successfully authenticated user:', user);

@@ -110,7 +110,9 @@ describe('RepositoryCard README lazy boundary', () => {
     }));
 
     const { RepositoryCard } = await import('./RepositoryCard');
-    const user = userEvent.setup();
+    // delay: null removes artificial keystroke/click delays so the test does not
+    // depend on wall-clock timing when the suite runs 60+ files in parallel.
+    const user = userEvent.setup({ delay: null });
 
     render(
       <TooltipProvider>
@@ -122,10 +124,12 @@ describe('RepositoryCard README lazy boundary', () => {
     trigger.focus();
     await user.keyboard('{Enter}');
 
-    await user.click(await screen.findByRole('button', { name: 'Close README' }));
+    // The README modal is React.lazy-loaded; under parallel load the chunk can
+    // take longer than findBy's default 1s timeout to resolve.
+    await user.click(await screen.findByRole('button', { name: 'Close README' }, { timeout: 10_000 }));
 
     expect(trigger).toHaveFocus();
-  });
+  }, 15_000);
 
   it('renders the existing error boundary when the README lazy chunk cannot load', async () => {
     vi.doMock('./ReadmeModal', () => {
@@ -133,7 +137,7 @@ describe('RepositoryCard README lazy boundary', () => {
     });
 
     const { RepositoryCard } = await import('./RepositoryCard');
-    const user = userEvent.setup();
+    const user = userEvent.setup({ delay: null });
 
     render(
       <TooltipProvider>
@@ -143,6 +147,6 @@ describe('RepositoryCard README lazy boundary', () => {
 
     await user.click(screen.getByRole('button', { name: /owner\/example-repository/i }));
 
-    expect(await screen.findByRole('heading', { name: 'Application Error' })).toBeInTheDocument();
-  });
+    expect(await screen.findByRole('heading', { name: 'Application Error' }, { timeout: 10_000 })).toBeInTheDocument();
+  }, 15_000);
 });

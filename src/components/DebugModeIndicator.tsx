@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { logger } from '../services/logger';
-import { backend } from '../services/backendAdapter';
+import { useDebugActions } from '../features/settings/hooks/useDebugActions';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from './ui/button';
 
@@ -13,6 +13,7 @@ export const DebugModeIndicator: React.FC = () => {
   const [frontendDebug, setFrontendDebug] = useState(() => sessionStorage.getItem('gsm:frontend-debug') === 'true');
   const [backendDebug, setBackendDebug] = useState(() => sessionStorage.getItem('gsm:backend-debug') === 'true');
   const setCurrentView = useAppStore(s => s.setCurrentView);
+  const { disableBackendDebug } = useDebugActions();
 
   // Sync with sessionStorage changes (e.g. from DiagnosticLogsPanel)
   useEffect(() => {
@@ -37,16 +38,7 @@ export const DebugModeIndicator: React.FC = () => {
     setFrontendDebug(false);
 
     // Disable backend debug
-    if (backend.isAvailable) {
-      try {
-        const secret = sessionStorage.getItem('github-stars-manager-backend-secret');
-        await fetch('/api/logs/debug', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
-          body: JSON.stringify({ enabled: false }),
-        });
-      } catch { /* Backend unreachable */ }
-    }
+    await disableBackendDebug();
     sessionStorage.setItem('gsm:backend-debug', 'false');
     setBackendDebug(false);
 
@@ -57,7 +49,7 @@ export const DebugModeIndicator: React.FC = () => {
     setCurrentView('settings');
     // Also dispatch event as a backup for same-instance navigation
     window.dispatchEvent(new CustomEvent('gsm:navigate-to-settings-tab', { detail: { tab: 'logs' } }));
-  }, [setCurrentView]);
+  }, [setCurrentView, disableBackendDebug]);
 
   if (!frontendDebug && !backendDebug) return null;
 

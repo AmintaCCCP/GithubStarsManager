@@ -12,7 +12,7 @@ import { Category, Repository } from '../types';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { CategoryEditModal } from './CategoryEditModal';
-import { forceSyncToBackend } from '../services/autoSync';
+import { useCategorySyncActions } from '../features/repositories/hooks/useCategorySyncActions';
 import { getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
 import { useDialog } from '../hooks/useDialog';
 
@@ -58,6 +58,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   })));
 
   const { toast, confirm } = useDialog();
+  const { forceSyncToBackend } = useCategorySyncActions();
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
