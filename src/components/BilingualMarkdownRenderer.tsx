@@ -9,7 +9,7 @@ import {
   wrapTextNodesWithAttr,
   unwrapSpans,
 } from '../utils/domTextScanner';
-import { translateBatch, TranslateResult } from '../services/translateService';
+import { useTranslationActions, type TranslateResult } from '../features/settings/hooks/useTranslationActions';
 import { detectLanguage, getTranslateDirection, cleanTranslatedText } from '../utils/markdownSplitter';
 import { FileText, Languages, Eye, Loader2 } from 'lucide-react';
 
@@ -84,6 +84,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
   onProgressRef.current = onProgress;
 
   const [internalDisplayMode, setInternalDisplayMode] = useState<DisplayMode>(defaultDisplayMode);
+  const { translateBatch } = useTranslationActions();
   const [status, setStatus] = useState<TranslationStatus>('idle');
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -290,7 +291,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       setError(err instanceof Error ? err.message : 'Translation failed');
       updateStatus('error');
     }
-  }, [language, scan, updateStatus, removeTranslations]);
+  }, [language, scan, updateStatus, removeTranslations, translateBatch]);
 
   const revert = useCallback(() => {
     if (abortRef.current) {
