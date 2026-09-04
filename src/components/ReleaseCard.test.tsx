@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ReleaseCard from './ReleaseCard';
 import type { Release } from '../types';
@@ -52,29 +52,31 @@ const makeRelease = (id: number, overrides: Partial<Release> = {}): Release => (
   ...overrides,
 });
 
+const buildCardProps = (props: Partial<Parameters<typeof ReleaseCard>[0]> = {}): Parameters<typeof ReleaseCard>[0] => ({
+  release: makeRelease(1, { updated_asset_ids: [101] }),
+  downloadLinks: [
+    { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101 },
+  ],
+  isUnread: true,
+  isAssetsExpanded: true,
+  isReleaseNotesExpanded: false,
+  isFullContent: false,
+  truncatedBody: '',
+  matchesActiveFilters: () => true,
+  selectedFilters: [],
+  onToggleAssets: () => {},
+  onToggleReleaseNotes: () => {},
+  onToggleFullContent: () => {},
+  onUnsubscribe: () => {},
+  onMarkAsRead: () => {},
+  onMarkAssetAsRead: () => {},
+  language: 'zh',
+  formatFileSize: (bytes: number) => `${bytes} B`,
+  ...props,
+});
+
 const renderCard = (props: Partial<Parameters<typeof ReleaseCard>[0]> = {}) => {
-  const defaults: Parameters<typeof ReleaseCard>[0] = {
-    release: makeRelease(1, { updated_asset_ids: [101] }),
-    downloadLinks: [
-      { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101 },
-    ],
-    isUnread: true,
-    isAssetsExpanded: true,
-    isReleaseNotesExpanded: false,
-    isFullContent: false,
-    truncatedBody: '',
-    matchesActiveFilters: () => true,
-    selectedFilters: [],
-    onToggleAssets: () => {},
-    onToggleReleaseNotes: () => {},
-    onToggleFullContent: () => {},
-    onUnsubscribe: () => {},
-    onMarkAsRead: () => {},
-    onMarkAssetAsRead: () => {},
-    language: 'zh',
-    formatFileSize: (bytes: number) => `${bytes} B`,
-  };
-  return render(<ReleaseCard {...defaults} {...props} />);
+  return render(<ReleaseCard {...buildCardProps(props)} />);
 };
 
 describe('ReleaseCard asset updated indicator', () => {
@@ -127,6 +129,76 @@ describe('ReleaseCard asset updated indicator', () => {
 
     expect(onMarkAssetAsRead).toHaveBeenCalledTimes(1);
     expect(onMarkAssetAsRead).toHaveBeenCalledWith(101);
+  });
+
+  it('regression: an RPC asset can be clicked again after a successful send', async () => {
+    const { sendToRpcDownload } = await import('../services/rpcDownloadService');
+    vi.mocked(sendToRpcDownload).mockResolvedValue({ success: true });
+
+    renderCard({});
+    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
+    fireEvent.click(assetRow);
+
+    await waitFor(() => expect(sendToRpcDownload).toHaveBeenCalledTimes(1));
+    // 成功后按钮必须保持可点（仅下载进行中才禁用）
+    await waitFor(() => expect(assetRow).not.toBeDisabled());
+
+    fireEvent.click(assetRow);
+    await waitFor(() => expect(sendToRpcDownload).toHaveBeenCalledTimes(2));
+  });
+
+  it('regression: a failed RPC retry clears the previous success check', async () => {
+    const { sendToRpcDownload } = await import('../services/rpcDownloadService');
+    const mocked = vi.mocked(sendToRpcDownload);
+    mocked.mockReset();
+    mocked.mockResolvedValueOnce({ success: true });
+    mocked.mockResolvedValueOnce({ success: false, error: 'boom' });
+
+    renderCard({});
+    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
+    fireEvent.click(assetRow);
+    // 首次成功后显示 ✓（CheckCircle2 带 text-success）
+    await waitFor(() => expect(assetRow.querySelector('.text-success')).not.toBeNull());
+
+    fireEvent.click(assetRow);
+    await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
+    // 重试失败后不得残留 ✓
+    await waitFor(() => expect(assetRow.querySelector('.text-success')).toBeNull());
+  });
+
+  it('regression: a new asset version (same URL, new updatedAt) drops the stale success check', async () => {
+    const { sendToRpcDownload } = await import('../services/rpcDownloadService');
+    const mocked = vi.mocked(sendToRpcDownload);
+    mocked.mockReset();
+    mocked.mockResolvedValue({ success: true });
+    const linkV1 = { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101, updatedAt: '2026-01-02T00:00:00.000Z' };
+    const linkV2 = { ...linkV1, updatedAt: '2026-02-01T00:00:00.000Z' };
+
+    const view = renderCard({ downloadLinks: [linkV1] });
+    fireEvent.click(screen.getByRole('button', { name: /app\.dmg/ }));
+    await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: /app\.dmg/ }).querySelector('.text-success')).not.toBeNull());
+
+    // 同 URL 新版本：不得沿用旧 key 的 ✓，且仍可发送
+    view.rerender(<ReleaseCard {...buildCardProps({ downloadLinks: [linkV2] })} />);
+    const v2Row = screen.getByRole('button', { name: /app\.dmg/ });
+    expect(v2Row.querySelector('.text-success')).toBeNull();
+
+    fireEvent.click(v2Row);
+    await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole('button', { name: /app\.dmg/ }).querySelector('.text-success')).not.toBeNull());
+  });
+
+  it('renders all five English header controls when body and download links exist', () => {
+    renderCard({
+      language: 'en',
+      release: makeRelease(1, { body: 'release notes', updated_asset_ids: [101] }),
+    });
+    expect(screen.getByRole('button', { name: 'Hide Assets' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show Changelog' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'AI Summary of this update' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unsubscribe from releases' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View on GitHub' })).toBeInTheDocument();
   });
 
   it('renders relative times in Chinese (release header and asset row) when language is zh', () => {

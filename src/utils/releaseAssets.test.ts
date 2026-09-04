@@ -158,6 +158,42 @@ describe('findReleasesWithChangedAssets', () => {
     expect(findReleasesWithChangedAssets(undefined, local)).toHaveLength(0);
     expect(findReleasesWithChangedAssets([], local)).toHaveLength(0);
   });
+
+  it('backfills an empty local body from the latest fetch without an asset badge', () => {
+    const local = [makeRelease({ id: 1, body: '' })];
+    const incoming = [makeRelease({ id: 1, body: '## What changed' })];
+    const updated = findReleasesWithChangedAssets(incoming, local);
+    expect(updated.map(r => r.id)).toEqual([1]);
+    expect(updated[0].body).toBe('## What changed');
+    // 仅正文变化时不产生资产级标识，避免误挂“资产已更新”
+    expect(updated[0].updated_asset_ids).toEqual([]);
+  });
+
+  it('treats null and empty body as equal (no refresh churn)', () => {
+    const local = [makeRelease({ id: 1, body: null })];
+    const incoming = [makeRelease({ id: 1, body: '' })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('detects release name changes', () => {
+    const local = [makeRelease({ id: 1, name: 'Old name' })];
+    const incoming = [makeRelease({ id: 1, name: 'New name' })];
+    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+  });
+
+  it('ignores legacy null names covered by the tag_name fallback (no false update)', () => {
+    // 后端旧数据 name 可能为 null，而 API 层映射为 name || tag_name；
+    // 两侧展示名一致时不得误判，避免升级后首次刷新批量重置已读。
+    const local = [makeRelease({ id: 1, tag_name: 'v1', name: null })];
+    const incoming = [makeRelease({ id: 1, tag_name: 'v1', name: 'v1' })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('detects tag_name changes even when the display name is unchanged', () => {
+    const local = [makeRelease({ id: 1, tag_name: 'v1', name: 'Fixed name' })];
+    const incoming = [makeRelease({ id: 1, tag_name: 'v2', name: 'Fixed name' })];
+    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+  });
 });
 
 describe('effectiveReleaseTime', () => {
