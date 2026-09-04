@@ -180,6 +180,20 @@ describe('findReleasesWithChangedAssets', () => {
     const incoming = [makeRelease({ id: 1, name: 'New name' })];
     expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
   });
+
+  it('ignores legacy null names covered by the tag_name fallback (no false update)', () => {
+    // 后端旧数据 name 可能为 null，而 API 层映射为 name || tag_name；
+    // 两侧展示名一致时不得误判，避免升级后首次刷新批量重置已读。
+    const local = [makeRelease({ id: 1, tag_name: 'v1', name: null })];
+    const incoming = [makeRelease({ id: 1, tag_name: 'v1', name: 'v1' })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('detects tag_name changes even when the display name is unchanged', () => {
+    const local = [makeRelease({ id: 1, tag_name: 'v1', name: 'Fixed name' })];
+    const incoming = [makeRelease({ id: 1, tag_name: 'v2', name: 'Fixed name' })];
+    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+  });
 });
 
 describe('effectiveReleaseTime', () => {

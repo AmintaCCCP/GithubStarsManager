@@ -413,10 +413,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         }`}
                       >
                         <div className="flex items-center space-x-1.5 min-w-0 flex-1">
-                          {isDownloaded ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
-                          ) : isDownloading ? (
+                          {isDownloading ? (
                             <Loader2 className="w-3.5 h-3.5 text-muted-foreground animate-spin flex-shrink-0" />
+                          ) : isDownloaded ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
                           ) : link.isSourceCode ? (
                             <Code2 className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
                           ) : (

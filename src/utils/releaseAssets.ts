@@ -74,10 +74,14 @@ export function findReleasesWithChangedAssets(
     if (!local) return [];
     const assetsChanged = hasAssetsChanged(local.assets, latest.assets);
     // body 可能为 null/''：统一按空字符串比对，避免 null 与 '' 的抖动；
-    // name 同理归一化（后端旧数据可能存 null，而 API 层回退为 tag_name）。
+    // name 与 API 层保持同一展示规则（`name || tag_name`）：后端旧数据 name
+    // 可能存 null，而远端对象经映射后回退为 tag_name；直接比对原始值会在升级后
+    // 的首次刷新中对所有 null-name 记录误判，触发 upsert 并重置已读。
     const bodyChanged = (local.body ?? '') !== (latest.body ?? '');
+    const localDisplayName = local.name || local.tag_name;
+    const latestDisplayName = latest.name || latest.tag_name;
     const metaChanged =
-      (local.name ?? '') !== (latest.name ?? '') || local.tag_name !== latest.tag_name;
+      localDisplayName !== latestDisplayName || local.tag_name !== latest.tag_name;
     if (!assetsChanged && !bodyChanged && !metaChanged) return [];
 
     return [{
