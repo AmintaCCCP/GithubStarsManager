@@ -91,8 +91,9 @@ export const useReleaseTimelineActions = () => {
       if (updatedReleases.length > 0) upsertReleases(updatedReleases);
       setLastRefreshTime(now);
 
+      // updatedReleases 既含资产变化也含正文回填（空日志补回），文案不再只提资产。
       const updatedPart = updatedReleases.length > 0
-        ? (language === 'zh' ? `，${updatedReleases.length} 个Release资产已更新` : `, ${updatedReleases.length} release assets updated`)
+        ? (language === 'zh' ? `，${updatedReleases.length} 个Release有更新` : `, ${updatedReleases.length} releases updated`)
         : '';
       const message = failedRepos.length > 0
         ? (language === 'zh'

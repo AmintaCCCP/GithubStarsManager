@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ReleaseCard from './ReleaseCard';
 import type { Release } from '../types';
@@ -127,6 +127,22 @@ describe('ReleaseCard asset updated indicator', () => {
 
     expect(onMarkAssetAsRead).toHaveBeenCalledTimes(1);
     expect(onMarkAssetAsRead).toHaveBeenCalledWith(101);
+  });
+
+  it('regression: an RPC asset can be clicked again after a successful send', async () => {
+    const { sendToRpcDownload } = await import('../services/rpcDownloadService');
+    vi.mocked(sendToRpcDownload).mockResolvedValue({ success: true });
+
+    renderCard({});
+    const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
+    fireEvent.click(assetRow);
+
+    await waitFor(() => expect(sendToRpcDownload).toHaveBeenCalledTimes(1));
+    // 成功后按钮必须保持可点（仅下载进行中才禁用）
+    await waitFor(() => expect(assetRow).not.toBeDisabled());
+
+    fireEvent.click(assetRow);
+    await waitFor(() => expect(sendToRpcDownload).toHaveBeenCalledTimes(2));
   });
 
   it('renders relative times in Chinese (release header and asset row) when language is zh', () => {

@@ -158,6 +158,28 @@ describe('findReleasesWithChangedAssets', () => {
     expect(findReleasesWithChangedAssets(undefined, local)).toHaveLength(0);
     expect(findReleasesWithChangedAssets([], local)).toHaveLength(0);
   });
+
+  it('backfills an empty local body from the latest fetch without an asset badge', () => {
+    const local = [makeRelease({ id: 1, body: '' })];
+    const incoming = [makeRelease({ id: 1, body: '## What changed' })];
+    const updated = findReleasesWithChangedAssets(incoming, local);
+    expect(updated.map(r => r.id)).toEqual([1]);
+    expect(updated[0].body).toBe('## What changed');
+    // 仅正文变化时不产生资产级标识，避免误挂“资产已更新”
+    expect(updated[0].updated_asset_ids).toEqual([]);
+  });
+
+  it('treats null and empty body as equal (no refresh churn)', () => {
+    const local = [makeRelease({ id: 1, body: null })];
+    const incoming = [makeRelease({ id: 1, body: '' })];
+    expect(findReleasesWithChangedAssets(incoming, local)).toHaveLength(0);
+  });
+
+  it('detects release name changes', () => {
+    const local = [makeRelease({ id: 1, name: 'Old name' })];
+    const incoming = [makeRelease({ id: 1, name: 'New name' })];
+    expect(findReleasesWithChangedAssets(incoming, local).map(r => r.id)).toEqual([1]);
+  });
 });
 
 describe('effectiveReleaseTime', () => {
