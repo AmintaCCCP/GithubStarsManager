@@ -15,17 +15,39 @@ interface GitHubTreeResponse {
   truncated?: boolean;
 }
 
+const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
+
+const normalizeBackendUrl = (value: string): string | null => {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    url.search = '';
+    url.hash = '';
+    const normalized = url.toString().replace(/\/$/, '');
+    return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
+  } catch {
+    return null;
+  }
+};
+
+const readStoredBackendUrl = (): string | null => {
+  try {
+    return normalizeBackendUrl(localStorage.getItem(BACKEND_URL_STORAGE_KEY) || '');
+  } catch {
+    return null;
+  }
+};
+
 class BackendAdapter {
   private _backendUrl: string | null = null;
 
-  async init(): Promise<void> {
+  async init(preferredUrl?: string): Promise<void> {
     try {
-      // Try common backend URLs
-      const urls = [
-        window.location.origin + '/api',
-      ];
-      // Only probe localhost in development
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      const configuredUrl = preferredUrl ? normalizeBackendUrl(preferredUrl) : readStoredBackendUrl();
+      const urls = preferredUrl
+        ? (configuredUrl ? [configuredUrl] : [])
+        : (configuredUrl ? [configuredUrl] : [window.location.origin + '/api']);
+      if (!preferredUrl && !configuredUrl && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
         urls.push('http://localhost:3000/api');
       }
 
@@ -41,6 +63,13 @@ class BackendAdapter {
             const data = await res.json();
             if (data.status === 'ok') {
               this._backendUrl = baseUrl;
+              if (preferredUrl) {
+                try {
+                  localStorage.setItem(BACKEND_URL_STORAGE_KEY, baseUrl);
+                } catch {
+                  // A restricted browser may block storage; keep this session connected.
+                }
+              }
               logger.info('backendAdapter', 'Backend connected', { url: baseUrl });
               return;
             }
@@ -66,6 +95,10 @@ class BackendAdapter {
 
   get backendUrl(): string | null {
     return this._backendUrl;
+  }
+
+  get configuredUrl(): string | null {
+    return this._backendUrl || readStoredBackendUrl();
   }
 
   private getAuthHeaders(): Record<string, string> {
