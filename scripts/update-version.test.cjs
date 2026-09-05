@@ -140,7 +140,18 @@ fs.renameSync = function patchedRenameSync(source, destination) {
   return preloadPath;
 }
 
-function interruptedTransactionFixture(root, { pid = 999999 } = {}) {
+async function createExitedProcessPid() {
+  const child = spawn(process.execPath, ['-e', 'process.exit(0)'], {
+    stdio: 'ignore',
+  });
+  await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', resolve);
+  });
+  return child.pid;
+}
+
+async function interruptedTransactionFixture(root, { pid } = {}) {
   const paths = transactionPaths(root);
   fs.mkdirSync(paths.backupDir);
   const targets = targetPaths(root).map((targetPath, index) => {
@@ -150,6 +161,7 @@ function interruptedTransactionFixture(root, { pid = 999999 } = {}) {
   });
 
   const rootVersion = readVersions(root).root;
+  const lockPid = pid ?? await createExitedProcessPid();
   writeJson(paths.journal, {
     transaction: 'package-version-sync',
     version: rootVersion,
@@ -157,7 +169,7 @@ function interruptedTransactionFixture(root, { pid = 999999 } = {}) {
     startedAt: new Date().toISOString(),
     state: 'prepared',
   });
-  writeJson(paths.lock, { pid, createdAt: new Date().toISOString() });
+  writeJson(paths.lock, { pid: lockPid, createdAt: new Date().toISOString() });
 
   const partialPackageLock = JSON.parse(fs.readFileSync(targets[0].targetPath, 'utf8'));
   partialPackageLock.version = rootVersion;
@@ -220,7 +232,7 @@ for (const failAfter of [1, 2]) {
 
 test('stale lock and interrupted transaction recover before the next sync', async () => {
   await withFixture(async (root) => {
-    const paths = interruptedTransactionFixture(root);
+    const paths = await interruptedTransactionFixture(root);
     const result = await runScript(root, ['--sync-lock']);
 
     assert.equal(result.code, 0, result.stderr);
@@ -253,12 +265,12 @@ test('stale lock and interrupted transaction recover before the next sync', asyn
 
 test('recovery is idempotent when the same interrupted fixture is encountered again', async () => {
   await withFixture(async (root) => {
-    const firstPaths = interruptedTransactionFixture(root);
+    const firstPaths = await interruptedTransactionFixture(root);
     const first = await runScript(root, ['--sync-lock']);
     assert.equal(first.code, 0, first.stderr);
     assert.equal(fs.existsSync(firstPaths.journal), false);
 
-    const secondPaths = interruptedTransactionFixture(root);
+    const secondPaths = await interruptedTransactionFixture(root);
     const second = await runScript(root, ['--sync-lock']);
     assert.equal(second.code, 0, second.stderr);
     assert.deepEqual(readVersions(root), {
@@ -281,7 +293,7 @@ test('a live lock owner is never taken over during recovery', async () => {
       stdio: 'ignore',
     });
     try {
-      const paths = interruptedTransactionFixture(root, { pid: owner.pid });
+      const paths = await interruptedTransactionFixture(root, { pid: owner.pid });
       const result = await runScript(root, ['--sync-lock']);
 
       assert.equal(result.code, 1);
