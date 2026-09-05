@@ -500,6 +500,8 @@ Let agents (Claude Code, Cursor, etc.) read your AI-enriched starred repositorie
 
 `gsm_vector_search` accepts optional `languages`, `tags`, `platforms`, `licenses`, `category`, `minStars`, `maxStars`, `isAnalyzed`, and `isSubscribed` filters. When a filter is supplied, the Worker returns at most 50 semantic candidates and GithubStarsManager applies the filter locally before truncating to `topK`; this is not an exact filtered topK over the complete vector corpus. With no filter, the existing query behavior is unchanged. Evidence reads the local repository database and cached releases only, never performs unbounded GitHub fan-out, and does not infer missing fields or return adoption decisions.
 
+`gsm_status` also returns `availableTools` (the exact names registered for the current configuration) and `conditionalTools` (the vector-gated names, whether currently available or not). `gsm_get_repo_evidence` includes `evidenceFreshness` from stored repository `updated_at`, analysis timestamps, and cached release `published_at`; local repository-sync and release-cache update timestamps are returned as `null` because they are not stored.
+
 **Desktop (Electron) notes:** binds loopback (`127.0.0.1`) only — local agents only; host/port adjustable in Settings (default port `3927`).
 
 ![MCP](assets/readme/screenshots/mcp.png)

@@ -5,6 +5,7 @@
  */
 const http = require('http');
 const crypto = require('crypto');
+const { version: MCP_SERVER_VERSION } = require('../package.json');
 const {
   buildBatchLookupResult,
   buildRepoEvidence,
@@ -42,6 +43,13 @@ function getVectorAvailability(snapshot) {
     reason: null,
     embeddingModel: emb.model,
     workerUrl,
+  };
+}
+
+function getMcpToolAvailability(vectorAvailable) {
+  return {
+    availableTools: getMcpToolDefinitions(vectorAvailable).map((tool) => tool.name),
+    conditionalTools: ['gsm_find_similar_repos', 'gsm_vector_search'],
   };
 }
 
@@ -422,10 +430,11 @@ async function callTool(name, args, snapshot) {
   });
 
   switch (name) {
-    case 'gsm_status':
+    case 'gsm_status': {
+      const toolAvailability = getMcpToolAvailability(vectorInfo.available);
       return text({
         name: 'github-stars-manager',
-        version: '0.7.0',
+        version: MCP_SERVER_VERSION,
         mode: 'electron-local',
         repositoryCount: repos.length,
         snapshotAt: snapshot?.snapshotAt || null,
@@ -437,7 +446,9 @@ async function callTool(name, args, snapshot) {
         toolsNote: vectorInfo.available
           ? 'gsm_vector_search is available'
           : 'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled',
+        ...toolAvailability,
       });
+    }
     case 'gsm_search_repos': {
       const result = searchRepositories(repos, args || {});
       return text({
@@ -586,7 +597,7 @@ function createMcpLocalServer(getState) {
         result: {
           protocolVersion: body?.params?.protocolVersion || '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'github-stars-manager', version: '0.7.0' },
+          serverInfo: { name: 'github-stars-manager', version: MCP_SERVER_VERSION },
         },
       };
     }
@@ -850,4 +861,4 @@ function createMcpLocalServer(getState) {
   return { start, stop, getStatus };
 }
 
-module.exports = { createMcpLocalServer, getMcpToolDefinitions };
+module.exports = { createMcpLocalServer, getMcpToolDefinitions, getMcpToolAvailability };

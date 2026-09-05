@@ -6,6 +6,8 @@ const path = require('path');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PACKAGE_PATH = path.join(PROJECT_ROOT, 'package.json');
 const LOCKFILE_PATH = path.join(PROJECT_ROOT, 'package-lock.json');
+const SERVER_PACKAGE_PATH = path.join(PROJECT_ROOT, 'server/package.json');
+const SERVER_LOCKFILE_PATH = path.join(PROJECT_ROOT, 'server/package-lock.json');
 const VERSION_XML_PATH = path.join(PROJECT_ROOT, 'versions/version-info.xml');
 const RELEASE_LOCK_PATH = path.join(PROJECT_ROOT, '.release-version.lock');
 
@@ -49,6 +51,8 @@ function updateVersionInfo() {
 
   let releaseLock;
   let stagedLockfilePath;
+  let stagedServerPackagePath;
+  let stagedServerLockfilePath;
   let stagedXmlPath;
 
   try {
@@ -61,18 +65,28 @@ function updateVersionInfo() {
     const version = readRootPackageVersion();
     validateVersion(version);
     const xmlContext = loadVersionXml(version);
-    stagedLockfilePath = stageSyncedPackageLock(version);
+    stagedLockfilePath = stageSyncedPackageLock(LOCKFILE_PATH, version);
+    stagedServerPackagePath = stageSyncedServerPackage(version);
+    stagedServerLockfilePath = stageSyncedPackageLock(SERVER_LOCKFILE_PATH, version);
     stagedXmlPath = stageVersionXml(xmlContext, version, releaseArgs.changelog, releaseArgs.customDownloadUrl);
-    const packageLockSnapshot = createFileSnapshot(LOCKFILE_PATH);
+    const packageSnapshots = createFileSnapshots([
+      LOCKFILE_PATH,
+      SERVER_PACKAGE_PATH,
+      SERVER_LOCKFILE_PATH,
+    ]);
 
     try {
       fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
       stagedLockfilePath = null;
+      fs.renameSync(stagedServerPackagePath, SERVER_PACKAGE_PATH);
+      stagedServerPackagePath = null;
+      fs.renameSync(stagedServerLockfilePath, SERVER_LOCKFILE_PATH);
+      stagedServerLockfilePath = null;
       verifyRootVersionSync(version);
       fs.renameSync(stagedXmlPath, VERSION_XML_PATH);
       stagedXmlPath = null;
     } catch (error) {
-      restoreFileSnapshot(packageLockSnapshot);
+      restoreFileSnapshots(packageSnapshots);
       throw error;
     }
 
@@ -90,6 +104,8 @@ function updateVersionInfo() {
     process.exitCode = 1;
   } finally {
     cleanupStagedFile(stagedLockfilePath);
+    cleanupStagedFile(stagedServerPackagePath);
+    cleanupStagedFile(stagedServerLockfilePath);
     cleanupStagedFile(stagedXmlPath);
     releaseReleaseLock(releaseLock);
   }
@@ -98,21 +114,41 @@ function updateVersionInfo() {
 function syncLockfileFromRootVersion() {
   let releaseLock;
   let stagedLockfilePath;
+  let stagedServerPackagePath;
+  let stagedServerLockfilePath;
 
   try {
     releaseLock = acquireReleaseLock();
     const version = readRootPackageVersion();
     validateVersion(version);
-    stagedLockfilePath = stageSyncedPackageLock(version);
-    fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
-    stagedLockfilePath = null;
-    verifyRootVersionSync(version);
-    console.log(`📦 已将 package-lock.json 同步为根 package.json 的版本 v${version}`);
+    stagedLockfilePath = stageSyncedPackageLock(LOCKFILE_PATH, version);
+    stagedServerPackagePath = stageSyncedServerPackage(version);
+    stagedServerLockfilePath = stageSyncedPackageLock(SERVER_LOCKFILE_PATH, version);
+    const packageSnapshots = createFileSnapshots([
+      LOCKFILE_PATH,
+      SERVER_PACKAGE_PATH,
+      SERVER_LOCKFILE_PATH,
+    ]);
+    try {
+      fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
+      stagedLockfilePath = null;
+      fs.renameSync(stagedServerPackagePath, SERVER_PACKAGE_PATH);
+      stagedServerPackagePath = null;
+      fs.renameSync(stagedServerLockfilePath, SERVER_LOCKFILE_PATH);
+      stagedServerLockfilePath = null;
+      verifyRootVersionSync(version);
+    } catch (error) {
+      restoreFileSnapshots(packageSnapshots);
+      throw error;
+    }
+    console.log(`📦 已将根与 server package-lock.json 同步为根 package.json 的版本 v${version}`);
   } catch (error) {
     console.error('❌ 同步 package-lock.json 失败:', error.message);
     process.exitCode = 1;
   } finally {
     cleanupStagedFile(stagedLockfilePath);
+    cleanupStagedFile(stagedServerPackagePath);
+    cleanupStagedFile(stagedServerLockfilePath);
     releaseReleaseLock(releaseLock);
   }
 }
@@ -215,15 +251,21 @@ function loadVersionXml(version) {
   return { content: xmlContent, closingTagIndex };
 }
 
-function stageSyncedPackageLock(version) {
-  const packageLock = JSON.parse(fs.readFileSync(LOCKFILE_PATH, 'utf8'));
+function stageSyncedPackageLock(lockfilePath, version) {
+  const packageLock = JSON.parse(fs.readFileSync(lockfilePath, 'utf8'));
   if (!packageLock.packages || !packageLock.packages['']) {
-    throw new Error('package-lock.json 缺少根包条目，无法同步版本');
+    throw new Error(`${path.basename(lockfilePath)} 缺少根包条目，无法同步版本`);
   }
 
   packageLock.version = version;
   packageLock.packages[''].version = version;
-  return stageFile(LOCKFILE_PATH, `${JSON.stringify(packageLock, null, 2)}\n`);
+  return stageFile(lockfilePath, `${JSON.stringify(packageLock, null, 2)}\n`);
+}
+
+function stageSyncedServerPackage(version) {
+  const packageJson = JSON.parse(fs.readFileSync(SERVER_PACKAGE_PATH, 'utf8'));
+  packageJson.version = version;
+  return stageFile(SERVER_PACKAGE_PATH, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 
 function stageVersionXml(xmlContext, version, changelog, customDownloadUrl) {
@@ -274,6 +316,16 @@ function createFileSnapshot(filePath) {
   };
 }
 
+function createFileSnapshots(filePaths) {
+  return filePaths.map(createFileSnapshot);
+}
+
+function restoreFileSnapshots(snapshots) {
+  for (const snapshot of [...snapshots].reverse()) {
+    restoreFileSnapshot(snapshot);
+  }
+}
+
 function restoreFileSnapshot(snapshot) {
   try {
     if (snapshot.exists) {
@@ -282,13 +334,16 @@ function restoreFileSnapshot(snapshot) {
       fs.unlinkSync(snapshot.path);
     }
   } catch (error) {
-    throw new Error(`版本同步失败，且 package-lock.json 回滚未完成：${error.message}`);
+    throw new Error(`版本同步失败，且 ${path.basename(snapshot.path)} 回滚未完成：${error.message}`);
   }
 }
 
 function verifyRootVersionSync(version) {
+  const serverPackage = JSON.parse(fs.readFileSync(SERVER_PACKAGE_PATH, 'utf8'));
+  const serverPackageLock = JSON.parse(fs.readFileSync(SERVER_LOCKFILE_PATH, 'utf8'));
   const packageLock = JSON.parse(fs.readFileSync(LOCKFILE_PATH, 'utf8'));
   const lockRootVersion = packageLock.packages?.['']?.version;
+  const serverLockRootVersion = serverPackageLock.packages?.['']?.version;
 
   if (readRootPackageVersion() !== version) {
     throw new Error(`package.json 版本在同步期间变更，预期为 ${version}`);
@@ -296,6 +351,14 @@ function verifyRootVersionSync(version) {
 
   if (packageLock.version !== version || lockRootVersion !== version) {
     throw new Error(`package-lock.json 的根包版本未同步为 ${version}`);
+  }
+
+  if (serverPackage.version !== version) {
+    throw new Error(`server/package.json 版本未同步为 ${version}`);
+  }
+
+  if (serverPackageLock.version !== version || serverLockRootVersion !== version) {
+    throw new Error(`server/package-lock.json 的根包版本未同步为 ${version}`);
   }
 }
 
@@ -358,7 +421,7 @@ function showHelp() {
   console.log('  npm run update-version -- "修复已知问题" "提升用户体验"');
   console.log('  npm run update-version -- "优化性能" --url=https://example.com/download\n');
   console.log('注意:');
-  console.log('  • package-lock.json 必须保留字面版本以保证 npm 锁定安装，但由脚本从根 package.json 自动同步。');
+  console.log('  • 根与 server 的 package-lock.json，以及 server/package.json 的版本由根 package.json 自动同步。');
   console.log('  • electron/package.json 不维护独立应用版本；Electron Builder 使用根 package.json。');
   console.log('  • 版本同步期间会持有仓库独占锁，防止并发发布互相覆盖。');
   console.log('  • --url= 会被视为无效参数，避免静默回退到默认下载链接。');
