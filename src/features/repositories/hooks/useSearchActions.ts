@@ -245,38 +245,45 @@ export const useSearchActions = (): SearchActions => {
     applyFilters: (repos: Repository[]) => Repository[],
   ): Promise<void> => {
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-    console.log('🤖 AI Config found:', !!activeConfig, 'Active AI Config ID:', activeAIConfig);
-    console.log('📋 Available AI Configs:', aiConfigs.length);
-    console.log('🔧 AI Configs:', aiConfigs.map(c => ({ id: c.id, name: c.name, hasApiKey: !!c.apiKey })));
 
     let filtered = repositories;
+    let aiOrdered = false;
     if (activeConfig) {
       try {
-        console.log('🚀 Calling AI service...');
+        // 无向量降级链：查询扩展+意图复述 → 词法候选召回 → LLM 精选排序
         setSearchPhase(t('AI 语义分析...', 'AI semantic analysis...'));
         const aiService = new AIService(activeConfig, language);
-
-        // 先尝试AI搜索
-        const aiResults = await aiService.searchRepositoriesWithReranking(repositories, query);
-        console.log('✅ AI search completed, results:', aiResults.length);
-
+        const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
+          onPhase: (phase) => {
+            setSearchPhase(phase === 'selecting'
+              ? t('AI 精选相关仓库...', 'AI selecting relevant repositories...')
+              : t('AI 语义分析...', 'AI semantic analysis...'));
+          },
+        });
+        console.log('✅ AI selection search completed, results:', aiResults.length);
         filtered = aiResults;
+        aiOrdered = true;
       } catch (error) {
         console.warn('❌ AI search failed, falling back to basic search:', error);
         filtered = performBasicTextSearch(repositories, query);
-        console.log('🔄 Basic search fallback results:', filtered.length);
       }
     } else {
       console.log('⚠️ No AI config found, using basic text search');
       // Basic text search if no AI config
       filtered = performBasicTextSearch(repositories, query);
-      console.log('📝 Basic search results:', filtered.length);
     }
 
     // Apply other filters and update results
     const finalFiltered = applyFilters(filtered);
-    console.log('🎯 Final filtered results:', finalFiltered.length);
-    console.log('📋 Final filtered repositories:', finalFiltered.map(r => r.name));
+    if (aiOrdered) {
+      // AI 返回的顺序（LLM 精选序或词法兜底序）就是相关性顺序；applyFilters 会按
+      // 排序控件重排（默认 star 降序），这里恢复 AI 顺序——与向量路径的
+      // rerankOrder 恢复逻辑同构。
+      const aiOrder = new Map(filtered.map((repo, index) => [String(repo.id), index]));
+      finalFiltered.sort((a, b) =>
+        (aiOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
+        - (aiOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER));
+    }
     setSearchResults(finalFiltered);
 
     // Update search filters to mark that AI search was performed
