@@ -192,7 +192,11 @@ export interface SearchActions {
   vectorScoreMapRef: MutableRefObject<{ query: string; scores: Map<string, number> } | null>;
   skipNextTextSearchRef: MutableRefObject<boolean>;
   aiSearch: (query: string, applyFilters: (repos: Repository[]) => Repository[]) => Promise<void>;
-  keywordSearch: (query: string, applyFilters: (repos: Repository[]) => Repository[]) => Promise<void>;
+  keywordSearch: (
+    query: string,
+    applyFilters: (repos: Repository[]) => Repository[],
+    options?: { signal?: AbortSignal },
+  ) => Promise<void>;
   syncStars: (mode?: 'auto' | 'stars-only' | 'stars-and-lists') => Promise<void>;
 }
 
@@ -238,11 +242,14 @@ export const useSearchActions = (): SearchActions => {
   const [searchPhase, setSearchPhase] = useState<string | null>(null);
   const vectorScoreMapRef = useRef<{ query: string; scores: Map<string, number> } | null>(null);
   const skipNextTextSearchRef = useRef(false);
+  // 当前在途 AI 搜索的控制器：新搜索启动时中止旧请求（超代语义）
+  const aiSearchAbortRef = useRef<AbortController | null>(null);
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const keywordSearch = useCallback(async (
     query: string,
     applyFilters: (repos: Repository[]) => Repository[],
+    options?: { signal?: AbortSignal },
   ): Promise<void> => {
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
 
@@ -254,6 +261,7 @@ export const useSearchActions = (): SearchActions => {
         setSearchPhase(t('AI 语义分析...', 'AI semantic analysis...'));
         const aiService = new AIService(activeConfig, language);
         const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
+          signal: options?.signal,
           onPhase: (phase) => {
             setSearchPhase(phase === 'selecting'
               ? t('AI 精选相关仓库...', 'AI selecting relevant repositories...')
@@ -308,6 +316,12 @@ export const useSearchActions = (): SearchActions => {
     applyFilters: (repos: Repository[]) => Repository[],
   ): Promise<void> => {
     if (!query.trim()) return;
+
+    // 新搜索接管：中止上一次仍在途的 AI 请求（搜索进行中按 Enter 可再次触发），
+    // 防止过期结果落盘覆盖新结果。被取代的搜索在 finally 里不复位搜索状态。
+    aiSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiSearchAbortRef.current = controller;
 
     setIsSearching(true);
     setSearchPhase(null);
@@ -428,17 +442,22 @@ export const useSearchActions = (): SearchActions => {
       }
       // ====== 向量搜索分支结束 ======
 
-      await keywordSearch(query, applyFilters);
+      await keywordSearch(query, applyFilters, { signal: controller.signal });
     } catch (error) {
-      // 取消不是失败：静默结束当前搜索（finally 会复位搜索状态），不产出结果
+      // 取消不是失败：静默结束当前搜索（不产出结果），不当作可恢复的 AI 失败
       if (isAbortError(error)) {
         console.log('🚫 AI search cancelled');
         return;
       }
       console.error('💥 Search failed:', error);
     } finally {
-      setIsSearching(false);
-      setSearchPhase(null);
+      // 仅当本次搜索仍是"当前搜索"时才复位状态：被新搜索取代的旧搜索
+      // 不把新搜索的 isSearching/searchPhase 状态清掉
+      if (aiSearchAbortRef.current === controller) {
+        aiSearchAbortRef.current = null;
+        setIsSearching(false);
+        setSearchPhase(null);
+      }
     }
   }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, keywordSearch, t]);
 
