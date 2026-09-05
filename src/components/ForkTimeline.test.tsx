@@ -340,7 +340,7 @@ describe('ForkTimeline branch request ordering', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/team-org\/org-fork/).length).toBeGreaterThan(0);
-      expect(screen.getByText('加载分支列表中...')).toBeInTheDocument();
+      expect(screen.getByText('加载分支列表中…')).toBeInTheDocument();
     });
     expect(toastMock).not.toHaveBeenCalledWith('加载分支失败，请检查网络连接后重试。', 'error');
   });

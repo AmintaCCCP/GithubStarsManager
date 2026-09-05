@@ -335,9 +335,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
       {isMobile ? (
         <div className="w-full overflow-hidden rounded-md border border-border bg-card p-3 sm:p-4">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-card-foreground">
+            <h2 className="text-base font-semibold text-card-foreground">
               {t('应用分类', 'Categories')}
-            </h3>
+            </h2>
             <Button
               variant="ghost"
               onClick={handleAddCategory}
@@ -431,7 +431,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={toggleSidebar}
-                  className="linear-icon-button w-8 h-8 flex items-center justify-center transition-all duration-200"
+                  className="linear-icon-button w-8 h-8 flex items-center justify-center transition-colors duration-200"
                   title={t('展开侧栏 (Ctrl/Cmd+B)', 'Expand Sidebar (Ctrl/Cmd+B)')}
                   aria-label={t('展开侧栏', 'Expand Sidebar')}
                   aria-expanded="false"
@@ -511,13 +511,13 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               <div>
                 {/* 头部 - 包含折叠按钮 */}
                 <div className="flex items-center justify-between mb-4">
-                  <h3
+                  <h2
                       className={`text-base font-semibold text-card-foreground transition-all duration-200 ease-out ${
                       showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                     }`}
                   >
                     {t('应用分类', 'Categories')}
-                  </h3>
+                  </h2>
                   <div className="flex items-center gap-1 pr-3">
                     <Button
                       variant="ghost"
@@ -534,7 +534,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                       variant="ghost"
                       size="icon"
                       onClick={toggleSidebar}
-                      className="h-8 w-8 rounded-md bg-muted text-muted-foreground transition-all duration-200"
+                      className="h-8 w-8 rounded-md bg-muted text-muted-foreground transition-colors duration-200"
                       title={t('折叠侧栏 (Ctrl/Cmd+B)', 'Collapse Sidebar (Ctrl/Cmd+B)')}
                       aria-label={t('折叠侧栏', 'Collapse Sidebar')}
                       aria-expanded="true"
@@ -580,7 +580,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           onClick={() => handleCategoryClick(category.id)}
                           aria-pressed={isSelected}
                           size="sm"
-                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-all duration-200 ease-out pr-3 ${
+                          className={`flex h-9 w-full items-center justify-between rounded-md text-left transition-[color,background-color,border-color,opacity,transform] duration-200 ease-out pr-3 ${
                             isSelected
                               ? 'bg-accent text-accent-foreground font-medium'
                               : isDragTarget
@@ -592,7 +592,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                           <div className="flex items-center space-x-3 min-w-0 flex-1">
                             <span className="text-base flex-shrink-0">{category.icon}</span>
                             <span
-                              className={`text-sm font-medium truncate transition-all duration-200 ease-out ${
+                              className={`text-sm font-medium truncate transition-[opacity,transform] duration-200 ease-out ${
                                 showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                               }`}
                             >
@@ -602,7 +602,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
                           {/* 数字 badge - 正常状态显示，hover/focus-within 时隐藏 */}
                           <span
-                              className={`ml-auto flex min-w-8 shrink-0 justify-center rounded-md px-2 py-0.5 text-xs transition-all duration-200 ease-out ${
+                              className={`ml-auto flex min-w-8 shrink-0 justify-center rounded-md px-2 py-0.5 text-xs transition-[color,background-color,border-color,opacity,transform] duration-200 ease-out ${
                               isSelected
                                 ? 'bg-primary text-primary-foreground'
                                 : isDragTarget

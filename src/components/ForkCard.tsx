@@ -2,6 +2,7 @@ import React, { memo, useCallback } from 'react';
 import { ExternalLink, GitFork, RefreshCw, ChevronDown, ChevronUp, FolderOpen, Folder, Play, Loader2 } from 'lucide-react';
 import { ForkRepo, WorkflowDefinition } from '../types';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { Button } from './ui/button';
 
 interface ForkCardProps {
@@ -100,7 +101,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>
                   {fork.updated_at
-                    ? formatDistanceToNow(new Date(fork.updated_at), { addSuffix: true })
+                    ? formatDistanceToNow(new Date(fork.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })
                     : '-'}
                 </span>
               </div>
@@ -108,7 +109,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 <div className="flex items-center gap-1.5">
                   <GitFork className="w-3.5 h-3.5" />
                   <span>
-                    {formatDistanceToNow(new Date(fork.source.updated_at), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(fork.source.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
                   </span>
                 </div>
               )}
@@ -191,7 +192,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
                 <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('加载工作流中...', 'Loading workflows...')}
+                  {t('加载工作流中…', 'Loading workflows…')}
                 </span>
               </div>
             ) : workflows.length === 0 ? (

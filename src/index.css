@@ -342,10 +342,10 @@
     @apply bg-transparent text-muted-foreground px-[10px] py-0 rounded-full border border-border text-[12px] font-medium flex items-center gap-1;
   }
   .pill-success {
-    @apply bg-success text-success-foreground rounded-full text-[10px] font-medium;
+    @apply bg-success text-success-foreground rounded-full text-xs font-medium;
   }
   .badge-subtle {
-    @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-[10px] font-medium;
+    @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-xs font-medium;
   }
 
   .input-base {
@@ -472,7 +472,9 @@ html:has(body[data-scroll-locked]) {
 
 :root {
   color-scheme: light;
-  --background: 0 0% 100%;
+  /* Canvas sits one step off-white so white cards/popovers float on it —
+     the Linear-style surface layering that makes the shell feel native. */
+  --background: 210 40% 98%;
   --foreground: 222.2 84% 4.9%;
   --card: 0 0% 100%;
   --card-foreground: 222.2 84% 4.9%;
@@ -507,8 +509,9 @@ html:has(body[data-scroll-locked]) {
   --overlay: 0 0% 0%;
   --overlay-foreground: 0 0% 100%;
 
-  /* Typography stacks (theme presets may swap families). */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Typography stacks (theme presets may swap families). Inter leads the
+     latin stack for the premium SaaS voice; CJK falls through to the OS face. */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
@@ -538,11 +541,13 @@ html:has(body[data-scroll-locked]) {
   --ui-selection-foreground: hsl(var(--accent-foreground));
   --ui-search-highlight: hsl(var(--primary) / 0.16);
   --ui-search-highlight-foreground: hsl(var(--foreground));
-  --ui-placeholder: hsl(var(--muted-foreground) / 0.55);
+  /* Placeholder text must stay above 4.5:1 on the canvas (WCAG 1.4.3), so it
+     uses the full muted-foreground token instead of an alpha wash. */
+  --ui-placeholder: hsl(var(--muted-foreground));
   --ui-success: hsl(var(--success));
   --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
-  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.03);
   --ui-shadow-float: 0 10px 24px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.04);
   --ui-radius-xs: calc(var(--radius) - 4px);
   --ui-radius-sm: calc(var(--radius) - 2px);
@@ -587,7 +592,7 @@ html.dark {
   --ui-selection-foreground: hsl(var(--foreground));
   --ui-search-highlight: hsl(var(--ring) / 0.28);
   --ui-search-highlight-foreground: hsl(var(--foreground));
-  --ui-placeholder: hsl(var(--muted-foreground) / 0.6);
+  --ui-placeholder: hsl(var(--muted-foreground));
 
   --ui-canvas: hsl(var(--background));
   --ui-panel: hsl(var(--card));
@@ -627,6 +632,10 @@ body {
 
   font-feature-settings: normal;
   letter-spacing: normal;
+  /* Root-level smoothing: on macOS text otherwise renders heavier than the
+     design intends. Set once here, never per component. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -715,7 +724,7 @@ textarea:focus-visible,
 }
 
 .ui-field::placeholder {
-  color: var(--ui-text-faint);
+  color: var(--ui-text-muted);
 }
 
 .ui-field:hover {
@@ -761,7 +770,7 @@ textarea:focus-visible,
 
 .ui-button:active,
 .ui-button-primary:active {
-  transform: translateY(1px);
+  transform: scale(0.96);
 }
 
 .ui-icon-button {
@@ -824,7 +833,8 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 .linear-header {
   background: hsl(var(--background) / 0.95);
   border-bottom: 1px solid hsl(var(--border));
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
 }
 
 .linear-header-inner {
@@ -1104,4 +1114,25 @@ html.dark .release-card.is-expanded {
   background: var(--ui-panel-muted);
   border: 1px solid var(--ui-line-subtle);
   border-radius: var(--ui-radius-md);
+}
+
+/* ========== prefers-reduced-motion: collapse all non-essential motion ==========
+   Movement, loops and slides become instant; color/opacity feedback survives via
+   the state cues themselves. Spinning loaders are re-enabled below: their rotation
+   is functional progress feedback (a frozen spinner reads as a hang), and it stays
+   confined to a tiny icon area. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
