@@ -259,6 +259,15 @@ describe('useDiscoveryRepoActions.star', () => {
     const { result } = renderHook(() => useDiscoveryRepoActions({ repo }));
     expect(result.current.isStarred).toBe(false);
     await act(async () => { await result.current.star(); });
+    expect(storeState.addRepository).toHaveBeenCalledTimes(1);
+    expect(storeState.addRepository.mock.calls[0][0]).toMatchObject({
+      id: repo.id,
+      full_name: repo.full_name,
+      rank: undefined,
+      channel: undefined,
+      platform: undefined,
+      starred_at: expect.any(String),
+    });
     expect(result.current.isStarred).toBe(false); // repositories fixture 不含该仓库，乐观态已清
     expect(result.current.isStarring).toBe(false);
   });

@@ -121,10 +121,10 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
   // RPC 发送与 AI 总结动作委托共享 hook（避免第三份拷贝）；summaries/downloadStates
   // 的对外形状由 hook 供给，downloadStates 的 key 已版本化为 computeRpcDownloadKey(link)。
   const artifactActions = useReleaseArtifactActions();
-  // cancelSummaryRequests 是共享 hook 内零依赖的稳定 useCallback——取消 effect 只能
-  // 挂它而不是整个 artifactActions 对象（后者随 summaries/RPC 状态更新换引用，
-  // 若挂进依赖，每次状态更新都会触发 cleanup 自我中止进行中的请求）。
-  const { cancelSummaryRequests } = artifactActions;
+  // 共享 hook 返回的 artifactActions 对象随 summaries/RPC 状态更新换引用——依赖只能
+  // 挂它解构出的引用稳定成员（useCallback 零依赖或仅依赖 store 值），否则每次状态
+  // 更新都会连带换 cancel effect / loadReleases / sendAssetToRpc 的身份。
+  const { cancelSummaryRequests, reset: resetArtifactStates, sendRpcDownload } = artifactActions;
   const [releases, setReleases] = useState<Release[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +166,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
     setIsLoading(true);
     setError(null);
     setBrowserDownloadStates({});
-    artifactActions.reset();
+    resetArtifactStates();
 
     try {
       const { owner, name } = getRepositoryCoordinates(repository.full_name);
@@ -213,13 +213,13 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         setIsLoading(false);
       }
     }
-  }, [artifactActions, fetchAllPages, githubToken, repository, t]);
+  }, [resetArtifactStates, fetchAllPages, githubToken, repository, t]);
 
   const sendAssetToRpc = useCallback(async (link: ReleaseDownloadLink) => {
     // enabled 守卫留在 sheet：ReleaseCard 侧由按钮显隐承担（共享 hook 不重复判断）
     if (!rpcDownloadConfig.enabled) return;
-    await artifactActions.sendRpcDownload(link);
-  }, [artifactActions, rpcDownloadConfig.enabled]);
+    await sendRpcDownload(link);
+  }, [sendRpcDownload, rpcDownloadConfig.enabled]);
 
   const downloadAsset = useCallback(async (link: ReleaseDownloadLink) => {
     if (rpcDownloadConfig.enabled) {

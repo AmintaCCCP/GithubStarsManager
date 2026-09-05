@@ -57,6 +57,24 @@ describe('applyDiscoveryAnalysisSuccess', () => {
     expect(patched.channel).toBe('trending');
     expect(patched.platform).toBe('Macos');
   });
+
+  it('clears a pre-existing analysis_error on success', () => {
+    const previouslyFailed: DiscoveryRepo = {
+      ...repo,
+      analysis_failed: true,
+      analysis_error: 'previous failure',
+    };
+    const patched = applyDiscoveryAnalysisSuccess(previouslyFailed, {
+      summary: 'recovered',
+      tags: [],
+      platforms: [],
+      analyzedAt: '2026-09-05T00:00:00.000Z',
+      analysisFailed: false,
+    });
+    expect(patched.analysis_error).toBeUndefined();
+    expect(patched.analysis_failed).toBe(false);
+    expect(patched.ai_summary).toBe('recovered');
+  });
 });
 
 describe('applyDiscoveryAnalysisFailure', () => {
