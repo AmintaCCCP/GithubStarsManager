@@ -2147,6 +2147,8 @@ ${repoInfo}
       });
       return ranked;
     } catch (error) {
+      // 用户主动取消：不产出兜底结果，向上传播交由调用方处理
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
       logger.warn('ai', 'AI selection failed, falling back to lexical ranking', {
         apiType: this.getApiType(),
         model: this.config.model,
@@ -2189,7 +2191,12 @@ ${repoInfo}
       system,
       user,
       temperature: 0.1,
-      maxTokens: AIService.SELECTION_MAX_TOKENS,
+      // 推理 token 与输出共享预算（openai reasoning 模型、gemini 2.5 思考模型）：
+      // 小预算被推理耗尽时 content 为空、精选会静默退化，故复用重排序的 4096
+      // 预算；普通模型 800 足够容纳 ≤20 个 ID 的 JSON 数组。
+      maxTokens: this.config.reasoningEffort || this.getApiType() === 'gemini'
+        ? AIService.RERANKING_MAX_TOKENS
+        : AIService.SELECTION_MAX_TOKENS,
       signal,
     });
 
@@ -2205,8 +2212,10 @@ ${repoInfo}
   private scoreRepositoriesByKeywords(repositories: Repository[], query: string, aiTerms: string[]): Array<{ repo: Repository; score: number }> {
     const normalizedQuery = query.toLowerCase();
     const queryWords = normalizedQuery.split(/\s+/).filter(word => word.length > 0);
-    // 去重并剔除与原查询相同的扩展词，避免重复计分
-    const terms = [...new Set(aiTerms.map(term => term.toLowerCase()).filter(term => term && term !== normalizedQuery))];
+    // 去重并剔除与任一查询词相同的扩展词：避免同一命中被查询词与扩展词
+    // 重复计分（按词级剔除，而非仅完整查询串）
+    const querySet = new Set([normalizedQuery, ...queryWords]);
+    const terms = [...new Set(aiTerms.map(term => term.toLowerCase()).filter(term => term && !querySet.has(term)))];
 
     const scoredRepos: Array<{ repo: Repository; score: number }> = [];
     for (const repo of repositories) {

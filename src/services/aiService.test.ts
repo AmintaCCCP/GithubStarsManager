@@ -121,6 +121,18 @@ describe('AIService.searchRepositoriesWithSelection — 词法兜底', () => {
     const results = service['performEnhancedBasicSearch']([repo], '技能', ['技能']);
     expect(results.map((r) => r.id)).toEqual([6]);
   });
+
+  it('扩展词与查询词相同时不重复计分（词级剔除）', async () => {
+    const repo = makeRepo({ id: 20, name: 'markdown', full_name: 'acme/markdown' });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const scored = service['scoreRepositoriesByKeywords']([repo], 'markdown editor', ['Markdown', 'acme']);
+
+    // 'Markdown' 等于查询词 'markdown'，剔除后不再对 name/fullName 重复计分；
+    // 'acme'（fullName 命中）仍正常计分：name 0.4 + fullName 0.35 + 扩展词 0.2 = 0.95
+    //（若词级剔除失效则为 1.4）
+    expect(scored[0].score).toBeCloseTo(0.95, 10);
+  });
 });
 
 describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
@@ -158,6 +170,8 @@ describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
     expect(selectionPrompt).toContain('用户意图说明：找 markdown 编辑器');
     expect(selectionPrompt).toContain('共 2 个');
     expect(selectionPrompt).toContain('acme/quick-md');
+    // 普通模型的精选请求维持紧凑预算
+    expect(requests[1].max_tokens).toBe(800);
   });
 
   it('模型把候选行号当作 ID 返回时按行号解析，重排结果不被静默丢弃', async () => {
@@ -209,6 +223,43 @@ describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
     const selectionPrompt = String((requests[1].messages as Array<{ content: string }>)[1].content);
     expect(selectionPrompt).toContain('共 100 个');
     expect(results.map((r) => r.id)).toEqual([900001]);
+  });
+
+  it('调用方取消（abort）时不做词法兜底，取消异常向上传播', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockImplementationOnce(async () => {
+      throw Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' });
+    });
+    const controller = new AbortController();
+
+    const repoA = makeRepo({ id: 750000001, name: 'foo-tool', full_name: 'acme/foo-tool' });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    // 取消 ≠ AI 失败：不能把词法兜底结果当作搜索结果返回
+    await expect(
+      service.searchRepositoriesWithSelection([repoA], 'foo', { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('推理模型的精选调用复用更大的 token 预算，避免推理耗尽预算后静默退化', async () => {
+    const fetchMock = mockFetch();
+    const requests: Array<Record<string, unknown>> = [];
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      requests.push(await captureBody(init));
+      return chatResponse('{"intent":"","keywords":[],"synonyms":[]}');
+    });
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      requests.push(await captureBody(init));
+      return chatResponse('[]');
+    });
+
+    const repo = makeRepo({ id: 760000001, name: 'foo-tool', full_name: 'acme/foo-tool' });
+    const service = new AIService({ ...makeConfig(), reasoningEffort: 'high' } as never, 'zh');
+    await service.searchRepositoriesWithSelection([repo], 'foo');
+
+    // 扩展请求维持 300；精选请求复用重排序的 4096 预算（推理 token 共享预算）
+    expect(requests[0].max_tokens).toBe(300);
+    expect(requests[1].max_tokens).toBe(4096);
   });
 });
 
