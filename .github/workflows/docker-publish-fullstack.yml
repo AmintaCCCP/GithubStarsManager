@@ -36,7 +36,9 @@ jobs:
   validate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Fork PRs can only read default-branch GHA caches, so a fork PR validate
+    # runs the full multi-arch build cold; keep the timeout above that.
+    timeout-minutes: 60
     # PR validation does not authenticate to GHCR and cannot publish packages.
     permissions:
       contents: read
@@ -60,8 +62,12 @@ jobs:
           file: ./Dockerfile.fullstack
           platforms: linux/amd64,linux/arm64
           push: false
-          # The cache remains isolated from the frontend and backend image workflows.
-          cache-from: type=gha,scope=github-stars-manager-fullstack-pr,timeout=5m
+          # Fork PRs may fall back to the default branch's publish cache, so a
+          # cold fork PR reuses the latest main build layers instead of timing
+          # out on a from-scratch multi-arch build.
+          cache-from: |
+            type=gha,scope=github-stars-manager-fullstack-pr,timeout=5m
+            type=gha,scope=github-stars-manager-fullstack-publish-branch,timeout=5m
           cache-to: type=gha,scope=github-stars-manager-fullstack-pr,mode=max,timeout=5m,ignore-error=true
 
   publish:
