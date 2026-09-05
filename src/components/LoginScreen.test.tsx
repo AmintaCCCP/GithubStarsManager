@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from './ui/tooltip';
 
 const mocks = vi.hoisted(() => ({
   safeReadText: vi.fn(),
   restoreBackendSession: vi.fn(),
+  configuredBackendUrl: null as string | null,
 }));
 
 vi.mock('../utils/clipboardUtils', () => ({ safeReadText: mocks.safeReadText }));
@@ -12,7 +13,7 @@ vi.mock('../features/lifecycle/hooks/useLoginActions', () => ({
   useLoginActions: () => ({
     authenticateWithGitHub: vi.fn(),
     syncTokenToBackend: vi.fn().mockResolvedValue({ ok: true }),
-    configuredBackendUrl: null,
+    configuredBackendUrl: mocks.configuredBackendUrl,
     restoreBackendSession: mocks.restoreBackendSession,
     setupBackendGitHubToken: vi.fn().mockResolvedValue(undefined),
     syncBackendData: vi.fn().mockResolvedValue(undefined),
@@ -87,5 +88,36 @@ describe('LoginScreen 后端登录', () => {
 
     expect(await screen.findByText('后端保存的 GitHub Token 无法使用，请重新配置')).toBeInTheDocument();
     expect(screen.getByLabelText('GitHub Personal Access Token')).toHaveAttribute('id', 'backend-github-token');
+  });
+});
+
+describe('LoginScreen 后端 URL 预填', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    mocks.configuredBackendUrl = null;
+  });
+
+  it('桌面端 file:// origin 不预填无效地址', async () => {
+    vi.stubGlobal('location', { protocol: 'file:', origin: 'file://' } as unknown as Location);
+
+    const { urlInput } = await enterBackendMode();
+
+    expect(urlInput).toHaveValue('');
+  });
+
+  it('Web 部署时预填同源地址', async () => {
+    vi.stubGlobal('location', { protocol: 'https:', origin: 'https://app.example.com' } as unknown as Location);
+
+    const { urlInput } = await enterBackendMode();
+
+    expect(urlInput).toHaveValue('https://app.example.com');
+  });
+
+  it('记住的后端地址优先于同源地址', async () => {
+    mocks.configuredBackendUrl = 'https://stored.example/api';
+
+    const { urlInput } = await enterBackendMode();
+
+    expect(urlInput).toHaveValue('https://stored.example');
   });
 });
