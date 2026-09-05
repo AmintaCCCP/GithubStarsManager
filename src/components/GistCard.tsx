@@ -13,7 +13,7 @@ interface GistCardProps {
   isMine: boolean;
   onOpen: (gist: Gist) => void;
   onEdit: (gist: Gist) => void;
-  onDeleted: (gistId: string) => void;
+  onDeleted?: (gistId: string) => void;
   onUnstarred: (gistId: string) => void;
 }
 
