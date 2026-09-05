@@ -15,10 +15,6 @@
  *    source files as text and pattern-matches import statements.
  *  - Exempts test files (*.test.ts / *.test.tsx) so vi.mock('../services/...')
  *    stays legal.
- *  - Uses the same phased allowlist as eslint.config.js: components whose
- *    operations have not yet been lifted into a hook are skipped, with an
- *    expiration date (each follow-up PR that migrates one removes it here
- *    and in eslint.config.js together).
  *
  * Exit code: 0 = clean, 1 = violations found (or unreadable file).
  */
@@ -43,20 +39,6 @@ const BANNED_COMPONENT_SERVICES = [
   'updateService',
   'translateService',
 ];
-
-// Mirror of COMPONENT_BOUNDARY_ALLOWLIST in eslint.config.js. Keep in sync.
-const COMPONENT_ALLOWLIST = new Set([
-  'src/components/SearchBar.tsx',
-  'src/components/ReadmeModal.tsx',
-  'src/components/GistCard.tsx',
-  'src/components/GistDetailModal.tsx',
-  'src/components/GistEditorModal.tsx',
-  'src/components/ReleaseCard.tsx',
-  'src/components/ReleaseSourceSettingsModal.tsx',
-  'src/components/SubscriptionRepoCard.tsx',
-  'src/components/RepositoryEditModal.tsx',
-  'src/components/SettingsPanel.tsx',
-]);
 
 // application purity: banned module specifiers (exact) + banned path patterns.
 // Mirrors eslint.config.js: **/store/** (not just useAppStore) so store/selectors
@@ -103,7 +85,6 @@ let violations = 0;
 
 function checkComponentFile(full, relPath) {
   if (isTestFile(relPath)) return;
-  if (COMPONENT_ALLOWLIST.has(relPath)) return;
   let src;
   try {
     src = fs.readFileSync(full, 'utf8');
