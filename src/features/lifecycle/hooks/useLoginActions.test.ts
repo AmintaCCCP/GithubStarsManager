@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../services/githubApi', () => ({
+  GITHUB_TOKEN_INVALID_ERROR: 'GitHub token expired or invalid',
   GitHubApiService: class {
     constructor(token: string) {
       mocks.apiTokens.push(token);
@@ -76,6 +77,15 @@ describe('useLoginActions', () => {
     await expect(result.current.restoreBackendSession('https://backend.example')).resolves.toEqual({
       status: 'restored-token-invalid',
     });
+  });
+
+  it('propagates transient GitHub errors instead of flagging the stored token', async () => {
+    mocks.getCurrentUser.mockRejectedValueOnce(new Error('GitHub API error: 503 Service Unavailable'));
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example')).rejects.toThrow(
+      'GitHub API error: 503 Service Unavailable'
+    );
   });
 
   it('distinguishes unreachable and unauthorized backends', async () => {

@@ -116,6 +116,9 @@ interface GitHubRateLimitResponse {
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+// Sentinel message for the 401 thrown above; callers match on it to tell a
+// confirmed auth failure apart from network/rate-limit/5xx errors.
+export const GITHUB_TOKEN_INVALID_ERROR = 'GitHub token expired or invalid';
 const REPOSITORY_CHAT_MAX_FILE_BYTES = 96 * 1024;
 // Larger Markdown files are common repository documentation. This bounded exception is
 // deliberately narrower than the normal chat-file reader: only non-sensitive Markdown
@@ -331,7 +334,7 @@ export class GitHubApiService {
       const durationMs = Date.now() - startTime;
       if (response.status === 401) {
         logger.warn('githubApi', 'API request failed: unauthorized', { method, endpoint, status: response.status, durationMs });
-        throw new Error('GitHub token expired or invalid');
+        throw new Error(GITHUB_TOKEN_INVALID_ERROR);
       }
       if (response.status === 403 && this.rateLimitRemaining === 0) {
         const resetDate = this.rateLimitReset
