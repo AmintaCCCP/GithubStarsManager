@@ -7,11 +7,13 @@ const mocks = vi.hoisted(() => ({
   syncFromBackend: vi.fn(),
   backend: {
     configuredUrl: 'https://backend.example/api',
+    backendUrl: null as string | null,
     init: vi.fn(),
     isAvailable: true,
     verifyAuth: vi.fn(),
     restoreAuth: vi.fn(),
     syncSettings: vi.fn(),
+    rememberActiveUrl: vi.fn(),
   },
 }));
 
@@ -39,6 +41,7 @@ describe('useLoginActions', () => {
     vi.clearAllMocks();
     mocks.apiTokens.splice(0);
     mocks.backend.isAvailable = true;
+    mocks.backend.backendUrl = null;
     mocks.backend.verifyAuth.mockResolvedValue(true);
     mocks.backend.restoreAuth.mockResolvedValue({ github_token: 'ghp_restored' });
     mocks.getCurrentUser.mockResolvedValue(user);
@@ -56,11 +59,12 @@ describe('useLoginActions', () => {
     expect(mocks.backend.init).toHaveBeenCalledWith('https://backend.example');
     expect(mocks.backend.verifyAuth).toHaveBeenCalledOnce();
     expect(mocks.backend.restoreAuth).toHaveBeenCalledOnce();
+    expect(mocks.backend.rememberActiveUrl).toHaveBeenCalledOnce();
     expect(mocks.apiTokens).toEqual(['ghp_restored']);
     expect(restored).toEqual({ status: 'connected', githubToken: 'ghp_restored', user });
   });
 
-  it('requests first-time GitHub token setup when the backend has none', async () => {
+  it('does not remember the URL before the token setup step', async () => {
     mocks.backend.restoreAuth.mockResolvedValueOnce({ github_token: null });
     const { result } = renderHook(() => useLoginActions());
 
@@ -68,6 +72,19 @@ describe('useLoginActions', () => {
       status: 'github-token-required',
     });
     expect(mocks.getCurrentUser).not.toHaveBeenCalled();
+    expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the previous backend when the key is rejected', async () => {
+    mocks.backend.backendUrl = 'https://old.example/api';
+    mocks.backend.verifyAuth.mockResolvedValueOnce(false);
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example')).resolves.toEqual({
+      status: 'unauthorized',
+    });
+    expect(mocks.backend.init).toHaveBeenLastCalledWith('https://old.example/api');
+    expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
   });
 
   it('reports an unusable stored token instead of a raw auth error', async () => {
@@ -117,6 +134,7 @@ describe('useLoginActions', () => {
     await expect(result.current.setupBackendGitHubToken('ghp_new')).resolves.toEqual(user);
     expect(mocks.apiTokens).toEqual(['ghp_new']);
     expect(mocks.backend.syncSettings).toHaveBeenCalledWith({ github_token: 'ghp_new' });
+    expect(mocks.backend.rememberActiveUrl).toHaveBeenCalledOnce();
     expect(mocks.syncFromBackend).not.toHaveBeenCalled();
 
     await result.current.syncBackendData();

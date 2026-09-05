@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   backendInit: vi.fn(),
   backendCheckHealth: vi.fn(),
   backendVerifyAuth: vi.fn(),
+  backendRememberActiveUrl: vi.fn(),
   setBackendApiSecret: vi.fn(),
   toast: vi.fn(),
   confirm: vi.fn(),
@@ -19,10 +20,12 @@ vi.mock('../../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore })
 vi.mock('../../../services/backendAdapter', () => ({
   backend: {
     configuredUrl: 'https://stored.example/api',
+    backendUrl: 'https://stored.example/api',
     isAvailable: false,
     init: mocks.backendInit,
     checkHealth: mocks.backendCheckHealth,
     verifyAuth: mocks.backendVerifyAuth,
+    rememberActiveUrl: mocks.backendRememberActiveUrl,
   },
 }));
 vi.mock('../../../services/autoSync', () => ({
@@ -103,7 +106,25 @@ describe('useBackendSettingsActions 后端地址配置', () => {
     expect(mocks.backendInit).toHaveBeenCalledWith('https://new.example.com');
     expect(mocks.setBackendApiSecret).toHaveBeenCalledWith('secret-1');
     expect(mocks.backendVerifyAuth).toHaveBeenCalledOnce();
+    expect(mocks.backendRememberActiveUrl).toHaveBeenCalledOnce();
     expect(mocks.toast).toHaveBeenCalledWith('后端连接成功！', 'success');
+  });
+
+  it('认证失败时恢复先前的后端连接且不记住候选地址', async () => {
+    const { result } = render();
+    act(() => {
+      result.current.setUrlInput('https://new.example.com');
+      result.current.setSecretInput('wrong-key');
+    });
+    mocks.backendVerifyAuth.mockResolvedValue(false);
+
+    await act(async () => {
+      await result.current.testConnection();
+    });
+
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('后端连接失败'), 'error');
+    expect(mocks.backendInit).toHaveBeenLastCalledWith('https://stored.example/api');
+    expect(mocks.backendRememberActiveUrl).not.toHaveBeenCalled();
   });
 
   it('地址留空时保持自动探测（不指定 preferredUrl）', async () => {
