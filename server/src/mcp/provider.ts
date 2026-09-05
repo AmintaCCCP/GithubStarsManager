@@ -416,12 +416,12 @@ export async function vectorSearch(
       },
       body: JSON.stringify({ vector, topK: workerTopK, threshold }),
     });
-  } catch (err) {
+  } catch {
     // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
     // 永不 throw，异常必须折叠进声明的 { available: false } 结果
     return {
       available: false,
-      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+      reason: 'worker_query_failed',
     };
   }
   if (!res.ok) {
@@ -433,10 +433,10 @@ export async function vectorSearch(
   };
   try {
     data = (await res.json()) as typeof data;
-  } catch (err) {
+  } catch {
     return {
       available: false,
-      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+      reason: 'worker_query_failed',
     };
   }
   const matches = data.matches || [];

@@ -226,7 +226,7 @@ describe('MCP provider discovery', () => {
 
     const result = await provider.vectorSearch('retrieval', {});
     expect(result).toMatchObject({ available: false });
-    expect((result as { reason: string }).reason).toBe('worker_query_failed: fetch failed');
+    expect((result as { reason: string }).reason).toBe('worker_query_failed');
   });
 
   it('maps a worker timeout abort to worker_query_failed instead of throwing', async () => {
@@ -246,7 +246,7 @@ describe('MCP provider discovery', () => {
       await vi.advanceTimersByTimeAsync(15_000);
       const result = await pending;
       expect(result).toMatchObject({ available: false });
-      expect((result as { reason: string }).reason).toMatch(/^worker_query_failed:/);
+      expect((result as { reason: string }).reason).toBe('worker_query_failed');
     } finally {
       vi.useRealTimers();
     }
@@ -260,7 +260,7 @@ describe('MCP provider discovery', () => {
 
     const result = await provider.vectorSearch('retrieval', {});
     expect(result).toMatchObject({ available: false });
-    expect((result as { reason: string }).reason).toMatch(/^worker_query_failed:/);
+    expect((result as { reason: string }).reason).toBe('worker_query_failed');
   });
 
   it('returns the declared unavailable result from findSimilarRepositories when the worker fails', async () => {
@@ -271,6 +271,6 @@ describe('MCP provider discovery', () => {
 
     const result = await provider.findSimilarRepositories('acme/alpha', { topK: 3 });
     expect(result).toMatchObject({ available: false });
-    expect((result as { reason: string }).reason).toMatch(/^worker_query_failed:/);
+    expect((result as { reason: string }).reason).toBe('worker_query_failed');
   });
 });

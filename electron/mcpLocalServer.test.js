@@ -394,7 +394,7 @@ test('Electron vector tools report worker_query_failed for a non-JSON worker res
     );
     const vectorData = JSON.parse(vector.body.result.content[0].text);
     assert.equal(vectorData.available, false);
-    assert.match(vectorData.reason, /^worker_query_failed:/);
+    assert.equal(vectorData.reason, 'worker_query_failed');
 
     const similar = await postJson(
       started.url,
@@ -403,7 +403,7 @@ test('Electron vector tools report worker_query_failed for a non-JSON worker res
     );
     const similarData = JSON.parse(similar.body.result.content[0].text);
     assert.equal(similarData.available, false);
-    assert.match(similarData.reason, /^worker_query_failed:/);
+    assert.equal(similarData.reason, 'worker_query_failed');
   } finally {
     await local.stop();
     await new Promise((resolve) => embeddingUpstream.server.close(resolve));
