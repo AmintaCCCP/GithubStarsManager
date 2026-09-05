@@ -434,6 +434,8 @@ npm run build
 
 `gsm_vector_search` 支持可选的 `languages`、`tags`、`platforms`、`licenses`、`category`、`minStars`、`maxStars`、`isAnalyzed` 与 `isSubscribed` 筛选。提供筛选时，Worker 最多返回 50 个语义候选，应用在本地确定性筛选后再截取 `topK`；这不是覆盖完整向量语料库的精确 filtered topK。未提供筛选时，既有查询行为保持不变。证据工具仅读取本地仓库数据库和 Release 缓存，不进行无界 GitHub 请求，不推测缺失字段，也不返回采纳决策。
 
+`gsm_status` 还返回 `availableTools`（当前配置实际注册的完整工具名）与 `conditionalTools`（受向量搜索开关控制的工具名，无论当前是否可用）。`gsm_get_repo_evidence` 包含来自已存仓库 `updated_at`、分析时间戳与缓存 Release `published_at` 的 `evidenceFreshness`；由于本地未保存仓库同步时间和 Release 缓存更新时间，这些字段会返回 `null`，不会推测。
+
 **桌面（Electron）说明：** 仅绑定回环地址（`127.0.0.1`），只能本机 Agent 访问；可在设置中调整主机/端口（默认端口 `3927`）。
 
 ![MCP](assets/readme/screenshots/mcp.png)

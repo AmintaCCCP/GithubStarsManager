@@ -9,7 +9,12 @@ const {
   filterVectorCandidates,
   hasActiveVectorFilters,
 } = require('./mcpDiscovery');
-const { createMcpLocalServer, getMcpToolDefinitions } = require('./mcpLocalServer');
+const {
+  createMcpLocalServer,
+  getMcpToolDefinitions,
+  getMcpToolAvailability,
+} = require('./mcpLocalServer');
+const { version: applicationVersion } = require('../package.json');
 
 function repo(overrides = {}) {
   return {
@@ -89,7 +94,7 @@ test('Electron discovery mirrors structured similarity text and vector filtering
 });
 
 test('Electron evidence is cache-only and does not infer unavailable fields', () => {
-  const value = repo();
+  const value = repo({ updated_at: '2026-02-04T00:00:00.000Z' });
   const result = buildRepoEvidence(value, {
     id: 10,
     tag_name: 'v1.0.0',
@@ -101,6 +106,17 @@ test('Electron evidence is cache-only and does not infer unavailable fields', ()
   });
   assert.equal(result.evidence.repository.archived, null);
   assert.equal(result.evidence.sources.latest_release, 'releases_cache');
+  assert.deepEqual(result.evidence.evidenceFreshness, {
+    repositoryUpdatedAt: '2026-02-04T00:00:00.000Z',
+    repositorySyncedAt: null,
+    releaseCacheUpdatedAt: null,
+    analyzedAt: '2026-02-04T00:00:00.000Z',
+    latestReleasePublishedAt: '2026-03-01T00:00:00.000Z',
+    limitations: [
+      'repositoryUpdatedAt is the stored repository updated_at, not a local sync timestamp',
+      'repositorySyncedAt and release-cache update time are not stored locally',
+    ],
+  });
   assert.match(result.evidence.limitations[0], /archived is not stored locally/);
   assert.doesNotMatch(JSON.stringify(result), /ADOPT|ADAPT|REFERENCE|REJECT/);
 });
@@ -222,10 +238,69 @@ test('Electron status accurately describes both vector tools when vector search 
       'local-token'
     );
     const text = result.body.result.content[0].text;
+    const payload = JSON.parse(text);
+    assert.equal(payload.version, applicationVersion);
     assert.equal(
-      JSON.parse(text).toolsNote,
+      payload.toolsNote,
       'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled'
     );
+    assert.deepEqual(payload.availableTools, getMcpToolDefinitions(false).map((tool) => tool.name));
+    assert.deepEqual(payload.conditionalTools, ['gsm_find_similar_repos', 'gsm_vector_search']);
+  } finally {
+    await local.stop();
+  }
+});
+
+test('Electron status reports exact registered and conditional tools when vector search is available', async () => {
+  const mcpPortProbe = await listen((_request, response) => response.end());
+  await new Promise((resolve) => mcpPortProbe.server.close(resolve));
+  const state = {
+    config: { enabled: true, host: '127.0.0.1', port: mcpPortProbe.port, token: 'local-token' },
+    snapshot: {
+      repositories: [],
+      customCategories: [],
+      releases: [],
+      vectorSearchConfig: {
+        enabled: true,
+        workerUrl: 'http://worker.example',
+        authToken: 'worker-token',
+        embedding: { apiType: 'ollama', model: 'bge-m3' },
+      },
+    },
+  };
+  const local = createMcpLocalServer(() => state);
+  const started = await local.start();
+
+  try {
+    const result = await postJson(
+      started.url,
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'gsm_status', arguments: {} },
+      },
+      'local-token'
+    );
+    const initialize = await postJson(
+      started.url,
+      {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'initialize',
+        params: { protocolVersion: '2025-06-18' },
+      },
+      'local-token'
+    );
+    const payload = JSON.parse(result.body.result.content[0].text);
+    assert.equal(payload.version, applicationVersion);
+    assert.equal(initialize.body.result.serverInfo.version, applicationVersion);
+    assert.deepEqual(payload.availableTools, getMcpToolDefinitions(true).map((tool) => tool.name));
+    assert.deepEqual(payload.conditionalTools, ['gsm_find_similar_repos', 'gsm_vector_search']);
+    assert.deepEqual(getMcpToolAvailability(true), {
+      availableTools: getMcpToolDefinitions(true).map((tool) => tool.name),
+      conditionalTools: ['gsm_find_similar_repos', 'gsm_vector_search'],
+    });
   } finally {
     await local.stop();
   }

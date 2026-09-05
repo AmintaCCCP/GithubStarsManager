@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRequire } from 'node:module';
 
 const mocks = vi.hoisted(() => ({
   getRepository: vi.fn(),
@@ -16,6 +17,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../src/mcp/provider.js', () => mocks);
 
 const { registerMcpTools } = await import('../../src/mcp/tools.js');
+const { MCP_SERVER_VERSION } = await import('../../src/mcp/version.js');
+const rootPackage = createRequire(import.meta.url)('../../../package.json') as { version: string };
 
 function captureRegistrations(vectorAvailable = true) {
   mocks.getVectorAvailability.mockReturnValue(
@@ -133,11 +136,41 @@ describe('MCP tool registration', () => {
     const result = await status!.handler({});
     const payload = JSON.parse(
       (result as { content: Array<{ text: string }> }).content[0].text
-    ) as { toolsNote: string };
+    ) as {
+      version: string;
+      toolsNote: string;
+      availableTools: string[];
+      conditionalTools: string[];
+    };
 
+    expect(MCP_SERVER_VERSION).toBe(rootPackage.version);
+    expect(payload.version).toBe(rootPackage.version);
     expect(payload.toolsNote).toBe(
       'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled'
     );
+    expect(payload.availableTools).toEqual([
+      'gsm_status',
+      'gsm_search_repos',
+      'gsm_get_repo',
+      'gsm_get_repos',
+      'gsm_get_repo_evidence',
+      'gsm_list_categories',
+      'gsm_list_repos_by_category',
+      'gsm_stats',
+    ]);
+    expect(payload.conditionalTools).toEqual(['gsm_find_similar_repos', 'gsm_vector_search']);
+  });
+
+  it('reports the exact registered and conditional tools when vector search is available', async () => {
+    const status = captureRegistrations(true).find((tool) => tool.name === 'gsm_status');
+    const result = await status!.handler({});
+    const payload = JSON.parse(
+      (result as { content: Array<{ text: string }> }).content[0].text
+    ) as { availableTools: string[]; conditionalTools: string[]; toolsNote: string };
+
+    expect(payload.availableTools).toEqual(captureRegistrations(true).map((tool) => tool.name));
+    expect(payload.conditionalTools).toEqual(['gsm_find_similar_repos', 'gsm_vector_search']);
+    expect(payload.toolsNote).toBe('gsm_vector_search is available');
   });
 
   it('routes the three new handlers without mutating the provider inputs', async () => {

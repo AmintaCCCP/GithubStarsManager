@@ -19,6 +19,14 @@ export function buildRepoEvidence(
     repository: Record<string, unknown>;
     latest_release: McpReleaseEvidence | null;
     sources: { repository: 'repositories'; latest_release: 'releases_cache' | null };
+    evidenceFreshness: {
+      repositoryUpdatedAt: string | null;
+      repositorySyncedAt: string | null;
+      releaseCacheUpdatedAt: string | null;
+      analyzedAt: string | null;
+      latestReleasePublishedAt: string | null;
+      limitations: string[];
+    };
     limitations: string[];
   };
 } {
@@ -51,6 +59,19 @@ export function buildRepoEvidence(
       sources: {
         repository: 'repositories',
         latest_release: latestRelease ? 'releases_cache' : null,
+      },
+      evidenceFreshness: {
+        // This is the stored GitHub repository updated_at value, not a local
+        // sync timestamp. Do not present it as a freshness check time.
+        repositoryUpdatedAt: repo.updated_at ?? null,
+        repositorySyncedAt: null,
+        releaseCacheUpdatedAt: null,
+        analyzedAt: repo.analyzed_at ?? null,
+        latestReleasePublishedAt: latestRelease?.published_at ?? null,
+        limitations: [
+          'repositoryUpdatedAt is the stored repository updated_at, not a local sync timestamp',
+          'repositorySyncedAt and release-cache update time are not stored locally',
+        ],
       },
       limitations: [
         'archived is not stored locally',
