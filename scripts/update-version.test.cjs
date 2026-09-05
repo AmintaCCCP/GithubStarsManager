@@ -287,6 +287,29 @@ test('recovery is idempotent when the same interrupted fixture is encountered ag
   });
 });
 
+test('orphaned backups from a pre-journal crash are cleared before a new transaction', async () => {
+  await withFixture(async (root) => {
+    const paths = transactionPaths(root);
+    fs.mkdirSync(paths.backupDir);
+    fs.copyFileSync(targetPaths(root)[0], path.join(paths.backupDir, '0-package-lock.json.bak'));
+
+    const result = await runScript(root, ['--sync-lock']);
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(readVersions(root), {
+      root: '1.2.3',
+      packageLock: '1.2.3',
+      packageLockRoot: '1.2.3',
+      serverPackage: '1.2.3',
+      serverPackageLock: '1.2.3',
+      serverPackageLockRoot: '1.2.3',
+    });
+    assert.equal(fs.existsSync(paths.backupDir), false);
+    assert.equal(fs.existsSync(paths.journal), false);
+  });
+});
+
+
 test('a live lock owner is never taken over during recovery', async () => {
   await withFixture(async (root) => {
     const owner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {

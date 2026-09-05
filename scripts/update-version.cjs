@@ -227,10 +227,16 @@ function createPackageSyncTransaction(version) {
 function preparePackageSyncBackupDir() {
   if (fs.existsSync(PACKAGE_SYNC_BACKUP_DIR)) {
     if (!fs.statSync(PACKAGE_SYNC_BACKUP_DIR).isDirectory()) {
-      throw new Error('package sync backup path はディレクトリではありません');
+      throw new Error('package sync 备份路径不是目录，无法开始新事务');
     }
-    if (fs.readdirSync(PACKAGE_SYNC_BACKUP_DIR).length > 0) {
-      throw new Error('package sync backup directory に孤立したファイルが残っています');
+    // 事务日志在所有备份写完后才落盘：没有日志时，目录中的备份必然来自
+    // 写日志前被中断的同步，目标文件尚未改写、备份无人引用，可安全清除。
+    for (const entry of fs.readdirSync(PACKAGE_SYNC_BACKUP_DIR)) {
+      const entryPath = path.join(PACKAGE_SYNC_BACKUP_DIR, entry);
+      if (!fs.statSync(entryPath).isFile()) {
+        throw new Error(`package sync 备份目录存在无法清理的异常条目：${entry}`);
+      }
+      unlinkIfExists(entryPath);
     }
     fs.rmdirSync(PACKAGE_SYNC_BACKUP_DIR);
   }
@@ -262,29 +268,33 @@ function readPackageSyncJournal() {
   try {
     transaction = JSON.parse(fs.readFileSync(PACKAGE_SYNC_JOURNAL_PATH, 'utf8'));
   } catch (error) {
-    throw new Error(`package sync transaction journal の読み込みに失敗しました: ${error.message}`);
+    throw new Error(packageSyncJournalError(`package sync 事务日志读取失败：${error.message}`));
   }
 
   validatePackageSyncJournal(transaction);
   return transaction;
 }
 
+function packageSyncJournalError(message) {
+  return `${message}。如确认当前没有同步在进行，可手动删除 .package-sync.transaction.json 与 .package-sync-backups/ 后重试`;
+}
+
 function validatePackageSyncJournal(transaction) {
   if (!transaction || transaction.transaction !== PACKAGE_SYNC_TRANSACTION) {
-    throw new Error('package sync transaction journal の種別が不正です');
+    throw new Error(packageSyncJournalError('package sync 事务日志类型不正确'));
   }
   if (typeof transaction.version !== 'string') {
-    throw new Error('package sync transaction journal の version が不正です');
+    throw new Error(packageSyncJournalError('package sync 事务日志的 version 字段不正确'));
   }
   validateVersion(transaction.version);
   if (typeof transaction.startedAt !== 'string' || transaction.startedAt.length === 0) {
-    throw new Error('package sync transaction journal の startedAt が不正です');
+    throw new Error(packageSyncJournalError('package sync 事务日志的 startedAt 字段不正确'));
   }
   if (!['prepared', 'committed', 'recovered'].includes(transaction.state)) {
-    throw new Error('package sync transaction journal の state が不正です');
+    throw new Error(packageSyncJournalError('package sync 事务日志的 state 字段不正确'));
   }
   if (!Array.isArray(transaction.targets) || transaction.targets.length !== PACKAGE_SYNC_TARGETS.length) {
-    throw new Error('package sync transaction journal の targets が不正です');
+    throw new Error(packageSyncJournalError('package sync 事务日志的 targets 列表不正确'));
   }
 
   PACKAGE_SYNC_TARGETS.forEach((expected, index) => {
@@ -294,7 +304,7 @@ function validatePackageSyncJournal(transaction) {
       `${index}-${path.basename(expected.path)}.bak`
     );
     if (!actual || actual.targetPath !== expected.path || actual.backupPath !== expectedBackupPath) {
-      throw new Error(`package sync transaction journal の target ${index} が不正です`);
+      throw new Error(packageSyncJournalError(`package sync 事务日志的 target ${index} 与预期不一致`));
     }
   });
 }
@@ -302,7 +312,10 @@ function validatePackageSyncJournal(transaction) {
 function restorePackageSyncBackups(transaction) {
   for (const target of transaction.targets) {
     if (!fs.existsSync(target.backupPath)) {
-      throw new Error(`package sync backup が見つかりません: ${path.basename(target.backupPath)}`);
+      throw new Error(
+        `package sync 备份文件缺失：${path.basename(target.backupPath)}，无法恢复中断的事务。` +
+        '可删除 .package-sync.transaction.json 与 .package-sync-backups/，用 git 还原目标文件后重试'
+      );
     }
     writeDurableFile(target.targetPath, fs.readFileSync(target.backupPath));
   }
@@ -321,7 +334,7 @@ function cleanupPackageSyncTransaction(transaction) {
 
   if (fs.existsSync(PACKAGE_SYNC_BACKUP_DIR)) {
     if (fs.readdirSync(PACKAGE_SYNC_BACKUP_DIR).length > 0) {
-      throw new Error('package sync backup directory の cleanup が完了していません');
+      throw new Error('package sync 备份目录清理未完成，存在残留文件');
     }
     syncDirectory(PACKAGE_SYNC_BACKUP_DIR);
     fs.rmdirSync(PACKAGE_SYNC_BACKUP_DIR);
@@ -357,15 +370,15 @@ function removeStaleReleaseLockForRecovery() {
   try {
     lock = JSON.parse(fs.readFileSync(RELEASE_LOCK_PATH, 'utf8'));
   } catch (error) {
-    throw new Error(`recovery中の release lock owner を確認できません: ${error.message}`);
+    throw new Error(`恢复中断事务时无法确认 release lock 属主进程状态：${error.message}`);
   }
 
   const ownerState = getProcessState(lock.pid);
   if (ownerState === 'live') {
-    throw new Error('recovery対象 transaction の release lock owner が live のため奪取しません');
+    throw new Error(`恢复中断事务时发现 release lock 属主进程（pid ${lock.pid}）正在运行，放弃恢复以免破坏进行中的同步`);
   }
   if (ownerState !== 'dead') {
-    throw new Error('recovery中の release lock owner 状態を確認できないため奪取しません');
+    throw new Error('恢复中断事务时无法确认 release lock 属主进程状态，放弃恢复');
   }
 
   unlinkIfExists(RELEASE_LOCK_PATH);
