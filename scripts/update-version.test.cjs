@@ -309,6 +309,59 @@ test('orphaned backups from a pre-journal crash are cleared before a new transac
   });
 });
 
+test('a stale release lock without a transaction journal is taken over', async () => {
+  await withFixture(async (root) => {
+    const paths = transactionPaths(root);
+    const deadPid = await createExitedProcessPid();
+    writeJson(paths.lock, { pid: deadPid, createdAt: new Date().toISOString() });
+
+    const result = await runScript(root, ['--sync-lock']);
+
+    assert.equal(result.code, 0, result.stderr);
+    assert.deepEqual(readVersions(root), {
+      root: '1.2.3',
+      packageLock: '1.2.3',
+      packageLockRoot: '1.2.3',
+      serverPackage: '1.2.3',
+      serverPackageLock: '1.2.3',
+      serverPackageLockRoot: '1.2.3',
+    });
+    assert.equal(fs.existsSync(paths.lock), false);
+    assert.equal(fs.existsSync(`${paths.lock}.takenover`), false);
+  });
+});
+
+test('concurrent syncs recover the interrupted transaction in single flight', async () => {
+  await withFixture(async (root) => {
+    const paths = await interruptedTransactionFixture(root);
+    const results = await Promise.all([
+      runScript(root, ['--sync-lock']),
+      runScript(root, ['--sync-lock']),
+    ]);
+
+    assert.ok(
+      results.some((result) => result.code === 0),
+      results.map((result) => result.stderr).join('\n')
+    );
+    for (const result of results) {
+      assert.ok([0, 1].includes(result.code), result.stderr);
+      assert.doesNotMatch(result.stderr, /ENOENT/);
+    }
+    assert.deepEqual(readVersions(root), {
+      root: '1.2.3',
+      packageLock: '1.2.3',
+      packageLockRoot: '1.2.3',
+      serverPackage: '1.2.3',
+      serverPackageLock: '1.2.3',
+      serverPackageLockRoot: '1.2.3',
+    });
+    assert.equal(fs.existsSync(paths.journal), false);
+    assert.equal(fs.existsSync(paths.backupDir), false);
+    assert.equal(fs.existsSync(paths.lock), false);
+  });
+});
+
+
 
 test('a live lock owner is never taken over during recovery', async () => {
   await withFixture(async (root) => {

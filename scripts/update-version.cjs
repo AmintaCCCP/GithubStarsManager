@@ -10,6 +10,7 @@ const SERVER_PACKAGE_PATH = path.join(PROJECT_ROOT, 'server/package.json');
 const SERVER_LOCKFILE_PATH = path.join(PROJECT_ROOT, 'server/package-lock.json');
 const VERSION_XML_PATH = path.join(PROJECT_ROOT, 'versions/version-info.xml');
 const RELEASE_LOCK_PATH = path.join(PROJECT_ROOT, '.release-version.lock');
+const RELEASE_LOCK_TAKENOVER_PATH = path.join(PROJECT_ROOT, '.release-version.lock.takenover');
 const PACKAGE_SYNC_TRANSACTION = 'package-version-sync';
 const PACKAGE_SYNC_JOURNAL_PATH = path.join(PROJECT_ROOT, '.package-sync.transaction.json');
 const PACKAGE_SYNC_BACKUP_DIR = path.join(PROJECT_ROOT, '.package-sync-backups');
@@ -161,8 +162,56 @@ function syncLockfileFromRootVersion() {
 }
 
 function acquireReleaseLockAfterRecovery() {
+  const lock = acquireReleaseLockWithTakeover();
+  // 恢复必须在持有独占锁之后进行，否则两个进程可能并发恢复同一份事务日志：
+  // 一个还在读备份，另一个已经把备份删掉了。
   recoverInterruptedPackageSync();
+  return lock;
+}
+
+function acquireReleaseLockWithTakeover() {
+  // 只有死属主残留的锁才会被接管；活进程或状态未知时保持获取失败（EEXIST 拒绝）。
+  tryTakeOverStaleReleaseLock();
   return acquireReleaseLock();
+}
+
+function tryTakeOverStaleReleaseLock() {
+  const stalePid = readReleaseLockPid(RELEASE_LOCK_PATH);
+  if (stalePid === null || getProcessState(stalePid) !== 'dead') {
+    return false;
+  }
+
+  try {
+    // rename 抢占是原子的：并发接管者中只有一个能把陈旧锁移走
+    fs.renameSync(RELEASE_LOCK_PATH, RELEASE_LOCK_TAKENOVER_PATH);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return true;
+    }
+    throw error;
+  }
+
+  if (readReleaseLockPid(RELEASE_LOCK_TAKENOVER_PATH) !== stalePid) {
+    // rename 前锁可能已被在线属主重建：原样放回并放弃接管，绝不删除在线进程的锁
+    try {
+      fs.renameSync(RELEASE_LOCK_TAKENOVER_PATH, RELEASE_LOCK_PATH);
+    } catch {
+      // 无法放回时同样放弃，由属主自身的释放逻辑兜底
+    }
+    return false;
+  }
+
+  unlinkIfExists(RELEASE_LOCK_TAKENOVER_PATH);
+  return true;
+}
+
+function readReleaseLockPid(lockPath) {
+  try {
+    const pid = JSON.parse(fs.readFileSync(lockPath, 'utf8')).pid;
+    return Number.isSafeInteger(pid) ? pid : null;
+  } catch {
+    return null;
+  }
 }
 
 function commitPackageSyncTargets(version, transaction, staged = {}) {
@@ -248,8 +297,6 @@ function recoverInterruptedPackageSync() {
   if (!transaction) {
     return;
   }
-
-  removeStaleReleaseLockForRecovery();
 
   if (transaction.state === 'prepared') {
     restorePackageSyncBackups(transaction);
@@ -359,29 +406,6 @@ function rollbackPackageSyncTransaction(transaction, snapshots) {
   restoreFileSnapshots(snapshots);
   markPackageSyncState(transaction, 'recovered');
   cleanupPackageSyncTransaction(transaction);
-}
-
-function removeStaleReleaseLockForRecovery() {
-  if (!fs.existsSync(RELEASE_LOCK_PATH)) {
-    return;
-  }
-
-  let lock;
-  try {
-    lock = JSON.parse(fs.readFileSync(RELEASE_LOCK_PATH, 'utf8'));
-  } catch (error) {
-    throw new Error(`恢复中断事务时无法确认 release lock 属主进程状态：${error.message}`);
-  }
-
-  const ownerState = getProcessState(lock.pid);
-  if (ownerState === 'live') {
-    throw new Error(`恢复中断事务时发现 release lock 属主进程（pid ${lock.pid}）正在运行，放弃恢复以免破坏进行中的同步`);
-  }
-  if (ownerState !== 'dead') {
-    throw new Error('恢复中断事务时无法确认 release lock 属主进程状态，放弃恢复');
-  }
-
-  unlinkIfExists(RELEASE_LOCK_PATH);
 }
 
 function getProcessState(pid) {

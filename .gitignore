@@ -45,6 +45,7 @@ LandingPage/
 
 # Release version synchronization runtime files
 .release-version.lock
+.release-version.lock.takenover
 .package-sync.transaction.json
 .package-sync-backups/
 versions/.version-info.xml.*.tmp
