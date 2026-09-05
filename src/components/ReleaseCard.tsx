@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
+import React, { memo, useCallback, useState, useEffect } from 'react';
 import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import { Release } from '../types';
 import { formatDistanceToNow } from 'date-fns';
@@ -7,20 +7,12 @@ import MarkdownRenderer from './MarkdownRenderer';
 import AssetLeadingIcon from './AssetLeadingIcon';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useDialog } from '../hooks/useDialog';
-import { sendToRpcDownload } from '../services/rpcDownloadService';
-import { AIService } from '../services/aiService';
+import { computeRpcDownloadKey, useReleaseArtifactActions } from '../hooks/useReleaseArtifactActions';
 import {
   effectiveReleaseTime,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
 import { Button } from './ui/button';
-
-type SummaryState = {
-  status: 'idle' | 'loading' | 'done' | 'error';
-  content?: string;
-  error?: string;
-};
 
 interface DownloadLink {
   name: string;
@@ -92,118 +84,29 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const effectiveTime = effectiveReleaseTime(release);
   const showAssetsUpdatedIndicator = shouldShowAssetsUpdatedIndicator(release);
 
-  // RPC download support — use refs to avoid stale closure in async handler
-  const { rpcDownloadConfig, backendApiSecret, aiConfigs, activeAIConfig } = useAppStore(useShallow((state) => ({
+  // RPC 发送与 AI 总结动作由共享 hook 承担（useRepositoryReleaseSheet 同源委托）
+  const { rpcDownloadConfig } = useAppStore(useShallow((state) => ({
     rpcDownloadConfig: state.rpcDownloadConfig,
-    backendApiSecret: state.backendApiSecret,
-    aiConfigs: state.aiConfigs,
-    activeAIConfig: state.activeAIConfig,
   })));
-  const activeConfig = aiConfigs.find((config) => config.id === activeAIConfig);
-
-  // AI 总结的本地状态（展开态与结果均内聚在卡片内，不持久化）
+  const { summaries, rpcDownloadStates, sendRpcDownload, generateSummary } = useReleaseArtifactActions();
+  // AI 总结状态内聚在 hook（展开态留在卡片内，不持久化）；
+  // 卡片卸载时的请求取消由 hook 的 unmount 副作用承担（卡片卸载即 hook 卸载）。
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
-  const [summary, setSummary] = useState<SummaryState>({ status: 'idle' });
-  const { toast } = useDialog();
-  // 管理进行中的 AI 请求，组件卸载或重新发起时取消，避免内存泄漏与无效网络开销
-  const summaryAbortRef = useRef<AbortController | null>(null);
+  const summary = summaries[release.id] ?? { status: 'idle' as const };
 
+  // 完成或失败后自动展开（原 runSummaryAnalysis 成功/失败分支的 setIsSummaryExpanded(true)）
   useEffect(() => {
-    return () => {
-      summaryAbortRef.current?.abort();
-    };
-  }, []);
-  const downloadingRef = useRef<Record<string, boolean>>({});
-  const downloadedRef = useRef<Record<string, boolean>>({});
-  const [, forceUpdate] = useState(0);
-
-  const handleRpcDownload = useCallback(async (link: DownloadLink) => {
-    // 同一资产更新后 URL 不变但 updatedAt 会变，key 带上版本，
-    // 否则旧版本的"已发送 ✓"会错误地残留在新版本上。
-    const key = `${link.url}@${link.updatedAt ?? ''}`;
-    // 仅在下载进行中时短路，允许下载完成后再次点击重新发送
-    if (downloadingRef.current[key]) return;
-
-    downloadingRef.current = { ...downloadingRef.current, [key]: true };
-    // 重试开始即清除旧的成功态：若本次失败/异常，行内不得残留 ✓，
-    // 否则卡片会把失败的重试报告成成功。
-    if (key in downloadedRef.current) {
-      const next = { ...downloadedRef.current };
-      delete next[key];
-      downloadedRef.current = next;
+    if (summary.status === 'done' || summary.status === 'error') {
+      setIsSummaryExpanded(true);
     }
-    forceUpdate(n => n + 1);
-    try {
-      const result = await sendToRpcDownload(link.url, link.name, backendApiSecret || undefined);
-      if (result.success) {
-        downloadedRef.current = { ...downloadedRef.current, [key]: true };
-        toast(t('已发送到远程下载器', 'Sent to remote downloader'), 'success');
-      } else {
-        toast(
-          result.error === 'RPC service not running'
-            ? t('远程下载服务未运行，请检查配置', 'Remote download service not running, please check config')
-            : result.error || t('发送失败', 'Send failed'),
-          'error'
-        );
-      }
-    } catch {
-      toast(t('远程下载服务未运行，请检查配置', 'Remote download service not running, please check config'), 'error');
-    } finally {
-      downloadingRef.current = { ...downloadingRef.current, [key]: false };
-      forceUpdate(n => n + 1);
-    }
-  }, [backendApiSecret, toast, t]);
+  }, [summary.status]);
 
   // 判断是否有任何内容展开
   const isAnyExpanded = isAssetsExpanded || isReleaseNotesExpanded || isSummaryExpanded;
 
-  const runSummaryAnalysis = useCallback(async () => {
-    if (!activeConfig) {
-      toast(
-        language === 'zh' ? '请先在设置中配置 AI 服务。' : 'Please configure AI service in settings first.',
-        'error'
-      );
-      return;
-    }
-
-    // 取消上一次未完成的请求
-    summaryAbortRef.current?.abort();
-    const controller = new AbortController();
-    summaryAbortRef.current = controller;
-
-    const config = activeConfig;
-    setSummary({ status: 'loading' });
-    try {
-      const aiService = new AIService(config, language);
-      const content = await aiService.analyzeReleaseSummary(
-        release.body || '',
-        {
-          repoName: release.repository.full_name,
-          tagName: release.tag_name,
-          releaseName: release.name && release.name !== release.tag_name ? release.name : undefined,
-        },
-        controller.signal
-      );
-      setSummary({ status: 'done', content });
-      setIsSummaryExpanded(true);
-    } catch (error) {
-      // 主动取消（卸载/重新发起）时静默处理，不更新状态、不弹错误
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      setSummary({ status: 'error', error: message });
-      setIsSummaryExpanded(true);
-      toast(
-        language === 'zh' ? `总结生成失败：${message}` : `Summary failed: ${message}`,
-        'error'
-      );
-    } finally {
-      if (summaryAbortRef.current === controller) {
-        summaryAbortRef.current = null;
-      }
-    }
-  }, [activeConfig, language, release, toast]);
+  const handleRpcDownload = useCallback(async (link: DownloadLink) => {
+    await sendRpcDownload(link);
+  }, [sendRpcDownload]);
 
   const handleToggleSummary = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -221,8 +124,8 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
     }
 
     // 未分析或上次失败 → 触发 AI 分析（按钮转圈，完成后自动展开）
-    await runSummaryAnalysis();
-  }, [isSummaryExpanded, summary, runSummaryAnalysis]);
+    await generateSummary(release);
+  }, [isSummaryExpanded, summary, generateSummary, release]);
 
   return (
     <div
@@ -398,10 +301,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               <div className="ui-inset-surface max-h-72 overflow-hidden overflow-y-auto">
                 {downloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
-                  // 与 handleRpcDownload 使用相同的版本化 key
-                  const rpcKey = `${link.url}@${link.updatedAt ?? ''}`;
-                  const isDownloading = downloadingRef.current[rpcKey];
-                  const isDownloaded = downloadedRef.current[rpcKey];
+                  // 与 sendRpcDownload 使用相同的版本化 key
+                  const rpcKey = computeRpcDownloadKey(link);
+                  const isDownloading = rpcDownloadStates[rpcKey] === 'sending';
+                  const isDownloaded = rpcDownloadStates[rpcKey] === 'sent';
                   const isAssetUpdated = link.assetId !== undefined
                     && release.updated_asset_ids?.includes(link.assetId) === true;
 
