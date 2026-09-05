@@ -174,7 +174,8 @@ export function getStats() {
   }
 
   const topTags = Object.entries(tagCounts)
-    .sort((a, b) => b[1] - a[1])
+    // 同数标签按名称稳定排序，与 Electron mcpDiscovery.buildStats 保持一致
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
     .slice(0, 20)
     .map(([tag, count]) => ({ tag, count }));
 

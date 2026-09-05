@@ -16,7 +16,9 @@ const providerMocks = vi.hoisted(() => ({
 vi.mock('../../src/mcp/provider.js', () => providerMocks);
 
 const { registerMcpTools } = await import('../../src/mcp/tools.js');
+const { searchRepositories: backendSearch } = await import('../../src/mcp/repoSearch.js');
 const electronModule = await import('../../../electron/mcpLocalServer.js');
+const electronDiscovery = await import('../../../electron/mcpDiscovery.js');
 const getElectronTools =
   electronModule.getMcpToolDefinitions || electronModule.default.getMcpToolDefinitions;
 
@@ -53,4 +55,64 @@ describe('backend/Electron MCP parity', () => {
     const backend = getBackendTools().map((tool) => tool.name);
     expect(getElectronTools(false).map((tool: { name: string }) => tool.name)).toEqual(backend);
   });
+
+  it('orders tied repos identically by full_name on both ends', () => {
+    const fixtures = [
+      parityRepo({ id: 1, name: 'zeta', full_name: 'acme/zeta', stargazers_count: 100 }),
+      parityRepo({ id: 2, name: 'alpha', full_name: 'acme/alpha', stargazers_count: 100 }),
+      parityRepo({ id: 3, name: 'mid', full_name: 'acme/mid', stargazers_count: 100 }),
+      parityRepo({ id: 4, name: 'solo', full_name: 'other/solo', stargazers_count: 5 }),
+    ];
+    // 输入顺序与预期输出相反，证明 tie-break 真正生效而非继承输入顺序
+    const expected = [
+      'acme/alpha',
+      'acme/mid',
+      'acme/zeta',
+      'other/solo',
+    ];
+    const backend = backendSearch(fixtures, {});
+    const electron = electronDiscovery.searchRepositories(fixtures, {});
+    expect(backend.items.map((repo: { full_name: string }) => repo.full_name)).toEqual(expected);
+    expect(electron.items.map((repo: { full_name: string }) => repo.full_name)).toEqual(
+      backend.items.map((repo: { full_name: string }) => repo.full_name)
+    );
+  });
+
+  it('clamps a zero limit identically on both ends', () => {
+    const fixtures = [
+      parityRepo({ id: 1, name: 'alpha', full_name: 'acme/alpha', stargazers_count: 100 }),
+      parityRepo({ id: 2, name: 'beta', full_name: 'acme/beta', stargazers_count: 50 }),
+    ];
+    const backend = backendSearch(fixtures, { limit: 0 });
+    const electron = electronDiscovery.searchRepositories(fixtures, { limit: 0 });
+    expect(backend.items).toHaveLength(1);
+    expect(electron.limit).toBe(1);
+    expect(electron.items.map((repo: { full_name: string }) => repo.full_name)).toEqual(
+      backend.items.map((repo: { full_name: string }) => repo.full_name)
+    );
+  });
 });
+
+function parityRepo(partial: {
+  id: number;
+  name: string;
+  full_name: string;
+  stargazers_count: number;
+}): {
+  id: number;
+  name: string;
+  full_name: string;
+  description: null;
+  html_url: string;
+  stargazers_count: number;
+  language: string;
+  topics: string[];
+} {
+  return {
+    description: null,
+    html_url: `https://github.com/${partial.full_name}`,
+    language: 'TS',
+    topics: [],
+    ...partial,
+  };
+}

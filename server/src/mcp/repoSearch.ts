@@ -177,7 +177,9 @@ export function applyRepoFilters<T extends McpRepository>(
     const bValue = getSortValue(b, sortBy);
     if (aValue < bValue) return sortOrder === 'desc' ? 1 : -1;
     if (aValue > bValue) return sortOrder === 'desc' ? -1 : 1;
-    return 0;
+    // 与 src/utils/repoSearch.ts 的 sortRepositories 保持一致：同分时按 full_name
+    // 稳定排序，保证跨端（后端/Electron）分页结果一致。
+    return a.full_name.localeCompare(b.full_name);
   });
   return sorted;
 }
