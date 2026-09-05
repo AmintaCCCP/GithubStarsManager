@@ -70,10 +70,13 @@ export const useReleaseArtifactActions = (): ReleaseArtifactActions => {
   useEffect(() => cancelSummaryRequests, [cancelSummaryRequests]);
 
   const reset = useCallback(() => {
+    // 先取消进行中的总结请求再清空：否则刷新（sheet 的 loadReleases）后，
+    // 迟到的完成会回写旧结果到刚清空的状态里。
+    cancelSummaryRequests();
     setSummaries({});
     rpcDownloadStatesRef.current = {};
     setRpcDownloadStates({});
-  }, []);
+  }, [cancelSummaryRequests]);
 
   const sendRpcDownload = useCallback(async (link: RpcDownloadLink) => {
     const key = computeRpcDownloadKey(link);

@@ -266,6 +266,40 @@ describe('useReleaseArtifactActions.generateSummary', () => {
     expect(signals[0].aborted).toBe(true);
   });
 
+  it('reset cancels in-flight summaries so they cannot write back after clearing', async () => {
+    // abort 感知 mock：真实 fetch 在 signal 中止时会以 AbortError 拒绝
+    const resolvers: Array<(value: string) => void> = [];
+    mocks.analyzeReleaseSummary.mockImplementation((_b: string, _m: unknown, signal: AbortSignal) =>
+      new Promise<string>((resolve, reject) => {
+        resolvers.push((value: string) => {
+          if (signal.aborted) {
+            const abortError = new Error('Aborted');
+            abortError.name = 'AbortError';
+            reject(abortError);
+          } else {
+            resolve(value);
+          }
+        });
+      }));
+    const { result } = renderHook(() => useReleaseArtifactActions());
+
+    act(() => {
+      void result.current.generateSummary(release);
+    });
+    expect(result.current.summaries[100]?.status).toBe('loading');
+
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.summaries).toEqual({});
+
+    // 模拟迟到的完成：请求已被 reset 取消，结果不得回写
+    resolvers[0]('# stale');
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(result.current.summaries).toEqual({});
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
   it('reset clears summaries and rpc download states', async () => {
     mocks.sendToRpcDownload.mockResolvedValue({ success: true });
     mocks.analyzeReleaseSummary.mockResolvedValue('# Summary');
