@@ -100,6 +100,54 @@ export function performBasicTextSearch<T extends McpRepository>(repos: T[], quer
   });
 }
 
+/**
+ * Pure predicate for the facet filters shared by keyword and vector search.
+ * Vector search uses this predicate after retrieval so it never changes the
+ * Worker contract or pretends to provide an exact corpus-wide filtered topK.
+ */
+export function matchesRepoFilters(repo: McpRepository, filters: McpSearchFilters): boolean {
+  if (filters.languages?.length && (!repo.language || !filters.languages.includes(repo.language))) {
+    return false;
+  }
+  if (filters.tags?.length) {
+    const tags = [...(repo.ai_tags || []), ...(repo.topics || []), ...(repo.custom_tags || [])];
+    if (!filters.tags.some((tag) => tags.includes(tag))) return false;
+  }
+  if (filters.platforms?.length) {
+    const platforms = repo.ai_platforms || [];
+    if (!filters.platforms.some((platform) => platforms.includes(platform))) return false;
+  }
+  if (filters.licenses?.length && !filters.licenses.includes(normalizeLicense(repo.license))) {
+    return false;
+  }
+  if (filters.isAnalyzed !== undefined && filters.analysisFailed === undefined) {
+    const matches = filters.isAnalyzed
+      ? !!repo.analyzed_at && !repo.analysis_failed
+      : !repo.analyzed_at;
+    if (!matches) return false;
+  }
+  if (filters.isSubscribed !== undefined && filters.isSubscribed !== !!repo.subscribed_to_releases) {
+    return false;
+  }
+  if (filters.isCategoryLocked !== undefined && filters.isCategoryLocked !== !!repo.category_locked) {
+    return false;
+  }
+  if (filters.analysisFailed !== undefined && filters.isAnalyzed === undefined) {
+    const failed = !!(repo.analyzed_at && repo.analysis_failed);
+    if (filters.analysisFailed !== failed) return false;
+  }
+  if (filters.minStars !== undefined && (repo.stargazers_count ?? 0) < filters.minStars) {
+    return false;
+  }
+  if (filters.maxStars !== undefined && (repo.stargazers_count ?? 0) > filters.maxStars) {
+    return false;
+  }
+  if (filters.category && filters.category !== 'all' && repo.custom_category !== filters.category) {
+    return false;
+  }
+  return true;
+}
+
 function getSortValue(repo: McpRepository, sortBy: McpSearchFilters['sortBy']): number | string {
   switch (sortBy) {
     case 'stars':
@@ -119,58 +167,7 @@ export function applyRepoFilters<T extends McpRepository>(
   repos: T[],
   filters: McpSearchFilters
 ): T[] {
-  let filtered: T[] = repos;
-
-  if (filters.languages?.length) {
-    filtered = filtered.filter((r) => r.language && filters.languages!.includes(r.language));
-  }
-  if (filters.tags?.length) {
-    filtered = filtered.filter((r) => {
-      const tags = [...(r.ai_tags || []), ...(r.topics || []), ...(r.custom_tags || [])];
-      return filters.tags!.some((t) => tags.includes(t));
-    });
-  }
-  if (filters.platforms?.length) {
-    filtered = filtered.filter((r) => {
-      const platforms = r.ai_platforms || [];
-      return filters.platforms!.some((p) => platforms.includes(p));
-    });
-  }
-  if (filters.licenses?.length) {
-    filtered = filtered.filter((r) =>
-      filters.licenses!.includes(normalizeLicense(r.license))
-    );
-  }
-  if (filters.isAnalyzed !== undefined && filters.analysisFailed === undefined) {
-    filtered = filtered.filter((r) =>
-      filters.isAnalyzed ? !!r.analyzed_at && !r.analysis_failed : !r.analyzed_at
-    );
-  }
-  if (filters.isSubscribed !== undefined) {
-    filtered = filtered.filter((r) =>
-      filters.isSubscribed ? !!r.subscribed_to_releases : !r.subscribed_to_releases
-    );
-  }
-  if (filters.isCategoryLocked !== undefined) {
-    filtered = filtered.filter((r) =>
-      filters.isCategoryLocked ? !!r.category_locked : !r.category_locked
-    );
-  }
-  if (filters.analysisFailed !== undefined && filters.isAnalyzed === undefined) {
-    filtered = filtered.filter((r) => {
-      const hasFailed = !!(r.analyzed_at && r.analysis_failed);
-      return filters.analysisFailed ? hasFailed : !hasFailed;
-    });
-  }
-  if (filters.minStars !== undefined) {
-    filtered = filtered.filter((r) => (r.stargazers_count ?? 0) >= filters.minStars!);
-  }
-  if (filters.maxStars !== undefined) {
-    filtered = filtered.filter((r) => (r.stargazers_count ?? 0) <= filters.maxStars!);
-  }
-  if (filters.category && filters.category !== 'all') {
-    filtered = filtered.filter((r) => r.custom_category === filters.category);
-  }
+  const filtered = repos.filter((repo) => matchesRepoFilters(repo, filters));
 
   const sortBy = filters.sortBy ?? 'stars';
   const sortOrder = filters.sortOrder ?? 'desc';
@@ -180,7 +177,9 @@ export function applyRepoFilters<T extends McpRepository>(
     const bValue = getSortValue(b, sortBy);
     if (aValue < bValue) return sortOrder === 'desc' ? 1 : -1;
     if (aValue > bValue) return sortOrder === 'desc' ? -1 : 1;
-    return 0;
+    // 与 src/utils/repoSearch.ts 的 sortRepositories 保持一致：同分时按 full_name
+    // 稳定排序，保证跨端（后端/Electron）分页结果一致。
+    return a.full_name.localeCompare(b.full_name);
   });
   return sorted;
 }

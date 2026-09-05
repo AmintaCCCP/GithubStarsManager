@@ -5,79 +5,20 @@
  */
 const http = require('http');
 const crypto = require('crypto');
+const {
+  buildBatchLookupResult,
+  buildRepoEvidence,
+  buildRepositoryEmbeddingText,
+  buildStats,
+  filterVectorCandidates,
+  getLatestCachedRelease,
+  hasActiveVectorFilters,
+  projectRepo,
+  searchRepositories,
+} = require('./mcpDiscovery');
 
-function performBasicTextSearch(repos, query) {
-  const normalizedQuery = String(query || '').toLowerCase().trim();
-  if (!normalizedQuery) return repos;
-  const words = normalizedQuery.split(/\s+/).filter(Boolean);
-  return repos.filter((repo) => {
-    const text = [
-      repo.name,
-      repo.full_name,
-      repo.description || '',
-      repo.custom_description || '',
-      repo.language || '',
-      ...(repo.topics || []),
-      repo.ai_summary || '',
-      ...(repo.ai_tags || []),
-      ...(repo.ai_platforms || []),
-      ...(repo.custom_tags || []),
-      repo.custom_category || '',
-      normalizeLicense(repo.license),
-    ]
-      .join(' ')
-      .toLowerCase();
-    return words.every((w) => text.includes(w));
-  });
-}
-
-// License 归一化镜像（与 src/utils/licenseFilter.ts 一致）
-const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
-const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
-function normalizeLicense(v) {
-  if (v == null || v === '') return NO_LICENSE_SENTINEL;
-  if (typeof v === 'object') {
-    const spdx = typeof v.spdx_id === 'string' ? v.spdx_id.trim() : '';
-    const key = typeof v.key === 'string' ? v.key.trim() : '';
-    const resolved = spdx || key;
-    if (!resolved) return NO_LICENSE_SENTINEL;
-    return NOASSERTION_KEYS.has(resolved.toLowerCase()) ? NO_LICENSE_SENTINEL : resolved;
-  }
-  if (typeof v !== 'string') return NO_LICENSE_SENTINEL;
-  // 直接字符串路径也需 trim：避免 " Other " / " NOASSERTION " 等空白变体逃过哨兵归并
-  const normalized = v.trim();
-  return !normalized || NOASSERTION_KEYS.has(normalized.toLowerCase())
-    ? NO_LICENSE_SENTINEL
-    : normalized;
-}
-
-function projectRepo(repo, max = 400) {
-  const summary = repo.ai_summary || repo.custom_description || repo.description || null;
-  const truncated =
-    typeof summary === 'string' && summary.length > max ? `${summary.slice(0, max)}…` : summary;
-  return {
-    id: repo.id,
-    full_name: repo.full_name,
-    name: repo.name,
-    html_url: repo.html_url,
-    description: repo.description,
-    language: repo.language,
-    stargazers_count: repo.stargazers_count,
-    topics: repo.topics || [],
-    ai_summary: truncated,
-    ai_tags: repo.ai_tags || [],
-    ai_platforms: repo.ai_platforms || [],
-    custom_description: repo.custom_description,
-    custom_tags: repo.custom_tags,
-    custom_category: repo.custom_category,
-    analyzed_at: repo.analyzed_at,
-    subscribed_to_releases: !!repo.subscribed_to_releases,
-    starred_at: repo.starred_at,
-    updated_at: repo.updated_at,
-    pushed_at: repo.pushed_at,
-    license: repo.license ?? null,
-  };
-}
+const MCP_BATCH_LIMIT = 50;
+const VECTOR_CANDIDATE_LIMIT = 50;
 
 function getVectorAvailability(snapshot) {
   const vs = snapshot?.vectorSearchConfig;
@@ -218,6 +159,8 @@ async function runVectorSearch(query, args, snapshot) {
       : typeof vs.searchThreshold === 'number'
         ? vs.searchThreshold
         : 0.35;
+  const filtersActive = hasActiveVectorFilters(args || {});
+  const workerTopK = filtersActive ? VECTOR_CANDIDATE_LIMIT : topK;
 
   let vector;
   try {
@@ -239,12 +182,12 @@ async function runVectorSearch(query, args, snapshot) {
         'Content-Type': 'application/json',
         ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
       },
-      body: JSON.stringify({ vector, topK, threshold }),
+      body: JSON.stringify({ vector, topK: workerTopK, threshold }),
     });
-  } catch (err) {
+  } catch {
     return {
       available: false,
-      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+      reason: 'worker_query_failed',
     };
   }
   if (!res.ok) {
@@ -255,23 +198,69 @@ async function runVectorSearch(query, args, snapshot) {
     };
   }
 
-  const data = await res.json();
-  const matches = Array.isArray(data.matches) ? data.matches : [];
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    // 200 但响应体不是合法 JSON（如网关错误页）；findSimilarRepositories 依赖
+    // runVectorSearch 永不 throw，异常必须折叠进声明的 { available: false } 结果
+    return {
+      available: false,
+      reason: 'worker_query_failed',
+    };
+  }
+  // 与 server/src/mcp/provider.ts 相同的结构校验：JSON null / matches 非数组
+  // 不静默转空结果，统一返回声明的 unavailable 结果
+  if (!data || !Array.isArray(data.matches)) {
+    return {
+      available: false,
+      reason: 'worker_query_failed',
+    };
+  }
+  const matches = data.matches;
   const repos = Array.isArray(snapshot?.repositories) ? snapshot.repositories : [];
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
-  const enriched = matches
+  const candidates = matches
     .map((m) => {
       const repo = byId.get(String(m.id));
       if (!repo) return null;
-      return { score: m.score, ...projectRepo(repo) };
+      return { id: String(m.id), score: Number(m.score), repository: repo };
     })
     .filter(Boolean);
 
-  return { available: true, total: enriched.length, matches: enriched };
+  if (!filtersActive) {
+    const enriched = candidates.map((candidate) => ({
+      score: candidate.score,
+      ...projectRepo(candidate.repository),
+    }));
+    return { available: true, total: enriched.length, matches: enriched };
+  }
+
+  // This is local filtering over the retrieved candidate set, not an exact
+  // filtered topK over the complete Vectorize corpus. The Worker returns at
+  // most VECTOR_CANDIDATE_LIMIT candidates and is intentionally unchanged.
+  const filtered = filterVectorCandidates(candidates, args || {}, topK);
+  const enriched = filtered.matches.map((candidate) => ({
+    score: candidate.score,
+    ...projectRepo(candidate.repository),
+  }));
+
+  return {
+    available: true,
+    total: enriched.length,
+    matches: enriched,
+    filtering: {
+      mode: 'local_candidate_set',
+      candidateLimit: VECTOR_CANDIDATE_LIMIT,
+      exactCorpusFilteredTopK: false,
+      candidateCount: filtered.candidateCount,
+      filteredCount: filtered.filteredCount,
+    },
+  };
 }
 
-function getTools(vectorAvailable) {
+function getMcpToolDefinitions(vectorAvailable) {
   const tools = [
     {
       name: 'gsm_status',
@@ -287,6 +276,7 @@ function getTools(vectorAvailable) {
           query: { type: 'string' },
           languages: { type: 'array', items: { type: 'string' } },
           tags: { type: 'array', items: { type: 'string' } },
+          platforms: { type: 'array', items: { type: 'string' } },
           licenses: {
             type: 'array',
             items: { type: 'string' },
@@ -295,6 +285,10 @@ function getTools(vectorAvailable) {
           category: { type: 'string' },
           minStars: { type: 'number' },
           maxStars: { type: 'number' },
+          isAnalyzed: { type: 'boolean' },
+          isSubscribed: { type: 'boolean' },
+          sortBy: { type: 'string', enum: ['stars', 'updated', 'name', 'starred'] },
+          sortOrder: { type: 'string', enum: ['asc', 'desc'] },
           limit: { type: 'number' },
           offset: { type: 'number' },
         },
@@ -306,6 +300,33 @@ function getTools(vectorAvailable) {
       inputSchema: {
         type: 'object',
         properties: { idOrFullName: { type: 'string' } },
+        required: ['idOrFullName'],
+      },
+    },
+    {
+      name: 'gsm_get_repos',
+      description:
+        'Get multiple starred repositories by id or full_name. Preserves input order and reports partial not_found results.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          idsOrFullNames: {
+            type: 'array',
+            minItems: 1,
+            maxItems: MCP_BATCH_LIMIT,
+            items: { type: 'string', minLength: 1 },
+          },
+        },
+        required: ['idsOrFullNames'],
+      },
+    },
+    {
+      name: 'gsm_get_repo_evidence',
+      description:
+        'Get deterministic local repository evidence and the latest cached release, without remote GitHub requests or inferred values.',
+      inputSchema: {
+        type: 'object',
+        properties: { idOrFullName: { type: 'string', minLength: 1 } },
         required: ['idOrFullName'],
       },
     },
@@ -323,6 +344,8 @@ function getTools(vectorAvailable) {
           category: { type: 'string' },
           limit: { type: 'number' },
           offset: { type: 'number' },
+          sortBy: { type: 'string', enum: ['stars', 'updated', 'name', 'starred'] },
+          sortOrder: { type: 'string', enum: ['asc', 'desc'] },
         },
         required: ['category'],
       },
@@ -335,6 +358,20 @@ function getTools(vectorAvailable) {
   ];
   if (vectorAvailable) {
     tools.push({
+      name: 'gsm_find_similar_repos',
+      description:
+        'Find semantically similar starred repositories using the existing vector index; the source repository is excluded.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          idOrFullName: { type: 'string', minLength: 1 },
+          topK: { type: 'number', minimum: 1, maximum: 50 },
+          threshold: { type: 'number', minimum: 0, maximum: 1 },
+        },
+        required: ['idOrFullName'],
+      },
+    });
+    tools.push({
       name: 'gsm_vector_search',
       description:
         'Semantic vector search over starred repositories (uses the app embedding + Vectorize worker config).',
@@ -344,6 +381,19 @@ function getTools(vectorAvailable) {
           query: { type: 'string' },
           topK: { type: 'number' },
           threshold: { type: 'number' },
+          languages: { type: 'array', items: { type: 'string' } },
+          tags: { type: 'array', items: { type: 'string' } },
+          platforms: { type: 'array', items: { type: 'string' } },
+          licenses: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'SPDX id list; use "__NO_LICENSE__" for repos with no license',
+          },
+          category: { type: 'string' },
+          minStars: { type: 'number' },
+          maxStars: { type: 'number' },
+          isAnalyzed: { type: 'boolean' },
+          isSubscribed: { type: 'boolean' },
         },
         required: ['query'],
       },
@@ -352,9 +402,19 @@ function getTools(vectorAvailable) {
   return tools;
 }
 
+function findSnapshotRepository(repos, idOrFullName) {
+  const key = String(idOrFullName || '');
+  return repos.find(
+    (repo) =>
+      String(repo.id) === key ||
+      (repo.full_name && String(repo.full_name).toLowerCase() === key.toLowerCase())
+  );
+}
+
 async function callTool(name, args, snapshot) {
   const repos = Array.isArray(snapshot?.repositories) ? snapshot.repositories : [];
   const categories = Array.isArray(snapshot?.customCategories) ? snapshot.customCategories : [];
+  const releases = Array.isArray(snapshot?.releases) ? snapshot.releases : [];
   const vectorInfo = getVectorAvailability(snapshot);
 
   const text = (data) => ({
@@ -376,77 +436,106 @@ async function callTool(name, args, snapshot) {
         },
         toolsNote: vectorInfo.available
           ? 'gsm_vector_search is available'
-          : 'gsm_vector_search is not listed until vector search is configured and enabled in the app',
+          : 'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled',
       });
     case 'gsm_search_repos': {
-      let list = performBasicTextSearch(repos, args?.query || '');
-      if (args?.languages?.length) {
-        list = list.filter((r) => r.language && args.languages.includes(r.language));
-      }
-      if (args?.tags?.length) {
-        list = list.filter((r) => {
-          const tags = [...(r.ai_tags || []), ...(r.topics || []), ...(r.custom_tags || [])];
-          return args.tags.some((t) => tags.includes(t));
-        });
-      }
-      if (args?.licenses?.length) {
-        list = list.filter((r) => args.licenses.includes(normalizeLicense(r.license)));
-      }
-      if (args?.category) {
-        list = list.filter((r) => r.custom_category === args.category);
-      }
-      if (typeof args?.minStars === 'number') {
-        list = list.filter((r) => (r.stargazers_count || 0) >= args.minStars);
-      }
-      if (typeof args?.maxStars === 'number') {
-        list = list.filter((r) => (r.stargazers_count || 0) <= args.maxStars);
-      }
-      list = [...list].sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
-      const offset = Math.max(0, args?.offset || 0);
-      const limit = Math.min(100, Math.max(1, args?.limit || 20));
-      const items = list.slice(offset, offset + limit).map((r) => projectRepo(r));
-      return text({ total: list.length, count: items.length, offset, limit, items });
+      const result = searchRepositories(repos, args || {});
+      return text({
+        total: result.total,
+        count: result.items.length,
+        offset: result.offset,
+        limit: result.limit,
+        items: result.items.map((repo) => projectRepo(repo)),
+      });
     }
     case 'gsm_get_repo': {
       const key = String(args?.idOrFullName || '');
-      const repo = repos.find(
-        (r) =>
-          String(r.id) === key ||
-          (r.full_name && r.full_name.toLowerCase() === key.toLowerCase())
-      );
+      const repo = findSnapshotRepository(repos, key);
       if (!repo) return text({ error: 'not_found', idOrFullName: key });
       return text(projectRepo(repo, 2000));
+    }
+    case 'gsm_get_repos': {
+      const inputs = args?.idsOrFullNames;
+      if (
+        !Array.isArray(inputs) ||
+        inputs.length < 1 ||
+        inputs.length > MCP_BATCH_LIMIT ||
+        inputs.some((input) => typeof input !== 'string' || !input.trim())
+      ) {
+        return text({
+          error: 'invalid_input',
+          field: 'idsOrFullNames',
+          message: `idsOrFullNames must contain between 1 and ${MCP_BATCH_LIMIT} non-empty strings`,
+        });
+      }
+      const normalizedInputs = inputs.map((input) => input.trim());
+      return text(
+        buildBatchLookupResult(normalizedInputs, (input) => findSnapshotRepository(repos, input))
+      );
+    }
+    case 'gsm_get_repo_evidence': {
+      const key = String(args?.idOrFullName || '').trim();
+      const repo = findSnapshotRepository(repos, key);
+      if (!repo) return text({ error: 'not_found', idOrFullName: key });
+      return text(buildRepoEvidence(repo, getLatestCachedRelease(releases, repo.id)));
     }
     case 'gsm_list_categories':
       return text({ categories });
     case 'gsm_list_repos_by_category': {
-      const cat = args?.category;
-      let list = repos.filter((r) => r.custom_category === cat);
-      list = [...list].sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
-      const offset = Math.max(0, args?.offset || 0);
-      const limit = Math.min(100, Math.max(1, args?.limit || 20));
-      const items = list.slice(offset, offset + limit).map((r) => projectRepo(r));
-      return text({ total: list.length, count: items.length, items });
-    }
-    case 'gsm_stats': {
-      const byLanguage = {};
-      const byLicense = {};
-      let analyzed = 0;
-      let subscribed = 0;
-      for (const r of repos) {
-        const lang = r.language || 'Unknown';
-        byLanguage[lang] = (byLanguage[lang] || 0) + 1;
-        const lic = normalizeLicense(r.license);
-        byLicense[lic] = (byLicense[lic] || 0) + 1;
-        if (r.analyzed_at && !r.analysis_failed) analyzed += 1;
-        if (r.subscribed_to_releases) subscribed += 1;
-      }
+      const result = searchRepositories(repos, {
+        ...(args || {}),
+        category: args?.category,
+      });
       return text({
-        totalRepositories: repos.length,
-        analyzed,
-        subscribedToReleases: subscribed,
-        byLanguage,
-        byLicense,
+        total: result.total,
+        count: result.items.length,
+        offset: result.offset,
+        limit: result.limit,
+        items: result.items.map((repo) => projectRepo(repo)),
+      });
+    }
+    case 'gsm_stats':
+      return text(buildStats(repos));
+    case 'gsm_find_similar_repos': {
+      if (!vectorInfo.available) {
+        return text({
+          available: false,
+          reason: vectorInfo.reason || 'vector_search_disabled',
+          hint: 'Enable Vector Search in Settings and ensure embedding + worker are configured, then retry.',
+        });
+      }
+      const key = String(args?.idOrFullName || '').trim();
+      const source = findSnapshotRepository(repos, key);
+      if (!source) return text({ error: 'not_found', idOrFullName: key });
+      const requestedTopK = Math.min(50, Math.max(1, Number(args?.topK) || 10));
+      const result = await runVectorSearch(
+        buildRepositoryEmbeddingText(source),
+        { topK: Math.min(50, requestedTopK + 8), threshold: args?.threshold },
+        snapshot
+      );
+      if (!result.available) return text(result);
+
+      const bestById = new Map();
+      for (const match of result.matches) {
+        const matchId = String(match.id || '');
+        if (!matchId || matchId === String(source.id)) continue;
+        const score = Number.isFinite(Number(match.score)) ? Number(match.score) : Number.NEGATIVE_INFINITY;
+        const current = bestById.get(matchId);
+        if (!current || score > current.score) bestById.set(matchId, { score, match });
+      }
+      const similarMatches = [...bestById.values()]
+        .sort(
+          (left, right) =>
+            right.score - left.score ||
+            String(left.match.full_name || '').localeCompare(String(right.match.full_name || ''))
+        )
+        .slice(0, requestedTopK)
+        .map(({ match }) => match);
+      return text({
+        available: true,
+        source: projectRepo(source, 2000),
+        sourceExcluded: true,
+        matches: similarMatches,
       });
     }
     case 'gsm_vector_search': {
@@ -511,7 +600,7 @@ function createMcpLocalServer(getState) {
       return {
         jsonrpc: '2.0',
         id,
-        result: { tools: getTools(vectorInfo.available) },
+        result: { tools: getMcpToolDefinitions(vectorInfo.available) },
       };
     }
     if (method === 'tools/call') {
@@ -761,4 +850,4 @@ function createMcpLocalServer(getState) {
   return { start, stop, getStatus };
 }
 
-module.exports = { createMcpLocalServer };
+module.exports = { createMcpLocalServer, getMcpToolDefinitions };
