@@ -46,9 +46,6 @@ export const GistView: React.FC = () => {
     fetchGistDetail,
     submitGist,
   } = useGistActions();
-  // useGistActions.deleteGist 是卡片级动作（接收 Gist 对象、内置确认）；这里的
-  // onDeleted 只需要原始 store action 按 id 移除记录，故直接订阅 store。
-  const deleteGistRecord = useAppStore(state => state.deleteGist);
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const [query, setQuery] = useState(gistSearchFilters.query);
   const [detailGist, setDetailGist] = useState<Gist | null>(null);
@@ -281,9 +278,6 @@ export const GistView: React.FC = () => {
                 onEdit={(target) => {
                   setEditingGist(target);
                   setIsEditorOpen(true);
-                }}
-                onDeleted={(gistId) => {
-                  deleteGistRecord(gistId);
                 }}
                 onUnstarred={(gistId) => {
                   const latestStarred = useAppStore.getState().starredGists;
