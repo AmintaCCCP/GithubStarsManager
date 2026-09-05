@@ -6,7 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Modal } from './Modal';
 import type { Gist } from '../types';
-import type { GistCreateInput, GistUpdateInput } from '../services/githubApi';
+import type { GistCreateInput, GistUpdateInput } from '../features/gists/hooks/useGistActions';
 import { useAppStore } from '../store/useAppStore';
 
 interface EditableFile {
