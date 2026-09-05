@@ -1,4 +1,5 @@
 import { translateBackendError } from '../utils/backendErrors';
+import { normalizeBackendUrl } from '../utils/backendUrl';
 import { logger } from './logger';
 
 import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
@@ -15,17 +16,26 @@ interface GitHubTreeResponse {
   truncated?: boolean;
 }
 
+const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
+
+const readStoredBackendUrl = (): string | null => {
+  try {
+    return normalizeBackendUrl(localStorage.getItem(BACKEND_URL_STORAGE_KEY) || '');
+  } catch {
+    return null;
+  }
+};
+
 class BackendAdapter {
   private _backendUrl: string | null = null;
 
-  async init(): Promise<void> {
+  async init(preferredUrl?: string): Promise<void> {
     try {
-      // Try common backend URLs
-      const urls = [
-        window.location.origin + '/api',
-      ];
-      // Only probe localhost in development
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      const configuredUrl = preferredUrl ? normalizeBackendUrl(preferredUrl) : readStoredBackendUrl();
+      const urls = preferredUrl
+        ? (configuredUrl ? [configuredUrl] : [])
+        : (configuredUrl ? [configuredUrl] : [window.location.origin + '/api']);
+      if (!preferredUrl && !configuredUrl && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
         urls.push('http://localhost:3000/api');
       }
 
@@ -33,13 +43,20 @@ class BackendAdapter {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
         try {
+          // redirect: 'error' — a 307/308 must never bounce the probe (or any
+          // later authenticated request) to a different, possibly plaintext,
+          // destination.
           const res = await fetch(`${baseUrl}/health`, {
             signal: controller.signal,
+            redirect: 'error',
           });
 
           if (res.ok) {
             const data = await res.json();
             if (data.status === 'ok') {
+              // In-memory commit only. Persistence is an explicit caller
+              // decision (rememberActiveUrl) after its own auth checks, so a
+              // candidate that later fails authentication is never remembered.
               this._backendUrl = baseUrl;
               logger.info('backendAdapter', 'Backend connected', { url: baseUrl });
               return;
@@ -66,6 +83,24 @@ class BackendAdapter {
 
   get backendUrl(): string | null {
     return this._backendUrl;
+  }
+
+  get configuredUrl(): string | null {
+    return this._backendUrl || readStoredBackendUrl();
+  }
+
+  /**
+   * Persist the active backend URL (the same storage the login screen prefills
+   * from). Call only after caller-side checks — auth, session restore — have
+   * fully succeeded; init() itself never persists candidate URLs.
+   */
+  rememberActiveUrl(): void {
+    if (!this._backendUrl) return;
+    try {
+      localStorage.setItem(BACKEND_URL_STORAGE_KEY, this._backendUrl);
+    } catch {
+      // A restricted browser may block storage; keep this session connected.
+    }
   }
 
   private getAuthHeaders(): Record<string, string> {
@@ -132,7 +167,7 @@ class BackendAdapter {
     }
 
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(url, { ...options, signal: controller.signal, redirect: 'error' });
       if (logger.isDebugMode()) {
         // Capture response headers
         const responseHeaders: Record<string, string> = {};

@@ -116,6 +116,13 @@ interface GitHubRateLimitResponse {
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+// Sentinel message for the 401 thrown above; callers match on it to tell a
+// confirmed auth failure apart from network/rate-limit/5xx errors.
+export const GITHUB_TOKEN_INVALID_ERROR = 'GitHub token expired or invalid';
+// Sentinel for 401s produced by the backend proxy's own auth middleware (its
+// body carries code: 'UNAUTHORIZED'). Kept distinct from the GitHub sentinel
+// so callers can tell a stale backend API key from a dead GitHub token.
+export const BACKEND_PROXY_UNAUTHORIZED_ERROR = 'Backend API key was rejected. Please check your backend settings';
 const REPOSITORY_CHAT_MAX_FILE_BYTES = 96 * 1024;
 // Larger Markdown files are common repository documentation. This bounded exception is
 // deliberately narrower than the normal chat-file reader: only non-sensitive Markdown
@@ -256,6 +263,7 @@ export class GitHubApiService {
     const maxRetries = 3;
     let response: Response | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const viaProxy = this.backendUrl != null;
       try {
         if (this.backendUrl) {
           // 通过后端代理路由：POST {backendUrl}/proxy/github/{endpoint}?query
@@ -331,7 +339,16 @@ export class GitHubApiService {
       const durationMs = Date.now() - startTime;
       if (response.status === 401) {
         logger.warn('githubApi', 'API request failed: unauthorized', { method, endpoint, status: response.status, durationMs });
-        throw new Error('GitHub token expired or invalid');
+        if (viaProxy) {
+          // The proxy forwards upstream GitHub bodies verbatim, while the
+          // backend's own auth middleware marks its 401s with code
+          // 'UNAUTHORIZED'. Only the latter is a backend API key problem.
+          const body = await response.json().catch(() => null) as { code?: string } | null;
+          if (body?.code === 'UNAUTHORIZED') {
+            throw new Error(BACKEND_PROXY_UNAUTHORIZED_ERROR);
+          }
+        }
+        throw new Error(GITHUB_TOKEN_INVALID_ERROR);
       }
       if (response.status === 403 && this.rateLimitRemaining === 0) {
         const resetDate = this.rateLimitReset
