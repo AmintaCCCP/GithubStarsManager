@@ -327,6 +327,15 @@ export class AIService {
   private static readonly ANALYSIS_MAX_ATTEMPTS = 3;
   private static readonly ANALYSIS_MAX_TOKENS = 4096;
   private static readonly RERANKING_MAX_TOKENS = 4096;
+  /** 库容不超过该数量时跳过词法召回，直接把全库交给 LLM 精选。 */
+  private static readonly SELECTION_FULL_LIBRARY_LIMIT = 150;
+  /** 大库时送入 LLM 的候选上限：token 成本与库容解耦的关键。 */
+  private static readonly SELECTION_CANDIDATE_LIMIT = 100;
+  /** 词法候选不足该数量时用 star 排序补足，保证 LLM 始终有足够候选。 */
+  private static readonly SELECTION_MIN_CANDIDATES = 15;
+  /** LLM 精选最多返回的相关仓库数。 */
+  private static readonly SELECTION_MAX_RESULTS = 20;
+  private static readonly SELECTION_MAX_TOKENS = 800;
 
   constructor(config: AIConfig, language: string = 'zh') {
     this.config = config;
@@ -1516,7 +1525,34 @@ AI Summary: ${gist.ai_summary || 'None'}`;
     // 注意：searchTopK 配置与此上限独立；若 searchTopK > 50，超出部分不会被重排序
     const candidates = repositories.slice(0, 50);
 
-    const repoSummaries = candidates.map((repo, index) => {
+    const system = this.language === 'zh'
+      ? '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出最相关的，按相关性从高到低返回 ID 数组 JSON。只输出 JSON 数组，不要输出额外文字。'
+      : 'You are a GitHub repository search reranking assistant. Given a user query and candidate repositories, return a JSON array of repository IDs ordered from most to least relevant. Output only the JSON array, no extra text.';
+
+    const content = await this.requestText({
+      system,
+      user: `Query: ${query}\n\nRepositories:\n${this.sanitizeForPrompt(this.buildCandidateSummaries(candidates))}`,
+      temperature: 0.1,
+      maxTokens: AIService.RERANKING_MAX_TOKENS,
+      signal,
+    });
+
+    const ranked = this.resolveRankedRepositories(content, candidates);
+    if (ranked === null) {
+      logger.warn('ai', 'Failed to parse semantic reranking result');
+      return repositories;
+    }
+    const rankedIds = new Set(ranked.map(r => r.id));
+    // 未被 LLM 排到的仓库追加到末尾（保留原始顺序）
+    return [...ranked, ...repositories.filter(r => !rankedIds.has(r.id))];
+  }
+
+  /**
+   * 构造候选仓库的紧凑摘要（序号. ID | 全名 / 简介 / 语言 | ★ | License | Tags）。
+   * 语义重排序与无向量精选共用同一格式。
+   */
+  private buildCandidateSummaries(candidates: Repository[]): string {
+    return candidates.map((repo, index) => {
       const stars = repo.stargazers_count >= 1000
         ? `${(repo.stargazers_count / 1000).toFixed(0)}k`
         : String(repo.stargazers_count || 0);
@@ -1526,50 +1562,53 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       if (desc) parts.push(`   ${desc}`);
       const meta = [repo.language, `★${stars}`];
       // 与 embedding 一致：归一化后、非哨兵才写入，避免 raw 对象变成 "[object Object]"
-      {
-        const lic = normalizeLicense(repo.license);
-        if (lic !== NO_LICENSE_SENTINEL) meta.push(`License: ${lic}`);
-      }
+      const lic = normalizeLicense(repo.license);
+      if (lic !== NO_LICENSE_SENTINEL) meta.push(`License: ${lic}`);
       if (tags) meta.push(`Tags: ${tags}`);
       parts.push(`   ${meta.join(' | ')}`);
       return parts.join('\n');
     }).join('\n\n');
+  }
 
-    const system = this.language === 'zh'
-      ? '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出最相关的，按相关性从高到低返回 ID 数组 JSON。只输出 JSON 数组，不要输出额外文字。'
-      : 'You are a GitHub repository search reranking assistant. Given a user query and candidate repositories, return a JSON array of repository IDs ordered from most to least relevant. Output only the JSON array, no extra text.';
-
-    const content = await this.requestText({
-      system,
-      user: `Query: ${query}\n\nRepositories:\n${this.sanitizeForPrompt(repoSummaries)}`,
-      temperature: 0.1,
-      maxTokens: AIService.RERANKING_MAX_TOKENS,
-      signal,
-    });
-
+  /**
+   * 从模型输出解析排序后的仓库列表。ID 优先匹配；模型偶尔会把候选行号
+   * （1..N）当作 ID 返回，此时在候选范围内按行号解析——否则整份重排结果会被
+   * 静默丢弃。返回 null 表示输出里没有可解析的 JSON 数组。
+   */
+  private resolveRankedRepositories(content: string, candidates: Repository[]): Repository[] | null {
+    const jsonMatch = content.match(/\[[\s\S]*?\]/);
+    if (!jsonMatch) return null;
+    let ids: unknown[];
     try {
-      const jsonMatch = content.match(/\[[\s\S]*?\]/);
-      const ids = JSON.parse(jsonMatch ? jsonMatch[0] : content);
-      if (!Array.isArray(ids)) return repositories;
-
-      const repoById = new Map(repositories.map(r => [String(r.id), r]));
-      const seen = new Set<string>();
-      const ranked = ids
-        .map((id: unknown) => String(id))
-        .filter(id => {
-          if (seen.has(id)) return false;
-          seen.add(id);
-          return true;
-        })
-        .map(id => repoById.get(id))
-        .filter((r): r is Repository => !!r);
-      const rankedIds = new Set(ranked.map(r => r.id));
-      // 未被 LLM 排到的仓库追加到末尾（保留原始顺序）
-      return [...ranked, ...repositories.filter(r => !rankedIds.has(r.id))];
-    } catch (error) {
-      logger.warn('ai', 'Failed to parse semantic reranking result', error);
-      return repositories;
+      const parsed = JSON.parse(jsonMatch[0]) as unknown;
+      if (!Array.isArray(parsed)) return null;
+      ids = parsed;
+    } catch {
+      return null;
     }
+    const byId = new Map(candidates.map(repo => [String(repo.id), repo]));
+    const seen = new Set<string>();
+    const ranked: Repository[] = [];
+    for (const raw of ids) {
+      const key = String(raw).trim();
+      let repo = byId.get(key);
+      if (!repo) {
+        // 真实 GitHub ID 都是大整数，与 1..N 行号不会冲突；先按 ID 匹配失败
+        // 再尝试行号，两种引用风格都能正确落位。
+        const ordinal = Number(key);
+        if (Number.isInteger(ordinal) && ordinal >= 1 && ordinal <= candidates.length) {
+          repo = candidates[ordinal - 1];
+        }
+      }
+      if (repo) {
+        const idKey = String(repo.id);
+        if (!seen.has(idKey)) {
+          seen.add(idKey);
+          ranked.push(repo);
+        }
+      }
+    }
+    return ranked;
   }
 
   private createAnalysisRetryPrompt(originalPrompt: string, previousContent: string, invalidReason: string): string {
@@ -1999,37 +2038,6 @@ ${repoInfo}
     }
   }
 
-  async searchRepositories(repositories: Repository[], query: string): Promise<Repository[]> {
-    const startTime = Date.now();
-    if (!query.trim()) return repositories;
-
-    try {
-      // Use AI to understand and translate the search query
-      const searchPrompt = this.createSearchPrompt(query);
-
-      const system = this.language === 'zh'
-        ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
-        : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
-
-      const content = await this.requestText({
-        system,
-        user: searchPrompt,
-        temperature: 0.1,
-        maxTokens: 200,
-      });
-
-      if (content) {
-        const searchTerms = this.parseSearchResponse(content);
-        return this.performEnhancedSearch(repositories, query, searchTerms);
-      }
-    } catch {
-      logger.warn('ai', 'AI search failed, falling back to basic search', { configId: this.config.id, durationMs: Date.now() - startTime });
-    }
-
-    // Fallback to basic search
-    return this.performBasicSearch(repositories, query);
-  }
-
   /**
    * HyDE (Hypothetical Document Embedding) 查询预处理
    * 根据用户查询生成一个"理想仓库描述"，用该描述生成向量而非原始查询
@@ -2056,60 +2064,154 @@ ${repoInfo}
   }
 
   /**
-   * Search repositories using AI semantic search with fallback to enhanced basic search.
-   * Attempts to call the configured AI service to parse search intent and extract
-   * multilingual keywords, then delegates to performEnhancedSearch. Falls back to
-   * performEnhancedBasicSearch with intelligent ranking if AI is unavailable or fails.
-   *
-   * @param repositories - The full list of repositories to search
-   * @param query - The user's search query string
-   * @returns Filtered and ranked repositories matching the query
+   * 无向量路径的 AI 语义搜索（向量搜索不可用时的降级链）。
+   * 三段式：
+   * ① 查询扩展 + 意图复述（一次 chat 调用）；
+   * ② 本地词法打分召回候选（小库直接全量；大库取 top-K，token 成本与库容解耦）；
+   * ③ LLM 精选排序（只返回真正相关的仓库，最多 20 个）。
+   * 与旧实现（LLM 只做关键词扩展、本地 OR 子串过滤）的本质区别：LLM 能看到
+   * 仓库摘要并直接决定结果与顺序。LLM 调用/解析失败时按词法得分序兜底；
+   * 模型明确表示"无相关结果"时返回空数组（UI 呈现空态而非噪声）。
    */
-  async searchRepositoriesWithReranking(repositories: Repository[], query: string): Promise<Repository[]> {
+  async searchRepositoriesWithSelection(
+    repositories: Repository[],
+    query: string,
+    options: {
+      signal?: AbortSignal;
+      /** 搜索阶段回调，供 UI 展示进度（扩展查询 → 精选排序）。 */
+      onPhase?: (phase: 'expanding' | 'selecting') => void;
+    } = {}
+  ): Promise<Repository[]> {
     const startTime = Date.now();
-    logger.info('ai', 'Starting enhanced search', { query });
     if (!query.trim()) return repositories;
+    const { signal, onPhase } = options;
+    let aiTerms: string[] = [];
+    let intent = '';
 
     try {
-      logger.info('ai', 'Calling configured AI service for semantic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id });
-      const searchPrompt = this.createSearchPrompt(query);
+      logger.info('ai', 'Starting AI selection search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, query });
+
+      // ① 查询扩展 + 意图复述
+      onPhase?.('expanding');
       const system = this.language === 'zh'
         ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
         : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
-
       const content = await this.requestText({
         system,
-        user: searchPrompt,
+        user: this.createSearchPrompt(query),
         temperature: 0.1,
-        maxTokens: 200,
+        maxTokens: 300,
+        signal,
       });
-
       if (content) {
-        const searchTerms = this.parseSearchResponse(content);
-        const results = this.performEnhancedSearch(repositories, query, searchTerms);
-        logger.info('ai', 'AI semantic search completed', { resultCount: results.length, apiType: this.getApiType(), model: this.config.model, durationMs: Date.now() - startTime });
-        return results;
+        const parsed = this.parseSearchResponse(content);
+        aiTerms = parsed.terms;
+        intent = parsed.intent;
       }
-    } catch {
-      logger.warn('ai', 'AI semantic search failed, falling back to enhanced basic search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, durationMs: Date.now() - startTime });
+
+      // ② 候选召回
+      let candidates: Repository[];
+      if (repositories.length <= AIService.SELECTION_FULL_LIBRARY_LIMIT) {
+        // 小库：全量直送（LLM 上下文足够，召回阶段没有信息增益）
+        candidates = [...repositories].sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+      } else {
+        const scored = this.scoreRepositoriesByKeywords(repositories, query, aiTerms);
+        candidates = scored.slice(0, AIService.SELECTION_CANDIDATE_LIMIT).map(item => item.repo);
+        if (candidates.length < AIService.SELECTION_MIN_CANDIDATES) {
+          // 词法命中过少（如纯语义查询）：用 star 排序补足，保证 LLM 有足够候选
+          const have = new Set(candidates.map(repo => repo.id));
+          const pad = [...repositories]
+            .sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0))
+            .filter(repo => !have.has(repo.id));
+          candidates = candidates.concat(pad.slice(0, AIService.SELECTION_CANDIDATE_LIMIT - candidates.length));
+        }
+      }
+      if (candidates.length === 0) return [];
+
+      // ③ LLM 精选排序
+      onPhase?.('selecting');
+      const ranked = await this.selectRelevantRepositories(candidates, query, intent, signal);
+      if (ranked === null) {
+        // 响应缺失或格式非法：按词法得分序兜底
+        logger.warn('ai', 'AI selection returned unparseable result, falling back to lexical ranking', { configId: this.config.id, durationMs: Date.now() - startTime });
+        return this.performEnhancedBasicSearch(repositories, query, aiTerms)
+          .slice(0, AIService.SELECTION_CANDIDATE_LIMIT);
+      }
+      logger.info('ai', 'AI selection completed', {
+        apiType: this.getApiType(),
+        model: this.config.model,
+        configId: this.config.id,
+        candidates: candidates.length,
+        resultCount: ranked.length,
+        durationMs: Date.now() - startTime,
+      });
+      return ranked;
+    } catch (error) {
+      logger.warn('ai', 'AI selection failed, falling back to lexical ranking', {
+        apiType: this.getApiType(),
+        model: this.config.model,
+        configId: this.config.id,
+        durationMs: Date.now() - startTime,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.performEnhancedBasicSearch(repositories, query, aiTerms)
+        .slice(0, AIService.SELECTION_CANDIDATE_LIMIT);
     }
-
-    logger.info('ai', 'Using enhanced basic search with intelligent ranking');
-    const fallbackResults = this.performEnhancedBasicSearch(repositories, query);
-    logger.info('ai', 'Enhanced search completed', { resultCount: fallbackResults.length });
-
-    return fallbackResults;
   }
 
-  // Enhanced basic search with intelligent ranking (fallback when AI fails)
-  private performEnhancedBasicSearch(repositories: Repository[], query: string): Repository[] {
+  /**
+   * 把候选仓库摘要交给 LLM，选出与查询真正相关的仓库并按相关性排序。
+   * 返回 null 表示响应缺失/无法解析（调用方走词法兜底）；空数组是合法结果
+   * （模型判断没有仓库能满足查询意图）。
+   */
+  private async selectRelevantRepositories(
+    candidates: Repository[],
+    query: string,
+    intent: string,
+    signal?: AbortSignal
+  ): Promise<Repository[] | null> {
+    const summaries = this.sanitizeForPrompt(this.buildCandidateSummaries(candidates));
+    const intentLine = intent
+      ? (this.language === 'zh'
+        ? `\n\n用户意图说明：${this.sanitizeForPrompt(intent)}`
+        : `\n\nQuery intent: ${this.sanitizeForPrompt(intent)}`)
+      : '';
+
+    const system = this.language === 'zh'
+      ? '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出真正相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。若没有仓库能满足查询意图，返回空数组 []。'
+      : 'You are a GitHub repository search reranking assistant. Select the repositories that truly match the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text. If no repository satisfies the query intent, return an empty array [].';
+
+    const user = this.language === 'zh'
+      ? `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 只保留能满足查询意图的仓库；若没有仓库能真正满足意图，返回 []，不要用仅部分沾边的仓库凑数。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`
+      : `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Keep only repositories that satisfy the query intent; if none truly do, return [] instead of padding with loosely related ones.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`;
+
+    const content = await this.requestText({
+      system,
+      user,
+      temperature: 0.1,
+      maxTokens: AIService.SELECTION_MAX_TOKENS,
+      signal,
+    });
+
+    const ranked = this.resolveRankedRepositories(content, candidates);
+    if (ranked === null) return null;
+    return ranked.slice(0, AIService.SELECTION_MAX_RESULTS);
+  }
+
+  /**
+   * 词法加权打分（候选召回与失败兜底共用）。查询词用高权重；AI 扩展词是弱
+   * 信号，只用于召回与加分，权重约为查询词的六成。
+   */
+  private scoreRepositoriesByKeywords(repositories: Repository[], query: string, aiTerms: string[]): Array<{ repo: Repository; score: number }> {
     const normalizedQuery = query.toLowerCase();
     const queryWords = normalizedQuery.split(/\s+/).filter(word => word.length > 0);
-    
-    // Score repositories based on relevance
-    const scoredRepos = repositories.map(repo => {
+    // 去重并剔除与原查询相同的扩展词，避免重复计分
+    const terms = [...new Set(aiTerms.map(term => term.toLowerCase()).filter(term => term && term !== normalizedQuery))];
+
+    const scoredRepos: Array<{ repo: Repository; score: number }> = [];
+    for (const repo of repositories) {
       let score = 0;
-      
+
       const searchableFields = {
         name: repo.name.toLowerCase(),
         fullName: repo.full_name.toLowerCase(),
@@ -2124,33 +2226,37 @@ ${repoInfo}
         license: normalizeLicense(repo.license).toLowerCase(),
       };
 
-      // Check if any query word matches any field
+      // 完全无命中（查询词与扩展词均未命中）的仓库不进入候选
       const hasMatch = queryWords.some(word => {
         return Object.values(searchableFields).some(fieldValue => {
           return fieldValue.includes(word);
         });
+      }) || terms.some(term => {
+        return Object.values(searchableFields).some(fieldValue => {
+          return fieldValue.includes(term);
+        });
       });
 
-      if (!hasMatch) return { repo, score: 0 };
+      if (!hasMatch) continue;
 
       // Calculate relevance score
       queryWords.forEach(word => {
         // Name matches (highest weight)
         if (searchableFields.name.includes(word)) score += 0.4;
         if (searchableFields.fullName.includes(word)) score += 0.35;
-        
+
         // Description matches
         if (searchableFields.description.includes(word)) score += 0.3;
         if (searchableFields.customDescription.includes(word)) score += 0.32;
-        
+
         // Tags and topics matches
         if (searchableFields.topics.includes(word)) score += 0.25;
         if (searchableFields.aiTags.includes(word)) score += 0.22;
         if (searchableFields.customTags.includes(word)) score += 0.24;
-        
+
         // AI summary matches
         if (searchableFields.aiSummary.includes(word)) score += 0.15;
-        
+
         // Platform and language matches
         if (searchableFields.aiPlatforms.includes(word)) score += 0.18;
         if (searchableFields.language.includes(word)) score += 0.12;
@@ -2159,21 +2265,40 @@ ${repoInfo}
         if (searchableFields.license.includes(word)) score += 0.2;
       });
 
+      // AI 扩展词：较弱权重的同类命中
+      terms.forEach(term => {
+        if (searchableFields.name.includes(term)) score += 0.25;
+        if (searchableFields.fullName.includes(term)) score += 0.2;
+        if (searchableFields.customDescription.includes(term)) score += 0.2;
+        if (searchableFields.description.includes(term)) score += 0.18;
+        if (searchableFields.topics.includes(term)) score += 0.15;
+        if (searchableFields.aiTags.includes(term)) score += 0.13;
+        if (searchableFields.customTags.includes(term)) score += 0.14;
+        if (searchableFields.aiPlatforms.includes(term)) score += 0.1;
+        if (searchableFields.aiSummary.includes(term)) score += 0.1;
+        if (searchableFields.license.includes(term)) score += 0.12;
+        if (searchableFields.language.includes(term)) score += 0.08;
+      });
+
       // Boost for exact matches
       if (searchableFields.name === normalizedQuery) score += 0.5;
       if (searchableFields.name.includes(normalizedQuery)) score += 0.3;
-      
+
       // Popularity boost (logarithmic to avoid overwhelming other factors)
       const popularityScore = Math.log10(repo.stargazers_count + 1) * 0.05;
       score += popularityScore;
 
-      return { repo, score };
-    });
+      scoredRepos.push({ repo, score });
+    }
 
-    // Filter out repositories with no matches and sort by relevance
-    return scoredRepos
+    scoredRepos.sort((a, b) => b.score - a.score);
+    return scoredRepos;
+  }
+
+  /** 词法得分排序兜底：只保留得分 > 0 的仓库，按得分从高到低。 */
+  private performEnhancedBasicSearch(repositories: Repository[], query: string, aiTerms: string[] = []): Repository[] {
+    return this.scoreRepositoriesByKeywords(repositories, query, aiTerms)
       .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
       .map(item => item.repo);
   }
 
@@ -2183,12 +2308,14 @@ ${repoInfo}
 用户搜索查询: "${query}"
 
 请分析这个搜索查询并提供：
-1. 主要关键词（中英文）
-2. 相关的技术术语和同义词
-3. 可能的应用类型或分类
+1. 一句话复述用户的真实搜索意图（不超过30字）
+2. 主要关键词（中英文）
+3. 相关的技术术语和同义词
+4. 可能的应用类型或分类
 
 以JSON格式回复：
 {
+  "intent": "一句话复述用户的真实搜索意图",
   "keywords": ["关键词1", "keyword1", "关键词2", "keyword2"],
   "categories": ["分类1", "category1"],
   "synonyms": ["同义词1", "synonym1"]
@@ -2199,12 +2326,14 @@ ${repoInfo}
 User search query: "${query}"
 
 Please analyze this search query and provide:
-1. Main keywords (in English and Chinese)
-2. Related technical terms and synonyms
-3. Possible application types or categories
+1. One sentence restating the user's true search intent (max 30 words)
+2. Main keywords (in English and Chinese)
+3. Related technical terms and synonyms
+4. Possible application types or categories
 
 Reply in JSON format:
 {
+  "intent": "One sentence restating the user's true search intent",
   "keywords": ["keyword1", "关键词1", "keyword2", "关键词2"],
   "categories": ["category1", "分类1"],
   "synonyms": ["synonym1", "同义词1"]
@@ -2213,71 +2342,24 @@ Reply in JSON format:
     }
   }
 
-  private parseSearchResponse(content: string): string[] {
+  private parseSearchResponse(content: string): { terms: string[]; intent: string } {
     try {
       const parsed = this.extractAndParseAIJson(content);
       if (parsed) {
-        const allTerms = [
+        const terms = [
           ...(Array.isArray(parsed.keywords) ? parsed.keywords : []),
           ...(Array.isArray(parsed.categories) ? parsed.categories : []),
           ...(Array.isArray(parsed.synonyms) ? parsed.synonyms : []),
-        ];
-        return allTerms.filter(term => typeof term === 'string' && term.length > 0);
+        ]
+          .filter((term): term is string => typeof term === 'string' && term.trim().length > 0)
+          .map(term => term.trim());
+        const intent = typeof parsed.intent === 'string' ? parsed.intent.trim() : '';
+        return { terms: [...new Set(terms)], intent: intent.slice(0, 100) };
       }
     } catch (error) {
       logger.warn('ai', 'Failed to parse AI search response', { error: String(error) });
     }
-    return [];
-  }
-
-  private performEnhancedSearch(repositories: Repository[], originalQuery: string, aiTerms: string[]): Repository[] {
-    const allSearchTerms = [originalQuery, ...aiTerms];
-
-    return repositories.filter(repo => {
-      const searchableText = [
-        repo.name,
-        repo.full_name,
-        repo.description || '',
-        repo.language || '',
-        ...(repo.topics || []),
-        repo.ai_summary || '',
-        ...(repo.custom_tags || []),
-        ...(repo.ai_tags || []),
-        ...(repo.ai_platforms || []),
-        normalizeLicense(repo.license),
-      ].join(' ').toLowerCase();
-
-      // Check if any of the AI-enhanced terms match
-      return allSearchTerms.some(term => {
-        const normalizedTerm = term.toLowerCase();
-        return searchableText.includes(normalizedTerm) ||
-               // Fuzzy matching for partial matches
-               normalizedTerm.split(/\s+/).every(word => searchableText.includes(word));
-      });
-    });
-  }
-
-  private performBasicSearch(repositories: Repository[], query: string): Repository[] {
-    const normalizedQuery = query.toLowerCase();
-    
-    return repositories.filter(repo => {
-      const searchableText = [
-        repo.name,
-        repo.full_name,
-        repo.description || '',
-        repo.language || '',
-        ...(repo.topics || []),
-        repo.ai_summary || '',
-        ...(repo.custom_tags || []),
-        ...(repo.ai_tags || []),
-        ...(repo.ai_platforms || []),
-        normalizeLicense(repo.license),
-      ].join(' ').toLowerCase();
-
-      // Split query into words and check if all words are present
-      const queryWords = normalizedQuery.split(/\s+/);
-      return queryWords.every(word => searchableText.includes(word));
-    });
+    return { terms: [], intent: '' };
   }
 
   static async searchRepositories(repositories: Repository[], query: string): Promise<Repository[]> {

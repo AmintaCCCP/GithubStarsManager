@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   vectorQuery: vi.fn(),
   generateHyDEQuery: vi.fn(),
   searchRepositoriesWithSemanticReranking: vi.fn(),
-  searchRepositoriesWithReranking: vi.fn(),
+  searchRepositoriesWithSelection: vi.fn(),
   getAllStarredRepositories: vi.fn(),
   getUserLists: vi.fn(),
   forceSyncToBackend: vi.fn(),
@@ -48,7 +48,7 @@ vi.mock('../../../services/aiService', () => ({
   AIService: class {
     generateHyDEQuery = mocks.generateHyDEQuery;
     searchRepositoriesWithSemanticReranking = mocks.searchRepositoriesWithSemanticReranking;
-    searchRepositoriesWithReranking = mocks.searchRepositoriesWithReranking;
+    searchRepositoriesWithSelection = mocks.searchRepositoriesWithSelection;
   },
 }));
 
@@ -245,7 +245,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
       });
       mocks.embed.mockResolvedValue([[0.1]]);
       mocks.vectorQuery.mockResolvedValue([]);
-      mocks.searchRepositoriesWithReranking.mockResolvedValue([]);
+      mocks.searchRepositoriesWithSelection.mockResolvedValue([]);
 
       const { result } = renderHook(() => useSearchActions());
       let promise!: Promise<void>;
@@ -265,7 +265,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.aiSearch('   ', identity); });
     expect(mocks.embed).not.toHaveBeenCalled();
-    expect(mocks.searchRepositoriesWithReranking).not.toHaveBeenCalled();
+    expect(mocks.searchRepositoriesWithSelection).not.toHaveBeenCalled();
     expect(storeState.setSearchResults).not.toHaveBeenCalled();
     expect(storeState.setSearchFilters).not.toHaveBeenCalled();
     expect(result.current.isSearching).toBe(false);
@@ -288,7 +288,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
       baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
     ];
     mocks.embed.mockResolvedValue([]);
-    mocks.searchRepositoriesWithReranking.mockResolvedValue([storeState.repositories[0]]);
+    mocks.searchRepositoriesWithSelection.mockResolvedValue([storeState.repositories[0]]);
 
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.aiSearch('foo', identity); });
@@ -317,7 +317,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
     mocks.vectorQuery.mockResolvedValue([
       { id: '99', score: 0.9, metadata: { full_name: '', description: '', tags: [] } },
     ]);
-    mocks.searchRepositoriesWithReranking.mockResolvedValue([storeState.repositories[0]]);
+    mocks.searchRepositoriesWithSelection.mockResolvedValue([storeState.repositories[0]]);
 
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.aiSearch('foo', identity); });
@@ -343,7 +343,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
       baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
     ];
     mocks.embed.mockRejectedValue(new Error('embed down'));
-    mocks.searchRepositoriesWithReranking.mockResolvedValue([storeState.repositories[0]]);
+    mocks.searchRepositoriesWithSelection.mockResolvedValue([storeState.repositories[0]]);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const { result } = renderHook(() => useSearchActions());
@@ -369,7 +369,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
     mocks.generateHyDEQuery.mockResolvedValue('an ideal description of foo');
     mocks.embed.mockResolvedValue([[0.1]]);
     mocks.vectorQuery.mockResolvedValue([]);
-    mocks.searchRepositoriesWithReranking.mockResolvedValue([]);
+    mocks.searchRepositoriesWithSelection.mockResolvedValue([]);
 
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.aiSearch('foo', identity); });
@@ -383,7 +383,7 @@ describe('useSearchActions.keywordSearch', () => {
     setupStoreMocks();
   });
 
-  it('falls back to basic text search when AI reranking fails and vector search found nothing', async () => {
+  it('falls back to basic text search when AI selection fails and vector search found nothing', async () => {
     storeState.vectorSearchConfig = {
       enabled: true,
       workerUrl: 'https://worker.example',
@@ -399,16 +399,76 @@ describe('useSearchActions.keywordSearch', () => {
     ];
     mocks.embed.mockResolvedValue([[0.1]]);
     mocks.vectorQuery.mockResolvedValue([]);
-    mocks.searchRepositoriesWithReranking.mockRejectedValue(new Error('ai down'));
+    mocks.searchRepositoriesWithSelection.mockRejectedValue(new Error('ai down'));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.aiSearch('foo', identity); });
     warnSpy.mockRestore();
 
-    expect(mocks.searchRepositoriesWithReranking).toHaveBeenCalledTimes(1);
+    expect(mocks.searchRepositoriesWithSelection).toHaveBeenCalledTimes(1);
     expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
     expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: 'foo' });
+  });
+
+  it('presents an empty result when AI selection explicitly returns no relevant repositories', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    mocks.embed.mockResolvedValue([[0.1]]);
+    mocks.vectorQuery.mockResolvedValue([]);
+    // 模型明确判断"没有相关仓库"：返回 [] 是合法结果，UI 应呈现空态而非全库噪声
+    mocks.searchRepositoriesWithSelection.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('完全不相关的东西', identity); });
+
+    expect(storeState.setSearchResults).toHaveBeenCalledWith([]);
+    expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: '完全不相关的东西' });
+  });
+
+  it('keeps the AI-provided ordering instead of the default star ordering', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/high-star', stargazers_count: 1000 }),
+      baseRepo({ id: 2, full_name: 'owner/low-star', stargazers_count: 3 }),
+    ];
+    mocks.embed.mockResolvedValue([[0.1]]);
+    mocks.vectorQuery.mockResolvedValue([]);
+    // LLM 精选把低 star 的排在前面：applyFilters 的 star 降序不能覆盖该顺序
+    mocks.searchRepositoriesWithSelection.mockResolvedValue([
+      storeState.repositories[1],
+      storeState.repositories[0],
+    ]);
+    // 模拟 SearchBar 真实的 applyFilters：按 star 降序排序
+    const starSort = (repos: Repository[]) =>
+      [...repos].sort((a, b) => (b.stargazers_count || 0) - (a.stargazers_count || 0));
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', starSort); });
+
+    expect(storeState.setSearchResults).toHaveBeenCalledWith([
+      storeState.repositories[1],
+      storeState.repositories[0],
+    ]);
   });
 
   it('uses basic text search directly when no AI config exists', async () => {
@@ -420,7 +480,7 @@ describe('useSearchActions.keywordSearch', () => {
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.keywordSearch('foo', identity); });
 
-    expect(mocks.searchRepositoriesWithReranking).not.toHaveBeenCalled();
+    expect(mocks.searchRepositoriesWithSelection).not.toHaveBeenCalled();
     expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
   });
 });
