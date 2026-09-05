@@ -740,7 +740,7 @@ export class GitHubListsApiService {
       { replayableMutation: true }
     );
   }
-  /** 重命名 List（用于语言切换时的自动迁移）。 */
+  /** 重命名 List（用于语言切换时的自动迁移）。幂等：重命名到同一目标名称可安全重放。 */
   async updateUserList(listId: string, name: string, description?: string): Promise<void> {
     await this.request<{ updateUserList: { list: { id: string; name: string } } }>(
       `mutation($listId: ID!, $name: String!, $description: String) {
@@ -749,7 +749,7 @@ export class GitHubListsApiService {
         }
       }`,
       { listId, name, description: description ?? null },
-      { replayableMutation: true }
+      { replayableMutation: false }
     );
   }
 
