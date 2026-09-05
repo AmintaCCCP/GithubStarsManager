@@ -108,8 +108,8 @@ export const useReleaseArtifactActions = (): ReleaseArtifactActions => {
 
   const generateSummary = useCallback(async (release: Release) => {
     const existing = summaries[release.id];
-    // 前置守卫：ReleaseCard 侧由 View 的展开短路保证不重复触发，这里同时兼容
-    // useRepositoryReleaseSheet 的委托调用（loading 中或已有结论时不重跑）。
+    // 前置守卫：loading 中或已有结论时不重跑。ReleaseCard 按钮在 loading 期间本就
+    // disabled（原实现的"取消上一请求"由此不可达，此处守卫化并兼容 sheet 委托）。
     if (existing?.status === 'loading' || (existing?.status === 'done' && existing.content)) return;
 
     const activeConfig = aiConfigs.find((config) => config.id === activeAIConfig);
@@ -121,8 +121,8 @@ export const useReleaseArtifactActions = (): ReleaseArtifactActions => {
       return;
     }
 
-    // 取消上一次未完成的请求
-    summaryAbortRefs.current[release.id]?.abort();
+    // 请求取消仅经由 cancelSummaryRequests（unmount / reset）；loading 守卫使同 id
+    // 并发不可达，无需"取消上一请求"。
     const controller = new AbortController();
     summaryAbortRefs.current[release.id] = controller;
 
@@ -139,10 +139,13 @@ export const useReleaseArtifactActions = (): ReleaseArtifactActions => {
         },
         controller.signal
       );
+      // 对齐原 sheet 的 post-await 守卫：服务不响应 signal 而迟到 resolve 时
+      // （如 reset()/unmount 之后），丢弃过期结果，不得回写刚清空的状态。
+      if (controller.signal.aborted) return;
       setSummaries((previous) => ({ ...previous, [release.id]: { status: 'done', content } }));
     } catch (error) {
-      // 主动取消（卸载/重新发起）时静默处理，不更新状态、不弹错误
-      if (error instanceof Error && error.name === 'AbortError') {
+      // 主动取消（卸载/重置）时静默处理，不更新状态、不弹错误
+      if ((error instanceof Error && error.name === 'AbortError') || controller.signal.aborted) {
         return;
       }
       const message = error instanceof Error ? error.message : String(error);

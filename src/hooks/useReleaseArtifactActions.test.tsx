@@ -300,6 +300,31 @@ describe('useReleaseArtifactActions.generateSummary', () => {
     expect(mocks.toast).not.toHaveBeenCalled();
   });
 
+  it('reset discards late results even when the service ignores the abort signal', async () => {
+    // H1 回归：resolve 型 mock（忽略 signal，不抛 AbortError）——修复前会把迟到
+    // 的 done 回写进刚清空的状态；修复后由 post-await aborted 守卫丢弃。
+    let resolveSummary!: (value: string) => void;
+    mocks.analyzeReleaseSummary.mockImplementation(() => new Promise<string>((resolve) => {
+      resolveSummary = resolve;
+    }));
+    const { result } = renderHook(() => useReleaseArtifactActions());
+
+    act(() => {
+      void result.current.generateSummary(release);
+    });
+    expect(result.current.summaries[100]?.status).toBe('loading');
+
+    act(() => {
+      result.current.reset();
+    });
+    expect(result.current.summaries).toEqual({});
+
+    resolveSummary('# stale');
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(result.current.summaries).toEqual({});
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
   it('reset clears summaries and rpc download states', async () => {
     mocks.sendToRpcDownload.mockResolvedValue({ success: true });
     mocks.analyzeReleaseSummary.mockResolvedValue('# Summary');

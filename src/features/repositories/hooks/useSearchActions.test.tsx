@@ -127,16 +127,23 @@ const createStoreState = () => ({
 
 let storeState = createStoreState();
 const mockUseAppStore = vi.mocked(mocks.useAppStore);
-mockUseAppStore.mockImplementation((selector?: (state: typeof storeState) => unknown) =>
-  selector ? selector(storeState) : storeState);
-(mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
 
 const identity = <T,>(repos: T[]): T[] => repos;
 
+// resetAllMocks 会连同 useAppStore 的 mockImplementation 一起清掉，每次重建。
+// 用 resetAllMocks 而非 clearAllMocks：后者不清实现，mockRejectedValue 等会
+// 泄漏进后续用例，形成用例顺序依赖。
+const setupStoreMocks = () => {
+  storeState = createStoreState();
+  mockUseAppStore.mockImplementation((selector?: (state: typeof storeState) => unknown) =>
+    selector ? selector(storeState) : storeState);
+  (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+};
+
 describe('useSearchActions.aiSearch (vector hit)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    storeState = createStoreState();
+    vi.resetAllMocks();
+    setupStoreMocks();
   });
 
   it('queries with default topK 30 / threshold 0.35, boosts scores and sets the skip ref', async () => {
@@ -268,8 +275,8 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
 
 describe('useSearchActions.keywordSearch', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    storeState = createStoreState();
+    vi.resetAllMocks();
+    setupStoreMocks();
   });
 
   it('falls back to basic text search when AI reranking fails and vector search found nothing', async () => {
@@ -316,8 +323,8 @@ describe('useSearchActions.keywordSearch', () => {
 
 describe('useSearchActions.syncStars', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    storeState = createStoreState();
+    vi.resetAllMocks();
+    setupStoreMocks();
   });
 
   it('keeps the setRepositories → forceSyncToBackend → setLastSync order and applies lists', async () => {
