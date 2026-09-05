@@ -283,6 +283,10 @@ export const useSearchActions = (): SearchActions => {
       finalFiltered.sort((a, b) =>
         (aiOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
         - (aiOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER));
+      // 下面 setSearchFilters({ query }) 会触发 SearchBar 的过滤 effect，用基础
+      // 文本搜索+star 排序重设结果——LLM 精选的顺序、子集与显式空态都会被覆盖。
+      // 与向量路径同用 skipNextTextSearchRef 挡掉这次 effect（含空结果场景）。
+      skipNextTextSearchRef.current = true;
     }
     setSearchResults(finalFiltered);
 

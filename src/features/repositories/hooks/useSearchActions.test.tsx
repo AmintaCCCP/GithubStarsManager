@@ -322,7 +322,8 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.aiSearch('foo', identity); });
 
-    expect(result.current.skipNextTextSearchRef.current).toBe(false);
+    // 落入 keywordSearch 后 AI 精选成功：结果须像向量路径一样挡住过滤 effect 的覆盖
+    expect(result.current.skipNextTextSearchRef.current).toBe(true);
     expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
     expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: 'foo' });
   });
@@ -409,6 +410,8 @@ describe('useSearchActions.keywordSearch', () => {
     expect(mocks.searchRepositoriesWithSelection).toHaveBeenCalledTimes(1);
     expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
     expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: 'foo' });
+    // AI 失败走基础文本搜索兜底：顺序非 AI 产物，无需挡 SearchBar 的过滤 effect
+    expect(result.current.skipNextTextSearchRef.current).toBe(false);
   });
 
   it('presents an empty result when AI selection explicitly returns no relevant repositories', async () => {
@@ -435,6 +438,8 @@ describe('useSearchActions.keywordSearch', () => {
 
     expect(storeState.setSearchResults).toHaveBeenCalledWith([]);
     expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: '完全不相关的东西' });
+    // 空态是模型的明确判断，同样必须挡住 SearchBar 过滤 effect 的回填
+    expect(result.current.skipNextTextSearchRef.current).toBe(true);
   });
 
   it('keeps the AI-provided ordering instead of the default star ordering', async () => {
@@ -469,6 +474,9 @@ describe('useSearchActions.keywordSearch', () => {
       storeState.repositories[1],
       storeState.repositories[0],
     ]);
+    // AI 结果的顺序/子集/空态不能被 SearchBar 的过滤 effect 用基础文本搜索覆盖：
+    // keywordSearch 需像向量路径一样置位 skipNextTextSearchRef
+    expect(result.current.skipNextTextSearchRef.current).toBe(true);
   });
 
   it('uses basic text search directly when no AI config exists', async () => {

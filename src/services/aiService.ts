@@ -2194,7 +2194,7 @@ ${repoInfo}
       // 推理 token 与输出共享预算（openai reasoning 模型、gemini 2.5 思考模型）：
       // 小预算被推理耗尽时 content 为空、精选会静默退化，故复用重排序的 4096
       // 预算；普通模型 800 足够容纳 ≤20 个 ID 的 JSON 数组。
-      maxTokens: this.config.reasoningEffort || this.getApiType() === 'gemini'
+      maxTokens: (this.config.reasoningEffort || this.getApiType() === 'gemini')
         ? AIService.RERANKING_MAX_TOKENS
         : AIService.SELECTION_MAX_TOKENS,
       signal,
