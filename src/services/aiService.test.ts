@@ -133,6 +133,21 @@ describe('AIService.searchRepositoriesWithSelection — 词法兜底', () => {
     //（若词级剔除失效则为 1.4）
     expect(scored[0].score).toBeCloseTo(0.95, 10);
   });
+
+  it('中文查询无 AI 扩展词时按 CJK bigram 召回，兜底不再整串零命中', async () => {
+    const repo = makeRepo({
+      id: 30,
+      name: 'stars-manager',
+      full_name: 'acme/stars-manager',
+      description: '管理 GitHub 星标仓库的工具',
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    // "星标仓库"无空格切不出词，整串也不在描述里；bigram "星标"/"仓库" 命中描述
+    const scored = service['scoreRepositoriesByKeywords']([repo], '星标仓库', []);
+    expect(scored).toHaveLength(1);
+    expect(scored[0].score).toBeGreaterThan(0);
+  });
 });
 
 describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
@@ -257,9 +272,41 @@ describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
     const service = new AIService({ ...makeConfig(), reasoningEffort: 'high' } as never, 'zh');
     await service.searchRepositoriesWithSelection([repo], 'foo');
 
-    // 扩展请求维持 300；精选请求复用重排序的 4096 预算（推理 token 共享预算）
-    expect(requests[0].max_tokens).toBe(300);
+    // 扩展请求给思考模型留足余量；精选请求复用重排序的 4096 预算（推理 token 共享预算）
+    expect(requests[0].max_tokens).toBe(2000);
     expect(requests[1].max_tokens).toBe(4096);
+  });
+
+  it('AI 请求失败时通过 onFallback 通知调用方，并回退词法得分序', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockImplementationOnce(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const onFallback = vi.fn();
+
+    const repoA = makeRepo({ id: 770000001, name: 'foo-tool', full_name: 'acme/foo-tool' });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const results = await service.searchRepositoriesWithSelection([repoA], 'foo', { onFallback });
+
+    // 端点抖动/配置问题时：回调说明原因，结果退到词法命中而非空
+    expect(onFallback).toHaveBeenCalledWith('ai_failed');
+    expect(results.map((r) => r.id)).toEqual([770000001]);
+  });
+
+  it('模型判定无相关仓库时保留空结果，并通过 onFallback 说明原因', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockImplementationOnce(async () => chatResponse('{"intent":"","keywords":[],"synonyms":[]}'));
+    fetchMock.mockImplementationOnce(async () => chatResponse('[]'));
+    const onFallback = vi.fn();
+
+    const repo = makeRepo({ id: 780000001, name: 'foo-tool', full_name: 'acme/foo-tool' });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const results = await service.searchRepositoriesWithSelection([repo], '完全无关的查询', { onFallback });
+
+    expect(onFallback).toHaveBeenCalledWith('ai_empty');
+    expect(results).toEqual([]);
   });
 });
 

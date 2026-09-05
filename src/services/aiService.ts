@@ -2080,18 +2080,23 @@ ${repoInfo}
       signal?: AbortSignal;
       /** 搜索阶段回调，供 UI 展示进度（扩展查询 → 精选排序）。 */
       onPhase?: (phase: 'expanding' | 'selecting') => void;
+      /** AI 精选未能产出结果时回调，供 UI 提示原因：ai_failed=请求/配置失败，
+       *  unparseable=响应无法解析，ai_empty=模型判定无相关仓库。 */
+      onFallback?: (reason: 'ai_failed' | 'unparseable' | 'ai_empty') => void;
     } = {}
   ): Promise<Repository[]> {
     const startTime = Date.now();
     if (!query.trim()) return repositories;
-    const { signal, onPhase } = options;
+    const { signal, onPhase, onFallback } = options;
     let aiTerms: string[] = [];
     let intent = '';
 
     try {
       logger.info('ai', 'Starting AI selection search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, query });
 
-      // ① 查询扩展 + 意图复述
+      // ① 查询扩展 + 意图复述。思考类模型的思考 token 与输出共享预算，
+      //    预算太小会把 JSON 截断在半截（实测 glm 思考模型 300 token 不够），
+      //    给足余量；非思考模型只按实际用量计费，无额外成本。
       onPhase?.('expanding');
       const system = this.language === 'zh'
         ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
@@ -2100,7 +2105,7 @@ ${repoInfo}
         system,
         user: this.createSearchPrompt(query),
         temperature: 0.1,
-        maxTokens: 300,
+        maxTokens: 2000,
         signal,
       });
       if (content) {
@@ -2133,9 +2138,16 @@ ${repoInfo}
       const ranked = await this.selectRelevantRepositories(candidates, query, intent, signal);
       if (ranked === null) {
         // 响应缺失或格式非法：按词法得分序兜底
+        onFallback?.('unparseable');
         logger.warn('ai', 'AI selection returned unparseable result, falling back to lexical ranking', { configId: this.config.id, durationMs: Date.now() - startTime });
         return this.performEnhancedBasicSearch(repositories, query, aiTerms)
           .slice(0, AIService.SELECTION_CANDIDATE_LIMIT);
+      }
+      if (ranked.length === 0) {
+        // 模型明确判定无相关仓库：尊重该判断返回空态，但让调用方知道原因
+        onFallback?.('ai_empty');
+        logger.info('ai', 'AI selection found no relevant repositories', { configId: this.config.id, durationMs: Date.now() - startTime });
+        return [];
       }
       logger.info('ai', 'AI selection completed', {
         apiType: this.getApiType(),
@@ -2149,6 +2161,7 @@ ${repoInfo}
     } catch (error) {
       // 用户主动取消：不产出兜底结果，向上传播交由调用方处理
       if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      onFallback?.('ai_failed');
       logger.warn('ai', 'AI selection failed, falling back to lexical ranking', {
         apiType: this.getApiType(),
         model: this.config.model,
@@ -2215,7 +2228,16 @@ ${repoInfo}
     // 去重并剔除与任一查询词相同的扩展词：避免同一命中被查询词与扩展词
     // 重复计分（按词级剔除，而非仅完整查询串）
     const querySet = new Set([normalizedQuery, ...queryWords]);
-    const terms = [...new Set(aiTerms.map(term => term.toLowerCase()).filter(term => term && !querySet.has(term)))];
+    // 中文查询没有空格分词，整串子串在英文元数据上几乎必然零命中（AI 失败
+    // 兜底时会得到空结果）：把 CJK 连续段切成 bigram 作为弱信号词参与召回
+    // 与计分。仅用于 AI 搜索的词法路径；输入框的 performBasicTextSearch 不受影响。
+    const cjkTerms = AIService.extractCjkBigrams(normalizedQuery).filter(bigram => !querySet.has(bigram));
+    const terms = [
+      ...new Set([
+        ...aiTerms.map(term => term.toLowerCase()).filter(term => term && !querySet.has(term)),
+        ...cjkTerms,
+      ]),
+    ];
 
     const scoredRepos: Array<{ repo: Repository; score: number }> = [];
     for (const repo of repositories) {
@@ -2309,6 +2331,26 @@ ${repoInfo}
     return this.scoreRepositoriesByKeywords(repositories, query, aiTerms)
       .filter(item => item.score > 0)
       .map(item => item.repo);
+  }
+
+  /**
+   * 把文本里的 CJK 连续段切成 bigram（"星标仓库" → 星标 / 标仓 / 仓库），
+   * 去重并限量。中文没有空格分词，整串子串匹配对英文元数据几乎必然失效，
+   * bigram 是无依赖词典时的最低成本召回手段。
+   */
+  private static extractCjkBigrams(text: string): string[] {
+    const cjkRuns = text.match(/[\u3400-\u4dbf\u4e00-\u9fff]+/g) || [];
+    const bigrams: string[] = [];
+    for (const run of cjkRuns) {
+      if (run.length === 1) {
+        bigrams.push(run);
+        continue;
+      }
+      for (let i = 0; i < run.length - 1; i++) {
+        bigrams.push(run.slice(i, i + 2));
+      }
+    }
+    return [...new Set(bigrams)].slice(0, 12);
   }
 
   private createSearchPrompt(query: string): string {

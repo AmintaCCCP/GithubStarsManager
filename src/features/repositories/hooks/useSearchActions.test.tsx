@@ -479,6 +479,37 @@ describe('useSearchActions.keywordSearch', () => {
     expect(result.current.skipNextTextSearchRef.current).toBe(true);
   });
 
+  it('toasts the fallback reason when AI selection reports a failure', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    mocks.embed.mockResolvedValue([[0.1]]);
+    mocks.vectorQuery.mockResolvedValue([]);
+    // 端点抖动/配置问题：service 回调 ai_failed，词法命中照常返回
+    mocks.searchRepositoriesWithSelection.mockImplementation(
+      (_repos: Repository[], _query: string, opts?: { onFallback?: (reason: string) => void }) => {
+        opts?.onFallback?.('ai_failed');
+        return Promise.resolve([storeState.repositories[0]]);
+      },
+    );
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+
+    expect(mocks.toast).toHaveBeenCalledWith('AI 请求失败，已回退本地词法搜索', 'warning');
+    expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
+  });
+
   it('uses basic text search directly when no AI config exists', async () => {
     storeState.aiConfigs = [];
     storeState.repositories = [

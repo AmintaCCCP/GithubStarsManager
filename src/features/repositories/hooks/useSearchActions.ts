@@ -259,12 +259,19 @@ export const useSearchActions = (): SearchActions => {
               ? t('AI 精选相关仓库...', 'AI selecting relevant repositories...')
               : t('AI 语义分析...', 'AI semantic analysis...'));
           },
+          onFallback: (reason) => {
+            // 端点抖动/配置问题时用户看到的不能只是"空结果"：明确告知已降级
+            if (reason === 'ai_failed') {
+              toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
+            }
+          },
         });
         console.log('✅ AI selection search completed, results:', aiResults.length);
         filtered = aiResults;
         aiOrdered = true;
       } catch (error) {
         console.warn('❌ AI search failed, falling back to basic search:', error);
+        toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
         filtered = performBasicTextSearch(repositories, query);
       }
     } else {
@@ -292,7 +299,7 @@ export const useSearchActions = (): SearchActions => {
 
     // Update search filters to mark that AI search was performed
     setSearchFilters({ query });
-  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, t]);
+  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, toast, t]);
 
   const aiSearch = useCallback(async (
     query: string,
