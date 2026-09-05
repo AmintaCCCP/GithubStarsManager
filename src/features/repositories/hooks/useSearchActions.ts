@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'r
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
-import { AIService } from '../../../services/aiService';
+import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { GitHubApiService } from '../../../services/githubApi';
 import { createGitHubListsApiService } from '../../../services/githubApiFactory';
@@ -192,7 +192,11 @@ export interface SearchActions {
   vectorScoreMapRef: MutableRefObject<{ query: string; scores: Map<string, number> } | null>;
   skipNextTextSearchRef: MutableRefObject<boolean>;
   aiSearch: (query: string, applyFilters: (repos: Repository[]) => Repository[]) => Promise<void>;
-  keywordSearch: (query: string, applyFilters: (repos: Repository[]) => Repository[]) => Promise<void>;
+  keywordSearch: (
+    query: string,
+    applyFilters: (repos: Repository[]) => Repository[],
+    options?: { signal?: AbortSignal },
+  ) => Promise<void>;
   syncStars: (mode?: 'auto' | 'stars-only' | 'stars-and-lists') => Promise<void>;
 }
 
@@ -238,56 +242,86 @@ export const useSearchActions = (): SearchActions => {
   const [searchPhase, setSearchPhase] = useState<string | null>(null);
   const vectorScoreMapRef = useRef<{ query: string; scores: Map<string, number> } | null>(null);
   const skipNextTextSearchRef = useRef(false);
+  // 当前在途 AI 搜索的控制器：新搜索启动时中止旧请求（超代语义）
+  const aiSearchAbortRef = useRef<AbortController | null>(null);
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const keywordSearch = useCallback(async (
     query: string,
     applyFilters: (repos: Repository[]) => Repository[],
+    options?: { signal?: AbortSignal },
   ): Promise<void> => {
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-    console.log('🤖 AI Config found:', !!activeConfig, 'Active AI Config ID:', activeAIConfig);
-    console.log('📋 Available AI Configs:', aiConfigs.length);
-    console.log('🔧 AI Configs:', aiConfigs.map(c => ({ id: c.id, name: c.name, hasApiKey: !!c.apiKey })));
 
     let filtered = repositories;
+    let aiOrdered = false;
     if (activeConfig) {
       try {
-        console.log('🚀 Calling AI service...');
+        // 无向量降级链：查询扩展+意图复述 → 词法候选召回 → LLM 精选排序
         setSearchPhase(t('AI 语义分析...', 'AI semantic analysis...'));
         const aiService = new AIService(activeConfig, language);
-
-        // 先尝试AI搜索
-        const aiResults = await aiService.searchRepositoriesWithReranking(repositories, query);
-        console.log('✅ AI search completed, results:', aiResults.length);
-
+        const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
+          signal: options?.signal,
+          onPhase: (phase) => {
+            setSearchPhase(phase === 'selecting'
+              ? t('AI 精选相关仓库...', 'AI selecting relevant repositories...')
+              : t('AI 语义分析...', 'AI semantic analysis...'));
+          },
+          onFallback: (reason) => {
+            // 端点抖动/配置问题时用户看到的不能只是"空结果"：明确告知已降级
+            if (reason === 'ai_failed') {
+              toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
+            }
+          },
+        });
+        console.log('✅ AI selection search completed, results:', aiResults.length);
         filtered = aiResults;
+        aiOrdered = true;
       } catch (error) {
+        // 取消不是失败：向上传播交给 aiSearch 静默结束，不产出兜底结果
+        if (isAbortError(error)) throw error;
         console.warn('❌ AI search failed, falling back to basic search:', error);
+        toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
         filtered = performBasicTextSearch(repositories, query);
-        console.log('🔄 Basic search fallback results:', filtered.length);
       }
     } else {
       console.log('⚠️ No AI config found, using basic text search');
       // Basic text search if no AI config
       filtered = performBasicTextSearch(repositories, query);
-      console.log('📝 Basic search results:', filtered.length);
     }
 
     // Apply other filters and update results
     const finalFiltered = applyFilters(filtered);
-    console.log('🎯 Final filtered results:', finalFiltered.length);
-    console.log('📋 Final filtered repositories:', finalFiltered.map(r => r.name));
+    if (aiOrdered) {
+      // AI 返回的顺序（LLM 精选序或词法兜底序）就是相关性顺序；applyFilters 会按
+      // 排序控件重排（默认 star 降序），这里恢复 AI 顺序——与向量路径的
+      // rerankOrder 恢复逻辑同构。
+      const aiOrder = new Map(filtered.map((repo, index) => [String(repo.id), index]));
+      finalFiltered.sort((a, b) =>
+        (aiOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
+        - (aiOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER));
+      // 下面 setSearchFilters({ query }) 会触发 SearchBar 的过滤 effect，用基础
+      // 文本搜索+star 排序重设结果——LLM 精选的顺序、子集与显式空态都会被覆盖。
+      // 与向量路径同用 skipNextTextSearchRef 挡掉这次 effect（含空结果场景）。
+      skipNextTextSearchRef.current = true;
+    }
     setSearchResults(finalFiltered);
 
     // Update search filters to mark that AI search was performed
     setSearchFilters({ query });
-  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, t]);
+  }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, toast, t]);
 
   const aiSearch = useCallback(async (
     query: string,
     applyFilters: (repos: Repository[]) => Repository[],
   ): Promise<void> => {
     if (!query.trim()) return;
+
+    // 新搜索接管：中止上一次仍在途的 AI 请求（搜索进行中按 Enter 可再次触发），
+    // 防止过期结果落盘覆盖新结果。被取代的搜索在 finally 里不复位搜索状态。
+    aiSearchAbortRef.current?.abort();
+    const controller = new AbortController();
+    aiSearchAbortRef.current = controller;
 
     setIsSearching(true);
     setSearchPhase(null);
@@ -408,12 +442,22 @@ export const useSearchActions = (): SearchActions => {
       }
       // ====== 向量搜索分支结束 ======
 
-      await keywordSearch(query, applyFilters);
+      await keywordSearch(query, applyFilters, { signal: controller.signal });
     } catch (error) {
+      // 取消不是失败：静默结束当前搜索（不产出结果），不当作可恢复的 AI 失败
+      if (isAbortError(error)) {
+        console.log('🚫 AI search cancelled');
+        return;
+      }
       console.error('💥 Search failed:', error);
     } finally {
-      setIsSearching(false);
-      setSearchPhase(null);
+      // 仅当本次搜索仍是"当前搜索"时才复位状态：被新搜索取代的旧搜索
+      // 不把新搜索的 isSearching/searchPhase 状态清掉
+      if (aiSearchAbortRef.current === controller) {
+        aiSearchAbortRef.current = null;
+        setIsSearching(false);
+        setSearchPhase(null);
+      }
     }
   }, [repositories, aiConfigs, activeAIConfig, language, setSearchResults, setSearchFilters, keywordSearch, t]);
 
