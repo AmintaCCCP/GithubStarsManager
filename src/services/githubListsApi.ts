@@ -740,19 +740,28 @@ export class GitHubListsApiService {
       { replayableMutation: true }
     );
   }
-  /** 重命名 List（用于语言切换时的自动迁移）。幂等：重命名到同一目标名称可安全重放。 */
-  async updateUserList(listId: string, name: string, description?: string): Promise<void> {
+  /**
+   * 重命名 List（用于语言切换时的自动迁移）。
+   * description 仅在显式传入时随请求发送：省略该参数时变量表中不含 description 键，
+   * GraphQL 视为"未提供该字段"，保留 list 已有描述；显式传 null 才表示清空描述。
+   * 未知结果（网络/超时）不自动重放：重命名虽幂等，但下一轮推送会因名称不匹配
+   * 自然重试，无需在请求层重放。
+   */
+  async updateUserList(listId: string, name: string, description?: string | null): Promise<void> {
+    const variables: { listId: string; name: string; description?: string | null } = { listId, name };
+    if (description !== undefined) {
+      variables.description = description;
+    }
     await this.request<{ updateUserList: { list: { id: string; name: string } } }>(
       `mutation($listId: ID!, $name: String!, $description: String) {
         updateUserList(input: { listId: $listId, name: $name, description: $description }) {
           list { id name }
         }
       }`,
-      { listId, name, description: description ?? null },
+      variables,
       { replayableMutation: false }
     );
   }
-
 
   /**
    * 将某仓库（itemId 为 GraphQL node id）加入指定 list 集合。

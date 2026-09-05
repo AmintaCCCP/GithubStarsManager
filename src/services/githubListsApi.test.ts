@@ -31,6 +31,10 @@ const UPDATE_ITEM_DATA = {
   data: { updateUserListsForItem: { clientMutationId: 'c1' } },
 };
 
+const UPDATE_LIST_DATA = {
+  data: { updateUserList: { list: { id: 'L_1', name: 'renamed' } } },
+};
+
 const VIEWER_LISTS_DATA = {
   data: {
     viewer: {
@@ -223,6 +227,53 @@ describe('GitHubListsApiService 后端代理回退直连', () => {
     expect(calls).toHaveLength(2);
     expect(String(calls[0][0])).toBe(PROXY_URL);
     expect(String(calls[1][0])).toBe(DIRECT_URL);
+  });
+
+  describe('updateUserList', () => {
+    function lastVariables(): Record<string, unknown> {
+      const calls = vi.mocked(window.fetch).mock.calls;
+      return JSON.parse(String((calls[calls.length - 1][1] as RequestInit).body ?? '{}')).variables;
+    }
+
+    it('省略 description 时变量表不含 description 键（重命名保留已有描述，不被显式 null 清空）', async () => {
+      const api = makeService(null);
+      vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, UPDATE_LIST_DATA));
+
+      await api.updateUserList('L_1', 'Development Tools');
+
+      const variables = lastVariables();
+      expect(variables).toEqual({ listId: 'L_1', name: 'Development Tools' });
+      // toEqual 会忽略值为 undefined 的键，这里显式断言键确实不存在
+      expect('description' in variables).toBe(false);
+    });
+
+    it('显式传 null 时发送 description: null（保留清空描述的能力）', async () => {
+      const api = makeService(null);
+      vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, UPDATE_LIST_DATA));
+
+      await api.updateUserList('L_1', 'Development Tools', null);
+
+      expect(lastVariables()).toEqual({ listId: 'L_1', name: 'Development Tools', description: null });
+    });
+
+    it('显式传描述字符串时原样发送', async () => {
+      const api = makeService(null);
+      vi.mocked(window.fetch).mockResolvedValueOnce(makeJsonResponse(200, UPDATE_LIST_DATA));
+
+      await api.updateUserList('L_1', 'Development Tools', 'curated tools');
+
+      expect(lastVariables()).toEqual({ listId: 'L_1', name: 'Development Tools', description: 'curated tools' });
+    });
+
+    it('未知结果（内部超时）时抛错，不自动重放、不回退直连', async () => {
+      const api = makeService(BACKEND_URL);
+      vi.mocked(window.fetch).mockRejectedValueOnce(new DOMException('The operation was aborted.', 'AbortError'));
+
+      await expect(api.updateUserList('L_1', 'Development Tools')).rejects.toThrow(/请求超时/);
+      const calls = vi.mocked(window.fetch).mock.calls;
+      expect(calls).toHaveLength(1);
+      expect(String(calls[0][0])).toBe(PROXY_URL);
+    });
   });
 
   it('代理请求内部超时（AbortError）后回退直连并成功', async () => {
