@@ -46,7 +46,7 @@ export const SliderInput: React.FC<SliderInputProps> = ({
               {markItems.map((mark) => {
                 const pct = range > 0 ? ((mark - min) / range) * 100 : 0;
                 return (
-                  <span key={mark} className="absolute -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground dark:text-muted-foreground" style={{ left: `${pct}%` }}>
+                  <span key={mark} className="absolute -translate-x-1/2 text-xs tabular-nums text-muted-foreground dark:text-muted-foreground" style={{ left: `${pct}%` }}>
                     {formatValue ? formatValue(mark) : mark}
                   </span>
                 );

@@ -178,7 +178,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   })}
                 </span>
                 {showAssetsUpdatedIndicator && (
-                  <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
+                  <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium">
                     {t('资产已更新', 'Assets updated')}
                   </span>
                 )}
@@ -342,7 +342,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                           {isAssetUpdated && (
-                            <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
+                            <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
                               {t('资产已更新', 'Asset updated')}
                             </span>
                           )}
@@ -384,7 +384,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                         {isAssetUpdated && (
-                          <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
+                          <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium whitespace-nowrap">
                             {t('资产已更新', 'Asset updated')}
                           </span>
                         )}

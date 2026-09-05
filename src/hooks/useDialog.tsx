@@ -124,8 +124,8 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
           isOpen={confirmState.isOpen}
           title={confirmState.title}
           message={confirmState.message}
-          confirmText={confirmState.confirmText}
-          cancelText={confirmState.cancelText}
+          confirmText={confirmState.confirmText ?? (language === 'zh' ? '确认' : 'Confirm')}
+          cancelText={confirmState.cancelText ?? (language === 'zh' ? '取消' : 'Cancel')}
           type={confirmState.type}
           onConfirm={handleConfirm}
           onCancel={handleCancel}

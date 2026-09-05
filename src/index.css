@@ -342,10 +342,10 @@
     @apply bg-transparent text-muted-foreground px-[10px] py-0 rounded-full border border-border text-[12px] font-medium flex items-center gap-1;
   }
   .pill-success {
-    @apply bg-success text-success-foreground rounded-full text-[10px] font-medium;
+    @apply bg-success text-success-foreground rounded-full text-xs font-medium;
   }
   .badge-subtle {
-    @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-[10px] font-medium;
+    @apply bg-muted text-muted-foreground px-2 py-0 rounded-sm border border-border text-xs font-medium;
   }
 
   .input-base {
@@ -538,7 +538,9 @@ html:has(body[data-scroll-locked]) {
   --ui-selection-foreground: hsl(var(--accent-foreground));
   --ui-search-highlight: hsl(var(--primary) / 0.16);
   --ui-search-highlight-foreground: hsl(var(--foreground));
-  --ui-placeholder: hsl(var(--muted-foreground) / 0.55);
+  /* Placeholder text must stay above 4.5:1 on the canvas (WCAG 1.4.3), so it
+     uses the full muted-foreground token instead of an alpha wash. */
+  --ui-placeholder: hsl(var(--muted-foreground));
   --ui-success: hsl(var(--success));
   --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
@@ -587,7 +589,7 @@ html.dark {
   --ui-selection-foreground: hsl(var(--foreground));
   --ui-search-highlight: hsl(var(--ring) / 0.28);
   --ui-search-highlight-foreground: hsl(var(--foreground));
-  --ui-placeholder: hsl(var(--muted-foreground) / 0.6);
+  --ui-placeholder: hsl(var(--muted-foreground));
 
   --ui-canvas: hsl(var(--background));
   --ui-panel: hsl(var(--card));
@@ -715,7 +717,7 @@ textarea:focus-visible,
 }
 
 .ui-field::placeholder {
-  color: var(--ui-text-faint);
+  color: var(--ui-text-muted);
 }
 
 .ui-field:hover {
@@ -1104,4 +1106,25 @@ html.dark .release-card.is-expanded {
   background: var(--ui-panel-muted);
   border: 1px solid var(--ui-line-subtle);
   border-radius: var(--ui-radius-md);
+}
+
+/* ========== prefers-reduced-motion: collapse all non-essential motion ==========
+   Movement, loops and slides become instant; color/opacity feedback survives via
+   the state cues themselves. Spinning loaders are re-enabled below: their rotation
+   is functional progress feedback (a frozen spinner reads as a hang), and it stays
+   confined to a tiny icon area. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin {
+    animation-duration: 1.2s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

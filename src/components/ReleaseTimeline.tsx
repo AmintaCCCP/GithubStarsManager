@@ -959,7 +959,7 @@ export const ReleaseTimeline: React.FC = () => {
                             <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap">
                               {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                               {latestAssetsUpdated && (
-                                <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
+                                <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium">
                                   {t('资产已更新', 'Assets updated')}
                                 </span>
                               )}

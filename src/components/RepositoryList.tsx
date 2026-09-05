@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
+import { Bot, ChevronDown, LayoutGrid, List, Pause, Play, X } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -40,6 +40,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     defaultCategoryOverrides,
     categoryMatchMode,
     searchFilters,
+    setSearchFilters,
     similarView,
     resetSimilarView,
     repositoryViewMode,
@@ -51,11 +52,46 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     defaultCategoryOverrides: state.defaultCategoryOverrides,
     categoryMatchMode: state.categoryMatchMode,
     searchFilters: state.searchFilters,
+    setSearchFilters: state.setSearchFilters,
     similarView: state.similarView,
     resetSimilarView: state.resetSimilarView,
     repositoryViewMode: state.repositoryViewMode,
     setRepositoryViewMode: state.setRepositoryViewMode,
   })));
+
+  // 空状态的"清除全部筛选"出口：只重置筛选条件，保留查询词——查询词是
+  // SearchBar 的本地输入状态，这里不重置以免输入框与结果列表失同步。
+  const clearAllFilters = useCallback(() => {
+    setSearchFilters({
+      tags: [],
+      languages: [],
+      platforms: [],
+      licenses: [],
+      minStars: undefined,
+      maxStars: undefined,
+      isAnalyzed: undefined,
+      isSubscribed: undefined,
+      isEdited: undefined,
+      isCategoryLocked: undefined,
+      analysisFailed: undefined,
+    });
+  }, [setSearchFilters]);
+
+  const hasActiveNonQueryFilters = useMemo(() => {
+    // 契约测试的极简 store 只提供 query 字段；其余字段缺省时视为无筛选。
+    if (!searchFilters) return false;
+    return (searchFilters.languages?.length ?? 0) > 0 ||
+      (searchFilters.tags?.length ?? 0) > 0 ||
+      (searchFilters.platforms?.length ?? 0) > 0 ||
+      (searchFilters.licenses?.length ?? 0) > 0 ||
+      searchFilters.minStars !== undefined ||
+      searchFilters.maxStars !== undefined ||
+      searchFilters.isAnalyzed !== undefined ||
+      searchFilters.isSubscribed !== undefined ||
+      searchFilters.isEdited !== undefined ||
+      searchFilters.isCategoryLocked !== undefined ||
+      searchFilters.analysisFailed !== undefined;
+  }, [searchFilters]);
 
 
   const { toast } = useDialog();
@@ -471,6 +507,18 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             </ul>
           </div>
           )}
+        {hasActiveNonQueryFilters && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearAllFilters}
+            className="mt-4"
+          >
+            <X className="w-4 h-4" />
+            {language === 'zh' ? '清除全部筛选' : 'Clear all filters'}
+          </Button>
+        )}
         </div>
         {chatPortal}
       </>
@@ -530,7 +578,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <div className="flex items-center space-x-2 sm:space-x-3">
               <div className="w-20 sm:w-32 bg-accent dark:bg-accent rounded-full h-2">
                 <div
-                  className="bg-primary dark:bg-primary h-2 rounded-full transition-all duration-300"
+                  className="bg-primary dark:bg-primary h-2 rounded-full transition-[width] duration-300"
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
                 ></div>
               </div>
@@ -580,7 +628,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
         <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right">
+          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
             <div className="flex items-center justify-between">
               <div>
                 {t(
