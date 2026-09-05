@@ -10,6 +10,14 @@ const SERVER_PACKAGE_PATH = path.join(PROJECT_ROOT, 'server/package.json');
 const SERVER_LOCKFILE_PATH = path.join(PROJECT_ROOT, 'server/package-lock.json');
 const VERSION_XML_PATH = path.join(PROJECT_ROOT, 'versions/version-info.xml');
 const RELEASE_LOCK_PATH = path.join(PROJECT_ROOT, '.release-version.lock');
+const PACKAGE_SYNC_TRANSACTION = 'package-version-sync';
+const PACKAGE_SYNC_JOURNAL_PATH = path.join(PROJECT_ROOT, '.package-sync.transaction.json');
+const PACKAGE_SYNC_BACKUP_DIR = path.join(PROJECT_ROOT, '.package-sync-backups');
+const PACKAGE_SYNC_TARGETS = [
+  { name: 'package-lock.json', path: LOCKFILE_PATH },
+  { name: 'server/package.json', path: SERVER_PACKAGE_PATH },
+  { name: 'server/package-lock.json', path: SERVER_LOCKFILE_PATH },
+];
 
 /**
  * 根 package.json 是应用版本的唯一来源。
@@ -54,9 +62,12 @@ function updateVersionInfo() {
   let stagedServerPackagePath;
   let stagedServerLockfilePath;
   let stagedXmlPath;
+  let packageTransaction;
+  let packageSnapshots;
+  let packageFilesCommitted = false;
 
   try {
-    releaseLock = acquireReleaseLock();
+    releaseLock = acquireReleaseLockAfterRecovery();
     const releaseArgs = parseReleaseArgs(args);
     if (releaseArgs.changelog.length === 0) {
       throw new Error('至少需要提供一条更新日志');
@@ -69,24 +80,29 @@ function updateVersionInfo() {
     stagedServerPackagePath = stageSyncedServerPackage(version);
     stagedServerLockfilePath = stageSyncedPackageLock(SERVER_LOCKFILE_PATH, version);
     stagedXmlPath = stageVersionXml(xmlContext, version, releaseArgs.changelog, releaseArgs.customDownloadUrl);
-    const packageSnapshots = createFileSnapshots([
-      LOCKFILE_PATH,
-      SERVER_PACKAGE_PATH,
-      SERVER_LOCKFILE_PATH,
-    ]);
+    packageSnapshots = createFileSnapshots(PACKAGE_SYNC_TARGETS.map(({ path: targetPath }) => targetPath));
+    packageTransaction = createPackageSyncTransaction(version);
 
     try {
-      fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
-      stagedLockfilePath = null;
-      fs.renameSync(stagedServerPackagePath, SERVER_PACKAGE_PATH);
-      stagedServerPackagePath = null;
-      fs.renameSync(stagedServerLockfilePath, SERVER_LOCKFILE_PATH);
-      stagedServerLockfilePath = null;
-      verifyRootVersionSync(version);
+      commitPackageSyncTargets(version, packageTransaction, {
+        stagedLockfilePath,
+        stagedServerPackagePath,
+        stagedServerLockfilePath,
+      });
+      packageFilesCommitted = true;
+      packageTransaction = null;
       fs.renameSync(stagedXmlPath, VERSION_XML_PATH);
       stagedXmlPath = null;
     } catch (error) {
-      restoreFileSnapshots(packageSnapshots);
+      try {
+        if (packageTransaction?.state === 'prepared') {
+          rollbackPackageSyncTransaction(packageTransaction, packageSnapshots);
+        } else if (!packageTransaction && packageFilesCommitted) {
+          restoreFileSnapshots(packageSnapshots);
+        }
+      } catch (rollbackError) {
+        throw new Error(`${error.message}; ${rollbackError.message}`);
+      }
       throw error;
     }
 
@@ -113,32 +129,26 @@ function updateVersionInfo() {
 
 function syncLockfileFromRootVersion() {
   let releaseLock;
-  let stagedLockfilePath;
-  let stagedServerPackagePath;
-  let stagedServerLockfilePath;
+  let packageTransaction;
+  let packageSnapshots;
 
   try {
-    releaseLock = acquireReleaseLock();
+    releaseLock = acquireReleaseLockAfterRecovery();
     const version = readRootPackageVersion();
     validateVersion(version);
-    stagedLockfilePath = stageSyncedPackageLock(LOCKFILE_PATH, version);
-    stagedServerPackagePath = stageSyncedServerPackage(version);
-    stagedServerLockfilePath = stageSyncedPackageLock(SERVER_LOCKFILE_PATH, version);
-    const packageSnapshots = createFileSnapshots([
-      LOCKFILE_PATH,
-      SERVER_PACKAGE_PATH,
-      SERVER_LOCKFILE_PATH,
-    ]);
+    packageSnapshots = createFileSnapshots(PACKAGE_SYNC_TARGETS.map(({ path: targetPath }) => targetPath));
+    packageTransaction = createPackageSyncTransaction(version);
     try {
-      fs.renameSync(stagedLockfilePath, LOCKFILE_PATH);
-      stagedLockfilePath = null;
-      fs.renameSync(stagedServerPackagePath, SERVER_PACKAGE_PATH);
-      stagedServerPackagePath = null;
-      fs.renameSync(stagedServerLockfilePath, SERVER_LOCKFILE_PATH);
-      stagedServerLockfilePath = null;
-      verifyRootVersionSync(version);
+      commitPackageSyncTargets(version, packageTransaction);
+      packageTransaction = null;
     } catch (error) {
-      restoreFileSnapshots(packageSnapshots);
+      try {
+        if (packageTransaction?.state === 'prepared') {
+          rollbackPackageSyncTransaction(packageTransaction, packageSnapshots);
+        }
+      } catch (rollbackError) {
+        throw new Error(`${error.message}; ${rollbackError.message}`);
+      }
       throw error;
     }
     console.log(`📦 已将根与 server package-lock.json 同步为根 package.json 的版本 v${version}`);
@@ -146,10 +156,293 @@ function syncLockfileFromRootVersion() {
     console.error('❌ 同步 package-lock.json 失败:', error.message);
     process.exitCode = 1;
   } finally {
-    cleanupStagedFile(stagedLockfilePath);
-    cleanupStagedFile(stagedServerPackagePath);
-    cleanupStagedFile(stagedServerLockfilePath);
     releaseReleaseLock(releaseLock);
+  }
+}
+
+function acquireReleaseLockAfterRecovery() {
+  recoverInterruptedPackageSync();
+  return acquireReleaseLock();
+}
+
+function commitPackageSyncTargets(version, transaction, staged = {}) {
+  const stagedPaths = {
+    lockfile: staged.stagedLockfilePath || null,
+    serverPackage: staged.stagedServerPackagePath || null,
+    serverLockfile: staged.stagedServerLockfilePath || null,
+  };
+
+  try {
+    stagedPaths.lockfile ||= stageSyncedPackageLock(LOCKFILE_PATH, version);
+    stagedPaths.serverPackage ||= stageSyncedServerPackage(version);
+    stagedPaths.serverLockfile ||= stageSyncedPackageLock(SERVER_LOCKFILE_PATH, version);
+
+    fs.renameSync(stagedPaths.lockfile, LOCKFILE_PATH);
+    fs.renameSync(stagedPaths.serverPackage, SERVER_PACKAGE_PATH);
+    fs.renameSync(stagedPaths.serverLockfile, SERVER_LOCKFILE_PATH);
+    for (const target of PACKAGE_SYNC_TARGETS) {
+      syncDirectory(path.dirname(target.path));
+    }
+    verifyRootVersionSync(version);
+    markPackageSyncState(transaction, 'committed');
+    cleanupPackageSyncTransaction(transaction);
+  } finally {
+    cleanupStagedFile(stagedPaths.lockfile);
+    cleanupStagedFile(stagedPaths.serverPackage);
+    cleanupStagedFile(stagedPaths.serverLockfile);
+  }
+}
+
+function createPackageSyncTransaction(version) {
+  if (fs.existsSync(PACKAGE_SYNC_JOURNAL_PATH)) {
+    throw new Error('检测到未完成的 package 版本同步事务，无法开始新的事务');
+  }
+
+  preparePackageSyncBackupDir();
+  const targets = PACKAGE_SYNC_TARGETS.map((target, index) => ({
+    targetPath: target.path,
+    backupPath: path.join(PACKAGE_SYNC_BACKUP_DIR, `${index}-${path.basename(target.path)}.bak`),
+  }));
+
+  try {
+    for (const target of targets) {
+      writeDurableFile(target.backupPath, fs.readFileSync(target.targetPath));
+    }
+
+    const transaction = {
+      transaction: PACKAGE_SYNC_TRANSACTION,
+      version,
+      targets,
+      startedAt: new Date().toISOString(),
+      state: 'prepared',
+    };
+    writeDurableJson(PACKAGE_SYNC_JOURNAL_PATH, transaction);
+    return transaction;
+  } catch (error) {
+    cleanupUncommittedPackageSyncArtifacts(targets);
+    throw error;
+  }
+}
+
+function preparePackageSyncBackupDir() {
+  if (fs.existsSync(PACKAGE_SYNC_BACKUP_DIR)) {
+    if (!fs.statSync(PACKAGE_SYNC_BACKUP_DIR).isDirectory()) {
+      throw new Error('package sync backup path はディレクトリではありません');
+    }
+    if (fs.readdirSync(PACKAGE_SYNC_BACKUP_DIR).length > 0) {
+      throw new Error('package sync backup directory に孤立したファイルが残っています');
+    }
+    fs.rmdirSync(PACKAGE_SYNC_BACKUP_DIR);
+  }
+  fs.mkdirSync(PACKAGE_SYNC_BACKUP_DIR, { mode: 0o700 });
+}
+
+function recoverInterruptedPackageSync() {
+  const transaction = readPackageSyncJournal();
+  if (!transaction) {
+    return;
+  }
+
+  removeStaleReleaseLockForRecovery();
+
+  if (transaction.state === 'prepared') {
+    restorePackageSyncBackups(transaction);
+    markPackageSyncState(transaction, 'recovered');
+  }
+
+  cleanupPackageSyncTransaction(transaction);
+}
+
+function readPackageSyncJournal() {
+  if (!fs.existsSync(PACKAGE_SYNC_JOURNAL_PATH)) {
+    return null;
+  }
+
+  let transaction;
+  try {
+    transaction = JSON.parse(fs.readFileSync(PACKAGE_SYNC_JOURNAL_PATH, 'utf8'));
+  } catch (error) {
+    throw new Error(`package sync transaction journal の読み込みに失敗しました: ${error.message}`);
+  }
+
+  validatePackageSyncJournal(transaction);
+  return transaction;
+}
+
+function validatePackageSyncJournal(transaction) {
+  if (!transaction || transaction.transaction !== PACKAGE_SYNC_TRANSACTION) {
+    throw new Error('package sync transaction journal の種別が不正です');
+  }
+  if (typeof transaction.version !== 'string') {
+    throw new Error('package sync transaction journal の version が不正です');
+  }
+  validateVersion(transaction.version);
+  if (typeof transaction.startedAt !== 'string' || transaction.startedAt.length === 0) {
+    throw new Error('package sync transaction journal の startedAt が不正です');
+  }
+  if (!['prepared', 'committed', 'recovered'].includes(transaction.state)) {
+    throw new Error('package sync transaction journal の state が不正です');
+  }
+  if (!Array.isArray(transaction.targets) || transaction.targets.length !== PACKAGE_SYNC_TARGETS.length) {
+    throw new Error('package sync transaction journal の targets が不正です');
+  }
+
+  PACKAGE_SYNC_TARGETS.forEach((expected, index) => {
+    const actual = transaction.targets[index];
+    const expectedBackupPath = path.join(
+      PACKAGE_SYNC_BACKUP_DIR,
+      `${index}-${path.basename(expected.path)}.bak`
+    );
+    if (!actual || actual.targetPath !== expected.path || actual.backupPath !== expectedBackupPath) {
+      throw new Error(`package sync transaction journal の target ${index} が不正です`);
+    }
+  });
+}
+
+function restorePackageSyncBackups(transaction) {
+  for (const target of transaction.targets) {
+    if (!fs.existsSync(target.backupPath)) {
+      throw new Error(`package sync backup が見つかりません: ${path.basename(target.backupPath)}`);
+    }
+    writeDurableFile(target.targetPath, fs.readFileSync(target.backupPath));
+  }
+}
+
+function markPackageSyncState(transaction, state) {
+  const updated = { ...transaction, state };
+  writeDurableJson(PACKAGE_SYNC_JOURNAL_PATH, updated);
+  Object.assign(transaction, updated);
+}
+
+function cleanupPackageSyncTransaction(transaction) {
+  for (const target of transaction.targets) {
+    unlinkIfExists(target.backupPath);
+  }
+
+  if (fs.existsSync(PACKAGE_SYNC_BACKUP_DIR)) {
+    if (fs.readdirSync(PACKAGE_SYNC_BACKUP_DIR).length > 0) {
+      throw new Error('package sync backup directory の cleanup が完了していません');
+    }
+    syncDirectory(PACKAGE_SYNC_BACKUP_DIR);
+    fs.rmdirSync(PACKAGE_SYNC_BACKUP_DIR);
+    syncDirectory(PROJECT_ROOT);
+  }
+
+  unlinkIfExists(PACKAGE_SYNC_JOURNAL_PATH);
+  syncDirectory(PROJECT_ROOT);
+}
+
+function cleanupUncommittedPackageSyncArtifacts(targets) {
+  for (const target of targets) {
+    unlinkIfExists(target.backupPath);
+  }
+  if (fs.existsSync(PACKAGE_SYNC_BACKUP_DIR) && fs.readdirSync(PACKAGE_SYNC_BACKUP_DIR).length === 0) {
+    fs.rmdirSync(PACKAGE_SYNC_BACKUP_DIR);
+  }
+  unlinkIfExists(PACKAGE_SYNC_JOURNAL_PATH);
+}
+
+function rollbackPackageSyncTransaction(transaction, snapshots) {
+  restoreFileSnapshots(snapshots);
+  markPackageSyncState(transaction, 'recovered');
+  cleanupPackageSyncTransaction(transaction);
+}
+
+function removeStaleReleaseLockForRecovery() {
+  if (!fs.existsSync(RELEASE_LOCK_PATH)) {
+    return;
+  }
+
+  let lock;
+  try {
+    lock = JSON.parse(fs.readFileSync(RELEASE_LOCK_PATH, 'utf8'));
+  } catch (error) {
+    throw new Error(`recovery中の release lock owner を確認できません: ${error.message}`);
+  }
+
+  const ownerState = getProcessState(lock.pid);
+  if (ownerState === 'live') {
+    throw new Error('recovery対象 transaction の release lock owner が live のため奪取しません');
+  }
+  if (ownerState !== 'dead') {
+    throw new Error('recovery中の release lock owner 状態を確認できないため奪取しません');
+  }
+
+  unlinkIfExists(RELEASE_LOCK_PATH);
+}
+
+function getProcessState(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) {
+    return 'unknown';
+  }
+
+  try {
+    process.kill(pid, 0);
+    return 'live';
+  } catch (error) {
+    if (error.code === 'ESRCH') {
+      return 'dead';
+    }
+    if (error.code === 'EPERM') {
+      return 'live';
+    }
+    return 'unknown';
+  }
+}
+
+function writeDurableJson(filePath, value) {
+  writeDurableFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function writeDurableFile(filePath, content) {
+  const stagedPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${Date.now()}.durable.tmp`
+  );
+  let fileDescriptor;
+  try {
+    fileDescriptor = fs.openSync(stagedPath, 'wx', 0o600);
+    fs.writeFileSync(fileDescriptor, content);
+    fs.fsyncSync(fileDescriptor);
+    fs.closeSync(fileDescriptor);
+    fileDescriptor = undefined;
+    fs.renameSync(stagedPath, filePath);
+    syncDirectory(path.dirname(filePath));
+  } finally {
+    if (fileDescriptor !== undefined) {
+      try {
+        fs.closeSync(fileDescriptor);
+      } catch {
+        // Preserve the original write/rename error.
+      }
+    }
+    unlinkIfExists(stagedPath);
+  }
+}
+
+function syncDirectory(directoryPath) {
+  try {
+    const fileDescriptor = fs.openSync(directoryPath, 'r');
+    try {
+      fs.fsyncSync(fileDescriptor);
+    } finally {
+      fs.closeSync(fileDescriptor);
+    }
+  } catch (error) {
+    if (['EINVAL', 'EISDIR', 'ENOTSUP', 'EPERM'].includes(error.code)) {
+      return;
+    }
+    throw error;
+  }
+}
+
+function unlinkIfExists(filePath) {
+  try {
+    fs.unlinkSync(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
   }
 }
 
