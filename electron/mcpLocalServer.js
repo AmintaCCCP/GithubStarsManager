@@ -198,7 +198,17 @@ async function runVectorSearch(query, args, snapshot) {
     };
   }
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    // 200 但响应体不是合法 JSON（如网关错误页）；findSimilarRepositories 依赖
+    // runVectorSearch 永不 throw，异常必须折叠进声明的 { available: false } 结果
+    return {
+      available: false,
+      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   const matches = Array.isArray(data.matches) ? data.matches : [];
   const repos = Array.isArray(snapshot?.repositories) ? snapshot.repositories : [];
   const byId = new Map(repos.map((r) => [String(r.id), r]));
