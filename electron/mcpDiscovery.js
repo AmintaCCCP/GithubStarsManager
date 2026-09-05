@@ -242,6 +242,19 @@ function buildRepoEvidence(repo, latestRelease) {
         repository: 'repositories',
         latest_release: latestRelease ? 'releases_cache' : null,
       },
+      evidenceFreshness: {
+        // This is the stored GitHub repository updated_at value, not a local
+        // sync timestamp. Do not present it as a freshness check time.
+        repositoryUpdatedAt: repo.updated_at ?? null,
+        repositorySyncedAt: null,
+        releaseCacheUpdatedAt: null,
+        analyzedAt: repo.analyzed_at ?? null,
+        latestReleasePublishedAt: latestRelease?.published_at ?? null,
+        limitations: [
+          'repositoryUpdatedAt is the stored repository updated_at, not a local sync timestamp',
+          'repositorySyncedAt and release-cache update time are not stored locally',
+        ],
+      },
       limitations: [
         'archived is not stored locally',
         'release evidence is limited to locally cached releases',

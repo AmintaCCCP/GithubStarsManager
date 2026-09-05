@@ -13,6 +13,36 @@ import {
   vectorSearch,
 } from './provider.js';
 import { projectRepoForAgent } from './repoSearch.js';
+import { MCP_SERVER_VERSION } from './version.js';
+
+const ALWAYS_AVAILABLE_MCP_TOOLS = [
+  'gsm_status',
+  'gsm_search_repos',
+  'gsm_get_repo',
+  'gsm_get_repos',
+  'gsm_get_repo_evidence',
+  'gsm_list_categories',
+  'gsm_list_repos_by_category',
+  'gsm_stats',
+] as const;
+const CONDITIONAL_MCP_TOOLS = ['gsm_find_similar_repos', 'gsm_vector_search'] as const;
+
+/**
+ * conditionalTools lists vector-gated tools even when they are unavailable;
+ * availableTools is the exact set registered for the current configuration.
+ */
+export function getMcpToolAvailability(vectorAvailable: boolean): {
+  availableTools: string[];
+  conditionalTools: string[];
+} {
+  return {
+    availableTools: [
+      ...ALWAYS_AVAILABLE_MCP_TOOLS,
+      ...(vectorAvailable ? CONDITIONAL_MCP_TOOLS : []),
+    ],
+    conditionalTools: [...CONDITIONAL_MCP_TOOLS],
+  };
+}
 
 function textResult(data: unknown) {
   return {
@@ -30,9 +60,10 @@ export function registerMcpTools(server: McpServer): void {
     async () => {
       const repos = loadAllRepositories();
       const vector = getVectorAvailability();
+      const toolAvailability = getMcpToolAvailability(vector.available);
       return textResult({
         name: 'github-stars-manager',
-        version: '0.7.0',
+        version: MCP_SERVER_VERSION,
         mode: 'backend-sqlite',
         repositoryCount: repos.length,
         vector: {
@@ -43,6 +74,7 @@ export function registerMcpTools(server: McpServer): void {
         toolsNote: vector.available
           ? 'gsm_vector_search is available'
           : 'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled',
+        ...toolAvailability,
       });
     }
   );
