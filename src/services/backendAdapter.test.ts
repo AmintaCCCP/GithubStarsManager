@@ -68,3 +68,84 @@ describe('backendAdapter 429 Retry-After 解析', () => {
     expect(err.retryAfterMs).toBeUndefined();
   });
 });
+
+function makeHealthOkResponse(): Response {
+  return {
+    ok: true,
+    json: async () => ({ status: 'ok' }),
+  } as unknown as Response;
+}
+
+describe('backendAdapter 后端 URL 安全策略', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+  const STORAGE_KEY = 'github-stars-manager-backend-url';
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+    localStorage.removeItem(STORAGE_KEY);
+  });
+
+  it('拒绝远程 HTTP 后端：不发起探测请求，也不写入本地存储', async () => {
+    await backend.init('http://backend.example.com');
+
+    expect(window.fetch).not.toHaveBeenCalled();
+    expect(backend.isAvailable).toBe(false);
+    expect(backend.configuredUrl).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('拒绝伪装成 loopback 的远程主机（如 127.example.com）', async () => {
+    await backend.init('http://127.example.com');
+
+    expect(window.fetch).not.toHaveBeenCalled();
+    expect(backend.isAvailable).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('放行 HTTPS 后端；rememberActiveUrl 之前不写入本地存储', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
+
+    await backend.init('https://backend.example.com');
+
+    expect(window.fetch).toHaveBeenCalledWith(
+      'https://backend.example.com/api/health',
+      expect.objectContaining({ redirect: 'error' })
+    );
+    expect(backend.isAvailable).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    backend.rememberActiveUrl();
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('https://backend.example.com/api');
+  });
+
+  it('认证请求同样禁止自动重定向', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    vi.mocked(window.fetch).mockResolvedValue({ ok: true, status: 200 } as unknown as Response);
+
+    await backend.verifyAuth();
+
+    expect(window.fetch).toHaveBeenCalledWith(
+      'https://backend.example.com/api/settings',
+      expect.objectContaining({ redirect: 'error' })
+    );
+  });
+
+  it('loopback HTTP 后端仍可用于本地开发', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
+
+    await backend.init('http://localhost:3000');
+
+    expect(window.fetch).toHaveBeenCalledWith('http://localhost:3000/api/health', expect.anything());
+    expect(backend.isAvailable).toBe(true);
+
+    vi.mocked(window.fetch).mockClear();
+    adapter._backendUrl = null;
+    localStorage.removeItem(STORAGE_KEY);
+
+    await backend.init('http://127.0.0.2:8080');
+
+    expect(window.fetch).toHaveBeenCalledWith('http://127.0.0.2:8080/api/health', expect.anything());
+    expect(backend.isAvailable).toBe(true);
+  });
+});

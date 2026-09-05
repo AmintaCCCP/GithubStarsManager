@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
+import { normalizeBackendUrl } from '../../../utils/backendUrl';
 import { syncLocalGitHubTokenToBackend, tryRestoreAuthFromBackend } from '../../../services/autoSync';
 
 interface UseBackendSettingsActionsOptions {
@@ -14,10 +15,12 @@ type BackendStatus = 'connected' | 'disconnected' | 'checking';
 export interface BackendSettingsActions {
   status: BackendStatus;
   health: { version: string; timestamp: string } | null;
+  urlInput: string;
   secretInput: string;
   backendAvailable: boolean;
   isSyncingToBackend: boolean;
   isSyncingFromBackend: boolean;
+  setUrlInput: (value: string) => void;
   setSecretInput: (value: string) => void;
   testConnection: () => Promise<void>;
   syncToBackend: () => Promise<void>;
@@ -55,12 +58,13 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
   const [health, setHealth] = useState<{ version: string; timestamp: string } | null>(null);
   const [isSyncingToBackend, setIsSyncingToBackend] = useState(false);
   const [isSyncingFromBackend, setIsSyncingFromBackend] = useState(false);
+  const [urlInput, setUrlInput] = useState(() => backend.configuredUrl?.replace(/\/api$/, '') || '');
   const [secretInput, setSecretInput] = useState(state.backendApiSecret || '');
 
-  const checkConnection = useCallback(async (syncToken: boolean) => {
+  const checkConnection = useCallback(async (syncToken: boolean, preferredUrl?: string) => {
     setStatus('checking');
     try {
-      await backend.init();
+      await backend.init(preferredUrl);
       const healthData = await backend.checkHealth();
       if (healthData) {
         setStatus('connected');
@@ -81,25 +85,41 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
   }, [checkConnection]);
 
   const testConnection = useCallback(async () => {
+    const trimmedUrl = urlInput.trim();
+    if (trimmedUrl && !normalizeBackendUrl(trimmedUrl)) {
+      toast(t(
+        '后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP',
+        'Invalid backend URL: remote backends must use HTTPS; only localhost may use HTTP'
+      ), 'error');
+      return;
+    }
+    const previousUrl = backend.backendUrl;
     state.setBackendApiSecret(secretInput || null);
-    const connected = await checkConnection(false);
+    // With an address entered, probe exactly that URL; empty keeps the
+    // previous auto-detect behavior (remembered URL, else same-origin).
+    const connected = await checkConnection(false, trimmedUrl || undefined);
     if (!connected) {
+      await backend.init(previousUrl ?? undefined);
       toast(t('后端连接失败，请检查服务器状态或 API Secret 是否正确。', 'Backend connection failed. Please check the server status or whether the API Secret is correct.'), 'error');
       return;
     }
     try {
       const authOk = secretInput ? await backend.verifyAuth() : true;
       if (!authOk) throw new Error('Authentication failed');
+      // Health and auth both passed — remember the address (shared with the
+      // login screen prefill).
+      backend.rememberActiveUrl();
       toast(t('后端连接成功！', 'Backend connection successful!'), 'success');
       // These are deliberate manual settings actions; app-start restoration is not moved here.
       void tryRestoreAuthFromBackend();
       void syncLocalGitHubTokenToBackend();
     } catch {
+      await backend.init(previousUrl ?? undefined);
       setStatus('disconnected');
       setHealth(null);
       toast(t('后端连接失败，请检查服务器状态或 API Secret 是否正确。', 'Backend connection failed. Please check the server status or whether the API Secret is correct.'), 'error');
     }
-  }, [checkConnection, secretInput, state, t, toast]);
+  }, [checkConnection, secretInput, state, t, toast, urlInput]);
 
   const syncToBackend = useCallback(async () => {
     if (!backend.isAvailable) {
@@ -186,10 +206,12 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
   return {
     status,
     health,
+    urlInput,
     secretInput,
     backendAvailable: backend.isAvailable,
     isSyncingToBackend,
     isSyncingFromBackend,
+    setUrlInput,
     setSecretInput,
     testConnection,
     syncToBackend,

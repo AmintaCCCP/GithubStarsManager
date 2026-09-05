@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Repository, Release } from '../types';
-import { GitHubApiService } from './githubApi';
+import { BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
 
 const makeRepository = (id: number, fullName: string, overrides: Partial<Repository> = {}): Repository => {
   const [owner, name] = fullName.split('/');
@@ -376,5 +376,49 @@ describe('GitHubApiService repository chat read APIs', () => {
     expect(requestCalls).toHaveLength(2);
     expect(requestCalls[1]?.[0]).toContain('?ref=abcdef1234567890');
     expect(requestCalls[1]?.[1]).toEqual({ operationTag: 'repository-chat:markdown-evidence' });
+  });
+});
+
+describe('GitHubApiService 401 来源区分', () => {
+  const makeJsonResponse = (status: number, body: unknown): Response => ({
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 401 ? 'Unauthorized' : '',
+    headers: { get: () => null },
+    json: async () => body,
+  } as unknown as Response);
+
+  const setBackendProxy = (service: GitHubApiService) => {
+    (service as unknown as { backendUrl: string | null }).backendUrl = 'http://localhost:3000/api';
+    (service as unknown as { backendAuthToken: string | null }).backendAuthToken = 'secret';
+  };
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+  });
+
+  it('代理凭据 401（code=UNAUTHORIZED）抛出 BACKEND_PROXY_UNAUTHORIZED_ERROR', async () => {
+    const service = new GitHubApiService('token');
+    setBackendProxy(service);
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(401, { error: 'Unauthorized', code: 'UNAUTHORIZED' }));
+
+    await expect(service.getCurrentUser()).rejects.toThrow(BACKEND_PROXY_UNAUTHORIZED_ERROR);
+    expect(window.fetch).toHaveBeenCalledWith('http://localhost:3000/api/proxy/github/user', expect.anything());
+  });
+
+  it('代理转发的 GitHub 401（无 code 标记）仍映射为 GITHUB_TOKEN_INVALID_ERROR', async () => {
+    const service = new GitHubApiService('token');
+    setBackendProxy(service);
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(401, { message: 'Bad credentials', documentation_url: 'https://docs.github.com' }));
+
+    await expect(service.getCurrentUser()).rejects.toThrow(GITHUB_TOKEN_INVALID_ERROR);
+  });
+
+  it('直连 GitHub 401 映射为 GITHUB_TOKEN_INVALID_ERROR', async () => {
+    const service = new GitHubApiService('token');
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(401, { message: 'Bad credentials' }));
+
+    await expect(service.getCurrentUser()).rejects.toThrow(GITHUB_TOKEN_INVALID_ERROR);
+    expect(window.fetch).toHaveBeenCalledWith('https://api.github.com/user', expect.anything());
   });
 });

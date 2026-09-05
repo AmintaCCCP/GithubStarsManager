@@ -16,10 +16,12 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const {
     status,
     health,
+    urlInput,
     secretInput,
     backendAvailable,
     isSyncingToBackend,
     isSyncingFromBackend,
+    setUrlInput,
     setSecretInput,
     testConnection: handleTestConnection,
     syncToBackend: handleSyncToBackend,
@@ -149,6 +151,17 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       </div>
 
       <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
+        <label htmlFor="backend-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
+          {t('后端地址', 'Backend URL')}
+        </label>
+        <Input
+          id="backend-url"
+          type="url"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none mb-3"
+          placeholder="https://example.com"
+        />
         <label htmlFor="backend-api-secret" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
           {t('API 密钥', 'API Secret')}
         </label>
@@ -176,8 +189,8 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </div>
         <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
           {t(
-            '如果后端设置了 API_SECRET 环境变量，在此输入相同的值。未设置则留空。',
-            'If the backend has API_SECRET env var set, enter the same value here. Leave empty if not set.'
+            '后端地址与登录页「已有后端数据」使用同一配置：修改后点击"测试连接"重新探测并记住，留空则自动探测（优先记住的地址，否则当前站点）。如果后端设置了 API_SECRET 环境变量，在下方输入相同的值，未设置则留空。',
+            'The backend URL is shared with the login screen\'s "Already have backend data" flow: edit it and press "Test Connection" to re-probe and remember it; leave empty to auto-detect (remembered URL first, then the current site). If the backend has API_SECRET env var set, enter the same value below. Leave empty if not set.'
           )}
         </p>
       </div>
