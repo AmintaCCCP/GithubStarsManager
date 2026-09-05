@@ -1,5 +1,5 @@
-
 import type { Repository } from '../../types';
+import { logger } from '../../services/logger';
 import { matchesCategory } from '../../utils/categoryUtils';
 import type { AppStoreSlice } from '../types';
 import { defaultCategories, initialSearchFilters } from '../schema';
@@ -192,13 +192,14 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           const listIdByCategoryId = new Map<string, string>();
           const managedListIds = new Set<string>();
           const nextCategoryListIdMap = { ...categoryListIdMap };
+          const renameFailures: string[] = [];
           for (const cat of allCategories) {
             const persistedId = categoryListIdMap[cat.id];
             if (persistedId && currentLists.some(l => l.id === persistedId)) {
               const existing = currentLists.find(l => l.id === persistedId)!;
-              // auto-migrate name on language switch
+              // auto-migrate name on language switch — best-effort, keep mapping even if rename fails (retry next push)
               if (existing.name !== cat.name) {
-                try { await api.updateUserList(persistedId, cat.name); } catch (e) { console.warn('rename list failed', persistedId, e); }
+                try { await api.updateUserList(persistedId, cat.name); } catch (e) { console.warn('rename list failed', persistedId, existing.name, '->', cat.name, e); renameFailures.push(`${existing.name} -> ${cat.name}`); }
               }
               listIdByCategoryId.set(cat.id, persistedId);
               managedListIds.add(persistedId);
@@ -213,9 +214,9 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
               nameVariants.some(v => v.toLowerCase() === l.name.toLowerCase())
             );
             if (matchedList) {
-              // rename if language changed (e.g. 开发工具 -> Development Tools)
+              // rename if language changed (e.g. 开发工具 -> Development Tools) — best-effort
               if (matchedList.name !== cat.name) {
-                try { await api.updateUserList(matchedList.id, cat.name); } catch (e) { console.warn('rename list failed', matchedList.id, e); }
+                try { await api.updateUserList(matchedList.id, cat.name); } catch (e) { console.warn('rename list failed', matchedList.id, matchedList.name, '->', cat.name, e); renameFailures.push(`${matchedList.name} -> ${cat.name}`); }
               }
               listIdByCategoryId.set(cat.id, matchedList.id);
               nextCategoryListIdMap[cat.id] = matchedList.id;
@@ -227,7 +228,9 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             nextCategoryListIdMap[cat.id] = id;
             managedListIds.add(id);
           }
-
+          if (renameFailures.length > 0) {
+            logger.warn('githubLists', 'Some lists failed to rename, will retry next push', { failures: renameFailures });
+          }
           // 3. 每仓库当前的 list 成员（小写 full_name → list id 集合）
           const repoCurrentListIds = new Map<string, Set<string>>();
           const lowerToOriginal = new Map<string, string>();
