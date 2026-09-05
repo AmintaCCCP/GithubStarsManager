@@ -7,6 +7,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import AssetLeadingIcon from './AssetLeadingIcon';
 import { useAppStore } from '../store/useAppStore';
 import { useRepositoryReleaseSheet } from '../features/repositories/hooks/useRepositoryReleaseSheet';
+import { computeRpcDownloadKey } from '../hooks/useReleaseArtifactActions';
 import { buildReleaseDownloadLinks, type ReleaseDownloadLink } from '../utils/releaseDownloadLinks';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Button } from './ui/button';
@@ -105,7 +106,7 @@ const ReleaseAssetsTable: React.FC<{
         </TableHeader>
         <TableBody>
           {displayedLinks.map((link) => {
-            const downloadState = downloadStates[link.url] ?? 'idle';
+            const downloadState = downloadStates[computeRpcDownloadKey(link)] ?? 'idle';
             const isSending = downloadState === 'sending';
             const isSent = downloadState === 'sent';
             return (

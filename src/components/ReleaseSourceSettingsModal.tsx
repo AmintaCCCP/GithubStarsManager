@@ -6,7 +6,7 @@ import type { CustomReleaseRepository, ReleaseSourceId } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { Modal } from './Modal';
 import { useDialog } from '../hooks/useDialog';
-import { GitHubApiService } from '../services/githubApi';
+import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import {
   CUSTOM_RELEASE_SOURCE_ID,
   RELEASE_SOURCE_LABELS,
@@ -14,7 +14,6 @@ import {
   WATCH_CUSTOM_RELEASE_SOURCE_ID,
   createCustomReleaseRepository,
   normalizeRepoKey,
-  repositoryToCustomReleaseRepository,
 } from '../utils/releaseSources';
 
 interface ReleaseSourceSettingsModalProps {
@@ -211,41 +210,14 @@ interface WatchCustomReleaseSyncPanelProps {
 
 const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = ({ repos, language }) => {
   const githubToken = useAppStore(state => state.githubToken);
-  const setReleaseSourceRepositories = useAppStore(state => state.setReleaseSourceRepositories);
   const updateReleaseSourceRepository = useAppStore(state => state.updateReleaseSourceRepository);
-  const { toast } = useDialog();
-  const [isSyncing, setIsSyncing] = useState(false);
+  const { syncWatchedSources, isSyncingWatchedSources } = useReleaseTimelineActions();
+  const isSyncing = isSyncingWatchedSources;
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-  const handleSync = async () => {
-    if (!githubToken || isSyncing) return;
-
-    setIsSyncing(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      // 只拉 /user/subscriptions（含私有仓）。/users/{login}/subscriptions 已被 GitHub 改为
-      // 恒定返回 204 空响应体，且其结果本就是前者的公开子集，并行合并只会拖垮整个同步。
-      const watchedRepos = await githubApi.getAllWatchedRepositories();
-      const hiddenByRepo = new Map(repos.map(repo => [normalizeRepoKey(repo.full_name), repo.release_hidden]));
-      const sourceRepos = watchedRepos.map(repo => ({
-        ...repositoryToCustomReleaseRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID),
-        release_hidden: hiddenByRepo.get(normalizeRepoKey(repo.full_name)) || undefined,
-      }));
-      setReleaseSourceRepositories(WATCH_CUSTOM_RELEASE_SOURCE_ID, sourceRepos);
-      toast(
-        t(
-          `已同步 ${sourceRepos.length} 个 Watch 仓库。`,
-          `Synced ${sourceRepos.length} Watch repositories.`
-        ),
-        'success'
-      );
-    } catch (error) {
-      console.error('Failed to sync watched repositories:', error);
-      toast(t('同步 Watch 仓库失败，请检查网络或 Token 权限。', 'Failed to sync Watch repositories. Check network or token permissions.'), 'error');
-    } finally {
-      setIsSyncing(false);
-    }
+  const handleSync = () => {
+    void syncWatchedSources();
   };
 
   return (

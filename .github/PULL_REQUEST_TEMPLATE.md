@@ -36,8 +36,6 @@ layering violation fails the job before the slower steps.
 - [ ] No new `import` of React/JSX/the Store/any service into `src/features/*/application/**`
       (static or dynamic).
 - [ ] No inline `eslint-disable` to bypass the boundary rules — fix the layering instead.
-- [ ] If this PR migrates a component off the allowlist in `eslint.config.js` /
-      `scripts/check-boundaries.cjs`, that entry is removed in the same PR.
 
 ### Runtime / persistence / UI changes (if any)
 

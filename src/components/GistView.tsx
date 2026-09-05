@@ -36,7 +36,6 @@ export const GistView: React.FC = () => {
     setGistSearchFilters,
     setGistSearchResults,
     setSelectedGistCategory,
-    deleteGist,
     setStarredGists,
     isRefreshing,
     isSearching,
@@ -279,9 +278,6 @@ export const GistView: React.FC = () => {
                 onEdit={(target) => {
                   setEditingGist(target);
                   setIsEditorOpen(true);
-                }}
-                onDeleted={(gistId) => {
-                  deleteGist(gistId);
                 }}
                 onUnstarred={(gistId) => {
                   const latestStarred = useAppStore.getState().starredGists;

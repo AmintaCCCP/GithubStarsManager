@@ -5,12 +5,10 @@ import { X, Loader2, AlertCircle, FileText, ExternalLink, List, Type, ArrowUp, L
 import BilingualMarkdownRenderer, { DisplayMode, BilingualMarkdownRendererHandle, TranslationStatus } from './BilingualMarkdownRenderer';
 import { stripMarkdownFormatting } from '../utils/markdownUtils';
 import { Repository } from '../types';
-import { GitHubApiService } from '../services/githubApi';
-import { backend } from '../services/backendAdapter';
-import { shouldBypassBackend } from '../services/routeMode';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { buildReadmeVariants, DEFAULT_README_VARIANT, type GitHubReadmeCandidateItem, type ReadmeVariant } from '../utils/readmeVariants';
+import { useReadmeFetch, pickReadmeCandidate } from '../hooks/useReadmeFetch';
+import { buildReadmeVariants, DEFAULT_README_VARIANT, type ReadmeVariant } from '../utils/readmeVariants';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 
 interface TocItem {
@@ -49,8 +47,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   onCloseAutoFocus,
   repository
 }) => {
-  const { githubToken, language, setReadmeModalOpen } = useAppStore(useShallow((state) => ({
-    githubToken: state.githubToken,
+  const { language, setReadmeModalOpen } = useAppStore(useShallow((state) => ({
     language: state.language,
     setReadmeModalOpen: state.setReadmeModalOpen,
   })));
@@ -76,11 +73,18 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const defaultReadmeVariant = useMemo(() => getDefaultReadmeVariant(language), [language]);
 
   const contentRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const variantsAbortControllerRef = useRef<AbortController | null>(null);
   const isResizingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
+
+  // README 抓取（backend 优先 → GitHub 兜底）由共享 hook 承担；
+  // abort 实体在 hook（每次 fetch 前中止上一个，unmount 自动取消），关闭 modal 时调 cancelFetches。
+  const [repoOwner = '', repoName = ''] = repository?.full_name.split('/') ?? [];
+  const {
+    fetchReadmeContent: fetchReadmeContentFromAvailableSource,
+    fetchReadmeCandidates: fetchReadmeCandidatesFromAvailableSource,
+    cancel: cancelFetches,
+  } = useReadmeFetch({ owner: repoOwner, name: repoName });
 
   const bilingualRef = useRef<BilingualMarkdownRendererHandle>(null);
   const [translateStatus, setTranslateStatus] = useState<TranslationStatus>('idle');
@@ -329,85 +333,14 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     scrollToTop();
   }, [resetTranslationState, scrollToTop]);
 
-  const fetchReadmeContentFromAvailableSource = useCallback(async (
-    owner: string,
-    name: string,
-    variant: ReadmeVariant,
-    signal: AbortSignal
-  ): Promise<string> => {
-    const fetchFromGitHubApi = async () => {
-      if (!githubToken) {
-        throw new Error(language === 'zh' ? '未登录且后端不可用，无法加载 README' : 'Not logged in and backend unavailable, cannot load README');
-      }
-      const githubApi = new GitHubApiService(githubToken);
-      return variant.isDefault || !variant.path
-        ? githubApi.getRepositoryReadme(owner, name, signal)
-        : githubApi.getRepositoryReadmeByPath(owner, name, variant.path, signal);
-    };
-
-    if (shouldBypassBackend() || !backend.isAvailable) {
-      return fetchFromGitHubApi();
-    }
-
-    try {
-      return variant.isDefault || !variant.path
-        ? await backend.getRepositoryReadme(owner, name, signal)
-        : await backend.getRepositoryReadmeByPath(owner, name, variant.path, signal);
-    } catch (backendError) {
-      if (isAbortError(backendError, signal) || !githubToken) {
-        throw backendError;
-      }
-
-      console.warn('Falling back to direct GitHub README fetch after backend failure:', backendError);
-      return fetchFromGitHubApi();
-    }
-  }, [githubToken, language]);
-
-  const fetchReadmeCandidatesFromAvailableSource = useCallback(async (
-    owner: string,
-    name: string,
-    defaultBranch: string | undefined,
-    signal: AbortSignal
-  ): Promise<GitHubReadmeCandidateItem[]> => {
-    const fetchFromGitHubApi = async () => {
-      if (!githubToken) return [];
-      const githubApi = new GitHubApiService(githubToken);
-      return githubApi.listRepositoryReadmeCandidates(owner, name, defaultBranch, signal);
-    };
-
-    if (shouldBypassBackend() || !backend.isAvailable) {
-      return fetchFromGitHubApi();
-    }
-
-    try {
-      return await backend.listRepositoryReadmeCandidates(owner, name, defaultBranch, signal);
-    } catch (backendError) {
-      if (isAbortError(backendError, signal) || !githubToken) {
-        throw backendError;
-      }
-
-      console.warn('Falling back to direct GitHub README variant detection after backend failure:', backendError);
-      return fetchFromGitHubApi();
-    }
-  }, [githubToken]);
-
   const fetchReadmeContent = useCallback(async (variant: ReadmeVariant) => {
     if (!repository) return;
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
 
     setLoading(true);
     setError(null);
 
     try {
-      const [owner, name] = repository.full_name.split('/');
-      const content = await fetchReadmeContentFromAvailableSource(owner, name, variant, abortController.signal);
-
-      if (abortController.signal.aborted) return;
+      const content = await fetchReadmeContentFromAvailableSource(variant);
 
       setReadmeCache(prev => ({ ...prev, [variant.key]: content }));
 
@@ -420,54 +353,41 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
           ? (language === 'zh' ? '该仓库没有 README 文件' : 'This repository has no README file')
           : (language === 'zh' ? '该 README 文件为空' : 'This README file is empty'));
       }
+      setLoading(false);
     } catch (err) {
-      if (abortController.signal.aborted) return;
+      // 被 hook abort（被新请求取代 / cancel）时静默返回，不动 loading 态
+      if (isAbortError(err)) return;
       console.error('Failed to fetch README:', err);
       setReadmeContent('');
       const fallbackMessage = variant.isDefault
         ? (language === 'zh' ? '加载 README 失败，请检查网络连接或稍后重试' : 'Failed to load README. Please check your network connection and try again later')
         : (language === 'zh' ? '加载所选 README 失败，请稍后重试' : 'Failed to load selected README. Please try again later');
       setError(err instanceof Error && err.message ? err.message : fallbackMessage);
-    } finally {
-      if (!abortController.signal.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [repository, fetchReadmeContentFromAvailableSource, language]);
 
   const fetchReadmeVariants = useCallback(async () => {
     if (!repository) return;
 
-    if (variantsAbortControllerRef.current) {
-      variantsAbortControllerRef.current.abort();
-    }
-    const abortController = new AbortController();
-    variantsAbortControllerRef.current = abortController;
-
     setVariantsLoading(true);
 
     try {
-      const [owner, name] = repository.full_name.split('/');
       const defaultBranch = (repository as Repository & { default_branch?: string }).default_branch;
-      const candidates = await fetchReadmeCandidatesFromAvailableSource(owner, name, defaultBranch, abortController.signal);
+      const candidates = await fetchReadmeCandidatesFromAvailableSource(defaultBranch);
 
-      if (abortController.signal.aborted) return;
       setReadmeVariants(buildReadmeVariants(candidates, language));
+      setVariantsLoading(false);
     } catch (err) {
-      if (!abortController.signal.aborted) {
-        console.warn('Failed to detect README variants:', err);
-        setReadmeVariants([defaultReadmeVariant]);
-      }
-    } finally {
-      if (!abortController.signal.aborted) {
-        setVariantsLoading(false);
-      }
+      if (isAbortError(err)) return;
+      console.warn('Failed to detect README variants:', err);
+      setReadmeVariants([defaultReadmeVariant]);
+      setVariantsLoading(false);
     }
   }, [repository, fetchReadmeCandidatesFromAvailableSource, language, defaultReadmeVariant]);
 
   const fetchReadme = useCallback(async () => {
-    const currentVariant = readmeVariants.find(variant => variant.key === selectedReadmeKey) || defaultReadmeVariant;
-    await fetchReadmeContent(currentVariant);
+    await fetchReadmeContent(pickReadmeCandidate(readmeVariants, selectedReadmeKey, defaultReadmeVariant));
   }, [readmeVariants, selectedReadmeKey, defaultReadmeVariant, fetchReadmeContent]);
 
   const handleReadmeVariantChange = useCallback((nextKey: string) => {
@@ -521,14 +441,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      if (variantsAbortControllerRef.current) {
-        variantsAbortControllerRef.current.abort();
-        variantsAbortControllerRef.current = null;
-      }
+      cancelFetches();
       setReadmeContent('');
       setError(null);
       setLoading(false);
@@ -554,20 +467,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     } else {
       setShowToc(true);
     }
-  }, [isOpen, language]);
-
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      if (variantsAbortControllerRef.current) {
-        variantsAbortControllerRef.current.abort();
-        variantsAbortControllerRef.current = null;
-      }
-    };
-  }, []);
+  }, [isOpen, language, cancelFetches]);
 
   if (!repository) return null;
 
@@ -592,7 +492,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const isTranslating = translateStatus === 'translating';
   const isTranslated = translateStatus === 'translated';
   const isTranslateError = translateStatus === 'error';
-  const currentReadmeVariant = readmeVariants.find(variant => variant.key === selectedReadmeKey) || defaultReadmeVariant;
+  const currentReadmeVariant = pickReadmeCandidate(readmeVariants, selectedReadmeKey, defaultReadmeVariant);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
