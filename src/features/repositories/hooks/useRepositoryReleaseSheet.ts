@@ -1,25 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { AIConfig, Release, ReleaseAsset, Repository } from '../../../types';
+import type { Release, ReleaseAsset, Repository } from '../../../types';
 import { backend } from '../../../services/backendAdapter';
 import { GitHubApiService } from '../../../services/githubApi';
-import { sendToRpcDownload } from '../../../services/rpcDownloadService';
-import { AIService } from '../../../services/aiService';
 import { shouldBypassBackend } from '../../../services/routeMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
+import { computeRpcDownloadKey, useReleaseArtifactActions } from '../../../hooks/useReleaseArtifactActions';
 import type { ReleaseDownloadLink } from '../../../utils/releaseDownloadLinks';
 
 const REMOTE_RELEASE_PAGE_SIZE = 100;
 const MAX_LIVE_RELEASES = 200;
-
-export type ReleaseSummaryState = {
-  status: 'idle' | 'loading' | 'done' | 'error';
-  content?: string;
-  error?: string;
-};
-
-type DownloadState = 'idle' | 'sending' | 'sent';
 
 const isAbortError = (error: unknown): boolean => (
   error instanceof DOMException && error.name === 'AbortError'
@@ -121,37 +112,29 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
     language,
     githubToken,
     rpcDownloadConfig,
-    backendApiSecret,
-    aiConfigs,
-    activeAIConfig,
   } = useAppStore(useShallow((state) => ({
     language: state.language,
     githubToken: state.githubToken,
     rpcDownloadConfig: state.rpcDownloadConfig,
-    backendApiSecret: state.backendApiSecret,
-    aiConfigs: state.aiConfigs,
-    activeAIConfig: state.activeAIConfig,
   })));
   const { toast } = useDialog();
+  // RPC 发送与 AI 总结动作委托共享 hook（避免第三份拷贝）；summaries/downloadStates
+  // 的对外形状由 hook 供给，downloadStates 的 key 已版本化为 computeRpcDownloadKey(link)。
+  const artifactActions = useReleaseArtifactActions();
   const [releases, setReleases] = useState<Release[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [summaries, setSummaries] = useState<Record<number, ReleaseSummaryState>>({});
-  const [downloadStates, setDownloadStates] = useState<Record<string, DownloadState>>({});
+  // 非 RPC（浏览器）下载路径的行内 sending 状态不属 RPC 委托范围，留在本 hook；
+  // 同样使用版本化 key，与 RPC 状态合并后对外暴露。
+  const [browserDownloadStates, setBrowserDownloadStates] = useState<Record<string, 'idle' | 'sending'>>({});
   const fetchAbortRef = useRef<AbortController | null>(null);
-  const summaryAbortRefs = useRef<Record<number, AbortController | undefined>>({});
-  const activeConfig = useMemo<AIConfig | undefined>(
-    () => aiConfigs.find((config) => config.id === activeAIConfig),
-    [activeAIConfig, aiConfigs],
-  );
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
   const cancelPendingRequests = useCallback(() => {
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = null;
-    Object.values(summaryAbortRefs.current).forEach((controller) => controller?.abort());
-    summaryAbortRefs.current = {};
-  }, []);
+    artifactActions.cancelSummaryRequests();
+  }, [artifactActions]);
 
   useEffect(() => cancelPendingRequests, [cancelPendingRequests]);
 
@@ -178,8 +161,8 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
     fetchAbortRef.current = controller;
     setIsLoading(true);
     setError(null);
-    setSummaries({});
-    setDownloadStates({});
+    setBrowserDownloadStates({});
+    artifactActions.reset();
 
     try {
       const { owner, name } = getRepositoryCoordinates(repository.full_name);
@@ -226,27 +209,13 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         setIsLoading(false);
       }
     }
-  }, [fetchAllPages, githubToken, repository, t]);
+  }, [artifactActions, fetchAllPages, githubToken, repository, t]);
 
   const sendAssetToRpc = useCallback(async (link: ReleaseDownloadLink) => {
-    if (!rpcDownloadConfig.enabled || downloadStates[link.url] === 'sending' || downloadStates[link.url] === 'sent') return;
-
-    setDownloadStates((previous) => ({ ...previous, [link.url]: 'sending' }));
-    try {
-      const result = await sendToRpcDownload(link.url, link.name, backendApiSecret || undefined);
-      if (!result.success) {
-        throw new Error(result.error || t('发送失败', 'Failed to send download'));
-      }
-      setDownloadStates((previous) => ({ ...previous, [link.url]: 'sent' }));
-      toast(t('已发送到远程下载器', 'Sent to remote downloader'), 'success');
-    } catch (downloadError) {
-      setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
-      toast(
-        getErrorMessage(downloadError) || t('远程下载服务未运行，请检查配置', 'Remote download service is not running. Check its configuration.'),
-        'error',
-      );
-    }
-  }, [backendApiSecret, downloadStates, rpcDownloadConfig.enabled, t, toast]);
+    // enabled 守卫留在 sheet：ReleaseCard 侧由按钮显隐承担（共享 hook 不重复判断）
+    if (!rpcDownloadConfig.enabled) return;
+    await artifactActions.sendRpcDownload(link);
+  }, [artifactActions, rpcDownloadConfig.enabled]);
 
   const downloadAsset = useCallback(async (link: ReleaseDownloadLink) => {
     if (rpcDownloadConfig.enabled) {
@@ -254,8 +223,9 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
       return;
     }
 
-    if (downloadStates[link.url] === 'sending') return;
-    setDownloadStates((previous) => ({ ...previous, [link.url]: 'sending' }));
+    const downloadKey = computeRpcDownloadKey(link);
+    if (browserDownloadStates[downloadKey] === 'sending') return;
+    setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'sending' }));
 
     try {
       let blob: Blob;
@@ -274,66 +244,28 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         blob = await backend.downloadGitHubResource(link.authenticatedPath);
       } else {
         window.open(link.url, '_blank', 'noopener,noreferrer');
-        setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
+        setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
         return;
       }
       downloadBrowserBlob(blob, link.name);
-      setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
+      setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
     } catch (downloadError) {
-      setDownloadStates((previous) => ({ ...previous, [link.url]: 'idle' }));
+      setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
       toast(`${t('下载失败', 'Download failed')}: ${getErrorMessage(downloadError)}`, 'error');
     }
-  }, [downloadStates, githubToken, rpcDownloadConfig.enabled, sendAssetToRpc, t, toast]);
+  }, [browserDownloadStates, githubToken, rpcDownloadConfig.enabled, sendAssetToRpc, t, toast]);
 
-  const generateSummary = useCallback(async (release: Release) => {
-    const existing = summaries[release.id];
-    if (existing?.status === 'loading' || (existing?.status === 'done' && existing.content)) return;
-
-    if (!activeConfig) {
-      const configMessage = t('请先在设置中配置 AI 服务。', 'Please configure AI service in Settings first.');
-      setSummaries((previous) => ({
-        ...previous,
-        [release.id]: { status: 'error', error: configMessage },
-      }));
-      return;
-    }
-
-    summaryAbortRefs.current[release.id]?.abort();
-    const controller = new AbortController();
-    summaryAbortRefs.current[release.id] = controller;
-    setSummaries((previous) => ({ ...previous, [release.id]: { status: 'loading' } }));
-
-    try {
-      const aiService = new AIService(activeConfig, language);
-      const content = await aiService.analyzeReleaseSummary(
-        release.body || '',
-        {
-          repoName: release.repository.full_name,
-          tagName: release.tag_name,
-          releaseName: release.name && release.name !== release.tag_name ? release.name : undefined,
-        },
-        controller.signal,
-      );
-      if (controller.signal.aborted) return;
-      setSummaries((previous) => ({ ...previous, [release.id]: { status: 'done', content } }));
-    } catch (summaryError) {
-      if (isAbortError(summaryError) || controller.signal.aborted) return;
-      const message = getErrorMessage(summaryError);
-      setSummaries((previous) => ({ ...previous, [release.id]: { status: 'error', error: message } }));
-      toast(t(`总结生成失败：${message}`, `Summary failed: ${message}`), 'error');
-    } finally {
-      if (summaryAbortRefs.current[release.id] === controller) {
-        delete summaryAbortRefs.current[release.id];
-      }
-    }
-  }, [activeConfig, language, summaries, t, toast]);
+  const generateSummary = artifactActions.generateSummary;
 
   return {
     releases,
     isLoading,
     error,
-    summaries,
-    downloadStates,
+    summaries: artifactActions.summaries,
+    downloadStates: useMemo(
+      () => ({ ...browserDownloadStates, ...artifactActions.rpcDownloadStates }),
+      [browserDownloadStates, artifactActions.rpcDownloadStates],
+    ),
     isRpcEnabled: rpcDownloadConfig.enabled,
     loadReleases,
     sendAssetToRpc,
