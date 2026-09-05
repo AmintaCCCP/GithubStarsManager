@@ -1,16 +1,13 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Star, StarOff, ExternalLink, Bot, GitFork, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
 import { getPlatformIcon as getSharedPlatformIcon } from './platformMeta';
 import type { DiscoveryRepo } from '../types';
-import { useAppStore, getAllCategories } from '../store/useAppStore';
-import { analyzeRepository, createFailedAnalysisResult } from '../services/aiAnalysisHelper';
-import { forceSyncToBackend } from '../services/autoSync';
-import { GitHubApiService } from '../services/githubApi';
+import { useAppStore } from '../store/useAppStore';
+import { useDiscoveryRepoActions } from '../features/discovery/hooks/useDiscoveryRepoActions';
 import { ReadmeModal } from './ReadmeModal';
 import { Modal } from './Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
 
 interface SubscriptionRepoCardProps {
@@ -23,41 +20,15 @@ interface SubscriptionRepoCardProps {
 export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo, onStar, onAnalyze, desktopSafeMode = false }) => {
   const language = useAppStore(state => state.language);
   const githubToken = useAppStore(state => state.githubToken);
-  const aiConfigs = useAppStore(state => state.aiConfigs);
-  const activeAIConfig = useAppStore(state => state.activeAIConfig);
-  const customCategories = useAppStore(state => state.customCategories);
-  const updateDiscoveryRepo = useAppStore(state => state.updateDiscoveryRepo);
-  const repositories = useAppStore(state => state.repositories);
-  const addRepository = useAppStore(state => state.addRepository);
-  const deleteRepository = useAppStore(state => state.deleteRepository);
-
-  const { toast } = useDialog();
 
   const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
 
-  const [isStarring, setIsStarring] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [readmeModalOpen, setReadmeModalOpen] = useState(false);
-  // 本地乐观状态，用于立即反映Star操作结果
-  const [optimisticStarred, setOptimisticStarred] = useState<boolean | null>(null);
-  // 取消Star确认对话框状态
-  const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
-  const [pendingUnstarAction, setPendingUnstarAction] = useState<(() => void) | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const { analyze, star, executeUnstar, isAnalyzing, isStarring, isStarred } =
+    useDiscoveryRepoActions({ repo });
 
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
-  
-  // 检查仓库是否已在本地存在（已被Star）
-  const isStarredComputed = useMemo(() => {
-    return repositories.some(r => r.full_name === repo.full_name);
-  }, [repositories, repo.full_name]);
-  
-  // 优先使用乐观状态，否则使用计算状态
-  const isStarred = optimisticStarred !== null ? optimisticStarred : isStarredComputed;
+  const [readmeModalOpen, setReadmeModalOpen] = useState(false);
+  // 取消Star确认对话框状态（确认 UI 留 View；动作本体在 useDiscoveryRepoActions）
+  const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -87,100 +58,21 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     return <Icon className="w-3 h-3" />;
   };
 
-  // 执行取消Star操作
-  const executeUnstar = useCallback(async () => {
-    if (!githubToken) return;
-    
-    setIsStarring(true);
-    
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const [owner, name] = repo.full_name.split('/');
-      
-      // 乐观更新：立即更新UI状态
-      setOptimisticStarred(false);
-      
-      await githubApi.unstarRepository(owner, name);
-      
-      // 从本地删除
-      const existingRepo = repositories.find(r => r.full_name === repo.full_name);
-      if (existingRepo) {
-        deleteRepository(existingRepo.id);
-      }
-      
-      await forceSyncToBackend();
-      
-      // 操作成功，清除乐观状态
-      setOptimisticStarred(null);
-    } catch (error) {
-      // 操作失败，回滚乐观状态
-      setOptimisticStarred(null);
-      console.error('Failed to unstar repository:', error);
-      const errorMessage = t('取消 Star 失败，请检查网络连接或 GitHub Token 权限。', 'Failed to unstar repository. Please check your network connection or GitHub Token permissions.');
-      toast(errorMessage, 'error');
-    } finally {
-      setIsStarring(false);
-      setPendingUnstarAction(null);
-    }
-  }, [githubToken, repo, repositories, deleteRepository, t, toast]);
+  // 执行取消Star操作：确认 UI（自定义 Modal）留 View，动作本体在 hook。
+  const confirmUnstar = () => {
+    setUnstarConfirmOpen(false);
+    void executeUnstar();
+  };
 
-  // 处理添加/取消Star
-  const handleStar = useCallback(async (e: React.MouseEvent) => {
+  // 处理添加/取消Star：已 Star 时打开自定义确认 Modal，否则执行添加
+  const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!githubToken || isStarring) return;
-
     if (isStarred) {
-      // 取消Star - 显示自定义确认对话框
-      setPendingUnstarAction(() => executeUnstar);
       setUnstarConfirmOpen(true);
       return;
     }
-    
-    // 添加Star
-    setIsStarring(true);
-    
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const [owner, name] = repo.full_name.split('/');
-      
-      // 乐观更新：立即更新UI状态
-      setOptimisticStarred(true);
-      
-      await githubApi.starRepository(owner, name);
-      
-      // 将DiscoveryRepo转换为Repository并添加到本地，保留AI分析结果
-      const repositoryToAdd = {
-        ...repo,
-        // 移除Discovery/Subscription特有的字段
-        rank: undefined,
-        channel: undefined,
-        platform: undefined,
-        // 添加Star时间
-        starred_at: new Date().toISOString(),
-      };
-      
-      addRepository(repositoryToAdd);
-      
-      if (onStar) {
-        onStar(repo);
-      }
-      
-      await forceSyncToBackend();
-      
-      // 操作成功，清除乐观状态
-      setOptimisticStarred(null);
-
-      toast(t('已成功添加 Star', 'Successfully starred'), 'success');
-    } catch (error) {
-      // 操作失败，回滚乐观状态
-      setOptimisticStarred(null);
-      console.error('Failed to star repository:', error);
-      const errorMessage = t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.');
-      toast(errorMessage, 'error');
-    } finally {
-      setIsStarring(false);
-    }
-  }, [githubToken, isStarring, repo, onStar, t, toast, isStarred, addRepository, executeUnstar]);
+    void star(onStar);
+  };
 
   // 处理在ZRead打开
   const handleOpenInZRead = useCallback((e: React.MouseEvent) => {
@@ -189,89 +81,11 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     window.open(zreadUrl, '_blank');
   }, [repo.full_name]);
 
-  // 处理单个项目AI分析
-  const handleAnalyze = useCallback(async (e: React.MouseEvent) => {
+  // 处理单个项目AI分析（校验/中止/patch/toast 均在 hook）
+  const handleAnalyze = (e: React.MouseEvent) => {
     e.stopPropagation();
-
-    if (!githubToken) {
-      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
-    if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
-      return;
-    }
-
-    if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
-      return;
-    }
-
-    if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
-      return;
-    }
-
-    if (isAnalyzing) return;
-
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    setIsAnalyzing(true);
-
-    try {
-      const allCategories = getAllCategories(customCategories, language);
-
-      const result = await analyzeRepository({
-        repository: repo,
-        githubToken,
-        aiConfig: activeConfig,
-        language,
-        categories: allCategories,
-        signal: controller.signal,
-      });
-
-      if (controller.signal.aborted) return;
-
-      const updatedRepo: DiscoveryRepo = {
-        ...repo,
-        ai_summary: result.summary,
-        ai_tags: result.tags,
-        ai_platforms: result.platforms,
-        analyzed_at: result.analyzed_at,
-        analysis_failed: result.analysis_failed,
-        analysis_error: undefined,
-      };
-      updateDiscoveryRepo(updatedRepo);
-      
-      if (onAnalyze) {
-        onAnalyze(updatedRepo);
-      }
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        console.error('AI analysis error:', error);
-        const errorMsg = error instanceof Error && error.message
-          ? error.message
-          : t('AI分析失败，请检查AI配置和网络连接', 'AI analysis failed, please check AI configuration and network connection');
-        const failedResult = createFailedAnalysisResult(errorMsg);
-        const failedRepo: DiscoveryRepo = {
-          ...repo,
-          analyzed_at: failedResult.analyzed_at,
-          analysis_failed: failedResult.analysis_failed,
-          analysis_error: failedResult.analysis_error,
-        };
-        updateDiscoveryRepo(failedRepo);
-        toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
-      }
-    } finally {
-      if (!controller.signal.aborted) {
-        setIsAnalyzing(false);
-      }
-    }
-  }, [githubToken, aiConfigs, activeAIConfig, language, repo, isAnalyzing, customCategories, updateDiscoveryRepo, onAnalyze, t, toast]);
+    void analyze(onAnalyze);
+  };
 
   // 判断是否已分析
   const isAnalyzed = !!repo.analyzed_at && !repo.analysis_failed;
@@ -501,7 +315,6 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
       isOpen={unstarConfirmOpen}
       onClose={() => {
         setUnstarConfirmOpen(false);
-        setPendingUnstarAction(null);
       }}
       title={t('确认取消 Star', 'Confirm Unstar')}
       maxWidth="max-w-sm"
@@ -519,7 +332,6 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           <Button
             onClick={() => {
               setUnstarConfirmOpen(false);
-              setPendingUnstarAction(null);
             }}
             variant="ghost"
             className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
@@ -529,12 +341,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           <Button
             type="button"
             variant="destructive"
-            onClick={() => {
-              setUnstarConfirmOpen(false);
-              if (pendingUnstarAction) {
-                pendingUnstarAction();
-              }
-            }}
+            onClick={confirmUnstar}
             className="rounded-lg px-4 py-2 text-sm font-medium"
           >
             {t('确认取消', 'Confirm Unstar')}
