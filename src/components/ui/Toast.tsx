@@ -14,10 +14,10 @@ interface ToastProps {
 }
 
 const TOAST_META: Record<ToastType, { icon: React.ComponentType<{ className?: string }>; className: string }> = {
-  success: { icon: CheckCircle2, className: 'border-status-green/30 bg-background text-status-green dark:bg-card' },
-  error: { icon: AlertTriangle, className: 'border-destructive/30 bg-background text-destructive dark:bg-card' },
-  warning: { icon: AlertTriangle, className: 'border-status-amber/40 bg-background text-status-amber dark:bg-card' },
-  info: { icon: Info, className: 'border-border bg-background text-muted-foreground dark:bg-card' },
+  success: { icon: CheckCircle2, className: 'border-status-green/30 bg-card text-status-green' },
+  error: { icon: AlertTriangle, className: 'border-destructive/30 bg-card text-destructive' },
+  warning: { icon: AlertTriangle, className: 'border-status-amber/40 bg-card text-status-amber' },
+  info: { icon: Info, className: 'border-border bg-card text-muted-foreground' },
 };
 
 const TOAST_EXIT_DURATION_MS = 150;

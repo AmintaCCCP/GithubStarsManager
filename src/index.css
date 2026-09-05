@@ -472,7 +472,9 @@ html:has(body[data-scroll-locked]) {
 
 :root {
   color-scheme: light;
-  --background: 0 0% 100%;
+  /* Canvas sits one step off-white so white cards/popovers float on it —
+     the Linear-style surface layering that makes the shell feel native. */
+  --background: 210 40% 98%;
   --foreground: 222.2 84% 4.9%;
   --card: 0 0% 100%;
   --card-foreground: 222.2 84% 4.9%;
@@ -507,8 +509,9 @@ html:has(body[data-scroll-locked]) {
   --overlay: 0 0% 0%;
   --overlay-foreground: 0 0% 100%;
 
-  /* Typography stacks (theme presets may swap families). */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Typography stacks (theme presets may swap families). Inter leads the
+     latin stack for the premium SaaS voice; CJK falls through to the OS face. */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
@@ -544,7 +547,7 @@ html:has(body[data-scroll-locked]) {
   --ui-success: hsl(var(--success));
   --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
-  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.03);
   --ui-shadow-float: 0 10px 24px rgb(0 0 0 / 0.08), 0 2px 6px rgb(0 0 0 / 0.04);
   --ui-radius-xs: calc(var(--radius) - 4px);
   --ui-radius-sm: calc(var(--radius) - 2px);
@@ -767,7 +770,7 @@ textarea:focus-visible,
 
 .ui-button:active,
 .ui-button-primary:active {
-  transform: translateY(1px);
+  transform: scale(0.96);
 }
 
 .ui-icon-button {
@@ -830,7 +833,8 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 .linear-header {
   background: hsl(var(--background) / 0.95);
   border-bottom: 1px solid hsl(var(--border));
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
 }
 
 .linear-header-inner {
