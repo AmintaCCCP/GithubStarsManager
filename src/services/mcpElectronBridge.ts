@@ -8,6 +8,7 @@ import { normalizeMcpHost } from '../utils/mcpHost';
 import { isElectron } from './electronProxy';
 import { backend } from './backendAdapter';
 import { logger } from './logger';
+import { buildMcpDataSnapshot } from './mcpSnapshot';
 
 let started = false;
 let unsub: (() => void) | null = null;
@@ -63,33 +64,9 @@ async function pushLifecycle(): Promise<void> {
       return;
     }
 
-    const vs = state.vectorSearchConfig;
-    const emb =
-      state.embeddingConfigs.find((c) => c.id === vs.embeddingConfigId) ||
-      state.embeddingConfigs.find((c) => c.id === state.activeEmbeddingConfig) ||
-      null;
-
     await api.pushSnapshot({
-      repositories: state.repositories,
-      customCategories: state.customCategories,
       // Pass runtime secrets only over IPC to main (never logged / never disk-persisted by MCP)
-      vectorSearchConfig: {
-        enabled: !!vs.enabled,
-        workerUrl: vs.workerUrl || '',
-        authToken: vs.authToken || '',
-        searchThreshold: vs.searchThreshold,
-        searchTopK: vs.searchTopK,
-        embedding: emb
-          ? {
-              apiType: emb.apiType,
-              baseUrl: emb.baseUrl || '',
-              apiKey: emb.apiKey || '',
-              model: emb.model || '',
-              dimensions: emb.dimensions,
-            }
-          : null,
-      },
-      snapshotAt: new Date().toISOString(),
+      ...buildMcpDataSnapshot(state, new Date().toISOString()),
     });
     const startResult = await api.start();
     if (startResult && startResult.success === false) {
@@ -133,6 +110,7 @@ export function startMcpElectronBridge(): void {
     const dataChanged =
       state.repositories !== prev.repositories ||
       state.customCategories !== prev.customCategories ||
+      state.releases !== prev.releases ||
       state.vectorSearchConfig !== prev.vectorSearchConfig;
 
     if (cfgChanged || dataChanged) {
