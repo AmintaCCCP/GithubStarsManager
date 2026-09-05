@@ -122,7 +122,29 @@ describe('MCP discovery pure contracts', () => {
     });
     expect(result.evidence.latest_release).toEqual(release);
     expect(result.evidence.sources).toEqual({ repository: 'repositories', latest_release: 'releases_cache' });
+    expect(result.evidence.evidenceFreshness).toEqual({
+      repositoryUpdatedAt: '2026-02-01T00:00:00.000Z',
+      repositorySyncedAt: null,
+      releaseCacheUpdatedAt: null,
+      analyzedAt: '2026-02-04T00:00:00.000Z',
+      latestReleasePublishedAt: '2026-03-01T00:00:00.000Z',
+      limitations: [
+        'repositoryUpdatedAt is the stored repository updated_at, not a local sync timestamp',
+        'repositorySyncedAt and release-cache update time are not stored locally',
+      ],
+    });
     expect(result.evidence.limitations).toContain('archived is not stored locally');
     expect(JSON.stringify(result)).not.toMatch(/ADOPT|ADAPT|REFERENCE|REJECT/);
+  });
+
+  it('keeps unknown freshness values null instead of inferring them', () => {
+    const result = buildRepoEvidence(repo({ id: 5, name: 'unknown', full_name: 'acme/unknown' }), null);
+    expect(result.evidence.evidenceFreshness).toMatchObject({
+      repositoryUpdatedAt: null,
+      repositorySyncedAt: null,
+      releaseCacheUpdatedAt: null,
+      analyzedAt: null,
+      latestReleasePublishedAt: null,
+    });
   });
 });

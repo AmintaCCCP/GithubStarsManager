@@ -16,11 +16,15 @@ const providerMocks = vi.hoisted(() => ({
 vi.mock('../../src/mcp/provider.js', () => providerMocks);
 
 const { registerMcpTools } = await import('../../src/mcp/tools.js');
+const { getMcpToolAvailability: getBackendToolAvailability } = await import('../../src/mcp/tools.js');
+const { buildRepoEvidence: buildBackendRepoEvidence } = await import('../../src/mcp/evidence.js');
 const { searchRepositories: backendSearch } = await import('../../src/mcp/repoSearch.js');
 const electronModule = await import('../../../electron/mcpLocalServer.js');
 const electronDiscovery = await import('../../../electron/mcpDiscovery.js');
 const getElectronTools =
   electronModule.getMcpToolDefinitions || electronModule.default.getMcpToolDefinitions;
+const getElectronToolAvailability =
+  electronModule.getMcpToolAvailability || electronModule.default.getMcpToolAvailability;
 
 function getBackendTools() {
   const registrations: Array<{ name: string; inputSchema?: Record<string, unknown> }> = [];
@@ -54,6 +58,21 @@ describe('backend/Electron MCP parity', () => {
     providerMocks.getVectorAvailability.mockReturnValue({ available: false, reason: 'disabled' });
     const backend = getBackendTools().map((tool) => tool.name);
     expect(getElectronTools(false).map((tool: { name: string }) => tool.name)).toEqual(backend);
+  });
+
+  it('keeps structured availability metadata identical in both runtimes', () => {
+    for (const vectorAvailable of [true, false]) {
+      expect(getElectronToolAvailability(vectorAvailable)).toEqual(
+        getBackendToolAvailability(vectorAvailable)
+      );
+    }
+  });
+
+  it('keeps evidence freshness metadata identical in both runtimes', () => {
+    const fixture = parityRepo({ id: 1, name: 'alpha', full_name: 'acme/alpha', stargazers_count: 10 });
+    const backend = buildBackendRepoEvidence(fixture, null);
+    const electron = electronDiscovery.buildRepoEvidence(fixture, null);
+    expect(electron.evidence.evidenceFreshness).toEqual(backend.evidence.evidenceFreshness);
   });
 
   it('orders tied repos identically by full_name on both ends', () => {
