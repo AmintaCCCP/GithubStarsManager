@@ -105,6 +105,17 @@ describe('useReadmeFetch.fetchReadmeContent', () => {
     expect(mocks.getRepositoryReadme).not.toHaveBeenCalled();
   });
 
+  it('rethrows the backend error instead of falling back when tokenless (content path)', async () => {
+    mocks.backend.getRepositoryReadme.mockRejectedValue(new Error('backend down'));
+    storeState.githubToken = null;
+    const { result } = renderHook(() => useReadmeFetch({ owner: 'owner', name: 'repo' }));
+    await act(async () => {
+      await expect(result.current.fetchReadmeContent(defaultVariant)).rejects.toThrow('backend down');
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryReadme).not.toHaveBeenCalled();
+  });
+
   it('uses the path variant against the backend and GitHub respectively', async () => {
     const pathVariant: ReadmeVariant = { ...DEFAULT_README_VARIANT, key: 'readme-zh', path: 'README.zh.md', isDefault: false };
     mocks.backend.getRepositoryReadmeByPath.mockResolvedValueOnce('# backend path');
@@ -227,6 +238,17 @@ describe('useReadmeFetch.fetchReadmeCandidates', () => {
     await act(async () => {
       await expect(result.current.fetchReadmeCandidates('main')).resolves.toEqual([]);
     });
+    expect(mocks.listRepositoryReadmeCandidates).not.toHaveBeenCalled();
+  });
+
+  it('rethrows the backend error instead of falling back when tokenless (candidates path)', async () => {
+    mocks.backend.listRepositoryReadmeCandidates.mockRejectedValue(new Error('backend down'));
+    storeState.githubToken = null;
+    const { result } = renderHook(() => useReadmeFetch({ owner: 'owner', name: 'repo' }));
+    await act(async () => {
+      await expect(result.current.fetchReadmeCandidates('main')).rejects.toThrow('backend down');
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
     expect(mocks.listRepositoryReadmeCandidates).not.toHaveBeenCalled();
   });
 

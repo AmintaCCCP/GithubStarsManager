@@ -101,7 +101,7 @@ const createStoreState = () => ({
   setRepositories: vi.fn(),
   setLastSync: vi.fn(),
   setSyncingStars: vi.fn(),
-  syncMode: 'stars-only' as const,
+  syncMode: 'stars-only' as 'stars-only' | 'stars-and-lists',
   user: { login: 'me' } as { login: string } | null,
   addCustomCategory: vi.fn(),
   customCategories: [] as Category[],
@@ -225,7 +225,7 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
     ]);
   });
 
-  it('falls back to the raw query when HyDE misses the 5s budget', async () => {
+  it('falls back to the raw query when HyDE misses the 5s budget and aborts the HyDE request', async () => {
     vi.useFakeTimers();
     try {
       storeState.vectorSearchConfig = {
@@ -235,8 +235,14 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
         embeddingConfigId: 'emb',
         indexMode: 'description',
         readmeMaxChars: 6000,
+        enableHyDE: true,
+        enableReranking: false,
       };
-      mocks.generateHyDEQuery.mockImplementation(() => new Promise<string>(() => undefined));
+      const hydeSignals: AbortSignal[] = [];
+      mocks.generateHyDEQuery.mockImplementation((_q: string, signal: AbortSignal) => {
+        hydeSignals.push(signal);
+        return new Promise<string>(() => undefined);
+      });
       mocks.embed.mockResolvedValue([[0.1]]);
       mocks.vectorQuery.mockResolvedValue([]);
       mocks.searchRepositoriesWithReranking.mockResolvedValue([]);
@@ -248,9 +254,105 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
       await act(async () => { await promise; });
 
       expect(mocks.embed).toHaveBeenCalledWith(['foo'], 'query');
+      // 5s 预算耗尽后 HyDE 局部 controller 必须真正 abort 掉挂起的请求
+      expect(hydeSignals[0]?.aborted).toBe(true);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('returns early for a blank query without touching search state', async () => {
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('   ', identity); });
+    expect(mocks.embed).not.toHaveBeenCalled();
+    expect(mocks.searchRepositoriesWithReranking).not.toHaveBeenCalled();
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(storeState.setSearchFilters).not.toHaveBeenCalled();
+    expect(result.current.isSearching).toBe(false);
+    expect(result.current.skipNextTextSearchRef.current).toBe(false);
+  });
+
+  it('falls through to keyword search when the embedding returns no vectors', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+      enableReranking: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    mocks.embed.mockResolvedValue([]);
+    mocks.searchRepositoriesWithReranking.mockResolvedValue([storeState.repositories[0]]);
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+
+    expect(mocks.vectorQuery).not.toHaveBeenCalled();
+    expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
+    expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: 'foo' });
+  });
+
+  it('falls through to keyword search when vector hits match no local repository', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+      enableReranking: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    mocks.embed.mockResolvedValue([[0.1]]);
+    mocks.vectorQuery.mockResolvedValue([
+      { id: '99', score: 0.9, metadata: { full_name: '', description: '', tags: [] } },
+    ]);
+    mocks.searchRepositoriesWithReranking.mockResolvedValue([storeState.repositories[0]]);
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+
+    expect(result.current.skipNextTextSearchRef.current).toBe(false);
+    expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
+    expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: 'foo' });
+  });
+
+  it('falls back to keyword search when the vector pipeline throws', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+      enableReranking: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    mocks.embed.mockRejectedValue(new Error('embed down'));
+    mocks.searchRepositoriesWithReranking.mockResolvedValue([storeState.repositories[0]]);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+    warnSpy.mockRestore();
+
+    expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
+    expect(storeState.setSearchFilters).toHaveBeenCalledWith({ query: 'foo' });
+    expect(result.current.isSearching).toBe(false);
   });
 
   it('uses the HyDE output when it resolves within the budget', async () => {
@@ -261,6 +363,8 @@ describe('useSearchActions.aiSearch (vector hit)', () => {
       embeddingConfigId: 'emb',
       indexMode: 'description',
       readmeMaxChars: 6000,
+      enableHyDE: true,
+      enableReranking: false,
     };
     mocks.generateHyDEQuery.mockResolvedValue('an ideal description of foo');
     mocks.embed.mockResolvedValue([[0.1]]);
@@ -398,6 +502,64 @@ describe('useSearchActions.syncStars', () => {
     ]);
     expect(mocks.forceSyncToBackend).toHaveBeenCalledTimes(1);
     expect(mocks.toast).toHaveBeenCalledWith('同步完成！所有仓库都是最新的。', 'info');
+  });
+
+  it('syncs lists when auto mode follows the stars-and-lists config', async () => {
+    mocks.getAllStarredRepositories.mockResolvedValue([baseRepo({ id: 1, full_name: 'owner/repo-one' })]);
+    mocks.getUserLists.mockResolvedValue([{ id: 'l1', name: 'MyList', isPrivate: false, items: ['owner/repo-one'] }]);
+    storeState.repositories = [baseRepo({ id: 1, full_name: 'owner/repo-one' })];
+    storeState.syncMode = 'stars-and-lists';
+    storeState.customCategories = [{ id: 'custom-1', name: 'MyList', icon: 'x', isCustom: true, keywords: [] }];
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.syncStars(); }); // mode 'auto'
+
+    expect(mocks.getUserLists).toHaveBeenCalledTimes(1);
+    const written = storeState.setRepositories.mock.calls[0][0] as Repository[];
+    expect(written[0].custom_tags).toContain('MyList');
+  });
+
+  it('keeps the starred result and toasts the list failure when the user login is missing', async () => {
+    mocks.getAllStarredRepositories.mockResolvedValue([baseRepo({ id: 1, full_name: 'owner/repo-one' })]);
+    storeState.user = null;
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.syncStars('stars-and-lists'); });
+
+    expect(mocks.getUserLists).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(
+      'List 同步失败，星标仓库已同步。请稍后重试，或检查 GitHub Token 权限（需 user scope）。',
+      'error',
+    );
+    expect(storeState.setRepositories).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 1, full_name: 'owner/repo-one' }),
+    ]);
+    expect(mocks.forceSyncToBackend).toHaveBeenCalledTimes(1);
+  });
+
+  it('toasts the created-categories summary when no list item matches a local repo', async () => {
+    mocks.getAllStarredRepositories.mockResolvedValue([baseRepo({ id: 1, full_name: 'owner/repo-one' })]);
+    mocks.getUserLists.mockResolvedValue([{ id: 'l1', name: 'BrandNewList', isPrivate: false, items: [] }]);
+    storeState.repositories = [baseRepo({ id: 1, full_name: 'owner/repo-one' })];
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.syncStars('stars-and-lists'); });
+
+    expect(storeState.addCustomCategory).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith('已同步 1 个 list（新建 1 个分类）。', 'info');
+  });
+
+  it('toasts the new-repositories count when the sync finds unseen repos', async () => {
+    storeState.repositories = [baseRepo({ id: 1, full_name: 'owner/repo-one' })];
+    mocks.getAllStarredRepositories.mockResolvedValue([
+      baseRepo({ id: 1, full_name: 'owner/repo-one' }),
+      baseRepo({ id: 2, full_name: 'owner/repo-two' }),
+    ]);
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.syncStars('stars-only'); });
+
+    expect(mocks.toast).toHaveBeenCalledWith('同步完成！发现 1 个新仓库。', 'success');
   });
 
   it('shows the token-expired message when the sync error mentions token', async () => {
