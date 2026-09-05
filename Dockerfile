@@ -14,8 +14,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application. --ignore-scripts skips the prebuild hook: sync-version
+# rewrites server/package.json, which is excluded from this frontend-only context.
+RUN npm run build --ignore-scripts
 
 # Production stage
 FROM nginx:alpine
