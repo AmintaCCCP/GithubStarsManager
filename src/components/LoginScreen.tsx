@@ -127,9 +127,12 @@ export const LoginScreen: React.FC = () => {
         return;
       }
 
+      // Commit auth only after the data sync succeeds: the button promised
+      // "connect and restore", and a sync failure must not leave a half-
+      // logged-in store behind a rolled-back API secret.
+      await syncBackendData();
       setGitHubToken(result.githubToken);
       setUser(result.user);
-      await syncBackendData();
     } catch (error) {
       setBackendApiSecret(previousApiSecret);
       setError(error instanceof Error ? error.message : t('登录失败，请稍后重试', 'Sign-in failed. Please try again'));
@@ -149,9 +152,9 @@ export const LoginScreen: React.FC = () => {
     setError('');
     try {
       const user = await setupBackendGitHubToken(githubToken);
+      await syncBackendData();
       setGitHubToken(githubToken);
       setUser(user);
-      await syncBackendData();
     } catch (error) {
       setError(error instanceof Error ? error.message : t('配置失败，请稍后重试', 'Setup failed. Please try again'));
     } finally {
