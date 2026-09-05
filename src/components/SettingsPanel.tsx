@@ -21,7 +21,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { isElectron } from '../services/electronProxy';
-import { backend } from '../services/backendAdapter';
+import { useBackendAvailability } from '../features/settings/hooks/useBackendAvailability';
 import {
   GeneralPanel,
   AIConfigPanel,
@@ -218,6 +218,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const tabResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
+  const backendAvailable = useBackendAvailability();
 
   const handleClose = () => {
     if (onClose) {
@@ -366,7 +367,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('诊断日志', 'Diagnostic Logs'),
       icon: <ScrollText className="w-5 h-5" />,
     },
-    ...((isElectron() || backend.isAvailable) ? [{
+    ...((isElectron() || backendAvailable) ? [{
       id: 'network' as SettingsTab,
       label: t('网络设置', 'Network'),
       icon: <Wifi className="w-5 h-5" />,
@@ -377,7 +378,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       icon: <Search className="w-5 h-5" />,
     },
     // MCP requires a long-lived process: backend or Electron main. Hide for pure SPA.
-    ...((isElectron() || backend.isAvailable) ? [{
+    ...((isElectron() || backendAvailable) ? [{
       id: 'mcp' as SettingsTab,
       label: t('MCP服务', 'MCP Server'),
       icon: <Cable className="w-5 h-5" />,

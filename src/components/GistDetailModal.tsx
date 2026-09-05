@@ -6,8 +6,8 @@ import { Modal } from './Modal';
 import type { Gist, GistFile } from '../types';
 import { getGistTitle, inferGistCodeLanguage } from '../utils/gistUtils';
 import { safeWriteText } from '../utils/clipboardUtils';
-import { createGitHubApiService } from '../services/githubApiFactory';
 import { useAppStore } from '../store/useAppStore';
+import { useGistActions } from '../features/gists/hooks/useGistActions';
 import { useDialog } from '../hooks/useDialog';
 import 'highlight.js/styles/github.min.css';
 
@@ -19,13 +19,13 @@ interface GistDetailModalProps {
 
 interface HighlightedCodeProps {
   file: GistFile;
+  fetchRaw: (rawUrl: string, signal: AbortSignal) => Promise<string>;
   onContentLoaded?: (filename: string, content: string, rawUrl?: string) => void;
 }
 
-const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded }) => {
+const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onContentLoaded }) => {
   const codeRef = useRef<HTMLElement>(null);
   const language = inferGistCodeLanguage(file.filename, file.language);
-  const githubToken = useAppStore(state => state.githubToken);
   const language2 = useAppStore(state => state.language);
   const t = (zh: string, en: string) => language2 === 'zh' ? zh : en;
 
@@ -53,14 +53,9 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
     setIsLoadingRaw(true);
     setRawError(null);
     const doFetch = async () => {
-      if (!githubToken) {
-        setRawError(t('未配置 GitHub token，无法加载文件内容', 'GitHub token not configured, cannot load file content'));
-        setIsLoadingRaw(false);
-        return;
-      }
       try {
-        const api = createGitHubApiService(githubToken);
-        const text = await api.getGistFileRaw(file.raw_url!, controller.signal);
+        // 无 token 时由 hook 抛出原文案错误，catch 落 rawError 后与原直写渲染一致
+        const text = await fetchRaw(file.raw_url!, controller.signal);
         if (controller.signal.aborted) return;
         setRawContent(text);
         onContentLoadedRef.current?.(file.filename, text, file.raw_url);
@@ -77,7 +72,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
     return () => controller.abort();
     // retryTick 用于手动触发重试；file.raw_url/filename 变化时也会重新拉取。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsRawFetch, file.raw_url, file.filename, retryTick, githubToken]);
+  }, [needsRawFetch, file.raw_url, file.filename, retryTick, fetchRaw]);
 
   useEffect(() => {
     if (!codeRef.current) return;
@@ -130,6 +125,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, onContentLoaded
 export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, onClose }) => {
   const language = useAppStore(state => state.language);
   const updateGist = useAppStore(state => state.updateGist);
+  const { fetchGistFileRaw } = useGistActions();
   const { toast } = useDialog();
   const [activeFilename, setActiveFilename] = useState<string>('');
   const [loadedContents, setLoadedContents] = useState<Record<string, string>>({});
@@ -278,6 +274,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
             <HighlightedCode
               key={`${gist.id}:${activeFile.filename}:${activeFile.raw_url ?? ''}`}
               file={effectiveActiveFile!}
+              fetchRaw={fetchGistFileRaw}
               onContentLoaded={handleContentLoaded}
             />
           </div>

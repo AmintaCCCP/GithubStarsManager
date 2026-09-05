@@ -4,15 +4,10 @@ import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, L
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { AIService } from '../services/aiService';
-import { EmbeddingClient, VectorSearchService } from '../services/vectorSearchService';
-import { GitHubApiService } from '../services/githubApi';
-import { createGitHubListsApiService } from '../services/githubApiFactory';
-import { forceSyncToBackend } from '../services/autoSync';
 import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
+import { useSearchActions } from '../features/repositories/hooks/useSearchActions';
 import { useDialog } from '../hooks/useDialog';
 import { isRepoCustomized } from '../utils/repoUtils';
-import { isReservedCategoryName } from '../utils/categoryUtils';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
@@ -26,7 +21,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import type { Repository } from '../types';
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
 
@@ -76,7 +70,6 @@ export const SearchBar: React.FC = () => {
     searchFilters,
     repositories,
     releaseSubscriptions,
-    aiConfigs,
     activeAIConfig,
     language,
     setSearchFilters,
@@ -84,20 +77,12 @@ export const SearchBar: React.FC = () => {
     customCategories,
     hiddenDefaultCategoryIds,
     defaultCategoryOverrides,
-    githubToken,
     lastSync,
-    setRepositories,
-    setLastSync,
     isSyncingStars,
-    setSyncingStars,
-    syncMode,
-    user,
-    addCustomCategory,
   } = useAppStore(useShallow((state) => ({
     searchFilters: state.searchFilters,
     repositories: state.repositories,
     releaseSubscriptions: state.releaseSubscriptions,
-    aiConfigs: state.aiConfigs,
     activeAIConfig: state.activeAIConfig,
     language: state.language,
     setSearchFilters: state.setSearchFilters,
@@ -105,22 +90,24 @@ export const SearchBar: React.FC = () => {
     customCategories: state.customCategories,
     hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
     defaultCategoryOverrides: state.defaultCategoryOverrides,
-    githubToken: state.githubToken,
     lastSync: state.lastSync,
-    setRepositories: state.setRepositories,
-    setLastSync: state.setLastSync,
     isSyncingStars: state.isSyncingStars,
-    setSyncingStars: state.setSyncingStars,
-    syncMode: state.syncMode,
-    user: state.user,
-    addCustomCategory: state.addCustomCategory,
   })));
 
-  const { toast, confirm } = useDialog();
+  const { confirm } = useDialog();
+  // 搜索动作（向量/关键词/AI 搜索、星标同步）由 hook 承担；
+  // 两 ref 实体挂 hook、以 RefObject 暴露，View 的过滤 effect 原样读写。
+  const {
+    isSearching,
+    searchPhase,
+    vectorScoreMapRef,
+    skipNextTextSearchRef,
+    aiSearch,
+    syncStars,
+  } = useSearchActions();
   
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState(searchFilters.query);
-  const [isSearching, setIsSearching] = useState(false);
   const [availableLanguages, setAvailableLanguages] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([]);
@@ -186,9 +173,6 @@ export const SearchBar: React.FC = () => {
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const skipNextTextSearchRef = useRef(false);
-  const vectorScoreMapRef = useRef<{ query: string; scores: Map<string, number> } | null>(null);
-  const [searchPhase, setSearchPhase] = useState<string | null>(null);
   const filterChipBaseClass = 'linear-filter-chip flex items-center space-x-2 px-3 py-1.5 text-sm';
   const filterChipActiveClass = 'is-active font-medium';
   const filterChipInactiveClass = '';
@@ -367,195 +351,24 @@ export const SearchBar: React.FC = () => {
     return filtered;
   };
 
+  // View-UI 部分（实时搜索开关/历史/建议下拉与搜索历史 localStorage）留在 View，
+  // 搜索编排（向量 → 关键词，含 HyDE/rerank 与降级路径）在 useSearchActions.aiSearch。
   const handleAISearch = async () => {
     if (!searchQuery.trim()) return;
-    
+
     // Switch to AI search mode and trigger advanced search
     setIsRealTimeSearch(false);
     setShowSearchHistory(false);
     setShowSuggestions(false);
-    
+
     // Add to search history if not empty and not already in history
     if (searchQuery.trim() && !searchHistory.includes(searchQuery.trim())) {
       const newHistory = [searchQuery.trim(), ...searchHistory.slice(0, 9)];
       setSearchHistory(newHistory);
       localStorage.setItem('github-stars-search-history', JSON.stringify(newHistory));
     }
-    
-    // Trigger AI search immediately
-    setIsSearching(true);
-    setSearchPhase(null);
-    vectorScoreMapRef.current = null;
-    console.log('🔍 Starting AI search for query:', searchQuery);
 
-    try {
-      let filtered = repositories;
-
-      // ====== 向量搜索分支 ======
-      const vsConfig = useAppStore.getState().vectorSearchConfig;
-      const embConfigs = useAppStore.getState().embeddingConfigs;
-      const activeEmbConfig = embConfigs.find(c => c.id === vsConfig?.embeddingConfigId);
-
-      if (vsConfig?.enabled && vsConfig?.workerUrl && activeEmbConfig) {
-        try {
-          const embeddingClient = new EmbeddingClient(activeEmbConfig);
-          const vectorService = new VectorSearchService(vsConfig);
-
-          // 1. HyDE 查询预处理：用 LLM 生成理想仓库描述再嵌入（可选，5 秒超时降级）
-          let embeddingQuery = searchQuery;
-          const hydeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-          if (vsConfig.enableHyDE !== false && hydeConfig) {
-            const hydeAbort = new AbortController();
-            let hydeTimer: ReturnType<typeof setTimeout> | null = null;
-            try {
-              setSearchPhase(t('AI 分析查询...', 'AI analyzing query...'));
-              const hydeService = new AIService(hydeConfig, language);
-              embeddingQuery = await Promise.race([
-                hydeService.generateHyDEQuery(searchQuery, hydeAbort.signal).catch(() => searchQuery),
-                new Promise<string>((resolve) => {
-                  hydeTimer = setTimeout(() => {
-                    hydeAbort.abort();
-                    resolve(searchQuery);
-                  }, 5000);
-                }),
-              ]);
-              if (embeddingQuery !== searchQuery) {
-                console.log('🔮 HyDE generated:', embeddingQuery.slice(0, 100));
-              }
-            } catch (hydeError) {
-              console.warn('HyDE failed, using raw query:', hydeError);
-              embeddingQuery = searchQuery;
-            } finally {
-              if (hydeTimer) clearTimeout(hydeTimer);
-            }
-          }
-
-          // 2. 前端调用 Embedding API 生成查询向量
-          setSearchPhase(t('生成查询向量...', 'Generating query vector...'));
-          const queryVectors = await embeddingClient.embed([embeddingQuery], 'query');
-          if (queryVectors && queryVectors.length > 0) {
-            // 2. 前端将查询向量发送到 Worker
-            setSearchPhase(t('检索向量库...', 'Searching vector index...'));
-            const vectorResults = await vectorService.query(queryVectors[0], {
-              topK: vsConfig.searchTopK ?? 30,
-              threshold: vsConfig.searchThreshold ?? 0.35,
-            });
-
-            if (vectorResults.length > 0) {
-              // 3. 轻量关键词加分：精确匹配的字段给予分数微调
-              const queryLower = searchQuery.toLowerCase();
-              const boostedResults = vectorResults.map(r => {
-                let bonus = 0;
-                const name = (r.metadata?.full_name || '').toLowerCase();
-                const desc = (r.metadata?.description || '').toLowerCase();
-                const tags = (r.metadata?.tags || []).map(tag => tag.toLowerCase());
-                if (name.includes(queryLower)) bonus += 0.05;
-                if (desc.includes(queryLower)) bonus += 0.03;
-                if (tags.some(tag => tag.includes(queryLower))) bonus += 0.02;
-                return { ...r, score: r.score + bonus };
-              });
-
-              // 4. 从本地仓库数据中取出匹配结果，按相似度排序
-              const scoreMap = new Map(boostedResults.map(r => [r.id, r.score]));
-              const scoredRepos = filtered
-                .filter(repo => scoreMap.has(String(repo.id)))
-                .map(repo => ({
-                  repo,
-                  score: scoreMap.get(String(repo.id)) || 0,
-                }))
-                .sort((a, b) => b.score - a.score)
-                .map(item => item.repo);
-
-              if (scoredRepos.length > 0) {
-                // 4. AI 语义重排序：用 LLM 对向量搜索结果做真正的语义排序
-                let reranked = scoredRepos;
-                let rerankSucceeded = false;
-                const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
-                if (rerankConfig && vsConfig.enableReranking !== false) {
-                  try {
-                    setSearchPhase(t('AI 语义重排序...', 'AI semantic reranking...'));
-                    const rerankService = new AIService(rerankConfig, language);
-                    reranked = await rerankService.searchRepositoriesWithSemanticReranking(scoredRepos, searchQuery);
-                    rerankSucceeded = true;
-                    console.log('🤖 AI semantically reranked results:', reranked.length);
-                  } catch (rerankError) {
-                    console.warn('AI semantic reranking failed, using vector order:', rerankError);
-                  }
-                }
-
-                // 保存 LLM 重排序顺序，applyFilters 可能按 UI 排序覆盖它
-                const rerankOrder = rerankSucceeded
-                  ? new Map(reranked.map((repo, index) => [String(repo.id), index]))
-                  : null;
-                const finalFiltered = applyFilters([...reranked]);
-                if (rerankOrder) {
-                  // 恢复 LLM 语义排序顺序
-                  finalFiltered.sort((a, b) =>
-                    (rerankOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
-                    - (rerankOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER)
-                  );
-                } else {
-                  finalFiltered.sort((a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0));
-                }
-                console.log('🎯 Vector search results:', finalFiltered.length);
-                vectorScoreMapRef.current = { query: searchQuery, scores: scoreMap };
-                skipNextTextSearchRef.current = true;
-                setSearchResults(finalFiltered);
-                setSearchFilters({ query: searchQuery });
-                return;
-              }
-            }
-          }
-          // 向量搜索无结果 → 继续走关键词搜索
-          console.log('⚠️ Vector search returned no results, falling back to keyword search');
-        } catch (vectorError) {
-          console.warn('❌ Vector search failed, falling back to keyword search:', vectorError);
-        }
-      }
-      // ====== 向量搜索分支结束 ======
-
-      const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-      console.log('🤖 AI Config found:', !!activeConfig, 'Active AI Config ID:', activeAIConfig);
-      console.log('📋 Available AI Configs:', aiConfigs.length);
-      console.log('🔧 AI Configs:', aiConfigs.map(c => ({ id: c.id, name: c.name, hasApiKey: !!c.apiKey })));
-
-      if (activeConfig) {
-        try {
-          console.log('🚀 Calling AI service...');
-          setSearchPhase(t('AI 语义分析...', 'AI semantic analysis...'));
-          const aiService = new AIService(activeConfig, language);
-
-          // 先尝试AI搜索
-          const aiResults = await aiService.searchRepositoriesWithReranking(filtered, searchQuery);
-          console.log('✅ AI search completed, results:', aiResults.length);
-          
-          filtered = aiResults;
-        } catch (error) {
-          console.warn('❌ AI search failed, falling back to basic search:', error);
-          filtered = performBasicTextSearch(filtered, searchQuery);
-          console.log('🔄 Basic search fallback results:', filtered.length);
-        }
-      } else {
-        console.log('⚠️ No AI config found, using basic text search');
-        // Basic text search if no AI config
-        filtered = performBasicTextSearch(filtered, searchQuery);
-        console.log('📝 Basic search results:', filtered.length);
-      }
-      
-      // Apply other filters and update results
-      const finalFiltered = applyFilters(filtered);
-      console.log('🎯 Final filtered results:', finalFiltered.length);
-      console.log('📋 Final filtered repositories:', finalFiltered.map(r => r.name));
-      setSearchResults(finalFiltered);
-      
-      // Update search filters to mark that AI search was performed
-      setSearchFilters({ query: searchQuery });
-    } catch (error) {
-      console.error('💥 Search failed:', error);
-    } finally {
-      setIsSearching(false);
-      setSearchPhase(null);
-    }
+    await aiSearch(searchQuery, applyFilters);
   };
 
   const handleClearSearch = () => {
@@ -711,233 +524,8 @@ export const SearchBar: React.FC = () => {
 
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
-  const handleStarSync = async (mode: 'auto' | 'stars-only' | 'stars-and-lists' = 'auto') => {
-    if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
-      return;
-    }
-
-    setSyncingStars(true);
-    try {
-      const githubApi = new GitHubApiService(githubToken);
-      const newRepositories = await githubApi.getAllStarredRepositories();
-
-      const storeRepos = useAppStore.getState().repositories;
-      const existingRepoMap = new Map(storeRepos.map(repo => [repo.id, repo]));
-      const mergedRepositories = newRepositories.map(newRepo => {
-        const existing = existingRepoMap.get(newRepo.id);
-        if (existing) {
-          return {
-            ...existing,
-            name: newRepo.name,
-            full_name: newRepo.full_name,
-            description: newRepo.description,
-            html_url: newRepo.html_url,
-            stargazers_count: newRepo.stargazers_count,
-            forks_count: newRepo.forks_count,
-            forks: newRepo.forks,
-            language: newRepo.language,
-            updated_at: newRepo.updated_at,
-            pushed_at: newRepo.pushed_at,
-            starred_at: newRepo.starred_at,
-            owner: newRepo.owner,
-            topics: newRepo.topics,
-            // 回填历史仓库缺失的 license 字段（GitHub 源元数据，跟随 newRepo）
-            license: newRepo.license ?? null,
-          };
-        }
-        return newRepo;
-      });
-
-      // 解析本次同步范围：
-      // - 'auto'：跟随持久化配置 syncMode
-      // - 'stars-only'：强制仅星标（忽略 syncMode，供下拉菜单显式选择）
-      // - 'stars-and-lists'：强制星标及 list（供下拉菜单显式选择）
-      const syncLists = mode === 'stars-and-lists' || (mode === 'auto' && syncMode === 'stars-and-lists');
-      let finalRepositories = mergedRepositories;
-
-      if (syncLists) {
-        const listRepoMap = new Map(finalRepositories.map(repo => [repo.full_name.toLowerCase(), repo]));
-        const appliedTagsCount: Record<string, number> = {};
-        try {
-          const listsApi = createGitHubListsApiService(githubToken);
-          const login = user?.login;
-          if (!login) {
-            throw new Error(t('无法获取 GitHub 用户名，请重新登录。', 'Failed to get GitHub username. Please login again.'));
-          }
-          const lists = await listsApi.getUserLists(login);
-
-          // 构造"list 名(小写) → 本地分类"的映射，避免每次循环重复查询。
-          // 值使用本地分类的原始名称（保留其大小写），而非 list 名：
-          // 锁定分类的筛选用精确相等比较，若直接存 GitHub 侧的大小写，
-          // 仓库会从分类结果中消失（如 list 名为 "web apps" 而分类为 "Web Apps"）。
-          const categoryByLowerName = new Map(
-            allCategories
-              .filter(c => c.id !== 'all' && !isReservedCategoryName(c.name))
-              .map(c => [c.name.toLowerCase(), c.name])
-          );
-
-          // 为云端存在、但本地无同名分类的 list 自动创建自定义分类。
-          // 修复"GitHub list 有很多新分类但本地从没拉到过"——原逻辑只贴 custom_tags
-          // 标签，不建分类，导致左侧分类树永远只有历史分类。
-          // 用每 list 递增的下标做 id 后缀，避免同一毫秒内多个 list 撞 id。
-          let createdCategoriesCount = 0;
-          lists.forEach((list, idx) => {
-            const lower = list.name.toLowerCase();
-            if (isReservedCategoryName(list.name) || categoryByLowerName.has(lower)) return;
-            const newCategory = {
-              id: `custom-sync-${Date.now()}-${idx}`,
-              name: list.name,
-              icon: ' 📋',
-              isCustom: true,
-              keywords: [],
-            };
-            addCustomCategory(newCategory);
-            // 纳入本次运行使用的映射，使后续 listMatchesCategory 命中、可设分类并加锁
-            categoryByLowerName.set(lower, list.name);
-            createdCategoriesCount++;
-          });
-
-          // DEC-4：只判定锁定状态。
-          // 区分"本次同步开始前已存在"的锁定与"本次运行中新产生"的锁定：
-          // - 预存在的锁定：不覆盖其分类与锁定，但仍追加本次命中的 list 名为
-          //   custom_tags（修复 #273：否则一旦仓库被锁过，之后云端 list 的任何
-          //   变化都被跳过，导致"无法将云端 list 拉取到本地"）。
-          // - 本次运行中被前面的 list 刚锁定：保留已分配的分类/锁定，继续追加后续 list 的标签
-          const preExistingLocked = new Set(
-            finalRepositories
-              .filter(r => r.category_locked)
-              .map(r => r.full_name.toLowerCase())
-          );
-
-          for (const list of lists) {
-            let appliedCount = 0;
-            for (const fullName of list.items) {
-              const key = fullName.toLowerCase();
-              const repo = listRepoMap.get(key);
-              if (!repo) continue;
-
-              const customTags = repo.custom_tags ? [...repo.custom_tags] : [];
-              if (!customTags.includes(list.name)) {
-                customTags.push(list.name);
-              }
-
-              // 预存在锁定：不覆盖其分类与锁定，仅追加 list 名为标签，让云端
-              // list 关系仍能反映到本地（修复 #273）。
-              if (preExistingLocked.has(key)) {
-                // 仅当标签确有变化才写回，避免无谓的 last_edited 抖动
-                if (customTags.length !== (repo.custom_tags?.length ?? 0)) {
-                  listRepoMap.set(key, { ...repo, custom_tags: customTags });
-                }
-                appliedCount++;
-                continue;
-              }
-
-              // 本次运行中刚被锁定的仓库：保留已分配的分类与锁定，仅追加标签
-              if (repo.category_locked) {
-                listRepoMap.set(key, { ...repo, custom_tags: customTags });
-                appliedCount++;
-                continue;
-              }
-
-              // 若 list 名对应某个本地分类：设置分类并加锁；否则仅加标签（多分类靠标签匹配）
-              const listMatchesCategory = categoryByLowerName.has(list.name.toLowerCase());
-              const updatedRepo: Repository = listMatchesCategory
-                ? {
-                    ...repo,
-                    custom_tags: customTags,
-                    custom_category: categoryByLowerName.get(list.name.toLowerCase()),
-                    category_locked: true,
-                    last_edited: new Date().toISOString(),
-                  }
-                : {
-                    ...repo,
-                    custom_tags: customTags,
-                  };
-
-              listRepoMap.set(key, updatedRepo);
-              appliedCount++;
-            }
-            if (appliedCount > 0) {
-              appliedTagsCount[list.name] = appliedCount;
-            }
-          }
-
-          finalRepositories = finalRepositories.map(repo =>
-            listRepoMap.get(repo.full_name.toLowerCase()) || repo
-          );
-
-          if (Object.keys(appliedTagsCount).length > 0) {
-            const appliedTotal = Object.values(appliedTagsCount).reduce((a, b) => a + b, 0);
-            const listSummary = Object.entries(appliedTagsCount)
-              .map(([name, count]) => `${name}(${count})`)
-              .join('、');
-            const createdHint = createdCategoriesCount > 0
-              ? t(
-                  `（新建 ${createdCategoriesCount} 个分类）`,
-                  ` (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created)`
-                )
-              : '';
-            toast(t(
-              `已同步 ${lists.length} 个 list，并应用到 ${appliedTotal} 个未锁定仓库：${listSummary}${createdHint}`,
-              `Synced ${lists.length} lists, applied to ${appliedTotal} unlocked repositories: ${listSummary}${createdHint}`
-            ), 'info');
-          } else if (createdCategoriesCount > 0) {
-            // 命中数为 0，但本次新建了分类（云端 list 与本地无交集但仍有其名分类）
-            toast(t(
-              `已同步 ${lists.length} 个 list（新建 ${createdCategoriesCount} 个分类）。`,
-              `Synced ${lists.length} lists (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created).`
-            ), 'info');
-          }
-        } catch (listError) {
-          console.error('List sync failed:', listError);
-          toast(t(
-            'List 同步失败，星标仓库已同步。请稍后重试，或检查 GitHub Token 权限（需 user scope）。',
-            'List sync failed, starred repositories were synced. Retry later, or check the GitHub Token has the user scope.'
-          ), 'error');
-          // 不中断：星标同步结果仍然生效
-        }
-      }
-
-      const existingRepoIds = new Set(storeRepos.map(repo => repo.id));
-      const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
-
-      setRepositories(finalRepositories);
-      await forceSyncToBackend();
-      
-      setLastSync(new Date().toISOString());
-
-      if (newRepoCount > 0) {
-        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
-      } else {
-        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
-      }
-
-    } catch (error) {
-      console.error('Sync failed:', error);
-      if (error instanceof Error && error.message.includes('token')) {
-        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
-      } else {
-        toast(t('同步失败，请检查网络连接或稍后重试。', 'Sync failed. Please check your network connection or try again later.'), 'error');
-      }
-    } finally {
-      setSyncingStars(false);
-    }
-  };
-
-  const formatLastSync = (timestamp: string | null) => {
-    if (!timestamp) return t('从未同步', 'Never');
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return t('从未同步', 'Never');
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours < 1) return t('刚刚', 'Just now');
-    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
-    return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
-  };
-
-  // 同步星标仓库及 list：先确认（警告会覆盖未锁定仓库的分类并加锁），再执行
+  // 同步星标仓库及 list：先确认（警告会覆盖未锁定仓库的分类并加锁），再执行。
+  // 'auto'/'stars-only' 入口原无确认，勿加（B8）。
   const handleStarAndListSync = async () => {
     const confirmed = await confirm(
       t('同步星标仓库及 list', 'Sync starred repos & lists'),
@@ -954,7 +542,19 @@ export const SearchBar: React.FC = () => {
       { type: 'warning' }
     );
     if (!confirmed) return;
-    await handleStarSync('stars-and-lists');
+    await syncStars('stars-and-lists');
+  };
+
+  const formatLastSync = (timestamp: string | null) => {
+    if (!timestamp) return t('从未同步', 'Never');
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return t('从未同步', 'Never');
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return t('刚刚', 'Just now');
+    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
+    return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
   };
 
   // 全局快捷键支持（Ctrl/Cmd+K、Ctrl/Cmd+Shift+F、/、Escape）
@@ -1206,7 +806,7 @@ export const SearchBar: React.FC = () => {
                 <div className="ui-button-primary inline-flex items-stretch overflow-hidden">
                   <Button
                     type="button"
-                    onClick={() => { void handleStarSync(); }}
+                    onClick={() => { void syncStars(); }}
                     disabled={isSyncingStars}
                     className="inline-flex items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
                     title={t('同步星标仓库列表', 'Sync starred repositories')}
@@ -1230,7 +830,7 @@ export const SearchBar: React.FC = () => {
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem
                   disabled={isSyncingStars}
-                  onSelect={() => { void handleStarSync('stars-only'); }}
+                  onSelect={() => { void syncStars('stars-only'); }}
                   className="justify-start text-sm"
                 >
                   <span className="whitespace-nowrap">{t('只同步星标仓库', 'Sync starred repos only')}</span>

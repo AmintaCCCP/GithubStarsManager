@@ -9,7 +9,7 @@ import { Modal } from './Modal';
 import { Repository } from '../types';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { forceSyncToBackend } from '../services/autoSync';
+import { useCategorySyncActions } from '../features/repositories/hooks/useCategorySyncActions';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { deferOutsideDismiss } from './modalDismiss';
 
@@ -70,6 +70,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
     defaultCategoryOverrides: state.defaultCategoryOverrides,
   })));
+  const { forceSyncToBackend } = useCategorySyncActions();
 
   const [formData, setFormData] = useState({
     description: '',
