@@ -195,6 +195,42 @@ async function postJson(url, payload, token) {
   return { response, body };
 }
 
+test('Electron status accurately describes both vector tools when vector search is unavailable', async () => {
+  const portProbe = await listen((_request, response) => response.end());
+  await new Promise((resolve) => portProbe.server.close(resolve));
+  const state = {
+    config: { enabled: true, host: '127.0.0.1', port: portProbe.port, token: 'local-token' },
+    snapshot: {
+      repositories: [],
+      customCategories: [],
+      releases: [],
+      vectorSearchConfig: { enabled: false },
+    },
+  };
+  const local = createMcpLocalServer(() => state);
+  const started = await local.start();
+
+  try {
+    const result = await postJson(
+      started.url,
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'gsm_status', arguments: {} },
+      },
+      'local-token'
+    );
+    const text = result.body.result.content[0].text;
+    assert.equal(
+      JSON.parse(text).toolsNote,
+      'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled'
+    );
+  } finally {
+    await local.stop();
+  }
+});
+
 test('Electron MCP executes batch, evidence, and candidate-set vector calls', async () => {
   const workerBodies = [];
   const embeddingUpstream = await listen((_request, response) => {

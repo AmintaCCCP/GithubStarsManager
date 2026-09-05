@@ -127,6 +127,19 @@ describe('MCP tool registration', () => {
     expect(getReposSchema.idsOrFullNames.safeParse(['']).success).toBe(false);
   });
 
+  it('accurately describes both vector tools when vector search is unavailable', async () => {
+    mocks.getVectorAvailability.mockReturnValue({ available: false, reason: 'disabled' });
+    const status = captureRegistrations(false).find((tool) => tool.name === 'gsm_status');
+    const result = await status!.handler({});
+    const payload = JSON.parse(
+      (result as { content: Array<{ text: string }> }).content[0].text
+    ) as { toolsNote: string };
+
+    expect(payload.toolsNote).toBe(
+      'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled'
+    );
+  });
+
   it('routes the three new handlers without mutating the provider inputs', async () => {
     mocks.getRepositories.mockReturnValue({ requested: 1 });
     mocks.getRepoEvidence.mockReturnValue({ evidence: {} });

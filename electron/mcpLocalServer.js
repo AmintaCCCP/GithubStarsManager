@@ -418,7 +418,7 @@ async function callTool(name, args, snapshot) {
         },
         toolsNote: vectorInfo.available
           ? 'gsm_vector_search is available'
-          : 'gsm_vector_search is not listed until vector search is configured and enabled in the app',
+          : 'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled',
       });
     case 'gsm_search_repos': {
       const result = searchRepositories(repos, args || {});
