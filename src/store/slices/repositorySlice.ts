@@ -195,6 +195,11 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           for (const cat of allCategories) {
             const persistedId = categoryListIdMap[cat.id];
             if (persistedId && currentLists.some(l => l.id === persistedId)) {
+              const existing = currentLists.find(l => l.id === persistedId)!;
+              // auto-migrate name on language switch
+              if (existing.name !== cat.name) {
+                try { await api.updateUserList(persistedId, cat.name); } catch (e) { console.warn('rename list failed', persistedId, e); }
+              }
               listIdByCategoryId.set(cat.id, persistedId);
               managedListIds.add(persistedId);
               continue;
@@ -208,12 +213,16 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
               nameVariants.some(v => v.toLowerCase() === l.name.toLowerCase())
             );
             if (matchedList) {
+              // rename if language changed (e.g. 开发工具 -> Development Tools)
+              if (matchedList.name !== cat.name) {
+                try { await api.updateUserList(matchedList.id, cat.name); } catch (e) { console.warn('rename list failed', matchedList.id, e); }
+              }
               listIdByCategoryId.set(cat.id, matchedList.id);
               nextCategoryListIdMap[cat.id] = matchedList.id;
               managedListIds.add(matchedList.id);
               continue;
             }
-            const id = await api.createUserList(canonicalName, true);
+            const id = await api.createUserList(cat.name, true);
             listIdByCategoryId.set(cat.id, id);
             nextCategoryListIdMap[cat.id] = id;
             managedListIds.add(id);
