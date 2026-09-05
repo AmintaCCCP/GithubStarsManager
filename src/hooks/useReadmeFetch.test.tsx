@@ -143,6 +143,27 @@ describe('useReadmeFetch.fetchReadmeContent', () => {
     });
   });
 
+  it('rejects with AbortError when cancelled after a direct-GitHub response resolves', async () => {
+    mocks.backend.isAvailable = false;
+    let resolveDirect!: (value: string) => void;
+    mocks.getRepositoryReadme.mockImplementation(() => new Promise<string>((resolve) => {
+      resolveDirect = resolve;
+    }));
+    const { result } = renderHook(() => useReadmeFetch({ owner: 'owner', name: 'repo' }));
+
+    let pending!: Promise<string>;
+    act(() => {
+      pending = result.current.fetchReadmeContent(defaultVariant);
+    });
+    act(() => {
+      result.current.cancel();
+    });
+    resolveDirect('# stale direct');
+    await act(async () => {
+      await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    });
+  });
+
   it('aborts the previous content request when a new one starts', async () => {
     const signals: AbortSignal[] = [];
     mocks.backend.getRepositoryReadme.mockImplementation((_owner: string, _name: string, signal: AbortSignal) => {
@@ -207,6 +228,29 @@ describe('useReadmeFetch.fetchReadmeCandidates', () => {
       await expect(result.current.fetchReadmeCandidates('main')).resolves.toEqual([]);
     });
     expect(mocks.listRepositoryReadmeCandidates).not.toHaveBeenCalled();
+  });
+
+  it('rejects with AbortError when a direct-GitHub candidates request is superseded after resolving', async () => {
+    mocks.backend.isAvailable = false;
+    const resolvers: Array<(value: unknown[]) => void> = [];
+    mocks.listRepositoryReadmeCandidates.mockImplementation(() =>
+      new Promise<unknown[]>((resolve) => {
+        resolvers.push(resolve);
+      }));
+    const { result } = renderHook(() => useReadmeFetch({ owner: 'owner', name: 'repo' }));
+
+    let first!: Promise<unknown[]>;
+    act(() => {
+      first = result.current.fetchReadmeCandidates('main');
+    });
+    act(() => {
+      void result.current.fetchReadmeCandidates('main');
+    });
+    // 仅 resolve 第一个（已被取代的）请求；第二个保持挂起，不影响断言
+    resolvers[0]([{ name: 'stale.md', path: 'stale.md' }]);
+    await act(async () => {
+      await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    });
   });
 
   it('cancel aborts the in-flight candidates request', async () => {

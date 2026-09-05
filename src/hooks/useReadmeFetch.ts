@@ -68,7 +68,9 @@ export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFe
     };
 
     if (shouldBypassBackend() || !backend.isAvailable) {
-      return fetchFromGitHubApi();
+      const directContent = await fetchFromGitHubApi();
+      if (signal.aborted) throw abortOperation();
+      return directContent;
     }
 
     try {
@@ -105,7 +107,9 @@ export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFe
     };
 
     if (shouldBypassBackend() || !backend.isAvailable) {
-      return fetchFromGitHubApi();
+      const directCandidates = await fetchFromGitHubApi();
+      if (signal.aborted) throw abortOperation();
+      return directCandidates;
     }
 
     try {
