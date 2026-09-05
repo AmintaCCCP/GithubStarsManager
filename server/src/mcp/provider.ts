@@ -9,6 +9,15 @@ import {
   projectRepoForAgent,
   searchRepositories,
 } from './repoSearch.js';
+import {
+  buildBatchLookupResult,
+  buildRepositoryEmbeddingText,
+  filterVectorCandidates,
+  hasActiveVectorFilters,
+  MCP_BATCH_LIMIT,
+  VECTOR_CANDIDATE_LIMIT,
+} from './discovery.js';
+import { buildRepoEvidence, type McpReleaseEvidence } from './evidence.js';
 
 function parseJsonColumn(value: unknown): unknown[] {
   if (typeof value !== 'string' || !value) return [];
@@ -76,6 +85,42 @@ export function getRepository(idOrFullName: string | number): McpRepository | nu
       .get(String(idOrFullName)) as Record<string, unknown> | undefined;
   }
   return row ? transformRepoRow(row) : null;
+}
+
+export function getRepositories(inputs: string[]) {
+  if (inputs.length > MCP_BATCH_LIMIT) {
+    throw new Error(`A maximum of ${MCP_BATCH_LIMIT} repositories may be requested`);
+  }
+  return buildBatchLookupResult(inputs, (input) => getRepository(input));
+}
+
+export function getLatestRelease(repoId: number): McpReleaseEvidence | null {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `SELECT id, tag_name, name, html_url, published_at, prerelease, draft
+       FROM releases
+       WHERE repo_id = ?
+       ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
+       LIMIT 1`
+    )
+    .get(repoId) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return {
+    id: row.id as number,
+    tag_name: (row.tag_name as string | null) ?? null,
+    name: (row.name as string | null) ?? null,
+    html_url: (row.html_url as string | null) ?? null,
+    published_at: (row.published_at as string | null) ?? null,
+    prerelease: !!row.prerelease,
+    draft: !!row.draft,
+  };
+}
+
+export function getRepoEvidence(idOrFullName: string | number) {
+  const repo = getRepository(idOrFullName);
+  if (!repo) return { error: 'not_found' as const, idOrFullName: String(idOrFullName) };
+  return buildRepoEvidence(repo, getLatestRelease(repo.id));
 }
 
 export function listCategories(): Array<Record<string, unknown>> {
@@ -297,10 +342,30 @@ async function embedQuery(
   return list[0].embedding;
 }
 
+export interface VectorSearchOptions
+  extends Pick<
+    McpSearchFilters,
+    | 'languages'
+    | 'tags'
+    | 'platforms'
+    | 'licenses'
+    | 'category'
+    | 'minStars'
+    | 'maxStars'
+    | 'isAnalyzed'
+    | 'isSubscribed'
+  > {
+  topK?: number;
+  threshold?: number;
+}
+
 export async function vectorSearch(
   query: string,
-  opts: { topK?: number; threshold?: number } = {}
-): Promise<{ available: false; reason: string } | { available: true; matches: Array<Record<string, unknown>> }> {
+  opts: VectorSearchOptions = {}
+): Promise<
+  | { available: false; reason: string }
+  | { available: true; matches: Array<Record<string, unknown>>; filtering?: Record<string, unknown> }
+> {
   const availability = getVectorAvailability();
   if (!availability.available) {
     return { available: false, reason: availability.reason || 'unavailable' };
@@ -326,6 +391,8 @@ export async function vectorSearch(
 
   const topK = Math.min(50, Math.max(1, opts.topK ?? 20));
   const threshold = opts.threshold ?? 0.35;
+  const filtersActive = hasActiveVectorFilters(opts);
+  const workerTopK = filtersActive ? VECTOR_CANDIDATE_LIMIT : topK;
 
   let vector: number[];
   try {
@@ -344,7 +411,7 @@ export async function vectorSearch(
       'Content-Type': 'application/json',
       ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
     },
-    body: JSON.stringify({ vector, topK, threshold }),
+    body: JSON.stringify({ vector, topK: workerTopK, threshold }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -357,16 +424,93 @@ export async function vectorSearch(
   const repos = loadAllRepositories();
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
-  const enriched = matches
+  const candidates = matches
     .map((m) => {
       const repo = byId.get(String(m.id));
       if (!repo) return null;
       return {
-        score: m.score,
-        ...projectRepoForAgent(repo),
+        id: String(m.id),
+        score: Number(m.score),
+        repository: repo,
       };
     })
-    .filter(Boolean) as Array<Record<string, unknown>>;
+    .filter(Boolean) as Array<{ id: string; score: number; repository: McpRepository }>;
 
-  return { available: true, matches: enriched };
+  if (!filtersActive) {
+    const enriched = candidates.map((candidate) => ({
+      score: candidate.score,
+      ...projectRepoForAgent(candidate.repository),
+    }));
+    return { available: true, matches: enriched };
+  }
+
+  // This is intentionally local filtering over the retrieved candidate set,
+  // not an exact filtered topK over the complete Vectorize corpus. The Worker
+  // remains unchanged and returns at most VECTOR_CANDIDATE_LIMIT candidates.
+  const filtered = filterVectorCandidates(candidates, opts, topK);
+  const enriched = filtered.matches.map((candidate) => ({
+    score: candidate.score,
+    ...projectRepoForAgent(candidate.repository),
+  }));
+
+  return {
+    available: true,
+    matches: enriched,
+    filtering: {
+      mode: 'local_candidate_set',
+      candidateLimit: VECTOR_CANDIDATE_LIMIT,
+      exactCorpusFilteredTopK: false,
+      candidateCount: filtered.candidateCount,
+      filteredCount: filtered.filteredCount,
+    },
+  };
+}
+
+export async function findSimilarRepositories(
+  idOrFullName: string | number,
+  opts: { topK?: number; threshold?: number } = {}
+): Promise<
+  | { error: 'not_found'; idOrFullName: string }
+  | { available: false; reason: string }
+  | {
+      available: true;
+      source: Record<string, unknown>;
+      sourceExcluded: true;
+      matches: Array<Record<string, unknown>>;
+    }
+> {
+  const source = getRepository(idOrFullName);
+  if (!source) return { error: 'not_found', idOrFullName: String(idOrFullName) };
+
+  const topK = Math.min(50, Math.max(1, opts.topK ?? 10));
+  const result = await vectorSearch(buildRepositoryEmbeddingText(source), {
+    topK: Math.min(50, topK + 8),
+    threshold: opts.threshold,
+  });
+  if (!result.available) return result;
+
+  const bestById = new Map<string, { score: number; match: Record<string, unknown> }>();
+  for (const match of result.matches) {
+    const matchId = String(match.id ?? '');
+    if (!matchId || matchId === String(source.id)) continue;
+    const score = Number.isFinite(Number(match.score)) ? Number(match.score) : Number.NEGATIVE_INFINITY;
+    const current = bestById.get(matchId);
+    if (!current || score > current.score) bestById.set(matchId, { score, match });
+  }
+
+  const matches = Array.from(bestById.values())
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        String(left.match.full_name || '').localeCompare(String(right.match.full_name || ''))
+    )
+    .slice(0, topK)
+    .map(({ match }) => match);
+
+  return {
+    available: true,
+    source: projectRepoForAgent(source, { summaryMaxChars: 2000 }),
+    sourceExcluded: true,
+    matches,
+  };
 }

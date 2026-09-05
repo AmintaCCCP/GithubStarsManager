@@ -424,10 +424,15 @@ npm run build
 | `gsm_status` | 服务状态：仓库数、向量可用性、版本 |
 | `gsm_search_repos` | 对星标做关键词搜索，支持筛选（语言 / 标签 / 平台 / 许可证 / 分类 / 星标数）与分页 |
 | `gsm_get_repo` | 按数字 id 或 `owner/repo` 获取单个仓库，含 AI 加工字段 |
+| `gsm_get_repos` | 按输入顺序批量获取最多 50 个仓库；保留重复输入并明确报告部分 `not_found` |
+| `gsm_get_repo_evidence` | 返回确定性的本地仓库与 Release 缓存证据；未保存的值保持为 `null` |
 | `gsm_list_categories` | 列出自定义分类 |
 | `gsm_list_repos_by_category` | 分页列出某分类下的仓库 |
 | `gsm_stats` | 聚合统计（语言、分析、标签） |
+| `gsm_find_similar_repos` | 使用现有向量索引查找相似星标仓库；排除源仓库，仅在向量搜索可用时列出 |
 | `gsm_vector_search` | 语义向量搜索 — 仅当已配置并启用向量搜索时列出 |
+
+`gsm_vector_search` 支持可选的 `languages`、`tags`、`platforms`、`licenses`、`category`、`minStars`、`maxStars`、`isAnalyzed` 与 `isSubscribed` 筛选。提供筛选时，Worker 最多返回 50 个语义候选，应用在本地确定性筛选后再截取 `topK`；这不是覆盖完整向量语料库的精确 filtered topK。未提供筛选时，既有查询行为保持不变。证据工具仅读取本地仓库数据库和 Release 缓存，不进行无界 GitHub 请求，不推测缺失字段，也不返回采纳决策。
 
 **桌面（Electron）说明：** 仅绑定回环地址（`127.0.0.1`），只能本机 Agent 访问；可在设置中调整主机/端口（默认端口 `3927`）。
 

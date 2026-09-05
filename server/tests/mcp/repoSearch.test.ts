@@ -3,6 +3,7 @@ import {
   performBasicTextSearch,
   searchRepositories,
   projectRepoForAgent,
+  matchesRepoFilters,
   type McpRepository,
 } from '../../src/mcp/repoSearch.js';
 
@@ -51,5 +52,46 @@ describe('mcp repoSearch', () => {
   it('projects compact agent payload', () => {
     const p = projectRepoForAgent(sample[0], { summaryMaxChars: 10 });
     expect(String(p.ai_summary).length).toBeLessThanOrEqual(11);
+  });
+
+  it('matches the approved vector filters with the same semantics as keyword search', () => {
+    const candidate = repo({
+      id: 3,
+      name: 'gamma',
+      full_name: 'acme/gamma',
+      language: 'TypeScript',
+      topics: ['retrieval'],
+      ai_tags: ['commerce'],
+      ai_platforms: ['linux'],
+      license: 'MIT',
+      custom_category: 'infrastructure',
+      stargazers_count: 120,
+      analyzed_at: '2026-09-01T00:00:00.000Z',
+      analysis_failed: false,
+      subscribed_to_releases: true,
+    });
+
+    expect(
+      matchesRepoFilters(candidate, {
+        languages: ['TypeScript'],
+        tags: ['retrieval'],
+        platforms: ['linux'],
+        licenses: ['MIT'],
+        category: 'infrastructure',
+        minStars: 100,
+        maxStars: 200,
+        isAnalyzed: true,
+        isSubscribed: true,
+      })
+    ).toBe(true);
+    expect(matchesRepoFilters(candidate, { isAnalyzed: false })).toBe(false);
+    expect(matchesRepoFilters(candidate, { isSubscribed: false })).toBe(false);
+    expect(matchesRepoFilters(candidate, { maxStars: 119 })).toBe(false);
+    expect(
+      matchesRepoFilters(
+        { ...candidate, analyzed_at: '2026-09-01T00:00:00.000Z', analysis_failed: true },
+        { isAnalyzed: false }
+      )
+    ).toBe(false);
   });
 });

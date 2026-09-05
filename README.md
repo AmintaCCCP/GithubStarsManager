@@ -490,10 +490,15 @@ Let agents (Claude Code, Cursor, etc.) read your AI-enriched starred repositorie
 | `gsm_status` | Server status: repo count, vector availability, version |
 | `gsm_search_repos` | Keyword search over stars with filters (languages / tags / platforms / licenses / category / stars) and pagination |
 | `gsm_get_repo` | Fetch one repo by numeric id or `owner/repo`, with AI-processed fields |
+| `gsm_get_repos` | Fetch up to 50 repos in input order; preserves duplicates and reports partial `not_found` entries |
+| `gsm_get_repo_evidence` | Return deterministic local repository and latest release-cache evidence; missing values stay `null` |
 | `gsm_list_categories` | List custom categories |
 | `gsm_list_repos_by_category` | List repos in a category with pagination |
 | `gsm_stats` | Aggregate stats (languages, analysis, tags) |
+| `gsm_find_similar_repos` | Find similar starred repos with the existing vector index; excludes the source repo and is listed only when Vector Search is available |
 | `gsm_vector_search` | Semantic vector search — listed only when Vector Search is configured and enabled |
+
+`gsm_vector_search` accepts optional `languages`, `tags`, `platforms`, `licenses`, `category`, `minStars`, `maxStars`, `isAnalyzed`, and `isSubscribed` filters. When a filter is supplied, the Worker returns at most 50 semantic candidates and GithubStarsManager applies the filter locally before truncating to `topK`; this is not an exact filtered topK over the complete vector corpus. With no filter, the existing query behavior is unchanged. Evidence reads the local repository database and cached releases only, never performs unbounded GitHub fan-out, and does not infer missing fields or return adoption decisions.
 
 **Desktop (Electron) notes:** binds loopback (`127.0.0.1`) only — local agents only; host/port adjustable in Settings (default port `3927`).
 
