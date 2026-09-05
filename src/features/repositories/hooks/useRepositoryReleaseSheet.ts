@@ -121,6 +121,10 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
   // RPC 发送与 AI 总结动作委托共享 hook（避免第三份拷贝）；summaries/downloadStates
   // 的对外形状由 hook 供给，downloadStates 的 key 已版本化为 computeRpcDownloadKey(link)。
   const artifactActions = useReleaseArtifactActions();
+  // cancelSummaryRequests 是共享 hook 内零依赖的稳定 useCallback——取消 effect 只能
+  // 挂它而不是整个 artifactActions 对象（后者随 summaries/RPC 状态更新换引用，
+  // 若挂进依赖，每次状态更新都会触发 cleanup 自我中止进行中的请求）。
+  const { cancelSummaryRequests } = artifactActions;
   const [releases, setReleases] = useState<Release[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,8 +137,8 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
   const cancelPendingRequests = useCallback(() => {
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = null;
-    artifactActions.cancelSummaryRequests();
-  }, [artifactActions]);
+    cancelSummaryRequests();
+  }, [cancelSummaryRequests]);
 
   useEffect(() => cancelPendingRequests, [cancelPendingRequests]);
 

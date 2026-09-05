@@ -67,6 +67,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   // 处理添加/取消Star：已 Star 时打开自定义确认 Modal，否则执行添加
   const handleStar = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!githubToken || isStarring) return;
     if (isStarred) {
       setUnstarConfirmOpen(true);
       return;
