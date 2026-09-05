@@ -17,7 +17,12 @@ export const LoginScreen: React.FC = () => {
   const [backendStep, setBackendStep] = useState<'credentials' | 'githubToken'>('credentials');
   const [tokenSetupReason, setTokenSetupReason] = useState<'missing' | 'invalid'>('missing');
   const [token, setToken] = useState('');
-  const [backendUrl, setBackendUrl] = useState(() => configuredBackendUrl?.replace(/\/api$/, '') || window.location.origin);
+  const [backendUrl, setBackendUrl] = useState(() => {
+    if (configuredBackendUrl) return configuredBackendUrl.replace(/\/api$/, '');
+    // A desktop webview origin (file://, tauri://, …) is not a usable backend
+    // address; only a web deployment can share its origin with the backend.
+    return /^https?:$/.test(window.location.protocol) ? window.location.origin : '';
+  });
   const [backendApiKey, setBackendApiKey] = useState('');
   const [backendGithubToken, setBackendGithubToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
