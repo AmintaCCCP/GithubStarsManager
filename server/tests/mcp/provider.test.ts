@@ -217,4 +217,60 @@ describe('MCP provider discovery', () => {
     const workerBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
     expect(workerBody.topK).toBe(10);
   });
+
+  it('maps worker connection failures to worker_query_failed instead of throwing', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+      .mockRejectedValueOnce(new TypeError('fetch failed'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await provider.vectorSearch('retrieval', {});
+    expect(result).toMatchObject({ available: false });
+    expect((result as { reason: string }).reason).toBe('worker_query_failed: fetch failed');
+  });
+
+  it('maps a worker timeout abort to worker_query_failed instead of throwing', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+      .mockImplementationOnce((_url: unknown, init?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('This operation was aborted', 'AbortError'))
+          );
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers();
+    try {
+      const pending = provider.vectorSearch('retrieval', {});
+      await vi.advanceTimersByTimeAsync(15_000);
+      const result = await pending;
+      expect(result).toMatchObject({ available: false });
+      expect((result as { reason: string }).reason).toMatch(/^worker_query_failed:/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('maps a non-JSON worker response to worker_query_failed instead of throwing', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+      .mockResolvedValueOnce(new Response('<html>gateway error</html>', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await provider.vectorSearch('retrieval', {});
+    expect(result).toMatchObject({ available: false });
+    expect((result as { reason: string }).reason).toMatch(/^worker_query_failed:/);
+  });
+
+  it('returns the declared unavailable result from findSimilarRepositories when the worker fails', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+      .mockRejectedValueOnce(new TypeError('fetch failed'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await provider.findSimilarRepositories('acme/alpha', { topK: 3 });
+    expect(result).toMatchObject({ available: false });
+    expect((result as { reason: string }).reason).toMatch(/^worker_query_failed:/);
+  });
 });

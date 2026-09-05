@@ -406,21 +406,39 @@ export async function vectorSearch(
   }
 
   const workerUrl = String(vs.worker_url).replace(/\/$/, '');
-  const res = await fetchWithTimeout(`${workerUrl}/query`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
-    },
-    body: JSON.stringify({ vector, topK: workerTopK, threshold }),
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${workerUrl}/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
+      },
+      body: JSON.stringify({ vector, topK: workerTopK, threshold }),
+    });
+  } catch (err) {
+    // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
+    // 永不 throw，异常必须折叠进声明的 { available: false } 结果
+    return {
+      available: false,
+      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     return { available: false, reason: `worker_query_failed: ${res.status} ${text.slice(0, 120)}` };
   }
-  const data = (await res.json()) as {
+  let data: {
     matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
   };
+  try {
+    data = (await res.json()) as typeof data;
+  } catch (err) {
+    return {
+      available: false,
+      reason: `worker_query_failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   const matches = data.matches || [];
   const repos = loadAllRepositories();
   const byId = new Map(repos.map((r) => [String(r.id), r]));

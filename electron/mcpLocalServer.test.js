@@ -351,3 +351,62 @@ test('Electron MCP executes batch, evidence, and candidate-set vector calls', as
     await new Promise((resolve) => workerUpstream.server.close(resolve));
   }
 });
+
+test('Electron vector tools report worker_query_failed for a non-JSON worker response', async () => {
+  const embeddingUpstream = await listen((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ embeddings: [[0.1, 0.2]] }));
+  });
+  const workerUpstream = await listen((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'text/html' });
+    response.end('<html>gateway error</html>');
+  });
+  const mcpPortProbe = await listen((_request, response) => response.end());
+  await new Promise((resolve) => mcpPortProbe.server.close(resolve));
+
+  const state = {
+    config: { enabled: true, host: '127.0.0.1', port: mcpPortProbe.port, token: 'local-token' },
+    snapshot: {
+      repositories: [repo()],
+      customCategories: [],
+      releases: [],
+      vectorSearchConfig: {
+        enabled: true,
+        workerUrl: `http://127.0.0.1:${workerUpstream.port}`,
+        authToken: 'worker-token',
+        searchTopK: 20,
+        embedding: {
+          apiType: 'ollama',
+          baseUrl: `http://127.0.0.1:${embeddingUpstream.port}`,
+          model: 'bge-m3',
+        },
+      },
+    },
+  };
+  const local = createMcpLocalServer(() => state);
+
+  try {
+    const started = await local.start();
+    const vector = await postJson(
+      started.url,
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'gsm_vector_search', arguments: { query: 'retrieval' } } },
+      'local-token'
+    );
+    const vectorData = JSON.parse(vector.body.result.content[0].text);
+    assert.equal(vectorData.available, false);
+    assert.match(vectorData.reason, /^worker_query_failed:/);
+
+    const similar = await postJson(
+      started.url,
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'gsm_find_similar_repos', arguments: { idOrFullName: 'acme/alpha' } } },
+      'local-token'
+    );
+    const similarData = JSON.parse(similar.body.result.content[0].text);
+    assert.equal(similarData.available, false);
+    assert.match(similarData.reason, /^worker_query_failed:/);
+  } finally {
+    await local.stop();
+    await new Promise((resolve) => embeddingUpstream.server.close(resolve));
+    await new Promise((resolve) => workerUpstream.server.close(resolve));
+  }
+});
