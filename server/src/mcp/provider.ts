@@ -439,7 +439,12 @@ export async function vectorSearch(
       reason: 'worker_query_failed',
     };
   }
-  const matches = data.matches || [];
+  // JSON null / 缺 matches 字段是合法 JSON，res.json() 不会 reject，必须在此
+  // 做结构校验；Electron 端 runVectorSearch 保持相同语义
+  if (!data || !Array.isArray(data.matches)) {
+    return { available: false, reason: 'worker_query_failed' };
+  }
+  const matches = data.matches;
   const repos = loadAllRepositories();
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 

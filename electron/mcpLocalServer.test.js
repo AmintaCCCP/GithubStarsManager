@@ -410,3 +410,63 @@ test('Electron vector tools report worker_query_failed for a non-JSON worker res
     await new Promise((resolve) => workerUpstream.server.close(resolve));
   }
 });
+
+test('Electron vector tools reject malformed worker payloads instead of returning empty matches', async () => {
+  const embeddingUpstream = await listen((_request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ embeddings: [[0.1, 0.2]] }));
+  });
+  let workerRequests = 0;
+  const workerUpstream = await listen((_request, response) => {
+    workerRequests += 1;
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    // 第 1 次返回 JSON null，第 2 次返回 matches 非数组的合法 JSON
+    response.end(workerRequests === 1 ? 'null' : JSON.stringify({ matches: 42 }));
+  });
+  const mcpPortProbe = await listen((_request, response) => response.end());
+  await new Promise((resolve) => mcpPortProbe.server.close(resolve));
+
+  const state = {
+    config: { enabled: true, host: '127.0.0.1', port: mcpPortProbe.port, token: 'local-token' },
+    snapshot: {
+      repositories: [repo({ id: 1, full_name: 'acme/source', name: 'source' })],
+      customCategories: [],
+      releases: [],
+      vectorSearchConfig: {
+        enabled: true,
+        workerUrl: `http://127.0.0.1:${workerUpstream.port}`,
+        authToken: 'worker-token',
+        searchTopK: 20,
+        embedding: {
+          apiType: 'ollama',
+          baseUrl: `http://127.0.0.1:${embeddingUpstream.port}`,
+          model: 'bge-m3',
+        },
+      },
+    },
+  };
+  const local = createMcpLocalServer(() => state);
+
+  try {
+    const started = await local.start();
+    const vector = await postJson(
+      started.url,
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'gsm_vector_search', arguments: { query: 'retrieval' } } },
+      'local-token'
+    );
+    const vectorData = JSON.parse(vector.body.result.content[0].text);
+    assert.deepEqual(vectorData, { available: false, reason: 'worker_query_failed' });
+
+    const similar = await postJson(
+      started.url,
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'gsm_find_similar_repos', arguments: { idOrFullName: 'acme/source' } } },
+      'local-token'
+    );
+    const similarData = JSON.parse(similar.body.result.content[0].text);
+    assert.deepEqual(similarData, { available: false, reason: 'worker_query_failed' });
+  } finally {
+    await local.stop();
+    await new Promise((resolve) => embeddingUpstream.server.close(resolve));
+    await new Promise((resolve) => workerUpstream.server.close(resolve));
+  }
+});

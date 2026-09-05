@@ -273,4 +273,24 @@ describe('MCP provider discovery', () => {
     expect(result).toMatchObject({ available: false });
     expect((result as { reason: string }).reason).toBe('worker_query_failed');
   });
+
+  it('rejects a JSON null worker payload instead of throwing or returning empty matches', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+      .mockResolvedValueOnce(new Response('null', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await provider.vectorSearch('retrieval', {});
+    expect(result).toEqual({ available: false, reason: 'worker_query_failed' });
+  });
+
+  it('rejects a non-array matches field instead of silently returning empty matches', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+      .mockResolvedValueOnce(jsonResponse({ matches: 'not-an-array' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await provider.vectorSearch('retrieval', {});
+    expect(result).toEqual({ available: false, reason: 'worker_query_failed' });
+  });
 });
