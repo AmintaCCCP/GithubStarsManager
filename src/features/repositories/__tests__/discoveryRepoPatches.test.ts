@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DiscoveryRepo } from '../../../../types';
-import { applyDiscoveryAnalysisFailure, applyDiscoveryAnalysisSuccess } from '../discoveryRepoPatches';
+import type { DiscoveryRepo } from '../../../types';
+import { applyDiscoveryAnalysisFailure, applyDiscoveryAnalysisSuccess } from '../application/discoveryRepoPatches';
 
 const repo: DiscoveryRepo = {
   id: 7,

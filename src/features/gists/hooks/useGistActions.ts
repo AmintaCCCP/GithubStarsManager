@@ -290,12 +290,17 @@ export const useGistActions = () => {
   // 大文件按需拉取（原 GistDetailModal.HighlightedCode effect 的服务调用部分）。
   // 无 token 时抛出的错误文案与原 setRawError 直写逐字一致，由 View catch 落 rawError。
   // Abort/retry/局部缓存归 View：signal 由调用方传入。
+  // 依赖只含 token：语言切换不得换引用（否则 View 的拉取 effect 会随 language 变化
+  // 重新发起网络请求），无 token 文案在抛错时经 getState() 读取当前语言。
   const fetchGistFileRaw = useCallback(async (rawUrl: string, signal?: AbortSignal): Promise<string> => {
     if (!state.githubToken) {
-      throw new Error(t('未配置 GitHub token，无法加载文件内容', 'GitHub token not configured, cannot load file content'));
+      const currentLanguage = useAppStore.getState().language;
+      throw new Error(currentLanguage === 'zh'
+        ? '未配置 GitHub token，无法加载文件内容'
+        : 'GitHub token not configured, cannot load file content');
     }
     return createGitHubApiService(state.githubToken).getGistFileRaw(rawUrl, signal);
-  }, [state.githubToken, t]);
+  }, [state.githubToken]);
 
   return {
     ...state,
