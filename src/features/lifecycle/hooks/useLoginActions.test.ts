@@ -88,6 +88,15 @@ describe('useLoginActions', () => {
     );
   });
 
+  it('does not treat a backend proxy credential failure as an invalid stored token', async () => {
+    mocks.getCurrentUser.mockRejectedValueOnce(new Error('Backend API key was rejected. Please check your backend settings'));
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example')).rejects.toThrow(
+      'Backend API key was rejected'
+    );
+  });
+
   it('distinguishes unreachable and unauthorized backends', async () => {
     const { result } = renderHook(() => useLoginActions());
     mocks.backend.isAvailable = false;
