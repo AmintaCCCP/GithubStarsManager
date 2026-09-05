@@ -98,7 +98,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           </div>
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
             {stats.languages.slice(0, 2).join(', ')}
-            {stats.languages.length > 2 && '...'}
+            {stats.languages.length > 2 && '…'}
           </div>
         </div>
 

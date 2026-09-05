@@ -47,7 +47,7 @@ export const ListsPushIndicator: React.FC = () => {
           {t('同步分类到 GitHub list', 'Pushing categories to lists')}
         </span>
         <span className="text-xs text-muted-foreground dark:text-muted-foreground shrink-0">
-          {listsPush.total > 0 ? `${listsPush.done}/${listsPush.total}` : '...'}
+          {listsPush.total > 0 ? `${listsPush.done}/${listsPush.total}` : '…'}
         </span>
       </div>
       <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">

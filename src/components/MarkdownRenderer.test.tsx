@@ -257,7 +257,7 @@ describe('MarkdownRenderer', () => {
   describe('shouldRender prop', () => {
     it('should show loading state when shouldRender is false', () => {
       render(<MarkdownRenderer content="Test" shouldRender={false} />);
-      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.getByText('Loading…')).toBeInTheDocument();
     });
   });
 

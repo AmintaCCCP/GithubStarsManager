@@ -88,7 +88,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
     return (
       <div className="flex items-center justify-center rounded-lg bg-muted p-8 dark:bg-muted/40">
         <Loader2 className="mr-2 h-5 w-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
-        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载文件内容...', 'Loading file content...')}</span>
+        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载文件内容…', 'Loading file content…')}</span>
       </div>
     );
   }

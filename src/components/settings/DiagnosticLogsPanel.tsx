@@ -493,7 +493,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             <Input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               aria-label={t('搜索日志模块或消息', 'Search log modules or messages')}
-              placeholder={t('搜索模块或消息...', 'Search module or message...')}
+              placeholder={t('搜索模块或消息…', 'Search module or message…')}
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
 
@@ -562,7 +562,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
               <Button onClick={handleExport} disabled={isExporting}
                 className="h-9 gap-1 px-3 text-sm font-medium">
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                <span>{isExporting ? t('导出中...', 'Exporting...') : t('导出', 'Export')}</span>
+                <span>{isExporting ? t('导出中…', 'Exporting…') : t('导出', 'Export')}</span>
               </Button>
             </div>
           </div>

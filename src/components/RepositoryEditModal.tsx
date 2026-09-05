@@ -735,7 +735,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             }}
             className={textareaClass}
             rows={5}
-            placeholder={t('输入自定义描述...', 'Enter custom description...')}
+            placeholder={t('输入自定义描述…', 'Enter custom description…')}
           />
 
           {/* Save Effect Info - Enhanced for Light Mode */}
@@ -896,9 +896,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             setFormData(prev => ({ ...prev, category: nextCategory, categoryLocked: nextCategory ? prev.categoryLocked : false }));
             setEditIntent(prev => ({ ...prev, category: 'keep-custom' }));
           }}>
-            <SelectTrigger aria-label={t('分类', 'Category')} className={inputClass}><SelectValue placeholder={t('选择分类...', 'Select category...')} /></SelectTrigger>
+            <SelectTrigger aria-label={t('分类', 'Category')} className={inputClass}><SelectValue placeholder={t('选择分类…', 'Select category…')} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">{t('选择分类...', 'Select category...')}</SelectItem>
+              <SelectItem value="none">{t('选择分类…', 'Select category…')}</SelectItem>
               {allCategories.filter(cat => cat.id !== 'all' && cat.name.trim().toLowerCase() !== 'none').map(category => <SelectItem key={category.id} value={category.name}>{category.icon} {category.name}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -1190,7 +1190,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               onChange={(e) => setNewTag(e.target.value)}
               onKeyDown={handleKeyPress}
               className={inputClass}
-              placeholder={t('添加自定义标签...', 'Add custom tag...')}
+              placeholder={t('添加自定义标签…', 'Add custom tag…')}
             />
             <Button
               aria-label={t('添加标签', 'Add tag')}

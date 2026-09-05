@@ -72,7 +72,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             ) : (
               <Upload className="w-5 h-5" />
             )}
-            <span>{isBackingUp ? t('备份中...', 'Backing up...') : t('开始备份', 'Start Backup')}</span>
+            <span>{isBackingUp ? t('备份中…', 'Backing up…') : t('开始备份', 'Start Backup')}</span>
           </Button>
         </div>
 
@@ -98,7 +98,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             ) : (
               <Download className="w-5 h-5" />
             )}
-            <span>{isRestoring ? t('恢复中...', 'Restoring...') : t('开始恢复', 'Start Restore')}</span>
+            <span>{isRestoring ? t('恢复中…', 'Restoring…') : t('开始恢复', 'Start Restore')}</span>
           </Button>
         </div>
       </div>

@@ -555,7 +555,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               >
                 <Bot className="h-4 w-4 shrink-0" />
                 {isLoading
-                  ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
+                  ? t(`分析中… (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing… (${analysisProgress.current}/${analysisProgress.total})`)
                   : t('AI分析', 'AI Analysis')}
                 <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
               </Button>
