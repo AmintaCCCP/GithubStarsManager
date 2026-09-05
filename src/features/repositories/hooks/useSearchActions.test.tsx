@@ -509,6 +509,9 @@ describe('useSearchActions.keywordSearch', () => {
 
     expect(mocks.toast).toHaveBeenCalledWith('AI 请求失败，已回退本地词法搜索', 'warning');
     expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
+    // 兜底结果（加权词法 + CJK bigram 召回）优于过滤 effect 的 AND 整串匹配，
+    // 必须置位 skipNextTextSearchRef 防止被其重设（CJK 查询会被重设为空）
+    expect(result.current.skipNextTextSearchRef.current).toBe(true);
   });
 
   it('stops quietly without fallback results when the search is cancelled', async () => {

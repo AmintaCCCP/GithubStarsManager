@@ -308,6 +308,22 @@ describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
     expect(onFallback).toHaveBeenCalledWith('ai_empty');
     expect(results).toEqual([]);
   });
+
+  it('模型返回的 ID 全部无法落位时按响应无效处理，回退词法而非空态', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockImplementationOnce(async () => chatResponse('{"intent":"","keywords":["foo"],"synonyms":[]}'));
+    fetchMock.mockImplementationOnce(async () => chatResponse('[999999999, 888888888]'));
+    const onFallback = vi.fn();
+
+    const repo = makeRepo({ id: 790000001, name: 'foo-tool', full_name: 'acme/foo-tool' });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const results = await service.searchRepositoriesWithSelection([repo], 'foo', { onFallback });
+
+    // 幻觉 ID ≠ 模型判空：不能把无效响应当成"无相关结果"呈现空态
+    expect(onFallback).toHaveBeenCalledWith('unparseable');
+    expect(results.map((r) => r.id)).toEqual([790000001]);
+  });
 });
 
 describe('AIService.searchRepositoriesWithSemanticReranking — 行号兜底', () => {

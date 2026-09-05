@@ -1578,7 +1578,8 @@ AI Summary: ${gist.ai_summary || 'None'}`;
   /**
    * 从模型输出解析排序后的仓库列表。ID 优先匹配；模型偶尔会把候选行号
    * （1..N）当作 ID 返回，此时在候选范围内按行号解析——否则整份重排结果会被
-   * 静默丢弃。返回 null 表示输出里没有可解析的 JSON 数组。
+   * 静默丢弃。返回 null 表示响应无效（没有可解析的 JSON 数组，或非空数组的
+   * ID 全部无法落位）；空数组是合法结果（模型明确判定无相关仓库）。
    */
   private resolveRankedRepositories(content: string, candidates: Repository[]): Repository[] | null {
     const jsonMatch = content.match(/\[[\s\S]*?\]/);
@@ -1613,6 +1614,9 @@ AI Summary: ${gist.ai_summary || 'None'}`;
         }
       }
     }
+    // 非空响应却一个 ID 都没落位：是幻觉 ID / 响应无效，不是模型判空。
+    // 返回 null 让调用方走词法兜底，避免把无效响应当成"无相关结果"呈现空态。
+    if (ids.length > 0 && ranked.length === 0) return null;
     return ranked;
   }
 
