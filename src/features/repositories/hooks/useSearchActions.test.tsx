@@ -544,6 +544,39 @@ describe('useSearchActions.keywordSearch', () => {
     expect(result.current.isSearching).toBe(false);
   });
 
+  it('supersedes an in-flight AI search: the previous signal aborts and writes nothing', async () => {
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    const signals: Array<AbortSignal | undefined> = [];
+    mocks.searchRepositoriesWithSelection.mockImplementation(
+      (_repos: Repository[], _query: string, opts?: { signal?: AbortSignal }) => {
+        signals.push(opts?.signal);
+        // 模拟真实在途请求：signal abort 时以 AbortError 拒绝
+        return new Promise<Repository[]>((_resolve, reject) => {
+          opts?.signal?.addEventListener('abort', () => {
+            reject(Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }));
+          });
+        });
+      },
+    );
+
+    const { result } = renderHook(() => useSearchActions());
+    let first!: Promise<void>;
+    await act(async () => { first = result.current.aiSearch('first', identity); });
+    // 第二次搜索（不 await：模拟仍在途）启动时中止第一次
+    await act(async () => { result.current.aiSearch('second', identity); });
+    // 第二次搜索的启动即中止第一次的在途 controller
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+    await act(async () => { await first; });
+
+    // 被取代的搜索不得写入结果，也不复位第二次搜索的 isSearching
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(result.current.isSearching).toBe(true);
+  });
+
   it('uses basic text search directly when no AI config exists', async () => {
     storeState.aiConfigs = [];
     storeState.repositories = [
