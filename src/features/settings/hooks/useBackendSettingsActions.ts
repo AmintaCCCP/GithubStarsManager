@@ -93,23 +93,28 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
       ), 'error');
       return;
     }
+    const previousUrl = backend.backendUrl;
     state.setBackendApiSecret(secretInput || null);
-    // With an address entered, probe exactly that URL and remember it on
-    // success (same storage as the login screen); empty keeps the previous
-    // auto-detect behavior (remembered URL, else same-origin).
+    // With an address entered, probe exactly that URL; empty keeps the
+    // previous auto-detect behavior (remembered URL, else same-origin).
     const connected = await checkConnection(false, trimmedUrl || undefined);
     if (!connected) {
+      await backend.init(previousUrl ?? undefined);
       toast(t('后端连接失败，请检查服务器状态或 API Secret 是否正确。', 'Backend connection failed. Please check the server status or whether the API Secret is correct.'), 'error');
       return;
     }
     try {
       const authOk = secretInput ? await backend.verifyAuth() : true;
       if (!authOk) throw new Error('Authentication failed');
+      // Health and auth both passed — remember the address (shared with the
+      // login screen prefill).
+      backend.rememberActiveUrl();
       toast(t('后端连接成功！', 'Backend connection successful!'), 'success');
       // These are deliberate manual settings actions; app-start restoration is not moved here.
       void tryRestoreAuthFromBackend();
       void syncLocalGitHubTokenToBackend();
     } catch {
+      await backend.init(previousUrl ?? undefined);
       setStatus('disconnected');
       setHealth(null);
       toast(t('后端连接失败，请检查服务器状态或 API Secret 是否正确。', 'Backend connection failed. Please check the server status or whether the API Secret is correct.'), 'error');

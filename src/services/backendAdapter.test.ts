@@ -103,14 +103,32 @@ describe('backendAdapter 后端 URL 安全策略', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it('放行 HTTPS 后端并记住规范化地址', async () => {
+  it('放行 HTTPS 后端；rememberActiveUrl 之前不写入本地存储', async () => {
     vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
 
     await backend.init('https://backend.example.com');
 
-    expect(window.fetch).toHaveBeenCalledWith('https://backend.example.com/api/health', expect.anything());
+    expect(window.fetch).toHaveBeenCalledWith(
+      'https://backend.example.com/api/health',
+      expect.objectContaining({ redirect: 'error' })
+    );
     expect(backend.isAvailable).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+
+    backend.rememberActiveUrl();
     expect(localStorage.getItem(STORAGE_KEY)).toBe('https://backend.example.com/api');
+  });
+
+  it('认证请求同样禁止自动重定向', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    vi.mocked(window.fetch).mockResolvedValue({ ok: true, status: 200 } as unknown as Response);
+
+    await backend.verifyAuth();
+
+    expect(window.fetch).toHaveBeenCalledWith(
+      'https://backend.example.com/api/settings',
+      expect.objectContaining({ redirect: 'error' })
+    );
   });
 
   it('loopback HTTP 后端仍可用于本地开发', async () => {

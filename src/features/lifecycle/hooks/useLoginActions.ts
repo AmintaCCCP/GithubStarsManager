@@ -37,22 +37,34 @@ export const useLoginActions = (): LoginActions => {
     }
   }, []);
   const restoreBackendSession = useCallback(async (url: string): Promise<BackendLoginResult> => {
+    const previousUrl = backend.backendUrl;
     await backend.init(url);
     if (!backend.isAvailable) return { status: 'backend-unavailable' };
-    if (!await backend.verifyAuth()) return { status: 'unauthorized' };
+    if (!await backend.verifyAuth()) {
+      // Wrong key: drop the candidate and fall back to whatever backend was
+      // active before (or auto-detect), so a failed candidate is never kept.
+      await backend.init(previousUrl ?? undefined);
+      return { status: 'unauthorized' };
+    }
 
     const restored = await backend.restoreAuth();
-    if (!restored) return { status: 'restore-failed' };
+    if (!restored) {
+      await backend.init(previousUrl ?? undefined);
+      return { status: 'restore-failed' };
+    }
     if (!restored.github_token) return { status: 'github-token-required' };
 
     try {
       const user = await authenticateWithGitHub(restored.github_token);
+      // Backend, API key, and stored token are all proven — remember the URL
+      // (the setup step re-remembers after persisting a new token).
+      backend.rememberActiveUrl();
       return { status: 'connected', githubToken: restored.github_token, user };
     } catch (err) {
       if (err instanceof Error && err.message === GITHUB_TOKEN_INVALID_ERROR) {
-        // Confirmed auth failure: the stored token is expired or revoked.
-        // Route to the token setup step instead of a dead end; saving a new
-        // token there overwrites the broken one on the backend.
+        // Confirmed auth failure: the stored token is what failed, while the
+        // backend and API key are fine — keep the connection for token setup;
+        // saving a new token there overwrites the broken one on the backend.
         return { status: 'restored-token-invalid' };
       }
       // Network failures, rate limits, and 5xx are transient — propagate so
@@ -63,6 +75,7 @@ export const useLoginActions = (): LoginActions => {
   const setupBackendGitHubToken = useCallback(async (token: string) => {
     const user = await authenticateWithGitHub(token);
     await backend.syncSettings({ github_token: token });
+    backend.rememberActiveUrl();
     return user;
   }, [authenticateWithGitHub]);
   const syncBackendData = useCallback(async () => {
