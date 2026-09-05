@@ -209,7 +209,15 @@ async function runVectorSearch(query, args, snapshot) {
       reason: 'worker_query_failed',
     };
   }
-  const matches = Array.isArray(data.matches) ? data.matches : [];
+  // 与 server/src/mcp/provider.ts 相同的结构校验：JSON null / matches 非数组
+  // 不静默转空结果，统一返回声明的 unavailable 结果
+  if (!data || !Array.isArray(data.matches)) {
+    return {
+      available: false,
+      reason: 'worker_query_failed',
+    };
+  }
+  const matches = data.matches;
   const repos = Array.isArray(snapshot?.repositories) ? snapshot.repositories : [];
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
