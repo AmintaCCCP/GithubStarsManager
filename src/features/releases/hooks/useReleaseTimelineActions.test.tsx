@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useReleaseTimelineActions } from './useReleaseTimelineActions';
 
@@ -150,6 +150,53 @@ describe('useReleaseTimelineActions.syncWatchedSources', () => {
     expect(mocks.toast).toHaveBeenCalledWith('已同步 2 个 Watch 仓库。', 'success');
     expect(result.current.isSyncingWatchedSources).toBe(false);
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+  });
+
+  it('reads release_hidden from the latest state after the request resolves', async () => {
+    // 模拟同步期间用户在设置面板切换隐藏状态：await 挂起时改 store，
+    // 完成后写入的 sourceRepos 必须保留切换后的值而非调用时的旧快照。
+    let resolveWatched!: (repos: unknown[]) => void;
+    mocks.getAllWatchedRepositories.mockImplementation(() => new Promise((resolve) => {
+      resolveWatched = resolve;
+    }));
+    const { result } = renderHook(() => useReleaseTimelineActions());
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.syncWatchedSources();
+    });
+    await waitFor(() => expect(mocks.getAllWatchedRepositories).toHaveBeenCalled());
+    act(() => {
+      storeState.releaseSourceSettings = {
+        ...storeState.releaseSourceSettings,
+        watchCustomReleaseRepos: [
+          { full_name: 'owner/watched', html_url: 'https://github.com/owner/watched', release_hidden: false },
+        ],
+      };
+    });
+    resolveWatched([
+      {
+        id: 1,
+        name: 'watched',
+        full_name: 'owner/watched',
+        html_url: 'https://github.com/owner/watched',
+        owner: { login: 'owner', avatar_url: 'https://example.com/a.png' },
+        description: 'desc',
+        language: 'TypeScript',
+        stargazers_count: 5,
+        forks_count: 1,
+        forks: 1,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-02T00:00:00.000Z',
+        pushed_at: '2026-01-03T00:00:00.000Z',
+        topics: [],
+      },
+    ]);
+    await act(async () => { await pending; });
+
+    const repos = mocks.setReleaseSourceRepositories.mock.calls[0][1];
+    expect(repos[0].release_hidden).toBeUndefined();
+    expect(mocks.toast).toHaveBeenCalledWith('已同步 1 个 Watch 仓库。', 'success');
   });
 
   it('toasts a failure without writing the store when the api rejects', async () => {

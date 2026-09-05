@@ -205,8 +205,10 @@ export const useReleaseTimelineActions = () => {
       // 只拉 /user/subscriptions（含私有仓）。/users/{login}/subscriptions 已被 GitHub 改为
       // 恒定返回 204 空响应体，且其结果本就是前者的公开子集，并行合并只会拖垮整个同步。
       const watchedRepos = await githubApi.getAllWatchedRepositories();
+      // hiddenByRepo 在 await 之后从最新 state 读取：同步期间用户仍可在设置面板
+      // 切换 release_hidden，旧快照会在 setReleaseSourceRepositories 时覆盖该修改。
       const hiddenByRepo = new Map(
-        state.releaseSourceSettings.watchCustomReleaseRepos.map(repo => [normalizeRepoKey(repo.full_name), repo.release_hidden]),
+        useAppStore.getState().releaseSourceSettings.watchCustomReleaseRepos.map(repo => [normalizeRepoKey(repo.full_name), repo.release_hidden]),
       );
       const sourceRepos = watchedRepos.map(repo => ({
         ...repositoryToCustomReleaseRepository(repo, WATCH_CUSTOM_RELEASE_SOURCE_ID),

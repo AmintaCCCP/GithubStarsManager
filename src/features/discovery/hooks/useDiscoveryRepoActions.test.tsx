@@ -236,8 +236,8 @@ describe('useDiscoveryRepoActions.star', () => {
     mocks.starRepository.mockImplementation(() => new Promise((_resolve, reject) => {
       rejectStar = reject;
     }));
-    const { result } = renderHook(() => useDiscoveryRepoActions({ repo }));
     storeState.repositories = [{ id: 1, full_name: 'other/repo' }];
+    const { result } = renderHook(() => useDiscoveryRepoActions({ repo }));
 
     let pending!: Promise<void>;
     act(() => {
