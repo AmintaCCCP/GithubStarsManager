@@ -847,13 +847,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
                   e.stopPropagation();
-                  setShowDragHint(true);
-                  if (dragHintTimeoutRef.current) {
-                    clearTimeout(dragHintTimeoutRef.current);
-                  }
-                  dragHintTimeoutRef.current = setTimeout(() => {
-                    setShowDragHint(false);
-                  }, 2000);
+                  // 键盘等价的分类操作：打开编辑弹窗完成分类，
+                  // 而不是仅显示拖拽提示气泡（拖拽本身无键盘等价物）。
+                  setEditModalOpen(true);
                 }
               }}
               onTouchStart={handleTouchStart}
@@ -861,7 +857,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onTouchEnd={handleTouchEnd}
               tabIndex={0}
               role="button"
-              aria-label={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
+              aria-label={language === 'zh' ? '编辑仓库分类' : 'Edit repository category'}
               className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing touch-manipulation"
               title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
             >
