@@ -747,7 +747,7 @@ export const SearchBar: React.FC = () => {
           <Button
             onClick={handleAISearch}
             variant="default"
-            aria-label={isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}
+            aria-label={isSearching ? t('AI搜索中…', 'AI Searching…') : t('AI搜索', 'AI Search')}
             disabled={isSearching || !searchQuery.trim()}
             className="flex shrink-0 items-center sm:px-4"
             title={activeAIConfig
@@ -755,7 +755,7 @@ export const SearchBar: React.FC = () => {
               : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
           >
             <Bot className="w-4 h-4" />
-            <span className="hidden sm:inline">{isSearching ? t('AI搜索中...', 'AI Searching...') : t('AI搜索', 'AI Search')}</span>
+            <span className="hidden sm:inline">{isSearching ? t('AI搜索中…', 'AI Searching…') : t('AI搜索', 'AI Search')}</span>
           </Button>
           {isSearching && searchPhase && (
             <span className="max-w-[12rem] truncate text-xs text-muted-foreground dark:text-muted-foreground animate-pulse whitespace-nowrap">

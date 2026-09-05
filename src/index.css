@@ -629,6 +629,10 @@ body {
 
   font-feature-settings: normal;
   letter-spacing: normal;
+  /* Root-level smoothing: on macOS text otherwise renders heavier than the
+     design intends. Set once here, never per component. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,

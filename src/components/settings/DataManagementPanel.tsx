@@ -1659,7 +1659,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               {isExporting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t('导出中...', 'Exporting...')}</span>
+                  <span>{t('导出中…', 'Exporting…')}</span>
                 </>
               ) : (
                 <>
@@ -1950,7 +1950,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 {isDeleting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{t('删除中...', 'Deleting...')}</span>
+                    <span>{t('删除中…', 'Deleting…')}</span>
                   </>
                 ) : (
                   <>
@@ -2061,7 +2061,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   {isImporting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{t('导入中...', 'Importing...')}</span>
+                      <span>{t('导入中…', 'Importing…')}</span>
                     </>
                   ) : (
                     <span>{t('合并导入', 'Merge Import')}</span>
@@ -2078,7 +2078,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   {isImporting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{t('导入中...', 'Importing...')}</span>
+                      <span>{t('导入中…', 'Importing…')}</span>
                     </>
                   ) : (
                     <span>{t('覆盖导入', 'Replace Import')}</span>

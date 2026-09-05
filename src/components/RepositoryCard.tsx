@@ -48,7 +48,7 @@ const ReadmeModalLoadingFallback: React.FC<{
       <DialogTitle className="sr-only">Loading README</DialogTitle>
       <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-        <p className="text-muted-foreground">Loading README...</p>
+        <p className="text-muted-foreground">Loading README…</p>
       </div>
     </DialogContent>
   </Dialog>
@@ -72,7 +72,7 @@ const ReleaseSheetLoadingFallback: React.FC<{
       <DialogTitle className="sr-only">Loading releases</DialogTitle>
       <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-        <p className="text-muted-foreground">Loading releases...</p>
+        <p className="text-muted-foreground">Loading releases…</p>
       </div>
     </DialogContent>
   </Dialog>
@@ -1054,8 +1054,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <p
               tabIndex={0}
               className={viewMode === 'list'
-                ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
-                : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
+                ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground'
+                : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
             >
               {highlightSearchTerm(displayContent.content, searchQuery)}
             </p>

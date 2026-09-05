@@ -330,7 +330,7 @@ export const LoginScreen: React.FC = () => {
               {isLoading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  <span>{t('连接中...', 'Connecting...')}</span>
+                  <span>{t('连接中…', 'Connecting…')}</span>
                 </>
               ) : (
                 <>
@@ -341,7 +341,7 @@ export const LoginScreen: React.FC = () => {
                         ? t('连接并恢复数据', 'Connect and restore data')
                         : t('保存并继续', 'Save and continue')}
                   </span>
-                  <ArrowRight className="h-5 w-5" />
+                  <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </Button>
