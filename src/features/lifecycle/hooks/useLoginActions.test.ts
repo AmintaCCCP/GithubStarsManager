@@ -69,6 +69,15 @@ describe('useLoginActions', () => {
     expect(mocks.getCurrentUser).not.toHaveBeenCalled();
   });
 
+  it('reports an unusable stored token instead of a raw auth error', async () => {
+    mocks.getCurrentUser.mockRejectedValueOnce(new Error('GitHub token expired or invalid'));
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example')).resolves.toEqual({
+      status: 'restored-token-invalid',
+    });
+  });
+
   it('distinguishes unreachable and unauthorized backends', async () => {
     const { result } = renderHook(() => useLoginActions());
     mocks.backend.isAvailable = false;

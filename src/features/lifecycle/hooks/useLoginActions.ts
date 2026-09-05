@@ -9,6 +9,7 @@ export type BackendLoginResult =
   | { status: 'backend-unavailable' }
   | { status: 'unauthorized' }
   | { status: 'restore-failed' }
+  | { status: 'restored-token-invalid' }
   | { status: 'github-token-required' };
 
 export interface LoginActions {
@@ -44,8 +45,16 @@ export const useLoginActions = (): LoginActions => {
     if (!restored) return { status: 'restore-failed' };
     if (!restored.github_token) return { status: 'github-token-required' };
 
-    const user = await authenticateWithGitHub(restored.github_token);
-    return { status: 'connected', githubToken: restored.github_token, user };
+    try {
+      const user = await authenticateWithGitHub(restored.github_token);
+      return { status: 'connected', githubToken: restored.github_token, user };
+    } catch {
+      // Backend auth already succeeded, so the stored GitHub token is what
+      // failed (expired, revoked, or unreachable GitHub). Route the user to
+      // the token setup step instead of a dead end; saving a new token there
+      // overwrites the broken one on the backend.
+      return { status: 'restored-token-invalid' };
+    }
   }, [authenticateWithGitHub]);
   const setupBackendGitHubToken = useCallback(async (token: string) => {
     const user = await authenticateWithGitHub(token);

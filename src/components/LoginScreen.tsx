@@ -4,6 +4,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
 import { safeReadText } from '../utils/clipboardUtils';
+import { normalizeBackendUrl } from '../utils/backendUrl';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Input } from './ui/input';
@@ -14,6 +15,7 @@ export const LoginScreen: React.FC = () => {
   const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend } = useLoginActions();
   const [loginMode, setLoginMode] = useState<'github' | 'backend'>('github');
   const [backendStep, setBackendStep] = useState<'credentials' | 'githubToken'>('credentials');
+  const [tokenSetupReason, setTokenSetupReason] = useState<'missing' | 'invalid'>('missing');
   const [token, setToken] = useState('');
   const [backendUrl, setBackendUrl] = useState(() => configuredBackendUrl?.replace(/\/api$/, '') || window.location.origin);
   const [backendApiKey, setBackendApiKey] = useState('');
@@ -37,6 +39,7 @@ export const LoginScreen: React.FC = () => {
   const switchLoginMode = (mode: 'github' | 'backend') => {
     setLoginMode(mode);
     setBackendStep('credentials');
+    setTokenSetupReason('missing');
     setError('');
   };
 
@@ -84,6 +87,13 @@ export const LoginScreen: React.FC = () => {
       setError(t('请输入后端 URL 和 API Key', 'Please enter the backend URL and API key'));
       return;
     }
+    if (!normalizeBackendUrl(url)) {
+      setError(t(
+        '后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP',
+        'Invalid backend URL: remote backends must use HTTPS; only localhost may use HTTP'
+      ));
+      return;
+    }
 
     setIsLoading(true);
     setError('');
@@ -101,7 +111,13 @@ export const LoginScreen: React.FC = () => {
       if (result.status === 'restore-failed') {
         throw new Error(t('读取后端登录数据失败', 'Failed to read login data from the backend'));
       }
+      if (result.status === 'restored-token-invalid') {
+        setTokenSetupReason('invalid');
+        setBackendStep('githubToken');
+        return;
+      }
       if (result.status === 'github-token-required') {
+        setTokenSetupReason('missing');
         setBackendStep('githubToken');
         return;
       }
@@ -151,14 +167,20 @@ export const LoginScreen: React.FC = () => {
     }
 
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && !isLoading) {
+      // e.currentTarget is only valid during dispatch; capture the id before
+      // awaiting the clipboard so the paste lands in the focused field.
+      const inputId = e.currentTarget.id;
       const result = await safeReadText();
       if (result.success && result.text) {
-        if (loginMode === 'github') {
-          setToken(result.text.trim());
-        } else if (backendStep === 'githubToken') {
-          setBackendGithubToken(result.text.trim());
-        } else {
-          setBackendApiKey(result.text.trim());
+        const text = result.text.trim();
+        if (inputId === 'backend-url') {
+          setBackendUrl(text);
+        } else if (inputId === 'backend-api-key') {
+          setBackendApiKey(text);
+        } else if (inputId === 'backend-github-token') {
+          setBackendGithubToken(text);
+        } else if (inputId === 'github-token') {
+          setToken(text);
         }
         setError('');
       } else {
@@ -215,7 +237,9 @@ export const LoginScreen: React.FC = () => {
                 ? t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')
                 : backendStep === 'credentials'
                   ? t('输入后端地址和 API Key 恢复账号与数据', 'Enter the backend URL and API key to restore your account and data')
-                  : t('后端尚未配置 Token，请完成首次设置', 'No token is configured on this backend. Complete the initial setup')}
+                  : tokenSetupReason === 'invalid'
+                    ? t('后端保存的 GitHub Token 无法使用，请重新配置', 'The GitHub token stored on the backend is not working. Please set it up again')
+                    : t('后端尚未配置 Token，请完成首次设置', 'No token is configured on this backend. Complete the initial setup')}
             </p>
           </div>
 

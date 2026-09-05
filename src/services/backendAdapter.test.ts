@@ -68,3 +68,49 @@ describe('backendAdapter 429 Retry-After 解析', () => {
     expect(err.retryAfterMs).toBeUndefined();
   });
 });
+
+function makeHealthOkResponse(): Response {
+  return {
+    ok: true,
+    json: async () => ({ status: 'ok' }),
+  } as unknown as Response;
+}
+
+describe('backendAdapter 后端 URL 安全策略', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+  const STORAGE_KEY = 'github-stars-manager-backend-url';
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+    localStorage.removeItem(STORAGE_KEY);
+  });
+
+  it('拒绝远程 HTTP 后端：不发起探测请求，也不写入本地存储', async () => {
+    await backend.init('http://backend.example.com');
+
+    expect(window.fetch).not.toHaveBeenCalled();
+    expect(backend.isAvailable).toBe(false);
+    expect(backend.configuredUrl).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('放行 HTTPS 后端并记住规范化地址', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
+
+    await backend.init('https://backend.example.com');
+
+    expect(window.fetch).toHaveBeenCalledWith('https://backend.example.com/api/health', expect.anything());
+    expect(backend.isAvailable).toBe(true);
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('https://backend.example.com/api');
+  });
+
+  it('loopback HTTP 后端仍可用于本地开发', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
+
+    await backend.init('http://localhost:3000');
+
+    expect(window.fetch).toHaveBeenCalledWith('http://localhost:3000/api/health', expect.anything());
+    expect(backend.isAvailable).toBe(true);
+  });
+});

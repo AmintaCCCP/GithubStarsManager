@@ -1,4 +1,5 @@
 import { translateBackendError } from '../utils/backendErrors';
+import { normalizeBackendUrl } from '../utils/backendUrl';
 import { logger } from './logger';
 
 import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
@@ -16,19 +17,6 @@ interface GitHubTreeResponse {
 }
 
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
-
-const normalizeBackendUrl = (value: string): string | null => {
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    url.search = '';
-    url.hash = '';
-    const normalized = url.toString().replace(/\/$/, '');
-    return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
-  } catch {
-    return null;
-  }
-};
 
 const readStoredBackendUrl = (): string | null => {
   try {
