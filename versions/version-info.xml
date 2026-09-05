@@ -591,4 +591,25 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.7.9</downloadUrl>
   </version>
+  <version>
+    <number>0.8.0</number>
+    <releaseDate>2026-09-06</releaseDate>
+    <changelog>
+      <item>feat: Rebuilt the no-vector AI search fallback as a three-stage lexical recall + LLM selection chain (query expansion with intent restatement, local weighted lexical recall of ~100 candidates, then LLM selection of genuinely relevant repositories), with fault-tolerant result parsing (real repository IDs first, row-number fallback), preserved AI relevance ordering, honest empty results, and a lexical top-100 fallback; measured P@5 improved from 0.21 to 0.67 on a real 951-repo library. (PR #331)</item>
+      <item>feat: Added MCP discovery tools: bounded read-only gsm_get_repos batch lookup, deterministic local gsm_get_repo_evidence (local database and release cache only, no GitHub fan-out), gsm_find_similar_repos via the vector query path, and metadata filters on gsm_vector_search; backend and Electron tool contracts stay aligned (10 tools with vector search enabled, 8 without). (PR #330)</item>
+      <item>fix: MCP gsm_status now reports the real application version from synchronized package metadata instead of a hard-coded 0.7.0, lists available and conditional tools, and gsm_get_repo_evidence exposes evidence freshness metadata; the release version script now synchronizes server package metadata with journal/backup rollback and interrupted-run recovery. (PR #333)</item>
+      <item>feat: Added an "Already have backend data" login path that restores the GitHub token and synchronized data from an existing backend using a backend URL and API Key, with guided token setup, remembered and normalized backend URLs, HTTPS-only remote address enforcement, and distinct backend vs GitHub token error handling. (PR #327)</item>
+      <item>feat: Added a Network Request Routing option (auto / backend / browser) under Settings &gt; Backend, letting GitHub data-plane requests egress from the current device when the self-hosted backend cannot reach GitHub; aria2 download routing is unchanged and the setting stays local per device. (PR #323)</item>
+      <item>fix: GitHub Lists now follow the app language: new lists are created with translated category names, and matched existing lists are auto-renamed best-effort on language switch without blocking sync. (PR #332)</item>
+      <item>fix: RPC (aria2) downloads can be retried after a successful send with per-asset-version success checkmarks, empty release changelogs are backfilled on refresh via body/name/tag change detection, and release card time and action columns stay aligned. (PR #324)</item>
+      <item>fix: The "Assets updated" badge no longer squeezes the timestamp into wrapping; the metadata column expands leftward and timestamps stay on one line. (PR #329)</item>
+      <item>fix: Accessibility and visual polish: prefers-reduced-motion support, placeholder contrast raised to 4.76:1 light / 8.2:1 dark, Chinese relative dates in the Chinese UI, copyable card text, keyboard navigation for search suggestions, a Clear all filters empty-state exit, unified dialog elevation, a 12px minimum badge size, and localized confirm-dialog buttons. (PR #334)</item>
+      <item>fix: Upgraded dependencies to clear all 31 external security scan findings (axios 1.20.0 fixing 10 CVEs, morgan 1.12.0, express 4.22.2, plus qs/fast-uri/ip-address/hono/form-data/decode-uri-component overrides); self-hosted users should redeploy updated images. (PR #328)</item>
+      <item>refactor: Completed the frontend layering migration (ADR 0001): the last 10 components were moved into action hooks and the component allowlist mechanism was deleted, with no behavior changes. (PR #326)</item>
+      <item>refactor: Banned update/translate services in view components and migrated six components into five new action hooks. (PR #325)</item>
+      <item>ci: Upgraded all Docker publishing workflows to Node 24-based official Docker actions, eliminating Node 20 deprecation warnings, and unified release asset platform badges between the Release page and the repository release sheet. (PR #315)</item>
+      <item>ci: Fixed the frontend Docker build failure caused by the prebuild version-sync hook running inside a build context that excludes the server directory. (PR #335)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.0</downloadUrl>
+  </version>
 </versions>
