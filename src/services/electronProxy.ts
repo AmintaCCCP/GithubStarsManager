@@ -4,6 +4,7 @@ import type {
   Category,
   EmbeddingConfig,
   McpServiceConfig,
+  Release,
 } from '../types';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
@@ -25,6 +26,7 @@ export interface McpVectorRuntimeConfig {
 export interface McpDataSnapshot {
   repositories: Repository[];
   customCategories: Category[];
+  releases: Release[];
   vectorSearchConfig: McpVectorRuntimeConfig;
   snapshotAt: string;
 }
