@@ -117,6 +117,11 @@ export function isAIStreamUnsupportedError(error: unknown): boolean {
   return error instanceof AIStreamUnsupportedError;
 }
 
+/** 判断错误是否为请求取消（AbortError）。取消不是失败：调用方应停止流程而非兜底。 */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 /** 当前 AI 配置/端点不支持模型原生工具调用（function calling）。调用方应降级到编排式循环。 */
 export class AIToolCallUnsupportedError extends Error {
   constructor(message = 'Tool calling is not supported on this AI configuration') {
@@ -2160,7 +2165,7 @@ ${repoInfo}
       return ranked;
     } catch (error) {
       // 用户主动取消：不产出兜底结果，向上传播交由调用方处理
-      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
+      if (signal?.aborted || isAbortError(error)) throw error;
       onFallback?.('ai_failed');
       logger.warn('ai', 'AI selection failed, falling back to lexical ranking', {
         apiType: this.getApiType(),

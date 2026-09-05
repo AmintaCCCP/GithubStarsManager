@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'r
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
-import { AIService } from '../../../services/aiService';
+import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { GitHubApiService } from '../../../services/githubApi';
 import { createGitHubListsApiService } from '../../../services/githubApiFactory';
@@ -270,6 +270,8 @@ export const useSearchActions = (): SearchActions => {
         filtered = aiResults;
         aiOrdered = true;
       } catch (error) {
+        // 取消不是失败：向上传播交给 aiSearch 静默结束，不产出兜底结果
+        if (isAbortError(error)) throw error;
         console.warn('❌ AI search failed, falling back to basic search:', error);
         toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
         filtered = performBasicTextSearch(repositories, query);
@@ -428,6 +430,11 @@ export const useSearchActions = (): SearchActions => {
 
       await keywordSearch(query, applyFilters);
     } catch (error) {
+      // 取消不是失败：静默结束当前搜索（finally 会复位搜索状态），不产出结果
+      if (isAbortError(error)) {
+        console.log('🚫 AI search cancelled');
+        return;
+      }
       console.error('💥 Search failed:', error);
     } finally {
       setIsSearching(false);

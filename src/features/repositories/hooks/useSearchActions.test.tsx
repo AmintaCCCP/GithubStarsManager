@@ -50,6 +50,7 @@ vi.mock('../../../services/aiService', () => ({
     searchRepositoriesWithSemanticReranking = mocks.searchRepositoriesWithSemanticReranking;
     searchRepositoriesWithSelection = mocks.searchRepositoriesWithSelection;
   },
+  isAbortError: (error: unknown) => error instanceof Error && error.name === 'AbortError',
 }));
 
 vi.mock('../../../services/githubApi', () => ({
@@ -508,6 +509,36 @@ describe('useSearchActions.keywordSearch', () => {
 
     expect(mocks.toast).toHaveBeenCalledWith('AI 请求失败，已回退本地词法搜索', 'warning');
     expect(storeState.setSearchResults).toHaveBeenCalledWith([storeState.repositories[0]]);
+  });
+
+  it('stops quietly without fallback results when the search is cancelled', async () => {
+    storeState.vectorSearchConfig = {
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+      indexMode: 'description',
+      readmeMaxChars: 6000,
+      enableHyDE: false,
+    };
+    storeState.repositories = [
+      baseRepo({ id: 1, full_name: 'owner/foo-repo' }),
+      baseRepo({ id: 2, full_name: 'owner/bar-repo' }),
+    ];
+    mocks.embed.mockResolvedValue([[0.1]]);
+    mocks.vectorQuery.mockResolvedValue([]);
+    // service 按契约把 AbortError 向上重抛：取消不是失败，hook 不做基础文本兜底
+    mocks.searchRepositoriesWithSelection.mockRejectedValue(
+      Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }),
+    );
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+
+    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(storeState.setSearchFilters).not.toHaveBeenCalled();
+    expect(result.current.isSearching).toBe(false);
   });
 
   it('uses basic text search directly when no AI config exists', async () => {
