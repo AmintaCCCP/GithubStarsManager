@@ -116,8 +116,9 @@ function searchRepositories(repos, filters = {}) {
   if (filters.query?.trim()) result = performBasicTextSearch(result, filters.query);
   result = applyRepoFilters(result, filters);
   const total = result.length;
-  const offset = Math.max(0, filters.offset || 0);
-  const limit = Math.min(100, Math.max(1, filters.limit || 20));
+  // 与后端 searchRepositories 相同的 ?? 语义：offset/limit 为 0 时按 0 处理而非回退默认值
+  const offset = Math.max(0, filters.offset ?? 0);
+  const limit = Math.min(100, Math.max(1, filters.limit ?? 20));
   return { items: result.slice(offset, offset + limit), total, offset, limit };
 }
 
