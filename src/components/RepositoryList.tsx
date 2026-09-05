@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { Bot, ChevronDown, LayoutGrid, List, Pause, Play, X } from 'lucide-react';
+import { Bot, ChevronDown, LayoutGrid, List, Pause, Play, SearchX, X } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -478,42 +478,46 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   if (filteredRepositories.length === 0) {
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     const categoryName = selectedCategoryObj?.name || selectedCategory;
-    
+
     return (
       <>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground dark:text-muted-foreground mb-4">
-          {searchFilters.query ? (
-            language === 'zh' 
-              ? `未找到与"${searchFilters.query}"相关的仓库。`
-              : `No repositories found for "${searchFilters.query}".`
-          ) : selectedCategory === 'all' 
-            ? (language === 'zh' ? '未找到仓库。点击同步加载您的星标仓库。' : 'No repositories found. Click sync to load your starred repositories.')
-            : (language === 'zh' 
-                ? `在"${categoryName}"分类中未找到仓库。`
-                : `No repositories found in "${categoryName}" category.`
+        <div className="ui-empty-state flex flex-col items-center px-6 py-14 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <SearchX className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <p className="font-medium text-foreground">
+          {searchFilters?.query ? (
+            language === 'zh'
+              ? `未找到与"${searchFilters.query}"相关的仓库`
+              : `No repositories found for "${searchFilters.query}"`
+          ) : selectedCategory === 'all'
+            ? (language === 'zh' ? '未找到仓库' : 'No repositories found')
+            : (language === 'zh'
+                ? `在"${categoryName}"分类中未找到仓库`
+                : `No repositories found in "${categoryName}"`
               )
           }
         </p>
-        {searchFilters.query && (
-          <div className="text-sm text-muted-foreground dark:text-muted-foreground">
-            <p className="mb-2">
-              {language === 'zh' ? '搜索建议：' : 'Search suggestions:'}
-            </p>
-            <ul className="space-y-1">
-              <li>• {language === 'zh' ? '尝试使用不同的关键词' : 'Try different keywords'}</li>
-              <li>• {language === 'zh' ? '使用AI搜索进行语义匹配' : 'Use AI search for semantic matching'}</li>
-              <li>• {language === 'zh' ? '检查拼写或尝试英文/中文关键词' : 'Check spelling or try English/Chinese keywords'}</li>
-            </ul>
-          </div>
-          )}
+        <p className="mt-1.5 max-w-md text-sm text-muted-foreground dark:text-muted-foreground">
+          {searchFilters?.query ? (
+            language === 'zh'
+              ? '尝试使用不同的关键词、使用AI搜索进行语义匹配，或检查拼写。'
+              : 'Try different keywords, use AI search for semantic matching, or check spelling.'
+          ) : selectedCategory === 'all'
+            ? (language === 'zh' ? '点击同步加载您的星标仓库。' : 'Click sync to load your starred repositories.')
+            : (language === 'zh'
+                ? '切换到其他分类，或使用同步加载更多仓库。'
+                : 'Switch to another category, or sync to load more repositories.'
+              )
+          }
+        </p>
         {hasActiveNonQueryFilters && (
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={clearAllFilters}
-            className="mt-4"
+            className="mt-5"
           >
             <X className="w-4 h-4" />
             {language === 'zh' ? '清除全部筛选' : 'Clear all filters'}
