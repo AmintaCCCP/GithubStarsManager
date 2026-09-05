@@ -26,8 +26,8 @@ docker-compose up -d
 
 Available image tags (all role-specific images share the same tagging scheme):
 - `latest` — latest build from the `main` branch
-- `v0.7.8` — the exact release tag; it must match the root `package.json` client version
-- `0.7.8`, `0.7`, `0` — convenience semver tags derived from the same `v0.7.8` release
+- `v0.8.0` — the exact release tag; it must match the root `package.json` client version
+- `0.8.0`, `0.8`, `0` — convenience semver tags derived from the same `v0.8.0` release
 - `sha-abc1234` — specific commit builds
 
 The root `package.json` is the single version source for desktop clients and Docker releases. A release workflow rejects a Git tag unless it is exactly `v` plus that file's `version`, so matching release image tags and client versions are published together.
@@ -61,8 +61,8 @@ curl http://localhost:8080/api/health
 You can also run the full-stack image directly. The data volume stores SQLite data and an automatically generated encryption key, so keep the `-v` option when upgrading or recreating the container. A direct `docker run` does not load Compose's `.env` file; export `IMAGE_TAG` (or replace it inline) to pin the image version.
 
 ```bash
-# Set this to 0.7.8 for a version-pinned deployment, or latest for main.
-export IMAGE_TAG=0.7.8
+# Set this to 0.8.0 for a version-pinned deployment, or latest for main.
+export IMAGE_TAG=0.8.0
 
 docker run -d \
   --name github-stars-manager-fullstack \
@@ -78,7 +78,7 @@ For Compose deployments, add `IMAGE_TAG` to the same `.env` file to pin a full-s
 
 ```bash
 API_SECRET=replace-with-a-long-random-secret
-IMAGE_TAG=0.7.8
+IMAGE_TAG=0.8.0
 # Set this only when preserving an existing environment-provided key.
 # ENCRYPTION_KEY=the-exact-existing-key
 ```
@@ -132,8 +132,8 @@ To pin specific versions in `docker-compose.yml`, set `BACKEND_IMAGE_TAG` and/or
 `FRONTEND_IMAGE_TAG` in your `.env` file:
 
 ```bash
-BACKEND_IMAGE_TAG=0.7.8
-FRONTEND_IMAGE_TAG=0.7.8
+BACKEND_IMAGE_TAG=0.8.0
+FRONTEND_IMAGE_TAG=0.8.0
 ```
 
 ## Backend Server (docker run)
@@ -190,8 +190,8 @@ To customize secrets and image versions, create a `.env` file in the project roo
 ```bash
 API_SECRET=my-strong-secret
 ENCRYPTION_KEY=my-encryption-key
-BACKEND_IMAGE_TAG=0.7.8    # pin backend image version (default: latest)
-FRONTEND_IMAGE_TAG=0.7.8   # pin frontend image version (default: latest)
+BACKEND_IMAGE_TAG=0.8.0    # pin backend image version (default: latest)
+FRONTEND_IMAGE_TAG=0.8.0   # pin frontend image version (default: latest)
 # BACKEND_HOST=backend:3000 # target for the frontend's /api proxy (default: backend:3000)
 ```
 

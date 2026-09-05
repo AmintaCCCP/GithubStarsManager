@@ -525,8 +525,8 @@ docker-compose up -d
 ```bash
 API_SECRET=your-secret
 ENCRYPTION_KEY=your-key
-BACKEND_IMAGE_TAG=0.7.9   # 固定后端版本（默认：latest）
-FRONTEND_IMAGE_TAG=0.7.9  # 固定前端版本（默认：latest）
+BACKEND_IMAGE_TAG=0.8.0   # 固定后端版本（默认：latest）
+FRONTEND_IMAGE_TAG=0.8.0  # 固定前端版本（默认：latest）
 ```
 
 #### 仅后端（docker run）
