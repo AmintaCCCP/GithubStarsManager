@@ -42,7 +42,7 @@ export function registerMcpTools(server: McpServer): void {
         },
         toolsNote: vector.available
           ? 'gsm_vector_search is available'
-          : 'gsm_vector_search is not listed until vector search is configured and enabled',
+          : 'gsm_find_similar_repos and gsm_vector_search are not listed until vector search is configured and enabled',
       });
     }
   );
