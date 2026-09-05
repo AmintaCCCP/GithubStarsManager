@@ -168,6 +168,16 @@ function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    // Suppress every color transition for one frame so the theme flip snaps
+    // instead of smearing across the whole shell (better-ui recipe).
+    const style = document.createElement('style');
+    style.textContent = '*,*::before,*::after{transition:none !important}';
+    document.head.appendChild(style);
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => style.remove()));
+    return () => {
+      cancelAnimationFrame(raf);
+      style.remove();
+    };
   }, [theme]);
 
   // Theme preset (palette/radius/font/shadow skin) rides on data-theme.

@@ -1,6 +1,6 @@
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock } from 'lucide-react';
+import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp } from 'lucide-react';
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -173,6 +173,7 @@ export const SearchBar: React.FC = () => {
   const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
   const filterChipBaseClass = 'linear-filter-chip flex items-center space-x-2 px-3 py-1.5 text-sm';
   const filterChipActiveClass = 'is-active font-medium';
   const filterChipInactiveClass = '';
@@ -418,7 +419,13 @@ export const SearchBar: React.FC = () => {
     }
   };
 
-  const handleInputBlur = () => {
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Keyboard focus moving into the dropdown (relatedTarget) keeps it open;
+    // only a genuine blur to elsewhere schedules the delayed hide that lets
+    // pointer clicks on items land.
+    if (e.relatedTarget instanceof Node && searchDropdownRef.current?.contains(e.relatedTarget)) {
+      return;
+    }
     // Delay hiding to allow clicking on history/suggestion items
     setTimeout(() => {
       setShowSearchHistory(false);
@@ -452,8 +459,55 @@ export const SearchBar: React.FC = () => {
 
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const dropdownOpen = showSearchHistory || showSuggestions;
+
+    // Escape first dismisses the open dropdown without firing the global
+    // "clear search" shortcut; a second Escape (dropdown closed) clears the query.
+    if (e.key === 'Escape' && dropdownOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowSearchHistory(false);
+      setShowSuggestions(false);
+      return;
+    }
+
+    // Arrow keys move focus into and across the option buttons (roving focus).
+    if (dropdownOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      focusSearchOption(e.key === 'ArrowDown' ? 0 : -1);
+    }
+
     if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       handleAISearch();
+    }
+  };
+
+  // 焦点漫游：ArrowDown/ArrowUp 在搜索历史/建议项之间移动。index 为负时从
+  // 末尾开始计数，-1 即最后一项，使输入框内按 ArrowUp 直达最后一项。
+  const focusSearchOption = (index: number) => {
+    const options = searchDropdownRef.current?.querySelectorAll<HTMLButtonElement>('button[data-search-option]');
+    if (!options || options.length === 0) return;
+    const resolved = index < 0 ? options.length + index : index;
+    options[Math.min(resolved, options.length - 1)]?.focus();
+  };
+
+  const handleSearchOptionKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      const options = searchDropdownRef.current?.querySelectorAll<HTMLButtonElement>('button[data-search-option]');
+      if (!options || options.length === 0) return;
+      const delta = e.key === 'ArrowDown' ? 1 : -1;
+      const next = (index + delta + options.length) % options.length;
+      options[next]?.focus();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowSearchHistory(false);
+      setShowSuggestions(false);
+      searchInputRef.current?.focus();
     }
   };
 
@@ -586,6 +640,8 @@ export const SearchBar: React.FC = () => {
           ref={searchInputRef}
           type="text"
           aria-label={t('搜索仓库', 'Search repositories')}
+          aria-expanded={showSearchHistory || showSuggestions}
+          aria-controls={showSearchHistory ? 'search-history-dropdown' : showSuggestions ? 'search-suggestions-dropdown' : undefined}
           placeholder={t(
             "输入关键词实时搜索，或使用AI搜索进行语义理解",
             "Type keywords for real-time search, or use AI search for semantic understanding"
@@ -602,7 +658,11 @@ export const SearchBar: React.FC = () => {
 
         {/* Search History Dropdown */}
         {showSearchHistory && searchHistory.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
+          <div
+            id="search-history-dropdown"
+            ref={searchDropdownRef}
+            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+          >
             <div className="p-2 border-b border-border/60 dark:border-border/60 flex items-center justify-between">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索历史', 'Search History')}
@@ -621,7 +681,9 @@ export const SearchBar: React.FC = () => {
                 type="button"
                 variant="ghost"
                 key={index}
+                data-search-option
                 onClick={() => handleHistoryItemClick(historyQuery)}
+                onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
                 className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
               >
                 <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
@@ -633,7 +695,11 @@ export const SearchBar: React.FC = () => {
 
         {/* Search Suggestions Dropdown */}
         {showSuggestions && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md">
+          <div
+            id="search-suggestions-dropdown"
+            ref={searchDropdownRef}
+            className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-md"
+          >
             <div className="p-2 border-b border-border/60 dark:border-border/60">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
                 {t('搜索建议', 'Search Suggestions')}
@@ -641,7 +707,7 @@ export const SearchBar: React.FC = () => {
             </div>
             {searchSuggestions
               .filter(suggestion =>
-                suggestion.toLowerCase().includes(searchQuery.toLowerCase()) && 
+                suggestion.toLowerCase().includes(searchQuery.toLowerCase()) &&
                 suggestion.toLowerCase() !== searchQuery.toLowerCase()
               )
               .slice(0, 5)
@@ -650,7 +716,9 @@ export const SearchBar: React.FC = () => {
                   type="button"
                   variant="ghost"
                   key={index}
+                  data-search-option
                   onClick={() => handleSuggestionClick(suggestion)}
+                  onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
                   className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
                 >
                   <div className="w-4 h-4 flex items-center justify-center">
@@ -796,7 +864,7 @@ export const SearchBar: React.FC = () => {
             aria-label={searchFilters.sortOrder === 'desc' ? t('按降序排列', 'Sort descending') : t('按升序排列', 'Sort ascending')}
             className="ui-button px-3 py-2 text-sm"
           >
-            {searchFilters.sortOrder === 'desc' ? '↓' : '↑'}
+            {searchFilters.sortOrder === 'desc' ? <ArrowDown className="w-4 h-4" aria-hidden="true" /> : <ArrowUp className="w-4 h-4" aria-hidden="true" />}
           </Button>
 
           {/* Sync Button */}

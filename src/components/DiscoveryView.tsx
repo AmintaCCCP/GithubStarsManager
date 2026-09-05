@@ -684,7 +684,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         : currentChannel?.nameEn}
                     </h2>
                     {currentLastRefresh && (
-                      <p className="hidden sm:block text-[11px] text-muted-foreground dark:text-muted-foreground">
+                      <p className="hidden sm:block text-xs text-muted-foreground dark:text-muted-foreground">
                         {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
                       </p>
                     )}

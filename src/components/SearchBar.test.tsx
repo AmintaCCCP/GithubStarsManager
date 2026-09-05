@@ -154,7 +154,8 @@ describe('SearchBar', () => {
     expect(storeState.searchFilters.query).toBe('');
 
     rerender(<SearchBar />);
-    fireEvent.click(screen.getByText('↓'));
+    // 排序方向按钮已从文本字形换成图标，按可访问名称定位
+    fireEvent.click(screen.getByRole('button', { name: '按降序排列' }));
 
     expect(storeState.searchFilters).toMatchObject({
       query: '',

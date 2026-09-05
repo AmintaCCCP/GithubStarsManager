@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import ForkCard from './ForkCard';
 import { useForkTimelineActions } from '../features/forks/hooks/useForkTimelineActions';
 import { Modal } from './Modal';
@@ -157,7 +158,7 @@ export const ForkTimeline: React.FC = () => {
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
               </span>
             )}
 

@@ -616,7 +616,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   // Unified card styles with enhanced light mode optimization
   const sectionClass = "p-5 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-sm";
   const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder:text-muted-foreground/60 dark:placeholder:text-tertiary focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-all duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-border-strong text-[13px] leading-[1.625]";
+  const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-[color,background-color,border-color] duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-border-strong text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
   const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
@@ -686,7 +686,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <Edit3 className="w-4 h-4 text-primary dark:text-primary" />
             <span>{t('描述', 'Description')}</span>
             {customStatus.description && (
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 {t('自定义', 'Custom')}
               </span>
             )}
@@ -699,27 +699,27 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xs text-muted-foreground dark:text-muted-foreground">{t('当前来源:', 'Source:')}</span>
             {editIntent.description === 'keep-custom' && (formData.description || '').trim() !== '' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 <Edit3 className="w-3 h-3 mr-1" />
                 {t('自定义', 'Custom')}
               </span>
             ) : editIntent.description === 'keep-custom' && (formData.description || '').trim() === '' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 <AlertTriangle className="w-3 h-3 mr-1" />
                 {t('将回退', 'Will fallback')}
               </span>
             ) : editIntent.description === 'reset-to-ai' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 <Bot className="w-3 h-3 mr-1" />
                 {t('AI总结', 'AI Summary')}
               </span>
             ) : editIntent.description === 'reset-to-original' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 <FileText className="w-3 h-3 mr-1" />
                 {t('原始描述', 'Original')}
               </span>
             ) : editIntent.description === 'clear' ? (
-              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 <X className="w-3 h-3 mr-1" />
                 {t('已清空', 'Cleared')}
               </span>
@@ -866,7 +866,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Feature Tip - Enhanced */}
           <div className={`${infoBoxClass} bg-gradient-to-br from-accent/30 to-background/60 dark:from-transparent dark:to-transparent`}>
-            <p className="text-[11px] text-muted-foreground dark:text-muted-foreground flex items-start">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground flex items-start">
               <Info className="w-3.5 h-3.5 mr-2 mt-0.5 flex-shrink-0 text-muted-foreground dark:text-muted-foreground" />
               <span>
                 {t(
@@ -884,7 +884,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <FolderOpen className="w-4 h-4 text-success " />
             <span>{t('分类', 'Category')}</span>
             {customStatus.category && (
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 {t('自定义', 'Custom')}
               </span>
             )}
@@ -1056,7 +1056,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground " />
             <span>{t('标签', 'Tags')}</span>
             {customStatus.tags && (
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
+              <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-full">
                 {t('自定义', 'Custom')}
               </span>
             )}
