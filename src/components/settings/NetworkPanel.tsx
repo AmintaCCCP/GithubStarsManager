@@ -164,7 +164,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {testing ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('测试中...', 'Testing...')}</span>
+                    <span>{t('测试中…', 'Testing…')}</span>
                   </span>
                 ) : (
                   t('测试连接', 'Test Connection')
@@ -179,7 +179,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {saving ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('保存中...', 'Saving...')}</span>
+                    <span>{t('保存中…', 'Saving…')}</span>
                   </span>
                 ) : (
                   t('保存', 'Save')
@@ -319,7 +319,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {rpcTesting ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('测试中...', 'Testing...')}</span>
+                    <span>{t('测试中…', 'Testing…')}</span>
                   </span>
                 ) : (
                   t('测试连接', 'Test Connection')
@@ -334,7 +334,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {rpcSaving ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('保存中...', 'Saving...')}</span>
+                    <span>{t('保存中…', 'Saving…')}</span>
                   </span>
                 ) : (
                   t('保存', 'Save')

@@ -424,7 +424,7 @@ export const ReleaseTimeline: React.FC = () => {
     }
 
     if (activePage - delta > 2) {
-      rangeWithDots.push(1, '...');
+      rangeWithDots.push(1, '…');
     } else {
       rangeWithDots.push(1);
     }
@@ -432,7 +432,7 @@ export const ReleaseTimeline: React.FC = () => {
     rangeWithDots.push(...range);
 
     if (activePage + delta < totalPages - 1) {
-      rangeWithDots.push('...', totalPages);
+      rangeWithDots.push('…', totalPages);
     } else if (totalPages > 1) {
       rangeWithDots.push(totalPages);
     }
@@ -494,7 +494,7 @@ export const ReleaseTimeline: React.FC = () => {
       result = body.substring(0, cutPoint).trimEnd();
     }
 
-    return result + '...';
+    return result + '…';
   }, []);
 
   const releasesTruncatedBody = useMemo(() => {
@@ -552,7 +552,7 @@ export const ReleaseTimeline: React.FC = () => {
                  className="flex items-center space-x-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-                 <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新Release', 'Refresh Releases')}</span>
+                 <span>{releaseIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新Release', 'Refresh Releases')}</span>
                </Button>
                <Button
                  onClick={() => setIsReleaseSourceSettingsOpen(true)}
@@ -660,7 +660,7 @@ export const ReleaseTimeline: React.FC = () => {
               className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{releaseIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
+              <span>{releaseIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新', 'Refresh')}</span>
             </Button>
             <Button
               onClick={() => setIsReleaseSourceSettingsOpen(true)}
@@ -681,7 +681,7 @@ export const ReleaseTimeline: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
             <Input
               type="text"
-              placeholder={t('搜索Release...', 'Search releases...')}
+              placeholder={t('搜索Release…', 'Search releases…')}
               value={searchQuery}
               onChange={(e) => {
                 setReleaseSearchQuery(e.target.value);
@@ -959,7 +959,7 @@ export const ReleaseTimeline: React.FC = () => {
                             <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap">
                               {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
                               {latestAssetsUpdated && (
-                                <span className="text-[10px] px-1 py-px rounded bg-primary/10 text-primary font-medium">
+                                <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium">
                                   {t('资产已更新', 'Assets updated')}
                                 </span>
                               )}

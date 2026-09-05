@@ -258,14 +258,14 @@ export const useSearchActions = (): SearchActions => {
     if (activeConfig) {
       try {
         // 无向量降级链：查询扩展+意图复述 → 词法候选召回 → LLM 精选排序
-        setSearchPhase(t('AI 语义分析...', 'AI semantic analysis...'));
+        setSearchPhase(t('AI 语义分析…', 'AI semantic analysis…'));
         const aiService = new AIService(activeConfig, language);
         const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
           signal: options?.signal,
           onPhase: (phase) => {
             setSearchPhase(phase === 'selecting'
-              ? t('AI 精选相关仓库...', 'AI selecting relevant repositories...')
-              : t('AI 语义分析...', 'AI semantic analysis...'));
+              ? t('AI 精选相关仓库…', 'AI selecting relevant repositories…')
+              : t('AI 语义分析…', 'AI semantic analysis…'));
           },
           onFallback: (reason) => {
             // 端点抖动/配置问题时用户看到的不能只是"空结果"：明确告知已降级
@@ -347,7 +347,7 @@ export const useSearchActions = (): SearchActions => {
             const hydeAbort = new AbortController();
             let hydeTimer: ReturnType<typeof setTimeout> | null = null;
             try {
-              setSearchPhase(t('AI 分析查询...', 'AI analyzing query...'));
+              setSearchPhase(t('AI 分析查询…', 'AI analyzing query…'));
               const hydeService = new AIService(hydeConfig, language);
               embeddingQuery = await Promise.race([
                 hydeService.generateHyDEQuery(query, hydeAbort.signal).catch(() => query),
@@ -370,11 +370,11 @@ export const useSearchActions = (): SearchActions => {
           }
 
           // 2. 前端调用 Embedding API 生成查询向量
-          setSearchPhase(t('生成查询向量...', 'Generating query vector...'));
+          setSearchPhase(t('生成查询向量…', 'Generating query vector…'));
           const queryVectors = await embeddingClient.embed([embeddingQuery], 'query');
           if (queryVectors && queryVectors.length > 0) {
             // 2. 前端将查询向量发送到 Worker
-            setSearchPhase(t('检索向量库...', 'Searching vector index...'));
+            setSearchPhase(t('检索向量库…', 'Searching vector index…'));
             const vectorResults = await vectorService.query(queryVectors[0], {
               topK: vsConfig.searchTopK ?? 30,
               threshold: vsConfig.searchThreshold ?? 0.35,
@@ -401,7 +401,7 @@ export const useSearchActions = (): SearchActions => {
                 const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
                 if (rerankConfig && vsConfig.enableReranking !== false) {
                   try {
-                    setSearchPhase(t('AI 语义重排序...', 'AI semantic reranking...'));
+                    setSearchPhase(t('AI 语义重排序…', 'AI semantic reranking…'));
                     const rerankService = new AIService(rerankConfig, language);
                     reranked = await rerankService.searchRepositoriesWithSemanticReranking(scoredRepos, query);
                     rerankSucceeded = true;

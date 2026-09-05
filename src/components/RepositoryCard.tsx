@@ -10,6 +10,7 @@ import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
@@ -47,7 +48,7 @@ const ReadmeModalLoadingFallback: React.FC<{
       <DialogTitle className="sr-only">Loading README</DialogTitle>
       <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-        <p className="text-muted-foreground">Loading README...</p>
+        <p className="text-muted-foreground">Loading README…</p>
       </div>
     </DialogContent>
   </Dialog>
@@ -71,7 +72,7 @@ const ReleaseSheetLoadingFallback: React.FC<{
       <DialogTitle className="sr-only">Loading releases</DialogTitle>
       <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-        <p className="text-muted-foreground">Loading releases...</p>
+        <p className="text-muted-foreground">Loading releases…</p>
       </div>
     </DialogContent>
   </Dialog>
@@ -664,8 +665,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 useMemo 缓存卡片类名，避免重复计算
   const cardClassName = useMemo(() => {
     const baseClasses = viewMode === 'list'
-      ? 'repository-card repository-card--list ui-card group relative px-6 pt-5 pb-0 transition-all duration-200 cursor-pointer select-none'
-      : 'repository-card ui-card group p-5 transition-all duration-200 flex flex-col h-full cursor-pointer select-none';
+      ? 'repository-card repository-card--list ui-card group relative px-6 pt-5 pb-0 transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer'
+      : 'repository-card ui-card group p-5 transition-[color,background-color,border-color,box-shadow] duration-200 flex flex-col h-full cursor-pointer';
     const selectedClasses = isSelected
       ? 'linear-card-selected'
       : '';
@@ -711,17 +712,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         {viewMode === 'list' && (
           <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
             {displayContent.isAnalysisFailed ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-destructive/10 text-destructive">
-                <Bot className="w-3 h-3" />
-                {language === 'zh' ? '分析失败' : 'Analysis failed'}
-              </span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                  <Bot className="w-3 h-3" />
+                  {language === 'zh' ? '分析失败' : 'Analysis failed'}
+                </span>
             ) : displayContent.isAnalyzed ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-primary/10 dark:bg-primary/20 text-primary">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary">
                 <Sparkles className="w-3 h-3" />
                 {language === 'zh' ? '已分析' : 'Analyzed'}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Bot className="w-3 h-3" />
                 {language === 'zh' ? '待分析' : 'Not analyzed'}
               </span>
@@ -842,10 +843,22 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   setShowDragHint(false);
                 }, 2000);
               }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // 键盘等价的分类操作：打开编辑弹窗完成分类，
+                  // 而不是仅显示拖拽提示气泡（拖拽本身无键盘等价物）。
+                  setEditModalOpen(true);
+                }
+              }}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing transition-all duration-200 touch-manipulation"
+              tabIndex={0}
+              role="button"
+              aria-label={language === 'zh' ? '编辑仓库分类' : 'Edit repository category'}
+              className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing touch-manipulation"
               title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
             >
               <GripVertical className="w-4 h-4" />
@@ -872,6 +885,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               selectionMode={selectionMode}
               className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               title={aiButtonTitle}
+              aria-label={aiButtonTitle}
             >
               {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
             </SelectionAwareButton>
@@ -896,6 +910,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
               }`}
               title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
+              aria-label={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
+              aria-pressed={isSubscribed}
             >
               {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
             </SelectionAwareButton>
@@ -906,6 +922,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               selectionMode={selectionMode}
               variant="edit"
               title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+              aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
             >
               <Edit3 className="w-4 h-4" />
             </SelectionAwareButton>
@@ -1037,8 +1054,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <p
               tabIndex={0}
               className={viewMode === 'list'
-                ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground'
-                : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
+                ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground'
+                : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
             >
               {highlightSearchTerm(displayContent.content, searchQuery)}
             </p>
@@ -1065,7 +1082,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
               <div className="group relative">
                 <HelpCircle className="w-3 h-3 text-destructive/70 dark:text-destructive/70 cursor-help" />
-                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all whitespace-normal break-words shadow-lg">
+                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-[opacity,visibility] whitespace-normal break-words shadow-lg">
                   <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
                     {repository.analysis_error || (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection')}
                   </p>
@@ -1075,7 +1092,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             </div>
           ) : displayContent.isAnalyzed ? (
             <div
-              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gradient-to-r from-primary/10 to-primary/10 text-primary dark:from-primary/20 dark:to-primary/20 dark:text-primary border border-primary/20 dark:border-primary/20"
+              className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary border border-primary/20 dark:border-primary/20"
               title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
             >
               <Sparkles className="w-3 h-3" />
@@ -1094,7 +1111,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className={`linear-card-tag font-medium ${viewMode === 'list' ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs'}`}
+              className={`linear-card-tag font-medium ${viewMode === 'list' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-xs'}`}
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -1169,7 +1186,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
-              {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true })}
+              {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
             </span>
 
             {viewMode === 'grid' && vectorSearchAvailable && !selectionMode && (
@@ -1180,7 +1197,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className="absolute inset-y-0 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
+                className="absolute -inset-y-1 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
                 title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
               >
                 {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -1205,6 +1222,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
               title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
+              aria-label={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
+              aria-pressed={isSelected}
             >
               {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
             </Button>

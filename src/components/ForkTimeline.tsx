@@ -3,6 +3,7 @@ import { Button } from './ui/button';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
 import ForkCard from './ForkCard';
 import { useForkTimelineActions } from '../features/forks/hooks/useForkTimelineActions';
 import { Modal } from './Modal';
@@ -108,7 +109,7 @@ export const ForkTimeline: React.FC = () => {
     }
 
     if (activePage - delta > 2) {
-      rangeWithDots.push(1, '...');
+      rangeWithDots.push(1, '…');
     } else {
       rangeWithDots.push(1);
     }
@@ -116,7 +117,7 @@ export const ForkTimeline: React.FC = () => {
     rangeWithDots.push(...range);
 
     if (activePage + delta < totalPages - 1) {
-      rangeWithDots.push('...', totalPages);
+      rangeWithDots.push('…', totalPages);
     } else if (totalPages > 1) {
       rangeWithDots.push(totalPages);
     }
@@ -150,14 +151,14 @@ export const ForkTimeline: React.FC = () => {
             {isLoadingOrganizations && (
               <span className="flex items-center space-x-1 text-sm text-muted-foreground dark:text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{t('加载组织中...', 'Loading organizations...')}</span>
+                <span>{t('加载组织中…', 'Loading organizations…')}</span>
               </span>
             )}
 
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true })}
+                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
               </span>
             )}
 
@@ -168,7 +169,7 @@ export const ForkTimeline: React.FC = () => {
               className="ui-button-primary flex h-auto shrink-0 items-center space-x-2 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{forkIsRefreshing ? t('刷新中...', 'Refreshing...') : t('刷新', 'Refresh')}</span>
+              <span>{forkIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新', 'Refresh')}</span>
             </Button>
           </div>
         </div>
@@ -180,7 +181,7 @@ export const ForkTimeline: React.FC = () => {
             <Input
               type="text"
               aria-label={t('搜索 Fork', 'Search forks')}
-              placeholder={t('搜索Fork...', 'Search forks...')}
+              placeholder={t('搜索Fork…', 'Search forks…')}
               value={searchQuery}
               onChange={(e) => {
                 setForkSearchQuery(e.target.value);
@@ -451,7 +452,7 @@ export const ForkTimeline: React.FC = () => {
             {isFetchingBranches ? (
               <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-muted-foreground py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{language === 'zh' ? '加载分支列表中...' : 'Loading branches...'}</span>
+                <span>{language === 'zh' ? '加载分支列表中…' : 'Loading branches…'}</span>
               </div>
             ) : (
               <Select value={syncModal.branch} onValueChange={(value) => setSyncModal(prev => ({ ...prev, branch: value }))}>

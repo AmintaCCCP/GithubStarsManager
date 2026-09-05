@@ -84,12 +84,12 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
       <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5">
         <HeaderIcon className={`h-4 w-4 shrink-0 ${isRunning ? 'animate-spin text-primary' : failed > 0 ? 'text-destructive' : 'text-emerald-500'}`} aria-hidden="true" />
         <span className="shrink-0 font-semibold text-foreground">{t('本轮任务执行', 'This turn’s work')}</span>
-        <span className="shrink-0 text-[11px] text-muted-foreground">
+        <span className="shrink-0 text-xs text-muted-foreground">
           {completed}/{events.length}
           {!isRunning && totalDuration > 0 ? ` · ${formatToolDuration(totalDuration)}` : ''}
           {failed > 0 ? ` · ${t(`${failed} 项需注意`, `${failed} attention`)}` : ''}
         </span>
-        <span className="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground" title={isRunning && runningEvent ? runningEvent.paramSummary : undefined}>
+        <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground" title={isRunning && runningEvent ? runningEvent.paramSummary : undefined}>
           {isRunning && runningEvent ? runningEvent.paramSummary : ''}
         </span>
         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-open/timeline:rotate-90" aria-hidden="true" />
@@ -110,7 +110,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
                 <div className="flex items-center gap-2">
                   <Icon className={`h-4 w-4 shrink-0 ${stageErrors > 0 ? 'text-destructive' : stageHasRunning ? 'animate-pulse text-primary' : 'text-emerald-500'}`} aria-hidden="true" />
                   <span className="min-w-0 flex-1 font-medium text-foreground">{label}</span>
-                  <span className={`text-[11px] ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{stageErrors > 0 ? t('需注意', 'Needs attention') : stageHasRunning ? t('进行中', 'In progress') : t('已完成', 'Completed')}{duration > 0 ? ` · ${formatToolDuration(duration)}` : ''}</span>
+                  <span className={`text-xs ${stageErrors > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{stageErrors > 0 ? t('需注意', 'Needs attention') : stageHasRunning ? t('进行中', 'In progress') : t('已完成', 'Completed')}{duration > 0 ? ` · ${formatToolDuration(duration)}` : ''}</span>
                 </div>
                 <ol className="mt-2 ml-2 space-y-2 border-l border-border pl-3">
                   {group.events.map((event) => {
@@ -120,7 +120,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
                       <li key={event.id} className="grid gap-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span className="font-medium text-foreground">{event.paramSummary}</span>
-                          <span className={`ml-auto text-[11px] ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
+                          <span className={`ml-auto text-xs ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
                         </div>
                         {event.detail && <p className="break-words text-muted-foreground">{event.detail}</p>}
                       </li>
@@ -551,8 +551,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                     >
                       <span className="flex w-full items-center gap-2 text-sm font-medium">
                         {language === 'zh' ? option.zh : option.en}
-                        <span className="text-[11px] font-normal text-muted-foreground">{suffix}</span>
-                        {option.value === 'default' && <span className="text-[11px] font-normal text-muted-foreground">{t('（当前默认）', '(current default)')}</span>}
+                        <span className="text-xs font-normal text-muted-foreground">{suffix}</span>
+                        {option.value === 'default' && <span className="text-xs font-normal text-muted-foreground">{t('（当前默认）', '(current default)')}</span>}
                       </span>
                       <span className="text-xs text-muted-foreground">{language === 'zh' ? option.descZh : option.descEn}</span>
                     </DropdownMenuItem>

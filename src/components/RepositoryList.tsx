@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
-import { Bot, ChevronDown, LayoutGrid, List, Pause, Play } from 'lucide-react';
+import { Bot, ChevronDown, LayoutGrid, List, Pause, Play, SearchX, X } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
 import { BulkActionToolbar } from './BulkActionToolbar';
@@ -40,6 +40,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     defaultCategoryOverrides,
     categoryMatchMode,
     searchFilters,
+    setSearchFilters,
     similarView,
     resetSimilarView,
     repositoryViewMode,
@@ -51,11 +52,46 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     defaultCategoryOverrides: state.defaultCategoryOverrides,
     categoryMatchMode: state.categoryMatchMode,
     searchFilters: state.searchFilters,
+    setSearchFilters: state.setSearchFilters,
     similarView: state.similarView,
     resetSimilarView: state.resetSimilarView,
     repositoryViewMode: state.repositoryViewMode,
     setRepositoryViewMode: state.setRepositoryViewMode,
   })));
+
+  // 空状态的"清除全部筛选"出口：只重置筛选条件，保留查询词——查询词是
+  // SearchBar 的本地输入状态，这里不重置以免输入框与结果列表失同步。
+  const clearAllFilters = useCallback(() => {
+    setSearchFilters({
+      tags: [],
+      languages: [],
+      platforms: [],
+      licenses: [],
+      minStars: undefined,
+      maxStars: undefined,
+      isAnalyzed: undefined,
+      isSubscribed: undefined,
+      isEdited: undefined,
+      isCategoryLocked: undefined,
+      analysisFailed: undefined,
+    });
+  }, [setSearchFilters]);
+
+  const hasActiveNonQueryFilters = useMemo(() => {
+    // 契约测试的极简 store 只提供 query 字段；其余字段缺省时视为无筛选。
+    if (!searchFilters) return false;
+    return (searchFilters.languages?.length ?? 0) > 0 ||
+      (searchFilters.tags?.length ?? 0) > 0 ||
+      (searchFilters.platforms?.length ?? 0) > 0 ||
+      (searchFilters.licenses?.length ?? 0) > 0 ||
+      searchFilters.minStars !== undefined ||
+      searchFilters.maxStars !== undefined ||
+      searchFilters.isAnalyzed !== undefined ||
+      searchFilters.isSubscribed !== undefined ||
+      searchFilters.isEdited !== undefined ||
+      searchFilters.isCategoryLocked !== undefined ||
+      searchFilters.analysisFailed !== undefined;
+  }, [searchFilters]);
 
 
   const { toast } = useDialog();
@@ -172,6 +208,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     languages: searchFilters.languages,
     tags: searchFilters.tags,
     platforms: searchFilters.platforms,
+    licenses: searchFilters.licenses,
     sortBy: searchFilters.sortBy,
     sortOrder: searchFilters.sortOrder,
     minStars: searchFilters.minStars,
@@ -187,6 +224,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     searchFilters.languages,
     searchFilters.tags,
     searchFilters.platforms,
+    searchFilters.licenses,
     searchFilters.sortBy,
     searchFilters.sortOrder,
     searchFilters.minStars,
@@ -442,35 +480,51 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   if (filteredRepositories.length === 0) {
     const selectedCategoryObj = allCategories.find(cat => cat.id === selectedCategory);
     const categoryName = selectedCategoryObj?.name || selectedCategory;
-    
+
     return (
       <>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground dark:text-muted-foreground mb-4">
-          {searchFilters.query ? (
-            language === 'zh' 
-              ? `未找到与"${searchFilters.query}"相关的仓库。`
-              : `No repositories found for "${searchFilters.query}".`
-          ) : selectedCategory === 'all' 
-            ? (language === 'zh' ? '未找到仓库。点击同步加载您的星标仓库。' : 'No repositories found. Click sync to load your starred repositories.')
-            : (language === 'zh' 
-                ? `在"${categoryName}"分类中未找到仓库。`
-                : `No repositories found in "${categoryName}" category.`
+        <div className="ui-empty-state flex flex-col items-center px-6 py-14 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <SearchX className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <p className="font-medium text-foreground">
+          {searchFilters?.query ? (
+            language === 'zh'
+              ? `未找到与"${searchFilters.query}"相关的仓库`
+              : `No repositories found for "${searchFilters.query}"`
+          ) : selectedCategory === 'all'
+            ? (language === 'zh' ? '未找到仓库' : 'No repositories found')
+            : (language === 'zh'
+                ? `在"${categoryName}"分类中未找到仓库`
+                : `No repositories found in "${categoryName}"`
               )
           }
         </p>
-        {searchFilters.query && (
-          <div className="text-sm text-muted-foreground dark:text-muted-foreground">
-            <p className="mb-2">
-              {language === 'zh' ? '搜索建议：' : 'Search suggestions:'}
-            </p>
-            <ul className="space-y-1">
-              <li>• {language === 'zh' ? '尝试使用不同的关键词' : 'Try different keywords'}</li>
-              <li>• {language === 'zh' ? '使用AI搜索进行语义匹配' : 'Use AI search for semantic matching'}</li>
-              <li>• {language === 'zh' ? '检查拼写或尝试英文/中文关键词' : 'Check spelling or try English/Chinese keywords'}</li>
-            </ul>
-          </div>
-          )}
+        <p className="mt-1.5 max-w-md text-sm text-muted-foreground dark:text-muted-foreground">
+          {searchFilters?.query ? (
+            language === 'zh'
+              ? '尝试使用不同的关键词、使用AI搜索进行语义匹配，或检查拼写。'
+              : 'Try different keywords, use AI search for semantic matching, or check spelling.'
+          ) : selectedCategory === 'all'
+            ? (language === 'zh' ? '点击同步加载您的星标仓库。' : 'Click sync to load your starred repositories.')
+            : (language === 'zh'
+                ? '切换到其他分类，或使用同步加载更多仓库。'
+                : 'Switch to another category, or sync to load more repositories.'
+              )
+          }
+        </p>
+        {hasActiveNonQueryFilters && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={clearAllFilters}
+            className="mt-5"
+          >
+            <X className="w-4 h-4" />
+            {language === 'zh' ? '清除全部筛选' : 'Clear all filters'}
+          </Button>
+        )}
         </div>
         {chatPortal}
       </>
@@ -507,7 +561,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               >
                 <Bot className="h-4 w-4 shrink-0" />
                 {isLoading
-                  ? t(`分析中... (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing... (${analysisProgress.current}/${analysisProgress.total})`)
+                  ? t(`分析中… (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing… (${analysisProgress.current}/${analysisProgress.total})`)
                   : t('AI分析', 'AI Analysis')}
                 <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
               </Button>
@@ -530,7 +584,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             <div className="flex items-center space-x-2 sm:space-x-3">
               <div className="w-20 sm:w-32 bg-accent dark:bg-accent rounded-full h-2">
                 <div
-                  className="bg-primary dark:bg-primary h-2 rounded-full transition-all duration-300"
+                  className="bg-primary dark:bg-primary h-2 rounded-full transition-[width] duration-300"
                   style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }}
                 ></div>
               </div>
@@ -580,7 +634,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
         <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right">
+          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
             <div className="flex items-center justify-between">
               <div>
                 {t(

@@ -673,7 +673,7 @@ Repository information:
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
                   className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
-                  placeholder={t('在此输入自定义提示词...', 'Enter custom prompt here...')}
+                  placeholder={t('在此输入自定义提示词…', 'Enter custom prompt here…')}
                 />
               </div>
             )}

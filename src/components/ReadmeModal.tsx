@@ -610,7 +610,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                         <span className="hidden sm:inline">
                           {translateProgress.total > 0 
                             ? `${translateProgress.current}/${translateProgress.total}` 
-                            : t('翻译中...', 'Translating...')}
+                            : t('翻译中…', 'Translating…')}
                         </span>
                       </>
                     ) : (
@@ -727,7 +727,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 text-primary dark:text-primary animate-spin mb-4" />
                 <p className="text-muted-foreground dark:text-muted-foreground">
-                  {language === 'zh' ? '正在加载 README...' : 'Loading README...'}
+                  {language === 'zh' ? '正在加载 README…' : 'Loading README…'}
                 </p>
               </div>
             ) : error ? (

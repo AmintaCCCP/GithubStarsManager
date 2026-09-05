@@ -64,7 +64,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
       case 'connected':
         return t('已连接', 'Connected');
       case 'checking':
-        return t('检查中...', 'Checking...');
+        return t('检查中…', 'Checking…');
       default:
         return t('未连接', 'Not Connected');
     }
@@ -219,7 +219,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
               ) : (
                 <Upload className="w-5 h-5" />
               )}
-              <span>{isSyncingToBackend ? t('同步中...', 'Syncing...') : t('开始同步', 'Start Sync')}</span>
+              <span>{isSyncingToBackend ? t('同步中…', 'Syncing…') : t('开始同步', 'Start Sync')}</span>
             </Button>
           </div>
 
@@ -245,7 +245,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
               ) : (
                 <Download className="w-5 h-5" />
               )}
-              <span>{isSyncingFromBackend ? t('同步中...', 'Syncing...') : t('开始同步', 'Start Sync')}</span>
+              <span>{isSyncingFromBackend ? t('同步中…', 'Syncing…') : t('开始同步', 'Start Sync')}</span>
             </Button>
           </div>
         </div>

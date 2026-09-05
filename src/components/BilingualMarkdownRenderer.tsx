@@ -403,7 +403,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
         <div className="flex items-center justify-center py-4 gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span>
-            {language === 'zh' ? '翻译中...' : 'Translating...'}
+            {language === 'zh' ? '翻译中…' : 'Translating…'}
             {progress.total > 0 && ` ${progress.current}/${progress.total}`}
           </span>
         </div>

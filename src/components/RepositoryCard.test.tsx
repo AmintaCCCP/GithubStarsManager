@@ -305,7 +305,7 @@ describe('RepositoryCard view modes', () => {
     const card = container.firstElementChild as HTMLElement;
 
     await user.click(screen.getByRole('button', { name: '查看 Release' }));
-    expect(await screen.findByText('Loading releases...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading releases…')).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.pointerDown(document.body);

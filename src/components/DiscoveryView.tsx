@@ -371,7 +371,7 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
         {isLoading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span>{t('加载中...', 'Loading...')}</span>
+            <span>{t('加载中…', 'Loading…')}</span>
           </>
         ) : (
           <>
@@ -684,7 +684,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         : currentChannel?.nameEn}
                     </h2>
                     {currentLastRefresh && (
-                      <p className="hidden sm:block text-[11px] text-muted-foreground dark:text-muted-foreground">
+                      <p className="hidden sm:block text-xs text-muted-foreground dark:text-muted-foreground">
                         {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
                       </p>
                     )}
@@ -826,7 +826,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      placeholder={t('搜索仓库...', 'Search repositories...')}
+                      placeholder={t('搜索仓库…', 'Search repositories…')}
                       className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
                   </div>
                   <Button
@@ -896,7 +896,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 </div>
                 <div className="text-center space-y-1.5">
                   <p className="text-foreground dark:text-muted-foreground font-medium text-sm">
-                    {t('正在获取数据...', 'Fetching data...')}
+                    {t('正在获取数据…', 'Fetching data…')}
                   </p>
                   <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     {t('GitHub API 响应中', 'Waiting for GitHub API response')}
@@ -975,7 +975,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {currentIsLoadingMore && (
               <div className="flex items-center justify-center py-6 gap-3">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载更多...', 'Loading more...')}</span>
+                <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载更多…', 'Loading more…')}</span>
               </div>
             )}
 
