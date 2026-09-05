@@ -740,6 +740,19 @@ export class GitHubListsApiService {
       { replayableMutation: true }
     );
   }
+  /** 重命名 List（用于语言切换时的自动迁移）。 */
+  async updateUserList(listId: string, name: string, description?: string): Promise<void> {
+    await this.request<{ updateUserList: { list: { id: string; name: string } } }>(
+      `mutation($listId: ID!, $name: String!, $description: String) {
+        updateUserList(input: { listId: $listId, name: $name, description: $description }) {
+          list { id name }
+        }
+      }`,
+      { listId, name, description: description ?? null },
+      { replayableMutation: true }
+    );
+  }
+
 
   /**
    * 将某仓库（itemId 为 GraphQL node id）加入指定 list 集合。
