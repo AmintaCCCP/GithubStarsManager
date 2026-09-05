@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { GitHubApiService } from '../../../services/githubApi';
+import { GitHubApiService, GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
 import { backend } from '../../../services/backendAdapter';
 import { syncFromBackend } from '../../../services/autoSync';
 import type { GitHubUser } from '../../../types';
@@ -48,12 +48,16 @@ export const useLoginActions = (): LoginActions => {
     try {
       const user = await authenticateWithGitHub(restored.github_token);
       return { status: 'connected', githubToken: restored.github_token, user };
-    } catch {
-      // Backend auth already succeeded, so the stored GitHub token is what
-      // failed (expired, revoked, or unreachable GitHub). Route the user to
-      // the token setup step instead of a dead end; saving a new token there
-      // overwrites the broken one on the backend.
-      return { status: 'restored-token-invalid' };
+    } catch (err) {
+      if (err instanceof Error && err.message === GITHUB_TOKEN_INVALID_ERROR) {
+        // Confirmed auth failure: the stored token is expired or revoked.
+        // Route to the token setup step instead of a dead end; saving a new
+        // token there overwrites the broken one on the backend.
+        return { status: 'restored-token-invalid' };
+      }
+      // Network failures, rate limits, and 5xx are transient — propagate so
+      // the user can retry without being pushed into token setup.
+      throw err;
     }
   }, [authenticateWithGitHub]);
   const setupBackendGitHubToken = useCallback(async (token: string) => {

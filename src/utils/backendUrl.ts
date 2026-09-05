@@ -3,10 +3,21 @@
  * and the login screen (pre-submit validation).
  */
 
+// Strict dotted-quad check: `127.example.com` also starts with "127." but is a
+// remote hostname that could resolve to an attacker-controlled address.
+const isIPv4Loopback = (hostname: string): boolean => {
+  const octets = hostname.split('.');
+  return (
+    octets.length === 4 &&
+    octets[0] === '127' &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255)
+  );
+};
+
 const isLoopbackHostname = (hostname: string): boolean =>
   hostname === 'localhost' ||
   hostname.endsWith('.localhost') ||
-  hostname.startsWith('127.') ||
+  isIPv4Loopback(hostname) ||
   hostname === '[::1]' ||
   hostname === '::1';
 

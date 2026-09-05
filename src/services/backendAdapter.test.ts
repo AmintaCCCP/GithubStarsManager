@@ -95,6 +95,14 @@ describe('backendAdapter 后端 URL 安全策略', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  it('拒绝伪装成 loopback 的远程主机（如 127.example.com）', async () => {
+    await backend.init('http://127.example.com');
+
+    expect(window.fetch).not.toHaveBeenCalled();
+    expect(backend.isAvailable).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   it('放行 HTTPS 后端并记住规范化地址', async () => {
     vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
 
@@ -111,6 +119,15 @@ describe('backendAdapter 后端 URL 安全策略', () => {
     await backend.init('http://localhost:3000');
 
     expect(window.fetch).toHaveBeenCalledWith('http://localhost:3000/api/health', expect.anything());
+    expect(backend.isAvailable).toBe(true);
+
+    vi.mocked(window.fetch).mockClear();
+    adapter._backendUrl = null;
+    localStorage.removeItem(STORAGE_KEY);
+
+    await backend.init('http://127.0.0.2:8080');
+
+    expect(window.fetch).toHaveBeenCalledWith('http://127.0.0.2:8080/api/health', expect.anything());
     expect(backend.isAvailable).toBe(true);
   });
 });
