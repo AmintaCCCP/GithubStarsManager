@@ -4,7 +4,7 @@
 - **仓库根**: 本仓库（GithubStarsManager）
 - **契约**: `docs/adr/0001-frontend-layering.md`（View → Hook → Application → Service → Store）
 - **目标**: `eslint.config.js` 的 `COMPONENT_BOUNDARY_ALLOWLIST`（52-63 行，恰 10 项）与 `scripts/check-boundaries.cjs` 的 `COMPONENT_ALLOWLIST`（48-59 行，镜像 10 项）**机制整体删除**（非置空）；10 个 View 组件的远程调用与 Store 写入全部收敛进 hook。
-- **行为基线**: 行为零变更。唯一例外 = `useRepositoryReleaseSheet` 委托共享 hook 的 **3 处已声明微差异**（§2.5，须在 PR 描述列明）；GistEditorModal 类型解套零行为影响。
+- **行为基线**: 行为零变更。例外 = PR 描述声明的 **8 处行为微差异/等价调整**（3 处规格预设见 §2.5 + 5 处实施补充，以 PR 描述清单为完整真值）；GistEditorModal 类型解套零行为影响。
 - **吸收的审计结论**: 第一轮 A1–A8 + 第二轮 B1–B8（附录二表，共 16 条已逐条修复进本文）。
 - **文案铁律**: 所有 toast/confirm/错误文案**以原文件现行为准逐字抄录**，禁止转写、概括或"顺手优化"。本文出现的文案仅为定位指引。
 
@@ -51,7 +51,7 @@ ban list 12 项（`eslint.config.js:16-29` 与 `check-boundaries.cjs:32-45` 一�
 | 3 | SearchBar.handleStarAndListSync (941-958) | confirm(warning，原文案) → handleStarSync('stars-and-lists') | **View 保留 confirm 包装**（§2.1；'auto'/'stars-only' 入口原无确认，勿加） |
 | 4 | SubscriptionRepoCard.executeUnstar (91-125) | 无 token 静默 return → setIsStarring → 乐观 setOptimisticStarred(false) → new GitHubApiService → unstarRepository(owner,name) → deleteRepository(按 full_name 查 id) → **await forceSyncToBackend()** → 乐观清 null；catch：回滚乐观 + toast（原文案）；finally setIsStarring(false)。**成功无 toast**。确认走自定义 Modal（留 View，B8） | useDiscoveryRepoActions.executeUnstar |
 | 5 | SubscriptionRepoCard.handleStar (128-183) | isStarring 短路 → 乐观(true) → starRepository(owner,name) → 构造 repositoryToAdd（rank/channel/platform 置 undefined + starred_at）→ addRepository → onStar(repo) → **await forceSyncToBackend()** → 乐观清 null → toast 成功；catch 回滚 + toast | useDiscoveryRepoActions.star |
-| 6 | SubscriptionRepoCard.handleAnalyze (193-274) | 三段校验 toast（token→无配置→apiKeyStatus→baseUrl/apiKey/model，**文案取本文件原文**，与 useRepositoryCardActions 措辞不同）→ isAnalyzing 短路 → abort 上一请求（abortControllerRef，unmount abort）→ analyzeRepository({repository: repo, githubToken, aiConfig, language, categories, signal})（aiAnalysisHelper）→ aborted 则 return → 成功 patch（ai_summary/ai_tags/ai_platforms/analyzed_at/analysis_failed/analysis_error:undefined，**无 custom_category/category_locked**）→ updateDiscoveryRepo → onAnalyze(updatedRepo)。**无 forceSync、成功无 toast、无重分析 confirm**（勿照 RepositoryCard "补齐"）；catch（非 abort）：createFailedAnalysisResult → 失败 patch → updateDiscoveryRepo → toast | useDiscoveryRepoActions.analyze |
+| 6 | SubscriptionRepoCard.handleAnalyze (193-274) | 四段校验 toast（token→无配置→apiKeyStatus→baseUrl/apiKey/model，**文案取本文件原文**，与 useRepositoryCardActions 措辞不同）→ isAnalyzing 短路 → abort 上一请求（abortControllerRef，unmount abort）→ analyzeRepository({repository: repo, githubToken, aiConfig, language, categories, signal})（aiAnalysisHelper）→ aborted 则 return → 成功 patch（ai_summary/ai_tags/ai_platforms/analyzed_at/analysis_failed/analysis_error:undefined，**无 custom_category/category_locked**）→ updateDiscoveryRepo → onAnalyze(updatedRepo)。**无 forceSync、成功无 toast、无重分析 confirm**（勿照 RepositoryCard "补齐"）；catch（非 abort）：createFailedAnalysisResult → 失败 patch → updateDiscoveryRepo → toast | useDiscoveryRepoActions.analyze |
 | 7 | GistCard.handleAnalyze (68-120) | 三段校验（gist 版原文案）→ 已分析则 confirm 覆盖（原文案）→ setAnalyzingGist(id,true)（store）+ 本地 flag → createGitHubApiService → getGistForAnalysis(id, gist) → new AIService → analyzeGist(detail, api.getGistContentPreview(detail))（**无 Abort**）→ updateGist(成功 patch) → toast；catch → updateGist(失败 patch) → toast；finally 双 flag 复位。**无 forceSync** | useGistActions.analyzeOne |
 | 8 | GistCard.handleUnstar (122-143) | 无 token 静默 return → confirm(warning+confirmText 原文案) → api.unstarGist(id) → onUnstarred(gist.id) → updateGist({starred:false}) → toast；catch toast。**无 forceSync** | useGistActions.unstarGist |
 | 9 | GistCard.handleDelete (145-174) | 无 token/isMine 静默 return → confirm(danger+confirmText 原文案) → api.deleteGist(id) → store.deleteGist → onDeleted(gist.id) → toast；catch：403/404/forbidden/scope/permission → 权限提示 toast（原文案）。**无 forceSync** | useGistActions.deleteGist |
@@ -199,7 +199,8 @@ export const computeRpcDownloadKey = (link: { url: string; updatedAt?: string })
   2. 内部实例化 `useReleaseArtifactActions()`；generateSummary 直接转发；sendAssetToRpc 变为 `if (!rpcDownloadConfig.enabled) return; await actions.sendRpcDownload(link);`（enabled 守卫留 sheet——ReleaseCard 侧由按钮显隐承担）；
   3. 对外返回的 summaries/downloadStates 改由 hook 供给 + computeRpcDownloadKey 换算（RepositoryReleaseSheet UI 及其测试同步换 key）；
   4. cancelPendingRequests 保留 fetch abort 部分，summary 部分转发 cancelSummaryRequests；
-  5. **3 处已接受微差异（写入 PR 描述，行为零变更的唯一例外）**：① dedup key 由 url-only 变 `url@updatedAt`（与卡片一致，修同病灶）；② AI 配置缺失由"静默置 error 态"变"toast 不置态"；③ RPC 失败文案统一为 ReleaseCard 版。若存量测试断言旧文案/旧 key，按新语义更新断言并在 PR 说明（§6.2）。
+  4b. loadReleases 原有的 `setSummaries({})`/`setDownloadStates({})` 置空行为由共享 hook 的 `reset()` 承担（规格遗漏，实施补充）：reset 先 `cancelSummaryRequests()` 取消进行中请求、再清空 summaries/rpcDownloadStates，防止迟到结果回写；generateSummary 另设 summaryAbortRefs 同步门卫（loading 守卫读渲染快照，挡不住同 tick 双调用）；
+  5. **3 处规格预设微差异（写入 PR 描述；实施期补充的 5 处等价调整一并在 PR 描述列明，该清单为完整真值）**：① dedup key 由 url-only 变 `url@updatedAt`（与卡片一致，修同病灶）；② AI 配置缺失由"静默置 error 态（含行内错误卡片）"变"仅 toast 不置态"；③ RPC 失败文案统一为 ReleaseCard 版。若存量测试断言旧文案/旧 key，按新语义更新断言并在 PR 说明（§6.2）。
 
 ### 2.6 `useReleaseTimelineActions` 新增 `syncWatchedSources`（B1：方法不存在，为新增）
 
@@ -335,15 +336,15 @@ L9 `import type { GistCreateInput, GistUpdateInput } from '../services/githubApi
 | `src/features/repositories/application/__tests__/discoveryRepoPatches.test.ts` | 纯函数无 mock | 成功/失败 patch 字段集（无 custom_category/category_locked）、DiscoveryRepo 字段保留 |
 | `src/features/repositories/hooks/useSearchActions.test.tsx` | store mock **必须同时提供 getState**：`useAppStore: Object.assign(vi.fn(sel => sel(state)), { getState: () => state })`；mock vectorSearchService/aiService/githubApi/githubApiFactory/autoSync | ① 向量命中：topK/threshold 默认 30/0.35、加分映射、rerank 失败仅回退不 toast、skipNextTextSearchRef=true；② HyDE 5s race 降级回原 query；③ 向量无结果→keywordSearch AI 失败回退 performBasicTextSearch；④ syncStars('stars-and-lists')：**setRepositories 先于 forceSyncToBackend、再 setLastSync**（保序断言）；list 失败不中断星标结果；token 过期文案分支；⑤ 4 个纯函数 |
 | `src/features/gists/hooks/useGistActions.test.tsx`（**全新增**，B4：无存量） | store state 覆盖 selectGistViewState 全字段；githubApiFactory mock 出 getGistForAnalysis/getGistContentPreview/unstarGist/deleteGist/getGistFileRaw；AIService.analyzeGist | analyzeOne：已分析触发 confirm、成功 patch 字段、**不调用 forceSync**；unstarGist/deleteGist：confirm false 中止、onUnstarred/onDeleted 各自原点位；fetchGistFileRaw：无 token 抛原文案、有 token 透传 signal |
-| `src/features/discovery/hooks/useDiscoveryRepoActions.test.tsx` | aiAnalysisHelper/autoSync/githubApi/store | analyze 三段校验文案与顺序、abort 短路、成功 patch 无 custom_category、**无 forceSync**；star 乐观→远端→addRepository→onStar→**forceSync**→乐观清→toast 保序；executeUnstar 乐观/回滚、deleteRepository by full_name、**forceSync**、成功无 toast |
+| `src/features/discovery/hooks/useDiscoveryRepoActions.test.tsx` | aiAnalysisHelper/autoSync/githubApi/store | analyze 四段校验文案与顺序、abort 短路、成功 patch 无 custom_category、**无 forceSync**；star 乐观→远端→addRepository→onStar→**forceSync**→乐观清→toast 保序；executeUnstar 乐观/回滚、deleteRepository by full_name、**forceSync**、成功无 toast |
 | `src/hooks/useReadmeFetch.test.tsx` | backendAdapter/githubApi/routeMode | bypass 或 !isAvailable→直连；backend 成功不走 GitHub；backend 失败非 abort 有 token→fallback+warn；无 token：content 抛/candidates 返回 []；cancel 后再 fetch abort 上一个；pickReadmeCandidate |
-| `src/hooks/useReleaseArtifactActions.test.tsx`（B4 更名：非 useReleaseCardActions.test） | rpcDownloadService/AIService/useDialog/store | sendRpcDownload：key=url@updatedAt、sending 短路、重试清 sent、'RPC service not running' 分支、catch 文案；generateSummary：无配置 toast、loading/done 短路、error 态+toast、AbortError 静默、unmount abort；computeRpcDownloadKey |
+| `src/hooks/useReleaseArtifactActions.test.tsx`（B4 更名：非 useReleaseCardActions.test） | rpcDownloadService/AIService/useDialog/store | sendRpcDownload：key=url@updatedAt、sending 短路、重试清 sent、'RPC service not running' 分支、catch 文案；generateSummary：无配置 toast、loading/done 短路、error 态+toast、AbortError 静默、unmount abort、同 tick 连续调用去重；reset：取消进行中请求、迟到结果不回写（abort 感知型与 resolve 型 mock 各一）、清空 summaries/rpcDownloadStates；computeRpcDownloadKey |
 | `src/features/releases/hooks/useReleaseTimelineActions.test.tsx`（新增，聚焦 syncWatchedSources） | githubApi/store（含 releaseSourceSettings.watchCustomReleaseRepos、setReleaseSourceRepositories） | 无 token/isSyncing 静默；release_hidden 保留合并；setReleaseSourceRepositories 入参；成功/失败 toast；**不调用 forceSync** |
 | `src/features/settings/hooks/useBackendAvailability.test.tsx`（小） | backendAdapter | 返回 backend.isAvailable 两态 |
 
 ### 6.2 存量回归（`npm run test:run` 必绿）
 
-`src/components/SearchBar.test.tsx`（未 mock service，不触达迁移路径）、`RepositoryEditModal.test.tsx`（已模块级 mock `../services/autoSync`，命中 useCategorySyncActions 内同名 import）、`ReadmeModal.test.tsx`（backendAdapter/githubApi 模块级 mock 命中 useReadmeFetch 内 import；若 hook 读取的 store 字段超出 mock 形状，补 fixture 字段而非改断言）、`ReleaseCard.test.tsx`（rpcDownloadService/aiService mock 命中共享 hook；注意其 mock 走动态 import 形式）、`RepositoryReleaseSheet.test.tsx` + `src/features/repositories/hooks/useRepositoryReleaseSheet.test.tsx`（委托重构后仅当断言 §2.5 三处微差异时按新语义更新断言并 PR 说明）、`useRepositoryCardActions.test.tsx`（不动）、`ReleaseTimeline.test.tsx`、`ForkTimeline.test.tsx`、`settings/BackendPanel.test.tsx`、`src/store/useAppStore.modularization.test.ts`（**必须零改动通过**——Store 未动的证明）。
+`src/components/SearchBar.test.tsx`（未 mock service，不触达迁移路径）、`RepositoryEditModal.test.tsx`（已模块级 mock `../services/autoSync`，命中 useCategorySyncActions 内同名 import）、`ReadmeModal.test.tsx`（backendAdapter/githubApi 模块级 mock 命中 useReadmeFetch 内 import；若 hook 读取的 store 字段超出 mock 形状，补 fixture 字段而非改断言）、`ReleaseCard.test.tsx`（rpcDownloadService/aiService mock 命中共享 hook；注意其 mock 走动态 import 形式）、`RepositoryReleaseSheet.test.tsx` + `src/features/repositories/hooks/useRepositoryReleaseSheet.test.tsx`（存量文件扩展：委托重构后仅当断言 §2.5 微差异时按新语义更新断言并 PR 说明；本 PR 为后者补 1 个同步门卫/状态回写回归用例）、`useRepositoryCardActions.test.tsx`（不动）、`ReleaseTimeline.test.tsx`、`ForkTimeline.test.tsx`、`settings/BackendPanel.test.tsx`、`src/store/useAppStore.modularization.test.ts`（**必须零改动通过**——Store 未动的证明）。
 
 **vi.mock 原则（B4）**：组件不再 import service 后，既有测试的 `vi.mock('.../services/x')` 经解析路径仍拦截 hook 内同名 import——**不预防性重写任何测试文件，跑通为准**；仅断言与既定微差异冲突时最小修改。
 
@@ -403,7 +404,7 @@ rg -n 'COMPONENT_BOUNDARY_ALLOWLIST|COMPONENT_ALLOWLIST' eslint.config.js script
 | 单 PR 体量大 | 每 commit 一文件/一主题（§7），可按 commit 粒度 revert；hook commit 与 View commit 相互独立 |
 | SearchBar 改动面最大 | ref 暴露策略（§2.1）使过滤 effect 零改动；applyFilters 参数传入消除 stale closure；置于最后一个 View commit |
 | DiscoveryRepo 类型摩擦 | patch 纯函数收发均 DiscoveryRepo（§3.1）；不改 Store shape；modularization 测试不动 |
-| useRepositoryReleaseSheet 委托的 3 处微差异 | §2.5 改造点显式列明 + PR 描述声明；断言同步更新；不满意可单独 revert commit 5（需恢复 sheet 内联实现） |
+| useRepositoryReleaseSheet 委托的行为微差异 | §2.5 列明规格预设 3 处 + PR 描述声明全部 8 条（含实施补充）；断言同步更新；不满意可单独 revert commit 5（需恢复 sheet 内联实现） |
 | 存量测试 mock 失配 | vi.mock 按解析路径拦截（§6.2 原则）；只补 fixture、不预防性重写 |
 | 删 allowlist 后冒出新违规 | 最后 commit 前先跑三条门禁；allowlist 删除 commit 本身只动两个门禁文件 |
 

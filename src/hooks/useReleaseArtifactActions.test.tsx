@@ -217,6 +217,19 @@ describe('useReleaseArtifactActions.generateSummary', () => {
     await act(async () => { await pending; });
   });
 
+  it('collapses same-tick consecutive generateSummary calls into a single request', async () => {
+    // loading 守卫读渲染快照：同一事件循环内（同步双调用）第二次仍看到旧快照，
+    // 依赖 summaryAbortRefs 的同步门卫去重。
+    mocks.analyzeReleaseSummary.mockImplementation(() => new Promise<string>(() => undefined));
+    const { result } = renderHook(() => useReleaseArtifactActions());
+    act(() => {
+      void result.current.generateSummary(release);
+      void result.current.generateSummary(release);
+    });
+    expect(mocks.analyzeReleaseSummary).toHaveBeenCalledTimes(1);
+    expect(result.current.summaries[100]?.status).toBe('loading');
+  });
+
   it('stores the error state and toasts on failure', async () => {
     mocks.analyzeReleaseSummary.mockRejectedValue(new Error('model offline'));
     const { result } = renderHook(() => useReleaseArtifactActions());

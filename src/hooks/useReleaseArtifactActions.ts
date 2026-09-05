@@ -121,8 +121,13 @@ export const useReleaseArtifactActions = (): ReleaseArtifactActions => {
       return;
     }
 
-    // 请求取消仅经由 cancelSummaryRequests（unmount / reset）；loading 守卫使同 id
-    // 并发不可达，无需"取消上一请求"。
+    // 同步门卫：loading 守卫读的是渲染快照，同一事件循环内的连续调用（双击/重复
+    // 触发）拿到的还是旧快照、会双双通过；summaryAbortRefs 同步更新，可挡住并发
+    // 双请求。
+    if (summaryAbortRefs.current[release.id]) return;
+
+    // 请求取消仅经由 cancelSummaryRequests（unmount / reset）；同步门卫 + loading
+    // 守卫使同 id 并发不可达，无需"取消上一请求"。
     const controller = new AbortController();
     summaryAbortRefs.current[release.id] = controller;
 
