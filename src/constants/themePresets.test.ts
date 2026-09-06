@@ -6,6 +6,7 @@ import {
   isThemePresetId,
 } from './themePresets';
 import { GENERATED_THEME_PRESETS } from './themePresets.generated';
+import { buildThemePresetCss } from '../lib/themePresets';
 
 const TRIPLET_RE = /^\d+(\.\d+)? \d+(\.\d+)?% \d+(\.\d+)?%$/;
 const PALETTE_KEYS = [
@@ -68,5 +69,23 @@ describe('themePresets registry', () => {
     expect(getThemePreset('default').id).toBe('default');
     // Unknown id: runtime guard prevents this, but the helper must stay safe.
     expect(getThemePreset('nope' as never).id).toBe('default');
+  });
+
+  it('generates strictly increasing shadow elevation tiers for all presets', () => {
+    const css = buildThemePresetCss();
+    for (const preset of THEME_PRESETS) {
+      if (preset.id === DEFAULT_THEME_PRESET_ID) continue;
+      const subtleMatch = css.match(new RegExp(`\\[data-theme='${preset.id}'\\][\\s\\S]*?--shadow-opacity: ([0-9.]+);`));
+      const elevatedMatch = css.match(new RegExp(`\\[data-theme='${preset.id}'\\][\\s\\S]*?--app-shadow-elevated: 0 12px 32px hsl\\(var\\(--shadow-color\\) / ([0-9.]+)\\)`));
+      const dialogMatch = css.match(new RegExp(`\\[data-theme='${preset.id}'\\][\\s\\S]*?--app-shadow-dialog: 0 20px 48px hsl\\(var\\(--shadow-color\\) / ([0-9.]+)\\)`));
+      expect(subtleMatch, `subtle opacity for ${preset.id}`).not.toBeNull();
+      expect(elevatedMatch, `elevated opacity for ${preset.id}`).not.toBeNull();
+      expect(dialogMatch, `dialog opacity for ${preset.id}`).not.toBeNull();
+      const subtle = parseFloat(subtleMatch![1]);
+      const elevated = parseFloat(elevatedMatch![1]);
+      const dialog = parseFloat(dialogMatch![1]);
+      expect(subtle, `subtle < elevated for ${preset.id}`).toBeLessThan(elevated);
+      expect(elevated, `elevated < dialog for ${preset.id}`).toBeLessThan(dialog);
+    }
   });
 });

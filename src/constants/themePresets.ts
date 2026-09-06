@@ -60,7 +60,7 @@ const DEFAULT_LIGHT_COLORS: GeneratedThemePalette = {
   'muted-foreground': '215.4 16.3% 46.9%',
   accent: '210 40% 92%',
   'accent-foreground': '222.2 47.4% 11.2%',
-  destructive: '0 84.2% 60.2%',
+  destructive: '0 72% 51%',
   'destructive-foreground': '210 40% 98%',
   border: '214.3 31.8% 91.4%',
   'border-strong': '214.3 25% 80%',
@@ -164,6 +164,12 @@ export const THEME_PRESETS: ThemePreset[] = (() => {
   return ordered;
 })();
 
+/**
+ * Look up a theme preset by its identifier, falling back to the default preset.
+ *
+ * @param id The theme preset identifier to look up.
+ * @returns The matching ThemePreset or default preset.
+ */
 export function getThemePreset(id: ThemePresetId): ThemePreset {
   const preset = THEME_PRESETS.find((p) => p.id === id);
   return preset ?? DEFAULT_PRESET;
