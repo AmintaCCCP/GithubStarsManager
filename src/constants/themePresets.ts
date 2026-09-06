@@ -60,7 +60,7 @@ const DEFAULT_LIGHT_COLORS: GeneratedThemePalette = {
   'muted-foreground': '215.4 16.3% 46.9%',
   accent: '210 40% 92%',
   'accent-foreground': '222.2 47.4% 11.2%',
-  destructive: '0 84.2% 60.2%',
+  destructive: '0 72% 51%',
   'destructive-foreground': '210 40% 98%',
   border: '214.3 31.8% 91.4%',
   'border-strong': '214.3 25% 80%',
