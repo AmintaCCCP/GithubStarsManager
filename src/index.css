@@ -538,7 +538,7 @@ html:has(body[data-scroll-locked]) {
   --ui-accent: hsl(var(--primary));
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
-  --ui-accent-ring: hsl(var(--ring) / 0.25);
+  --ui-accent-ring: hsl(var(--ring));
   --ui-selection: hsl(var(--accent));
   --ui-selection-foreground: hsl(var(--accent-foreground));
   --ui-search-highlight: hsl(var(--primary) / 0.16);
@@ -609,7 +609,7 @@ html.dark {
   --ui-accent: hsl(var(--primary));
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
-  --ui-accent-ring: hsl(var(--ring) / 0.3);
+  --ui-accent-ring: hsl(var(--ring));
   --ui-success: hsl(var(--success));
   --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
@@ -809,7 +809,8 @@ textarea:focus-visible,
 textarea:focus,
 input:focus,
 select:focus {
-  box-shadow: 0 0 0 3px var(--ui-accent-ring);
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 ::selection {
