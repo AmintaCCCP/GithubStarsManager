@@ -150,8 +150,202 @@ function deriveBorderStrong(triplet, isLightMode) {
   return fmtTriplet({ ...triplet, l });
 }
 
+// ---------- accessibility & surface normalization ----------
+//
+// Vendored tweakcn palettes predate this app's token usage: several fail WCAG
+// contrast once rendered through the shared components (dim text on canvas,
+// white text on mid-tone fills, focus rings at whisper contrast), and most
+// light/dark pairs ship canvas === card, which flattens the surface hierarchy
+// the shell is built on. normalizeMode nudges lightness — hue and saturation
+// stay untouched — just enough to clear the threshold, so a preset keeps its
+// identity while its UI stops failing.
+
+/**
+ * Convert an HSL triplet ({ h, s, l }) to sRGB channel values in [0, 255].
+ *
+ * @param {{ h: number, s: number, l: number }} triplet HSL values with h in [0, 360), s in [0, 100], l in [0, 100].
+ * @returns {[number, number, number]} RGB channel values in [0, 255].
+ */
+function hslTripletToRgb({ h, s, l }) {
+  const H = ((h % 360) + 360) % 360;
+  const S = s / 100;
+  const L = l / 100;
+  const c = (1 - Math.abs(2 * L - 1)) * S;
+  const x = c * (1 - Math.abs(((H / 60) % 2) - 1));
+  const m = L - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (H < 60) [r, g, b] = [c, x, 0];
+  else if (H < 120) [r, g, b] = [x, c, 0];
+  else if (H < 180) [r, g, b] = [0, c, x];
+  else if (H < 240) [r, g, b] = [0, x, c];
+  else if (H < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+
+/**
+ * Compute the relative luminance of an sRGB color per WCAG 2.1 specifications.
+ *
+ * @param {[number, number, number]} rgb RGB channel values in [0, 255].
+ * @returns {number} Relative luminance in [0, 1].
+ */
+function relativeLuminance(rgb) {
+  const [r, g, b] = rgb.map((v) => {
+    const s = v / 255;
+    return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/**
+ * Compute the WCAG contrast ratio between two HSL triplet colors.
+ *
+ * @param {{ h: number, s: number, l: number }} a First color triplet.
+ * @param {{ h: number, s: number, l: number }} b Second color triplet.
+ * @returns {number} Contrast ratio in range [1, 21].
+ */
+function contrastTriplets(a, b) {
+  const [l1, l2] = [relativeLuminance(hslTripletToRgb(a)), relativeLuminance(hslTripletToRgb(b))]
+    .sort((x, y) => y - x);
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+/**
+ * Shift the lightness of an HSL triplet by a delta while clamping within [0, 100].
+ *
+ * @param {{ h: number, s: number, l: number }} triplet Original color triplet.
+ * @param {number} delta Lightness delta to add.
+ * @returns {{ h: number, s: number, l: number }} Clamped color triplet.
+ */
+function shiftL(triplet, delta) {
+  return { ...triplet, l: Math.min(100, Math.max(0, triplet.l + delta)) };
+}
+
+/**
+ * Nudge a fill surface away from its text color until the pair clears `req`.
+ * Hue and saturation are preserved; the search is capped so a theme cannot be
+ * dragged into a different color. Falls back to flipping the text toward
+ * white/black when the fill cannot move far enough. Returns both tokens since
+ * either side may end up adjusted.
+ *
+ * @param {{ h: number, s: number, l: number }} fg Foreground text triplet.
+ * @param {{ h: number, s: number, l: number }} fill Background fill triplet.
+ * @param {number} req Required minimum contrast ratio.
+ * @returns {{ fg: { h: number, s: number, l: number }, fill: { h: number, s: number, l: number } }} Adjusted pair.
+ */
+function ensureTextOnFill(fg, fill, req) {
+  if (contrastTriplets(fg, fill) >= req) return { fg, fill };
+  const fgLum = relativeLuminance(hslTripletToRgb(fg));
+  const fillLum = relativeLuminance(hslTripletToRgb(fill));
+  const dir = fillLum >= fgLum ? 1 : -1;
+  let best = fill;
+  let moved = false;
+  for (let d = 1; d <= 30; d += 0.5) {
+    const cand = shiftL(fill, dir * d);
+    best = cand;
+    moved = true;
+    if (contrastTriplets(fg, cand) >= req) return { fg, fill: cand };
+  }
+  for (const flipped of [{ ...fg, s: 0, l: 98 }, { ...fg, s: 0, l: 6 }]) {
+    if (contrastTriplets(flipped, fill) >= req) {
+      return { fg: flipped, fill };
+    }
+  }
+  return { fg, fill: moved ? best : fill };
+}
+
+/**
+ * Nudge a text/ring token until it clears `req` against every surface it
+ * renders on. Both directions are searched; the smaller passing shift wins.
+ *
+ * @param {{ h: number, s: number, l: number }} token Token to adjust.
+ * @param {Array<{ h: number, s: number, l: number }>} surfaces Array of surface color triplets.
+ * @param {number} req Required minimum contrast ratio.
+ * @returns {{ h: number, s: number, l: number }} Adjusted token.
+ */
+function ensureTextOnSurfaces(token, surfaces, req) {
+  const worst = (t) => Math.min(...surfaces.map((s) => contrastTriplets(t, s)));
+  if (worst(token) >= req) return token;
+  let bestUp = null;
+  let bestDown = null;
+  for (let d = 0.5; d <= 60; d += 0.5) {
+    if (bestUp === null && worst(shiftL(token, d)) >= req) bestUp = d;
+    if (bestDown === null && worst(shiftL(token, -d)) >= req) bestDown = d;
+    if (bestUp !== null && bestDown !== null) break;
+  }
+  const up = bestUp !== null ? shiftL(token, bestUp) : null;
+  const down = bestDown !== null ? shiftL(token, -bestDown) : null;
+  if (up && down) return bestUp <= bestDown ? up : down;
+  if (up || down) return up ?? down;
+  let best = token;
+  let bestScore = worst(token);
+  for (let l = 0; l <= 100; l += 1) {
+    const cand = { ...token, l };
+    const score = worst(cand);
+    if (score > bestScore) {
+      bestScore = score;
+      best = cand;
+    }
+  }
+  return best;
+}
+
+/**
+ * Normalizes all color tokens for a single preset mode (light or dark)
+ * to satisfy WCAG contrast targets and surface layering hierarchy.
+ *
+ * @param {Record<string, { h: number, s: number, l: number }>} triplets Palette color triplets.
+ * @returns {Record<string, { h: number, s: number, l: number }>} Normalized color triplets.
+ */
+function normalizeMode(triplets) {
+  const out = { ...triplets };
+
+  // Surface layering: canvas must sit apart from card, darker in both modes
+  // so white/light cards float and dark cards lift off the page.
+  const bgLum = relativeLuminance(hslTripletToRgb(out.background));
+  const cardLum = relativeLuminance(hslTripletToRgb(out.card));
+  if (Math.abs(bgLum - cardLum) < 0.015) {
+    const dir = bgLum > cardLum ? 1 : -1;
+    for (let d = 1.5; d <= 6; d += 0.5) {
+      const cand = shiftL(out.background, dir * d);
+      if (Math.abs(relativeLuminance(hslTripletToRgb(cand)) - cardLum) >= 0.015) {
+        out.background = cand;
+        break;
+      }
+    }
+  }
+
+  // Text on filled surfaces (buttons, chips, pills).
+  for (const [fillKey, fgKey] of [
+    ['destructive', 'destructive-foreground'],
+    ['primary', 'primary-foreground'],
+    ['accent', 'accent-foreground'],
+    ['secondary', 'secondary-foreground'],
+  ]) {
+    const pair = ensureTextOnFill(out[fgKey], out[fillKey], 4.5);
+    out[fillKey] = pair.fill;
+    out[fgKey] = pair.fg;
+  }
+
+  // Dim text and focus ring against the surfaces they render on.
+  out['muted-foreground'] = ensureTextOnSurfaces(
+    out['muted-foreground'], [out.background, out.card, out.muted], 4.55,
+  );
+  out.ring = ensureTextOnSurfaces(
+    out.ring, [out.background, out.card, out.muted], 3.05,
+  );
+
+  return out;
+}
+
 // ---------- shadow composition ----------
 
+/**
+ * Parse and validate a pixel value string, returning formatted px length.
+ *
+ * @param {string | number} value Pixel length string (e.g. "3px" or 3).
+ * @returns {string} Formatted pixel string.
+ */
 function px(value) {
   const raw = String(value).trim();
   const num = Number(raw.replace(/px$/, ''));
@@ -233,11 +427,14 @@ const presets = Object.entries(source.presets).map(([id, preset]) => {
     darkTriplets[key] = toTriplet(darkValue);
   }
 
+  const normalizedLight = normalizeMode(lightTriplets);
+  const normalizedDark = normalizeMode(darkTriplets);
+
   const lightColors = {};
   const darkColors = {};
   for (const key of COLOR_KEYS) {
-    lightColors[key] = fmtTriplet(lightTriplets[key]);
-    darkColors[key] = fmtTriplet(darkTriplets[key]);
+    lightColors[key] = fmtTriplet(normalizedLight[key]);
+    darkColors[key] = fmtTriplet(normalizedDark[key]);
   }
   lightColors['border-strong'] = deriveBorderStrong(lightTriplets.border, true);
   darkColors['border-strong'] = deriveBorderStrong(darkTriplets.border, false);
@@ -261,7 +458,9 @@ const presets = Object.entries(source.presets).map(([id, preset]) => {
 
 const banner = `// Generated by scripts/generate-theme-presets.mjs from
 // scripts/theme-source/tweakcn-presets.json (${source._meta.source}).
-// DO NOT EDIT MANUALLY — rerun "npm run gen:themes" instead.
+// Colors are normalized for WCAG contrast and canvas/card surface layering
+// (see normalizeMode) — rerun "npm run gen:themes" instead of editing.
+// DO NOT EDIT MANUALLY.
 `;
 
 const body = `${banner}
