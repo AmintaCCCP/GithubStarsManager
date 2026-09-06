@@ -65,10 +65,13 @@ export function buildThemePresetCss(): string {
     // dialog shadow actually lifts above cards instead of all three tokens
     // sharing one flat recipe.
     const base = preset.shadowOpacity ?? 0.1;
+    const subtleOpacity = base;
+    const elevatedOpacity = roundToThreeDecimals(Math.min(0.35, Math.max(subtleOpacity + 0.04, base + 0.06)));
+    const dialogOpacity = roundToThreeDecimals(Math.min(0.5, Math.max(elevatedOpacity + 0.04, base + 0.14)));
     const elevation = [
       `  --app-shadow-subtle: 0 1px 3px hsl(var(--shadow-color) / var(--shadow-opacity));`,
-      `  --app-shadow-elevated: 0 12px 32px hsl(var(--shadow-color) / ${roundToThreeDecimals(Math.min(0.16, base + 0.06))}), 0 2px 6px hsl(var(--shadow-color) / var(--shadow-opacity));`,
-      `  --app-shadow-dialog: 0 20px 48px hsl(var(--shadow-color) / ${roundToThreeDecimals(Math.min(0.3, base + 0.14))}), 0 2px 8px hsl(var(--shadow-color) / var(--shadow-opacity));`,
+      `  --app-shadow-elevated: 0 12px 32px hsl(var(--shadow-color) / ${elevatedOpacity}), 0 2px 6px hsl(var(--shadow-color) / var(--shadow-opacity));`,
+      `  --app-shadow-dialog: 0 20px 48px hsl(var(--shadow-color) / ${dialogOpacity}), 0 2px 8px hsl(var(--shadow-color) / var(--shadow-opacity));`,
     ];
     blocks.push(`[data-theme='${preset.id}'] {\n${[...identityVars, elevation[0], elevation[1], elevation[2], paletteVars(preset.lightColors)].filter(Boolean).join('\n')}\n}`);
     blocks.push(`html.dark[data-theme='${preset.id}'] {\n${paletteVars(preset.darkColors)}\n}`);
