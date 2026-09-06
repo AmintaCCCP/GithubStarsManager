@@ -5,14 +5,36 @@ export const THEME_STYLE_TAG_ID = 'gsm-theme-presets';
 
 type Palette = ThemePreset['lightColors'];
 
+/**
+ * Format a token key as a CSS custom property variable name.
+ *
+ * @param token The token key name (e.g. "background").
+ * @returns The CSS variable name (e.g. "--background").
+ */
 function cssVarName(token: string): string {
   return `--${token}`;
 }
 
+/**
+ * Format a preset palette into a block of indented CSS variable declarations.
+ *
+ * @param palette Record of color token names to HSL triplet values.
+ * @returns Formatted CSS declarations string.
+ */
 function paletteVars(palette: Palette): string {
   return Object.entries(palette)
     .map(([token, value]) => `  ${cssVarName(token)}: ${value};`)
     .join('\n');
+}
+
+/**
+ * Round a numeric value to at most three decimal places for CSS opacity values.
+ *
+ * @param value The floating-point number to round.
+ * @returns Rounded number.
+ */
+function roundToThreeDecimals(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }
 
 /**
@@ -43,11 +65,10 @@ export function buildThemePresetCss(): string {
     // dialog shadow actually lifts above cards instead of all three tokens
     // sharing one flat recipe.
     const base = preset.shadowOpacity ?? 0.1;
-    const r3 = (v: number) => Math.round(v * 1000) / 1000;
     const elevation = [
       `  --app-shadow-subtle: 0 1px 3px hsl(var(--shadow-color) / var(--shadow-opacity));`,
-      `  --app-shadow-elevated: 0 12px 32px hsl(var(--shadow-color) / ${r3(Math.min(0.16, base + 0.06))}), 0 2px 6px hsl(var(--shadow-color) / var(--shadow-opacity));`,
-      `  --app-shadow-dialog: 0 20px 48px hsl(var(--shadow-color) / ${r3(Math.min(0.3, base + 0.14))}), 0 2px 8px hsl(var(--shadow-color) / var(--shadow-opacity));`,
+      `  --app-shadow-elevated: 0 12px 32px hsl(var(--shadow-color) / ${roundToThreeDecimals(Math.min(0.16, base + 0.06))}), 0 2px 6px hsl(var(--shadow-color) / var(--shadow-opacity));`,
+      `  --app-shadow-dialog: 0 20px 48px hsl(var(--shadow-color) / ${roundToThreeDecimals(Math.min(0.3, base + 0.14))}), 0 2px 8px hsl(var(--shadow-color) / var(--shadow-opacity));`,
     ];
     blocks.push(`[data-theme='${preset.id}'] {\n${[...identityVars, elevation[0], elevation[1], elevation[2], paletteVars(preset.lightColors)].filter(Boolean).join('\n')}\n}`);
     blocks.push(`html.dark[data-theme='${preset.id}'] {\n${paletteVars(preset.darkColors)}\n}`);

@@ -164,6 +164,12 @@ export const THEME_PRESETS: ThemePreset[] = (() => {
   return ordered;
 })();
 
+/**
+ * Look up a theme preset by its identifier, falling back to the default preset.
+ *
+ * @param id The theme preset identifier to look up.
+ * @returns The matching ThemePreset or default preset.
+ */
 export function getThemePreset(id: ThemePresetId): ThemePreset {
   const preset = THEME_PRESETS.find((p) => p.id === id);
   return preset ?? DEFAULT_PRESET;
