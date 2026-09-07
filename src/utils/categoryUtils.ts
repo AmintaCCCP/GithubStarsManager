@@ -65,8 +65,7 @@ export const getAICategory = (repo: Repository, allCategories: Category[]): stri
 
     const hasMatch = repo.ai_tags.some(tag =>
       category.keywords.some(keyword =>
-        tag.toLowerCase().includes(keyword.toLowerCase()) ||
-        keyword.toLowerCase().includes(tag.toLowerCase())
+        tag.toLowerCase().includes(keyword.toLowerCase())
       )
     );
 
@@ -151,8 +150,7 @@ const tagMatchesCategory = (
 ): boolean => {
   const tagLower = tag.toLowerCase();
   const keywordMatch = getCategoryKeywords(category).some(keyword =>
-    tagLower.includes(keyword.toLowerCase()) ||
-    keyword.toLowerCase().includes(tagLower)
+    tagLower.includes(keyword.toLowerCase())
   );
   if (keywordMatch) return true;
 
@@ -293,8 +291,7 @@ export const resolveCategoryAssignment = (
       category.name.toLowerCase().includes(tag.toLowerCase()) ||
       tag.toLowerCase().includes(category.name.toLowerCase()) ||
       keywords.some(keyword =>
-        tag.toLowerCase().includes(keyword.toLowerCase()) ||
-        keyword.toLowerCase().includes(tag.toLowerCase())
+        tag.toLowerCase().includes(keyword.toLowerCase())
       )
     );
   });
@@ -304,8 +301,7 @@ export const resolveCategoryAssignment = (
     return normalizedTags.some(tag =>
       category.name.toLowerCase() === tag.toLowerCase() ||
       keywords.some(keyword =>
-        tag.toLowerCase().includes(keyword.toLowerCase()) ||
-        keyword.toLowerCase().includes(tag.toLowerCase())
+        tag.toLowerCase().includes(keyword.toLowerCase())
       )
     );
   });
