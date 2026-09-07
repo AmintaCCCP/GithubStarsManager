@@ -61,7 +61,16 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('bilingual');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(() => {
+    try {
+      const mode = localStorage.getItem('gsm:readme-display-mode');
+      if (mode === 'original' || mode === 'translated' || mode === 'bilingual') return mode;
+    } catch { /* Storage may be disabled. */ }
+    return 'bilingual';
+  });
+  useEffect(() => {
+    try { localStorage.setItem('gsm:readme-display-mode', displayMode); } catch { /* Optional preference. */ }
+  }, [displayMode]);
   const [errorExpanded, setErrorExpanded] = useState(false);
   const [tocWidth, setTocWidth] = useState(224);
   const [translatedHeadingMap, setTranslatedHeadingMap] = useState<Map<string, string>>(new Map());
@@ -316,7 +325,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
   const resetTranslationState = useCallback(() => {
     bilingualRef.current?.revert();
-    setDisplayMode('bilingual');
     setTranslateStatus('idle');
     setTranslateProgress({ current: 0, total: 0 });
     setTranslateError(null);
@@ -454,7 +462,6 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setScrollProgress(0);
       setShowBackToTop(false);
       setActiveHeadingId(null);
-      setDisplayMode('bilingual');
       setErrorExpanded(false);
       bilingualRef.current?.revert();
       setTranslateStatus('idle');
@@ -550,6 +557,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     >
                       <Languages className="w-4 h-4" />
                       <span className="hidden sm:inline">{t('已翻译', 'Translated')}</span>
+                    </Button>
+                    <Button variant="ghost" onClick={() => void bilingualRef.current?.translate(true)}
+                      title={t('忽略缓存，重新请求翻译服务', 'Ignore cache and translate again')}>
+                      {t('重新翻译', 'Retranslate')}
                     </Button>
                     {([
                       { mode: 'original' as DisplayMode, icon: FileText, label: t('原文', 'Original') },

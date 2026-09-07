@@ -1,3 +1,4 @@
+import { translationCacheKey, readTranslationCache, writeTranslationCache } from '../utils/translationCache';
 import { Button } from './ui/button';
 import { memo, useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -17,7 +18,7 @@ export type DisplayMode = 'original' | 'translated' | 'bilingual';
 export type TranslationStatus = 'idle' | 'scanning' | 'translating' | 'translated' | 'error';
 
 export interface BilingualMarkdownRendererHandle {
-  translate: () => Promise<void>;
+  translate: (force?: boolean) => Promise<void>;
   revert: () => void;
   getStatus: () => TranslationStatus;
 }
@@ -124,7 +125,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
     return segments;
   }, []);
 
-  const translate = useCallback(async () => {
+  const translate = useCallback(async (force = false, cacheOnly = false) => {
     const container = containerRef.current;
     if (!container || statusRef.current === 'translating') return;
 
@@ -135,6 +136,10 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       updateStatus('translated');
       return;
     }
+
+    const cacheKey = translationCacheKey(markdown, language, baseUrl);
+    const cachedTexts = force ? undefined : readTranslationCache(cacheKey, segments.length);
+    if (cacheOnly && !cachedTexts) return;
 
     const segmentTexts = segments.map(s => s.text).filter(Boolean);
     const sampleText = segmentTexts.slice(0, 20).join(' ');
@@ -169,9 +174,9 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
 
       const batchSize = 10;
       let completedCount = 0;
-      const translatedTexts: string[] = new Array(segments.length).fill('');
+      const translatedTexts: string[] = cachedTexts ? [...cachedTexts] : new Array(segments.length).fill('');
 
-      for (let i = 0; i < segments.length; i += batchSize) {
+      for (let i = 0; !cachedTexts && i < segments.length; i += batchSize) {
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
         const batchIndices: number[] = [];
@@ -224,6 +229,9 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
           onProgressRef.current?.(completedCount, segments.length);
         }
       }
+
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      if (!cachedTexts) writeTranslationCache(cacheKey, translatedTexts);
 
       const inlineContainerTags = new Set(['LI', 'TD', 'TH', 'DT', 'DD']);
 
@@ -284,14 +292,14 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       setProgress({ current: segments.length, total: segments.length });
       onProgressRef.current?.(segments.length, segments.length);
     } catch (err) {
-      if ((err as { name?: string })?.name === 'AbortError') {
-        updateStatus('idle');
+      if (signal.aborted || (err as { name?: string })?.name === 'AbortError') {
+        if (abortRef.current?.signal === signal) updateStatus('idle');
         return;
       }
       setError(err instanceof Error ? err.message : 'Translation failed');
       updateStatus('error');
     }
-  }, [language, scan, updateStatus, removeTranslations, translateBatch]);
+  }, [markdown, baseUrl, language, scan, updateStatus, removeTranslations, translateBatch]);
 
   const revert = useCallback(() => {
     if (abortRef.current) {
@@ -314,12 +322,13 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
     const timer = setTimeout(() => {
       if (containerRef.current) {
         scan();
-        if (autoTranslate) {
-          translate();
-        }
+        void translate(false, !autoTranslate);
       }
     }, 150);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
   }, [markdown, autoTranslate, revert, scan, translate]);
 
   useEffect(() => {
