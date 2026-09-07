@@ -76,7 +76,7 @@ function makeSliceHarness(options: {
     createUserList: vi.fn().mockResolvedValue('L_new'),
     updateUserList: vi.fn().mockResolvedValue(undefined),
     updateUserListsForItem: vi.fn().mockResolvedValue(undefined),
-    resolveRepositoryNodeIds: vi.fn().mockResolvedValue(new Map()),
+    resolveRepositoryNodeIds: vi.fn().mockResolvedValue(new Map([['owner/my-cli-app', 'R_cli']])),
   };
   const slice = createRepositorySlice(set as never, get as never);
   const push = () => slice.pushCategoriesToLists(api as never);
@@ -157,5 +157,101 @@ describe('pushCategoriesToLists 语言切换自动重命名', () => {
 
     expect(api.createUserList).toHaveBeenCalledWith('Development Tools', true);
     expect(state.categoryListIdMap.devtools).toBe('L_new');
+  });
+});
+
+describe('pushCategoriesToLists partial sync recovery', () => {
+  const custom = (id: string, name: string, keywords = ['cli']) => ({ id, name, keywords, icon: '📁', isCustom: true });
+  const remoteLists = (count: number) => Array.from({ length: count }, (_, i) => ({ id: `L_${i}`, name: `Unmanaged ${i}`, items: [] as string[] }));
+
+  it('fills existing lists at capacity, preserves unmanaged memberships, and reports omitted categories', async () => {
+    const currentLists = remoteLists(31);
+    currentLists[0].items = ['owner/my-cli-app'];
+    currentLists.push({ id: 'L_tools', name: 'Development Tools', items: [] });
+    const { push, api, state } = makeSliceHarness({ currentLists });
+    state.customCategories = [custom('extra', 'Extra')];
+    await push();
+    expect(api.createUserList).not.toHaveBeenCalled();
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('R_cli', ['L_0', 'L_tools']);
+    expect(state.listsPush.error).toContain('32-list limit reached');
+    expect(state.listsPush.error).toContain('Extra');
+    expect(state.listsPush.error).toContain('updated 1 repos');
+    expect(state.listsPush.message).toBeNull();
+  });
+
+  it('does not create lists for empty categories', async () => {
+    const { push, api, state } = makeSliceHarness({ currentLists: [] });
+    state.customCategories = [custom('empty', 'Empty', ['unmatched-xyz'])];
+    await push();
+    expect(api.createUserList).toHaveBeenCalledTimes(1);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('R_cli', ['L_new']);
+    expect(state.listsPush.error).toBeNull();
+    expect(state.listsPush.message).toContain('created 1, updated 1 repos');
+  });
+
+  it('continues to later existing lists if GitHub rejects creation at capacity', async () => {
+    const { push, api, state } = makeSliceHarness({ currentLists: [{ id: 'L_extra', name: 'Extra', items: [] }] });
+    state.customCategories = [custom('extra', 'Extra'), custom('other', 'Other')];
+    api.createUserList.mockRejectedValue(new Error('cannot have more than 32 lists'));
+    await push();
+    expect(api.createUserList).toHaveBeenCalledTimes(1);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('R_cli', ['L_extra']);
+    expect(state.categoryListIdMap.extra).toBe('L_extra');
+    expect(state.listsPush.error).toContain('Development Tools');
+    expect(state.listsPush.error).toContain('Other');
+    expect(state.listsPush.error).toContain('updated 1 repos');
+  });
+
+  it('counts newly created lists against the remaining slots', async () => {
+    const { push, api, state } = makeSliceHarness({ currentLists: remoteLists(31) });
+    state.customCategories = [custom('extra', 'Extra')];
+    await push();
+    expect(api.createUserList).toHaveBeenCalledTimes(1);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('R_cli', ['L_new']);
+    expect(state.listsPush.error).toContain('Extra');
+  });
+
+  it('reports unresolved repository IDs rather than a successful zero-update push', async () => {
+    const { push, api, state } = makeSliceHarness({ currentLists: [] });
+    api.resolveRepositoryNodeIds.mockResolvedValue(new Map());
+    await push();
+    expect(api.updateUserListsForItem).not.toHaveBeenCalled();
+    expect(state.listsPush.error).toContain('Repository IDs unresolved');
+    expect(state.listsPush.error).toContain('owner/my-cli-app');
+    expect(state.categoryListIdMap.devtools).toBe('L_new');
+  });
+
+  it('keeps created list mappings when a later repository API call fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { push, api, state } = makeSliceHarness({ currentLists: [] });
+      api.updateUserListsForItem.mockRejectedValue(new Error('network down'));
+      await push();
+      expect(state.categoryListIdMap.devtools).toBe('L_new');
+      expect(state.listsPush.error).toContain('created 1 lists, updated 0 repos');
+      expect(state.listsPush.error).toContain('network down');
+      expect(state.listsPush.isRunning).toBe(false);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('still removes stale memberships from existing empty managed categories', async () => {
+    const { push, api, state } = makeSliceHarness({
+      currentLists: [{ id: 'L_tools', name: 'Development Tools', items: ['owner/my-cli-app'] },
+        { id: 'L_keep', name: 'Personal', items: ['owner/my-cli-app'] }],
+      repositories: [makeRepo({ custom_category: '' })],
+    });
+    await push();
+    expect(api.createUserList).not.toHaveBeenCalled();
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('R_cli', ['L_keep']);
+    expect(state.listsPush.error).toBeNull();
+  });
+
+  it('reports capacity failure even when no lists can be filled', async () => {
+    const { push, api, state } = makeSliceHarness({ currentLists: remoteLists(32) });
+    await push();
+    expect(api.createUserList).not.toHaveBeenCalled();
+    expect(api.updateUserListsForItem).not.toHaveBeenCalled();
+    expect(state.listsPush.error).toContain('Push incomplete');
+    expect(state.listsPush.error).toContain('Development Tools');
   });
 });

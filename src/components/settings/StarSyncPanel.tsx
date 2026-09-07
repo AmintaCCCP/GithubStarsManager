@@ -56,7 +56,7 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
         <CardHeader>
           <div className="flex items-center space-x-3">
             <GitBranch className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
-            <div><CardTitle>{t('同步仓库分类到 GitHub list', 'Push categories to GitHub lists')}</CardTitle><p className="mt-1 text-sm font-normal text-muted-foreground dark:text-muted-foreground">{t('将每个本地分类写回为同名 GitHub List。同名 list 将被覆盖，无同名 list 则新建。', 'Write each local category to a GitHub List of the same name. Same-name lists are overwritten, missing lists are created.')}</p></div>
+            <div><CardTitle>{t('同步仓库分类到 GitHub list', 'Push categories to GitHub lists')}</CardTitle><p className="mt-1 text-sm font-normal text-muted-foreground dark:text-muted-foreground">{t('将本地分类写回 GitHub List，覆盖已匹配列表的成员。仅为非空分类新建列表；达到 32 个上限后仍同步已有列表，并提示未同步分类。', 'Push local categories to GitHub Lists, replacing memberships in matched lists. Create lists only for non-empty categories; at the 32-list limit, still populate existing lists and report omitted categories.')}</p></div>
           </div>
         </CardHeader>
         <CardContent>

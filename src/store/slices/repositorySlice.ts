@@ -170,6 +170,8 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
         set({ listsPush: { isRunning: true, total: 0, done: 0, currentLabel: null, message: null, error: null } });
 
+        let createdCount = 0;
+        let updatedCount = 0;
         try {
           const { user, repositories, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryListIdMap } = get();
 
@@ -193,6 +195,22 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           const managedListIds = new Set<string>();
           const nextCategoryListIdMap = { ...categoryListIdMap };
           const renameFailures: string[] = [];
+          const skippedCategories: string[] = [];
+          let remainingSlots = Math.max(0, 32 - currentLists.length);
+          const finish = (total: number, done: number, unresolved: string[] = []) => {
+            const summary = t(
+              `已匹配 ${listIdByCategoryId.size} 个 list、新建 ${createdCount} 个、实际更新 ${updatedCount} 个仓库`,
+              `Matched ${listIdByCategoryId.size} lists, created ${createdCount}, updated ${updatedCount} repos`
+            );
+            const warnings = [
+              skippedCategories.length ? t(`未同步分类：${skippedCategories.join('；')}`, `Categories not pushed: ${skippedCategories.join('; ')}`) : '',
+              unresolved.length ? t(`无法解析仓库 ID，未更新：${unresolved.join('、')}`, `Repository IDs unresolved, not updated: ${unresolved.join(', ')}`) : '',
+            ].filter(Boolean);
+            set({ listsPush: { isRunning: false, total, done, currentLabel: null,
+              message: warnings.length ? null : summary,
+              error: warnings.length ? `${summary}。${t('同步未全部完成', 'Push incomplete')}：${warnings.join('；')}` : null,
+            }, categoryListIdMap: nextCategoryListIdMap });
+          };
           for (const cat of allCategories) {
             const persistedId = categoryListIdMap[cat.id];
             const existing = persistedId ? currentLists.find(l => l.id === persistedId) : undefined;
@@ -230,13 +248,32 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
               }
               listIdByCategoryId.set(cat.id, matchedList.id);
               nextCategoryListIdMap[cat.id] = matchedList.id;
+              set({ categoryListIdMap: { ...nextCategoryListIdMap } });
               managedListIds.add(matchedList.id);
               continue;
             }
-            const id = await api.createUserList(cat.name, true);
-            listIdByCategoryId.set(cat.id, id);
-            nextCategoryListIdMap[cat.id] = id;
-            managedListIds.add(id);
+            // Empty new categories need no list. Existing managed lists still participate
+            // so their stale memberships can be removed under the normal push semantics.
+            if (!repositories.some(repo => matchesCategory(repo, cat, 'effective'))) continue;
+            if (remainingSlots === 0) {
+              skippedCategories.push(`${cat.name} (${t('已达到 32 个 list 上限', '32-list limit reached')})`);
+              continue;
+            }
+            try {
+              const id = await api.createUserList(cat.name, true);
+              createdCount++;
+              remainingSlots--;
+              listIdByCategoryId.set(cat.id, id);
+              nextCategoryListIdMap[cat.id] = id;
+              managedListIds.add(id);
+              // Persist immediately: a later API failure must not lose created list identities.
+              set({ categoryListIdMap: { ...nextCategoryListIdMap } });
+            } catch (error) {
+              const reason = error instanceof Error ? error.message : String(error);
+              if (/cannot have more than 32 lists/i.test(reason)) remainingSlots = 0;
+              skippedCategories.push(`${cat.name} (${reason})`);
+              // Still populate the lists that exist; never delete remote lists to make room.
+            }
           }
           if (renameFailures.length > 0) {
             logger.warn('githubLists', 'Some lists failed to rename, will retry next push', { failures: renameFailures });
@@ -287,7 +324,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           }
 
           if (reposToUpdate.size === 0) {
-            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: t('没有仓库命中任何分类', 'No repos matched any category'), error: null } });
+            finish(0, 0);
             return;
           }
 
@@ -300,14 +337,17 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           const nodeIdMap = await api.resolveRepositoryNodeIds(ownerNamePairs);
 
           // 7. 覆盖写入（保留非托管 list 成员），逐仓库更新进度
-          let updatedCount = 0;
+          const unresolved: string[] = [];
           let done = 0;
           const total = reposToUpdate.size;
           for (const [key, targetIds] of reposToUpdate) {
             done++;
             set({ listsPush: { isRunning: true, total, done, currentLabel: key, message: null, error: null } });
             const itemId = nodeIdMap.get(key);
-            if (!itemId) continue;
+            if (!itemId) {
+              unresolved.push(key);
+              continue;
+            }
             const currentIds = repoCurrentListIds.get(key) || new Set<string>();
             const preservedIds = [...currentIds].filter(id => !managedListIds.has(id));
             const finalListIds = [...new Set([...preservedIds, ...targetIds])];
@@ -318,14 +358,14 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             updatedCount++;
           }
 
-          set({ listsPush: { isRunning: false, total, done, currentLabel: null, message: t(
-            `已同步 ${listIdByCategoryId.size} 个 list、更新 ${updatedCount} 个仓库`,
-            `Pushed ${listIdByCategoryId.size} lists, updated ${updatedCount} repos`
-          ), error: null }, categoryListIdMap: nextCategoryListIdMap });
+          finish(total, done, unresolved);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error('Push categories to lists failed:', error);
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('同步失败', 'Push failed') + `: ${message}` } });
+          set({ listsPush: { ...get().listsPush, isRunning: false, currentLabel: null, message: null,
+            error: t(`同步中断（已新建 ${createdCount} 个 list、实际更新 ${updatedCount} 个仓库）`,
+              `Push interrupted (created ${createdCount} lists, updated ${updatedCount} repos)`) + `: ${message}`,
+          } });
         }
       },
       deleteRepository: (repoId) => set((state) => {
