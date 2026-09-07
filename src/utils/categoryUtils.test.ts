@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Category, Repository } from '../types';
-import { getEffectiveTags, matchesCategory, resolveCategoryAssignment, buildCategoryHints } from './categoryUtils';
+import { getAICategory, getEffectiveTags, matchesCategory, resolveCategoryAssignment, buildCategoryHints } from './categoryUtils';
 
 const aiCategory: Category = {
   id: 'ai',
@@ -586,5 +586,39 @@ describe('resolveCategoryAssignment summary-only metadata match', () => {
       custom_category: undefined,
     };
     expect(resolveCategoryAssignment(repository, ['开发工具'], [customSkills, aiCategory])).toBe(undefined);
+  });
+});
+
+describe('category keyword direction', () => {
+  const gameCategory: Category = {
+    id: 'game', name: '游戏', icon: '🎮',
+    keywords: ['游戏', 'game', 'gaming', 'unity', 'unreal', 'godot'],
+  };
+
+  it.each(['legacy', 'effective'] as const)('does not classify Go tags as Godot in %s mode', (mode) => {
+    const repository = { ...baseRepository, ai_tags: ['Go'] };
+    expect(matchesCategory(repository, gameCategory, mode)).toBe(false);
+    expect(getAICategory(repository, [gameCategory])).toBe('');
+  });
+
+  it('does not classify Go topics as Godot', () => {
+    const repository = { ...baseRepository, ai_tags: [], topics: ['go', 'docker'] };
+    expect(matchesCategory(repository, gameCategory, 'effective')).toBe(false);
+  });
+
+  it.each(['godot', 'godot-engine', 'gaming', '游戏开发'])('keeps matching relevant tag %s', (tag) => {
+    const repository = { ...baseRepository, ai_tags: [tag] };
+    expect(matchesCategory(repository, gameCategory, 'effective')).toBe(true);
+    expect(getAICategory(repository, [gameCategory])).toBe('游戏');
+  });
+
+  it('does not assign a custom Godot category to Go tags', () => {
+    const category = { ...gameCategory, isCustom: true };
+    expect(resolveCategoryAssignment(baseRepository, ['Go'], [category])).toBeUndefined();
+  });
+
+  it('preserves a locked manual game category', () => {
+    const repository = { ...baseRepository, ai_tags: ['Go'], custom_category: '游戏', category_locked: true };
+    expect(matchesCategory(repository, gameCategory, 'effective')).toBe(true);
   });
 });
