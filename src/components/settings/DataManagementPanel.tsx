@@ -487,7 +487,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         'hot-release': [],
         'most-popular': [],
         'topic': [],
-        'search': []
+        'search': [],
+        'code-search': []
       } as Record<string, DiscoveryRepo[]>;
       useAppStore.setState({
         discoveryRepos: emptyDiscoveryRepos,
@@ -496,7 +497,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'hot-release': null,
           'most-popular': null,
           'topic': null,
-          'search': null
+          'search': null,
+          'code-search': null
         }
       });
       addLog(t('删除发现页缓存数据', 'Delete discovery cache data'), true);

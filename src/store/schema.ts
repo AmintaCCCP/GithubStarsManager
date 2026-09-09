@@ -487,4 +487,12 @@ export const defaultDiscoveryChannels: DiscoveryChannel[] = [
     description: '自定义搜索发现新项目',
     enabled: true,
   },
+  {
+    id: 'code-search',
+    name: '高级搜索',
+    nameEn: 'Code Search',
+    icon: 'search',
+    description: 'grep.app 代码全文检索，支持正则与仓库/路径/语言过滤',
+    enabled: true,
+  },
 ];

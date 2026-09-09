@@ -299,11 +299,11 @@ state.discoverySortOrder = 'Descending';
   // discoveryIsLoading 不应持久化，migrate 时始终重置防止旧数据格式异常导致 spread 崩溃
   if (state) {
 (state as Record<string, unknown>).discoveryIsLoading = {
-'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false,
+'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'search': false, 'code-search': false,
 };
 // discoveryScrollPositions 同样不应持久化，重置以避免 stale 滚动位置
 (state as Record<string, unknown>).discoveryScrollPositions = {
-'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0,
+'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'search': 0, 'code-search': 0,
 };
   }
 

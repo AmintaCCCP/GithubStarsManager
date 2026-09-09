@@ -60,6 +60,15 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
             '【Features】\n• Custom keyword search\n• Sort options: Best match, Most stars, Most forks\n• Language and platform filters\n\n【Best for】\nPrecise search for specific projects or tech stack related repos.'
           ),
         };
+      case 'code-search':
+        return {
+          title: t('高级搜索', 'Code Search'),
+          highlight: t('🔍 grep.app 代码全文检索', '🔍 Full-text code search via grep.app'),
+          description: t(
+            '【特点】\n• 模糊 / 全词 / 正则三种匹配，可叠加区分大小写\n• 仓库 / 路径 / 语言过滤器动态筛选\n• 支持只看我收藏的仓库\n\n【适合场景】\n在公开仓库代码中定位用法、配置与示例。',
+            '【Features】\n• Fuzzy / whole-word / regexp modes, optional case sensitivity\n• Dynamic repo / path / language facets\n• Optional starred-only filter\n\n【Best for】\nFinding usages, configs and examples across public code.'
+          ),
+        };
       default:
         return {
           title: t('排序算法', 'Sorting Algorithm'),

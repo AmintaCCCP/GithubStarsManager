@@ -609,7 +609,7 @@ export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
 
 export type SortOrder = 'Descending' | 'Ascending';
 
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search';
+export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search' | 'code-search';
 
 export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'search';
 
