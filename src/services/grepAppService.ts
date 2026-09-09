@@ -74,6 +74,7 @@ function toBucketList(input: unknown): GrepFacetBucket[] {
     .filter((bucket) => bucket.val !== '');
 }
 
+/** 拼接 grep.app 搜索 URL：多值过滤重复传参，全词与正则互斥由调用方保证。 */
 export function buildGrepSearchUrl(params: GrepSearchParams): string {
   const query = new URLSearchParams();
   query.set('q', params.q);
@@ -93,6 +94,7 @@ export function buildGrepSearchUrl(params: GrepSearchParams): string {
   return `${GREP_APP_SEARCH_URL}?${query.toString()}`;
 }
 
+/** 归一化 grep.app 响应：兼容纯字符串与旧 `{raw}` 包裹两种命中形状。 */
 export function normalizeGrepSearchResponse(data: unknown): GrepSearchResult {
   const root = (data ?? {}) as Record<string, unknown>;
   const facets = (root.facets ?? {}) as Record<string, unknown>;
@@ -126,6 +128,7 @@ export function normalizeGrepSearchResponse(data: unknown): GrepSearchResult {
   return { total, repoFacets, pathFacets, langFacets, hits };
 }
 
+/** 判断错误是否为 grep.app 限流（HTTP 429），供重试 UI 使用。 */
 export function isGrepRateLimitError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const status = (error as { status?: unknown }).status;
@@ -138,6 +141,10 @@ export interface GrepSearchOptions {
   fetchImpl?: typeof fetch;
 }
 
+/**
+ * 执行一次 grep.app 搜索：空查询直接返回空结果；支持外部取消与超时取消；
+ * 429 抛出带 `status` 的错误，其余非 2xx 同理。
+ */
 export async function searchGrepApp(
   params: GrepSearchParams,
   options: GrepSearchOptions = {}
@@ -190,22 +197,35 @@ export function filterStarredHits(hits: GrepCodeHit[], starredFullNames: Iterabl
 }
 
 /**
- * 最小化消毒：去掉可执行载荷，保留 pygments highlight-table 排版与 <mark> 高亮。
- * 不引入 DOMPurify 新依赖，避免包体积变化。
+ * 最小化消毒：DOMParser 允许名单实现，仅保留 pygments highlight-table
+ * 排版与 `<mark>` 高亮所需的标签，剥离其余元素（保留子节点文本）与全部属性。
+ * 不引入 DOMPurify 新依赖，避免包体积变化。仅运行于浏览器/jsdom 环境。
  */
 export function sanitizeGrepSnippet(html: string): string {
   if (!html) return '';
-  let safe = html
-    .replace(/<script[\s\S]*?<\/script\s*>/gi, '')
-    .replace(/<style[\s\S]*?<\/style\s*>/gi, '')
-    .replace(/<(iframe|object|embed|form|input|button|link|meta)[\s\S]*?(<\/\1\s*>|>)/gi, '')
-    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/(href|src|xlink:href)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1=$2#$2');
-  // 仅允许排版与高亮标签，其余转义
-  const allowed = new Set(['table', 'tr', 'td', 'div', 'pre', 'span', 'mark', 'br', 'code']);
-  safe = safe.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)(\s[^<>]*)?\/?>/g, (tag, tagName: string) => {
-    if (allowed.has(tagName.toLowerCase())) return tag;
-    return tag.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  });
-  return safe;
+  const allowed = new Set([
+    'TABLE', 'TBODY', 'THEAD', 'TR', 'TD', 'DIV',
+    'PRE', 'SPAN', 'MARK', 'BR', 'CODE',
+  ]);
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  // 可执行/样式元素连内容整体移除，避免解包后残留脚本正文
+  doc.querySelectorAll('script, style').forEach((el) => el.remove());
+
+  const sanitizeChildren = (parent: Element): void => {
+    for (const child of Array.from(parent.children)) {
+      sanitizeChildren(child);
+      if (!allowed.has(child.tagName)) {
+        // 非允许名单元素：解包保留子节点（文本/高亮）后移除
+        child.replaceWith(...Array.from(child.childNodes));
+        continue;
+      }
+      // 允许名单元素：剥离全部属性（含 on* 事件与 javascript: 伪协议）
+      for (const attr of Array.from(child.attributes)) {
+        child.removeAttribute(attr.name);
+      }
+    }
+  };
+
+  sanitizeChildren(doc.body);
+  return doc.body.innerHTML;
 }

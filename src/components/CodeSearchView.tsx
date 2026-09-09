@@ -29,6 +29,7 @@ function toggleInSet(prev: Set<string>, value: string): Set<string> {
   return next;
 }
 
+/** 分面筛选组：渲染带计数的多选 chips，超限可展开。 */
 const FacetGroup: React.FC<{
   title: string;
   buckets: GrepFacetBucket[];
@@ -78,6 +79,7 @@ const FacetGroup: React.FC<{
   );
 };
 
+/** 单条代码命中卡片：消毒后的 snippet 经 innerHTML 渲染，链接均指向 GitHub。 */
 const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, en: string) => string }> = ({
   hit,
   isStarred,
@@ -152,6 +154,7 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, 
   );
 };
 
+/** 代码高级搜索视图：实时防抖查询 + 匹配模式 + 分面筛选 + 收藏过滤 + 分页。 */
 export const CodeSearchView: React.FC = () => {
   const { repositories, language } = useAppStore(
     useShallow((state) => ({ repositories: state.repositories, language: state.language }))
@@ -491,7 +494,7 @@ export const CodeSearchView: React.FC = () => {
               {t('正在加载更多…', 'Loading more…')}
             </div>
           )}
-          {!loadingMore && hasMore && visibleHits.length > 0 && (
+          {!loadingMore && hasMore && (visibleHits.length > 0 || starredOnly) && (
             <div className="flex justify-center pt-1">
               <Button
                 variant="outline"

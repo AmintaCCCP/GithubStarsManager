@@ -814,9 +814,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
           </div>
 
           {/* 内容区域 */}
-          <div 
+          <div
             ref={scrollContainerRef}
-            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-card dark:bg-card' : ''}`}
+            className="flex-1 overflow-y-auto space-y-4 pr-2"
           >
             {selectedDiscoveryChannel === 'code-search' && <CodeSearchView />}
             {selectedDiscoveryChannel !== 'code-search' && (
@@ -928,7 +928,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('搜索发现', 'Search & Discover')}
+                        {t('简单搜索', 'Simple Search')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                         {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}

@@ -481,8 +481,8 @@ export const defaultDiscoveryChannels: DiscoveryChannel[] = [
   },
   {
     id: 'search',
-    name: '搜索发现',
-    nameEn: 'Search',
+    name: '简单搜索',
+    nameEn: 'Simple Search',
     icon: 'search',
     description: '自定义搜索发现新项目',
     enabled: true,

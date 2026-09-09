@@ -64,6 +64,14 @@ describe('grepAppService', () => {
     expect(out).toContain('<mark>x</mark>');
     expect(out).not.toContain('<script>');
     expect(out).not.toContain('onclick');
+    expect(out).not.toContain('alert(1)');
+  });
+
+  it('strips slash-glued event handlers that bypass whitespace regexes', () => {
+    const out = sanitizeGrepSnippet('<div/onclick=alert(1)>x</div>');
+    expect(out).not.toContain('onclick');
+    expect(out).not.toContain('alert(1)');
+    expect(out).toContain('x');
   });
 
   it('marks 429 with status for retry UI', async () => {
