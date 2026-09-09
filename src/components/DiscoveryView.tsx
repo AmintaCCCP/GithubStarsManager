@@ -21,6 +21,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
+import { CodeSearchView } from './CodeSearchView';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
 import { ScrollToBottom } from './ScrollToBottom';
 import { Input } from './ui/input';
@@ -497,10 +498,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
     const savedPosition = discoveryScrollPositionsRef.current[selectedDiscoveryChannel] || 0;
     window.scrollTo({ top: savedPosition, behavior: 'auto' });
     
-    // 取消持久化后，首次打开或切换到空频道时自动加载
+    // 取消持久化后，首次打开或切换到空频道时自动加载（代码搜索走本地实时请求，不参与自动拉取）
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
     const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (selectedDiscoveryChannel !== 'topic' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
+    if (selectedDiscoveryChannel !== 'topic' && selectedDiscoveryChannel !== 'code-search' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
       autoFetchChannelRef.current = selectedDiscoveryChannel;
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
@@ -602,7 +603,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
   ]);
 
   const refreshAll = useCallback(async () => {
-    const enabledChannels = safeDiscoveryChannels.filter(ch => ch.enabled);
+    const enabledChannels = safeDiscoveryChannels.filter(ch => ch.enabled && ch.id !== 'code-search');
     for (const channel of enabledChannels) {
       await refreshChannel(channel.id, 1, false);
     }
@@ -690,6 +691,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                   </div>
                 </div>
+                {selectedDiscoveryChannel !== 'code-search' && (
                 <div className="relative group/refresh shrink-0">
                   <Button
                     variant="ghost"
@@ -710,9 +712,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     </div>
                   )}
                 </div>
+                )}
               </div>
               
-              {/* 第二行：筛选和操作按钮 */}
+              {/* 第二行：筛选和操作按钮（代码搜索频道使用自有工具条，此处隐藏仓库维度控件） */}
+              {selectedDiscoveryChannel !== 'code-search' && (
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'trending' && (
             <div className="flex items-center gap-1.5">
@@ -805,14 +809,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   />
                 </div>
               </div>
+              )}
             </div>
           </div>
 
           {/* 内容区域 */}
-          <div 
+          <div
             ref={scrollContainerRef}
-            className={`flex-1 overflow-y-auto space-y-4 pr-2 ${isDesktopSafeMode ? 'bg-card dark:bg-card' : ''}`}
+            className="flex-1 overflow-y-auto space-y-4 pr-2"
           >
+            {selectedDiscoveryChannel === 'code-search' && <CodeSearchView />}
+            {selectedDiscoveryChannel !== 'code-search' && (
+            <>
             {selectedDiscoveryChannel === 'search' && (
               <div className={isDesktopSafeMode
                 ? 'ui-toolbar p-4 space-y-4'
@@ -920,7 +928,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('搜索发现', 'Search & Discover')}
+                        {t('简单搜索', 'Simple Search')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
                         {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}
@@ -1024,6 +1032,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 totalCount={currentTotalCount}
                 language={language}
               />
+            )}
+            </>
             )}
 
 

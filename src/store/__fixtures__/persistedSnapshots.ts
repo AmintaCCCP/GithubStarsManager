@@ -21,7 +21,7 @@ export const buildPersistedSnapshot = (
 });
 
 /**
- * Creates the five-channel shape used by legacy discovery snapshots. The
+ * Creates the six-channel shape used by legacy discovery snapshots. The
  * values are intentionally non-default so reset behavior is observable.
  */
 export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
@@ -31,6 +31,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': [],
     topic: [],
     search: [],
+    'code-search': [],
   },
   discoveryIsLoading: {
     trending: true,
@@ -38,6 +39,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': true,
     topic: true,
     search: true,
+    'code-search': true,
   },
   discoveryLastRefresh: {
     trending: '2026-02-01T00:00:00.000Z',
@@ -45,6 +47,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': '2026-02-03T00:00:00.000Z',
     topic: '2026-02-04T00:00:00.000Z',
     search: '2026-02-05T00:00:00.000Z',
+    'code-search': '2026-02-06T00:00:00.000Z',
   },
   discoveryTotalCount: {
     trending: 100,
@@ -52,6 +55,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': 60,
     topic: 40,
     search: 20,
+    'code-search': 10,
   },
   discoveryHasMore: {
     trending: true,
@@ -59,6 +63,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': true,
     topic: true,
     search: true,
+    'code-search': true,
   },
   discoveryNextPage: {
     trending: 6,
@@ -66,6 +71,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': 4,
     topic: 3,
     search: 2,
+    'code-search': 2,
   },
   discoveryScrollPositions: {
     trending: 120,
@@ -73,6 +79,7 @@ export const buildTransientDiscoverySnapshot = (): PersistedSnapshot => ({
     'most-popular': 40,
     topic: 20,
     search: 10,
+    'code-search': 5,
   },
 });
 
@@ -83,6 +90,7 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': [],
     topic: [],
     search: [],
+    'code-search': [],
   },
   discoveryLastRefresh: {
     trending: null,
@@ -90,6 +98,7 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': null,
     topic: null,
     search: null,
+    'code-search': null,
   },
   discoveryTotalCount: {
     trending: 0,
@@ -97,6 +106,7 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': 0,
     topic: 0,
     search: 0,
+    'code-search': 0,
   },
   discoveryHasMore: {
     trending: false,
@@ -104,6 +114,7 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': false,
     topic: false,
     search: false,
+    'code-search': false,
   },
   discoveryNextPage: {
     trending: 1,
@@ -111,6 +122,7 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': 1,
     topic: 1,
     search: 1,
+    'code-search': 1,
   },
   discoveryIsLoading: {
     trending: false,
@@ -118,6 +130,7 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': false,
     topic: false,
     search: false,
+    'code-search': false,
   },
   discoveryScrollPositions: {
     trending: 0,
@@ -125,5 +138,6 @@ export const buildExpectedResetDiscoveryState = () => ({
     'most-popular': 0,
     topic: 0,
     search: 0,
+    'code-search': 0,
   },
 });
