@@ -49,15 +49,14 @@ function getSortValue(repo: Repository, sortBy: SearchFilters['sortBy']): number
       return Number.isFinite(stars) ? stars : 0;
     }
     case 'updated':
-      // The control is labelled “recently updated”, so use GitHub's updated_at
-      // rather than pushed_at (which drives the separate “last pushed” card label).
-      return toSortableTimestamp(repo.updated_at || repo.pushed_at);
+      // “按更新排序”按最近代码变更（push）排序，用 GitHub 的 pushed_at。
+      return toSortableTimestamp(repo.pushed_at || repo.updated_at);
     case 'name':
       return repo.name.toLocaleLowerCase();
     case 'starred':
       return toSortableTimestamp(repo.starred_at);
     default:
-      return toSortableTimestamp(repo.updated_at || repo.pushed_at);
+      return toSortableTimestamp(repo.pushed_at || repo.updated_at);
   }
 }
 

@@ -95,10 +95,10 @@ describe('applyRepoFilters', () => {
     expect(hits.map((r) => r.id)).toEqual([1, 3, 2]);
   });
 
-  it('sorts recently updated repositories by GitHub updated_at rather than last pushed_at', () => {
+  it('sorts recently updated repositories by GitHub pushed_at (last code change)', () => {
     const repositories = [
-      makeRepo({ id: 10, name: 'older-update', full_name: 'acme/older-update', updated_at: '2026-01-01T00:00:00Z', pushed_at: '2026-06-01T00:00:00Z' }),
-      makeRepo({ id: 11, name: 'newer-update', full_name: 'acme/newer-update', updated_at: '2026-05-01T00:00:00Z', pushed_at: '2026-02-01T00:00:00Z' }),
+      makeRepo({ id: 10, name: 'older-push', full_name: 'acme/older-push', updated_at: '2026-05-01T00:00:00Z', pushed_at: '2026-01-01T00:00:00Z' }),
+      makeRepo({ id: 11, name: 'newer-push', full_name: 'acme/newer-push', updated_at: '2026-02-01T00:00:00Z', pushed_at: '2026-06-01T00:00:00Z' }),
     ];
 
     const hits = applyRepoFilters(repositories, { sortBy: 'updated', sortOrder: 'desc' });
