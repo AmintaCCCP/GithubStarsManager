@@ -40,10 +40,28 @@ export interface McpElectronAPI {
   getStatus: () => Promise<{ running: boolean; url?: string; error?: string }>;
 }
 
+/** Desktop client prefs: auto-launch + tray behavior (#345). Electron only. */
+export interface DesktopPrefs {
+  autoLaunch: boolean;
+  closeToTray: boolean;
+  minimizeToTray: boolean;
+}
+
+export type DesktopPrefsResult = { success: boolean; prefs?: DesktopPrefs; error?: string };
+
+export interface DesktopElectronAPI {
+  getPrefs: () => Promise<DesktopPrefs>;
+  setAutoLaunch: (enabled: boolean) => Promise<DesktopPrefsResult>;
+  setCloseToTray: (enabled: boolean) => Promise<DesktopPrefsResult>;
+  setMinimizeToTray: (enabled: boolean) => Promise<DesktopPrefsResult>;
+  show: () => Promise<{ success: boolean }>;
+}
+
 interface ElectronAPI {
   setProxy: (config: ProxyConfig) => Promise<{ success: boolean }>;
   getProxy: () => Promise<ProxyConfig>;
   testProxy: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>;
+  desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
 }
 
@@ -73,5 +91,56 @@ export const electronProxy = {
       return { success: false, error: 'Not running in Electron' };
     }
     return window.electronAPI.testProxy(config);
+  },
+};
+
+/** Default prefs mirror the main-process defaults; used before IPC resolves. */
+export const DEFAULT_DESKTOP_PREFS: DesktopPrefs = {
+  autoLaunch: false,
+  closeToTray: true,
+  minimizeToTray: true,
+};
+
+/** Desktop (auto-launch + tray) bridge. No-op when not in the Electron client. */
+export const desktopBridge = {
+  isSupported(): boolean {
+    return isElectron() && !!window.electronAPI?.desktop;
+  },
+
+  async getPrefs(): Promise<DesktopPrefs> {
+    if (!window.electronAPI?.desktop) return { ...DEFAULT_DESKTOP_PREFS };
+    try {
+      return await window.electronAPI.desktop.getPrefs();
+    } catch {
+      return { ...DEFAULT_DESKTOP_PREFS };
+    }
+  },
+
+  async setAutoLaunch(enabled: boolean): Promise<DesktopPrefsResult> {
+    if (!window.electronAPI?.desktop) {
+      return { success: false, error: 'Not running in Electron' };
+    }
+    return window.electronAPI.desktop.setAutoLaunch(enabled);
+  },
+
+  async setCloseToTray(enabled: boolean): Promise<DesktopPrefsResult> {
+    if (!window.electronAPI?.desktop) {
+      return { success: false, error: 'Not running in Electron' };
+    }
+    return window.electronAPI.desktop.setCloseToTray(enabled);
+  },
+
+  async setMinimizeToTray(enabled: boolean): Promise<DesktopPrefsResult> {
+    if (!window.electronAPI?.desktop) {
+      return { success: false, error: 'Not running in Electron' };
+    }
+    return window.electronAPI.desktop.setMinimizeToTray(enabled);
+  },
+
+  async show(): Promise<{ success: boolean }> {
+    if (!window.electronAPI?.desktop) {
+      return { success: false };
+    }
+    return window.electronAPI.desktop.show();
   },
 };

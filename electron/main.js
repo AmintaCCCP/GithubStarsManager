@@ -1,10 +1,33 @@
-const { app, BrowserWindow, Menu, shell, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, shell, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+const {
+  DEFAULT_DESKTOP_PREFS,
+  normalizeDesktopPrefs,
+  loadDesktopPrefs,
+  saveDesktopPrefs,
+  getLinuxAutostartPath,
+  buildLinuxDesktopEntry,
+} = require('./desktopPrefs');
 
 let mainWindow;
+let tray = null;
+// True only when the user explicitly quits (tray menu / Cmd+Q / before-quit).
+// Distinguishes "hide to tray" from "really exit" for close-to-tray (#345).
+let isQuitting = false;
+// In-memory desktop prefs (#345). Source of truth on disk:
+// `<userData>/desktop-prefs.json`. Defaults: autoLaunch OFF, tray ON.
+let desktopPrefs = { ...DEFAULT_DESKTOP_PREFS };
+
+// `--hidden` is appended to our own Linux autostart entry so login starts in tray.
+const startHidden = process.argv.includes('--hidden');
+
+// ── Single instance (#345): a second launch restores the existing window
+// instead of spawning a duplicate tray icon.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -60,8 +83,8 @@ function createWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     if (isDev) console.log('Page finished loading');
-    // 页面加载完成后显示窗口
-    if (!mainWindow.isVisible()) {
+    // 页面加载完成后显示窗口（--hidden 自启常驻托盘时不闪现）
+    if (!startHidden && !mainWindow.isVisible()) {
       mainWindow.show();
     }
   });
@@ -111,7 +134,7 @@ function createWindow() {
   }
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
+    if (!startHidden) mainWindow.show();
   });
 
   // 提供稳定的菜单与编辑快捷键（生产环境）
@@ -203,6 +226,22 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  mainWindow.on('close', (event) => {
+    // #345: 关闭默认常驻托盘（设置-通用可改）。真退出只走 isQuitting 路径。
+    if (!isQuitting && desktopPrefs.closeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
+  mainWindow.on('minimize', (event) => {
+    // #345: 最小化默认隐藏到托盘。
+    if (desktopPrefs.minimizeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -338,6 +377,197 @@ ipcMain.handle('test-proxy', async (event, config) => {
 });
 
 
+// ── Desktop prefs: auto-launch + tray behavior (#345) ──
+// Defaults: autoLaunch OFF, closeToTray/minimizeToTray ON (see desktopPrefs.js).
+
+function getDesktopUserDataPath() {
+  return app.getPath('userData');
+}
+
+function reloadDesktopPrefs() {
+  desktopPrefs = loadDesktopPrefs({ fs, pathModule: path, userDataPath: getDesktopUserDataPath() });
+  return desktopPrefs;
+}
+
+function persistDesktopPrefs(next) {
+  desktopPrefs = saveDesktopPrefs(
+    { fs, pathModule: path, userDataPath: getDesktopUserDataPath() },
+    normalizeDesktopPrefs({ ...desktopPrefs, ...next }),
+  );
+  return desktopPrefs;
+}
+
+/**
+ * Apply the auto-launch OS setting. Best-effort: never throws, reports errors.
+ * - Windows/macOS: Electron built-in login-item settings.
+ * - Linux: freedesktop `~/.config/autostart/*.desktop` entry.
+ */
+async function applyAutoLaunch(enabled) {
+  try {
+    if (process.platform === 'win32' || process.platform === 'darwin') {
+      app.setLoginItemSettings({
+        openAtLogin: !!enabled,
+        openAsHidden: true,
+        // Windows: start resident in tray like the Linux --hidden entry.
+        ...(process.platform === 'win32' ? { args: ['--hidden'] } : {}),
+      });
+    } else if (process.platform === 'linux') {
+      const autostartPath = getLinuxAutostartPath({ homeDir: os.homedir(), pathModule: path });
+      if (enabled) {
+        fs.mkdirSync(path.dirname(autostartPath), { recursive: true });
+        fs.writeFileSync(
+          autostartPath,
+          buildLinuxDesktopEntry({ execPath: process.execPath }),
+        );
+      } else if (fs.existsSync(autostartPath)) {
+        fs.unlinkSync(autostartPath);
+      }
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function resolveTrayIcon() {
+  const candidates = [
+    path.join(__dirname, 'assets', 'tray-32.png'),
+    path.join(__dirname, 'assets', 'tray-16.png'),
+    path.join(__dirname, '..', 'public', 'icon.png'),
+    path.join(__dirname, '..', 'dist', 'icon.png'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function restoreMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+}
+
+function refreshTrayMenu() {
+  if (!tray || tray.isDestroyed()) return;
+  const template = [
+    {
+      label: '显示主窗口',
+      click: () => restoreMainWindow(),
+    },
+    { type: 'separator' },
+    {
+      label: '开机自动启动',
+      type: 'checkbox',
+      checked: desktopPrefs.autoLaunch,
+      click: async (item) => {
+        await setAutoLaunchWithRollback(!!item.checked);
+        refreshTrayMenu();
+      },
+    },
+    {
+      label: '关闭时最小化到托盘',
+      type: 'checkbox',
+      checked: desktopPrefs.closeToTray,
+      click: (item) => {
+        persistDesktopPrefs({ closeToTray: !!item.checked });
+        refreshTrayMenu();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: '退出',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ];
+  tray.setContextMenu(Menu.buildFromTemplate(template));
+  tray.setToolTip('GitHub Stars Manager');
+}
+
+/** Set auto-launch with disk persistence; rolls back the pref on OS failure. */
+async function setAutoLaunchWithRollback(enabled) {
+  const previous = { ...desktopPrefs };
+  persistDesktopPrefs({ autoLaunch: !!enabled });
+  const applied = await applyAutoLaunch(!!enabled);
+  if (!applied.success) {
+    try {
+      persistDesktopPrefs(previous);
+    } catch {
+      desktopPrefs = previous;
+    }
+    return { success: false, prefs: { ...desktopPrefs }, error: applied.error };
+  }
+  refreshTrayMenu();
+  return { success: true, prefs: { ...desktopPrefs } };
+}
+
+function createTray() {
+  if (tray && !tray.isDestroyed()) {
+    refreshTrayMenu();
+    return;
+  }
+  try {
+    const iconPath = resolveTrayIcon();
+    const icon = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+    tray = new Tray(icon);
+    tray.on('click', () => {
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        restoreMainWindow();
+      }
+    });
+    refreshTrayMenu();
+  } catch (err) {
+    console.error('Failed to create tray:', err);
+    tray = null;
+  }
+}
+
+function destroyTray() {
+  try {
+    if (tray && !tray.isDestroyed()) tray.destroy();
+  } catch {
+    // Best-effort cleanup during shutdown.
+  }
+  tray = null;
+}
+
+ipcMain.handle('desktop:getPrefs', () => ({ ...desktopPrefs }));
+
+ipcMain.handle('desktop:setAutoLaunch', async (_e, enabled) =>
+  setAutoLaunchWithRollback(!!enabled),
+);
+
+ipcMain.handle('desktop:setCloseToTray', (_e, enabled) => {
+  const prefs = persistDesktopPrefs({ closeToTray: !!enabled });
+  refreshTrayMenu();
+  return { success: true, prefs: { ...prefs } };
+});
+
+ipcMain.handle('desktop:setMinimizeToTray', (_e, enabled) => {
+  const prefs = persistDesktopPrefs({ minimizeToTray: !!enabled });
+  refreshTrayMenu();
+  return { success: true, prefs: { ...prefs } };
+});
+
+ipcMain.handle('desktop:show', () => {
+  restoreMainWindow();
+  return { success: true };
+});
+
+
 // ── MCP local server (read-only tools for agents) ──
 let mcpConfig = {
   enabled: false,
@@ -394,8 +624,26 @@ ipcMain.handle('mcp:stop', async () => mcpServer.stop());
 
 ipcMain.handle('mcp:getStatus', async () => mcpServer.getStatus());
 
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    restoreMainWindow();
+  });
+}
+
 app.whenReady().then(() => {
+  reloadDesktopPrefs();
+  // Self-heal the OS login item on every start (e.g. path changed after update).
+  if (desktopPrefs.autoLaunch) {
+    void applyAutoLaunch(true).then((result) => {
+      if (!result.success) console.error('Failed to apply auto-launch:', result.error);
+    });
+  }
+  createTray();
   createWindow();
+  // `--hidden` (Linux autostart) starts resident in tray without flashing.
+  if (startHidden && mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
   const savedProxy = loadProxyConfig();
   if (savedProxy.enabled && savedProxy.host && savedProxy.port) {
     applyProxy(savedProxy);
@@ -413,13 +661,21 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   void mcpServer.stop();
+  // #345: close-to-tray prevents this from firing while resident; when the
+  // user disabled it, keep the historical behavior (quit on Win/Linux).
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
+app.on('before-quit', () => {
+  // Allow the real quit path to bypass the close-to-tray interceptor.
+  isQuitting = true;
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  destroyTray();
   void mcpServer.stop();
 });
 
