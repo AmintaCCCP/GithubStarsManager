@@ -128,13 +128,13 @@ export const useRepositoryChatSessions = ({
     setError(null);
     try {
       await repositoryChatSessionRepository.permanentlyDeleteSession(sessionId);
+      notifyGlobalHistoryChanged();
       if (operationId !== operationIdRef.current) return;
       const nextSessions = sessions.filter((session) => session.id !== sessionId);
       setSessions(nextSessions);
       const nextActive = activeSession?.id === sessionId ? (nextSessions[0] ?? null) : activeSession;
       setActiveSession(nextActive);
       await loadSessionMessages(nextActive, operationId);
-      notifyGlobalHistoryChanged();
     } catch (unknownError) {
       if (operationId === operationIdRef.current) setError(unknownError instanceof Error ? unknownError.message : 'Unable to delete the repository chat session');
     } finally {
