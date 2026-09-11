@@ -1,14 +1,13 @@
 import { Router } from 'express';
-import { getDb } from '../db/connection.js';
+import { db } from '../db/client.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { proxyRequest, ProxyConfig, validateUrl, isPrivateOrLoopback } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
 
-function getProxyConfig(): ProxyConfig | null {
+async function getProxyConfig(): Promise<ProxyConfig | null> {
   try {
-    const db = getDb();
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+    const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'proxy_config');
     if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
     if (parsed && parsed.enabled && parsed.host && parsed.port) {
@@ -102,11 +101,10 @@ function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
 // POST /api/proxy/github/*
 router.post('/api/proxy/github/*', async (req, res) => {
   try {
-    const db = getDb();
     const githubPath = (req.params as Record<string, string>)[0]; // wildcard capture
     
     // Read and decrypt GitHub token from settings
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    const tokenRow = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'github_token');
     if (!tokenRow?.value) {
       res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
       return;
@@ -138,7 +136,7 @@ router.post('/api/proxy/github/*', async (req, res) => {
       headers['Content-Type'] = contentType;
     }
 
-    const proxyConfig = getProxyConfig();
+    const proxyConfig = await getProxyConfig();
     const result = await proxyRequest({ url: targetUrl, method, headers, body: body.body, proxyConfig });
     relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
@@ -153,8 +151,7 @@ router.post('/api/proxy/github/*', async (req, res) => {
 // Used for fetching individual gist file content (raw_url) when the gist API marks files as truncated.
 router.post('/api/proxy/github-raw', async (req, res) => {
   try {
-    const db = getDb();
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    const tokenRow = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'github_token');
     if (!tokenRow?.value) {
       res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
       return;
@@ -207,7 +204,7 @@ router.post('/api/proxy/github-raw', async (req, res) => {
       'Accept': 'application/vnd.github.v3+json',
     };
 
-    const proxyConfig = getProxyConfig();
+    const proxyConfig = await getProxyConfig();
     const result = await proxyRequest({ url: body.url, method, headers, proxyConfig, preserveRawResponse: true });
 
     // Raw content is text/plain, forward as-is (not JSON-wrapped)
@@ -229,7 +226,6 @@ function normalizeReasoningEffort(value: unknown): string | null {
 // Accepts either { configId, body } (lookup from DB) or { config, body } (inline config for one-time requests)
 router.post('/api/proxy/ai', async (req, res) => {
   try {
-    const db = getDb();
     const { configId, config: inlineConfig, body: requestBody } = req.body as {
       configId?: string;
       config?: { apiType?: string; baseUrl: string; apiKey: string; model: string; reasoningEffort?: string };
@@ -262,7 +258,7 @@ router.post('/api/proxy/ai', async (req, res) => {
       } catch { /* invalid URL, will be caught by validateUrl later */ }
     } else if (configId) {
       // DB lookup path (for saved configs)
-      const aiConfig = db.prepare('SELECT * FROM ai_configs WHERE id = ?').get(configId) as Record<string, unknown> | undefined;
+      const aiConfig = await db.get<Record<string, unknown>>('SELECT * FROM ai_configs WHERE id = ?', configId);
       if (!aiConfig) {
         res.status(404).json({ error: 'AI config not found', code: 'AI_CONFIG_NOT_FOUND' });
         return;
@@ -329,7 +325,7 @@ router.post('/api/proxy/ai', async (req, res) => {
     // 内联 config 路径（任意客户端均可携带目标地址）保持严格档，避免 SSRF 放宽被滥用。
     const allowPrivate = Boolean(configId);
 
-    const proxyConfig = getProxyConfig();
+    const proxyConfig = await getProxyConfig();
     const result = await proxyRequest({
       url: targetUrl,
       method: 'POST',
@@ -351,7 +347,6 @@ router.post('/api/proxy/ai', async (req, res) => {
 // POST /api/proxy/webdav
 router.post('/api/proxy/webdav', async (req, res) => {
   try {
-    const db = getDb();
     const { configId, method, path, body: requestBody, headers: extraHeaders } = req.body as {
       configId: string;
       method: string;
@@ -365,7 +360,7 @@ router.post('/api/proxy/webdav', async (req, res) => {
       return;
     }
 
-    const webdavConfig = db.prepare('SELECT * FROM webdav_configs WHERE id = ?').get(configId) as Record<string, unknown> | undefined;
+    const webdavConfig = await db.get<Record<string, unknown>>('SELECT * FROM webdav_configs WHERE id = ?', configId);
     if (!webdavConfig) {
       res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
       return;
@@ -393,7 +388,7 @@ router.post('/api/proxy/webdav', async (req, res) => {
       headers['Content-Type'] = headers['Content-Type'] || 'application/xml';
     }
 
-    const proxyConfig = getProxyConfig();
+    const proxyConfig = await getProxyConfig();
     const result = await proxyRequest({
       url: targetUrl,
       method,
@@ -416,11 +411,10 @@ router.post('/api/proxy/webdav', async (req, res) => {
 // POST /api/proxy/github/search/repositories
 router.post('/api/proxy/github/search/repositories', async (req, res) => {
   try {
-    const db = getDb();
     const githubPath = 'search/repositories';
     const { query_params } = req.body as { query_params?: Record<string, string> };
 
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    const tokenRow = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'github_token');
     if (!tokenRow?.value) {
       res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
       return;
@@ -444,7 +438,7 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
       'User-Agent': 'GithubStarsManager-Backend',
     };
 
-    const proxyConfig = getProxyConfig();
+    const proxyConfig = await getProxyConfig();
     const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
     relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
@@ -457,11 +451,10 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
 // POST /api/proxy/github/search/users
 router.post('/api/proxy/github/search/users', async (req, res) => {
   try {
-    const db = getDb();
     const githubPath = 'search/users';
     const { query_params } = req.body as { query_params?: Record<string, string> };
 
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+    const tokenRow = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'github_token');
     if (!tokenRow?.value) {
       res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
       return;
@@ -485,7 +478,7 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
       'User-Agent': 'GithubStarsManager-Backend',
     };
 
-    const proxyConfig = getProxyConfig();
+    const proxyConfig = await getProxyConfig();
     const result = await proxyRequest({ url: targetUrl, method: 'GET', headers, proxyConfig });
     relayRateLimitHeaders(res, result.headers);
     res.status(result.status).json(result.data);
@@ -496,10 +489,9 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
 });
 
 // GET /api/settings/proxy
-router.get('/api/settings/proxy', (_req, res) => {
+router.get('/api/settings/proxy', async (_req, res) => {
   try {
-    const db = getDb();
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+    const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'proxy_config');
     if (!row?.value) {
       res.json({ enabled: false, type: 'http', host: '', port: 7890 });
       return;
@@ -518,9 +510,8 @@ router.get('/api/settings/proxy', (_req, res) => {
 });
 
 // PUT /api/settings/proxy
-router.put('/api/settings/proxy', (req, res) => {
+router.put('/api/settings/proxy', async (req, res) => {
   try {
-    const db = getDb();
     const { enabled, type, host, port, username, password } = req.body;
     const passwordProvided = 'password' in req.body;
 
@@ -533,7 +524,7 @@ router.put('/api/settings/proxy', (req, res) => {
       // No password_encrypted field = no password
     } else {
       // Password field omitted - preserve existing encrypted password
-      const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('proxy_config') as { value: string } | undefined;
+      const existing = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'proxy_config');
       if (existing?.value) {
         try {
           const parsed = JSON.parse(existing.value);
@@ -544,8 +535,8 @@ router.put('/api/settings/proxy', (req, res) => {
       }
     }
 
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-      .run('proxy_config', JSON.stringify(configToStore));
+    await db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      'proxy_config', JSON.stringify(configToStore));
 
     res.json({ success: true });
   } catch (err) {
@@ -684,10 +675,9 @@ router.post('/api/settings/proxy/test', async (req, res) => {
 
 // --- RPC Download endpoints ---
 
-function getRpcDownloadConfig(): { host: string; port: number; secret: string } | null {
+async function getRpcDownloadConfig(): Promise<{ host: string; port: number; secret: string } | null> {
   try {
-    const db = getDb();
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('rpc_download_config') as { value: string } | undefined;
+    const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'rpc_download_config');
     if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
     if (parsed && parsed.enabled && parsed.host && parsed.port) {
@@ -704,10 +694,9 @@ function getRpcDownloadConfig(): { host: string; port: number; secret: string } 
 }
 
 // GET /api/settings/rpc-download
-router.get('/api/settings/rpc-download', (_req, res) => {
+router.get('/api/settings/rpc-download', async (_req, res) => {
   try {
-    const db = getDb();
-    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('rpc_download_config') as { value: string } | undefined;
+    const row = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'rpc_download_config');
     if (!row?.value) {
       res.json({ enabled: false, host: '', port: 6800 });
       return;
@@ -725,9 +714,8 @@ router.get('/api/settings/rpc-download', (_req, res) => {
 });
 
 // PUT /api/settings/rpc-download
-router.put('/api/settings/rpc-download', (req, res) => {
+router.put('/api/settings/rpc-download', async (req, res) => {
   try {
-    const db = getDb();
     const { enabled, host, port, secret } = req.body;
     const secretProvided = 'secret' in req.body;
 
@@ -738,7 +726,7 @@ router.put('/api/settings/rpc-download', (req, res) => {
       // Explicitly empty secret - clear stored secret
     } else {
       // Secret field omitted - preserve existing encrypted secret
-      const existing = db.prepare('SELECT value FROM settings WHERE key = ?').get('rpc_download_config') as { value: string } | undefined;
+      const existing = await db.get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'rpc_download_config');
       if (existing?.value) {
         try {
           const parsed = JSON.parse(existing.value);
@@ -749,8 +737,8 @@ router.put('/api/settings/rpc-download', (req, res) => {
       }
     }
 
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-      .run('rpc_download_config', JSON.stringify(configToStore));
+    await db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
+      'rpc_download_config', JSON.stringify(configToStore));
 
     res.json({ success: true });
   } catch (err) {
@@ -783,7 +771,7 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
   const secretProvided = Object.prototype.hasOwnProperty.call(req.body, 'secret');
   let secret = secretProvided ? requestSecret : undefined;
   if (!secretProvided) {
-    const stored = getRpcDownloadConfig();
+    const stored = await getRpcDownloadConfig();
     if (stored && stored.secret) {
       secret = stored.secret;
     }
@@ -842,7 +830,7 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
 
 // POST /api/download/rpc
 router.post('/api/download/rpc', async (req, res) => {
-  const rpcConfig = getRpcDownloadConfig();
+  const rpcConfig = await getRpcDownloadConfig();
   if (!rpcConfig) {
     res.status(400).json({ success: false, error: 'RPC download not configured or disabled' });
     return;

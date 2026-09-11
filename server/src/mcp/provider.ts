@@ -1,4 +1,4 @@
-import { getDb } from '../db/connection.js';
+import { db } from '../db/client.js';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
@@ -64,47 +64,46 @@ export function transformRepoRow(row: Record<string, unknown>): McpRepository {
 /** Soft cap to avoid unbounded memory if a DB ever holds extreme row counts. */
 const MAX_REPOS_IN_MEMORY = 50_000;
 
-export function loadAllRepositories(): McpRepository[] {
-  const db = getDb();
-  const rows = db
-    .prepare('SELECT * FROM repositories ORDER BY stargazers_count DESC LIMIT ?')
-    .all(MAX_REPOS_IN_MEMORY) as Record<string, unknown>[];
+export async function loadAllRepositories(): Promise<McpRepository[]> {
+  const rows = await db.all<Record<string, unknown>>(
+    'SELECT * FROM repositories ORDER BY stargazers_count DESC LIMIT ?',
+    MAX_REPOS_IN_MEMORY
+  );
   return rows.map(transformRepoRow);
 }
 
-export function getRepository(idOrFullName: string | number): McpRepository | null {
-  const db = getDb();
+export async function getRepository(idOrFullName: string | number): Promise<McpRepository | null> {
   let row: Record<string, unknown> | undefined;
   if (typeof idOrFullName === 'number' || /^\d+$/.test(String(idOrFullName))) {
-    row = db
-      .prepare('SELECT * FROM repositories WHERE id = ?')
-      .get(Number(idOrFullName)) as Record<string, unknown> | undefined;
+    row = await db.get<Record<string, unknown>>(
+      'SELECT * FROM repositories WHERE id = ?',
+      Number(idOrFullName)
+    );
   } else {
-    row = db
-      .prepare('SELECT * FROM repositories WHERE full_name = ? COLLATE NOCASE')
-      .get(String(idOrFullName)) as Record<string, unknown> | undefined;
+    row = await db.get<Record<string, unknown>>(
+      'SELECT * FROM repositories WHERE full_name = ? COLLATE NOCASE',
+      String(idOrFullName)
+    );
   }
   return row ? transformRepoRow(row) : null;
 }
 
-export function getRepositories(inputs: string[]) {
+export async function getRepositories(inputs: string[]) {
   if (inputs.length > MCP_BATCH_LIMIT) {
     throw new Error(`A maximum of ${MCP_BATCH_LIMIT} repositories may be requested`);
   }
   return buildBatchLookupResult(inputs, (input) => getRepository(input));
 }
 
-export function getLatestRelease(repoId: number): McpReleaseEvidence | null {
-  const db = getDb();
-  const row = db
-    .prepare(
-      `SELECT id, tag_name, name, html_url, published_at, prerelease, draft
+export async function getLatestRelease(repoId: number): Promise<McpReleaseEvidence | null> {
+  const row = await db.get<Record<string, unknown>>(
+    `SELECT id, tag_name, name, html_url, published_at, prerelease, draft
        FROM releases
        WHERE repo_id = ?
        ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
-       LIMIT 1`
-    )
-    .get(repoId) as Record<string, unknown> | undefined;
+       LIMIT 1`,
+    repoId
+  );
   if (!row) return null;
   return {
     id: row.id as number,
@@ -117,17 +116,16 @@ export function getLatestRelease(repoId: number): McpReleaseEvidence | null {
   };
 }
 
-export function getRepoEvidence(idOrFullName: string | number) {
-  const repo = getRepository(idOrFullName);
+export async function getRepoEvidence(idOrFullName: string | number) {
+  const repo = await getRepository(idOrFullName);
   if (!repo) return { error: 'not_found' as const, idOrFullName: String(idOrFullName) };
-  return buildRepoEvidence(repo, getLatestRelease(repo.id));
+  return buildRepoEvidence(repo, await getLatestRelease(repo.id));
 }
 
-export function listCategories(): Array<Record<string, unknown>> {
-  const db = getDb();
-  const rows = db
-    .prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC')
-    .all() as Record<string, unknown>[];
+export async function listCategories(): Promise<Array<Record<string, unknown>>> {
+  const rows = await db.all<Record<string, unknown>>(
+    'SELECT * FROM categories ORDER BY sort_order ASC, name ASC'
+  );
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
@@ -139,8 +137,8 @@ export function listCategories(): Array<Record<string, unknown>> {
   }));
 }
 
-export function searchRepos(filters: McpSearchFilters) {
-  const all = loadAllRepositories();
+export async function searchRepos(filters: McpSearchFilters) {
+  const all = await loadAllRepositories();
   const { items, total } = searchRepositories(all, filters);
   return {
     total,
@@ -151,8 +149,8 @@ export function searchRepos(filters: McpSearchFilters) {
   };
 }
 
-export function getStats() {
-  const repos = loadAllRepositories();
+export async function getStats() {
+  const repos = await loadAllRepositories();
   const byLanguage: Record<string, number> = {};
   const byLicense: Record<string, number> = {};
   const tagCounts: Record<string, number> = {};
@@ -198,11 +196,11 @@ export interface VectorAvailability {
   embeddingModel?: string;
 }
 
-export function getVectorAvailability(): VectorAvailability {
-  const db = getDb();
-  const row = db
-    .prepare('SELECT * FROM vector_search_configs WHERE id = ?')
-    .get('default') as Record<string, unknown> | undefined;
+export async function getVectorAvailability(): Promise<VectorAvailability> {
+  const row = await db.get<Record<string, unknown>>(
+    'SELECT * FROM vector_search_configs WHERE id = ?',
+    'default'
+  );
 
   if (!row || !row.enabled) {
     return { available: false, reason: 'vector_search_disabled' };
@@ -215,9 +213,10 @@ export function getVectorAvailability(): VectorAvailability {
   if (!embeddingId) {
     return { available: false, reason: 'embedding_config_missing' };
   }
-  const emb = db
-    .prepare('SELECT * FROM embedding_configs WHERE id = ?')
-    .get(embeddingId) as Record<string, unknown> | undefined;
+  const emb = await db.get<Record<string, unknown>>(
+    'SELECT * FROM embedding_configs WHERE id = ?',
+    embeddingId
+  );
   if (!emb) {
     return { available: false, reason: 'embedding_config_not_found' };
   }
@@ -367,18 +366,26 @@ export async function vectorSearch(
   | { available: false; reason: string }
   | { available: true; matches: Array<Record<string, unknown>>; filtering?: Record<string, unknown> }
 > {
-  const availability = getVectorAvailability();
+  const availability = await getVectorAvailability();
   if (!availability.available) {
     return { available: false, reason: availability.reason || 'unavailable' };
   }
 
-  const db = getDb();
-  const vs = db
-    .prepare('SELECT * FROM vector_search_configs WHERE id = ?')
-    .get('default') as Record<string, unknown>;
-  const emb = db
-    .prepare('SELECT * FROM embedding_configs WHERE id = ?')
-    .get(String(vs.embedding_config_id)) as Record<string, unknown>;
+  const vs = await db.get<Record<string, unknown>>(
+    'SELECT * FROM vector_search_configs WHERE id = ?',
+    'default'
+  );
+  // getVectorAvailability() 已保证该行存在；此处仅做类型收窄。
+  if (!vs) {
+    return { available: false, reason: 'vector_search_disabled' };
+  }
+  const emb = await db.get<Record<string, unknown>>(
+    'SELECT * FROM embedding_configs WHERE id = ?',
+    String(vs.embedding_config_id)
+  );
+  if (!emb) {
+    return { available: false, reason: 'embedding_config_not_found' };
+  }
 
   let workerToken = '';
   if (vs.auth_token_encrypted) {
@@ -445,7 +452,7 @@ export async function vectorSearch(
     return { available: false, reason: 'worker_query_failed' };
   }
   const matches = data.matches;
-  const repos = loadAllRepositories();
+  const repos = await loadAllRepositories();
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
   const candidates = matches
@@ -503,7 +510,7 @@ export async function findSimilarRepositories(
       matches: Array<Record<string, unknown>>;
     }
 > {
-  const source = getRepository(idOrFullName);
+  const source = await getRepository(idOrFullName);
   if (!source) return { error: 'not_found', idOrFullName: String(idOrFullName) };
 
   const topK = Math.min(50, Math.max(1, opts.topK ?? 10));

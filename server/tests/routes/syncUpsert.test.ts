@@ -2,10 +2,22 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
-const getDbMock = vi.fn();
+const dbMocks = vi.hoisted(() => ({
+  all: vi.fn(),
+  get: vi.fn(),
+  run: vi.fn(),
+  exec: vi.fn(),
+  batch: vi.fn(),
+}));
 
-vi.mock('../../src/db/connection.js', () => ({
-  getDb: () => getDbMock(),
+vi.mock('../../src/db/client.js', () => ({
+  db: {
+    all: (...args: unknown[]) => Promise.resolve(dbMocks.all(...args)),
+    get: (...args: unknown[]) => Promise.resolve(dbMocks.get(...args)),
+    run: (...args: unknown[]) => Promise.resolve(dbMocks.run(...args)),
+    exec: (...args: unknown[]) => Promise.resolve(dbMocks.exec(...args)),
+    batch: (...args: unknown[]) => Promise.resolve(dbMocks.batch(...args)),
+  },
 }));
 // sync 路由顶部引入 config/crypto，但 import 分支不实际使用它们，mock 为空即可。
 vi.mock('../../src/config.js', () => ({ config: { encryptionKey: 'test-key' } }));
@@ -21,30 +33,20 @@ const createTestApp = () => {
 };
 
 /**
- * Mock DB：只记录 prepare 收到的 SQL 与每次 run 的参数，便于断言导入合并 UPSERT 的 is_read 语义。
+ * Mock DB：只记录 db.run 收到的 SQL 与参数，便于断言导入合并 UPSERT 的 is_read 语义。
+ * 门面签名：db.run(sql, ...args)，首个参数是 SQL。
  */
 function captureStatements() {
   const statements: { sql: string; params: unknown[][] }[] = [];
-  const exec: Record<string, unknown> = {};
-  const db = {
-    prepare: (sql: string) => {
-      const stmt = {
-        run: (...params: unknown[]) => {
-          statements.push({ sql, params });
-          return { changes: 1 };
-        },
-        all: () => [],
-        get: () => undefined,
-      };
-      return stmt;
-    },
-    // 路由中 `db.transaction(() => {...})` 返回 importAll，随后调用 `importAll()`；
-    // 因此这里返回 fn 本身（与 releasesUpsert.test.ts 的惯例一致）。
-    transaction: (fn: () => number) => fn,
-    exec,
-  };
-  getDbMock.mockReturnValue(db);
-  return { statements, db };
+
+  dbMocks.run.mockImplementation((sql: string, ...params: unknown[]) => {
+    statements.push({ sql, params: params as unknown[] });
+    return { lastInsertRowid: 0, rowsAffected: 1 };
+  });
+  dbMocks.all.mockReturnValue([]);
+  dbMocks.get.mockReturnValue(undefined);
+
+  return { statements };
 }
 
 // 两段式语句中，保留分支用 releases.is_read，覆盖分支用 excluded.is_read

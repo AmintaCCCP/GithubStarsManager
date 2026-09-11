@@ -50,7 +50,7 @@ function textResult(data: unknown) {
   };
 }
 
-export function registerMcpTools(server: McpServer): void {
+export async function registerMcpTools(server: McpServer): Promise<void> {
   server.registerTool(
     'gsm_status',
     {
@@ -58,8 +58,8 @@ export function registerMcpTools(server: McpServer): void {
         'Get GithubStarsManager MCP status: repo count, vector availability, and version.',
     },
     async () => {
-      const repos = loadAllRepositories();
-      const vector = getVectorAvailability();
+      const repos = await loadAllRepositories();
+      const vector = await getVectorAvailability();
       const toolAvailability = getMcpToolAvailability(vector.available);
       return textResult({
         name: 'github-stars-manager',
@@ -105,7 +105,7 @@ export function registerMcpTools(server: McpServer): void {
       },
     },
     async (args) => {
-      const result = searchRepos({
+      const result = await searchRepos({
         query: args.query,
         languages: args.languages,
         tags: args.tags,
@@ -135,7 +135,7 @@ export function registerMcpTools(server: McpServer): void {
       },
     },
     async (args) => {
-      const repo = getRepository(args.idOrFullName);
+      const repo = await getRepository(args.idOrFullName);
       if (!repo) {
         return textResult({ error: 'not_found', idOrFullName: args.idOrFullName });
       }
@@ -156,7 +156,7 @@ export function registerMcpTools(server: McpServer): void {
           .describe('One to 50 repository ids or full_name values'),
       },
     },
-    async (args) => textResult(getRepositories(args.idsOrFullNames))
+    async (args) => textResult(await getRepositories(args.idsOrFullNames))
   );
 
   server.registerTool(
@@ -168,7 +168,7 @@ export function registerMcpTools(server: McpServer): void {
         idOrFullName: z.string().trim().min(1).describe('Repository id or full_name'),
       },
     },
-    async (args) => textResult(getRepoEvidence(args.idOrFullName))
+    async (args) => textResult(await getRepoEvidence(args.idOrFullName))
   );
 
   server.registerTool(
@@ -176,7 +176,7 @@ export function registerMcpTools(server: McpServer): void {
     {
       description: 'List custom categories stored in GithubStarsManager.',
     },
-    async () => textResult({ categories: listCategories() })
+    async () => textResult({ categories: await listCategories() })
   );
 
   server.registerTool(
@@ -192,7 +192,7 @@ export function registerMcpTools(server: McpServer): void {
       },
     },
     async (args) => {
-      const result = searchRepos({
+      const result = await searchRepos({
         category: args.category,
         limit: args.limit,
         offset: args.offset,
@@ -209,11 +209,11 @@ export function registerMcpTools(server: McpServer): void {
       description:
         'Aggregate stats over starred repositories (language, analysis, tags).',
     },
-    async () => textResult(getStats())
+    async () => textResult(await getStats())
   );
 
   // Only list vector tool when vector search is fully configured
-  const vector = getVectorAvailability();
+  const vector = await getVectorAvailability();
   if (vector.available) {
     server.registerTool(
       'gsm_find_similar_repos',

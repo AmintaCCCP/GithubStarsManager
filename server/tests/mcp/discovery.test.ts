@@ -20,9 +20,9 @@ function repo(partial: Partial<McpRepository> & Pick<McpRepository, 'id' | 'name
 }
 
 describe('MCP discovery pure contracts', () => {
-  it('preserves input order and duplicate occurrences in bounded batch results', () => {
+  it('preserves input order and duplicate occurrences in bounded batch results', async () => {
     const alpha = repo({ id: 1, name: 'alpha', full_name: 'acme/alpha' });
-    const result = buildBatchLookupResult(
+    const result = await buildBatchLookupResult(
       ['acme/alpha', 'missing/repo', 'acme/alpha'],
       (input) => (input === 'acme/alpha' ? alpha : null)
     );

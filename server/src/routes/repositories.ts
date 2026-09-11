@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDb } from '../db/connection.js';
+import { db } from '../db/client.js';
 
 const router = Router();
 
@@ -64,9 +64,8 @@ function transformRepo(row: Record<string, unknown>) {
 }
 
 // GET /api/repositories
-router.get('/api/repositories', (req, res) => {
+router.get('/api/repositories', async (req, res) => {
   try {
-    const db = getDb();
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 100));
     const search = req.query.search as string | undefined;
@@ -85,16 +84,16 @@ router.get('/api/repositories', (req, res) => {
     sql += ' ORDER BY stargazers_count DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = await db.all<Record<string, unknown>>(sql, ...params);
     const repositories = rows.map(transformRepo);
 
     const countSql = search
       ? 'SELECT COUNT(*) as total FROM repositories WHERE name LIKE ? OR full_name LIKE ? OR description LIKE ? OR ai_summary LIKE ? OR ai_tags LIKE ?'
       : 'SELECT COUNT(*) as total FROM repositories';
     const countParams = search ? Array(5).fill(`%${search}%`) : [];
-    const countRow = db.prepare(countSql).get(...countParams) as { total: number };
+    const countRow = await db.get<{ total: number }>(countSql, ...countParams);
 
-    res.json({ repositories, total: countRow.total, page, limit });
+    res.json({ repositories, total: countRow?.total ?? 0, page, limit });
   } catch (err) {
     console.error('GET /api/repositories error:', err);
     res.status(500).json({ error: 'Failed to fetch repositories', code: 'FETCH_REPOSITORIES_FAILED' });
@@ -102,9 +101,8 @@ router.get('/api/repositories', (req, res) => {
 });
 
 // PUT /api/repositories (bulk upsert)
-router.put('/api/repositories', (req, res) => {
+router.put('/api/repositories', async (req, res) => {
   try {
-    const db = getDb();
     const { repositories } = req.body as { repositories: Record<string, unknown>[] };
     if (!Array.isArray(repositories)) {
       res.status(400).json({ error: 'repositories array required', code: 'REPOSITORIES_ARRAY_REQUIRED' });
@@ -147,7 +145,7 @@ router.put('/api/repositories', (req, res) => {
       }
     }
 
-    const stmt = db.prepare(`
+    const stmtSql = `
       INSERT INTO repositories (
         id, name, full_name, description, html_url, stargazers_count, language,
         created_at, updated_at, pushed_at, starred_at,
@@ -189,68 +187,69 @@ router.put('/api/repositories', (req, res) => {
         -- 区分「省略 license 字段」与「显式提供 null/对象」：
         -- 旧客户端/旧备份不含 license 字段时（@licenseProvided = 0）保留已存储值；
         -- 显式提供时（@licenseProvided = 1）采用归一化后的 excluded.license（含 null 清空）。
-        license = CASE WHEN @licenseProvided IS 1 THEN excluded.license ELSE repositories.license END
-    `);
+        -- 注意：better-sqlite3 的 @命名参数语法对 libSQL 不兼容，改为 ? 占位并放到位置参数末尾。
+        license = CASE WHEN ? IS 1 THEN excluded.license ELSE repositories.license END
+    `;
 
-    const deleteAllReleases = db.prepare('DELETE FROM releases');
-    const deleteAllRepositories = db.prepare('DELETE FROM repositories');
-    const deleteReleasesNotIn = (placeholders: string) =>
-      db.prepare(`DELETE FROM releases WHERE repo_id NOT IN (${placeholders})`);
-    const deleteRepositoriesNotIn = (placeholders: string) =>
-      db.prepare(`DELETE FROM repositories WHERE id NOT IN (${placeholders})`);
+    const deleteAllReleasesSql = 'DELETE FROM releases';
+    const deleteAllRepositoriesSql = 'DELETE FROM repositories';
+    const deleteReleasesNotInSql = (placeholders: string) =>
+      `DELETE FROM releases WHERE repo_id NOT IN (${placeholders})`;
+    const deleteRepositoriesNotInSql = (placeholders: string) =>
+      `DELETE FROM repositories WHERE id NOT IN (${placeholders})`;
 
-    const upsert = db.transaction(() => {
-      const isFullSync = Boolean(req.body?.isFullSync);
+    // 事务语义：body 内有控制流（if/return/for），保留原执行顺序逐条 await 执行。
+    const isFullSync = Boolean(req.body?.isFullSync);
 
-      if (isFullSync) {
-        const repoIds = repositories
-          .map((repo) => repo.id)
-          .filter((id): id is number => typeof id === 'number');
+    if (isFullSync) {
+      const repoIds = repositories
+        .map((repo) => repo.id)
+        .filter((id): id is number => typeof id === 'number');
 
-        if (repoIds.length === 0) {
-          deleteAllReleases.run();
-          deleteAllRepositories.run();
-          return 0;
-        }
-
-        const placeholders = repoIds.map(() => '?').join(', ');
-        deleteReleasesNotIn(placeholders).run(...repoIds);
-        deleteRepositoriesNotIn(placeholders).run(...repoIds);
+      if (repoIds.length === 0) {
+        await db.run(deleteAllReleasesSql);
+        await db.run(deleteAllRepositoriesSql);
+        res.json({ upserted: 0 });
+        return;
       }
 
-      let count = 0;
-      for (const repo of repositories) {
-        const owner = repo.owner as { login?: string; avatar_url?: string } | undefined;
-        // 仅当 payload 显式提供 license 字段时才覆盖已存储值；省略（旧客户端/旧备份）则保留。
-        const licenseProvided = Object.prototype.hasOwnProperty.call(repo, 'license') ? 1 : 0;
-        stmt.run(
-          repo.id, repo.name, repo.full_name, repo.description ?? null,
-          repo.html_url, repo.stargazers_count ?? 0, repo.language ?? null,
-          repo.created_at ?? null, repo.updated_at ?? null, repo.pushed_at ?? null,
-          repo.starred_at ?? null,
-          owner?.login ?? '', owner?.avatar_url ?? null,
-          JSON.stringify(Array.isArray(repo.topics) ? repo.topics : []),
-          repo.ai_summary ?? null,
-          JSON.stringify(Array.isArray(repo.ai_tags) ? repo.ai_tags : []),
-          JSON.stringify(Array.isArray(repo.ai_platforms) ? repo.ai_platforms : []),
-          repo.analyzed_at ?? null, (repo.analysis_failed === true || repo.analysis_failed === 1) ? 1 : 0,
-          repo.custom_description ?? null,
-          JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
-          repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
-          (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
-          repo.vector_indexed_at ?? null,
-          toLicenseSpdxId(repo.license),
-          // 备份中 vector_indexed_license 已是规范化的 SPDX id 字符串或 null；
-          // 非 string 一律清空，避免奇怪类型破坏增量谓词的字符串比较。
-          typeof repo.vector_indexed_license === 'string' ? repo.vector_indexed_license || null : null,
-          { licenseProvided }
-        );
-        count++;
-      }
-      return count;
-    });
+      const placeholders = repoIds.map(() => '?').join(', ');
+      await db.run(deleteReleasesNotInSql(placeholders), ...repoIds);
+      await db.run(deleteRepositoriesNotInSql(placeholders), ...repoIds);
+    }
 
-    const count = upsert();
+    let count = 0;
+    for (const repo of repositories) {
+      const owner = repo.owner as { login?: string; avatar_url?: string } | undefined;
+      // 仅当 payload 显式提供 license 字段时才覆盖已存储值；省略（旧客户端/旧备份）则保留。
+      const licenseProvided = Object.prototype.hasOwnProperty.call(repo, 'license') ? 1 : 0;
+      await db.run(
+        stmtSql,
+        repo.id, repo.name, repo.full_name, repo.description ?? null,
+        repo.html_url, repo.stargazers_count ?? 0, repo.language ?? null,
+        repo.created_at ?? null, repo.updated_at ?? null, repo.pushed_at ?? null,
+        repo.starred_at ?? null,
+        owner?.login ?? '', owner?.avatar_url ?? null,
+        JSON.stringify(Array.isArray(repo.topics) ? repo.topics : []),
+        repo.ai_summary ?? null,
+        JSON.stringify(Array.isArray(repo.ai_tags) ? repo.ai_tags : []),
+        JSON.stringify(Array.isArray(repo.ai_platforms) ? repo.ai_platforms : []),
+        repo.analyzed_at ?? null, (repo.analysis_failed === true || repo.analysis_failed === 1) ? 1 : 0,
+        repo.custom_description ?? null,
+        JSON.stringify(Array.isArray(repo.custom_tags) ? repo.custom_tags : []),
+        repo.custom_category ?? null, (repo.category_locked === true || repo.category_locked === 1) ? 1 : 0, repo.last_edited ?? null,
+        (repo.subscribed_to_releases === true || repo.subscribed_to_releases === 1) ? 1 : 0,
+        repo.vector_indexed_at ?? null,
+        toLicenseSpdxId(repo.license),
+        // 备份中 vector_indexed_license 已是规范化的 SPDX id 字符串或 null；
+        // 非 string 一律清空，避免奇怪类型破坏增量谓词的字符串比较。
+        typeof repo.vector_indexed_license === 'string' ? repo.vector_indexed_license || null : null,
+        // licenseProvided 作为最后一个位置参数（替换原 @命名参数对象）
+        licenseProvided
+      );
+      count++;
+    }
+
     res.json({ upserted: count });
   } catch (err) {
     console.error('PUT /api/repositories error:', err);
@@ -259,9 +258,8 @@ router.put('/api/repositories', (req, res) => {
 });
 
 // PATCH /api/repositories/:id
-router.patch('/api/repositories/:id', (req, res) => {
+router.patch('/api/repositories/:id', async (req, res) => {
   try {
-    const db = getDb();
     const id = parseInt(req.params.id);
     const updates = req.body as Record<string, unknown>;
 
@@ -315,9 +313,9 @@ router.patch('/api/repositories/:id', (req, res) => {
     }
 
     values.push(id);
-    db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+    await db.run(`UPDATE repositories SET ${setClauses.join(', ')} WHERE id = ?`, ...values);
 
-    const row = db.prepare('SELECT * FROM repositories WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = await db.get<Record<string, unknown>>('SELECT * FROM repositories WHERE id = ?', id);
     if (!row) {
       res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
       return;
@@ -330,7 +328,7 @@ router.patch('/api/repositories/:id', (req, res) => {
 });
 
 // DELETE /api/repositories/:id
-router.delete('/api/repositories/:id', (req, res) => {
+router.delete('/api/repositories/:id', async (req, res) => {
   try {
     const idStr = req.params.id;
     if (!/^\d+$/.test(idStr)) {
@@ -344,29 +342,24 @@ router.delete('/api/repositories/:id', (req, res) => {
       return;
     }
 
-    const db = getDb();
-    const deleteReleases = db.prepare('DELETE FROM releases WHERE repo_id = ?');
-    const deleteRepo = db.prepare('DELETE FROM repositories WHERE id = ?');
+    // 原 transaction body 无控制流，用 batch 保留原子性（远程走 libSQL 写事务）
+    const [releaseResult, repoResult] = await db.batch([
+      { sql: 'DELETE FROM releases WHERE repo_id = ?', args: [id] },
+      { sql: 'DELETE FROM repositories WHERE id = ?', args: [id] },
+    ]);
 
-    const deleteAll = db.transaction(() => {
-      const releaseResult = deleteReleases.run(id);
-      const repoResult = deleteRepo.run(id);
-      
-      return {
-        releasesDeleted: releaseResult.changes,
-        repoDeleted: repoResult.changes
-      };
-    });
-
-    const result = deleteAll();
+    const result = {
+      releasesDeleted: releaseResult.rowsAffected,
+      repoDeleted: repoResult.rowsAffected
+    };
 
     if (result.repoDeleted === 0) {
       res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
       return;
     }
 
-    res.json({ 
-      deleted: true, 
+    res.json({
+      deleted: true,
       id,
       releasesDeleted: result.releasesDeleted
     });

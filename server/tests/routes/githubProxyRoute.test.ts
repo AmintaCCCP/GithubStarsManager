@@ -5,19 +5,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const proxyRequestMock = vi.fn();
 const validateUrlMock = vi.fn();
 
-vi.mock('../../src/db/connection.js', () => ({
-  getDb: () => ({
-    prepare: (sql: string) => ({
-      get: (key: string) => {
-        if (!sql.includes('FROM settings')) return undefined;
-        if (key === 'github_token') return { value: 'encrypted-token' };
-        if (key === 'proxy_config') return {
-          value: JSON.stringify({ enabled: true, type: 'http', host: '127.0.0.1', port: 7890 }),
-        };
-        return undefined;
-      },
-    }),
-  }),
+vi.mock('../../src/db/client.js', () => ({
+  db: {
+    // 门面签名：db.get(sql, ...args)，SQL 是第一个参数，key 是第二个参数。
+    get: (sql: string, key: string) => {
+      if (!sql.includes('FROM settings')) return Promise.resolve(undefined);
+      if (key === 'github_token') return Promise.resolve({ value: 'encrypted-token' });
+      if (key === 'proxy_config') return Promise.resolve({
+        value: JSON.stringify({ enabled: true, type: 'http', host: '127.0.0.1', port: 7890 }),
+      });
+      return Promise.resolve(undefined);
+    },
+    all: () => Promise.resolve([]),
+    run: () => Promise.resolve({ lastInsertRowid: 0, rowsAffected: 0 }),
+    exec: () => Promise.resolve(),
+    batch: () => Promise.resolve([]),
+  },
 }));
 
 vi.mock('../../src/services/crypto.js', () => ({

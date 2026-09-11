@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDb } from '../db/connection.js';
+import { db } from '../db/client.js';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
@@ -23,12 +23,10 @@ const router = Router();
 // uncacheable at every layer even though helmet() already sets no-store globally.
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store, no-cache, must-revalidate' };
 
-router.post('/api/sync/auth', (_req, res) => {
+router.post('/api/sync/auth', async (_req, res) => {
   try {
-    const db = getDb();
-    const tokenRow = db
-      .prepare('SELECT value FROM settings WHERE key = ?')
-      .get('github_token') as { value: string } | undefined;
+    const tokenRow = await db
+      .get<{ value: string }>('SELECT value FROM settings WHERE key = ?', 'github_token');
 
     if (!tokenRow?.value) {
       res.set(NO_STORE_HEADERS).json({ github_token: null });

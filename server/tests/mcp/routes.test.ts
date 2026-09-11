@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-// Isolate DB before importing app modules that call getDb()
+// Isolate DB before importing app modules that use the db/client.js facade
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-mcp-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
 process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
@@ -27,31 +27,29 @@ describeIfDb('MCP admin + transport auth', () => {
   let request: typeof import('supertest').default;
   let app: import('express').Express;
   let closeDb: () => void;
-  let getMcpTokenPlain: () => string | null;
-  let setMcpEnabled: (v: boolean) => void;
-  let ensureMcpToken: () => string;
-  let isMcpEnabled: () => boolean;
+  let getMcpTokenPlain: () => Promise<string | null>;
+  let setMcpEnabled: (v: boolean) => Promise<void>;
+  let ensureMcpToken: () => Promise<string>;
+  let isMcpEnabled: () => Promise<boolean>;
 
   beforeAll(async () => {
-    const conn = await import('../../src/db/connection.js');
+    const client = await import('../../src/db/client.js');
     const migrations = await import('../../src/db/migrations.js');
     const index = await import('../../src/index.js');
     const settings = await import('../../src/mcp/settings.js');
     const supertest = await import('supertest');
 
     request = supertest.default;
-    closeDb = conn.closeDb;
+    closeDb = () => client.db.close();
     getMcpTokenPlain = settings.getMcpTokenPlain;
     setMcpEnabled = settings.setMcpEnabled;
     ensureMcpToken = settings.ensureMcpToken;
     isMcpEnabled = settings.isMcpEnabled;
 
-    const db = conn.getDb();
-    migrations.runMigrations(db);
-    db.prepare(
+    await migrations.runMigrations();
+    await client.db.run(
       `INSERT INTO repositories (id, name, full_name, description, html_url, stargazers_count, language, owner_login, topics, ai_summary, ai_tags)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       1,
       'alpha',
       'acme/alpha',
@@ -65,7 +63,7 @@ describeIfDb('MCP admin + transport auth', () => {
       JSON.stringify(['crdt'])
     );
     // Default: MCP off — mount must not mint tokens
-    setMcpEnabled(false);
+    await setMcpEnabled(false);
     app = index.createApp();
   });
 
@@ -78,10 +76,10 @@ describeIfDb('MCP admin + transport auth', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('does not create token on app mount when MCP disabled', () => {
-    expect(isMcpEnabled()).toBe(false);
+  it('does not create token on app mount when MCP disabled', async () => {
+    expect(await isMcpEnabled()).toBe(false);
     // token may be absent
-    expect(getMcpTokenPlain()).toBeNull();
+    expect(await getMcpTokenPlain()).toBeNull();
   });
 
   it('GET /api/mcp/status requires API secret', async () => {
@@ -132,8 +130,8 @@ describeIfDb('MCP admin + transport auth', () => {
   });
 
   it('rejects wrong MCP token with 401 when enabled', async () => {
-    ensureMcpToken();
-    setMcpEnabled(true);
+    await ensureMcpToken();
+    await setMcpEnabled(true);
     const res = await request(app)
       .post('/mcp')
       .set('Authorization', 'Bearer gsm_mcp_wrong_token_value_here_xxx')
@@ -143,8 +141,8 @@ describeIfDb('MCP admin + transport auth', () => {
   });
 
   it('PUT /api/mcp/config can reset token', async () => {
-    setMcpEnabled(true);
-    const before = ensureMcpToken();
+    await setMcpEnabled(true);
+    const before = await ensureMcpToken();
     const res = await request(app)
       .put('/api/mcp/config')
       .set('Authorization', 'Bearer test-api-secret')

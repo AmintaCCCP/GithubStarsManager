@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDb } from '../db/connection.js';
+import { db } from '../db/client.js';
 
 const router = Router();
 
@@ -31,9 +31,8 @@ function transformRelease(row: Record<string, unknown>) {
 }
 
 // GET /api/releases
-router.get('/api/releases', (req, res) => {
+router.get('/api/releases', async (req, res) => {
   try {
-    const db = getDb();
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));
     const repoId = req.query.repo_id as string | undefined;
@@ -59,7 +58,7 @@ router.get('/api/releases', (req, res) => {
     sql += ' ORDER BY published_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = await db.all<Record<string, unknown>>(sql, ...params);
     const releases = rows.map(transformRelease);
 
     let countSql = 'SELECT COUNT(*) as total FROM releases';
@@ -68,9 +67,9 @@ router.get('/api/releases', (req, res) => {
       countSql += ' WHERE ' + conditions.join(' AND ');
       if (repoId) countParams.push(parseInt(repoId));
     }
-    const countRow = db.prepare(countSql).get(...countParams) as { total: number };
+    const countRow = await db.get<{ total: number }>(countSql, ...countParams);
 
-    res.json({ releases, total: countRow.total, page, limit });
+    res.json({ releases, total: countRow?.total ?? 0, page, limit });
   } catch (err) {
     console.error('GET /api/releases error:', err);
     res.status(500).json({ error: 'Failed to fetch releases', code: 'FETCH_RELEASES_FAILED' });
@@ -78,9 +77,8 @@ router.get('/api/releases', (req, res) => {
 });
 
 // PUT /api/releases (bulk upsert)
-router.put('/api/releases', (req, res) => {
+router.put('/api/releases', async (req, res) => {
   try {
-    const db = getDb();
     const { releases } = req.body as { releases: Record<string, unknown>[] };
     if (!Array.isArray(releases)) {
       res.status(400).json({ error: 'releases array required', code: 'RELEASES_ARRAY_REQUIRED' });
@@ -94,7 +92,7 @@ router.put('/api/releases', (req, res) => {
       }
     }
 
-    const stmtPreserveIsRead = db.prepare(`
+    const sqlPreserveIsRead = `
       INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
@@ -116,8 +114,8 @@ router.put('/api/releases', (req, res) => {
         repo_name = excluded.repo_name,
         zipball_url = excluded.zipball_url,
         tarball_url = excluded.tarball_url
-    `);
-    const stmtOverwriteIsRead = db.prepare(`
+    `;
+    const sqlOverwriteIsRead = `
       INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
@@ -139,39 +137,37 @@ router.put('/api/releases', (req, res) => {
         repo_name = excluded.repo_name,
         zipball_url = excluded.zipball_url,
         tarball_url = excluded.tarball_url
-    `);
+    `;
 
-    const upsert = db.transaction(() => {
-      let count = 0;
-      for (const release of releases) {
-        const repository = release.repository as { id?: number; full_name?: string; name?: string } | undefined;
-        // 合并 UPSERT：仅更新数据列，保留库中已有的 is_read 已读状态，避免整行替换把已读清空。
-        // 仅当请求显式携带 is_read（如导入/同步完整快照）时才覆盖已读状态。
-        const hasExplicitIsRead = typeof release.is_read === 'boolean';
-        const stmt = hasExplicitIsRead ? stmtOverwriteIsRead : stmtPreserveIsRead;
-        stmt.run(
-          release.id,
-          release.tag_name ?? null,
-          release.name ?? null,
-          release.body ?? null,
-          release.html_url ?? null,
-          release.published_at ?? null,
-          release.prerelease ? 1 : 0,
-          release.draft ? 1 : 0,
-          hasExplicitIsRead ? (release.is_read ? 1 : 0) : 0,
-          JSON.stringify(release.assets ?? []),
-          repository?.id ?? release.repo_id ?? null,
-          repository?.full_name ?? release.repo_full_name ?? null,
-          repository?.name ?? release.repo_name ?? null,
-          release.zipball_url ?? null,
-          release.tarball_url ?? null
-        );
-        count++;
-      }
-      return count;
-    });
+    // 事务语义：body 内有 for 循环，保留原执行顺序逐条 await 执行。
+    let count = 0;
+    for (const release of releases) {
+      const repository = release.repository as { id?: number; full_name?: string; name?: string } | undefined;
+      // 合并 UPSERT：仅更新数据列，保留库中已有的 is_read 已读状态，避免整行替换把已读清空。
+      // 仅当请求显式携带 is_read（如导入/同步完整快照）时才覆盖已读状态。
+      const hasExplicitIsRead = typeof release.is_read === 'boolean';
+      const sql = hasExplicitIsRead ? sqlOverwriteIsRead : sqlPreserveIsRead;
+      await db.run(
+        sql,
+        release.id,
+        release.tag_name ?? null,
+        release.name ?? null,
+        release.body ?? null,
+        release.html_url ?? null,
+        release.published_at ?? null,
+        release.prerelease ? 1 : 0,
+        release.draft ? 1 : 0,
+        hasExplicitIsRead ? (release.is_read ? 1 : 0) : 0,
+        JSON.stringify(release.assets ?? []),
+        repository?.id ?? release.repo_id ?? null,
+        repository?.full_name ?? release.repo_full_name ?? null,
+        repository?.name ?? release.repo_name ?? null,
+        release.zipball_url ?? null,
+        release.tarball_url ?? null
+      );
+      count++;
+    }
 
-    const count = upsert();
     res.json({ upserted: count });
   } catch (err) {
     console.error('PUT /api/releases error:', err);
@@ -180,9 +176,8 @@ router.put('/api/releases', (req, res) => {
 });
 
 // PATCH /api/releases/:id
-router.patch('/api/releases/:id', (req, res) => {
+router.patch('/api/releases/:id', async (req, res) => {
   try {
-    const db = getDb();
     const id = parseInt(req.params.id);
     const { is_read } = req.body as { is_read?: boolean };
 
@@ -191,9 +186,9 @@ router.patch('/api/releases/:id', (req, res) => {
       return;
     }
 
-    db.prepare('UPDATE releases SET is_read = ? WHERE id = ?').run(is_read ? 1 : 0, id);
+    await db.run('UPDATE releases SET is_read = ? WHERE id = ?', is_read ? 1 : 0, id);
 
-    const row = db.prepare('SELECT * FROM releases WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = await db.get<Record<string, unknown>>('SELECT * FROM releases WHERE id = ?', id);
     if (!row) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
@@ -206,11 +201,10 @@ router.patch('/api/releases/:id', (req, res) => {
 });
 
 // POST /api/releases/mark-all-read
-router.post('/api/releases/mark-all-read', (_req, res) => {
+router.post('/api/releases/mark-all-read', async (_req, res) => {
   try {
-    const db = getDb();
-    const result = db.prepare('UPDATE releases SET is_read = 1').run();
-    res.json({ updated: result.changes });
+    const result = await db.run('UPDATE releases SET is_read = 1');
+    res.json({ updated: result.rowsAffected });
   } catch (err) {
     console.error('POST /api/releases/mark-all-read error:', err);
     res.status(500).json({ error: 'Failed to mark all as read', code: 'MARK_ALL_READ_FAILED' });
@@ -218,7 +212,7 @@ router.post('/api/releases/mark-all-read', (_req, res) => {
 });
 
 // DELETE /api/releases/:id
-router.delete('/api/releases/:id', (req, res) => {
+router.delete('/api/releases/:id', async (req, res) => {
   try {
     const idStr = req.params.id;
     if (!/^\d+$/.test(idStr)) {
@@ -232,10 +226,9 @@ router.delete('/api/releases/:id', (req, res) => {
       return;
     }
 
-    const db = getDb();
-    const result = db.prepare('DELETE FROM releases WHERE id = ?').run(id);
+    const result = await db.run('DELETE FROM releases WHERE id = ?', id);
 
-    if (result.changes === 0) {
+    if (result.rowsAffected === 0) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }

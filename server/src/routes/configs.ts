@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
-import { getDb } from '../db/connection.js';
+import { db } from '../db/client.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
@@ -66,11 +66,10 @@ function registerEncryptedConfigRoutes(opts: {
   const { router, basePath, table, secretColumn, label, logPrefix, insertSql, updateSql, insertParams, updateParams, shapeResponse, requiresSecret = true } = opts;
 
   // PUT /bulk — replace all configs (for sync)
-  router.put(`${basePath}/bulk`, (req, res) => {
+  router.put(`${basePath}/bulk`, async (req, res) => {
     const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
 
     try {
-      const db = getDb();
       const configs = req.body.configs as Array<Record<string, unknown>>;
 
       if (!Array.isArray(configs)) {
@@ -78,60 +77,58 @@ function registerEncryptedConfigRoutes(opts: {
         return;
       }
 
-      const bulkSync = db.transaction(() => {
-        const existingKeys = new Map<string, string>();
-        const existingRows = db.prepare(`SELECT id, ${secretColumn} FROM ${table}`).all() as Array<{ id: string; [key: string]: string }>;
-        for (const row of existingRows) {
-          if (row[secretColumn]) existingKeys.set(String(row.id), row[secretColumn]);
-        }
+      // 事务语义：body 内有控制流（for/continue/throw），保留原执行顺序逐条执行；
+      // 本地逐条执行靠 SQLite 单写保证原子，远程靠 libSQL 单写保证。
+      const existingKeys = new Map<string, string>();
+      const existingRows = await db.all<{ id: string; [key: string]: string }>(`SELECT id, ${secretColumn} FROM ${table}`);
+      for (const row of existingRows) {
+        if (row[secretColumn]) existingKeys.set(String(row.id), row[secretColumn]);
+      }
 
-        db.prepare(`DELETE FROM ${table}`).run();
-        const stmt = db.prepare(insertSql);
+      await db.run(`DELETE FROM ${table}`);
 
-        for (const c of configs) {
-          let encryptedKey = '';
-          const rawKey = c.apiKey ?? c.password;
-          if (rawKey && typeof rawKey === 'string' && !rawKey.startsWith('***')) {
-            try {
-              encryptedKey = encrypt(String(rawKey), config.encryptionKey);
-            } catch (encErr) {
-              logger.errorFromError(`${logPrefix}.encrypt`, `Failed to encrypt secret for ${label}`, encErr, { configId: c.id, configName: c.name });
-              encryptedKey = existingKeys.get(String(c.id)) ?? '';
-              if (!encryptedKey) {
-                syncResult.skipped.push({ id: String(c.id), name: String(c.name ?? ''), reason: 'encrypt_failed' });
-                continue;
-              }
-            }
-          } else if (rawKey === '') {
-            // Explicit empty string = user wants to clear the secret
-            encryptedKey = '';
-          } else {
-            // Omitted or masked = reuse existing
+      for (const c of configs) {
+        let encryptedKey = '';
+        const rawKey = c.apiKey ?? c.password;
+        if (rawKey && typeof rawKey === 'string' && !rawKey.startsWith('***')) {
+          try {
+            encryptedKey = encrypt(String(rawKey), config.encryptionKey);
+          } catch (encErr) {
+            logger.errorFromError(`${logPrefix}.encrypt`, `Failed to encrypt secret for ${label}`, encErr, { configId: c.id, configName: c.name });
             encryptedKey = existingKeys.get(String(c.id)) ?? '';
+            if (!encryptedKey) {
+              syncResult.skipped.push({ id: String(c.id), name: String(c.name ?? ''), reason: 'encrypt_failed' });
+              continue;
+            }
           }
-
-          if (!encryptedKey && requiresSecret) {
-            syncResult.skipped.push({
-              id: String(c.id),
-              name: String(c.name ?? ''),
-              reason: (typeof rawKey === 'string' && rawKey.startsWith('***'))
-                ? 'Secret is masked and no existing key found'
-                : 'Secret is empty',
-            });
-            continue;
-          }
-
-          stmt.run(...insertParams(c, encryptedKey));
-          syncResult.inserted++;
+        } else if (rawKey === '') {
+          // Explicit empty string = user wants to clear the secret
+          encryptedKey = '';
+        } else {
+          // Omitted or masked = reuse existing
+          encryptedKey = existingKeys.get(String(c.id)) ?? '';
         }
 
-        // Rollback if any config was skipped (prevents partial replacement)
-        if (syncResult.skipped.length > 0) {
-          throw new Error('SOME_CONFIGS_SKIPPED');
+        if (!encryptedKey && requiresSecret) {
+          syncResult.skipped.push({
+            id: String(c.id),
+            name: String(c.name ?? ''),
+            reason: (typeof rawKey === 'string' && rawKey.startsWith('***'))
+              ? 'Secret is masked and no existing key found'
+              : 'Secret is empty',
+          });
+          continue;
         }
-      });
 
-      bulkSync();
+        await db.run(insertSql, ...insertParams(c, encryptedKey));
+        syncResult.inserted++;
+      }
+
+      // Rollback if any config was skipped (prevents partial replacement)
+      if (syncResult.skipped.length > 0) {
+        throw new Error('SOME_CONFIGS_SKIPPED');
+      }
+
       res.json({ synced: syncResult.inserted, skipped: 0, errors: [] });
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -151,9 +148,8 @@ function registerEncryptedConfigRoutes(opts: {
   });
 
   // PUT /:id — update single config
-  router.put(`${basePath}/:id`, (req, res) => {
+  router.put(`${basePath}/:id`, async (req, res) => {
     try {
-      const db = getDb();
       const id = req.params.id;
       const body = req.body as Record<string, unknown>;
       const rawKey = body.apiKey ?? body.password;
@@ -166,13 +162,13 @@ function registerEncryptedConfigRoutes(opts: {
         encryptedKey = '';
       } else {
         // Omitted or masked = reuse existing
-        const existing = db.prepare(`SELECT ${secretColumn} FROM ${table} WHERE id = ?`).get(id) as Record<string, unknown> | undefined;
+        const existing = await db.get<Record<string, unknown>>(`SELECT ${secretColumn} FROM ${table} WHERE id = ?`, id);
         encryptedKey = (existing?.[secretColumn] as string) ?? null;
       }
 
-      const result = db.prepare(updateSql).run(...updateParams(body, id, encryptedKey ?? ''));
+      const result = await db.run(updateSql, ...updateParams(body, id, encryptedKey ?? ''));
 
-      if (result.changes === 0) {
+      if (result.rowsAffected === 0) {
         res.status(404).json({ error: `${label} not found`, code: `${logPrefix.toUpperCase().replace(/\./g, '_')}_NOT_FOUND` });
         return;
       }
@@ -190,12 +186,11 @@ function registerEncryptedConfigRoutes(opts: {
   });
 
   // DELETE /:id
-  router.delete(`${basePath}/:id`, (req, res) => {
+  router.delete(`${basePath}/:id`, async (req, res) => {
     try {
-      const db = getDb();
       const id = req.params.id;
-      const result = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
-      if (result.changes === 0) {
+      const result = await db.run(`DELETE FROM ${table} WHERE id = ?`, id);
+      if (result.rowsAffected === 0) {
         res.status(404).json({ error: `${label} not found`, code: `${logPrefix.toUpperCase().replace(/\./g, '_')}_NOT_FOUND` });
         return;
       }
@@ -208,11 +203,10 @@ function registerEncryptedConfigRoutes(opts: {
 }
 
 // GET /api/configs/ai
-router.get('/api/configs/ai', (req, res) => {
+router.get('/api/configs/ai', async (req, res) => {
   try {
-    const db = getDb();
     const shouldDecrypt = req.query.decrypt === 'true';
-    const rows = db.prepare('SELECT * FROM ai_configs ORDER BY id ASC').all() as Record<string, unknown>[];
+    const rows = await db.all<Record<string, unknown>>('SELECT * FROM ai_configs ORDER BY id ASC');
     const configs = rows.map((row) => {
       const { decryptedValue, status } = getMaskedSecretResult({
         encryptedValue: row.api_key_encrypted,
@@ -245,16 +239,14 @@ router.get('/api/configs/ai', (req, res) => {
 });
 
 // POST /api/configs/ai
-router.post('/api/configs/ai', (req, res) => {
+router.post('/api/configs/ai', async (req, res) => {
   try {
-    const db = getDb();
     const { name, apiType, model, baseUrl, apiKey, isActive, customPrompt, useCustomPrompt, concurrency, reasoningEffort, mimoPlan } = req.body as Record<string, unknown>;
 
     const encryptedKey = apiKey && typeof apiKey === 'string' ? encrypt(apiKey, config.encryptionKey) : null;
 
-    const result = db.prepare(
-      'INSERT INTO ai_configs (name, api_type, model, base_url, api_key_encrypted, is_active, custom_prompt, use_custom_prompt, concurrency, reasoning_effort, mimo_plan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(
+    const result = await db.run(
+      'INSERT INTO ai_configs (name, api_type, model, base_url, api_key_encrypted, is_active, custom_prompt, use_custom_prompt, concurrency, reasoning_effort, mimo_plan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       name ?? '', apiType ?? 'openai', model ?? '', baseUrl ?? null,
       encryptedKey, isActive ? 1 : 0, customPrompt ?? null, useCustomPrompt ? 1 : 0, concurrency ?? 1, reasoningEffort ?? null, mimoPlan ?? null
     );
@@ -302,11 +294,10 @@ function maskPassword(pwd: string | null | undefined): string {
 }
 
 // GET /api/configs/webdav
-router.get('/api/configs/webdav', (req, res) => {
+router.get('/api/configs/webdav', async (req, res) => {
   try {
-    const db = getDb();
     const shouldDecrypt = req.query.decrypt === 'true';
-    const rows = db.prepare('SELECT * FROM webdav_configs ORDER BY id ASC').all() as Record<string, unknown>[];
+    const rows = await db.all<Record<string, unknown>>('SELECT * FROM webdav_configs ORDER BY id ASC');
     const configs = rows.map((row) => {
       const { decryptedValue, status } = getMaskedSecretResult({
         encryptedValue: row.password_encrypted,
@@ -334,16 +325,14 @@ router.get('/api/configs/webdav', (req, res) => {
 });
 
 // POST /api/configs/webdav
-router.post('/api/configs/webdav', (req, res) => {
+router.post('/api/configs/webdav', async (req, res) => {
   try {
-    const db = getDb();
     const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
 
     const encryptedPwd = password && typeof password === 'string' ? encrypt(password, config.encryptionKey) : null;
 
-    const result = db.prepare(
-      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(
+    const result = await db.run(
+      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active) VALUES (?, ?, ?, ?, ?, ?)',
       name ?? '', url ?? '', username ?? '', encryptedPwd,
       path ?? '/', isActive ? 1 : 0
     );
@@ -357,12 +346,11 @@ router.post('/api/configs/webdav', (req, res) => {
 
 // PUT /api/configs/webdav/bulk — replace all WebDAV configs (for sync)
 // MUST be registered before :id route to avoid matching 'bulk' as an id
-router.put('/api/configs/webdav/bulk', (req, res) => {
+router.put('/api/configs/webdav/bulk', async (req, res) => {
   // Shared between transaction, response, and error handler
   const syncResult = { inserted: 0, skipped: [] as Array<{ id: string; name: string; reason: string }> };
 
   try {
-    const db = getDb();
     const configs = req.body.configs as Array<{
       id: string;
       name: string;
@@ -378,67 +366,66 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       return;
     }
 
-    const bulkSync = db.transaction(() => {
-      // Read existing passwords BEFORE delete
-      const existingPwds = new Map<string, string>();
-      const existingRows = db.prepare('SELECT id, password_encrypted FROM webdav_configs').all() as Array<{ id: string; password_encrypted: string }>;
-      for (const row of existingRows) {
-        if (row.password_encrypted) existingPwds.set(String(row.id), row.password_encrypted);
-      }
+    // 事务语义：body 内有控制流（for/continue/throw），保留原执行顺序逐条执行。
+    // 先读取已存密码（在 DELETE 前）
+    const existingPwds = new Map<string, string>();
+    const existingRows = await db.all<{ id: string; password_encrypted: string }>('SELECT id, password_encrypted FROM webdav_configs');
+    for (const row of existingRows) {
+      if (row.password_encrypted) existingPwds.set(String(row.id), row.password_encrypted);
+    }
 
-      db.prepare('DELETE FROM webdav_configs').run();
+    await db.run('DELETE FROM webdav_configs');
 
-      const stmt = db.prepare(`
+    const insertSql2 = `
         INSERT INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
+      `;
 
-      for (const c of configs) {
-        let encryptedPwd = '';
-        if (c.password && !c.password.startsWith('***')) {
-          try {
-            encryptedPwd = encrypt(String(c.password), config.encryptionKey);
-          } catch (encErr) {
-            logger.errorFromError('configs.encryptWebDAVPwd', 'Failed to encrypt WebDAV password for config', encErr, { configId: c.id, configName: c.name });
-            encryptedPwd = existingPwds.get(String(c.id)) ?? '';
-            if (!encryptedPwd) {
-              syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
-              continue;
-            }
-          }
-        } else {
+    for (const c of configs) {
+      let encryptedPwd = '';
+      if (c.password && !c.password.startsWith('***')) {
+        try {
+          encryptedPwd = encrypt(String(c.password), config.encryptionKey);
+        } catch (encErr) {
+          logger.errorFromError('configs.encryptWebDAVPwd', 'Failed to encrypt WebDAV password for config', encErr, { configId: c.id, configName: c.name });
           encryptedPwd = existingPwds.get(String(c.id)) ?? '';
+          if (!encryptedPwd) {
+            syncResult.skipped.push({ id: c.id, name: c.name ?? '', reason: 'encrypt_failed' });
+            continue;
+          }
         }
-
-        if (!encryptedPwd) {
-          syncResult.skipped.push({
-            id: c.id,
-            name: c.name ?? '',
-            reason: c.password?.startsWith('***')
-              ? 'Password is masked and no existing password found'
-              : 'Password is empty',
-          });
-          continue;
-        }
-
-        stmt.run(
-          c.id, c.name ?? '', c.url ?? '', c.username ?? '',
-          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
-        );
-        syncResult.inserted++;
+      } else {
+        encryptedPwd = existingPwds.get(String(c.id)) ?? '';
       }
 
-      if (syncResult.skipped.length > 0) {
-        logger.warn('configs.bulkWebDAV', 'Skipped WebDAV configs with missing passwords', { skippedCount: syncResult.skipped.length });
+      if (!encryptedPwd) {
+        syncResult.skipped.push({
+          id: c.id,
+          name: c.name ?? '',
+          reason: c.password?.startsWith('***')
+            ? 'Password is masked and no existing password found'
+            : 'Password is empty',
+        });
+        continue;
       }
 
-      // Safety guard: prevent committing an empty database when all configs were skipped
-      if (syncResult.inserted === 0 && configs.length > 0) {
-        throw new Error('ALL_CONFIGS_SKIPPED');
-      }
-    });
+      await db.run(
+        insertSql2,
+        c.id, c.name ?? '', c.url ?? '', c.username ?? '',
+        encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
+      );
+      syncResult.inserted++;
+    }
 
-    bulkSync();
+    if (syncResult.skipped.length > 0) {
+      logger.warn('configs.bulkWebDAV', 'Skipped WebDAV configs with missing passwords', { skippedCount: syncResult.skipped.length });
+    }
+
+    // Safety guard: prevent committing an empty database when all configs were skipped
+    if (syncResult.inserted === 0 && configs.length > 0) {
+      throw new Error('ALL_CONFIGS_SKIPPED');
+    }
+
     res.json({ synced: syncResult.inserted, skipped: syncResult.skipped.length, errors: syncResult.skipped });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -458,9 +445,8 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
 });
 
 // PUT /api/configs/webdav/:id
-router.put('/api/configs/webdav/:id', (req, res) => {
+router.put('/api/configs/webdav/:id', async (req, res) => {
   try {
-    const db = getDb();
     const id = req.params.id;
     const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
 
@@ -468,15 +454,16 @@ router.put('/api/configs/webdav/:id', (req, res) => {
     if (password && typeof password === 'string' && !password.startsWith('***')) {
       encryptedPwd = encrypt(password, config.encryptionKey);
     } else {
-      const existing = db.prepare('SELECT password_encrypted FROM webdav_configs WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+      const existing = await db.get<Record<string, unknown>>('SELECT password_encrypted FROM webdav_configs WHERE id = ?', id);
       encryptedPwd = (existing?.password_encrypted as string) ?? null;
     }
 
-    const result = db.prepare(
-      'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_active = ? WHERE id = ?'
-    ).run(name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', isActive ? 1 : 0, id);
+    const result = await db.run(
+      'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_active = ? WHERE id = ?',
+      name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', isActive ? 1 : 0, id
+    );
 
-    if (result.changes === 0) {
+    if (result.rowsAffected === 0) {
       res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
       return;
     }
@@ -493,12 +480,11 @@ router.put('/api/configs/webdav/:id', (req, res) => {
 });
 
 // DELETE /api/configs/webdav/:id
-router.delete('/api/configs/webdav/:id', (req, res) => {
+router.delete('/api/configs/webdav/:id', async (req, res) => {
   try {
-    const db = getDb();
     const id = req.params.id;
-    const result = db.prepare('DELETE FROM webdav_configs WHERE id = ?').run(id);
-    if (result.changes === 0) {
+    const result = await db.run('DELETE FROM webdav_configs WHERE id = ?', id);
+    if (result.rowsAffected === 0) {
       res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
       return;
     }
@@ -512,10 +498,9 @@ router.delete('/api/configs/webdav/:id', (req, res) => {
 // ── Settings ──
 
 // GET /api/settings
-router.get('/api/settings', (_req, res) => {
+router.get('/api/settings', async (_req, res) => {
   try {
-    const db = getDb();
-    const rows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
+    const rows = await db.all<Record<string, unknown>>('SELECT * FROM settings');
     const settings: Record<string, unknown> = {};
 
     for (const row of rows) {
@@ -543,38 +528,32 @@ router.get('/api/settings', (_req, res) => {
 });
 
 // PUT /api/settings
-router.put('/api/settings', (req, res) => {
+router.put('/api/settings', async (req, res) => {
   try {
-    const db = getDb();
     const updates = req.body as Record<string, unknown>;
 
-    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    for (const [key, rawValue] of Object.entries(updates)) {
+      let value = rawValue as string | null;
 
-    const upsert = db.transaction(() => {
-      for (const [key, rawValue] of Object.entries(updates)) {
-        let value = rawValue as string | null;
-
-        if (key === 'github_token' && value && typeof value === 'string') {
-          if (value.startsWith('***')) {
-            // Skip masked values — keep existing
-            continue;
-          }
-          value = encrypt(value, config.encryptionKey);
+      if (key === 'github_token' && value && typeof value === 'string') {
+        if (value.startsWith('***')) {
+          // Skip masked values — keep existing
+          continue;
         }
-
-        // better-sqlite3 interprets objects/arrays as named parameter maps,
-        // causing RangeError. Serialize non-primitive values to JSON strings.
-        const serialized =
-          value === null || value === undefined
-            ? null
-            : typeof value === 'object'
-              ? JSON.stringify(value)
-              : value;
-        stmt.run(key, serialized);
+        value = encrypt(value, config.encryptionKey);
       }
-    });
 
-    upsert();
+      // better-sqlite3 interprets objects/arrays as named parameter maps,
+      // causing RangeError. Serialize non-primitive values to JSON strings.
+      const serialized =
+        value === null || value === undefined
+          ? null
+          : typeof value === 'object'
+            ? JSON.stringify(value)
+            : value;
+      await db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', key, serialized);
+    }
+
     res.json({ updated: true });
   } catch (err) {
     logger.errorFromError('configs.updateSettings', 'PUT /api/settings error', err);
@@ -585,11 +564,10 @@ router.put('/api/settings', (req, res) => {
 // ── Embedding Configs ──
 
 // GET /api/configs/embedding
-router.get('/api/configs/embedding', (req, res) => {
+router.get('/api/configs/embedding', async (req, res) => {
   try {
-    const db = getDb();
     const shouldDecrypt = req.query.decrypt === 'true';
-    const rows = db.prepare('SELECT * FROM embedding_configs ORDER BY id ASC').all() as Record<string, unknown>[];
+    const rows = await db.all<Record<string, unknown>>('SELECT * FROM embedding_configs ORDER BY id ASC');
     const configs = rows.map((row) => {
       const { decryptedValue, status } = getMaskedSecretResult({
         encryptedValue: row.api_key_encrypted,
@@ -618,17 +596,17 @@ router.get('/api/configs/embedding', (req, res) => {
 });
 
 // POST /api/configs/embedding
-router.post('/api/configs/embedding', (req, res) => {
+router.post('/api/configs/embedding', async (req, res) => {
   try {
-    const db = getDb();
     const { name, apiType, baseUrl, apiKey, model, dimensions, isActive } = req.body as Record<string, unknown>;
 
     const id = typeof req.body.id === 'string' && req.body.id ? req.body.id : randomUUID();
     const encryptedKey = apiKey && typeof apiKey === 'string' ? encrypt(apiKey, config.encryptionKey) : '';
 
-    db.prepare(
-      'INSERT INTO embedding_configs (id, name, api_type, base_url, api_key_encrypted, model, dimensions, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, name ?? '', apiType ?? 'openai', baseUrl ?? '', encryptedKey, model ?? '', dimensions ?? 1536, isActive ? 1 : 0);
+    await db.run(
+      'INSERT INTO embedding_configs (id, name, api_type, base_url, api_key_encrypted, model, dimensions, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      id, name ?? '', apiType ?? 'openai', baseUrl ?? '', encryptedKey, model ?? '', dimensions ?? 1536, isActive ? 1 : 0
+    );
 
     res.status(201).json({
       id,
@@ -674,11 +652,10 @@ registerEncryptedConfigRoutes({
 // ── Vector Search Config ──
 
 // GET /api/configs/vector-search
-router.get('/api/configs/vector-search', (req, res) => {
+router.get('/api/configs/vector-search', async (req, res) => {
   try {
-    const db = getDb();
     const shouldDecrypt = req.query.decrypt === 'true';
-    const row = db.prepare('SELECT * FROM vector_search_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
+    const row = await db.get<Record<string, unknown>>('SELECT * FROM vector_search_configs WHERE id = ?', 'default');
 
     if (!row) {
       res.json({ enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000, searchThreshold: 0.35, searchTopK: 30, enableHyDE: true, enableReranking: true });
@@ -725,9 +702,8 @@ router.get('/api/configs/vector-search', (req, res) => {
 });
 
 // PUT /api/configs/vector-search
-router.put('/api/configs/vector-search', (req, res) => {
+router.put('/api/configs/vector-search', async (req, res) => {
   try {
-    const db = getDb();
     const { enabled, workerUrl, authToken, embeddingConfigId, indexMode, readmeMaxChars, status, lastSyncAt } = req.body as Record<string, unknown>;
     const { searchThreshold, searchTopK, enableHyDE, enableReranking, embeddingFormatVersion } = req.body as Record<string, unknown>;
 
@@ -740,7 +716,7 @@ router.put('/api/configs/vector-search', (req, res) => {
       encryptedToken = encrypt(authToken, config.encryptionKey);
     } else {
       // Omitted or masked = reuse existing
-      const existing = db.prepare('SELECT auth_token_encrypted FROM vector_search_configs WHERE id = ?').get('default') as Record<string, unknown> | undefined;
+      const existing = await db.get<Record<string, unknown>>('SELECT auth_token_encrypted FROM vector_search_configs WHERE id = ?', 'default');
       encryptedToken = (existing?.auth_token_encrypted as string) ?? '';
     }
 
@@ -759,10 +735,10 @@ router.put('/api/configs/vector-search', (req, res) => {
       ? embeddingFormatVersion
       : null;
 
-    db.prepare(`
+    await db.run(`
       INSERT OR REPLACE INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id, index_mode, readme_max_chars, search_threshold, search_top_k, enable_hyde, enable_reranking, embedding_format_version, status_json, last_sync_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run('default', enabled ? 1 : 0, workerUrl ?? '', encryptedToken, embeddingConfigId ?? '', mode, maxChars, threshold, topK, hyde, reranking, formatVersion, statusJson, lastSyncAt ?? null);
+    `, 'default', enabled ? 1 : 0, workerUrl ?? '', encryptedToken, embeddingConfigId ?? '', mode, maxChars, threshold, topK, hyde, reranking, formatVersion, statusJson, lastSyncAt ?? null);
 
     res.json({ updated: true });
   } catch (err) {

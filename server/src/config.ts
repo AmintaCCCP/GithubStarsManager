@@ -10,10 +10,13 @@ interface Config {
   nodeEnv: string;
 }
 
+/** 判断是否运行在 Vercel serverless（文件系统只读，不允许落盘）。 */
+const isServerless = (): boolean => process.env.VERCEL === '1' || !!process.env.TURSO_DATABASE_URL;
+
 /** Resolve the data directory path, creating it if it doesn't exist. */
 function resolveDataDir(): string {
   const dataDir = path.resolve(process.cwd(), 'data');
-  if (!fs.existsSync(dataDir)) {
+  if (!isServerless() && !fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
   return dataDir;
@@ -54,6 +57,15 @@ function resolveEncryptionKey(dataDir: string): string {
   const envKey = process.env.ENCRYPTION_KEY;
   if (envKey) {
     return normalizeEncryptionKey(envKey);
+  }
+
+  // Serverless（Vercel + Turso）文件系统只读，无法落盘：ENCRYPTION_KEY 必须
+  // 由环境变量显式提供，否则每次冷启动都会生成新密钥、无法解密既有数据。
+  if (isServerless()) {
+    throw new Error(
+      'ENCRYPTION_KEY environment variable is required in serverless/Turso mode. ' +
+      'Generate once with: openssl rand -hex 32'
+    );
   }
 
   const keyFilePath = path.join(dataDir, '.encryption-key');

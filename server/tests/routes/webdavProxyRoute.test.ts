@@ -4,25 +4,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const proxyRequestMock = vi.fn();
 
-vi.mock('../../src/db/connection.js', () => ({
-  getDb: () => ({
-    prepare: (sql: string) => ({
-      get: (keyOrId: string) => {
-        if (sql.includes('FROM webdav_configs')) {
-          return {
-            id: keyOrId,
-            username: 'alice',
-            password_encrypted: 'secret',
-            url: 'https://dav.example.com',
-          };
-        }
-        if (sql.includes('FROM settings')) {
-          return undefined;
-        }
-        return undefined;
-      },
-    }),
-  }),
+vi.mock('../../src/db/client.js', () => ({
+  db: {
+    // 门面签名：db.get(sql, ...args)。WebDAV 路由查 webdav_configs（第二参为 configId），
+    // getProxyConfig 查 settings（第二参为 proxy_config）→ 无配置返回 undefined。
+    get: (sql: string, keyOrId: string) => {
+      if (sql.includes('FROM webdav_configs')) {
+        return Promise.resolve({
+          id: keyOrId,
+          username: 'alice',
+          password_encrypted: 'secret',
+          url: 'https://dav.example.com',
+        });
+      }
+      return Promise.resolve(undefined);
+    },
+    all: () => Promise.resolve([]),
+    run: () => Promise.resolve({ lastInsertRowid: 0, rowsAffected: 0 }),
+    exec: () => Promise.resolve(),
+    batch: () => Promise.resolve([]),
+  },
 }));
 
 vi.mock('../../src/services/crypto.js', () => ({

@@ -1,44 +1,26 @@
-import type Database from 'better-sqlite3';
 import { initializeSchema } from './schema.js';
+import { db } from './client.js';
 import { logger } from '../services/logger.js';
 
-const migrations: Record<number, (db: Database.Database) => void> = {
-  1: (db) => {
-    initializeSchema(db);
-  },
-};
-
-export function runMigrations(db: Database.Database): void {
+export async function runMigrations(): Promise<void> {
   // Ensure schema_version table exists first
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
-  const currentVersionRow = db
-    .prepare('SELECT MAX(version) as version FROM schema_version')
-    .get() as { version: number | null } | undefined;
-
+  const currentVersionRow = await db.get<{ version: number | null }>(
+    'SELECT MAX(version) as version FROM schema_version'
+  );
   const currentVersion = currentVersionRow?.version ?? 0;
-  const targetVersion = Math.max(...Object.keys(migrations).map(Number));
 
-  if (currentVersion >= targetVersion) {
-    return;
+  // v1: 建表 + 增量列
+  if (currentVersion < 1) {
+    logger.info('db.migration', 'Applying migration v1...');
+    await initializeSchema();
+    await db.run('INSERT OR REPLACE INTO schema_version (version) VALUES (?)', 1);
+    logger.info('db.migration', 'Migration v1 applied.');
   }
-
-  const applyMigration = db.transaction(() => {
-    for (let v = currentVersion + 1; v <= targetVersion; v++) {
-      const migration = migrations[v];
-      if (migration) {
-        logger.info('db.migration', `Applying migration v${v}...`);
-        migration(db);
-        db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (?)').run(v);
-        logger.info('db.migration', `Migration v${v} applied.`);
-      }
-    }
-  });
-
-  applyMigration();
 }

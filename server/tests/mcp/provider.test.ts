@@ -1,8 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getDbMock } = vi.hoisted(() => ({ getDbMock: vi.fn() }));
+const { dbMocks } = vi.hoisted(() => ({
+  dbMocks: {
+    all: vi.fn(),
+    get: vi.fn(),
+    run: vi.fn(),
+    exec: vi.fn(),
+    batch: vi.fn(),
+  },
+}));
 
-vi.mock('../../src/db/connection.js', () => ({ getDb: getDbMock }));
+vi.mock('../../src/db/client.js', () => ({
+  db: {
+    all: (...args: unknown[]) => Promise.resolve(dbMocks.all(...args)),
+    get: (...args: unknown[]) => Promise.resolve(dbMocks.get(...args)),
+    run: (...args: unknown[]) => Promise.resolve(dbMocks.run(...args)),
+    exec: (...args: unknown[]) => Promise.resolve(dbMocks.exec(...args)),
+    batch: (...args: unknown[]) => Promise.resolve(dbMocks.batch(...args)),
+  },
+}));
 vi.mock('../../src/services/crypto.js', () => ({ decrypt: (value: string) => value }));
 vi.mock('../../src/config.js', () => ({ config: { encryptionKey: 'test-key' } }));
 vi.mock('../../src/services/logger.js', () => ({
@@ -72,31 +88,26 @@ function configureDb(options: {
     base_url: 'http://127.0.0.1:11434',
   };
 
-  getDbMock.mockReturnValue({
-    prepare(sql: string) {
-      return {
-        all: () => {
-          if (sql.includes('FROM repositories')) return repos;
-          return [];
-        },
-        get: (value?: unknown) => {
-          if (sql.includes('FROM vector_search_configs')) return vectorConfig;
-          if (sql.includes('FROM embedding_configs')) return embeddingConfig;
-          if (sql.includes('FROM releases')) {
-            return releases.find((release) => Number(release.repo_id) === Number(value));
-          }
-          if (sql.includes('WHERE id = ?')) {
-            return repos.find((repo) => Number(repo.id) === Number(value));
-          }
-          if (sql.includes('WHERE full_name = ?')) {
-            return repos.find(
-              (repo) => String(repo.full_name).toLowerCase() === String(value).toLowerCase()
-            );
-          }
-          return undefined;
-        },
-      };
-    },
+  // 门面签名：all/get 的第一个参数是 SQL，其后是绑定参数。
+  dbMocks.all.mockImplementation((sql: string) => {
+    if (sql.includes('FROM repositories')) return repos;
+    return [];
+  });
+  dbMocks.get.mockImplementation((sql: string, value?: unknown) => {
+    if (sql.includes('FROM vector_search_configs')) return vectorConfig;
+    if (sql.includes('FROM embedding_configs')) return embeddingConfig;
+    if (sql.includes('FROM releases')) {
+      return releases.find((release) => Number(release.repo_id) === Number(value));
+    }
+    if (sql.includes('WHERE id = ?')) {
+      return repos.find((repo) => Number(repo.id) === Number(value));
+    }
+    if (sql.includes('WHERE full_name = ?')) {
+      return repos.find(
+        (repo) => String(repo.full_name).toLowerCase() === String(value).toLowerCase()
+      );
+    }
+    return undefined;
   });
 }
 
@@ -113,8 +124,8 @@ describe('MCP provider discovery', () => {
     configureDb();
   });
 
-  it('returns bounded batch entries in order and preserves duplicates', () => {
-    const result = provider.getRepositories(['acme/alpha', 'missing/repo', 'acme/alpha']);
+  it('returns bounded batch entries in order and preserves duplicates', async () => {
+    const result = await provider.getRepositories(['acme/alpha', 'missing/repo', 'acme/alpha']);
     expect(result.notFound).toEqual(['missing/repo']);
     expect(result.items.map((item) => item.input)).toEqual([
       'acme/alpha',
@@ -124,14 +135,14 @@ describe('MCP provider discovery', () => {
     expect(result.items[1]).toMatchObject({ status: 'not_found', repository: null });
     expect(result.foundCount).toBe(2);
     expect(result.notFoundCount).toBe(1);
-    expect(() => provider.getRepositories(Array.from({ length: 51 }, () => 'acme/alpha'))).toThrow(
-      'A maximum of 50 repositories may be requested'
-    );
+    await expect(
+      provider.getRepositories(Array.from({ length: 51 }, () => 'acme/alpha'))
+    ).rejects.toThrow('A maximum of 50 repositories may be requested');
   });
 
-  it('reads the latest release from the local cache only', () => {
+  it('reads the latest release from the local cache only', async () => {
     configureDb({ releases: [releaseRow({ repo_id: 1 })] });
-    const result = provider.getRepoEvidence('acme/alpha');
+    const result = await provider.getRepoEvidence('acme/alpha');
     expect(result).not.toHaveProperty('error');
     expect(result.evidence.latest_release).toMatchObject({ id: 10, tag_name: 'v1.0.0' });
   });

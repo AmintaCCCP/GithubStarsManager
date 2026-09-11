@@ -26,14 +26,15 @@ function extractBearer(req: Request): string | null {
  * Live config gate: read enabled + token from SQLite on every request so toggles
  * take effect without restart. No module-level server or cached token.
  */
-export function mcpAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (!isMcpEnabled()) {
+export async function mcpAuthMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const enabled = await isMcpEnabled();
+  if (!enabled) {
     // 404 when disabled — do not advertise MCP surface
     res.status(404).json({ error: 'not found', code: 'MCP_DISABLED' });
     return;
   }
 
-  const expected = getMcpTokenPlain();
+  const expected = await getMcpTokenPlain();
   if (!expected) {
     res.status(503).json({ error: 'MCP token not configured', code: 'MCP_TOKEN_MISSING' });
     return;
@@ -60,7 +61,7 @@ async function handleStreamable(req: Request, res: Response): Promise<void> {
     res.on('close', () => {
       void transport.close().catch(() => undefined);
     });
-    const server = createMcpServer();
+    const server = await createMcpServer();
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
   } catch (err) {
@@ -82,7 +83,7 @@ async function connectSse(messagesPath: string, res: Response): Promise<void> {
       void maybeClose.call(transport).catch(() => undefined);
     }
   });
-  const server = createMcpServer();
+  const server = await createMcpServer();
   await server.connect(transport);
 }
 

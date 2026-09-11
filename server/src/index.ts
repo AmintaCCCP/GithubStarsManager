@@ -7,7 +7,6 @@ import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger, morganLoggerStream } from './services/logger.js';
 import { mountStaticFrontend } from './services/staticFrontend.js';
-import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
 import healthRouter from './routes/health.js';
 import repositoriesRouter from './routes/repositories.js';
@@ -88,10 +87,9 @@ export function createApp(): express.Express {
   return app;
 }
 
-function startServer(): void {
-  // Initialize database
-  const db = getDb();
-  runMigrations(db);
+async function startServer(): Promise<void> {
+  // 初始化数据库（本地 better-sqlite3 / 远端 Turso 由 env 自动选择）
+  await runMigrations();
   logger.info('server.init', 'Database initialized');
 
   const app = createApp();
@@ -107,7 +105,6 @@ function startServer(): void {
   const shutdown = () => {
     logger.info('server.shutdown', 'Shutting down...');
     server.close(() => {
-      closeDb();
       logger.info('server.shutdown', 'Server stopped');
       process.exit(0);
     });
@@ -121,5 +118,8 @@ function startServer(): void {
 const isMainModule =
   process.argv[1] && new URL(import.meta.url).pathname === new URL(`file://${process.argv[1]}`).pathname;
 if (isMainModule) {
-  startServer();
+  startServer().catch((err) => {
+    logger.errorFromError('server.start', 'Failed to start server', err);
+    process.exit(1);
+  });
 }

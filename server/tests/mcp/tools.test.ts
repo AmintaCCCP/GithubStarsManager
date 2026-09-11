@@ -20,8 +20,8 @@ const { registerMcpTools } = await import('../../src/mcp/tools.js');
 const { MCP_SERVER_VERSION } = await import('../../src/mcp/version.js');
 const rootPackage = createRequire(import.meta.url)('../../../package.json') as { version: string };
 
-function captureRegistrations(vectorAvailable = true) {
-  mocks.getVectorAvailability.mockReturnValue(
+async function captureRegistrations(vectorAvailable = true) {
+  mocks.getVectorAvailability.mockResolvedValue(
     vectorAvailable ? { available: true } : { available: false, reason: 'disabled' }
   );
   const registrations: Array<{
@@ -34,19 +34,19 @@ function captureRegistrations(vectorAvailable = true) {
       registrations.push({ name, config, handler });
     },
   };
-  registerMcpTools(server as never);
+  await registerMcpTools(server as never);
   return registrations;
 }
 
 describe('MCP tool registration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.loadAllRepositories.mockReturnValue([]);
-    mocks.getVectorAvailability.mockReturnValue({ available: true });
+    mocks.loadAllRepositories.mockResolvedValue([]);
+    mocks.getVectorAvailability.mockResolvedValue({ available: true });
   });
 
-  it('lists ten tools when vector search is available and eight otherwise', () => {
-    expect(captureRegistrations(true).map((tool) => tool.name)).toEqual([
+  it('lists ten tools when vector search is available and eight otherwise', async () => {
+    expect((await captureRegistrations(true)).map((tool) => tool.name)).toEqual([
       'gsm_status',
       'gsm_search_repos',
       'gsm_get_repo',
@@ -58,7 +58,7 @@ describe('MCP tool registration', () => {
       'gsm_find_similar_repos',
       'gsm_vector_search',
     ]);
-    expect(captureRegistrations(false).map((tool) => tool.name)).toEqual([
+    expect((await captureRegistrations(false)).map((tool) => tool.name)).toEqual([
       'gsm_status',
       'gsm_search_repos',
       'gsm_get_repo',
@@ -70,8 +70,8 @@ describe('MCP tool registration', () => {
     ]);
   });
 
-  it('exposes the approved input properties for discovery and vector tools', () => {
-    const tools = new Map(captureRegistrations(true).map((tool) => [tool.name, tool]));
+  it('exposes the approved input properties for discovery and vector tools', async () => {
+    const tools = new Map((await captureRegistrations(true)).map((tool) => [tool.name, tool]));
     expect(Object.keys(tools.get('gsm_search_repos')?.config.inputSchema ?? {})).toEqual([
       'query',
       'languages',
@@ -131,8 +131,8 @@ describe('MCP tool registration', () => {
   });
 
   it('accurately describes both vector tools when vector search is unavailable', async () => {
-    mocks.getVectorAvailability.mockReturnValue({ available: false, reason: 'disabled' });
-    const status = captureRegistrations(false).find((tool) => tool.name === 'gsm_status');
+    mocks.getVectorAvailability.mockResolvedValue({ available: false, reason: 'disabled' });
+    const status = (await captureRegistrations(false)).find((tool) => tool.name === 'gsm_status');
     const result = await status!.handler({});
     const payload = JSON.parse(
       (result as { content: Array<{ text: string }> }).content[0].text
@@ -162,13 +162,13 @@ describe('MCP tool registration', () => {
   });
 
   it('reports the exact registered and conditional tools when vector search is available', async () => {
-    const status = captureRegistrations(true).find((tool) => tool.name === 'gsm_status');
+    const status = (await captureRegistrations(true)).find((tool) => tool.name === 'gsm_status');
     const result = await status!.handler({});
     const payload = JSON.parse(
       (result as { content: Array<{ text: string }> }).content[0].text
     ) as { availableTools: string[]; conditionalTools: string[]; toolsNote: string };
 
-    expect(payload.availableTools).toEqual(captureRegistrations(true).map((tool) => tool.name));
+    expect(payload.availableTools).toEqual((await captureRegistrations(true)).map((tool) => tool.name));
     expect(payload.conditionalTools).toEqual(['gsm_find_similar_repos', 'gsm_vector_search']);
     expect(payload.toolsNote).toBe('gsm_vector_search is available');
   });
@@ -177,7 +177,7 @@ describe('MCP tool registration', () => {
     mocks.getRepositories.mockReturnValue({ requested: 1 });
     mocks.getRepoEvidence.mockReturnValue({ evidence: {} });
     mocks.findSimilarRepositories.mockResolvedValue({ available: true, matches: [] });
-    const tools = new Map(captureRegistrations(true).map((tool) => [tool.name, tool]));
+    const tools = new Map((await captureRegistrations(true)).map((tool) => [tool.name, tool]));
 
     await tools.get('gsm_get_repos')!.handler({ idsOrFullNames: ['acme/alpha'] });
     await tools.get('gsm_get_repo_evidence')!.handler({ idOrFullName: 'acme/alpha' });

@@ -2,10 +2,22 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
-const getDbMock = vi.fn();
+const dbMocks = vi.hoisted(() => ({
+  all: vi.fn(),
+  get: vi.fn(),
+  run: vi.fn(),
+  exec: vi.fn(),
+  batch: vi.fn(),
+}));
 
-vi.mock('../../src/db/connection.js', () => ({
-  getDb: () => getDbMock(),
+vi.mock('../../src/db/client.js', () => ({
+  db: {
+    all: (...args: unknown[]) => Promise.resolve(dbMocks.all(...args)),
+    get: (...args: unknown[]) => Promise.resolve(dbMocks.get(...args)),
+    run: (...args: unknown[]) => Promise.resolve(dbMocks.run(...args)),
+    exec: (...args: unknown[]) => Promise.resolve(dbMocks.exec(...args)),
+    batch: (...args: unknown[]) => Promise.resolve(dbMocks.batch(...args)),
+  },
 }));
 
 const { default: releasesRouter } = await import('../../src/routes/releases.js');
@@ -18,29 +30,20 @@ const createTestApp = () => {
 };
 
 /**
- * Mock DB 只记录 prepare 收到的 SQL 与每次 run 的参数，便于断言合并 UPSERT 的行为。
+ * Mock DB 只记录 db.run 收到的 SQL 与参数，便于断言合并 UPSERT 的行为。
+ * 门面签名：db.run(sql, ...args)，首个参数是 SQL。
  */
 function captureStatements() {
   const statements: { sql: string; params: unknown[][] }[] = [];
-  const exec: Record<string, unknown> = {};
 
-  const db = {
-    prepare: (sql: string) => {
-      const stmt = {
-        run: (...params: unknown[]) => {
-          statements.push({ sql, params });
-          return { changes: 1 };
-        },
-        all: () => [],
-        get: () => undefined,
-      };
-      return stmt;
-    },
-    transaction: (fn: () => number) => fn,
-    exec,
-  };
-  getDbMock.mockReturnValue(db);
-  return { statements, db };
+  dbMocks.run.mockImplementation((sql: string, ...params: unknown[]) => {
+    statements.push({ sql, params: params as unknown[] });
+    return { lastInsertRowid: 0, rowsAffected: 1 };
+  });
+  dbMocks.all.mockReturnValue([]);
+  dbMocks.get.mockReturnValue(undefined);
+
+  return { statements };
 }
 
 const sampleRelease = (overrides: Record<string, unknown> = {}) => ({

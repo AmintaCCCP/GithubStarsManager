@@ -1,14 +1,18 @@
-import type Database from 'better-sqlite3';
+import { db } from './client.js';
 
-function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+/**
+ * 幂等添加列：若目标表缺列则 ALTER TABLE ADD COLUMN。
+ * 远端（Turso）不支持 PRAGMA table_info，统一走 db.pragma() 抽象。
+ */
+async function addColumnIfMissing(table: string, column: string, definition: string): Promise<void> {
+  const columns = await db.pragma(table);
   if (!columns.some((col) => col.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
 
-export function initializeSchema(db: Database.Database): void {
-  db.exec(`
+export async function initializeSchema(): Promise<void> {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY,
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -143,27 +147,27 @@ export function initializeSchema(db: Database.Database): void {
     );
   `);
 
-  addColumnIfMissing(db, 'ai_configs', 'reasoning_effort', 'TEXT');
-  addColumnIfMissing(db, 'ai_configs', 'mimo_plan', 'TEXT');
-  addColumnIfMissing(db, 'repositories', 'category_locked', 'INTEGER DEFAULT 0');
-  addColumnIfMissing(db, 'releases', 'zipball_url', 'TEXT');
-  addColumnIfMissing(db, 'releases', 'tarball_url', 'TEXT');
-  addColumnIfMissing(db, 'categories', 'description', 'TEXT');
-  addColumnIfMissing(db, 'categories', 'color', 'TEXT');
-  addColumnIfMissing(db, 'categories', 'sort_order', 'INTEGER DEFAULT 0');
-  addColumnIfMissing(db, 'asset_filters', 'description', 'TEXT');
-  addColumnIfMissing(db, 'asset_filters', 'platform', 'TEXT');
-  addColumnIfMissing(db, 'asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
-  addColumnIfMissing(db, 'vector_search_configs', 'index_mode', "TEXT NOT NULL DEFAULT 'readme'");
-  addColumnIfMissing(db, 'vector_search_configs', 'readme_max_chars', 'INTEGER NOT NULL DEFAULT 6000');
-  addColumnIfMissing(db, 'vector_search_configs', 'search_threshold', 'REAL DEFAULT 0.35');
-  addColumnIfMissing(db, 'vector_search_configs', 'search_top_k', 'INTEGER DEFAULT 30');
-  addColumnIfMissing(db, 'vector_search_configs', 'enable_hyde', 'INTEGER DEFAULT 1');
-  addColumnIfMissing(db, 'vector_search_configs', 'enable_reranking', 'INTEGER DEFAULT 1');
-  addColumnIfMissing(db, 'vector_search_configs', 'embedding_format_version', 'INTEGER');
-  addColumnIfMissing(db, 'repositories', 'vector_indexed_at', 'TEXT');
-  addColumnIfMissing(db, 'repositories', 'license', 'TEXT');
+  await addColumnIfMissing('ai_configs', 'reasoning_effort', 'TEXT');
+  await addColumnIfMissing('ai_configs', 'mimo_plan', 'TEXT');
+  await addColumnIfMissing('repositories', 'category_locked', 'INTEGER DEFAULT 0');
+  await addColumnIfMissing('releases', 'zipball_url', 'TEXT');
+  await addColumnIfMissing('releases', 'tarball_url', 'TEXT');
+  await addColumnIfMissing('categories', 'description', 'TEXT');
+  await addColumnIfMissing('categories', 'color', 'TEXT');
+  await addColumnIfMissing('categories', 'sort_order', 'INTEGER DEFAULT 0');
+  await addColumnIfMissing('asset_filters', 'description', 'TEXT');
+  await addColumnIfMissing('asset_filters', 'platform', 'TEXT');
+  await addColumnIfMissing('asset_filters', 'sort_order', 'INTEGER DEFAULT 0');
+  await addColumnIfMissing('vector_search_configs', 'index_mode', "TEXT NOT NULL DEFAULT 'readme'");
+  await addColumnIfMissing('vector_search_configs', 'readme_max_chars', 'INTEGER NOT NULL DEFAULT 6000');
+  await addColumnIfMissing('vector_search_configs', 'search_threshold', 'REAL DEFAULT 0.35');
+  await addColumnIfMissing('vector_search_configs', 'search_top_k', 'INTEGER DEFAULT 30');
+  await addColumnIfMissing('vector_search_configs', 'enable_hyde', 'INTEGER DEFAULT 1');
+  await addColumnIfMissing('vector_search_configs', 'enable_reranking', 'INTEGER DEFAULT 1');
+  await addColumnIfMissing('vector_search_configs', 'embedding_format_version', 'INTEGER');
+  await addColumnIfMissing('repositories', 'vector_indexed_at', 'TEXT');
+  await addColumnIfMissing('repositories', 'license', 'TEXT');
   // 上一次向量索引时采用的 license 值（SPDX id / null）。用于增量谓词判断 license 是否
   // 变化：当期 license 与此值不一致时需重新索引，保证 license 变更能使向量元数据失效。
-  addColumnIfMissing(db, 'repositories', 'vector_indexed_license', 'TEXT');
+  await addColumnIfMissing('repositories', 'vector_indexed_license', 'TEXT');
 }

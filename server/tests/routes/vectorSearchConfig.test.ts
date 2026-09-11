@@ -2,10 +2,22 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
-const getDbMock = vi.fn();
+const dbMocks = vi.hoisted(() => ({
+  all: vi.fn(),
+  get: vi.fn(),
+  run: vi.fn(),
+  exec: vi.fn(),
+  batch: vi.fn(),
+}));
 
-vi.mock('../../src/db/connection.js', () => ({
-  getDb: () => getDbMock(),
+vi.mock('../../src/db/client.js', () => ({
+  db: {
+    all: (...args: unknown[]) => Promise.resolve(dbMocks.all(...args)),
+    get: (...args: unknown[]) => Promise.resolve(dbMocks.get(...args)),
+    run: (...args: unknown[]) => Promise.resolve(dbMocks.run(...args)),
+    exec: (...args: unknown[]) => Promise.resolve(dbMocks.exec(...args)),
+    batch: (...args: unknown[]) => Promise.resolve(dbMocks.batch(...args)),
+  },
 }));
 
 vi.mock('../../src/services/crypto.js', () => ({
@@ -26,27 +38,21 @@ const createTestApp = () => {
   return app;
 };
 
-// PUT binds params in INSERT order; capture them so we can assert what persisted.
+// 门面签名：db.run(sql, ...args)，SQL 是第一参数；捕获 SQL 之后的绑定参数，
+// 便于断言 PUT 实际持久化的字段顺序。
 function capturePut(): { params: unknown[][] } {
   const capture = { params: [] as unknown[][] };
-  getDbMock.mockReturnValue({
-    prepare: () => ({
-      get: () => undefined,
-      run: (...p: unknown[]) => {
-        capture.params.push(p);
-      },
-    }),
+  dbMocks.get.mockReturnValue(undefined);
+  dbMocks.run.mockImplementation((_sql: string, ...p: unknown[]) => {
+    capture.params.push(p);
+    return { lastInsertRowid: 0, rowsAffected: 1 };
   });
   return capture;
 }
 
 function mockGetReturningRow(row: Record<string, unknown>) {
-  getDbMock.mockReturnValue({
-    prepare: (sql: string) => ({
-      get: () => (sql.includes('vector_search_configs') ? row : undefined),
-      run: () => ({ changes: 1 }),
-    }),
-  });
+  // GET 路由只查 vector_search_configs 一行：db.get('SELECT * FROM vector_search_configs WHERE id = ?', 'default')
+  dbMocks.get.mockReturnValue(row);
 }
 
 const fullConfig = {

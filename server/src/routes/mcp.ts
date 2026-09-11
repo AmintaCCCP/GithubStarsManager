@@ -17,15 +17,15 @@ const router = Router();
  * Token is returned in full for owner UI (viewable anytime) when present.
  * Mint only when enabled and missing — never rotates an existing token.
  */
-router.get('/api/mcp/status', (_req, res) => {
+router.get('/api/mcp/status', async (_req, res) => {
   try {
-    const enabled = isMcpEnabled();
+    const enabled = await isMcpEnabled();
     // Only mint when already enabled and no token exists yet (first enable path)
-    let token = getMcpTokenPlain() || '';
+    let token = (await getMcpTokenPlain()) || '';
     if (enabled && !token) {
-      token = ensureMcpToken();
+      token = await ensureMcpToken();
     }
-    const vector = getVectorAvailability();
+    const vector = await getVectorAvailability();
     res.json({
       enabled,
       token,
@@ -47,7 +47,7 @@ router.get('/api/mcp/status', (_req, res) => {
  * PUT /api/mcp/config
  * body: { enabled?: boolean, resetToken?: boolean }
  */
-router.put('/api/mcp/config', (req, res) => {
+router.put('/api/mcp/config', async (req, res) => {
   try {
     const body = (req.body && typeof req.body === 'object' ? req.body : {}) as {
       enabled?: boolean;
@@ -55,29 +55,29 @@ router.put('/api/mcp/config', (req, res) => {
     };
 
     if (typeof body.enabled === 'boolean') {
-      setMcpEnabled(body.enabled);
+      await setMcpEnabled(body.enabled);
       if (body.enabled) {
-        ensureMcpToken();
+        await ensureMcpToken();
       }
     }
 
-    let token = getMcpTokenPlain();
+    let token = await getMcpTokenPlain();
     // Only mint/reset when MCP is (or remains) enabled — never create tokens while disabled
     if (body.resetToken) {
-      if (!isMcpEnabled()) {
+      if (!(await isMcpEnabled())) {
         res.status(400).json({
           error: 'Cannot reset token while MCP is disabled',
           code: 'MCP_DISABLED',
         });
         return;
       }
-      token = resetMcpToken();
-    } else if (isMcpEnabled() && !token) {
-      token = ensureMcpToken();
+      token = await resetMcpToken();
+    } else if (await isMcpEnabled() && !token) {
+      token = await ensureMcpToken();
     }
 
     res.json({
-      enabled: isMcpEnabled(),
+      enabled: await isMcpEnabled(),
       token: token || '',
       endpoints: {
         streamableHttp: '/mcp',

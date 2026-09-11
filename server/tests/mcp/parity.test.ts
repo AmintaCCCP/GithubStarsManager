@@ -5,9 +5,9 @@ const providerMocks = vi.hoisted(() => ({
   getRepositories: vi.fn(),
   getRepoEvidence: vi.fn(),
   getStats: vi.fn(),
-  getVectorAvailability: vi.fn(() => ({ available: true })),
+  getVectorAvailability: vi.fn(async () => ({ available: true })),
   listCategories: vi.fn(),
-  loadAllRepositories: vi.fn(() => []),
+  loadAllRepositories: vi.fn(async () => []),
   searchRepos: vi.fn(),
   vectorSearch: vi.fn(),
   findSimilarRepositories: vi.fn(),
@@ -26,9 +26,9 @@ const getElectronTools =
 const getElectronToolAvailability =
   electronModule.getMcpToolAvailability || electronModule.default.getMcpToolAvailability;
 
-function getBackendTools() {
+async function getBackendTools() {
   const registrations: Array<{ name: string; inputSchema?: Record<string, unknown> }> = [];
-  registerMcpTools({
+  await registerMcpTools({
     registerTool(name: string, config: { inputSchema?: Record<string, unknown> }) {
       registrations.push({ name, inputSchema: config.inputSchema });
     },
@@ -44,8 +44,8 @@ function contract(tool: { name: string; inputSchema?: Record<string, unknown> })
 }
 
 describe('backend/Electron MCP parity', () => {
-  it('keeps the same names and input property sets for vector-enabled MCP', () => {
-    const backend = getBackendTools().map(contract);
+  it('keeps the same names and input property sets for vector-enabled MCP', async () => {
+    const backend = (await getBackendTools()).map(contract);
     const electron = getElectronTools(true).map((tool: { name: string; inputSchema?: { properties?: Record<string, unknown> } }) => ({
       name: tool.name,
       properties: Object.keys(tool.inputSchema?.properties || {}),
@@ -54,9 +54,9 @@ describe('backend/Electron MCP parity', () => {
     expect(electron).toEqual(backend);
   });
 
-  it('keeps the same non-vector inventory when vector search is unavailable', () => {
-    providerMocks.getVectorAvailability.mockReturnValue({ available: false, reason: 'disabled' });
-    const backend = getBackendTools().map((tool) => tool.name);
+  it('keeps the same non-vector inventory when vector search is unavailable', async () => {
+    providerMocks.getVectorAvailability.mockResolvedValue({ available: false, reason: 'disabled' });
+    const backend = (await getBackendTools()).map((tool) => tool.name);
     expect(getElectronTools(false).map((tool: { name: string }) => tool.name)).toEqual(backend);
   });
 

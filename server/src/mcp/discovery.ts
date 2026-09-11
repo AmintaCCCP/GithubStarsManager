@@ -65,22 +65,22 @@ export function buildRepositoryEmbeddingText(repo: McpRepository): string {
   return parts.join('\n');
 }
 
-export function buildBatchLookupResult<T extends McpRepository>(
+export async function buildBatchLookupResult<T extends McpRepository>(
   inputs: string[],
-  resolve: (input: string) => T | null
-): {
+  resolve: (input: string) => T | null | Promise<T | null>
+): Promise<{
   requested: number;
   foundCount: number;
   notFoundCount: number;
   notFound: string[];
   items: Array<{ input: string; status: 'found' | 'not_found'; repository: Record<string, unknown> | null }>;
-} {
-  const items = inputs.map((input) => {
-    const repository = resolve(input);
+}> {
+  const items = await Promise.all(inputs.map(async (input) => {
+    const repository = await resolve(input);
     return repository
       ? { input, status: 'found' as const, repository: projectRepoForAgent(repository) }
       : { input, status: 'not_found' as const, repository: null };
-  });
+  }));
   const notFound = items.filter((item) => item.status === 'not_found').map((item) => item.input);
   return {
     requested: items.length,
