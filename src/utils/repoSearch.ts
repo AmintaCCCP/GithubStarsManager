@@ -43,8 +43,14 @@ const toSortableTimestamp = (value?: string): number => {
 };
 
 /**
- * “按更新排序”按最近代码变更排序：优先用 pushed_at（缺失/非法时回退 updated_at），
- * 与仓库卡片“最近提交”及搜索统计近期更新口径保持一致（#45，#342）。
+ * Resolve the sort key for "recently updated" ordering.
+ *
+ * Prefers `pushed_at` (last code push) and falls back to `updated_at` when
+ * `pushed_at` is missing or unparsable, keeping list sorting consistent with
+ * the card "Last pushed" label and stats (#45, #342).
+ *
+ * @param repo Repository to score.
+ * @returns Milliseconds since epoch, or 0 when neither timestamp parses.
  */
 const toUpdatedSortValue = (repo: Repository): number => {
   const pushed = toSortableTimestamp(repo.pushed_at);
@@ -52,6 +58,13 @@ const toUpdatedSortValue = (repo: Repository): number => {
   return toSortableTimestamp(repo.updated_at);
 };
 
+/**
+ * Resolve the comparable sort value for a repository.
+ *
+ * @param repo Repository to score.
+ * @param sortBy Active sort mode; `updated`/default prefer last push time.
+ * @returns Numeric timestamp, star count, or lowercase name for comparison.
+ */
 function getSortValue(repo: Repository, sortBy: SearchFilters['sortBy']): number | string {
   switch (sortBy) {
     case 'stars': {
