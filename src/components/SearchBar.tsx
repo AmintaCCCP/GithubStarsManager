@@ -117,15 +117,18 @@ export const SearchBar: React.FC = () => {
   const [isComposing, setIsComposing] = useState(false);
   // S4 全局问答历史入口：徽标显示已保存会话数。
   const [globalHistoryCount, setGlobalHistoryCount] = useState(0);
+  // 重叠刷新只允许最新请求提交，避免旧数量覆盖新状态。
+  const globalHistoryRequestRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
     const refreshGlobalHistoryCount = async () => {
+      const requestId = ++globalHistoryRequestRef.current;
       try {
         const sessions = await repositoryChatSessionRepository.listRecentSessions(100);
-        if (!cancelled) setGlobalHistoryCount(sessions.length);
+        if (!cancelled && requestId === globalHistoryRequestRef.current) setGlobalHistoryCount(sessions.length);
       } catch {
-        if (!cancelled) setGlobalHistoryCount(0);
+        if (!cancelled && requestId === globalHistoryRequestRef.current) setGlobalHistoryCount(0);
       }
     };
     void refreshGlobalHistoryCount();

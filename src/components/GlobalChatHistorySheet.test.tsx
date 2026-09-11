@@ -62,8 +62,7 @@ describe('GlobalChatHistorySheet', () => {
     expect(onSelectSession).toHaveBeenCalledWith(repositories[1], 's2');
   });
 
-  it('删除会话后从列表移除', async () => {
-    await repositoryChatSessionRepository.saveSession(createSession('doomed', 1, 'owner/repo-one', '2026-08-26T00:00:00.000Z'));
+  it('删除会话后从列表移除', async () => {    await repositoryChatSessionRepository.saveSession(createSession('doomed', 1, 'owner/repo-one', '2026-08-26T00:00:00.000Z'));
 
     render(<GlobalChatHistorySheet isOpen repositories={repositories} onClose={() => {}} onSelectSession={() => {}} />);
     await screen.findByTitle('进入 owner/repo-one 的会话');
@@ -73,5 +72,20 @@ describe('GlobalChatHistorySheet', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除会话' }));
 
     expect(await screen.findByText('还没有保存的问答会话。')).toBeTruthy();
+  });
+
+  it('读取失败时显示错误与重试，恢复后可重载', async () => {
+    const listSpy = vi.spyOn(repositoryChatSessionRepository, 'listRecentSessions');
+    listSpy.mockRejectedValueOnce(new Error('IndexedDB unavailable'));
+
+    render(<GlobalChatHistorySheet isOpen repositories={repositories} onClose={() => {}} onSelectSession={() => {}} />);
+    expect(await screen.findByText('历史加载失败，请重试。')).toBeTruthy();
+
+    listSpy.mockResolvedValueOnce([createSession('recovered', 1, 'owner/repo-one', '2026-08-26T00:00:00.000Z')]);
+    const retryButtons = await screen.findAllByRole('button', { name: '重试' });
+    fireEvent.click(retryButtons[0]);
+
+    expect(await screen.findByTitle('进入 owner/repo-one 的会话')).toBeTruthy();
+    listSpy.mockRestore();
   });
 });

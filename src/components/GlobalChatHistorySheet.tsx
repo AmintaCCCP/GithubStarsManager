@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { History, Search, Trash2 } from 'lucide-react';
 import type { Repository } from '../types';
 import type { RepositoryChatSession } from '../types/repositoryChat';
@@ -37,8 +37,11 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const [sessions, setSessions] = useState<RepositoryChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<RepositoryChatSession | null>(null);
+  // 重叠刷新只允许最新请求提交，避免旧结果覆盖新状态。
+  const requestIdRef = useRef(0);
 
   const repositoryById = useMemo(() => {
     const map = new Map<number, Repository>();
@@ -47,13 +50,20 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   }, [repositories]);
 
   const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
+    setLoadError(null);
     try {
-      setSessions(await repositoryChatSessionRepository.listRecentSessions(50));
+      const nextSessions = await repositoryChatSessionRepository.listRecentSessions(50);
+      if (requestId !== requestIdRef.current) return;
+      setSessions(nextSessions);
+    } catch {
+      if (requestId !== requestIdRef.current) return;
+      setLoadError(language === 'zh' ? '历史加载失败，请重试。' : 'Failed to load history. Please retry.');
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     if (isOpen) {
@@ -123,6 +133,13 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
         <section aria-label={t('问答历史列表', 'Chat history list')} className="min-h-0 flex-1 overflow-y-auto pr-1">
           {isLoading ? (
             <p className="py-10 text-center text-sm text-muted-foreground" role="status">{t('正在加载历史…', 'Loading history…')}</p>
+          ) : loadError && visibleSessions.length === 0 ? (
+            <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-md border border-destructive/40 px-4 text-center text-sm" role="alert">
+              <p className="text-destructive">{loadError}</p>
+              <Button type="button" variant="secondary" size="sm" onClick={() => void refresh()}>
+                {t('重试', 'Retry')}
+              </Button>
+            </div>
           ) : visibleSessions.length === 0 ? (
             <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">
               <History className="h-5 w-5" aria-hidden="true" />
@@ -131,7 +148,16 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                 : t('没有匹配的会话。', 'No matching conversations found.')}</p>
             </div>
           ) : (
-            <ul className="space-y-1">
+            <>
+              {loadError && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive" role="alert">
+                  <span>{loadError}</span>
+                  <Button type="button" variant="secondary" size="sm" className="h-7" onClick={() => void refresh()}>
+                    {t('重试', 'Retry')}
+                  </Button>
+                </div>
+              )}
+              <ul className="space-y-1">
               {visibleSessions.map((session) => {
                 const repository = repositoryById.get(session.repoId);
                 return (
@@ -167,7 +193,8 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                   </li>
                 );
               })}
-            </ul>
+              </ul>
+            </>
           )}
         </section>
 
