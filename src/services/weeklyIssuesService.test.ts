@@ -142,15 +142,20 @@ describe('extractRepoFullNames', () => {
 });
 
 describe('processWeeklyIssue', () => {
+  const marks = () => ({
+    changedIssueNumbers: new Set<number>(),
+    changedRepoKeys: new Set<string>(),
+    dirtyIssueNumbers: new Set<number>(),
+    dirtyRepoKeys: new Set<string>(),
+  });
+
   it('skips pull requests, off-topic titles and link-less bodies', () => {
     const issues = new Map<number, WeeklyStoredIssue>();
     const repos = new Map<string, WeeklyStoredRepo>();
-    const changedIssues = new Set<number>();
-    const changedRepos = new Set<string>();
 
-    expect(processWeeklyIssue(makeIssue({ number: 1, isPullRequest: true }), issues, repos, changedIssues, changedRepos)).toBe(false);
-    expect(processWeeklyIssue(makeIssue({ number: 2, title: '【文章推荐】weekly blog' }), issues, repos, changedIssues, changedRepos)).toBe(false);
-    expect(processWeeklyIssue(makeIssue({ number: 3, body: '看这里 https://example.com/x' }), issues, repos, changedIssues, changedRepos)).toBe(false);
+    expect(processWeeklyIssue(makeIssue({ number: 1, isPullRequest: true }), issues, repos, marks())).toBe(false);
+    expect(processWeeklyIssue(makeIssue({ number: 2, title: '【文章推荐】weekly blog' }), issues, repos, marks())).toBe(false);
+    expect(processWeeklyIssue(makeIssue({ number: 3, body: '看这里 https://example.com/x' }), issues, repos, marks())).toBe(false);
     expect(issues.size).toBe(0);
     expect(repos.size).toBe(0);
   });
@@ -158,41 +163,41 @@ describe('processWeeklyIssue', () => {
   it('stores matched issues and repo entries keyed by lowercased full_name', () => {
     const issues = new Map<number, WeeklyStoredIssue>();
     const repos = new Map<string, WeeklyStoredRepo>();
-    const changedIssues = new Set<number>();
-    const changedRepos = new Set<string>();
+    const changeMarks = marks();
 
-    expect(processWeeklyIssue(makeIssue({ number: 10, body: 'https://github.com/Foo/Bar' }), issues, repos, changedIssues, changedRepos)).toBe(true);
+    expect(processWeeklyIssue(makeIssue({ number: 10, body: 'https://github.com/Foo/Bar' }), issues, repos, changeMarks)).toBe(true);
     expect(issues.get(10)?.repoFullNames).toEqual(['foo/bar']);
     expect(repos.get('foo/bar')?.fullName).toBe('Foo/Bar');
     expect(repos.get('foo/bar')?.sourceIssueNumber).toBe(10);
+    expect([...changeMarks.dirtyRepoKeys]).toEqual(['foo/bar']);
   });
 
   it('keeps the newest issue as the source post and refreshes labels of the source issue', () => {
     const issues = new Map<number, WeeklyStoredIssue>();
     const repos = new Map<string, WeeklyStoredRepo>();
-    const changedIssues = new Set<number>();
-    const changedRepos = new Set<string>();
 
-    processWeeklyIssue(makeIssue({ number: 1, created_at: '2026-01-01T00:00:00Z', labels: [] }), issues, repos, changedIssues, changedRepos);
-    processWeeklyIssue(makeIssue({ number: 2, created_at: '2026-02-01T00:00:00Z', labels: ['weekly'] }), issues, repos, changedIssues, changedRepos);
+    processWeeklyIssue(makeIssue({ number: 1, created_at: '2026-01-01T00:00:00Z', labels: [] }), issues, repos, marks());
+    processWeeklyIssue(makeIssue({ number: 2, created_at: '2026-02-01T00:00:00Z', labels: ['weekly'] }), issues, repos, marks());
     expect(repos.get('foo/bar')?.sourceIssueNumber).toBe(2);
     expect(repos.get('foo/bar')?.issueLabels).toEqual(['weekly']);
 
     // 同一原贴 label 补加（issue 编辑后 updated_at 变化）
-    processWeeklyIssue(makeIssue({ number: 2, updated_at: '2026-02-05T00:00:00Z', labels: ['weekly', 'issue-300'] }), issues, repos, changedIssues, changedRepos);
+    const updateMarks = marks();
+    processWeeklyIssue(makeIssue({ number: 2, updated_at: '2026-02-05T00:00:00Z', labels: ['weekly', 'issue-300'] }), issues, repos, updateMarks);
     expect(repos.get('foo/bar')?.issueLabels).toEqual(['weekly', 'issue-300']);
+    // 已知仓库的再次变更必须登记到页级脏集合（跨页重复变更不丢）
+    expect([...updateMarks.dirtyRepoKeys]).toEqual(['foo/bar']);
   });
 
   it('fast-skips issues whose updated_at is unchanged', () => {
     const issues = new Map<number, WeeklyStoredIssue>();
     const repos = new Map<string, WeeklyStoredRepo>();
-    const changedIssues = new Set<number>();
-    const changedRepos = new Set<string>();
+    const firstMarks = marks();
 
-    processWeeklyIssue(makeIssue({ number: 1 }), issues, repos, changedIssues, changedRepos);
-    const before = changedIssues.size;
-    processWeeklyIssue(makeIssue({ number: 1 }), issues, repos, changedIssues, changedRepos);
-    expect(changedIssues.size).toBe(before);
+    processWeeklyIssue(makeIssue({ number: 1 }), issues, repos, firstMarks);
+    const before = firstMarks.changedIssueNumbers.size;
+    processWeeklyIssue(makeIssue({ number: 1 }), issues, repos, firstMarks);
+    expect(firstMarks.changedIssueNumbers.size).toBe(before);
   });
 });
 
@@ -340,6 +345,61 @@ describe('syncWeeklyChannel on-demand paging', () => {
     const result = await syncWeeklyChannel(api, 1, false, () => {});
     expect(result.repos).toHaveLength(50);
     expect(storage.metaRef.current.deepNextPage).toBe(2);
+  });
+
+  it('persists a repo re-updated on a later page (Set.size watermark regression)', async () => {
+    // P1 满页：#1 引用 dup/repo，其余 orgN；P2 满页：#101（created_at 更新）再次
+    // 引用 dup/repo → 原贴应更新为 #101 并落盘；旧实现按 Set.size 切片，
+    // dup/repo 位于已保存水位之前，其变更会被遗漏
+    const p1 = issuePage(1, (i) => (i === 0 ? 'dup/repo' : `org${i}/repo${i}`));
+    const p2 = issuePage(101, (i) => (i === 0 ? 'dup/repo' : `zed${i}/repo${i}`));
+    const api = makeApi([p1, p2]);
+
+    await syncWeeklyChannel(api, 1, false, () => {});
+    // 页 3 需要 150 张卡片 > 100 → 深度遍历：重叠重读 P1（跳过）+ P2（更新 + 新增）
+    await syncWeeklyChannel(api, 3, false, () => {});
+
+    const stored = (storage.reposStore as Map<string, WeeklyStoredRepo & { sourceIssueNumber: number; issueCreatedAt: string }>).get('dup/repo');
+    expect(stored?.sourceIssueNumber).toBe(101);
+    expect(stored?.issueCreatedAt).toBe(p2[0].created_at);
+  });
+
+  it('deep-walk stop condition ignores straggler pendings not enriched this round', async () => {
+    // 60 个游离 pending（此前中止同步遗留）：不在本轮 changedRepoKeys 内、本轮
+    // 不会补全，不应计入停止条件。P2 全部为已知 issue（快速跳过）：
+    // 旧实现把游离 pending 计入 → P2 后 prospective=160≥150 提前停，页 3 永远差卡；
+    // 新实现继续到 P3 → 200 张卡
+    const strays = Array.from({ length: 60 }, (_, i) => ({
+      fullName: `stray${i}/repo${i}`, detail: null, lastFetchedAt: '',
+      sourceIssueNumber: 101 + i, issueLabels: [], issueCreatedAt: '2025-06-01T00:00:00Z',
+    }));
+    for (const stray of strays) storage.reposStore.set(stray.fullName.toLowerCase(), stray);
+    const p1 = issuePage(1, (i) => `org${i}/repo${i}`);
+    const p2 = issuePage(101, (i) => (i < 60 ? `stray${i}/repo${i}` : `org${i - 60}/repo${i - 60}`));
+    // 预置已知 issue（WeeklyStoredIssue 形状，updatedAt 与拉取一致）→ P2 全部快速跳过
+    for (const issue of p2) {
+      storage.issuesStore.set(issue.number, {
+        number: issue.number,
+        title: issue.title,
+        body: issue.body,
+        labels: issue.labels,
+        state: issue.state,
+        createdAt: issue.created_at,
+        updatedAt: issue.updated_at,
+        htmlUrl: issue.html_url,
+        repoFullNames: extractRepoFullNames(issue.body),
+      });
+    }
+    const p3 = issuePage(201, (i) => `gamma${i}/repo${i}`);
+    const api = makeApi([p1, p2, p3]);
+
+    await syncWeeklyChannel(api, 1, false, () => {});
+    const result = await syncWeeklyChannel(api, 3, false, () => {});
+    expect(api.listRepositoryIssues).toHaveBeenCalledTimes(4); // 首刷 1 + 深度 P1/P2/P3
+    // 230 = P1 100 + P3 100 + 首轮维护合法补全的 30 个游离 pending；
+    // 旧实现把 60 个游离 pending 全部计入停止条件 → 在 P2 后提前停（只 130 卡）
+    expect(result.totalCount).toBe(230);
+    expect(storage.metaRef.current.historyComplete).toBe(false);
   });
 
   it('fetches deeper pages only when the requested UI page exceeds cached cards', async () => {

@@ -116,16 +116,27 @@ export const hasCollectedLabel = (labels: string[]): boolean =>
   labels.some((label) => label.toLowerCase() === WEEKLY_COLLECTED_LABEL);
 
 /**
+ * issue 处理的变更登记：累计集合供遍历后的详情补全定位（跨页保留）；
+ * 页级脏集合供逐页原子落盘（事务成功后清空）。同一仓库跨页再次变更时，
+ * 累计集合去重不会推进、页级集合仍会登记——落盘必须走页级集合。
+ */
+export interface IssueChangeMarks {
+  changedIssueNumbers: Set<number>;
+  changedRepoKeys: Set<string>;
+  dirtyIssueNumbers: Set<number>;
+  dirtyRepoKeys: Set<string>;
+}
+
+/**
  * 处理单条 issue：命中（标题含"开源"且正文提取到仓库链接）则 upsert 到
- * issues/repos 映射，并登记到 changed 集合。updatedAt 未变化的已知 issue 走快速跳过。
+ * issues/repos 映射，并登记到变更集合。updatedAt 未变化的已知 issue 走快速跳过。
  * 返回是否命中投稿条目。
  */
 export function processWeeklyIssue(
   issue: GitHubIssueListRead,
   issues: Map<number, WeeklyStoredIssue>,
   repos: Map<string, WeeklyStoredRepo>,
-  changedIssueNumbers: Set<number>,
-  changedRepoKeys: Set<string>,
+  marks: IssueChangeMarks,
 ): boolean {
   const existing = issues.get(issue.number);
   if (existing && existing.updatedAt === issue.updated_at) return Boolean(existing.repoFullNames.length);
@@ -144,7 +155,8 @@ export function processWeeklyIssue(
     htmlUrl: issue.html_url,
     repoFullNames: fullNames.map((fullName) => fullName.toLowerCase()),
   });
-  changedIssueNumbers.add(issue.number);
+  marks.changedIssueNumbers.add(issue.number);
+  marks.dirtyIssueNumbers.add(issue.number);
 
   for (const fullName of fullNames) {
     const key = fullName.toLowerCase();
@@ -167,7 +179,8 @@ export function processWeeklyIssue(
       // 原贴 label 更新（weekly label 可能发布几天后才补加）
       repo.issueLabels = issue.labels;
     }
-    changedRepoKeys.add(key);
+    marks.changedRepoKeys.add(key);
+    marks.dirtyRepoKeys.add(key);
   }
   return true;
 }
@@ -300,7 +313,7 @@ async function enrichRepos(
   }
 }
 
-/** 遍历共享的可变状态：issue/repo 内存映射、变更集合与增量落盘水位。 */
+/** 遍历共享的可变状态：issue/repo 内存映射、变更集合（累计 + 页级脏）。 */
 interface WalkContext {
   api: GitHubApiService;
   signal: AbortSignal | undefined;
@@ -309,9 +322,9 @@ interface WalkContext {
   repos: Map<string, WeeklyStoredRepo>;
   changedIssueNumbers: Set<number>;
   changedRepoKeys: Set<string>;
+  dirtyIssueNumbers: Set<number>;
+  dirtyRepoKeys: Set<string>;
   meta: WeeklySyncMeta;
-  savedIssues: number;
-  savedRepos: number;
 }
 
 interface WalkOptions {
@@ -323,6 +336,12 @@ interface WalkOptions {
   advanceCursor: boolean;
   /** 每页处理完后的停止条件（深度遍历：凑够目标卡片数即停） */
   stopWhen?: () => boolean;
+  /**
+   * 从该页起短页/空页才视为历史取尽并标记 historyComplete。深度遍历的游标
+   * 重叠区（startPage = deepNextPage-1）是此前已消费的旧页，其"不足一页"
+   * 可能是删除位移造成的过时信息，不能据此取尽；undefined = 永不标记。
+   */
+  completeFromPage?: number;
 }
 
 interface WalkResult {
@@ -334,19 +353,17 @@ interface WalkResult {
 }
 
 /**
- * 原子落盘本页增量 + 游标：issues、repos、meta（deepNextPage/historyComplete）
- * 走同一事务。事务失败时抛出且不推进内存水位/游标——下轮同步重新拉取该页，
- * 避免"游标已推进但数据未落盘"的永久缺口。
+ * 原子落盘本页脏数据 + 游标：issues、repos、meta（deepNextPage/historyComplete）
+ * 走同一事务。事务成功后才清空页级脏集合并推进内存游标；失败抛出中止遍历，
+ * 下轮同步重新拉取该页，避免"游标已推进但数据未落盘"的永久缺口。
  */
 async function flushWalkPage(
   ctx: WalkContext,
   page: number,
   opts: { advanceCursor: boolean; markComplete: boolean },
 ): Promise<void> {
-  const newIssues = [...ctx.changedIssueNumbers].slice(ctx.savedIssues)
-    .map((number) => ctx.issues.get(number)!).filter(Boolean);
-  const newRepos = [...ctx.changedRepoKeys].slice(ctx.savedRepos)
-    .map((key) => ctx.repos.get(key)!).filter(Boolean);
+  const newIssues = [...ctx.dirtyIssueNumbers].map((number) => ctx.issues.get(number)!).filter(Boolean);
+  const newRepos = [...ctx.dirtyRepoKeys].map((key) => ctx.repos.get(key)!).filter(Boolean);
   const nextMeta: WeeklySyncMeta = { ...ctx.meta };
   let metaChanged = false;
   if (opts.advanceCursor) {
@@ -359,8 +376,8 @@ async function flushWalkPage(
   }
   if (newIssues.length === 0 && newRepos.length === 0 && !metaChanged) return;
   await weeklyIssuesStorage.saveWalkPage({ issues: newIssues, repos: newRepos, meta: nextMeta });
-  ctx.savedIssues = ctx.changedIssueNumbers.size;
-  ctx.savedRepos = ctx.changedRepoKeys.size;
+  ctx.dirtyIssueNumbers.clear();
+  ctx.dirtyRepoKeys.clear();
   ctx.meta = nextMeta;
 }
 
@@ -387,19 +404,21 @@ async function walkIssuePages(ctx: WalkContext, opts: WalkOptions): Promise<Walk
     });
     pagesFetched++;
     const isShort = items.length < ISSUE_PAGE_SIZE;
-    const markComplete = isShort && !opts.since;
+    const isNewTerritory = opts.completeFromPage === undefined || page >= opts.completeFromPage;
+    const markComplete = isShort && isNewTerritory && !opts.since;
     if (items.length > 0) {
       for (const issue of items) {
-        if (processWeeklyIssue(issue, ctx.issues, ctx.repos, ctx.changedIssueNumbers, ctx.changedRepoKeys)) matched++;
+        if (processWeeklyIssue(issue, ctx.issues, ctx.repos, ctx)) matched++;
       }
       scanned += items.length;
       ctx.onStatus?.({ phase: 'syncing', current: scanned, total: 0 });
     }
     await flushWalkPage(ctx, page, { advanceCursor: opts.advanceCursor, markComplete });
-    if (isShort) {
+    if (isShort && isNewTerritory) {
       hitEnd = markComplete;
       break;
     }
+    // 短的重叠旧页：取尽判断已过时（历史越过此处），继续深入（maxPages 兜底）
     if (opts.stopWhen?.()) break;
     page++;
     await sleep(ISSUE_LIST_THROTTLE_MS);
@@ -448,14 +467,21 @@ const countCards = (repos: Map<string, WeeklyStoredRepo>, onlyCollected: boolean
 };
 
 /**
- * 遍历完成后预期可展示的卡片数：待补全（!lastFetchedAt）的仓库紧随其后会被
- * 补全，也计入；不可用（已标记且无详情）的永不出卡，排除。供深度遍历的
- * 停止条件使用——补全发生在遍历结束之后，不能只数已补全的。
+ * 遍历完成后预期可展示的卡片数：已补全的仓库 + 本轮详情补全实际会处理的
+ * 待补全仓库（enrichKeys 内）。遗留自此前被中止同步的游离 pending 不在
+ * enrichKeys 内、不会在本轮补全，不计入——否则停止条件与补全集合不一致，
+ * 分页会反复返回不足一页的数据。不可用仓库永不出卡，排除。
  */
-const countProspectiveCards = (repos: Map<string, WeeklyStoredRepo>, onlyCollected: boolean): number => {
+const countProspectiveCards = (
+  repos: Map<string, WeeklyStoredRepo>,
+  onlyCollected: boolean,
+  enrichKeys: Set<string>,
+): number => {
   let count = 0;
   for (const repo of repos.values()) {
-    if (repo.lastFetchedAt && !repo.detail) continue;
+    const willDisplay = repo.detail
+      || (!repo.lastFetchedAt && enrichKeys.has(repo.fullName.toLowerCase()));
+    if (!willDisplay) continue;
     if (onlyCollected && !hasCollectedLabel(repo.issueLabels)) continue;
     count++;
   }
@@ -545,16 +571,16 @@ export async function syncWeeklyChannel(
         repos,
         changedIssueNumbers: new Set<number>(),
         changedRepoKeys: new Set<string>(),
+        dirtyIssueNumbers: new Set<number>(),
+        dirtyRepoKeys: new Set<string>(),
         meta,
-        savedIssues: 0,
-        savedRepos: 0,
       };
 
       if (page <= 1 && !isRecentlySynced(meta.lastSyncedAt)) {
         const firstRun = meta.lastSyncedAt === null;
         onStatus?.({ phase: 'syncing', current: 0, total: 0 });
         const walk = await walkIssuePages(ctx, firstRun
-          ? { startPage: 1, maxPages: 1, advanceCursor: true }
+          ? { startPage: 1, maxPages: 1, advanceCursor: true, completeFromPage: 1 }
           : {
               since: new Date(Date.parse(meta.lastSyncedAt!) - LABEL_GRACE_MS).toISOString(),
               startPage: 1,
@@ -574,11 +600,14 @@ export async function syncWeeklyChannel(
 
       if (countCards(repos, onlyCollected) < page * CARD_PAGE_SIZE && !ctx.meta.historyComplete) {
         onStatus?.({ phase: 'syncing', current: 0, total: 0 });
+        // 重叠区起点之前的页都已消费过，短页/空页的取尽判断只对该页之后的页生效
+        const completeFromPage = ctx.meta.deepNextPage;
         const walk = await walkIssuePages(ctx, {
           startPage: Math.max(1, ctx.meta.deepNextPage - 1),
           maxPages: DEEP_WALK_MAX_PAGES,
           advanceCursor: true,
-          stopWhen: () => countProspectiveCards(repos, onlyCollected) >= page * CARD_PAGE_SIZE,
+          stopWhen: () => countProspectiveCards(repos, onlyCollected, ctx.changedRepoKeys) >= page * CARD_PAGE_SIZE,
+          completeFromPage,
         });
         logger.info('weeklyIssues', 'Deep walk finished', {
           pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched, hitEnd: walk.hitEnd,
