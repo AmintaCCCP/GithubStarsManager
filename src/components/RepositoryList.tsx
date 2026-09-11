@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Bot, ChevronDown, LayoutGrid, List, Pause, Play, SearchX, X } from 'lucide-react';
 import { RepositoryCard } from './RepositoryCard';
 import { SimilarViewBanner } from './SimilarViewBanner';
+import { GlobalChatHistorySheet } from './GlobalChatHistorySheet';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { BulkCategorizeModal } from './BulkCategorizeModal';
 import { BulkRestoreModal, RestoreConfig } from './BulkRestoreModal';
@@ -111,6 +112,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [isExitingSelection, setIsExitingSelection] = useState(false);
   const [activeChatRepository, setActiveChatRepository] = useState<Repository | null>(null);
   const activeChatTriggerRef = useRef<HTMLElement | null>(null);
+  // 全局问答历史（S4 入口）：抽屉 + 从历史进入单仓会话的目标会话。
+  const [globalHistoryOpen, setGlobalHistoryOpen] = useState(false);
+  const [globalChatSessionId, setGlobalChatSessionId] = useState<string | null>(null);
 
   const allCategories = useMemo(
     () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
@@ -400,7 +404,34 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const handleAskRepository = useCallback((repository: Repository) => {
     const trigger = document.activeElement;
     activeChatTriggerRef.current = trigger instanceof HTMLElement ? trigger : null;
+    setGlobalChatSessionId(null);
     setActiveChatRepository(repository);
+  }, []);
+
+  // S4 全局入口（SearchBar「问答历史」按钮）经窗口事件打开历史抽屉。
+  useEffect(() => {
+    const handleOpenGlobalHistory = () => setGlobalHistoryOpen(true);
+    window.addEventListener('gsm:open-global-chat-history', handleOpenGlobalHistory);
+    return () => window.removeEventListener('gsm:open-global-chat-history', handleOpenGlobalHistory);
+  }, []);
+
+  const handleSelectGlobalSession = useCallback((repository: Repository, sessionId: string) => {
+    const trigger = document.activeElement;
+    activeChatTriggerRef.current = trigger instanceof HTMLElement ? trigger : null;
+    setGlobalChatSessionId(sessionId);
+    setActiveChatRepository(repository);
+    setGlobalHistoryOpen(false);
+  }, []);
+
+  const handleCloseChat = useCallback(() => {
+    setActiveChatRepository(null);
+    setGlobalChatSessionId(null);
+  }, []);
+
+  const handleBackToGlobalHistory = useCallback(() => {
+    setActiveChatRepository(null);
+    setGlobalChatSessionId(null);
+    setGlobalHistoryOpen(true);
   }, []);
 
   const handleBulkAction = async (action: string, selectedRepositories: Repository[]) => {
@@ -469,12 +500,23 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         <LazyRepositoryChatSheet
           isOpen
           repository={activeChatRepository}
-          onClose={() => setActiveChatRepository(null)}
+          initialSessionId={globalChatSessionId}
+          onBack={globalChatSessionId ? handleBackToGlobalHistory : undefined}
+          onClose={handleCloseChat}
           onCloseAutoFocus={() => activeChatTriggerRef.current?.focus()}
         />
       </React.Suspense>
     </ErrorBoundary>,
     document.body,
+  );
+
+  const globalHistorySheet = (
+    <GlobalChatHistorySheet
+      isOpen={globalHistoryOpen}
+      onClose={() => setGlobalHistoryOpen(false)}
+      repositories={repositories}
+      onSelectSession={handleSelectGlobalSession}
+    />
   );
 
   if (filteredRepositories.length === 0) {
@@ -527,6 +569,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         )}
         </div>
         {chatPortal}
+        {globalHistorySheet}
       </>
     );
   }
@@ -765,6 +808,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       />
 
       {chatPortal}
+      {globalHistorySheet}
     </div>
   );
 };

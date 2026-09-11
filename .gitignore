@@ -52,3 +52,6 @@ versions/.version-info.xml.*.tmp
 package-lock.json.*.tmp
 .omo/
 .zcode/
+
+# Local static demos for entry-point selection (never commit)
+.tmp-chat-entry-demos/

@@ -109,6 +109,28 @@ describe('repositoryChatSessionRepository local fallback', () => {
     await expect(repositoryChatSessionRepository.listEvidence([messageEvidence.id, toolEvidence.id])).resolves.toEqual([]);
   });
 
+  it('lists recent sessions across repositories in recency order with a limit', async () => {
+    await repositoryChatSessionRepository.saveSession(createSession('repo1-older', 1, '2026-08-24T00:00:00.000Z'));
+    await repositoryChatSessionRepository.saveSession(createSession('repo2-newer', 2, '2026-08-26T00:00:00.000Z'));
+    await repositoryChatSessionRepository.saveSession(createSession('repo1-middle', 1, '2026-08-25T00:00:00.000Z'));
+
+    await expect(repositoryChatSessionRepository.listRecentSessions(2)).resolves.toMatchObject([
+      { id: 'repo2-newer', repoId: 2 },
+      { id: 'repo1-middle', repoId: 1 },
+    ]);
+    await expect(repositoryChatSessionRepository.listRecentSessions()).resolves.toMatchObject([
+      { id: 'repo2-newer', repoId: 2 },
+      { id: 'repo1-middle', repoId: 1 },
+      { id: 'repo1-older', repoId: 1 },
+    ]);
+
+    await repositoryChatSessionRepository.softDeleteSession('repo2-newer');
+    await expect(repositoryChatSessionRepository.listRecentSessions()).resolves.toMatchObject([
+      { id: 'repo1-middle', repoId: 1 },
+      { id: 'repo1-older', repoId: 1 },
+    ]);
+  });
+
   it('rejects fallback writes when localStorage persistence is unavailable', async () => {
     // 直接把 window.localStorage 换成抛错桩：不同平台的 jsdom 对 Storage 原型/
     // 实例方法的实现有差异，逐方法 spy 在 CI（Linux）上不可靠。

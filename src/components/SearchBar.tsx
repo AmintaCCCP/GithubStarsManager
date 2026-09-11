@@ -1,6 +1,6 @@
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp } from 'lucide-react';
+import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History } from 'lucide-react';
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,6 +8,7 @@ import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useSearchActions } from '../features/repositories/hooks/useSearchActions';
 import { useDialog } from '../hooks/useDialog';
 import { isRepoCustomized } from '../utils/repoUtils';
+import { repositoryChatSessionRepository } from '../features/repository-chat/repositories/sessionRepository';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
@@ -114,6 +115,36 @@ export const SearchBar: React.FC = () => {
   const [availableLicenses, setAvailableLicenses] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
+  // S4 全局问答历史入口：徽标显示已保存会话数。
+  const [globalHistoryCount, setGlobalHistoryCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshGlobalHistoryCount = async () => {
+      try {
+        const sessions = await repositoryChatSessionRepository.listRecentSessions(100);
+        if (!cancelled) setGlobalHistoryCount(sessions.length);
+      } catch {
+        if (!cancelled) setGlobalHistoryCount(0);
+      }
+    };
+    void refreshGlobalHistoryCount();
+    // 删除会话时由历史抽屉广播；打开抽屉与窗口重获焦点时也刷新，
+    // 覆盖单仓问答内新建会话导致的计数过期。
+    window.addEventListener('gsm:global-chat-history-changed', refreshGlobalHistoryCount);
+    window.addEventListener('gsm:open-global-chat-history', refreshGlobalHistoryCount);
+    window.addEventListener('focus', refreshGlobalHistoryCount);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('gsm:global-chat-history-changed', refreshGlobalHistoryCount);
+      window.removeEventListener('gsm:open-global-chat-history', refreshGlobalHistoryCount);
+      window.removeEventListener('focus', refreshGlobalHistoryCount);
+    };
+  }, []);
+
+  const openGlobalChatHistory = () => {
+    window.dispatchEvent(new CustomEvent('gsm:open-global-chat-history'));
+  };
   
   const allCategories = useMemo(() => 
     getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
@@ -832,6 +863,23 @@ export const SearchBar: React.FC = () => {
             {activeFiltersCount > 0 && (
               <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
                 {activeFiltersCount}
+              </span>
+            )}
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={openGlobalChatHistory}
+            className="linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm"
+            aria-label={t('问答历史', 'Chat history')}
+            title={t('查看各仓库的问答历史', 'View chat history across repositories')}
+          >
+            <History className="w-4 h-4" aria-hidden="true" />
+            <span>{t('问答历史', 'Chat history')}</span>
+            {globalHistoryCount > 0 && (
+              <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
+                {globalHistoryCount > 99 ? '99+' : globalHistoryCount}
               </span>
             )}
           </Button>
