@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Github, Globe, Mail, Package, Twitter } from 'lucide-react';
+import { ExternalLink, Github, Globe, Mail, Monitor, Package, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,7 +9,9 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Switch } from '../ui/switch';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
+import { useDesktopActions } from '../../features/settings/hooks/useDesktopActions';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
@@ -20,6 +22,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
     language: state.language,
     setLanguage: state.setLanguage,
   })));
+  const desktop = useDesktopActions({ t });
 
   return (
     <div className="space-y-6">
@@ -56,6 +59,58 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           </RadioGroup>
         </CardContent>
       </Card>
+
+      {desktop.supported && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center space-x-3">
+              <Monitor className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+              <CardTitle>{t('桌面选项', 'Desktop')}</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground dark:text-foreground">{t('开机自动启动', 'Launch at startup')}</p>
+                <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{t('登录系统后自动启动客户端（默认关闭）', 'Start the client automatically after login (off by default)')}</p>
+              </div>
+              <Switch
+                aria-label={t('开机自动启动', 'Launch at startup')}
+                checked={desktop.prefs.autoLaunch}
+                disabled={desktop.loading || desktop.saving}
+                onCheckedChange={(checked) => { void desktop.toggleAutoLaunch(checked); }}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground dark:text-foreground">{t('关闭时最小化到托盘', 'Minimize to tray on close')}</p>
+                <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{t('关闭窗口后保持在托盘运行，右键托盘图标可彻底退出（默认开启）', 'Keep running in the tray after closing; right-click the tray icon to quit (on by default)')}</p>
+              </div>
+              <Switch
+                aria-label={t('关闭时最小化到托盘', 'Minimize to tray on close')}
+                checked={desktop.prefs.closeToTray}
+                disabled={desktop.loading || desktop.saving}
+                onCheckedChange={(checked) => { void desktop.toggleCloseToTray(checked); }}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground dark:text-foreground">{t('最小化时隐藏到托盘', 'Hide to tray on minimize')}</p>
+                <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{t('点击最小化按钮时隐藏到托盘（默认开启）', 'Hide to the tray when minimizing (on by default)')}</p>
+              </div>
+              <Switch
+                aria-label={t('最小化时隐藏到托盘', 'Hide to tray on minimize')}
+                checked={desktop.prefs.minimizeToTray}
+                disabled={desktop.loading || desktop.saving}
+                onCheckedChange={(checked) => { void desktop.toggleMinimizeToTray(checked); }}
+              />
+            </div>
+            {desktop.error && (
+              <p role="alert" className="text-xs text-destructive dark:text-destructive">{desktop.error}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

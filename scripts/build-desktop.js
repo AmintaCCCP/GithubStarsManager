@@ -13,11 +13,19 @@ execSync('npm run build', { stdio: 'inherit' });
 // 2. Electron sources are committed under electron/ (main.js, preload.js, mcpLocalServer.js).
 // Do NOT overwrite them with a generated shell — MCP + preload require first-class sources.
 const electronDir = path.join(__dirname, '../electron');
-const required = ['main.js', 'preload.js', 'mcpLocalServer.js', 'package.json'];
+const required = ['main.js', 'preload.js', 'mcpLocalServer.js', 'desktopPrefs.js', 'package.json'];
 for (const file of required) {
   const p = path.join(electronDir, file);
   if (!fs.existsSync(p)) {
     console.error(`❌ Missing required Electron file: electron/${file}`);
+    process.exit(1);
+  }
+}
+// Tray icons (#345) ship inside electron/assets (covered by electron-builder `electron/**`).
+for (const icon of ['tray-16.png', 'tray-32.png']) {
+  const p = path.join(electronDir, 'assets', icon);
+  if (!fs.existsSync(p)) {
+    console.error(`❌ Missing required tray icon: electron/assets/${icon}`);
     process.exit(1);
   }
 }
