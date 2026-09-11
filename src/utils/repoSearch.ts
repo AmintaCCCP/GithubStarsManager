@@ -42,6 +42,16 @@ const toSortableTimestamp = (value?: string): number => {
   return Number.isFinite(timestamp) ? timestamp : 0;
 };
 
+/**
+ * “按更新排序”按最近代码变更排序：优先用 pushed_at（缺失/非法时回退 updated_at），
+ * 与仓库卡片“最近提交”及搜索统计近期更新口径保持一致（#45，#342）。
+ */
+const toUpdatedSortValue = (repo: Repository): number => {
+  const pushed = toSortableTimestamp(repo.pushed_at);
+  if (pushed > 0) return pushed;
+  return toSortableTimestamp(repo.updated_at);
+};
+
 function getSortValue(repo: Repository, sortBy: SearchFilters['sortBy']): number | string {
   switch (sortBy) {
     case 'stars': {
@@ -49,15 +59,14 @@ function getSortValue(repo: Repository, sortBy: SearchFilters['sortBy']): number
       return Number.isFinite(stars) ? stars : 0;
     }
     case 'updated':
-      // The control is labelled “recently updated”, so use GitHub's updated_at
-      // rather than pushed_at (which drives the separate “last pushed” card label).
-      return toSortableTimestamp(repo.updated_at || repo.pushed_at);
+      // “按更新排序”按最近代码变更（push）排序，用 GitHub 的 pushed_at。
+      return toUpdatedSortValue(repo);
     case 'name':
       return repo.name.toLocaleLowerCase();
     case 'starred':
       return toSortableTimestamp(repo.starred_at);
     default:
-      return toSortableTimestamp(repo.updated_at || repo.pushed_at);
+      return toUpdatedSortValue(repo);
   }
 }
 

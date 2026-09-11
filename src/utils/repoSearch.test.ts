@@ -95,14 +95,34 @@ describe('applyRepoFilters', () => {
     expect(hits.map((r) => r.id)).toEqual([1, 3, 2]);
   });
 
-  it('sorts recently updated repositories by GitHub updated_at rather than last pushed_at', () => {
+  it('sorts recently updated repositories by GitHub pushed_at (last code change)', () => {
     const repositories = [
-      makeRepo({ id: 10, name: 'older-update', full_name: 'acme/older-update', updated_at: '2026-01-01T00:00:00Z', pushed_at: '2026-06-01T00:00:00Z' }),
-      makeRepo({ id: 11, name: 'newer-update', full_name: 'acme/newer-update', updated_at: '2026-05-01T00:00:00Z', pushed_at: '2026-02-01T00:00:00Z' }),
+      makeRepo({ id: 10, name: 'older-push', full_name: 'acme/older-push', updated_at: '2026-05-01T00:00:00Z', pushed_at: '2026-01-01T00:00:00Z' }),
+      makeRepo({ id: 11, name: 'newer-push', full_name: 'acme/newer-push', updated_at: '2026-02-01T00:00:00Z', pushed_at: '2026-06-01T00:00:00Z' }),
     ];
 
     const hits = applyRepoFilters(repositories, { sortBy: 'updated', sortOrder: 'desc' });
     expect(hits.map((repository) => repository.id)).toEqual([11, 10]);
+  });
+
+  it('falls back to updated_at when pushed_at is missing', () => {
+    const repositories = [
+      makeRepo({ id: 20, name: 'no-push', full_name: 'acme/no-push', updated_at: '2026-06-01T00:00:00Z', pushed_at: '' }),
+      makeRepo({ id: 21, name: 'has-push', full_name: 'acme/has-push', updated_at: '2026-01-01T00:00:00Z', pushed_at: '2026-02-01T00:00:00Z' }),
+    ];
+
+    const hits = applyRepoFilters(repositories, { sortBy: 'updated', sortOrder: 'desc' });
+    expect(hits.map((repository) => repository.id)).toEqual([20, 21]);
+  });
+
+  it('falls back to updated_at when pushed_at is invalid', () => {
+    const repositories = [
+      makeRepo({ id: 30, name: 'bad-push', full_name: 'acme/bad-push', updated_at: '2026-06-01T00:00:00Z', pushed_at: 'not-a-date' }),
+      makeRepo({ id: 31, name: 'has-push', full_name: 'acme/has-push', updated_at: '2026-01-01T00:00:00Z', pushed_at: '2026-02-01T00:00:00Z' }),
+    ];
+
+    const hits = applyRepoFilters(repositories, { sortBy: 'updated', sortOrder: 'desc' });
+    expect(hits.map((repository) => repository.id)).toEqual([30, 31]);
   });
 
   it('filters by SPDX id license', () => {
