@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "functions": {
+    "server/api/index.ts": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/server/api/index.ts" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
