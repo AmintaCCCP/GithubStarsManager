@@ -22,20 +22,16 @@ export const useWeeklyIssueBody = (issueNumber: number, enabled: boolean) => {
     setError(null);
     setLoading(true);
     const load = async () => {
-      if (!githubToken) {
-        setError(language === 'zh'
-          ? 'GitHub Token 未找到，请重新登录。'
-          : 'GitHub token not found. Please login again.');
-        setLoading(false);
-        return;
-      }
+      // 缓存命中无需 token（logout 不清周刊缓存）；仅在缓存未命中且有 token 时才建 API 回源
       try {
-        const api = new GitHubApiService(githubToken);
+        const api = githubToken ? new GitHubApiService(githubToken) : null;
         const result = await fetchWeeklyIssueBody(api, issueNumber);
         if (!cancelled) {
           setIssueData(result);
           if (!result?.body) {
-            setError(language === 'zh' ? '暂无正文内容' : 'No content available');
+            setError(language === 'zh'
+              ? (githubToken ? '暂无正文内容' : 'GitHub Token 未找到，请重新登录。')
+              : (githubToken ? 'No content available' : 'GitHub token not found. Please login again.'));
           }
         }
       } catch {

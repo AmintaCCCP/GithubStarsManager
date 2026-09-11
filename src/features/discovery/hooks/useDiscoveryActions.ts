@@ -47,6 +47,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   useEffect(() => {
     setIsAnalyzing(false);
     setAnalysisProgress({ current: 0, total: 0 });
+    // 账号切换后旧会话的周刊同步进度不再属于当前页面，直接清空
+    useAppStore.getState().setWeeklySyncStatus(null);
     return () => {
       optimizerRef.current?.abort();
       optimizerRef.current = null;
@@ -105,7 +107,12 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
             api,
             page,
             currentState.weeklyOnlyCollected,
-            (status) => { useAppStore.getState().setWeeklySyncStatus(status); },
+            // 只有当前请求有权写进度，避免切换账号/过滤器后旧任务覆盖新页面的状态
+            (status) => {
+              if (isCurrentRequest()) {
+                useAppStore.getState().setWeeklySyncStatus(status);
+              }
+            },
           );
           break;
         default:

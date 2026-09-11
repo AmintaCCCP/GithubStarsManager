@@ -6,6 +6,7 @@ import {
   selectReposToEnrich,
   buildWeeklyDiscoveryRepos,
   syncWeeklyChannel,
+  fetchWeeklyIssueBody,
   hasCollectedLabel,
 } from './weeklyIssuesService';
 import type { WeeklyStoredIssue, WeeklyStoredRepo } from './weeklyIssuesStorage';
@@ -103,6 +104,13 @@ describe('extractRepoFullNames', () => {
     expect(extractRepoFullNames(null)).toEqual([]);
     expect(extractRepoFullNames('')).toEqual([]);
     expect(extractRepoFullNames('仓库：https://github.com/foo/bar。欢迎试用')).toEqual(['foo/bar']);
+  });
+
+  it('strips trailing ascii periods but preserves legal trailing hyphens', () => {
+    expect(extractRepoFullNames('https://github.com/foo/bar.')).toEqual(['foo/bar']);
+    expect(extractRepoFullNames('https://github.com/foo/bar...')).toEqual(['foo/bar']);
+    expect(extractRepoFullNames('https://github.com/foo/bar-')).toEqual(['foo/bar-']);
+    expect(extractRepoFullNames('https://github.com/foo/.')).toEqual([]);
   });
 });
 
@@ -311,5 +319,53 @@ describe('syncWeeklyChannel', () => {
     expect(page2.repos).toHaveLength(50);
     expect(page2.hasMore).toBe(true);
     expect(page2.repos[0].full_name).toBe('org69/repo69');
+  });
+});
+
+describe('fetchWeeklyIssueBody without token', () => {
+  beforeEach(() => {
+    storage.reset();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  const storedIssue = (number: number): WeeklyStoredIssue => ({
+    number,
+    title: '【开源自荐】cached',
+    body: 'cached body',
+    labels: ['weekly'],
+    state: 'open',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    htmlUrl: `https://github.com/ruanyf/weekly/issues/${number}`,
+    repoFullNames: ['foo/bar'],
+  });
+
+  it('returns cached issue without any API when token is missing', async () => {
+    storage.issuesStore.set(7, storedIssue(7));
+    const result = await fetchWeeklyIssueBody(null, 7);
+    expect(result?.body).toBe('cached body');
+  });
+
+  it('returns null without touching the network when cache misses and token is missing', async () => {
+    const api = {
+      getRepositoryIssue: vi.fn(),
+    } as unknown as GitHubApiService;
+    const result = await fetchWeeklyIssueBody(null, 8);
+    expect(result).toBeNull();
+    expect(api.getRepositoryIssue).not.toHaveBeenCalled();
+  });
+
+  it('falls back to live fetch only when cache misses and api is provided', async () => {
+    const api = {
+      getRepositoryIssue: vi.fn(async (_o: string, _r: string, n: number) => makeIssue({ number: n, body: 'live body' })),
+    } as unknown as GitHubApiService;
+    const miss = await fetchWeeklyIssueBody(api, 9);
+    expect(miss?.body).toBe('live body');
+    expect(api.getRepositoryIssue).toHaveBeenCalledWith('ruanyf', 'weekly', 9);
+
+    storage.issuesStore.set(10, storedIssue(10));
+    const hit = await fetchWeeklyIssueBody(api, 10);
+    expect(hit?.body).toBe('cached body');
+    expect(api.getRepositoryIssue).toHaveBeenCalledTimes(1);
   });
 });

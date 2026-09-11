@@ -71,6 +71,35 @@ const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T
   return Promise.race([promise, timeoutPromise]);
 };
 
+/**
+ * 事务超时守卫：返回一次性 settle 函数。超时未结算时 abort 事务并 reject
+ * （Promise.race 无法中止后台事务，必须显式 abort 释放锁）；
+ * complete/error/abort 先到时清理定时器并只结算一次。
+ */
+const guardTx = (
+  tx: IDBTransaction,
+  timeoutMs: number,
+  reject: (reason: Error) => void,
+): (() => boolean) => {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    try {
+      tx.abort();
+    } catch {
+      // 事务可能已自行结束
+    }
+    reject(new Error('weeklyIssuesStorage timeout'));
+  }, timeoutMs);
+  return () => {
+    if (settled) return false;
+    settled = true;
+    clearTimeout(timer);
+    return true;
+  };
+};
+
 /** 写事务：execute 同步发起所有写请求，事务 complete 即成功。 */
 const runWriteTx = async (
   storeName: string,
@@ -82,10 +111,22 @@ const runWriteTx = async (
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(storeName, 'readwrite');
-      execute(tx.objectStore(storeName));
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      tx.onabort = () => reject(tx.error ?? new Error('transaction aborted'));
+      const settle = guardTx(tx, timeoutMs, reject);
+      try {
+        execute(tx.objectStore(storeName));
+      } catch (e) {
+        if (settle()) reject(e instanceof Error ? e : new Error(String(e)));
+        return;
+      }
+      tx.oncomplete = () => {
+        if (settle()) resolve();
+      };
+      tx.onerror = () => {
+        if (settle()) reject(tx.error ?? new Error('transaction error'));
+      };
+      tx.onabort = () => {
+        if (settle()) reject(tx.error ?? new Error('transaction aborted'));
+      };
     });
   } finally {
     db.close();
@@ -103,9 +144,14 @@ const runGetTx = async <T>(
   try {
     return await new Promise<T | undefined>((resolve, reject) => {
       const tx = db.transaction(storeName, 'readonly');
+      const settle = guardTx(tx, timeoutMs, reject);
       const req = tx.objectStore(storeName).get(key);
-      req.onsuccess = () => resolve(req.result as T | undefined);
-      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        if (settle()) resolve(req.result as T | undefined);
+      };
+      req.onerror = () => {
+        if (settle()) reject(req.error ?? new Error('request error'));
+      };
     });
   } finally {
     db.close();
@@ -123,17 +169,25 @@ const runCursorTx = async (
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(storeName, 'readonly');
+      const settle = guardTx(tx, timeoutMs, reject);
       const req = tx.objectStore(storeName).openCursor();
       req.onsuccess = () => {
         const cursor = req.result;
         if (!cursor) {
-          resolve();
+          if (settle()) resolve();
           return;
         }
-        visit(cursor.value, cursor.key);
+        try {
+          visit(cursor.value, cursor.key);
+        } catch (e) {
+          if (settle()) reject(e instanceof Error ? e : new Error(String(e)));
+          return;
+        }
         cursor.continue();
       };
-      req.onerror = () => reject(req.error);
+      req.onerror = () => {
+        if (settle()) reject(req.error ?? new Error('request error'));
+      };
     });
   } finally {
     db.close();
@@ -225,15 +279,15 @@ export const weeklyIssuesStorage = {
     }
   },
 
-  /** 清空全部周刊数据（设置页"删除发现页缓存"调用）。 */
+  /**
+   * 清空全部周刊数据（设置页"删除发现页缓存/删除全部数据"调用）。
+   * 错误向上抛出（调用方据此决定是否提示成功）；先清 meta：即使后续
+   * store 清理失败，同步水位已移除，下次同步退化为全量重扫可自愈。
+   */
   async clearAll(): Promise<void> {
     if (!canUseIndexedDB()) return;
-    try {
-      await runWriteTx(ISSUES_STORE, 15_000, (store) => store.clear());
-      await runWriteTx(REPOS_STORE, 15_000, (store) => store.clear());
-      await runWriteTx(META_STORE, 5000, (store) => store.clear());
-    } catch (e) {
-      console.warn('[weeklyIssuesStorage] clearAll failed:', e);
-    }
+    await runWriteTx(META_STORE, 5000, (store) => store.clear());
+    await runWriteTx(ISSUES_STORE, 15_000, (store) => store.clear());
+    await runWriteTx(REPOS_STORE, 15_000, (store) => store.clear());
   },
 };

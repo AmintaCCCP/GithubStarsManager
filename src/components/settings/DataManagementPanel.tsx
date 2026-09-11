@@ -1213,6 +1213,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       // 先清除存储，确保存储清除成功后再重置状态
       // 这样可以避免状态已重置但存储清除失败导致的数据不一致
       await clearAllStorage();
+      // 周刊频道数据在独立 IndexedDB（github-stars-weekly），一并清空；
+      // 失败会抛出，走下方 catch 提示失败而不重置状态
+      await weeklyIssuesStorage.clearAll();
 
       // 存储清除成功后，重置所有状态到初始值
       useAppStore.setState({

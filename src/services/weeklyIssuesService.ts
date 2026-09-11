@@ -87,6 +87,10 @@ export function extractRepoFullNames(body: string | null | undefined): string[] 
     const ownerLower = owner.toLowerCase();
     if (NON_REPO_OWNER_PATHS.has(ownerLower)) continue;
     if (ownerLower === WEEKLY_REPO_OWNER && name.toLowerCase() === WEEKLY_REPO_NAME) continue;
+    // GitHub 仓库名不能以句点结尾（`bar.` 是正文标点被 [\w.-] 吞进来了）；
+    // 末尾连字符是合法仓库名，保留
+    name = name.replace(/\.+$/, '');
+    if (!name) continue;
     if (name.toLowerCase().endsWith('.git')) name = name.slice(0, -4);
     result.add(`${owner}/${name}`);
   }
@@ -279,6 +283,7 @@ export async function syncWeeklyIssues(
   let scanned = 0;
   let matched = 0;
   let savedIssues = 0;
+  let savedRepos = 0;
   while (true) {
     const items = await api.listRepositoryIssues(WEEKLY_REPO_OWNER, WEEKLY_REPO_NAME, {
       state: 'all',
@@ -295,15 +300,16 @@ export async function syncWeeklyIssues(
     }
     scanned += items.length;
     onStatus?.({ phase: 'syncing', current: scanned, total: 0 });
-    // 每页落盘一次：中途取消/断网时已处理条目不丢（重复扫描靠 updatedAt 快速跳过）
+    // 每页落盘一次（增量切片）：中途取消/断网时已处理条目不丢（重复扫描靠 updatedAt 快速跳过）
     if (changedIssueNumbers.size > savedIssues) {
       await weeklyIssuesStorage.saveIssues(
         [...changedIssueNumbers].slice(savedIssues).map((number) => issues.get(number)!).filter(Boolean),
       );
       await weeklyIssuesStorage.saveRepos(
-        [...changedRepoKeys].map((key) => repos.get(key)!).filter(Boolean),
+        [...changedRepoKeys].slice(savedRepos).map((key) => repos.get(key)!).filter(Boolean),
       );
       savedIssues = changedIssueNumbers.size;
+      savedRepos = changedRepoKeys.size;
     }
     if (items.length < ISSUE_PAGE_SIZE) break;
     page++;
@@ -360,14 +366,19 @@ export function buildWeeklyDiscoveryRepos(
 }
 
 let syncAbortController: AbortController | null = null;
+let syncInFlight: Promise<void> | null = null;
 
 /** 互斥的同步入口：新请求会中止上一轮未完成的同步（切换频道/重入场景）。 */
 async function runExclusiveSync(api: GitHubApiService, onStatus: StatusCallback): Promise<void> {
   syncAbortController?.abort();
+  // 等待被中止轮次完成落盘再开新一轮，避免旧快照覆盖新一轮刚写入的补全结果
+  if (syncInFlight) await syncInFlight.catch(() => {});
   const controller = new AbortController();
   syncAbortController = controller;
+  const run = syncWeeklyIssues(api, controller.signal, onStatus);
+  syncInFlight = run.then(() => {}, () => {});
   try {
-    await syncWeeklyIssues(api, controller.signal, onStatus);
+    await run;
   } finally {
     // 仅在仍持有同步权时清空状态，避免被中止的旧轮次清掉新一轮的进度显示
     if (syncAbortController === controller) {
@@ -411,13 +422,17 @@ export async function syncWeeklyChannel(
   };
 }
 
-/** "查看原贴"弹窗取 issue 正文：优先离线缓存，缺失时兜底实时拉取。 */
+/**
+ * "查看原贴"弹窗取 issue 正文：优先离线缓存（无需 token，logout 后仍可看），
+ * 缓存未命中且提供了 api 时实时拉取兜底，否则原样返回缓存（可能为 null）。
+ */
 export async function fetchWeeklyIssueBody(
-  api: GitHubApiService,
+  api: GitHubApiService | null,
   issueNumber: number,
 ): Promise<WeeklyStoredIssue | null> {
   const stored = await weeklyIssuesStorage.getIssue(issueNumber);
   if (stored?.body) return stored;
+  if (!api) return stored;
   try {
     const issue = await api.getRepositoryIssue(WEEKLY_REPO_OWNER, WEEKLY_REPO_NAME, issueNumber);
     return {
