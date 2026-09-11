@@ -4,6 +4,7 @@ import type { DiscoveryChannelId, DiscoveryRepo, PaginatedDiscoveryRepositories 
 import { useAppStore } from '../../../store/useAppStore';
 import { selectDiscoveryViewState } from '../../../store/selectors';
 import { GitHubApiService } from '../../../services/githubApi';
+import { syncWeeklyChannel } from '../../../services/weeklyIssuesService';
 import { AIService } from '../../../services/aiService';
 import { AIAnalysisOptimizer } from '../../../services/aiAnalysisOptimizer';
 import { discoveryAnalysisStorage } from '../../../services/discoveryAnalysisStorage';
@@ -18,6 +19,8 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
     case 'trending': return JSON.stringify([...common, state.trendingTimeRange]);
     case 'topic': return JSON.stringify([...common, state.discoverySelectedTopic]);
     case 'search': return JSON.stringify([...common, state.discoverySearchQuery, state.discoveryLanguage, state.discoverySortBy, state.discoverySortOrder]);
+    // 周刊过滤为客户端行为，但签名纳入 weeklyOnlyCollected 以便切换过滤器时重跑入口重建切片
+    case 'weekly': return JSON.stringify([...common, state.weeklyOnlyCollected]);
     default: return JSON.stringify(common);
   }
 };
@@ -44,6 +47,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   useEffect(() => {
     setIsAnalyzing(false);
     setAnalysisProgress({ current: 0, total: 0 });
+    // 账号切换后旧会话的周刊同步进度不再属于当前页面，直接清空
+    useAppStore.getState().setWeeklySyncStatus(null);
     return () => {
       optimizerRef.current?.abort();
       optimizerRef.current = null;
@@ -97,6 +102,22 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
             ? await api.searchRepositories(currentState.discoverySearchQuery, currentState.discoveryPlatform, currentState.discoveryLanguage, currentState.discoverySortBy, currentState.discoverySortOrder, page)
             : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
           break;
+        case 'weekly':
+          // 新请求开始即清掉旧状态：缓存命中时 syncWeeklyChannel 不会回调 onStatus，
+          // 不清会残留上一轮的进度文案
+          useAppStore.getState().setWeeklySyncStatus(null);
+          result = await syncWeeklyChannel(
+            api,
+            page,
+            currentState.weeklyOnlyCollected,
+            // 只有当前请求有权写进度，避免切换账号/过滤器后旧任务覆盖新页面的状态
+            (status) => {
+              if (isCurrentRequest()) {
+                useAppStore.getState().setWeeklySyncStatus(status);
+              }
+            },
+          );
+          break;
         default:
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
       }
@@ -138,6 +159,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (append) currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
       else toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
     } finally {
+      if (channelId === 'weekly' && isCurrentRequest()) {
+        useAppStore.getState().setWeeklySyncStatus(null);
+      }
       if (ownsLoading()) {
         if (append) currentState.setDiscoveryLoadingMore(channelId, false);
         else currentState.setDiscoveryLoading(channelId, false);

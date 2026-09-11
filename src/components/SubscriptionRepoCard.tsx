@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Star, StarOff, ExternalLink, Bot, GitFork, Sparkles, BookOpen, AlertTriangle } from 'lucide-react';
+import { Star, StarOff, ExternalLink, Bot, GitFork, Sparkles, BookOpen, AlertTriangle, FileText, Calendar } from 'lucide-react';
 import { getPlatformIcon as getSharedPlatformIcon } from './platformMeta';
 import type { DiscoveryRepo } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryRepoActions } from '../features/discovery/hooks/useDiscoveryRepoActions';
 import { ReadmeModal } from './ReadmeModal';
+import { WeeklyIssueModal } from './WeeklyIssueModal';
 import { Modal } from './Modal';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -29,6 +30,8 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const [readmeModalOpen, setReadmeModalOpen] = useState(false);
   // 取消Star确认对话框状态（确认 UI 留 View；动作本体在 useDiscoveryRepoActions）
   const [unstarConfirmOpen, setUnstarConfirmOpen] = useState(false);
+  // 周刊频道："查看原贴"弹窗
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -96,6 +99,20 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const handleCardClick = useCallback(() => {
     setReadmeModalOpen(true);
   }, []);
+
+  // 周刊频道：查看原贴（GitHub 渲染样式的投稿 issue）
+  const handleOpenIssue = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIssueModalOpen(true);
+  }, []);
+
+  const weeklyIssueLabels = repo.weeklyIssue?.labels ?? [];
+  const isWeeklyCollected = weeklyIssueLabels.some(label => label.toLowerCase() === 'weekly');
+  const weeklyIssueNumberLabel = weeklyIssueLabels.find(label => /^issue-\d+$/i.test(label));
+  const weeklyIssueNumber = weeklyIssueNumberLabel ? Number(weeklyIssueNumberLabel.replace(/^\D+/i, '')) : null;
+  const weeklySubmittedDate = repo.weeklyIssue?.createdAt && Number.isFinite(Date.parse(repo.weeklyIssue.createdAt))
+    ? new Date(repo.weeklyIssue.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')
+    : '';
 
   const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
 
@@ -166,6 +183,18 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               >
                 <BookOpen className="w-4 h-4" />
               </Button>
+
+              {/* 周刊频道：查看原贴按钮 */}
+              {repo.weeklyIssue && (
+                <Button
+                  size="icon"
+                  onClick={handleOpenIssue}
+                  className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  title={t('查看原贴', 'View original post')}
+                >
+                  <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </Button>
+              )}
 
               {/* GitHub button - hidden on small screens */}
               <a
@@ -258,8 +287,22 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           )}
 
           {/* Tags */}
-          {((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0)) && (
+          {((repo.ai_tags && repo.ai_tags.length > 0) || (repo.topics && repo.topics.length > 0) || repo.weeklyIssue) && (
             <div className="flex flex-wrap gap-1.5 mb-3">
+              {repo.weeklyIssue && (
+                <>
+                  {isWeeklyCollected && (
+                    <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
+                      {t('周刊收录', 'In Weekly')}
+                    </span>
+                  )}
+                  {weeklyIssueNumber != null && (
+                    <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground">
+                      {t(`第 ${weeklyIssueNumber} 期`, `Issue #${weeklyIssueNumber}`)}
+                    </span>
+                  )}
+                </>
+              )}
               {(repo.ai_tags || repo.topics || []).slice(0, 5).map((tag) => (
                 <span
                   key={tag}
@@ -306,6 +349,12 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               <GitFork className="w-4 h-4" />
               <span>{formatNumber(repo.forks_count ?? repo.forks ?? 0)}</span>
             </div>
+            {weeklySubmittedDate && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                <span>{weeklySubmittedDate}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -356,6 +405,14 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
         isOpen={readmeModalOpen}
         onClose={() => setReadmeModalOpen(false)}
         repository={repo} />
+
+    {/* 周刊原贴 Modal */}
+      {repo.weeklyIssue && (
+        <WeeklyIssueModal
+          isOpen={issueModalOpen}
+          onClose={() => setIssueModalOpen(false)}
+          issue={repo.weeklyIssue} />
+      )}
     </>
   );
 };

@@ -1,6 +1,7 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
+import { weeklyIssuesStorage } from '../../services/weeklyIssuesStorage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -482,11 +483,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteDiscoveryData = useCallback(async () => {
     try {
+      // 周刊频道数据在独立 IndexedDB（issues/repos/正文缓存），一并清空
+      await weeklyIssuesStorage.clearAll();
       const emptyDiscoveryRepos = {
         'trending': [],
         'hot-release': [],
         'most-popular': [],
         'topic': [],
+        'weekly': [],
         'search': [],
         'code-search': []
       } as Record<string, DiscoveryRepo[]>;
@@ -497,6 +501,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'hot-release': null,
           'most-popular': null,
           'topic': null,
+          'weekly': null,
           'search': null,
           'code-search': null
         }
@@ -1204,10 +1209,25 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   }, [releases, readReleases, deleteDiscoveryData, addLog, showSuccess, showError, t]);
 
   const deleteAllData = async () => {
+    // 分步跟踪未完成的存储：失败时记录哪一步未完成并保留失败状态（不重置内存、
+    // 不提示成功），用户重试时清理幂等重跑即可续清残留
+    const pendingStorages: string[] = [];
     try {
       // 先清除存储，确保存储清除成功后再重置状态
       // 这样可以避免状态已重置但存储清除失败导致的数据不一致
-      await clearAllStorage();
+      try {
+        await clearAllStorage();
+      } catch (e) {
+        pendingStorages.push(t('主应用存储', 'app storage'));
+        throw e;
+      }
+      // 周刊频道数据在独立 IndexedDB（github-stars-weekly），一并清空
+      try {
+        await weeklyIssuesStorage.clearAll();
+      } catch (e) {
+        pendingStorages.push(t('周刊数据', 'weekly data'));
+        throw e;
+      }
 
       // 存储清除成功后，重置所有状态到初始值
       useAppStore.setState({
@@ -1269,7 +1289,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         window.location.reload();
       }, 2000);
     } catch (error) {
-      addLog(t('删除所有数据', 'Delete all data'), false, String(error));
+      addLog(
+        pendingStorages.length > 0
+          ? `${t('删除所有数据', 'Delete all data')} (${t('未完成', 'pending')}: ${pendingStorages.join(', ')})`
+          : t('删除所有数据', 'Delete all data'),
+        false,
+        String(error)
+      );
       showError(t('删除失败，请重试', 'Delete failed, please try again'));
       throw error;
     }

@@ -84,6 +84,38 @@ export interface RepositoryIssueCommentRead {
   body: string;
 }
 
+/** 仓库 issue 列表端点的原始条目（PR 条目带 isPullRequest 标记，调用方自行过滤）。 */
+export interface GitHubIssueListRead {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  html_url: string;
+  body: string | null;
+  created_at: string;
+  updated_at: string;
+  labels: string[];
+  isPullRequest: boolean;
+}
+
+/** 周刊频道补全用的仓库详情最小字段集（兼容 Repository 的子集形状）。 */
+export interface GitHubRepoDetailRead {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  html_url: string;
+  stargazers_count: number;
+  forks_count: number;
+  forks: number;
+  language: string | null;
+  created_at: string;
+  updated_at: string;
+  pushed_at: string;
+  topics: string[];
+  owner: { login: string; avatar_url: string };
+  license: string | null;
+}
+
 interface GitHubStarredItem {
   starred_at?: string;
   repo?: Repository;
@@ -112,6 +144,87 @@ interface GitHubRateLimitResponse {
   rate: {
     remaining: number;
     reset: number;
+  };
+}
+
+/** 把 REST issue 条目归一化为 GitHubIssueListRead（labels 对象数组展开为 name）。 */
+function mapRestIssueListItem(item: Record<string, unknown>): GitHubIssueListRead {
+  const labels = Array.isArray(item.labels)
+    ? item.labels.map((label) => {
+        if (label && typeof label === 'object' && typeof (label as { name?: unknown }).name === 'string') return (label as { name: string }).name;
+        return '';
+      }).filter(Boolean)
+    : [];
+  return {
+    number: typeof item.number === 'number' ? item.number : 0,
+    title: typeof item.title === 'string' ? item.title : '',
+    state: item.state === 'closed' ? 'closed' : 'open',
+    html_url: typeof item.html_url === 'string' ? item.html_url : '',
+    body: typeof item.body === 'string' ? item.body : null,
+    created_at: typeof item.created_at === 'string' ? item.created_at : '',
+    updated_at: typeof item.updated_at === 'string' ? item.updated_at : '',
+    labels,
+    isPullRequest: item.pull_request != null,
+  };
+}
+
+/** 把 REST /repos/{owner}/{repo} 响应归一化为 GitHubRepoDetailRead。 */
+function mapRestRepoDetail(data: Record<string, unknown>): GitHubRepoDetailRead {
+  const owner = (data.owner as { login?: unknown; avatar_url?: unknown } | undefined) ?? {};
+  return {
+    id: typeof data.id === 'number' ? data.id : 0,
+    name: typeof data.name === 'string' ? data.name : '',
+    full_name: typeof data.full_name === 'string' ? data.full_name : '',
+    description: typeof data.description === 'string' ? data.description : null,
+    html_url: typeof data.html_url === 'string' ? data.html_url : '',
+    stargazers_count: typeof data.stargazers_count === 'number' ? data.stargazers_count : 0,
+    forks_count: typeof data.forks_count === 'number' ? data.forks_count : 0,
+    forks: typeof data.forks === 'number' ? data.forks : 0,
+    language: typeof data.language === 'string' ? data.language : null,
+    created_at: typeof data.created_at === 'string' ? data.created_at : '',
+    updated_at: typeof data.updated_at === 'string' ? data.updated_at : '',
+    pushed_at: typeof data.pushed_at === 'string' ? data.pushed_at : '',
+    topics: Array.isArray(data.topics) ? data.topics.filter((t): t is string => typeof t === 'string') : [],
+    owner: {
+      login: typeof owner.login === 'string' ? owner.login : '',
+      avatar_url: typeof owner.avatar_url === 'string' ? owner.avatar_url : '',
+    },
+    license: toLicenseSpdxId(data.license),
+  };
+}
+
+/** 把 GraphQL Repository 节点归一化为 GitHubRepoDetailRead。 */
+function mapGraphqlRepoDetail(node: Record<string, unknown>): GitHubRepoDetailRead {
+  const owner = (node.owner as { login?: unknown; avatarUrl?: unknown } | undefined) ?? {};
+  const primaryLanguage = node.primaryLanguage as { name?: unknown } | null | undefined;
+  const licenseInfo = node.licenseInfo as { spdxId?: unknown } | null | undefined;
+  const topics: string[] = [];
+  const topicNodes = (node.repositoryTopics as { nodes?: Array<{ topic?: { name?: unknown } }> } | null | undefined)?.nodes;
+  if (Array.isArray(topicNodes)) {
+    for (const topicNode of topicNodes) {
+      const name = topicNode?.topic?.name;
+      if (typeof name === 'string' && name) topics.push(name);
+    }
+  }
+  return {
+    id: typeof node.databaseId === 'number' ? node.databaseId : 0,
+    name: typeof node.name === 'string' ? node.name : '',
+    full_name: typeof node.nameWithOwner === 'string' ? node.nameWithOwner : '',
+    description: typeof node.description === 'string' ? node.description : null,
+    html_url: typeof node.url === 'string' ? node.url : '',
+    stargazers_count: typeof node.stargazerCount === 'number' ? node.stargazerCount : 0,
+    forks_count: typeof node.forkCount === 'number' ? node.forkCount : 0,
+    forks: typeof node.forkCount === 'number' ? node.forkCount : 0,
+    language: primaryLanguage && typeof primaryLanguage.name === 'string' ? primaryLanguage.name : null,
+    created_at: typeof node.createdAt === 'string' ? node.createdAt : '',
+    updated_at: typeof node.updatedAt === 'string' ? node.updatedAt : '',
+    pushed_at: typeof node.pushedAt === 'string' ? node.pushedAt : '',
+    topics,
+    owner: {
+      login: typeof owner.login === 'string' ? owner.login : '',
+      avatar_url: typeof owner.avatarUrl === 'string' ? owner.avatarUrl : '',
+    },
+    license: licenseInfo && typeof licenseInfo.spdxId === 'string' ? licenseInfo.spdxId : null,
   };
 }
 
@@ -1104,6 +1217,114 @@ export class GitHubApiService {
       createdAt: typeof comment.created_at === 'string' ? comment.created_at : '',
       body: typeof comment.body === 'string' ? comment.body.slice(0, 4_000) : '',
     }));
+  }
+
+  /**
+   * 分页列出仓库 issues（state=all 含已关闭，按 updated 排序可配合 since 做
+   * 增量同步；PR 条目以 isPullRequest 标记，由调用方过滤）。
+   */
+  async listRepositoryIssues(
+    owner: string,
+    repo: string,
+    options: {
+      state?: 'open' | 'closed' | 'all';
+      sort?: 'created' | 'updated' | 'comments';
+      direction?: 'asc' | 'desc';
+      since?: string;
+      perPage?: number;
+      page?: number;
+      signal?: AbortSignal;
+    } = {},
+  ): Promise<GitHubIssueListRead[]> {
+    const params = new URLSearchParams({
+      state: options.state ?? 'all',
+      sort: options.sort ?? 'created',
+      direction: options.direction ?? 'desc',
+      per_page: String(Math.min(100, Math.max(1, options.perPage ?? 100))),
+      page: String(Math.max(1, options.page ?? 1)),
+    });
+    if (options.since) params.set('since', options.since);
+    const response = await this.makeRequest<Array<Record<string, unknown>>>(
+      `/repos/${owner}/${repo}/issues?${params.toString()}`,
+      { operationTag: 'issue-list' },
+      options.signal,
+    );
+    return (Array.isArray(response) ? response : []).map(mapRestIssueListItem).filter((issue) => issue.number > 0);
+  }
+
+  /** 抓取单条 issue 完整正文（周刊"查看原贴"缓存缺失时的兜底路径）。 */
+  async getRepositoryIssue(owner: string, repo: string, issueNumber: number, signal?: AbortSignal): Promise<GitHubIssueListRead> {
+    const item = await this.makeRequest<Record<string, unknown>>(
+      `/repos/${owner}/${repo}/issues/${issueNumber}`,
+      { operationTag: 'issue-list' },
+      signal,
+    );
+    return mapRestIssueListItem(item);
+  }
+
+  /** 抓取仓库详情（周刊频道 REST 逐仓补全路径）。 */
+  async getRepositoryDetails(owner: string, repo: string, signal?: AbortSignal): Promise<GitHubRepoDetailRead> {
+    const data = await this.makeRequest<Record<string, unknown>>(
+      `/repos/${owner}/${repo}`,
+      { operationTag: 'repo-detail' },
+      signal,
+    );
+    return mapRestRepoDetail(data);
+  }
+
+  /**
+   * 批量抓取仓库详情（GraphQL alias 批处理，默认 100 个/请求，每批间隔 150ms）。
+   * 返回 Map 以调用方传入的 full_name 小写为键；仓库不存在/不可访问时值为 null。
+   * 整批请求失败（网络/代理不支持/鉴权）时抛错，由调用方决定是否回退 REST 逐仓补全。
+   */
+  async graphqlFetchRepositories(
+    fullNames: string[],
+    options: { signal?: AbortSignal; batchSize?: number; onBatchDone?: (doneBatches: number, totalBatches: number) => void } = {},
+  ): Promise<Map<string, GitHubRepoDetailRead | null>> {
+    const result = new Map<string, GitHubRepoDetailRead | null>();
+    const fullNamePattern = /^[^/\s]+\/[^/\s]+$/;
+    const validFullNames = fullNames.filter((fullName) => fullNamePattern.test(fullName));
+    const validSet = new Set(validFullNames);
+    for (const fullName of fullNames) {
+      if (!validSet.has(fullName)) result.set(fullName.toLowerCase(), null);
+    }
+    const batchSize = Math.min(100, Math.max(1, options.batchSize ?? 100));
+    const batches: string[][] = [];
+    for (let i = 0; i < validFullNames.length; i += batchSize) {
+      batches.push(validFullNames.slice(i, i + batchSize));
+    }
+    const escapeGraphQlString = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      const aliases = batch.map((fullName, idx) => {
+        const [owner, name] = fullName.split('/');
+        return `a${idx}: repository(owner: "${escapeGraphQlString(owner)}", name: "${escapeGraphQlString(name)}") { ...WeeklyRepoDetailFragment }`;
+      });
+      const query = `query WeeklyRepoBatch {\n${aliases.join('\n')}\n}\nfragment WeeklyRepoDetailFragment on Repository {\n  databaseId\n  name\n  nameWithOwner\n  description\n  url\n  stargazerCount\n  forkCount\n  primaryLanguage { name }\n  createdAt\n  updatedAt\n  pushedAt\n  repositoryTopics(first: 20) { nodes { topic { name } } }\n  owner { login avatarUrl }\n  licenseInfo { spdxId }\n}`;
+      const response = await this.makeRequest<{ data?: Record<string, unknown> | null; errors?: Array<{ message?: string }> }>(
+        '/graphql',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query }),
+          operationTag: 'graphql-repo-batch',
+        },
+        options.signal,
+      );
+      if (!response.data || typeof response.data !== 'object') {
+        const message = response.errors?.map((e) => e.message ?? '').filter(Boolean).join('; ');
+        throw new Error(message ? `GraphQL batch failed: ${message}` : 'GraphQL batch failed: empty data');
+      }
+      batch.forEach((fullName, idx) => {
+        const node = response.data![`a${idx}`];
+        result.set(fullName.toLowerCase(), node && typeof node === 'object' ? mapGraphqlRepoDetail(node as Record<string, unknown>) : null);
+      });
+      options.onBatchDone?.(batchIndex + 1, batches.length);
+      if (batchIndex < batches.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
+    return result;
   }
 
   async getMultipleRepositoryReleases(
