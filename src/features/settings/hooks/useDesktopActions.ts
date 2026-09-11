@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_DESKTOP_PREFS,
   desktopBridge,
@@ -30,6 +30,10 @@ export const useDesktopActions = ({ t }: UseDesktopActionsOptions): DesktopActio
   const [prefs, setPrefs] = useState<DesktopPrefs>({ ...DEFAULT_DESKTOP_PREFS });
   const [loading, setLoading] = useState(supported);
   const [saving, setSaving] = useState(false);
+  // Synchronous write lock: `saving` is a render snapshot, so two toggles
+  // fired in the same tick would both pass a state check and issue
+  // concurrent IPC writes. The ref guards within a single render cycle.
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,7 +62,8 @@ export const useDesktopActions = ({ t }: UseDesktopActionsOptions): DesktopActio
     async (patch: Partial<DesktopPrefs>, apply: (enabled: boolean) => Promise<{ success: boolean; prefs?: DesktopPrefs; error?: string }>, enabled: boolean) => {
       // Serialize IPC writes: a second toggle while one is in flight is dropped,
       // otherwise optimistic states can interleave and the wrong value wins.
-      if (saving) return;
+      if (savingRef.current) return;
+      savingRef.current = true;
       const previous = prefs;
       setPrefs((current) => ({ ...current, ...patch }));
       setError(null);
@@ -75,10 +80,11 @@ export const useDesktopActions = ({ t }: UseDesktopActionsOptions): DesktopActio
         setPrefs(previous);
         setError(reason instanceof Error ? reason.message : t('保存失败', 'Save failed'));
       } finally {
+        savingRef.current = false;
         setSaving(false);
       }
     },
-    [prefs, saving, t],
+    [prefs, t],
   );
 
   const toggleAutoLaunch = useCallback(

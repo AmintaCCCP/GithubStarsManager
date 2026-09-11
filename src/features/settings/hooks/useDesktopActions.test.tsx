@@ -88,17 +88,19 @@ describe('useDesktopActions', () => {
     );
     const { result } = renderHook(() => useDesktopActions({ t }));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    let first: Promise<void>;
+    // Fire both toggles synchronously in one act: with only a render-snapshot
+    // guard both would issue IPC writes; the ref lock must serialize them.
+    let first: Promise<void> | undefined;
+    let second: Promise<void> | undefined;
     act(() => {
       first = result.current.toggleAutoLaunch(true);
-    });
-    await act(async () => {
-      await result.current.toggleAutoLaunch(false);
+      second = result.current.toggleAutoLaunch(false);
     });
     expect(mocks.setAutoLaunch).toHaveBeenCalledTimes(1);
     await act(async () => {
       resolveFirst?.({ success: true, prefs: { autoLaunch: true, closeToTray: true, minimizeToTray: true } });
       await first;
+      await second;
     });
     expect(result.current.prefs.autoLaunch).toBe(true);
   });
