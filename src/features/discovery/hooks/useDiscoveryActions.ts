@@ -103,6 +103,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
             : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
           break;
         case 'weekly':
+          // 新请求开始即清掉旧状态：缓存命中时 syncWeeklyChannel 不会回调 onStatus，
+          // 不清会残留上一轮的进度文案
+          useAppStore.getState().setWeeklySyncStatus(null);
           result = await syncWeeklyChannel(
             api,
             page,
@@ -156,6 +159,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (append) currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
       else toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
     } finally {
+      if (channelId === 'weekly' && isCurrentRequest()) {
+        useAppStore.getState().setWeeklySyncStatus(null);
+      }
       if (ownsLoading()) {
         if (append) currentState.setDiscoveryLoadingMore(channelId, false);
         else currentState.setDiscoveryLoading(channelId, false);

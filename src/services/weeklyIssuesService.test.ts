@@ -455,6 +455,19 @@ describe('syncWeeklyChannel on-demand paging', () => {
     expect(storage.metaRef.current.historyComplete).toBe(false);
   });
 
+  it('treats an unparseable lastSyncedAt as a first run instead of throwing', async () => {
+    const api = makeApi([issuePage(1, (i) => `org${i}/repo${i}`)]);
+    storage.setLastSyncedAt('not-a-timestamp');
+
+    const result = await syncWeeklyChannel(api, 1, false, () => {});
+    // 损坏水位按首次运行处理：不带 since、只取 1 页；走完覆盖为合法水位
+    expect(api.listRepositoryIssues).toHaveBeenCalledTimes(1);
+    const callOpts = (api.listRepositoryIssues as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(callOpts.since).toBeUndefined();
+    expect(result.repos).toHaveLength(50);
+    expect(Number.isFinite(Date.parse(storage.metaRef.current.lastSyncedAt ?? ''))).toBe(true);
+  });
+
   it('deep-walks to fill a filtered page when onlyCollected is on', async () => {
     // P1: 100 条中仅 10 条带 weekly label；P2: 100 条中 45 条带 label
     const p1 = issuePage(1, (i) => `org${i}/repo${i}`, 100, (i) => (i < 10 ? ['weekly'] : []));

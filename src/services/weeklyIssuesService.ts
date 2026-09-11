@@ -577,12 +577,16 @@ export async function syncWeeklyChannel(
       };
 
       if (page <= 1 && !isRecentlySynced(meta.lastSyncedAt)) {
-        const firstRun = meta.lastSyncedAt === null;
+        // 水位损坏（不可解析）时退化为首次运行：避免 Date.parse → NaN 在
+        // toISOString 处抛 RangeError 使频道永久无法刷新；走完首次遍历后
+        // lastSyncedAt 会被合法时间戳覆盖，自动自愈
+        const lastSyncedMs = meta.lastSyncedAt === null ? NaN : Date.parse(meta.lastSyncedAt);
+        const firstRun = !Number.isFinite(lastSyncedMs);
         onStatus?.({ phase: 'syncing', current: 0, total: 0 });
         const walk = await walkIssuePages(ctx, firstRun
           ? { startPage: 1, maxPages: 1, advanceCursor: true, completeFromPage: 1 }
           : {
-              since: new Date(Date.parse(meta.lastSyncedAt!) - LABEL_GRACE_MS).toISOString(),
+              since: new Date(lastSyncedMs - LABEL_GRACE_MS).toISOString(),
               startPage: 1,
               maxPages: REFRESH_WALK_MAX_PAGES,
               advanceCursor: false,

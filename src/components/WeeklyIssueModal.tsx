@@ -26,7 +26,7 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
   const issueNumberLabel = issue.labels.find(label => /^issue-\d+$/i.test(label));
   const issueNumber = issueNumberLabel ? Number(issueNumberLabel.replace(/^\D+/i, '')) : null;
   const submittedDate = issue.createdAt && Number.isFinite(Date.parse(issue.createdAt))
-    ? new Date(issue.createdAt).toLocaleDateString()
+    ? new Date(issue.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')
     : '';
 
   return (

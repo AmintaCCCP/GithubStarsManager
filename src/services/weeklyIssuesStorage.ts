@@ -225,17 +225,17 @@ export const weeklyIssuesStorage = {
     }
   },
 
+  /**
+   * 读取失败向上抛出（不返回半量快照）：调用方会把它当作权威内存状态，
+   * 缺失的键会让已知条目被当作新条目重建，进而用空详情覆盖已落盘数据。
+   */
   async getAllIssues(): Promise<Map<number, WeeklyStoredIssue>> {
     const result = new Map<number, WeeklyStoredIssue>();
     if (!canUseIndexedDB()) return result;
-    try {
-      await runCursorTx(ISSUES_STORE, 20_000, (value) => {
-        const issue = value as WeeklyStoredIssue;
-        if (issue && typeof issue.number === 'number') result.set(issue.number, issue);
-      });
-    } catch (e) {
-      console.warn('[weeklyIssuesStorage] getAllIssues failed:', e);
-    }
+    await runCursorTx(ISSUES_STORE, 20_000, (value) => {
+      const issue = value as WeeklyStoredIssue;
+      if (issue && typeof issue.number === 'number') result.set(issue.number, issue);
+    });
     return result;
   },
 
@@ -262,17 +262,14 @@ export const weeklyIssuesStorage = {
     }
   },
 
+  /** 读取失败向上抛出（同 getAllIssues：不返回半量快照）。 */
   async getAllRepos(): Promise<Map<string, WeeklyStoredRepo>> {
     const result = new Map<string, WeeklyStoredRepo>();
     if (!canUseIndexedDB()) return result;
-    try {
-      await runCursorTx(REPOS_STORE, 15_000, (value, key) => {
-        const repo = value as WeeklyStoredRepo;
-        if (repo && typeof repo.fullName === 'string') result.set(String(key), repo);
-      });
-    } catch (e) {
-      console.warn('[weeklyIssuesStorage] getAllRepos failed:', e);
-    }
+    await runCursorTx(REPOS_STORE, 15_000, (value, key) => {
+      const repo = value as WeeklyStoredRepo;
+      if (repo && typeof repo.fullName === 'string') result.set(String(key), repo);
+    });
     return result;
   },
 

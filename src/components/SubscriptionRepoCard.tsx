@@ -111,7 +111,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const weeklyIssueNumberLabel = weeklyIssueLabels.find(label => /^issue-\d+$/i.test(label));
   const weeklyIssueNumber = weeklyIssueNumberLabel ? Number(weeklyIssueNumberLabel.replace(/^\D+/i, '')) : null;
   const weeklySubmittedDate = repo.weeklyIssue?.createdAt && Number.isFinite(Date.parse(repo.weeklyIssue.createdAt))
-    ? new Date(repo.weeklyIssue.createdAt).toLocaleDateString()
+    ? new Date(repo.weeklyIssue.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')
     : '';
 
   const cardTitle = repo.full_name || `${repo.owner?.login || ''}/${repo.name || ''}`;
