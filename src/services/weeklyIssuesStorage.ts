@@ -298,6 +298,48 @@ export const weeklyIssuesStorage = {
   },
 
   /**
+   * 遍历分页的原子落盘：issues + repos + meta（deepNextPage/historyComplete）
+   * 在同一个跨 store 读写事务中写入，任一失败整体回滚并抛出——调用方据此
+   * 不推进内存游标，下轮同步会重新拉取该页，避免 historyComplete 跳过未
+   * 持久化的数据。
+   */
+  async saveWalkPage(payload: {
+    issues: WeeklyStoredIssue[];
+    repos: WeeklyStoredRepo[];
+    meta: WeeklySyncMeta;
+  }): Promise<void> {
+    if (!canUseIndexedDB()) throw new Error('IndexedDB unavailable');
+    const db = await withTimeout(openDb(), 15_000);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([ISSUES_STORE, REPOS_STORE, META_STORE], 'readwrite');
+        const settle = guardTx(tx, 15_000, reject);
+        try {
+          const issueStore = tx.objectStore(ISSUES_STORE);
+          for (const issue of payload.issues) issueStore.put(issue, issue.number);
+          const repoStore = tx.objectStore(REPOS_STORE);
+          for (const repo of payload.repos) repoStore.put(repo, repo.fullName.toLowerCase());
+          tx.objectStore(META_STORE).put(payload.meta, 'sync');
+        } catch (e) {
+          if (settle()) reject(e instanceof Error ? e : new Error(String(e)));
+          return;
+        }
+        tx.oncomplete = () => {
+          if (settle()) resolve();
+        };
+        tx.onerror = () => {
+          if (settle()) reject(tx.error ?? new Error('transaction error'));
+        };
+        tx.onabort = () => {
+          if (settle()) reject(tx.error ?? new Error('transaction aborted'));
+        };
+      });
+    } finally {
+      db.close();
+    }
+  },
+
+  /**
    * 清空全部周刊数据（设置页"删除发现页缓存/删除全部数据"调用）。
    * 错误向上抛出（调用方据此决定是否提示成功）；先清 meta：即使后续
    * store 清理失败，同步水位已移除，下次同步退化为全量重扫可自愈。

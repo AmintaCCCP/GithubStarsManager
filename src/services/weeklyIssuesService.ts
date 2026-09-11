@@ -333,27 +333,41 @@ interface WalkResult {
   hitEnd: boolean;
 }
 
-/** 增量落盘本页新增（切片水位），并按需推进/持久化深度游标。 */
-async function flushWalkPage(ctx: WalkContext, page: number, advanceCursor: boolean): Promise<void> {
-  if (ctx.changedIssueNumbers.size > ctx.savedIssues) {
-    await weeklyIssuesStorage.saveIssues(
-      [...ctx.changedIssueNumbers].slice(ctx.savedIssues).map((number) => ctx.issues.get(number)!).filter(Boolean),
-    );
-    await weeklyIssuesStorage.saveRepos(
-      [...ctx.changedRepoKeys].slice(ctx.savedRepos).map((key) => ctx.repos.get(key)!).filter(Boolean),
-    );
-    ctx.savedIssues = ctx.changedIssueNumbers.size;
-    ctx.savedRepos = ctx.changedRepoKeys.size;
+/**
+ * 原子落盘本页增量 + 游标：issues、repos、meta（deepNextPage/historyComplete）
+ * 走同一事务。事务失败时抛出且不推进内存水位/游标——下轮同步重新拉取该页，
+ * 避免"游标已推进但数据未落盘"的永久缺口。
+ */
+async function flushWalkPage(
+  ctx: WalkContext,
+  page: number,
+  opts: { advanceCursor: boolean; markComplete: boolean },
+): Promise<void> {
+  const newIssues = [...ctx.changedIssueNumbers].slice(ctx.savedIssues)
+    .map((number) => ctx.issues.get(number)!).filter(Boolean);
+  const newRepos = [...ctx.changedRepoKeys].slice(ctx.savedRepos)
+    .map((key) => ctx.repos.get(key)!).filter(Boolean);
+  const nextMeta: WeeklySyncMeta = { ...ctx.meta };
+  let metaChanged = false;
+  if (opts.advanceCursor) {
+    nextMeta.deepNextPage = page + 1;
+    metaChanged = true;
   }
-  if (advanceCursor) {
-    ctx.meta.deepNextPage = page + 1;
-    await weeklyIssuesStorage.saveSyncMeta(ctx.meta);
+  if (opts.markComplete && !nextMeta.historyComplete) {
+    nextMeta.historyComplete = true;
+    metaChanged = true;
   }
+  if (newIssues.length === 0 && newRepos.length === 0 && !metaChanged) return;
+  await weeklyIssuesStorage.saveWalkPage({ issues: newIssues, repos: newRepos, meta: nextMeta });
+  ctx.savedIssues = ctx.changedIssueNumbers.size;
+  ctx.savedRepos = ctx.changedRepoKeys.size;
+  ctx.meta = nextMeta;
 }
 
 /**
- * 按 updated 倒序遍历 issue 页：逐页处理、落盘、推进游标。
- * 停止条件：页数上限 / 不足一页或空页（无 since 时即历史取尽）。
+ * 按 updated 倒序遍历 issue 页：逐页处理、原子落盘、推进游标。
+ * 停止条件：页数上限 / 不足一页或空页（无 since 时即历史取尽，随本页原子
+ * 标记 historyComplete）/ 深度遍历凑够目标卡片数。
  */
 async function walkIssuePages(ctx: WalkContext, opts: WalkOptions): Promise<WalkResult> {
   let page = opts.startPage;
@@ -372,18 +386,18 @@ async function walkIssuePages(ctx: WalkContext, opts: WalkOptions): Promise<Walk
       signal: ctx.signal,
     });
     pagesFetched++;
-    if (items.length === 0) {
-      hitEnd = !opts.since;
-      break;
+    const isShort = items.length < ISSUE_PAGE_SIZE;
+    const markComplete = isShort && !opts.since;
+    if (items.length > 0) {
+      for (const issue of items) {
+        if (processWeeklyIssue(issue, ctx.issues, ctx.repos, ctx.changedIssueNumbers, ctx.changedRepoKeys)) matched++;
+      }
+      scanned += items.length;
+      ctx.onStatus?.({ phase: 'syncing', current: scanned, total: 0 });
     }
-    for (const issue of items) {
-      if (processWeeklyIssue(issue, ctx.issues, ctx.repos, ctx.changedIssueNumbers, ctx.changedRepoKeys)) matched++;
-    }
-    scanned += items.length;
-    ctx.onStatus?.({ phase: 'syncing', current: scanned, total: 0 });
-    await flushWalkPage(ctx, page, opts.advanceCursor);
-    if (items.length < ISSUE_PAGE_SIZE) {
-      hitEnd = !opts.since;
+    await flushWalkPage(ctx, page, { advanceCursor: opts.advanceCursor, markComplete });
+    if (isShort) {
+      hitEnd = markComplete;
       break;
     }
     if (opts.stopWhen?.()) break;
@@ -509,7 +523,9 @@ export async function syncWeeklyChannel(
 ): Promise<PaginatedDiscoveryRepositories> {
   const meta0 = await weeklyIssuesStorage.getSyncMeta();
   const needsRefreshWalk = page <= 1 && !isRecentlySynced(meta0.lastSyncedAt);
-  const needsDeepWalk = !(meta0.historyComplete)
+  // 刷新路径会在互斥体内重读仓库并自行评估深度遍历条件，这里跳过冗余的全量读取
+  const needsDeepWalk = !needsRefreshWalk
+    && !meta0.historyComplete
     && countCards(await weeklyIssuesStorage.getAllRepos(), onlyCollected) < page * CARD_PAGE_SIZE;
 
   let finalIssues: Map<number, WeeklyStoredIssue> | null = null;
@@ -545,32 +561,27 @@ export async function syncWeeklyChannel(
               maxPages: REFRESH_WALK_MAX_PAGES,
               advanceCursor: false,
             });
-        if (walk.hitEnd) meta.historyComplete = true;
         logger.info('weeklyIssues', 'Refresh walk finished', {
-          pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched, firstRun,
+          pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched, firstRun, hitEnd: walk.hitEnd,
         });
         await enrichAndPersist(ctx, [
           ...pendingReposFromKeys(repos, ctx.changedRepoKeys),
           ...refreshMaintenanceRepos(repos, ctx.changedRepoKeys, Date.now()),
         ], signal);
-        meta.lastSyncedAt = new Date().toISOString();
-        await weeklyIssuesStorage.saveSyncMeta(meta);
+        ctx.meta.lastSyncedAt = new Date().toISOString();
+        await weeklyIssuesStorage.saveSyncMeta(ctx.meta);
       }
 
-      if (countCards(repos, onlyCollected) < page * CARD_PAGE_SIZE && !meta.historyComplete) {
+      if (countCards(repos, onlyCollected) < page * CARD_PAGE_SIZE && !ctx.meta.historyComplete) {
         onStatus?.({ phase: 'syncing', current: 0, total: 0 });
         const walk = await walkIssuePages(ctx, {
-          startPage: Math.max(1, meta.deepNextPage - 1),
+          startPage: Math.max(1, ctx.meta.deepNextPage - 1),
           maxPages: DEEP_WALK_MAX_PAGES,
           advanceCursor: true,
           stopWhen: () => countProspectiveCards(repos, onlyCollected) >= page * CARD_PAGE_SIZE,
         });
-        if (walk.hitEnd) {
-          meta.historyComplete = true;
-          await weeklyIssuesStorage.saveSyncMeta(meta);
-        }
         logger.info('weeklyIssues', 'Deep walk finished', {
-          pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched,
+          pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched, hitEnd: walk.hitEnd,
         });
         await enrichAndPersist(ctx, pendingReposFromKeys(repos, ctx.changedRepoKeys), signal);
       }

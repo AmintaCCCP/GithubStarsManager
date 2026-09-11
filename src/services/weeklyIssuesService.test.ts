@@ -19,6 +19,7 @@ const storage = vi.hoisted(() => {
   const metaRef = {
     current: { lastSyncedAt: null as string | null, deepNextPage: 1, historyComplete: false },
   };
+  let failWalkPage = false;
   return {
     issuesStore,
     reposStore,
@@ -26,10 +27,22 @@ const storage = vi.hoisted(() => {
     setLastSyncedAt(v: string | null) {
       metaRef.current = { ...metaRef.current, lastSyncedAt: v };
     },
+    setFailWalkPage(v: boolean) { failWalkPage = v; },
+    failWalkPageNow: () => failWalkPage,
     reset() {
       issuesStore.clear();
       reposStore.clear();
       metaRef.current = { lastSyncedAt: null, deepNextPage: 1, historyComplete: false };
+      failWalkPage = false;
+    },
+    applyWalkPage(payload: {
+      issues: Array<{ number: number }>;
+      repos: Array<{ fullName: string }>;
+      meta: { lastSyncedAt: string | null; deepNextPage: number; historyComplete: boolean };
+    }) {
+      for (const issue of payload.issues) issuesStore.set(issue.number, issue);
+      for (const repo of payload.repos) reposStore.set(repo.fullName.toLowerCase(), repo);
+      metaRef.current = { ...payload.meta };
     },
   };
 });
@@ -48,6 +61,15 @@ vi.mock('./weeklyIssuesStorage', () => ({
     getSyncMeta: async () => ({ ...storage.metaRef.current }),
     saveSyncMeta: async (m: { lastSyncedAt: string | null; deepNextPage: number; historyComplete: boolean }) => {
       storage.metaRef.current = { ...m };
+    },
+    saveWalkPage: async (payload: {
+      issues: Array<{ number: number }>;
+      repos: Array<{ fullName: string }>;
+      meta: { lastSyncedAt: string | null; deepNextPage: number; historyComplete: boolean };
+    }) => {
+      // 原子语义在真实现由单事务保证；替身以"先抛错后应用"模拟失败回滚
+      if (storage.failWalkPageNow()) throw new Error('walk page tx failed');
+      storage.applyWalkPage(payload);
     },
     clearAll: async () => storage.reset(),
   },
@@ -303,6 +325,21 @@ describe('syncWeeklyChannel on-demand paging', () => {
     expect(api.listRepositoryIssues).toHaveBeenCalledTimes(1);
     expect(result.hasMore).toBe(false);
     expect(storage.metaRef.current.historyComplete).toBe(true);
+  });
+
+  it('does not advance the cursor when the atomic page write fails', async () => {
+    const api = makeApi([issuePage(1, (i) => `org${i}/repo${i}`)]);
+    storage.setFailWalkPage(true);
+    await expect(syncWeeklyChannel(api, 1, false, () => {})).rejects.toThrow('walk page tx failed');
+    // 原子写入失败：游标不推进、historyComplete 不标记，下轮同步重拉该页
+    expect(storage.metaRef.current.deepNextPage).toBe(1);
+    expect(storage.metaRef.current.historyComplete).toBe(false);
+
+    // 恢复后重试成功
+    storage.setFailWalkPage(false);
+    const result = await syncWeeklyChannel(api, 1, false, () => {});
+    expect(result.repos).toHaveLength(50);
+    expect(storage.metaRef.current.deepNextPage).toBe(2);
   });
 
   it('fetches deeper pages only when the requested UI page exceeds cached cards', async () => {
