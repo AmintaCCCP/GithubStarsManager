@@ -12,6 +12,13 @@ const createId = (): string => {
 
 const defaultTitle = (language: 'zh' | 'en') => language === 'zh' ? '新对话' : 'New conversation';
 
+/** 通知全局问答历史入口（SearchBar 徽标、历史抽屉）刷新。 */
+const notifyGlobalHistoryChanged = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('gsm:global-chat-history-changed'));
+  }
+};
+
 export interface UseRepositoryChatSessionsOptions {
   repository: Repository | null;
   language: 'zh' | 'en';
@@ -98,6 +105,7 @@ export const useRepositoryChatSessions = ({
       setSessions((previous) => [session, ...previous]);
       setActiveSession(session);
       setMessages([]);
+      notifyGlobalHistoryChanged();
       return session;
     } catch (unknownError) {
       if (operationId === operationIdRef.current) setError(unknownError instanceof Error ? unknownError.message : 'Unable to create a repository chat session');
@@ -120,6 +128,7 @@ export const useRepositoryChatSessions = ({
     setError(null);
     try {
       await repositoryChatSessionRepository.permanentlyDeleteSession(sessionId);
+      notifyGlobalHistoryChanged();
       if (operationId !== operationIdRef.current) return;
       const nextSessions = sessions.filter((session) => session.id !== sessionId);
       setSessions(nextSessions);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowDown, CheckCircle2, ChevronDown, ChevronRight, CircleDot, Copy, ExternalLink, Gauge, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
+import { AlertCircle, ArrowDown, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDot, Copy, ExternalLink, Gauge, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
 import type { RepositoryChatMessage, RepositoryChatTaskDepth, RepositoryChatToolEvent, ToolEvidence } from '../types/repositoryChat';
 import { TASK_DEPTH_PRESETS } from '../types/repositoryChat';
@@ -24,6 +24,10 @@ interface RepositoryChatSheetProps {
   onClose: () => void;
   onCloseAutoFocus?: () => void;
   repository: Repository;
+  /** 从全局问答历史进入时，直接选中该会话。 */
+  initialSessionId?: string | null;
+  /** 从全局问答历史进入时，返回历史列表。 */
+  onBack?: () => void;
 }
 
 const shortSha = (sha: string) => sha.slice(0, 7);
@@ -155,6 +159,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   onClose,
   onCloseAutoFocus,
   repository,
+  initialSessionId,
+  onBack,
 }) => {
   const { language, setCurrentView, repositoryChatSettings, setRepositoryChatSettings } = useAppStore(useShallow((state) => ({
     language: state.language,
@@ -244,6 +250,22 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     setShowHistory(false);
   };
 
+  // 从全局问答历史进入：会话列表就绪后直接选中目标会话。
+  const initialSessionAppliedRef = useRef<string | null>(null);
+  useEffect(() => {
+    initialSessionAppliedRef.current = null;
+  }, [repository.id]);
+  useEffect(() => {
+    if (!initialSessionId || initialSessionAppliedRef.current === initialSessionId || isLoading) return;
+    if (!sessions.some((session) => session.id === initialSessionId)) return;
+    if (activeSession?.id === initialSessionId) {
+      initialSessionAppliedRef.current = initialSessionId;
+      return;
+    }
+    initialSessionAppliedRef.current = initialSessionId;
+    void selectSession(initialSessionId);
+  }, [initialSessionId, sessions, isLoading, activeSession?.id, selectSession]);
+
   const navigateToAiSettings = () => {
     if (repository) {
       sessionStorage.setItem('gsm:repository-chat-return', JSON.stringify({ repoId: repository.id, draft }));
@@ -300,6 +322,20 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         }}
       >
         <SheetHeader>
+          {onBack && (
+            <div className="-mb-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={onBack}
+              >
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                {t('返回历史', 'Back to history')}
+              </Button>
+            </div>
+          )}
           <div className="flex min-w-0 items-start gap-3">
             <img src={repository.owner.avatar_url} alt="" className="h-9 w-9 shrink-0 rounded-md border border-border" />
             <div className="min-w-0 flex-1">

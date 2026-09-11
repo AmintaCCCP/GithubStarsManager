@@ -288,4 +288,19 @@ describe('SearchBar', () => {
       vi.useRealTimers();
     }
   });
+
+  it('dispatches the global history open event from the 问答历史 button', () => {
+    currentState = createStoreState({});
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
+    const dispatchSpy = vi.fn();
+    window.addEventListener('gsm:open-global-chat-history', dispatchSpy);
+
+    try {
+      render(<SearchBar />);
+      fireEvent.click(screen.getByRole('button', { name: '问答历史' }));
+      expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('gsm:open-global-chat-history', dispatchSpy);
+    }
+  });
 });

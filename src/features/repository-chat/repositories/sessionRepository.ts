@@ -198,6 +198,28 @@ export const repositoryChatSessionRepository = {
     }
   },
 
+  async listRecentSessions(limit = 50): Promise<RepositoryChatSession[]> {
+    const count = Math.max(1, Math.floor(limit));
+    const fallback = () => readFallback().sessions
+      .filter((session) => !session.deletedAt)
+      .sort(byUpdatedAtDescending)
+      .slice(0, count);
+    if (useFallbackStorage || !canUseIndexedDb()) {
+      enableFallbackStorage();
+      return fallback();
+    }
+    try {
+      return await withTimeout(runTransaction('sessions', 'readonly', async (stores) => {
+        const records = await requestValue(stores.sessions.getAll()) as RepositoryChatSession[];
+        return records.filter((session) => !session.deletedAt).sort(byUpdatedAtDescending).slice(0, count);
+      }));
+    } catch (error) {
+      console.warn('[repository-chat] recent session list fell back to localStorage', error);
+      if (!await transitionToFallbackStorage()) throw error;
+      return fallback();
+    }
+  },
+
   async getSession(sessionId: string): Promise<RepositoryChatSession | null> {
     const fallback = () => readFallback().sessions.find((session) => session.id === sessionId) ?? null;
     if (useFallbackStorage || !canUseIndexedDb()) {
