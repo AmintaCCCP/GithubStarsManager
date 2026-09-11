@@ -233,7 +233,7 @@ export const CodeSearchView: React.FC = () => {
         const translate = tRef.current;
         setError(
           isGrepRateLimitError(err)
-            ? translate('触发 grep.app 限流（429），请稍后重试', 'grep.app rate limited (429), please retry later')
+            ? translate('触发代码搜索限流（429），请稍后重试', 'Code search rate limited (429), please retry later')
             : err instanceof Error
               ? err.message
               : translate('搜索失败，请重试', 'Search failed, please retry')
@@ -426,7 +426,7 @@ export const CodeSearchView: React.FC = () => {
       {loading && !result && (
         <div className="flex flex-col items-center justify-center gap-3 py-14">
           <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t('正在搜索 grep.app…', 'Searching grep.app…')}</p>
+          <p className="text-sm text-muted-foreground">{t('正在搜索代码…', 'Searching code…')}</p>
         </div>
       )}
       {error && (
@@ -441,11 +441,11 @@ export const CodeSearchView: React.FC = () => {
       {!loading && !error && !result && (
         <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
           <Search className="h-8 w-8 text-muted-foreground/50" />
-          <p className="font-medium text-muted-foreground">{t('高级搜索', 'Code Search')}</p>
+          <p className="font-medium text-muted-foreground">{t('代码搜索', 'Code Search')}</p>
           <p className="max-w-sm text-sm text-muted-foreground">
             {t(
-              '基于 grep.app 的公开仓库代码检索，支持模糊 / 全词 / 正则与仓库·路径·语言过滤。',
-              'Public code search via grep.app with fuzzy / whole-word / regexp and repo·path·language facets.'
+              '公开仓库代码全文检索，支持模糊 / 全词 / 正则与仓库·路径·语言过滤。',
+              'Full-text code search across public repos with fuzzy / whole-word / regexp and repo·path·language facets.'
             )}
           </p>
         </div>

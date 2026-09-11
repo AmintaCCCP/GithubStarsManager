@@ -60,10 +60,19 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
             '【Features】\n• Custom keyword search\n• Sort options: Best match, Most stars, Most forks\n• Language and platform filters\n\n【Best for】\nPrecise search for specific projects or tech stack related repos.'
           ),
         };
+      case 'weekly':
+        return {
+          title: t('阮一峰周刊', 'Ruanyifeng Weekly'),
+          highlight: t('📰 科技爱好者周刊开源投稿精选', '📰 Open-source picks from the weekly'),
+          description: t(
+            '【特点】\n• 来源：ruanyf/weekly 的开源投稿 issue\n• 自动提取正文中的仓库链接\n• 排序方式：按投稿时间倒序\n• 可过滤已被周刊收录的条目\n\n【适合场景】\n浏览经人工筛选视角推荐的开源项目，发现周刊读者关注的优质仓库。',
+            '【Features】\n• Source: open-source submission issues of ruanyf/weekly\n• Repo links extracted from issue bodies\n• Sort by: submission time descending\n• Filter by weekly-collected items\n\n【Best for】\nBrowsing open-source projects recommended through the weekly editorial lens.'
+          ),
+        };
       case 'code-search':
         return {
-          title: t('高级搜索', 'Code Search'),
-          highlight: t('🔍 grep.app 代码全文检索', '🔍 Full-text code search via grep.app'),
+          title: t('代码搜索', 'Code Search'),
+          highlight: t('🔍 公开仓库代码全文检索', '🔍 Full-text code search across public repos'),
           description: t(
             '【特点】\n• 模糊 / 全词 / 正则三种匹配，可叠加区分大小写\n• 仓库 / 路径 / 语言过滤器动态筛选\n• 支持只看我收藏的仓库\n\n【适合场景】\n在公开仓库代码中定位用法、配置与示例。',
             '【Features】\n• Fuzzy / whole-word / regexp modes, optional case sensitivity\n• Dynamic repo / path / language facets\n• Optional starred-only filter\n\n【Best for】\nFinding usages, configs and examples across public code.'

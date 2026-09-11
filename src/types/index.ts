@@ -543,6 +543,10 @@ export interface AppState {
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
   trendingTimeRange: TrendingTimeRange;
+  /** 周刊频道过滤器：仅显示已被周刊收录（issue labels 含 'weekly'）的条目 */
+  weeklyOnlyCollected: boolean;
+  /** 周刊频道同步进度（会话级，不持久化） */
+  weeklySyncStatus: WeeklySyncStatus | null;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
@@ -609,9 +613,25 @@ export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
 
 export type SortOrder = 'Descending' | 'Ascending';
 
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'search' | 'code-search';
+export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'weekly' | 'search' | 'code-search';
 
-export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'search';
+export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'weekly' | 'search';
+
+/** 阮一峰周刊频道：来源 issue 的引用信息（周刊收录 = labels 含 'weekly'） */
+export interface WeeklyIssueRef {
+  number: number;
+  title: string;
+  html_url: string;
+  labels: string[];
+  createdAt: string;
+}
+
+/** 周刊频道同步/详情补全进度 */
+export interface WeeklySyncStatus {
+  phase: 'syncing' | 'enriching';
+  current: number;
+  total: number;
+}
 
 export interface DiscoveryChannel {
   id: DiscoveryChannelId;
@@ -633,6 +653,8 @@ export interface DiscoveryRepo extends Repository {
   rank: number;
   channel: DiscoveryChannelId;
   platform: DiscoveryPlatform;
+  /** 仅 weekly 频道：该仓库对应的周刊投稿 issue */
+  weeklyIssue?: WeeklyIssueRef;
 }
 
 export type TrendingTimeRange = 'daily' | 'weekly' | 'monthly';

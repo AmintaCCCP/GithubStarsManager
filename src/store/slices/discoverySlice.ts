@@ -21,6 +21,8 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'setDiscoveryTotalCount'
   | 'setDiscoveryScrollPosition'
   | 'setTrendingTimeRange'
+  | 'setWeeklyOnlyCollected'
+  | 'setWeeklySyncStatus'
   | 'appendDiscoveryRepos'
 >> = (set) => ({
     // Discovery actions
@@ -100,6 +102,8 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
       discoveryTotalCount: { ...state.discoveryTotalCount, [channel]: count },
     })),
     setTrendingTimeRange: (range) => set({ trendingTimeRange: range }),
+    setWeeklyOnlyCollected: (only) => set({ weeklyOnlyCollected: only }),
+    setWeeklySyncStatus: (status) => set({ weeklySyncStatus: status }),
   setDiscoveryScrollPosition: (channel, position) => set((state) => ({
       discoveryScrollPositions: { ...state.discoveryScrollPositions, [channel]: position },
     })),

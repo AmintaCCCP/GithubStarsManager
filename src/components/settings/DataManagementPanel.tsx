@@ -1,6 +1,7 @@
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
+import { weeklyIssuesStorage } from '../../services/weeklyIssuesStorage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -482,11 +483,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteDiscoveryData = useCallback(async () => {
     try {
+      // 周刊频道数据在独立 IndexedDB（issues/repos/正文缓存），一并清空
+      await weeklyIssuesStorage.clearAll();
       const emptyDiscoveryRepos = {
         'trending': [],
         'hot-release': [],
         'most-popular': [],
         'topic': [],
+        'weekly': [],
         'search': [],
         'code-search': []
       } as Record<string, DiscoveryRepo[]>;
@@ -497,6 +501,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'hot-release': null,
           'most-popular': null,
           'topic': null,
+          'weekly': null,
           'search': null,
           'code-search': null
         }

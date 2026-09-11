@@ -158,4 +158,7 @@ export const selectDiscoveryViewState = (state: AppStoreState) => ({
   appendDiscoveryRepos: state.appendDiscoveryRepos,
   trendingTimeRange: state.trendingTimeRange,
   setTrendingTimeRange: state.setTrendingTimeRange,
+  weeklyOnlyCollected: state.weeklyOnlyCollected,
+  weeklySyncStatus: state.weeklySyncStatus,
+  setWeeklyOnlyCollected: state.setWeeklyOnlyCollected,
 });

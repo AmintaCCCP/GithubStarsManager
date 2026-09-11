@@ -109,6 +109,7 @@ export type PersistedAppState = Partial<
     | 'discoverySortBy'
     | 'discoverySortOrder'
     | 'discoverySelectedTopic'
+    | 'weeklyOnlyCollected'
     | 'proxyConfig'
     | 'rpcDownloadConfig'
     | 'routeMode'
@@ -480,19 +481,27 @@ export const defaultDiscoveryChannels: DiscoveryChannel[] = [
     enabled: true,
   },
   {
+    id: 'weekly',
+    name: '阮一峰周刊',
+    nameEn: 'Ruanyifeng Weekly',
+    icon: 'weekly',
+    description: '阮一峰科技爱好者周刊的开源项目投稿精选',
+    enabled: true,
+  },
+  {
     id: 'search',
-    name: '简单搜索',
-    nameEn: 'Simple Search',
+    name: '仓库搜索',
+    nameEn: 'Repo Search',
     icon: 'search',
     description: '自定义搜索发现新项目',
     enabled: true,
   },
   {
     id: 'code-search',
-    name: '高级搜索',
+    name: '代码搜索',
     nameEn: 'Code Search',
     icon: 'search',
-    description: 'grep.app 代码全文检索，支持正则与仓库/路径/语言过滤',
+    description: '公开仓库代码全文检索，支持正则与仓库/路径/语言过滤',
     enabled: true,
   },
 ];

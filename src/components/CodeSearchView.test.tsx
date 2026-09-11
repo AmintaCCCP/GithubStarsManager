@@ -78,7 +78,7 @@ describe('CodeSearchView', () => {
 
   it('renders the idle empty state without fetching', () => {
     render(<CodeSearchView />);
-    expect(screen.getByText('高级搜索')).toBeInTheDocument();
+    expect(screen.getByText('代码搜索')).toBeInTheDocument();
     expect(mockedSearch).not.toHaveBeenCalled();
   });
 

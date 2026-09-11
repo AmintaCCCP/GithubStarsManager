@@ -4,6 +4,7 @@ import type { DiscoveryChannelId, DiscoveryRepo, PaginatedDiscoveryRepositories 
 import { useAppStore } from '../../../store/useAppStore';
 import { selectDiscoveryViewState } from '../../../store/selectors';
 import { GitHubApiService } from '../../../services/githubApi';
+import { syncWeeklyChannel } from '../../../services/weeklyIssuesService';
 import { AIService } from '../../../services/aiService';
 import { AIAnalysisOptimizer } from '../../../services/aiAnalysisOptimizer';
 import { discoveryAnalysisStorage } from '../../../services/discoveryAnalysisStorage';
@@ -18,6 +19,8 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
     case 'trending': return JSON.stringify([...common, state.trendingTimeRange]);
     case 'topic': return JSON.stringify([...common, state.discoverySelectedTopic]);
     case 'search': return JSON.stringify([...common, state.discoverySearchQuery, state.discoveryLanguage, state.discoverySortBy, state.discoverySortOrder]);
+    // 周刊过滤为客户端行为，但签名纳入 weeklyOnlyCollected 以便切换过滤器时重跑入口重建切片
+    case 'weekly': return JSON.stringify([...common, state.weeklyOnlyCollected]);
     default: return JSON.stringify(common);
   }
 };
@@ -96,6 +99,14 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
           result = currentState.discoverySearchQuery.trim()
             ? await api.searchRepositories(currentState.discoverySearchQuery, currentState.discoveryPlatform, currentState.discoveryLanguage, currentState.discoverySortBy, currentState.discoverySortOrder, page)
             : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+          break;
+        case 'weekly':
+          result = await syncWeeklyChannel(
+            api,
+            page,
+            currentState.weeklyOnlyCollected,
+            (status) => { useAppStore.getState().setWeeklySyncStatus(status); },
+          );
           break;
         default:
           result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };

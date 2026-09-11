@@ -30,6 +30,7 @@ import type {
   SortBy,
   SortOrder,
   TrendingTimeRange,
+  WeeklySyncStatus,
   TopicCategory,
   CustomReleaseRepository,
   ReleaseSourceId,
@@ -245,6 +246,8 @@ export interface AppActions {
   setDiscoveryTotalCount: (channel: DiscoveryChannelId, count: number) => void;
   setDiscoveryScrollPosition: (channel: DiscoveryChannelId, position: number) => void;
   setTrendingTimeRange: (range: TrendingTimeRange) => void;
+  setWeeklyOnlyCollected: (only: boolean) => void;
+  setWeeklySyncStatus: (status: WeeklySyncStatus | null) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 }
 

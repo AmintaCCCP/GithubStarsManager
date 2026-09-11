@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search } from 'lucide-react';
+import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search, Newspaper } from 'lucide-react';
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 import { Button } from './ui/button';
 
@@ -8,6 +8,7 @@ const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ComponentType<
   rocket: Rocket,
   star: Crown,
   tag: Tag,
+  weekly: Newspaper,
   search: Search,
 };
 

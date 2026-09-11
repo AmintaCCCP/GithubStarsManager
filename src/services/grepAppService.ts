@@ -167,12 +167,12 @@ export async function searchGrepApp(
       signal: controller.signal,
     });
     if (response.status === 429) {
-      const error = new Error('grep.app rate limited (429), please retry later');
+      const error = new Error('Code search rate limited (429), please retry later');
       (error as { status?: number }).status = 429;
       throw error;
     }
     if (!response.ok) {
-      const error = new Error(`grep.app request failed: ${response.status}`);
+      const error = new Error(`Code search request failed: ${response.status}`);
       (error as { status?: number }).status = response.status;
       throw error;
     }
