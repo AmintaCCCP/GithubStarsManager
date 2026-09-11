@@ -39,7 +39,25 @@ export interface WeeklyStoredRepo {
 
 export interface WeeklySyncMeta {
   lastSyncedAt: string | null;
+  /** 深度分页游标：全量（无 since）updated 倒序遍历已消费到的下一页（1 起） */
+  deepNextPage: number;
+  /** 全量历史是否已取尽（深度遍历遇到不足一页/空页） */
+  historyComplete: boolean;
 }
+
+const DEFAULT_META: WeeklySyncMeta = {
+  lastSyncedAt: null,
+  deepNextPage: 1,
+  historyComplete: false,
+};
+
+const normalizeMeta = (meta: WeeklySyncMeta | null | undefined): WeeklySyncMeta => ({
+  lastSyncedAt: meta?.lastSyncedAt ?? null,
+  deepNextPage: typeof meta?.deepNextPage === 'number' && Number.isFinite(meta.deepNextPage) && meta.deepNextPage >= 1
+    ? Math.floor(meta.deepNextPage)
+    : 1,
+  historyComplete: meta?.historyComplete === true,
+});
 
 const DB_NAME = 'github-stars-weekly';
 const DB_VERSION = 1;
@@ -259,13 +277,13 @@ export const weeklyIssuesStorage = {
   },
 
   async getSyncMeta(): Promise<WeeklySyncMeta> {
-    if (!canUseIndexedDB()) return { lastSyncedAt: null };
+    if (!canUseIndexedDB()) return { ...DEFAULT_META };
     try {
       const meta = await withTimeout(runGetTx<WeeklySyncMeta>(META_STORE, 5000, 'sync'), 6000);
-      return meta ?? { lastSyncedAt: null };
+      return normalizeMeta(meta);
     } catch (e) {
       console.warn('[weeklyIssuesStorage] getSyncMeta failed:', e);
-      return { lastSyncedAt: null };
+      return { ...DEFAULT_META };
     }
   },
 

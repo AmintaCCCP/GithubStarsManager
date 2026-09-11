@@ -1004,7 +1004,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         {t('阮一峰周刊', 'Ruanyifeng Weekly')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('同步科技爱好者周刊的开源项目投稿，首次同步需要几分钟', 'Sync open-source submissions from the weekly. First sync may take a few minutes')}
+                        {t('同步科技爱好者周刊的开源项目投稿，加载更多时自动获取更早的投稿', 'Sync open-source submissions from the weekly. Earlier submissions are fetched as you load more')}
                       </p>
                     </div>
                     <Button

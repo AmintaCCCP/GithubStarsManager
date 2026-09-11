@@ -3,7 +3,8 @@ import type { GitHubApiService, GitHubIssueListRead, GitHubRepoDetailRead } from
 import {
   extractRepoFullNames,
   processWeeklyIssue,
-  selectReposToEnrich,
+  pendingReposFromKeys,
+  refreshMaintenanceRepos,
   buildWeeklyDiscoveryRepos,
   syncWeeklyChannel,
   fetchWeeklyIssueBody,
@@ -11,20 +12,24 @@ import {
 } from './weeklyIssuesService';
 import type { WeeklyStoredIssue, WeeklyStoredRepo } from './weeklyIssuesStorage';
 
-// 内存版存储替身（jsdom 无 IndexedDB）：验证 syncWeeklyChannel 的分页/缓存复用语义
+// 内存版存储替身（jsdom 无 IndexedDB）：验证 syncWeeklyChannel 的分页/游标/缓存语义
 const storage = vi.hoisted(() => {
   const issuesStore = new Map<number, unknown>();
   const reposStore = new Map<string, unknown>();
-  let lastSyncedAt: string | null = null;
+  const metaRef = {
+    current: { lastSyncedAt: null as string | null, deepNextPage: 1, historyComplete: false },
+  };
   return {
     issuesStore,
     reposStore,
-    get lastSyncedAt() { return lastSyncedAt; },
-    setLastSyncedAt(v: string | null) { lastSyncedAt = v; },
+    metaRef,
+    setLastSyncedAt(v: string | null) {
+      metaRef.current = { ...metaRef.current, lastSyncedAt: v };
+    },
     reset() {
       issuesStore.clear();
       reposStore.clear();
-      lastSyncedAt = null;
+      metaRef.current = { lastSyncedAt: null, deepNextPage: 1, historyComplete: false };
     },
   };
 });
@@ -40,9 +45,9 @@ vi.mock('./weeklyIssuesStorage', () => ({
       for (const repo of repos) storage.reposStore.set(repo.fullName.toLowerCase(), repo);
     },
     getAllRepos: async () => new Map(storage.reposStore) as Map<string, never>,
-    getSyncMeta: async () => ({ lastSyncedAt: storage.lastSyncedAt }),
-    saveSyncMeta: async (meta: { lastSyncedAt: string | null }) => {
-      storage.setLastSyncedAt(meta.lastSyncedAt);
+    getSyncMeta: async () => ({ ...storage.metaRef.current }),
+    saveSyncMeta: async (m: { lastSyncedAt: string | null; deepNextPage: number; historyComplete: boolean }) => {
+      storage.metaRef.current = { ...m };
     },
     clearAll: async () => storage.reset(),
   },
@@ -169,7 +174,7 @@ describe('processWeeklyIssue', () => {
   });
 });
 
-describe('selectReposToEnrich', () => {
+describe('enrichment target selection', () => {
   const repo = (overrides: Partial<WeeklyStoredRepo>): WeeklyStoredRepo => ({
     fullName: 'foo/bar',
     detail: null,
@@ -180,16 +185,17 @@ describe('selectReposToEnrich', () => {
     ...overrides,
   });
 
-  it('only enqueues never-fetched repos', () => {
+  it('pendingReposFromKeys only returns never-fetched repos from the given keys', () => {
     const repos = new Map<string, WeeklyStoredRepo>([
-      ['a/a', repo({ fullName: 'a/a', lastFetchedAt: '2026-06-01T00:00:00Z', detail: makeDetail('a/a') })],
-      ['b/b', repo({ fullName: 'b/b' })],
+      ['a/a', repo({ fullName: 'a/a' })],
+      ['b/b', repo({ fullName: 'b/b', lastFetchedAt: '2026-06-01T00:00:00Z', detail: makeDetail('b/b') })],
+      ['c/c', repo({ fullName: 'c/c' })],
     ]);
-    const result = selectReposToEnrich(repos, Date.parse('2026-07-01T00:00:00Z'));
-    expect(result.map(r => r.fullName)).toEqual(['b/b']);
+    const result = pendingReposFromKeys(repos, new Set(['a/a', 'b/b', 'd/d']));
+    expect(result.map(r => r.fullName)).toEqual(['a/a']);
   });
 
-  it('caps stale refreshes and retries unavailable repos only after TTL', () => {
+  it('maintenance caps stale snapshots and TTL-gated unavailable retries, excludes changed pendings', () => {
     const now = Date.parse('2026-07-01T00:00:00Z');
     const repos = new Map<string, WeeklyStoredRepo>([
       ['stale/stale', repo({
@@ -203,9 +209,14 @@ describe('selectReposToEnrich', () => {
         lastFetchedAt: '2026-06-28T00:00:00Z', // 3 天前，未到 7 天重试期
         detail: null,
       })],
+      ['new/new', repo({ fullName: 'new/new' })],
     ]);
-    const result = selectReposToEnrich(repos, now);
+    const changedKeys = new Set(['new/new']);
+    const result = refreshMaintenanceRepos(repos, changedKeys, now);
     expect(result.map(r => r.fullName)).toEqual(['stale/stale']);
+    // 不在 changed 集合内的游离 pending 会被维护队列兜底收录
+    const resultWithoutChanged = refreshMaintenanceRepos(repos, new Set<string>(), now);
+    expect(resultWithoutChanged.map(r => r.fullName)).toContain('new/new');
   });
 });
 
@@ -244,14 +255,13 @@ describe('buildWeeklyDiscoveryRepos', () => {
   });
 });
 
-describe('syncWeeklyChannel', () => {
-  const makeApi = (pages: GitHubIssueListRead[][], overrides: Partial<Record<string, unknown>> = {}) => {
-    let page = 0;
+describe('syncWeeklyChannel on-demand paging', () => {
+  /** 构造按页返回的 mock API；issues 数组的每页条目 number 连续。 */
+  const makeApi = (pages: GitHubIssueListRead[][]) => {
     return {
-      listRepositoryIssues: vi.fn(async () => {
-        const items = pages[page] ?? [];
-        page++;
-        return items;
+      listRepositoryIssues: vi.fn(async (_owner: string, _repo: string, opts?: { page?: number; since?: string }) => {
+        const idx = (opts?.page ?? 1) - 1;
+        return pages[idx] ?? [];
       }),
       graphqlFetchRepositories: vi.fn(async (fullNames: string[]) => {
         const map = new Map<string, GitHubRepoDetailRead | null>();
@@ -259,66 +269,106 @@ describe('syncWeeklyChannel', () => {
         return map;
       }),
       getRepositoryDetails: vi.fn(async (owner: string, name: string) => makeDetail(`${owner}/${name}`)),
-      ...overrides,
-    } as unknown as GitHubApiService;
+    } as unknown as GitHubApiService & { listRepositoryIssues: ReturnType<typeof vi.fn>; graphqlFetchRepositories: ReturnType<typeof vi.fn>; getRepositoryDetails: ReturnType<typeof vi.fn> };
   };
+
+  /** 生成一页 100 条 issue，仓库 full_name 由 nameOf(i) 决定。 */
+  const issuePage = (startNumber: number, nameOf: (i: number) => string, count = 100, labelOf?: (i: number) => string[]) =>
+    Array.from({ length: count }, (_, i) => makeIssue({
+      number: startNumber + i,
+      body: `https://github.com/${nameOf(i)}`,
+      created_at: new Date(Date.parse('2026-01-01T00:00:00Z') + (startNumber + i) * 60_000).toISOString(),
+      updated_at: new Date(Date.parse('2026-01-01T00:00:00Z') + (startNumber + i) * 60_000).toISOString(),
+      labels: labelOf?.(i) ?? [],
+    }));
 
   beforeEach(() => {
     storage.reset();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  it('syncs issues, enriches repos and returns the first page', async () => {
-    const api = makeApi([
-      [
-        makeIssue({ number: 1, isPullRequest: true }),
-        makeIssue({ number: 2, title: '【文章推荐】blog', body: 'https://github.com/skip/me' }),
-        makeIssue({ number: 3, body: 'https://github.com/alpha/one', created_at: '2026-03-01T00:00:00Z' }),
-        makeIssue({ number: 4, body: 'https://github.com/beta/two', created_at: '2026-02-01T00:00:00Z' }),
-      ],
-      [], // 第二页为空 → 遍历结束
-    ]);
-
+  it('first run fetches exactly one full issue page and marks the cursor', async () => {
+    const api = makeApi([issuePage(1, (i) => `org${i}/repo${i}`), issuePage(101, () => 'x/y')]);
     const result = await syncWeeklyChannel(api, 1, false, () => {});
-    // 首页 4 条 < per_page(100)，单次调用即结束遍历
     expect(api.listRepositoryIssues).toHaveBeenCalledTimes(1);
-    expect(result.repos.map(r => r.full_name)).toEqual(['alpha/one', 'beta/two']);
-    expect(result.hasMore).toBe(false);
-    expect(result.totalCount).toBe(2);
-    expect(result.repos[0].stargazers_count).toBe(10);
-    expect(result.repos[0].weeklyIssue?.number).toBe(3);
+    expect(result.repos).toHaveLength(50);
+    expect(result.hasMore).toBe(true);
+    expect(storage.metaRef.current.deepNextPage).toBe(2);
+    expect(storage.metaRef.current.historyComplete).toBe(false);
   });
 
-  it('falls back to REST enrichment when GraphQL fails', async () => {
-    const api = makeApi(
-      [[makeIssue({ number: 5, body: 'https://github.com/gamma/three' })], []],
-      {
-        graphqlFetchRepositories: vi.fn(async () => {
-          throw new Error('GraphQL batch failed: unsupported');
-        }),
-      },
-    );
+  it('marks history complete when the first page is short', async () => {
+    const api = makeApi([issuePage(1, (i) => `org${i}/repo${i}`, 4)]);
     const result = await syncWeeklyChannel(api, 1, false, () => {});
-    expect(api.getRepositoryDetails).toHaveBeenCalledWith('gamma', 'three', expect.anything());
-    expect(result.repos.map(r => r.full_name)).toEqual(['gamma/three']);
+    expect(api.listRepositoryIssues).toHaveBeenCalledTimes(1);
+    expect(result.hasMore).toBe(false);
+    expect(storage.metaRef.current.historyComplete).toBe(true);
   });
 
-  it('page > 1 loads purely from cache without touching the network', async () => {
-    const issues = Array.from({ length: 120 }, (_, i) => makeIssue({
-      number: i + 1,
-      body: `https://github.com/org${i}/repo${i}`,
-      created_at: new Date(Date.parse('2026-01-01T00:00:00Z') + i * 60_000).toISOString(),
-    }));
-    const api = makeApi([issues, []]);
-    await syncWeeklyChannel(api, 1, false, () => {});
-    const listSpy = api.listRepositoryIssues as ReturnType<typeof vi.fn>;
-    listSpy.mockClear();
+  it('fetches deeper pages only when the requested UI page exceeds cached cards', async () => {
+    // P1: 100 个新仓库；P2: 50 新 + 50 重复引用 P1 仓库；P3: 100 新；P4: 空
+    const p1 = issuePage(1, (i) => `org${i}/repo${i}`);
+    const p2 = issuePage(101, (i) => (i < 50 ? `zed${i}/repo${i}` : `org${i - 50}/repo${i - 50}`));
+    const p3 = issuePage(201, (i) => `gamma${i}/repo${i}`);
+    const api = makeApi([p1, p2, p3, []]);
 
-    const page2 = await syncWeeklyChannel(api, 2, false, () => {});
-    expect(listSpy).not.toHaveBeenCalled();
-    expect(page2.repos).toHaveLength(50);
-    expect(page2.hasMore).toBe(true);
-    expect(page2.repos[0].full_name).toBe('org69/repo69');
+    await syncWeeklyChannel(api, 1, false, () => {});
+    expect(api.listRepositoryIssues).toHaveBeenCalledTimes(1);
+    expect(storage.metaRef.current.deepNextPage).toBe(2);
+
+    // 页 2（需要 100 张卡片，缓存恰好 100）→ 纯缓存切片
+    const spy = api.listRepositoryIssues as ReturnType<typeof vi.fn>;
+    spy.mockClear();
+    await syncWeeklyChannel(api, 2, false, () => {});
+    expect(spy).not.toHaveBeenCalled();
+
+    // 页 3（需要 150 > 100）→ 深度遍历：重叠重读 P1（跳过）+ P2（+50）
+    await syncWeeklyChannel(api, 3, false, () => {});
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(storage.metaRef.current.deepNextPage).toBe(3);
+
+    // 页 4（需要 200 > 150）→ 从游标 3-1=2 继续：P2（跳过）+ P3（+100）
+    spy.mockClear();
+    await syncWeeklyChannel(api, 4, false, () => {});
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(storage.metaRef.current.deepNextPage).toBe(4);
+  });
+
+  it('stops at history end and reports hasMore=false', async () => {
+    const p1 = issuePage(1, (i) => `org${i}/repo${i}`);
+    const api = makeApi([p1, []]);
+    // 先取到第 5 页触发深度遍历直到空页
+    await syncWeeklyChannel(api, 1, false, () => {});
+    const result = await syncWeeklyChannel(api, 5, false, () => {});
+    expect(result.hasMore).toBe(false);
+    expect(storage.metaRef.current.historyComplete).toBe(true);
+  });
+
+  it('refresh walk passes since and does not advance the deep cursor', async () => {
+    const api = makeApi([issuePage(1, (i) => `org${i}/repo${i}`), issuePage(101, (i) => `late${i}/repo${i}`, 3)]);
+    // 预置旧同步水位（不在 60 秒窗口内）
+    storage.setLastSyncedAt('2026-06-01T00:00:00Z');
+
+    await syncWeeklyChannel(api, 1, false, () => {});
+    expect(api.listRepositoryIssues).toHaveBeenCalledTimes(2); // P1 满 100 继续，P2 仅 3 条停止
+    const firstCallOpts = (api.listRepositoryIssues as ReturnType<typeof vi.fn>).mock.calls[0][2];
+    expect(firstCallOpts.since).toBe('2026-05-25T00:00:00.000Z'); // 上次同步 - 7 天
+    // since 遍历不推进深度游标、不标记取尽
+    expect(storage.metaRef.current.deepNextPage).toBe(1);
+    expect(storage.metaRef.current.historyComplete).toBe(false);
+  });
+
+  it('deep-walks to fill a filtered page when onlyCollected is on', async () => {
+    // P1: 100 条中仅 10 条带 weekly label；P2: 100 条中 45 条带 label
+    const p1 = issuePage(1, (i) => `org${i}/repo${i}`, 100, (i) => (i < 10 ? ['weekly'] : []));
+    const p2 = issuePage(101, (i) => `zed${i}/repo${i}`, 100, (i) => (i < 45 ? ['weekly'] : []));
+    const api = makeApi([p1, p2, []]);
+
+    const result = await syncWeeklyChannel(api, 1, true, () => {});
+    // 刷新遍历 1 页 + 深度遍历补足过滤后的 50 张卡片（重叠重读 P1 + P2）
+    expect(api.listRepositoryIssues).toHaveBeenCalledTimes(3);
+    expect(result.repos).toHaveLength(50);
+    expect(result.repos.every(r => r.weeklyIssue?.labels.some(l => l.toLowerCase() === 'weekly'))).toBe(true);
   });
 });
 

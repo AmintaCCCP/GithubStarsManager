@@ -1,14 +1,24 @@
 /**
- * 阮一峰周刊频道数据服务。
+ * 阮一峰周刊频道数据服务（按需分页抓取）。
  *
- * 数据管道：分页拉取 ruanyf/weekly 的 issues（增量走 `sort=updated&since=上次同步-7天`，
- * label 变更会 bump updated_at，因此"发布几天后才补加 weekly label"的场景天然被覆盖）
- * → 标题含"开源"过滤 → 正文提取 GitHub 仓库链接 → 按 full_name 去重（原贴取最新投稿）
- * → 仓库详情补全（GraphQL 批量优先，REST 逐仓回退）→ 独立 IndexedDB 持久化
- * → 客户端按投稿时间倒序 + "周刊收录"过滤 + 分页切片。
+ * 数据管道：分页拉取 ruanyf/weekly 的 issues → 标题含"开源"过滤 → 正文提取
+ * GitHub 仓库链接 → 按 full_name 去重（原贴取最新投稿）→ 仓库详情补全
+ * （GraphQL 批量优先，REST 逐仓回退）→ 独立 IndexedDB 持久化 → 客户端按
+ * 投稿时间倒序 + "周刊收录"过滤 + 分页切片。
  *
- * 不用 search/issues API 的原因：结果有 1000 条硬上限且独立限速 30 次/分，
- * 装不下仓库上万条 issue；list 端点走核心 API（5000 次/小时）。
+ * 分页语义（不一次性取全量）：
+ * - 刷新遍历（page 1 / 手动刷新）：`state=all&sort=updated&since=上次同步-7天`，
+ *   label 变更会 bump updated_at，单遍即覆盖"新投稿 + 编辑 + 发布几天后才补加
+ *   的收录 label"；服务端已按窗口过滤，走到底（不足一页/空页）即窗口覆盖完。
+ *   首次运行（无同步水位）不带 since、只取 1 页，秒级出数据。
+ * - 深度遍历（缓存卡片不够当前分页时）：不带 since，从持久化游标
+ *   deepNextPage-1（1 页重叠防删除位移）继续，每页落盘并推进游标，凑够目标
+ *   卡片数或遇到不足一页/空页（→ historyComplete，历史取尽）或单次页数上限。
+ * - 重复扫描由 updatedAt 快速跳过；每页增量落盘，中途取消不丢已处理条目。
+ *
+ * 不用 search/issues API 的原因：结果有 1000 条硬上限且独立限速 30 次/分；
+ * list 端点走核心 API（5000 次/小时）。详情补全用 GraphQL alias 批量
+ * （100 仓库/请求），失败自动回退 REST 逐仓。
  */
 
 import type {
@@ -24,6 +34,7 @@ import {
   weeklyIssuesStorage,
   type WeeklyStoredIssue,
   type WeeklyStoredRepo,
+  type WeeklySyncMeta,
 } from './weeklyIssuesStorage';
 
 export const WEEKLY_REPO_OWNER = 'ruanyf';
@@ -49,9 +60,13 @@ const LABEL_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 const REPO_DETAIL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** 不可用仓库（404/私有）的重试周期 */
 const UNAVAILABLE_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
-/** 每轮同步最多刷新的过期仓库数（控制 API 预算） */
-const STALE_REPO_REFRESH_CAP = 150;
-/** 60 秒内同步过则跳过网络同步（过滤器切换等签名变化触发的重刷走缓存） */
+/** 每轮刷新遍历做详情维护（过期快照/不可用重试）的仓库上限 */
+const MAINTENANCE_CAP = 30;
+/** 深度遍历单次（一次"加载更多"）最多拉取的 issue 页数 */
+const DEEP_WALK_MAX_PAGES = 10;
+/** 刷新遍历单次最多页数（since 窗口异常扩大时的保险丝） */
+const REFRESH_WALK_MAX_PAGES = 20;
+/** 60 秒内同步过则跳过刷新遍历（过滤器切换等签名变化触发的重刷走缓存） */
 const RECENT_SYNC_SKIP_MS = 60 * 1000;
 const ISSUE_LIST_THROTTLE_MS = 100;
 const REST_ENRICH_THROTTLE_MS = 80;
@@ -157,26 +172,48 @@ export function processWeeklyIssue(
   return true;
 }
 
-/** 挑选本轮需要补全详情的仓库：新仓库优先，其后是过期快照与到期重试的不可用仓库。 */
-export function selectReposToEnrich(repos: Map<string, WeeklyStoredRepo>, nowMs: number): WeeklyStoredRepo[] {
+const bySubmissionDesc = (a: WeeklyStoredRepo, b: WeeklyStoredRepo) =>
+  b.issueCreatedAt.localeCompare(a.issueCreatedAt);
+
+/** 本轮遍历新触达、且尚未补全详情的仓库（不设上限，遍历自身的新增必须补全）。 */
+export function pendingReposFromKeys(
+  repos: Map<string, WeeklyStoredRepo>,
+  keys: Set<string>,
+): WeeklyStoredRepo[] {
   const pending: WeeklyStoredRepo[] = [];
+  for (const key of keys) {
+    const repo = repos.get(key);
+    if (repo && !repo.lastFetchedAt) pending.push(repo);
+  }
+  return pending.sort(bySubmissionDesc);
+}
+
+/**
+ * 刷新遍历附带的详情维护（各自限额，控制单次 API 预算）：
+ * 30 天未刷新的过期快照、到期重试的不可用仓库，以及游离的未补全仓库
+ * （此前同步被中止遗留、不在本轮 changed 集合内的）。
+ */
+export function refreshMaintenanceRepos(
+  repos: Map<string, WeeklyStoredRepo>,
+  changedKeys: Set<string>,
+  nowMs: number,
+): WeeklyStoredRepo[] {
   const stale: WeeklyStoredRepo[] = [];
   const unavailableRetry: WeeklyStoredRepo[] = [];
+  const stragglers: WeeklyStoredRepo[] = [];
   for (const repo of repos.values()) {
     if (!repo.lastFetchedAt) {
-      pending.push(repo);
+      if (!changedKeys.has(repo.fullName.toLowerCase())) stragglers.push(repo);
     } else if (repo.detail) {
       if (nowMs - Date.parse(repo.lastFetchedAt) > REPO_DETAIL_TTL_MS) stale.push(repo);
     } else if (nowMs - Date.parse(repo.lastFetchedAt) > UNAVAILABLE_RETRY_MS) {
       unavailableRetry.push(repo);
     }
   }
-  const bySubmissionDesc = (a: WeeklyStoredRepo, b: WeeklyStoredRepo) => b.issueCreatedAt.localeCompare(a.issueCreatedAt);
-  pending.sort(bySubmissionDesc);
   return [
-    ...pending,
-    ...stale.sort(bySubmissionDesc).slice(0, STALE_REPO_REFRESH_CAP),
-    ...unavailableRetry.sort(bySubmissionDesc).slice(0, STALE_REPO_REFRESH_CAP),
+    ...stale.sort(bySubmissionDesc).slice(0, MAINTENANCE_CAP),
+    ...unavailableRetry.sort(bySubmissionDesc).slice(0, MAINTENANCE_CAP),
+    ...stragglers.sort(bySubmissionDesc).slice(0, MAINTENANCE_CAP),
   ];
 }
 
@@ -263,75 +300,97 @@ async function enrichRepos(
   }
 }
 
-/** 全量/增量同步：分页遍历 issues → 提取入库 → 详情补全 → 写同步时间戳。 */
-export async function syncWeeklyIssues(
-  api: GitHubApiService,
-  signal: AbortSignal | undefined,
-  onStatus: StatusCallback,
-): Promise<void> {
-  const meta = await weeklyIssuesStorage.getSyncMeta();
-  const since = meta.lastSyncedAt
-    ? new Date(Date.parse(meta.lastSyncedAt) - LABEL_GRACE_MS).toISOString()
-    : undefined;
-  const issues = await weeklyIssuesStorage.getAllIssues();
-  const repos = await weeklyIssuesStorage.getAllRepos();
-  const changedIssueNumbers = new Set<number>();
-  const changedRepoKeys = new Set<string>();
+/** 遍历共享的可变状态：issue/repo 内存映射、变更集合与增量落盘水位。 */
+interface WalkContext {
+  api: GitHubApiService;
+  signal: AbortSignal | undefined;
+  onStatus: StatusCallback;
+  issues: Map<number, WeeklyStoredIssue>;
+  repos: Map<string, WeeklyStoredRepo>;
+  changedIssueNumbers: Set<number>;
+  changedRepoKeys: Set<string>;
+  meta: WeeklySyncMeta;
+  savedIssues: number;
+  savedRepos: number;
+}
 
-  onStatus?.({ phase: 'syncing', current: 0, total: 0 });
-  let page = 1;
+interface WalkOptions {
+  /** 仅拉取 updated_at >= since 的 issue（刷新遍历）；深度遍历不传 */
+  since?: string;
+  startPage: number;
+  maxPages: number;
+  /** 是否推进深度分页游标（仅无 since 的全序遍历） */
+  advanceCursor: boolean;
+  /** 每页处理完后的停止条件（深度遍历：凑够目标卡片数即停） */
+  stopWhen?: () => boolean;
+}
+
+interface WalkResult {
+  pagesFetched: number;
+  scanned: number;
+  matched: number;
+  /** 历史取尽：仅无 since 的遍历在遇到不足一页/空页时为 true */
+  hitEnd: boolean;
+}
+
+/** 增量落盘本页新增（切片水位），并按需推进/持久化深度游标。 */
+async function flushWalkPage(ctx: WalkContext, page: number, advanceCursor: boolean): Promise<void> {
+  if (ctx.changedIssueNumbers.size > ctx.savedIssues) {
+    await weeklyIssuesStorage.saveIssues(
+      [...ctx.changedIssueNumbers].slice(ctx.savedIssues).map((number) => ctx.issues.get(number)!).filter(Boolean),
+    );
+    await weeklyIssuesStorage.saveRepos(
+      [...ctx.changedRepoKeys].slice(ctx.savedRepos).map((key) => ctx.repos.get(key)!).filter(Boolean),
+    );
+    ctx.savedIssues = ctx.changedIssueNumbers.size;
+    ctx.savedRepos = ctx.changedRepoKeys.size;
+  }
+  if (advanceCursor) {
+    ctx.meta.deepNextPage = page + 1;
+    await weeklyIssuesStorage.saveSyncMeta(ctx.meta);
+  }
+}
+
+/**
+ * 按 updated 倒序遍历 issue 页：逐页处理、落盘、推进游标。
+ * 停止条件：页数上限 / 不足一页或空页（无 since 时即历史取尽）。
+ */
+async function walkIssuePages(ctx: WalkContext, opts: WalkOptions): Promise<WalkResult> {
+  let page = opts.startPage;
   let scanned = 0;
   let matched = 0;
-  let savedIssues = 0;
-  let savedRepos = 0;
-  while (true) {
-    const items = await api.listRepositoryIssues(WEEKLY_REPO_OWNER, WEEKLY_REPO_NAME, {
+  let pagesFetched = 0;
+  let hitEnd = false;
+  while (pagesFetched < opts.maxPages) {
+    const items = await ctx.api.listRepositoryIssues(WEEKLY_REPO_OWNER, WEEKLY_REPO_NAME, {
       state: 'all',
       sort: 'updated',
       direction: 'desc',
-      since,
+      since: opts.since,
       perPage: ISSUE_PAGE_SIZE,
       page,
-      signal,
+      signal: ctx.signal,
     });
-    if (items.length === 0) break;
+    pagesFetched++;
+    if (items.length === 0) {
+      hitEnd = !opts.since;
+      break;
+    }
     for (const issue of items) {
-      if (processWeeklyIssue(issue, issues, repos, changedIssueNumbers, changedRepoKeys)) matched++;
+      if (processWeeklyIssue(issue, ctx.issues, ctx.repos, ctx.changedIssueNumbers, ctx.changedRepoKeys)) matched++;
     }
     scanned += items.length;
-    onStatus?.({ phase: 'syncing', current: scanned, total: 0 });
-    // 每页落盘一次（增量切片）：中途取消/断网时已处理条目不丢（重复扫描靠 updatedAt 快速跳过）
-    if (changedIssueNumbers.size > savedIssues) {
-      await weeklyIssuesStorage.saveIssues(
-        [...changedIssueNumbers].slice(savedIssues).map((number) => issues.get(number)!).filter(Boolean),
-      );
-      await weeklyIssuesStorage.saveRepos(
-        [...changedRepoKeys].slice(savedRepos).map((key) => repos.get(key)!).filter(Boolean),
-      );
-      savedIssues = changedIssueNumbers.size;
-      savedRepos = changedRepoKeys.size;
+    ctx.onStatus?.({ phase: 'syncing', current: scanned, total: 0 });
+    await flushWalkPage(ctx, page, opts.advanceCursor);
+    if (items.length < ISSUE_PAGE_SIZE) {
+      hitEnd = !opts.since;
+      break;
     }
-    if (items.length < ISSUE_PAGE_SIZE) break;
+    if (opts.stopWhen?.()) break;
     page++;
     await sleep(ISSUE_LIST_THROTTLE_MS);
   }
-  await weeklyIssuesStorage.saveIssues([...changedIssueNumbers].map((number) => issues.get(number)!).filter(Boolean));
-  await weeklyIssuesStorage.saveRepos([...changedRepoKeys].map((key) => repos.get(key)!).filter(Boolean));
-
-  logger.info('weeklyIssues', 'Issue scan finished', { scanned, matched, pages: page, since: since ?? 'full' });
-
-  const targets = selectReposToEnrich(repos, Date.now());
-  if (targets.length > 0) {
-    try {
-      await enrichRepos(api, targets, repos, changedRepoKeys, onStatus, signal);
-    } finally {
-      // 中途失败（限流/中止）也落盘已获取的批量详情，避免下次重复请求
-      await weeklyIssuesStorage.saveRepos([...changedRepoKeys].map((key) => repos.get(key)!).filter(Boolean));
-    }
-  }
-
-  await weeklyIssuesStorage.saveSyncMeta({ lastSyncedAt: new Date().toISOString() });
-  logger.info('weeklyIssues', 'Weekly sync finished', { enriched: targets.length });
+  return { pagesFetched, scanned, matched, hitEnd };
 }
 
 /** 由存储的仓库/issue 数据构建发现频道卡片（未补全详情的条目暂不展示）。 */
@@ -365,17 +424,49 @@ export function buildWeeklyDiscoveryRepos(
   return list;
 }
 
+/** 当前可展示的卡片数（含过滤语义，仅统计已补全详情的），用于外层判断是否需要深度遍历。 */
+const countCards = (repos: Map<string, WeeklyStoredRepo>, onlyCollected: boolean): number => {
+  let count = 0;
+  for (const repo of repos.values()) {
+    if (repo.detail && (!onlyCollected || hasCollectedLabel(repo.issueLabels))) count++;
+  }
+  return count;
+};
+
+/**
+ * 遍历完成后预期可展示的卡片数：待补全（!lastFetchedAt）的仓库紧随其后会被
+ * 补全，也计入；不可用（已标记且无详情）的永不出卡，排除。供深度遍历的
+ * 停止条件使用——补全发生在遍历结束之后，不能只数已补全的。
+ */
+const countProspectiveCards = (repos: Map<string, WeeklyStoredRepo>, onlyCollected: boolean): number => {
+  let count = 0;
+  for (const repo of repos.values()) {
+    if (repo.lastFetchedAt && !repo.detail) continue;
+    if (onlyCollected && !hasCollectedLabel(repo.issueLabels)) continue;
+    count++;
+  }
+  return count;
+};
+
+const isRecentlySynced = (lastSyncedAt: string | null): boolean =>
+  lastSyncedAt !== null
+  && Number.isFinite(Date.parse(lastSyncedAt))
+  && Date.now() - Date.parse(lastSyncedAt) < RECENT_SYNC_SKIP_MS;
+
 let syncAbortController: AbortController | null = null;
 let syncInFlight: Promise<void> | null = null;
 
-/** 互斥的同步入口：新请求会中止上一轮未完成的同步（切换频道/重入场景）。 */
-async function runExclusiveSync(api: GitHubApiService, onStatus: StatusCallback): Promise<void> {
+/** 互斥执行：新请求中止上一轮并等待其落盘结算后再开新一轮。 */
+async function runExclusiveSync(
+  body: (signal: AbortSignal) => Promise<void>,
+  onStatus: StatusCallback,
+): Promise<void> {
   syncAbortController?.abort();
-  // 等待被中止轮次完成落盘再开新一轮，避免旧快照覆盖新一轮刚写入的补全结果
+  // 等待被中止轮次完成落盘，避免旧快照覆盖新一轮刚写入的结果
   if (syncInFlight) await syncInFlight.catch(() => {});
   const controller = new AbortController();
   syncAbortController = controller;
-  const run = syncWeeklyIssues(api, controller.signal, onStatus);
+  const run = body(controller.signal);
   syncInFlight = run.then(() => {}, () => {});
   try {
     await run;
@@ -388,10 +479,27 @@ async function runExclusiveSync(api: GitHubApiService, onStatus: StatusCallback)
   }
 }
 
+/** 补全 targets 并在 finally 中落盘（中途限流/中止也不丢已获取详情）。 */
+async function enrichAndPersist(
+  ctx: WalkContext,
+  targets: WeeklyStoredRepo[],
+  signal: AbortSignal,
+): Promise<void> {
+  if (targets.length === 0) return;
+  try {
+    await enrichRepos(ctx.api, targets, ctx.repos, ctx.changedRepoKeys, ctx.onStatus, signal);
+  } finally {
+    await weeklyIssuesStorage.saveRepos(
+      [...ctx.changedRepoKeys].map((key) => ctx.repos.get(key)!).filter(Boolean),
+    );
+  }
+}
+
 /**
- * 频道抓取入口（refreshChannel 调用）：page 1 触发（增量）同步后返回首页切片，
- * page > 1 纯缓存切片不触网。"周刊收录"过滤为客户端行为，切换过滤器
- * 会改变请求签名从而重跑本入口（60 秒内已同步则直接重建）。
+ * 频道抓取入口（refreshChannel 调用）。按需分页：
+ * - page 1：60 秒内未同步则做一次有界刷新遍历（since 窗口 / 首次 1 页）；
+ * - 任意页：缓存卡片不足该页所需时做一次有界深度遍历（游标续页）；
+ * - 缓存充足时纯切片不触网。"周刊收录"过滤为客户端行为。
  */
 export async function syncWeeklyChannel(
   api: GitHubApiService,
@@ -399,33 +507,93 @@ export async function syncWeeklyChannel(
   onlyCollected: boolean,
   onStatus: StatusCallback,
 ): Promise<PaginatedDiscoveryRepositories> {
-  if (page <= 1) {
-    const meta = await weeklyIssuesStorage.getSyncMeta();
-    const recentlySynced = meta.lastSyncedAt !== null
-      && Number.isFinite(Date.parse(meta.lastSyncedAt))
-      && Date.now() - Date.parse(meta.lastSyncedAt) < RECENT_SYNC_SKIP_MS;
-    if (!recentlySynced) {
-      await runExclusiveSync(api, onStatus);
-    }
+  const meta0 = await weeklyIssuesStorage.getSyncMeta();
+  const needsRefreshWalk = page <= 1 && !isRecentlySynced(meta0.lastSyncedAt);
+  const needsDeepWalk = !(meta0.historyComplete)
+    && countCards(await weeklyIssuesStorage.getAllRepos(), onlyCollected) < page * CARD_PAGE_SIZE;
+
+  let finalIssues: Map<number, WeeklyStoredIssue> | null = null;
+  let finalRepos: Map<string, WeeklyStoredRepo> | null = null;
+
+  if (needsRefreshWalk || needsDeepWalk) {
+    await runExclusiveSync(async (signal) => {
+      // 上一轮可能已落盘新数据，重读最新状态
+      const meta = await weeklyIssuesStorage.getSyncMeta();
+      const issues = await weeklyIssuesStorage.getAllIssues();
+      const repos = await weeklyIssuesStorage.getAllRepos();
+      const ctx: WalkContext = {
+        api,
+        signal,
+        onStatus,
+        issues,
+        repos,
+        changedIssueNumbers: new Set<number>(),
+        changedRepoKeys: new Set<string>(),
+        meta,
+        savedIssues: 0,
+        savedRepos: 0,
+      };
+
+      if (page <= 1 && !isRecentlySynced(meta.lastSyncedAt)) {
+        const firstRun = meta.lastSyncedAt === null;
+        onStatus?.({ phase: 'syncing', current: 0, total: 0 });
+        const walk = await walkIssuePages(ctx, firstRun
+          ? { startPage: 1, maxPages: 1, advanceCursor: true }
+          : {
+              since: new Date(Date.parse(meta.lastSyncedAt!) - LABEL_GRACE_MS).toISOString(),
+              startPage: 1,
+              maxPages: REFRESH_WALK_MAX_PAGES,
+              advanceCursor: false,
+            });
+        if (walk.hitEnd) meta.historyComplete = true;
+        logger.info('weeklyIssues', 'Refresh walk finished', {
+          pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched, firstRun,
+        });
+        await enrichAndPersist(ctx, [
+          ...pendingReposFromKeys(repos, ctx.changedRepoKeys),
+          ...refreshMaintenanceRepos(repos, ctx.changedRepoKeys, Date.now()),
+        ], signal);
+        meta.lastSyncedAt = new Date().toISOString();
+        await weeklyIssuesStorage.saveSyncMeta(meta);
+      }
+
+      if (countCards(repos, onlyCollected) < page * CARD_PAGE_SIZE && !meta.historyComplete) {
+        onStatus?.({ phase: 'syncing', current: 0, total: 0 });
+        const walk = await walkIssuePages(ctx, {
+          startPage: Math.max(1, meta.deepNextPage - 1),
+          maxPages: DEEP_WALK_MAX_PAGES,
+          advanceCursor: true,
+          stopWhen: () => countProspectiveCards(repos, onlyCollected) >= page * CARD_PAGE_SIZE,
+        });
+        if (walk.hitEnd) {
+          meta.historyComplete = true;
+          await weeklyIssuesStorage.saveSyncMeta(meta);
+        }
+        logger.info('weeklyIssues', 'Deep walk finished', {
+          pages: walk.pagesFetched, scanned: walk.scanned, matched: walk.matched,
+        });
+        await enrichAndPersist(ctx, pendingReposFromKeys(repos, ctx.changedRepoKeys), signal);
+      }
+
+      finalIssues = issues;
+      finalRepos = repos;
+    }, onStatus);
   }
-  const [issues, repos] = await Promise.all([
-    weeklyIssuesStorage.getAllIssues(),
-    weeklyIssuesStorage.getAllRepos(),
-  ]);
-  const all = buildWeeklyDiscoveryRepos(repos, issues, onlyCollected);
+
+  const issues = finalIssues ?? await weeklyIssuesStorage.getAllIssues();
+  const repos = finalRepos ?? await weeklyIssuesStorage.getAllRepos();
+  const historyComplete = (await weeklyIssuesStorage.getSyncMeta()).historyComplete;
+  const accumulated = buildWeeklyDiscoveryRepos(repos, issues, onlyCollected);
   const start = (page - 1) * CARD_PAGE_SIZE;
   return {
-    repos: all.slice(start, start + CARD_PAGE_SIZE),
-    hasMore: start + CARD_PAGE_SIZE < all.length,
+    repos: accumulated.slice(start, start + CARD_PAGE_SIZE),
+    hasMore: !historyComplete || accumulated.length > start + CARD_PAGE_SIZE,
     nextPageIndex: page + 1,
-    totalCount: all.length,
+    totalCount: accumulated.length,
   };
 }
 
-/**
- * "查看原贴"弹窗取 issue 正文：优先离线缓存（无需 token，logout 后仍可看），
- * 缓存未命中且提供了 api 时实时拉取兜底，否则原样返回缓存（可能为 null）。
- */
+/** "查看原贴"弹窗取 issue 正文：优先离线缓存（无需 token，logout 后仍可看），缓存未命中且提供了 api 时实时拉取兜底，否则原样返回缓存（可能为 null）。 */
 export async function fetchWeeklyIssueBody(
   api: GitHubApiService | null,
   issueNumber: number,
