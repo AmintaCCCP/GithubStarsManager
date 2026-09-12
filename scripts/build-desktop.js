@@ -22,7 +22,18 @@ for (const file of required) {
   }
 }
 // Tray icons (#345) ship inside electron/assets (covered by electron-builder `electron/**`).
-for (const icon of ['tray-16.png', 'tray-32.png']) {
+// trayTemplate*.png: macOS menu bar template image; tray-black/white*.png: themed monochrome
+// for Windows/Linux taskbars; tray-16/32.png: legacy color fallback.
+for (const icon of [
+  'trayTemplate.png',
+  'trayTemplate@2x.png',
+  'tray-black.png',
+  'tray-black@2x.png',
+  'tray-white.png',
+  'tray-white@2x.png',
+  'tray-16.png',
+  'tray-32.png',
+]) {
   const p = path.join(electronDir, 'assets', icon);
   if (!fs.existsSync(p)) {
     console.error(`❌ Missing required tray icon: electron/assets/${icon}`);
