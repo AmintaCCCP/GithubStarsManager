@@ -429,6 +429,12 @@ async function applyAutoLaunch(enabled) {
   }
 }
 
+/**
+ * Resolve the tray icon path for the current platform and theme.
+ * macOS prefers the monochrome template image (system recolors it for
+ * light/dark menu bars); other platforms pick the black/white monochrome
+ * variant from the system theme, falling back to the legacy color icons.
+ */
 function resolveTrayIcon() {
   // macOS 菜单栏要求单色 template 图（纯黑+alpha），系统自动适配深浅外观；
   // 其他平台没有 template 机制，按系统主题在黑/白两份之间切换。
@@ -520,6 +526,7 @@ async function setAutoLaunchWithRollback(enabled) {
   return { success: true, prefs: { ...desktopPrefs } };
 }
 
+/** Create the tray with the resolved icon (marked as template on macOS) and menu wiring. */
 function createTray() {
   if (tray && !tray.isDestroyed()) {
     refreshTrayMenu();
