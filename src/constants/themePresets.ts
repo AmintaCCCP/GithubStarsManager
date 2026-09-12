@@ -66,6 +66,9 @@ const DEFAULT_LIGHT_COLORS: GeneratedThemePalette = {
   'border-strong': '214.3 25% 80%',
   input: '214.3 31.8% 91.4%',
   ring: '222.2 84% 4.9%',
+  selection: '222.2 47.4% 55.5%',
+  'selection-foreground': '222.2 84% 4.9%',
+  'search-highlight': '222.2 28.4% 72.8%',
 };
 
 const DEFAULT_DARK_COLORS: GeneratedThemePalette = {
@@ -89,6 +92,9 @@ const DEFAULT_DARK_COLORS: GeneratedThemePalette = {
   'border-strong': '217.2 32.6% 28%',
   input: '217.2 32.6% 17.5%',
   ring: '212.7 26.8% 83.9%',
+  selection: '210 40% 40%',
+  'selection-foreground': '210 40% 98%',
+  'search-highlight': '210 24% 29.6%',
 };
 
 const DEFAULT_PRESET: ThemePreset = {
