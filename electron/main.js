@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, shell, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme, shell, globalShortcut, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -430,12 +430,20 @@ async function applyAutoLaunch(enabled) {
 }
 
 function resolveTrayIcon() {
-  const candidates = [
+  // macOS 菜单栏要求单色 template 图（纯黑+alpha），系统自动适配深浅外观；
+  // 其他平台没有 template 机制，按系统主题在黑/白两份之间切换。
+  const candidates = [];
+  if (process.platform === 'darwin') {
+    candidates.push(path.join(__dirname, 'assets', 'trayTemplate.png'));
+  } else {
+    candidates.push(path.join(__dirname, 'assets', nativeTheme.shouldUseDarkColors ? 'tray-white.png' : 'tray-black.png'));
+  }
+  candidates.push(
     path.join(__dirname, 'assets', 'tray-32.png'),
     path.join(__dirname, 'assets', 'tray-16.png'),
     path.join(__dirname, '..', 'public', 'icon.png'),
     path.join(__dirname, '..', 'dist', 'icon.png'),
-  ];
+  );
   for (const candidate of candidates) {
     try {
       if (fs.existsSync(candidate)) return candidate;
@@ -520,6 +528,7 @@ function createTray() {
   try {
     const iconPath = resolveTrayIcon();
     const icon = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+    if (process.platform === 'darwin') icon.setTemplateImage(true);
     tray = new Tray(icon);
     tray.on('click', () => {
       if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
@@ -543,6 +552,14 @@ function destroyTray() {
   }
   tray = null;
 }
+
+// 非 macOS 托盘图标跟随系统深浅主题切换（macOS 用 template 图自动适配）。
+nativeTheme.on('updated', () => {
+  if (process.platform === 'darwin') return;
+  if (!tray || tray.isDestroyed()) return;
+  const iconPath = resolveTrayIcon();
+  if (iconPath) tray.setImage(nativeImage.createFromPath(iconPath));
+});
 
 ipcMain.handle('desktop:getPrefs', () => ({ ...desktopPrefs }));
 
