@@ -25,6 +25,9 @@ export interface GeneratedThemePalette {
   'border-strong': string;
   input: string;
   ring: string;
+  selection: string;
+  'selection-foreground': string;
+  'search-highlight': string;
 }
 
 export interface GeneratedThemePreset {
@@ -70,7 +73,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "240 17.1% 92%",
       "input": "0 0% 92.2%",
       "ring": "15.4 90.6% 49.8%",
-      "border-strong": "240 17.1% 81%"
+      "border-strong": "240 17.1% 81%",
+      "selection": "15.4 62% 55%",
+      "selection-foreground": "0 0% 0%",
+      "search-highlight": "15.4 37.2% 72.4%"
     },
     "darkColors": {
       "background": "0 0% 3.9%",
@@ -92,7 +98,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 12.2%",
       "input": "0 0% 23.1%",
       "ring": "15.4 90.6% 49.8%",
-      "border-strong": "0 0% 23.2%"
+      "border-strong": "0 0% 23.2%",
+      "selection": "15.4 62% 32%",
+      "selection-foreground": "0 0% 94.1%",
+      "search-highlight": "15.4 37.2% 25%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.1,
@@ -122,7 +131,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "50 7.5% 84.3%",
       "input": "50.8 8% 68%",
       "ring": "15.1 55.6% 52.4%",
-      "border-strong": "50 7.5% 73.3%"
+      "border-strong": "50 7.5% 73.3%",
+      "selection": "15.1 55.6% 67%",
+      "selection-foreground": "48 19.6% 20%",
+      "search-highlight": "15.1 33.3% 77.3%"
     },
     "darkColors": {
       "background": "60 2.7% 14.5%",
@@ -144,7 +156,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "60 5.1% 23.1%",
       "input": "52.5 5.1% 30.6%",
       "ring": "14.8 63.1% 59.6%",
-      "border-strong": "60 5.1% 34.1%"
+      "border-strong": "60 5.1% 34.1%",
+      "selection": "14.8 62% 31%",
+      "selection-foreground": "46.2 9.8% 73.9%",
+      "search-highlight": "14.8 37.2% 28.7%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.1,
@@ -177,7 +192,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "220 13.1% 91%",
       "input": "220 13.1% 91%",
       "ring": "263 70% 50%",
-      "border-strong": "220 13.1% 80%"
+      "border-strong": "220 13.1% 80%",
+      "selection": "263 62% 61.5%",
+      "selection-foreground": "224 71.1% 4%",
+      "search-highlight": "263 37.2% 75.7%"
     },
     "darkColors": {
       "background": "260 25% 2%",
@@ -199,7 +217,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "260 20% 15%",
       "input": "260 20% 15%",
       "ring": "263 85% 65%",
-      "border-strong": "260 20% 26%"
+      "border-strong": "260 20% 26%",
+      "selection": "263 62% 40%",
+      "selection-foreground": "210 40.1% 98%",
+      "search-highlight": "263 37.2% 26.5%"
     },
     "shadowColor": "263 70% 50%",
     "shadowOpacity": 0.08,
@@ -232,7 +253,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "240 26.1% 91%",
       "input": "240 26.1% 91%",
       "ring": "219.2 99.2% 52.7%",
-      "border-strong": "240 26.1% 80%"
+      "border-strong": "240 26.1% 80%",
+      "selection": "219.2 62% 56%",
+      "selection-foreground": "240 16.2% 6.1%",
+      "search-highlight": "219.2 37.2% 73.8%"
     },
     "darkColors": {
       "background": "240 9.1% 4.3%",
@@ -254,7 +278,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "240 11.6% 18.6%",
       "input": "240 11.6% 18.6%",
       "ring": "251.4 100% 72.2%",
-      "border-strong": "240 11.6% 29.6%"
+      "border-strong": "240 11.6% 29.6%",
+      "selection": "251.4 62% 40%",
+      "selection-foreground": "240 40.2% 98%",
+      "search-highlight": "251.4 37.2% 27.9%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.15,
@@ -287,7 +314,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "214.3 31.8% 91.4%",
       "input": "214.3 31.8% 91.4%",
       "ring": "82.5 88.3% 32.3%",
-      "border-strong": "214.3 31.8% 80.4%"
+      "border-strong": "214.3 31.8% 80.4%",
+      "selection": "82.5 62% 57.8%",
+      "selection-foreground": "222.2 47.3% 11.2%",
+      "search-highlight": "82.5 37.2% 73.9%"
     },
     "darkColors": {
       "background": "228.6 84% 4.9%",
@@ -309,7 +339,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "217.2 32.5% 17.4%",
       "input": "217.2 32.5% 17.4%",
       "ring": "82.5 88.3% 59.8%",
-      "border-strong": "217.2 32.5% 28.4%"
+      "border-strong": "217.2 32.5% 28.4%",
+      "selection": "82.5 62% 30%",
+      "selection-foreground": "210 40% 98%",
+      "search-highlight": "82.5 37.2% 24.6%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.05,
@@ -342,7 +375,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 89%",
       "input": "0 0% 100%",
       "ring": "223.3 51% 40%",
-      "border-strong": "0 0% 78%"
+      "border-strong": "0 0% 78%",
+      "selection": "223.4 62% 56.5%",
+      "selection-foreground": "0 0% 0.4%",
+      "search-highlight": "223.4 37.2% 72.7%"
     },
     "darkColors": {
       "background": "0 0% 2%",
@@ -364,7 +400,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 15.7%",
       "input": "0 0% 7.1%",
       "ring": "220.9 58.5% 63.1%",
-      "border-strong": "0 0% 26.7%"
+      "border-strong": "0 0% 26.7%",
+      "selection": "220.9 58.5% 40%",
+      "selection-foreground": "0 0% 98%",
+      "search-highlight": "220.9 35.1% 28.5%"
     },
     "shadowColor": "225.5 35.8% 15.9%",
     "shadowOpacity": 0.05,
@@ -397,7 +436,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 89.8%",
       "input": "45 14.6% 83.9%",
       "ring": "45.1 90.2% 36%",
-      "border-strong": "0 0% 78.8%"
+      "border-strong": "0 0% 78.8%",
+      "selection": "45.1 62% 55%",
+      "selection-foreground": "0 0% 10.2%",
+      "search-highlight": "45.1 37.2% 73%"
     },
     "darkColors": {
       "background": "0 0% 3.9%",
@@ -419,7 +461,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 12.9%",
       "input": "0 0% 22%",
       "ring": "45.1 90.2% 52%",
-      "border-strong": "0 0% 23.9%"
+      "border-strong": "0 0% 23.9%",
+      "selection": "45.1 62% 30.5%",
+      "selection-foreground": "0 0% 92.2%",
+      "search-highlight": "45.1 37.2% 24.3%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.01,
@@ -449,7 +494,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "304.8 61% 83.9%",
       "input": "317.4 44.2% 83.1%",
       "ring": "333.3 71.4% 50.6%",
-      "border-strong": "304.8 61% 72.9%"
+      "border-strong": "304.8 61% 72.9%",
+      "selection": "333.3 43% 66%",
+      "selection-foreground": "296 55.6% 21.2%",
+      "search-highlight": "333.3 25.8% 76.8%"
     },
     "darkColors": {
       "background": "270 14.7% 7.8%",
@@ -471,7 +519,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "326.7 8.3% 21.4%",
       "input": "312 8.8% 22.4%",
       "ring": "333.3 71.4% 50.6%",
-      "border-strong": "326.7 8.3% 32.4%"
+      "border-strong": "326.7 8.3% 32.4%",
+      "selection": "332 62% 34.5%",
+      "selection-foreground": "272.3 28.3% 82%",
+      "search-highlight": "332 37.2% 29.9%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.1,
@@ -504,7 +555,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 89.6%",
       "input": "0 0% 92.1%",
       "ring": "0 0% 0%",
-      "border-strong": "0 0% 78.6%"
+      "border-strong": "0 0% 78.6%",
+      "selection": "0 0% 55%",
+      "selection-foreground": "0 0% 0%",
+      "search-highlight": "0 0% 72.8%"
     },
     "darkColors": {
       "background": "0 0% 0%",
@@ -526,7 +580,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 14.1%",
       "input": "0 0% 19.9%",
       "ring": "0 0% 64.5%",
-      "border-strong": "0 0% 25.1%"
+      "border-strong": "0 0% 25.1%",
+      "selection": "0 0% 40%",
+      "selection-foreground": "0 0% 100%",
+      "search-highlight": "0 0% 27.4%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.18,
@@ -559,7 +616,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "200 15.8% 92.5%",
       "input": "200 15.8% 92.5%",
       "ring": "142.4 70.2% 36.6%",
-      "border-strong": "200 15.8% 81.5%"
+      "border-strong": "200 15.8% 81.5%",
+      "selection": "173.1 62% 55%",
+      "selection-foreground": "202.5 32% 9.8%",
+      "search-highlight": "173.1 37.2% 71.1%"
     },
     "darkColors": {
       "background": "204 40.5% 7.3%",
@@ -581,7 +641,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "202.5 22.2% 21.2%",
       "input": "202.5 22.2% 21.2%",
       "ring": "167.1 100% 32.9%",
-      "border-strong": "202.5 22.2% 32.2%"
+      "border-strong": "202.5 22.2% 32.2%",
+      "selection": "167.1 62% 28.4%",
+      "selection-foreground": "200 15.8% 92.5%",
+      "search-highlight": "167.1 37.2% 26.4%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.1,
@@ -614,7 +677,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "41.7 20.3% 77.9%",
       "input": "41.7 20.3% 77.9%",
       "ring": "0 0% 18%",
-      "border-strong": "41.7 20.3% 66.9%"
+      "border-strong": "41.7 20.3% 66.9%",
+      "selection": "52 42% 48.5%",
+      "selection-foreground": "0 0% 11.8%",
+      "search-highlight": "52 25.2% 64.3%"
     },
     "darkColors": {
       "background": "0 0% 7.8%",
@@ -636,7 +702,10 @@ export const GENERATED_THEME_PRESETS: GeneratedThemePreset[] = [
       "border": "0 0% 17.3%",
       "input": "0 0% 17.3%",
       "ring": "52.9 15.6% 78.6%",
-      "border-strong": "0 0% 28.3%"
+      "border-strong": "0 0% 28.3%",
+      "selection": "52.9 36% 31%",
+      "selection-foreground": "38.6 23.4% 88.2%",
+      "search-highlight": "52.9 21.6% 25%"
     },
     "shadowColor": "0 0% 0%",
     "shadowOpacity": 0.1,

@@ -150,6 +150,143 @@ function deriveBorderStrong(triplet, isLightMode) {
   return fmtTriplet({ ...triplet, l });
 }
 
+// ---------- text selection & search highlight derivation ----------
+//
+// The vendored palettes ship selection-hostile accents: zen-inspired light
+// accent (52 23.1% 87.3%) is nearly identical to its card (41.2 42.2% 92.5%),
+// so ::selection rendered invisible (issue #348), and no single palette token
+// is safe everywhere — accent collides with card, while primary/ring can sit
+// mid-tone or near the foreground depending on the preset. Selection and
+// search-highlight are therefore derived per mode into a mid-tone band with
+// two enforced invariants: visible against every surface text can sit on, and
+// body text stays readable on top.
+
+/** Every surface selected or highlighted text can render over. */
+function textSurfaces(t) {
+  return [t.background, t.card, t.popover, t.secondary, t.muted];
+}
+
+/**
+ * Smallest WCAG contrast between a candidate fill and a set of surfaces.
+ *
+ * @param {{ h: number, s: number, l: number }} triplet Candidate fill triplet.
+ * @param {Array<{ h: number, s: number, l: number }>} surfaces Surface triplets.
+ * @returns {number} Minimum contrast ratio across the surfaces.
+ */
+function minSurfaceContrast(triplet, surfaces) {
+  return Math.min(...surfaces.map((surface) => contrastTriplets(triplet, surface)));
+}
+
+/**
+ * Pick the hue source for derived text marks: primary, falling back to
+ * ring/accent when primary is neutral so colorful themes keep their identity
+ * while truly monochrome ones stay achromatic instead of inventing a hue.
+ *
+ * @param {Record<string, { h: number, s: number, l: number }>} t Normalized palette triplets.
+ * @returns {{ h: number, s: number, l: number }} Hue source triplet.
+ */
+function selectionHueSource(t) {
+  if (t.primary.s >= 8) return t.primary;
+  return [t.ring, t.accent].find((candidate) => candidate.s >= 14) ?? t.primary;
+}
+
+/**
+ * Derive the ::selection fill plus its foreground for one palette mode.
+ *
+ * Lightness starts from a mid-tone "highlighter" band and sweeps in both
+ * directions until the fill clears every text surface while the body
+ * foreground stays readable on top; the nearest passing candidate wins so each
+ * preset keeps its own character. Both targets carry a small guard margin so
+ * the one-decimal output rounding cannot land below the audited 1.5/4.5
+ * invariants. When no lightness satisfies both (e.g. dark text over dark
+ * fills), ensureTextOnFill flips the selection foreground toward white/black
+ * instead.
+ *
+ * @param {Record<string, { h: number, s: number, l: number }>} t Normalized palette triplets.
+ * @returns {{ selection: { h: number, s: number, l: number }, selectionForeground: { h: number, s: number, l: number } }} Derived triplets.
+ */
+function deriveSelection(t) {
+  const surfaces = textSurfaces(t);
+  const isLight = relativeLuminance(hslTripletToRgb(t.background)) > 0.35;
+  const hueSource = selectionHueSource(t);
+  const saturation = hueSource.s < 8
+    ? 0
+    : Math.min(62, Math.max(isLight ? 42 : 36, hueSource.s));
+  const [bandLow, bandHigh] = isLight ? [55, 68] : [26, 40];
+  const base = {
+    h: hueSource.h,
+    s: saturation,
+    l: Math.min(bandHigh, Math.max(bandLow, hueSource.l)),
+  };
+  const passes = (candidate) =>
+    minSurfaceContrast(candidate, surfaces) >= 1.55
+    && contrastTriplets(t.foreground, candidate) >= 4.6;
+
+  let selection = base;
+  if (!passes(base)) {
+    let best = base;
+    let bestScore = -1;
+    search: for (let d = 0.5; d <= 40; d += 0.5) {
+      for (const dir of [1, -1]) {
+        const candidate = shiftL(base, dir * d);
+        if (passes(candidate)) {
+          selection = candidate;
+          break search;
+        }
+        const score = minSurfaceContrast(candidate, surfaces)
+          + contrastTriplets(t.foreground, candidate);
+        if (score > bestScore) {
+          bestScore = score;
+          best = candidate;
+        }
+      }
+    }
+    selection = passes(selection) ? selection : best;
+  }
+
+  const pair = ensureTextOnFill(t.foreground, selection, 4.5);
+  return { selection: pair.fill, selectionForeground: pair.fg };
+}
+
+/**
+ * Derive the search-result highlight for one palette mode: the selection hue
+ * pulled halfway toward the closest surface it renders on, so hits stay
+ * visible without competing with an active text selection. Only card,
+ * popover, and canvas count as surfaces — the highlight class is used inside
+ * repository cards, never on chip/secondary fills whose vendored colors can
+ * be extreme outliers (claude dark ships a near-white secondary). Lightness
+ * is swept until the fill clears card and canvas with readable text on top;
+ * targets carry a guard margin over the audited 1.25/4.5 invariants.
+ *
+ * @param {Record<string, { h: number, s: number, l: number }>} t Normalized palette triplets.
+ * @param {{ h: number, s: number, l: number }} selection Derived selection fill.
+ * @returns {{ h: number, s: number, l: number }} Highlight fill triplet.
+ */
+function deriveSearchHighlight(t, selection) {
+  const surfaces = [t.card, t.popover, t.background];
+  const isLight = relativeLuminance(hslTripletToRgb(t.background)) > 0.35;
+  const surfaceL = (isLight ? Math.min : Math.max)(...surfaces.map((surface) => surface.l));
+  const edge = isLight ? surfaceL - 8 : surfaceL + 8;
+  const base = {
+    h: selection.h,
+    s: round(selection.s * 0.6, 1),
+    l: round(selection.l + (edge - selection.l) / 2, 1),
+  };
+  const passes = (candidate) =>
+    contrastTriplets(candidate, t.card) >= 1.3
+    && contrastTriplets(candidate, t.background) >= 1.3
+    && contrastTriplets(t.foreground, candidate) >= 4.6;
+
+  if (passes(base)) return base;
+  for (let d = 0.5; d <= 40; d += 0.5) {
+    for (const dir of isLight ? [-1, 1] : [1, -1]) {
+      const candidate = shiftL(base, dir * d);
+      if (passes(candidate)) return candidate;
+    }
+  }
+  return base;
+}
+
 // ---------- accessibility & surface normalization ----------
 //
 // Vendored tweakcn palettes predate this app's token usage: several fail WCAG
@@ -439,6 +576,15 @@ const presets = Object.entries(source.presets).map(([id, preset]) => {
   lightColors['border-strong'] = deriveBorderStrong(lightTriplets.border, true);
   darkColors['border-strong'] = deriveBorderStrong(darkTriplets.border, false);
 
+  const lightSelection = deriveSelection(normalizedLight);
+  const darkSelection = deriveSelection(normalizedDark);
+  lightColors['selection'] = fmtTriplet(lightSelection.selection);
+  lightColors['selection-foreground'] = fmtTriplet(lightSelection.selectionForeground);
+  lightColors['search-highlight'] = fmtTriplet(deriveSearchHighlight(normalizedLight, lightSelection.selection));
+  darkColors['selection'] = fmtTriplet(darkSelection.selection);
+  darkColors['selection-foreground'] = fmtTriplet(darkSelection.selectionForeground);
+  darkColors['search-highlight'] = fmtTriplet(deriveSearchHighlight(normalizedDark, darkSelection.selection));
+
   const shadow = composeShadow(lightStyles);
 
   return {
@@ -485,6 +631,9 @@ export interface GeneratedThemePalette {
   'border-strong': string;
   input: string;
   ring: string;
+  selection: string;
+  'selection-foreground': string;
+  'search-highlight': string;
 }
 
 export interface GeneratedThemePreset {

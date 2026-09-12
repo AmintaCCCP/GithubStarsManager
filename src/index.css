@@ -539,9 +539,16 @@ html:has(body[data-scroll-locked]) {
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
   --ui-accent-ring: hsl(var(--ring));
-  --ui-selection: hsl(var(--accent));
-  --ui-selection-foreground: hsl(var(--accent-foreground));
-  --ui-search-highlight: hsl(var(--primary) / 0.16);
+  /* Text-selection and search-hit fills. Accent/palettes cannot be trusted
+     here (zen-inspired light accent ≈ card made ::selection invisible,
+     issue #348), so each theme ships derived fills with guaranteed surface
+     contrast; values below mirror DEFAULT_*_COLORS in constants/themePresets.ts. */
+  --selection: 222.2 47.4% 55.5%;
+  --selection-foreground: 222.2 84% 4.9%;
+  --search-highlight: 222.2 28.4% 72.8%;
+  --ui-selection: hsl(var(--selection));
+  --ui-selection-foreground: hsl(var(--selection-foreground));
+  --ui-search-highlight: hsl(var(--search-highlight));
   --ui-search-highlight-foreground: hsl(var(--foreground));
   /* Placeholder text must stay above 4.5:1 on the canvas (WCAG 1.4.3), so it
      uses the full muted-foreground token instead of an alpha wash. */
@@ -588,11 +595,14 @@ html.dark {
   --success-foreground: 222.2 47.4% 11.2%;
   --warning-foreground: 222.2 47.4% 11.2%;
 
-  /* Selection tint: solid accent wash in light mode, translucent ring glow in
-     dark mode (mirrors the pre-tokenization visuals). */
-  --ui-selection: hsl(var(--ring) / 0.3);
-  --ui-selection-foreground: hsl(var(--foreground));
-  --ui-search-highlight: hsl(var(--ring) / 0.28);
+  /* Selection and search-hit fills re-derive per mode for the same
+     guaranteed-contrast reasons as the light block above. */
+  --selection: 210 40% 40%;
+  --selection-foreground: 210 40% 98%;
+  --search-highlight: 210 24% 29.6%;
+  --ui-selection: hsl(var(--selection));
+  --ui-selection-foreground: hsl(var(--selection-foreground));
+  --ui-search-highlight: hsl(var(--search-highlight));
   --ui-search-highlight-foreground: hsl(var(--foreground));
   --ui-placeholder: hsl(var(--muted-foreground));
 
