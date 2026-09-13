@@ -17,11 +17,11 @@ const X_HANDLE_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
 // 首页（queryId 提取入口）、abs.twimg.com 主脚本（绝不附带 X Cookie）、
 // GraphQL UserTweets / UserByScreenName（queryId 动态，操作名固定）。
 const X_HOME_URL = 'https://x.com/home';
-const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js$/;
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-zA-Z0-9_-]+\.js$/;
 const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
 const isAllowedXProxyUrl = (url: string): boolean =>
   url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
-const X_COOKIE_VALUE_PATTERN = /^[\w%+/=-]+$/;
+const X_COOKIE_VALUE_PATTERN = /^[\w%+/=.~-]+$/;
 const X_WEB_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const FETCH_TIMEOUT_MS = 20_000;
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
@@ -62,8 +62,8 @@ router.get('/api/xtweet/profile/:handle', async (req, res) => {
 
 router.post('/api/xtweet/graphql', async (req, res) => {
   const url = typeof req.body?.url === 'string' ? req.body.url : '';
-  const authToken = typeof req.body?.auth?.authToken === 'string' ? req.body.auth.authToken.trim() : '';
-  const ct0 = typeof req.body?.auth?.ct0 === 'string' ? req.body.auth.ct0.trim() : '';
+  const authToken = typeof req.body?.auth?.authToken === 'string' ? req.body.auth.authToken.trim().replace(/^["']|["']$/g, '').trim() : '';
+  const ct0 = typeof req.body?.auth?.ct0 === 'string' ? req.body.auth.ct0.trim().replace(/^["']|["']$/g, '').trim() : '';
   if (!isAllowedXProxyUrl(url)) {
     res.status(400).json({ error: 'invalid url', code: 'INVALID_URL' });
     return;

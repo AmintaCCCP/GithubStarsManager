@@ -351,18 +351,18 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
 // - abs.twimg.com 主脚本（queryId 提取源，绝不附带 X Cookie）
 // - GraphQL UserTweets / UserByScreenName（queryId 动态，操作名固定）
 const X_HOME_URL = 'https://x.com/home';
-const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js$/;
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-zA-Z0-9_-]+\.js$/;
 const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
 const isAllowedXProxyUrl = (url) =>
   url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
-const X_COOKIE_VALUE_PATTERN = /^[\w%+/=-]+$/;
+const X_COOKIE_VALUE_PATTERN = /^[\w%+/=.~-]+$/;
 
 ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
   if (typeof url !== 'string' || !isAllowedXProxyUrl(url)) {
     return { success: false, error: 'invalid url' };
   }
-  const authToken = typeof auth?.authToken === 'string' ? auth.authToken.trim() : '';
-  const ct0 = typeof auth?.ct0 === 'string' ? auth.ct0.trim() : '';
+  const authToken = typeof auth?.authToken === 'string' ? auth.authToken.trim().replace(/^["']|["']$/g, '').trim() : '';
+  const ct0 = typeof auth?.ct0 === 'string' ? auth.ct0.trim().replace(/^["']|["']$/g, '').trim() : '';
   if (!authToken || !ct0 || !X_COOKIE_VALUE_PATTERN.test(authToken) || !X_COOKIE_VALUE_PATTERN.test(ct0)) {
     return { success: false, error: 'invalid auth cookies' };
   }

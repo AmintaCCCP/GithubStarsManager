@@ -58,8 +58,8 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
   };
 
   const handleSaveAuth = () => {
-    const authToken = authTokenInput.trim();
-    const ct0 = ct0Input.trim();
+    const authToken = authTokenInput.trim().replace(/^["']|["']$/g, '').trim();
+    const ct0 = ct0Input.trim().replace(/^["']|["']$/g, '').trim();
     if (!authToken || !ct0) {
       toast(t('auth_token 与 ct0 都需要填写。', 'Both auth_token and ct0 are required.'), 'error');
       return;

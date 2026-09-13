@@ -254,12 +254,13 @@ export async function extractXGraphQLQueryIds(
   graphQL: XGraphQLTransport,
 ): Promise<Record<string, string>> {
   const homeHtml = await graphQL('https://x.com/home', auth);
-  const mainJsUrl = homeHtml.match(/https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js/)?.[0];
+  const mainJsUrl = homeHtml.match(/https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-zA-Z0-9_-]+\.js/)?.[0];
   if (!mainJsUrl) throw new Error('无法定位 x.com 主脚本（页面结构可能已变化）');
   const mainJs = await graphQL(mainJsUrl, auth);
   const ids: Record<string, string> = {};
   for (const operation of X_GRAPHQL_OPERATIONS) {
-    const id = mainJs.match(new RegExp(`queryId:"([A-Za-z0-9_-]+)",operationName:"${operation}"`))?.[1];
+    const id = mainJs.match(new RegExp(`queryId:"([A-Za-z0-9_-]+)",operationName:"${operation}"`))?.[1]
+      || mainJs.match(new RegExp(`operationName:"${operation}"[^{}]*?queryId:"([A-Za-z0-9_-]+)"`))?.[1];
     if (id) ids[operation] = id;
   }
   if (!ids.UserTweets || !ids.UserByScreenName) {

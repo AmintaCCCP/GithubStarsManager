@@ -132,7 +132,10 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
       ),
     })),
     setXTweetAuth: (auth) => set((state) => ({
-      xTweetAuth: { authToken: auth.authToken.trim(), ct0: auth.ct0.trim() },
+      xTweetAuth: {
+        authToken: auth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
+        ct0: auth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
+      },
       xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
     })),
     clearXTweetAuth: () => set((state) => ({

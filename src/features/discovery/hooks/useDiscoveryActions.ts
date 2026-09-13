@@ -195,8 +195,18 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     } catch (error) {
       if (!isCurrentRequest()) return;
       console.error(`Failed to refresh channel ${channelId}:`, error);
-      if (append) currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
-      else toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
+      if (append) {
+        currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
+      } else {
+        const errorMsg = error instanceof Error ? error.message : '';
+        if (channelId === 'x-tweet') {
+          toast(errorMsg ? `${t('X 推文获取失败', 'Failed to fetch X tweets')}: ${errorMsg}` : t('获取 X 推文失败，请检查网络连接或在设置中核对 X 鉴权 Cookie。', 'Failed to fetch X tweets. Please check your network connection or X auth cookies in settings.'), 'error');
+        } else if (channelId === 'telegram') {
+          toast(errorMsg ? `${t('Telegram 消息获取失败', 'Failed to fetch Telegram messages')}: ${errorMsg}` : t('获取 Telegram 消息失败，请检查网络连接或关注频道。', 'Failed to fetch Telegram messages. Please check your network connection or followed channels.'), 'error');
+        } else {
+          toast(errorMsg || t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
+        }
+      }
     } finally {
       if (channelId === 'weekly' && isCurrentRequest()) {
         useAppStore.getState().setWeeklySyncStatus(null);

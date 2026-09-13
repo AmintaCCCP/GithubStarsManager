@@ -114,7 +114,7 @@ export const fetchXTimelineViaDesktop = async (handle: string): Promise<string |
 };
 
 const X_HOME_URL = 'https://x.com/home';
-const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js$/;
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-zA-Z0-9_-]+\.js$/;
 const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
 
 export const isAllowedXGraphQLUrl = (url: string): boolean =>
