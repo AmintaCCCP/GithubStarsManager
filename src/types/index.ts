@@ -549,6 +549,8 @@ export interface AppState {
   weeklySyncStatus: WeeklySyncStatus | null;
   /** X 推文频道：关注博主列表（handle 不含 @，初始化含 geekbb） */
   xTweetFollows: XTweetFollow[];
+  /** X 推文频道：可选登录鉴权 Cookie（配置后走 GraphQL 抓取 + 历史翻页） */
+  xTweetAuth: XTweetAuth | null;
   /** X 推文频道同步/详情补全进度（会话级，不持久化） */
   xTweetSyncStatus: WeeklySyncStatus | null;
   /** Telegram 频道：关注频道列表（channel 不含 @，初始化含 geekhub23） */
@@ -645,6 +647,16 @@ export interface WeeklySyncStatus {
 export interface XTweetFollow {
   handle: string;
   addedAt: string;
+}
+
+/**
+ * X 推文频道：可选的登录态鉴权 Cookie（用户在设置中自行填写）。
+ * 配置后改走 x.com GraphQL 接口：每位博主每页约 20 条推文且支持游标回溯
+ * 历史翻页；留空则退回未登录抓取（每次仅最新一小批、无历史翻页）。
+ */
+export interface XTweetAuth {
+  authToken: string;
+  ct0: string;
 }
 
 /** X 推文频道：仓库来源推文的引用信息（正文缓存供"查看原贴"离线渲染） */

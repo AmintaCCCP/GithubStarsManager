@@ -5,7 +5,7 @@ import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscript
 import { defaultRepositoryChatSettings } from '../../types/repositoryChat';
 import { logger } from '../../services/logger';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
-import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
+import { normalizeXTweetFollows, normalizeXTweetAuth } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
 import {
@@ -150,6 +150,7 @@ discoverySortOrder: state.discoverySortOrder,
 discoverySelectedTopic: state.discoverySelectedTopic,
 weeklyOnlyCollected: state.weeklyOnlyCollected,
 xTweetFollows: state.xTweetFollows,
+xTweetAuth: state.xTweetAuth,
 telegramFollows: state.telegramFollows,
 // 持久化完整代理配置，包含认证密码，确保重启后无需重新输入。
 proxyConfig: {
@@ -321,6 +322,9 @@ state.discoverySortOrder = 'Descending';
   if (state) {
     (state as Record<string, unknown>).xTweetFollows = normalizeXTweetFollows(
       (state as Record<string, unknown>).xTweetFollows,
+    );
+    (state as Record<string, unknown>).xTweetAuth = normalizeXTweetAuth(
+      (state as Record<string, unknown>).xTweetAuth,
     );
     (state as Record<string, unknown>).telegramFollows = normalizeTelegramFollows(
       (state as Record<string, unknown>).telegramFollows,

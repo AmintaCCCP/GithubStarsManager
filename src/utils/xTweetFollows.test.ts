@@ -3,6 +3,7 @@ import {
   DEFAULT_XTWEET_FOLLOWS,
   normalizeXTweetFollows,
   normalizeXTweetHandleInput,
+  normalizeXTweetAuth,
 } from './xTweetFollows';
 
 describe('normalizeXTweetHandleInput', () => {
@@ -45,5 +46,16 @@ describe('normalizeXTweetFollows', () => {
       { handle: 'geekbb', addedAt: '2026-09-12T00:00:00.000Z' },
       { handle: 'ruanyf', addedAt: '1970-01-01T00:00:00.000Z' },
     ]);
+  });
+});
+
+describe('normalizeXTweetAuth', () => {
+  it('两端去空白后成对保存；任一为空即整体视为未配置', () => {
+    expect(normalizeXTweetAuth({ authToken: '  abc  ', ct0: ' def ' })).toEqual({ authToken: 'abc', ct0: 'def' });
+    expect(normalizeXTweetAuth({ authToken: 'abc', ct0: '' })).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: '', ct0: 'def' })).toBeNull();
+    expect(normalizeXTweetAuth(null)).toBeNull();
+    expect(normalizeXTweetAuth('junk')).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: 1, ct0: 2 })).toBeNull();
   });
 });

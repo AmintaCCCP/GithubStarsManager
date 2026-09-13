@@ -28,6 +28,8 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'setXTweetSyncStatus'
   | 'addXTweetFollow'
   | 'removeXTweetFollow'
+  | 'setXTweetAuth'
+  | 'clearXTweetAuth'
   | 'setTelegramSyncStatus'
   | 'addTelegramFollow'
   | 'removeTelegramFollow'
@@ -129,6 +131,8 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
         (follow) => follow.handle.toLowerCase() !== handle.toLowerCase(),
       ),
     })),
+    setXTweetAuth: (auth) => set({ xTweetAuth: { authToken: auth.authToken.trim(), ct0: auth.ct0.trim() } }),
+    clearXTweetAuth: () => set({ xTweetAuth: null }),
     setTelegramSyncStatus: (status) => set({ telegramSyncStatus: status }),
     addTelegramFollow: (channel) => set((state) => {
       const normalized = normalizeTelegramChannelInput(channel);

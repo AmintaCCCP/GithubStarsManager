@@ -13,8 +13,9 @@ export const useXTweetProbe = () => {
   const probe = useCallback(async (handle: string) => {
     setIsProbing(true);
     setProbeResult(null);
+    const auth = useAppStore.getState().xTweetAuth;
     try {
-      const result = await probeXTweetSource(handle);
+      const result = await probeXTweetSource(handle, undefined, auth);
       setProbeResult(result.ok
         ? `OK|${result.tweetCount ?? 0}|${result.repoCount ?? 0}`
         : `FAIL|${result.error ?? '未知错误'}`);

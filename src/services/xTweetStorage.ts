@@ -34,20 +34,58 @@ export interface XStoredRepo {
   tweetCreatedAt: string;
 }
 
+/** 单博主的 GraphQL 翻页游标：cursor 为下一页请求参数（null = 尚未翻过页） */
+export interface XTweetPageState {
+  cursor: string | null;
+  /** 已翻到时间线尽头（无 bottom cursor） */
+  exhausted: boolean;
+}
+
 export interface XTweetSyncMeta {
   lastSyncedAt: string | null;
   /** 生成水位时的关注列表签名（规范化 handle 排序拼接）；列表变化则水位失效 */
   followsSignature: string;
+  /** 鉴权路径的分页游标（跨会话保留，"加载更多"接着上次的位置继续拉） */
+  pages: Record<string, XTweetPageState>;
+  /** 已解析的博主用户 ID（handle → rest_id，鉴权 GraphQL 路径复用） */
+  userIds: Record<string, string>;
+  /** 上次从线上 bundle 提取的 GraphQL queryId（防 queryId 轮换的缓存） */
+  queryIds: Record<string, string>;
 }
 
 const DEFAULT_META: XTweetSyncMeta = {
   lastSyncedAt: null,
   followsSignature: '',
+  pages: {},
+  userIds: {},
+  queryIds: {},
+};
+
+const normalizeStringRecord = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => typeof v === 'string' && v.length > 0)
+      .map(([k, v]) => [k, v as string]),
+  );
 };
 
 const normalizeMeta = (meta: XTweetSyncMeta | null | undefined): XTweetSyncMeta => ({
   lastSyncedAt: meta?.lastSyncedAt ?? null,
   followsSignature: typeof meta?.followsSignature === 'string' ? meta.followsSignature : '',
+  pages: meta?.pages && typeof meta.pages === 'object'
+    ? Object.fromEntries(
+        Object.entries(meta.pages)
+          .filter(([, v]) => v && typeof v === 'object')
+          .map(([k, v]) => [k, {
+            cursor: typeof (v as XTweetPageState).cursor === 'string'
+              ? (v as XTweetPageState).cursor : null,
+            exhausted: Boolean((v as XTweetPageState).exhausted),
+          }]),
+      )
+    : {},
+  userIds: normalizeStringRecord(meta?.userIds),
+  queryIds: normalizeStringRecord(meta?.queryIds),
 });
 
 const DB_NAME = 'github-stars-x-tweet';

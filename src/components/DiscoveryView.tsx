@@ -468,9 +468,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setWeeklyOnlyCollected,
     weeklySyncStatus,
     xTweetFollows,
+    xTweetAuth,
     xTweetSyncStatus,
     telegramFollows,
     telegramSyncStatus,
+    setXTweetAuth,
+    clearXTweetAuth,
     t,
     isAnalyzing,
     refreshChannel,
@@ -576,9 +579,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [weeklyOnlyCollected, selectedDiscoveryChannel, refreshChannel]);
 
-  // X 推文关注列表变化时重建列表：只在关注集真正变化时触发（挂载/切频道不触发，
-  // 避免与空频道自动加载 effect 双重调用导致同步被中止重启）
-  const xTweetFollowsSignature = xTweetFollows.map(follow => follow.handle.toLowerCase()).sort().join(',');
+  // X 推文关注列表/鉴权变化时重建列表：只在集合真正变化时触发（挂载/切频道
+  // 不触发，避免与空频道自动加载 effect 双重调用导致同步被中止重启）
+  const xTweetFollowsSignature = `${xTweetFollows.map(follow => follow.handle.toLowerCase()).sort().join(',')}|${xTweetAuth !== null}`;
   const prevXTweetFollowsRef = useRef(xTweetFollowsSignature);
   useEffect(() => {
     if (prevXTweetFollowsRef.current === xTweetFollowsSignature) return;

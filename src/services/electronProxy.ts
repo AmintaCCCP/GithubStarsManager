@@ -63,6 +63,11 @@ interface ElectronAPI {
   testProxy: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>;
   /** X 推文频道：主进程代抓 x.com 未登录主页 HTML（绕开渲染进程 CORS） */
   xFetchTimeline?: (handle: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  /**
+   * X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
+   * （带用户的 auth_token/ct0 Cookie 与 Bearer，绕开渲染进程 CORS）
+   */
+  xFetchGraphQL?: (url: string, auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; body?: string; error?: string }>;
   /** Telegram 频道：主进程代抓 t.me/s/<name> 公开预览 HTML（可选 before 游标翻历史页） */
   telegramFetchChannel?: (channel: string, before?: string) => Promise<{ success: boolean; html?: string; error?: string }>;
   desktop?: DesktopElectronAPI;
@@ -106,6 +111,19 @@ export const fetchXTimelineViaDesktop = async (handle: string): Promise<string |
     throw new Error(result.error || 'desktop x.com fetch failed');
   }
   return result.html;
+};
+
+/** X 推文频道鉴权路径：经主进程代发 x.com GraphQL / 静态资源请求。非桌面环境返回 null。 */
+export const fetchXGraphQLViaDesktop = async (
+  url: string,
+  auth: { authToken: string; ct0: string },
+): Promise<string | null> => {
+  if (!window.electronAPI?.xFetchGraphQL) return null;
+  const result = await window.electronAPI.xFetchGraphQL(url, auth);
+  if (!result.success || typeof result.body !== 'string') {
+    throw new Error(result.error || 'desktop x.com GraphQL fetch failed');
+  }
+  return result.body;
 };
 
 /** Telegram 频道：经主进程抓取 t.me/s 公开预览 HTML。非桌面环境返回 null。 */

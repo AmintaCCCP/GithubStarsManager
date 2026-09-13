@@ -6,6 +6,12 @@ import {
   decodeTweetRef,
   parseXTimelineHtml,
   tweetSnowflakeToDate,
+  tweetDateToIso,
+  buildTweetContentHtml,
+  buildUserTweetsUrl,
+  buildUserByScreenNameUrl,
+  parseXUserTweetsJson,
+  extractXGraphQLQueryIds,
   ingestFeedTweets,
   reposNeedingDetail,
   buildXTweetDiscoveryRepos,
@@ -13,9 +19,10 @@ import {
   probeXTweetSource,
   X_TWEET_CARD_PAGE_SIZE,
   type XTimelineTransport,
+  type XGraphQLTransport,
 } from './xTweetService';
-import type { XStoredRepo, XStoredTweet, XTweetSyncMeta } from './xTweetStorage';
-import type { XTweetFollow } from '../types';
+import { xTweetStorage, type XStoredRepo, type XStoredTweet, type XTweetSyncMeta } from './xTweetStorage';
+import type { XTweetAuth, XTweetFollow } from '../types';
 
 /**
  * fixture 是从 x.com/geekbb 未登录主页真实响应中截取的 Flight 数据段
@@ -25,12 +32,31 @@ const REAL_TIMELINE_HTML = readFileSync(
   path.join(__dirname, '__fixtures__', 'x-timeline-geekbb.html'),
   'utf-8',
 );
+/** 鉴权路径 fixture：登录态 UserTweets GraphQL 真实响应（geekbb 最新页）。 */
+const REAL_USER_TWEETS_JSON = readFileSync(
+  path.join(__dirname, '__fixtures__', 'x-usertweets-geekbb-auth.json'),
+  'utf-8',
+);
 
-// 内存版存储替身（jsdom 无 IndexedDB）
+// 内存版存储替身（jsdom 无 IndexedDB；meta 每次读取返回深拷贝，仿 IDB 语义）
 const storage = vi.hoisted(() => {
   const tweetsStore = new Map<string, unknown>();
   const reposStore = new Map<string, unknown>();
-  const metaRef = { current: { lastSyncedAt: null as string | null } };
+  const metaRef = {
+    current: {
+      lastSyncedAt: null as string | null,
+      followsSignature: '',
+      pages: {} as Record<string, { cursor: string | null; exhausted: boolean }>,
+      userIds: {} as Record<string, string>,
+      queryIds: {} as Record<string, string>,
+    },
+  };
+  const copyMeta = (): XTweetSyncMeta => ({
+    ...metaRef.current,
+    pages: Object.fromEntries(Object.entries(metaRef.current.pages).map(([k, v]) => [k, { ...v }])),
+    userIds: { ...metaRef.current.userIds },
+    queryIds: { ...metaRef.current.queryIds },
+  });
   let failSyncBatchOnRepo: string | null = null;
   return {
     tweetsStore,
@@ -43,9 +69,16 @@ const storage = vi.hoisted(() => {
     reset() {
       tweetsStore.clear();
       reposStore.clear();
-      metaRef.current = { lastSyncedAt: null };
+      metaRef.current = {
+        lastSyncedAt: null,
+        followsSignature: '',
+        pages: {},
+        userIds: {},
+        queryIds: {},
+      };
       failSyncBatchOnRepo = null;
     },
+    copyMeta,
   };
 });
 
@@ -59,9 +92,9 @@ vi.mock('./xTweetStorage', () => ({
       for (const repo of repos) storage.reposStore.set(repo.fullName.toLowerCase(), repo);
     },
     getAllRepos: async () => new Map(storage.reposStore) as Map<string, XStoredRepo>,
-    getSyncMeta: async () => ({ ...storage.metaRef.current }),
+    getSyncMeta: async () => storage.copyMeta(),
     saveSyncMeta: async (meta: XTweetSyncMeta) => {
-      storage.metaRef.current = { ...meta };
+      storage.metaRef.current = JSON.parse(JSON.stringify(meta));
     },
     saveSyncBatch: async (payload: { tweets: XStoredTweet[]; repos: XStoredRepo[]; meta: XTweetSyncMeta }) => {
       // 原子语义在真实现由单事务保证；替身以"先抛错后应用"模拟失败回滚
@@ -71,7 +104,7 @@ vi.mock('./xTweetStorage', () => ({
       }
       for (const tweet of payload.tweets) storage.tweetsStore.set(tweet.tweetId, tweet);
       for (const repo of payload.repos) storage.reposStore.set(repo.fullName.toLowerCase(), repo);
-      storage.metaRef.current = { ...payload.meta };
+      storage.metaRef.current = JSON.parse(JSON.stringify(payload.meta));
     },
     clearAll: async () => storage.reset(),
   },
@@ -414,5 +447,318 @@ describe('probeXTweetSource', () => {
     const result = await probeXTweetSource('geekbb', fail.transport);
     expect(result.ok).toBe(false);
     expect(result.error).toBe('timeout');
+  });
+});
+
+/* ============ 鉴权 GraphQL 路径 ============ */
+
+const AUTH: XTweetAuth = { authToken: '4e61test', ct0: 'a3ddtest' };
+const authFollows: XTweetFollow[] = [{ handle: 'geekbb', addedAt: '2026-09-13T00:00:00.000Z' }];
+
+const makeUserByScreenNameBody = (restId: string): string => JSON.stringify({
+  data: { user: { result: { __typename: 'User', rest_id: restId } } },
+});
+
+const makeUserTweetsBody = (
+  entries: Array<Record<string, unknown>>,
+  cursor: string | null,
+): string => JSON.stringify({
+  data: {
+    user: {
+      result: {
+        __typename: 'User',
+        timeline: { timeline: { instructions: [{ type: 'TimelineAddEntries', entries: cursor ? [...entries, { entryId: 'cursor-bottom-1', content: { entryType: 'TimelineTimelineCursor', value: cursor } }] : entries }] } },
+      },
+    },
+  },
+});
+
+const tweetEntry = (
+  id: number,
+  fullText: string,
+  createdAt: string,
+  urls: Array<{ url: string; expanded_url: string; indices: [number, number] }> = [],
+): Record<string, unknown> => ({
+  entryId: `tweet-${id}`,
+  content: {
+    entryType: 'TimelineTimelineItem',
+    itemContent: {
+      tweet_results: {
+        result: { __typename: 'Tweet', rest_id: String(id), legacy: { full_text: fullText, created_at: createdAt, entities: { urls } } },
+      },
+    },
+  },
+});
+
+/** 鉴权传输替身：按 URL 正则返回预设响应（或抛错），记录每次调用 */
+const stubGraphQL = (
+  handlers: Array<{ match: RegExp; body: string | Error }>,
+): { graphQL: XGraphQLTransport; calls: string[] } => {
+  const calls: string[] = [];
+  const graphQL: XGraphQLTransport = async (url) => {
+    calls.push(url);
+    const handler = handlers.find((h) => h.match.test(url));
+    if (!handler) throw new Error(`unexpected url: ${url.slice(0, 120)}`);
+    if (handler.body instanceof Error) throw handler.body;
+    return handler.body;
+  };
+  return { graphQL, calls };
+};
+
+describe('tweetDateToIso', () => {
+  it('解析 Twitter 时间格式并回退纪元', () => {
+    expect(tweetDateToIso('Sun Sep 13 06:17:25 +0000 2026')).toBe('2026-09-13T06:17:25.000Z');
+    expect(tweetDateToIso('not-a-date')).toBe('1970-01-01T00:00:00.000Z');
+  });
+});
+
+describe('buildTweetContentHtml', () => {
+  it('按实体索引把 t.co 短链替换为 expanded_url 锚点', () => {
+    const html = buildTweetContentHtml('look https://t.co/xyz end', [
+      { url: 'https://t.co/xyz', expanded_url: 'https://github.com/foo/bar', indices: [5, 21] },
+    ]);
+    expect(html).toBe('look <a href="https://github.com/foo/bar">https://t.co/xyz</a> end');
+  });
+
+  it('转义正文 HTML、换行转 <br/>、非法索引跳过', () => {
+    const html = buildTweetContentHtml('a <b>\nc', [
+      { url: 'https://t.co/x', expanded_url: 'https://x.com/x', indices: [10, 12] },
+    ]);
+    expect(html).toBe('a &lt;b&gt;<br/>c');
+  });
+});
+
+describe('buildUserTweetsUrl / buildUserByScreenNameUrl', () => {
+  it('variables 含 userId；仅传入 cursor 时带 cursor 参数', () => {
+    const p1 = buildUserTweetsUrl('123', null, 'QID');
+    expect(p1).toContain('/i/api/graphql/QID/UserTweets');
+    expect(decodeURIComponent(p1)).toContain('"userId":"123"');
+    expect(decodeURIComponent(p1)).not.toContain('"cursor"');
+    const p2 = buildUserTweetsUrl('123', 'CUR', 'QID');
+    expect(decodeURIComponent(p2)).toContain('"cursor":"CUR"');
+    expect(decodeURIComponent(buildUserByScreenNameUrl('geekbb', 'QID2'))).toContain('"screen_name":"geekbb"');
+  });
+});
+
+describe('parseXUserTweetsJson（真实 UserTweets fixture）', () => {
+  it('解析出 19 条真实推文；无 core.name 时 displayName 回退 handle', () => {
+    const parsed = parseXUserTweetsJson(REAL_USER_TWEETS_JSON, 'geekbb');
+    expect(parsed.tweets).toHaveLength(19);
+    expect(parsed.exhausted).toBe(false);
+    expect(parsed.nextCursor).toBeTruthy();
+    expect(new Set(parsed.tweets.map((t) => t.displayName))).toEqual(new Set(['geekbb']));
+    const ids = parsed.tweets.map((t) => t.tweetId);
+    expect(ids).toContain('2098629676495159496');
+    const knap = parsed.tweets.find((t) => t.tweetId === '2098629676495159496');
+    expect(knap?.createdAt).toBe('2026-09-12T04:28:00.000Z');
+    expect(knap?.htmlUrl).toBe('https://x.com/geekbb/status/2098629676495159496');
+    expect(knap?.repoFullNames).toContain('obsidianmd/knap');
+    expect(knap?.content).toContain('<a href="https://github.com/obsidianmd/knap"');
+  });
+
+  it('鉴权失效（code 32）抛可读错误；账号不可用抛错', () => {
+    const authInvalid = JSON.stringify({ errors: [{ code: 32, message: 'Could not authenticate you' }] });
+    expect(() => parseXUserTweetsJson(authInvalid, 'geekbb')).toThrow('鉴权已失效');
+    const unavailable = JSON.stringify({ data: { user: { result: { __typename: 'UserUnavailable' } } } });
+    expect(() => parseXUserTweetsJson(unavailable, 'geekbb')).toThrow('无法获取');
+  });
+
+  it('Tombstone 跳过；TweetWithVisibilityResults 包装（result.tweet）兼容；无 cursor 即取尽', () => {
+    const body = JSON.stringify({
+      data: {
+        user: {
+          result: {
+            __typename: 'User',
+            timeline: {
+              timeline: {
+                instructions: [{
+                  type: 'TimelineAddEntries',
+                  entries: [
+                    { entryId: 'tweet-1', content: { entryType: 'TimelineTimelineItem', itemContent: { tweet_results: { result: { __typename: 'TweetTombstone' } } } } },
+                    { entryId: 'tweet-2', content: { entryType: 'TimelineTimelineItem', itemContent: { tweet_results: { result: { __typename: 'TweetWithVisibilityResults', tweet: { rest_id: '2', legacy: { full_text: 'wrapped https://github.com/a/b', created_at: 'Sun Sep 13 00:00:00 +0000 2026', entities: { urls: [{ url: 'https://t.co/x', expanded_url: 'https://github.com/a/b', indices: [8, 22] }] } } } } } } } },
+                  ],
+                }],
+              },
+            },
+          },
+        },
+      },
+    });
+    const parsed = parseXUserTweetsJson(body, 'geekbb');
+    expect(parsed.tweets).toHaveLength(1);
+    expect(parsed.tweets[0].tweetId).toBe('2');
+    expect(parsed.tweets[0].repoFullNames).toEqual(['a/b']);
+    expect(parsed.exhausted).toBe(true);
+  });
+});
+
+describe('extractXGraphQLQueryIds', () => {
+  it('从登录态首页引用的 main bundle 提取 UserTweets/UserByScreenName queryId', async () => {
+    const { graphQL } = stubGraphQL([
+      { match: /^https:\/\/x\.com\/home$/, body: '<html><script src="https://abs.twimg.com/responsive-web/client-web/main.abc123def.js"></script></html>' },
+      { match: /main\.abc123def\.js$/, body: 'queryId:"QIDTWEETS",operationName:"UserTweets" ... queryId:"QIDUSER",operationName:"UserByScreenName"' },
+    ]);
+    const ids = await extractXGraphQLQueryIds(AUTH, graphQL);
+    expect(ids).toEqual({ UserTweets: 'QIDTWEETS', UserByScreenName: 'QIDUSER' });
+  });
+
+  it('定位不到主脚本或 operation 时抛错', async () => {
+    const { graphQL } = stubGraphQL([{ match: /^https:\/\/x\.com\/home$/, body: '<html></html>' }]);
+    await expect(extractXGraphQLQueryIds(AUTH, graphQL)).rejects.toThrow('无法定位');
+  });
+});
+
+describe('syncXTweetChannel（鉴权路径）', () => {
+  const getFixtureCursor = (): string => {
+    const d = JSON.parse(REAL_USER_TWEETS_JSON);
+    const instructions = d.data.user.result.timeline.timeline.instructions;
+    const entries = instructions.find((i: { type?: string }) => i.type === 'TimelineAddEntries').entries;
+    return entries.find((e: { entryId?: string }) => e.entryId?.startsWith('cursor-bottom')).content.value;
+  };
+
+  it('首页逐博主真实抓取：解析用户 ID、初始化游标、补全仓库详情、返回前缀切片', async () => {
+    const fixtureCursor = getFixtureCursor();
+    const { graphQL, calls } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]);
+    const details = new Map<string, GitHubRepoDetailRead | null>([['obsidianmd/knap', makeDetail('obsidianmd/knap')]]);
+    const result = await syncXTweetChannel(makeApi(details), 1, authFollows, undefined, undefined, AUTH, graphQL);
+
+    expect(calls.some((url) => url.includes('/UserByScreenName'))).toBe(true);
+    expect(calls.some((url) => url.includes('/UserTweets'))).toBe(true);
+    expect(result.repos.length).toBeGreaterThan(0);
+    expect(result.repos[0].xTweet).toBeDefined();
+    expect(result.hasMore).toBe(true);
+    const meta = await xTweetStorage.getSyncMeta();
+    expect(meta.userIds['geekbb']).toBe('168139512');
+    expect(meta.pages['geekbb']).toEqual({ cursor: fixtureCursor, exhausted: false });
+    expect(meta.lastSyncedAt).not.toBeNull();
+  });
+
+  it('加载更多按落盘游标拉下一页（一次点击翻一页），不受 60 秒水位拦截', async () => {
+    const fixtureCursor = getFixtureCursor();
+    const p2Cursor = 'CURSOR_PAGE_3';
+    const p2Body = makeUserTweetsBody([
+      tweetEntry(1, 'older https://github.com/eee/fff', 'Sun Sep 06 00:00:00 +0000 2026', [
+        { url: 'https://t.co/fff', expanded_url: 'https://github.com/eee/fff', indices: [6, 20] },
+      ]),
+    ], p2Cursor);
+    const { graphQL, calls } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: p2Body },
+    ]);
+    const details = new Map<string, GitHubRepoDetailRead | null>([
+      ['obsidianmd/knap', makeDetail('obsidianmd/knap')],
+      ['eee/fff', makeDetail('eee/fff')],
+    ]);
+    const api = makeApi(details);
+    // 预置 page 1 状态（游标来自 fixture 最新页），水位刚推进
+    await syncXTweetChannel(makeApi(details), 1, authFollows, undefined, undefined, AUTH, stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]).graphQL);
+    // 刚同步过（60 秒水位内）仍必须翻页
+    const page2 = await syncXTweetChannel(api, 2, authFollows, undefined, undefined, AUTH, graphQL);
+
+    const tweetsCall = calls.find((url) => url.includes('/UserTweets'));
+    expect(tweetsCall).toBeDefined();
+    expect(decodeURIComponent(tweetsCall!)).toContain(`"cursor":"${fixtureCursor}"`);
+    expect(page2.hasMore).toBe(true);
+    const meta = await xTweetStorage.getSyncMeta();
+    expect(meta.pages['geekbb']).toEqual({ cursor: p2Cursor, exhausted: false });
+    expect(page2.totalCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('page 1 刷新重抓最新页但不回退已推进的游标', async () => {
+    const p2Cursor = 'CURSOR_PAGE_3';
+    const { graphQL } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: makeUserTweetsBody([tweetEntry(1, 'older', 'Sun Sep 06 00:00:00 +0000 2026')], p2Cursor) },
+    ]);
+    const api = makeApi(new Map([['obsidianmd/knap', makeDetail('obsidianmd/knap')]]));
+    await syncXTweetChannel(api, 1, authFollows, undefined, undefined, AUTH, stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]).graphQL);
+    await syncXTweetChannel(api, 2, authFollows, undefined, undefined, AUTH, graphQL);
+    expect((await xTweetStorage.getSyncMeta()).pages['geekbb']).toEqual({ cursor: p2Cursor, exhausted: false });
+
+    // 让水位失效强制 page 1 重新触网（用新的替身便于断言最新页调用）
+    const meta = await xTweetStorage.getSyncMeta();
+    meta.lastSyncedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await xTweetStorage.saveSyncMeta(meta);
+    const { graphQL: refreshGraphQL, calls } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]);
+    await syncXTweetChannel(api, 1, authFollows, undefined, undefined, AUTH, refreshGraphQL);
+    const tweetsCall = calls.find((url) => url.includes('/UserTweets'))!;
+    expect(decodeURIComponent(tweetsCall)).not.toContain('"cursor"');
+    expect((await xTweetStorage.getSyncMeta()).pages['geekbb']).toEqual({ cursor: p2Cursor, exhausted: false });
+  });
+
+  it('时间线取尽后：纯切片不触网，缓存耗尽即 hasMore=false', async () => {
+    const { graphQL, calls } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: makeUserTweetsBody([tweetEntry(1, 'end https://github.com/gg/hh', 'Sun Sep 06 00:00:00 +0000 2026', [{ url: 'https://t.co/h', expanded_url: 'https://github.com/gg/hh', indices: [4, 18] }])], null) },
+    ]);
+    const api = makeApi(new Map([['gg/hh', makeDetail('gg/hh')]]));
+    await syncXTweetChannel(api, 1, authFollows, undefined, undefined, AUTH, graphQL);
+    const page2 = await syncXTweetChannel(api, 2, authFollows, undefined, undefined, AUTH, graphQL);
+    expect((await xTweetStorage.getSyncMeta()).pages['geekbb']).toEqual({ cursor: null, exhausted: true });
+
+    const callsBefore = calls.length;
+    const page3 = await syncXTweetChannel(api, 3, authFollows, undefined, undefined, AUTH, graphQL);
+    expect(calls.length).toBe(callsBefore);
+    expect(page3.totalCount).toBe(page2.totalCount);
+    expect(page3.hasMore).toBe(false);
+  });
+
+  it('鉴权失效（HTTP 401 / GraphQL code 32）向上传播可读错误', async () => {
+    const { graphQL } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: JSON.stringify({ errors: [{ code: 32, message: 'Could not authenticate you' }] }) },
+    ]);
+    await expect(syncXTweetChannel(makeApi(new Map()), 1, authFollows, undefined, undefined, AUTH, graphQL))
+      .rejects.toThrow('鉴权已失效');
+
+    const { graphQL: httpGraphQL } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: new Error('x.com responded 401') },
+    ]);
+    await expect(syncXTweetChannel(makeApi(new Map()), 1, authFollows, undefined, undefined, AUTH, httpGraphQL))
+      .rejects.toThrow('鉴权已失效');
+  });
+
+  it('缓存的 queryId 过期（404）时自动从 bundle 重提取并重试', async () => {
+    const { graphQL: fullGraphQL, calls: fullCalls } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /^https:\/\/x\.com\/home$/, body: '<html><script src="https://abs.twimg.com/responsive-web/client-web/main.deadbeef.js"></script></html>' },
+      { match: /main\.deadbeef\.js$/, body: 'queryId:"FRESHQID",operationName:"UserTweets" queryId:"FRESHUSER",operationName:"UserByScreenName"' },
+      { match: /STALEQID/, body: new Error('x.com responded 404') },
+      { match: /FRESHQID/, body: REAL_USER_TWEETS_JSON },
+    ]);
+    // 预置过期缓存 queryId，让第一次 UserTweets 命中 404
+    storage.metaRef.current.queryIds = { UserTweets: 'STALEQID', UserByScreenName: 'FRESHUSER' };
+    const details = new Map<string, GitHubRepoDetailRead | null>([['obsidianmd/knap', makeDetail('obsidianmd/knap')]]);
+    const result = await syncXTweetChannel(makeApi(details), 1, authFollows, undefined, undefined, AUTH, fullGraphQL);
+    expect(result.repos.length).toBeGreaterThan(0);
+    expect((await xTweetStorage.getSyncMeta()).queryIds.UserTweets).toBe('FRESHQID');
+    // home + main bundle + 两次 UserTweets（过期 + 重试）
+    expect(fullCalls.some((url) => url.includes('x.com/home'))).toBe(true);
+    expect(fullCalls.filter((url) => url.includes('/UserTweets')).length).toBe(2);
+  });
+});
+
+describe('probeXTweetSource（鉴权路径）', () => {
+  it('走 GraphQL 解析并返回推文数与仓库链接数', async () => {
+    const { graphQL } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]);
+    const result = await probeXTweetSource('geekbb', undefined, AUTH, graphQL);
+    expect(result).toMatchObject({ ok: true, tweetCount: 19 });
+    expect(result.repoCount).toBeGreaterThan(0);
   });
 });

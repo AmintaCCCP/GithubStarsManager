@@ -344,6 +344,53 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
   }
 });
 
+// X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
+// （带用户的 auth_token/ct0 Cookie；net.fetch 走 Chromium 网络栈，自动跟随应用代理）
+const X_GRAPHQL_URL_PATTERN = /^https:\/\/(x\.com|abs\.twimg\.com)\/[^\s]*$/;
+const X_COOKIE_VALUE_PATTERN = /^[\w%+/=-]+$/;
+
+ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
+  if (typeof url !== 'string' || !X_GRAPHQL_URL_PATTERN.test(url)) {
+    return { success: false, error: 'invalid url' };
+  }
+  const authToken = typeof auth?.authToken === 'string' ? auth.authToken.trim() : '';
+  const ct0 = typeof auth?.ct0 === 'string' ? auth.ct0.trim() : '';
+  if (!authToken || !ct0 || !X_COOKIE_VALUE_PATTERN.test(authToken) || !X_COOKIE_VALUE_PATTERN.test(ct0)) {
+    return { success: false, error: 'invalid auth cookies' };
+  }
+  try {
+    // GraphQL API 请求带 Bearer/CSRF 等专有头；HTML 页面与静态资源带这些头
+    // 反而被 x.com 拒 401（实测），只发 UA + Cookie
+    const isApiCall = url.startsWith('https://x.com/i/api/');
+    const headers = isApiCall
+      ? {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          'Accept': '*/*',
+          'Authorization': 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
+          'X-CSRF-Token': ct0,
+          'X-Twitter-Auth-Type': 'OAuth2Session',
+          'X-Twitter-Active-User': 'yes',
+          'Cookie': `auth_token=${authToken}; ct0=${ct0}`,
+        }
+      : {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+          ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
+        };
+    const response = await net.fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) {
+      return { success: false, error: `x.com responded ${response.status}` };
+    }
+    const body = await response.text();
+    return { success: true, body };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
 ipcMain.handle('set-proxy', async (event, config) => {
   saveProxyConfig(config);
   await applyProxy(config);
