@@ -158,20 +158,18 @@ export const loadEncryptedXAuthViaDesktop = async (): Promise<{ authToken: strin
 /** X 鉴权 Cookie 本地安全写入（Electron safeStorage 加密保存在本机）。 */
 export const saveEncryptedXAuthViaDesktop = async (auth: { authToken: string; ct0: string }): Promise<void> => {
   if (!window.electronAPI?.xAuth?.save) return;
-  try {
-    await window.electronAPI.xAuth.save(auth);
-  } catch {
-    // 忽略持久化失败，内存状态优先
+  const result = await window.electronAPI.xAuth.save(auth);
+  if (result && !result.success) {
+    throw new Error(result.error || 'failed to save X authentication');
   }
 };
 
 /** X 鉴权 Cookie 本地安全清理。 */
 export const clearEncryptedXAuthViaDesktop = async (): Promise<void> => {
   if (!window.electronAPI?.xAuth?.clear) return;
-  try {
-    await window.electronAPI.xAuth.clear();
-  } catch {
-    // 忽略清理失败
+  const result = await window.electronAPI.xAuth.clear();
+  if (result && !result.success) {
+    throw new Error(result.error || 'failed to clear X authentication');
   }
 };
 

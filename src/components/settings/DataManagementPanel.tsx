@@ -4,6 +4,9 @@ import { Card, CardContent } from '../ui/card';
 import { weeklyIssuesStorage } from '../../services/weeklyIssuesStorage';
 import { xTweetStorage } from '../../services/xTweetStorage';
 import { telegramStorage } from '../../services/telegramStorage';
+import { abortXTweetSync } from '../../services/xTweetService';
+import { abortTelegramSync } from '../../services/telegramService';
+import { clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -485,6 +488,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteDiscoveryData = useCallback(async () => {
     try {
+      // 在清理前先中止并等待进行中的推文与 Telegram 同步，防止并发写入导致清理后脏数据写回
+      await abortXTweetSync();
+      await abortTelegramSync();
       // 周刊/推文/Telegram 频道数据在独立 IndexedDB，一并清空
       await weeklyIssuesStorage.clearAll();
       await xTweetStorage.clearAll();
@@ -1242,16 +1248,25 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         throw e;
       }
       try {
+        await abortXTweetSync();
         await xTweetStorage.clearAll();
       } catch (e) {
         pendingStorages.push(t('X 推文数据', 'X tweet data'));
         throw e;
       }
       try {
+        await abortTelegramSync();
         await telegramStorage.clearAll();
       } catch (e) {
         pendingStorages.push(t('Telegram 频道数据', 'Telegram channel data'));
         throw e;
+      }
+
+      // 清除 Electron 桌面端独立保存的加密凭据文件（x-auth.enc）
+      try {
+        await clearEncryptedXAuthViaDesktop();
+      } catch {
+        // 忽略桌面端清理失败
       }
 
       // 存储清除成功后，重置所有状态到初始值

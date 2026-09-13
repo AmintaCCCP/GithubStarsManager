@@ -11,6 +11,9 @@ function getXAuthPath(userDataPath, pathModule) {
   return pathModule.join(userDataPath, X_AUTH_FILENAME);
 }
 
+const X_COOKIE_VALUE_PATTERN = /^[\w%+/=.~-]+$/;
+const MAX_COOKIE_LENGTH = 512;
+
 function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth) {
   const filePath = getXAuthPath(userDataPath, pathModule);
   if (!auth || typeof auth.authToken !== 'string' || typeof auth.ct0 !== 'string') {
@@ -19,10 +22,23 @@ function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth)
     } catch { /* ignore */ }
     return { success: true };
   }
-  const payload = JSON.stringify({
-    authToken: auth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
-    ct0: auth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
-  });
+  const authToken = auth.authToken.trim().replace(/^["']|["']$/g, '').trim();
+  const ct0 = auth.ct0.trim().replace(/^["']|["']$/g, '').trim();
+  if (!authToken && !ct0) {
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch { /* ignore */ }
+    return { success: true };
+  }
+  if (
+    authToken.length > MAX_COOKIE_LENGTH ||
+    ct0.length > MAX_COOKIE_LENGTH ||
+    !X_COOKIE_VALUE_PATTERN.test(authToken) ||
+    !X_COOKIE_VALUE_PATTERN.test(ct0)
+  ) {
+    return { success: false, error: 'invalid auth cookies' };
+  }
+  const payload = JSON.stringify({ authToken, ct0 });
 
   if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
     return {

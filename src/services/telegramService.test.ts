@@ -8,6 +8,7 @@ import {
   reposNeedingDetail,
   buildTelegramDiscoveryRepos,
   syncTelegramChannel,
+  abortTelegramSync,
   probeTelegramSource,
   TELEGRAM_CARD_PAGE_SIZE,
   type TelegramChannelTransport,
@@ -469,6 +470,20 @@ describe('syncTelegramChannel', () => {
     await syncTelegramChannel(api, 1, follows, (status) => statuses.push(status), transport);
     expect(statuses.some((status) => status?.phase === 'syncing')).toBe(true);
     expect(statuses.some((status) => status?.phase === 'enriching')).toBe(true);
+  });
+
+  it('abortTelegramSync 可中断进行中的同步任务', async () => {
+    let transportCalled = false;
+    const slowTransport: TelegramChannelTransport = async () => {
+      transportCalled = true;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return PAGE1_HTML;
+    };
+    const api = makeApi(new Map());
+    const syncPromise = syncTelegramChannel(api, 1, follows, undefined, slowTransport);
+    await vi.waitFor(() => expect(transportCalled).toBe(true));
+    await abortTelegramSync();
+    await expect(syncPromise).rejects.toThrow();
   });
 });
 

@@ -309,8 +309,8 @@ function getFetchDispatcher() {
     try {
       const { ProxyAgent } = require('undici');
       return new ProxyAgent(proxyUrl);
-    } catch {
-      return undefined;
+    } catch (err) {
+      throw new Error(`Failed to initialize configured proxy agent: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   const envProxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.ALL_PROXY || process.env.all_proxy;
@@ -318,8 +318,8 @@ function getFetchDispatcher() {
     try {
       const { ProxyAgent } = require('undici');
       return new ProxyAgent(envProxy);
-    } catch {
-      return undefined;
+    } catch (err) {
+      throw new Error(`Failed to initialize environment proxy agent: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   return undefined;
@@ -444,7 +444,28 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
 });
 
 ipcMain.handle('x-auth:save', async (_event, auth) => {
-  return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, auth);
+  if (auth === null || auth === undefined) {
+    return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, null);
+  }
+  if (typeof auth !== 'object' || Array.isArray(auth)) {
+    return { success: false, error: 'invalid auth payload' };
+  }
+  const authToken = typeof auth.authToken === 'string' ? auth.authToken.trim().replace(/^["']|["']$/g, '').trim() : '';
+  const ct0 = typeof auth.ct0 === 'string' ? auth.ct0.trim().replace(/^["']|["']$/g, '').trim() : '';
+  if (!authToken && !ct0) {
+    return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, null);
+  }
+  if (
+    !authToken ||
+    !ct0 ||
+    authToken.length > 512 ||
+    ct0.length > 512 ||
+    !X_COOKIE_VALUE_PATTERN.test(authToken) ||
+    !X_COOKIE_VALUE_PATTERN.test(ct0)
+  ) {
+    return { success: false, error: 'invalid auth cookies' };
+  }
+  return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, { authToken, ct0 });
 });
 
 ipcMain.handle('x-auth:get', async () => {

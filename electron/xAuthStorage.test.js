@@ -96,4 +96,27 @@ describe('xAuthStorage save, load, clear', () => {
     saveEncryptedXAuth(ctx, null);
     assert.equal(storage.size, 0);
   });
+
+  it('rejects oversized tokens (>512 chars) or invalid cookie characters', () => {
+    const fakeFs = {
+      existsSync: () => false,
+      writeFileSync: () => {},
+    };
+    const fakeSafeStorage = {
+      isEncryptionAvailable: () => true,
+      encryptString: (str) => Buffer.from(str),
+    };
+    const ctx = { fs: fakeFs, pathModule: path, userDataPath: '/test/data', safeStorage: fakeSafeStorage };
+
+    // Oversized token
+    const longToken = 'a'.repeat(513);
+    const resOversized = saveEncryptedXAuth(ctx, { authToken: longToken, ct0: 'valid_ct0' });
+    assert.equal(resOversized.success, false);
+    assert.equal(resOversized.error, 'invalid auth cookies');
+
+    // Invalid characters (e.g. newline or control chars)
+    const resInvalidChar = saveEncryptedXAuth(ctx, { authToken: 'token\ninvalid', ct0: 'valid_ct0' });
+    assert.equal(resInvalidChar.success, false);
+    assert.equal(resInvalidChar.error, 'invalid auth cookies');
+  });
 });

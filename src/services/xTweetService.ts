@@ -765,6 +765,17 @@ export function buildXTweetDiscoveryRepos(
 let syncAbortController: AbortController | null = null;
 let syncInFlight: Promise<void> | null = null;
 
+/**
+ * 中止并等待当前正在运行的 X 推文同步完成。
+ * 主要用于数据管理面板清理缓存前调用，防止并发写入导致清理后脏数据重新落盘。
+ */
+export async function abortXTweetSync(): Promise<void> {
+  syncAbortController?.abort();
+  if (syncInFlight) {
+    await syncInFlight.catch(() => {});
+  }
+}
+
 /** 互斥执行：先登记新一轮再等待旧轮，避免重叠请求并发执行 body。 */
 async function runExclusiveSync(
   body: (signal: AbortSignal) => Promise<void>,
