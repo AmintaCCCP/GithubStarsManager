@@ -294,20 +294,52 @@ async function applyProxy(config) {
   }
 }
 
-// X 推文频道：主进程代抓 x.com 未登录主页（渲染进程受 CORS 限制无法直连；
-// net.fetch 走 Chromium 网络栈，自动跟随应用内已设置的代理）
+function getFetchDispatcher() {
+  const config = loadProxyConfig();
+  if (config.enabled && config.host && config.port) {
+    let auth = '';
+    if (config.username) {
+      auth = config.password
+        ? encodeURIComponent(config.username) + ':' + encodeURIComponent(config.password) + '@'
+        : encodeURIComponent(config.username) + '@';
+    }
+    const proxyUrl = config.type === 'socks5'
+      ? 'socks5://' + auth + config.host + ':' + config.port
+      : 'http://' + auth + config.host + ':' + config.port;
+    try {
+      const { ProxyAgent } = require('undici');
+      return new ProxyAgent(proxyUrl);
+    } catch {
+      return undefined;
+    }
+  }
+  const envProxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.ALL_PROXY || process.env.all_proxy;
+  if (envProxy) {
+    try {
+      const { ProxyAgent } = require('undici');
+      return new ProxyAgent(envProxy);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+// X 推文频道：主进程代抓 x.com 未登录主页
 ipcMain.handle('x-fetch-timeline', async (_event, handle) => {
   if (typeof handle !== 'string' || !/^[A-Za-z0-9_]{1,15}$/.test(handle)) {
     return { success: false, error: 'invalid handle' };
   }
   try {
-    const response = await net.fetch(`https://x.com/${handle}`, {
+    const dispatcher = getFetchDispatcher();
+    const response = await fetch(`https://x.com/${handle}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-US,en;q=0.9',
       },
       signal: AbortSignal.timeout(20_000),
+      ...(dispatcher ? { dispatcher } : {}),
     });
     if (!response.ok) {
       return { success: false, error: `x.com responded ${response.status}` };
@@ -350,7 +382,7 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
 });
 
 // X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
-// （带用户的 auth_token/ct0 Cookie；net.fetch 走 Chromium 网络栈，自动跟随应用代理）
+// （带用户的 auth_token/ct0 Cookie；使用 Node fetch 保持 TLS 指纹并规避 Chromium 对自定义 Header 的限制）
 // 只允许受控操作对应的 URL（调用方不可任意指定 x.com 路径）：
 // - 登录态首页（queryId 提取入口）
 // - abs.twimg.com 主脚本（queryId 提取源，绝不附带 X Cookie）
@@ -391,10 +423,12 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
           ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
         };
     // redirect: 'error' — 拒绝跨域（及一切）重定向，避免 Cookie 被转到允许域名之外
-    const response = await net.fetch(url, {
+    const dispatcher = getFetchDispatcher();
+    const response = await fetch(url, {
       headers,
       redirect: 'error',
       signal: AbortSignal.timeout(20_000),
+      ...(dispatcher ? { dispatcher } : {}),
     });
     if (typeof response.url === 'string' && response.url && !isAllowedXProxyUrl(response.url)) {
       return { success: false, error: 'redirect blocked' };
