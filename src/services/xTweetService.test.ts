@@ -46,6 +46,7 @@ const storage = vi.hoisted(() => {
     current: {
       lastSyncedAt: null as string | null,
       followsSignature: '',
+      authFingerprint: '',
       pages: {} as Record<string, { cursor: string | null; exhausted: boolean }>,
       userIds: {} as Record<string, string>,
       queryIds: {} as Record<string, string>,
@@ -72,6 +73,7 @@ const storage = vi.hoisted(() => {
       metaRef.current = {
         lastSyncedAt: null,
         followsSignature: '',
+        authFingerprint: '',
         pages: {},
         userIds: {},
         queryIds: {},
@@ -781,6 +783,68 @@ describe('syncXTweetChannel（鉴权路径）', () => {
     await expect(syncXTweetChannel(api, 2, authFollows, undefined, undefined, AUTH, graphQL))
       .rejects.toThrow('分页游标未前进');
     expect((await xTweetStorage.getSyncMeta()).pages['geekbb']).toEqual({ cursor: fixtureCursor, exhausted: false });
+  });
+
+  it('相同 handle 使用不同 Cookie 身份时隔离缓存：第二身份不显示第一身份的缓存记录', async () => {
+    const AUTH1: XTweetAuth = { authToken: 'token_user1', ct0: 'ct0_user1' };
+    const AUTH2: XTweetAuth = { authToken: 'token_user2', ct0: 'ct0_user2' };
+
+    const tweets1 = makeUserTweetsBody([
+      tweetEntry(1001, 'check this https://t.co/user1', 'Sun Sep 13 01:00:00 +0000 2026', [
+        { url: 'https://t.co/user1', expanded_url: 'https://github.com/user1/repo1', indices: [11, 34] },
+      ]),
+    ], null);
+
+    const tweets2 = makeUserTweetsBody([
+      tweetEntry(2001, 'check this https://t.co/user2', 'Sun Sep 13 02:00:00 +0000 2026', [
+        { url: 'https://t.co/user2', expanded_url: 'https://github.com/user2/repo2', indices: [11, 34] },
+      ]),
+    ], null);
+
+    const api1 = makeApi(new Map([['user1/repo1', makeDetail('user1/repo1')]]));
+    const { graphQL: graphQL1 } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: tweets1 },
+    ]);
+
+    const result1 = await syncXTweetChannel(api1, 1, authFollows, undefined, undefined, AUTH1, graphQL1);
+    expect(result1.repos.some((r) => r.full_name === 'user1/repo1')).toBe(true);
+
+    const api2 = makeApi(new Map([['user2/repo2', makeDetail('user2/repo2')]]));
+    const { graphQL: graphQL2 } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: tweets2 },
+    ]);
+
+    const result2 = await syncXTweetChannel(api2, 1, authFollows, undefined, undefined, AUTH2, graphQL2);
+    expect(result2.repos.some((r) => r.full_name === 'user2/repo2')).toBe(true);
+    expect(result2.repos.some((r) => r.full_name === 'user1/repo1')).toBe(false);
+
+    const storedTweets = await xTweetStorage.getAllTweets();
+    expect(storedTweets.has('1001')).toBe(false);
+    expect(storedTweets.has('2001')).toBe(true);
+  });
+
+  it('clearAll() 失败时同步立即失败且不发起上游 GraphQL 请求', async () => {
+    const AUTH1: XTweetAuth = { authToken: 'token_user1', ct0: 'ct0_user1' };
+    const AUTH2: XTweetAuth = { authToken: 'token_user2', ct0: 'ct0_user2' };
+
+    const api1 = makeApi(new Map([['obsidianmd/knap', makeDetail('obsidianmd/knap')]]));
+    await syncXTweetChannel(api1, 1, authFollows, undefined, undefined, AUTH1, stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]).graphQL);
+
+    const clearAllSpy = vi.spyOn(xTweetStorage, 'clearAll').mockRejectedValueOnce(new Error('clearAll failure'));
+    const { graphQL: graphQL2, calls: calls2 } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]);
+
+    await expect(syncXTweetChannel(api1, 1, authFollows, undefined, undefined, AUTH2, graphQL2))
+      .rejects.toThrow('clearAll failure');
+    expect(calls2.length).toBe(0);
+    clearAllSpy.mockRestore();
   });
 });
 

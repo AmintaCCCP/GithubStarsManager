@@ -972,86 +972,107 @@ async function syncXTweetChannelWithAuth(
   const windowEnd = page * X_TWEET_CARD_PAGE_SIZE;
   // 签名带鉴权指纹：不同 Cookie 之间切换后 60 秒水位立即失效，触发重抓，
   // 避免复用旧账户的 IndexedDB 快照（指纹为哈希，不含原始 Cookie）
-  const signature = `${followsSignatureOf(handles)}|${xTweetAuthFingerprint(auth)}`;
-  const meta0 = await xTweetStorage.getSyncMeta();
-  const recent = isRecentlySynced(meta0, signature);
+  const currentFingerprint = xTweetAuthFingerprint(auth);
+  const signature = `${followsSignatureOf(handles)}|${currentFingerprint}`;
+
   let snapshot: { tweets: Map<string, XStoredTweet>; repos: Map<string, XStoredRepo> } | null = null;
-  let needsSync = page <= 1 && !recent;
-  if (!needsSync) {
-    const [tweets, repos] = await Promise.all([
-      xTweetStorage.getAllTweets(),
-      xTweetStorage.getAllRepos(),
-    ]);
-    snapshot = { tweets, repos };
-    if (page > 1) {
-      needsSync = handlesWithMore(meta0, handles).length > 0;
+  let settledMeta: XTweetSyncMeta | null = null;
+
+  await runExclusiveSync(async (signal) => {
+    // 鉴权指纹变化检查必须置于 needsSync 判断和缓存快照读取之前；
+    // 检测到变化时先 clearAll()，若抛错立即终止整轮，确保不发起上游请求或提交结果
+    let meta = await xTweetStorage.getSyncMeta();
+    const prevFingerprint = meta.authFingerprint || (meta.followsSignature.includes('|') ? meta.followsSignature.split('|')[1] : '');
+    const authChanged = Boolean(prevFingerprint && prevFingerprint !== currentFingerprint);
+
+    if (authChanged) {
+      await xTweetStorage.clearAll();
+      meta = await xTweetStorage.getSyncMeta();
     }
-  }
 
-  if (needsSync) {
-    await runExclusiveSync(async (signal) => {
-      const meta = await xTweetStorage.getSyncMeta();
-      if (page <= 1 && isRecentlySynced(meta, signature)) return;
-      meta.followsSignature = signature;
-      const tweets = await xTweetStorage.getAllTweets();
-      const repos = await xTweetStorage.getAllRepos();
+    const recent = isRecentlySynced(meta, signature);
+    let needsSync = page <= 1 && !recent;
+    if (!needsSync && page > 1) {
+      needsSync = handlesWithMore(meta, handles).length > 0;
+    }
 
-      const touchedRepoKeys = new Set<string>();
-      let succeeded = 0;
-      let firstError: unknown = null;
-      // page N 只翻未取尽的博主；page 1 始终重抓全部博主最新页
-      const targets = page <= 1 ? handles : handlesWithMore(meta, handles);
-      for (const handle of targets) {
-        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-        onStatus?.({ phase: 'syncing', current: succeeded, total: targets.length });
-        try {
-          const pendingKeys = await fetchAndIngestXUserPage(
-            handle, page, meta, auth, tweets, repos, graphQL, signal,
-          );
-          for (const key of pendingKeys) touchedRepoKeys.add(key);
-        } catch (error) {
-          if (isAbortError(error) || isPersistenceError(error) || isStalledCursorError(error)) throw error;
-          // 抓取/解析失败只跳过该博主（账号不存在/网络抖动不拖垮整轮）
-          logger.warn('xTweet', `Authenticated timeline fetch failed for @${handle}`, error);
-          firstError = firstError ?? error;
-          await sleep(HANDLE_THROTTLE_MS);
-          continue;
-        }
-        succeeded++;
-        await sleep(HANDLE_THROTTLE_MS);
-      }
-      if (succeeded === 0 && targets.length > 0) {
-        throw firstError instanceof Error
-          ? firstError
-          : new Error('X 推文抓取失败：所有博主的时间线均不可达');
-      }
+    if (!needsSync) {
+      const [tweets, repos] = await Promise.all([
+        xTweetStorage.getAllTweets(),
+        xTweetStorage.getAllRepos(),
+      ]);
+      snapshot = { tweets, repos };
+      settledMeta = meta;
+      return;
+    }
 
-      const enrichTargets = reposNeedingDetail(repos, touchedRepoKeys, Date.now());
-      const touchedRepos = () => [...touchedRepoKeys]
-        .map((key) => repos.get(key))
-        .filter((repo): repo is XStoredRepo => Boolean(repo));
+    meta.followsSignature = signature;
+    meta.authFingerprint = currentFingerprint;
+    const tweets = await xTweetStorage.getAllTweets();
+    const repos = await xTweetStorage.getAllRepos();
+
+    const touchedRepoKeys = new Set<string>();
+    let succeeded = 0;
+    let firstError: unknown = null;
+    // page N 只翻未取尽的博主；page 1 始终重抓全部博主最新页
+    const targets = page <= 1 ? handles : handlesWithMore(meta, handles);
+    for (const handle of targets) {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      onStatus?.({ phase: 'syncing', current: succeeded, total: targets.length });
       try {
-        await enrichRepos(api, enrichTargets, onStatus, signal);
-        meta.lastSyncedAt = new Date().toISOString();
-        await xTweetStorage.saveSyncBatch({ tweets: [], repos: touchedRepos(), meta });
+        const pendingKeys = await fetchAndIngestXUserPage(
+          handle, page, meta, auth, tweets, repos, graphQL, signal,
+        );
+        for (const key of pendingKeys) touchedRepoKeys.add(key);
       } catch (error) {
-        if (isAbortError(error)) {
-          // 取消：保留已获取的详情，但不推进水位（下轮继续补全）
-          await xTweetStorage.saveSyncBatch({ tweets: [], repos: touchedRepos(), meta });
-        }
-        throw error;
+        if (isAbortError(error) || isPersistenceError(error) || isStalledCursorError(error)) throw error;
+        // 抓取/解析失败只跳过该博主（账号不存在/网络抖动不拖垮整轮）
+        logger.warn('xTweet', `Authenticated timeline fetch failed for @${handle}`, error);
+        firstError = firstError ?? error;
+        await sleep(HANDLE_THROTTLE_MS);
+        continue;
       }
-    }, onStatus);
+      succeeded++;
+      await sleep(HANDLE_THROTTLE_MS);
+    }
+    if (succeeded === 0 && targets.length > 0) {
+      throw firstError instanceof Error
+        ? firstError
+        : new Error('X 推文抓取失败：所有博主的时间线均不可达');
+    }
+
+    const enrichTargets = reposNeedingDetail(repos, touchedRepoKeys, Date.now());
+    const touchedRepos = () => [...touchedRepoKeys]
+      .map((key) => repos.get(key))
+      .filter((repo): repo is XStoredRepo => Boolean(repo));
+    try {
+      await enrichRepos(api, enrichTargets, onStatus, signal);
+      meta.lastSyncedAt = new Date().toISOString();
+      await xTweetStorage.saveSyncBatch({ tweets: [], repos: touchedRepos(), meta });
+    } catch (error) {
+      if (isAbortError(error)) {
+        // 取消：保留已获取的详情，但不推进水位（下轮继续补全）
+        await xTweetStorage.saveSyncBatch({ tweets: [], repos: touchedRepos(), meta });
+      }
+      throw error;
+    }
+
+    snapshot = {
+      tweets: await xTweetStorage.getAllTweets(),
+      repos: await xTweetStorage.getAllRepos(),
+    };
+    settledMeta = meta;
+  }, onStatus);
+
+  if (!snapshot || !settledMeta) {
+    snapshot = {
+      tweets: await xTweetStorage.getAllTweets(),
+      repos: await xTweetStorage.getAllRepos(),
+    };
+    settledMeta = await xTweetStorage.getSyncMeta();
   }
 
-  const settled = needsSync
-    ? {
-        tweets: await xTweetStorage.getAllTweets(),
-        repos: await xTweetStorage.getAllRepos(),
-      }
-    : snapshot!;
-  const settledMeta = await xTweetStorage.getSyncMeta();
-  const accumulated = buildXTweetDiscoveryRepos(settled.tweets, settled.repos, handles);
+  const accumulated = buildXTweetDiscoveryRepos(snapshot.tweets, snapshot.repos, handles);
   const allExhausted = handlesWithMore(settledMeta, handles).length === 0;
   return {
     repos: accumulated.slice(0, windowEnd),

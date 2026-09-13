@@ -45,6 +45,8 @@ export interface XTweetSyncMeta {
   lastSyncedAt: string | null;
   /** 生成水位时的关注列表签名（规范化 handle 排序拼接）；列表变化则水位失效 */
   followsSignature: string;
+  /** 鉴权指纹（不同 Cookie 切换时清理推文与仓库缓存） */
+  authFingerprint?: string;
   /** 鉴权路径的分页游标（跨会话保留，"加载更多"接着上次的位置继续拉） */
   pages: Record<string, XTweetPageState>;
   /** 已解析的博主用户 ID（handle → rest_id，鉴权 GraphQL 路径复用） */
@@ -56,6 +58,7 @@ export interface XTweetSyncMeta {
 const createDefaultMeta = (): XTweetSyncMeta => ({
   lastSyncedAt: null,
   followsSignature: '',
+  authFingerprint: '',
   pages: {},
   userIds: {},
   queryIds: {},
@@ -73,6 +76,7 @@ const normalizeStringRecord = (value: unknown): Record<string, string> => {
 const normalizeMeta = (meta: XTweetSyncMeta | null | undefined): XTweetSyncMeta => ({
   lastSyncedAt: meta?.lastSyncedAt ?? null,
   followsSignature: typeof meta?.followsSignature === 'string' ? meta.followsSignature : '',
+  authFingerprint: typeof meta?.authFingerprint === 'string' ? meta.authFingerprint : '',
   pages: meta?.pages && typeof meta.pages === 'object'
     ? Object.fromEntries(
         Object.entries(meta.pages)

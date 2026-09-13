@@ -113,11 +113,25 @@ export const fetchXTimelineViaDesktop = async (handle: string): Promise<string |
   return result.html;
 };
 
-/** X 推文频道鉴权路径：经主进程代发 x.com GraphQL / 静态资源请求。非桌面环境返回 null。 */
+const X_HOME_URL = 'https://x.com/home';
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js$/;
+const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
+
+export const isAllowedXGraphQLUrl = (url: string): boolean =>
+  url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
+
+/**
+ * X 推文频道鉴权路径：经主进程代发 x.com GraphQL / 静态资源请求。非桌面环境返回 null。
+ * 限制仅允许 x.com 与 abs.twimg.com 目标，主进程 net.fetch 配置 redirect: 'error'
+ * 拒绝跨域重定向，防止 Cookie 被转到允许域名之外。
+ */
 export const fetchXGraphQLViaDesktop = async (
   url: string,
   auth: { authToken: string; ct0: string },
 ): Promise<string | null> => {
+  if (typeof url !== 'string' || !isAllowedXGraphQLUrl(url)) {
+    throw new Error('invalid url for x.com fetch');
+  }
   if (!window.electronAPI?.xFetchGraphQL) return null;
   const result = await window.electronAPI.xFetchGraphQL(url, auth);
   if (!result.success || typeof result.body !== 'string') {

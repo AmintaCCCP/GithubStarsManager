@@ -1255,6 +1255,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         user: null,
         githubToken: null,
         isAuthenticated: false,
+        xTweetAuth: null,
+        xTweetAuthRevision: 0,
 
         // 仓库数据
         repositories: [],
