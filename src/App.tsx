@@ -163,19 +163,18 @@ function App() {
     }
   }, []);
 
-  // Restore persisted encrypted X auth cookies on desktop startup (#356)
+  // Restore persisted encrypted X auth cookies on desktop startup after hydration completes (#356)
   useEffect(() => {
-    if (isElectron()) {
-      void loadEncryptedXAuthViaDesktop().then((auth) => {
-        if (auth) {
-          const current = useAppStore.getState().xTweetAuth;
-          if (!current || current.authToken !== auth.authToken || current.ct0 !== auth.ct0) {
-            useAppStore.getState().setXTweetAuth(auth);
-          }
+    if (!hasHydrated || !isElectron()) return;
+    void loadEncryptedXAuthViaDesktop().then((auth) => {
+      if (auth) {
+        const current = useAppStore.getState().xTweetAuth;
+        if (!current || current.authToken !== auth.authToken || current.ct0 !== auth.ct0) {
+          useAppStore.getState().setXTweetAuth(auth);
         }
-      });
-    }
-  }, []);
+      }
+    });
+  }, [hasHydrated]);
 
   useEffect(() => {
     if (theme === 'dark') {

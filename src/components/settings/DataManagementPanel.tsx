@@ -1831,7 +1831,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <Button
                   variant="ghost"
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
-                  disabled={stat.count === 0}
+                  disabled={stat.key !== 'discoveryData' && stat.count === 0}
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />

@@ -54,7 +54,7 @@ describe('xAuthStorage save, load, clear', () => {
     assert.equal(loadEncryptedXAuth(ctx), null);
   });
 
-  it('falls back to buffer when safeStorage encryption is unavailable', () => {
+  it('returns error and does not write plaintext file when safeStorage encryption is unavailable', () => {
     const storage = new Map();
     const fakeFs = {
       existsSync: (p) => storage.has(p),
@@ -67,9 +67,11 @@ describe('xAuthStorage save, load, clear', () => {
     };
     const ctx = { fs: fakeFs, pathModule: path, userDataPath: '/test/data', safeStorage: fakeSafeStorage };
 
-    saveEncryptedXAuth(ctx, { authToken: 'my_auth', ct0: 'my_ct0' });
+    const saveRes = saveEncryptedXAuth(ctx, { authToken: 'my_auth', ct0: 'my_ct0' });
+    assert.equal(saveRes.success, false);
+    assert.equal(storage.size, 0);
     const loaded = loadEncryptedXAuth(ctx);
-    assert.deepEqual(loaded, { authToken: 'my_auth', ct0: 'my_ct0' });
+    assert.equal(loaded, null);
   });
 
   it('handles corrupted file gracefully returning null', () => {

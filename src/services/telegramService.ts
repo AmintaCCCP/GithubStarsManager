@@ -459,16 +459,10 @@ async function fetchAndIngestChannelPage(
   signal: AbortSignal,
 ): Promise<Set<string>> {
   if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-  let parsed: ReturnType<typeof parseTelegramChannelHtml>;
+  const html = await transport(channel, before ?? undefined);
+  const parsed = parseTelegramChannelHtml(html, channel);
   const key = channel.toLowerCase();
   const known = meta.pages[key];
-  try {
-    const html = await transport(channel, before ?? undefined);
-    parsed = parseTelegramChannelHtml(html, channel);
-  } catch (error) {
-    if (isAbortError(error)) throw error;
-    throw error;
-  }
   if (before === null || before === undefined) {
     // page 1 刷新：游标只在从未翻过页时初始化，绝不回退已推进的位置
     if (!known) {

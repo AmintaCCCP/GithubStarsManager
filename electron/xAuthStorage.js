@@ -24,13 +24,16 @@ function saveEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }, auth)
     ct0: auth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
   });
 
+  if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
+    return {
+      success: false,
+      error: 'SafeStorage encryption is unavailable on this system; credentials not saved to disk.',
+    };
+  }
+
   try {
-    if (safeStorage && typeof safeStorage.isEncryptionAvailable === 'function' && safeStorage.isEncryptionAvailable()) {
-      const encrypted = safeStorage.encryptString(payload);
-      fs.writeFileSync(filePath, encrypted);
-    } else {
-      fs.writeFileSync(filePath, Buffer.from(payload, 'utf-8'));
-    }
+    const encrypted = safeStorage.encryptString(payload);
+    fs.writeFileSync(filePath, encrypted);
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -41,16 +44,13 @@ function loadEncryptedXAuth({ fs, pathModule, userDataPath, safeStorage }) {
   try {
     const filePath = getXAuthPath(userDataPath, pathModule);
     if (!fs.existsSync(filePath)) return null;
+    if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
+      return null;
+    }
     const buf = fs.readFileSync(filePath);
     if (!buf || buf.length === 0) return null;
 
-    let payloadStr;
-    if (safeStorage && typeof safeStorage.isEncryptionAvailable === 'function' && safeStorage.isEncryptionAvailable()) {
-      payloadStr = safeStorage.decryptString(buf);
-    } else {
-      payloadStr = buf.toString('utf-8');
-    }
-
+    const payloadStr = safeStorage.decryptString(buf);
     const data = JSON.parse(payloadStr);
     if (data && typeof data.authToken === 'string' && typeof data.ct0 === 'string' && data.authToken && data.ct0) {
       return { authToken: data.authToken, ct0: data.ct0 };
