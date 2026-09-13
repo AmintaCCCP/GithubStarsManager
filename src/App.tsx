@@ -166,13 +166,20 @@ function App() {
   // Restore persisted encrypted X auth cookies on desktop startup after hydration completes (#356)
   useEffect(() => {
     if (!hasHydrated || !isElectron()) return;
-    void loadEncryptedXAuthViaDesktop().then((auth) => {
+    loadEncryptedXAuthViaDesktop().then((auth) => {
       if (auth) {
         const current = useAppStore.getState().xTweetAuth;
         if (!current || current.authToken !== auth.authToken || current.ct0 !== auth.ct0) {
+          logger.info('xAuth', 'Restoring encrypted X auth from disk');
           useAppStore.getState().setXTweetAuth(auth);
+        } else {
+          logger.debug('xAuth', 'Encrypted X auth already matches in-memory state; skipping restore');
         }
+      } else {
+        logger.debug('xAuth', 'No encrypted X auth found on disk');
       }
+    }).catch((err: unknown) => {
+      logger.errorFromError('xAuth', 'Failed to load encrypted X auth from disk', err);
     });
   }, [hasHydrated]);
 

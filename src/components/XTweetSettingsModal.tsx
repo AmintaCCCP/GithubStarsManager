@@ -8,6 +8,8 @@ import { Modal } from './Modal';
 import { useDialog } from '../hooks/useDialog';
 import { useXTweetProbe } from '../features/discovery/hooks/useXTweetProbe';
 import { normalizeXTweetAuth, normalizeXTweetHandleInput } from '../utils/xTweetFollows';
+import { saveEncryptedXAuthViaDesktop, isElectron } from '../services/electronProxy';
+import { logger } from '../services/logger';
 
 interface XTweetSettingsModalProps {
   isOpen: boolean;
@@ -66,16 +68,35 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
     toast(t(`已取消关注 @${follow.handle}。`, `Unfollowed @${follow.handle}.`), 'info');
   };
 
-  const handleSaveAuth = () => {
+  const handleSaveAuth = async () => {
     const sanitized = normalizeXTweetAuth({ authToken: authTokenInput, ct0: ct0Input });
     if (!sanitized) {
       toast(t('auth_token 与 ct0 都需要填写有效内容。', 'Both auth_token and ct0 must contain valid values.'), 'error');
       return;
     }
+    // Eagerly update in-memory state so UI reacts immediately
     setXTweetAuth(sanitized);
     setAuthTokenInput(sanitized.authToken);
     setCt0Input(sanitized.ct0);
-    toast(t('已保存鉴权 Cookie，刷新后按 GraphQL 模式抓取。', 'Auth cookies saved; refreshes now use the GraphQL mode.'), 'success');
+
+    // Verify the disk write actually succeeded (desktop only)
+    if (isElectron()) {
+      try {
+        await saveEncryptedXAuthViaDesktop(sanitized);
+        toast(t('已保存鉴权 Cookie，刷新后按 GraphQL 模式抓取。', 'Auth cookies saved; refreshes now use the GraphQL mode.'), 'success');
+      } catch (err: unknown) {
+        logger.errorFromError('xAuth', 'Disk persistence of X auth failed after setXTweetAuth', err);
+        toast(
+          t(
+            '鉴权 Cookie 已生效但未能持久化保存到磁盘，重启后可能丢失。',
+            'Auth cookies applied but failed to persist to disk; they may be lost on restart.',
+          ),
+          'warning',
+        );
+      }
+    } else {
+      toast(t('已保存鉴权 Cookie（仅本次会话有效）。', 'Auth cookies saved (current session only).'), 'success');
+    }
   };
 
   const handleClearAuth = () => {

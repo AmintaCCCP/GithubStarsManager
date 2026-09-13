@@ -3,6 +3,7 @@ import type { AppStoreSlice } from '../types';
 import { normalizeXTweetAuth, normalizeXTweetHandleInput } from '../../utils/xTweetFollows';
 import { normalizeTelegramChannelInput } from '../../utils/telegramFollows';
 import { saveEncryptedXAuthViaDesktop, clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
+import { logger } from '../../services/logger';
 
 export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setSelectedDiscoveryChannel'
@@ -135,21 +136,27 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     setXTweetAuth: (auth) => {
       const sanitized = normalizeXTweetAuth(auth);
       if (!sanitized) {
-        void clearEncryptedXAuthViaDesktop();
+        clearEncryptedXAuthViaDesktop().catch((err: unknown) => {
+          logger.errorFromError('xAuth', 'Failed to clear encrypted X auth', err);
+        });
         set((state) => ({
           xTweetAuth: null,
           xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
         }));
         return;
       }
-      void saveEncryptedXAuthViaDesktop(sanitized);
+      saveEncryptedXAuthViaDesktop(sanitized).catch((err: unknown) => {
+        logger.errorFromError('xAuth', 'Failed to persist encrypted X auth to disk — auth will be lost on restart', err);
+      });
       set((state) => ({
         xTweetAuth: sanitized,
         xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
       }));
     },
     clearXTweetAuth: () => {
-      void clearEncryptedXAuthViaDesktop();
+      clearEncryptedXAuthViaDesktop().catch((err: unknown) => {
+        logger.errorFromError('xAuth', 'Failed to clear encrypted X auth', err);
+      });
       set((state) => ({
         xTweetAuth: null,
         xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
