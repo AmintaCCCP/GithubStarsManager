@@ -216,9 +216,15 @@ export const normalizePersistedState = (
     discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
   trendingTimeRange: 'weekly' as TrendingTimeRange,
     xTweetFollows: normalizeXTweetFollows(safePersisted.xTweetFollows),
-    // xTweetAuth 仅内存态：永不从持久化快照恢复（旧快照残留字段直接忽略），
-    // 避免明文 Cookie 经 hydration 回到状态。
-    xTweetAuth: null,
+    xTweetAuth: safePersisted.xTweetAuth && typeof safePersisted.xTweetAuth.authToken === 'string'
+      && typeof safePersisted.xTweetAuth.ct0 === 'string'
+      && safePersisted.xTweetAuth.authToken.trim()
+      && safePersisted.xTweetAuth.ct0.trim()
+      ? {
+          authToken: safePersisted.xTweetAuth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
+          ct0: safePersisted.xTweetAuth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
+        }
+      : null,
     xTweetAuthRevision: typeof (safePersisted as Record<string, unknown>).xTweetAuthRevision === 'number'
       && Number.isFinite((safePersisted as Record<string, unknown>).xTweetAuthRevision)
       ? (safePersisted as Record<string, unknown>).xTweetAuthRevision as number

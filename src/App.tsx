@@ -167,8 +167,11 @@ function App() {
   useEffect(() => {
     if (isElectron()) {
       void loadEncryptedXAuthViaDesktop().then((auth) => {
-        if (auth && !useAppStore.getState().xTweetAuth) {
-          useAppStore.getState().setXTweetAuth(auth);
+        if (auth) {
+          const current = useAppStore.getState().xTweetAuth;
+          if (!current || current.authToken !== auth.authToken || current.ct0 !== auth.ct0) {
+            useAppStore.getState().setXTweetAuth(auth);
+          }
         }
       });
     }

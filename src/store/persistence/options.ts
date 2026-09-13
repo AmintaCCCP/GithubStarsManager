@@ -150,8 +150,8 @@ discoverySortOrder: state.discoverySortOrder,
 discoverySelectedTopic: state.discoverySelectedTopic,
 weeklyOnlyCollected: state.weeklyOnlyCollected,
 xTweetFollows: state.xTweetFollows,
-// xTweetAuth 仅内存态：明文 Cookie 不写入 IndexedDB/localStorage。
-// 非敏感的 xTweetAuthRevision 持久化，用于跨会话的请求签名稳定性。
+// 持久化 X 鉴权 Cookie 与版本号（同 proxyConfig 密码和 backendApiSecret 一样保存，避免用户重启后重新输入）
+xTweetAuth: state.xTweetAuth,
 xTweetAuthRevision: state.xTweetAuthRevision,
 telegramFollows: state.telegramFollows,
 // 持久化完整代理配置，包含认证密码，确保重启后无需重新输入。
@@ -324,9 +324,19 @@ state.discoverySortOrder = 'Descending';
   if (state) {
     const stateRecord = state as Record<string, unknown>;
     stateRecord.xTweetFollows = normalizeXTweetFollows(stateRecord.xTweetFollows);
-    // 旧快照可能含明文 xTweetAuth：直接删除（不删除整个快照），内存态置 null；
-    // 清理后的快照随下次持久化写回 IndexedDB/localStorage。
-    if ('xTweetAuth' in stateRecord) delete stateRecord.xTweetAuth;
+    if (stateRecord.xTweetAuth && typeof stateRecord.xTweetAuth === 'object') {
+      const auth = stateRecord.xTweetAuth as Record<string, unknown>;
+      if (typeof auth.authToken === 'string' && typeof auth.ct0 === 'string' && auth.authToken && auth.ct0) {
+        stateRecord.xTweetAuth = {
+          authToken: auth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
+          ct0: auth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
+        };
+      } else {
+        stateRecord.xTweetAuth = null;
+      }
+    } else {
+      stateRecord.xTweetAuth = null;
+    }
     if (typeof stateRecord.xTweetAuthRevision !== 'number' || !Number.isFinite(stateRecord.xTweetAuthRevision)) {
       stateRecord.xTweetAuthRevision = 0;
     }

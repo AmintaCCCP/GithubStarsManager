@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import React, { useState } from 'react';
-import { Cookie, KeyRound, PlugZap, Plus, Trash2, Users, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Cookie, Eye, EyeOff, KeyRound, PlugZap, Plus, Trash2, Users, X } from 'lucide-react';
 import type { XTweetFollow } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { Modal } from './Modal';
@@ -34,6 +34,15 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
   const [input, setInput] = useState('');
   const [authTokenInput, setAuthTokenInput] = useState('');
   const [ct0Input, setCt0Input] = useState('');
+  const [showAuthToken, setShowAuthToken] = useState(false);
+  const [showCt0, setShowCt0] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setAuthTokenInput(xTweetAuth?.authToken || '');
+      setCt0Input(xTweetAuth?.ct0 || '');
+    }
+  }, [isOpen, xTweetAuth]);
 
   const handleKeys = new Set(xTweetFollows.map(follow => follow.handle.toLowerCase()));
 
@@ -65,8 +74,8 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
       return;
     }
     setXTweetAuth({ authToken, ct0 });
-    setAuthTokenInput('');
-    setCt0Input('');
+    setAuthTokenInput(authToken);
+    setCt0Input(ct0);
     toast(t('已保存鉴权 Cookie，刷新后按 GraphQL 模式抓取。', 'Auth cookies saved; refreshes now use the GraphQL mode.'), 'success');
   };
 
@@ -76,6 +85,10 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
     setCt0Input('');
     toast(t('已清除鉴权 Cookie，回到未登录抓取模式。', 'Auth cookies cleared; back to the signed-out mode.'), 'info');
   };
+
+  const isAuthDirty =
+    authTokenInput.trim() !== (xTweetAuth?.authToken || '') ||
+    ct0Input.trim() !== (xTweetAuth?.ct0 || '');
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('X 推文频道设置', 'X Tweets Channel Settings')} maxWidth="max-w-2xl">
@@ -211,24 +224,44 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
             </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
-            <Input
-              type="password"
-              aria-label={t('auth_token', 'auth_token')}
-              value={authTokenInput}
-              onChange={(event) => setAuthTokenInput(event.target.value)}
-              placeholder={xTweetAuth ? t('已保存（输入可覆盖）', 'Saved (type to replace)') : 'auth_token'}
-              autoComplete="off"
-              className="min-w-0 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
-            />
-            <Input
-              type="password"
-              aria-label={t('ct0', 'ct0')}
-              value={ct0Input}
-              onChange={(event) => setCt0Input(event.target.value)}
-              placeholder={xTweetAuth ? t('已保存（输入可覆盖）', 'Saved (type to replace)') : 'ct0'}
-              autoComplete="off"
-              className="min-w-0 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
-            />
+            <div className="relative">
+              <Input
+                type={showAuthToken ? 'text' : 'password'}
+                aria-label={t('auth_token', 'auth_token')}
+                value={authTokenInput}
+                onChange={(event) => setAuthTokenInput(event.target.value)}
+                placeholder="auth_token"
+                autoComplete="off"
+                className="w-full rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 pl-3 pr-9 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAuthToken((prev) => !prev)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                aria-label={showAuthToken ? t('隐藏 auth_token', 'Hide auth_token') : t('显示 auth_token', 'Show auth_token')}
+              >
+                {showAuthToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <div className="relative">
+              <Input
+                type={showCt0 ? 'text' : 'password'}
+                aria-label={t('ct0', 'ct0')}
+                value={ct0Input}
+                onChange={(event) => setCt0Input(event.target.value)}
+                placeholder="ct0"
+                autoComplete="off"
+                className="w-full rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 pl-3 pr-9 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCt0((prev) => !prev)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors rounded"
+                aria-label={showCt0 ? t('隐藏 ct0', 'Hide ct0') : t('显示 ct0', 'Show ct0')}
+              >
+                {showCt0 ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
@@ -252,11 +285,11 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
               <Button
                 type="button"
                 onClick={handleSaveAuth}
-                disabled={!authTokenInput.trim() || !ct0Input.trim()}
+                disabled={!authTokenInput.trim() || !ct0Input.trim() || (xTweetAuth !== null && !isAuthDirty)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <PlugZap className="h-4 w-4" />
-                {xTweetAuth ? t('更新鉴权', 'Update Auth') : t('保存鉴权', 'Save Auth')}
+                {xTweetAuth ? (isAuthDirty ? t('更新鉴权', 'Update Auth') : t('已保存', 'Saved')) : t('保存鉴权', 'Save Auth')}
               </Button>
             </div>
           </div>
