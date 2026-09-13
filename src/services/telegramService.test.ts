@@ -298,7 +298,7 @@ describe('syncTelegramChannel', () => {
     ]);
     const api = makeApi(details);
     const page1 = await syncTelegramChannel(api, 1, follows, undefined, transport);
-    const page1Count = page1.totalCount;
+    const page1Count = page1.totalCount ?? 0;
 
     const page2 = await syncTelegramChannel(api, 2, follows, undefined, transport);
     expect(calls).toEqual(['geekhub23|', 'geekhub23|589']);
