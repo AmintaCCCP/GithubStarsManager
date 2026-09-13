@@ -209,7 +209,42 @@ export function ingestFeedMessages(
   const newMessages: TelegramStoredMessage[] = [];
   const pendingRepoKeys = new Set<string>();
   for (const message of feed) {
-    if (messages.has(message.messageId)) continue;
+    const existing = messages.get(message.messageId);
+    if (existing) {
+      const sameRepos =
+        existing.repoFullNames.length === message.repoFullNames.length &&
+        existing.repoFullNames.every((name, idx) => name === message.repoFullNames[idx]);
+      const isIdentical =
+        existing.content === message.content &&
+        existing.displayName === message.displayName &&
+        sameRepos;
+      if (isIdentical) continue;
+
+      // 若已存消息被编辑且删除了原有关联仓库，重新计算对应仓库的来源消息归属
+      const newRepoKeys = new Set(message.repoFullNames);
+      for (const oldKey of existing.repoFullNames) {
+        if (!newRepoKeys.has(oldKey)) {
+          const repo = repos.get(oldKey);
+          if (repo && repo.sourceMessageId === message.messageId) {
+            let latestOtherMsg: TelegramStoredMessage | null = null;
+            for (const otherMsg of messages.values()) {
+              if (otherMsg.messageId !== message.messageId && otherMsg.repoFullNames.includes(oldKey)) {
+                if (!latestOtherMsg || otherMsg.createdAt > latestOtherMsg.createdAt) {
+                  latestOtherMsg = otherMsg;
+                }
+              }
+            }
+            if (latestOtherMsg) {
+              repo.sourceMessageId = latestOtherMsg.messageId;
+              repo.messageCreatedAt = latestOtherMsg.createdAt;
+            } else {
+              repos.delete(oldKey);
+            }
+          }
+        }
+      }
+    }
+
     messages.set(message.messageId, message);
     newMessages.push(message);
 
@@ -223,7 +258,7 @@ export function ingestFeedMessages(
           sourceMessageId: message.messageId,
           messageCreatedAt: message.createdAt,
         });
-      } else if (message.createdAt > repo.messageCreatedAt) {
+      } else if (message.createdAt >= repo.messageCreatedAt || repo.sourceMessageId === message.messageId) {
         repo.sourceMessageId = message.messageId;
         repo.messageCreatedAt = message.createdAt;
       }

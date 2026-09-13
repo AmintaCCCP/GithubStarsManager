@@ -1,6 +1,6 @@
 
 import type { AppStoreSlice } from '../types';
-import { normalizeXTweetHandleInput } from '../../utils/xTweetFollows';
+import { normalizeXTweetAuth, normalizeXTweetHandleInput } from '../../utils/xTweetFollows';
 import { normalizeTelegramChannelInput } from '../../utils/telegramFollows';
 import { saveEncryptedXAuthViaDesktop, clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
 
@@ -133,10 +133,15 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
       ),
     })),
     setXTweetAuth: (auth) => {
-      const sanitized = {
-        authToken: auth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
-        ct0: auth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
-      };
+      const sanitized = normalizeXTweetAuth(auth);
+      if (!sanitized) {
+        void clearEncryptedXAuthViaDesktop();
+        set((state) => ({
+          xTweetAuth: null,
+          xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
+        }));
+        return;
+      }
       void saveEncryptedXAuthViaDesktop(sanitized);
       set((state) => ({
         xTweetAuth: sanitized,

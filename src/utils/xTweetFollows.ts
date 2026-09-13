@@ -60,17 +60,18 @@ export const normalizeXTweetFollows = (value: unknown): XTweetFollow[] => {
 };
 
 /**
- * 修复持久化的鉴权 Cookie：两端去空白，任一为空即整体视为未配置（null）。
- * Cookie 值本身不做格式校验（x.com 校验），无效值由同步阶段报"鉴权失效"。
+ * 修复鉴权 Cookie：去除首尾空白与包裹引号（如用户直接复制 JSON 字符串带有的引号），
+ * 净化后若任一字段为空字符串则整体视为未配置（null）。
+ * Cookie 值本身不做特定格式过滤（x.com 校验），无效值由同步阶段报"鉴权失效"。
  */
 export const normalizeXTweetAuth = (value: unknown): XTweetAuth | null => {
   if (!value || typeof value !== 'object') return null;
-  const authToken = typeof (value as { authToken?: unknown }).authToken === 'string'
-    ? (value as { authToken: string }).authToken.trim()
-    : '';
-  const ct0 = typeof (value as { ct0?: unknown }).ct0 === 'string'
-    ? (value as { ct0: string }).ct0.trim()
-    : '';
+  const cleanField = (val: unknown): string => {
+    if (typeof val !== 'string') return '';
+    return val.trim().replace(/^["']|["']$/g, '').trim();
+  };
+  const authToken = cleanField((value as { authToken?: unknown }).authToken);
+  const ct0 = cleanField((value as { ct0?: unknown }).ct0);
   if (!authToken || !ct0) return null;
   return { authToken, ct0 };
 };

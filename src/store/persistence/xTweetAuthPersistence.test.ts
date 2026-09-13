@@ -4,8 +4,8 @@ import { normalizePersistedState } from '../normalizers/persistedState';
 import { createInitialState } from '../initialState';
 import type { AppStoreState } from '../types';
 
-describe('xTweetAuth persistence', () => {
-  it('includes xTweetAuth in partialize snapshot', () => {
+describe('xTweetAuth persistence & security', () => {
+  it('excludes plaintext xTweetAuth from partialize snapshot (CWE-922 protection)', () => {
     const state = {
       ...createInitialState(),
       xTweetAuth: {
@@ -17,62 +17,50 @@ describe('xTweetAuth persistence', () => {
 
     expect(appPersistenceOptions.partialize).toBeDefined();
     const partial = appPersistenceOptions.partialize!(state);
-    expect(partial.xTweetAuth).toEqual({
-      authToken: 'test_token_123',
-      ct0: 'test_ct0_456',
-    });
+    expect((partial as Record<string, unknown>).xTweetAuth).toBeUndefined();
     expect(partial.xTweetAuthRevision).toBe(2);
   });
 
-  it('normalizes and preserves valid xTweetAuth during hydration', () => {
-    const rawPersisted = {
+  it('preserves desktop-restored currentState.xTweetAuth during hydration without resetting to null', () => {
+    const currentState = {
+      ...createInitialState(),
       xTweetAuth: {
-        authToken: '  abc12345  ',
-        ct0: '  def67890  ',
+        authToken: 'desktop_token_123',
+        ct0: 'desktop_ct0_456',
       },
-      xTweetAuthRevision: 5,
-    };
+    } as unknown as AppStoreState;
 
-    const normalized = normalizePersistedState(
-      rawPersisted,
-      createInitialState() as unknown as AppStoreState,
-    );
+    const normalized = normalizePersistedState({}, currentState);
     expect(normalized.xTweetAuth).toEqual({
-      authToken: 'abc12345',
-      ct0: 'def67890',
+      authToken: 'desktop_token_123',
+      ct0: 'desktop_ct0_456',
     });
-    expect(normalized.xTweetAuthRevision).toBe(5);
   });
 
-  it('falls back to null when persisted xTweetAuth is invalid', () => {
-    const rawPersisted = {
+  it('sanitizes currentState.xTweetAuth and clears invalid quote-only auth during hydration', () => {
+    const currentState = {
+      ...createInitialState(),
       xTweetAuth: {
-        authToken: '',
-        ct0: 'valid_ct0',
+        authToken: '""',
+        ct0: "''",
       },
-    };
+    } as unknown as AppStoreState;
 
-    const normalized = normalizePersistedState(
-      rawPersisted,
-      createInitialState() as unknown as AppStoreState,
-    );
+    const normalized = normalizePersistedState({}, currentState);
     expect(normalized.xTweetAuth).toBeNull();
   });
 
-  it('preserves xTweetAuth during migration', () => {
+  it('removes plaintext xTweetAuth from legacy snapshot during migration', () => {
     const rawState = {
       xTweetAuth: {
-        authToken: 'my_auth',
-        ct0: 'my_ct0',
+        authToken: 'legacy_auth',
+        ct0: 'legacy_ct0',
       },
     };
 
     if (typeof appPersistenceOptions.migrate === 'function') {
       const migrated = appPersistenceOptions.migrate(rawState as unknown, 14) as Record<string, unknown>;
-      expect(migrated.xTweetAuth).toEqual({
-        authToken: 'my_auth',
-        ct0: 'my_ct0',
-      });
+      expect('xTweetAuth' in migrated).toBe(false);
     }
   });
 });

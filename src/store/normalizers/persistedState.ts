@@ -9,7 +9,7 @@ import type {
 import { defaultHeaderMenuConfig, defaultSubscriptionChannels } from '../../types';
 import { DEFAULT_THEME_PRESET_ID, isThemePresetId } from '../../constants/themePresets';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
-import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
+import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
 import { readAuthMirror } from '../persistence/authStorage';
@@ -216,15 +216,9 @@ export const normalizePersistedState = (
     discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
   trendingTimeRange: 'weekly' as TrendingTimeRange,
     xTweetFollows: normalizeXTweetFollows(safePersisted.xTweetFollows),
-    xTweetAuth: safePersisted.xTweetAuth && typeof safePersisted.xTweetAuth.authToken === 'string'
-      && typeof safePersisted.xTweetAuth.ct0 === 'string'
-      && safePersisted.xTweetAuth.authToken.trim()
-      && safePersisted.xTweetAuth.ct0.trim()
-      ? {
-          authToken: safePersisted.xTweetAuth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
-          ct0: safePersisted.xTweetAuth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
-        }
-      : null,
+    // xTweetAuth 仅由桌面端 safeStorage 安全加密存储（Web 模式仅在内存），debouncedPersistStorage 不将其写入快照（CWE-922）。
+    // hydration 期间保留当前运行态 currentState.xTweetAuth，避免冲掉桌面端已恢复的鉴权状态。
+    xTweetAuth: normalizeXTweetAuth(currentState.xTweetAuth),
     xTweetAuthRevision: typeof (safePersisted as Record<string, unknown>).xTweetAuthRevision === 'number'
       && Number.isFinite((safePersisted as Record<string, unknown>).xTweetAuthRevision)
       ? (safePersisted as Record<string, unknown>).xTweetAuthRevision as number

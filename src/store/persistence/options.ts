@@ -148,12 +148,12 @@ discoveryLanguage: state.discoveryLanguage,
 discoverySortBy: state.discoverySortBy,
 discoverySortOrder: state.discoverySortOrder,
 discoverySelectedTopic: state.discoverySelectedTopic,
-weeklyOnlyCollected: state.weeklyOnlyCollected,
-xTweetFollows: state.xTweetFollows,
-// 持久化 X 鉴权 Cookie 与版本号（同 proxyConfig 密码和 backendApiSecret 一样保存，避免用户重启后重新输入）
-xTweetAuth: state.xTweetAuth,
-xTweetAuthRevision: state.xTweetAuthRevision,
-telegramFollows: state.telegramFollows,
+  weeklyOnlyCollected: state.weeklyOnlyCollected,
+  xTweetFollows: state.xTweetFollows,
+  // xTweetAuth 仅由桌面端 safeStorage 安全加密存储（Web 模式仅在内存），避免明文 Cookie 写入 IndexedDB/localStorage（CWE-922）。
+  // 仅持久化非敏感的 xTweetAuthRevision 用于跨会话请求签名稳定性。
+  xTweetAuthRevision: state.xTweetAuthRevision,
+  telegramFollows: state.telegramFollows,
 // 持久化完整代理配置，包含认证密码，确保重启后无需重新输入。
 proxyConfig: {
   enabled: state.proxyConfig.enabled,
@@ -324,19 +324,9 @@ state.discoverySortOrder = 'Descending';
   if (state) {
     const stateRecord = state as Record<string, unknown>;
     stateRecord.xTweetFollows = normalizeXTweetFollows(stateRecord.xTweetFollows);
-    if (stateRecord.xTweetAuth && typeof stateRecord.xTweetAuth === 'object') {
-      const auth = stateRecord.xTweetAuth as Record<string, unknown>;
-      if (typeof auth.authToken === 'string' && typeof auth.ct0 === 'string' && auth.authToken && auth.ct0) {
-        stateRecord.xTweetAuth = {
-          authToken: auth.authToken.trim().replace(/^["']|["']$/g, '').trim(),
-          ct0: auth.ct0.trim().replace(/^["']|["']$/g, '').trim(),
-        };
-      } else {
-        stateRecord.xTweetAuth = null;
-      }
-    } else {
-      stateRecord.xTweetAuth = null;
-    }
+    // 旧快照可能含明文 xTweetAuth：直接删除（不删除整个快照），内存态置 null；
+    // 清理后的快照随下次持久化写回 IndexedDB/localStorage。
+    if ('xTweetAuth' in stateRecord) delete stateRecord.xTweetAuth;
     if (typeof stateRecord.xTweetAuthRevision !== 'number' || !Number.isFinite(stateRecord.xTweetAuthRevision)) {
       stateRecord.xTweetAuthRevision = 0;
     }

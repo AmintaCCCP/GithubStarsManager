@@ -7,7 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Modal } from './Modal';
 import { useDialog } from '../hooks/useDialog';
 import { useXTweetProbe } from '../features/discovery/hooks/useXTweetProbe';
-import { normalizeXTweetHandleInput } from '../utils/xTweetFollows';
+import { normalizeXTweetAuth, normalizeXTweetHandleInput } from '../utils/xTweetFollows';
 
 interface XTweetSettingsModalProps {
   isOpen: boolean;
@@ -67,15 +67,14 @@ export const XTweetSettingsModal: React.FC<XTweetSettingsModalProps> = ({ isOpen
   };
 
   const handleSaveAuth = () => {
-    const authToken = authTokenInput.trim().replace(/^["']|["']$/g, '').trim();
-    const ct0 = ct0Input.trim().replace(/^["']|["']$/g, '').trim();
-    if (!authToken || !ct0) {
-      toast(t('auth_token 与 ct0 都需要填写。', 'Both auth_token and ct0 are required.'), 'error');
+    const sanitized = normalizeXTweetAuth({ authToken: authTokenInput, ct0: ct0Input });
+    if (!sanitized) {
+      toast(t('auth_token 与 ct0 都需要填写有效内容。', 'Both auth_token and ct0 must contain valid values.'), 'error');
       return;
     }
-    setXTweetAuth({ authToken, ct0 });
-    setAuthTokenInput(authToken);
-    setCt0Input(ct0);
+    setXTweetAuth(sanitized);
+    setAuthTokenInput(sanitized.authToken);
+    setCt0Input(sanitized.ct0);
     toast(t('已保存鉴权 Cookie，刷新后按 GraphQL 模式抓取。', 'Auth cookies saved; refreshes now use the GraphQL mode.'), 'success');
   };
 

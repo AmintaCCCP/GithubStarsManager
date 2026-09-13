@@ -58,4 +58,14 @@ describe('normalizeXTweetAuth', () => {
     expect(normalizeXTweetAuth('junk')).toBeNull();
     expect(normalizeXTweetAuth({ authToken: 1, ct0: 2 })).toBeNull();
   });
+
+  it('去除首尾包裹的引号；纯引号输入判定为无效并返回 null', () => {
+    expect(normalizeXTweetAuth({ authToken: '"my_token"', ct0: "'my_ct0'" })).toEqual({
+      authToken: 'my_token',
+      ct0: 'my_ct0',
+    });
+    expect(normalizeXTweetAuth({ authToken: '""', ct0: 'valid_ct0' })).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: 'valid_token', ct0: "''" })).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: '  "  "  ', ct0: 'valid_ct0' })).toBeNull();
+  });
 });

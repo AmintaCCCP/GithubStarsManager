@@ -231,6 +231,38 @@ describe('ingestFeedMessages', () => {
     expect(repos.get('foo/one')!.sourceMessageId).toBe('chan/2');
     expect(repos.get('foo/one')!.messageCreatedAt).toBe('2026-09-02T00:00:00.000Z');
   });
+
+  it('正确更新已编辑消息的正文与仓库关联，重新计算来源归属', () => {
+    const messages = new Map<string, TelegramStoredMessage>();
+    const repos = new Map<string, TelegramStoredRepo>();
+
+    const msg1: TelegramStoredMessage = {
+      messageId: 'chan/10',
+      channel: 'chan',
+      displayName: 'Chan',
+      content: 'old text https://github.com/foo/old',
+      htmlUrl: 'https://t.me/chan/10',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      repoFullNames: ['foo/old'],
+    };
+    ingestFeedMessages([msg1], messages, repos);
+    expect(messages.get('chan/10')!.content).toBe('old text https://github.com/foo/old');
+    expect(repos.has('foo/old')).toBe(true);
+
+    // 编辑消息：改为了 foo/new，移除了 foo/old
+    const editedMsg1: TelegramStoredMessage = {
+      ...msg1,
+      content: 'new text https://github.com/foo/new',
+      repoFullNames: ['foo/new'],
+    };
+    const { newMessages, pendingRepoKeys } = ingestFeedMessages([editedMsg1], messages, repos);
+    expect(newMessages).toEqual([editedMsg1]);
+    expect(messages.get('chan/10')!.content).toBe('new text https://github.com/foo/new');
+    expect(repos.has('foo/old')).toBe(false);
+    expect(repos.has('foo/new')).toBe(true);
+    expect(repos.get('foo/new')!.sourceMessageId).toBe('chan/10');
+    expect(pendingRepoKeys.has('foo/new')).toBe(true);
+  });
 });
 
 describe('reposNeedingDetail', () => {
