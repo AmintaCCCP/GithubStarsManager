@@ -469,6 +469,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     weeklySyncStatus,
     xTweetFollows,
     xTweetAuth,
+    xTweetAuthRevision,
     xTweetSyncStatus,
     telegramFollows,
     telegramSyncStatus,
@@ -579,7 +580,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   // X 推文关注列表/鉴权变化时重建列表：只在集合真正变化时触发（挂载/切频道
   // 不触发，避免与空频道自动加载 effect 双重调用导致同步被中止重启）
-  const xTweetFollowsSignature = `${xTweetFollows.map(follow => follow.handle.toLowerCase()).sort().join(',')}|${xTweetAuth !== null}`;
+  // 修订号区分"不同 Cookie 之间的切换"，布尔值做不到
+  const xTweetFollowsSignature = `${xTweetFollows.map(follow => follow.handle.toLowerCase()).sort().join(',')}|${xTweetAuth !== null}|${xTweetAuthRevision ?? 0}`;
   const prevXTweetFollowsRef = useRef(xTweetFollowsSignature);
   useEffect(() => {
     if (prevXTweetFollowsRef.current === xTweetFollowsSignature) return;

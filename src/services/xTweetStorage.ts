@@ -53,13 +53,13 @@ export interface XTweetSyncMeta {
   queryIds: Record<string, string>;
 }
 
-const DEFAULT_META: XTweetSyncMeta = {
+const createDefaultMeta = (): XTweetSyncMeta => ({
   lastSyncedAt: null,
   followsSignature: '',
   pages: {},
   userIds: {},
   queryIds: {},
-};
+});
 
 const normalizeStringRecord = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') return {};
@@ -286,14 +286,13 @@ export const xTweetStorage = {
   },
 
   async getSyncMeta(): Promise<XTweetSyncMeta> {
-    if (!canUseIndexedDB()) return { ...DEFAULT_META };
-    try {
-      const meta = await withTimeout(runGetTx<XTweetSyncMeta>(META_STORE, 5000, 'sync'), 6000);
-      return normalizeMeta(meta);
-    } catch (e) {
-      console.warn('[xTweetStorage] getSyncMeta failed:', e);
-      return { ...DEFAULT_META };
-    }
+    // 无 IndexedDB 环境视作记录不存在，返回全新默认值（独立嵌套对象，
+    // 避免浅拷贝共享 DEFAULT_META.pages/userIds/queryIds 造成跨调用污染）；
+    // 真实读取失败向上抛出，避免调用方误判游标。
+    if (!canUseIndexedDB()) return createDefaultMeta();
+    const meta = await withTimeout(runGetTx<XTweetSyncMeta>(META_STORE, 5000, 'sync'), 6000);
+    if (meta === undefined) return createDefaultMeta();
+    return normalizeMeta(meta);
   },
 
   async saveSyncMeta(meta: XTweetSyncMeta): Promise<void> {

@@ -24,7 +24,8 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
     // 周刊过滤为客户端行为，但签名纳入 weeklyOnlyCollected 以便切换过滤器时重跑入口重建切片
     case 'weekly': return JSON.stringify([...common, state.weeklyOnlyCollected]);
     // 关注列表/鉴权变化会改变抓取范围，纳入签名作废旧请求
-    case 'x-tweet': return JSON.stringify([...common, state.xTweetFollows, state.xTweetAuth !== null]);
+    // （修订号区分"不同 Cookie 之间的切换"，布尔值做不到）
+    case 'x-tweet': return JSON.stringify([...common, state.xTweetFollows, state.xTweetAuth !== null, state.xTweetAuthRevision]);
     case 'telegram': return JSON.stringify([...common, state.telegramFollows]);
     default: return JSON.stringify(common);
   }

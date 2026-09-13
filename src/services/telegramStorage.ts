@@ -53,11 +53,11 @@ export interface TelegramSyncMeta {
   pages: Record<string, TelegramChannelPageState>;
 }
 
-const DEFAULT_META: TelegramSyncMeta = {
+const createDefaultMeta = (): TelegramSyncMeta => ({
   lastSyncedAt: null,
   followsSignature: '',
   pages: {},
-};
+});
 
 const normalizeMeta = (meta: TelegramSyncMeta | null | undefined): TelegramSyncMeta => ({
   lastSyncedAt: meta?.lastSyncedAt ?? null,
@@ -273,14 +273,13 @@ export const telegramStorage = {
   },
 
   async getSyncMeta(): Promise<TelegramSyncMeta> {
-    if (!canUseIndexedDB()) return { ...DEFAULT_META, pages: {} };
-    try {
-      const meta = await withTimeout(runGetTx<TelegramSyncMeta>(META_STORE, 5000, 'sync'), 6000);
-      return normalizeMeta(meta);
-    } catch (e) {
-      console.warn('[telegramStorage] getSyncMeta failed:', e);
-      return { ...DEFAULT_META, pages: {} };
-    }
+    // 无 IndexedDB 环境（如 SSR/测试）视作记录不存在，返回全新默认值；
+    // 真实读取失败则向上抛出，避免调用方把缺失游标误判为"尚未翻页"而
+    // 重抓最新页并用新游标覆盖已推进的位置。
+    if (!canUseIndexedDB()) return createDefaultMeta();
+    const meta = await withTimeout(runGetTx<TelegramSyncMeta>(META_STORE, 5000, 'sync'), 6000);
+    if (meta === undefined) return createDefaultMeta();
+    return normalizeMeta(meta);
   },
 
   async saveSyncMeta(meta: TelegramSyncMeta): Promise<void> {

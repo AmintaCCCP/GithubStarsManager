@@ -346,11 +346,19 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
 
 // X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
 // （带用户的 auth_token/ct0 Cookie；net.fetch 走 Chromium 网络栈，自动跟随应用代理）
-const X_GRAPHQL_URL_PATTERN = /^https:\/\/(x\.com|abs\.twimg\.com)\/[^\s]*$/;
+// 只允许受控操作对应的 URL（调用方不可任意指定 x.com 路径）：
+// - 登录态首页（queryId 提取入口）
+// - abs.twimg.com 主脚本（queryId 提取源，绝不附带 X Cookie）
+// - GraphQL UserTweets / UserByScreenName（queryId 动态，操作名固定）
+const X_HOME_URL = 'https://x.com/home';
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js$/;
+const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
+const isAllowedXProxyUrl = (url) =>
+  url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
 const X_COOKIE_VALUE_PATTERN = /^[\w%+/=-]+$/;
 
 ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
-  if (typeof url !== 'string' || !X_GRAPHQL_URL_PATTERN.test(url)) {
+  if (typeof url !== 'string' || !isAllowedXProxyUrl(url)) {
     return { success: false, error: 'invalid url' };
   }
   const authToken = typeof auth?.authToken === 'string' ? auth.authToken.trim() : '';
@@ -377,10 +385,15 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
           'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
           ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
         };
+    // redirect: 'error' — 拒绝跨域（及一切）重定向，避免 Cookie 被转到允许域名之外
     const response = await net.fetch(url, {
       headers,
+      redirect: 'error',
       signal: AbortSignal.timeout(20_000),
     });
+    if (typeof response.url === 'string' && response.url && !isAllowedXProxyUrl(response.url)) {
+      return { success: false, error: 'redirect blocked' };
+    }
     if (!response.ok) {
       return { success: false, error: `x.com responded ${response.status}` };
     }

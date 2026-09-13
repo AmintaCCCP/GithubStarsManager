@@ -9,7 +9,7 @@ import type {
 import { defaultHeaderMenuConfig, defaultSubscriptionChannels } from '../../types';
 import { DEFAULT_THEME_PRESET_ID, isThemePresetId } from '../../constants/themePresets';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
-import { normalizeXTweetFollows, normalizeXTweetAuth } from '../../utils/xTweetFollows';
+import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
 import { readAuthMirror } from '../persistence/authStorage';
@@ -216,7 +216,13 @@ export const normalizePersistedState = (
     discoveryScrollPositions: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
   trendingTimeRange: 'weekly' as TrendingTimeRange,
     xTweetFollows: normalizeXTweetFollows(safePersisted.xTweetFollows),
-    xTweetAuth: normalizeXTweetAuth(safePersisted.xTweetAuth),
+    // xTweetAuth 仅内存态：永不从持久化快照恢复（旧快照残留字段直接忽略），
+    // 避免明文 Cookie 经 hydration 回到状态。
+    xTweetAuth: null,
+    xTweetAuthRevision: typeof (safePersisted as Record<string, unknown>).xTweetAuthRevision === 'number'
+      && Number.isFinite((safePersisted as Record<string, unknown>).xTweetAuthRevision)
+      ? (safePersisted as Record<string, unknown>).xTweetAuthRevision as number
+      : 0,
     telegramFollows: normalizeTelegramFollows(safePersisted.telegramFollows),
     // 确保 subscription 相关状态包含 trending 键
     subscriptionRepos: {

@@ -31,7 +31,7 @@ import type {
   XTweetFollow,
 } from '../types';
 import { logger } from './logger';
-import { backend } from './backendAdapter';
+import { backend, getBackendAuthHeaders } from './backendAdapter';
 import { fetchXTimelineViaDesktop, fetchXGraphQLViaDesktop } from './electronProxy';
 import type { GitHubApiService } from './githubApi';
 import { extractRepoFullNames } from './weeklyIssuesService';
@@ -68,6 +68,31 @@ const isRateLimitError = (error: unknown): boolean =>
 const isTokenInvalidError = (error: unknown): boolean =>
   error instanceof Error && error.message.includes('token expired or invalid');
 
+/** 持久化失败标记：saveSyncBatch 拒绝必须中止整轮，不能按博主抓取失败跳过。 */
+const markPersistenceError = (error: unknown): unknown => {
+  if (error instanceof Error) {
+    (error as Error & { isPersistenceError?: boolean }).isPersistenceError = true;
+  }
+  return error;
+};
+
+const isPersistenceError = (error: unknown): boolean =>
+  error instanceof Error && (error as Error & { isPersistenceError?: boolean }).isPersistenceError === true;
+
+/** 分页游标未前进：不能当普通抓取失败跳过，否则 hasMore 会永远为 true。 */
+const markStalledCursorError = (error: unknown): unknown => {
+  if (error instanceof Error) {
+    (error as Error & { isStalledCursorError?: boolean }).isStalledCursorError = true;
+  }
+  return error;
+};
+
+const isStalledCursorError = (error: unknown): boolean =>
+  error instanceof Error && (error as Error & { isStalledCursorError?: boolean }).isStalledCursorError === true;
+
+const isUpstreamNotFound = (error: unknown): boolean =>
+  /\b404\b/.test(error instanceof Error ? error.message : String(error));
+
 export const isValidXTweetHandle = (handle: string): boolean =>
   /^[A-Za-z0-9_]{1,15}$/.test(handle);
 
@@ -90,6 +115,7 @@ export const defaultXTimelineTransport: XTimelineTransport = async (handle) => {
   const backendUrl = backend.backendUrl;
   if (backendUrl) {
     const response = await fetch(`${backendUrl}/xtweet/profile/${encodeURIComponent(handle)}`, {
+      headers: getBackendAuthHeaders(),
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
@@ -172,12 +198,20 @@ export const defaultXGraphQLTransport: XGraphQLTransport = async (url, auth) => 
   if (backendUrl) {
     const response = await fetch(`${backendUrl}/xtweet/graphql`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getBackendAuthHeaders(),
       body: JSON.stringify({ url, auth }),
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
-      throw new Error(`服务端 X GraphQL 请求失败 (${response.status})`);
+      let upstreamStatus: number | undefined;
+      try {
+        const payload = await response.clone().json() as { upstreamStatus?: unknown };
+        if (typeof payload?.upstreamStatus === 'number') upstreamStatus = payload.upstreamStatus;
+      } catch {
+        // 非 JSON 错误体：只报告外层状态
+      }
+      const reported = upstreamStatus ?? response.status;
+      throw new Error(`服务端 X GraphQL 请求失败 (${reported})`);
     }
     const data = await response.json();
     if (typeof data?.body === 'string') return data.body;
@@ -252,7 +286,7 @@ async function resolveXQueryIds(
   }
 }
 
-/** 用户 ID 解析：meta 缓存 → UserByScreenName。 */
+/** 用户 ID 解析：meta 缓存 → UserByScreenName。queryId 404 时失效缓存并重提取一次后重试。 */
 async function resolveXUserId(
   handle: string,
   meta: XTweetSyncMeta,
@@ -262,7 +296,20 @@ async function resolveXUserId(
   const cached = meta.userIds[handle.toLowerCase()];
   if (cached) return cached;
   const ids = await resolveXQueryIds(meta, auth, graphQL);
-  const body = await graphQL(buildUserByScreenNameUrl(handle, ids.UserByScreenName), auth);
+  let body: string;
+  try {
+    body = await graphQL(buildUserByScreenNameUrl(handle, ids.UserByScreenName), auth);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('401') || message.includes('403')) {
+      throw new Error('X 鉴权已失效（auth_token/ct0 无效或过期），请在设置中更新或清除鉴权配置');
+    }
+    if (!isUpstreamNotFound(error)) throw error;
+    logger.warn('xTweet', 'UserByScreenName queryId stale, re-extracting from bundle');
+    delete meta.queryIds.UserByScreenName;
+    const fresh = await resolveXQueryIds(meta, auth, graphQL);
+    body = await graphQL(buildUserByScreenNameUrl(handle, fresh.UserByScreenName), auth);
+  }
   const restId = JSON.parse(body)?.data?.user?.result?.rest_id;
   if (typeof restId !== 'string' || !restId) {
     throw new Error(`无法解析 @${handle} 的用户 ID（账号可能不存在或已受限）`);
@@ -423,7 +470,7 @@ async function fetchXUserTimelinePage(
     if (message.includes('401') || message.includes('403')) {
       throw new Error('X 鉴权已失效（auth_token/ct0 无效或过期），请在设置中更新或清除鉴权配置');
     }
-    if (!message.includes('404')) throw error;
+    if (!isUpstreamNotFound(error)) throw error;
     logger.warn('xTweet', 'UserTweets queryId stale, re-extracting from bundle');
     delete meta.queryIds.UserTweets;
     const fresh = await resolveXQueryIds(meta, auth, graphQL);
@@ -469,17 +516,27 @@ async function fetchAndIngestXUserPage(
       meta.pages[key] = { cursor: parsed.nextCursor, exhausted: parsed.exhausted };
     }
   } else {
+    // 请求游标与下一页游标相同且非空：上游未前进，落盘会让 hasMore 永远为 true
+    if (cursor && parsed.nextCursor === cursor) {
+      throw markStalledCursorError(new Error(`X 分页游标未前进（@${handle}）`));
+    }
     meta.pages[key] = { cursor: parsed.nextCursor, exhausted: parsed.exhausted };
   }
   const { newTweets, pendingRepoKeys } = ingestFeedTweets(parsed.tweets, tweets, repos);
   // 逐博主原子落盘（推文+仓库+meta 同一事务，水位此时不推进）
-  await xTweetStorage.saveSyncBatch({
-    tweets: newTweets,
-    repos: [...pendingRepoKeys]
-      .map((repoKey) => repos.get(repoKey))
-      .filter((repo): repo is XStoredRepo => Boolean(repo)),
-    meta,
-  });
+  // 写失败标记后上抛中止整轮（调用方按 isPersistenceError 识别）
+  try {
+    await xTweetStorage.saveSyncBatch({
+      tweets: newTweets,
+      repos: [...pendingRepoKeys]
+        .map((repoKey) => repos.get(repoKey))
+        .filter((repo): repo is XStoredRepo => Boolean(repo)),
+      meta,
+    });
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    throw markPersistenceError(error);
+  }
   return pendingRepoKeys;
 }
 
@@ -654,7 +711,7 @@ async function enrichRepos(
       if (!repo) continue;
       if (detail !== undefined) appliedKeys.add(key);
       repo.lastFetchedAt = fetchedAtIso;
-      if (detail) repo.detail = detail;
+      repo.detail = detail ?? null;
     }
   } catch (error) {
     if (isAbortError(error) || isRateLimitError(error) || isTokenInvalidError(error)) throw error;
@@ -701,24 +758,34 @@ export function buildXTweetDiscoveryRepos(
 let syncAbortController: AbortController | null = null;
 let syncInFlight: Promise<void> | null = null;
 
-/** 互斥执行：新请求中止上一轮并等待其落盘结算后再开新一轮。 */
+/** 互斥执行：先登记新一轮再等待旧轮，避免重叠请求并发执行 body。 */
 async function runExclusiveSync(
   body: (signal: AbortSignal) => Promise<void>,
   onStatus: StatusCallback,
 ): Promise<void> {
-  syncAbortController?.abort();
-  // 等待被中止轮次完成落盘，避免旧快照覆盖新一轮刚写入的结果
-  if (syncInFlight) await syncInFlight.catch(() => {});
   const controller = new AbortController();
+  const prev = syncInFlight;
+  const prevController = syncAbortController;
+  let resolveSlot: () => void = () => {};
+  const slot = new Promise<void>((resolve) => { resolveSlot = resolve; });
+  // 先登记：后续请求等待的是本轮 slot，不会与本轮同时进入 body
   syncAbortController = controller;
+  syncInFlight = slot;
+  prevController?.abort();
+  if (prev) await prev.catch(() => {});
+  // 等待期间可能已被更新的请求取代：直接退出，不执行 body
+  if (syncAbortController !== controller) {
+    resolveSlot();
+    return;
+  }
   const run = body(controller.signal);
-  syncInFlight = run.then(() => {}, () => {});
   try {
     await run;
   } finally {
-    // 仅在仍持有同步权时清空状态，避免被中止的旧轮次清掉新一轮的进度显示
+    resolveSlot();
     if (syncAbortController === controller) {
       syncAbortController = null;
+      syncInFlight = null;
       onStatus?.(null);
     }
   }
@@ -737,6 +804,20 @@ const isRecentlySynced = (meta: { lastSyncedAt: string | null; followsSignature:
 /** 关注列表签名：规范化 handle 排序拼接（大小写不敏感去重后的集合身份） */
 const followsSignatureOf = (handles: string[]): string =>
   [...new Set(handles.map((handle) => handle.toLowerCase()))].sort().join(',');
+
+/**
+ * 鉴权身份指纹（非敏感）：同一组 Cookie 稳定，不同 Cookie 必然不同。
+ * 只用 djb2 哈希区分缓存归属，绝不把原始 Cookie 写入签名或持久化元数据。
+ */
+export const xTweetAuthFingerprint = (auth: XTweetAuth | null): string => {
+  if (!auth) return 'anon';
+  const input = `${auth.authToken}\u0000${auth.ct0}`;
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) >>> 0;
+  }
+  return `auth:${hash.toString(16)}`;
+};
 
 /**
  * 频道抓取入口（refreshChannel 调用）：
@@ -889,8 +970,9 @@ async function syncXTweetChannelWithAuth(
   graphQL: XGraphQLTransport,
 ): Promise<PaginatedDiscoveryRepositories> {
   const windowEnd = page * X_TWEET_CARD_PAGE_SIZE;
-  // 签名带鉴权标记：切换鉴权/匿名后 60 秒水位立即失效，触发重抓
-  const signature = `${followsSignatureOf(handles)}|${auth ? 'auth' : 'anon'}`;
+  // 签名带鉴权指纹：不同 Cookie 之间切换后 60 秒水位立即失效，触发重抓，
+  // 避免复用旧账户的 IndexedDB 快照（指纹为哈希，不含原始 Cookie）
+  const signature = `${followsSignatureOf(handles)}|${xTweetAuthFingerprint(auth)}`;
   const meta0 = await xTweetStorage.getSyncMeta();
   const recent = isRecentlySynced(meta0, signature);
   let snapshot: { tweets: Map<string, XStoredTweet>; repos: Map<string, XStoredRepo> } | null = null;
@@ -928,7 +1010,7 @@ async function syncXTweetChannelWithAuth(
           );
           for (const key of pendingKeys) touchedRepoKeys.add(key);
         } catch (error) {
-          if (isAbortError(error)) throw error;
+          if (isAbortError(error) || isPersistenceError(error) || isStalledCursorError(error)) throw error;
           // 抓取/解析失败只跳过该博主（账号不存在/网络抖动不拖垮整轮）
           logger.warn('xTweet', `Authenticated timeline fetch failed for @${handle}`, error);
           firstError = firstError ?? error;

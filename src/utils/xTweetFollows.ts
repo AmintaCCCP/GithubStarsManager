@@ -33,8 +33,8 @@ export const normalizeXTweetHandleInput = (input: string): string | null => {
   return HANDLE_PATTERN.test(candidate) ? candidate : null;
 };
 
-/** 排序键：按 handle 去重时保留最早添加的记录 */
-const byAddedAtAsc = (a: XTweetFollow, b: XTweetFollow) => a.addedAt.localeCompare(b.addedAt);
+/** 排序键：按 handle 去重时保留最早添加的记录（按实际时间比较，兼容 +08:00 等偏移） */
+const byAddedAtAsc = (a: XTweetFollow, b: XTweetFollow) => Date.parse(a.addedAt) - Date.parse(b.addedAt);
 
 /** 修复持久化/外部输入的关注列表：去重（handle 大小写不敏感）、剔除非法项。 */
 export const normalizeXTweetFollows = (value: unknown): XTweetFollow[] => {

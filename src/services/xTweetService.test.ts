@@ -749,6 +749,39 @@ describe('syncXTweetChannel（鉴权路径）', () => {
     expect(fullCalls.some((url) => url.includes('x.com/home'))).toBe(true);
     expect(fullCalls.filter((url) => url.includes('/UserTweets')).length).toBe(2);
   });
+
+  it('UserByScreenName queryId 过期（404）时自动从 bundle 重提取并重试', async () => {
+    const { graphQL, calls } = stubGraphQL([
+      { match: /STALEUSER/, body: new Error('x.com responded 404') },
+      { match: /^https:\/\/x\.com\/home$/, body: '<html><script src="https://abs.twimg.com/responsive-web/client-web/main.deadbeef.js"></script></html>' },
+      { match: /main\.deadbeef\.js$/, body: 'queryId:"FRESHQID",operationName:"UserTweets" queryId:"FRESHUSER",operationName:"UserByScreenName"' },
+      { match: /FRESHUSER/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]);
+    storage.metaRef.current.queryIds = { UserTweets: 'FRESHQID', UserByScreenName: 'STALEUSER' };
+    const details = new Map<string, GitHubRepoDetailRead | null>([['obsidianmd/knap', makeDetail('obsidianmd/knap')]]);
+    const result = await syncXTweetChannel(makeApi(details), 1, authFollows, undefined, undefined, AUTH, graphQL);
+    expect(result.repos.length).toBeGreaterThan(0);
+    expect((await xTweetStorage.getSyncMeta()).queryIds.UserByScreenName).toBe('FRESHUSER');
+    expect(calls.filter((url) => url.includes('/UserByScreenName')).length).toBe(2);
+    expect(calls.some((url) => url.includes('x.com/home'))).toBe(true);
+  });
+
+  it('加载更多时游标未前进入上抛，不落盘停滞游标', async () => {
+    const fixtureCursor = getFixtureCursor();
+    const api = makeApi(new Map([['obsidianmd/knap', makeDetail('obsidianmd/knap')]]));
+    await syncXTweetChannel(api, 1, authFollows, undefined, undefined, AUTH, stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]).graphQL);
+    const { graphQL } = stubGraphQL([
+      { match: /UserByScreenName/, body: makeUserByScreenNameBody('168139512') },
+      { match: /UserTweets/, body: REAL_USER_TWEETS_JSON },
+    ]);
+    await expect(syncXTweetChannel(api, 2, authFollows, undefined, undefined, AUTH, graphQL))
+      .rejects.toThrow('分页游标未前进');
+    expect((await xTweetStorage.getSyncMeta()).pages['geekbb']).toEqual({ cursor: fixtureCursor, exhausted: false });
+  });
 });
 
 describe('probeXTweetSource（鉴权路径）', () => {

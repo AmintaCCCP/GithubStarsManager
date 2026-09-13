@@ -18,6 +18,28 @@ interface GitHubTreeResponse {
 
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
 
+/**
+ * 共享 helper：构造后端 API 鉴权头（fullstack Web 模式下 API_SECRET 的
+ * `Authorization: Bearer ...`）。服务端 `authMiddleware` 对所有 `/api/*`
+ * （除 health）要求该头，直接 `fetch(backendUrl/...)` 的传输层必须复用它，
+ * 否则在配置 API_SECRET 时一律 401。
+ */
+export const getBackendAuthHeaders = (): Record<string, string> => {
+  let secret = '';
+  try {
+    secret = useAppStore.getState().backendApiSecret || '';
+  } catch {
+    secret = '';
+  }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (secret) {
+    headers['Authorization'] = `Bearer ${secret}`;
+  }
+  return headers;
+};
+
 const readStoredBackendUrl = (): string | null => {
   try {
     return normalizeBackendUrl(localStorage.getItem(BACKEND_URL_STORAGE_KEY) || '');
@@ -85,6 +107,11 @@ class BackendAdapter {
     return this._backendUrl;
   }
 
+  /** 供直接 fetch 后端路由的传输层复用（公开版 getAuthHeaders）。 */
+  get backendAuthHeaders(): Record<string, string> {
+    return getBackendAuthHeaders();
+  }
+
   get configuredUrl(): string | null {
     return this._backendUrl || readStoredBackendUrl();
   }
@@ -104,15 +131,7 @@ class BackendAdapter {
   }
 
   private getAuthHeaders(): Record<string, string> {
-    const secret = useAppStore.getState().backendApiSecret || '';
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (secret) {
-      headers['Authorization'] = `Bearer ${secret}`;
-    }
-    return headers;
+    return getBackendAuthHeaders();
   }
   private async fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 30000): Promise<Response> {
     const startTime = Date.now();

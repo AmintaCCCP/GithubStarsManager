@@ -549,8 +549,13 @@ export interface AppState {
   weeklySyncStatus: WeeklySyncStatus | null;
   /** X 推文频道：关注博主列表（handle 不含 @，初始化含 geekbb） */
   xTweetFollows: XTweetFollow[];
-  /** X 推文频道：可选登录鉴权 Cookie（配置后走 GraphQL 抓取 + 历史翻页） */
+  /**
+   * X 推文频道：可选登录鉴权 Cookie（配置后走 GraphQL 抓取 + 历史翻页）。
+   * 仅内存态，不持久化到 IndexedDB/localStorage（明文 Cookie 防同源脚本读取）。
+   */
   xTweetAuth: XTweetAuth | null;
+  /** X 鉴权修订号：每次 set/clear 递增的非敏感计数器，用于请求失效判定与列表刷新 */
+  xTweetAuthRevision: number;
   /** X 推文频道同步/详情补全进度（会话级，不持久化） */
   xTweetSyncStatus: WeeklySyncStatus | null;
   /** Telegram 频道：关注频道列表（channel 不含 @，初始化含 geekhub23） */

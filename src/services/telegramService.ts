@@ -25,7 +25,7 @@ import type {
   WeeklySyncStatus,
 } from '../types';
 import { logger } from './logger';
-import { backend } from './backendAdapter';
+import { backend, getBackendAuthHeaders } from './backendAdapter';
 import { fetchTelegramChannelViaDesktop } from './electronProxy';
 import type { GitHubApiService } from './githubApi';
 import { extractRepoFullNames } from './weeklyIssuesService';
@@ -63,6 +63,28 @@ const isRateLimitError = (error: unknown): boolean =>
 const isTokenInvalidError = (error: unknown): boolean =>
   error instanceof Error && error.message.includes('token expired or invalid');
 
+/** 持久化失败标记：saveSyncBatch 拒绝必须中止整轮，不能按频道抓取失败跳过。 */
+const markPersistenceError = (error: unknown): unknown => {
+  if (error instanceof Error) {
+    (error as Error & { isPersistenceError?: boolean }).isPersistenceError = true;
+  }
+  return error;
+};
+
+const isPersistenceError = (error: unknown): boolean =>
+  error instanceof Error && (error as Error & { isPersistenceError?: boolean }).isPersistenceError === true;
+
+/** 分页游标未前进：不能当普通抓取失败跳过，否则 hasMore 会永远为 true。 */
+const markStalledCursorError = (error: unknown): unknown => {
+  if (error instanceof Error) {
+    (error as Error & { isStalledCursorError?: boolean }).isStalledCursorError = true;
+  }
+  return error;
+};
+
+const isStalledCursorError = (error: unknown): boolean =>
+  error instanceof Error && (error as Error & { isStalledCursorError?: boolean }).isStalledCursorError === true;
+
 export const isValidTelegramChannel = (channel: string): boolean =>
   /^[A-Za-z0-9_]{3,64}$/.test(channel);
 
@@ -87,6 +109,7 @@ export const defaultTelegramChannelTransport: TelegramChannelTransport = async (
   if (backendUrl) {
     const suffix = before ? `?before=${encodeURIComponent(before)}` : '';
     const response = await fetch(`${backendUrl}/telegram/channel/${encodeURIComponent(channel)}${suffix}`, {
+      headers: getBackendAuthHeaders(),
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
@@ -283,7 +306,7 @@ async function enrichRepos(
       if (!repo) continue;
       if (detail !== undefined) appliedKeys.add(key);
       repo.lastFetchedAt = fetchedAtIso;
-      if (detail) repo.detail = detail;
+      repo.detail = detail ?? null;
     }
   } catch (error) {
     if (isAbortError(error) || isRateLimitError(error) || isTokenInvalidError(error)) throw error;
@@ -330,24 +353,36 @@ export function buildTelegramDiscoveryRepos(
 let syncAbortController: AbortController | null = null;
 let syncInFlight: Promise<void> | null = null;
 
-/** 互斥执行：新请求中止上一轮并等待其落盘结算后再开新一轮。 */
+/** 互斥执行：先登记新一轮再等待旧轮，避免重叠请求并发执行 body。 */
 async function runExclusiveSync(
   body: (signal: AbortSignal) => Promise<void>,
   onStatus: StatusCallback,
 ): Promise<void> {
-  syncAbortController?.abort();
-  // 等待被中止轮次完成落盘，避免旧快照覆盖新一轮刚写入的结果
-  if (syncInFlight) await syncInFlight.catch(() => {});
   const controller = new AbortController();
+  const prev = syncInFlight;
+  const prevController = syncAbortController;
+  let resolveSlot: () => void = () => {};
+  const slot = new Promise<void>((resolve) => { resolveSlot = resolve; });
+  // 先登记：后续请求等待的是本轮 slot，不会与本轮同时进入 body
   syncAbortController = controller;
+  syncInFlight = slot;
+  prevController?.abort();
+  // 等待被中止轮次完成落盘，避免旧快照覆盖新一轮刚写入的结果
+  if (prev) await prev.catch(() => {});
+  // 等待期间可能已被更新的请求取代：直接退出，不执行 body
+  if (syncAbortController !== controller) {
+    resolveSlot();
+    return;
+  }
   const run = body(controller.signal);
-  syncInFlight = run.then(() => {}, () => {});
   try {
     await run;
   } finally {
+    resolveSlot();
     // 仅在仍持有同步权时清空状态，避免被中止的旧轮次清掉新一轮的进度显示
     if (syncAbortController === controller) {
       syncAbortController = null;
+      syncInFlight = null;
       onStatus?.(null);
     }
   }
@@ -389,29 +424,44 @@ async function fetchAndIngestChannelPage(
   signal: AbortSignal,
 ): Promise<Set<string>> {
   if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-  const html = await transport(channel, before ?? undefined);
-  const parsed = parseTelegramChannelHtml(html, channel);
+  let parsed: ReturnType<typeof parseTelegramChannelHtml>;
   const key = channel.toLowerCase();
   const known = meta.pages[key];
+  try {
+    const html = await transport(channel, before ?? undefined);
+    parsed = parseTelegramChannelHtml(html, channel);
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    throw error;
+  }
   if (before === null || before === undefined) {
     // page 1 刷新：游标只在从未翻过页时初始化，绝不回退已推进的位置
     if (!known) {
       meta.pages[key] = { cursor: parsed.nextCursor, exhausted: parsed.exhausted };
     }
   } else {
+    // 请求游标与下一页游标相同且非空：上游未前进，落盘会让 hasMore 永远为 true
+    if (before && parsed.nextCursor === before) {
+      throw markStalledCursorError(new Error(`Telegram 分页游标未前进（@${channel} before=${before}）`));
+    }
     meta.pages[key] = { cursor: parsed.nextCursor, exhausted: parsed.exhausted };
   }
   const { newMessages, pendingRepoKeys } = ingestFeedMessages(parsed.messages, messages, repos);
   // 逐频道原子落盘（消息+仓库+游标同一事务，水位此时不推进）。
   // 写失败必须上抛中止整轮：内存合并态无法安全回滚，带着脏状态继续会让
-  // 未持久化的合并混入末轮落盘
-  await telegramStorage.saveSyncBatch({
-    messages: newMessages,
-    repos: [...pendingRepoKeys]
-      .map((repoKey) => repos.get(repoKey))
-      .filter((repo): repo is TelegramStoredRepo => Boolean(repo)),
-    meta,
-  });
+  // 未持久化的合并混入末轮落盘（调用方按 isPersistenceError 识别并直接抛出）
+  try {
+    await telegramStorage.saveSyncBatch({
+      messages: newMessages,
+      repos: [...pendingRepoKeys]
+        .map((repoKey) => repos.get(repoKey))
+        .filter((repo): repo is TelegramStoredRepo => Boolean(repo)),
+      meta,
+    });
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    throw markPersistenceError(error);
+  }
   return pendingRepoKeys;
 }
 
@@ -480,7 +530,7 @@ export async function syncTelegramChannel(
           );
           for (const key of pendingKeys) touchedRepoKeys.add(key);
         } catch (error) {
-          if (isAbortError(error)) throw error;
+          if (isAbortError(error) || isPersistenceError(error) || isStalledCursorError(error)) throw error;
           // 抓取/解析失败只跳过该频道（频道不可达/网络抖动不拖垮整轮）
           logger.warn('telegram', `Channel page fetch failed for @${channel}`, error);
           firstError = firstError ?? error;

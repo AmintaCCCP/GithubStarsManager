@@ -363,6 +363,19 @@ describe('syncTelegramChannel', () => {
     expect(page3.hasMore).toBe(false);
   });
 
+  it('加载更多时游标未前进入上抛，不落盘停滞游标', async () => {
+    const stalledHtml = PAGE1_HTML; // rel=prev 仍是 before=589
+    const { transport } = stubTransport({
+      'geekhub23|': PAGE1_HTML,
+      'geekhub23|589': stalledHtml,
+    });
+    const api = makeApi(new Map([['microsoft/powertoys', makeDetail('microsoft/PowerToys')]]));
+    await syncTelegramChannel(api, 1, follows, undefined, transport);
+    await expect(syncTelegramChannel(api, 2, follows, undefined, transport))
+      .rejects.toThrow('分页游标未前进');
+    expect((await telegramStorage.getSyncMeta()).pages['geekhub23']).toEqual({ cursor: '589', exhausted: false });
+  });
+
   it('60 秒内重复刷新走缓存，不再调用传输层', async () => {
     const { transport, calls } = stubTransport({ 'geekhub23|': PAGE1_HTML });
     const api = makeApi(new Map([['microsoft/powertoys', makeDetail('microsoft/PowerToys')]]));

@@ -118,6 +118,7 @@ export const createInitialState = (): AppState => ({
       weeklySyncStatus: null,
       xTweetFollows: DEFAULT_XTWEET_FOLLOWS.map((follow) => ({ ...follow })),
       xTweetAuth: null,
+      xTweetAuthRevision: 0,
       xTweetSyncStatus: null,
       telegramFollows: DEFAULT_TELEGRAM_FOLLOWS.map((follow) => ({ ...follow })),
       telegramSyncStatus: null,

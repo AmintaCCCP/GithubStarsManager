@@ -13,7 +13,14 @@ import { logger } from '../services/logger.js';
  * Cookie 代发 GET；仅允许 x.com 与 abs.twimg.com 两个主机名。
  */
 const X_HANDLE_PATTERN = /^[A-Za-z0-9_]{1,15}$/;
-const X_PROXY_URL_PATTERN = /^https:\/\/(x\.com|abs\.twimg\.com)\/[^\s]*$/;
+// 鉴权代抓仅允许受控操作对应的 URL（调用方不可任意指定 x.com 路径）：
+// 首页（queryId 提取入口）、abs.twimg.com 主脚本（绝不附带 X Cookie）、
+// GraphQL UserTweets / UserByScreenName（queryId 动态，操作名固定）。
+const X_HOME_URL = 'https://x.com/home';
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-f0-9]+\.js$/;
+const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
+const isAllowedXProxyUrl = (url: string): boolean =>
+  url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
 const X_COOKIE_VALUE_PATTERN = /^[\w%+/=-]+$/;
 const X_WEB_BEARER = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const FETCH_TIMEOUT_MS = 20_000;
@@ -57,7 +64,7 @@ router.post('/api/xtweet/graphql', async (req, res) => {
   const url = typeof req.body?.url === 'string' ? req.body.url : '';
   const authToken = typeof req.body?.auth?.authToken === 'string' ? req.body.auth.authToken.trim() : '';
   const ct0 = typeof req.body?.auth?.ct0 === 'string' ? req.body.auth.ct0.trim() : '';
-  if (!X_PROXY_URL_PATTERN.test(url)) {
+  if (!isAllowedXProxyUrl(url)) {
     res.status(400).json({ error: 'invalid url', code: 'INVALID_URL' });
     return;
   }
@@ -84,14 +91,23 @@ router.post('/api/xtweet/graphql', async (req, res) => {
           'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
           ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
         };
+    // redirect: 'error' — 拒绝跨域重定向，避免 Cookie 被转到允许域名之外
     const response = await fetch(url, {
       headers,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      redirect: 'follow',
+      redirect: 'error',
     });
+    if (typeof response.url === 'string' && response.url && !isAllowedXProxyUrl(response.url)) {
+      res.status(400).json({ error: 'redirect blocked', code: 'INVALID_URL' });
+      return;
+    }
     if (!response.ok) {
       logger.warn('xtweet', `x.com graphql responded ${response.status} for ${new URL(url).hostname}`);
-      res.status(502).json({ error: `x.com responded ${response.status}`, code: 'UPSTREAM_ERROR' });
+      res.status(502).json({
+        error: `x.com responded ${response.status}`,
+        code: 'UPSTREAM_ERROR',
+        upstreamStatus: response.status,
+      });
       return;
     }
     const body = await response.text();

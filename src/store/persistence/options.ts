@@ -5,7 +5,7 @@ import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscript
 import { defaultRepositoryChatSettings } from '../../types/repositoryChat';
 import { logger } from '../../services/logger';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
-import { normalizeXTweetFollows, normalizeXTweetAuth } from '../../utils/xTweetFollows';
+import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
 import {
@@ -150,7 +150,9 @@ discoverySortOrder: state.discoverySortOrder,
 discoverySelectedTopic: state.discoverySelectedTopic,
 weeklyOnlyCollected: state.weeklyOnlyCollected,
 xTweetFollows: state.xTweetFollows,
-xTweetAuth: state.xTweetAuth,
+// xTweetAuth 仅内存态：明文 Cookie 不写入 IndexedDB/localStorage。
+// 非敏感的 xTweetAuthRevision 持久化，用于跨会话的请求签名稳定性。
+xTweetAuthRevision: state.xTweetAuthRevision,
 telegramFollows: state.telegramFollows,
 // 持久化完整代理配置，包含认证密码，确保重启后无需重新输入。
 proxyConfig: {
@@ -320,12 +322,14 @@ state.discoverySortOrder = 'Descending';
 
   // v14→v15: X 推文频道选项兜底（关注列表默认含 geekbb）
   if (state) {
-    (state as Record<string, unknown>).xTweetFollows = normalizeXTweetFollows(
-      (state as Record<string, unknown>).xTweetFollows,
-    );
-    (state as Record<string, unknown>).xTweetAuth = normalizeXTweetAuth(
-      (state as Record<string, unknown>).xTweetAuth,
-    );
+    const stateRecord = state as Record<string, unknown>;
+    stateRecord.xTweetFollows = normalizeXTweetFollows(stateRecord.xTweetFollows);
+    // 旧快照可能含明文 xTweetAuth：直接删除（不删除整个快照），内存态置 null；
+    // 清理后的快照随下次持久化写回 IndexedDB/localStorage。
+    if ('xTweetAuth' in stateRecord) delete stateRecord.xTweetAuth;
+    if (typeof stateRecord.xTweetAuthRevision !== 'number' || !Number.isFinite(stateRecord.xTweetAuthRevision)) {
+      stateRecord.xTweetAuthRevision = 0;
+    }
     (state as Record<string, unknown>).telegramFollows = normalizeTelegramFollows(
       (state as Record<string, unknown>).telegramFollows,
     );
