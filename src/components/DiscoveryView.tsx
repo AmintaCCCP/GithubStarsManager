@@ -472,8 +472,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
     xTweetSyncStatus,
     telegramFollows,
     telegramSyncStatus,
-    setXTweetAuth,
-    clearXTweetAuth,
     t,
     isAnalyzing,
     refreshChannel,
