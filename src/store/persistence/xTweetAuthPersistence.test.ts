@@ -15,7 +15,8 @@ describe('xTweetAuth persistence', () => {
       xTweetAuthRevision: 2,
     } as unknown as AppStoreState;
 
-    const partial = appPersistenceOptions.partialize(state);
+    expect(appPersistenceOptions.partialize).toBeDefined();
+    const partial = appPersistenceOptions.partialize!(state);
     expect(partial.xTweetAuth).toEqual({
       authToken: 'test_token_123',
       ct0: 'test_ct0_456',
@@ -32,7 +33,10 @@ describe('xTweetAuth persistence', () => {
       xTweetAuthRevision: 5,
     };
 
-    const normalized = normalizePersistedState(rawPersisted, createInitialState());
+    const normalized = normalizePersistedState(
+      rawPersisted,
+      createInitialState() as unknown as AppStoreState,
+    );
     expect(normalized.xTweetAuth).toEqual({
       authToken: 'abc12345',
       ct0: 'def67890',
@@ -48,7 +52,10 @@ describe('xTweetAuth persistence', () => {
       },
     };
 
-    const normalized = normalizePersistedState(rawPersisted, createInitialState());
+    const normalized = normalizePersistedState(
+      rawPersisted,
+      createInitialState() as unknown as AppStoreState,
+    );
     expect(normalized.xTweetAuth).toBeNull();
   });
 
@@ -61,8 +68,8 @@ describe('xTweetAuth persistence', () => {
     };
 
     if (typeof appPersistenceOptions.migrate === 'function') {
-      const migrated = appPersistenceOptions.migrate(rawState as any, 14);
-      expect((migrated as any).xTweetAuth).toEqual({
+      const migrated = appPersistenceOptions.migrate(rawState as unknown, 14) as Record<string, unknown>;
+      expect(migrated.xTweetAuth).toEqual({
         authToken: 'my_auth',
         ct0: 'my_ct0',
       });
