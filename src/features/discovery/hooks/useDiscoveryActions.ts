@@ -6,6 +6,7 @@ import { selectDiscoveryViewState } from '../../../store/selectors';
 import { GitHubApiService } from '../../../services/githubApi';
 import { syncWeeklyChannel } from '../../../services/weeklyIssuesService';
 import { syncXTweetChannel } from '../../../services/xTweetService';
+import { syncTelegramChannel } from '../../../services/telegramService';
 import { AIService } from '../../../services/aiService';
 import { AIAnalysisOptimizer } from '../../../services/aiAnalysisOptimizer';
 import { discoveryAnalysisStorage } from '../../../services/discoveryAnalysisStorage';
@@ -22,8 +23,10 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
     case 'search': return JSON.stringify([...common, state.discoverySearchQuery, state.discoveryLanguage, state.discoverySortBy, state.discoverySortOrder]);
     // 周刊过滤为客户端行为，但签名纳入 weeklyOnlyCollected 以便切换过滤器时重跑入口重建切片
     case 'weekly': return JSON.stringify([...common, state.weeklyOnlyCollected]);
-    // 关注列表变化会改变抓取范围，纳入签名作废旧请求
-    case 'x-tweet': return JSON.stringify([...common, state.xTweetFollows]);
+    // 关注列表/鉴权变化会改变抓取范围，纳入签名作废旧请求
+    // （修订号区分"不同 Cookie 之间的切换"，布尔值做不到）
+    case 'x-tweet': return JSON.stringify([...common, state.xTweetFollows, state.xTweetAuth !== null, state.xTweetAuthRevision]);
+    case 'telegram': return JSON.stringify([...common, state.telegramFollows]);
     default: return JSON.stringify(common);
   }
 };
@@ -50,9 +53,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   useEffect(() => {
     setIsAnalyzing(false);
     setAnalysisProgress({ current: 0, total: 0 });
-    // 账号切换后旧会话的周刊/推文同步进度不再属于当前页面，直接清空
+    // 账号切换后旧会话的周刊/推文/频道同步进度不再属于当前页面，直接清空
     useAppStore.getState().setWeeklySyncStatus(null);
     useAppStore.getState().setXTweetSyncStatus(null);
+    useAppStore.getState().setTelegramSyncStatus(null);
     return () => {
       optimizerRef.current?.abort();
       optimizerRef.current = null;
@@ -133,6 +137,21 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
                 useAppStore.getState().setXTweetSyncStatus(status);
               }
             },
+            undefined,
+            currentState.xTweetAuth,
+          );
+          break;
+        case 'telegram':
+          useAppStore.getState().setTelegramSyncStatus(null);
+          result = await syncTelegramChannel(
+            api,
+            page,
+            currentState.telegramFollows,
+            (status) => {
+              if (isCurrentRequest()) {
+                useAppStore.getState().setTelegramSyncStatus(status);
+              }
+            },
           );
           break;
         default:
@@ -157,9 +176,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
           analysis_error: analysis.analysis_error,
         } : newRepo;
       });
-      // x-tweet 每页返回累积前缀切片（服务按页整体重建窗口），加载更多时
-      // 用替换语义写入，否则加深拉取新增的卡片落进已消费窗口内永远补不到
-      const replacesOnAppend = channelId === 'x-tweet';
+      // x-tweet/telegram 每页返回累积前缀切片（服务按页整体重建窗口），加载
+      // 更多时用替换语义写入，否则加深拉取新增的卡片落进已消费窗口内永远补不到
+      const replacesOnAppend = channelId === 'x-tweet' || channelId === 'telegram';
       if (append && !replacesOnAppend) currentState.appendDiscoveryRepos(channelId, mergedRepos);
       else currentState.setDiscoveryRepos(channelId, mergedRepos);
       currentState.setDiscoveryHasMore(channelId, result.hasMore);
@@ -176,14 +195,27 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     } catch (error) {
       if (!isCurrentRequest()) return;
       console.error(`Failed to refresh channel ${channelId}:`, error);
-      if (append) currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
-      else toast(t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
+      if (append) {
+        currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
+      } else {
+        const errorMsg = error instanceof Error ? error.message : '';
+        if (channelId === 'x-tweet') {
+          toast(errorMsg ? `${t('X 推文获取失败', 'Failed to fetch X tweets')}: ${errorMsg}` : t('获取 X 推文失败，请检查网络连接或在设置中核对 X 鉴权 Cookie。', 'Failed to fetch X tweets. Please check your network connection or X auth cookies in settings.'), 'error');
+        } else if (channelId === 'telegram') {
+          toast(errorMsg ? `${t('Telegram 消息获取失败', 'Failed to fetch Telegram messages')}: ${errorMsg}` : t('获取 Telegram 消息失败，请检查网络连接或关注频道。', 'Failed to fetch Telegram messages. Please check your network connection or followed channels.'), 'error');
+        } else {
+          toast(errorMsg || t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
+        }
+      }
     } finally {
       if (channelId === 'weekly' && isCurrentRequest()) {
         useAppStore.getState().setWeeklySyncStatus(null);
       }
       if (channelId === 'x-tweet' && isCurrentRequest()) {
         useAppStore.getState().setXTweetSyncStatus(null);
+      }
+      if (channelId === 'telegram' && isCurrentRequest()) {
+        useAppStore.getState().setTelegramSyncStatus(null);
       }
       if (ownsLoading()) {
         if (append) currentState.setDiscoveryLoadingMore(channelId, false);

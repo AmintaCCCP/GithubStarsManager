@@ -5,6 +5,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getProxy: () => ipcRenderer.invoke('get-proxy'),
   testProxy: (config) => ipcRenderer.invoke('test-proxy', config),
   xFetchTimeline: (handle) => ipcRenderer.invoke('x-fetch-timeline', handle),
+  xFetchGraphQL: (url, auth) => ipcRenderer.invoke('x-fetch-graphql', url, auth),
+  xAuth: {
+    save: (auth) => ipcRenderer.invoke('x-auth:save', auth),
+    get: () => ipcRenderer.invoke('x-auth:get'),
+    clear: () => ipcRenderer.invoke('x-auth:clear'),
+  },
+  telegramFetchChannel: (channel, before) => ipcRenderer.invoke('telegram-fetch-channel', channel, before),
   desktop: {
     getPrefs: () => ipcRenderer.invoke('desktop:getPrefs'),
     setAutoLaunch: (enabled) => ipcRenderer.invoke('desktop:setAutoLaunch', enabled),

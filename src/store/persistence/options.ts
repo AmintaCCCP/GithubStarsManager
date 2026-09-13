@@ -6,6 +6,7 @@ import { defaultRepositoryChatSettings } from '../../types/repositoryChat';
 import { logger } from '../../services/logger';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
+import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
 import {
   defaultDiscoveryChannels,
@@ -147,8 +148,12 @@ discoveryLanguage: state.discoveryLanguage,
 discoverySortBy: state.discoverySortBy,
 discoverySortOrder: state.discoverySortOrder,
 discoverySelectedTopic: state.discoverySelectedTopic,
-weeklyOnlyCollected: state.weeklyOnlyCollected,
-xTweetFollows: state.xTweetFollows,
+  weeklyOnlyCollected: state.weeklyOnlyCollected,
+  xTweetFollows: state.xTweetFollows,
+  // xTweetAuth 仅由桌面端 safeStorage 安全加密存储（Web 模式仅在内存），避免明文 Cookie 写入 IndexedDB/localStorage（CWE-922）。
+  // 仅持久化非敏感的 xTweetAuthRevision 用于跨会话请求签名稳定性。
+  xTweetAuthRevision: state.xTweetAuthRevision,
+  telegramFollows: state.telegramFollows,
 // 持久化完整代理配置，包含认证密码，确保重启后无需重新输入。
 proxyConfig: {
   enabled: state.proxyConfig.enabled,
@@ -302,11 +307,11 @@ state.discoverySortOrder = 'Descending';
   // discoveryIsLoading 不应持久化，migrate 时始终重置防止旧数据格式异常导致 spread 崩溃
   if (state) {
 (state as Record<string, unknown>).discoveryIsLoading = {
-'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'weekly': false, 'search': false, 'code-search': false,
+'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false,
 };
 // discoveryScrollPositions 同样不应持久化，重置以避免 stale 滚动位置
 (state as Record<string, unknown>).discoveryScrollPositions = {
-'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'weekly': 0, 'search': 0, 'code-search': 0,
+'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0,
 };
   }
 
@@ -317,8 +322,16 @@ state.discoverySortOrder = 'Descending';
 
   // v14→v15: X 推文频道选项兜底（关注列表默认含 geekbb）
   if (state) {
-    (state as Record<string, unknown>).xTweetFollows = normalizeXTweetFollows(
-      (state as Record<string, unknown>).xTweetFollows,
+    const stateRecord = state as Record<string, unknown>;
+    stateRecord.xTweetFollows = normalizeXTweetFollows(stateRecord.xTweetFollows);
+    // 旧快照可能含明文 xTweetAuth：直接删除（不删除整个快照），内存态置 null；
+    // 清理后的快照随下次持久化写回 IndexedDB/localStorage。
+    if ('xTweetAuth' in stateRecord) delete stateRecord.xTweetAuth;
+    if (typeof stateRecord.xTweetAuthRevision !== 'number' || !Number.isFinite(stateRecord.xTweetAuthRevision)) {
+      stateRecord.xTweetAuthRevision = 0;
+    }
+    (state as Record<string, unknown>).telegramFollows = normalizeTelegramFollows(
+      (state as Record<string, unknown>).telegramFollows,
     );
   }
 

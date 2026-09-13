@@ -114,6 +114,8 @@ const currentPersistedKeys = [
   'discoverySelectedTopic',
   'weeklyOnlyCollected',
   'xTweetFollows',
+  'xTweetAuthRevision',
+  'telegramFollows',
   'proxyConfig',
   'rpcDownloadConfig',
   'routeMode',
@@ -242,8 +244,8 @@ describe('PR-07 Store modularization compatibility', () => {
     const normalized = actualStore.normalizePersistedState(snapshot, actualStore.useAppStore.getInitialState());
 
     expect(normalized.analyzingGistIds).toEqual(new Set());
-    expect(normalized.discoveryRepos).toEqual({ trending: [], 'hot-release': [], 'most-popular': [], topic: [], 'x-tweet': [], weekly: [], search: [], 'code-search': [] });
-    expect(normalized.discoveryIsLoading).toEqual({ trending: false, 'hot-release': false, 'most-popular': false, topic: false, 'x-tweet': false, weekly: false, search: false, 'code-search': false });
+    expect(normalized.discoveryRepos).toEqual({ trending: [], 'hot-release': [], 'most-popular': [], topic: [], 'x-tweet': [], telegram: [], weekly: [], search: [], 'code-search': [] });
+    expect(normalized.discoveryIsLoading).toEqual({ trending: false, 'hot-release': false, 'most-popular': false, topic: false, 'x-tweet': false, telegram: false, weekly: false, search: false, 'code-search': false });
     expect(normalized.repositories?.[0]).toMatchObject({
       has_fetched_releases: true,
       last_release_fetch_time: '2026-02-01T00:00:00.000Z',

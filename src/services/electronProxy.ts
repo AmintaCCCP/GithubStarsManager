@@ -63,6 +63,18 @@ interface ElectronAPI {
   testProxy: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>;
   /** X 推文频道：主进程代抓 x.com 未登录主页 HTML（绕开渲染进程 CORS） */
   xFetchTimeline?: (handle: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  /**
+   * X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
+   * （带用户的 auth_token/ct0 Cookie 与 Bearer，绕开渲染进程 CORS）
+   */
+  xFetchGraphQL?: (url: string, auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; body?: string; error?: string }>;
+  /** Telegram 频道：主进程代抓 t.me/s/<name> 公开预览 HTML（可选 before 游标翻历史页） */
+  telegramFetchChannel?: (channel: string, before?: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  xAuth?: {
+    save: (auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; error?: string }>;
+    get: () => Promise<{ authToken: string; ct0: string } | null>;
+    clear: () => Promise<{ success: boolean; error?: string }>;
+  };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
 }
@@ -102,6 +114,72 @@ export const fetchXTimelineViaDesktop = async (handle: string): Promise<string |
   const result = await window.electronAPI.xFetchTimeline(handle);
   if (!result.success || typeof result.html !== 'string') {
     throw new Error(result.error || 'desktop x.com fetch failed');
+  }
+  return result.html;
+};
+
+const X_HOME_URL = 'https://x.com/home';
+const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-zA-Z0-9_-]+\.js$/;
+const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
+
+export const isAllowedXGraphQLUrl = (url: string): boolean =>
+  url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
+
+/**
+ * X 推文频道鉴权路径：经主进程代发 x.com GraphQL / 静态资源请求。非桌面环境返回 null。
+ * 限制仅允许 x.com 与 abs.twimg.com 目标，主进程 net.fetch 配置 redirect: 'error'
+ * 拒绝跨域重定向，防止 Cookie 被转到允许域名之外。
+ */
+export const fetchXGraphQLViaDesktop = async (
+  url: string,
+  auth: { authToken: string; ct0: string },
+): Promise<string | null> => {
+  if (typeof url !== 'string' || !isAllowedXGraphQLUrl(url)) {
+    throw new Error('invalid url for x.com fetch');
+  }
+  if (!window.electronAPI?.xFetchGraphQL) return null;
+  const result = await window.electronAPI.xFetchGraphQL(url, auth);
+  if (!result.success || typeof result.body !== 'string') {
+    throw new Error(result.error || 'desktop x.com GraphQL fetch failed');
+  }
+  return result.body;
+};
+
+/** X 鉴权 Cookie 本地安全读取（Electron safeStorage 加密保存在本机）。非桌面环境返回 null。 */
+export const loadEncryptedXAuthViaDesktop = async (): Promise<{ authToken: string; ct0: string } | null> => {
+  if (!window.electronAPI?.xAuth?.get) return null;
+  try {
+    return await window.electronAPI.xAuth.get();
+  } catch {
+    return null;
+  }
+};
+
+/** X 鉴权 Cookie 本地安全写入（Electron safeStorage 加密保存在本机）。 */
+export const saveEncryptedXAuthViaDesktop = async (auth: { authToken: string; ct0: string }): Promise<void> => {
+  if (!window.electronAPI?.xAuth?.save) return;
+  const result = await window.electronAPI.xAuth.save(auth);
+  if (result && !result.success) {
+    throw new Error(result.error || 'failed to save X authentication');
+  }
+};
+
+/** X 鉴权 Cookie 本地安全清理。 */
+export const clearEncryptedXAuthViaDesktop = async (): Promise<void> => {
+  if (!window.electronAPI?.xAuth?.clear) return;
+  const result = await window.electronAPI.xAuth.clear();
+  if (result && !result.success) {
+    throw new Error(result.error || 'failed to clear X authentication');
+  }
+};
+
+
+/** Telegram 频道：经主进程抓取 t.me/s 公开预览 HTML。非桌面环境返回 null。 */
+export const fetchTelegramChannelViaDesktop = async (channel: string, before?: string): Promise<string | null> => {
+  if (!window.electronAPI?.telegramFetchChannel) return null;
+  const result = await window.electronAPI.telegramFetchChannel(channel, before);
+  if (!result.success || typeof result.html !== 'string') {
+    throw new Error(result.error || 'desktop t.me fetch failed');
   }
   return result.html;
 };

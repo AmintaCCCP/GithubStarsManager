@@ -1,23 +1,22 @@
 import { useCallback, useState } from 'react';
-import { probeXTweetSource } from '../../../services/xTweetService';
+import { probeTelegramSource } from '../../../services/telegramService';
 import { useAppStore } from '../../../store/useAppStore';
 
 /**
- * X 推文频道"测试连接"的编排 hook：真实抓取一位博主主页并解析，
- * 返回可展示的结果（推文数/仓库链接数或错误）。View 不直接触达服务。
+ * Telegram 频道"测试连接"的编排 hook：真实抓取一个频道最新页并解析，
+ * 返回可展示的结果（消息数/仓库链接数或错误）。View 不直接触达服务。
  */
-export const useXTweetProbe = () => {
+export const useTelegramProbe = () => {
   const [isProbing, setIsProbing] = useState(false);
   const [probeResult, setProbeResult] = useState<string | null>(null);
 
-  const probe = useCallback(async (handle: string) => {
+  const probe = useCallback(async (channel: string) => {
     setIsProbing(true);
     setProbeResult(null);
-    const auth = useAppStore.getState().xTweetAuth;
     try {
-      const result = await probeXTweetSource(handle, undefined, auth);
+      const result = await probeTelegramSource(channel);
       setProbeResult(result.ok
-        ? `OK|${result.tweetCount ?? 0}|${result.repoCount ?? 0}`
+        ? `OK|${result.messageCount ?? 0}|${result.repoCount ?? 0}`
         : `FAIL|${result.error ?? '未知错误'}`);
     } catch (error) {
       setProbeResult(`FAIL|${error instanceof Error ? error.message : String(error)}`);
@@ -31,10 +30,10 @@ export const useXTweetProbe = () => {
     ? null
     : probeResult.startsWith('OK|')
       ? (() => {
-          const [, tweetCount, repoCount] = probeResult.split('|');
+          const [, messageCount, repoCount] = probeResult.split('|');
           return language === 'zh'
-            ? `连接成功：解析到 ${tweetCount} 条推文，其中 ${repoCount} 个 GitHub 仓库链接。`
-            : `Connected: parsed ${tweetCount} tweets with ${repoCount} GitHub repo links.`;
+            ? `连接成功：解析到 ${messageCount} 条频道消息，其中 ${repoCount} 个 GitHub 仓库链接。`
+            : `Connected: parsed ${messageCount} channel messages with ${repoCount} GitHub repo links.`;
         })()
       : (() => {
           const [, error] = probeResult.split('|');

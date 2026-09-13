@@ -549,8 +549,19 @@ export interface AppState {
   weeklySyncStatus: WeeklySyncStatus | null;
   /** X 推文频道：关注博主列表（handle 不含 @，初始化含 geekbb） */
   xTweetFollows: XTweetFollow[];
+  /**
+   * X 推文频道：可选登录鉴权 Cookie（配置后走 GraphQL 抓取 + 历史翻页）。
+   * 仅内存态，不持久化到 IndexedDB/localStorage（明文 Cookie 防同源脚本读取）。
+   */
+  xTweetAuth: XTweetAuth | null;
+  /** X 鉴权修订号：每次 set/clear 递增的非敏感计数器，用于请求失效判定与列表刷新 */
+  xTweetAuthRevision: number;
   /** X 推文频道同步/详情补全进度（会话级，不持久化） */
   xTweetSyncStatus: WeeklySyncStatus | null;
+  /** Telegram 频道：关注频道列表（channel 不含 @，初始化含 geekhub23） */
+  telegramFollows: TelegramFollow[];
+  /** Telegram 频道同步/详情补全进度（会话级，不持久化） */
+  telegramSyncStatus: WeeklySyncStatus | null;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
@@ -617,9 +628,9 @@ export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
 
 export type SortOrder = 'Descending' | 'Ascending';
 
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'x-tweet' | 'weekly' | 'search' | 'code-search';
+export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'x-tweet' | 'telegram' | 'weekly' | 'search' | 'code-search';
 
-export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'tweet' | 'weekly' | 'search';
+export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'tweet' | 'telegram' | 'weekly' | 'search';
 
 /** 阮一峰周刊频道：来源 issue 的引用信息（周刊收录 = labels 含 'weekly'） */
 export interface WeeklyIssueRef {
@@ -643,6 +654,16 @@ export interface XTweetFollow {
   addedAt: string;
 }
 
+/**
+ * X 推文频道：可选的登录态鉴权 Cookie（用户在设置中自行填写）。
+ * 配置后改走 x.com GraphQL 接口：每位博主每页约 20 条推文且支持游标回溯
+ * 历史翻页；留空则退回未登录抓取（每次仅最新一小批、无历史翻页）。
+ */
+export interface XTweetAuth {
+  authToken: string;
+  ct0: string;
+}
+
 /** X 推文频道：仓库来源推文的引用信息（正文缓存供"查看原贴"离线渲染） */
 export interface XTweetRef {
   tweetId: string;
@@ -652,6 +673,27 @@ export interface XTweetRef {
   /** 推文正文（RSS 输出的 HTML 片段） */
   content: string;
   /** 推文链接（https://x.com/<handle>/status/<id>） */
+  html_url: string;
+  createdAt: string;
+}
+
+/** Telegram 频道：一条关注配置（channel 不含 @） */
+export interface TelegramFollow {
+  channel: string;
+  addedAt: string;
+}
+
+/** Telegram 频道：仓库来源消息的引用信息（正文缓存供"查看消息原文"离线渲染） */
+export interface TelegramRef {
+  /** 复合 ID `<channel>/<messageId>` */
+  messageId: string;
+  /** 频道名（不含 @） */
+  channel: string;
+  /** 频道显示名 */
+  displayName: string;
+  /** 消息正文（t.me 公开预览输出的 HTML 片段） */
+  content: string;
+  /** 消息链接（https://t.me/<channel>/<id>） */
   html_url: string;
   createdAt: string;
 }
@@ -680,6 +722,8 @@ export interface DiscoveryRepo extends Repository {
   weeklyIssue?: WeeklyIssueRef;
   /** 仅 x-tweet 频道：该仓库来源的推文 */
   xTweet?: XTweetRef;
+  /** 仅 telegram 频道：该仓库来源的频道消息 */
+  telegram?: TelegramRef;
 }
 
 export type TrendingTimeRange = 'daily' | 'weekly' | 'monthly';

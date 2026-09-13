@@ -3,6 +3,10 @@ import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { weeklyIssuesStorage } from '../../services/weeklyIssuesStorage';
 import { xTweetStorage } from '../../services/xTweetStorage';
+import { telegramStorage } from '../../services/telegramStorage';
+import { abortXTweetSync } from '../../services/xTweetService';
+import { abortTelegramSync } from '../../services/telegramService';
+import { clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -484,15 +488,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteDiscoveryData = useCallback(async () => {
     try {
-      // 周刊/推文频道数据在独立 IndexedDB，一并清空
+      // 在清理前先中止并等待进行中的推文与 Telegram 同步，防止并发写入导致清理后脏数据写回
+      await abortXTweetSync();
+      await abortTelegramSync();
+      // 周刊/推文/Telegram 频道数据在独立 IndexedDB，一并清空
       await weeklyIssuesStorage.clearAll();
       await xTweetStorage.clearAll();
+      await telegramStorage.clearAll();
       const emptyDiscoveryRepos = {
         'trending': [],
         'hot-release': [],
         'most-popular': [],
         'topic': [],
         'x-tweet': [],
+        'telegram': [],
         'weekly': [],
         'search': [],
         'code-search': []
@@ -505,10 +514,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'most-popular': null,
           'topic': null,
           'x-tweet': null,
+          'telegram': null,
           'weekly': null,
           'search': null,
           'code-search': null
-        }
+        },
+        discoveryNextPage: { 'trending': 1, 'hot-release': 1, 'most-popular': 1, 'topic': 1, 'x-tweet': 1, 'telegram': 1, 'weekly': 1, 'search': 1, 'code-search': 1 },
+        discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
+        discoveryHasMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false },
+        discoveryIsLoadingMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false },
+        discoveryLoadMoreError: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'x-tweet': null, 'telegram': null, 'weekly': null, 'search': null, 'code-search': null },
       });
       addLog(t('删除发现页缓存数据', 'Delete discovery cache data'), true);
       showSuccess(t('发现页缓存数据已删除', 'Discovery cache data deleted'));
@@ -1233,10 +1248,25 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         throw e;
       }
       try {
+        await abortXTweetSync();
         await xTweetStorage.clearAll();
       } catch (e) {
         pendingStorages.push(t('X 推文数据', 'X tweet data'));
         throw e;
+      }
+      try {
+        await abortTelegramSync();
+        await telegramStorage.clearAll();
+      } catch (e) {
+        pendingStorages.push(t('Telegram 频道数据', 'Telegram channel data'));
+        throw e;
+      }
+
+      // 清除 Electron 桌面端独立保存的加密凭据文件（x-auth.enc）
+      try {
+        await clearEncryptedXAuthViaDesktop();
+      } catch {
+        // 忽略桌面端清理失败
       }
 
       // 存储清除成功后，重置所有状态到初始值
@@ -1245,6 +1275,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         user: null,
         githubToken: null,
         isAuthenticated: false,
+        xTweetAuth: null,
+        xTweetAuthRevision: 0,
 
         // 仓库数据
         repositories: [],
@@ -1814,7 +1846,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <Button
                   variant="ghost"
                   onClick={() => openConfirmation(stat.key as DeleteOperation)}
-                  disabled={stat.count === 0}
+                  disabled={stat.key !== 'discoveryData' && stat.count === 0}
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />

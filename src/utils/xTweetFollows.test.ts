@@ -3,6 +3,7 @@ import {
   DEFAULT_XTWEET_FOLLOWS,
   normalizeXTweetFollows,
   normalizeXTweetHandleInput,
+  normalizeXTweetAuth,
 } from './xTweetFollows';
 
 describe('normalizeXTweetHandleInput', () => {
@@ -45,5 +46,26 @@ describe('normalizeXTweetFollows', () => {
       { handle: 'geekbb', addedAt: '2026-09-12T00:00:00.000Z' },
       { handle: 'ruanyf', addedAt: '1970-01-01T00:00:00.000Z' },
     ]);
+  });
+});
+
+describe('normalizeXTweetAuth', () => {
+  it('两端去空白后成对保存；任一为空即整体视为未配置', () => {
+    expect(normalizeXTweetAuth({ authToken: '  abc  ', ct0: ' def ' })).toEqual({ authToken: 'abc', ct0: 'def' });
+    expect(normalizeXTweetAuth({ authToken: 'abc', ct0: '' })).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: '', ct0: 'def' })).toBeNull();
+    expect(normalizeXTweetAuth(null)).toBeNull();
+    expect(normalizeXTweetAuth('junk')).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: 1, ct0: 2 })).toBeNull();
+  });
+
+  it('去除首尾包裹的引号；纯引号输入判定为无效并返回 null', () => {
+    expect(normalizeXTweetAuth({ authToken: '"my_token"', ct0: "'my_ct0'" })).toEqual({
+      authToken: 'my_token',
+      ct0: 'my_ct0',
+    });
+    expect(normalizeXTweetAuth({ authToken: '""', ct0: 'valid_ct0' })).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: 'valid_token', ct0: "''" })).toBeNull();
+    expect(normalizeXTweetAuth({ authToken: '  "  "  ', ct0: 'valid_ct0' })).toBeNull();
   });
 });

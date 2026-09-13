@@ -1,6 +1,9 @@
 
 import type { AppStoreSlice } from '../types';
-import { normalizeXTweetHandleInput } from '../../utils/xTweetFollows';
+import { normalizeXTweetAuth, normalizeXTweetHandleInput } from '../../utils/xTweetFollows';
+import { normalizeTelegramChannelInput } from '../../utils/telegramFollows';
+import { saveEncryptedXAuthViaDesktop, clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
+import { logger } from '../../services/logger';
 
 export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setSelectedDiscoveryChannel'
@@ -27,6 +30,11 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'setXTweetSyncStatus'
   | 'addXTweetFollow'
   | 'removeXTweetFollow'
+  | 'setXTweetAuth'
+  | 'clearXTweetAuth'
+  | 'setTelegramSyncStatus'
+  | 'addTelegramFollow'
+  | 'removeTelegramFollow'
   | 'appendDiscoveryRepos'
 >> = (set) => ({
     // Discovery actions
@@ -123,6 +131,52 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     removeXTweetFollow: (handle) => set((state) => ({
       xTweetFollows: state.xTweetFollows.filter(
         (follow) => follow.handle.toLowerCase() !== handle.toLowerCase(),
+      ),
+    })),
+    setXTweetAuth: (auth) => {
+      const sanitized = normalizeXTweetAuth(auth);
+      if (!sanitized) {
+        clearEncryptedXAuthViaDesktop().catch((err: unknown) => {
+          logger.errorFromError('xAuth', 'Failed to clear encrypted X auth', err);
+        });
+        set((state) => ({
+          xTweetAuth: null,
+          xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
+        }));
+        return;
+      }
+      saveEncryptedXAuthViaDesktop(sanitized).catch((err: unknown) => {
+        logger.errorFromError('xAuth', 'Failed to persist encrypted X auth to disk — auth will be lost on restart', err);
+      });
+      set((state) => ({
+        xTweetAuth: sanitized,
+        xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
+      }));
+    },
+    clearXTweetAuth: () => {
+      clearEncryptedXAuthViaDesktop().catch((err: unknown) => {
+        logger.errorFromError('xAuth', 'Failed to clear encrypted X auth', err);
+      });
+      set((state) => ({
+        xTweetAuth: null,
+        xTweetAuthRevision: (state.xTweetAuthRevision ?? 0) + 1,
+      }));
+    },
+    setTelegramSyncStatus: (status) => set({ telegramSyncStatus: status }),
+    addTelegramFollow: (channel) => set((state) => {
+      const normalized = normalizeTelegramChannelInput(channel);
+      if (!normalized) return {};
+      const exists = state.telegramFollows.some(
+        (follow) => follow.channel.toLowerCase() === normalized.toLowerCase(),
+      );
+      if (exists) return {};
+      return {
+        telegramFollows: [...state.telegramFollows, { channel: normalized, addedAt: new Date().toISOString() }],
+      };
+    }),
+    removeTelegramFollow: (channel) => set((state) => ({
+      telegramFollows: state.telegramFollows.filter(
+        (follow) => follow.channel.toLowerCase() !== channel.toLowerCase(),
       ),
     })),
   setDiscoveryScrollPosition: (channel, position) => set((state) => ({

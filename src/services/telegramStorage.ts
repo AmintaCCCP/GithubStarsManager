@@ -1,100 +1,83 @@
 /**
- * X 推文频道持久化层（独立 IndexedDB，仿 weeklyIssuesStorage）。
+ * Telegram 频道持久化层（独立 IndexedDB，仿 xTweetStorage）。
  *
- * 发现页 discoveryRepos 是会话级数据不持久化，但推文与仓库详情的获取成本高
- * （每次刷新要跨 RSSHub 实例抓取多位博主的时间线并批量补全仓库详情），
+ * 发现页 discoveryRepos 是会话级数据不持久化，但频道消息与仓库详情的获取
+ * 成本高（每次抓取要走代抓通道翻 t.me 公开预览页并批量补全仓库详情），
  * 所以落在这里跨会话复用，refreshChannel 只做增量同步。
  */
 
 import type { GitHubRepoDetailRead } from './githubApi';
 
-/** 关注博主的推文（正文缓存供"查看原贴"离线渲染） */
-export interface XStoredTweet {
-  tweetId: string;
-  handle: string;
+/** 频道消息（正文缓存供"查看消息原文"离线渲染） */
+export interface TelegramStoredMessage {
+  /** 复合键 `<channel>/<messageId>`（跨频道唯一） */
+  messageId: string;
+  /** 频道名（不含 @） */
+  channel: string;
+  /** 频道显示名（来自页面 owner_name，抓取时快照） */
   displayName: string;
-  /** 推文正文（RSS 输出的 HTML 片段） */
+  /** 消息正文（t.me 公开预览输出的 HTML 片段） */
   content: string;
+  /** 消息链接（https://t.me/<channel>/<id>） */
   htmlUrl: string;
   createdAt: string;
-  /** 推文中提取到的仓库 full_name（小写键，对应 repos store） */
+  /** 消息中提取到的仓库 full_name（小写键，对应 repos store） */
   repoFullNames: string[];
 }
 
 /**
- * 推文涉及的 GitHub 仓库（按 full_name 小写去重，一仓库一条）。
+ * 消息涉及的 GitHub 仓库（按 full_name 小写去重，一仓库一条）。
  * detail 为 null 且 lastFetchedAt 非空表示仓库不可用（删除/私有），到期重试。
  */
-export interface XStoredRepo {
+export interface TelegramStoredRepo {
   fullName: string;
   detail: GitHubRepoDetailRead | null;
   lastFetchedAt: string;
-  /** 来源推文 = 发布时间最新的推文 */
-  sourceTweetId: string;
-  tweetCreatedAt: string;
+  /** 来源消息 = 发布时间最新的消息 */
+  sourceMessageId: string;
+  messageCreatedAt: string;
 }
 
-/** 单博主的 GraphQL 翻页游标：cursor 为下一页请求参数（null = 尚未翻过页） */
-export interface XTweetPageState {
+/** 单频道的分页游标：cursor 为下一页 ?before= 值（null = 尚未翻过页） */
+export interface TelegramChannelPageState {
   cursor: string | null;
-  /** 已翻到时间线尽头（无 bottom cursor） */
+  /** 已翻到频道历史尽头（rel=prev 消失） */
   exhausted: boolean;
 }
 
-export interface XTweetSyncMeta {
+export interface TelegramSyncMeta {
   lastSyncedAt: string | null;
-  /** 生成水位时的关注列表签名（规范化 handle 排序拼接）；列表变化则水位失效 */
+  /** 生成水位时的关注列表签名（规范化频道名排序拼接）；列表变化则水位失效 */
   followsSignature: string;
-  /** 鉴权指纹（不同 Cookie 切换时清理推文与仓库缓存） */
-  authFingerprint?: string;
-  /** 鉴权路径的分页游标（跨会话保留，"加载更多"接着上次的位置继续拉） */
-  pages: Record<string, XTweetPageState>;
-  /** 已解析的博主用户 ID（handle → rest_id，鉴权 GraphQL 路径复用） */
-  userIds: Record<string, string>;
-  /** 上次从线上 bundle 提取的 GraphQL queryId（防 queryId 轮换的缓存） */
-  queryIds: Record<string, string>;
+  /** 每个频道的翻页游标（跨会话保留，"加载更多"接着上次的位置继续拉） */
+  pages: Record<string, TelegramChannelPageState>;
 }
 
-const createDefaultMeta = (): XTweetSyncMeta => ({
+const createDefaultMeta = (): TelegramSyncMeta => ({
   lastSyncedAt: null,
   followsSignature: '',
-  authFingerprint: '',
   pages: {},
-  userIds: {},
-  queryIds: {},
 });
 
-const normalizeStringRecord = (value: unknown): Record<string, string> => {
-  if (!value || typeof value !== 'object') return {};
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([, v]) => typeof v === 'string' && v.length > 0)
-      .map(([k, v]) => [k, v as string]),
-  );
-};
-
-const normalizeMeta = (meta: XTweetSyncMeta | null | undefined): XTweetSyncMeta => ({
+const normalizeMeta = (meta: TelegramSyncMeta | null | undefined): TelegramSyncMeta => ({
   lastSyncedAt: meta?.lastSyncedAt ?? null,
   followsSignature: typeof meta?.followsSignature === 'string' ? meta.followsSignature : '',
-  authFingerprint: typeof meta?.authFingerprint === 'string' ? meta.authFingerprint : '',
   pages: meta?.pages && typeof meta.pages === 'object'
     ? Object.fromEntries(
         Object.entries(meta.pages)
           .filter(([, v]) => v && typeof v === 'object')
           .map(([k, v]) => [k, {
-            cursor: typeof (v as XTweetPageState).cursor === 'string'
-              ? (v as XTweetPageState).cursor : null,
-            exhausted: Boolean((v as XTweetPageState).exhausted),
+            cursor: typeof (v as TelegramChannelPageState).cursor === 'string'
+              ? (v as TelegramChannelPageState).cursor : null,
+            exhausted: Boolean((v as TelegramChannelPageState).exhausted),
           }]),
       )
     : {},
-  userIds: normalizeStringRecord(meta?.userIds),
-  queryIds: normalizeStringRecord(meta?.queryIds),
 });
 
-const DB_NAME = 'github-stars-x-tweet';
+const DB_NAME = 'github-stars-telegram';
 const DB_VERSION = 1;
-const TWEETS_STORE = 'tweets';
+const MESSAGES_STORE = 'messages';
 const REPOS_STORE = 'repos';
 const META_STORE = 'meta';
 
@@ -106,7 +89,7 @@ const openDb = (): Promise<IDBDatabase> => {
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(TWEETS_STORE)) db.createObjectStore(TWEETS_STORE);
+      if (!db.objectStoreNames.contains(MESSAGES_STORE)) db.createObjectStore(MESSAGES_STORE);
       if (!db.objectStoreNames.contains(REPOS_STORE)) db.createObjectStore(REPOS_STORE);
       if (!db.objectStoreNames.contains(META_STORE)) db.createObjectStore(META_STORE);
     };
@@ -117,7 +100,7 @@ const openDb = (): Promise<IDBDatabase> => {
 
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   const timeoutPromise = new Promise<T>((_, reject) =>
-    setTimeout(() => reject(new Error('xTweetStorage timeout')), timeoutMs),
+    setTimeout(() => reject(new Error('telegramStorage timeout')), timeoutMs),
   );
   return Promise.race([promise, timeoutPromise]);
 };
@@ -139,7 +122,7 @@ const runWriteTx = async (
         } catch {
           // 事务可能已自行结束
         }
-        reject(new Error('xTweetStorage timeout'));
+        reject(new Error('telegramStorage timeout'));
       }, timeoutMs);
       let settled = false;
       const settle = (fn: () => void) => {
@@ -174,7 +157,7 @@ const runGetTx = async <T>(
   try {
     return await new Promise<T | undefined>((resolve, reject) => {
       const tx = db.transaction(storeName, 'readonly');
-      const timer = setTimeout(() => reject(new Error('xTweetStorage timeout')), timeoutMs);
+      const timer = setTimeout(() => reject(new Error('telegramStorage timeout')), timeoutMs);
       let settled = false;
       const settle = (fn: () => void) => {
         if (settled) return;
@@ -208,7 +191,7 @@ const runCursorTx = async (
         } catch {
           // 事务可能已自行结束
         }
-        reject(new Error('xTweetStorage timeout'));
+        reject(new Error('telegramStorage timeout'));
       }, timeoutMs);
       let settled = false;
       const settle = (fn: () => void) => {
@@ -239,98 +222,98 @@ const runCursorTx = async (
   }
 };
 
-export const xTweetStorage = {
-  /** 批量 upsert 推文（键为 tweetId）。写失败不抛出（不影响同步流程）。 */
-  async saveTweets(tweets: XStoredTweet[]): Promise<void> {
-    if (tweets.length === 0) return;
+export const telegramStorage = {
+  /** 批量 upsert 消息（键为 `<channel>/<id>` 复合键）。写失败不抛出（不影响同步流程）。 */
+  async saveMessages(messages: TelegramStoredMessage[]): Promise<void> {
+    if (messages.length === 0) return;
     try {
-      await runWriteTx(TWEETS_STORE, 15_000, (store) => {
-        for (const tweet of tweets) store.put(tweet, tweet.tweetId);
+      await runWriteTx(MESSAGES_STORE, 15_000, (store) => {
+        for (const message of messages) store.put(message, message.messageId);
       });
     } catch (e) {
-      console.warn('[xTweetStorage] saveTweets failed:', e);
+      console.warn('[telegramStorage] saveMessages failed:', e);
     }
   },
 
   /**
    * 读取失败向上抛出（不返回半量快照）：调用方会把它当作权威内存状态，
-   * 缺失的键会让已知推文被当作新推文重建，进而用空详情覆盖已落盘数据。
+   * 缺失的键会让已知消息被当作新消息重建，进而用空详情覆盖已落盘数据。
    */
-  async getAllTweets(): Promise<Map<string, XStoredTweet>> {
-    const result = new Map<string, XStoredTweet>();
+  async getAllMessages(): Promise<Map<string, TelegramStoredMessage>> {
+    const result = new Map<string, TelegramStoredMessage>();
     if (!canUseIndexedDB()) return result;
-    await runCursorTx(TWEETS_STORE, 20_000, (value) => {
-      const tweet = value as XStoredTweet;
-      if (tweet && typeof tweet.tweetId === 'string') result.set(tweet.tweetId, tweet);
+    await runCursorTx(MESSAGES_STORE, 20_000, (value) => {
+      const message = value as TelegramStoredMessage;
+      if (message && typeof message.messageId === 'string') result.set(message.messageId, message);
     });
     return result;
   },
 
   /** 批量 upsert 仓库（键为 full_name 小写）。写失败不抛出（不影响同步流程）。 */
-  async saveRepos(repos: XStoredRepo[]): Promise<void> {
+  async saveRepos(repos: TelegramStoredRepo[]): Promise<void> {
     if (repos.length === 0) return;
     try {
       await runWriteTx(REPOS_STORE, 15_000, (store) => {
         for (const repo of repos) store.put(repo, repo.fullName.toLowerCase());
       });
     } catch (e) {
-      console.warn('[xTweetStorage] saveRepos failed:', e);
+      console.warn('[telegramStorage] saveRepos failed:', e);
     }
   },
 
-  /** 读取失败向上抛出（同 getAllTweets：不返回半量快照）。 */
-  async getAllRepos(): Promise<Map<string, XStoredRepo>> {
-    const result = new Map<string, XStoredRepo>();
+  /** 读取失败向上抛出（同 getAllMessages：不返回半量快照）。 */
+  async getAllRepos(): Promise<Map<string, TelegramStoredRepo>> {
+    const result = new Map<string, TelegramStoredRepo>();
     if (!canUseIndexedDB()) return result;
     await runCursorTx(REPOS_STORE, 15_000, (value) => {
-      const repo = value as XStoredRepo;
+      const repo = value as TelegramStoredRepo;
       if (repo && typeof repo.fullName === 'string') result.set(repo.fullName.toLowerCase(), repo);
     });
     return result;
   },
 
-  async getSyncMeta(): Promise<XTweetSyncMeta> {
-    // 无 IndexedDB 环境视作记录不存在，返回全新默认值（独立嵌套对象，
-    // 避免浅拷贝共享 DEFAULT_META.pages/userIds/queryIds 造成跨调用污染）；
-    // 真实读取失败向上抛出，避免调用方误判游标。
+  async getSyncMeta(): Promise<TelegramSyncMeta> {
+    // 无 IndexedDB 环境（如 SSR/测试）视作记录不存在，返回全新默认值；
+    // 真实读取失败则向上抛出，避免调用方把缺失游标误判为"尚未翻页"而
+    // 重抓最新页并用新游标覆盖已推进的位置。
     if (!canUseIndexedDB()) return createDefaultMeta();
-    const meta = await withTimeout(runGetTx<XTweetSyncMeta>(META_STORE, 5000, 'sync'), 6000);
+    const meta = await withTimeout(runGetTx<TelegramSyncMeta>(META_STORE, 5000, 'sync'), 6000);
     if (meta === undefined) return createDefaultMeta();
     return normalizeMeta(meta);
   },
 
-  async saveSyncMeta(meta: XTweetSyncMeta): Promise<void> {
+  async saveSyncMeta(meta: TelegramSyncMeta): Promise<void> {
     try {
       await runWriteTx(META_STORE, 5000, (store) => {
         store.put(meta, 'sync');
       });
     } catch (e) {
-      console.warn('[xTweetStorage] saveSyncMeta failed:', e);
+      console.warn('[telegramStorage] saveSyncMeta failed:', e);
     }
   },
 
   /**
-   * 同步轮次的原子落盘：tweets + repos + meta（水位/取尽标记）在同一个跨
+   * 同步轮次的原子落盘：messages + repos + meta（水位/游标）在同一个跨
    * store 读写事务中写入，任一失败整体回滚并抛出——调用方据此不推进内存
-   * 游标，下轮同步会重新拉取该批推文，避免水位已推进但数据未落盘的缺口。
+   * 游标，下轮同步会重新拉取该批消息，避免游标已推进但数据未落盘的缺口。
    */
   async saveSyncBatch(payload: {
-    tweets: XStoredTweet[];
-    repos: XStoredRepo[];
-    meta: XTweetSyncMeta;
+    messages: TelegramStoredMessage[];
+    repos: TelegramStoredRepo[];
+    meta: TelegramSyncMeta;
   }): Promise<void> {
     if (!canUseIndexedDB()) throw new Error('IndexedDB unavailable');
     const db = await withTimeout(openDb(), 15_000);
     try {
       await new Promise<void>((resolve, reject) => {
-        const tx = db.transaction([TWEETS_STORE, REPOS_STORE, META_STORE], 'readwrite');
+        const tx = db.transaction([MESSAGES_STORE, REPOS_STORE, META_STORE], 'readwrite');
         const timer = setTimeout(() => {
           try {
             tx.abort();
           } catch {
             // 事务可能已自行结束
           }
-          reject(new Error('xTweetStorage timeout'));
+          reject(new Error('telegramStorage timeout'));
         }, 15_000);
         let settled = false;
         const settle = (fn: () => void) => {
@@ -340,8 +323,8 @@ export const xTweetStorage = {
           fn();
         };
         try {
-          const tweetStore = tx.objectStore(TWEETS_STORE);
-          for (const tweet of payload.tweets) tweetStore.put(tweet, tweet.tweetId);
+          const messageStore = tx.objectStore(MESSAGES_STORE);
+          for (const message of payload.messages) messageStore.put(message, message.messageId);
           const repoStore = tx.objectStore(REPOS_STORE);
           for (const repo of payload.repos) repoStore.put(repo, repo.fullName.toLowerCase());
           tx.objectStore(META_STORE).put(payload.meta, 'sync');
@@ -359,14 +342,14 @@ export const xTweetStorage = {
   },
 
   /**
-   * 清空全部推文数据（设置页"删除发现页缓存/删除全部数据"调用）。
+   * 清空全部频道数据（设置页"删除发现页缓存/删除全部数据"调用）。
    * 错误向上抛出（调用方据此决定是否提示成功）；先清 meta：即使后续
-   * store 清理失败，同步水位已移除，下次同步退化为全量重扫可自愈。
+   * store 清理失败，水位与游标已移除，下次同步退化为全量重扫可自愈。
    */
   async clearAll(): Promise<void> {
     if (!canUseIndexedDB()) return;
     await runWriteTx(META_STORE, 5000, (store) => store.clear());
-    await runWriteTx(TWEETS_STORE, 15_000, (store) => store.clear());
+    await runWriteTx(MESSAGES_STORE, 15_000, (store) => store.clear());
     await runWriteTx(REPOS_STORE, 15_000, (store) => store.clear());
   },
 };

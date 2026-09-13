@@ -111,6 +111,8 @@ export type PersistedAppState = Partial<
     | 'discoverySelectedTopic'
     | 'weeklyOnlyCollected'
     | 'xTweetFollows'
+    | 'xTweetAuthRevision'
+    | 'telegramFollows'
     | 'proxyConfig'
     | 'rpcDownloadConfig'
     | 'routeMode'
@@ -487,6 +489,14 @@ export const defaultDiscoveryChannels: DiscoveryChannel[] = [
     nameEn: 'X Tweets',
     icon: 'tweet',
     description: '关注 X 博主推文中分享的 GitHub 项目',
+    enabled: true,
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram 频道',
+    nameEn: 'Telegram Channels',
+    icon: 'telegram',
+    description: '关注 Telegram 频道消息中分享的 GitHub 项目',
     enabled: true,
   },
   {
