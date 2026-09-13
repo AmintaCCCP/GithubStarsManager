@@ -612,4 +612,24 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.0</downloadUrl>
   </version>
+  <version>
+    <number>0.8.1</number>
+    <releaseDate>2026-09-14</releaseDate>
+    <changelog>
+      <item>feat: Added Telegram discovery channel and enhanced X (Twitter) tweet channel with optional credentials persistence and continuous history timeline pagination. (PR #356)</item>
+      <item>fix: Restored responsive clicking on "View on GitHub" buttons after dragging cards to reclassify, and enabled uncategorizing repositories by dragging directly to the sidebar. (PR #355)</item>
+      <item>feat: Upgraded top navigation from "Trending" to "Discovery", introducing curated X (Twitter) tweet discovery channels. (PR #354)</item>
+      <item>refactor: Standardized frontend layering architecture (ADR 0001) by re-anchoring hook and persistence storage boundaries, extending boundary protections, and narrowing fine-grained reactive subscriptions. (PR #352)</item>
+      <item>fix: Replaced desktop system tray icon with an adaptive monochrome template image that automatically matches light and dark menu bars on macOS and Windows. (PR #351)</item>
+      <item>fix: Fixed invisible text selection highlights across theme presets by deriving explicit selection and search-highlight color tokens. (PR #350)</item>
+      <item>feat: Added Ruan Yifeng Weekly open-source submissions discovery channel, offering direct access to practical candidate tools and utilities. (PR #349)</item>
+      <item>fix: Prioritized repository pushed_at timestamp over metadata update time when sorting repositories by recent updates. (PR #347)</item>
+      <item>feat: Added desktop auto-launch on system startup and minimize-to-tray on window close, ensuring continuous background synchronization. (PR #346)</item>
+      <item>feat: Added global repository Q&amp;A history drawer and session switcher to the repository detail view for seamless conversation lookup. (PR #344)</item>
+      <item>feat: Added lightning-fast global code and documentation search across public GitHub repositories with path, extension, and language filters. (PR #341)</item>
+      <item>fix: Prevented partial keyword false-positive matches in automatic category classification rules (contributed by @Swiftlyfisher). (PR #337)</item>
+      <item>fix: Normalized preset palettes for WCAG accessibility contrast, semantic layering, and consistent border radii across themes. (PR #336)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.1</downloadUrl>
+  </version>
 </versions>
