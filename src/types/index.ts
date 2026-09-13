@@ -551,6 +551,10 @@ export interface AppState {
   xTweetFollows: XTweetFollow[];
   /** X 推文频道同步/详情补全进度（会话级，不持久化） */
   xTweetSyncStatus: WeeklySyncStatus | null;
+  /** Telegram 频道：关注频道列表（channel 不含 @，初始化含 geekhub23） */
+  telegramFollows: TelegramFollow[];
+  /** Telegram 频道同步/详情补全进度（会话级，不持久化） */
+  telegramSyncStatus: WeeklySyncStatus | null;
 
   // Subscription
   subscriptionRepos: Record<string, SubscriptionRepo[]>;
@@ -617,9 +621,9 @@ export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
 
 export type SortOrder = 'Descending' | 'Ascending';
 
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'x-tweet' | 'weekly' | 'search' | 'code-search';
+export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'x-tweet' | 'telegram' | 'weekly' | 'search' | 'code-search';
 
-export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'tweet' | 'weekly' | 'search';
+export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'tweet' | 'telegram' | 'weekly' | 'search';
 
 /** 阮一峰周刊频道：来源 issue 的引用信息（周刊收录 = labels 含 'weekly'） */
 export interface WeeklyIssueRef {
@@ -656,6 +660,27 @@ export interface XTweetRef {
   createdAt: string;
 }
 
+/** Telegram 频道：一条关注配置（channel 不含 @） */
+export interface TelegramFollow {
+  channel: string;
+  addedAt: string;
+}
+
+/** Telegram 频道：仓库来源消息的引用信息（正文缓存供"查看消息原文"离线渲染） */
+export interface TelegramRef {
+  /** 复合 ID `<channel>/<messageId>` */
+  messageId: string;
+  /** 频道名（不含 @） */
+  channel: string;
+  /** 频道显示名 */
+  displayName: string;
+  /** 消息正文（t.me 公开预览输出的 HTML 片段） */
+  content: string;
+  /** 消息链接（https://t.me/<channel>/<id>） */
+  html_url: string;
+  createdAt: string;
+}
+
 export interface DiscoveryChannel {
   id: DiscoveryChannelId;
   name: string;
@@ -680,6 +705,8 @@ export interface DiscoveryRepo extends Repository {
   weeklyIssue?: WeeklyIssueRef;
   /** 仅 x-tweet 频道：该仓库来源的推文 */
   xTweet?: XTweetRef;
+  /** 仅 telegram 频道：该仓库来源的频道消息 */
+  telegram?: TelegramRef;
 }
 
 export type TrendingTimeRange = 'daily' | 'weekly' | 'monthly';

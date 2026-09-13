@@ -252,6 +252,10 @@ export interface AppActions {
   /** 添加 X 推文频道关注（接受 @handle / handle / x.com 链接，重复添加忽略） */
   addXTweetFollow: (handle: string) => void;
   removeXTweetFollow: (handle: string) => void;
+  setTelegramSyncStatus: (status: WeeklySyncStatus | null) => void;
+  /** 添加 Telegram 频道关注（接受 @channel / channel / t.me 链接，重复添加忽略） */
+  addTelegramFollow: (channel: string) => void;
+  removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 }
 

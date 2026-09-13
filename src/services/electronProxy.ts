@@ -63,6 +63,8 @@ interface ElectronAPI {
   testProxy: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>;
   /** X 推文频道：主进程代抓 x.com 未登录主页 HTML（绕开渲染进程 CORS） */
   xFetchTimeline?: (handle: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  /** Telegram 频道：主进程代抓 t.me/s/<name> 公开预览 HTML（可选 before 游标翻历史页） */
+  telegramFetchChannel?: (channel: string, before?: string) => Promise<{ success: boolean; html?: string; error?: string }>;
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
 }
@@ -102,6 +104,16 @@ export const fetchXTimelineViaDesktop = async (handle: string): Promise<string |
   const result = await window.electronAPI.xFetchTimeline(handle);
   if (!result.success || typeof result.html !== 'string') {
     throw new Error(result.error || 'desktop x.com fetch failed');
+  }
+  return result.html;
+};
+
+/** Telegram 频道：经主进程抓取 t.me/s 公开预览 HTML。非桌面环境返回 null。 */
+export const fetchTelegramChannelViaDesktop = async (channel: string, before?: string): Promise<string | null> => {
+  if (!window.electronAPI?.telegramFetchChannel) return null;
+  const result = await window.electronAPI.telegramFetchChannel(channel, before);
+  if (!result.success || typeof result.html !== 'string') {
+    throw new Error(result.error || 'desktop t.me fetch failed');
   }
   return result.html;
 };

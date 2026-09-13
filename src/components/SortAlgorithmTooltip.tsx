@@ -78,6 +78,15 @@ export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ chan
             '【Features】\n• Source: repo links shared in followed accounts\' tweets\n• Incremental paginated fetching; earlier tweets load as you page\n• Sort by: tweet time descending\n\n【Best for】\nTracking real-time recommendations from tech accounts and discovering tools developers are sharing.'
           ),
         };
+      case 'telegram':
+        return {
+          title: t('Telegram 频道', 'Telegram Channels'),
+          highlight: t('📢 关注频道消息中的开源项目', '📢 Open-source projects shared by followed channels'),
+          description: t(
+            '【特点】\n• 来源：关注频道消息中分享的仓库链接\n• 服务端分页拉取，加载更多时抓取更早的历史消息\n• 排序方式：按消息时间倒序\n\n【适合场景】\n跟踪 Telegram 技术频道持续推荐的项目，按页回溯频道历史发现好仓库。',
+            '【Features】\n• Source: repo links shared in followed channels\' messages\n• Server-side paginated fetching; earlier messages load as you page\n• Sort by: message time descending\n\n【Best for】\nTracking projects recommended by Telegram tech channels and paging back through their history.'
+          ),
+        };
       case 'code-search':
         return {
           title: t('代码搜索', 'Code Search'),

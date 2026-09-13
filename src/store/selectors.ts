@@ -166,4 +166,9 @@ export const selectDiscoveryViewState = (state: AppStoreState) => ({
   setXTweetSyncStatus: state.setXTweetSyncStatus,
   addXTweetFollow: state.addXTweetFollow,
   removeXTweetFollow: state.removeXTweetFollow,
+  telegramFollows: state.telegramFollows,
+  telegramSyncStatus: state.telegramSyncStatus,
+  setTelegramSyncStatus: state.setTelegramSyncStatus,
+  addTelegramFollow: state.addTelegramFollow,
+  removeTelegramFollow: state.removeTelegramFollow,
 });

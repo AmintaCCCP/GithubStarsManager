@@ -1,6 +1,6 @@
 import React from 'react';
 import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search, Newspaper } from 'lucide-react';
-import { SiX } from '@icons-pack/react-simple-icons';
+import { SiX, SiTelegram } from '@icons-pack/react-simple-icons';
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 import { Button } from './ui/button';
 
@@ -10,6 +10,7 @@ const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ComponentType<
   star: Crown,
   tag: Tag,
   tweet: SiX,
+  telegram: SiTelegram,
   weekly: Newspaper,
   search: Search,
 };

@@ -17,7 +17,7 @@ import {
   Newspaper,
   Users
 } from 'lucide-react';
-import { SiAndroid, SiApple, SiLinux, SiX } from '@icons-pack/react-simple-icons';
+import { SiAndroid, SiApple, SiLinux, SiX, SiTelegram } from '@icons-pack/react-simple-icons';
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
@@ -27,6 +27,7 @@ import { CodeSearchView } from './CodeSearchView';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
 import { ScrollToBottom } from './ScrollToBottom';
 import { XTweetSettingsModal } from './XTweetSettingsModal';
+import { TelegramSettingsModal } from './TelegramSettingsModal';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -47,6 +48,7 @@ const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ReactNode> = {
   star: <Crown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
   tag: <Tag className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
   tweet: <SiX className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
+  telegram: <SiTelegram className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
   weekly: <Newspaper className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
   search: <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />,
 };
@@ -76,6 +78,11 @@ const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string;
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
     shadow: 'shadow-subtle',
     largeIcon: <SiX className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
+  },
+  telegram: {
+    gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
+    shadow: 'shadow-subtle',
+    largeIcon: <SiTelegram className="w-9 h-9 text-muted-foreground dark:text-foreground" />,
   },
   weekly: {
     gradient: 'from-muted to-muted/60 dark:from-muted/40 dark:to-muted/20',
@@ -462,6 +469,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     weeklySyncStatus,
     xTweetFollows,
     xTweetSyncStatus,
+    telegramFollows,
+    telegramSyncStatus,
     t,
     isAnalyzing,
     refreshChannel,
@@ -474,6 +483,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
   const sidebarRef = useRef<HTMLDivElement>(null);
   // X 推文频道：关注列表设置弹窗
   const [tweetSettingsOpen, setTweetSettingsOpen] = useState(false);
+  // Telegram 频道：关注频道设置弹窗
+  const [telegramSettingsOpen, setTelegramSettingsOpen] = useState(false);
   // 工具栏显示状态
   const [isToolbarVisible, setIsToolbarVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -523,6 +534,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
       ? t(`正在拉取关注博主的时间线… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`, `Fetching timelines… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`)
       : t(`补全仓库详情… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`, `Fetching repo details… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`))
     : null;
+  // Telegram 频道同步/补全进度文案
+  const telegramStatusText = telegramSyncStatus
+    ? (telegramSyncStatus.phase === 'syncing'
+      ? t(`正在拉取关注频道的消息… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`, `Fetching channel messages… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`)
+      : t(`补全仓库详情… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`, `Fetching repo details… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`))
+    : null;
 
 
 
@@ -570,6 +587,18 @@ export const DiscoveryView: React.FC = React.memo(() => {
       refreshChannel('x-tweet', 1, false);
     }
   }, [xTweetFollowsSignature, selectedDiscoveryChannel, refreshChannel]);
+
+  // Telegram 关注列表变化时重建列表：只在关注集真正变化时触发（挂载/切频道
+  // 不触发，避免与空频道自动加载 effect 双重调用导致同步被中止重启）
+  const telegramFollowsSignature = telegramFollows.map(follow => follow.channel.toLowerCase()).sort().join(',');
+  const prevTelegramFollowsRef = useRef(telegramFollowsSignature);
+  useEffect(() => {
+    if (prevTelegramFollowsRef.current === telegramFollowsSignature) return;
+    prevTelegramFollowsRef.current = telegramFollowsSignature;
+    if (selectedDiscoveryChannel === 'telegram') {
+      refreshChannel('telegram', 1, false);
+    }
+  }, [telegramFollowsSignature, selectedDiscoveryChannel, refreshChannel]);
 
   // 主题改变时刷新数据
   useEffect(() => {
@@ -843,8 +872,25 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     {t('关注列表', 'Follow List')}
                   </button>
                 )}
+                {selectedDiscoveryChannel === 'telegram' && telegramStatusText && (
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground" aria-live="polite">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {telegramStatusText}
+                  </span>
+                )}
+                {selectedDiscoveryChannel === 'telegram' && (
+                  <button
+                    type="button"
+                    onClick={() => setTelegramSettingsOpen(true)}
+                    className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
+                    title={t('管理关注频道列表', 'Manage the channel list')}
+                  >
+                    <Users className="w-4 h-4" />
+                    {t('频道列表', 'Channel List')}
+                  </button>
+                )}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && (
+                  {selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
                     <PlatformFilter
                       platform={discoveryPlatform}
                       onPlatformChange={setDiscoveryPlatform}
@@ -1009,6 +1055,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       ? weeklyStatusText
                       : selectedDiscoveryChannel === 'x-tweet' && xTweetStatusText
                       ? xTweetStatusText
+                      : selectedDiscoveryChannel === 'telegram' && telegramStatusText
+                      ? telegramStatusText
                       : t('GitHub API 响应中', 'Waiting for GitHub API response')}
                   </p>
                 </div>
@@ -1076,6 +1124,48 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       >
                         <Users className="w-4 h-4" />
                         {t('关注列表', 'Follow List')}
+                      </Button>
+                    </div>
+                  </>
+                ) : selectedDiscoveryChannel === 'telegram' ? (
+                  <>
+                    {isDesktopSafeMode ? (
+                      <div className="w-16 h-16 rounded-2xl bg-muted dark:bg-card flex items-center justify-center text-muted-foreground dark:text-muted-foreground border border-border dark:border-border">
+                        {currentChannelIconNode}
+                      </div>
+                    ) : (
+                      <div className={`w-20 h-20 rounded-3xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
+                        {currentChannelStyle.largeIcon}
+                      </div>
+                    )}
+                    <div className="space-y-2 max-w-xs">
+                      <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
+                        {t('Telegram 频道', 'Telegram Channels')}
+                      </p>
+                      <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
+                        {t('直连 t.me 公开预览抓取关注频道消息中的 GitHub 项目，需要桌面版或服务端模式', 'Fetches GitHub projects from followed channels\' messages via the t.me public preview; requires the desktop or server build')}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      <Button
+                        variant="default"
+                        onClick={() => refreshChannel('telegram', 1, false)}
+                        disabled={currentIsLoading}
+                        className={isDesktopSafeMode
+                          ? 'flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'
+                          : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        {t('开始同步', 'Start Sync')}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setTelegramSettingsOpen(true)}
+                        disabled={currentIsLoading}
+                        className="flex items-center gap-2 rounded-xl border border-border dark:border-border bg-card dark:bg-muted/40 px-6 py-2.5 text-sm font-medium text-foreground dark:text-foreground transition-colors hover:bg-accent dark:hover:bg-accent"
+                      >
+                        <Users className="w-4 h-4" />
+                        {t('频道列表', 'Channel List')}
                       </Button>
                     </div>
                   </>
@@ -1221,6 +1311,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
           <XTweetSettingsModal
             isOpen={tweetSettingsOpen}
             onClose={() => setTweetSettingsOpen(false)} />
+
+          {/* Telegram 频道关注列表设置 */}
+          <TelegramSettingsModal
+            isOpen={telegramSettingsOpen}
+            onClose={() => setTelegramSettingsOpen(false)} />
         </div>
       </div>
     </div>

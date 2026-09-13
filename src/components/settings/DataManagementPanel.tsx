@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { weeklyIssuesStorage } from '../../services/weeklyIssuesStorage';
 import { xTweetStorage } from '../../services/xTweetStorage';
+import { telegramStorage } from '../../services/telegramStorage';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -484,15 +485,17 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteDiscoveryData = useCallback(async () => {
     try {
-      // 周刊/推文频道数据在独立 IndexedDB，一并清空
+      // 周刊/推文/Telegram 频道数据在独立 IndexedDB，一并清空
       await weeklyIssuesStorage.clearAll();
       await xTweetStorage.clearAll();
+      await telegramStorage.clearAll();
       const emptyDiscoveryRepos = {
         'trending': [],
         'hot-release': [],
         'most-popular': [],
         'topic': [],
         'x-tweet': [],
+        'telegram': [],
         'weekly': [],
         'search': [],
         'code-search': []
@@ -505,6 +508,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'most-popular': null,
           'topic': null,
           'x-tweet': null,
+          'telegram': null,
           'weekly': null,
           'search': null,
           'code-search': null
@@ -1236,6 +1240,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         await xTweetStorage.clearAll();
       } catch (e) {
         pendingStorages.push(t('X 推文数据', 'X tweet data'));
+        throw e;
+      }
+      try {
+        await telegramStorage.clearAll();
+      } catch (e) {
+        pendingStorages.push(t('Telegram 频道数据', 'Telegram channel data'));
         throw e;
       }
 

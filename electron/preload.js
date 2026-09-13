@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getProxy: () => ipcRenderer.invoke('get-proxy'),
   testProxy: (config) => ipcRenderer.invoke('test-proxy', config),
   xFetchTimeline: (handle) => ipcRenderer.invoke('x-fetch-timeline', handle),
+  telegramFetchChannel: (channel, before) => ipcRenderer.invoke('telegram-fetch-channel', channel, before),
   desktop: {
     getPrefs: () => ipcRenderer.invoke('desktop:getPrefs'),
     setAutoLaunch: (enabled) => ipcRenderer.invoke('desktop:setAutoLaunch', enabled),

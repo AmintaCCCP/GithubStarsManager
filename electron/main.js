@@ -314,6 +314,36 @@ ipcMain.handle('x-fetch-timeline', async (_event, handle) => {
   }
 });
 
+// Telegram 频道：主进程代抓 t.me/s/<name> 公开网页预览（渲染进程受 CORS 限制；
+// net.fetch 走 Chromium 网络栈，自动跟随应用内已设置的代理）
+ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
+  if (typeof channel !== 'string' || !/^[A-Za-z0-9_]{3,64}$/.test(channel)) {
+    return { success: false, error: 'invalid channel' };
+  }
+  if (before !== undefined && before !== null && before !== '' &&
+      (typeof before !== 'string' || !/^\d{1,20}$/.test(before))) {
+    return { success: false, error: 'invalid before cursor' };
+  }
+  try {
+    const suffix = before ? `?before=${before}` : '';
+    const response = await net.fetch(`https://t.me/s/${channel}${suffix}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) {
+      return { success: false, error: `t.me responded ${response.status}` };
+    }
+    const html = await response.text();
+    return { success: true, html };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
 ipcMain.handle('set-proxy', async (event, config) => {
   saveProxyConfig(config);
   await applyProxy(config);
