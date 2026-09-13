@@ -21,6 +21,7 @@ import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { useBackendLifecycle } from './features/lifecycle/hooks/useBackendLifecycle';
 import type { AppState } from './types';
 import { hasActiveSearchFilters } from './utils/repoSearch';
+import { isElectron, loadEncryptedXAuthViaDesktop } from './services/electronProxy';
 
 const LazyReleaseTimeline = React.lazy(() =>
   import('./components/ReleaseTimeline').then((module) => ({ default: module.ReleaseTimeline }))
@@ -159,6 +160,17 @@ function App() {
   useEffect(() => {
     if (sessionStorage.getItem('gsm:frontend-debug') === 'true') {
       logger.setLevel('debug');
+    }
+  }, []);
+
+  // Restore persisted encrypted X auth cookies on desktop startup (#356)
+  useEffect(() => {
+    if (isElectron()) {
+      void loadEncryptedXAuthViaDesktop().then((auth) => {
+        if (auth && !useAppStore.getState().xTweetAuth) {
+          useAppStore.getState().setXTweetAuth(auth);
+        }
+      });
     }
   }, []);
 

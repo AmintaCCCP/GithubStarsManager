@@ -302,8 +302,11 @@ async function resolveXUserId(
     body = await graphQL(buildUserByScreenNameUrl(handle, ids.UserByScreenName), auth);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('401') || message.includes('403')) {
+    if (message.includes('401')) {
       throw new Error('X 鉴权已失效（auth_token/ct0 无效或过期），请在设置中更新或清除鉴权配置');
+    }
+    if (message.includes('403')) {
+      throw new Error('X 请求被拒绝（HTTP 403，可能触发了 Cloudflare 防火墙拦截、IP 限制或账号受限）');
     }
     if (!isUpstreamNotFound(error)) throw error;
     logger.warn('xTweet', 'UserByScreenName queryId stale, re-extracting from bundle');
@@ -468,8 +471,11 @@ async function fetchXUserTimelinePage(
     return await graphQL(buildUserTweetsUrl(userId, cursor, ids.UserTweets), auth);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('401') || message.includes('403')) {
+    if (message.includes('401')) {
       throw new Error('X 鉴权已失效（auth_token/ct0 无效或过期），请在设置中更新或清除鉴权配置');
+    }
+    if (message.includes('403')) {
+      throw new Error('X 请求被拒绝（HTTP 403，可能触发了 Cloudflare 防火墙拦截、IP 限制或账号受限）');
     }
     if (!isUpstreamNotFound(error)) throw error;
     logger.warn('xTweet', 'UserTweets queryId stale, re-extracting from bundle');

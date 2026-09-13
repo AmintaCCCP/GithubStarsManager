@@ -70,6 +70,11 @@ interface ElectronAPI {
   xFetchGraphQL?: (url: string, auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; body?: string; error?: string }>;
   /** Telegram 频道：主进程代抓 t.me/s/<name> 公开预览 HTML（可选 before 游标翻历史页） */
   telegramFetchChannel?: (channel: string, before?: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  xAuth?: {
+    save: (auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; error?: string }>;
+    get: () => Promise<{ authToken: string; ct0: string } | null>;
+    clear: () => Promise<{ success: boolean; error?: string }>;
+  };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
 }
@@ -139,6 +144,37 @@ export const fetchXGraphQLViaDesktop = async (
   }
   return result.body;
 };
+
+/** X 鉴权 Cookie 本地安全读取（Electron safeStorage 加密保存在本机）。非桌面环境返回 null。 */
+export const loadEncryptedXAuthViaDesktop = async (): Promise<{ authToken: string; ct0: string } | null> => {
+  if (!window.electronAPI?.xAuth?.get) return null;
+  try {
+    return await window.electronAPI.xAuth.get();
+  } catch {
+    return null;
+  }
+};
+
+/** X 鉴权 Cookie 本地安全写入（Electron safeStorage 加密保存在本机）。 */
+export const saveEncryptedXAuthViaDesktop = async (auth: { authToken: string; ct0: string }): Promise<void> => {
+  if (!window.electronAPI?.xAuth?.save) return;
+  try {
+    await window.electronAPI.xAuth.save(auth);
+  } catch {
+    // 忽略持久化失败，内存状态优先
+  }
+};
+
+/** X 鉴权 Cookie 本地安全清理。 */
+export const clearEncryptedXAuthViaDesktop = async (): Promise<void> => {
+  if (!window.electronAPI?.xAuth?.clear) return;
+  try {
+    await window.electronAPI.xAuth.clear();
+  } catch {
+    // 忽略清理失败
+  }
+};
+
 
 /** Telegram 频道：经主进程抓取 t.me/s 公开预览 HTML。非桌面环境返回 null。 */
 export const fetchTelegramChannelViaDesktop = async (channel: string, before?: string): Promise<string | null> => {

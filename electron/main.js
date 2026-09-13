@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, net } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, net, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -12,6 +12,11 @@ const {
   getLinuxAutostartPath,
   buildLinuxDesktopEntry,
 } = require('./desktopPrefs');
+const {
+  saveEncryptedXAuth,
+  loadEncryptedXAuth,
+  clearEncryptedXAuth,
+} = require('./xAuthStorage');
 
 let mainWindow;
 let tray = null;
@@ -284,8 +289,8 @@ async function applyProxy(config) {
     const redactedProxyUrl = proxyUrl.replace(/\/\/[^@/]+@/, '//***:***@');
     console.log('[Proxy] Applied:', redactedProxyUrl);
   } else {
-    await mainWindow.webContents.session.setProxy({ proxyRules: 'direct://' });
-    console.log('[Proxy] Disabled, using direct connection');
+    await mainWindow.webContents.session.setProxy({ mode: 'system' });
+    console.log('[Proxy] Disabled, using system proxy settings');
   }
 }
 
@@ -402,6 +407,18 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
+});
+
+ipcMain.handle('x-auth:save', async (_event, auth) => {
+  return saveEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, auth);
+});
+
+ipcMain.handle('x-auth:get', async () => {
+  return loadEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage });
+});
+
+ipcMain.handle('x-auth:clear', async () => {
+  return clearEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData') });
 });
 
 ipcMain.handle('set-proxy', async (event, config) => {
