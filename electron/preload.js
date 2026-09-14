@@ -19,4 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stop: () => ipcRenderer.invoke('mcp:stop'),
     getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
   },
+  plugins: {
+    list: () => ipcRenderer.invoke('plugins:list'),
+  },
 });

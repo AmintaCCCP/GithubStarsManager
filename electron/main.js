@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+const { createPluginManager } = require('./plugins/pluginManager');
 const {
   DEFAULT_DESKTOP_PREFS,
   normalizeDesktopPrefs,
@@ -647,6 +648,13 @@ ipcMain.handle('mcp:start', async () => {
 ipcMain.handle('mcp:stop', async () => mcpServer.stop());
 
 ipcMain.handle('mcp:getStatus', async () => mcpServer.getStatus());
+
+// Metadata only: listing never loads or executes plugin entry files.
+let pluginManager;
+ipcMain.handle('plugins:list', () => {
+  pluginManager ??= createPluginManager({ pluginsRoot: path.join(app.getPath('userData'), 'plugins') });
+  return pluginManager.list();
+});
 
 if (!gotSingleInstanceLock) {
   app.quit();
