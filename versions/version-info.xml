@@ -632,4 +632,13 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.1</downloadUrl>
   </version>
+  <version>
+    <number>0.9.0</number>
+    <releaseDate>2026-09-14</releaseDate>
+    <changelog>
+      <item>feat: Added a local plugin platform with validated manifests, explicit permissions, restricted Host APIs, actions, processors, exporters, isolated storage, and sanitized logging.</item>
+      <item>feat: Added sandboxed plugin pages with a restricted protocol, CSP, validated message bridge, permission-gated AI, and user-configured SearXNG web search.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.9.0</downloadUrl>
+  </version>
 </versions>

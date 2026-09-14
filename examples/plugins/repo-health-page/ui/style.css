@@ -1,0 +1,11 @@
+:root { color-scheme: light; font-family: system-ui, sans-serif; }
+body { margin: 0; background: #f8fafc; color: #0f172a; }
+main { max-width: 760px; margin: 0 auto; padding: 2rem; }
+h1 { margin-top: 0; }
+p { line-height: 1.5; }
+label { display: block; margin-bottom: .5rem; font-weight: 600; }
+.search-row { display: flex; gap: .5rem; }
+input { flex: 1; padding: .65rem; border: 1px solid #94a3b8; border-radius: .35rem; }
+button { padding: .65rem 1rem; border: 0; border-radius: .35rem; background: #2563eb; color: white; cursor: pointer; }
+li { margin: .75rem 0; padding: .75rem; border: 1px solid #cbd5e1; border-radius: .35rem; background: white; }
+small { display: block; color: #475569; }

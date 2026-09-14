@@ -5,7 +5,7 @@ import {
   getPlatformIcon,
 } from './platformMeta';
 import { useRepositoryPlatforms } from '../hooks/useRepositoryPlatforms';
-import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Terminal, Edit3, BookOpen, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen, MessageSquareText } from 'lucide-react';
+import { GripVertical, Star, StarOff, ExternalLink, Calendar, Bell, BellOff, Bot, Sparkles, Terminal, Edit3, BookOpen, Square, CheckSquare, Loader2, HelpCircle, Search, Scale, MoreHorizontal, PackageOpen, MessageSquareText, Plug } from 'lucide-react';
 import { Repository, Category } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { useRepositoryDragStore } from '../store/useRepositoryDragStore';
@@ -20,6 +20,11 @@ import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { useRepositoryCardActions } from '../features/repositories/hooks/useRepositoryCardActions';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { usePluginActions } from '../plugins/hooks/usePluginActions';
+import { applyPluginActionResult } from '../plugins/applyPluginActionResult';
+import { useDialog } from '../hooks/useDialog';
+import { pluginClient } from '../plugins/pluginClient';
+import type { RegisteredPluginAction } from '../plugins/types';
 
 type DialogContentPointerDownOutsideHandler = NonNullable<
   React.ComponentProps<typeof DialogContent>['onPointerDownOutside']
@@ -138,6 +143,38 @@ interface RepositoryCardProps {
   onAskRepository?: (repository: Repository) => void;
 }
 
+const PluginRepositoryActionItems: React.FC<{
+  actions: RegisteredPluginAction[];
+  repository: Repository;
+  language: 'zh' | 'en';
+}> = ({ actions, repository, language }) => {
+  const { toast } = useDialog();
+
+  const run = async (action: RegisteredPluginAction) => {
+    const operation = await pluginClient.runAction({
+      pluginId: action.pluginId,
+      actionId: action.id,
+      repositories: [repository],
+    });
+    if (!operation.success) {
+      toast(operation.error.message, 'error');
+      return;
+    }
+    try {
+      await applyPluginActionResult(operation.result, toast, language);
+    } catch {
+      toast(language === 'zh' ? '无法应用插件结果' : 'Failed to apply plugin result', 'error');
+    }
+  };
+
+  return actions.map((action) => (
+    <DropdownMenuItem key={`${action.pluginId}:${action.id}`} onSelect={() => void run(action)}>
+      <Plug className="mr-2 h-3.5 w-3.5" />
+      {action.title}
+    </DropdownMenuItem>
+  ));
+};
+
 const MAX_CACHE_SIZE = 500;
 
 const highlightCache = new Map<string, React.ReactNode>();
@@ -159,6 +196,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   onAskRepository,
 }) => {
   const language = useAppStore((state) => state.language);
+  const pluginActions = usePluginActions('repository-card');
   const {
     analyze: handleAIAnalyze,
     findSimilar: handleFindSimilar,
@@ -203,7 +241,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       // until a real layout measurement is available.
       if (width === 0) return;
       const capacity = Math.max(1, Math.floor((width + 6) / 38));
-      setVisibleGridActionCount(capacity >= 8 ? 8 : Math.max(0, capacity - 1));
+      if (pluginActions.actions.length > 0) {
+        setVisibleGridActionCount(Math.max(0, Math.min(7, capacity - 1)));
+      } else {
+        setVisibleGridActionCount(capacity >= 8 ? 8 : Math.max(0, capacity - 1));
+      }
     };
 
     updateVisibleActionCount();
@@ -214,7 +256,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       observer.disconnect();
       window.removeEventListener('resize', updateVisibleActionCount);
     };
-  }, [viewMode]);
+  }, [viewMode, pluginActions.actions.length]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -809,6 +851,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
                 </DropdownMenuItem>
               )}
+              {pluginActions.actions.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>{language === 'zh' ? '插件操作' : 'Plugin actions'}</DropdownMenuLabel>
+                  <PluginRepositoryActionItems actions={pluginActions.actions} repository={repository} language={language} />
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setReleaseSheetOpen(true)}>
                 <PackageOpen className="mr-2 h-3.5 w-3.5" />
@@ -988,7 +1037,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
             </SelectionAwareButton>
           )}
-          {visibleGridActionCount < 8 && (
+          {(visibleGridActionCount < 8 || pluginActions.actions.length > 0) && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -1055,6 +1104,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                     <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
                     {language === 'zh' ? '取消 Star' : 'Unstar'}
                   </DropdownMenuItem>
+                )}
+                {pluginActions.actions.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{language === 'zh' ? '插件操作' : 'Plugin actions'}</DropdownMenuLabel>
+                    <PluginRepositoryActionItems actions={pluginActions.actions} repository={repository} language={language} />
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

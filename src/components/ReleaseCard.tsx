@@ -13,6 +13,7 @@ import {
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
 import { Button } from './ui/button';
+import { ReleasePluginRecommendations } from './ReleasePluginRecommendations';
 
 interface DownloadLink {
   name: string;
@@ -291,6 +292,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-border dark:border-border">
           {isAssetsExpanded && downloadLinks.length > 0 && (
             <div className="py-2">
+              <ReleasePluginRecommendations release={release} language={language} />
               <div className="flex items-center space-x-2 mb-3">
                 <FileArchive className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
                 <span className="text-xs font-medium text-foreground dark:text-muted-foreground">

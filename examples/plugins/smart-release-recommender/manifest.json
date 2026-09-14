@@ -1,0 +1,17 @@
+{
+  "manifestVersion": 1,
+  "id": "com.githubstarsmanager.smart-release-recommender",
+  "name": "Smart Release Recommender",
+  "version": "0.1.0",
+  "description": "Recommends a release asset for the current operating system and CPU architecture.",
+  "author": "GithubStarsManager",
+  "apiVersion": "1",
+  "main": "worker.js",
+  "permissions": ["releases:read", "downloads:create"],
+  "contributes": {
+    "releaseProcessors": [{
+      "id": "recommend-platform-asset",
+      "title": "Recommend for this device"
+    }]
+  }
+}

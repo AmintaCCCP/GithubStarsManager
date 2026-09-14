@@ -15,6 +15,7 @@ import {
   Search,
   Cable,
   Star,
+  Plug,
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -36,9 +37,10 @@ import {
   StarSyncPanel,
   VectorSearchSettings,
   McpSettingsPanel,
+  PluginSettingsPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'starSync' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp';
+type SettingsTab = 'general' | 'starSync' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp' | 'plugins';
 
 interface SettingsTabItem {
   id: SettingsTab;
@@ -266,7 +268,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'starSync', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp']),
+    () => new Set(['general', 'starSync', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp', 'plugins']),
     []
   );
 
@@ -372,6 +374,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       label: t('网络设置', 'Network'),
       icon: <Wifi className="w-5 h-5" />,
     }] : []),
+    ...(isElectron() ? [{
+      id: 'plugins' as SettingsTab,
+      label: t('插件', 'Plugins'),
+      icon: <Plug className="w-5 h-5" />,
+    }] : []),
     {
       id: 'vectorSearch' as SettingsTab,
       label: t('向量搜索', 'Vector Search'),
@@ -414,6 +421,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
           return <VectorSearchSettings t={t} />;
         case 'mcp':
           return <McpSettingsPanel t={t} />;
+        case 'plugins':
+          return <PluginSettingsPanel t={t} />;
         default:
           return null;
       }
