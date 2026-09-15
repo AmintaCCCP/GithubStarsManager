@@ -14,6 +14,7 @@ import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ReleasePluginRecommendations } from './ReleasePluginRecommendations';
 
 const RELEASES_PER_PAGE = 10;
 const ASSETS_PER_PAGE = 8;
@@ -155,7 +156,8 @@ const ReleaseContent: React.FC<{
   summary: { status: 'idle' | 'loading' | 'done' | 'error'; content?: string; error?: string } | undefined;
   onGenerateSummary: () => void;
   language: 'zh' | 'en';
-}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, summary, onGenerateSummary, language }) => {
+  repository: Repository;
+}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, summary, onGenerateSummary, language, repository }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const [activeTab, setActiveTab] = useState('assets');
   const hasBody = Boolean(release.body?.trim());
@@ -173,6 +175,7 @@ const ReleaseContent: React.FC<{
         <TabsTrigger className="text-xs" value="summary">{t('总结', 'Summary')}</TabsTrigger>
       </TabsList>
       <TabsContent value="assets" className="mt-3">
+        <ReleasePluginRecommendations release={release} repository={repository} language={language} />
         <ReleaseAssetsTable
           release={release}
           assetPage={assetPage}
@@ -346,6 +349,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
                         summary={summaries[release.id]}
                         onGenerateSummary={() => void generateSummary(release)}
                         language={language}
+                        repository={repository}
                       />
                     </AccordionContent>
                   </AccordionItem>

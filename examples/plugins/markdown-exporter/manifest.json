@@ -1,0 +1,43 @@
+{
+  "manifestVersion": 1,
+  "id": "com.githubstarsmanager.markdown-exporter",
+  "name": "Markdown Exporter Example",
+  "version": "0.1.0",
+  "description": "Example V1 plugin with repository actions, a processor, and a Markdown exporter",
+  "author": "GitHub Stars Manager",
+  "apiVersion": "1",
+  "main": "worker.js",
+  "permissions": [
+    "repositories:read",
+    "storage",
+    "clipboard:write"
+  ],
+  "contributes": {
+    "repositoryActions": [
+      {
+        "id": "copy-repository",
+        "title": "Copy repository as Markdown",
+        "placement": "repository-card"
+      },
+      {
+        "id": "copy-selected",
+        "title": "Copy selected repositories",
+        "placement": "bulk-toolbar"
+      }
+    ],
+    "repositoryProcessors": [
+      {
+        "id": "activity-summary",
+        "title": "Build activity summary"
+      }
+    ],
+    "exporters": [
+      {
+        "id": "markdown",
+        "title": "Export Markdown",
+        "fileExtension": ".md",
+        "mimeType": "text/markdown"
+      }
+    ]
+  }
+}

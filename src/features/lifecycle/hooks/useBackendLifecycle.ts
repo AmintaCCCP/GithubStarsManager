@@ -12,6 +12,7 @@ import {
   startMcpElectronBridge,
   stopMcpElectronBridge,
 } from '../../../services/mcpElectronBridge';
+import { startPluginSnapshotBridge, stopPluginSnapshotBridge } from '../../../plugins/pluginSnapshotBridge';
 
 /**
  * Owns application-wide backend and Electron MCP startup after Store hydration.
@@ -20,7 +21,10 @@ import {
  */
 export const useBackendLifecycle = (hasHydrated: boolean): void => {
   useEffect(() => {
-    return () => stopMcpElectronBridge();
+    return () => {
+      stopMcpElectronBridge();
+      stopPluginSnapshotBridge();
+    };
   }, []);
 
   useEffect(() => {
@@ -55,6 +59,7 @@ export const useBackendLifecycle = (hasHydrated: boolean): void => {
         if (!cancelled) {
           startMcpElectronBridge();
           refreshMcpElectronBridge();
+          startPluginSnapshotBridge();
         }
       }
     };

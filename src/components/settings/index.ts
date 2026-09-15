@@ -11,3 +11,4 @@ export { MenuManagementPanel } from './MenuManagementPanel';
 export { StarSyncPanel } from './StarSyncPanel';
 export { VectorSearchSettings } from './VectorSearchSettings';
 export { McpSettingsPanel } from './McpSettingsPanel';
+export { PluginSettingsPanel } from './PluginSettingsPanel';

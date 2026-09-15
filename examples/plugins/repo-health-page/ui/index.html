@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Repository Health</title>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./index.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Repository Health</h1>
+      <p>This page reads the Host's sanitized local repository snapshot. It cannot access your GitHub token or make network requests.</p>
+      <label for="query">Search starred repositories</label>
+      <div class="search-row">
+        <input id="query" type="search" value="a" maxlength="200">
+        <button id="search" type="button">Search</button>
+      </div>
+      <p id="status" role="status">Waiting for the Host bridge…</p>
+      <ul id="results"></ul>
+    </main>
+  </body>
+</html>

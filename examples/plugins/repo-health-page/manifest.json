@@ -1,0 +1,15 @@
+{
+  "manifestVersion": 1,
+  "id": "com.example.repo-health-page",
+  "name": "Repo Health Page",
+  "version": "0.1.0",
+  "description": "A page-only example that summarizes local repository activity.",
+  "author": "GithubStarsManager",
+  "apiVersion": "1",
+  "permissions": ["repositories:read"],
+  "contributes": {
+    "pages": [
+      { "id": "dashboard", "title": "Repository Health", "entry": "ui/index.html" }
+    ]
+  }
+}
