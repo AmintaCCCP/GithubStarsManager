@@ -51,14 +51,33 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
       const request = validatePluginPageMessage(event, frameRef.current?.contentWindow ?? null, pluginId, pageId, tokenRef.current);
       if (!request) return;
       const pendingKey = `${tokenRef.current}:${request.requestId}`;
-      if (pendingRef.current.has(pendingKey) || pendingRef.current.size >= 8) return;
+      const rejectRequest = (code: string, message: string) => {
+        frameRef.current?.contentWindow?.postMessage({
+          type: 'plugin-page:response', pluginId, pageId,
+          requestId: request.requestId, token: tokenRef.current,
+          success: false, error: { code, message },
+        }, '*');
+      };
+      if (pendingRef.current.has(pendingKey) || pendingRef.current.size >= 8) {
+        rejectRequest('PLUGIN_PAGE_RATE_LIMITED', 'Plugin page request limit exceeded');
+        return;
+      }
       const now = Date.now();
       requestTimesRef.current = requestTimesRef.current.filter((time) => now - time < 60_000);
-      if (requestTimesRef.current.length >= 120) return;
+      if (requestTimesRef.current.length >= 120) {
+        rejectRequest('PLUGIN_PAGE_RATE_LIMITED', 'Plugin page request rate limit exceeded');
+        return;
+      }
       requestTimesRef.current.push(now);
       let requestSize;
-      try { requestSize = JSON.stringify(request.args).length; } catch { return; }
-      if (requestSize > 1024 * 1024) return;
+      try { requestSize = JSON.stringify(request.args).length; } catch {
+        rejectRequest('PLUGIN_PAGE_REQUEST_TOO_LARGE', 'Plugin page request arguments are not serializable');
+        return;
+      }
+      if (requestSize > 1024 * 1024) {
+        rejectRequest('PLUGIN_PAGE_REQUEST_TOO_LARGE', 'Plugin page request exceeds the size limit');
+        return;
+      }
       pendingRef.current.add(pendingKey);
       const requestToken = tokenRef.current;
       const aiController = request.method === 'ai.generate' ? new AbortController() : null;

@@ -67,11 +67,13 @@ function createPluginCatalog() {
       return { repositories: repositories.size, releases: releases.size };
     },
     upsert(repository, release) {
-      if (repository !== undefined) {
-        const sanitizedRepository = sanitizeRepository(repository);
+      const sanitizedRepository = repository === undefined
+        ? null
+        : sanitizeRepository(repository);
+      const normalizedRelease = normalizeRelease(release);
+      if (sanitizedRepository) {
         repositories.set(sanitizedRepository.id, sanitizedRepository);
       }
-      const normalizedRelease = normalizeRelease(release);
       releases.set(normalizedRelease.public.id, normalizedRelease);
     },
     searchRepositories(query, limit = 20) {

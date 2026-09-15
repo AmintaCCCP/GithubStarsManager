@@ -49,4 +49,20 @@ describe('ReleasePluginRecommendations', () => {
       expect.objectContaining({ pluginId: 'com.example.release' }), 2, 3
     ));
   });
+
+  it('does not bubble analyze or download clicks to the release card', async () => {
+    const onClick = vi.fn();
+    mocks.runProcessor.mockResolvedValue({
+      success: true,
+      result: { recommendedAssetId: 3, confidence: 0.9, reason: 'Windows x64 installer' },
+    });
+    mocks.download.mockResolvedValue({ success: true, fileName: 'p-x64.exe', bytes: 10 });
+    render(<div onClick={onClick}><ReleasePluginRecommendations release={release} language="en" /></div>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+    await screen.findByText('p-x64.exe');
+    fireEvent.click(screen.getByRole('button', { name: 'Host download' }));
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

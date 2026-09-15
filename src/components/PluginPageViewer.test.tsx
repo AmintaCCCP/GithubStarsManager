@@ -153,4 +153,29 @@ describe('PluginPageViewer', () => {
       type: 'plugin-page:response', requestId: '1', success: true, value: [{ id: 1 }],
     }), '*');
   });
+
+  it('responds with a structured error when request arguments exceed the limit', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'large', token: 'session-token', method: 'repositories.search',
+          args: { query: 'x'.repeat(1024 * 1024) } },
+        origin: 'null', source: frame.contentWindow,
+      }));
+    });
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: 'large', success: false,
+      error: expect.objectContaining({ code: 'PLUGIN_PAGE_REQUEST_TOO_LARGE' }),
+    }), '*');
+    expect(requestPageCapability).not.toHaveBeenCalled();
+  });
 });

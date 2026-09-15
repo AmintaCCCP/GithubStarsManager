@@ -17,12 +17,14 @@ const ARCH_PATTERNS = {
 function scoreAsset(asset, environment) {
   const name = asset.name.toLowerCase();
   if (SOURCE_ARCHIVE.test(name) || /(?:checksum|sha256|\.sig$|\.asc$)/i.test(name)) return -100;
+  if (Object.entries(PLATFORM_PATTERNS).some(([platform, pattern]) =>
+    platform !== environment.os && pattern.test(name))) return -100;
+  if (Object.entries(ARCH_PATTERNS).some(([architecture, pattern]) =>
+    architecture !== environment.arch && pattern.test(name))) return -100;
   let score = 0;
   if (PLATFORM_PATTERNS[environment.os]?.test(name)) score += 50;
   if (ARCH_PATTERNS[environment.arch]?.test(name)) score += 35;
   if (/(?:setup|installer|portable|appimage|\.msi$|\.dmg$|\.deb$|\.rpm$)/i.test(name)) score += 10;
-  if (environment.arch === 'x64' && ARCH_PATTERNS.arm64.test(name)) score -= 60;
-  if (environment.arch === 'arm64' && ARCH_PATTERNS.x64.test(name)) score -= 40;
   return score;
 }
 

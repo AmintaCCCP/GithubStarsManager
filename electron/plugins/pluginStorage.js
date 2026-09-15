@@ -27,12 +27,15 @@ function createPluginStorage({ dataRoot, pluginId }) {
   const dataPath = path.join(path.resolve(dataRoot), `${pluginId}.json`);
 
   function load() {
+    let serialized;
     try {
-      const value = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-    } catch {
-      return {};
+      serialized = fs.readFileSync(dataPath, 'utf8');
+    } catch (error) {
+      if (error?.code === 'ENOENT') return {};
+      throw error;
     }
+    const value = JSON.parse(serialized);
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   }
 
   function save(value) {

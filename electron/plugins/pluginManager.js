@@ -155,6 +155,7 @@ function createPluginManager({
   let state = stateStore.load();
   const runtimes = new Map();
   let initialized = false;
+  let scanCache = null;
 
   function saveState() {
     stateStore.save(state);
@@ -181,7 +182,7 @@ function createPluginManager({
   }
 
   function findPlugin(pluginId) {
-    const scanResult = scan();
+    const scanResult = scanCache || scan();
     return scanResult.plugins.find((plugin) => plugin.manifest.id === pluginId) || null;
   }
 
@@ -235,7 +236,7 @@ function createPluginManager({
     }
   }
 
-  function scan() {
+  function scanFresh() {
     if (!fs.existsSync(resolvedRoot)) return { plugins: [], invalidPlugins: [] };
 
     let rootRealPath;
@@ -326,6 +327,11 @@ function createPluginManager({
     return { plugins, invalidPlugins };
   }
 
+  function scan() {
+    scanCache = scanFresh();
+    return scanCache;
+  }
+
   return {
     scan,
     updateSnapshot(snapshot) {
@@ -403,6 +409,7 @@ function createPluginManager({
           throw Object.assign(new Error('Plugin manifest changed during installation'), { code: 'PLUGIN_INSTALL_CHANGED' });
         }
         fs.renameSync(temporaryDirectory, targetDirectory);
+        scanCache = null;
         return { success: true, pluginId: inspected.manifest.id };
       } catch (error) {
         try { fs.rmSync(temporaryDirectory, { recursive: true, force: true }); } catch {}
@@ -523,6 +530,7 @@ function createPluginManager({
         fs.rmSync(pluginDirectory, { recursive: true, force: false });
         delete state.plugins[pluginId];
         saveState();
+        scanCache = null;
         return { success: true };
       } catch (error) {
         return { success: false, error: safeError(error, 'PLUGIN_UNINSTALL_FAILED') };

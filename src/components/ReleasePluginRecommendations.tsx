@@ -68,7 +68,8 @@ const RecommendationItem: React.FC<{
                   size="sm"
                   className="h-7 px-2 text-xs"
                   disabled={running === key}
-                  onClick={async () => {
+                  onClick={async (event) => {
+                    event.stopPropagation();
                     setRunning(key);
                     try {
                       const operation = await runProcessor(processor, release, repository);
@@ -99,7 +100,8 @@ const RecommendationItem: React.FC<{
                       size="sm"
                       className="h-7 shrink-0 px-2 text-xs"
                       disabled={downloading === key}
-                      onClick={async () => {
+                      onClick={async (event) => {
+                        event.stopPropagation();
                         setDownloading(key);
                         try {
                           const operation = await download(processor, release.id, asset.id);

@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
+const { EventEmitter } = require('node:events');
 
 const { createPluginRuntime } = require('./pluginRuntime');
 
@@ -139,4 +140,70 @@ test('runs release processors with semantic GitHub Host capabilities', async (t)
     recommendedAssetId: 7, confidence: 1, reason: 'matched',
   });
   await runtime.deactivate();
+});
+
+class FakeWorker extends EventEmitter {
+  constructor() {
+    super();
+    this.messages = [];
+    queueMicrotask(() => this.emit('message', { type: 'ready' }));
+  }
+
+  postMessage(message) {
+    this.messages.push(message);
+    if (message.type === 'request') {
+      queueMicrotask(() => this.emit('message', {
+        type: 'response', requestId: message.requestId, success: true, result: null,
+      }));
+    }
+  }
+
+  terminate() {
+    return Promise.resolve(0);
+  }
+}
+
+test('clears the active runtime when a Worker exits with code zero unexpectedly', async () => {
+  let createdWorker;
+  class CapturedWorker extends FakeWorker {
+    constructor() {
+      super();
+      createdWorker = this;
+    }
+  }
+  const runtime = createPluginRuntime({
+    entryPath: 'unused.js', pluginId: 'com.example.exit', permissions: [], WorkerClass: CapturedWorker,
+  });
+
+  await runtime.activate();
+  createdWorker.emit('exit', 0);
+
+  assert.equal(runtime.isActive(), false);
+});
+
+test('does not deliver an old Worker capability response to a replacement Worker', async () => {
+  const workers = [];
+  class CapturedWorker extends FakeWorker {
+    constructor() {
+      super();
+      workers.push(this);
+    }
+  }
+  let resolveCapability;
+  const capability = new Promise((resolve) => { resolveCapability = resolve; });
+  const runtime = createPluginRuntime({
+    entryPath: 'unused.js', pluginId: 'com.example.race', permissions: [], WorkerClass: CapturedWorker,
+    capabilityHandler: () => capability,
+  });
+
+  await runtime.activate();
+  workers[0].emit('message', { type: 'host-request', requestId: 1, request: {} });
+  workers[0].emit('exit', 0);
+  await runtime.activate();
+  resolveCapability('stale');
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(workers.length, 2);
+  assert.equal(workers[1].messages.some((message) => message.type === 'host-response'), false);
+  runtime.terminate();
 });

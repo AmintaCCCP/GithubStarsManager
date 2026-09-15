@@ -58,21 +58,26 @@ function createPluginRuntime({
 
       worker.on('message', (message) => {
         if (message?.type === 'host-request') {
+          const requestWorker = worker;
           void Promise.resolve()
             .then(() => capabilityHandler(message.request))
             .then(
-              (result) => worker?.postMessage({
-                type: 'host-response', requestId: message.requestId, success: true, result,
-              }),
-              (cause) => worker?.postMessage({
-                type: 'host-response',
-                requestId: message.requestId,
-                success: false,
-                error: {
-                  code: typeof cause?.code === 'string' ? cause.code : 'PLUGIN_CAPABILITY_FAILED',
-                  message: cause instanceof Error ? cause.message : 'Host capability failed',
-                },
-              })
+              (result) => {
+                if (worker === requestWorker) requestWorker?.postMessage({
+                  type: 'host-response', requestId: message.requestId, success: true, result,
+                });
+              },
+              (cause) => {
+                if (worker === requestWorker) requestWorker?.postMessage({
+                  type: 'host-response',
+                  requestId: message.requestId,
+                  success: false,
+                  error: {
+                    code: typeof cause?.code === 'string' ? cause.code : 'PLUGIN_CAPABILITY_FAILED',
+                    message: cause instanceof Error ? cause.message : 'Host capability failed',
+                  },
+                });
+              }
             );
           return;
         }
@@ -107,7 +112,7 @@ function createPluginRuntime({
       });
       worker.on('exit', (code) => {
         clearTimeout(startupTimeout);
-        if (worker && code !== 0) {
+        if (worker) {
           const error = protocolError('PLUGIN_RUNTIME_EXITED', `Plugin worker exited with code ${code}`);
           reject(error);
           terminate(error);

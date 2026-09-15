@@ -151,16 +151,16 @@ const PluginRepositoryActionItems: React.FC<{
   const { toast } = useDialog();
 
   const run = async (action: RegisteredPluginAction) => {
-    const operation = await pluginClient.runAction({
-      pluginId: action.pluginId,
-      actionId: action.id,
-      repositories: [repository],
-    });
-    if (!operation.success) {
-      toast(operation.error.message, 'error');
-      return;
-    }
     try {
+      const operation = await pluginClient.runAction({
+        pluginId: action.pluginId,
+        actionId: action.id,
+        repositories: [repository],
+      });
+      if (!operation.success) {
+        toast(operation.error.message, 'error');
+        return;
+      }
       await applyPluginActionResult(operation.result, toast, language);
     } catch {
       toast(language === 'zh' ? '无法应用插件结果' : 'Failed to apply plugin result', 'error');

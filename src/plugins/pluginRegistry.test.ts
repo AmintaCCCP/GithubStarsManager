@@ -42,4 +42,20 @@ describe('pluginRegistry', () => {
     expect(enable).toHaveBeenCalledWith('com.example.plugin', []);
     expect(list).toHaveBeenCalledTimes(1);
   });
+
+  it('does not let an older refresh overwrite a newer snapshot', async () => {
+    let resolveFirst!: (value: { plugins: never[]; invalidPlugins: { directoryName: string; code: string; message: string }[] }) => void;
+    const first = new Promise<{ plugins: never[]; invalidPlugins: { directoryName: string; code: string; message: string }[] }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const latest = { plugins: [], invalidPlugins: [{ directoryName: 'latest', code: 'LATEST', message: 'latest' }] };
+    list.mockReturnValueOnce(first).mockResolvedValueOnce(latest);
+
+    const olderRequest = pluginRegistry.refresh();
+    await pluginRegistry.refresh();
+    resolveFirst({ plugins: [], invalidPlugins: [] });
+    await olderRequest;
+
+    expect(pluginRegistry.getSnapshot()).toEqual(latest);
+  });
 });

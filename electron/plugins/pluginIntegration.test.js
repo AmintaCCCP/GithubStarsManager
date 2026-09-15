@@ -117,6 +117,23 @@ test('runs the V1.1 Smart Release Recommendation example without exposing downlo
   assert.equal(operation.success, true);
   assert.equal(operation.result.recommendedAssetId, 21);
   assert.equal(manager.getDownloadAsset(pluginId, 20, 21).success, true);
+  const incompatibleNames = {
+    win32: `project-${process.arch}.AppImage`,
+    darwin: `project-${process.arch}.AppImage`,
+    linux: `project-${process.arch}.dmg`,
+  };
+  const incompatibleName = incompatibleNames[process.platform] || 'project-x64.AppImage';
+  const incompatibleRelease = {
+    ...release,
+    id: 23,
+    assets: [{ ...release.assets[0], id: 24, name: incompatibleName,
+      browser_download_url: `https://github.com/owner/project/releases/download/v2/${incompatibleName}` }],
+  };
+  const incompatible = await manager.runReleaseProcessor({
+    pluginId, processorId: 'recommend-platform-asset', release: incompatibleRelease,
+  });
+  assert.equal(incompatible.success, false);
+  assert.equal(incompatible.error.code, 'NO_COMPATIBLE_RELEASE_ASSET');
   manager.shutdown();
 });
 

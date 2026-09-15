@@ -5,6 +5,7 @@ const EMPTY_SNAPSHOT: PluginListResult = { plugins: [], invalidPlugins: [] };
 let snapshot = EMPTY_SNAPSHOT;
 let loaded = false;
 let loading: Promise<PluginListResult> | null = null;
+let refreshVersion = 0;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -12,15 +13,19 @@ function emit() {
 }
 
 async function refresh(): Promise<PluginListResult> {
-  loading = pluginClient.list().then((result) => {
-    snapshot = result;
-    loaded = true;
-    emit();
+  const version = ++refreshVersion;
+  const request = pluginClient.list().then((result) => {
+    if (version === refreshVersion) {
+      snapshot = result;
+      loaded = true;
+      emit();
+    }
     return result;
   }).finally(() => {
-    loading = null;
+    if (loading === request) loading = null;
   });
-  return loading;
+  loading = request;
+  return request;
 }
 
 async function mutate(operation: () => Promise<PluginOperationResult>): Promise<PluginOperationResult> {
@@ -60,6 +65,7 @@ export const pluginRegistry = {
     snapshot = EMPTY_SNAPSHOT;
     loaded = false;
     loading = null;
+    refreshVersion += 1;
     emit();
   },
 };

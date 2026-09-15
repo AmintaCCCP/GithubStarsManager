@@ -39,3 +39,13 @@ test('rejects non-GitHub and non-HTTPS asset URLs', () => {
   input.assets[0].browser_download_url = 'https://evil.example/file.exe';
   assert.throws(() => catalog.update({ repositories: [], releases: [input] }), { code: 'PLUGIN_SNAPSHOT_INVALID' });
 });
+
+test('does not partially update a repository when release validation fails', () => {
+  const catalog = createPluginCatalog();
+  const invalidRelease = release();
+  invalidRelease.assets[0].browser_download_url = 'https://evil.example/file.exe';
+
+  assert.throws(() => catalog.upsert(repository(), invalidRelease), { code: 'PLUGIN_SNAPSHOT_INVALID' });
+  assert.equal(catalog.getRepository(1), null);
+  assert.equal(catalog.getRelease(2), null);
+});

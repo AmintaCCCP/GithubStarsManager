@@ -126,6 +126,29 @@ test('scanning reads metadata but never executes plugin code', (t) => {
   assert.equal(fs.existsSync(marker), false);
 });
 
+test('reuses cached discovery for lookups and scan explicitly refreshes it', (t) => {
+  const root = createWorkspace(t);
+  writePlugin(root, 'page', validManifest('com.example.cached', {
+    main: undefined,
+    contributes: { pages: [{ id: 'dashboard', title: 'Dashboard', entry: 'index.html' }] },
+  }), { 'index.html': '<!doctype html>' });
+  const manager = createPluginManager({ pluginsRoot: root });
+  const originalRead = fs.readFileSync;
+  let manifestReads = 0;
+  fs.readFileSync = function (...args) {
+    if (String(args[0]).endsWith('manifest.json')) manifestReads += 1;
+    return originalRead.apply(this, args);
+  };
+  t.after(() => { fs.readFileSync = originalRead; });
+
+  manager.scan();
+  manager.getPage('com.example.cached', 'dashboard');
+  manager.getPage('com.example.cached', 'dashboard');
+  assert.equal(manifestReads, 1);
+  manager.scan();
+  assert.equal(manifestReads, 2);
+});
+
 test('rejects page entry paths that escape or do not exist', (t) => {
   const root = createWorkspace(t);
   const pageManifest = validManifest('com.example.page', {

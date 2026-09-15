@@ -37,3 +37,15 @@ test('rejects invalid keys, non-JSON values, and oversized values', (t) => {
     code: 'PLUGIN_STORAGE_VALUE_TOO_LARGE',
   });
 });
+
+test('reports damaged storage instead of overwriting it', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-data-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dataPath = path.join(root, 'com.example.damaged.json');
+  fs.writeFileSync(dataPath, '{damaged');
+  const storage = createPluginStorage({ dataRoot: root, pluginId: 'com.example.damaged' });
+
+  assert.throws(() => storage.get('settings'), SyntaxError);
+  assert.throws(() => storage.set('settings', true), SyntaxError);
+  assert.equal(fs.readFileSync(dataPath, 'utf8'), '{damaged');
+});
