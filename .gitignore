@@ -55,3 +55,6 @@ package-lock.json.*.tmp
 
 # Local static demos for entry-point selection (never commit)
 .tmp-chat-entry-demos/
+
+# GitHub wiki clone (published to *.wiki.git, not this repo)
+docs/wiki/

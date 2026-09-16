@@ -109,7 +109,7 @@ Claude Code、Cursor 等 Agent 可通过 [Model Context Protocol](https://modelc
 
 **此外还包括**
 
-Fork 同步与 GitHub Actions、Gist 浏览/编辑与 AI 摘要、12 套主题预设、HTTP/SOCKS5 代理、WebDAV 备份、发现中心（趋势 / 热门发布 / 最受欢迎）、诊断日志、双语 Wiki 跳转，以及打包好的桌面客户端。
+Fork 同步与 GitHub Actions、Gist 浏览/编辑与 AI 摘要、12 套主题预设、HTTP/SOCKS5 代理、WebDAV 备份、发现中心（趋势 / 热门发布 / 最受欢迎）、诊断日志、双语 Wiki 跳转、本地插件，以及打包好的桌面客户端。
 
 </td>
   </tr>
@@ -133,6 +133,7 @@ Fork 同步与 GitHub Actions、Gist 浏览/编辑与 AI 摘要、12 套主题�
 | **远程下载 (aria2)** | 通过 aria2 JSON-RPC 将 Release 资产推送到远程下载 |
 | **诊断日志** | 前后端统一日志查看器，支持 Debug 捕获模式 |
 | **双语 Wiki 跳转** | 根据仓库语言跳转到 Deepwiki (EN) 或 zread (ZH) |
+| **本地插件** | 仅 Electron：仓库操作、导出、Release 推荐、隔离插件页面。[使用说明](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage) · [开发文档](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Development) |
 | **客户端打包** | 无需配置环境，下载即用 |
 
 ### 可选后端服务
@@ -260,6 +261,7 @@ Fork 同步与 GitHub Actions、Gist 浏览/编辑与 AI 摘要、12 套主题�
 | **Data Management** | 数据导入/导出、清除本地数据、重置所有数据 |
 | **向量搜索** | 配置 Cloudflare Vectorize Worker、Embedding 模型、索引模式（描述/README）、索引重建管理 |
 | **MCP 服务** | 开启 MCP 供 Claude Code、Cursor 等 Agent 通过 Streamable HTTP / SSE 检索 AI 加工后的星标，Bearer Token 鉴权 |
+| **插件** | 安装本地插件、确认权限、为页面搜索配置 SearXNG。仅桌面端，见 [插件 Wiki](https://github.com/AmintaCCCP/GithubStarsManager/wiki) |
 
 **外观：** 在 **设置 → General → Appearance** 中任选 12 套内置主题预设。每套主题均提供匹配的亮色和暗色配色，并会立即应用到整个应用。
 
@@ -439,6 +441,16 @@ npm run build
 **桌面（Electron）说明：** 仅绑定回环地址（`127.0.0.1`），只能本机 Agent 访问；可在设置中调整主机/端口（默认端口 `3927`）。
 
 ![MCP](assets/readme/screenshots/mcp.png)
+
+## 🔌 本地插件（桌面端）
+
+Electron 客户端可以从本地目录加载**受信任的本地插件**。安装后默认禁用，启用前必须确认 Manifest 中的权限。Worker 插件以隔离的 Node.js 运行（不是安全沙箱）；页面插件在受限 iframe 中运行。
+
+- [插件使用](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Usage) — 安装、启用、权限、入口位置
+- [插件开发](https://github.com/AmintaCCCP/GithubStarsManager/wiki/Plugin-Development) — Manifest、Worker API、页面 Bridge、限额
+- 示例：[`examples/plugins/`](https://github.com/AmintaCCCP/GithubStarsManager/tree/main/examples/plugins)
+
+**启用：** 设置 → 插件 → 安装本地插件。浏览器和 Docker 前端不包含该宿主。
 
 ## 🔄 GitHub Lists 双向同步
 
