@@ -46,9 +46,13 @@ function createPluginRuntime({
   function ensureWorker() {
     if (worker && readyPromise) return readyPromise;
 
-    worker = new WorkerClass(path.join(__dirname, 'pluginWorker.js'), {
+    // Listeners are bound to the Worker instance that created them: a replaced
+    // Worker can still emit 'exit', 'error', or a queued message afterwards, and
+    // those late events must never tear down the current runtime.
+    const runtimeWorker = new WorkerClass(path.join(__dirname, 'pluginWorker.js'), {
       workerData: { entryPath, pluginId, permissions: [...permissions] },
     });
+    worker = runtimeWorker;
     readyPromise = new Promise((resolve, reject) => {
       const startupTimeout = setTimeout(() => {
         const error = protocolError('PLUGIN_RUNTIME_TIMEOUT', 'Plugin runtime did not start in time');
@@ -56,9 +60,10 @@ function createPluginRuntime({
         terminate(error);
       }, timeoutMs);
 
-      worker.on('message', (message) => {
+      runtimeWorker.on('message', (message) => {
+        if (worker !== runtimeWorker) return;
         if (message?.type === 'host-request') {
-          const requestWorker = worker;
+          const requestWorker = runtimeWorker;
           void Promise.resolve()
             .then(() => capabilityHandler(message.request))
             .then(
@@ -104,19 +109,19 @@ function createPluginRuntime({
           request.reject(protocolError(message.error?.code || 'PLUGIN_RUNTIME_ERROR', message.error?.message || 'Plugin call failed'));
         }
       });
-      worker.on('error', (cause) => {
+      runtimeWorker.on('error', (cause) => {
+        if (worker !== runtimeWorker) return;
         clearTimeout(startupTimeout);
         const error = protocolError('PLUGIN_RUNTIME_ERROR', cause.message || 'Plugin worker failed');
         reject(error);
         terminate(error);
       });
-      worker.on('exit', (code) => {
+      runtimeWorker.on('exit', (code) => {
+        if (worker !== runtimeWorker) return;
         clearTimeout(startupTimeout);
-        if (worker) {
-          const error = protocolError('PLUGIN_RUNTIME_EXITED', `Plugin worker exited with code ${code}`);
-          reject(error);
-          terminate(error);
-        }
+        const error = protocolError('PLUGIN_RUNTIME_EXITED', `Plugin worker exited with code ${code}`);
+        reject(error);
+        terminate(error);
       });
     });
     return readyPromise;

@@ -74,7 +74,11 @@ function safeError(error, fallbackCode = 'PLUGIN_OPERATION_FAILED') {
 
 function samePermissions(left, right) {
   if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+  // Compare unique sets so duplicated or extra entries cannot satisfy the confirmation check.
   const expected = new Set(left);
+  if (expected.size !== left.length) return false;
+  const provided = new Set(right);
+  if (provided.size !== right.length) return false;
   return right.every((permission) => expected.has(permission));
 }
 
@@ -154,6 +158,7 @@ function createPluginManager({
   const resolvedLogsRoot = path.resolve(logsRoot || path.join(path.dirname(resolvedRoot), 'plugin-logs'));
   let state = stateStore.load();
   const runtimes = new Map();
+  const activations = new Map();
   let initialized = false;
   let scanCache = null;
 
@@ -210,30 +215,44 @@ function createPluginManager({
     }
   }
 
-  async function activatePlugin(plugin) {
-    if (!plugin.manifest.main) return;
-    const entryPath = path.join(resolvedRoot, plugin.directoryName, plugin.manifest.main);
-    const permissions = plugin.manifest.permissions;
-    const capabilityRouter = createCapabilityRouter({
-      storage: createPluginStorage({ dataRoot: resolvedDataRoot, pluginId: plugin.manifest.id }),
-      logger: createPluginLogger({ logsRoot: resolvedLogsRoot, pluginId: plugin.manifest.id }),
-      catalog,
+  function activatePlugin(plugin) {
+    if (!plugin.manifest.main) return Promise.resolve();
+    const pluginId = plugin.manifest.id;
+    // Concurrent requests for the same plugin share one activation, so a plugin can
+    // never end up with two Worker runtimes or an activation that outlives disable().
+    const inFlight = activations.get(pluginId);
+    if (inFlight) return inFlight;
+
+    const activation = (async () => {
+      const entryPath = path.join(resolvedRoot, plugin.directoryName, plugin.manifest.main);
+      const permissions = plugin.manifest.permissions;
+      const capabilityRouter = createCapabilityRouter({
+        storage: createPluginStorage({ dataRoot: resolvedDataRoot, pluginId }),
+        logger: createPluginLogger({ logsRoot: resolvedLogsRoot, pluginId }),
+        catalog,
+      });
+      const runtime = runtimeFactory({
+        entryPath,
+        pluginId,
+        permissions,
+        capabilityHandler: (request) => capabilityRouter.handle(permissions, request),
+        ...(runtimeTimeoutMs === undefined ? {} : { timeoutMs: runtimeTimeoutMs }),
+      });
+      runtimes.set(pluginId, runtime);
+      try {
+        await runtime.activate();
+      } catch (error) {
+        runtimes.delete(pluginId);
+        runtime.terminate();
+        throw error;
+      }
+    })();
+
+    const tracked = activation.finally(() => {
+      if (activations.get(pluginId) === tracked) activations.delete(pluginId);
     });
-    const runtime = runtimeFactory({
-      entryPath,
-      pluginId: plugin.manifest.id,
-      permissions,
-      capabilityHandler: (request) => capabilityRouter.handle(permissions, request),
-      ...(runtimeTimeoutMs === undefined ? {} : { timeoutMs: runtimeTimeoutMs }),
-    });
-    runtimes.set(plugin.manifest.id, runtime);
-    try {
-      await runtime.activate();
-    } catch (error) {
-      runtimes.delete(plugin.manifest.id);
-      runtime.terminate();
-      throw error;
-    }
+    activations.set(pluginId, tracked);
+    return tracked;
   }
 
   function scanFresh() {
@@ -448,6 +467,15 @@ function createPluginManager({
       const plugin = findPlugin(pluginId);
       if (!plugin) {
         return { success: false, error: { code: 'PLUGIN_NOT_FOUND', message: 'Plugin was not found' } };
+      }
+      const pendingActivation = activations.get(pluginId);
+      if (pendingActivation) {
+        // Wait for the in-flight activation, otherwise its Worker would stay alive after this disable.
+        try {
+          await pendingActivation;
+        } catch {
+          // The activation caller reports its own failure; disable still has to clean up.
+        }
       }
       const runtime = runtimes.get(pluginId);
       try {

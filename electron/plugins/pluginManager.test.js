@@ -235,6 +235,86 @@ test('requires exact permission confirmation before enabling and persists lifecy
   assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).plugins['com.example.exporter'].enabled, false);
 });
 
+test('rejects duplicated or unknown granted permissions instead of enabling', async (t) => {
+  const root = createWorkspace(t);
+  const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);
+  t.after(() => fs.rmSync(statePath, { force: true }));
+  writePlugin(root, 'duplicates', validManifest('com.example.duplicates', {
+    permissions: ['repositories:read', 'ai:invoke'],
+  }), { 'worker.js': '' });
+  const events = [];
+  const manager = createPluginManager({
+    pluginsRoot: root,
+    statePath,
+    runtimeFactory: () => createFakeRuntime(events),
+  });
+
+  const duplicated = await manager.enable('com.example.duplicates', ['repositories:read', 'repositories:read']);
+  assert.equal(duplicated.error.code, 'PLUGIN_PERMISSION_CONFIRMATION_REQUIRED');
+  const unknown = await manager.enable('com.example.duplicates', ['repositories:read', 'made:up']);
+  assert.equal(unknown.error.code, 'PLUGIN_PERMISSION_CONFIRMATION_REQUIRED');
+  assert.deepEqual(events, []);
+
+  assert.deepEqual(
+    await manager.enable('com.example.duplicates', ['repositories:read', 'ai:invoke']),
+    { success: true }
+  );
+  assert.deepEqual(events, ['activate']);
+});
+
+test('coalesces concurrent activation requests for the same plugin', async (t) => {
+  const root = createWorkspace(t);
+  const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);
+  t.after(() => fs.rmSync(statePath, { force: true }));
+  writePlugin(root, 'shared', validManifest('com.example.shared'), { 'worker.js': '' });
+  const events = [];
+  let runtimeCount = 0;
+  const manager = createPluginManager({
+    pluginsRoot: root,
+    statePath,
+    runtimeFactory: () => { runtimeCount += 1; return createFakeRuntime(events); },
+  });
+
+  const [first, second] = await Promise.all([
+    manager.enable('com.example.shared', []),
+    manager.enable('com.example.shared', []),
+  ]);
+
+  assert.deepEqual(first, { success: true });
+  assert.deepEqual(second, { success: true });
+  assert.equal(runtimeCount, 1);
+  assert.deepEqual(events, ['activate']);
+});
+
+test('never leaves an active Worker when a plugin is disabled during activation', async (t) => {
+  const root = createWorkspace(t);
+  const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);
+  t.after(() => fs.rmSync(statePath, { force: true }));
+  writePlugin(root, 'slow', validManifest('com.example.slow'), { 'worker.js': '' });
+  const events = [];
+  let releaseActivation;
+  const gate = new Promise((resolve) => { releaseActivation = resolve; });
+  const manager = createPluginManager({
+    pluginsRoot: root,
+    statePath,
+    runtimeFactory: () => ({
+      async activate() { events.push('activate'); await gate; events.push('activated'); },
+      async deactivate() { events.push('deactivate'); },
+      async runAction() { return { type: 'text', content: 'ok' }; },
+      terminate() { events.push('terminate'); },
+    }),
+  });
+
+  const enabling = manager.enable('com.example.slow', []);
+  releaseActivation();
+  const disabled = await manager.disable('com.example.slow');
+
+  assert.deepEqual(await enabling, { success: true });
+  assert.deepEqual(disabled, { success: true });
+  assert.deepEqual(events, ['activate', 'activated', 'deactivate']);
+  assert.equal((await manager.list()).plugins[0].status, 'disabled');
+});
+
 test('restores enabled plugins and disables them when permissions change', async (t) => {
   const root = createWorkspace(t);
   const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);

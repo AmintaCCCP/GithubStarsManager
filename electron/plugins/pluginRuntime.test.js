@@ -207,3 +207,60 @@ test('does not deliver an old Worker capability response to a replacement Worker
   assert.equal(workers[1].messages.some((message) => message.type === 'host-response'), false);
   runtime.terminate();
 });
+
+test('keeps the replacement Worker active when the previous Worker exits late', async () => {
+  const workers = [];
+  class CapturedWorker extends FakeWorker {
+    constructor() {
+      super();
+      workers.push(this);
+    }
+  }
+  const runtime = createPluginRuntime({
+    entryPath: 'unused.js', pluginId: 'com.example.stale-exit', permissions: [], WorkerClass: CapturedWorker,
+  });
+
+  await runtime.activate();
+  runtime.terminate();
+  await runtime.activate();
+  assert.equal(workers.length, 2);
+  assert.equal(runtime.isActive(), true);
+
+  // A terminated Worker reports its exit asynchronously, possibly after a replacement started.
+  workers[0].emit('exit', 0);
+
+  assert.equal(runtime.isActive(), true);
+  const requestsBefore = workers[1].messages.filter((message) => message.type === 'request').length;
+  await runtime.activate();
+  assert.equal(workers.length, 2);
+  assert.equal(
+    workers[1].messages.filter((message) => message.type === 'request').length,
+    requestsBefore + 1
+  );
+  runtime.terminate();
+});
+
+test('ignores late failure events from a Worker that was already replaced', async () => {
+  const workers = [];
+  class CapturedWorker extends FakeWorker {
+    constructor() {
+      super();
+      workers.push(this);
+    }
+  }
+  const runtime = createPluginRuntime({
+    entryPath: 'unused.js', pluginId: 'com.example.stale-failure', permissions: [], WorkerClass: CapturedWorker,
+  });
+
+  await runtime.activate();
+  runtime.terminate();
+  await runtime.activate();
+
+  workers[0].emit('error', new Error('late failure'));
+  workers[0].emit('message', { type: 'startup-error', error: { code: 'PLUGIN_RUNTIME_ERROR', message: 'late' } });
+
+  assert.equal(runtime.isActive(), true);
+  await runtime.activate();
+  assert.equal(workers.length, 2);
+  runtime.terminate();
+});
