@@ -268,11 +268,12 @@ function validateManifest(input) {
   if (
     [input.contributes.repositoryActions, input.contributes.repositoryProcessors, input.contributes.exporters]
       .some((items) => Array.isArray(items) && items.length > 0) &&
-    !permissions.has('repositories:read')
+    !permissions.has('repositories:read') &&
+    !permissions.has('privateRepositories:read')
   ) {
     return failure(
       'MANIFEST_PERMISSION_REQUIRED',
-      "Repository contributions require permission 'repositories:read'"
+      "Repository contributions require permission 'repositories:read' or 'privateRepositories:read'"
     );
   }
   if (

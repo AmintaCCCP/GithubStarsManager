@@ -60,9 +60,11 @@ function createContext() {
       delete: (key) => callHost('storage', 'delete', { key }),
     });
   }
-  if (workerData.permissions.includes('repositories:read') || workerData.permissions.includes('releases:read')) {
+  const canReadRepositories = workerData.permissions.includes('repositories:read')
+    || workerData.permissions.includes('privateRepositories:read');
+  if (canReadRepositories || workerData.permissions.includes('releases:read')) {
     context.github = Object.freeze({
-      ...(workerData.permissions.includes('repositories:read') ? {
+      ...(canReadRepositories ? {
         searchRepositories: (query, options = {}) => callHost('github', 'searchRepositories', { query, limit: options.limit ?? 20 }),
         getRepository: (repositoryId) => callHost('github', 'getRepository', { repositoryId }),
       } : {}),

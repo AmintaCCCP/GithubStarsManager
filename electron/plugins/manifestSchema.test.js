@@ -127,8 +127,9 @@ test('requires repositories:read for repository contributions', () => {
   assert.deepEqual(validateManifest(manifest({ permissions: [] })), {
     success: false,
     code: 'MANIFEST_PERMISSION_REQUIRED',
-    message: "Repository contributions require permission 'repositories:read'",
+    message: "Repository contributions require permission 'repositories:read' or 'privateRepositories:read'",
   });
+  assert.equal(validateManifest(manifest({ permissions: ['privateRepositories:read'] })).success, true);
 });
 
 test('validates repository processors and exporters', () => {

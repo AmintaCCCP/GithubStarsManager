@@ -120,6 +120,42 @@ test('exposes only permission-backed Host capabilities to plugin code', async (t
   await runtime.deactivate();
 });
 
+test('exposes GitHub repository reads when only privateRepositories:read is granted', async (t) => {
+  const entryPath = writePlugin(t, `
+    let context;
+    module.exports = {
+      activate(value) { context = value; },
+      async runAction() {
+        const repositories = await context.github.searchRepositories('private', { limit: 1 });
+        const repository = await context.github.getRepository(repositories[0].id);
+        return { type: 'text', content: repository.full_name };
+      },
+    };
+  `);
+  const events = [];
+  const runtime = createPluginRuntime({
+    entryPath,
+    pluginId: 'com.example.private-read',
+    permissions: ['privateRepositories:read'],
+    timeoutMs: 2000,
+    capabilityHandler: async (request) => {
+      events.push([request.capability, request.operation]);
+      if (request.operation === 'searchRepositories') return [{ id: 9 }];
+      return { id: 9, full_name: 'owner/private' };
+    },
+  });
+
+  await runtime.activate();
+  assert.deepEqual(await runtime.runAction({ actionId: 'show', repositories: [] }), {
+    type: 'text', content: 'owner/private',
+  });
+  assert.deepEqual(events, [
+    ['github', 'searchRepositories'],
+    ['github', 'getRepository'],
+  ]);
+  await runtime.deactivate();
+});
+
 test('runs release processors with semantic GitHub Host capabilities', async (t) => {
   const entryPath = writePlugin(t, `
     let context;
