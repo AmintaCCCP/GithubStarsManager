@@ -286,6 +286,36 @@ test('coalesces concurrent activation requests for the same plugin', async (t) =
   assert.deepEqual(events, ['activate']);
 });
 
+test('concurrent enable waits for a failing in-flight activation instead of reporting success', async (t) => {
+  const root = createWorkspace(t);
+  const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);
+  t.after(() => fs.rmSync(statePath, { force: true }));
+  writePlugin(root, 'failing', validManifest('com.example.failing'), { 'worker.js': '' });
+  let releaseActivation;
+  const gate = new Promise((resolve) => { releaseActivation = resolve; });
+  const manager = createPluginManager({
+    pluginsRoot: root,
+    statePath,
+    runtimeFactory: () => ({
+      async activate() {
+        await gate;
+        throw Object.assign(new Error('startup failed'), { code: 'PLUGIN_RUNTIME_ERROR' });
+      },
+      terminate() {},
+    }),
+  });
+
+  const first = manager.enable('com.example.failing', []);
+  const second = manager.enable('com.example.failing', []);
+  releaseActivation();
+  const [left, right] = await Promise.all([first, second]);
+  assert.equal(left.success, false);
+  assert.equal(right.success, false);
+  assert.equal(left.error.code, 'PLUGIN_RUNTIME_ERROR');
+  assert.equal(right.error.code, 'PLUGIN_RUNTIME_ERROR');
+  assert.equal((await manager.list()).plugins[0].status, 'error');
+});
+
 test('never leaves an active Worker when a plugin is disabled during activation', async (t) => {
   const root = createWorkspace(t);
   const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);

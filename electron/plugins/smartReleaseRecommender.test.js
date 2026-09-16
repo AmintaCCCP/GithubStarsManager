@@ -67,6 +67,8 @@ test('recommends only assets that declare the Host platform and architecture', a
     ['project-win32-arm64.zip', { os: 'darwin', arch: 'arm64' }, false],
     ['project-linux-arm64.AppImage', { os: 'win32', arch: 'x64' }, false],
     ['project-source-code.zip', { os: 'darwin', arch: 'arm64' }, false],
+    ['project-win32-linux-x64.zip', { os: 'win32', arch: 'x64' }, false],
+    ['project-win32-x64-arm64.zip', { os: 'win32', arch: 'x64' }, false],
   ];
 
   for (const [name, environment, expected] of cases) {

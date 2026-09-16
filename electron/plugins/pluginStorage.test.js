@@ -63,3 +63,13 @@ test('removePluginStorage deletes the isolated file and leftover temporary files
   assert.equal(fs.existsSync(leftover), false);
   assert.equal(removePluginStorage({ dataRoot: root, pluginId: 'com.example.removed' }), true);
 });
+
+test('removePluginStorage still deletes leftover temporary files when the data file is missing', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-data-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const leftover = path.join(root, `com.example.orphan.json.${process.pid}.tmp`);
+  fs.writeFileSync(leftover, '{}');
+
+  assert.equal(removePluginStorage({ dataRoot: root, pluginId: 'com.example.orphan' }), true);
+  assert.equal(fs.existsSync(leftover), false);
+});

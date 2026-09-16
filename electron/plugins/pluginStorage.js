@@ -102,22 +102,28 @@ function createPluginStorage({ dataRoot, pluginId }) {
  */
 function removePluginStorage({ dataRoot, pluginId }) {
   const dataPath = storageDataPath(dataRoot, pluginId);
-  if (!fs.existsSync(dataPath)) return true;
+  let removed = true;
   try {
     fs.rmSync(dataPath, { force: true });
-  } catch {
-    return false;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') removed = false;
   }
   const directory = path.dirname(dataPath);
   const prefix = `${path.basename(dataPath)}.`;
   try {
     for (const entry of fs.readdirSync(directory)) {
       if (entry.startsWith(prefix) && entry.endsWith('.tmp')) {
-        try { fs.rmSync(path.join(directory, entry), { force: true }); } catch { /* Leftovers are not fatal. */ }
+        try {
+          fs.rmSync(path.join(directory, entry), { force: true });
+        } catch (error) {
+          if (error?.code !== 'ENOENT') removed = false;
+        }
       }
     }
-  } catch { /* The data file is already gone; a missing directory is fine. */ }
-  return true;
+  } catch (error) {
+    if (error?.code !== 'ENOENT') removed = false;
+  }
+  return removed;
 }
 
 module.exports = {

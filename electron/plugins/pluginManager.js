@@ -218,11 +218,9 @@ function createPluginManager({
   function activatePlugin(plugin) {
     if (!plugin.manifest.main) return Promise.resolve();
     const pluginId = plugin.manifest.id;
-    if (runtimes.has(pluginId)) return Promise.resolve();
-    // Concurrent requests for the same plugin share one activation, so a plugin can
-    // never end up with two Worker runtimes or an activation that outlives disable().
     const inFlight = activations.get(pluginId);
     if (inFlight) return inFlight;
+    if (runtimes.has(pluginId)) return Promise.resolve();
 
     const activation = (async () => {
       const entryPath = path.join(resolvedRoot, plugin.directoryName, plugin.manifest.main);

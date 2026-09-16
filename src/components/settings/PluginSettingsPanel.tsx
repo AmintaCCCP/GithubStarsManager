@@ -101,8 +101,15 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   const removePlugin = async (plugin: InstalledPlugin, removePluginData: boolean) => {
     setUninstallTarget(null);
     setBusyPluginId(plugin.manifest.id);
-    const result = await pluginRegistry.uninstall(plugin.manifest.id, removePluginData);
-    setBusyPluginId(null);
+    let result;
+    try {
+      result = await pluginRegistry.uninstall(plugin.manifest.id, removePluginData);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('插件卸载失败', 'Plugin uninstall failed'), 'error');
+      return;
+    } finally {
+      setBusyPluginId(null);
+    }
     if (!result.success) {
       toast(result.error.message, 'error');
       return;

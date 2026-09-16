@@ -27,9 +27,9 @@ function scoreAsset(asset, environment) {
   // Reject a name that declares another platform or architecture, but keep names that also
   // declare the Host's own value (e.g. 'app-win32-x64.zip' on a 64-bit Windows Host).
   const platforms = matchingKeys(PLATFORM_PATTERNS, name);
-  if (platforms.length > 0 && !platforms.includes(environment.os)) return -100;
+  if (platforms.some((platform) => platform !== environment.os)) return -100;
   const architectures = matchingKeys(ARCH_PATTERNS, name);
-  if (architectures.length > 0 && !architectures.includes(environment.arch)) return -100;
+  if (architectures.some((architecture) => architecture !== environment.arch)) return -100;
   let score = 0;
   if (PLATFORM_PATTERNS[environment.os]?.test(name)) score += 50;
   if (ARCH_PATTERNS[environment.arch]?.test(name)) score += 35;
