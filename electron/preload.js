@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
+if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
   setProxy: (config) => ipcRenderer.invoke('set-proxy', config),
   getProxy: () => ipcRenderer.invoke('get-proxy'),
   testProxy: (config) => ipcRenderer.invoke('test-proxy', config),
@@ -26,5 +26,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     start: () => ipcRenderer.invoke('mcp:start'),
     stop: () => ipcRenderer.invoke('mcp:stop'),
     getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
+  },
+  plugins: {
+    list: () => ipcRenderer.invoke('plugins:list'),
+    installFromDirectory: () => ipcRenderer.invoke('plugins:installFromDirectory'),
+    enable: (pluginId, grantedPermissions) => ipcRenderer.invoke('plugins:enable', pluginId, grantedPermissions),
+    disable: (pluginId) => ipcRenderer.invoke('plugins:disable', pluginId),
+    uninstall: (pluginId, removePluginData) => ipcRenderer.invoke('plugins:uninstall', pluginId, removePluginData),
+    runAction: (request) => ipcRenderer.invoke('plugins:runAction', request),
+    runProcessor: (request) => ipcRenderer.invoke('plugins:runProcessor', request),
+    pushSnapshot: (snapshot) => ipcRenderer.invoke('plugins:pushSnapshot', snapshot),
+    runReleaseProcessor: (request) => ipcRenderer.invoke('plugins:runReleaseProcessor', request),
+    downloadReleaseAsset: (request) => ipcRenderer.invoke('plugins:downloadReleaseAsset', request),
+    runExporter: (request) => ipcRenderer.invoke('plugins:runExporter', request),
+    getPage: (pluginId, pageId) => ipcRenderer.invoke('plugins:getPage', pluginId, pageId),
+    requestPageCapability: (request) => ipcRenderer.invoke('plugins:requestPageCapability', request),
+    getSearchEndpoint: () => ipcRenderer.invoke('plugins:getSearchEndpoint'),
+    configureWebSearch: (endpoint) => ipcRenderer.invoke('plugins:configureWebSearch', endpoint),
+    searchWeb: (request) => ipcRenderer.invoke('plugins:searchWeb', request),
   },
 });

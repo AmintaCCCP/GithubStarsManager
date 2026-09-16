@@ -6,6 +6,7 @@ import type {
   McpServiceConfig,
   Release,
 } from '../types';
+import type { ElectronPluginAPI } from '../plugins/types';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
 export type McpLocalConfig = McpServiceConfig;
@@ -77,6 +78,7 @@ interface ElectronAPI {
   };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
+  plugins?: ElectronPluginAPI;
 }
 
 declare global {

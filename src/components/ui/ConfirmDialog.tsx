@@ -59,7 +59,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             </div>
             <div className="space-y-2">
               <AlertDialogTitle>{title}</AlertDialogTitle>
-              <AlertDialogDescription>{message}</AlertDialogDescription>
+              <AlertDialogDescription className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-all">{message}</AlertDialogDescription>
             </div>
           </div>
         </AlertDialogHeader>

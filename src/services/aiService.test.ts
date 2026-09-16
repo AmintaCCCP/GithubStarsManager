@@ -10,6 +10,7 @@ import {
   type AIToolLoopMessage,
 } from './aiService';
 import { isToolCallCapableApiType } from '../constants/aiCapabilities';
+import { logger } from './logger';
 
 // Minimal AIConfig that lets AIService construct without a real token.
 const makeConfig = () => ({
@@ -20,6 +21,30 @@ const makeConfig = () => ({
   apiKey: '',
   model: 'gpt-test',
   isActive: true,
+});
+
+it('redacts plugin AI request details from debug logs', () => {
+  const debug = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+  const isDebugMode = vi.spyOn(logger, 'isDebugMode').mockReturnValue(true);
+  try {
+    const service = new AIService(makeConfig() as never, 'en', true);
+    const logRequest = service as unknown as { logAIRequestDebug: (
+      startTime: number,
+      context: { apiType: string; model: string; configId: string },
+      result: { responseLength: number },
+      details: Record<string, unknown>,
+    ) => void };
+    logRequest.logAIRequestDebug(Date.now(), { apiType: 'openai', model: 'example', configId: 'test' },
+      { responseLength: 5 }, { url: 'https://secret.example/key', requestBody: 'private prompt', responseBody: 'private answer', status: 200 });
+    expect(debug).toHaveBeenCalledOnce();
+    const metadata = debug.mock.calls[0][2];
+    expect(metadata).toEqual(expect.objectContaining({ status: 200, responseLength: 5 }));
+    expect(JSON.stringify(metadata)).not.toContain('private');
+    expect(JSON.stringify(metadata)).not.toContain('secret.example');
+  } finally {
+    debug.mockRestore();
+    isDebugMode.mockRestore();
+  }
 });
 
 function makeRepo(partial: Partial<Repository> & Pick<Repository, 'id' | 'name' | 'full_name'>): Repository {

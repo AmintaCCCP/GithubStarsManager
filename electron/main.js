@@ -1,9 +1,12 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, net, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+const { createPluginManager } = require('./plugins/pluginManager');
+const { downloadReleaseAsset } = require('./plugins/releaseDownload');
+const { PAGE_SCHEME, pageCsp } = require('./plugins/pluginPage');
 const {
   DEFAULT_DESKTOP_PREFS,
   normalizeDesktopPrefs,
@@ -34,6 +37,8 @@ const startHidden = process.argv.includes('--hidden');
 // instead of spawning a duplicate tray icon.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
+protocol.registerSchemesAsPrivileged([{ scheme: PAGE_SCHEME, privileges: { standard: true, secure: true } }]);
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -43,6 +48,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       enableRemoteModule: false,
       // Production: keep same-origin + block mixed content. Local files load via loadFile.
       // Dev may relax for Vite HMR / local services if needed later — keep secure by default.
@@ -231,6 +237,21 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-frame-navigate', (event) => {
+    if (event.isMainFrame) return;
+    if (!event.url.startsWith(`${PAGE_SCHEME}://`)) {
+      event.preventDefault();
+      return;
+    }
+    const current = event.frame?.url;
+    if (current?.startsWith(`${PAGE_SCHEME}://`)) {
+      const previousPage = new URL(current);
+      const nextPage = new URL(event.url);
+      if (previousPage.hostname !== nextPage.hostname ||
+        previousPage.pathname.split('/')[1] !== nextPage.pathname.split('/')[1]) event.preventDefault();
+    }
   });
 
   mainWindow.on('close', (event) => {
@@ -845,6 +866,101 @@ ipcMain.handle('mcp:stop', async () => mcpServer.stop());
 
 ipcMain.handle('mcp:getStatus', async () => mcpServer.getStatus());
 
+// ── Trusted local plugin host (discovery, lifecycle, and restricted IPC) ──
+let pluginManager = null;
+
+function getPluginManager() {
+  if (!pluginManager) {
+    pluginManager = createPluginManager({
+      pluginsRoot: path.join(app.getPath('userData'), 'plugins'),
+    });
+  }
+  return pluginManager;
+}
+
+ipcMain.handle('plugins:list', async () => getPluginManager().list());
+ipcMain.handle('plugins:installFromDirectory', async () => {
+  const selection = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select plugin directory',
+    properties: ['openDirectory'],
+  });
+  if (selection.canceled || selection.filePaths.length !== 1) return { success: false, canceled: true };
+  return getPluginManager().installFromDirectory(selection.filePaths[0]);
+});
+ipcMain.handle('plugins:enable', async (_event, pluginId, grantedPermissions) =>
+  getPluginManager().enable(pluginId, grantedPermissions)
+);
+ipcMain.handle('plugins:disable', async (_event, pluginId) =>
+  getPluginManager().disable(pluginId)
+);
+ipcMain.handle('plugins:uninstall', async (_event, pluginId, removePluginData) =>
+  getPluginManager().uninstall(pluginId, removePluginData)
+);
+ipcMain.handle('plugins:runAction', async (_event, request) => {
+  const operation = await getPluginManager().runAction(request);
+  if (operation.success && operation.result.type === 'open-external') {
+    try {
+      await shell.openExternal(operation.result.url);
+    } catch {
+      return {
+        success: false,
+        error: { code: 'PLUGIN_EXTERNAL_OPEN_FAILED', message: 'Failed to open the external URL' },
+      };
+    }
+  }
+  return operation;
+});
+ipcMain.handle('plugins:runProcessor', async (_event, request) =>
+  getPluginManager().runProcessor(request)
+);
+ipcMain.handle('plugins:pushSnapshot', async (_event, snapshot) =>
+  getPluginManager().updateSnapshot(snapshot)
+);
+ipcMain.handle('plugins:runReleaseProcessor', async (_event, request) =>
+  getPluginManager().runReleaseProcessor(request)
+);
+ipcMain.handle('plugins:downloadReleaseAsset', async (_event, request) => {
+  const resolved = getPluginManager().getDownloadAsset(
+    request?.pluginId,
+    request?.releaseId,
+    request?.assetId
+  );
+  if (!resolved.success) return resolved;
+  return downloadReleaseAsset({
+    fetchImpl: (url, options) => net.fetch(url, options),
+    showSaveDialog: (...args) => dialog.showSaveDialog(...args),
+    ownerWindow: mainWindow,
+    ...resolved.value,
+  });
+});
+ipcMain.handle('plugins:runExporter', async (_event, request) =>
+  getPluginManager().runExporter(request)
+);
+function isMainPluginFrame(event) {
+  return mainWindow && event.sender === mainWindow.webContents &&
+    event.senderFrame === mainWindow.webContents.mainFrame;
+}
+ipcMain.handle('plugins:getPage', async (event, pluginId, pageId) => {
+  if (!isMainPluginFrame(event)) return { success: false, error: { code: 'PLUGIN_IPC_DENIED', message: 'Plugin IPC requires the main frame' } };
+  return getPluginManager().getPage(pluginId, pageId);
+});
+ipcMain.handle('plugins:requestPageCapability', async (event, request) => {
+  if (!isMainPluginFrame(event)) return { success: false, error: { code: 'PLUGIN_IPC_DENIED', message: 'Plugin IPC requires the main frame' } };
+  return getPluginManager().requestPageCapability(request);
+});
+ipcMain.handle('plugins:getSearchEndpoint', async (event) => {
+  if (!isMainPluginFrame(event)) return { endpoint: null };
+  return getPluginManager().getSearchEndpoint();
+});
+ipcMain.handle('plugins:configureWebSearch', async (event, endpoint) => {
+  if (!isMainPluginFrame(event)) return { success: false, error: { code: 'PLUGIN_IPC_DENIED', message: 'Plugin IPC requires the main frame' } };
+  return getPluginManager().configureWebSearch(endpoint);
+});
+ipcMain.handle('plugins:searchWeb', async (event, request) => {
+  if (!isMainPluginFrame(event)) return { success: false, error: { code: 'PLUGIN_IPC_DENIED', message: 'Plugin IPC requires the main frame' } };
+  return getPluginManager().searchWeb(request);
+});
+
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
@@ -854,7 +970,23 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+  protocol.handle(PAGE_SCHEME, (request) => {
+    const resource = getPluginManager().readPageResource(request.url);
+    if (!resource) return new Response('Not Found', { status: 404 });
+    return new Response(resource.body, {
+      headers: {
+        'Content-Type': resource.mimeType,
+        'Content-Security-Policy': pageCsp(new URL(request.url).hostname),
+        'Access-Control-Allow-Origin': 'null',
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'no-store',
+      },
+    });
+  });
   reloadDesktopPrefs();
+  void getPluginManager().initialize().catch((error) => {
+    console.error('Failed to initialize plugins:', error instanceof Error ? error.message : 'Unknown error');
+  });
   // Self-heal the OS login item on every start (e.g. path changed after update).
   if (desktopPrefs.autoLaunch) {
     void applyAutoLaunch(true).then((result) => {
@@ -898,6 +1030,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   destroyTray();
   void mcpServer.stop();
+  pluginManager?.shutdown();
 });
 
 app.on('activate', () => {

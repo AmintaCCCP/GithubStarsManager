@@ -342,7 +342,7 @@ export class AIService {
   private static readonly SELECTION_MAX_RESULTS = 20;
   private static readonly SELECTION_MAX_TOKENS = 800;
 
-  constructor(config: AIConfig, language: string = 'zh') {
+  constructor(config: AIConfig, language: string = 'zh', private readonly redactDebugPayload = false) {
     this.config = config;
     this.language = language;
   }
@@ -370,7 +370,7 @@ export class AIService {
         ...context,
         durationMs: Date.now() - startTime,
         ...result,
-        ...(httpDetails || {}),
+        ...(this.redactDebugPayload ? { status: httpDetails?.status } : (httpDetails || {})),
       });
     }
   }
