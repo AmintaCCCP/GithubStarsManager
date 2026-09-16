@@ -2,6 +2,7 @@ const pluginId = 'com.example.repo-health-page';
 const pageId = 'dashboard';
 let token = null;
 let nextRequestId = 0;
+let latestSearchId = 0;
 const pending = new Map();
 
 function request(method, args) {
@@ -32,14 +33,17 @@ function renderRepositories(repositories) {
 
 async function search() {
   const status = document.getElementById('status');
+  const searchId = ++latestSearchId;
   try {
     status.textContent = 'Searching…';
     const repositories = await request('repositories.search', {
       query: document.getElementById('query').value.trim(), limit: 30,
     });
+    if (searchId !== latestSearchId) return;
     renderRepositories(repositories);
     status.textContent = `${repositories.length} repositories found in the local Host snapshot.`;
   } catch (error) {
+    if (searchId !== latestSearchId) return;
     status.textContent = error instanceof Error ? error.message : 'Search failed';
   }
 }

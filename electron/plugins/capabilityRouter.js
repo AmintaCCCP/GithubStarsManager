@@ -39,7 +39,7 @@ function createCapabilityRouter({ storage, logger, catalog }) {
           }
           return catalog.getRelease(request.args?.releaseId);
         }
-        if (!permissions.includes('repositories:read')) {
+        if (!permissions.includes('repositories:read') && !permissions.includes('privateRepositories:read')) {
           throw protocolError('PLUGIN_PERMISSION_DENIED', "Permission 'repositories:read' is required");
         }
         if (request.operation === 'getRepository') return catalog.getRepository(request.args?.repositoryId);

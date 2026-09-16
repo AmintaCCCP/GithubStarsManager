@@ -30,12 +30,25 @@ test('rejects invalid keys, non-JSON values, and oversized values', (t) => {
   const storage = createPluginStorage({ dataRoot: root, pluginId: 'com.example.quota' });
 
   assert.throws(() => storage.set('', true), { code: 'PLUGIN_STORAGE_KEY_INVALID' });
+  assert.throws(() => storage.set('__proto__', { polluted: true }), { code: 'PLUGIN_STORAGE_KEY_INVALID' });
+  assert.throws(() => storage.set('constructor', true), { code: 'PLUGIN_STORAGE_KEY_INVALID' });
   assert.throws(() => storage.set('cyclic', (() => { const value = {}; value.self = value; return value; })()), {
     code: 'PLUGIN_STORAGE_VALUE_INVALID',
   });
   assert.throws(() => storage.set('large', 'x'.repeat(MAX_STORAGE_VALUE_BYTES + 1)), {
     code: 'PLUGIN_STORAGE_VALUE_TOO_LARGE',
   });
+});
+
+test('round-trips own properties without inheriting Object.prototype keys', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-data-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const storage = createPluginStorage({ dataRoot: root, pluginId: 'com.example.proto' });
+
+  assert.equal(storage.get('toString'), null);
+  storage.set('toString', 'own-value');
+  assert.equal(storage.get('toString'), 'own-value');
+  assert.equal(createPluginStorage({ dataRoot: root, pluginId: 'com.example.proto' }).get('toString'), 'own-value');
 });
 
 test('reports damaged storage instead of overwriting it', (t) => {

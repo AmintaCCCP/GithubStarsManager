@@ -290,6 +290,15 @@ function validateManifest(input) {
   if (!hasMain && !hasPage) {
     return failure('MANIFEST_FIELD_REQUIRED', "Manifest requires either 'main' or a contributed page entry");
   }
+  const hasRuntimeContribution = [
+    input.contributes.repositoryActions,
+    input.contributes.repositoryProcessors,
+    input.contributes.releaseProcessors,
+    input.contributes.exporters,
+  ].some((items) => Array.isArray(items) && items.length > 0);
+  if (!hasMain && hasRuntimeContribution) {
+    return failure('MANIFEST_FIELD_REQUIRED', "Manifest field 'main' is required for runtime contributions");
+  }
 
   return { success: true, data: JSON.parse(JSON.stringify(input)) };
 }

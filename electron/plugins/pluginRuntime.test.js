@@ -198,12 +198,14 @@ test('does not deliver an old Worker capability response to a replacement Worker
 
   await runtime.activate();
   workers[0].emit('message', { type: 'host-request', requestId: 1, request: {} });
-  workers[0].emit('exit', 0);
+  runtime.terminate();
   await runtime.activate();
+  workers[0].emit('exit', 0);
   resolveCapability('stale');
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(workers.length, 2);
+  assert.equal(runtime.isActive(), true);
   assert.equal(workers[1].messages.some((message) => message.type === 'host-response'), false);
   runtime.terminate();
 });
@@ -237,6 +239,50 @@ test('keeps the replacement Worker active when the previous Worker exits late', 
     workers[1].messages.filter((message) => message.type === 'request').length,
     requestsBefore + 1
   );
+  runtime.terminate();
+});
+
+test('keeps a replacement Worker active after a stale startup timeout would have fired', async () => {
+  const workers = [];
+  class ManualWorker extends EventEmitter {
+    constructor() {
+      super();
+      this.messages = [];
+      workers.push(this);
+    }
+
+    postMessage(message) {
+      this.messages.push(message);
+      if (message.type === 'request') {
+        queueMicrotask(() => this.emit('message', {
+          type: 'response', requestId: message.requestId, success: true, result: null,
+        }));
+      }
+    }
+
+    terminate() {
+      return Promise.resolve(0);
+    }
+  }
+  const runtime = createPluginRuntime({
+    entryPath: 'unused.js',
+    pluginId: 'com.example.stale-timeout',
+    permissions: [],
+    timeoutMs: 30,
+    WorkerClass: ManualWorker,
+  });
+
+  const first = runtime.activate();
+  runtime.terminate();
+  void first.catch(() => {});
+
+  const second = runtime.activate();
+  workers[1].emit('message', { type: 'ready' });
+  await second;
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  assert.equal(workers.length, 2);
+  assert.equal(runtime.isActive(), true);
   runtime.terminate();
 });
 

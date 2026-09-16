@@ -30,11 +30,13 @@ function manifest(overrides = {}) {
 }
 
 test('accepts the v1 manifest contract', () => {
-  const result = validateManifest(manifest());
+  const input = manifest();
+  const result = validateManifest(input);
 
   assert.equal(result.success, true);
   assert.equal(result.data.id, 'com.example.markdown-exporter');
-  assert.notEqual(result.data, manifest());
+  assert.notEqual(result.data, input);
+  assert.notEqual(result.data.contributes, input.contributes);
 });
 
 test('rejects missing required fields with a stable error code', () => {
@@ -93,6 +95,23 @@ test('accepts a page-only manifest and domain-scoped HTTPS permission declaratio
   const result = validateManifest(input);
   assert.equal(result.success, true);
   assert.equal(result.data.contributes.pages[0].entry, 'ui/index.html');
+});
+
+test('rejects page-only manifests that declare Worker contributions', () => {
+  const input = manifest({
+    main: undefined,
+    permissions: ['repositories:read'],
+    contributes: {
+      pages: [{ id: 'dashboard', title: 'Dashboard', entry: 'ui/index.html' }],
+      repositoryActions: [{ id: 'export-markdown', title: 'Export as Markdown', placement: 'bulk-toolbar' }],
+    },
+  });
+  delete input.main;
+
+  const result = validateManifest(input);
+  assert.equal(result.success, false);
+  assert.equal(result.code, 'MANIFEST_FIELD_REQUIRED');
+  assert.equal(result.message, "Manifest field 'main' is required for runtime contributions");
 });
 
 test('requires contributed page entries to be HTML documents', () => {

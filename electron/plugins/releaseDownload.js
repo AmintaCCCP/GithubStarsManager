@@ -64,7 +64,6 @@ async function downloadReleaseAsset({ fetchImpl, showSaveDialog, ownerWindow, re
     if (asset.size > 0 && received !== asset.size) {
       throw Object.assign(new Error('Downloaded asset size did not match GitHub metadata'), { code: 'PLUGIN_DOWNLOAD_SIZE_MISMATCH' });
     }
-    if (fs.existsSync(selection.filePath)) fs.rmSync(selection.filePath, { force: false });
     fs.renameSync(temporaryPath, selection.filePath);
     return { success: true, fileName: path.basename(selection.filePath), bytes: received };
   } catch (error) {

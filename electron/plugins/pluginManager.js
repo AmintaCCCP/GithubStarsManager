@@ -159,6 +159,7 @@ function createPluginManager({
   let state = stateStore.load();
   const runtimes = new Map();
   const activations = new Map();
+  const lifecycleQueues = new Map();
   let initialized = false;
   let scanCache = null;
 
@@ -168,6 +169,16 @@ function createPluginManager({
 
   function stateFor(pluginId) {
     return state.plugins[pluginId] || { enabled: false, grantedPermissions: [] };
+  }
+
+  function runLifecycle(pluginId, operation) {
+    const previous = lifecycleQueues.get(pluginId) || Promise.resolve();
+    const next = previous.catch(() => {}).then(operation);
+    const tracked = next.finally(() => {
+      if (lifecycleQueues.get(pluginId) === tracked) lifecycleQueues.delete(pluginId);
+    });
+    lifecycleQueues.set(pluginId, tracked);
+    return tracked;
   }
 
   function recordError(pluginId, error) {
@@ -435,61 +446,65 @@ function createPluginManager({
       }
     },
     async enable(pluginId, grantedPermissions) {
-      const plugin = findPlugin(pluginId);
-      if (!plugin) {
-        return { success: false, error: { code: 'PLUGIN_NOT_FOUND', message: 'Plugin was not found' } };
-      }
-      if (!samePermissions(plugin.manifest.permissions, grantedPermissions)) {
-        return {
-          success: false,
-          error: {
-            code: 'PLUGIN_PERMISSION_CONFIRMATION_REQUIRED',
-            message: 'All requested plugin permissions must be confirmed',
-          },
-        };
-      }
-      if (stateFor(pluginId).enabled && (!plugin.manifest.main || runtimes.has(pluginId))) return { success: true };
-      try {
-        await activatePlugin(plugin);
+      return runLifecycle(pluginId, async () => {
+        const plugin = findPlugin(pluginId);
+        if (!plugin) {
+          return { success: false, error: { code: 'PLUGIN_NOT_FOUND', message: 'Plugin was not found' } };
+        }
+        if (!samePermissions(plugin.manifest.permissions, grantedPermissions)) {
+          return {
+            success: false,
+            error: {
+              code: 'PLUGIN_PERMISSION_CONFIRMATION_REQUIRED',
+              message: 'All requested plugin permissions must be confirmed',
+            },
+          };
+        }
+        if (stateFor(pluginId).enabled && (!plugin.manifest.main || runtimes.has(pluginId))) return { success: true };
+        try {
+          await activatePlugin(plugin);
+          state.plugins[pluginId] = {
+            enabled: true,
+            grantedPermissions: [...grantedPermissions],
+          };
+          saveState();
+          return { success: true };
+        } catch (error) {
+          recordError(pluginId, error);
+          return { success: false, error: safeError(error) };
+        }
+      });
+    },
+    async disable(pluginId) {
+      return runLifecycle(pluginId, async () => {
+        const plugin = findPlugin(pluginId);
+        if (!plugin) {
+          return { success: false, error: { code: 'PLUGIN_NOT_FOUND', message: 'Plugin was not found' } };
+        }
+        const pendingActivation = activations.get(pluginId);
+        if (pendingActivation) {
+          // Wait for the in-flight activation, otherwise its Worker would stay alive after this disable.
+          try {
+            await pendingActivation;
+          } catch {
+            // The activation caller reports its own failure; disable still has to clean up.
+          }
+        }
+        const runtime = runtimes.get(pluginId);
+        try {
+          if (runtime) await runtime.deactivate();
+        } catch (error) {
+          runtime.terminate();
+        } finally {
+          runtimes.delete(pluginId);
+        }
         state.plugins[pluginId] = {
-          enabled: true,
-          grantedPermissions: [...grantedPermissions],
+          enabled: false,
+          grantedPermissions: [...stateFor(pluginId).grantedPermissions],
         };
         saveState();
         return { success: true };
-      } catch (error) {
-        recordError(pluginId, error);
-        return { success: false, error: safeError(error) };
-      }
-    },
-    async disable(pluginId) {
-      const plugin = findPlugin(pluginId);
-      if (!plugin) {
-        return { success: false, error: { code: 'PLUGIN_NOT_FOUND', message: 'Plugin was not found' } };
-      }
-      const pendingActivation = activations.get(pluginId);
-      if (pendingActivation) {
-        // Wait for the in-flight activation, otherwise its Worker would stay alive after this disable.
-        try {
-          await pendingActivation;
-        } catch {
-          // The activation caller reports its own failure; disable still has to clean up.
-        }
-      }
-      const runtime = runtimes.get(pluginId);
-      try {
-        if (runtime) await runtime.deactivate();
-      } catch (error) {
-        runtime.terminate();
-      } finally {
-        runtimes.delete(pluginId);
-      }
-      state.plugins[pluginId] = {
-        enabled: false,
-        grantedPermissions: [...stateFor(pluginId).grantedPermissions],
-      };
-      saveState();
-      return { success: true };
+      });
     },
     getPage(pluginId, pageId) {
       const plugin = findPlugin(pluginId);

@@ -56,10 +56,17 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   }, []);
 
   const saveSearchEndpoint = async () => {
-    const result = await pluginClient.configureWebSearch(searchEndpoint.trim() || null);
-    toast(result.success
-      ? t('搜索服务设置已保存', 'Search service settings saved')
-      : result.error.message, result.success ? 'success' : 'error');
+    try {
+      const result = await pluginClient.configureWebSearch(searchEndpoint.trim() || null);
+      toast(result.success
+        ? t('搜索服务设置已保存', 'Search service settings saved')
+        : result.error.message, result.success ? 'success' : 'error');
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : t('搜索服务设置保存失败', 'Failed to save search service settings'),
+        'error'
+      );
+    }
   };
 
   const enable = async (plugin: InstalledPlugin) => {
@@ -85,17 +92,27 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     if (!approved) return;
 
     setBusyPluginId(plugin.manifest.id);
-    const result = await pluginRegistry.enable(plugin.manifest.id, permissions);
-    setBusyPluginId(null);
-    if (!result.success) toast(result.error.message, 'error');
-    else toast(t('插件已启用', 'Plugin enabled'), 'success');
+    try {
+      const result = await pluginRegistry.enable(plugin.manifest.id, permissions);
+      if (!result.success) toast(result.error.message, 'error');
+      else toast(t('插件已启用', 'Plugin enabled'), 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('插件启用失败', 'Failed to enable plugin'), 'error');
+    } finally {
+      setBusyPluginId(null);
+    }
   };
 
   const disable = async (plugin: InstalledPlugin) => {
     setBusyPluginId(plugin.manifest.id);
-    const result = await pluginRegistry.disable(plugin.manifest.id);
-    setBusyPluginId(null);
-    if (!result.success) toast(result.error.message, 'error');
+    try {
+      const result = await pluginRegistry.disable(plugin.manifest.id);
+      if (!result.success) toast(result.error.message, 'error');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('插件停用失败', 'Failed to disable plugin'), 'error');
+    } finally {
+      setBusyPluginId(null);
+    }
   };
 
   const removePlugin = async (plugin: InstalledPlugin, removePluginData: boolean) => {
@@ -125,12 +142,17 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
 
   const install = async () => {
     setLoading(true);
-    const result = await pluginRegistry.installFromDirectory();
-    setLoading(false);
-    if (!result.success && !result.canceled) {
-      toast(result.error?.message || t('插件安装失败', 'Plugin installation failed'), 'error');
-    } else if (result.success) {
-      toast(t('插件已安装，启用前请检查权限', 'Plugin installed; review permissions before enabling'), 'success');
+    try {
+      const result = await pluginRegistry.installFromDirectory();
+      if (!result.success && !result.canceled) {
+        toast(result.error?.message || t('插件安装失败', 'Plugin installation failed'), 'error');
+      } else if (result.success) {
+        toast(t('插件已安装，启用前请检查权限', 'Plugin installed; review permissions before enabling'), 'success');
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : t('插件安装失败', 'Plugin installation failed'), 'error');
+    } finally {
+      setLoading(false);
     }
   };
 

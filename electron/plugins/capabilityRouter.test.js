@@ -45,6 +45,12 @@ test('routes GitHub semantic reads through the Host catalog with exact permissio
   await assert.rejects(router.handle([], {
     capability: 'github', operation: 'getRepository', args: { repositoryId: 1 },
   }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  assert.deepEqual(await router.handle(['privateRepositories:read'], {
+    capability: 'github', operation: 'getRepository', args: { repositoryId: 9 },
+  }), { id: 9 });
+  assert.deepEqual(await router.handle(['privateRepositories:read'], {
+    capability: 'github', operation: 'searchRepositories', args: { query: 'private', limit: 2 },
+  }), [{ query: 'private', limit: 2 }]);
 });
 
 test('AI authorization requires an explicit permission and rejects other operations', async () => {

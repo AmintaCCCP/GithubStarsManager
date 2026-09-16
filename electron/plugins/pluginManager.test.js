@@ -345,6 +345,34 @@ test('never leaves an active Worker when a plugin is disabled during activation'
   assert.equal((await manager.list()).plugins[0].status, 'disabled');
 });
 
+test('serializes overlapping enable and disable so a later disable wins', async (t) => {
+  const root = createWorkspace(t);
+  const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);
+  t.after(() => fs.rmSync(statePath, { force: true }));
+  writePlugin(root, 'overlap', validManifest('com.example.overlap'), { 'worker.js': '' });
+  const events = [];
+  let releaseDisable;
+  const gate = new Promise((resolve) => { releaseDisable = resolve; });
+  const manager = createPluginManager({
+    pluginsRoot: root,
+    statePath,
+    runtimeFactory: () => ({
+      async activate() { events.push('activate'); },
+      async deactivate() { events.push('deactivate-start'); await gate; events.push('deactivate-end'); },
+      terminate() { events.push('terminate'); },
+    }),
+  });
+
+  assert.deepEqual(await manager.enable('com.example.overlap', []), { success: true });
+  const disabling = manager.disable('com.example.overlap');
+  const reenabled = manager.enable('com.example.overlap', []);
+  releaseDisable();
+  assert.deepEqual(await disabling, { success: true });
+  assert.deepEqual(await reenabled, { success: true });
+  assert.deepEqual(events, ['activate', 'deactivate-start', 'deactivate-end', 'activate']);
+  assert.equal((await manager.list()).plugins[0].status, 'active');
+});
+
 test('restores enabled plugins and disables them when permissions change', async (t) => {
   const root = createWorkspace(t);
   const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);

@@ -44,3 +44,30 @@ test('streams an approved GitHub asset to the user-selected path', async (t) => 
   assert.deepEqual(result, { success: true, fileName: 'setup.exe', bytes: 5 });
   assert.equal(fs.readFileSync(destination, 'utf8'), 'hello');
 });
+
+test('replaces an existing destination file without a pre-delete race', async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-download-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const destination = path.join(directory, 'setup.exe');
+  fs.writeFileSync(destination, 'stale');
+
+  const result = await downloadReleaseAsset({
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      url: 'https://release-assets.githubusercontent.com/file',
+      body: new Blob(['fresh']).stream(),
+    }),
+    showSaveDialog: async () => ({ canceled: false, filePath: destination }),
+    ownerWindow: null,
+    release: { repository: { full_name: 'owner/repository' }, tag_name: 'v1.0.0' },
+    asset: {
+      name: 'setup.exe',
+      size: 5,
+      browser_download_url: 'https://github.com/owner/repository/releases/download/v1.0.0/setup.exe',
+    },
+  });
+
+  assert.deepEqual(result, { success: true, fileName: 'setup.exe', bytes: 5 });
+  assert.equal(fs.readFileSync(destination, 'utf8'), 'fresh');
+});

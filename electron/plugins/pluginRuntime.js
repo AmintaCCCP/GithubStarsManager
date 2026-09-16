@@ -25,6 +25,7 @@ function createPluginRuntime({
   let worker = null;
   let nextRequestId = 1;
   let readyPromise = null;
+  let startupTimer = null;
   const pending = new Map();
 
   function rejectPending(error) {
@@ -35,7 +36,13 @@ function createPluginRuntime({
     pending.clear();
   }
 
+  function clearStartupTimer(timer) {
+    if (timer) clearTimeout(timer);
+    if (startupTimer === timer) startupTimer = null;
+  }
+
   function terminate(error) {
+    clearStartupTimer(startupTimer);
     const current = worker;
     worker = null;
     readyPromise = null;
@@ -55,10 +62,12 @@ function createPluginRuntime({
     worker = runtimeWorker;
     readyPromise = new Promise((resolve, reject) => {
       const startupTimeout = setTimeout(() => {
+        if (worker !== runtimeWorker) return;
         const error = protocolError('PLUGIN_RUNTIME_TIMEOUT', 'Plugin runtime did not start in time');
         reject(error);
         terminate(error);
       }, timeoutMs);
+      startupTimer = startupTimeout;
 
       runtimeWorker.on('message', (message) => {
         if (worker !== runtimeWorker) return;
@@ -87,12 +96,12 @@ function createPluginRuntime({
           return;
         }
         if (message?.type === 'ready') {
-          clearTimeout(startupTimeout);
+          clearStartupTimer(startupTimeout);
           resolve();
           return;
         }
         if (message?.type === 'startup-error') {
-          clearTimeout(startupTimeout);
+          clearStartupTimer(startupTimeout);
           const error = protocolError(message.error?.code || 'PLUGIN_RUNTIME_ERROR', message.error?.message || 'Plugin failed to load');
           reject(error);
           terminate(error);
@@ -110,15 +119,15 @@ function createPluginRuntime({
         }
       });
       runtimeWorker.on('error', (cause) => {
+        clearStartupTimer(startupTimeout);
         if (worker !== runtimeWorker) return;
-        clearTimeout(startupTimeout);
         const error = protocolError('PLUGIN_RUNTIME_ERROR', cause.message || 'Plugin worker failed');
         reject(error);
         terminate(error);
       });
       runtimeWorker.on('exit', (code) => {
+        clearStartupTimer(startupTimeout);
         if (worker !== runtimeWorker) return;
-        clearTimeout(startupTimeout);
         const error = protocolError('PLUGIN_RUNTIME_EXITED', `Plugin worker exited with code ${code}`);
         reject(error);
         terminate(error);

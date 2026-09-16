@@ -10,12 +10,21 @@ const MAX_STORAGE_VALUE_BYTES = 64 * 1024;
 const MAX_PLUGIN_STORAGE_BYTES = 1024 * 1024;
 const PLUGIN_ID_RE = /^[a-z0-9]+(?:[.-][a-z0-9]+)+$/;
 
+const FORBIDDEN_STORAGE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
 function cloneJson(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function emptyStore() {
+  return Object.create(null);
+}
+
 function validateKey(key) {
   if (typeof key !== 'string' || key.length === 0 || key.length > MAX_STORAGE_KEY_LENGTH) {
+    throw protocolError('PLUGIN_STORAGE_KEY_INVALID', 'Plugin storage key is invalid');
+  }
+  if (FORBIDDEN_STORAGE_KEYS.has(key)) {
     throw protocolError('PLUGIN_STORAGE_KEY_INVALID', 'Plugin storage key is invalid');
   }
 }
@@ -35,11 +44,12 @@ function createPluginStorage({ dataRoot, pluginId }) {
     try {
       serialized = fs.readFileSync(dataPath, 'utf8');
     } catch (error) {
-      if (error?.code === 'ENOENT') return {};
+      if (error?.code === 'ENOENT') return emptyStore();
       throw error;
     }
     const value = JSON.parse(serialized);
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return emptyStore();
+    return Object.assign(emptyStore(), value);
   }
 
   function save(value) {
@@ -65,7 +75,8 @@ function createPluginStorage({ dataRoot, pluginId }) {
   return {
     get(key) {
       validateKey(key);
-      const value = load()[key];
+      const stored = load();
+      const value = Object.prototype.hasOwnProperty.call(stored, key) ? stored[key] : undefined;
       return value === undefined ? null : cloneJson(value);
     },
     set(key, value) {
