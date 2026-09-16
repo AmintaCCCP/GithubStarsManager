@@ -90,6 +90,7 @@ const baseStoreState = () => ({
   forkIsRefreshing: false,
   setForkSearchQuery: vi.fn(),
   setForkIsRefreshing: vi.fn(),
+  setUser: vi.fn(),
 });
 
 describe('ForkTimeline owner filtering', () => {
@@ -113,6 +114,9 @@ describe('ForkTimeline owner filtering', () => {
     storeState.setForkIsRefreshing = vi.fn((refreshing: boolean) => {
       storeState.forkIsRefreshing = refreshing;
     });
+    storeState.setUser = vi.fn((user: typeof storeState.user) => {
+      storeState.user = user;
+    });
     MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockResolvedValue([
         {
@@ -125,6 +129,7 @@ describe('ForkTimeline owner filtering', () => {
       ]),
       getUserForks: vi.fn().mockResolvedValue([personalFork, orgFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
+      getCurrentUser: vi.fn().mockResolvedValue(storeState.user),
       checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
       getRepositoryWorkflows: vi.fn().mockResolvedValue([]),
       getBranches: vi.fn().mockResolvedValue(['main']),
@@ -171,6 +176,70 @@ describe('ForkTimeline owner filtering', () => {
     });
   });
 
+  it('keeps personal forks when the cached GitHub login is stale after a rename', async () => {
+    const renamedFork = createFork(3, 'twdlight', 'zsh-autocomplete');
+    storeState.user = {
+      ...storeState.user,
+      login: 'TowardLights',
+      name: 'TowardLights',
+    };
+    storeState.forks = [];
+    const getCurrentUser = vi.fn().mockResolvedValue({
+      id: 1,
+      login: 'twdlight',
+      name: 'Twdlight',
+      avatar_url: 'https://github.com/twdlight.png',
+      email: null,
+    });
+    MockGitHubApiService.mockImplementation(function () { return {
+      getUserOrganizations: vi.fn().mockResolvedValue([]),
+      getUserForks: vi.fn().mockResolvedValue([renamedFork]),
+      getOrganizationForks: vi.fn().mockResolvedValue([]),
+      getCurrentUser,
+      checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
+    } as unknown as GitHubApiService; });
+
+    const { rerender } = render(<ForkTimeline />);
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+
+    await waitFor(() => {
+      expect(storeState.forks).toHaveLength(1);
+    });
+    expect(storeState.forks[0]).toMatchObject({
+      full_name: 'twdlight/zsh-autocomplete',
+      owner: { login: 'twdlight' },
+    });
+    await waitFor(() => {
+      expect(getCurrentUser).toHaveBeenCalledOnce();
+      expect(storeState.setUser).toHaveBeenCalledWith(expect.objectContaining({ login: 'twdlight' }));
+    });
+    rerender(<ForkTimeline />);
+    expect(await screen.findByText('zsh-autocomplete')).toBeInTheDocument();
+  });
+
+  it('matches personal forks case-insensitively without treating them as a rename', async () => {
+    const casedFork = createFork(1, 'Tamina', 'personal-fork');
+    storeState.forks = [];
+    const getCurrentUser = vi.fn();
+    MockGitHubApiService.mockImplementation(function () { return {
+      getUserOrganizations: vi.fn().mockResolvedValue([]),
+      getUserForks: vi.fn().mockResolvedValue([casedFork, orgFork]),
+      getOrganizationForks: vi.fn().mockResolvedValue([]),
+      getCurrentUser,
+      checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
+    } as unknown as GitHubApiService; });
+
+    render(<ForkTimeline />);
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+
+    await waitFor(() => {
+      expect(storeState.forks).toHaveLength(1);
+    });
+    expect(storeState.forks[0].owner.login).toBe('Tamina');
+    expect(getCurrentUser).not.toHaveBeenCalled();
+    expect(storeState.setUser).not.toHaveBeenCalled();
+  });
+
   it('warns when organization owners cannot be loaded', async () => {
     MockGitHubApiService.mockImplementation(function () { return {
       getUserOrganizations: vi.fn().mockRejectedValue(new Error('missing scope')),
@@ -207,6 +276,7 @@ describe('ForkTimeline async session and sync contracts', () => {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks: vi.fn().mockResolvedValue([personalFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([]),
+      getCurrentUser: vi.fn().mockResolvedValue(storeState.user),
       checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
       getRepositoryWorkflows: vi.fn().mockResolvedValue([]),
       getBranches: vi.fn().mockResolvedValue(['main']),
@@ -297,6 +367,7 @@ describe('ForkTimeline branch request ordering', () => {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks: vi.fn().mockResolvedValue([personalFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
+      getCurrentUser: vi.fn().mockResolvedValue(storeState.user),
       checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: false }),
     } as unknown as GitHubApiService; });
   });
@@ -316,6 +387,7 @@ describe('ForkTimeline branch request ordering', () => {
       getUserOrganizations: vi.fn().mockResolvedValue([]),
       getUserForks: vi.fn().mockResolvedValue([personalFork]),
       getOrganizationForks: vi.fn().mockResolvedValue([orgFork]),
+      getCurrentUser: vi.fn().mockResolvedValue(storeState.user),
       checkForkSyncNeeded,
       getBranches,
     } as unknown as GitHubApiService; });

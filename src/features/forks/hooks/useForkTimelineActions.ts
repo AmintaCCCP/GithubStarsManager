@@ -17,6 +17,12 @@ interface SyncModalState {
   full_name: string;
 }
 
+const isSameGitHubLogin = (left?: string | null, right?: string | null): boolean =>
+  Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+
+const matchesOwnerLogins = (login: string, owners: Iterable<string>): boolean =>
+  [...owners].some(owner => isSameGitHubLogin(login, owner));
+
 /** Owns ForkTimeline's remote GitHub workflows while the view remains presentational. */
 export const useForkTimelineActions = () => {
   const state = useAppStore(useShallow(selectForkTimelineState));
@@ -52,7 +58,7 @@ export const useForkTimelineActions = () => {
     setLoadedForkOwners(new Set());
   }, [personalOwnerLogin]);
 
-  const authSessionIdentity = `${state.githubToken ?? ''}\u0000${state.user?.id ?? ''}\u0000${state.user?.login ?? ''}`;
+  const authSessionIdentity = `${state.githubToken ?? ''}\u0000${state.user?.id ?? ''}`;
   const { captureSession, isCurrentSession } = useAuthSessionGeneration(authSessionIdentity);
   useEffect(() => {
     if (refreshRequestRef.current && !isCurrentSession(refreshRequestRef.current.session)) {
@@ -95,14 +101,14 @@ export const useForkTimelineActions = () => {
   }, [state.githubToken, state.language, personalOwnerLogin, toast]);
 
   const ownerForks = useMemo(() => activeForkOwner
-    ? state.forks.filter(fork => fork.fork === true && fork.owner.login === activeForkOwner)
+    ? state.forks.filter(fork => fork.fork === true && isSameGitHubLogin(fork.owner.login, activeForkOwner))
     : [], [state.forks, activeForkOwner]);
   const forkOwnerOptions = useMemo(() => {
     const options = new Map<string, { id: string; login: string; isPersonal: boolean }>();
     if (personalOwnerLogin) options.set(personalOwnerLogin, { id: `user-${personalOwnerLogin}`, login: personalOwnerLogin, isPersonal: true });
     organizations.forEach(org => options.set(org.login, { id: `org-${org.id}`, login: org.login, isPersonal: false }));
     state.forks.forEach(fork => {
-      if (fork.fork && fork.owner.login !== personalOwnerLogin && !options.has(fork.owner.login)) {
+      if (fork.fork && !isSameGitHubLogin(fork.owner.login, personalOwnerLogin) && !options.has(fork.owner.login)) {
         options.set(fork.owner.login, { id: `cached-${fork.owner.login}`, login: fork.owner.login, isPersonal: false });
       }
     });
@@ -153,10 +159,27 @@ export const useForkTimelineActions = () => {
     state.setForkIsRefreshing(true);
     try {
       const api = new GitHubApiService(state.githubToken);
-      const fetchedForks = ownerLogin === personalOwnerLogin ? await api.getUserForks() : await api.getOrganizationForks(ownerLogin);
+      const isPersonalOwner = isSameGitHubLogin(ownerLogin, personalOwnerLogin);
+      const fetchedForks = isPersonalOwner ? await api.getUserForks() : await api.getOrganizationForks(ownerLogin);
       if (!isCurrentSession(requestSession)) return;
-      const newForks = fetchedForks.filter(fork => fork.fork === true && fork.owner.login === ownerLogin);
-      logger.info('githubApi', 'Refresh forks completed', { owner: ownerLogin, forkCount: newForks.length, durationMs: Date.now() - startTime });
+      let resolvedOwnerLogin = ownerLogin;
+      let refreshedUser: Awaited<ReturnType<GitHubApiService['getCurrentUser']>> | null = null;
+      if (isPersonalOwner) {
+        const matchingFork = fetchedForks.find(fork => fork.fork === true && isSameGitHubLogin(fork.owner.login, ownerLogin));
+        if (matchingFork) {
+          resolvedOwnerLogin = matchingFork.owner.login;
+        } else {
+          refreshedUser = await api.getCurrentUser();
+          if (!isCurrentSession(requestSession)) return;
+          if (refreshedUser.login) resolvedOwnerLogin = refreshedUser.login;
+        }
+        if (!isSameGitHubLogin(resolvedOwnerLogin, ownerLogin)) {
+          setSelectedForkOwner(resolvedOwnerLogin);
+        }
+      }
+      const newForks = fetchedForks.filter(fork => fork.fork === true && isSameGitHubLogin(fork.owner.login, resolvedOwnerLogin));
+      const replacedOwnerLogins = new Set([ownerLogin, resolvedOwnerLogin]);
+      logger.info('githubApi', 'Refresh forks completed', { owner: resolvedOwnerLogin, forkCount: newForks.length, durationMs: Date.now() - startTime });
       let updatedForks: ForkRepo[] = [];
       let newCount = 0;
       useAppStore.setState(current => {
@@ -175,9 +198,19 @@ export const useForkTimelineActions = () => {
           }
           return { ...newFork, has_unread: existing.has_unread, upstream_updated_at: existing.upstream_updated_at || currentTime };
         });
-        return { forks: [...current.forks.filter(fork => fork.owner.login !== ownerLogin || fork.fork !== true), ...updatedForks], readForks: nextReadForks };
+        return {
+          forks: [
+            ...current.forks.filter(fork => fork.fork !== true || !matchesOwnerLogins(fork.owner.login, replacedOwnerLogins)),
+            ...updatedForks,
+          ],
+          readForks: nextReadForks,
+        };
       });
-      setLoadedForkOwners(previous => new Set(previous).add(ownerLogin));
+      setLoadedForkOwners(previous => {
+        const next = new Set(previous);
+        replacedOwnerLogins.forEach(login => next.add(login));
+        return next;
+      });
       setLastRefreshTime(new Date().toISOString());
       await Promise.all(updatedForks.map(async fork => {
         if (!fork.fork) return;
@@ -201,6 +234,19 @@ export const useForkTimelineActions = () => {
         }
       }));
       if (!isCurrentSession(requestSession)) return;
+      if (refreshedUser?.login) {
+        const storedUser = useAppStore.getState().user;
+        if (storedUser && storedUser.login !== refreshedUser.login) {
+          useAppStore.getState().setUser({
+            ...storedUser,
+            id: refreshedUser.id || storedUser.id,
+            login: refreshedUser.login,
+            name: refreshedUser.name ?? storedUser.name,
+            avatar_url: refreshedUser.avatar_url || storedUser.avatar_url,
+            email: refreshedUser.email ?? storedUser.email,
+          });
+        }
+      }
       toast(newCount > 0 ? t(`刷新完成！发现 ${newCount} 个新Fork。`, `Refresh completed! Found ${newCount} new forks.`) : t('刷新完成！', 'Refresh completed!'), newCount > 0 ? 'success' : 'info');
     } catch (error) {
       if (!isCurrentSession(requestSession)) return;
@@ -217,7 +263,7 @@ export const useForkTimelineActions = () => {
 
   const handleForkOwnerChange = useCallback((ownerLogin: string) => {
     setSelectedForkOwner(ownerLogin);
-    const hasCachedOwnerForks = useAppStore.getState().forks.some(fork => fork.fork === true && fork.owner.login === ownerLogin);
+    const hasCachedOwnerForks = useAppStore.getState().forks.some(fork => fork.fork === true && isSameGitHubLogin(fork.owner.login, ownerLogin));
     if (!hasCachedOwnerForks && !loadedForkOwners.has(ownerLogin)) void loadForksForOwner(ownerLogin);
   }, [loadedForkOwners, loadForksForOwner]);
 
