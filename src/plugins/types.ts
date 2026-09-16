@@ -55,7 +55,7 @@ export interface PluginListResult {
 }
 
 export type PluginOperationResult =
-  | { success: true }
+  | { success: true; dataRemoved?: boolean }
   | { success: false; error: PluginError };
 
 export type PluginActionResult =
@@ -78,7 +78,7 @@ export interface ElectronPluginAPI {
   installFromDirectory: () => Promise<({ success: true; pluginId: string } | { success: false; canceled?: boolean; error?: PluginError })>;
   enable: (pluginId: string, grantedPermissions: string[]) => Promise<PluginOperationResult>;
   disable: (pluginId: string) => Promise<PluginOperationResult>;
-  uninstall: (pluginId: string) => Promise<PluginOperationResult>;
+  uninstall: (pluginId: string, removePluginData?: boolean) => Promise<PluginOperationResult>;
   runAction: (request: RunPluginActionRequest) => Promise<RunPluginActionResult>;
   runProcessor: (request: {
     pluginId: string;

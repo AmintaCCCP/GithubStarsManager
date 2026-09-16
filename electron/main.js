@@ -893,8 +893,8 @@ ipcMain.handle('plugins:enable', async (_event, pluginId, grantedPermissions) =>
 ipcMain.handle('plugins:disable', async (_event, pluginId) =>
   getPluginManager().disable(pluginId)
 );
-ipcMain.handle('plugins:uninstall', async (_event, pluginId) =>
-  getPluginManager().uninstall(pluginId)
+ipcMain.handle('plugins:uninstall', async (_event, pluginId, removePluginData) =>
+  getPluginManager().uninstall(pluginId, removePluginData)
 );
 ipcMain.handle('plugins:runAction', async (_event, request) => {
   const operation = await getPluginManager().runAction(request);

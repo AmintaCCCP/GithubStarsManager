@@ -32,7 +32,7 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     installFromDirectory: () => ipcRenderer.invoke('plugins:installFromDirectory'),
     enable: (pluginId, grantedPermissions) => ipcRenderer.invoke('plugins:enable', pluginId, grantedPermissions),
     disable: (pluginId) => ipcRenderer.invoke('plugins:disable', pluginId),
-    uninstall: (pluginId) => ipcRenderer.invoke('plugins:uninstall', pluginId),
+    uninstall: (pluginId, removePluginData) => ipcRenderer.invoke('plugins:uninstall', pluginId, removePluginData),
     runAction: (request) => ipcRenderer.invoke('plugins:runAction', request),
     runProcessor: (request) => ipcRenderer.invoke('plugins:runProcessor', request),
     pushSnapshot: (snapshot) => ipcRenderer.invoke('plugins:pushSnapshot', snapshot),

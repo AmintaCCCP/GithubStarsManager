@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { MAX_STORAGE_VALUE_BYTES, createPluginStorage } = require('./pluginStorage');
+const { MAX_STORAGE_VALUE_BYTES, createPluginStorage, removePluginStorage } = require('./pluginStorage');
 
 test('isolates JSON storage by plugin id and returns cloned values', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-data-'));
@@ -48,4 +48,18 @@ test('reports damaged storage instead of overwriting it', (t) => {
   assert.throws(() => storage.get('settings'), SyntaxError);
   assert.throws(() => storage.set('settings', true), SyntaxError);
   assert.equal(fs.readFileSync(dataPath, 'utf8'), '{damaged');
+});
+
+test('removePluginStorage deletes the isolated file and leftover temporary files', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-data-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const storage = createPluginStorage({ dataRoot: root, pluginId: 'com.example.removed' });
+  storage.set('settings', { enabled: true });
+  const leftover = path.join(root, `com.example.removed.json.${process.pid}.tmp`);
+  fs.writeFileSync(leftover, '{}');
+
+  assert.equal(removePluginStorage({ dataRoot: root, pluginId: 'com.example.removed' }), true);
+  assert.equal(fs.existsSync(path.join(root, 'com.example.removed.json')), false);
+  assert.equal(fs.existsSync(leftover), false);
+  assert.equal(removePluginStorage({ dataRoot: root, pluginId: 'com.example.removed' }), true);
 });

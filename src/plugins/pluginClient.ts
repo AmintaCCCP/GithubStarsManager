@@ -37,8 +37,8 @@ export const pluginClient = {
   async disable(pluginId: string): Promise<PluginOperationResult> {
     return api()?.disable(pluginId) ?? unavailable();
   },
-  async uninstall(pluginId: string): Promise<PluginOperationResult> {
-    return api()?.uninstall(pluginId) ?? unavailable();
+  async uninstall(pluginId: string, removePluginData?: boolean): Promise<PluginOperationResult> {
+    return api()?.uninstall(pluginId, removePluginData) ?? unavailable();
   },
   async runAction(request: RunPluginActionRequest): Promise<RunPluginActionResult> {
     return api()?.runAction(request) ?? unavailableAction();

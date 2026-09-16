@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 
-const { createPluginLogger } = require('./pluginLogger');
+const { createPluginLogger, removePluginLogs } = require('./pluginLogger');
 
 test('redacts tokens and sensitive metadata from plugin logs', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-logs-'));
@@ -21,4 +21,17 @@ test('redacts tokens and sensitive metadata from plugin logs', (t) => {
   assert.equal(text.includes('secret-key'), false);
   assert.equal(text.includes('secret-token'), false);
   assert.equal(text.includes('visible'), true);
+});
+
+test('removePluginLogs deletes the current and rotated log files', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-plugin-logs-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const logger = createPluginLogger({ logsRoot: root, pluginId: 'com.example.logger' });
+  logger.log('info', 'keep', {});
+  fs.writeFileSync(path.join(root, 'com.example.logger.log.1'), 'rotated');
+
+  assert.equal(removePluginLogs({ logsRoot: root, pluginId: 'com.example.logger' }), true);
+  assert.equal(fs.existsSync(path.join(root, 'com.example.logger.log')), false);
+  assert.equal(fs.existsSync(path.join(root, 'com.example.logger.log.1')), false);
+  assert.equal(removePluginLogs({ logsRoot: root, pluginId: 'com.example.logger' }), true);
 });

@@ -11,8 +11,8 @@ const {
   validateRunReleaseProcessorRequest,
 } = require('./pluginProtocol');
 const { createPluginStateStore } = require('./pluginState');
-const { createPluginStorage } = require('./pluginStorage');
-const { createPluginLogger, sanitizeText } = require('./pluginLogger');
+const { createPluginStorage, removePluginStorage } = require('./pluginStorage');
+const { createPluginLogger, removePluginLogs, sanitizeText } = require('./pluginLogger');
 const { createCapabilityRouter } = require('./capabilityRouter');
 const { createPluginCatalog } = require('./pluginCatalog');
 const { pageUrl, readPageResource } = require('./pluginPage');
@@ -218,6 +218,7 @@ function createPluginManager({
   function activatePlugin(plugin) {
     if (!plugin.manifest.main) return Promise.resolve();
     const pluginId = plugin.manifest.id;
+    if (runtimes.has(pluginId)) return Promise.resolve();
     // Concurrent requests for the same plugin share one activation, so a plugin can
     // never end up with two Worker runtimes or an activation that outlives disable().
     const inFlight = activations.get(pluginId);
@@ -537,7 +538,13 @@ function createPluginManager({
         return { success: false, error: safeError(error) };
       }
     },
-    async uninstall(pluginId) {
+    async uninstall(pluginId, removePluginData) {
+      if (removePluginData !== undefined && typeof removePluginData !== 'boolean') {
+        return {
+          success: false,
+          error: { code: 'PLUGIN_UNINSTALL_OPTIONS_INVALID', message: 'Plugin uninstall options are invalid' },
+        };
+      }
       const plugin = findPlugin(pluginId);
       if (!plugin) {
         return { success: false, error: { code: 'PLUGIN_NOT_FOUND', message: 'Plugin was not found' } };
@@ -559,10 +566,22 @@ function createPluginManager({
         delete state.plugins[pluginId];
         saveState();
         scanCache = null;
-        return { success: true };
       } catch (error) {
         return { success: false, error: safeError(error, 'PLUGIN_UNINSTALL_FAILED') };
       }
+      // The installed directory is already gone, so a data-removal failure is reported instead of
+      // being thrown: the caller can tell the user that files are still on disk.
+      let dataRemoved = false;
+      if (removePluginData) {
+        try {
+          const storageRemoved = removePluginStorage({ dataRoot: resolvedDataRoot, pluginId });
+          const logsRemoved = removePluginLogs({ logsRoot: resolvedLogsRoot, pluginId });
+          dataRemoved = storageRemoved && logsRemoved;
+        } catch {
+          dataRemoved = false;
+        }
+      }
+      return { success: true, dataRemoved };
     },
     async runAction(request) {
       let validated;
@@ -657,8 +676,14 @@ function createPluginManager({
       if (!stateFor(validated.pluginId).enabled || !runtimes.has(validated.pluginId)) {
         return { success: false, error: { code: 'PLUGIN_NOT_ACTIVE', message: 'Plugin is not active' } };
       }
+      // Update the Host snapshot before the plugin can query it, but keep a rejected snapshot from
+      // being recorded as a plugin runtime failure.
       try {
         catalog.upsert(request.repository, request.release);
+      } catch (error) {
+        return { success: false, error: safeError(error, 'PLUGIN_RELEASE_SNAPSHOT_INVALID') };
+      }
+      try {
         return {
           success: true,
           result: await runtimes.get(validated.pluginId).runReleaseProcessor({

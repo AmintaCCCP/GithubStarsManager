@@ -411,11 +411,93 @@ test('disables a plugin before uninstalling only its validated directory', async
   });
   await manager.enable('com.example.remove', []);
 
-  assert.deepEqual(await manager.uninstall('com.example.remove'), { success: true });
+  assert.deepEqual(await manager.uninstall('com.example.remove'), { success: true, dataRemoved: false });
   assert.deepEqual(events, ['activate', 'deactivate']);
   assert.equal(fs.existsSync(pluginDirectory), false);
   assert.equal(fs.readFileSync(sibling, 'utf8'), 'keep');
   assert.equal((await manager.list()).plugins.length, 0);
+});
+
+test('keeps or deletes isolated plugin storage and logs according to uninstall choice', async (t) => {
+  const workspace = createWorkspace(t);
+  const pluginsRoot = path.join(workspace, 'plugins');
+  const dataRoot = path.join(workspace, 'plugin-data');
+  const logsRoot = path.join(workspace, 'plugin-logs');
+  const statePath = path.join(workspace, 'plugins-state.json');
+  writePlugin(pluginsRoot, 'keep-data', validManifest('com.example.keep-data', { permissions: ['storage'] }), {
+    'worker.js': '',
+  });
+  writePlugin(pluginsRoot, 'wipe-data', validManifest('com.example.wipe-data', { permissions: ['storage'] }), {
+    'worker.js': '',
+  });
+  fs.mkdirSync(dataRoot, { recursive: true });
+  fs.mkdirSync(logsRoot, { recursive: true });
+  fs.writeFileSync(path.join(dataRoot, 'com.example.keep-data.json'), '{"settings":true}\n');
+  fs.writeFileSync(path.join(logsRoot, 'com.example.keep-data.log'), 'keep\n');
+  fs.writeFileSync(path.join(dataRoot, 'com.example.wipe-data.json'), '{"settings":true}\n');
+  fs.writeFileSync(path.join(logsRoot, 'com.example.wipe-data.log'), 'wipe\n');
+  fs.writeFileSync(path.join(logsRoot, 'com.example.wipe-data.log.1'), 'rotated\n');
+  const manager = createPluginManager({
+    pluginsRoot,
+    statePath,
+    dataRoot,
+    logsRoot,
+    runtimeFactory: () => createFakeRuntime([]),
+  });
+  await manager.enable('com.example.keep-data', ['storage']);
+  await manager.enable('com.example.wipe-data', ['storage']);
+
+  assert.deepEqual(await manager.uninstall('com.example.keep-data', false), { success: true, dataRemoved: false });
+  assert.equal(fs.existsSync(path.join(dataRoot, 'com.example.keep-data.json')), true);
+  assert.equal(fs.existsSync(path.join(logsRoot, 'com.example.keep-data.log')), true);
+
+  assert.deepEqual(await manager.uninstall('com.example.wipe-data', true), { success: true, dataRemoved: true });
+  assert.equal(fs.existsSync(path.join(dataRoot, 'com.example.wipe-data.json')), false);
+  assert.equal(fs.existsSync(path.join(logsRoot, 'com.example.wipe-data.log')), false);
+  assert.equal(fs.existsSync(path.join(logsRoot, 'com.example.wipe-data.log.1')), false);
+  assert.equal((await manager.uninstall('com.example.wipe-data', 'yes')).error.code, 'PLUGIN_UNINSTALL_OPTIONS_INVALID');
+});
+
+test('does not disable a plugin when a release snapshot is invalid', async (t) => {
+  const root = createWorkspace(t);
+  const statePath = path.join(root, '..', `${path.basename(root)}-state.json`);
+  t.after(() => fs.rmSync(statePath, { force: true }));
+  writePlugin(root, 'release', validManifest('com.example.release', {
+    permissions: ['releases:read'],
+    contributes: { releaseProcessors: [{ id: 'recommend', title: 'Recommend' }] },
+  }), { 'worker.js': '' });
+  const events = [];
+  const manager = createPluginManager({
+    pluginsRoot: root,
+    statePath,
+    runtimeFactory: () => createFakeRuntime(events),
+  });
+  await manager.enable('com.example.release', ['releases:read']);
+  const result = await manager.runReleaseProcessor({
+    pluginId: 'com.example.release',
+    processorId: 'recommend',
+    release: {
+      id: 20,
+      tag_name: 'v1',
+      published_at: '2026-01-01',
+      html_url: 'https://github.com/owner/project/releases/tag/v1',
+      repository: { id: 1, full_name: 'owner/project', name: 'project' },
+      assets: [{
+        id: 21,
+        name: 'app.zip',
+        size: 1,
+        download_count: 0,
+        browser_download_url: 'https://evil.example/app.zip',
+        content_type: 'application/zip',
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+      }],
+    },
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'PLUGIN_SNAPSHOT_INVALID');
+  assert.equal((await manager.list()).plugins[0].status, 'active');
+  assert.deepEqual(events, ['activate']);
 });
 
 test('runs declared processors and exporters for active plugins', async (t) => {

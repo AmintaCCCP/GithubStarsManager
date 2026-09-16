@@ -20,11 +20,15 @@ function validateKey(key) {
   }
 }
 
-function createPluginStorage({ dataRoot, pluginId }) {
+function storageDataPath(dataRoot, pluginId) {
   if (typeof dataRoot !== 'string' || !PLUGIN_ID_RE.test(pluginId)) {
     throw new TypeError('Plugin storage requires a data root and valid plugin id');
   }
-  const dataPath = path.join(path.resolve(dataRoot), `${pluginId}.json`);
+  return path.join(path.resolve(dataRoot), `${pluginId}.json`);
+}
+
+function createPluginStorage({ dataRoot, pluginId }) {
+  const dataPath = storageDataPath(dataRoot, pluginId);
 
   function load() {
     let serialized;
@@ -92,9 +96,34 @@ function createPluginStorage({ dataRoot, pluginId }) {
   };
 }
 
+/**
+ * Deletes the isolated storage file of an uninstalled plugin and any leftover temporary file.
+ * Missing files are not an error; returns false when the data could not be removed.
+ */
+function removePluginStorage({ dataRoot, pluginId }) {
+  const dataPath = storageDataPath(dataRoot, pluginId);
+  if (!fs.existsSync(dataPath)) return true;
+  try {
+    fs.rmSync(dataPath, { force: true });
+  } catch {
+    return false;
+  }
+  const directory = path.dirname(dataPath);
+  const prefix = `${path.basename(dataPath)}.`;
+  try {
+    for (const entry of fs.readdirSync(directory)) {
+      if (entry.startsWith(prefix) && entry.endsWith('.tmp')) {
+        try { fs.rmSync(path.join(directory, entry), { force: true }); } catch { /* Leftovers are not fatal. */ }
+      }
+    }
+  } catch { /* The data file is already gone; a missing directory is fine. */ }
+  return true;
+}
+
 module.exports = {
   MAX_PLUGIN_STORAGE_BYTES,
   MAX_STORAGE_KEY_LENGTH,
   MAX_STORAGE_VALUE_BYTES,
   createPluginStorage,
+  removePluginStorage,
 };

@@ -50,4 +50,25 @@ function createPluginLogger({ logsRoot, pluginId }) {
   };
 }
 
-module.exports = { MAX_LOG_BYTES, createPluginLogger, sanitizeMetadata, sanitizeText };
+/**
+ * Deletes the log file and its rotated copy of an uninstalled plugin.
+ * Missing files are not an error; returns false when a file could not be removed.
+ */
+function removePluginLogs({ logsRoot, pluginId }) {
+  if (typeof logsRoot !== 'string' || !/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/.test(pluginId)) {
+    throw new TypeError('Plugin logs require a logs root and valid plugin id');
+  }
+  const logPath = path.join(path.resolve(logsRoot), `${pluginId}.log`);
+  let removed = true;
+  for (const target of [logPath, `${logPath}.1`]) {
+    if (!fs.existsSync(target)) continue;
+    try {
+      fs.rmSync(target, { force: true });
+    } catch {
+      removed = false;
+    }
+  }
+  return removed;
+}
+
+module.exports = { MAX_LOG_BYTES, createPluginLogger, removePluginLogs, sanitizeMetadata, sanitizeText };

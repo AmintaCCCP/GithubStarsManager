@@ -7,6 +7,16 @@ import { PluginPageViewer } from '../PluginPageViewer';
 import type { InstalledPlugin } from '../../plugins/types';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 interface PluginSettingsPanelProps {
   t: (zh: string, en: string) => string;
@@ -22,6 +32,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   const [loading, setLoading] = useState(true);
   const [busyPluginId, setBusyPluginId] = useState<string | null>(null);
   const [selectedPage, setSelectedPage] = useState<{ pluginId: string; pageId: string } | null>(null);
+  const [uninstallTarget, setUninstallTarget] = useState<InstalledPlugin | null>(null);
   const [searchEndpoint, setSearchEndpoint] = useState('');
 
   const refresh = async () => {
@@ -56,12 +67,19 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     const permissionText = permissions.length > 0
       ? permissions.map((permission) => `• ${permission}`).join('\n')
       : t('无额外 Host 权限', 'No additional Host permissions');
+    const repositoryDataNotice = permissions.some((permission) =>
+      permission === 'repositories:read' || permission === 'privateRepositories:read')
+      ? t(
+        '\n\n注意：仓库读取权限会包含你已收藏的私有仓库元数据。',
+        '\n\nNote: repository read access includes metadata of your private starred repositories.'
+      )
+      : '';
     const approved = await confirm(
       t(`启用 ${plugin.manifest.name}`, `Enable ${plugin.manifest.name}`),
       `${t(
         '带 worker.js 的本地插件拥有 Node.js 权限，Worker 不是安全沙箱。仅启用你信任的代码。',
         'Local plugins with worker.js have Node.js access; a Worker is not a security sandbox. Enable only code you trust.'
-      )}\n\n${t('请求权限：', 'Requested permissions:')}\n${permissionText}`,
+      )}\n\n${t('请求权限：', 'Requested permissions:')}\n${permissionText}${repositoryDataNotice}`,
       { confirmText: t('确认并启用', 'Confirm and enable'), type: 'warning' }
     );
     if (!approved) return;
@@ -80,22 +98,22 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     if (!result.success) toast(result.error.message, 'error');
   };
 
-  const uninstall = async (plugin: InstalledPlugin) => {
-    const approved = await confirm(
-      t('卸载插件', 'Uninstall plugin'),
-      t(
-        `将删除插件“${plugin.manifest.name}”的安装目录。插件数据暂时保留。是否继续？`,
-        `The installed directory for “${plugin.manifest.name}” will be deleted. Plugin data is retained. Continue?`
-      ),
-      { confirmText: t('卸载', 'Uninstall'), type: 'danger' }
-    );
-    if (!approved) return;
-
+  const removePlugin = async (plugin: InstalledPlugin, removePluginData: boolean) => {
+    setUninstallTarget(null);
     setBusyPluginId(plugin.manifest.id);
-    const result = await pluginRegistry.uninstall(plugin.manifest.id);
+    const result = await pluginRegistry.uninstall(plugin.manifest.id, removePluginData);
     setBusyPluginId(null);
-    if (!result.success) toast(result.error.message, 'error');
-    else toast(t('插件已卸载', 'Plugin uninstalled'), 'success');
+    if (!result.success) {
+      toast(result.error.message, 'error');
+      return;
+    }
+    if (removePluginData && result.dataRemoved === false) {
+      toast(t('插件已卸载，但部分数据未能删除', 'Plugin uninstalled, but some data could not be deleted'), 'warning');
+      return;
+    }
+    toast(removePluginData
+      ? t('插件已卸载，数据已删除', 'Plugin uninstalled and its data was deleted')
+      : t('插件已卸载，数据已保留', 'Plugin uninstalled; its data was kept'), 'success');
   };
 
   const install = async () => {
@@ -252,7 +270,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                       variant="ghost"
                       size="icon"
                       disabled={busy}
-                      onClick={() => void uninstall(plugin)}
+                      onClick={() => setUninstallTarget(plugin)}
                       aria-label={t(`卸载 ${plugin.manifest.name}`, `Uninstall ${plugin.manifest.name}`)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -276,6 +294,37 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
           ))}
         </div>
       )}
+
+      <AlertDialog open={uninstallTarget !== null} onOpenChange={(open) => { if (!open) setUninstallTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(`卸载 ${uninstallTarget?.manifest.name ?? ''}`, `Uninstall ${uninstallTarget?.manifest.name ?? ''}`)}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="whitespace-pre-wrap break-all">
+              {t(
+                '插件安装目录会被删除。请选择是否同时删除该插件的存储数据和日志。',
+                'The installed plugin directory is deleted. Choose whether to also delete this plugin’s stored data and logs.'
+              )}
+              {uninstallTarget ? `\n\n${uninstallTarget.manifest.id}` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('取消', 'Cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (uninstallTarget) void removePlugin(uninstallTarget, false); }}
+            >
+              {t('保留数据并卸载', 'Uninstall, keep data')}
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => { if (uninstallTarget) void removePlugin(uninstallTarget, true); }}
+            >
+              {t('卸载并删除数据', 'Uninstall and delete data')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

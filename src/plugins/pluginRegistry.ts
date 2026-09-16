@@ -58,8 +58,8 @@ export const pluginRegistry = {
   disable(pluginId: string): Promise<PluginOperationResult> {
     return mutate(() => pluginClient.disable(pluginId));
   },
-  uninstall(pluginId: string): Promise<PluginOperationResult> {
-    return mutate(() => pluginClient.uninstall(pluginId));
+  uninstall(pluginId: string, removePluginData?: boolean): Promise<PluginOperationResult> {
+    return mutate(() => pluginClient.uninstall(pluginId, removePluginData));
   },
   resetForTests() {
     snapshot = EMPTY_SNAPSHOT;

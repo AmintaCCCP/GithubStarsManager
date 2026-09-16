@@ -24,7 +24,28 @@ my-plugin/
 ```
 
 可以从设置页的“插件 → 安装本地插件”选择该目录。安装完成后插件默认禁用，
-用户确认 Manifest 中列出的全部权限后才会启动。
+用户确认 Manifest 中列出的全部权限后才会启动。卸载时宿主会删除插件安装目录，
+并让用户选择“保留数据并卸载”或“卸载并删除数据”；后者会删除该插件的隔离
+Storage 文件和日志。
+
+## 权限
+
+V1 接受以下权限。未实现的项可以出现在 Manifest 中，但不会提供对应 Host API：
+
+| 权限 | V1 行为 |
+|---|---|
+| `repositories:read` | 读取宿主已加载的仓库快照，**包含私有仓库元数据**。启用时设置页会单独提示。 |
+| `privateRepositories:read` | 预留。当前没有独立过滤；声明后与 `repositories:read` 一样覆盖私有仓库。 |
+| `releases:read` | 读取宿主已加载的 Release / Asset 快照。 |
+| `storage` | 按插件隔离的 JSON 存储。 |
+| `clipboard:write` | 允许 Action 建议复制文本。 |
+| `external:open` | 允许 Action 打开无凭据的 HTTPS URL。 |
+| `downloads:create` | 允许设置页显示“宿主下载”；用户仍需确认保存位置。 |
+| `ai:invoke` | 仅页面 Bridge：逐次确认后调用当前 AI Provider。Worker 不获得该方法。 |
+| `web:search` | 仅页面 Bridge：逐次确认后查询用户配置的 SearXNG。Worker 不获得该方法。 |
+| `repositories:write` | 预留，V1 不提供写入仓库的 Host API。 |
+| `gists:read` | 预留，V1 不提供 Gist 查询。 |
+| `network:<domain>` | 预留，V1.3 不提供通用网络请求。 |
 
 ## Manifest
 
@@ -102,6 +123,7 @@ const release = await context.github.getRelease(releaseId);
 ```
 
 这些查询只访问宿主内存中的脱敏快照，不会发起实时 GitHub API 请求。
+`repositories:read` 覆盖你已收藏的私有仓库元数据；V1 没有单独的私有仓库过滤。
 
 ## 返回结构
 

@@ -499,7 +499,7 @@ interface ElectronPluginApi {
   installFromDirectory(): Promise<InstallResult>;
   enable(pluginId: string): Promise<PluginOperationResult>;
   disable(pluginId: string): Promise<PluginOperationResult>;
-  uninstall(pluginId: string): Promise<PluginOperationResult>;
+  uninstall(pluginId: string, removePluginData?: boolean): Promise<PluginOperationResult>;
   runAction(request: RunPluginActionRequest): Promise<PluginActionResult>;
 }
 ```
@@ -516,7 +516,8 @@ V1 开发模式只支持从本地目录加载。正式安装流程再增加：
 - 防止 ZIP Slip、路径穿越和符号链接逃逸。
 - 插件安装目录不可由 manifest 自定义。
 - 更新后权限增加时必须重新确认。
-- 卸载前先停用并终止插件运行时。
+- 卸载前先停用并终止插件运行时。卸载时提供“保留数据”或“同时删除插件数据”
+  （隔离 Storage 与日志）的明确选择。
 
 插件商店、签名、发布者身份和自动更新属于 V2。
 
@@ -823,8 +824,10 @@ package.json
 截至 2026-09-13：
 
 - 第一轮 Manifest discovery 与 validation 已实现。
-- V1 本地插件协议已实现：安装、默认禁用、权限确认、启停、卸载、Worker 生命周期、
-  Repository Actions、Processors、Exporters、隔离 Storage 和脱敏日志。
+- V1 本地插件协议已实现：安装、默认禁用、权限确认、启停、卸载（可选删除隔离数据）、
+  Worker 生命周期、Repository Actions、Processors、Exporters、隔离 Storage 和脱敏日志。
+  `repositories:read` 覆盖已收藏的私有仓库元数据；`repositories:write` 与 `gists:read`
+  仍为预留声明。
 - V1 明确仍是受信任本地插件模型；Worker 不作为恶意代码安全边界。
 - V1.1 Release 能力已实现：Release processors、基于宿主脱敏快照的只读 `github.*`、
   用户确认后由宿主执行的 Release Asset 下载，以及 Smart Release Recommendation 示例插件。
