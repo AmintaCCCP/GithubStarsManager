@@ -1,4 +1,5 @@
 import { logger } from '../../services/logger';
+import { resetSyncHashes } from '../../services/autoSync';
 import type { AppStoreSlice } from '../types';
 import { accountIdKey, applyAccountWorkspace, captureAccountWorkspace, switchAccountWorkspace } from '../helpers/accountWorkspace';
 import { clearAuthMirror, writeAuthMirror, writeSessionBackendSecret } from '../persistence/authStorage';
@@ -45,6 +46,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions, 
           : current.accountWorkspaces;
         clearAuthMirror();
         writeSessionBackendSecret(null);
+        // Reset sync fingerprints so the next force sync (e.g. backend
+        // login restore) applies every shard even if the backend data has
+        // not changed since this session.
+        resetSyncHashes();
         set({
           user: null,
           githubToken: null,

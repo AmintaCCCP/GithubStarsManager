@@ -47,8 +47,10 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
         return;
       }
 
-      setGitHubToken(token);
-      setUser(nextUser);
+      // When a backend is available, sync the token there FIRST. Committing
+      // local credentials before the backend write would leave them out of
+      // sync if the backend call fails (the local session uses the new token
+      // while the backend still stores the old one).
       if (backend.isAvailable) {
         try {
           await backend.syncSettings({ github_token: token });
@@ -56,8 +58,8 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
           console.warn('Failed to save GitHub token to backend:', error);
           toast(
             t(
-              'Token 已更新到本机，但未能保存到后端。',
-              'Token updated locally, but saving it to the backend failed.',
+              '未能将新 Token 保存到后端，本地凭证未更新。请稍后重试。',
+              'Failed to save the new token to the backend. Local credentials were not updated. Please try again later.',
             ),
             'error',
           );
@@ -65,6 +67,8 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
           return;
         }
       }
+      setGitHubToken(token);
+      setUser(nextUser);
       setTokenInput('');
       toast(t('GitHub Token 已更新', 'GitHub token updated'), 'success');
     } catch (error) {

@@ -40,6 +40,24 @@ const _lastHash = {
   settings: '',
 };
 
+// Track the current sync-from-backend promise so force sync can wait
+let _syncPromise: Promise<void> | null = null;
+
+/**
+ * Reset all sync fingerprints. Must be called on logout so that the next
+ * force sync (e.g. backend login restore) applies every shard regardless of
+ * whether the backend data has changed since the last session.
+ */
+export function resetSyncHashes(): void {
+  _lastHash.repos = '';
+  _lastHash.releases = '';
+  _lastHash.ai = '';
+  _lastHash.webdav = '';
+  _lastHash.embedding = '';
+  _lastHash.vectorSearch = '';
+  _lastHash.settings = '';
+}
+
 function quickHash(data: unknown): string {
   return JSON.stringify(data);
 }
@@ -227,11 +245,19 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     }
     _hasPendingLocalChanges = false;
     _hasPendingPush = false;
+    // Wait for any in-flight pull to finish before starting a forced one,
+    // so the old pull's results are fully committed and we don't race.
+    if (_isSyncingFromBackendActive && _syncPromise) {
+      try { await _syncPromise; } catch { /* swallow — we'll do our own pull */ }
+    }
+    // Reset fingerprints so every shard is applied regardless of prior hash.
+    resetSyncHashes();
   }
   if (_isSyncingFromBackendActive) return;
 
   _isSyncingFromBackendActive = true;
 
+  const doSync = async () => {
   const startTime = Date.now();
   try {
     const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
@@ -244,13 +270,16 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       backend.fetchSettings(),
     ]);
 
-    const changed = { repos: false, releases: false, ai: false, webdav: false, embedding: false, vectorSearch: false, settings: false };
+    const changed = {
+      repos: false, releases: false, ai: false, webdav: false,
+      embedding: false, vectorSearch: false, settings: false,
+    };
 
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
     if (reposResult.status === 'fulfilled') {
       const hash = repositoryPayloadHash(reposResult.value.repositories);
-      if (hash !== _lastHash.repos) {
+      if (options.force || hash !== _lastHash.repos) {
         hashes.repos = hash;
         changed.repos = true;
       }
@@ -258,7 +287,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
     if (releasesResult.status === 'fulfilled') {
       const hash = quickHash(releasesResult.value.releases);
-      if (hash !== _lastHash.releases) {
+      if (options.force || hash !== _lastHash.releases) {
         hashes.releases = hash;
         changed.releases = true;
       }
@@ -266,7 +295,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
     if (aiResult.status === 'fulfilled') {
       const hash = quickHash(aiResult.value);
-      if (hash !== _lastHash.ai) {
+      if (options.force || hash !== _lastHash.ai) {
         hashes.ai = hash;
         changed.ai = true;
       }
@@ -274,7 +303,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
     if (webdavResult.status === 'fulfilled') {
       const hash = quickHash(webdavResult.value);
-      if (hash !== _lastHash.webdav) {
+      if (options.force || hash !== _lastHash.webdav) {
         hashes.webdav = hash;
         changed.webdav = true;
       }
@@ -282,7 +311,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
     if (embeddingResult.status === 'fulfilled') {
       const hash = quickHash(embeddingResult.value);
-      if (hash !== _lastHash.embedding) {
+      if (options.force || hash !== _lastHash.embedding) {
         hashes.embedding = hash;
         changed.embedding = true;
       }
@@ -290,14 +319,14 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
     if (vectorSearchResult.status === 'fulfilled') {
       const hash = vectorSearchFingerprint(vectorSearchResult.value);
-      if (hash !== _lastHash.vectorSearch) {
+      if (options.force || hash !== _lastHash.vectorSearch) {
         changed.vectorSearch = true;
       }
     }
 
     if (settingsResult.status === 'fulfilled') {
       const hash = quickHash(settingsResult.value);
-      if (hash !== _lastHash.settings) {
+      if (options.force || hash !== _lastHash.settings) {
         hashes.settings = hash;
         changed.settings = true;
       }
@@ -480,6 +509,14 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       _hasPendingPush = false;
       void syncToBackend();
     }
+  }
+  }; // end doSync
+
+  _syncPromise = doSync();
+  try {
+    await _syncPromise;
+  } finally {
+    _syncPromise = null;
   }
 }
 

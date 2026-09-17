@@ -212,6 +212,15 @@ const liveWorkspaceHasData = (state: AccountWorkspaceSource): boolean => (
   || state.starredGists.length > 0
   || state.releases.length > 0
   || state.forks.length > 0
+  // Non-default workspace settings restored from backend also count as
+  // "having data". Without this, a workspace with only category/sync
+  // settings but empty content lists would be overwritten by an empty or
+  // stale parked snapshot during setUser → switchAccountWorkspace.
+  || state.customCategories.length > 0
+  || state.categoryOrder.length > 0
+  || state.hiddenDefaultCategoryIds.length > 0
+  || Object.keys(state.defaultCategoryOverrides).length > 0
+  || Object.keys(state.categoryListIdMap).length > 0
 );
 
 export const switchAccountWorkspace = (
