@@ -206,22 +206,28 @@ export const applyAccountWorkspace = (workspace: AccountWorkspace | undefined): 
   };
 };
 
-const liveWorkspaceHasData = (state: AccountWorkspaceSource): boolean => (
-  state.repositories.length > 0
-  || state.gists.length > 0
-  || state.starredGists.length > 0
-  || state.releases.length > 0
-  || state.forks.length > 0
-  // Non-default workspace settings restored from backend also count as
-  // "having data". Without this, a workspace with only category/sync
-  // settings but empty content lists would be overwritten by an empty or
-  // stale parked snapshot during setUser → switchAccountWorkspace.
-  || state.customCategories.length > 0
-  || state.categoryOrder.length > 0
-  || state.hiddenDefaultCategoryIds.length > 0
-  || Object.keys(state.defaultCategoryOverrides).length > 0
-  || Object.keys(state.categoryListIdMap).length > 0
-);
+export type WorkspaceDataCandidate = Partial<AccountWorkspaceSource | AccountWorkspace>;
+
+/**
+ * Predicate checking whether a workspace (live or parked snapshot) holds any
+ * persisted user content or user-defined category configuration.
+ * Excludes syncMode alone, adhering to the account-switching contract.
+ */
+export const workspaceHasData = (workspace: WorkspaceDataCandidate | null | undefined): boolean => {
+  if (!workspace) return false;
+  return (
+    (workspace.repositories?.length ?? 0) > 0
+    || (workspace.gists?.length ?? 0) > 0
+    || (workspace.starredGists?.length ?? 0) > 0
+    || (workspace.releases?.length ?? 0) > 0
+    || (workspace.forks?.length ?? 0) > 0
+    || (workspace.customCategories?.length ?? 0) > 0
+    || (workspace.categoryOrder?.length ?? 0) > 0
+    || (workspace.hiddenDefaultCategoryIds?.length ?? 0) > 0
+    || Object.keys(workspace.defaultCategoryOverrides ?? {}).length > 0
+    || Object.keys(workspace.categoryListIdMap ?? {}).length > 0
+  );
+};
 
 export const switchAccountWorkspace = (
   current: AccountWorkspaceSource & { accountWorkspaces: Record<string, AccountWorkspace> },
@@ -237,7 +243,7 @@ export const switchAccountWorkspace = (
   }
   // Logged-out login: keep live lists if they already hold data (backend
   // restore wrote first). Otherwise restore a parked snapshot for this id.
-  if (!previousAccountId && liveWorkspaceHasData(current)) {
+  if (!previousAccountId && workspaceHasData(current)) {
     return { accountWorkspaces, workspace: null };
   }
   return {
@@ -245,3 +251,4 @@ export const switchAccountWorkspace = (
     workspace: applyAccountWorkspace(accountWorkspaces[nextAccountId]),
   };
 };
+

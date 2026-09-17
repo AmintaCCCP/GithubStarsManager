@@ -9,6 +9,7 @@ import {
   normalizeAccountWorkspaces,
   shouldPreserveExisting,
   switchAccountWorkspace,
+  workspaceHasData,
   type AccountWorkspace,
   type AccountWorkspaceSource,
 } from './accountWorkspace';
@@ -65,6 +66,35 @@ describe('account workspace identity', () => {
     expect(shouldPreserveExisting([], [repo(1)], true)).toBe(false);
     expect(shouldPreserveExisting([repo(2)], [repo(1)])).toBe(false);
     expect(shouldPreserveExisting(undefined, [repo(1)])).toBe(false);
+  });
+});
+
+describe('workspaceHasData predicate', () => {
+  it('returns false for null, undefined, or empty objects', () => {
+    expect(workspaceHasData(null)).toBe(false);
+    expect(workspaceHasData(undefined)).toBe(false);
+    expect(workspaceHasData({})).toBe(false);
+    expect(workspaceHasData(emptyAccountWorkspace())).toBe(false);
+  });
+
+  it('returns false when only syncMode or syncModeConfigured are set', () => {
+    expect(workspaceHasData({ syncMode: 'stars-and-lists' as const, syncModeConfigured: true })).toBe(false);
+  });
+
+  it('returns true when content lists hold items', () => {
+    expect(workspaceHasData({ repositories: [repo(1)] })).toBe(true);
+    expect(workspaceHasData({ gists: [{ id: 'g1' } as unknown as import('../../types').Gist] })).toBe(true);
+    expect(workspaceHasData({ starredGists: [{ id: 'g2' } as unknown as import('../../types').Gist] })).toBe(true);
+    expect(workspaceHasData({ releases: [{ id: 10 } as unknown as import('../../types').Release] })).toBe(true);
+    expect(workspaceHasData({ forks: [{ id: 20 } as unknown as import('../../types').ForkRepo] })).toBe(true);
+  });
+
+  it('returns true when user-defined categories or category mappings exist', () => {
+    expect(workspaceHasData({ customCategories: [{ id: 'c1', name: 'Cat', icon: '', isCustom: true, keywords: [] }] })).toBe(true);
+    expect(workspaceHasData({ categoryOrder: ['c1'] })).toBe(true);
+    expect(workspaceHasData({ hiddenDefaultCategoryIds: ['all'] })).toBe(true);
+    expect(workspaceHasData({ defaultCategoryOverrides: { all: { name: 'Everything' } } })).toBe(true);
+    expect(workspaceHasData({ categoryListIdMap: { c1: 'L1' } })).toBe(true);
   });
 });
 

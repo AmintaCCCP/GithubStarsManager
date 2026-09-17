@@ -44,6 +44,32 @@ const _lastHash = {
 let _syncPromise: Promise<void> | null = null;
 
 /**
+ * Wait for any current syncFromBackend pull to finish.
+ */
+export async function waitForInFlightSync(): Promise<void> {
+  while (_syncPromise) {
+    try {
+      await _syncPromise;
+    } catch {
+      // swallow error so waiting callers continue
+    }
+  }
+}
+
+// Drain and clean up any in-flight sync before switching backend URL
+if (typeof backend.registerBeforeInitHook === 'function') {
+  backend.registerBeforeInitHook(async () => {
+    await waitForInFlightSync();
+    _hasPendingPush = false;
+    _hasPendingLocalChanges = false;
+    if (_debounceTimer) {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = null;
+    }
+  });
+}
+
+/**
  * Reset all sync fingerprints. Must be called on logout so that the next
  * force sync (e.g. backend login restore) applies every shard regardless of
  * whether the backend data has changed since the last session.
@@ -247,9 +273,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     _hasPendingPush = false;
     // Wait for any in-flight pull to finish before starting a forced one,
     // so the old pull's results are fully committed and we don't race.
-    if (_isSyncingFromBackendActive && _syncPromise) {
-      try { await _syncPromise; } catch { /* swallow — we'll do our own pull */ }
-    }
+    await waitForInFlightSync();
     // Reset fingerprints so every shard is applied regardless of prior hash.
     resetSyncHashes();
   }
@@ -512,11 +536,14 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
   }
   }; // end doSync
 
-  _syncPromise = doSync();
+  const currentPromise = doSync();
+  _syncPromise = currentPromise;
   try {
-    await _syncPromise;
+    await currentPromise;
   } finally {
-    _syncPromise = null;
+    if (_syncPromise === currentPromise) {
+      _syncPromise = null;
+    }
   }
 }
 
@@ -633,10 +660,13 @@ export function startAutoSync(): () => void {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
-  // Reset in-flight state flags to prevent permanent sync blocking
-  _isSyncingFromBackend = false;
+  // Reset in-flight state flags to prevent permanent sync blocking,
+  // but preserve pull activity if an actual pull Promise is currently executing.
+  if (!_syncPromise) {
+    _isSyncingFromBackend = false;
+    _isSyncingFromBackendActive = false;
+  }
   _isPushingToBackend = false;
-  _isSyncingFromBackendActive = false;
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
@@ -702,10 +732,12 @@ export function stopAutoSync(unsubscribe: () => void): void {
   } else {
     unsubscribe();
   }
-  // Reset in-flight state flags
+  // Reset in-flight state flags, preserving active pull if running
   _isPushingToBackend = false;
-  _isSyncingFromBackendActive = false;
-  _isSyncingFromBackend = false;
+  if (!_syncPromise) {
+    _isSyncingFromBackendActive = false;
+    _isSyncingFromBackend = false;
+  }
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
   logger.info('sync.stop', 'Auto-sync stopped');

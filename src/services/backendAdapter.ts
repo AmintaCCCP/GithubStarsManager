@@ -50,8 +50,20 @@ const readStoredBackendUrl = (): string | null => {
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
+  private _beforeInitHook: (() => Promise<void>) | null = null;
+
+  registerBeforeInitHook(fn: () => Promise<void>): void {
+    this._beforeInitHook = fn;
+  }
 
   async init(preferredUrl?: string): Promise<void> {
+    if (this._beforeInitHook) {
+      try {
+        await this._beforeInitHook();
+      } catch {
+        // Ignore hook errors so init can proceed
+      }
+    }
     try {
       const configuredUrl = preferredUrl ? normalizeBackendUrl(preferredUrl) : readStoredBackendUrl();
       const urls = preferredUrl

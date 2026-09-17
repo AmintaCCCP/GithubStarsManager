@@ -3,10 +3,9 @@ import { AlertCircle, ArrowLeft, ArrowRight, Database, Github, Key, Link, Moon, 
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
-import type { BackendLoginResult } from '../features/lifecycle/hooks/useLoginActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
-import { accountIdKey } from '../store/helpers/accountWorkspace';
+import { accountIdKey, workspaceHasData } from '../store/helpers/accountWorkspace';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { ConfirmDialog } from './ui/ConfirmDialog';
@@ -34,12 +33,27 @@ export const LoginScreen: React.FC = () => {
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   // Ref to resolve the conflict dialog promise
   const conflictResolveRef = useRef<((overwrite: boolean) => void) | null>(null);
-  const { setUser, setGitHubToken, setBackendApiSecret, backendApiSecret, repositories, lastSync, accountWorkspaces, language, setLanguage, theme, setTheme } = useAppStore(useShallow((state) => ({
+  const {
+    setUser, setGitHubToken, setBackendApiSecret, backendApiSecret,
+    repositories, gists, starredGists, releases, forks,
+    customCategories, categoryOrder, hiddenDefaultCategoryIds,
+    defaultCategoryOverrides, categoryListIdMap,
+    lastSync, accountWorkspaces, language, setLanguage, theme, setTheme,
+  } = useAppStore(useShallow((state) => ({
     setUser: state.setUser,
     setGitHubToken: state.setGitHubToken,
     setBackendApiSecret: state.setBackendApiSecret,
     backendApiSecret: state.backendApiSecret,
     repositories: state.repositories,
+    gists: state.gists,
+    starredGists: state.starredGists,
+    releases: state.releases,
+    forks: state.forks,
+    customCategories: state.customCategories,
+    categoryOrder: state.categoryOrder,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    categoryListIdMap: state.categoryListIdMap,
     lastSync: state.lastSync,
     accountWorkspaces: state.accountWorkspaces,
     language: state.language,
@@ -145,13 +159,24 @@ export const LoginScreen: React.FC = () => {
       }
 
       // Backend, auth, and stored token are all proven. Before syncing data,
-      // check whether the local client already has data for this account and
-      // the backend also has data. If both sides have data, ask the user
-      // whether to overwrite the local copy.
+      // check whether the local client already has data for this account (in
+      // current live workspace or parked workspace). If so, ask the user
+      // whether to overwrite local data with backend data.
       const nextAccountId = accountIdKey(result.user);
       const parkedWorkspace = nextAccountId ? accountWorkspaces[nextAccountId] : undefined;
-      const localHasData = repositories.length > 0
-        || (parkedWorkspace && parkedWorkspace.repositories.length > 0);
+      const currentWorkspace = {
+        repositories,
+        gists,
+        starredGists,
+        releases,
+        forks,
+        customCategories,
+        categoryOrder,
+        hiddenDefaultCategoryIds,
+        defaultCategoryOverrides,
+        categoryListIdMap,
+      };
+      const localHasData = workspaceHasData(currentWorkspace) || workspaceHasData(parkedWorkspace);
 
       if (localHasData) {
         // Show conflict dialog and wait for user decision
