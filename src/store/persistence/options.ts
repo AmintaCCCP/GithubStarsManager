@@ -22,13 +22,14 @@ import { debouncedPersistStorage } from './storage';
 
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
   name: 'github-stars-manager',
-  version: 15,
+  version: 16,
   storage: debouncedPersistStorage as PersistStorage<PersistedAppState>,
 partialize: (state) => ({
   // 持久化用户信息和认证状态
   user: state.user,
   githubToken: state.githubToken,
   isAuthenticated: state.isAuthenticated,
+  accountWorkspaces: state.accountWorkspaces,
 
   // 持久化仓库数据
   repositories: state.repositories,
@@ -387,6 +388,16 @@ stateRecord.vectorSearchConfig,
 stateRecord.embeddingConfigs
 );
 stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
+    }
+
+  // v15→v16: per-GitHub-id workspace snapshots so logout does not wipe local data
+  if (state) {
+    const stateRecord = state as Record<string, unknown>;
+    if (typeof stateRecord.accountWorkspaces !== 'object'
+      || stateRecord.accountWorkspaces === null
+      || Array.isArray(stateRecord.accountWorkspaces)) {
+      stateRecord.accountWorkspaces = {};
+    }
   }
 
   return state as PersistedAppState;

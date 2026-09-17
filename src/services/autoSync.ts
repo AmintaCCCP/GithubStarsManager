@@ -40,6 +40,50 @@ const _lastHash = {
   settings: '',
 };
 
+// Track the current sync-from-backend promise so force sync can wait
+let _syncPromise: Promise<void> | null = null;
+
+/**
+ * Wait for any current syncFromBackend pull to finish.
+ */
+export async function waitForInFlightSync(): Promise<void> {
+  while (_syncPromise) {
+    try {
+      await _syncPromise;
+    } catch {
+      // swallow error so waiting callers continue
+    }
+  }
+}
+
+// Drain and clean up any in-flight sync before switching backend URL
+if (typeof backend.registerBeforeInitHook === 'function') {
+  backend.registerBeforeInitHook(async () => {
+    await waitForInFlightSync();
+    _hasPendingPush = false;
+    _hasPendingLocalChanges = false;
+    if (_debounceTimer) {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = null;
+    }
+  });
+}
+
+/**
+ * Reset all sync fingerprints. Must be called on logout so that the next
+ * force sync (e.g. backend login restore) applies every shard regardless of
+ * whether the backend data has changed since the last session.
+ */
+export function resetSyncHashes(): void {
+  _lastHash.repos = '';
+  _lastHash.releases = '';
+  _lastHash.ai = '';
+  _lastHash.webdav = '';
+  _lastHash.embedding = '';
+  _lastHash.vectorSearch = '';
+  _lastHash.settings = '';
+}
+
 function quickHash(data: unknown): string {
   return JSON.stringify(data);
 }
@@ -210,19 +254,34 @@ export async function syncLocalGitHubTokenToBackend(
  * Backend-first strategy: backend data overwrites local data.
  * Silent: errors logged to console only.
  */
-export async function syncFromBackend(): Promise<void> {
-  if (
-    !backend.isAvailable ||
+export async function syncFromBackend(options: { force?: boolean } = {}): Promise<void> {
+  if (!backend.isAvailable) return;
+  if (!options.force && (
     _isSyncingFromBackendActive ||
     _isPushingToBackend ||
     _hasPendingLocalChanges ||
     _debounceTimer
-  ) {
+  )) {
     return;
   }
+  if (options.force) {
+    if (_debounceTimer) {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = null;
+    }
+    _hasPendingLocalChanges = false;
+    _hasPendingPush = false;
+    // Wait for any in-flight pull to finish before starting a forced one,
+    // so the old pull's results are fully committed and we don't race.
+    await waitForInFlightSync();
+    // Reset fingerprints so every shard is applied regardless of prior hash.
+    resetSyncHashes();
+  }
+  if (_isSyncingFromBackendActive) return;
 
   _isSyncingFromBackendActive = true;
 
+  const doSync = async () => {
   const startTime = Date.now();
   try {
     const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
@@ -235,13 +294,16 @@ export async function syncFromBackend(): Promise<void> {
       backend.fetchSettings(),
     ]);
 
-    const changed = { repos: false, releases: false, ai: false, webdav: false, embedding: false, vectorSearch: false, settings: false };
+    const changed = {
+      repos: false, releases: false, ai: false, webdav: false,
+      embedding: false, vectorSearch: false, settings: false,
+    };
 
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
     if (reposResult.status === 'fulfilled') {
       const hash = repositoryPayloadHash(reposResult.value.repositories);
-      if (hash !== _lastHash.repos) {
+      if (options.force || hash !== _lastHash.repos) {
         hashes.repos = hash;
         changed.repos = true;
       }
@@ -249,7 +311,7 @@ export async function syncFromBackend(): Promise<void> {
 
     if (releasesResult.status === 'fulfilled') {
       const hash = quickHash(releasesResult.value.releases);
-      if (hash !== _lastHash.releases) {
+      if (options.force || hash !== _lastHash.releases) {
         hashes.releases = hash;
         changed.releases = true;
       }
@@ -257,7 +319,7 @@ export async function syncFromBackend(): Promise<void> {
 
     if (aiResult.status === 'fulfilled') {
       const hash = quickHash(aiResult.value);
-      if (hash !== _lastHash.ai) {
+      if (options.force || hash !== _lastHash.ai) {
         hashes.ai = hash;
         changed.ai = true;
       }
@@ -265,7 +327,7 @@ export async function syncFromBackend(): Promise<void> {
 
     if (webdavResult.status === 'fulfilled') {
       const hash = quickHash(webdavResult.value);
-      if (hash !== _lastHash.webdav) {
+      if (options.force || hash !== _lastHash.webdav) {
         hashes.webdav = hash;
         changed.webdav = true;
       }
@@ -273,7 +335,7 @@ export async function syncFromBackend(): Promise<void> {
 
     if (embeddingResult.status === 'fulfilled') {
       const hash = quickHash(embeddingResult.value);
-      if (hash !== _lastHash.embedding) {
+      if (options.force || hash !== _lastHash.embedding) {
         hashes.embedding = hash;
         changed.embedding = true;
       }
@@ -281,14 +343,14 @@ export async function syncFromBackend(): Promise<void> {
 
     if (vectorSearchResult.status === 'fulfilled') {
       const hash = vectorSearchFingerprint(vectorSearchResult.value);
-      if (hash !== _lastHash.vectorSearch) {
+      if (options.force || hash !== _lastHash.vectorSearch) {
         changed.vectorSearch = true;
       }
     }
 
     if (settingsResult.status === 'fulfilled') {
       const hash = quickHash(settingsResult.value);
-      if (hash !== _lastHash.settings) {
+      if (options.force || hash !== _lastHash.settings) {
         hashes.settings = hash;
         changed.settings = true;
       }
@@ -310,17 +372,16 @@ export async function syncFromBackend(): Promise<void> {
     if (changed.repos && reposResult.status === 'fulfilled') {
       const backendRepos = reposResult.value.repositories;
       const localRepos = state.repositories;
-      // Distinguish first-ever sync (bootstrap) from an authoritative empty backend.
-      // On bootstrap the hash is still '' — preserve local cache and push it to backend.
-      // On subsequent syncs, accept the backend state even if empty (e.g. user cleared
-      // stars from another device).
-      const isBootstrapEmpty =
-        backendRepos.length === 0 && localRepos.length > 0 && _lastHash.repos === '';
-      if (isBootstrapEmpty) {
+      // Empty backend payloads never wipe local analysis during background
+      // polling. A forced login restore must apply the backend copy, including
+      // an empty list, because the user explicitly asked to restore from it.
+      if (!options.force && backendRepos.length === 0 && localRepos.length > 0) {
         _hasPendingPush = true;
       } else {
-        const merged = mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
-        state.setRepositories(merged);
+        const merged = options.force
+          ? backendRepos
+          : mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
+        state.setRepositories(merged, options.force ? { allowEmpty: true } : undefined);
         // Commit the RAW backend hash, not the merged one. The merge preserves
         // local-only metadata (e.g. vector_indexed_at) the backend never stores,
         // so hashing `merged` here made the next poll's backend hash differ
@@ -329,8 +390,13 @@ export async function syncFromBackend(): Promise<void> {
       }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
-      state.setReleases(releasesResult.value.releases);
-      _lastHash.releases = hashes.releases;
+      const backendReleases = releasesResult.value.releases;
+      if (!options.force && backendReleases.length === 0 && state.releases.length > 0) {
+        _hasPendingPush = true;
+      } else {
+        state.setReleases(backendReleases, options.force ? { allowEmpty: true } : undefined);
+        _lastHash.releases = hashes.releases;
+      }
     }
     if (changed.ai && aiResult.status === 'fulfilled') {
       // Filter out configs with decrypt_failed status — preserve local apiKey values
@@ -468,6 +534,17 @@ export async function syncFromBackend(): Promise<void> {
       void syncToBackend();
     }
   }
+  }; // end doSync
+
+  const currentPromise = doSync();
+  _syncPromise = currentPromise;
+  try {
+    await currentPromise;
+  } finally {
+    if (_syncPromise === currentPromise) {
+      _syncPromise = null;
+    }
+  }
 }
 
 /**
@@ -583,10 +660,13 @@ export function startAutoSync(): () => void {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
-  // Reset in-flight state flags to prevent permanent sync blocking
-  _isSyncingFromBackend = false;
+  // Reset in-flight state flags to prevent permanent sync blocking,
+  // but preserve pull activity if an actual pull Promise is currently executing.
+  if (!_syncPromise) {
+    _isSyncingFromBackend = false;
+    _isSyncingFromBackendActive = false;
+  }
   _isPushingToBackend = false;
-  _isSyncingFromBackendActive = false;
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
@@ -652,10 +732,12 @@ export function stopAutoSync(unsubscribe: () => void): void {
   } else {
     unsubscribe();
   }
-  // Reset in-flight state flags
+  // Reset in-flight state flags, preserving active pull if running
   _isPushingToBackend = false;
-  _isSyncingFromBackendActive = false;
-  _isSyncingFromBackend = false;
+  if (!_syncPromise) {
+    _isSyncingFromBackendActive = false;
+    _isSyncingFromBackend = false;
+  }
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
   logger.info('sync.stop', 'Auto-sync stopped');

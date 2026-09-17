@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Database, Github, Key, Link, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
+import { accountIdKey, workspaceHasData } from '../store/helpers/accountWorkspace';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -27,19 +29,48 @@ export const LoginScreen: React.FC = () => {
   const [backendGithubToken, setBackendGithubToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setGitHubToken, setBackendApiSecret, backendApiSecret, repositories, lastSync, language, setLanguage, theme, setTheme } = useAppStore(useShallow((state) => ({
+  // Data conflict dialog state for backend login
+  const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
+  // Ref to resolve the conflict dialog promise
+  const conflictResolveRef = useRef<((overwrite: boolean) => void) | null>(null);
+  const {
+    setUser, setGitHubToken, setBackendApiSecret, backendApiSecret,
+    repositories, gists, starredGists, releases, forks,
+    customCategories, categoryOrder, hiddenDefaultCategoryIds,
+    defaultCategoryOverrides, categoryListIdMap,
+    lastSync, accountWorkspaces, language, setLanguage, theme, setTheme,
+  } = useAppStore(useShallow((state) => ({
     setUser: state.setUser,
     setGitHubToken: state.setGitHubToken,
     setBackendApiSecret: state.setBackendApiSecret,
     backendApiSecret: state.backendApiSecret,
     repositories: state.repositories,
+    gists: state.gists,
+    starredGists: state.starredGists,
+    releases: state.releases,
+    forks: state.forks,
+    customCategories: state.customCategories,
+    categoryOrder: state.categoryOrder,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    categoryListIdMap: state.categoryListIdMap,
     lastSync: state.lastSync,
+    accountWorkspaces: state.accountWorkspaces,
     language: state.language,
     setLanguage: state.setLanguage,
     theme: state.theme,
     setTheme: state.setTheme,
   })));
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const parkedWorkspaces = Object.values(accountWorkspaces ?? {});
+  const cachedRepoCount = repositories.length > 0
+    ? repositories.length
+    : parkedWorkspaces.reduce((total, workspace) => total + workspace.repositories.length, 0);
+  const parkedLastSyncs = parkedWorkspaces
+    .map((workspace) => workspace.lastSync)
+    .filter((value): value is string => typeof value === 'string')
+    .sort();
+  const cachedLastSync = lastSync ?? parkedLastSyncs[parkedLastSyncs.length - 1] ?? null;
 
   const switchLoginMode = (mode: 'github' | 'backend') => {
     setLoginMode(mode);
@@ -127,10 +158,43 @@ export const LoginScreen: React.FC = () => {
         return;
       }
 
-      // Commit auth only after the data sync succeeds: the button promised
-      // "connect and restore", and a sync failure must not leave a half-
-      // logged-in store behind a rolled-back API secret.
-      await syncBackendData();
+      // Backend, auth, and stored token are all proven. Before syncing data,
+      // check whether the local client already has data for this account (in
+      // current live workspace or parked workspace). If so, ask the user
+      // whether to overwrite local data with backend data.
+      const nextAccountId = accountIdKey(result.user);
+      const parkedWorkspace = nextAccountId ? accountWorkspaces[nextAccountId] : undefined;
+      const currentWorkspace = {
+        repositories,
+        gists,
+        starredGists,
+        releases,
+        forks,
+        customCategories,
+        categoryOrder,
+        hiddenDefaultCategoryIds,
+        defaultCategoryOverrides,
+        categoryListIdMap,
+      };
+      const localHasData = workspaceHasData(currentWorkspace) || workspaceHasData(parkedWorkspace);
+
+      if (localHasData) {
+        // Show conflict dialog and wait for user decision
+        const overwrite = await new Promise<boolean>((resolve) => {
+          conflictResolveRef.current = resolve;
+          setConflictDialogOpen(true);
+          setIsLoading(false); // Let user interact with dialog
+        });
+        setIsLoading(true);
+        if (overwrite) {
+          await syncBackendData();
+        }
+        // Either way, complete login with backend credentials
+      } else {
+        // No conflict: sync backend data directly
+        await syncBackendData();
+      }
+
       setGitHubToken(result.githubToken);
       setUser(result.user);
     } catch (error) {
@@ -197,6 +261,18 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleConflictConfirm = useCallback(() => {
+    setConflictDialogOpen(false);
+    conflictResolveRef.current?.(true);
+    conflictResolveRef.current = null;
+  }, []);
+
+  const handleConflictCancel = useCallback(() => {
+    setConflictDialogOpen(false);
+    conflictResolveRef.current?.(false);
+    conflictResolveRef.current = null;
+  }, []);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground transition-colors duration-300">
       <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
@@ -251,13 +327,13 @@ export const LoginScreen: React.FC = () => {
             </p>
           </div>
 
-          {repositories.length > 0 && lastSync && (
+          {cachedRepoCount > 0 && (
             <div className="mb-4 rounded-md border border-success/30 bg-success/10 p-3 text-success">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-success" />
-                <span className="text-sm font-medium">{t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}</span>
+                <span className="text-sm font-medium">{t(`已缓存 ${cachedRepoCount} 个仓库`, `${cachedRepoCount} repositories cached`)}</span>
               </div>
-              <p className="mt-1 text-xs text-success">{t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}</p>
+              {cachedLastSync && <p className="mt-1 text-xs text-success">{t('上次同步:', 'Last sync:')} {new Date(cachedLastSync).toLocaleString()}</p>}
             </div>
           )}
 
@@ -383,6 +459,20 @@ export const LoginScreen: React.FC = () => {
           </Button>
         </Card>
       </div>
+
+      <ConfirmDialog
+        isOpen={conflictDialogOpen}
+        title={t('本地数据冲突', 'Local Data Conflict')}
+        message={t(
+          '本地已缓存该账号的仓库数据。是否用后端数据覆盖本地数据？选择“保留本地”将跳过同步并直接登录。',
+          'This account already has cached repository data locally. Overwrite it with the backend data? Choose "Keep local" to skip the sync and sign in directly.',
+        )}
+        confirmText={t('使用后端数据', 'Use backend data')}
+        cancelText={t('保留本地', 'Keep local')}
+        onConfirm={handleConflictConfirm}
+        onCancel={handleConflictCancel}
+        type="warning"
+      />
     </div>
   );
 };

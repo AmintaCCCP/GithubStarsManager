@@ -16,6 +16,13 @@ vi.mock('./backendAdapter', () => ({
     fetchEmbeddingConfigs: vi.fn(),
     fetchVectorSearchConfig: vi.fn(),
     fetchSettings: vi.fn(),
+    syncRepositories: vi.fn().mockResolvedValue(undefined),
+    syncReleases: vi.fn().mockResolvedValue(undefined),
+    syncAIConfigs: vi.fn().mockResolvedValue(undefined),
+    syncWebDAVConfigs: vi.fn().mockResolvedValue(undefined),
+    syncEmbeddingConfigs: vi.fn().mockResolvedValue(undefined),
+    syncVectorSearchConfig: vi.fn().mockResolvedValue(undefined),
+    syncSettings: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -220,6 +227,49 @@ describe('syncFromBackend two-pull loop (Issue #304 end-to-end)', () => {
 
     expect(useAppStore.getState().repositories).toBe(repositoriesAfterFirstPull);
     expect(useAppStore.getState().searchResults).toBe(searchResultsBeforePull);
+  });
+
+  it('does not wipe local repositories when the backend returns an empty list', async () => {
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: [], total: 0 });
+    const localRepo = createRepository(1, { ai_summary: 'keep-me' });
+    useAppStore.setState({
+      repositories: [localRepo],
+      searchResults: [localRepo],
+    });
+
+    await syncFromBackend();
+
+    expect(useAppStore.getState().repositories).toHaveLength(1);
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('keep-me');
+  });
+
+  it('force pull applies backend repositories even when a local debounce is pending', async () => {
+    const backendRepos = [createRepository(2, { ai_summary: 'from-backend' })];
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: backendRepos, total: 1 });
+    const localRepo = createRepository(1, { ai_summary: 'local-only' });
+    useAppStore.setState({
+      repositories: [localRepo],
+      searchResults: [localRepo],
+    });
+
+    await syncFromBackend({ force: true });
+
+    expect(useAppStore.getState().repositories).toHaveLength(1);
+    expect(useAppStore.getState().repositories[0].id).toBe(2);
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('from-backend');
+  });
+
+  it('force pull keeps an empty backend list instead of preserving leftover local repos', async () => {
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: [], total: 0 });
+    const localRepo = createRepository(1, { ai_summary: 'local-only' });
+    useAppStore.setState({
+      repositories: [localRepo],
+      searchResults: [localRepo],
+    });
+
+    await syncFromBackend({ force: true });
+
+    expect(useAppStore.getState().repositories).toEqual([]);
   });
 });
 

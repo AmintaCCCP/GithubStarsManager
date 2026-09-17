@@ -186,8 +186,8 @@ export const Header: React.FC = () => {
                         const confirmed = await confirm(
                           t('退出登录确认', 'Logout Confirmation'),
                           language === 'zh'
-                            ? '退出后您的 AI 配置、WebDAV 设置、自定义分类等数据仍会保留。如需完全清除所有数据，请前往「设置 → 数据管理」。'
-                            : 'Your AI configs, WebDAV settings, custom categories and other data will be preserved. To completely clear all data, please go to "Settings → Data Management".',
+                            ? '退出后仅清除登录凭证。仓库、AI 分析和分类等本地数据会保留；同一 GitHub 账号换 token 再登录会自动继承。如需完全清除所有数据，请前往「设置 → 数据管理」。'
+                            : 'Logout only clears credentials. Repositories, AI analysis, and categories stay on this device; signing back in with the same GitHub account (even a new token) restores them. To completely clear all data, go to Settings → Data Management.',
                           { type: 'warning' }
                         );
                         if (confirmed) {

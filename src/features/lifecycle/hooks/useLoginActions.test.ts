@@ -138,6 +138,6 @@ describe('useLoginActions', () => {
     expect(mocks.syncFromBackend).not.toHaveBeenCalled();
 
     await result.current.syncBackendData();
-    expect(mocks.syncFromBackend).toHaveBeenCalledOnce();
+    expect(mocks.syncFromBackend).toHaveBeenCalledWith({ force: true });
   });
 });

@@ -51,7 +51,7 @@ export interface AppActions {
   logout: () => void;
 
   // Repository actions
-  setRepositories: (repos: Repository[]) => void;
+  setRepositories: (repos: Repository[], options?: { allowEmpty?: boolean }) => void;
   updateRepository: (repo: Repository) => void;
   /** 批量更新多个仓库的指定字段，保留当前过滤的 searchResults 不被重置 */
   updateRepositoriesMetadata: (updates: { id: number; patch: Partial<Repository> }[]) => void;
@@ -69,8 +69,8 @@ export interface AppActions {
   setAnalyzingRepository: (repoId: number, isAnalyzing: boolean) => void;
 
   // Gist actions
-  setGists: (gists: Gist[]) => void;
-  setStarredGists: (gists: Gist[]) => void;
+  setGists: (gists: Gist[], options?: { allowEmpty?: boolean }) => void;
+  setStarredGists: (gists: Gist[], options?: { allowEmpty?: boolean }) => void;
   updateGist: (gist: Gist) => void;
   deleteGist: (gistId: string) => void;
   setGistSearchFilters: (filters: Partial<GistSearchFilters>) => void;
@@ -119,7 +119,7 @@ export interface AppActions {
   setSearchResults: (results: Repository[]) => void;
 
   // Release actions
-  setReleases: (releases: Release[]) => void;
+  setReleases: (releases: Release[], options?: { allowEmpty?: boolean }) => void;
   addReleases: (releases: Release[]) => void;
   /** 按 id 合并更新已存在 Release 的资产/元数据；内容变化后重置为未读（is_read=false 并从 readReleases 移除） */
   upsertReleases: (releases: Release[]) => void;
@@ -141,7 +141,7 @@ export interface AppActions {
   updateReleaseSourceRepository: (sourceId: ReleaseSourceId, fullName: string, updates: Partial<CustomReleaseRepository>) => void;
 
   // Fork actions
-  setForks: (forks: ForkRepo[]) => void;
+  setForks: (forks: ForkRepo[], options?: { allowEmpty?: boolean }) => void;
   addForks: (forks: ForkRepo[]) => void;
   updateFork: (fork: ForkRepo) => void;
   markForkAsRead: (forkId: number) => void;

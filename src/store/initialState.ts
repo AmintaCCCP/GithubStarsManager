@@ -21,6 +21,7 @@ export const createInitialState = (): AppState => ({
       user: null,
       githubToken: null,
       isAuthenticated: false,
+      accountWorkspaces: {},
       repositories: [],
       gists: [],
       starredGists: [],

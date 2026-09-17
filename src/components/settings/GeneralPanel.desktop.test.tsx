@@ -30,6 +30,14 @@ vi.mock('../../services/electronProxy', () => ({
 }));
 vi.mock('../UpdateChecker', () => ({ UpdateChecker: () => null }));
 vi.mock('./ThemeSettingsCard', () => ({ ThemeSettingsCard: () => null }));
+vi.mock('../../features/settings/hooks/useGitHubTokenActions', () => ({
+  useGitHubTokenActions: () => ({
+    tokenInput: '',
+    isSaving: false,
+    setTokenInput: vi.fn(),
+    updateToken: vi.fn(),
+  }),
+}));
 
 import { GeneralPanel } from './GeneralPanel';
 
@@ -37,7 +45,7 @@ const t = (zh: string) => zh;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  Object.assign(mocks.state, { language: 'zh', setLanguage: vi.fn() });
+    Object.assign(mocks.state, { language: 'zh', setLanguage: vi.fn(), user: null });
 });
 
 describe('GeneralPanel desktop section', () => {

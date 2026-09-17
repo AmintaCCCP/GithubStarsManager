@@ -12,6 +12,7 @@ import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
+import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import { readAuthMirror } from '../persistence/authStorage';
 import {
   defaultDiscoveryChannels,
@@ -84,6 +85,9 @@ export const normalizePersistedState = (
     user: resolvedUser,
     githubToken: resolvedGithubToken,
     backendApiSecret: resolvedBackendApiSecret,
+    accountWorkspaces: normalizeAccountWorkspaces(
+      (safePersisted as Record<string, unknown>).accountWorkspaces,
+    ),
     theme:
       safePersisted.theme === 'light' || safePersisted.theme === 'dark'
         ? safePersisted.theme

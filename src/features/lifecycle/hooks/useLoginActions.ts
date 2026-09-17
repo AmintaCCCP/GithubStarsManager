@@ -79,7 +79,7 @@ export const useLoginActions = (): LoginActions => {
     return user;
   }, [authenticateWithGitHub]);
   const syncBackendData = useCallback(async () => {
-    await syncFromBackend();
+    await syncFromBackend({ force: true });
   }, []);
 
   return {

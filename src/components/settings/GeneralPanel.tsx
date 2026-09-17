@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Github, Globe, Mail, Monitor, Package, Twitter } from 'lucide-react';
+import { ExternalLink, Github, Globe, Key, Mail, Monitor, Package, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -7,22 +7,26 @@ import { version } from '../../../package.json';
 import { PROJECT_REPO_URL } from '../../constants/project';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
 import { useDesktopActions } from '../../features/settings/hooks/useDesktopActions';
+import { useGitHubTokenActions } from '../../features/settings/hooks/useGitHubTokenActions';
 
 interface GeneralPanelProps {
   t: (zh: string, en: string) => string;
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-  const { language, setLanguage } = useAppStore(useShallow((state) => ({
+  const { language, setLanguage, user } = useAppStore(useShallow((state) => ({
     language: state.language,
     setLanguage: state.setLanguage,
+    user: state.user,
   })));
   const desktop = useDesktopActions({ t });
+  const githubToken = useGitHubTokenActions({ t });
 
   return (
     <div className="space-y-6">
@@ -32,6 +36,42 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
       </div>
 
       <ThemeSettingsCard t={t} />
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <Key className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <CardTitle>{t('GitHub Token', 'GitHub Token')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+            {t(
+              user?.login
+                ? `当前账号 ${user.login}。过期后可在此直接更换 token，不必退出登录。`
+                : '过期后可在此直接更换 token，不必退出登录。',
+              user?.login
+                ? `Signed in as ${user.login}. Update an expired token here without logging out.`
+                : 'Update an expired token here without logging out.',
+            )}
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="settings-github-token">GitHub Personal Access Token</Label>
+            <Input
+              id="settings-github-token"
+              type="password"
+              autoComplete="off"
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              value={githubToken.tokenInput}
+              onChange={(event) => githubToken.setTokenInput(event.target.value)}
+              disabled={githubToken.isSaving}
+            />
+          </div>
+          <Button type="button" onClick={() => { void githubToken.updateToken(); }} disabled={githubToken.isSaving || !githubToken.tokenInput.trim()}>
+            {githubToken.isSaving ? t('更新中…', 'Updating…') : t('更新 Token', 'Update token')}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

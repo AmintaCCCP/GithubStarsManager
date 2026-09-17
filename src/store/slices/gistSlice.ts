@@ -1,5 +1,7 @@
 
+import { logger } from '../../services/logger';
 import type { AppStoreSlice } from '../types';
+import { shouldPreserveExisting } from '../helpers/accountWorkspace';
 import { replaceGistInList } from '../helpers/repositoryRecords';
 
 export const createGistSlice: AppStoreSlice<Pick<import('../types').AppActions,
@@ -13,11 +15,23 @@ export const createGistSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setAnalyzingGist'
 >> = (set) => ({
       // Gist actions
-      setGists: (gists) => set((state) => ({
-        gists,
-        gistSearchResults: state.gistSearchFilters.query ? state.gistSearchResults : gists,
-      })),
-      setStarredGists: (starredGists) => set({ starredGists }),
+      setGists: (gists, options) => set((state) => {
+        if (shouldPreserveExisting(gists, state.gists, options?.allowEmpty)) {
+          logger.warn('store.setGists', 'Refusing empty overwrite of local gists');
+          return state;
+        }
+        return {
+          gists,
+          gistSearchResults: state.gistSearchFilters.query ? state.gistSearchResults : gists,
+        };
+      }),
+      setStarredGists: (starredGists, options) => set((state) => {
+        if (shouldPreserveExisting(starredGists, state.starredGists, options?.allowEmpty)) {
+          logger.warn('store.setStarredGists', 'Refusing empty overwrite of local starred gists');
+          return state;
+        }
+        return { starredGists };
+      }),
       updateGist: (gist) => set((state) => {
         const gistsResult = replaceGistInList(state.gists, gist);
         const starredResult = replaceGistInList(state.starredGists, gist);

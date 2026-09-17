@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     setGitHubToken: vi.fn(),
     setBackendApiSecret: vi.fn(),
     backendApiSecret: null as string | null,
+    accountWorkspaces: {} as Record<string, unknown>,
   },
 }));
 
@@ -35,7 +36,17 @@ vi.mock('../store/useAppStore', () => ({
       setBackendApiSecret: mocks.store.setBackendApiSecret,
       backendApiSecret: mocks.store.backendApiSecret,
       repositories: [],
+      gists: [],
+      starredGists: [],
+      releases: [],
+      forks: [],
+      customCategories: [],
+      categoryOrder: [],
+      hiddenDefaultCategoryIds: [],
+      defaultCategoryOverrides: {},
+      categoryListIdMap: {},
       lastSync: null,
+      accountWorkspaces: mocks.store.accountWorkspaces,
       language: 'zh',
       setLanguage: vi.fn(),
       theme: 'light',
@@ -64,6 +75,7 @@ describe('LoginScreen 后端登录', () => {
     mocks.safeReadText.mockResolvedValue({ success: false, error: 'empty' });
     mocks.syncBackendData.mockReset().mockResolvedValue(undefined);
     mocks.store.backendApiSecret = null;
+    mocks.store.accountWorkspaces = {};
   });
 
   it('Ctrl+V 粘贴只写入当前聚焦的输入框', async () => {
@@ -98,6 +110,26 @@ describe('LoginScreen 后端登录', () => {
 
     expect(await screen.findByText('后端保存的 GitHub Token 无法使用，请重新配置')).toBeInTheDocument();
     expect(screen.getByLabelText('GitHub Personal Access Token')).toHaveAttribute('id', 'backend-github-token');
+  });
+
+  it('连接已有后端成功后先拉后端数据再登录', async () => {
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_restored',
+      user: { id: 1, login: 'octocat' },
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    await waitFor(() => expect(mocks.store.setUser).toHaveBeenCalledWith({ id: 1, login: 'octocat' }));
+    expect(mocks.syncBackendData).toHaveBeenCalledOnce();
+    expect(mocks.store.setGitHubToken).toHaveBeenCalledWith('ghp_restored');
+    expect(mocks.syncBackendData.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.store.setUser.mock.invocationCallOrder[0],
+    );
   });
 
   it('后端数据同步失败时不提交登录状态', async () => {
@@ -136,6 +168,33 @@ describe('LoginScreen 后端登录', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('sync failed');
     expect(mocks.store.setUser).not.toHaveBeenCalled();
     expect(mocks.store.setGitHubToken).not.toHaveBeenCalled();
+  });
+
+  it('当本地存在已归档的自定义分类时弹出冲突确认对话框并确认覆盖', async () => {
+    mocks.store.accountWorkspaces = {
+      '1': {
+        repositories: [],
+        customCategories: [{ id: 'cat-1', name: 'Cat', icon: '', isCustom: true, keywords: [] }],
+      },
+    };
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_restored',
+      user: { id: 1, login: 'octocat' },
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    expect(await screen.findByText('本地数据冲突')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '使用后端数据' }));
+
+    await waitFor(() => expect(mocks.store.setUser).toHaveBeenCalledWith({ id: 1, login: 'octocat' }));
+    expect(mocks.syncBackendData).toHaveBeenCalledOnce();
+    expect(mocks.store.setGitHubToken).toHaveBeenCalledWith('ghp_restored');
   });
 });
 

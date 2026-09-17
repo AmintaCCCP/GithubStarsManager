@@ -703,6 +703,107 @@ describe('useAppStore auth localStorage mirror (Issue #259)', () => {
   });
 });
 
+describe('useAppStore logout and per-account workspaces', () => {
+  const userA = { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null };
+  const userB = { id: 2, login: 'bob', name: 'Bob', avatar_url: 'https://x/b.png', email: null };
+
+  beforeEach(() => {
+    window.localStorage?.removeItem?.('github-stars-manager-auth');
+    useAppStore.setState({
+      user: null,
+      githubToken: null,
+      isAuthenticated: false,
+      accountWorkspaces: {},
+      repositories: [],
+      searchResults: [],
+      lastSync: null,
+      customCategories: [],
+    });
+  });
+
+  it('keeps repositories after logout so the same GitHub account can sign back in', () => {
+    const repositories = [createRepository(1, { ai_summary: 'keep-me' })];
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_old',
+      isAuthenticated: true,
+      repositories,
+      searchResults: repositories,
+      lastSync: '2026-09-16T00:00:00.000Z',
+    });
+
+    useAppStore.getState().logout();
+
+    const state = useAppStore.getState();
+    expect(state.user).toBeNull();
+    expect(state.githubToken).toBeNull();
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.repositories).toEqual([]);
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('keep-me');
+
+    useAppStore.getState().setGitHubToken('ghp_new');
+    useAppStore.getState().setUser(userA);
+
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('keep-me');
+    expect(useAppStore.getState().isAuthenticated).toBe(true);
+  });
+
+  it('restores each GitHub account workspace when switching users', () => {
+    const aliceRepos = [createRepository(1, { ai_summary: 'alice-ai' })];
+    const bobRepos = [createRepository(2, { ai_summary: 'bob-ai' })];
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: aliceRepos,
+      searchResults: aliceRepos,
+      lastSync: '2026-09-16T00:00:00.000Z',
+    });
+
+    useAppStore.getState().logout();
+    useAppStore.getState().setGitHubToken('ghp_b');
+    useAppStore.getState().setUser(userB);
+    expect(useAppStore.getState().repositories).toEqual([]);
+
+    useAppStore.setState({
+      repositories: bobRepos,
+      searchResults: bobRepos,
+      lastSync: '2026-09-17T00:00:00.000Z',
+    });
+    useAppStore.getState().logout();
+    useAppStore.getState().setGitHubToken('ghp_a2');
+    useAppStore.getState().setUser(userA);
+
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('alice-ai');
+    expect(useAppStore.getState().user?.login).toBe('alice');
+  });
+
+  it('does not wipe live repositories when signing in after a backend restore', () => {
+    const restored = [createRepository(9, { ai_summary: 'from-backend' })];
+    useAppStore.setState({
+      repositories: restored,
+      searchResults: restored,
+      lastSync: '2026-09-17T00:00:00.000Z',
+    });
+
+    useAppStore.getState().setGitHubToken('ghp_restored');
+    useAppStore.getState().setUser(userA);
+
+    expect(useAppStore.getState().repositories[0].ai_summary).toBe('from-backend');
+  });
+
+  it('refuses accidental empty repository overwrites unless allowEmpty is set', () => {
+    const repositories = [createRepository(1, { ai_summary: 'keep-me' })];
+    useAppStore.setState({ repositories, searchResults: repositories });
+
+    useAppStore.getState().setRepositories([]);
+    expect(useAppStore.getState().repositories).toEqual(repositories);
+
+    useAppStore.getState().setRepositories([], { allowEmpty: true });
+    expect(useAppStore.getState().repositories).toEqual([]);
+  });
+});
+
 describe('useAppStore repository view mode', () => {
   beforeEach(() => {
     useAppStore.setState({ repositoryViewMode: 'grid' });
