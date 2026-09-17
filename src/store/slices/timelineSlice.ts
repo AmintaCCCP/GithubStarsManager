@@ -1,6 +1,8 @@
 
+import { logger } from '../../services/logger';
 import { WATCH_CUSTOM_RELEASE_SOURCE_ID, normalizeReleaseSourceSettings, normalizeRepoKey } from '../../utils/releaseSources';
 import type { AppStoreSlice } from '../types';
+import { shouldPreserveExisting } from '../helpers/accountWorkspace';
 
 export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setReleases'
@@ -35,7 +37,13 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
   | 'setForkIsRefreshing'
 >> = (set, get) => ({
       // Release actions
-      setReleases: (releases) => set({ releases }),
+      setReleases: (releases, options) => set((state) => {
+        if (shouldPreserveExisting(releases, state.releases, options?.allowEmpty)) {
+          logger.warn('store.setReleases', 'Refusing empty overwrite of local releases');
+          return state;
+        }
+        return { releases };
+      }),
       addReleases: (newReleases) => set((state) => {
         const existingIds = new Set(state.releases.map(r => r.id));
         const uniqueReleases = newReleases.filter(r => !existingIds.has(r.id));
@@ -249,7 +257,13 @@ export const createTimelineSlice: AppStoreSlice<Pick<import('../types').AppActio
       }),
 
       // Fork actions
-      setForks: (forks) => set({ forks }),
+      setForks: (forks, options) => set((state) => {
+        if (shouldPreserveExisting(forks, state.forks, options?.allowEmpty)) {
+          logger.warn('store.setForks', 'Refusing empty overwrite of local forks');
+          return state;
+        }
+        return { forks };
+      }),
       addForks: (newForks) => set((state) => {
         const existingIds = new Set(state.forks.map(f => f.id));
         const uniqueForks = newForks.filter(f => !existingIds.has(f.id));

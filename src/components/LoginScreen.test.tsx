@@ -36,6 +36,7 @@ vi.mock('../store/useAppStore', () => ({
       backendApiSecret: mocks.store.backendApiSecret,
       repositories: [],
       lastSync: null,
+      accountWorkspaces: {},
       language: 'zh',
       setLanguage: vi.fn(),
       theme: 'light',
@@ -98,6 +99,26 @@ describe('LoginScreen 后端登录', () => {
 
     expect(await screen.findByText('后端保存的 GitHub Token 无法使用，请重新配置')).toBeInTheDocument();
     expect(screen.getByLabelText('GitHub Personal Access Token')).toHaveAttribute('id', 'backend-github-token');
+  });
+
+  it('连接已有后端成功后先拉后端数据再登录', async () => {
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_restored',
+      user: { id: 1, login: 'octocat' },
+    });
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    await waitFor(() => expect(mocks.store.setUser).toHaveBeenCalledWith({ id: 1, login: 'octocat' }));
+    expect(mocks.syncBackendData).toHaveBeenCalledOnce();
+    expect(mocks.store.setGitHubToken).toHaveBeenCalledWith('ghp_restored');
+    expect(mocks.syncBackendData.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.store.setUser.mock.invocationCallOrder[0],
+    );
   });
 
   it('后端数据同步失败时不提交登录状态', async () => {

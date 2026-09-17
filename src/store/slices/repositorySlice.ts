@@ -6,6 +6,7 @@ import { defaultCategories, initialSearchFilters } from '../schema';
 import { getAllCategories, getCategoryNameVariants } from '../helpers/categoryHelpers';
 import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
+import { shouldPreserveExisting } from '../helpers/accountWorkspace';
 
 export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setRepositories'
@@ -30,14 +31,20 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setSearchResults'
 >> = (set, get) => ({
       // Repository actions
-      setRepositories: (repositories) => set((state) => ({
-        repositories,
-        // Background sync must not wipe an active search result set: replacing
-        // it with the full list shrinks the visible slice and unmounts the card
-        // being edited (closing its edit modal). SearchBar recomputes results
-        // from the new repositories on its own effect.
-        searchResults: hasActiveSearchFilters(state.searchFilters) ? state.searchResults : repositories,
-      })),
+      setRepositories: (repositories, options) => set((state) => {
+        if (shouldPreserveExisting(repositories, state.repositories, options?.allowEmpty)) {
+          logger.warn('store.setRepositories', 'Refusing empty overwrite of local repositories');
+          return state;
+        }
+        return {
+          repositories,
+          // Background sync must not wipe an active search result set: replacing
+          // it with the full list shrinks the visible slice and unmounts the card
+          // being edited (closing its edit modal). SearchBar recomputes results
+          // from the new repositories on its own effect.
+          searchResults: hasActiveSearchFilters(state.searchFilters) ? state.searchResults : repositories,
+        };
+      }),
       updateRepository: (repo) => set((state) => {
         const repositoriesResult = replaceRepositoryInList(state.repositories, repo);
         const searchResultsResult = state.searchResults === state.repositories

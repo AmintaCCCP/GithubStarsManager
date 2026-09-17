@@ -210,16 +210,25 @@ export async function syncLocalGitHubTokenToBackend(
  * Backend-first strategy: backend data overwrites local data.
  * Silent: errors logged to console only.
  */
-export async function syncFromBackend(): Promise<void> {
-  if (
-    !backend.isAvailable ||
+export async function syncFromBackend(options: { force?: boolean } = {}): Promise<void> {
+  if (!backend.isAvailable) return;
+  if (!options.force && (
     _isSyncingFromBackendActive ||
     _isPushingToBackend ||
     _hasPendingLocalChanges ||
     _debounceTimer
-  ) {
+  )) {
     return;
   }
+  if (options.force) {
+    if (_debounceTimer) {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = null;
+    }
+    _hasPendingLocalChanges = false;
+    _hasPendingPush = false;
+  }
+  if (_isSyncingFromBackendActive) return;
 
   _isSyncingFromBackendActive = true;
 
@@ -310,17 +319,16 @@ export async function syncFromBackend(): Promise<void> {
     if (changed.repos && reposResult.status === 'fulfilled') {
       const backendRepos = reposResult.value.repositories;
       const localRepos = state.repositories;
-      // Distinguish first-ever sync (bootstrap) from an authoritative empty backend.
-      // On bootstrap the hash is still '' — preserve local cache and push it to backend.
-      // On subsequent syncs, accept the backend state even if empty (e.g. user cleared
-      // stars from another device).
-      const isBootstrapEmpty =
-        backendRepos.length === 0 && localRepos.length > 0 && _lastHash.repos === '';
-      if (isBootstrapEmpty) {
+      // Empty backend payloads never wipe local analysis during background
+      // polling. A forced login restore must apply the backend copy, including
+      // an empty list, because the user explicitly asked to restore from it.
+      if (!options.force && backendRepos.length === 0 && localRepos.length > 0) {
         _hasPendingPush = true;
       } else {
-        const merged = mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
-        state.setRepositories(merged);
+        const merged = options.force
+          ? backendRepos
+          : mergeRepositoriesPreservingLocalMetadata(backendRepos, localRepos);
+        state.setRepositories(merged, options.force ? { allowEmpty: true } : undefined);
         // Commit the RAW backend hash, not the merged one. The merge preserves
         // local-only metadata (e.g. vector_indexed_at) the backend never stores,
         // so hashing `merged` here made the next poll's backend hash differ
@@ -329,8 +337,13 @@ export async function syncFromBackend(): Promise<void> {
       }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
-      state.setReleases(releasesResult.value.releases);
-      _lastHash.releases = hashes.releases;
+      const backendReleases = releasesResult.value.releases;
+      if (!options.force && backendReleases.length === 0 && state.releases.length > 0) {
+        _hasPendingPush = true;
+      } else {
+        state.setReleases(backendReleases, options.force ? { allowEmpty: true } : undefined);
+        _lastHash.releases = hashes.releases;
+      }
     }
     if (changed.ai && aiResult.status === 'fulfilled') {
       // Filter out configs with decrypt_failed status — preserve local apiKey values

@@ -144,8 +144,8 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
       }
       const backupData = JSON.parse(content) as Record<string, unknown>;
       const backupIncludedKeys = backupData.includeKeysInBackup ?? true;
-      if (Array.isArray(backupData.repositories)) state.setRepositories(backupData.repositories as typeof state.repositories);
-      if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases);
+      if (Array.isArray(backupData.repositories)) state.setRepositories(backupData.repositories as typeof state.repositories, { allowEmpty: true });
+      if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
 
       try {
         if (Array.isArray(backupData.releaseSubscriptions)) {

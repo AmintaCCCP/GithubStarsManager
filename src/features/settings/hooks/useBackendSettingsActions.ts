@@ -182,8 +182,8 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
         backend.fetchWebDAVConfigs(),
         backend.fetchSettings(),
       ]);
-      state.setRepositories(repoData.repositories);
-      state.setReleases(releaseData.releases);
+      state.setRepositories(repoData.repositories, { allowEmpty: true });
+      state.setReleases(releaseData.releases, { allowEmpty: true });
       state.setAIConfigs(aiConfigData);
       state.setWebDAVConfigs(webdavConfigData);
       const serverHidden = Array.isArray(settingsData.hiddenDefaultCategoryIds) ? settingsData.hiddenDefaultCategoryIds : [];

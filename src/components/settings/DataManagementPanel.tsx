@@ -374,7 +374,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteRepositories = async () => {
     try {
-      setRepositories([]);
+      setRepositories([], { allowEmpty: true });
       addLog(t('删除 Stars 仓库数据', 'Delete Stars repositories'), true);
       showSuccess(t('Stars 仓库数据已删除', 'Stars repositories deleted'));
     } catch (error) {
@@ -390,7 +390,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
   const deleteReleases = async () => {
     try {
-      setReleases([]);
+      setReleases([], { allowEmpty: true });
       addLog(t('删除 Release 发布记录', 'Delete Release records'), true);
       showSuccess(t('Release 发布记录已删除', 'Release records deleted'));
     } catch (error) {
@@ -751,10 +751,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       if (mode === 'replace') {
         if (selectedTypes.includes('repositories') && importedData.repositories) {
-          store.setRepositories(importedData.repositories);
+          store.setRepositories(importedData.repositories, { allowEmpty: true });
         }
         if (selectedTypes.includes('releases') && importedData.releases) {
-          store.setReleases(importedData.releases);
+          store.setReleases(importedData.releases, { allowEmpty: true });
         }
         if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
           const restoredConfigs = importedData.aiConfigs.map(cfg => ({
@@ -1275,6 +1275,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         user: null,
         githubToken: null,
         isAuthenticated: false,
+        accountWorkspaces: {},
         xTweetAuth: null,
         xTweetAuthRevision: 0,
 

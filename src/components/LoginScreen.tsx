@@ -27,19 +27,29 @@ export const LoginScreen: React.FC = () => {
   const [backendGithubToken, setBackendGithubToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setUser, setGitHubToken, setBackendApiSecret, backendApiSecret, repositories, lastSync, language, setLanguage, theme, setTheme } = useAppStore(useShallow((state) => ({
+  const { setUser, setGitHubToken, setBackendApiSecret, backendApiSecret, repositories, lastSync, accountWorkspaces, language, setLanguage, theme, setTheme } = useAppStore(useShallow((state) => ({
     setUser: state.setUser,
     setGitHubToken: state.setGitHubToken,
     setBackendApiSecret: state.setBackendApiSecret,
     backendApiSecret: state.backendApiSecret,
     repositories: state.repositories,
     lastSync: state.lastSync,
+    accountWorkspaces: state.accountWorkspaces,
     language: state.language,
     setLanguage: state.setLanguage,
     theme: state.theme,
     setTheme: state.setTheme,
   })));
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const parkedWorkspaces = Object.values(accountWorkspaces ?? {});
+  const cachedRepoCount = repositories.length > 0
+    ? repositories.length
+    : parkedWorkspaces.reduce((total, workspace) => total + workspace.repositories.length, 0);
+  const parkedLastSyncs = parkedWorkspaces
+    .map((workspace) => workspace.lastSync)
+    .filter((value): value is string => typeof value === 'string')
+    .sort();
+  const cachedLastSync = lastSync ?? parkedLastSyncs[parkedLastSyncs.length - 1] ?? null;
 
   const switchLoginMode = (mode: 'github' | 'backend') => {
     setLoginMode(mode);
@@ -251,13 +261,13 @@ export const LoginScreen: React.FC = () => {
             </p>
           </div>
 
-          {repositories.length > 0 && lastSync && (
+          {cachedRepoCount > 0 && (
             <div className="mb-4 rounded-md border border-success/30 bg-success/10 p-3 text-success">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-success" />
-                <span className="text-sm font-medium">{t(`已缓存 ${repositories.length} 个仓库`, `${repositories.length} repositories cached`)}</span>
+                <span className="text-sm font-medium">{t(`已缓存 ${cachedRepoCount} 个仓库`, `${cachedRepoCount} repositories cached`)}</span>
               </div>
-              <p className="mt-1 text-xs text-success">{t('上次同步:', 'Last sync:')} {new Date(lastSync).toLocaleString()}</p>
+              {cachedLastSync && <p className="mt-1 text-xs text-success">{t('上次同步:', 'Last sync:')} {new Date(cachedLastSync).toLocaleString()}</p>}
             </div>
           )}
 
