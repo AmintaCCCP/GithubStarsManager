@@ -28,7 +28,7 @@
     "@types/morgan": "^1.9.9",
     "@types/supertest": "^6.0.2",
     "supertest": "^6.3.4",
-    "tsx": "^4.7.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.5.3",
     "vitest": "^5.0.1"
   },
