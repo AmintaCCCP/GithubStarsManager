@@ -425,9 +425,9 @@
   },
   "matchesCategory": {
     "lockedZhName_vs_zhWeb": true,
-    "lockedZhName_vs_enWeb": false,
+    "lockedZhName_vs_enWeb": true,
     "lockedEnName_vs_enWeb": true,
-    "lockedEnName_vs_zhWeb": false,
+    "lockedEnName_vs_zhWeb": true,
     "lockedCustomExactName": true,
     "emptyCustomCategory_vs_zhWeb": false,
     "zhAiTags_vs_zhDevtools": true,

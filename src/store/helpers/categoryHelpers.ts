@@ -1,7 +1,7 @@
 
 import type { AppLanguage } from '../../i18n/languages';
 import type { Category } from '../../types';
-import { categoryExtraKeywords, categoryName } from '../../constants/categoryI18n';
+import { builtinCategoryNameVariants, categoryExtraKeywords, categoryName } from '../../constants/categoryI18n';
 import { defaultCategories } from '../schema';
 
 export const sortCategoriesByOrder = (
@@ -79,25 +79,17 @@ export const translateCategoryName = (zhName: string): string => {
 
 // Helper function to get all possible name variants for a category (original + translated)
 export const getCategoryNameVariants = (originalName: string, overrideName?: string): string[] => {
-  const variants = new Set<string>();
+  const variants = new Set<string>([originalName]);
 
-  // Add original name
-  variants.add(originalName);
-
-  // Add translated name
-  const translated = translateCategoryName(originalName);
-  if (translated !== originalName) {
-    variants.add(translated);
+  // 内置分类：加入全部语言的显示名（GitHub List 名称随语言切换自动改名）
+  const builtinVariants = builtinCategoryNameVariants(originalName, overrideName);
+  for (const variant of builtinVariants) {
+    variants.add(variant);
   }
 
   // Add override name if provided and different
   if (overrideName && overrideName !== originalName) {
     variants.add(overrideName);
-    // Also add translated version of override if it matches a known pattern
-    const overrideTranslated = translateCategoryName(overrideName);
-    if (overrideTranslated !== overrideName) {
-      variants.add(overrideTranslated);
-    }
   }
 
   return Array.from(variants);

@@ -1,5 +1,6 @@
 
 import { Category, CategoryMatchMode, Repository } from '../types';
+import { builtinCategoryNameVariants, isBuiltinCategoryDisplayName } from '../constants/categoryI18n';
 
 export type CategoryNameTranslator = (zh: string, en: string) => string;
 
@@ -175,7 +176,12 @@ export const matchesCategory = (
     return false;
   }
   if (repo.category_locked && repo.custom_category != null) {
-    return repo.custom_category === category.name;
+    if (repo.custom_category === category.name) return true;
+    // 内置分类跨语言：custom_category 可能是锁定当时语言的历史显示名
+    if (!category.isCustom) {
+      return builtinCategoryNameVariants(category.name).includes(repo.custom_category);
+    }
+    return false;
   }
 
   const tags = mode === 'effective' ? getEffectiveTags(repo) : normalizeTags(repo.ai_tags);
@@ -252,9 +258,11 @@ export const resolveCategoryAssignment = (
   allCategories: Category[]
 ): string | undefined => {
   // 验证分类是否仍然有效（存在于当前分类列表中）
-  const isValidCategory = (categoryName: string | undefined): boolean => {
-    if (!categoryName) return false;
-    return allCategories.some(cat => cat.name === categoryName);
+  const isValidCategory = (name: string | undefined): boolean => {
+    if (!name) return false;
+    if (allCategories.some(cat => cat.name === name)) return true;
+    // 内置分类的历史语言显示名仍视为有效（跨语言锁定保持）
+    return isBuiltinCategoryDisplayName(name);
   };
 
   // 如果分类被锁定且自定义分类仍然有效，保持当前分类

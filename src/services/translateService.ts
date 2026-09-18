@@ -32,8 +32,8 @@ const GOOGLE_BATCH_LIMITS = { texts: 20, chars: 1_800 };
 const AI_BATCH_LIMITS = { texts: 10 };
 
 /** 应用内语言代码 → 引擎语言代码映射（zh 在两家引擎里都不是合法目标码）。 */
-const MICROSOFT_LANG: Record<string, string> = { zh: 'zh-Hans' };
-const GOOGLE_LANG: Record<string, string> = { zh: 'zh-CN' };
+const MICROSOFT_LANG: Record<string, string> = { zh: 'zh-Hans', 'zh-TW': 'zh-Hant' };
+const GOOGLE_LANG: Record<string, string> = { zh: 'zh-CN', 'zh-TW': 'zh-TW' };
 
 /** 匹配行内 <code>…</code> 标签（可带属性）。注意以 /g 使用前需重置 lastIndex。 */
 const CODE_TAG_PATTERN = /<code(?:\s+[^>]*)?>[\s\S]*?<\/code>/g;

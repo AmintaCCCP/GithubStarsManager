@@ -1,4 +1,4 @@
-import type { AppLanguage } from '../i18n/languages';
+import { isAppLanguage, type AppLanguage } from '../i18n/languages';
 
 const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   // Auth
@@ -70,7 +70,7 @@ function getCurrentLanguage(): AppLanguage {
     if (storeData) {
       const parsed = JSON.parse(storeData);
       const lang = parsed.state?.language;
-      if (lang === 'en') return 'en';
+      if (isAppLanguage(lang)) return lang;
     }
   } catch { /* ignore */ }
   return 'zh';

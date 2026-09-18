@@ -13,6 +13,8 @@ const createId = (): string => {
   return `repository-chat-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+/** 会话默认标题集合：历史会话可能以任意语言创建，判断是否默认标题用集合比较 */
+export const DEFAULT_CHAT_TITLES = new Set(['新对话', 'New conversation']);
 const defaultTitle = (language: AppLanguage) => language === 'zh' ? '新对话' : 'New conversation';
 
 /** 通知全局问答历史入口（SearchBar 徽标、历史抽屉）刷新。 */

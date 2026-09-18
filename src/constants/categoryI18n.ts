@@ -30,6 +30,35 @@ export const categoryName = (id: string, language: AppLanguage): string => {
   return entry[language] ?? entry.en ?? entry.zh;
 };
 
+const ID_BY_ANY_NAME = new Map<string, string>();
+for (const [id, entry] of Object.entries(CATEGORY_NAMES)) {
+  for (const name of Object.values(entry)) {
+    if (name) ID_BY_ANY_NAME.set(name, id);
+  }
+}
+
+/**
+ * 某内置分类在全部语言下的显示名集合（含用户 override）。
+ * 用于锁定分类的跨语言匹配与 GitHub List 的名称变体匹配。
+ */
+export const builtinCategoryNameVariants = (originalZhName: string, overrideName?: string): string[] => {
+  const variants = new Set<string>([originalZhName]);
+  const id = ID_BY_ANY_NAME.get(originalZhName);
+  if (id) {
+    const entry = CATEGORY_NAMES[id];
+    for (const name of Object.values(entry)) {
+      if (name) variants.add(name);
+    }
+  }
+  if (overrideName && overrideName !== originalZhName) {
+    variants.add(overrideName);
+  }
+  return [...variants];
+};
+
+/** 判断名称是否是任意内置分类在任意语言下的显示名。 */
+export const isBuiltinCategoryDisplayName = (name: string): boolean => ID_BY_ANY_NAME.has(name);
+
 /**
  * 内置分类的扩展关键词（按语言补充）。zh/en 关键词已在 schema.defaultCategories
  * 内置，这里只为新语言补充，保证新语言 AI tags 能归入内置分类。

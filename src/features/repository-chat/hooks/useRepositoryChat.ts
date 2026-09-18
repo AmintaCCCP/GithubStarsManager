@@ -16,6 +16,7 @@ import type {
 } from '../../../types/repositoryChat';
 import { runRepositoryChatTurn } from '../../../services/repositoryChatRunner';
 import { repositoryChatStorage } from '../../../services/repositoryChatStorage';
+import { DEFAULT_CHAT_TITLES } from './useRepositoryChatSessions';
 
 const createId = (prefix: string): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`;
@@ -268,7 +269,7 @@ export const useRepositoryChat = ({
         onMessagesChange([...baseMessages, userMessage, completedAssistant]);
         await onSessionChange({
           ...session,
-          title: session.title === (t('useRepositoryChat.new-conversation'))
+          title: DEFAULT_CHAT_TITLES.has(session.title)
             ? normalizedQuestion.slice(0, 72)
             : session.title,
           modelConfigId: aiConfig.id,
