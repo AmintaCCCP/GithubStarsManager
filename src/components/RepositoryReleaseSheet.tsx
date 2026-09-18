@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, ExternalLink, Loader2, PackageOpen, RefreshCw, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -79,7 +80,7 @@ const ReleaseAssetsTable: React.FC<{
   onAssetPageChange: (page: number) => void;
   downloadStates: Record<string, 'idle' | 'sending' | 'sent'>;
   onDownload: (link: ReleaseDownloadLink) => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, language }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const links = useMemo(() => buildReleaseDownloadLinks(release), [release]);
@@ -155,7 +156,7 @@ const ReleaseContent: React.FC<{
   onDownload: (link: ReleaseDownloadLink) => void;
   summary: { status: 'idle' | 'loading' | 'done' | 'error'; content?: string; error?: string } | undefined;
   onGenerateSummary: () => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   repository: Repository;
 }> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, summary, onGenerateSummary, language, repository }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;

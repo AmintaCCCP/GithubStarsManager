@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { useMemo, useState } from 'react';
 import { Download, Loader2, Sparkles } from 'lucide-react';
 import type { Release, Repository } from '../types';
@@ -10,7 +11,7 @@ import { useDialog } from '../hooks/useDialog';
 export const ReleasePluginRecommendations: React.FC<{
   release: Release;
   repository?: Repository;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }> = ({ release, repository, language }) => {
   const { processors, runProcessor, download } = useReleaseProcessors();
   if (processors.length === 0 || release.assets.length === 0) return null;
@@ -42,7 +43,7 @@ const RecommendationItem: React.FC<{
   processor: RegisteredReleaseProcessor;
   release: Release;
   repository?: Repository;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   runProcessor: ReturnType<typeof useReleaseProcessors>['runProcessor'];
   download: ReturnType<typeof useReleaseProcessors>['download'];
 }> = ({ processor, release, repository, language, runProcessor, download }) => {

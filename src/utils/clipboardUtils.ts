@@ -42,7 +42,7 @@ export const isReadSupported = (): boolean => {
  */
 export const getClipboardErrorMessage = (
   operation: 'read' | 'write',
-  language: 'zh' | 'en' = 'zh'
+  language: AppLanguage = 'zh'
 ): string => {
   const support = checkClipboardSupport();
 
@@ -138,4 +138,5 @@ export const safeReadText = async (): Promise<{ success: boolean; text?: string;
       error: getClipboardErrorMessage('read'),
     };
   }
-};
+};import type { AppLanguage } from '../i18n/languages';
+

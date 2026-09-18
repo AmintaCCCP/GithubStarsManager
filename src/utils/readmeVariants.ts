@@ -73,22 +73,24 @@ const getFileName = (path: string, fallback?: string): string => {
 
 const normalizeLanguageCode = (code: string): string => code.toLowerCase().replace(/_/g, '-');
 
-const getLanguageLabel = (languageCode: string, uiLanguage: 'zh' | 'en'): string => {
+const getLanguageLabel = (languageCode: string, uiLanguage: AppLanguage): string => {
+  const labelFor = (record: { zh: string; en: string } & Partial<Record<AppLanguage, string>>): string =>
+    record[uiLanguage] ?? record.en;
   const normalized = normalizeLanguageCode(languageCode);
   const exact = LANGUAGE_LABELS[normalized];
-  if (exact) return exact[uiLanguage];
+  if (exact) return labelFor(exact);
 
   const baseCode = normalized.split('-')[0];
   const base = LANGUAGE_LABELS[baseCode];
   if (base) {
     const region = normalized.split('-').slice(1).join('-').toUpperCase();
-    return region ? `${base[uiLanguage]} (${region})` : base[uiLanguage];
+    return region ? `${labelFor(base)} (${region})` : labelFor(base);
   }
 
   return normalized;
 };
 
-const getLanguagePriority = (languageCode: string | undefined, uiLanguage: 'zh' | 'en'): number => {
+const getLanguagePriority = (languageCode: string | undefined, uiLanguage: AppLanguage): number => {
   if (!languageCode) return 999;
   const normalized = normalizeLanguageCode(languageCode);
   const currentLanguagePriority = uiLanguage === 'zh'
@@ -115,7 +117,7 @@ export const isReadmeCandidateItem = (item: GitHubReadmeCandidateItem): boolean 
 
 export const buildReadmeVariants = (
   items: GitHubReadmeCandidateItem[],
-  uiLanguage: 'zh' | 'en'
+  uiLanguage: AppLanguage
 ): ReadmeVariant[] => {
   const defaultVariant: ReadmeVariant = {
     ...DEFAULT_README_VARIANT,
@@ -155,4 +157,5 @@ export const buildReadmeVariants = (
     });
 
   return [defaultVariant, ...variants];
-};
+};import type { AppLanguage } from '../i18n/languages';
+

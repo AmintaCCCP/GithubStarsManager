@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { memo, useCallback, useMemo, useState, useEffect } from 'react';
 import { ExternalLink, GitBranch, Calendar, Download, ChevronDown, ChevronUp, BookOpen, ArrowUpRight, FolderOpen, Folder, BellOff, FileArchive, Code2, Loader2, CheckCircle2, Sparkles } from 'lucide-react';
 import { Release } from '../types';
@@ -27,7 +28,7 @@ interface DownloadLink {
 }
 
 /** 资产相对时间：updated_at 非法时不渲染，避免 date-fns 对 Invalid Date 抛错；中文界面用 zhCN。 */
-const AssetUpdatedTime = ({ updatedAt, language }: { updatedAt?: string; language: 'zh' | 'en' }) => {
+const AssetUpdatedTime = ({ updatedAt, language }: { updatedAt?: string; language: AppLanguage }) => {
   if (!updatedAt) return null;
   const time = new Date(updatedAt).getTime();
   if (Number.isNaN(time)) return null;
@@ -57,7 +58,7 @@ interface ReleaseCardProps {
   onUnsubscribe: () => void;
   onMarkAsRead: () => void;
   onMarkAssetAsRead: (assetId: number) => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   formatFileSize: (bytes: number) => string;
 }
 

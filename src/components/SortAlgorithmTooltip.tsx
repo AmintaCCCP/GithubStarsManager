@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React from 'react';
 import { Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -7,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 interface SortAlgorithmTooltipProps {
   channelId: DiscoveryChannelId;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 export const SortAlgorithmTooltip: React.FC<SortAlgorithmTooltipProps> = ({ channelId, language }) => {

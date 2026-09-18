@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../i18n/languages';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -134,7 +135,7 @@ interface ExportData {
     categoryOrder?: string[];
     theme?: 'light' | 'dark';
     themePreset?: ThemePresetId;
-    language?: 'zh' | 'en';
+    language?: AppLanguage;
     isSidebarCollapsed?: boolean;
     releaseViewMode?: 'timeline' | 'repository';
     releaseSelectedFilters?: string[];

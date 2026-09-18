@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../../i18n/languages';
 import { useMemo } from 'react';
 import { FileCode2 } from 'lucide-react';
 import hljs from 'highlight.js';
@@ -14,7 +15,7 @@ export interface CitationTarget {
 
 interface CitationBadgeProps {
   target: CitationTarget;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {

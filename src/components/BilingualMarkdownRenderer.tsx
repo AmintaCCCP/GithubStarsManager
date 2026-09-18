@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import { memo, useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -27,7 +28,7 @@ interface BilingualMarkdownRendererProps {
   baseUrl?: string;
   headingIds?: Map<string, string>;
   fontSize?: 'small' | 'medium' | 'large';
-  language?: 'zh' | 'en';
+  language?: AppLanguage;
   defaultDisplayMode?: DisplayMode;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;

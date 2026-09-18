@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import { useMemo, useState } from 'react';
 import { History, Search, Trash2 } from 'lucide-react';
 import type { RepositoryChatSession } from '../types/repositoryChat';
@@ -17,7 +18,7 @@ import {
 interface RepositoryChatHistoryPanelProps {
   sessions: RepositoryChatSession[];
   activeSessionId?: string;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   disabled?: boolean;
   onSelect: (sessionId: string) => void;
   onDelete: (sessionId: string) => void;

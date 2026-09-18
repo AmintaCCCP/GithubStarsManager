@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React from 'react';
 import { RotateCcw, Search } from 'lucide-react';
 import { Button } from './ui/button';
@@ -5,7 +6,7 @@ import { Button } from './ui/button';
 interface SimilarViewBannerProps {
   anchorRepoName: string;
   onReset: () => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 /**

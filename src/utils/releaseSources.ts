@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import type {
   AppState,
   CustomReleaseRepository,
@@ -48,7 +49,7 @@ export const isReleaseSourceId = (value: unknown): value is ReleaseSourceId => (
   typeof value === 'string' && RELEASE_SOURCE_IDS.includes(value as ReleaseSourceId)
 );
 
-export const getReleaseSourceLabel = (sourceId: ReleaseSourceId, language: 'zh' | 'en'): string => {
+export const getReleaseSourceLabel = (sourceId: ReleaseSourceId, language: AppLanguage): string => {
   const label = RELEASE_SOURCE_LABELS[sourceId];
   return language === 'zh' ? label.zh : label.en;
 };

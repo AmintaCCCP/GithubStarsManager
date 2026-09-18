@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
@@ -100,7 +101,7 @@ interface MobileTabNavProps {
   channels: { id: DiscoveryChannelId; name: string; nameEn: string; icon: React.ReactNode }[];
   selectedChannel: DiscoveryChannelId;
   onChannelSelect: (channel: DiscoveryChannelId) => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const MobileTabNav: React.FC<MobileTabNavProps> = ({ 
@@ -247,7 +248,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 interface PlatformFilterProps {
   platform: DiscoveryPlatform;
   onPlatformChange: (platform: DiscoveryPlatform) => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformChange, language }) => {
@@ -357,7 +358,7 @@ interface LoadMoreButtonProps {
   isLoading: boolean;
   hasMore: boolean;
   totalCount: number;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
@@ -411,7 +412,7 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
 interface DataStatsProps {
   currentCount: number;
   totalCount: number;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, language }) => {

@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import React, { useId, useMemo, useState } from 'react';
@@ -9,10 +10,10 @@ import { useDialog } from '../hooks/useDialog';
 import { useWatchedSourcesSync } from '../features/releases/hooks/useWatchedSourcesSync';
 import {
   CUSTOM_RELEASE_SOURCE_ID,
-  RELEASE_SOURCE_LABELS,
   STARRED_RELEASE_SOURCE_ID,
   WATCH_CUSTOM_RELEASE_SOURCE_ID,
   createCustomReleaseRepository,
+  getReleaseSourceLabel,
   normalizeRepoKey,
 } from '../utils/releaseSources';
 
@@ -27,12 +28,12 @@ interface RepoListEditorProps {
   title: string;
   description: string;
   placeholder: string;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 interface PaginatedRepoListProps {
   repos: CustomReleaseRepository[];
-  language: 'zh' | 'en';
+  language: AppLanguage;
   emptyText: string;
   renderActions?: (repo: CustomReleaseRepository) => React.ReactNode;
 }
@@ -205,7 +206,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
 
 interface WatchCustomReleaseSyncPanelProps {
   repos: CustomReleaseRepository[];
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = ({ repos, language }) => {
@@ -287,7 +288,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
     },
     {
       id: WATCH_CUSTOM_RELEASE_SOURCE_ID,
-      title: RELEASE_SOURCE_LABELS[WATCH_CUSTOM_RELEASE_SOURCE_ID][language],
+      title: getReleaseSourceLabel(WATCH_CUSTOM_RELEASE_SOURCE_ID, language),
       description: t('从 Watch 仓库同步的 Release 来源。', 'Release source synced from Watch repositories.'),
       count: releaseSourceSettings.watchCustomReleaseRepos.length,
     },

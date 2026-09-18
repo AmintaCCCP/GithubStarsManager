@@ -1,5 +1,7 @@
 
+import type { AppLanguage } from '../../i18n/languages';
 import type { Category } from '../../types';
+import { categoryExtraKeywords, categoryName } from '../../constants/categoryI18n';
 import { defaultCategories } from '../schema';
 
 export const sortCategoriesByOrder = (
@@ -32,7 +34,7 @@ export const sortCategoriesByOrder = (
 // Helper function to get all categories (default + custom)
 export const getAllCategories = (
   customCategories: Category[],
-  language: 'zh' | 'en' = 'zh',
+  language: AppLanguage = 'zh',
   hiddenDefaultCategoryIds: string[] = [],
   defaultCategoryOverrides: Record<string, Partial<Category>> = {}
 ): Category[] => {
@@ -40,11 +42,13 @@ export const getAllCategories = (
     .filter(cat => !hiddenDefaultCategoryIds.includes(cat.id))
     .map(cat => {
       const override = defaultCategoryOverrides[cat.id];
-      const baseName = language === 'en' ? translateCategoryName(cat.name) : cat.name;
+      const baseName = language === 'zh' ? cat.name : categoryName(cat.id, language);
+      const baseKeywords = [...(cat.keywords ?? []), ...categoryExtraKeywords(cat.id, language)];
       return {
         ...cat,
         name: baseName,
-        ...(override ? { name: override.name ?? baseName, icon: override.icon ?? cat.icon, keywords: override.keywords ?? cat.keywords } : {})
+        keywords: baseKeywords,
+        ...(override ? { name: override.name ?? baseName, icon: override.icon ?? cat.icon, keywords: override.keywords ?? baseKeywords } : {})
       };
     });
 

@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../../i18n/languages';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
@@ -10,7 +11,7 @@ const createId = (): string => {
   return `repository-chat-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const defaultTitle = (language: 'zh' | 'en') => language === 'zh' ? '新对话' : 'New conversation';
+const defaultTitle = (language: AppLanguage) => language === 'zh' ? '新对话' : 'New conversation';
 
 /** 通知全局问答历史入口（SearchBar 徽标、历史抽屉）刷新。 */
 const notifyGlobalHistoryChanged = () => {
@@ -21,7 +22,7 @@ const notifyGlobalHistoryChanged = () => {
 
 export interface UseRepositoryChatSessionsOptions {
   repository: Repository | null;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   resolveSourceRefSha?: (repository: Repository, signal?: AbortSignal) => Promise<string>;
 }
 

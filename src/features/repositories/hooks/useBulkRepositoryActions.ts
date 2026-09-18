@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../../i18n/languages';
 import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
@@ -34,7 +35,7 @@ export interface BulkRepositoryActions {
   unlockCategory: (repositories: Repository[]) => Promise<boolean>;
 }
 
-const formatFailures = (language: 'zh' | 'en', failedRepositories: string[]) => {
+const formatFailures = (language: AppLanguage, failedRepositories: string[]) => {
   if (failedRepositories.length === 0) return '';
   return language === 'zh'
     ? `\n\n失败 (${failedRepositories.length} 个):\n${failedRepositories.join('\n')}`

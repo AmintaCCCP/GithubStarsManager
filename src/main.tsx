@@ -10,6 +10,8 @@ import { DialogProvider } from './hooks/useDialog';
 import { TooltipProvider } from './components/ui/tooltip';
 import { logger } from './services/logger';
 import { ensureThemeStyleTag } from './lib/themePresets';
+import { useAppStore } from './store/useAppStore';
+import { ensureLanguageLoaded, FALLBACK_LANGUAGE } from './i18n';
 
 // Self-hosted webfonts used by built-in theme presets (families load on demand).
 import '@fontsource-variable/open-sans';
@@ -30,33 +32,43 @@ import '@fontsource/playfair-display';
 
 logger.info('app', 'Main.tsx loading');
 
-try {
-  // Theme preset rules must exist before React renders so a persisted
-  // non-default theme applies on first paint after hydration.
-  ensureThemeStyleTag();
+const bootstrap = async (): Promise<void> => {
+  try {
+    // Theme preset rules must exist before React renders so a persisted
+    // non-default theme applies on first paint after hydration.
+    ensureThemeStyleTag();
 
-  const rootElement = document.getElementById('root');
-  if (!rootElement) {
-    throw new Error('Root element not found');
-  }
+    // 首帧前装载初始语言包与回退语言包，避免界面闪现 i18n key。
+    // 持久化语言在水合完成后由 App 的 language 副作用切换。
+    const initialLanguage = useAppStore.getState().language;
+    await Promise.all([
+      ensureLanguageLoaded(initialLanguage),
+      ensureLanguageLoaded(FALLBACK_LANGUAGE),
+    ]);
+    logger.info('app', 'Initial language pack loaded', { initialLanguage });
 
-  logger.info('app', 'Root element found, creating React root');
+    const rootElement = document.getElementById('root');
+    if (!rootElement) {
+      throw new Error('Root element not found');
+    }
 
-  const root = createRoot(rootElement);
-  root.render(
-    <StrictMode>
-      <ErrorBoundary>
-        <DialogProvider>
-          <TooltipProvider delayDuration={300}>
-            <App />
-          </TooltipProvider>
-        </DialogProvider>
-      </ErrorBoundary>
-    </StrictMode>
-  );
+    logger.info('app', 'Root element found, creating React root');
 
-  logger.info('app', 'React app rendered');
-} catch (error) {
+    const root = createRoot(rootElement);
+    root.render(
+      <StrictMode>
+        <ErrorBoundary>
+          <DialogProvider>
+            <TooltipProvider delayDuration={300}>
+              <App />
+            </TooltipProvider>
+          </DialogProvider>
+        </ErrorBoundary>
+      </StrictMode>
+    );
+
+    logger.info('app', 'React app rendered');
+  } catch (error) {
   logger.error('app', 'Failed to render React app', error);
   const strings = (() => {
     const lang = navigator.language?.startsWith('zh') ? 'zh' : 'en';
@@ -84,4 +96,7 @@ try {
       </div>
     </div>
   `;
-}
+  }
+};
+
+void bootstrap();

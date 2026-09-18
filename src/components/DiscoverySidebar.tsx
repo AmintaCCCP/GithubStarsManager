@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React from 'react';
 import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search, Newspaper } from 'lucide-react';
 import { SiX, SiTelegram } from '@icons-pack/react-simple-icons';
@@ -23,7 +24,7 @@ interface DiscoverySidebarProps {
   isLoading: Record<DiscoveryChannelId, boolean>;
   lastRefresh: Record<DiscoveryChannelId, string | null>;
   isAnalyzing: boolean;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({

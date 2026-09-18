@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -146,7 +147,7 @@ interface RepositoryCardProps {
 const PluginRepositoryActionItems: React.FC<{
   actions: RegisteredPluginAction[];
   repository: Repository;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }> = ({ actions, repository, language }) => {
   const { toast } = useDialog();
 

@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../../i18n/languages';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -16,7 +17,7 @@ const createId = (prefix: string): string => {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-export const repositoryChatErrorMessage = (unknownError: unknown, language: 'zh' | 'en'): string => {
+export const repositoryChatErrorMessage = (unknownError: unknown, language: AppLanguage): string => {
   const rawMessage = unknownError instanceof Error ? unknownError.message : String(unknownError ?? '');
   const isTemporaryServiceFailure = /\b(?:5\d\d|429)\b|upstream|timeout|timed?\s*out|network|fetch|do_request_failed|temporarily unavailable/i.test(rawMessage);
   if (isTemporaryServiceFailure) {

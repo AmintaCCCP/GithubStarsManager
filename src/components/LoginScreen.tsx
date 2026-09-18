@@ -12,6 +12,8 @@ import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { APP_LANGUAGES, type AppLanguage } from '../i18n/languages';
 
 export const LoginScreen: React.FC = () => {
   const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend } = useLoginActions();
@@ -277,12 +279,18 @@ export const LoginScreen: React.FC = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground transition-colors duration-300">
       <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
         <div className="flex items-center overflow-hidden rounded-md border border-border bg-card">
-          <Button type="button" variant={language === 'zh' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('zh')} aria-pressed={language === 'zh'} className="w-16 rounded-none">
-            中文
-          </Button>
-          <Button type="button" variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} className="w-16 rounded-none">
-            EN
-          </Button>
+          <Select value={language} onValueChange={(value) => setLanguage(value as AppLanguage)}>
+            <SelectTrigger aria-label={t('界面语言', 'Interface language')} className="h-9 w-[150px] rounded-none border-0 bg-card shadow-none focus:ring-0 focus:ring-offset-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {APP_LANGUAGES.map((definition) => (
+                <SelectItem key={definition.code} value={definition.code}>
+                  {definition.nativeName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <Tooltip>

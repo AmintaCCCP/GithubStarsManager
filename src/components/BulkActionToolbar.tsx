@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { useState, useRef } from 'react';
 import { X, Star, FolderOpen, Bot, Bell, BellOff, CheckSquare, Square, Loader2, Lock, Unlock, RotateCcw, Plug } from 'lucide-react';
 import { Repository } from '../types';
@@ -42,7 +43,7 @@ const PluginBulkMenu: React.FC<{
   actions: RegisteredPluginAction[];
   exporters: RegisteredExporter[];
   repositories: Repository[];
-  language: 'zh' | 'en';
+  language: AppLanguage;
   disabled: boolean;
   onBusyChange: (busy: boolean) => void;
 }> = ({ actions, exporters, repositories, language, disabled, onBusyChange }) => {

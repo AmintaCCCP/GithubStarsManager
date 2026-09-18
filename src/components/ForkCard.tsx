@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { memo, useCallback } from 'react';
 import { ExternalLink, GitFork, RefreshCw, ChevronDown, ChevronUp, FolderOpen, Folder, Play, Loader2 } from 'lucide-react';
 import { ForkRepo, WorkflowDefinition } from '../types';
@@ -18,7 +19,7 @@ interface ForkCardProps {
   isSyncing: boolean;
   isRunningWorkflow: boolean;
   needsSync: boolean; // true = out-of-date, can sync; false = already up-to-date
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const ForkCard: React.FC<ForkCardProps> = memo(({

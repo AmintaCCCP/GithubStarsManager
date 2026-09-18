@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
@@ -32,7 +33,7 @@ const FONT_SIZES = [
 
 const TOC_MAX_LEVEL = 6;
 
-const getDefaultReadmeVariant = (language: 'zh' | 'en'): ReadmeVariant => ({
+const getDefaultReadmeVariant = (language: AppLanguage): ReadmeVariant => ({
   ...DEFAULT_README_VARIANT,
   label: language === 'zh' ? '默认 README' : 'Default README',
 });

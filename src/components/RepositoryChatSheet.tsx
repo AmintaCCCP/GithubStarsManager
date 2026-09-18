@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowDown, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDot, Copy, ExternalLink, Gauge, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
@@ -37,7 +38,7 @@ const formatToolDuration = (durationMs?: number): string | null => {
   return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
 };
 
-const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: 'zh' | 'en'): string => {
+const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: AppLanguage): string => {
   const zh = language === 'zh';
   if (stage === 'understanding') return zh ? '理解问题' : 'Understand question';
   if (stage === 'context') return zh ? '查看项目结构' : 'Inspect repository structure';
@@ -57,7 +58,7 @@ const TASK_DEPTH_OPTIONS: Array<{ value: RepositoryChatTaskDepth; zh: string; en
   { value: 'unlimited', zh: '不限', en: 'Unlimited', descZh: '放开所有限制，注意耗时与额度', descEn: 'No limits; expect longer runs and higher usage' },
 ];
 
-const depthMeta = (depth: RepositoryChatTaskDepth, language: 'zh' | 'en'): { label: string; description: string } => {
+const depthMeta = (depth: RepositoryChatTaskDepth, language: AppLanguage): { label: string; description: string } => {
   const option = TASK_DEPTH_OPTIONS.find((item) => item.value === depth) ?? TASK_DEPTH_OPTIONS[0];
   const budget = depth !== 'default' ? TASK_DEPTH_PRESETS[depth].budget : null;
   const label = budget
@@ -66,7 +67,7 @@ const depthMeta = (depth: RepositoryChatTaskDepth, language: 'zh' | 'en'): { lab
   return { label, description: language === 'zh' ? option.descZh : option.descEn };
 };
 
-const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: 'zh' | 'en'; isRunning: boolean }> = ({ events, language, isRunning }) => {
+const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: AppLanguage; isRunning: boolean }> = ({ events, language, isRunning }) => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   const completed = events.filter((event) => event.status === 'success').length;
   const failed = events.filter((event) => event.status === 'error').length;
@@ -141,7 +142,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
 };
 
 /** 助手消息正文：行内引用渲染为 CitationBadge；按内容 + 证据 + 语言做 memo，避免流式期间全量重渲。 */
-const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]; evidenceById: Record<string, ToolEvidence>; language: 'zh' | 'en' }>(({ content, evidenceIds, evidenceById, language }) => {
+const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]; evidenceById: Record<string, ToolEvidence>; language: AppLanguage }>(({ content, evidenceIds, evidenceById, language }) => {
   const renderInlineCode = useCallback((text: string) => {
     const evidences = evidenceIds
       .map((id) => evidenceById[id])

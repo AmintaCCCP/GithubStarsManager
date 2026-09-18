@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import type { PluginActionResult } from './types';
 
 type Toast = (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
@@ -5,7 +6,7 @@ type Toast = (message: string, type?: 'success' | 'error' | 'info' | 'warning') 
 export async function applyPluginActionResult(
   result: PluginActionResult,
   toast: Toast,
-  language: 'zh' | 'en'
+  language: AppLanguage
 ): Promise<void> {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
   if (result.type === 'notice') {
