@@ -1,3 +1,4 @@
+import { i18n } from '../i18n';
 import { useT } from "../i18n/useT";
 import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
@@ -36,7 +37,7 @@ const TOC_MAX_LEVEL = 6;
 
 const getDefaultReadmeVariant = (language: AppLanguage): ReadmeVariant => ({
   ...DEFAULT_README_VARIANT,
-  label: language === 'zh' ? '默认 README' : 'Default README',
+  label: i18n.getFixedT(language, 'app')('readmeModal.default-readme'),
 });
 
 const isAbortError = (error: unknown, signal?: AbortSignal): boolean => {

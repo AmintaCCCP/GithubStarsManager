@@ -217,7 +217,8 @@
     "this-readme-file-is-empty": "This README file is empty",
     "failed-to-load-readme-please-check-your-network": "Failed to load README. Please check your network connection and try again later",
     "failed-to-load-selected-readme-please-try-again": "Failed to load selected README. Please try again later",
-    "loading-readme": "Loading README…"
+    "loading-readme": "Loading README…",
+    "default-readme": "Default README"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "Scroll to bottom"

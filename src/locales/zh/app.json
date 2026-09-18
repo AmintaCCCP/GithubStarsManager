@@ -217,7 +217,8 @@
     "this-readme-file-is-empty": "该 README 文件为空",
     "failed-to-load-readme-please-check-your-network": "加载 README 失败，请检查网络连接或稍后重试",
     "failed-to-load-selected-readme-please-try-again": "加载所选 README 失败，请稍后重试",
-    "loading-readme": "正在加载 README…"
+    "loading-readme": "正在加载 README…",
+    "default-readme": "默认 README"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "滚动到底部"

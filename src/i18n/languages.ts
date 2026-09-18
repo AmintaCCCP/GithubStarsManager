@@ -41,10 +41,12 @@ export const languageDefinition = (code: AppLanguage): LanguageDefinition =>
 
 /**
  * 首次安装（无持久化语言）时的默认语言检测。仅影响新安装，老用户始终读取
- * 持久化值。无 navigator 的环境回退 DEFAULT_LANGUAGE。
+ * 持久化值。命中支持列表 → 该语言；未命中（如 it-IT/sv-SE）→ 英文回退，
+ * 让非中英文用户首屏即可读。无 navigator 的环境回退简体中文（历史默认）。
  */
 const LANGUAGE_MATCHERS: Array<[AppLanguage, RegExp]> = [
-  ['zh-TW', /^zh(?:[-_](?:tw|hk|mo|hant))?\b/i],
+  // zh-TW 必须显式带地区/文字后缀；'zh'/'zh-CN'/'zh-Hans' 落到简体
+  ['zh-TW', /^zh[-_](?:tw|hk|mo|hant)\b/i],
   ['ja', /^ja\b/i],
   ['ko', /^ko\b/i],
   ['ru', /^ru\b/i],
@@ -53,6 +55,7 @@ const LANGUAGE_MATCHERS: Array<[AppLanguage, RegExp]> = [
   ['es', /^es\b/i],
   ['pt-BR', /^pt\b/i],
   ['en', /^en\b/i],
+  ['zh', /^zh\b/i],
 ];
 
 export const detectInitialLanguage = (): AppLanguage => {
@@ -66,5 +69,5 @@ export const detectInitialLanguage = (): AppLanguage => {
     const matched = LANGUAGE_MATCHERS.find(([, pattern]) => pattern.test(candidate));
     if (matched) return matched[0];
   }
-  return DEFAULT_LANGUAGE;
+  return FALLBACK_LANGUAGE;
 };

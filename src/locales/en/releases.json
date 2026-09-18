@@ -16,7 +16,7 @@
   "forkTimeline": {
     "personal-account": "Personal account",
     "fork": "Fork",
-    "manage-v2-forked-repositories-for-v2": "Manage {{v2}} forked repositories for {{v2}}",
+    "manage-v2-forked-repositories-for-v2": "Manage {{v2}} forked repositories for {{currentOwnerLabel}}",
     "owner": "Owner:",
     "v1-personal": "{{v1}} (Personal)",
     "loading-organizations": "Loading organizations…",

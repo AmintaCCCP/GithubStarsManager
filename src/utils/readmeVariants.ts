@@ -90,12 +90,24 @@ const getLanguageLabel = (languageCode: string, uiLanguage: AppLanguage): string
   return normalized;
 };
 
+/** 各 UI 语言的 README 变体优先级：本语言源码优先，其次英文，再回退中文 */
+const UI_LANGUAGE_README_PRIORITY: Record<AppLanguage, string[]> = {
+  zh: ['zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn', 'en'],
+  'zh-TW': ['zh-tw', 'zh-hant', 'zh-hk', 'zh', 'zh-cn', 'zh-hans', 'en'],
+  en: ['en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  ja: ['ja', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  ko: ['ko', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  ru: ['ru', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  fr: ['fr', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  de: ['de', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  es: ['es', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+  'pt-BR': ['pt-br', 'pt', 'en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'],
+};
+
 const getLanguagePriority = (languageCode: string | undefined, uiLanguage: AppLanguage): number => {
   if (!languageCode) return 999;
   const normalized = normalizeLanguageCode(languageCode);
-  const currentLanguagePriority = uiLanguage === 'zh'
-    ? ['zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn', 'en']
-    : ['en', 'zh', 'zh-cn', 'zh-hans', 'zh-tw', 'zh-hant', 'cn'];
+  const currentLanguagePriority = UI_LANGUAGE_README_PRIORITY[uiLanguage] ?? UI_LANGUAGE_README_PRIORITY.en;
 
   const currentIndex = currentLanguagePriority.indexOf(normalized);
   if (currentIndex >= 0) return currentIndex;
