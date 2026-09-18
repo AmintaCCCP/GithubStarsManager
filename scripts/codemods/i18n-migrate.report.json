@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/components/GlobalChatHistorySheet.tsx",
+    "line": 94,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/ReadmeModal.tsx",
+    "line": 39,
+    "reason": "host has no block body",
+    "snippet": "language === 'zh' ? '默认 README' : 'Default README'"
+  },
+  {
+    "file": "src/components/SearchBar.tsx",
+    "line": 642,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/SubscriptionRepoCard.tsx",
+    "line": 133,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/SubscriptionRepoCard.tsx",
+    "line": 136,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/TelegramMessageModal.tsx",
+    "line": 25,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/UpdateChecker.tsx",
+    "line": 67,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/UpdateNotificationBanner.tsx",
+    "line": 27,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/WeeklyIssueModal.tsx",
+    "line": 30,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/components/XTweetModal.tsx",
+    "line": 24,
+    "reason": "locale ternary in formatter",
+    "snippet": "language === 'zh' ? 'zh-CN' : 'en-US'"
+  },
+  {
+    "file": "src/features/repository-chat/hooks/useRepositoryChatSessions.ts",
+    "line": 16,
+    "reason": "host has no block body",
+    "snippet": "language === 'zh' ? '新对话' : 'New conversation'"
+  }
+]

@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { GitHubApiService, GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
@@ -6,7 +8,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 
 interface UseGitHubTokenActionsOptions {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export interface GitHubTokenActions {
@@ -29,7 +31,7 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
   const updateToken = useCallback(async () => {
     const token = tokenInput.trim();
     if (!token) {
-      toast(t('请输入有效的 GitHub Access Token', 'Please enter a valid GitHub access token'), 'error');
+      toast(t('useGitHubTokenActions.please-enter-a-valid-github-access-token'), 'error');
       return;
     }
 
@@ -38,10 +40,7 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
       const nextUser = await new GitHubApiService(token).getCurrentUser();
       if (user && nextUser.id !== user.id) {
         toast(
-          t(
-            `该 token 属于 ${nextUser.login}，当前账号是 ${user.login}。请先退出再登录另一个账号，本地数据会按账号分别保留。`,
-            `This token belongs to ${nextUser.login}, but you are signed in as ${user.login}. Log out first to switch accounts; local data is kept per GitHub account.`,
-          ),
+          t('useGitHubTokenActions.this-token-belongs-to-v1-but-you-are-signed-in-a', { v1: nextUser.login, v2: user.login }),
           'error',
         );
         return;
@@ -57,10 +56,7 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
         } catch (error) {
           console.warn('Failed to save GitHub token to backend:', error);
           toast(
-            t(
-              '未能将新 Token 保存到后端，本地凭证未更新。请稍后重试。',
-              'Failed to save the new token to the backend. Local credentials were not updated. Please try again later.',
-            ),
+            t('useGitHubTokenActions.failed-to-save-the-new-token-to-the-backend-loca'),
             'error',
           );
           setTokenInput('');
@@ -70,11 +66,11 @@ export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitH
       setGitHubToken(token);
       setUser(nextUser);
       setTokenInput('');
-      toast(t('GitHub Token 已更新', 'GitHub token updated'), 'success');
+      toast(t('useGitHubTokenActions.github-token-updated'), 'success');
     } catch (error) {
       const message = error instanceof Error && error.message === GITHUB_TOKEN_INVALID_ERROR
-        ? t('GitHub token 已过期或无效', 'GitHub token has expired or is invalid')
-        : (error instanceof Error ? error.message : t('更新失败，请稍后重试', 'Update failed. Please try again'));
+        ? t('useGitHubTokenActions.github-token-has-expired-or-is-invalid')
+        : (error instanceof Error ? error.message : t('useGitHubTokenActions.update-failed-please-try-again'));
       toast(message, 'error');
     } finally {
       setIsSaving(false);

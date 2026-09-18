@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
@@ -6,7 +8,7 @@ import { backend } from '../../../services/backendAdapter';
 import { isElectron } from '../../../services/electronProxy';
 
 interface UseMcpActionsOptions {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 const generateLocalToken = (): string => {
@@ -80,17 +82,17 @@ export const useMcpActions = ({ t }: UseMcpActionsOptions): McpActions => {
         const result = await backend.updateMcpConfig({ enabled });
         setMcpConfig({ enabled: result.enabled, token: result.token });
         setEndpoints(result.endpoints);
-        toast(enabled ? t('MCP 服务已开启', 'MCP server enabled') : t('MCP 服务已关闭', 'MCP server disabled'), 'success');
+        toast(enabled ? t('useMcpActions.mcp-server-enabled') : t('useMcpActions.mcp-server-disabled'), 'success');
       } else if (isElectron()) {
         const token = enabled && !mcpConfig.token ? generateLocalToken() : mcpConfig.token;
         setMcpConfig({ enabled, token });
-        toast(enabled ? t('MCP 服务已开启（本地）', 'MCP server enabled (local)') : t('MCP 服务已关闭', 'MCP server disabled'), 'success');
+        toast(enabled ? t('useMcpActions.mcp-server-enabled-local') : t('useMcpActions.mcp-server-disabled'), 'success');
       } else {
-        toast(t('需要后端或客户端才能使用 MCP', 'Backend or desktop client required for MCP'), 'error');
+        toast(t('useMcpActions.backend-or-desktop-client-required-for-mcp'), 'error');
       }
     } catch (reason) {
       setError((reason as Error).message);
-      toast(t('操作失败', 'Operation failed'), 'error');
+      toast(t('useMcpActions.operation-failed'), 'error');
     } finally {
       setSaving(false);
     }
@@ -98,12 +100,12 @@ export const useMcpActions = ({ t }: UseMcpActionsOptions): McpActions => {
 
   const resetToken = useCallback(async () => {
     if (!mcpConfig.enabled) {
-      toast(t('请先开启 MCP 服务再重置 Token', 'Enable MCP before resetting the token'), 'error');
+      toast(t('useMcpActions.enable-mcp-before-resetting-the-token'), 'error');
       return;
     }
     const confirmed = await confirm(
-      t('重置 MCP Token', 'Reset MCP Token'),
-      t('重置后旧 Token 立即失效，需要更新 Agent 配置。是否继续？', 'The old token will stop working immediately. Update your agent config. Continue?'),
+      t('useMcpActions.reset-mcp-token'),
+      t('useMcpActions.the-old-token-will-stop-working-immediately-upda'),
     );
     if (!confirmed) return;
     setSaving(true);
@@ -114,10 +116,10 @@ export const useMcpActions = ({ t }: UseMcpActionsOptions): McpActions => {
       } else {
         setMcpConfig({ token: generateLocalToken() });
       }
-      toast(t('Token 已重置', 'Token reset'), 'success');
+      toast(t('useMcpActions.token-reset'), 'success');
     } catch (reason) {
       setError((reason as Error).message);
-      toast(t('重置失败', 'Reset failed'), 'error');
+      toast(t('useMcpActions.reset-failed'), 'error');
     } finally {
       setSaving(false);
     }

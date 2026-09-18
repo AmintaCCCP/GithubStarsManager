@@ -1,8 +1,11 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import { Button } from './ui/button';
 import React, { useState } from 'react';
 import { Search, Bot, Lightbulb, Play, CheckCircle } from 'lucide-react';
-import { useAppStore } from '../store/useAppStore';
-import { useShallow } from 'zustand/react/shallow';
 
 interface SearchExample {
   query: string;
@@ -51,13 +54,10 @@ const searchExamples: SearchExample[] = [
 ];
 
 export const SearchDemo: React.FC = () => {
-  const { language } = useAppStore(useShallow((state) => ({
-    language: state.language,
-  })));
   const [selectedExample, setSelectedExample] = useState<SearchExample | null>(null);
   const [showDemo, setShowDemo] = useState(false);
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
 
   const handleExampleClick = (example: SearchExample) => {
     setSelectedExample(example);
@@ -75,10 +75,10 @@ export const SearchDemo: React.FC = () => {
             </div>
             <div>
               <h3 className="font-medium text-foreground dark:text-foreground">
-                {t('搜索功能升级', 'Search Feature Upgrade')}
+                {t('searchDemo.search-feature-upgrade')}
               </h3>
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('体验全新的实时搜索和AI语义搜索功能', 'Experience new real-time and AI semantic search features')}
+                {t('searchDemo.experience-new-real-time-and-ai-semantic-search')}
               </p>
             </div>
           </div>
@@ -87,7 +87,7 @@ export const SearchDemo: React.FC = () => {
             className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium"
           >
             <Play className="w-4 h-4" />
-            <span>{t('查看演示', 'View Demo')}</span>
+            <span>{t('searchDemo.view-demo')}</span>
           </Button>
         </div>
       </div>
@@ -103,10 +103,10 @@ export const SearchDemo: React.FC = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-              {t('搜索功能演示', 'Search Feature Demo')}
+              {t('searchDemo.search-feature-demo')}
             </h3>
             <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('点击下方示例体验不同的搜索模式', 'Click examples below to experience different search modes')}
+              {t('searchDemo.click-examples-below-to-experience-different-sea')}
             </p>
           </div>
         </div>
@@ -115,7 +115,7 @@ export const SearchDemo: React.FC = () => {
           variant="ghost"
           size="icon"
           onClick={() => setShowDemo(false)}
-          aria-label={t('关闭搜索演示', 'Close search demo')}
+          aria-label={t('searchDemo.close-search-demo')}
           className="text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
         >
           ×
@@ -128,7 +128,7 @@ export const SearchDemo: React.FC = () => {
           <div className="flex items-center space-x-2 mb-3">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
             <h4 className="font-medium text-foreground dark:text-foreground">
-              {t('实时搜索', 'Real-time Search')}
+              {t('searchDemo.real-time-search')}
             </h4>
           </div>
           {searchExamples
@@ -164,7 +164,7 @@ export const SearchDemo: React.FC = () => {
           <div className="flex items-center space-x-2 mb-3">
             <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             <h4 className="font-medium text-foreground dark:text-foreground">
-              {t('AI语义搜索', 'AI Semantic Search')}
+              {t('searchDemo.ai-semantic-search')}
             </h4>
           </div>
           {searchExamples
@@ -212,7 +212,7 @@ export const SearchDemo: React.FC = () => {
           
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('预期结果:', 'Expected Results:')}
+              {t('searchDemo.expected-results')}
             </p>
             <ul className="space-y-1">
               {selectedExample.expectedResults.map((result, index) => (
@@ -227,15 +227,9 @@ export const SearchDemo: React.FC = () => {
           <div className="mt-4 p-3 bg-muted dark:bg-primary/20 rounded-lg">
             <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
               {selectedExample.type === 'realtime' ? (
-                t(
-                  '💡 实时搜索会在您输入时立即显示匹配的仓库名称，响应速度极快。',
-                  '💡 Real-time search instantly shows matching repository names as you type, with extremely fast response.'
-                )
+                t('searchDemo.real-time-search-instantly-shows-matching-reposi')
               ) : (
-                t(
-                  '🤖 AI搜索使用语义理解，能够跨语言匹配并智能排序结果，适合复杂查询。',
-                  '🤖 AI search uses semantic understanding, can match across languages and intelligently rank results, perfect for complex queries.'
-                )
+                t('searchDemo.ai-search-uses-semantic-understanding-can-match')
               )}
             </p>
           </div>
@@ -245,35 +239,35 @@ export const SearchDemo: React.FC = () => {
       {/* 使用提示 */}
       <div className="mt-6 pt-6 border-t border-border dark:border-border">
         <h4 className="font-medium text-foreground dark:text-foreground mb-3">
-          {t('使用技巧', 'Usage Tips')}
+          {t('searchDemo.usage-tips')}
         </h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <div className="w-2 h-2 bg-primary rounded-full"></div>
               <span className="font-medium text-foreground dark:text-muted-foreground">
-                {t('实时搜索', 'Real-time Search')}
+                {t('searchDemo.real-time-search')}
               </span>
             </div>
             <ul className="space-y-1 text-muted-foreground dark:text-muted-foreground ml-4">
-              <li>• {t('输入时自动触发', 'Automatically triggered while typing')}</li>
-              <li>• {t('匹配仓库名称', 'Matches repository names')}</li>
-              <li>• {t('支持中文输入法', 'Supports Chinese IME')}</li>
-              <li>• {t('响应速度快', 'Fast response time')}</li>
+              <li>• {t('searchDemo.automatically-triggered-while-typing')}</li>
+              <li>• {t('searchDemo.matches-repository-names')}</li>
+              <li>• {t('searchDemo.supports-chinese-ime')}</li>
+              <li>• {t('searchDemo.fast-response-time')}</li>
             </ul>
           </div>
           <div className="space-y-2">
             <div className="flex items-center space-x-2">
               <Bot className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
               <span className="font-medium text-foreground dark:text-muted-foreground">
-                {t('AI语义搜索', 'AI Semantic Search')}
+                {t('searchDemo.ai-semantic-search')}
               </span>
             </div>
             <ul className="space-y-1 text-muted-foreground dark:text-muted-foreground ml-6">
-              <li>• {t('点击AI搜索按钮触发', 'Click AI Search button to trigger')}</li>
-              <li>• {t('支持自然语言查询', 'Supports natural language queries')}</li>
-              <li>• {t('跨语言匹配', 'Cross-language matching')}</li>
-              <li>• {t('智能结果排序', 'Intelligent result ranking')}</li>
+              <li>• {t('searchDemo.click-ai-search-button-to-trigger')}</li>
+              <li>• {t('searchDemo.supports-natural-language-queries')}</li>
+              <li>• {t('searchDemo.cross-language-matching')}</li>
+              <li>• {t('searchDemo.intelligent-result-ranking')}</li>
             </ul>
           </div>
         </div>

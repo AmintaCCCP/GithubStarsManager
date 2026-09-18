@@ -1,3 +1,4 @@
+
 import { Category, CategoryMatchMode, Repository } from '../types';
 
 export type CategoryNameTranslator = (zh: string, en: string) => string;
@@ -10,20 +11,17 @@ export const isReservedCategoryName = (name: string): boolean => name.trim().toL
 
 export const validateCategoryName = (
   name: string,
-  t: CategoryNameTranslator,
-  emptyMessage: readonly [string, string] = ['请输入分类名称', 'Please enter category name']
+  t: (key: string, params?: Record<string, unknown>) => string,
+  emptyMessageKey: string = 'categoryUtils.empty-name'
 ): CategoryNameValidation => {
   const trimmedName = name.trim();
   if (!trimmedName) {
-    return { value: null, error: t(emptyMessage[0], emptyMessage[1]) };
+    return { value: null, error: t(emptyMessageKey) };
   }
   if (isReservedCategoryName(trimmedName)) {
     return {
       value: null,
-      error: t(
-        'none 是保留名称，请使用其他分类名称',
-        'The name "none" is reserved. Please choose another category name.'
-      ),
+      error: t('categoryUtils.the-name-none-is-reserved-please-choose-another'),
     };
   }
   return { value: trimmedName, error: null };

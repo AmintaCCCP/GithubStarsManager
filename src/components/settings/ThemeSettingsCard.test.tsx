@@ -22,13 +22,15 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
 
+import { makeT } from '../../i18n/useT';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
 import { THEME_PRESETS } from '../../constants/themePresets';
 
-const t = (zh: string) => zh;
+const t = makeT('zh', 'app');
 
 beforeEach(() => {
   Object.assign(mocks.state, {
+    language: 'zh',
     theme: 'dark',
     themePreset: 'default',
     setTheme: vi.fn((mode: 'light' | 'dark') => setStateTheme(mode)),

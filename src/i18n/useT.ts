@@ -27,3 +27,19 @@ export function makeT(language: string, namespace?: I18nNamespace): TranslateFn 
   return (key: string, params?: Record<string, unknown>) =>
     i18n.getFixedT(language, namespace ?? 'common')(key, params) as string;
 }
+
+export type PairTranslateFn = (zh: string, en: string) => string;
+
+/**
+ * 过渡期兼容通道：数据驱动的双语标签对（如 labelZh/labelEn 字段、运行时拼装的
+ * 消息）暂时无法 key 化，tPair 保持 zh/en 行为不变，非 zh 语言回退英文。
+ * 后续把这些标签常量迁入字典后移除。
+ */
+export function useTPair(): PairTranslateFn {
+  const language = useAppStore(useShallow((state) => state.language));
+  return useMemo(() => (zh: string, en: string) => (language === 'zh' ? zh : en), [language]);
+}
+
+export function makeTPair(language: string): PairTranslateFn {
+  return (zh: string, en: string) => (language === 'zh' ? zh : en);
+}

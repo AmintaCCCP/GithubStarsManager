@@ -1,3 +1,5 @@
+
+import { useT } from '../../../i18n/useT';
 import type { AppLanguage } from '../../../i18n/languages';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Repository } from '../../../types';
@@ -31,6 +33,7 @@ export const useRepositoryChatSessions = ({
   language,
   resolveSourceRefSha,
 }: UseRepositoryChatSessionsOptions) => {
+  const t = useT('chat');
   const githubToken = useAppStore((state) => state.githubToken);
   const retainSessionDays = useAppStore((state) => state.repositoryChatSettings.retainSessionDays);
   const [sessions, setSessions] = useState<RepositoryChatSession[]>([]);
@@ -86,7 +89,7 @@ export const useRepositoryChatSessions = ({
     setError(null);
     try {
       const resolveSha = resolveSourceRefSha ?? ((targetRepository: Repository) => {
-        if (!githubToken) throw new Error(language === 'zh' ? '请先配置 GitHub token。' : 'Configure a GitHub token before starting a conversation.');
+        if (!githubToken) throw new Error(t('useRepositoryChatSessions.configure-a-github-token-before-starting-a-conve'));
         return resolveRepositoryChatHeadSha(targetRepository, githubToken);
       });
       const sourceRefSha = await resolveSha(repository);
@@ -114,7 +117,7 @@ export const useRepositoryChatSessions = ({
     } finally {
       if (operationId === operationIdRef.current) setIsLoading(false);
     }
-  }, [githubToken, language, repository, resolveSourceRefSha]);
+  }, [githubToken, language, repository, resolveSourceRefSha, t]);
 
   const selectSession = useCallback(async (sessionId: string) => {
     const operationId = ++operationIdRef.current;

@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ReleaseCard from './ReleaseCard';
 import type { Release } from '../types';
 
+const storeState: Record<string, unknown> = {
+  rpcDownloadConfig: { enabled: true, host: '', port: 6800 },
+  backendApiSecret: null,
+  aiConfigs: [],
+  activeAIConfig: null,
+  language: 'zh',
+};
+
 vi.mock('../store/useAppStore', () => ({
-  useAppStore: vi.fn(() => ({
-    rpcDownloadConfig: { enabled: true, host: '', port: 6800 },
-    backendApiSecret: null,
-    aiConfigs: [],
-    activeAIConfig: null,
-  })),
+  useAppStore: vi.fn((selector?: (state: Record<string, unknown>) => unknown) =>
+    selector ? selector(storeState) : storeState),
 }));
 
 vi.mock('../hooks/useDialog', () => ({
@@ -190,6 +194,7 @@ describe('ReleaseCard asset updated indicator', () => {
   });
 
   it('renders all five English header controls when body and download links exist', () => {
+    storeState.language = 'en';
     renderCard({
       language: 'en',
       release: makeRelease(1, { body: 'release notes', updated_asset_ids: [101] }),

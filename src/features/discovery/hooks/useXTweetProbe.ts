@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { probeXTweetSource } from '../../../services/xTweetService';
 import { useAppStore } from '../../../store/useAppStore';
@@ -8,6 +13,7 @@ import { useAppStore } from '../../../store/useAppStore';
  */
 export const useXTweetProbe = () => {
   const [isProbing, setIsProbing] = useState(false);
+  const t = useT('discovery');
   const [probeResult, setProbeResult] = useState<string | null>(null);
 
   const probe = useCallback(async (handle: string) => {
@@ -26,19 +32,16 @@ export const useXTweetProbe = () => {
     }
   }, []);
 
-  const language = useAppStore((state) => state.language);
   const message = probeResult === null
     ? null
     : probeResult.startsWith('OK|')
       ? (() => {
           const [, tweetCount, repoCount] = probeResult.split('|');
-          return language === 'zh'
-            ? `连接成功：解析到 ${tweetCount} 条推文，其中 ${repoCount} 个 GitHub 仓库链接。`
-            : `Connected: parsed ${tweetCount} tweets with ${repoCount} GitHub repo links.`;
+          return t('useXTweetProbe.connected-parsed-tweetcount-tweets-with-repocoun', { tweetCount: tweetCount, repoCount: repoCount });
         })()
       : (() => {
           const [, error] = probeResult.split('|');
-          return language === 'zh' ? `连接失败：${error}` : `Failed: ${error}`;
+          return t('useXTweetProbe.failed-error', { error: error });
         })();
   const probeOk = probeResult?.startsWith('OK|') ?? null;
 

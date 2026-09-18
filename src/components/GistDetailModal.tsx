@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import { Button } from './ui/button';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js';
@@ -26,8 +31,7 @@ interface HighlightedCodeProps {
 const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onContentLoaded }) => {
   const codeRef = useRef<HTMLElement>(null);
   const language = inferGistCodeLanguage(file.filename, file.language);
-  const language2 = useAppStore(state => state.language);
-  const t = (zh: string, en: string) => language2 === 'zh' ? zh : en;
+  const t = useT('gists');
 
   // 需要按需从 raw_url 拉取完整内容的场景：
   // 1. file.truncated === true：详情 API 标记文件已截断（>1MB），content 仅是部分内容
@@ -62,7 +66,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
       } catch (err) {
         if (controller.signal.aborted) return;
         const msg = err instanceof Error ? err.message : String(err);
-        setRawError(msg === 'Aborted' ? t('加载已取消', 'Loading cancelled') : msg);
+        setRawError(msg === 'Aborted' ? t('gistDetailModal.loading-cancelled') : msg);
       } finally {
         if (!controller.signal.aborted) setIsLoadingRaw(false);
       }
@@ -88,7 +92,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
     return (
       <div className="flex items-center justify-center rounded-lg bg-muted p-8 dark:bg-muted/40">
         <Loader2 className="mr-2 h-5 w-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
-        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载文件内容…', 'Loading file content…')}</span>
+        <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('gistDetailModal.loading-file-content')}</span>
       </div>
     );
   }
@@ -107,7 +111,7 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <RefreshCw className="h-4 w-4" />
-          {t('重试', 'Retry')}
+          {t('gistDetailModal.retry')}
         </Button>
       </div>
     );
@@ -123,14 +127,13 @@ const HighlightedCode: React.FC<HighlightedCodeProps> = ({ file, fetchRaw, onCon
 };
 
 export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, onClose }) => {
-  const language = useAppStore(state => state.language);
   const updateGist = useAppStore(state => state.updateGist);
   const { fetchGistFileRaw } = useGistActions();
   const { toast } = useDialog();
   const [activeFilename, setActiveFilename] = useState<string>('');
   const [loadedContents, setLoadedContents] = useState<Record<string, string>>({});
   const previousGistIdRef = useRef<Gist['id'] | null>(null);
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('gists');
 
   const files = useMemo(() => Object.values(gist?.files || {}), [gist]);
   const activeFile = files.find(file => file.filename === activeFilename) || files[0];
@@ -190,7 +193,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
 
   const handleCopy = async (text: string, message: string) => {
     const result = await safeWriteText(text);
-    toast(result.success ? message : (result.error || t('复制失败', 'Copy failed')), result.success ? 'success' : 'error');
+    toast(result.success ? message : (result.error || t('gistDetailModal.copy-failed')), result.success ? 'success' : 'error');
   };
 
   if (!gist) return null;
@@ -200,20 +203,20 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
       <div className="min-w-0 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 text-sm text-muted-foreground dark:text-muted-foreground">
-            <span>{gist.owner?.login || t('未知创建者', 'Unknown owner')}</span>
+            <span>{gist.owner?.login || t('gistDetailModal.unknown-owner')}</span>
             <span className="mx-2">·</span>
-            <span>{t('更新于', 'Updated')} {new Date(gist.updated_at).toLocaleString()}</span>
+            <span>{t('gistDetailModal.updated')} {new Date(gist.updated_at).toLocaleString()}</span>
             <span className="mx-2">·</span>
-            <span>{gist.public ? t('公开', 'Public') : t('私有', 'Secret')}</span>
+            <span>{gist.public ? t('gistDetailModal.public') : t('gistDetailModal.secret')}</span>
           </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
-              onClick={() => handleCopy(gist.html_url, t('链接已复制', 'Link copied'))}
+              onClick={() => handleCopy(gist.html_url, t('gistDetailModal.link-copied'))}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
             >
               <Copy className="h-4 w-4" />
-              {t('复制链接', 'Copy link')}
+              {t('gistDetailModal.copy-link')}
             </Button>
             <a
               href={gist.html_url}
@@ -222,7 +225,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <ExternalLink className="h-4 w-4" />
-              {t('打开', 'Open')}
+              {t('gistDetailModal.open')}
             </a>
           </div>
         </div>
@@ -258,17 +261,17 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
                 <div className="truncate font-medium text-foreground dark:text-foreground">{activeFile.filename}</div>
                 <div className="text-xs text-muted-foreground dark:text-muted-foreground">
                   {activeFile.language || inferGistCodeLanguage(activeFile.filename)} · {activeFile.size.toLocaleString()} bytes
-                  {activeFile.truncated ? ` · ${t('内容已截断', 'Content truncated')}` : ''}
+                  {activeFile.truncated ? ` · ${t('gistDetailModal.content-truncated')}` : ''}
                 </div>
               </div>
               <Button
                 type="button"
                 disabled={!canCopyActiveFile}
-                onClick={() => handleCopy(activeCopyContent, t('文件内容已复制', 'File copied'))}
+                onClick={() => handleCopy(activeCopyContent, t('gistDetailModal.file-copied'))}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted dark:border-border dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
               >
                 <Copy className="h-4 w-4" />
-                {t('复制文件', 'Copy file')}
+                {t('gistDetailModal.copy-file')}
               </Button>
             </div>
             <HighlightedCode
@@ -280,7 +283,7 @@ export const GistDetailModal: React.FC<GistDetailModalProps> = ({ gist, isOpen, 
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground dark:border-border dark:text-muted-foreground">
-            {t('没有文件', 'No files')}
+            {t('gistDetailModal.no-files')}
           </div>
         )}
       </div>

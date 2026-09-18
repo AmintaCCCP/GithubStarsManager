@@ -1,3 +1,5 @@
+import { getIntlLocale } from '../i18n/format';
+import { useT } from "../i18n/useT";
 import React from 'react';
 import { ExternalLink, Calendar } from 'lucide-react';
 import { Modal } from './Modal';
@@ -17,17 +19,17 @@ interface XTweetModalProps {
  */
 export const XTweetModal: React.FC<XTweetModalProps> = ({ isOpen, onClose, tweet }) => {
   const language = useAppStore(state => state.language);
-  const t = React.useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('plugins');
 
   const tweetDate = tweet.createdAt && Number.isFinite(Date.parse(tweet.createdAt))
-    ? new Date(tweet.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
+    ? new Date(tweet.createdAt).toLocaleString(getIntlLocale(language))
     : '';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t(`@${tweet.handle} 的推文`, `Tweet from @${tweet.handle}`)}
+      title={t('xTweetModal.tweet-from-v1', { v1: tweet.handle })}
       maxWidth="max-w-4xl"
       scrollable
       footer={
@@ -50,7 +52,7 @@ export const XTweetModal: React.FC<XTweetModalProps> = ({ isOpen, onClose, tweet
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
-            {t('在 X 打开', 'Open on X')}
+            {t('xTweetModal.open-on-x')}
           </a>
         </div>
       }
@@ -63,7 +65,7 @@ export const XTweetModal: React.FC<XTweetModalProps> = ({ isOpen, onClose, tweet
         />
       ) : (
         <div className="py-10 text-center text-sm text-muted-foreground dark:text-muted-foreground">
-          {t('推文正文为空', 'This tweet has no text content')}
+          {t('xTweetModal.this-tweet-has-no-text-content')}
         </div>
       )}
     </Modal>

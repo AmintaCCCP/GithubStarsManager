@@ -1,8 +1,12 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useState, useCallback, createContext, useContext, ReactNode, useMemo, useRef } from 'react';
 import { Toast, ToastType } from '../components/ui/Toast';
 import * as ToastPrimitive from '@radix-ui/react-toast';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { useAppStore } from '../store/useAppStore';
 
 interface ToastState {
   message: string;
@@ -43,7 +47,7 @@ interface DialogProviderProps {
 }
 
 export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
-  const language = useAppStore((state) => state.language);
+    const t = useT('app');
   const [toastState, setToastState] = useState<ToastState | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>({
     isOpen: false,
@@ -116,7 +120,7 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
             key={toastState.key}
             message={toastState.message}
             type={toastState.type}
-            closeLabel={language === 'zh' ? '关闭' : 'Close'}
+            closeLabel={t('useDialog.close')}
             onClose={closeToast}
           />
         )}
@@ -124,8 +128,8 @@ export const DialogProvider: React.FC<DialogProviderProps> = ({ children }) => {
           isOpen={confirmState.isOpen}
           title={confirmState.title}
           message={confirmState.message}
-          confirmText={confirmState.confirmText ?? (language === 'zh' ? '确认' : 'Confirm')}
-          cancelText={confirmState.cancelText ?? (language === 'zh' ? '取消' : 'Cancel')}
+          confirmText={confirmState.confirmText ?? (t('useDialog.confirm'))}
+          cancelText={confirmState.cancelText ?? (t('useDialog.cancel'))}
           type={confirmState.type}
           onConfirm={handleConfirm}
           onCancel={handleCancel}

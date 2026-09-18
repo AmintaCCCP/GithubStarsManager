@@ -85,7 +85,7 @@ beforeEach(() => {
   storeState.repositoryViewMode = 'grid';
   storeState.similarView = null;
   Object.assign(searchFilters, { sortBy: 'stars', sortOrder: 'desc' });
-  mockUseAppStore.mockImplementation(() => storeState as ReturnType<typeof useAppStore>);
+  mockUseAppStore.mockImplementation(((selector?: (state: unknown) => unknown) => (selector ? selector(storeState) : storeState)) as unknown as typeof useAppStore);
   Object.assign(mockUseAppStore, {
     getState: () => storeState,
   });

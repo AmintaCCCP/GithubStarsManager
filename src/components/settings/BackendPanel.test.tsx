@@ -1,3 +1,4 @@
+import { makeT } from '../../i18n/useT';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BackendPanel } from './BackendPanel';
@@ -66,7 +67,7 @@ vi.mock('../../hooks/useDialog', () => ({
 }));
 
 const health = { version: '0.1.0', timestamp: '2026-08-19T00:00:00Z' };
-const t = (_zh: string, en: string) => en;
+const t = makeT('en', 'app');
 
 describe('BackendPanel token synchronization', () => {
   beforeEach(() => {

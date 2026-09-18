@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { ProxyConfig, RpcDownloadConfig } from '../../../types';
@@ -7,7 +9,7 @@ import { electronProxy, isElectron } from '../../../services/electronProxy';
 import { testRpcDownload } from '../../../services/rpcDownloadService';
 
 interface UseNetworkActionsOptions {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 type ConnectionResult = { success: boolean; error?: string };
@@ -137,7 +139,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
       if (isElectron()) {
         try { await electronProxy.setProxy(previous); } catch { /* best-effort rollback */ }
       }
-      setTestResult({ success: false, error: reason instanceof Error ? reason.message : t('保存失败', 'Save failed') });
+      setTestResult({ success: false, error: reason instanceof Error ? reason.message : t('useNetworkActions.save-failed') });
     } finally {
       setSaving(false);
     }
@@ -178,7 +180,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
         try { await electronProxy.setProxy(previousConfig); } catch { /* best-effort rollback */ }
       }
       setForm(previousForm);
-      setTestResult({ success: false, error: reason instanceof Error ? reason.message : t('保存失败', 'Save failed') });
+      setTestResult({ success: false, error: reason instanceof Error ? reason.message : t('useNetworkActions.save-failed') });
     } finally {
       setIsProxyToggling(false);
     }
@@ -206,7 +208,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
       setRpcDownloadConfig(rpcForm);
       if (rpcForm.secret) setHasStoredSecret(true);
     } catch (reason) {
-      setRpcTestResult({ success: false, error: reason instanceof Error ? reason.message : t('保存失败', 'Save failed') });
+      setRpcTestResult({ success: false, error: reason instanceof Error ? reason.message : t('useNetworkActions.save-failed') });
     } finally {
       setRpcSaving(false);
     }
@@ -236,7 +238,7 @@ export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActio
       setRpcDownloadConfig(nextConfig);
     } catch (reason) {
       setRpcForm(previous);
-      setRpcTestResult({ success: false, error: reason instanceof Error ? reason.message : t('保存失败', 'Save failed') });
+      setRpcTestResult({ success: false, error: reason instanceof Error ? reason.message : t('useNetworkActions.save-failed') });
     } finally {
       setIsRpcToggling(false);
     }
