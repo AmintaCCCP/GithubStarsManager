@@ -62,7 +62,7 @@ const depthMeta = (depth: RepositoryChatTaskDepth, language: AppLanguage): { lab
   const budget = depth !== 'default' ? TASK_DEPTH_PRESETS[depth].budget : null;
   const optionLabel = t(`repositoryChatSheet.${option.key}`);
   const label = budget
-    ? `${optionLabel} · ${budget.maxTurns}${t('repositoryChatSheet.rounds')}/${Math.round(budget.maxDurationMs / 1000)}s`
+    ? t('repositoryChatSheet.depth-with-budget', { label: optionLabel, turns: budget.maxTurns, seconds: Math.round(budget.maxDurationMs / 1000) })
     : optionLabel;
   return { label, description: t(`repositoryChatSheet.${option.key}-desc`) };
 };

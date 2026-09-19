@@ -103,7 +103,8 @@
     "depth-deep": "深入",
     "depth-deep-desc": "多轮取证并读代码，适合细节与对比",
     "depth-unlimited": "不限",
-    "depth-unlimited-desc": "放开所有限制，注意耗时与额度"
+    "depth-unlimited-desc": "放开所有限制，注意耗时与额度",
+    "depth-with-budget": "{{label}} · {{turns}} 轮/{{seconds}}s"
   },
   "citationBadge": {
     "open-source-path-linestart": "查看来源 {{path}}:{{lineStart}}",

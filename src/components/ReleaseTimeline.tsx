@@ -566,7 +566,7 @@ export const ReleaseTimeline: React.FC = () => {
              </div>
             {lastRefreshTime && (
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('releaseTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
+                {t('releaseTimeline.last-refresh-time', { time: formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
               </p>
             )}
           </div>
@@ -638,7 +638,7 @@ export const ReleaseTimeline: React.FC = () => {
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('releaseTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
+                {t('releaseTimeline.last-refresh-time', { time: formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
               </span>
             )}
 

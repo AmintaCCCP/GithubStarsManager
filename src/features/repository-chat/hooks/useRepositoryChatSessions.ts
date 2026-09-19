@@ -18,7 +18,11 @@ export const DEFAULT_CHAT_TITLES = new Set([
   '新对话', 'New conversation', '新しい会話', 'Nueva conversación', 'Nova conversa',
   'Новый диалог', '新對話', 'Nouvelle conversation', 'Neue Unterhaltung', '새 대화',
 ]);
-const defaultTitle = (language: AppLanguage) => language === 'zh' ? '新对话' : 'New conversation';
+const DEFAULT_TITLE_BY_LANGUAGE: Record<AppLanguage, string> = {
+  zh: '新对话', en: 'New conversation', ja: '新しい会話', es: 'Nueva conversación', 'pt-BR': 'Nova conversa',
+  ru: 'Новый диалог', 'zh-TW': '新對話', fr: 'Nouvelle conversation', de: 'Neue Unterhaltung', ko: '새 대화',
+};
+const defaultTitle = (language: AppLanguage) => DEFAULT_TITLE_BY_LANGUAGE[language] ?? 'New conversation';
 
 /** 通知全局问答历史入口（SearchBar 徽标、历史抽屉）刷新。 */
 const notifyGlobalHistoryChanged = () => {

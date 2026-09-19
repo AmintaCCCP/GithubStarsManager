@@ -1,4 +1,4 @@
-import { getDateFnsLocale } from '../i18n/format';
+import { getDateFnsLocale, getIntlLocale } from '../i18n/format';
 import { useT } from "../i18n/useT";
 import type { AppLanguage } from '../i18n/languages';
 import React, { memo, useCallback, useMemo, useState, useEffect } from 'react';
@@ -355,7 +355,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                             <span>{formatFileSize(link.size)}</span>
                           )}
                           {link.downloadCount > 0 && (
-                            <span>{t('releaseCard.download-count', { count: link.downloadCount.toLocaleString() })}</span>
+                            <span>{t('releaseCard.download-count', { count: link.downloadCount.toLocaleString(getIntlLocale(language)) })}</span>
                           )}
                         </div>
                       </Button>
@@ -397,7 +397,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           <span>{formatFileSize(link.size)}</span>
                         )}
                         {link.downloadCount > 0 && (
-                          <span>{t('releaseCard.download-count', { count: link.downloadCount.toLocaleString() })}</span>
+                          <span>{t('releaseCard.download-count', { count: link.downloadCount.toLocaleString(getIntlLocale(language)) })}</span>
                         )}
                       </div>
                     </a>

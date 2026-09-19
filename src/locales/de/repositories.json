@@ -39,13 +39,13 @@
     "analyzed-on": "analysiert in",
     "ai-analyzed": "KI analysiert",
     "platforms": "Unterstützte Plattformen:",
-    "last-pushed": "Aktuelle Einsendungen",
+    "last-pushed": "Zuletzt aktualisiert",
     "find-similar-repositories-2": "Finden Sie ähnliche Lager",
     "find-similar": "Finden Sie ähnliche Lager",
     "deselect": "Abwählen",
     "select": "wählen",
     "analyzed-on-date": "Analysiert am {{date}}",
-    "last-pushed-time": "Letzte Einreichung {{time}}"
+    "last-pushed-time": "Zuletzt aktualisiert {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Lagerinformationen bearbeiten",

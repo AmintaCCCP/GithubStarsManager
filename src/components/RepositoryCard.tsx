@@ -1,5 +1,5 @@
 
-import { getDateFnsLocale } from '../i18n/format';
+import { getDateFnsLocale, getIntlLocale } from '../i18n/format';
 import { useT } from '../i18n/useT';
 import type { AppLanguage } from '../i18n/languages';
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
@@ -1165,7 +1165,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           ) : displayContent.isAnalyzed ? (
             <div
               className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary border border-primary/20 dark:border-primary/20"
-              title={displayContent.analyzedAt ? t('repositoryCard.analyzed-on-date', { date: new Date(displayContent.analyzedAt).toLocaleString() }) : ''}
+              title={displayContent.analyzedAt ? t('repositoryCard.analyzed-on-date', { date: new Date(displayContent.analyzedAt).toLocaleString(getIntlLocale(language)) }) : ''}
             >
               <Sparkles className="w-3 h-3" />
               <span>{t('repositoryCard.ai-analyzed')}</span>

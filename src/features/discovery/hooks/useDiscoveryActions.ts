@@ -64,11 +64,13 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     };
   }, [authSessionIdentity, setAnalysisProgress]);
   const t = useT('discovery');
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page = 1, append = false) => {
     const currentState = latestStateRef.current;
     if (!currentState.githubToken) {
-      toast(t('useDiscoveryActions.github-token-not-found-please-login-again'), 'error');
+      toast(tRef.current('useDiscoveryActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
     const requestVersion = (channelRequestVersionRef.current[channelId] ?? 0) + 1;
@@ -197,15 +199,15 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (!isCurrentRequest()) return;
       console.error(`Failed to refresh channel ${channelId}:`, error);
       if (append) {
-        currentState.setDiscoveryLoadMoreError(channelId, t('useDiscoveryActions.failed-to-load-more-please-retry'));
+        currentState.setDiscoveryLoadMoreError(channelId, tRef.current('useDiscoveryActions.failed-to-load-more-please-retry'));
       } else {
         const errorMsg = error instanceof Error ? error.message : '';
         if (channelId === 'x-tweet') {
-          toast(errorMsg ? `${t('useDiscoveryActions.failed-to-fetch-x-tweets')}: ${errorMsg}` : t('useDiscoveryActions.failed-to-fetch-x-tweets-please-check-your-netwo'), 'error');
+          toast(errorMsg ? `${tRef.current('useDiscoveryActions.failed-to-fetch-x-tweets')}: ${errorMsg}` : tRef.current('useDiscoveryActions.failed-to-fetch-x-tweets-please-check-your-netwo'), 'error');
         } else if (channelId === 'telegram') {
-          toast(errorMsg ? `${t('useDiscoveryActions.failed-to-fetch-telegram-messages')}: ${errorMsg}` : t('useDiscoveryActions.failed-to-fetch-telegram-messages-please-check-y'), 'error');
+          toast(errorMsg ? `${tRef.current('useDiscoveryActions.failed-to-fetch-telegram-messages')}: ${errorMsg}` : tRef.current('useDiscoveryActions.failed-to-fetch-telegram-messages-please-check-y'), 'error');
         } else {
-          toast(errorMsg || t('useDiscoveryActions.failed-to-fetch-data-please-check-your-network-c'), 'error');
+          toast(errorMsg || tRef.current('useDiscoveryActions.failed-to-fetch-data-please-check-your-network-c'), 'error');
         }
       }
     } finally {
@@ -223,7 +225,6 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         else currentState.setDiscoveryLoading(channelId, false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- t 仅用于 toast 文案，语言切换不应重建 refreshChannel（引用稳定性优先）
   }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
 
   const handleAnalyzePage = useCallback(async () => {

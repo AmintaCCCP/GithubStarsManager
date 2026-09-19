@@ -170,7 +170,8 @@
     "first-page": "First page",
     "previous-page": "Previous page",
     "next-page": "Next page",
-    "last-page": "Last page"
+    "last-page": "Last page",
+    "last-refresh-time": "Last refresh {{time}}"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "This release has no downloadable assets.",
