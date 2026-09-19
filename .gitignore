@@ -1,6 +1,10 @@
 # Logs
 logs
 *.log
+# 但 docs/logs/ 是版本化的阶段开发日志（不是运行日志），必须入库：
+# 上面的 `logs` 规则会匹配任意层级的 logs 目录，因此需要显式把该目录本身重新包含进来
+# （父目录被排除时，git 无法单独重新包含目录内的文件）。
+!docs/logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
