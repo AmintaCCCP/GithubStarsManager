@@ -14,6 +14,15 @@ export type {
   RepositoryHealthSignalId,
   RepositoryHealthSnapshot,
 } from './health';
+export type {
+  InstallableArchitecture,
+  InstallableAsset,
+  InstallableAssetDetectionOptions,
+  InstallableAssetDetectionResult,
+  InstallableConfidence,
+  InstallablePackageType,
+  InstallablePlatform,
+} from './installableAsset';
 
 export interface Repository {
   id: number;

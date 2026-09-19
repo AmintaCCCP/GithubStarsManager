@@ -643,4 +643,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.9.0/github-stars-manager-0.9.0.dmg</downloadUrl>
   </version>
+  <version>
+    <number>0.10.0</number>
+    <releaseDate>2026-09-19</releaseDate>
+    <changelog>
+      <item>feat: Added installable asset detection that identifies which release assets can be installed on the current device (Windows EXE/MSI/portable ZIP/7z, macOS DMG/PKG/ZIP/universal, Linux DEB/RPM/AppImage/tar.gz, Android APK) together with architecture (x64/arm64/x86/universal), package type, confidence and a human-readable reason.</item>
+      <item>feat: Excluded non-installable assets (source code, checksums, signatures, debug symbols, blockmaps, SBOM) and assets that declare conflicting platforms or architectures, and surfaced every candidate plus the exclusion reasons in the repository release sheet.</item>
+      <item>feat: Kept the user in control — nothing downloads or runs automatically, no asset is claimed to be safe, alternative candidates and the full asset list stay manually selectable, and the existing download path is reused unchanged.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.10.0/github-stars-manager-0.10.0.dmg</downloadUrl>
+  </version>
 </versions>
