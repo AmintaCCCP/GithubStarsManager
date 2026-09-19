@@ -134,6 +134,37 @@ describe('deriveRepositoryHealthSnapshot', () => {
     ).toBe(3);
   });
 
+  it('keeps release frequency unknown instead of reporting zero when nothing is known', () => {
+    // 既没有可解析的创建时间、也没有 Release 数据：只能承认「不知道」。
+    const unknown = deriveRepositoryHealthSnapshot(
+      makeRepo({ created_at: 'not-a-date' }),
+      undefined,
+      undefined,
+      NOW,
+    );
+    expect(unknown.releasesPerYear).toBeNull();
+    expect(unknown.ageDays).toBeNull();
+
+    // 给了 Release 数组（哪怕是空数组）就说明调用方知道 Release 情况，此时 0 才是事实。
+    const knownEmpty = deriveRepositoryHealthSnapshot(
+      makeRepo({ created_at: 'not-a-date' }),
+      [],
+      undefined,
+      NOW,
+    );
+    expect(knownEmpty.releasesPerYear).toBe(0);
+  });
+
+  it('falls back to updated_at when pushed_at is unusable, like the MCP mirrors', () => {
+    const snapshot = deriveRepositoryHealthSnapshot(
+      makeRepo({ pushed_at: 'not-a-date', updated_at: '2026-09-10T00:00:00.000Z' }),
+      [],
+      undefined,
+      NOW,
+    );
+    expect(snapshot.daysSinceLastPush).toBe(7);
+  });
+
   it('never emits a numeric health score', () => {
     const snapshot = deriveRepositoryHealthSnapshot(makeRepo(), [], undefined, NOW);
     expect(snapshot).not.toHaveProperty('score');

@@ -116,8 +116,8 @@ export interface RepositoryHealthSnapshot {
   releasesFetched: boolean;
   latestReleaseAt: string | null;
   releaseCount: number;
-  /** 粗略发布频率：release 总数 / 仓库年龄（年），保留一位小数。 */
-  releasesPerYear: number;
+  /** 粗略发布频率：release 总数 / 仓库年龄（年），保留一位小数；无法计算时为 null（未知）。 */
+  releasesPerYear: number | null;
   latestStableVersion: string | null;
   latestPrereleaseVersion: string | null;
 

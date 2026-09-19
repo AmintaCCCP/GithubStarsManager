@@ -126,7 +126,10 @@ export function deriveRepositoryHealthSnapshot(
     ownReleases.find((release) => isPrereleaseRelease(release)) ?? null;
 
   const createdTimestamp = toTimestamp(repository.created_at);
-  const pushedTimestamp = toTimestamp(repository.pushed_at);
+  // 与 `hasRecentActivity` 及 electron/server 两份镜像一致：pushed_at 缺失或不可解析时
+  // 回落到 updated_at，避免同一份数据在「最近活动」筛选与事实面板上给出不同答案。
+  const pushedTimestamp =
+    toTimestamp(repository.pushed_at) ?? toTimestamp(repository.updated_at);
   const ageDays =
     createdTimestamp === null
       ? null
@@ -137,9 +140,13 @@ export function deriveRepositoryHealthSnapshot(
       : Math.max(0, Math.floor((now - pushedTimestamp) / MS_PER_DAY));
 
   // 发布频率：以仓库年龄为窗口，分母下限一个月，避免新仓库出现噪声极值。
+  // 仓库年龄未知且调用方没给 Release 数据时保持 null（未知），不能报成 0 次/年
+  // ——那会把「不知道」说成「从不发布」。
   const releasesPerYear =
     ageDays === null
-      ? round1(releaseCount)
+      ? releases === undefined
+        ? null
+        : round1(releaseCount)
       : round1(
           releaseCount /
             (Math.max(ageDays, MIN_FREQUENCY_WINDOW_DAYS) / DAYS_PER_YEAR),
