@@ -290,7 +290,14 @@
     "star-count-range": "Star-Mengenbereich",
     "min": "Minimum:",
     "max": "maximal:",
-    "min-cannot-be-greater-than-max": "Der Minimalwert kann nicht größer als der Maximalwert sein"
+    "min-cannot-be-greater-than-max": "Der Minimalwert kann nicht größer als der Maximalwert sein",
+    "sort-updated": "nach Aktualisierungszeit",
+    "sort-created": "nach Erstellungszeit",
+    "sort-name": "mit Namen",
+    "sort-files": "Nach Anzahl der Dateien",
+    "sort-stars": "Nach Stern sortieren",
+    "sort-starred": "Sortieren nach Sternadditionszeit",
+    "sync-lists-confirm-body": "Ruft Ihre GitHub-Listen (Sternlisten) ab und wendet sie auf Ihr lokales Repository an:\n\n· Jeder Listenname wird dem entsprechenden Lager als Bezeichnung hinzugefügt (ein Lager kann zu mehreren Listen/Kategorien gehören).\n· Lager mit entsperrten Kategorien wenden die der Liste entsprechende Kategorie an und sind standardmäßig gesperrt\n· Lager mit gesperrten Kategorien bleiben unverändert\n\nSind Sie sicher, dass Sie fortfahren möchten?"
   },
   "searchDemo": {
     "search-feature-upgrade": "Upgrade der Suchfunktion",

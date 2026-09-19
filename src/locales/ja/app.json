@@ -290,7 +290,14 @@
     "star-count-range": "スター数量範囲",
     "min": "最小：",
     "max": "最大：",
-    "min-cannot-be-greater-than-max": "最小値は最大値より大きくすることはできません"
+    "min-cannot-be-greater-than-max": "最小値は最大値より大きくすることはできません",
+    "sort-updated": "更新時間までに",
+    "sort-created": "作成時間までに",
+    "sort-name": "名前で",
+    "sort-files": "ファイル数別",
+    "sort-stars": "星順に並べ替える",
+    "sort-starred": "スター追加時間順に並べ替える",
+    "sync-lists-confirm-body": "GitHub リスト (スター付きリスト) を取得し、ローカル リポジトリに適用します。\n\n· 各リスト名は対応する倉庫にラベルとして追加されます (1 つの倉庫が複数のリスト/カテゴリに属することができます)\n· ロックされていないカテゴリを持つウェアハウスは、リストに対応するカテゴリを適用し、デフォルトでロックされます。\n· ロックされたカテゴリを持つ倉庫は変更されません。\n\n続行してもよろしいですか?"
   },
   "searchDemo": {
     "search-feature-upgrade": "検索機能のアップグレード",

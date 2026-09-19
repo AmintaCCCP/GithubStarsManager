@@ -290,7 +290,14 @@
     "star-count-range": "별 수량 범위",
     "min": "최저한의:",
     "max": "최고:",
-    "min-cannot-be-greater-than-max": "최소값은 최대값보다 클 수 없습니다."
+    "min-cannot-be-greater-than-max": "최소값은 최대값보다 클 수 없습니다.",
+    "sort-updated": "업데이트 시간별",
+    "sort-created": "생성 시간별",
+    "sort-name": "이름으로",
+    "sort-files": "파일 수별",
+    "sort-stars": "별표순으로 정렬",
+    "sync-lists-confirm-body": "GitHub 목록(별표 표시된 목록)을 가져와 로컬 저장소에 적용합니다.\n\n· 각 목록 이름은 해당 창고에 라벨로 추가됩니다(하나의 창고가 여러 목록/카테고리에 속할 수 있음).\n· 잠금 해제된 카테고리가 있는 창고는 목록에 해당하는 카테고리가 적용되며 기본적으로 잠겨 있습니다.\n· 잠긴 카테고리가 있는 창고는 변경되지 않습니다.\n\n계속하시겠습니까?",
+    "sort-starred": "별 추가 시간을 기준으로 정렬"
   },
   "searchDemo": {
     "search-feature-upgrade": "검색 기능 업그레이드",

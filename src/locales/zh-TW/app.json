@@ -290,7 +290,14 @@
     "star-count-range": "Star數量範圍",
     "min": "最小:",
     "max": "最大:",
-    "min-cannot-be-greater-than-max": "最小值不能大於最大值"
+    "min-cannot-be-greater-than-max": "最小值不能大於最大值",
+    "sort-updated": "按更新時間",
+    "sort-created": "按創建時間",
+    "sort-files": "按文件數",
+    "sort-name": "按名稱",
+    "sort-stars": "按星標排序",
+    "sort-starred": "按加星時間排序",
+    "sync-lists-confirm-body": "將拉取你的 GitHub Lists（星標清單）並套用到本地倉庫：\n\n· 每個 list 名會作為標籤新增至對應倉庫（一個倉庫可屬於多個 list/分類）\n· 未鎖定分類的倉庫將套用 list 對應的分類並預設鎖定\n· 已锁定分类的仓库保持不变\n\n確定繼續嗎？"
   },
   "searchDemo": {
     "search-feature-upgrade": "搜尋功能升級",

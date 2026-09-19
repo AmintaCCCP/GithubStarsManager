@@ -1232,9 +1232,12 @@ ${options.user}` : options.user;
       : this.createAnalysisPrompt(repository, readmeContent, customCategories, categoryHints);
 
     try {
-      const system = (this.language === 'zh'
+      const system = this.language === 'zh'
         ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。只输出合法JSON，不要输出思考过程、Markdown、代码块标记或任何额外文本。summary字段只能描述仓库功能，不得复述提示词、输出格式或“只输出JSON”等要求。'
-        : 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.') + getOutputLanguageDirective(this.language);
+        : this.language === 'en'
+          ? 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.'
+          : 'You are a professional GitHub repository analysis assistant. Analyze repositories concisely, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.'
+            + getOutputLanguageDirective(this.language);
 
       let lastContent = '';
       let lastInvalidReason = '';
@@ -1295,9 +1298,12 @@ ${options.user}` : options.user;
       .map(file => `${file.filename}${file.language ? ` (${file.language})` : ''}, ${file.size} bytes`)
       .join('\n');
 
-    const system = (this.language === 'zh'
+    const system = this.language === 'zh'
       ? '你是一个专业的 GitHub Gist 分析助手。请用中文简洁总结 gist 的用途、关键内容和可能的使用场景。只输出摘要文本，不要 Markdown 标题。'
-      : 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely in English. Output summary text only, no Markdown heading.') + getOutputLanguageDirective(this.language);
+      : this.language === 'en'
+        ? 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely in English. Output summary text only, no Markdown heading.'
+        : 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely. Output summary text only, no Markdown heading.'
+          + getOutputLanguageDirective(this.language);
 
     const user = this.language === 'zh'
       ? `
@@ -1423,9 +1429,12 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
       throw new Error(this.language === 'zh' ? 'Release 内容为空，无法分析。' : 'Release body is empty, cannot analyze.');
     }
 
-    const system = (this.language === 'zh'
+    const system = this.language === 'zh'
       ? '你是一个专业的 GitHub Release 更新日志分析助手。请用简体中文，以通俗易懂的语言总结本次更新。直接输出 Markdown，不要输出任何额外解释、代码块标记或“以下是总结”之类的开场白。排版需易读，使用列表形式，并按重要程度从高到低排序。'
-      : 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand English. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.') + getOutputLanguageDirective(this.language);
+      : this.language === 'en'
+        ? 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand English. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.'
+        : 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand language. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.'
+          + getOutputLanguageDirective(this.language);
 
     const repoName = this.sanitizeForPrompt(meta.repoName);
     const tagName = this.sanitizeForPrompt(meta.tagName);

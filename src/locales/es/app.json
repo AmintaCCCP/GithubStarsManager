@@ -290,7 +290,14 @@
     "star-count-range": "Rango de cantidad de estrellas",
     "min": "Mínimo:",
     "max": "máximo:",
-    "min-cannot-be-greater-than-max": "El valor mínimo no puede ser mayor que el valor máximo."
+    "min-cannot-be-greater-than-max": "El valor mínimo no puede ser mayor que el valor máximo.",
+    "sort-updated": "por hora de actualización",
+    "sort-created": "por el tiempo de creación",
+    "sort-name": "por nombre",
+    "sort-files": "Por número de archivos",
+    "sort-stars": "Ordenar por estrella",
+    "sync-lists-confirm-body": "Extraerá sus listas de GitHub (listas destacadas) y las aplicará a su repositorio local:\n\n· Cada nombre de lista se agregará al almacén correspondiente como una etiqueta (un almacén puede pertenecer a varias listas/categorías)\n· Los almacenes con categorías desbloqueadas aplicarán la categoría correspondiente a la lista y estarán bloqueados de forma predeterminada\n· Los almacenes con categorías bloqueadas permanecen sin cambios\n\n¿Estás seguro de que quieres continuar?",
+    "sort-starred": "Ordenar por tiempo de adición de estrellas"
   },
   "searchDemo": {
     "search-feature-upgrade": "Actualización de la función de búsqueda",

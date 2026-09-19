@@ -4,7 +4,7 @@
  * - {{placeholder}} 保真校验：缺失/错位时回退 en，再回退 zh
  * - 纯 ASCII 文案直接沿用 zh（多为产品名词）
  * - 每个命名空间完成即落盘，可断点续跑（已有译文的语言文件整体重译）
- * 用法：node scripts/codemods/generate-translations.mjs [ja,es,...] [--ns=common,login]
+ * 用法：node scripts/codemods/generate-translations.mjs [--langs=ja,es,...] [--ns=common,login]
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -53,8 +53,10 @@ function protectPlaceholders(text) {
 
 function restorePlaceholders(translated, names, fallback) {
   if (!translated) return fallback;
-  const missing = names.some((_, index) => !translated.includes(`{{${index}}}`));
-  if (missing) return fallback;
+  // 索引集合必须与占位符完全一致（0..n-1 顺序无缺漏），否则整条回退
+  const indices = [...translated.matchAll(/\{\{(\d+)\}\}/g)].map((match) => Number(match[1])).sort((a, b) => a - b);
+  const invalid = indices.length !== names.length || indices.some((value, index) => value !== index);
+  if (invalid) return fallback;
   return translated.replace(/\{\{(\d+)\}\}/g, (_, index) => `{{${names[Number(index)]}}}`);
 }
 

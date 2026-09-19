@@ -2,7 +2,7 @@
 
 
 
-import { useT, useTPair } from '../i18n/useT';
+import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
 import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
@@ -59,7 +59,6 @@ export const Header: React.FC = () => {
   );
 
   const t = useT('app');
-  const tPair = useTPair();
 
   return (
     <header className="linear-header sticky top-0 z-50 hd-drag lg:hd-drag relative">
@@ -144,7 +143,7 @@ export const Header: React.FC = () => {
                     className={isActive ? 'bg-muted dark:bg-accent' : undefined}
                   >
                     <Icon className="mr-3 h-4 w-4" />
-                    {tPair(meta.labelZh, meta.labelEn)}
+                    {t(`header.menu-${menuItem.id}`)}
                   </DropdownMenuItem>
                 );
               })}
