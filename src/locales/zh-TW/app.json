@@ -338,9 +338,9 @@
     "press-escape-in-input-to-clear-search": "在輸入框中按 Escape 清除搜尋",
     "use-key-to-quickly-start-searching": "使用 / 鍵快速開始搜索",
     "got-it": "知道了",
+    "shortcut-focus-search": "聚焦搜尋框",
     "shortcut-clear-search": "清除搜尋",
     "shortcut-toggle-filters": "切換過濾器",
-    "shortcut-focus-search": "聚焦搜尋框",
     "shortcut-quick-search": "快速搜尋",
     "shortcut-ai-search": "AI搜尋"
   },

@@ -30,6 +30,7 @@
     "this-month": "este mes",
     "topic-filter": "Filtro de tema",
     "topic": "tema",
+    "ai": "IA",
     "ml": "aprendizaje automático",
     "db": "base de datos",
     "web": "desarrollo web",
@@ -76,10 +77,9 @@
     "loading-more": "Cargando más…",
     "retry": "Intentar otra vez",
     "platform-filter-v1": "Filtro de plataforma: {{v1}}",
-    "total-2": "(total",
-    "ai": "IA",
     "items-count": "{{currentCount}} artículos",
-    "items-count-with-total": "{{currentCount}} artículos ({{totalCount}} artículos en total)"
+    "items-count-with-total": "{{currentCount}} artículos ({{totalCount}} artículos en total)",
+    "total-2": "(total"
   },
   "weeklyIssueModal": {
     "submission-v1": "Contribución #{{v1}}",

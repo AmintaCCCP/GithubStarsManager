@@ -338,11 +338,11 @@
     "press-escape-in-input-to-clear-search": "Нажмите Escape в поле ввода, чтобы очистить поиск.",
     "use-key-to-quickly-start-searching": "Используйте клавишу /, чтобы быстро начать поиск.",
     "got-it": "знал",
-    "shortcut-clear-search": "Очистить поиск",
     "shortcut-focus-search": "Окно поиска фокуса",
+    "shortcut-clear-search": "Очистить поиск",
     "shortcut-toggle-filters": "Переключить фильтр",
-    "shortcut-ai-search": "AI-поиск",
-    "shortcut-quick-search": "Быстрый поиск"
+    "shortcut-quick-search": "Быстрый поиск",
+    "shortcut-ai-search": "AI-поиск"
   },
   "settingsPanel": {
     "general": "Универсальный",

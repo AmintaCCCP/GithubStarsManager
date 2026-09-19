@@ -338,10 +338,10 @@
     "press-escape-in-input-to-clear-search": "검색어를 지우려면 입력 상자에서 Esc를 누르세요.",
     "use-key-to-quickly-start-searching": "/ 키를 사용하여 빠르게 검색을 시작하세요.",
     "got-it": "알고 있었다",
-    "shortcut-clear-search": "검색 지우기",
     "shortcut-focus-search": "포커스 검색창",
-    "shortcut-quick-search": "빠른 검색",
+    "shortcut-clear-search": "검색 지우기",
     "shortcut-toggle-filters": "필터 전환",
+    "shortcut-quick-search": "빠른 검색",
     "shortcut-ai-search": "AI 검색"
   },
   "settingsPanel": {

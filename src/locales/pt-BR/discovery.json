@@ -77,9 +77,9 @@
     "loading-more": "Carregando mais…",
     "retry": "Tente novamente",
     "platform-filter-v1": "Filtro de plataforma: {{v1}}",
-    "total-2": "(total",
     "items-count": "{{currentCount}} itens",
-    "items-count-with-total": "{{currentCount}} itens ({{totalCount}} itens no total)"
+    "items-count-with-total": "{{currentCount}} itens ({{totalCount}} itens no total)",
+    "total-2": "(total"
   },
   "weeklyIssueModal": {
     "submission-v1": "Contribuição #{{v1}}",

@@ -125,11 +125,12 @@
   },
   "repositoryChatService": {
     "no-verified-summary": "本輪已完成僅讀取證，但未能產生可與精確來源核驗的總結性結果。請重試，或把問題縮小到一個具體功能、文件或目標；已讀取的文件與證據可在「來源與證據」中展開查看。",
-    "evidence-insufficient-tool-error": "讀取倉庫文件時遇到問題：{{reason}} 已保留成功讀取的來源；可縮小問題範圍、提高取證預算或稍後重試。",
     "evidence-insufficient": "目前倉庫證據不足：{{reason}} 已保留成功讀取的來源；可縮小問題範圍、提高取證預算或稍後重試。",
+    "evidence-insufficient-tool-error": "讀取倉庫文件時遇到問題：{{reason}} 已保留成功讀取的來源；可縮小問題範圍、提高取證預算或稍後重試。",
     "verified-sources-heading": "### 已驗證來源",
     "verified-sources-intro": "已完成取证，但模型回答未能可靠绑定到来源。以下為本輪已驗證的固定版本來源：",
     "unverified-heading": "## 未證實或缺失的訊息",
-    "unverified-note": "以下段落未能與精確來源逐條核驗，請謹慎採信："
+    "unverified-note": "以下段落未能與精確來源逐條核驗，請謹慎採信：",
+    "evidence-insufficient-default-reason": "未能在取證預算內確認完整答案。"
   }
 }

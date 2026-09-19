@@ -338,11 +338,11 @@
     "press-escape-in-input-to-clear-search": "Appuyez sur Échap dans la zone de saisie pour effacer la recherche",
     "use-key-to-quickly-start-searching": "Utilisez la touche / pour lancer rapidement la recherche",
     "got-it": "savait",
+    "shortcut-focus-search": "Champ de recherche ciblé",
     "shortcut-clear-search": "Effacer la recherche",
     "shortcut-toggle-filters": "Changer de filtre",
-    "shortcut-focus-search": "Champ de recherche ciblé",
-    "shortcut-ai-search": "Recherche IA",
-    "shortcut-quick-search": "Recherche rapide"
+    "shortcut-quick-search": "Recherche rapide",
+    "shortcut-ai-search": "Recherche IA"
   },
   "settingsPanel": {
     "general": "Universel",

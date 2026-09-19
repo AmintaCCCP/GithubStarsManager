@@ -125,11 +125,12 @@
   },
   "repositoryChatService": {
     "no-verified-summary": "Diese Runde hat die schreibgeschützte Überprüfung abgeschlossen, konnte jedoch keine zusammenfassenden Ergebnisse liefern, die mit genauen Quellen überprüft werden können. Bitte versuchen Sie es erneut oder grenzen Sie das Problem auf eine bestimmte Funktion, Datei oder ein bestimmtes Ziel ein. Die eingelesenen Akten und Beweise können unter „Quellen und Beweise“ erweitert und eingesehen werden.",
-    "evidence-insufficient-tool-error": "Beim Lesen der Repository-Datei ist ein Problem aufgetreten: {{reason}} hat die Quelle eines erfolgreichen Lesevorgangs beibehalten; Sie können den Umfang des Problems eingrenzen, Ihr forensisches Budget erhöhen oder es später noch einmal versuchen.",
     "evidence-insufficient": "Unzureichende Beweise im aktuellen Repository: {{reason}} hat die Quelle eines erfolgreichen Lesevorgangs beibehalten; Sie können den Umfang des Problems eingrenzen, Ihr forensisches Budget erhöhen oder es später noch einmal versuchen.",
+    "evidence-insufficient-tool-error": "Beim Lesen der Repository-Datei ist ein Problem aufgetreten: {{reason}} hat die Quelle eines erfolgreichen Lesevorgangs beibehalten; Sie können den Umfang des Problems eingrenzen, Ihr forensisches Budget erhöhen oder es später noch einmal versuchen.",
     "verified-sources-heading": "### Verifizierte Quelle",
     "verified-sources-intro": "Die Forensik ist abgeschlossen, die Modellantworten sind jedoch nicht zuverlässig mit der Quelle verknüpft. Im Folgenden sind die Quellen der verifizierten festen Versionen für diese Runde aufgeführt:",
     "unverified-heading": "## Nicht bestätigte oder fehlende Informationen",
-    "unverified-note": "Die folgenden Absätze können nicht einzeln mit genauen Quellen überprüft werden. Akzeptieren Sie sie daher bitte mit Vorsicht:"
+    "unverified-note": "Die folgenden Absätze können nicht einzeln mit genauen Quellen überprüft werden. Akzeptieren Sie sie daher bitte mit Vorsicht:",
+    "evidence-insufficient-default-reason": "Vollständige Antworten können im Rahmen des forensischen Budgets nicht bestätigt werden."
   }
 }

@@ -11,6 +11,7 @@ import type {
 } from '../types/repositoryChat';
 import { TASK_DEPTH_PRESETS, DEFAULT_ANSWER_MAX_TOKENS } from '../types/repositoryChat';
 import { AIService, isAIStreamUnsupportedError } from './aiService';
+import { makeT } from '../i18n/useT';
 import { getOutputLanguageDirective } from '../i18n/aiLanguage';
 import { createGitHubApiService } from './githubApiFactory';
 import {
@@ -453,22 +454,20 @@ const mapFootnoteReferences = (content: string, evidences: ToolEvidence[]): stri
 };
 
 export const sourceBoundEvidenceDigest = (input: RepositoryChatTurnInput, evidences: ToolEvidence[]): string => {
-  const heading = input.language === 'zh' ? '### 已验证来源' : '### Verified sources';
+  const t = makeT(input.language, 'chat');
+  const heading = t('repositoryChatService.verified-sources-heading');
   const references = Array.from(new Set(sourceReferences(evidences))).slice(0, 3);
   // Do not interpolate raw repository excerpts into a fallback answer: repository
   // content can contain secrets or prompt-like text. The existing evidence panel
   // lets users open each fixed-SHA source safely.
-  const intro = input.language === 'zh'
-    ? '已完成取证，但模型回答未能可靠绑定到来源。以下为本轮已验证的固定版本来源：'
-    : 'Evidence retrieval completed, but the model answer could not be reliably source-bound. These fixed-version sources were verified:';
+  const intro = t('repositoryChatService.verified-sources-intro');
   return references.length > 0
     ? `${heading}\n\n${intro}\n\n${references.map((reference) => `- \`${reference}\``).join('\n')}`
     : noVerifiedSummaryResponse(input.language);
 };
 
-export const noVerifiedSummaryResponse = (language: AppLanguage): string => language === 'zh'
-  ? '本轮已完成只读取证，但未能生成可与精确来源核验的总结性结果。请重试，或把问题缩小到一个具体功能、文件或目标；已读取的文件与证据可在“来源与证据”中展开查看。'
-  : 'This turn completed read-only evidence retrieval but did not produce a source-verifiable summary. Retry, or narrow the question to a specific feature, file, or goal; the retrieved files and evidence remain available under “Sources and evidence”.';
+export const noVerifiedSummaryResponse = (language: AppLanguage): string =>
+  makeT(language, 'chat')('repositoryChatService.no-verified-summary');
 
 /** 剥离不可核验的引用残留：未命中的源码路径 token、脚注编号（[^E1]/[^1]/E2）与多余空行。 */
 const stripUnverifiableMarkers = (content: string, evidences: ToolEvidence[]): string => {
@@ -523,10 +522,9 @@ export const pruneUnverifiableSections = (content: string, evidences: ToolEviden
   kept.push(...pendingHeadings);
   if (kept.filter((section) => !isStandaloneHeading(section)).length === 0) return null;
   if (unverified.length === 0) return kept.join('\n\n');
-  const heading = language === 'zh' ? '## 未证实或缺失的信息' : '## Unverified or missing information';
-  const note = language === 'zh'
-    ? '以下段落未能与精确来源逐条核验，请谨慎采信：'
-    : 'The paragraphs below could not be verified against exact sources; take them with caution:';
+  const t = makeT(language, 'chat');
+  const heading = t('repositoryChatService.unverified-heading');
+  const note = t('repositoryChatService.unverified-note');
   return `${kept.join('\n\n')}\n\n${heading}\n\n${note}\n\n${unverified.join('\n\n')}`;
 };
 
@@ -846,9 +844,12 @@ export const isTransientAgentError = (error: unknown): boolean => /\b(?:429|5\d\
   error instanceof Error ? error.message : String(error ?? ''),
 );
 
-export const evidenceAgentInsufficientResponse = (language: AppLanguage, reason: string, hadToolError = false): string => language === 'zh'
-  ? `${hadToolError ? '读取仓库文件时遇到问题，' : '当前仓库证据不足，'}${reason || '未能在取证预算内确认完整答案。'} 已保留成功读取的来源；可缩小问题范围、提高取证预算或稍后重试。`
-  : `${hadToolError ? 'Repository file retrieval encountered an error: ' : 'The current repository evidence is insufficient: '}${reason || 'A complete answer could not be confirmed within the research budget.'} Successful sources were retained; narrow the question, increase the research budget, or retry later.`;
+export const evidenceAgentInsufficientResponse = (language: AppLanguage, reason: string, hadToolError = false): string => {
+  const t = makeT(language, 'chat');
+  return t(hadToolError ? 'repositoryChatService.evidence-insufficient-tool-error' : 'repositoryChatService.evidence-insufficient', {
+    reason: reason || t('repositoryChatService.evidence-insufficient-default-reason'),
+  });
+};
 
 export const buildQueryUnderstandingPrompt = (input: RepositoryChatTurnInput, availablePaths: string[]): { system: string; user: string } => ({
   system: input.language === 'zh'

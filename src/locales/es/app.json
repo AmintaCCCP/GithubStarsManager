@@ -338,10 +338,10 @@
     "press-escape-in-input-to-clear-search": "Presione Escape en el cuadro de entrada para borrar la búsqueda.",
     "use-key-to-quickly-start-searching": "Utilice la tecla / para comenzar a buscar rápidamente",
     "got-it": "sabía",
-    "shortcut-clear-search": "Borrar búsqueda",
     "shortcut-focus-search": "Cuadro de búsqueda de enfoque",
-    "shortcut-quick-search": "búsqueda rápida",
+    "shortcut-clear-search": "Borrar búsqueda",
     "shortcut-toggle-filters": "Cambiar filtro",
+    "shortcut-quick-search": "búsqueda rápida",
     "shortcut-ai-search": "búsqueda por IA"
   },
   "settingsPanel": {

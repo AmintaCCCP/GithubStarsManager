@@ -338,10 +338,10 @@
     "press-escape-in-input-to-clear-search": "検索をクリアするには、入力ボックスで Esc キーを押します。",
     "use-key-to-quickly-start-searching": "/ キーを使用してすぐに検索を開始します",
     "got-it": "知っていた",
-    "shortcut-clear-search": "検索をクリア",
     "shortcut-focus-search": "フォーカス検索ボックス",
-    "shortcut-quick-search": "クイック検索",
+    "shortcut-clear-search": "検索をクリア",
     "shortcut-toggle-filters": "スイッチフィルター",
+    "shortcut-quick-search": "クイック検索",
     "shortcut-ai-search": "AI検索"
   },
   "settingsPanel": {

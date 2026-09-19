@@ -77,9 +77,9 @@
     "loading-more": "さらに読み込み中…",
     "retry": "もう一度やり直してください",
     "platform-filter-v1": "プラットフォームフィルター: {{v1}}",
-    "ai": "AI",
     "items-count": "{{currentCount}} 個のアイテム",
-    "items-count-with-total": "{{currentCount}} 個のアイテム (合計 {{totalCount}} 個のアイテム)"
+    "items-count-with-total": "{{currentCount}} 個のアイテム (合計 {{totalCount}} 個のアイテム)",
+    "ai": "AI"
   },
   "weeklyIssueModal": {
     "submission-v1": "貢献番号{{v1}}",

@@ -130,6 +130,7 @@
     "verified-sources-heading": "### Source vérifiée",
     "verified-sources-intro": "L'analyse médico-légale est terminée, mais les réponses du modèle ne sont pas liées de manière fiable à la source. Voici les sources des versions corrigées vérifiées pour ce cycle :",
     "unverified-heading": "## Informations non vérifiées ou manquantes",
-    "unverified-note": "Les paragraphes suivants ne peuvent pas être vérifiés élément par élément auprès de sources précises, veuillez donc les accepter avec prudence :"
+    "unverified-note": "Les paragraphes suivants ne peuvent pas être vérifiés élément par élément auprès de sources précises, veuillez donc les accepter avec prudence :",
+    "evidence-insufficient-default-reason": "Impossible de confirmer les réponses complètes dans le cadre du budget médico-légal."
   }
 }

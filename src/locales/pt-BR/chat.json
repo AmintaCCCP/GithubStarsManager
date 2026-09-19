@@ -125,11 +125,12 @@
   },
   "repositoryChatService": {
     "no-verified-summary": "Esta rodada concluiu a verificação somente leitura, mas não conseguiu produzir resultados resumidos que possam ser verificados com fontes precisas. Tente novamente ou restrinja o problema a uma função, arquivo ou destino específico; os arquivos e evidências lidas podem ser ampliados e visualizados em “Fontes e Evidências”.",
-    "evidence-insufficient-tool-error": "Ocorreu um problema ao ler o arquivo do repositório: {{reason}} reteve a fonte de uma leitura bem-sucedida; você pode restringir o escopo do problema, aumentar seu orçamento forense ou tentar novamente mais tarde.",
     "evidence-insufficient": "Evidência insuficiente no repositório atual: {{reason}} reteve a fonte de uma leitura bem-sucedida; você pode restringir o escopo do problema, aumentar seu orçamento forense ou tentar novamente mais tarde.",
+    "evidence-insufficient-tool-error": "Ocorreu um problema ao ler o arquivo do repositório: {{reason}} reteve a fonte de uma leitura bem-sucedida; você pode restringir o escopo do problema, aumentar seu orçamento forense ou tentar novamente mais tarde.",
     "verified-sources-heading": "### Fonte verificada",
     "verified-sources-intro": "A perícia foi concluída, mas as respostas do modelo não estão vinculadas de forma confiável à fonte. A seguir estão as fontes de versões fixas verificadas para esta rodada:",
     "unverified-heading": "## Informações não verificadas ou ausentes",
-    "unverified-note": "Os parágrafos a seguir não podem ser verificados item por item com fontes precisas, portanto, aceite-os com cautela:"
+    "unverified-note": "Os parágrafos a seguir não podem ser verificados item por item com fontes precisas, portanto, aceite-os com cautela:",
+    "evidence-insufficient-default-reason": "Não foi possível confirmar respostas completas dentro do orçamento forense."
   }
 }

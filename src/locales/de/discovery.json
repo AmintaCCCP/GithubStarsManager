@@ -131,10 +131,10 @@
     "hot-release": "Beliebte Veröffentlichungen",
     "most-popular": "am beliebtesten",
     "topic": "Themenerkundung",
-    "telegram": "Telegram-Kanal",
     "x-tweet": "X-Tweet",
-    "search": "Lagersuche",
-    "weekly": "Ruan Yifeng Weekly"
+    "telegram": "Telegram-Kanal",
+    "weekly": "Ruan Yifeng Weekly",
+    "search": "Lagersuche"
   },
   "discoveryPlatform": {
     "All": "Alle Plattformen"

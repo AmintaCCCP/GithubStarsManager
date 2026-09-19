@@ -338,11 +338,11 @@
     "press-escape-in-input-to-clear-search": "Drücken Sie im Eingabefeld die Escape-Taste, um die Suche zu löschen",
     "use-key-to-quickly-start-searching": "Mit der Taste / können Sie schnell mit der Suche beginnen",
     "got-it": "wusste",
+    "shortcut-focus-search": "Suchfeld fokussieren",
     "shortcut-clear-search": "Suche löschen",
     "shortcut-toggle-filters": "Filter wechseln",
-    "shortcut-focus-search": "Suchfeld fokussieren",
-    "shortcut-ai-search": "KI-Suche",
-    "shortcut-quick-search": "Schnellsuche"
+    "shortcut-quick-search": "Schnellsuche",
+    "shortcut-ai-search": "KI-Suche"
   },
   "settingsPanel": {
     "general": "Universal",
