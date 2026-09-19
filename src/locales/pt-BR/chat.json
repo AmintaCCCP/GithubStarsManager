@@ -87,23 +87,24 @@
     "v1-rounds": "{{v1}} roda",
     "current-default": "(atualmente padrão)",
     "rounds": "roda",
-    "stage-context": "Ver estrutura do projeto",
     "stage-understanding": "Entendendo o problema",
-    "stage-retrieval": "Leia informações relacionadas",
+    "stage-context": "Ver estrutura do projeto",
     "stage-planning": "Faça um plano de leitura",
-    "stage-replanning": "plano de leitura complementar",
+    "stage-retrieval": "Leia informações relacionadas",
     "stage-verification": "Avalie se a pergunta é respondível",
+    "stage-replanning": "plano de leitura complementar",
     "stage-escalation": "Adicione detalhes de implementação",
     "stage-answer": "Organize a resposta final",
-    "depth-default": "padrão",
     "stage-tool": "Chamada de ferramenta",
-    "depth-quick": "rápido",
+    "depth-default": "padrão",
     "depth-default-desc": "Siga os parâmetros avançados nas configurações",
+    "depth-quick": "rápido",
     "depth-quick-desc": "Colete uma pequena quantidade de documentos e forneça respostas o mais rápido possível",
     "depth-deep": "vá fundo",
-    "depth-unlimited": "Sem limite",
     "depth-deep-desc": "Várias rodadas de análise forense e leitura de código, adequadas para detalhes e comparação",
-    "depth-unlimited-desc": "Libere todas as restrições e preste atenção ao consumo de tempo e cota"
+    "depth-unlimited": "Sem limite",
+    "depth-unlimited-desc": "Libere todas as restrições e preste atenção ao consumo de tempo e cota",
+    "depth-with-budget": "{{label}} · {{turns}} rodadas/{{seconds}}s"
   },
   "citationBadge": {
     "open-source-path-linestart": "Ver fonte {{path}}:{{lineStart}}",
@@ -121,5 +122,14 @@
   },
   "useRepositoryChatSessions": {
     "configure-a-github-token-before-starting-a-conve": "Configure primeiro o token GitHub."
+  },
+  "repositoryChatService": {
+    "no-verified-summary": "Esta rodada concluiu a verificação somente leitura, mas não conseguiu produzir resultados resumidos que possam ser verificados com fontes precisas. Tente novamente ou restrinja o problema a uma função, arquivo ou destino específico; os arquivos e evidências lidas podem ser ampliados e visualizados em “Fontes e Evidências”.",
+    "evidence-insufficient-tool-error": "Ocorreu um problema ao ler o arquivo do repositório: {{reason}} reteve a fonte de uma leitura bem-sucedida; você pode restringir o escopo do problema, aumentar seu orçamento forense ou tentar novamente mais tarde.",
+    "evidence-insufficient": "Evidência insuficiente no repositório atual: {{reason}} reteve a fonte de uma leitura bem-sucedida; você pode restringir o escopo do problema, aumentar seu orçamento forense ou tentar novamente mais tarde.",
+    "verified-sources-heading": "### Fonte verificada",
+    "verified-sources-intro": "A perícia foi concluída, mas as respostas do modelo não estão vinculadas de forma confiável à fonte. A seguir estão as fontes de versões fixas verificadas para esta rodada:",
+    "unverified-heading": "## Informações não verificadas ou ausentes",
+    "unverified-note": "Os parágrafos a seguir não podem ser verificados item por item com fontes precisas, portanto, aceite-os com cautela:"
   }
 }

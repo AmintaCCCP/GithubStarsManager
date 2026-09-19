@@ -170,7 +170,8 @@
     "first-page": "最初のページ",
     "previous-page": "前のページへ",
     "next-page": "次のページ",
-    "last-page": "最後のページ"
+    "last-page": "最後のページ",
+    "last-refresh-time": "最終更新 {{time}}"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "このリリースにはダウンロード可能なアセットはありません。",

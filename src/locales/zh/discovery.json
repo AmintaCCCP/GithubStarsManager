@@ -77,7 +77,9 @@
     "refresh-now": "立即刷新",
     "loading-more": "正在加载更多…",
     "retry": "重试",
-    "platform-filter-v1": "平台筛选：{{v1}}"
+    "platform-filter-v1": "平台筛选：{{v1}}",
+    "items-count": "{{currentCount}} 项",
+    "items-count-with-total": "{{currentCount}} 项（共 {{totalCount}} 项）"
   },
   "weeklyIssueModal": {
     "submission-v1": "投稿 #{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "连接成功：解析到 {{tweetCount}} 条推文，其中 {{repoCount}} 个 GitHub 仓库链接。",
     "failed-error": "连接失败：{{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "趋势",
+    "hot-release": "热门发布",
+    "most-popular": "最受欢迎",
+    "topic": "主题探索",
+    "x-tweet": "X 推文",
+    "telegram": "Telegram 频道",
+    "weekly": "阮一峰周刊",
+    "search": "仓库搜索"
+  },
+  "discoveryPlatform": {
+    "All": "全部平台"
   }
 }

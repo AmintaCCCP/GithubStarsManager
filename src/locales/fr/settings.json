@@ -56,7 +56,8 @@
   },
   "useStarSyncActions": {
     "not-connected-to-github-yet": "Vous n'êtes pas connecté à GitHub, veuillez d'abord vous connecter",
-    "push-categories-to-github-lists": "Synchroniser la classification des entrepôts avec la liste GitHub"
+    "push-categories-to-github-lists": "Synchroniser la classification des entrepôts avec la liste GitHub",
+    "push-confirm-body": "Écrivez chaque catégorie locale (y compris les catégories par défaut et personnalisées) dans la liste GitHub avec le même nom :\n\n· Une liste portant le même nom écrasera ses membres (les référentiels qui ne correspondent pas à la catégorie seront supprimés de la liste)\n· S'il n'y a pas de liste du même nom, créez-en une nouvelle (privée par défaut)\n· L'entrepôt sera ajouté à la liste correspondante selon sa classification correspondante\n· Les autres adhésions à la liste n'appartenant pas à la catégorie locale seront conservées\n\nÊtes-vous sûr de vouloir continuer ?"
   },
   "useWebDAVActions": {
     "webdav-url-is-required": "L'URL WebDAV est requise",
@@ -68,5 +69,9 @@
     "webdav-connection-successful": "Connexion WebDAV réussie !",
     "webdav-connection-failed-please-check-configurat": "La connexion WebDAV a échoué, veuillez vérifier la configuration.",
     "webdav-test-failed": "Le test WebDAV a échoué"
+  },
+  "generalPanel": {
+    "account-token-hint": "Compte courant {{login}}. Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",
+    "token-hint": "Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter."
   }
 }

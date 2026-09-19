@@ -1,5 +1,5 @@
 
-import { useTPair, TranslateFn } from '../../i18n/useT';
+import { TranslateFn } from '../../i18n/useT';
 import { Button } from '../ui/button';
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
@@ -39,7 +39,6 @@ const MENU_META: Record<HeaderMenuId, {
 };
 
 export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) => {
-  const tPair = useTPair();
   const { headerMenuConfig, setHeaderMenuConfig } = useAppStore(useShallow((state) => ({
     headerMenuConfig: state.headerMenuConfig,
     setHeaderMenuConfig: state.setHeaderMenuConfig,
@@ -158,7 +157,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 {/* Menu icon + label + lock */}
                 <Icon className="w-5 h-5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
                 <span className="flex-1 flex items-center gap-1.5 text-sm font-medium text-foreground dark:text-foreground">
-                  <span>{tPair(meta.labelZh, meta.labelEn)}</span>
+                  <span>{t(`header.menu-${item.id}`)}</span>
                   {!meta.canHide && (
                     <span className="text-muted-foreground dark:text-muted-foreground flex-shrink-0" title={t('menuManagementPanel.always-visible')}>
                       <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">

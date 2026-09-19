@@ -170,7 +170,8 @@
     "first-page": "第一頁",
     "previous-page": "上一頁",
     "next-page": "下一頁",
-    "last-page": "最後一頁"
+    "last-page": "最後一頁",
+    "last-refresh-time": "最後重新整理 {{time}}"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "該 Release 沒有可下載的資產。",

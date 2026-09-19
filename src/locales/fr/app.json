@@ -171,8 +171,8 @@
     "logout-confirmation": "Confirmation de déconnexion",
     "logout": "Se déconnecter",
     "logout-only-clears-credentials-repositories-ai-a": "Seules les informations de connexion sont effacées après la déconnexion. Les données locales telles que les entrepôts, l'analyse de l'IA et la classification seront conservées ; il sera automatiquement hérité si vous modifiez le jeton et vous reconnectez avec le même compte GitHub. Pour effacer complètement toutes les données, allez dans « Paramètres → Gestion des données ».",
-    "menu-gists": "Gist",
     "menu-repositories": "entrepôt",
+    "menu-gists": "Gist",
     "menu-releases": "libérer",
     "menu-forks": "réplique",
     "menu-subscription": "Découvrir",
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "Les touches de raccourci peuvent être utilisées sur n'importe quelle page",
     "press-escape-in-input-to-clear-search": "Appuyez sur Échap dans la zone de saisie pour effacer la recherche",
     "use-key-to-quickly-start-searching": "Utilisez la touche / pour lancer rapidement la recherche",
-    "got-it": "savait"
+    "got-it": "savait",
+    "shortcut-clear-search": "Effacer la recherche",
+    "shortcut-toggle-filters": "Changer de filtre",
+    "shortcut-focus-search": "Champ de recherche ciblé",
+    "shortcut-ai-search": "Recherche IA",
+    "shortcut-quick-search": "Recherche rapide"
   },
   "settingsPanel": {
     "general": "Universel",
@@ -1110,11 +1115,11 @@
     "must-rebuild-index-after-changing-embedding-mode": "L'index doit être reconstruit après avoir remplacé le modèle d'intégration",
     "different-models-produce-vectors-with-different": "Les dimensions vectorielles générées par différents modèles sont différentes et leur mélange entraînera un échec de la requête. Après avoir remplacé le modèle, vous devez : ① Supprimer l'ancien index et créer un nouvel index (les dimensions doivent correspondre) ② Cliquez sur \"Reconstruire l'index vectoriel\" ci-dessous.",
     "for-detailed-instructions-see": "Veuillez vous référer au guide de déploiement détaillé",
-    "dimensions": "Dimensions",
-    "text": ")",
-    "connection-failed-detail": "Échec de la connexion : {{error}}",
     "connection-successful-dimensions": "Connexion réussie – Dimension : {{dimensions}}",
-    "connection-successful-vectors": "Connexion réussie – vecteur : {{vectorCount}}, dimensions : {{dimensions}}"
+    "connection-failed-detail": "Échec de la connexion : {{error}}",
+    "connection-successful-vectors": "Connexion réussie – vecteur : {{vectorCount}}, dimensions : {{dimensions}}",
+    "dimensions": "Dimensions",
+    "text": ")"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuration WebDAV",

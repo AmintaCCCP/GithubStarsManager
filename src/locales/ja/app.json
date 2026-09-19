@@ -171,8 +171,8 @@
     "logout-confirmation": "ログアウトの確認",
     "logout": "ログアウト",
     "logout-only-clears-credentials-repositories-ai-a": "ログアウト後にクリアされるのは、ログイン資格情報のみです。倉庫、AI 分析、分類などのローカル データは保持されます。トークンを変更して同じGitHubアカウントで再度ログインすると自動的に引き継がれます。すべてのデータを完全に消去するには、「設定→データ管理」に移動します。",
-    "menu-gists": "Gist",
     "menu-repositories": "倉庫",
+    "menu-gists": "Gist",
     "menu-releases": "リリース",
     "menu-forks": "レプリカ",
     "menu-subscription": "発見する",
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "どのページでもショートカットキーが使用可能",
     "press-escape-in-input-to-clear-search": "検索をクリアするには、入力ボックスで Esc キーを押します。",
     "use-key-to-quickly-start-searching": "/ キーを使用してすぐに検索を開始します",
-    "got-it": "知っていた"
+    "got-it": "知っていた",
+    "shortcut-clear-search": "検索をクリア",
+    "shortcut-focus-search": "フォーカス検索ボックス",
+    "shortcut-quick-search": "クイック検索",
+    "shortcut-toggle-filters": "スイッチフィルター",
+    "shortcut-ai-search": "AI検索"
   },
   "settingsPanel": {
     "general": "ユニバーサル",
@@ -1107,13 +1112,13 @@
     "then": "それから",
     "redeploy-after-code-changes": "更新のデプロイメント (コード変更後)",
     "if-dependencies-changed-run": "(依存関係が変更された場合は、最初に実行してください",
+    "text": "テキスト",
     "note-redeployment-does-not-require-recreating-th": "注: デプロイメントの更新には Vectorize インデックスを再作成する必要はなく、既存のベクター データは影響を受けません。",
     "must-rebuild-index-after-changing-embedding-mode": "埋め込みモデルを置き換えた後、インデックスを再構築する必要があります",
     "different-models-produce-vectors-with-different": "異なるモデルによって生成されるベクトルの次元は異なるため、それらを混合するとクエリが失敗する原因になります。モデルを置き換えた後、次の操作を行う必要があります。 ① 古いインデックスを削除し、新しいインデックスを作成します (次元が一致している必要があります) ② 下の「ベクトル インデックスの再構築」をクリックします。",
     "for-detailed-instructions-see": "詳細な導入ガイドを参照してください。",
-    "text": "テキスト",
-    "connection-failed-detail": "接続に失敗しました: {{error}}",
     "connection-successful-dimensions": "接続成功 - ディメンション: {{dimensions}}",
+    "connection-failed-detail": "接続に失敗しました: {{error}}",
     "connection-successful-vectors": "接続成功 — ベクトル: {{vectorCount}}、次元: {{dimensions}}"
   },
   "webDAVPanel": {

@@ -408,11 +408,27 @@
   "categoryNameVariants": {
     "devtools": [
       "开发工具",
-      "Development Tools"
+      "Development Tools",
+      "開発ツール",
+      "Herramientas de desarrollo",
+      "Ferramentas de desenvolvimento",
+      "Инструменты разработки",
+      "開發工具",
+      "Outils de développement",
+      "Entwicklungstools",
+      "개발 도구"
     ],
     "web": [
       "Web应用",
-      "Web Apps"
+      "Web Apps",
+      "Webアプリ",
+      "Aplicaciones web",
+      "Aplicativos web",
+      "Веб-приложения",
+      "網頁應用",
+      "Applications web",
+      "Web-Apps",
+      "웹 앱"
     ],
     "untouchedCustomName": [
       "My Tools"
@@ -420,6 +436,14 @@
     "withOverride": [
       "开发工具",
       "Development Tools",
+      "開発ツール",
+      "Herramientas de desarrollo",
+      "Ferramentas de desenvolvimento",
+      "Инструменты разработки",
+      "開發工具",
+      "Outils de développement",
+      "Entwicklungstools",
+      "개발 도구",
       "My Tools"
     ]
   },

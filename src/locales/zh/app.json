@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "快捷键在任何页面都可使用",
     "press-escape-in-input-to-clear-search": "在输入框中按 Escape 清除搜索",
     "use-key-to-quickly-start-searching": "使用 / 键快速开始搜索",
-    "got-it": "知道了"
+    "got-it": "知道了",
+    "shortcut-focus-search": "聚焦搜索框",
+    "shortcut-clear-search": "清除搜索",
+    "shortcut-toggle-filters": "切换过滤器",
+    "shortcut-quick-search": "快速搜索",
+    "shortcut-ai-search": "AI搜索"
   },
   "settingsPanel": {
     "general": "通用",

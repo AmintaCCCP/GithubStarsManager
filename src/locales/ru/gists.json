@@ -65,11 +65,11 @@
     "v1-gists": "Всего {{v1}} сути",
     "search-applied": "Поиск применен",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Сути пока нет. Нажмите «Синхронизировать», чтобы получить данные, или создайте новый список.",
-    "sort-created": "по времени создания",
     "sort-updated": "по времени обновления",
+    "sort-created": "по времени создания",
     "sort-name": "по имени",
-    "category-all": "все суть",
     "sort-files": "По количеству файлов",
+    "category-all": "все суть",
     "category-starred": "суть звезды",
     "category-mine": "моя суть"
   },
@@ -102,8 +102,8 @@
     "delete": "удалить",
     "gist-deleted": "Суть удалена",
     "failed-to-delete-gist-v1-v2": "Не удалось удалить Gist{{v1}}{{v2}}",
-    "gist-create-failed": "Не удалось создать Gist: {{message}}{{permissionNote}}",
     "gist-update-failed": "Не удалось обновить Gist: {{message}}{{permissionNote}}",
+    "gist-create-failed": "Не удалось создать Gist: {{message}}{{permissionNote}}",
     "gist-permission-note": "(Подтвердите, что токен проверил разрешение gist, и повторно введите логин токена в настройках)"
   }
 }

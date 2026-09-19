@@ -77,7 +77,9 @@
     "refresh-now": "立即刷新",
     "loading-more": "正在加載更多…",
     "retry": "重試",
-    "platform-filter-v1": "平台篩選：{{v1}}"
+    "platform-filter-v1": "平台篩選：{{v1}}",
+    "items-count-with-total": "{{currentCount}} 項（共 {{totalCount}} 項）",
+    "items-count": "{{currentCount}} 項"
   },
   "weeklyIssueModal": {
     "submission-v1": "投稿 #{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "連接成功：解析到 {{tweetCount}} 條推文，其中 {{repoCount}} 個 GitHub 倉庫連結。",
     "failed-error": "連結失敗：{{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "趨勢",
+    "most-popular": "最受歡迎",
+    "hot-release": "熱門發布",
+    "x-tweet": "X 推文",
+    "topic": "主題探索",
+    "telegram": "Telegram 頻道",
+    "search": "倉庫搜尋",
+    "weekly": "阮一峰周刊"
+  },
+  "discoveryPlatform": {
+    "All": "全部平台"
   }
 }

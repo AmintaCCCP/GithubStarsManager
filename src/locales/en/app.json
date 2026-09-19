@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "Shortcuts work on any page",
     "press-escape-in-input-to-clear-search": "Press Escape in input to clear search",
     "use-key-to-quickly-start-searching": "Use / key to quickly start searching",
-    "got-it": "Got it"
+    "got-it": "Got it",
+    "shortcut-focus-search": "Focus search box",
+    "shortcut-clear-search": "Clear search",
+    "shortcut-toggle-filters": "Toggle filters",
+    "shortcut-quick-search": "Quick search",
+    "shortcut-ai-search": "AI search"
   },
   "settingsPanel": {
     "general": "General",

@@ -77,7 +77,9 @@
     "retry": "Intentar otra vez",
     "platform-filter-v1": "Filtro de plataforma: {{v1}}",
     "total-2": "(total",
-    "ai": "AI"
+    "ai": "IA",
+    "items-count": "{{currentCount}} artículos",
+    "items-count-with-total": "{{currentCount}} artículos ({{totalCount}} artículos en total)"
   },
   "weeklyIssueModal": {
     "submission-v1": "Contribución #{{v1}}",
@@ -99,8 +101,8 @@
     "all-loaded-projects-have-been-analyzed": "Todos los proyectos cargados han completado el análisis de IA.",
     "ai-analysis-complete-successcount-succeeded-v2": "¡Análisis de IA completado! Con éxito {{successCount}}{{v2}}",
     "ai-analysis-failed-please-check-your-ai-configur": "El análisis de IA falló, verifique la configuración de IA.",
-    "ai-analysis-complete-with-failures": "¡Análisis de IA completado! {{successCount}} exitoso, {{failCount}} fallido",
-    "ai-analysis-complete": "¡Análisis de IA completado! {{successCount}} exitoso"
+    "ai-analysis-complete": "¡Análisis de IA completado! {{successCount}} exitoso",
+    "ai-analysis-complete-with-failures": "¡Análisis de IA completado! {{successCount}} exitoso, {{failCount}} fallido"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "Error al cancelar Star, verifique la conexión de red o los permisos del token de GitHub.",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "Conexión exitosa: {{tweetCount}} tweets analizados, incluidos {{repoCount}} enlaces al repositorio de GitHub.",
     "failed-error": "Error de conexión: {{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "tendencia",
+    "hot-release": "Lanzamientos populares",
+    "most-popular": "más popular",
+    "topic": "Exploración de temas",
+    "x-tweet": "x tuit",
+    "telegram": "canal de telegramas",
+    "weekly": "Ruan Yifeng Semanal",
+    "search": "Búsqueda de almacén"
+  },
+  "discoveryPlatform": {
+    "All": "Todas las plataformas"
   }
 }

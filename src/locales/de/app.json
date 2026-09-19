@@ -22,8 +22,8 @@
     "translated": "Übersetzung",
     "bilingual": "zweisprachig",
     "translating": "Übersetzen…",
-    "original": "Original",
-    "content-already-in-language": "Der Inhalt ist bereits {{language}} und muss nicht übersetzt werden"
+    "content-already-in-language": "Der Inhalt ist bereits {{language}} und muss nicht übersetzt werden",
+    "original": "Original"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "Der Plug-in-Vorgang ist fehlgeschlagen",
@@ -171,8 +171,8 @@
     "logout-confirmation": "Abmeldebestätigung",
     "logout": "Abmelden",
     "logout-only-clears-credentials-repositories-ai-a": "Nach der Abmeldung werden nur die Anmeldedaten gelöscht. Lokale Daten wie Lager, KI-Analyse und Klassifizierung bleiben erhalten; Es wird automatisch vererbt, wenn Sie das Token ändern und sich erneut mit demselben GitHub-Konto anmelden. Um alle Daten vollständig zu löschen, gehen Sie zu „Einstellungen → Datenverwaltung“.",
-    "menu-gists": "Gist",
     "menu-repositories": "Lagerhaus",
+    "menu-gists": "Gist",
     "menu-releases": "freigeben",
     "menu-forks": "Replik",
     "menu-subscription": "Entdecken",
@@ -226,8 +226,8 @@
     "failed-to-load-selected-readme-please-try-again": "Die ausgewählte README-Datei konnte nicht geladen werden. Bitte versuchen Sie es später noch einmal",
     "loading-readme": "README wird geladen…",
     "default-readme": "Standard-README",
-    "original": "Original",
-    "cycle-font-size": "Schriftgröße ändern"
+    "cycle-font-size": "Schriftgröße ändern",
+    "original": "Original"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "nach unten scrollen"
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "Tastenkombinationen können auf jeder Seite verwendet werden",
     "press-escape-in-input-to-clear-search": "Drücken Sie im Eingabefeld die Escape-Taste, um die Suche zu löschen",
     "use-key-to-quickly-start-searching": "Mit der Taste / können Sie schnell mit der Suche beginnen",
-    "got-it": "wusste"
+    "got-it": "wusste",
+    "shortcut-clear-search": "Suche löschen",
+    "shortcut-toggle-filters": "Filter wechseln",
+    "shortcut-focus-search": "Suchfeld fokussieren",
+    "shortcut-ai-search": "KI-Suche",
+    "shortcut-quick-search": "Schnellsuche"
   },
   "settingsPanel": {
     "general": "Universal",
@@ -1111,10 +1116,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "Der Index muss nach dem Ersetzen des Einbettungsmodells neu erstellt werden",
     "different-models-produce-vectors-with-different": "Die von verschiedenen Modellen generierten Vektordimensionen sind unterschiedlich, und ihre Mischung führt zu Abfragefehlern. Nach dem Ersetzen des Modells müssen Sie Folgendes tun: ① Löschen Sie den alten Index und erstellen Sie einen neuen Index (Abmessungen müssen übereinstimmen). ② Klicken Sie unten auf „Vektorindex neu erstellen“.",
     "for-detailed-instructions-see": "Bitte beachten Sie die ausführliche Bereitstellungsanleitung",
-    "text": ")",
-    "connection-failed-detail": "Verbindung fehlgeschlagen: {{error}}",
     "connection-successful-dimensions": "Verbindung erfolgreich – Dimension: {{dimensions}}",
-    "connection-successful-vectors": "Verbindung erfolgreich – Vektor: {{vectorCount}}, Abmessungen: {{dimensions}}"
+    "connection-failed-detail": "Verbindung fehlgeschlagen: {{error}}",
+    "connection-successful-vectors": "Verbindung erfolgreich – Vektor: {{vectorCount}}, Abmessungen: {{dimensions}}",
+    "text": ")"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV-Konfiguration",
@@ -1159,7 +1164,7 @@
     "run-workflow-named": "Workflow ausführen: {{name}}"
   },
   "repositoryEditModal": {
-    "tag-count": "{{count}}-Tags",
-    "char-count": "{{count}} Wörter"
+    "char-count": "{{count}} Wörter",
+    "tag-count": "{{count}}-Tags"
   }
 }

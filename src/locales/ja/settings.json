@@ -56,7 +56,8 @@
   },
   "useStarSyncActions": {
     "not-connected-to-github-yet": "GitHub にログインしていません。最初に接続してください",
-    "push-categories-to-github-lists": "倉庫分類を GitHub リストに同期する"
+    "push-categories-to-github-lists": "倉庫分類を GitHub リストに同期する",
+    "push-confirm-body": "各ローカル カテゴリ (デフォルト カテゴリとカスタム カテゴリを含む) を同じ名前で GitHub リストに書き戻します。\n\n· 同じ名前のリストはそのメンバーを上書きします (カテゴリに一致しないリポジトリはリストから削除されます)\n· 同じ名前のリストがない場合は、新しいリストを作成します (デフォルトではプライベート)\n· 倉庫は、一致する分類に従って対応するリストに追加されます\n· ローカル カテゴリに属さない他のリスト メンバーシップは保持されます。\n\n続行してもよろしいですか?"
   },
   "useWebDAVActions": {
     "webdav-url-is-required": "WebDAV URLは必須です",
@@ -68,5 +69,9 @@
     "webdav-connection-successful": "WebDAV接続に成功しました！",
     "webdav-connection-failed-please-check-configurat": "WebDAV 接続に失敗しました。構成を確認してください。",
     "webdav-test-failed": "WebDAVテストに失敗しました"
+  },
+  "generalPanel": {
+    "account-token-hint": "現在のアカウント {{login}}。有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。",
+    "token-hint": "有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。"
   }
 }

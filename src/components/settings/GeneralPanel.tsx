@@ -1,5 +1,5 @@
 
-import { useTPair, TranslateFn } from '../../i18n/useT';
+import { TranslateFn } from '../../i18n/useT';
 import React from 'react';
 import { ExternalLink, Github, Globe, Key, Mail, Monitor, Package, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
@@ -23,7 +23,6 @@ interface GeneralPanelProps {
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-    const tPair = useTPair();
   const { language, setLanguage, user } = useAppStore(useShallow((state) => ({
     language: state.language,
     setLanguage: state.setLanguage,
@@ -50,7 +49,9 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-            {tPair(user?.login ? `当前账号 ${user.login}。过期后可在此直接更换 token，不必退出登录。` : '过期后可在此直接更换 token，不必退出登录。', user?.login ? `Signed in as ${user.login}. Update an expired token here without logging out.` : 'Update an expired token here without logging out.')}
+            {user?.login
+              ? t('generalPanel.account-token-hint', { login: user.login })
+              : t('generalPanel.token-hint')}
           </p>
           <div className="space-y-2">
             <Label htmlFor="settings-github-token">GitHub Personal Access Token</Label>

@@ -87,23 +87,24 @@
     "v1-rounds": "{{v1}} roue",
     "current-default": "(actuellement par défaut)",
     "rounds": "roue",
-    "stage-context": "Voir la structure du projet",
     "stage-understanding": "Comprendre le problème",
-    "stage-retrieval": "Lire les informations associées",
+    "stage-context": "Voir la structure du projet",
     "stage-planning": "Faire un plan de lecture",
+    "stage-retrieval": "Lire les informations associées",
     "stage-verification": "Évaluer si la question peut répondre",
     "stage-replanning": "plan de lecture supplémentaire",
-    "stage-answer": "Organisez la réponse finale",
     "stage-escalation": "Ajouter des détails de mise en œuvre",
-    "depth-default": "défaut",
+    "stage-answer": "Organisez la réponse finale",
     "stage-tool": "Appel d'outil",
+    "depth-default": "défaut",
+    "depth-default-desc": "Suivez les paramètres avancés dans les paramètres",
     "depth-quick": "rapide",
     "depth-quick-desc": "Recueillir une petite quantité de documents et fournir des réponses dans les plus brefs délais",
-    "depth-default-desc": "Suivez les paramètres avancés dans les paramètres",
+    "depth-deep": "aller en profondeur",
     "depth-deep-desc": "Plusieurs séries d'analyses médico-légales et de lecture de code, adaptées aux détails et à la comparaison",
     "depth-unlimited": "Aucune limite",
-    "depth-deep": "aller en profondeur",
-    "depth-unlimited-desc": "Libérez toutes les restrictions et faites attention à la consommation de temps et au quota"
+    "depth-unlimited-desc": "Libérez toutes les restrictions et faites attention à la consommation de temps et au quota",
+    "depth-with-budget": "{{label}} · {{turns}} tours/{{seconds}} s"
   },
   "citationBadge": {
     "open-source-path-linestart": "Afficher la source {{path}} :{{lineStart}}",
@@ -121,5 +122,14 @@
   },
   "useRepositoryChatSessions": {
     "configure-a-github-token-before-starting-a-conve": "Veuillez d'abord configurer le jeton GitHub."
+  },
+  "repositoryChatService": {
+    "no-verified-summary": "Ce cycle a terminé la vérification en lecture seule, mais n'a pas réussi à produire des résultats récapitulatifs pouvant être vérifiés avec des sources précises. Veuillez réessayer ou limiter le problème à une fonction, un fichier ou une cible spécifique ; les dossiers et preuves qui ont été lus peuvent être développés et consultés dans « Sources et preuves ».",
+    "evidence-insufficient": "Preuves insuffisantes dans le référentiel actuel : {{reason}} a conservé la source d'une lecture réussie ; vous pouvez réduire la portée du problème, augmenter votre budget médico-légal ou réessayer plus tard.",
+    "evidence-insufficient-tool-error": "Un problème est survenu lors de la lecture du fichier du référentiel : {{reason}} a conservé la source d'une lecture réussie ; vous pouvez réduire la portée du problème, augmenter votre budget médico-légal ou réessayer plus tard.",
+    "verified-sources-heading": "### Source vérifiée",
+    "verified-sources-intro": "L'analyse médico-légale est terminée, mais les réponses du modèle ne sont pas liées de manière fiable à la source. Voici les sources des versions corrigées vérifiées pour ce cycle :",
+    "unverified-heading": "## Informations non vérifiées ou manquantes",
+    "unverified-note": "Les paragraphes suivants ne peuvent pas être vérifiés élément par élément auprès de sources précises, veuillez donc les accepter avec prudence :"
   }
 }

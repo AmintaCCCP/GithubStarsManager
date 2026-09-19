@@ -56,7 +56,8 @@
   },
   "useStarSyncActions": {
     "not-connected-to-github-yet": "No has iniciado sesión en GitHub, conéctate primero",
-    "push-categories-to-github-lists": "Sincronizar la clasificación del almacén con la lista de GitHub"
+    "push-categories-to-github-lists": "Sincronizar la clasificación del almacén con la lista de GitHub",
+    "push-confirm-body": "Escriba cada categoría local (incluidas las categorías predeterminadas y personalizadas) en la Lista de GitHub con el mismo nombre:\n\n· Una lista con el mismo nombre sobrescribirá a sus miembros (los repositorios que no coincidan con la categoría serán eliminados de la lista)\n· Si no hay una lista con el mismo nombre, crea una nueva (privada por defecto)\n· El almacén se añadirá al listado correspondiente según su clasificación coincidente\n· Se conservarán otras membresías de la lista que no pertenecen a la categoría local.\n\n¿Estás seguro de que quieres continuar?"
   },
   "useWebDAVActions": {
     "webdav-url-is-required": "Se requiere la URL de WebDAV",
@@ -68,5 +69,9 @@
     "webdav-connection-successful": "¡Conexión WebDAV exitosa!",
     "webdav-connection-failed-please-check-configurat": "La conexión WebDAV falló, verifique la configuración.",
     "webdav-test-failed": "La prueba WebDAV falló"
+  },
+  "generalPanel": {
+    "account-token-hint": "Cuenta corriente {{login}}. Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión.",
+    "token-hint": "Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión."
   }
 }

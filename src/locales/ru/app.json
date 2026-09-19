@@ -171,8 +171,8 @@
     "logout-confirmation": "Подтверждение выхода из системы",
     "logout": "Выйти",
     "logout-only-clears-credentials-repositories-ai-a": "После выхода из системы удаляются только учетные данные для входа. Локальные данные, такие как склады, анализ ИИ и классификация, будут сохранены; он будет автоматически унаследован, если вы измените токен и снова войдете в систему с той же учетной записью GitHub. Чтобы полностью очистить все данные, перейдите в «Настройки → Управление данными».",
-    "menu-gists": "Gist",
     "menu-repositories": "склад",
+    "menu-gists": "Gist",
     "menu-releases": "выпускать",
     "menu-forks": "копия",
     "menu-subscription": "Обнаружить",
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "Сочетания клавиш можно использовать на любой странице.",
     "press-escape-in-input-to-clear-search": "Нажмите Escape в поле ввода, чтобы очистить поиск.",
     "use-key-to-quickly-start-searching": "Используйте клавишу /, чтобы быстро начать поиск.",
-    "got-it": "знал"
+    "got-it": "знал",
+    "shortcut-clear-search": "Очистить поиск",
+    "shortcut-focus-search": "Окно поиска фокуса",
+    "shortcut-toggle-filters": "Переключить фильтр",
+    "shortcut-ai-search": "AI-поиск",
+    "shortcut-quick-search": "Быстрый поиск"
   },
   "settingsPanel": {
     "general": "Универсальный",
@@ -1107,13 +1112,13 @@
     "then": "Затем",
     "redeploy-after-code-changes": "Развертывание обновлений (после изменений кода)",
     "if-dependencies-changed-run": "(Если зависимости меняются, сначала выполните",
+    "text": "Текст",
     "note-redeployment-does-not-require-recreating-th": "Примечание. Обновление развертывания не требует повторного создания индекса векторизации, и существующие векторные данные не будут затронуты.",
     "must-rebuild-index-after-changing-embedding-mode": "Индекс необходимо перестроить после замены модели внедрения.",
     "different-models-produce-vectors-with-different": "Размерности векторов, созданные разными моделями, различны, и их смешивание приведет к сбою запроса. После замены модели вам необходимо: ① Удалить старый индекс и создать новый индекс (размеры должны совпадать) ② Нажмите «Перестроить векторный индекс» ниже.",
     "for-detailed-instructions-see": "Пожалуйста, обратитесь к подробному руководству по развертыванию.",
-    "text": "Текст",
-    "connection-failed-detail": "Не удалось подключиться: {{error}}",
     "connection-successful-dimensions": "Соединение успешно выполнено – Размер: {{dimensions}}",
+    "connection-failed-detail": "Не удалось подключиться: {{error}}",
     "connection-successful-vectors": "Соединение успешно — вектор: {{vectorCount}}, размеры: {{dimensions}}"
   },
   "webDAVPanel": {
@@ -1152,8 +1157,8 @@
     "push-failed-detail": "Не удалось отправить: {{message}}"
   },
   "discoverySidebar": {
-    "hours-ago": "{{count}} часа назад",
-    "minutes-ago": "{{count}} минуты назад"
+    "minutes-ago": "{{count}} минуты назад",
+    "hours-ago": "{{count}} часа назад"
   },
   "forkCard": {
     "run-workflow-named": "Запустить рабочий процесс: {{name}}"

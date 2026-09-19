@@ -65,12 +65,12 @@
     "v1-gists": "Insgesamt {{v1}} Gists",
     "search-applied": "Suche angewendet",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Es gibt noch keine Kernaussagen. Klicken Sie auf „Synchronisieren“, um Daten abzurufen oder einen neuen Gist zu erstellen.",
-    "sort-created": "nach Erstellungszeit",
     "sort-updated": "nach Aktualisierungszeit",
-    "sort-files": "Nach Anzahl der Dateien",
+    "sort-created": "nach Erstellungszeit",
     "sort-name": "mit Namen",
-    "category-starred": "Der Kern des Sterns",
+    "sort-files": "Nach Anzahl der Dateien",
     "category-all": "Alles Wesentliche",
+    "category-starred": "Der Kern des Sterns",
     "category-mine": "mein Kern"
   },
   "useGistActions": {

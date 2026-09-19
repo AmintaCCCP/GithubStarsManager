@@ -77,7 +77,9 @@
     "refresh-now": "지금 새로고침",
     "loading-more": "더 로드 중…",
     "retry": "다시 시도해 보세요",
-    "platform-filter-v1": "플랫폼 필터: {{v1}}"
+    "platform-filter-v1": "플랫폼 필터: {{v1}}",
+    "items-count": "{{currentCount}}개 항목",
+    "items-count-with-total": "{{currentCount}}개 항목(총 {{totalCount}}개 항목)"
   },
   "weeklyIssueModal": {
     "submission-v1": "기여 #{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "연결 성공: {{repoCount}} GitHub 저장소 링크를 포함하여 {{tweetCount}}개의 트윗이 구문 분석되었습니다.",
     "failed-error": "연결 실패: {{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "경향",
+    "hot-release": "인기 릴리스",
+    "most-popular": "가장 인기있는",
+    "topic": "주제 탐색",
+    "x-tweet": "X 트윗",
+    "telegram": "텔레그램 채널",
+    "weekly": "루안 이펑 주간",
+    "search": "창고 검색"
+  },
+  "discoveryPlatform": {
+    "All": "모든 플랫폼"
   }
 }

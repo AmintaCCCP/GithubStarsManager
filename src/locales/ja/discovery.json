@@ -77,7 +77,9 @@
     "loading-more": "さらに読み込み中…",
     "retry": "もう一度やり直してください",
     "platform-filter-v1": "プラットフォームフィルター: {{v1}}",
-    "ai": "AI"
+    "ai": "AI",
+    "items-count": "{{currentCount}} 個のアイテム",
+    "items-count-with-total": "{{currentCount}} 個のアイテム (合計 {{totalCount}} 個のアイテム)"
   },
   "weeklyIssueModal": {
     "submission-v1": "貢献番号{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "接続成功: {{repoCount}} 個の GitHub リポジトリ リンクを含む、{{tweetCount}} 個のツイートが解析されました。",
     "failed-error": "接続に失敗しました: {{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "傾向",
+    "hot-release": "人気のリリース",
+    "most-popular": "最も人気のある",
+    "topic": "トピックの探索",
+    "x-tweet": "×ツイート",
+    "telegram": "電報チャンネル",
+    "weekly": "ルアン・イーフェン・ウィークリー",
+    "search": "倉庫検索"
+  },
+  "discoveryPlatform": {
+    "All": "すべてのプラットフォーム"
   }
 }

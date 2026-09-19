@@ -65,13 +65,13 @@
     "v1-gists": "{{v1}} pontos essenciais no total",
     "search-applied": "Pesquisa aplicada",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Ainda não há essências. Clique em Sincronizar para obter dados ou crie uma nova essência.",
-    "sort-created": "por hora de criação",
     "sort-updated": "por hora de atualização",
+    "sort-created": "por hora de criação",
     "sort-name": "por nome",
     "sort-files": "Por número de arquivos",
     "category-all": "todas as essências",
-    "category-mine": "minha essência",
-    "category-starred": "essência da estrela"
+    "category-starred": "essência da estrela",
+    "category-mine": "minha essência"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "Token GitHub não encontrado, faça login novamente.",
@@ -102,8 +102,8 @@
     "delete": "excluir",
     "gist-deleted": "Gist excluído",
     "failed-to-delete-gist-v1-v2": "Falha ao excluir o Gist{{v1}}{{v2}}",
-    "gist-create-failed": "Falha na criação do Gist: {{message}}{{permissionNote}}",
     "gist-update-failed": "Falha na atualização do Gist: {{message}}{{permissionNote}}",
+    "gist-create-failed": "Falha na criação do Gist: {{message}}{{permissionNote}}",
     "gist-permission-note": "(Confirme se o token verificou a permissão Gist e insira novamente o login do token nas configurações)"
   }
 }

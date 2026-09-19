@@ -170,7 +170,8 @@
     "first-page": "첫 페이지",
     "previous-page": "이전 페이지",
     "next-page": "다음 페이지",
-    "last-page": "마지막 페이지"
+    "last-page": "마지막 페이지",
+    "last-refresh-time": "마지막 새로고침 {{time}}"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "이 릴리스에는 다운로드 가능한 자산이 없습니다.",

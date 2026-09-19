@@ -1,5 +1,5 @@
 
-import { TranslateFn, useTPair } from '../../i18n/useT';
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -50,7 +50,6 @@ const DEFAULT_DIMENSIONS: Record<EmbeddingApiType, number> = {
 };
 
 export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t }) => {
-  const tPair = useTPair();
   const {
     embeddingConfigs, activeEmbeddingConfig, vectorSearchConfig, vectorSearchStatus,
     vectorIndexingState, addEmbeddingConfig, updateEmbeddingConfig,
@@ -204,7 +203,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                     : 'bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
-                {tPair(type.label, type.labelEn)}
+                {t(`vectorSearchSettings.api-type-${type.value}`)}
               </Button>
             ))}
           </div>

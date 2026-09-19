@@ -88,8 +88,8 @@
     "current-default": "（當前預設）",
     "rounds": "輪",
     "stage-understanding": "理解問題",
-    "stage-planning": "制定閱讀計劃",
     "stage-context": "查看專案結構",
+    "stage-planning": "制定閱讀計劃",
     "stage-retrieval": "閱讀相關資料",
     "stage-verification": "評估問題是否已回答",
     "stage-replanning": "補充閱讀計劃",
@@ -99,11 +99,12 @@
     "depth-default": "預設",
     "depth-default-desc": "跟隨設定中的進階參數",
     "depth-quick": "快速",
+    "depth-quick-desc": "少量文檔取證，盡快出答",
     "depth-deep": "深入",
     "depth-deep-desc": "多輪取證並讀取程式碼，適合細節與對比",
     "depth-unlimited": "不限",
     "depth-unlimited-desc": "放開所有限制，注意耗時與額度",
-    "depth-quick-desc": "少量文檔取證，盡快出答"
+    "depth-with-budget": "{{label}} · {{turns}} 輪/{{seconds}}s"
   },
   "citationBadge": {
     "open-source-path-linestart": "看來源 {{path}}:{{lineStart}}",
@@ -121,5 +122,14 @@
   },
   "useRepositoryChatSessions": {
     "configure-a-github-token-before-starting-a-conve": "請先設定 GitHub token。"
+  },
+  "repositoryChatService": {
+    "no-verified-summary": "本輪已完成僅讀取證，但未能產生可與精確來源核驗的總結性結果。請重試，或把問題縮小到一個具體功能、文件或目標；已讀取的文件與證據可在「來源與證據」中展開查看。",
+    "evidence-insufficient-tool-error": "讀取倉庫文件時遇到問題：{{reason}} 已保留成功讀取的來源；可縮小問題範圍、提高取證預算或稍後重試。",
+    "evidence-insufficient": "目前倉庫證據不足：{{reason}} 已保留成功讀取的來源；可縮小問題範圍、提高取證預算或稍後重試。",
+    "verified-sources-heading": "### 已驗證來源",
+    "verified-sources-intro": "已完成取证，但模型回答未能可靠绑定到来源。以下為本輪已驗證的固定版本來源：",
+    "unverified-heading": "## 未證實或缺失的訊息",
+    "unverified-note": "以下段落未能與精確來源逐條核驗，請謹慎採信："
   }
 }

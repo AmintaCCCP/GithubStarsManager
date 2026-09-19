@@ -2,6 +2,7 @@
 
 
 
+import { discoveryChannelName, discoveryPlatformName } from '../i18n/discoveryNames';
 import { useT } from '../i18n/useT';
 import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
@@ -232,7 +233,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
           >
             <span className="flex items-center gap-1.5 whitespace-nowrap">
               {channel.icon}
-              {language === 'zh' ? channel.name : channel.nameEn}
+              {discoveryChannelName(channel, language)}
             </span>
           </Button>
         ))}
@@ -278,7 +279,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
           className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
         >
           <Filter className="h-4 w-4" />
-          <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
+          <span className="hidden xl:inline">{selectedPlatform ? discoveryPlatformName(selectedPlatform, language) : ''}</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -291,7 +292,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
               className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
             >
               {p.icon}
-              <span>{language === 'zh' ? p.name : p.nameEn}</span>
+              <span>{discoveryPlatformName(p, language)}</span>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -425,12 +426,9 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
     <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
       <div className="w-1.5 h-1.5 rounded-full bg-primary" />
       <span>
-        {t('discoveryView.total')} <strong className="text-foreground dark:text-foreground">{currentCount}</strong> {t('discoveryView.items')}
-        {totalCount > 0 && currentCount < totalCount && (
-          <span className="text-muted-foreground dark:text-muted-foreground">
-            {' '}{t('discoveryView.total-2')} {totalCount} {t('discoveryView.items-2')}
-          </span>
-        )}
+        {totalCount > 0 && currentCount < totalCount
+          ? t('discoveryView.items-count-with-total', { currentCount, totalCount })
+          : t('discoveryView.items-count', { currentCount })}
       </span>
     </div>
   );
@@ -775,7 +773,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <h2 className="text-base sm:text-lg font-bold text-foreground dark:text-foreground truncate leading-tight">
                       {language === 'zh'
                         ? currentChannel?.name
-                        : currentChannel?.nameEn}
+                        : discoveryChannelName(currentChannel ?? { id: 'search', name: '仓库搜索', nameEn: 'Repo Search' }, language)}
                     </h2>
                     {currentLastRefresh && (
                       <p className="hidden sm:block text-xs text-muted-foreground dark:text-muted-foreground">

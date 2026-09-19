@@ -170,7 +170,8 @@
     "first-page": "Первая страница",
     "previous-page": "Предыдущая страница",
     "next-page": "Следующая страница",
-    "last-page": "последняя страница"
+    "last-page": "последняя страница",
+    "last-refresh-time": "Последнее обновление {{time}}"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "Для этого выпуска нет загружаемых ресурсов.",

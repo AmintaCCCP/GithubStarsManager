@@ -68,8 +68,8 @@
     "sort-updated": "par heure de mise à jour",
     "sort-created": "par heure de création",
     "sort-name": "par nom",
-    "category-all": "tout l'essentiel",
     "sort-files": "Par nombre de fichiers",
+    "category-all": "tout l'essentiel",
     "category-starred": "l'essentiel des étoiles",
     "category-mine": "mon résumé"
   },
@@ -102,8 +102,8 @@
     "delete": "supprimer",
     "gist-deleted": "L'essentiel a été supprimé",
     "failed-to-delete-gist-v1-v2": "Échec de la suppression de Gist{{v1}}{{v2}}",
-    "gist-create-failed": "Échec de la création de l'essentiel : {{message}}{{permissionNote}}",
     "gist-update-failed": "Échec de la mise à jour générale : {{message}}{{permissionNote}}",
+    "gist-create-failed": "Échec de la création de l'essentiel : {{message}}{{permissionNote}}",
     "gist-permission-note": "(Veuillez confirmer que le jeton a vérifié l'autorisation essentielle et ressaisissez la connexion du jeton dans les paramètres)"
   }
 }

@@ -6,20 +6,20 @@ import type { AppLanguage } from '../i18n/languages';
  * 其余语言由 AI 初稿生成，欢迎社区校对。
  */
 export const CATEGORY_NAMES: Record<string, { zh: string } & Partial<Record<AppLanguage, string>>> = {
-  all: { zh: '全部分类', en: 'All Categories' },
-  web: { zh: 'Web应用', en: 'Web Apps' },
-  mobile: { zh: '移动应用', en: 'Mobile Apps' },
-  desktop: { zh: '桌面应用', en: 'Desktop Apps' },
-  database: { zh: '数据库', en: 'Database' },
-  ai: { zh: 'AI/机器学习', en: 'AI/Machine Learning' },
-  devtools: { zh: '开发工具', en: 'Development Tools' },
-  security: { zh: '安全工具', en: 'Security Tools' },
-  game: { zh: '游戏', en: 'Games' },
-  design: { zh: '设计工具', en: 'Design Tools' },
-  productivity: { zh: '效率工具', en: 'Productivity Tools' },
-  education: { zh: '教育学习', en: 'Education' },
-  social: { zh: '社交网络', en: 'Social Network' },
-  analytics: { zh: '数据分析', en: 'Data Analytics' },
+  all: { zh: '全部分类', en: 'All Categories', ja: 'すべて', es: 'Todas las categorías', 'pt-BR': 'Todas as categorias', ru: 'Все категории', 'zh-TW': '全部分類', fr: 'Toutes les catégories', de: 'Alle Kategorien', ko: '전체 카테고리' },
+  web: { zh: 'Web应用', en: 'Web Apps', ja: 'Webアプリ', es: 'Aplicaciones web', 'pt-BR': 'Aplicativos web', ru: 'Веб-приложения', 'zh-TW': '網頁應用', fr: 'Applications web', de: 'Web-Apps', ko: '웹 앱' },
+  mobile: { zh: '移动应用', en: 'Mobile Apps', ja: 'モバイルアプリ', es: 'Aplicaciones móviles', 'pt-BR': 'Aplicativos móveis', ru: 'Мобильные приложения', 'zh-TW': '行動應用', fr: 'Applications mobiles', de: 'Mobile Apps', ko: '모바일 앱' },
+  desktop: { zh: '桌面应用', en: 'Desktop Apps', ja: 'デスクトップアプリ', es: 'Aplicaciones de escritorio', 'pt-BR': 'Aplicativos de desktop', ru: 'Настольные приложения', 'zh-TW': '桌面應用', fr: 'Applications de bureau', de: 'Desktop-Apps', ko: '데스크톱 앱' },
+  database: { zh: '数据库', en: 'Database', ja: 'データベース', es: 'Bases de datos', 'pt-BR': 'Bancos de dados', ru: 'Базы данных', 'zh-TW': '資料庫', fr: 'Bases de données', de: 'Datenbanken', ko: '데이터베이스' },
+  ai: { zh: 'AI/机器学习', en: 'AI/Machine Learning', ja: 'AI・機械学習', es: 'IA y machine learning', 'pt-BR': 'IA e machine learning', ru: 'ИИ и машинное обучение', 'zh-TW': 'AI／機器學習', fr: 'IA et machine learning', de: 'KI & Machine Learning', ko: 'AI·머신러닝' },
+  devtools: { zh: '开发工具', en: 'Development Tools', ja: '開発ツール', es: 'Herramientas de desarrollo', 'pt-BR': 'Ferramentas de desenvolvimento', ru: 'Инструменты разработки', 'zh-TW': '開發工具', fr: 'Outils de développement', de: 'Entwicklungstools', ko: '개발 도구' },
+  security: { zh: '安全工具', en: 'Security Tools', ja: 'セキュリティツール', es: 'Herramientas de seguridad', 'pt-BR': 'Ferramentas de segurança', ru: 'Инструменты безопасности', 'zh-TW': '資安工具', fr: 'Outils de sécurité', de: 'Sicherheitstools', ko: '보안 도구' },
+  game: { zh: '游戏', en: 'Games', ja: 'ゲーム', es: 'Juegos', 'pt-BR': 'Jogos', ru: 'Игры', 'zh-TW': '遊戲', fr: 'Jeux', de: 'Spiele', ko: '게임' },
+  design: { zh: '设计工具', en: 'Design Tools', ja: 'デザインツール', es: 'Herramientas de diseño', 'pt-BR': 'Ferramentas de design', ru: 'Инструменты дизайна', 'zh-TW': '設計工具', fr: 'Outils de design', de: 'Design-Tools', ko: '디자인 도구' },
+  productivity: { zh: '效率工具', en: 'Productivity Tools', ja: '生産性ツール', es: 'Herramientas de productividad', 'pt-BR': 'Ferramentas de produtividade', ru: 'Инструменты продуктивности', 'zh-TW': '效率工具', fr: 'Outils de productivité', de: 'Produktivitätstools', ko: '생산성 도구' },
+  education: { zh: '教育学习', en: 'Education', ja: '教育・学習', es: 'Educación y aprendizaje', 'pt-BR': 'Educação e aprendizado', ru: 'Образование и обучение', 'zh-TW': '教育學習', fr: 'Éducation et apprentissage', de: 'Bildung & Lernen', ko: '교육·학습' },
+  social: { zh: '社交网络', en: 'Social Network', ja: 'ソーシャルネットワーク', es: 'Redes sociales', 'pt-BR': 'Redes sociais', ru: 'Социальные сети', 'zh-TW': '社群網路', fr: 'Réseaux sociaux', de: 'Soziale Netzwerke', ko: '소셜 네트워크' },
+  analytics: { zh: '数据分析', en: 'Data Analytics', ja: 'データ分析', es: 'Análisis de datos', 'pt-BR': 'Análise de dados', ru: 'Аналитика данных', 'zh-TW': '資料分析', fr: 'Analyse de données', de: 'Datenanalyse', ko: '데이터 분석' },
 };
 
 /** 内置分类在某语言的显示名；缺译文回退 en，再回退中文规范名。 */

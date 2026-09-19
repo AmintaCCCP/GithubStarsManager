@@ -171,8 +171,8 @@
     "logout-confirmation": "로그아웃 확인",
     "logout": "로그아웃",
     "logout-only-clears-credentials-repositories-ai-a": "로그아웃 후에는 로그인 자격 증명만 지워집니다. 창고, AI 분석, 분류 등의 로컬 데이터는 유지됩니다. 토큰을 변경하고 동일한 GitHub 계정으로 다시 로그인하면 자동으로 상속됩니다. 모든 데이터를 완전히 삭제하려면 \"설정 → 데이터 관리\"로 이동하세요.",
-    "menu-gists": "Gist",
     "menu-repositories": "창고",
+    "menu-gists": "Gist",
     "menu-releases": "풀어 주다",
     "menu-forks": "레플리카",
     "menu-subscription": "발견하다",
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "모든 페이지에서 단축키를 사용할 수 있습니다.",
     "press-escape-in-input-to-clear-search": "검색어를 지우려면 입력 상자에서 Esc를 누르세요.",
     "use-key-to-quickly-start-searching": "/ 키를 사용하여 빠르게 검색을 시작하세요.",
-    "got-it": "알고 있었다"
+    "got-it": "알고 있었다",
+    "shortcut-clear-search": "검색 지우기",
+    "shortcut-focus-search": "포커스 검색창",
+    "shortcut-quick-search": "빠른 검색",
+    "shortcut-toggle-filters": "필터 전환",
+    "shortcut-ai-search": "AI 검색"
   },
   "settingsPanel": {
     "general": "만능인",
@@ -1107,14 +1112,14 @@
     "then": "그 다음에",
     "redeploy-after-code-changes": "업데이트 배포(코드 변경 후)",
     "if-dependencies-changed-run": "(종속성이 변경되면 먼저 실행",
+    "text": "텍스트",
     "note-redeployment-does-not-require-recreating-th": "참고: 배포를 업데이트할 때 Vectorize 인덱스를 다시 생성할 필요가 없으며 기존 벡터 데이터는 영향을 받지 않습니다.",
     "must-rebuild-index-after-changing-embedding-mode": "Embedding 모델을 교체한 후 인덱스를 다시 작성해야 합니다.",
     "different-models-produce-vectors-with-different": "서로 다른 모델에서 생성된 벡터 차원은 다르므로 이를 혼합하면 쿼리 오류가 발생합니다. 모델을 교체한 후 다음을 수행해야 합니다. ① 기존 인덱스를 삭제하고 새 인덱스를 생성합니다(치수가 일치해야 함). ② 아래의 \"벡터 인덱스 재구축\"을 클릭합니다.",
     "for-detailed-instructions-see": "자세한 배포 가이드를 참조하세요.",
-    "text": "텍스트",
+    "connection-successful-dimensions": "연결 성공 - 측정기준: {{dimensions}}",
     "connection-failed-detail": "연결 실패: {{error}}",
-    "connection-successful-vectors": "연결 성공 — 벡터: {{vectorCount}}, 크기: {{dimensions}}",
-    "connection-successful-dimensions": "연결 성공 - 측정기준: {{dimensions}}"
+    "connection-successful-vectors": "연결 성공 — 벡터: {{vectorCount}}, 크기: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV 구성",

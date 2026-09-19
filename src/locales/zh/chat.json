@@ -122,5 +122,14 @@
   },
   "useRepositoryChatSessions": {
     "configure-a-github-token-before-starting-a-conve": "请先配置 GitHub token。"
+  },
+  "repositoryChatService": {
+    "no-verified-summary": "本轮已完成只读取证，但未能生成可与精确来源核验的总结性结果。请重试，或把问题缩小到一个具体功能、文件或目标；已读取的文件与证据可在「来源与证据」中展开查看。",
+    "evidence-insufficient": "当前仓库证据不足：{{reason}} 已保留成功读取的来源；可缩小问题范围、提高取证预算或稍后重试。",
+    "evidence-insufficient-tool-error": "读取仓库文件时遇到问题：{{reason}} 已保留成功读取的来源；可缩小问题范围、提高取证预算或稍后重试。",
+    "verified-sources-heading": "### 已验证来源",
+    "verified-sources-intro": "已完成取证，但模型回答未能可靠绑定到来源。以下为本轮已验证的固定版本来源：",
+    "unverified-heading": "## 未证实或缺失的信息",
+    "unverified-note": "以下段落未能与精确来源逐条核验，请谨慎采信："
   }
 }

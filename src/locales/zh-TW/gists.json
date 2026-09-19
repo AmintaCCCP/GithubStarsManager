@@ -65,12 +65,12 @@
     "v1-gists": "共 {{v1}} 個 gist",
     "search-applied": "已應用程式搜尋",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "暫無 gist。點選同步取得數據，或新建一個 gist。",
-    "sort-created": "按創建時間",
     "sort-updated": "按更新時間",
+    "sort-created": "按創建時間",
     "sort-name": "按名稱",
     "sort-files": "按文件數",
-    "category-starred": "星標 gist",
     "category-all": "全部 gist",
+    "category-starred": "星標 gist",
     "category-mine": "我的 gist"
   },
   "useGistActions": {

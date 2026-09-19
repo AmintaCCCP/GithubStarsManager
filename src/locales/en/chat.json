@@ -122,5 +122,14 @@
   },
   "useRepositoryChatSessions": {
     "configure-a-github-token-before-starting-a-conve": "Configure a GitHub token before starting a conversation."
+  },
+  "repositoryChatService": {
+    "no-verified-summary": "This turn completed read-only evidence retrieval but did not produce a source-verifiable summary. Retry, or narrow the question to a specific feature, file, or goal; the retrieved files and evidence remain available under \"Sources and evidence\".",
+    "evidence-insufficient": "The current repository evidence is insufficient: {{reason}} Successful sources were retained; narrow the question, increase the research budget, or retry later.",
+    "evidence-insufficient-tool-error": "Repository file retrieval encountered an error: {{reason}} Successful sources were retained; narrow the question, increase the research budget, or retry later.",
+    "verified-sources-heading": "### Verified sources",
+    "verified-sources-intro": "Evidence retrieval completed, but the model answer could not be reliably source-bound. These fixed-version sources were verified:",
+    "unverified-heading": "## Unverified or missing information",
+    "unverified-note": "The paragraphs below could not be verified against exact sources; take them with caution:"
   }
 }

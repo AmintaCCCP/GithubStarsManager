@@ -171,8 +171,8 @@
     "logout-confirmation": "Confirmação de logout",
     "logout": "Sair",
     "logout-only-clears-credentials-repositories-ai-a": "Somente as credenciais de login são apagadas após o logout. Dados locais, como armazéns, análise de IA e classificação, serão retidos; ele será herdado automaticamente se você alterar o token e fazer login novamente com a mesma conta GitHub. Para limpar completamente todos os dados, vá em “Configurações → Gerenciamento de Dados”.",
-    "menu-gists": "Gist",
     "menu-repositories": "armazém",
+    "menu-gists": "Gist",
     "menu-releases": "liberar",
     "menu-forks": "réplica",
     "menu-subscription": "Descobrir",
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "As teclas de atalho podem ser usadas em qualquer página",
     "press-escape-in-input-to-clear-search": "Pressione Escape na caixa de entrada para limpar a pesquisa",
     "use-key-to-quickly-start-searching": "Use a tecla / para iniciar a pesquisa rapidamente",
-    "got-it": "sabia"
+    "got-it": "sabia",
+    "shortcut-clear-search": "Limpar pesquisa",
+    "shortcut-focus-search": "Caixa de pesquisa em foco",
+    "shortcut-toggle-filters": "Trocar filtro",
+    "shortcut-quick-search": "Pesquisa rápida",
+    "shortcut-ai-search": "Pesquisa de IA"
   },
   "settingsPanel": {
     "general": "Universal",
@@ -1111,10 +1116,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "O índice deve ser reconstruído após a substituição do modelo de incorporação",
     "different-models-produce-vectors-with-different": "As dimensões vetoriais geradas por diferentes modelos são diferentes e misturá-las causará falha na consulta. Após substituir o modelo, você precisa: ① Excluir o índice antigo e criar um novo índice (as dimensões precisam corresponder) ② Clique em \"Reconstruir Índice de Vetor\" abaixo",
     "for-detailed-instructions-see": "Consulte o guia de implantação detalhado",
-    "text": ")",
-    "connection-failed-detail": "Falha na conexão: {{error}}",
     "connection-successful-dimensions": "Conexão bem-sucedida - Dimensão: {{dimensions}}",
-    "connection-successful-vectors": "Conexão bem-sucedida — vetor: {{vectorCount}}, dimensões: {{dimensions}}"
+    "connection-failed-detail": "Falha na conexão: {{error}}",
+    "connection-successful-vectors": "Conexão bem-sucedida — vetor: {{vectorCount}}, dimensões: {{dimensions}}",
+    "text": ")"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuração WebDAV",

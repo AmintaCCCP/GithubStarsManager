@@ -171,8 +171,8 @@
     "logout-confirmation": "登出登入確認",
     "logout": "登出登入",
     "logout-only-clears-credentials-repositories-ai-a": "登出後僅清除登入憑證。仓库、AI 分析和分类等本地数据会保留；同一 GitHub 账号换 token 再登录会自动继承。如需完全清除所有数据，请前往「设置 → 数据管理」。",
-    "menu-gists": "Gist",
     "menu-repositories": "倉庫",
+    "menu-gists": "Gist",
     "menu-releases": "發布",
     "menu-forks": "復刻",
     "menu-subscription": "發現",
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "快捷鍵在任何頁面都可使用",
     "press-escape-in-input-to-clear-search": "在輸入框中按 Escape 清除搜尋",
     "use-key-to-quickly-start-searching": "使用 / 鍵快速開始搜索",
-    "got-it": "知道了"
+    "got-it": "知道了",
+    "shortcut-clear-search": "清除搜尋",
+    "shortcut-toggle-filters": "切換過濾器",
+    "shortcut-focus-search": "聚焦搜尋框",
+    "shortcut-quick-search": "快速搜尋",
+    "shortcut-ai-search": "AI搜尋"
   },
   "settingsPanel": {
     "general": "一般",
@@ -1113,8 +1118,8 @@
     "different-models-produce-vectors-with-different": "不同模型產生的向量維度不同，混用會導致查詢失敗。更換模型後需要：① 刪除舊索引並建立新索引（維度需匹配） ② 點選下方「重建向量索引」",
     "for-detailed-instructions-see": "詳細部署指南請參考",
     "connection-successful-dimensions": "連結成功 — 維度: {{dimensions}}",
-    "connection-successful-vectors": "連結成功 — 向量: {{vectorCount}}，維度: {{dimensions}}",
-    "connection-failed-detail": "連結失敗：{{error}}"
+    "connection-failed-detail": "連結失敗：{{error}}",
+    "connection-successful-vectors": "連結成功 — 向量: {{vectorCount}}，維度: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",

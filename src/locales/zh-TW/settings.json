@@ -56,7 +56,8 @@
   },
   "useStarSyncActions": {
     "not-connected-to-github-yet": "未登入 GitHub，請先連接",
-    "push-categories-to-github-lists": "同步倉庫分類到 GitHub list"
+    "push-categories-to-github-lists": "同步倉庫分類到 GitHub list",
+    "push-confirm-body": "將每個本地分類（含預設與自訂分類）寫回為同名 GitHub List：\n\n· 同名 list 將涵蓋其成員（未匹配分類的倉庫將從該 list 移除）\n· 無同名 list 則新建（預設私有）\n· 倉庫將以其符合的分類加入對應 list\n· 不屬於本地分類的其他 list 成員關係會被保留\n\n確定繼續嗎？"
   },
   "useWebDAVActions": {
     "webdav-url-is-required": "WebDAV URL是必要的",
@@ -68,5 +69,9 @@
     "webdav-connection-successful": "WebDAV連線成功！",
     "webdav-connection-failed-please-check-configurat": "WebDAV連線失敗，請檢查設定。",
     "webdav-test-failed": "WebDAV測試失敗"
+  },
+  "generalPanel": {
+    "account-token-hint": "當前帳號 {{login}}。過期後可在此直接更換 token，不必登出登入。",
+    "token-hint": "過期後可在此直接更換 token，不必登出登入。"
   }
 }

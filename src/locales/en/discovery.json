@@ -77,7 +77,9 @@
     "refresh-now": "Refresh Now",
     "loading-more": "Loading more…",
     "retry": "Retry",
-    "platform-filter-v1": "Platform filter: {{v1}}"
+    "platform-filter-v1": "Platform filter: {{v1}}",
+    "items-count": "{{currentCount}} items",
+    "items-count-with-total": "{{currentCount}} of {{totalCount}} items"
   },
   "weeklyIssueModal": {
     "submission-v1": "Submission #{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "Connected: parsed {{tweetCount}} tweets with {{repoCount}} GitHub repo links.",
     "failed-error": "Failed: {{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "Trending",
+    "hot-release": "Hot Release",
+    "most-popular": "Most Popular",
+    "topic": "Topic",
+    "x-tweet": "X Tweets",
+    "telegram": "Telegram Channels",
+    "weekly": "Ruanyifeng Weekly",
+    "search": "Repo Search"
+  },
+  "discoveryPlatform": {
+    "All": "All Platforms"
   }
 }

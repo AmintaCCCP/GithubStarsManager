@@ -66,12 +66,12 @@
     "search-applied": "検索が適用されました",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "まだ要点はありません。 「同期」をクリックしてデータを取得するか、新しい要点を作成します。",
     "sort-updated": "更新時間までに",
-    "sort-name": "名前で",
     "sort-created": "作成時間までに",
+    "sort-name": "名前で",
     "sort-files": "ファイル数別",
     "category-all": "すべての要点",
-    "category-mine": "私の要点",
-    "category-starred": "要点"
+    "category-starred": "要点",
+    "category-mine": "私の要点"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub トークンが見つかりません。再度ログインしてください。",

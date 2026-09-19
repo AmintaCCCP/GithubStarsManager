@@ -171,11 +171,11 @@
     "logout-confirmation": "Confirmación de cierre de sesión",
     "logout": "Finalizar la sesión",
     "logout-only-clears-credentials-repositories-ai-a": "Sólo las credenciales de inicio de sesión se borran después de cerrar la sesión. Se conservarán datos locales como almacenes, análisis de IA y clasificación; se heredará automáticamente si cambia el token e inicia sesión nuevamente con la misma cuenta de GitHub. Para borrar completamente todos los datos, vaya a \"Configuración → Gestión de datos\".",
-    "menu-gists": "Gist",
     "menu-repositories": "almacén",
+    "menu-gists": "Gist",
     "menu-releases": "liberar",
-    "menu-subscription": "Descubrir",
     "menu-forks": "réplica",
+    "menu-subscription": "Descubrir",
     "menu-settings": "configuración"
   },
   "listsPushIndicator": {
@@ -337,7 +337,12 @@
     "shortcuts-work-on-any-page": "Las teclas de acceso directo se pueden utilizar en cualquier página.",
     "press-escape-in-input-to-clear-search": "Presione Escape en el cuadro de entrada para borrar la búsqueda.",
     "use-key-to-quickly-start-searching": "Utilice la tecla / para comenzar a buscar rápidamente",
-    "got-it": "sabía"
+    "got-it": "sabía",
+    "shortcut-clear-search": "Borrar búsqueda",
+    "shortcut-focus-search": "Cuadro de búsqueda de enfoque",
+    "shortcut-quick-search": "búsqueda rápida",
+    "shortcut-toggle-filters": "Cambiar filtro",
+    "shortcut-ai-search": "búsqueda por IA"
   },
   "settingsPanel": {
     "general": "Universal",
@@ -1107,11 +1112,11 @@
     "then": "Entonces",
     "redeploy-after-code-changes": "Implementación de actualización (después de cambios de código)",
     "if-dependencies-changed-run": "(Si las dependencias cambian, ejecute primero",
+    "text": "Texto",
     "note-redeployment-does-not-require-recreating-th": "Nota: Actualizar la implementación no requiere volver a crear el índice Vectorize y los datos vectoriales existentes no se verán afectados.",
     "must-rebuild-index-after-changing-embedding-mode": "El índice debe reconstruirse después de reemplazar el modelo de incrustación.",
     "different-models-produce-vectors-with-different": "Las dimensiones vectoriales generadas por diferentes modelos son diferentes y mezclarlas provocará un error en la consulta. Después de reemplazar el modelo, debe: ① Eliminar el índice anterior y crear un nuevo índice (las dimensiones deben coincidir) ② Haga clic en \"Reconstruir índice de vectores\" a continuación",
     "for-detailed-instructions-see": "Consulte la guía de implementación detallada.",
-    "text": "Texto",
     "connection-successful-dimensions": "Conexión exitosa - Dimensión: {{dimensions}}",
     "connection-failed-detail": "Error de conexión: {{error}}",
     "connection-successful-vectors": "Conexión exitosa: vector: {{vectorCount}}, dimensiones: {{dimensions}}"

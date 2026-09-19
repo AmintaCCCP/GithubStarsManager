@@ -77,7 +77,9 @@
     "refresh-now": "Обновить сейчас",
     "loading-more": "Загрузка еще…",
     "retry": "Попробуйте еще раз",
-    "platform-filter-v1": "Фильтр платформы: {{v1}}"
+    "platform-filter-v1": "Фильтр платформы: {{v1}}",
+    "items-count": "{{currentCount}} элементов",
+    "items-count-with-total": "{{currentCount}} элементов (всего {{totalCount}} элементов)"
   },
   "weeklyIssueModal": {
     "submission-v1": "Вклад №{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "Соединение успешно: обработано {{tweetCount}} твитов, включая {{repoCount}} ссылки на репозиторий GitHub.",
     "failed-error": "Не удалось подключиться: {{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "тенденция",
+    "hot-release": "Популярные релизы",
+    "most-popular": "самый популярный",
+    "topic": "Исследование темы",
+    "x-tweet": "Х-твит",
+    "telegram": "Telegram-канал",
+    "weekly": "Жуан Ифэн Еженедельник",
+    "search": "Поиск склада"
+  },
+  "discoveryPlatform": {
+    "All": "Все платформы"
   }
 }

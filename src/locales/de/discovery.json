@@ -77,7 +77,9 @@
     "refresh-now": "Jetzt aktualisieren",
     "loading-more": "Mehr laden…",
     "retry": "Versuchen Sie es erneut",
-    "platform-filter-v1": "Plattformfilter: {{v1}}"
+    "platform-filter-v1": "Plattformfilter: {{v1}}",
+    "items-count": "{{currentCount}} Artikel",
+    "items-count-with-total": "{{currentCount}} Artikel ({{totalCount}} Artikel insgesamt)"
   },
   "weeklyIssueModal": {
     "submission-v1": "Beitrag #{{v1}}",
@@ -123,5 +125,18 @@
   "useXTweetProbe": {
     "connected-parsed-tweetcount-tweets-with-repocoun": "Verbindung erfolgreich: {{tweetCount}} Tweets analysiert, einschließlich {{repoCount}} GitHub-Repository-Links.",
     "failed-error": "Verbindung fehlgeschlagen: {{error}}"
+  },
+  "discoveryChannel": {
+    "trending": "Trend",
+    "hot-release": "Beliebte Veröffentlichungen",
+    "most-popular": "am beliebtesten",
+    "topic": "Themenerkundung",
+    "telegram": "Telegram-Kanal",
+    "x-tweet": "X-Tweet",
+    "search": "Lagersuche",
+    "weekly": "Ruan Yifeng Weekly"
+  },
+  "discoveryPlatform": {
+    "All": "Alle Plattformen"
   }
 }

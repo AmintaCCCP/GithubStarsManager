@@ -1,3 +1,4 @@
+import { discoveryChannelName } from '../i18n/discoveryNames';
 import { useT } from "../i18n/useT";
 import type { AppLanguage } from '../i18n/languages';
 import React from 'react';
@@ -99,7 +100,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 <span className="flex items-center gap-2.5">
                   <ChannelIcon className="w-4 h-4" />
                   <span className="font-medium text-sm">
-                    {language === 'zh' ? channel.name : channel.nameEn}
+                    {discoveryChannelName(channel, language)}
                   </span>
                 </span>
                 <span className="flex items-center gap-2.5">

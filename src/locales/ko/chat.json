@@ -89,21 +89,22 @@
     "rounds": "바퀴",
     "stage-understanding": "문제 이해",
     "stage-context": "프로젝트 구조 보기",
-    "stage-retrieval": "관련 정보 읽기",
     "stage-planning": "독서 계획을 세우세요",
+    "stage-retrieval": "관련 정보 읽기",
     "stage-verification": "질문에 답할 수 있는지 평가",
     "stage-replanning": "보충 독서 계획",
-    "stage-answer": "최종 답변 정리",
     "stage-escalation": "구현 세부정보 추가",
-    "depth-default": "기본",
+    "stage-answer": "최종 답변 정리",
     "stage-tool": "도구 호출",
+    "depth-default": "기본",
     "depth-default-desc": "설정의 고급 매개변수를 따르세요.",
     "depth-quick": "빠른",
     "depth-quick-desc": "소량의 문서를 수집하여 최대한 빠른 답변을 제공합니다.",
     "depth-deep": "깊이 들어가다",
-    "depth-unlimited": "제한 없음",
     "depth-deep-desc": "세부 사항 및 비교에 적합한 여러 차례의 포렌식 및 코드 판독",
-    "depth-unlimited-desc": "모든 제한을 해제하고 시간 소비 및 할당량에 주의하세요."
+    "depth-unlimited": "제한 없음",
+    "depth-unlimited-desc": "모든 제한을 해제하고 시간 소비 및 할당량에 주의하세요.",
+    "depth-with-budget": "{{label}} · {{turns}} 라운드/{{seconds}}초"
   },
   "citationBadge": {
     "open-source-path-linestart": "소스 보기 {{path}}:{{lineStart}}",
@@ -121,5 +122,14 @@
   },
   "useRepositoryChatSessions": {
     "configure-a-github-token-before-starting-a-conve": "먼저 GitHub 토큰을 구성하세요."
+  },
+  "repositoryChatService": {
+    "no-verified-summary": "이번 라운드에서는 읽기 전용 검증을 완료했지만, 정확한 출처로 검증할 수 있는 요약 결과를 생성하지 못했습니다. 다시 시도하거나 특정 기능, 파일 또는 대상으로 문제 범위를 좁히십시오. 열람한 파일과 증거물은 \"출처 및 증거물\"에서 확대하여 보실 수 있습니다.",
+    "evidence-insufficient": "현재 저장소에 증거가 부족합니다. {{reason}}이(가) 성공적인 읽기의 소스를 유지했습니다. 문제의 범위를 좁히거나, 포렌식 예산을 늘리거나, 나중에 다시 시도할 수 있습니다.",
+    "evidence-insufficient-tool-error": "저장소 파일을 읽는 동안 문제가 발생했습니다. {{reason}}이(가) 성공적인 읽기 소스를 유지했습니다. 문제의 범위를 좁히거나, 포렌식 예산을 늘리거나, 나중에 다시 시도할 수 있습니다.",
+    "verified-sources-heading": "### 출처 확인됨",
+    "verified-sources-intro": "법의학이 완료되었지만 모델 답변이 소스에 안정적으로 연결되어 있지 않습니다. 다음은 이번 라운드에 대해 검증된 수정 버전의 소스입니다.",
+    "unverified-heading": "## 확인되지 않았거나 누락된 정보",
+    "unverified-note": "다음 문단은 항목별로 정확한 출처를 확인할 수 없으므로 주의해서 받아들여 주시기 바랍니다."
   }
 }
