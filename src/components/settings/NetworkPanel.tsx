@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -9,7 +11,7 @@ import type { ProxyType } from '../../types';
 import { useNetworkActions } from '../../features/settings/hooks/useNetworkActions';
 
 interface NetworkPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
@@ -38,14 +40,14 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           <div className="flex items-center space-x-3">
             <Wifi className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
             <h4 className="font-medium text-foreground dark:text-foreground">
-              {t('网络代理', 'Network Proxy')}
+              {t('networkPanel.network-proxy')}
             </h4>
           </div>
           <Switch
             checked={form.enabled}
             onCheckedChange={(checked) => { void handleProxyToggle(checked); }}
             disabled={isProxyToggling}
-            aria-label={t('启用网络代理', 'Enable network proxy')}
+            aria-label={t('networkPanel.enable-network-proxy')}
             className="shrink-0"
           />
         </div>
@@ -55,7 +57,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {/* Proxy Type */}
             <div>
               <label id="proxy-type-label" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-2">
-                {t('代理类型', 'Proxy Type')}
+                {t('networkPanel.proxy-type')}
               </label>
               <RadioGroup aria-labelledby="proxy-type-label" value={form.type} onValueChange={(value) => setForm({ ...form, type: value as ProxyType })} className="grid max-w-md grid-cols-2 gap-3">
                 {(['http', 'socks5'] as ProxyType[]).map((type) => (
@@ -71,7 +73,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
                 <label htmlFor="proxy-host" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                  {t('主机地址', 'Host')}
+                  {t('networkPanel.host')}
                 </label>
                 <Input
                   id="proxy-host"
@@ -84,7 +86,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               </div>
               <div>
                 <label htmlFor="proxy-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                  {t('端口', 'Port')}
+                  {t('networkPanel.port')}
                 </label>
                 <NumberInput
                   id="proxy-port"
@@ -107,27 +109,27 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 onClick={() => setShowAuth(!showAuth)}
                 className="h-auto p-0 text-sm text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground transition-colors"
               >
-                {showAuth ? t('隐藏认证', 'Hide Authentication') : t('需要认证（可选）', 'Authentication (optional)')}
+                {showAuth ? t('networkPanel.hide-authentication') : t('networkPanel.authentication-optional')}
               </Button>
 
               {showAuth && (
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="proxy-username" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                      {t('用户名', 'Username')}
+                      {t('networkPanel.username')}
                     </label>
                     <Input
                       id="proxy-username"
                       type="text"
                       value={form.username || ''}
                       onChange={(e) => setForm({ ...form, username: e.target.value || undefined })}
-                      placeholder={t('可选', 'Optional')}
+                      placeholder={t('networkPanel.optional')}
                       className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                     />
                   </div>
                   <div>
                     <label htmlFor="proxy-password" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                      {t('密码', 'Password')}
+                      {t('networkPanel.password')}
                     </label>
                     <div className="relative">
                       <Input
@@ -135,14 +137,14 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                         type={showPassword ? 'text' : 'password'}
                         value={form.password || ''}
                         onChange={(e) => setForm({ ...form, password: e.target.value || undefined })}
-                        placeholder={t('可选', 'Optional')}
+                        placeholder={t('networkPanel.optional')}
                         className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                       />
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label={showPassword ? t('隐藏密码', 'Hide password') : t('显示密码', 'Show password')}
+                        aria-label={showPassword ? t('networkPanel.hide-password') : t('networkPanel.show-password')}
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                       >
@@ -164,10 +166,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {testing ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('测试中…', 'Testing…')}</span>
+                    <span>{t('networkPanel.testing')}</span>
                   </span>
                 ) : (
-                  t('测试连接', 'Test Connection')
+                  t('networkPanel.test-connection')
                 )}
               </Button>
 
@@ -179,10 +181,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {saving ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('保存中…', 'Saving…')}</span>
+                    <span>{t('networkPanel.saving')}</span>
                   </span>
                 ) : (
-                  t('保存', 'Save')
+                  t('networkPanel.save')
                 )}
               </Button>
             </div>
@@ -201,8 +203,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 )}
                 <span>
                   {testResult.success
-                    ? t('代理连接成功', 'Proxy connection successful')
-                    : testResult.error || t('代理连接失败', 'Proxy connection failed')}
+                    ? t('networkPanel.proxy-connection-successful')
+                    : testResult.error || t('networkPanel.proxy-connection-failed')}
                 </span>
               </div>
             )}
@@ -217,14 +219,14 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
           <div className="flex items-center space-x-3">
             <Download className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
             <h4 className="font-medium text-foreground dark:text-foreground">
-              {t('远程下载', 'Remote Download')}
+              {t('networkPanel.remote-download')}
             </h4>
           </div>
           <Switch
             checked={rpcForm.enabled}
             onCheckedChange={(enabled) => void handleRpcToggle(enabled)}
             disabled={isRpcToggling}
-            aria-label={t('启用远程下载', 'Enable remote download')}
+            aria-label={t('networkPanel.enable-remote-download')}
             className="shrink-0"
           />
         </div>
@@ -235,7 +237,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             <div className="grid grid-cols-3 gap-3">
               <div className="col-span-2">
                 <label htmlFor="rpc-host" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                  {t('主机地址', 'Host')}
+                  {t('networkPanel.host')}
                 </label>
                 <Input
                   id="rpc-host"
@@ -248,7 +250,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
               </div>
               <div>
                 <label htmlFor="rpc-port" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                  {t('端口', 'Port')}
+                  {t('networkPanel.port')}
                 </label>
                 <NumberInput
                   id="rpc-port"
@@ -266,7 +268,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
             {/* Secret */}
             <div>
               <label htmlFor="rpc-secret" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                {t('密钥', 'Secret')}
+                {t('networkPanel.secret')}
               </label>
               <div className="relative">
                 <Input
@@ -278,15 +280,15 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                     if (e.target.value) clearStoredSecret();
                   }}
                   placeholder={hasStoredSecret
-                    ? t('已保存密钥，留空则保留', 'Secret saved, leave blank to keep')
-                    : t('可选，对应 aria2 的 --rpc-secret', 'Optional, aria2 --rpc-secret')}
+                    ? t('networkPanel.secret-saved-leave-blank-to-keep')
+                    : t('networkPanel.optional-aria2-rpc-secret')}
                   className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={showSecret ? t('隐藏密钥', 'Hide secret') : t('显示密钥', 'Show secret')}
+                  aria-label={showSecret ? t('networkPanel.hide-secret') : t('networkPanel.show-secret')}
                   onClick={() => setShowSecret(!showSecret)}
                   className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
                 >
@@ -297,16 +299,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
 
             {/* Hint */}
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-              {t(
-                '需要运行 aria2 并启用 RPC（aria2c --enable-rpc --rpc-listen-port=6800）',
-                'Requires aria2 with RPC enabled (aria2c --enable-rpc --rpc-listen-port=6800)'
-              )}
+              {t('networkPanel.requires-aria2-with-rpc-enabled-aria2c-enable-rp')}
             </p>
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-              {t(
-                'GitHub/Release 请求出口可在「设置 → 后端同步 → 网络请求路由」调整。RPC 下载仍由 aria2 配置决定，下载流量由 aria2 进程所在机器发出，与本设置无关。',
-                'Adjust GitHub/Release request egress under "Settings → Backend Sync → Network Request Routing". RPC downloads remain controlled by aria2 configuration, and traffic leaves from wherever aria2 runs; this setting does not change it.'
-              )}
+              {t('networkPanel.adjust-github-release-request-egress-under-setti')}
             </p>
 
             {/* Actions */}
@@ -319,10 +315,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {rpcTesting ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('测试中…', 'Testing…')}</span>
+                    <span>{t('networkPanel.testing')}</span>
                   </span>
                 ) : (
-                  t('测试连接', 'Test Connection')
+                  t('networkPanel.test-connection')
                 )}
               </Button>
 
@@ -334,10 +330,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 {rpcSaving ? (
                   <span className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{t('保存中…', 'Saving…')}</span>
+                    <span>{t('networkPanel.saving')}</span>
                   </span>
                 ) : (
-                  t('保存', 'Save')
+                  t('networkPanel.save')
                 )}
               </Button>
             </div>
@@ -356,8 +352,8 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                 )}
                 <span>
                   {rpcTestResult.success
-                    ? `${t('连接成功', 'Connection successful')}${rpcTestResult.version ? ` (aria2 v${rpcTestResult.version})` : ''}`
-                    : rpcTestResult.error || t('连接失败', 'Connection failed')}
+                    ? `${t('networkPanel.connection-successful')}${rpcTestResult.version ? ` (aria2 v${rpcTestResult.version})` : ''}`
+                    : rpcTestResult.error || t('networkPanel.connection-failed')}
                 </span>
               </div>
             )}

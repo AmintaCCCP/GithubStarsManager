@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "{{v1}} のチャンネル メッセージ",
+    "open-in-telegram": "テレグラムで開く",
+    "this-message-is-media-only-and-has-no-text-conte": "このメッセージは純粋にメディア コンテンツであり、テキスト コンテンツはありません。"
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "https://t.me/geekhub23 や @geekhub23 などの有効なチャンネル名を入力してください。",
+    "this-channel-is-already-in-the-list": "チャンネルはすでにウォッチリストに含まれています。",
+    "channel-added-to-the-follow-list": "フォローチャンネル追加しました。",
+    "unfollowed-v1": "@{{v1}} のフォローが解除されました。",
+    "telegram-channels-settings": "電報チャンネル設定",
+    "refreshing-incrementally-pulls-the-latest-messag": "更新すると、フォローしているチャンネルからの最新ニュースが段階的に取得されます。ニュース内の GitHub ウェアハウス リンクを含むエントリはリスト項目として表示されます。 「さらに読み込む」は、以前の履歴メッセージをページごとに取得します。データは、t.me パブリック プレビューに直接接続されたアプリケーションによってキャプチャされます。これには、デスクトップ バージョンまたはサーバー モードが必要です (純粋なブラウザ モードはクロスドメイン制限の対象となります)。プライベートチャンネルはキャプチャできません。",
+    "follow-list": "ウォッチリスト",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "t.me チャンネル リンク、@チャンネル名、または裸のチャンネル名をサポートします。更新時に最新のニュースをチャンネルごとに取得します。",
+    "enter-a-valid-channel-name": "有効なチャンネル名を入力してください。",
+    "fill-in-or-add-a-channel-to-test-first": "最初にテスト用のチャンネルを入力または追加してください。",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "実際にチャネルを一度キャプチャし、パブリック プレビューしてキャプチャ チャネルを確認します",
+    "testing": "テスト中…",
+    "test-connection": "テスト接続",
+    "channel-name": "チャンネル名",
+    "add": "に追加",
+    "no-followed-channels-yet": "まだフォローするチャンネルがありません。",
+    "unfollow": "フォローを解除する",
+    "unfollow-v1": "@{{v1}}のフォローを解除",
+    "done": "仕上げる"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "@{{v1}} からのツイート",
+    "open-on-x": "Xでオープン",
+    "this-tweet-has-no-text-content": "ツイートのテキストが空です"
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "有効な X ユーザー名 (@geekbb など) またはホームページのリンクを入力してください。",
+    "this-account-is-already-in-the-list": "このブロガーはすでにウォッチリストに登録されています。",
+    "account-added-to-the-follow-list": "ブロガーさんがフォローに追加されました。",
+    "unfollowed-v1": "@{{v1}} のフォローが解除されました。",
+    "both-auth-token-and-ct0-must-contain-valid-value": "auth_token と ct0 の両方に有効な内容を入力する必要があります。",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "認証 Cookie は保存されており、更新後に GraphQL モードで取得されます。",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "認証 Cookie は有効になりましたが、ディスクに永続化されていないため、再起動後に失われる可能性があります。",
+    "auth-cookies-saved-current-session-only": "認証 Cookie が保存されました (このセッションのみ有効)。",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "認証 Cookie がクリアされ、非ログイン クロール モードに戻りました。",
+    "x-tweets-channel-settings": "Xツイートチャンネル設定",
+    "refreshing-incrementally-pulls-the-latest-tweets": "更新すると、フォローしているブロガーの最新のツイートが段階的に取得され、ツイート内の GitHub リポジトリ リンクを含むアイテムがリスト アイテムとして表示されます。データは、x.com に直接接続されたアプリケーションによってキャプチャされます。これには、デスクトップ バージョンまたはサーバー モードが必要です (純粋なブラウザ モードはクロスドメイン制限の対象となります)。必要に応じて、ログイン認証 Cookie を入力して、より多くのツイートや履歴ページのめくりを有効にします。",
+    "follow-list": "ウォッチリスト",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "@username、username、または x.com ホームページ リンクをサポートします。更新時にブロガーの最新のツイートを取得します。",
+    "enter-a-valid-x-handle": "有効な X ユーザー名を入力してください。",
+    "fill-in-or-add-an-account-to-test-first": "テストのために、最初にブロガーを入力または追加してください。",
+    "fetch-a-profile-once-to-verify-the-pipeline": "ホームページを実際に 1 回クロールして、クロール チャネルを確認します。",
+    "testing": "テスト中…",
+    "test-connection": "テスト接続",
+    "x-handle": "Xのユーザー名",
+    "add": "に追加",
+    "no-followed-accounts-yet": "フォローするブロガーはまだいません。",
+    "unfollow": "フォローを解除する",
+    "unfollow-v1": "@{{v1}}のフォローを解除",
+    "auth-cookies-optional": "認証クッキー (オプション)",
+    "once-set-fetching-switches-to-the-signed-in-grap": "入力後、ログイン状態の GraphQL インターフェイスに変更します。各ブロガーには 1 ページあたり約 20 件のツイートがあり、「さらに読み込む」ことでページごとの履歴を確認できます。ログに記録されないクロールを使用するには、空白のままにします (一度に各ブロガーの最新の小さなバッチのみ)。ブラウザが x.com にログインした後、DevTools → Application → Cookies で auth_token と ct0 をコピーし、ローカル アプリケーション データにのみ保存します。",
+    "auth-token": "auth_token",
+    "hide-auth-token": "auth_token を隠す",
+    "show-auth-token": "auth_token を表示",
+    "ct0": "ct0",
+    "hide-ct0": "ct0を隠す",
+    "show-ct0": "ct0を表示",
+    "authenticated-fetching-is-on": "認証キャプチャは現在有効になっています",
+    "signed-out-fetching-mode": "現在、非ログイン クロール モードです",
+    "clear": "クリア",
+    "update-auth": "認証を更新する",
+    "saved": "保存されました",
+    "save-auth": "認証の保存",
+    "done": "仕上げる"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "ブラウザで開いた状態",
+    "plugin-result-copied": "プラグインの結果がコピーされました",
+    "plugin-result-saved": "プラグインの結果が保存されました",
+    "plugin-action-completed": "プラグイン操作が完了しました"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "カスタムサービス",
+    "allow-plugin-ai-request": "プラグインによる AI の呼び出しを許可しますか?",
+    "the-host-may-relay-this-through-its-configured-b": "有効なホスティング バックエンド プロキシによって転送される可能性があります。",
+    "send-to-ai": "AIに送信",
+    "allow-plugin-ai-body": "プラグイン {{pluginName}} が AI 構成「{{configName}}」（モデル {{model}}）の使用をリクエストしました。\n宛先アドレス: {{destination}}\n{{relayNote}}\n\nシステム:\n{{system}}\n\nユーザー:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "プラグインのネットワーク検索を許可しますか?",
+    "search-query": "検索語:",
+    "send-search-query": "検索語を送信する"
+  }
+}

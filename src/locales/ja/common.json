@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "GitHub トークンが見つかりません。再度ログインしてください。",
+    "fork-owner-not-found-please-login-again": "フォーク ウェアハウスの所有者が見つかりません。再度ログインしてください。",
+    "refresh-completed-found-newcount-new-forks": "リフレッシュ完了！ {{newCount}} 個の新しいフォークが見つかりました。",
+    "refresh-completed": "リフレッシュ完了！",
+    "fork-refresh-failed-please-check-your-network-co": "フォークの更新に失敗しました。ネットワーク接続を確認してください。",
+    "failed-to-load-branches-please-check-your-networ": "ブランチのロードに失敗しました。ネットワーク接続を確認して再試行してください。",
+    "v1-is-already-up-to-date": "{{v1}} はすでに最新バージョンであるため、更新する必要はありません。",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} は最新のアップストリーム バージョンに正常に更新されました。",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} はフォーク ウェアハウスではないため、アップストリームで同期できません。",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "同期に失敗しました: {{v1}} には上流のウェアハウスとのマージ競合があります。手動で解決して再試行してください。",
+    "sync-failed-message": "同期に失敗しました: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "ワークフロー「{{workflowName}}」が {{branch}} ブランチでトリガーされました。",
+    "failed-to-run-workflow": "ワークフローの実行に失敗しました。",
+    "failed-to-load-organizations-please-check-github": "組織リストの読み込みに失敗しました。GitHub トークンの権限を確認してください。"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "AI-Dienstverbindung erfolgreich!",
+    "ai-service-test-failed-please-check-network-conn": "Der KI-Diensttest ist fehlgeschlagen. Bitte überprüfen Sie die Netzwerkverbindung und -konfiguration."
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "Ungültige Backend-Adresse: Das Remote-Backend erfordert HTTPS, nur localhost kann HTTP verwenden",
+    "backend-connection-failed-please-check-the-serve": "Die Backend-Verbindung ist fehlgeschlagen. Bitte überprüfen Sie, ob der Serverstatus oder das API-Geheimnis korrekt ist.",
+    "backend-connection-successful": "Backend-Verbindung erfolgreich!",
+    "backend-not-available": "Backend ist nicht verfügbar",
+    "partial-sync-failure-v1-failed-v2-succeeded": "Teilweise Synchronisierung fehlgeschlagen: {{v1}} fehlgeschlagen, {{v2}} erfolgreich",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "Mit dem Backend synchronisiert: Warehouse {{v1}}, Release {{v2}}, AI-Konfiguration {{v3}}, WebDAV-Konfiguration {{v4}}",
+    "sync-failed": "Die Synchronisierung ist fehlgeschlagen",
+    "sync-from-backend": "Vom Backend aus synchronisieren",
+    "syncing-from-backend-will-overwrite-local-data-c": "Durch die Synchronisierung vom Backend werden lokale Daten überschrieben. Möchten Sie fortfahren?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Vom Backend synchronisiert: Warehouse {{v1}}, Release {{v2}}, AI-Konfiguration {{v3}}, WebDAV-Konfiguration {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "Bitte konfigurieren und aktivieren Sie zunächst den WebDAV-Dienst.",
+    "data-backup-successful": "Datensicherung erfolgreich!",
+    "data-backup-failed": "Datensicherung fehlgeschlagen!",
+    "backup-failed": "Die Sicherung ist fehlgeschlagen",
+    "restore-data": "Daten wiederherstellen",
+    "restoring-data-will-overwrite-all-current-data-c": "Beim Wiederherstellen der Daten werden alle aktuellen Daten überschrieben. Möchten Sie fortfahren?",
+    "no-backup-files-found": "Sicherungsdatei nicht gefunden.",
+    "backup-file-is-empty-cannot-restore": "Der Inhalt der Sicherungsdatei ist leer und kann nicht wiederhergestellt werden.",
+    "data-restored-from-backup-repositories-v1-releas": "Aus der Sicherung wiederhergestellte Daten: Warehouse {{v1}}, Release {{v2}}, benutzerdefinierte Klassifizierung {{v3}}.",
+    "restore-failed": "Die Wiederherstellung ist fehlgeschlagen"
+  },
+  "useDesktopActions": {
+    "load-failed": "Das Laden ist fehlgeschlagen",
+    "save-failed": "Speichern fehlgeschlagen"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "Bitte geben Sie ein gültiges GitHub-Zugriffstoken ein",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "Dieses Token gehört {{v1}} und das aktuelle Konto ist {{v2}}. Bitte melden Sie sich zuerst ab und melden Sie sich dann mit einem anderen Konto an. Lokale Daten werden pro Konto gespeichert.",
+    "failed-to-save-the-new-token-to-the-backend-loca": "Das Speichern des neuen Tokens im Backend ist fehlgeschlagen, die lokalen Anmeldeinformationen wurden nicht aktualisiert. Bitte versuchen Sie es später noch einmal.",
+    "github-token-updated": "GitHub-Token wurde aktualisiert",
+    "github-token-has-expired-or-is-invalid": "GitHub-Token ist abgelaufen oder ungültig",
+    "update-failed-please-try-again": "Das Update ist fehlgeschlagen. Bitte versuchen Sie es später noch einmal"
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "Der MCP-Dienst wird gestartet",
+    "mcp-server-disabled": "Der MCP-Dienst ist ausgefallen",
+    "mcp-server-enabled-local": "MCP-Dienst wird gestartet (lokal)",
+    "backend-or-desktop-client-required-for-mcp": "Für die Nutzung von MCP ist ein Backend oder Client erforderlich",
+    "operation-failed": "Der Vorgang ist fehlgeschlagen",
+    "enable-mcp-before-resetting-the-token": "Bitte aktivieren Sie zuerst den MCP-Dienst und setzen Sie dann das Token zurück",
+    "reset-mcp-token": "MCP-Token zurücksetzen",
+    "the-old-token-will-stop-working-immediately-upda": "Nach dem Zurücksetzen wird das alte Token sofort ungültig und die Agentenkonfiguration muss aktualisiert werden. Weitermachen?",
+    "token-reset": "Token wurde zurückgesetzt",
+    "reset-failed": "Zurücksetzen fehlgeschlagen"
+  },
+  "useNetworkActions": {
+    "save-failed": "Speichern fehlgeschlagen"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "Nicht bei GitHub angemeldet, bitte verbinden Sie sich zuerst",
+    "push-categories-to-github-lists": "Synchronisieren Sie die Lagerklassifizierung mit der GitHub-Liste",
+    "push-confirm-body": "Schreiben Sie jede lokale Kategorie (einschließlich Standard- und benutzerdefinierter Kategorien) mit demselben Namen zurück in die GitHub-Liste:\n\n· Eine Liste mit demselben Namen überschreibt ihre Mitglieder (Repositorys, die nicht mit der Kategorie übereinstimmen, werden aus der Liste entfernt).\n· Wenn es keine Liste mit demselben Namen gibt, erstellen Sie eine neue (standardmäßig privat).\n· Das Lager wird entsprechend seiner passenden Klassifizierung zur entsprechenden Liste hinzugefügt\n· Andere Listenmitgliedschaften, die nicht zur lokalen Kategorie gehören, bleiben erhalten\n\nSind Sie sicher, dass Sie fortfahren möchten?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "WebDAV-URL ist erforderlich",
+    "webdav-url-must-start-with-http-or-https": "Die WebDAV-URL muss mit http:// oder https:// beginnen.",
+    "username-is-required": "Benutzername ist erforderlich",
+    "password-is-required": "Passwort ist erforderlich",
+    "path-is-required": "Pfad ist erforderlich",
+    "path-must-start-with": "Pfad muss mit / beginnen",
+    "webdav-connection-successful": "WebDAV-Verbindung erfolgreich!",
+    "webdav-connection-failed-please-check-configurat": "WebDAV-Verbindung fehlgeschlagen, bitte überprüfen Sie die Konfiguration.",
+    "webdav-test-failed": "Der WebDAV-Test ist fehlgeschlagen"
+  },
+  "generalPanel": {
+    "account-token-hint": "Girokonto {{login}}. Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden.",
+    "token-hint": "Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden."
+  }
+}

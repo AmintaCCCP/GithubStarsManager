@@ -1,3 +1,10 @@
+
+
+
+
+import { discoveryChannelName, discoveryPlatformName } from '../i18n/discoveryNames';
+import { useT } from '../i18n/useT';
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
@@ -100,7 +107,7 @@ interface MobileTabNavProps {
   channels: { id: DiscoveryChannelId; name: string; nameEn: string; icon: React.ReactNode }[];
   selectedChannel: DiscoveryChannelId;
   onChannelSelect: (channel: DiscoveryChannelId) => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const MobileTabNav: React.FC<MobileTabNavProps> = ({ 
@@ -226,7 +233,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
           >
             <span className="flex items-center gap-1.5 whitespace-nowrap">
               {channel.icon}
-              {language === 'zh' ? channel.name : channel.nameEn}
+              {discoveryChannelName(channel, language)}
             </span>
           </Button>
         ))}
@@ -247,10 +254,11 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 interface PlatformFilterProps {
   platform: DiscoveryPlatform;
   onPlatformChange: (platform: DiscoveryPlatform) => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformChange, language }) => {
+    const t = useT('discovery');
   const platforms: { id: DiscoveryPlatform; name: string; nameEn: string; icon: React.ReactNode }[] = [
     { id: 'All', name: '全部平台', nameEn: 'All Platforms', icon: <Globe className="w-4 h-4" /> },
     { id: 'Android', name: 'Android', nameEn: 'Android', icon: <SiAndroid className="w-4 h-4" /> },
@@ -267,13 +275,11 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
         <Button
           type="button"
           variant="ghost"
-          aria-label={language === 'zh'
-            ? `平台筛选：${selectedPlatform?.name ?? '全部平台'}`
-            : `Platform filter: ${selectedPlatform?.nameEn ?? 'All Platforms'}`}
+          aria-label={t('discoveryView.platform-filter-v1', { v1: discoveryPlatformName(selectedPlatform ?? { id: 'All', name: '全部平台', nameEn: 'All Platforms' }, language) })}
           className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
         >
           <Filter className="h-4 w-4" />
-          <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
+          <span className="hidden xl:inline">{selectedPlatform ? discoveryPlatformName(selectedPlatform, language) : ''}</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -286,7 +292,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
               className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
             >
               {p.icon}
-              <span>{language === 'zh' ? p.name : p.nameEn}</span>
+              <span>{discoveryPlatformName(p, language)}</span>
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -357,7 +363,7 @@ interface LoadMoreButtonProps {
   isLoading: boolean;
   hasMore: boolean;
   totalCount: number;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
@@ -365,20 +371,19 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
   isLoading,
   hasMore,
   totalCount,
-  language
 }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('discovery');
 
   if (!hasMore) {
     return (
       <div className="flex flex-col items-center gap-2 py-8">
         <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
           <div className="w-8 h-px bg-muted dark:bg-muted/40" />
-          <span className="text-sm">{t('已加载全部', 'All loaded')}</span>
+          <span className="text-sm">{t('discoveryView.all-loaded')}</span>
           <div className="w-8 h-px bg-muted dark:bg-muted/40" />
         </div>
         <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-          {t(`共 ${totalCount} 个项目`, `Total ${totalCount} items`)}
+          {t('discoveryView.total-totalcount-items', { totalCount: totalCount })}
         </span>
       </div>
     );
@@ -394,12 +399,12 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
         {isLoading ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span>{t('加载中…', 'Loading…')}</span>
+            <span>{t('discoveryView.loading')}</span>
           </>
         ) : (
           <>
             <RefreshCw className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-            <span>{t('加载更多', 'Load More')}</span>
+            <span>{t('discoveryView.load-more')}</span>
           </>
         )}
       </Button>
@@ -411,22 +416,19 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
 interface DataStatsProps {
   currentCount: number;
   totalCount: number;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
-const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount, language }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
+  const t = useT('discovery');
   
   return (
     <div className="flex items-center gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
       <div className="w-1.5 h-1.5 rounded-full bg-primary" />
       <span>
-        {t('共', 'Total')} <strong className="text-foreground dark:text-foreground">{currentCount}</strong> {t('个项目', 'items')}
-        {totalCount > 0 && currentCount < totalCount && (
-          <span className="text-muted-foreground dark:text-muted-foreground">
-            {' '}{t('（总计', '(total')} {totalCount} {t('个）', 'items)')}
-          </span>
-        )}
+        {totalCount > 0 && currentCount < totalCount
+          ? t('discoveryView.items-count-with-total', { currentCount, totalCount })
+          : t('discoveryView.items-count', { currentCount })}
       </span>
     </div>
   );
@@ -527,20 +529,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
   // 周刊同步/补全进度文案（工具栏与空态加载两处共用）
   const weeklyStatusText = weeklySyncStatus
     ? (weeklySyncStatus.phase === 'syncing'
-      ? t(`正在同步周刊投稿… 已扫描 ${weeklySyncStatus.current} 条`, `Syncing weekly submissions… ${weeklySyncStatus.current} scanned`)
-      : t(`补全仓库详情… ${weeklySyncStatus.current}/${weeklySyncStatus.total}`, `Fetching repo details… ${weeklySyncStatus.current}/${weeklySyncStatus.total}`))
+      ? t('discoveryView.syncing-weekly-submissions-v1-scanned', { v1: weeklySyncStatus.current })
+      : t('discoveryView.fetching-repo-details-v1-v2', { v1: weeklySyncStatus.current, v2: weeklySyncStatus.total }))
     : null;
   // X 推文同步/补全进度文案
   const xTweetStatusText = xTweetSyncStatus
     ? (xTweetSyncStatus.phase === 'syncing'
-      ? t(`正在拉取关注博主的时间线… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`, `Fetching timelines… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`)
-      : t(`补全仓库详情… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`, `Fetching repo details… ${xTweetSyncStatus.current}/${xTweetSyncStatus.total}`))
+      ? t('discoveryView.fetching-timelines-v1-v2', { v1: xTweetSyncStatus.current, v2: xTweetSyncStatus.total })
+      : t('discoveryView.fetching-repo-details-v1-v2', { v1: xTweetSyncStatus.current, v2: xTweetSyncStatus.total }))
     : null;
   // Telegram 频道同步/补全进度文案
   const telegramStatusText = telegramSyncStatus
     ? (telegramSyncStatus.phase === 'syncing'
-      ? t(`正在拉取关注频道的消息… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`, `Fetching channel messages… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`)
-      : t(`补全仓库详情… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`, `Fetching repo details… ${telegramSyncStatus.current}/${telegramSyncStatus.total}`))
+      ? t('discoveryView.fetching-channel-messages-v1-v2', { v1: telegramSyncStatus.current, v2: telegramSyncStatus.total })
+      : t('discoveryView.fetching-repo-details-v1-v2', { v1: telegramSyncStatus.current, v2: telegramSyncStatus.total }))
     : null;
 
 
@@ -618,10 +620,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / (1000 * 60));
-    if (diffMin < 1) return t('刚刚', 'Just now');
-    if (diffMin < 60) return t(`${diffMin}分钟前`, `${diffMin}m ago`);
+    if (diffMin < 1) return t('discoveryView.just-now');
+    if (diffMin < 60) return t('discoveryView.diffmin-m-ago', { diffMin: diffMin });
     const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
+    if (diffHours < 24) return t('discoveryView.diffhours-h-ago', { diffHours: diffHours });
     return date.toLocaleDateString();
   }, [t]);
 
@@ -771,11 +773,11 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <h2 className="text-base sm:text-lg font-bold text-foreground dark:text-foreground truncate leading-tight">
                       {language === 'zh'
                         ? currentChannel?.name
-                        : currentChannel?.nameEn}
+                        : discoveryChannelName(currentChannel ?? { id: 'search', name: '仓库搜索', nameEn: 'Repo Search' }, language)}
                     </h2>
                     {currentLastRefresh && (
                       <p className="hidden sm:block text-xs text-muted-foreground dark:text-muted-foreground">
-                        {t('更新于', 'Updated')} {formatLastRefresh(currentLastRefresh)}
+                        {t('discoveryView.updated')} {formatLastRefresh(currentLastRefresh)}
                       </p>
                     )}
                   </div>
@@ -788,14 +790,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                     disabled={currentIsLoading || isAnalyzing}
                     className="p-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={t('刷新', 'Refresh')}
+                    title={t('discoveryView.refresh')}
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
                   </Button>
                   {selectedDiscoveryChannel === 'hot-release' && (
                     <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
                       <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
-                        {t('每次刷新都能看到不一样的内容', 'Each refresh shows different content')}
+                        {t('discoveryView.each-refresh-shows-different-content')}
                       </div>
                       <div className="absolute -top-1 right-3 w-2 h-2 bg-popover border-t border-l border-border rotate-45" />
                     </div>
@@ -811,28 +813,28 @@ export const DiscoveryView: React.FC = React.memo(() => {
             <div className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
               <Select value={trendingTimeRange} onValueChange={(value) => setTrendingTimeRange(value as TrendingTimeRange)}>
-                <SelectTrigger aria-label={t('时间范围', 'Time range')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('discoveryView.time-range')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">{t('今日', 'Today')}</SelectItem>
-                  <SelectItem value="weekly">{t('本周', 'This Week')}</SelectItem>
-                  <SelectItem value="monthly">{t('本月', 'This Month')}</SelectItem>
+                  <SelectItem value="daily">{t('discoveryView.today')}</SelectItem>
+                  <SelectItem value="weekly">{t('discoveryView.this-week')}</SelectItem>
+                  <SelectItem value="monthly">{t('discoveryView.this-month')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
         {selectedDiscoveryChannel === 'topic' && (
                   <Select value={discoverySelectedTopic || 'all'} onValueChange={(value) => setDiscoverySelectedTopic(value === 'all' ? null : value as TopicCategory)}>
-                    <SelectTrigger aria-label={t('主题筛选', 'Topic filter')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('主题', 'Topic')} /></SelectTrigger>
+                    <SelectTrigger aria-label={t('discoveryView.topic-filter')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('discoveryView.topic')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{t('主题', 'Topic')}</SelectItem>
-                      <SelectItem value="ai">{t('人工智能', 'AI')}</SelectItem>
-                      <SelectItem value="ml">{t('机器学习', 'ML')}</SelectItem>
-                      <SelectItem value="database">{t('数据库', 'DB')}</SelectItem>
-                      <SelectItem value="web">{t('Web开发', 'Web')}</SelectItem>
-                      <SelectItem value="mobile">{t('移动开发', 'Mobile')}</SelectItem>
-                      <SelectItem value="devtools">{t('开发工具', 'DevTools')}</SelectItem>
-                      <SelectItem value="security">{t('安全', 'Security')}</SelectItem>
-                      <SelectItem value="game">{t('游戏', 'Game')}</SelectItem>
+                      <SelectItem value="all">{t('discoveryView.topic')}</SelectItem>
+                      <SelectItem value="ai">{t('discoveryView.ai')}</SelectItem>
+                      <SelectItem value="ml">{t('discoveryView.ml')}</SelectItem>
+                      <SelectItem value="database">{t('discoveryView.db')}</SelectItem>
+                      <SelectItem value="web">{t('discoveryView.web')}</SelectItem>
+                      <SelectItem value="mobile">{t('discoveryView.mobile')}</SelectItem>
+                      <SelectItem value="devtools">{t('discoveryView.devtools')}</SelectItem>
+                      <SelectItem value="security">{t('discoveryView.security')}</SelectItem>
+                      <SelectItem value="game">{t('discoveryView.game')}</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -846,10 +848,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         ? 'bg-primary/10 text-primary border-primary/30 dark:text-primary'
                         : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'
                     }`}
-                    title={t('仅显示已收录进周刊的投稿', 'Only show submissions included in the weekly issue')}
+                    title={t('discoveryView.only-show-submissions-included-in-the-weekly-iss')}
                   >
                     <Newspaper className="w-4 h-4" />
-                    {t('周刊收录', 'In Weekly')}
+                    {t('discoveryView.in-weekly')}
                   </button>
                 )}
                 {selectedDiscoveryChannel === 'weekly' && weeklyStatusText && (
@@ -869,10 +871,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     type="button"
                     onClick={() => setTweetSettingsOpen(true)}
                     className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
-                    title={t('管理关注博主列表', 'Manage the follow list')}
+                    title={t('discoveryView.manage-the-follow-list')}
                   >
                     <Users className="w-4 h-4" />
-                    {t('关注列表', 'Follow List')}
+                    {t('discoveryView.follow-list')}
                   </button>
                 )}
                 {selectedDiscoveryChannel === 'telegram' && telegramStatusText && (
@@ -886,10 +888,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     type="button"
                     onClick={() => setTelegramSettingsOpen(true)}
                     className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
-                    title={t('管理关注频道列表', 'Manage the channel list')}
+                    title={t('discoveryView.manage-the-channel-list')}
                   >
                     <Users className="w-4 h-4" />
-                    {t('频道列表', 'Channel List')}
+                    {t('discoveryView.channel-list')}
                   </button>
                 )}
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -929,8 +931,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         variant="ghost"
                         size="icon"
                         onClick={handleAbortAnalysis}
-                        aria-label={t('停止分析', 'Stop analysis')}
-                        title={t('停止', 'Stop')}
+                        aria-label={t('discoveryView.stop-analysis')}
+                        title={t('discoveryView.stop')}
                         className="h-8 w-8"
                       >
                         <X className="w-4 h-4" />
@@ -943,10 +945,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
                       className="h-9 shrink-0 gap-1.5 px-3 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={t('AI分析', 'Analyze with AI')}
+                      title={t('discoveryView.analyze-with-ai')}
                     >
                       <Bot className="w-4 h-4" />
-                      <span className="hidden sm:inline">{t('AI分析', 'AI Analyze')}</span>
+                      <span className="hidden sm:inline">{t('discoveryView.ai-analyze')}</span>
                     </Button>
                   )}
                   <DataStats
@@ -977,29 +979,29 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                     <Input
                       type="text"
-                      aria-label={t('搜索仓库', 'Search repositories')}
+                      aria-label={t('discoveryView.search-repositories')}
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      placeholder={t('搜索仓库…', 'Search repositories…')}
+                      placeholder={t('discoveryView.search-repositories-2')}
                       className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
                   </div>
                   <Button
                     onClick={handleSearch}
-                    aria-label={t('搜索', 'Search')}
+                    aria-label={t('discoveryView.search')}
                     disabled={!searchInput.trim() || currentIsLoading}
                     className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
                   >
                     <Search className="w-4 h-4" />
-                    <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
+                    <span className="hidden sm:inline">{t('discoveryView.search')}</span>
                   </Button>
                 </div>
                 
                 <div className="flex flex-wrap gap-2.5">
                   <Select value={discoveryLanguage} onValueChange={(value) => setDiscoveryLanguage(value as ProgrammingLanguage)}>
-                    <SelectTrigger aria-label={t('编程语言', 'Programming language')} className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={t('discoveryView.programming-language')} className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="All">{t('所有语言', 'All Languages')}</SelectItem>
+                      <SelectItem value="All">{t('discoveryView.all-languages')}</SelectItem>
                       <SelectItem value="JavaScript">JavaScript</SelectItem>
                       <SelectItem value="TypeScript">TypeScript</SelectItem>
                       <SelectItem value="Python">Python</SelectItem>
@@ -1020,21 +1022,21 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <CustomSelect
                     value={discoverySortBy}
                     onChange={(value) => setDiscoverySortBy(value as SortBy)}
-                    ariaLabel={t('发现排序字段', 'Discovery sort field')}
+                    ariaLabel={t('discoveryView.discovery-sort-field')}
                     options={[
-                      { value: 'BestMatch', label: t('最佳匹配', 'Best Match') },
-                      { value: 'MostStars', label: t('最多Star', 'Most Stars') },
-                      { value: 'MostForks', label: t('最多Fork', 'Most Forks') },
+                      { value: 'BestMatch', label: t('discoveryView.best-match') },
+                      { value: 'MostStars', label: t('discoveryView.most-stars') },
+                      { value: 'MostForks', label: t('discoveryView.most-forks') },
                     ]}
                   />
 
                   <CustomSelect
                     value={discoverySortOrder}
                     onChange={(value) => setDiscoverySortOrder(value as SortOrder)}
-                    ariaLabel={t('发现排序顺序', 'Discovery sort order')}
+                    ariaLabel={t('discoveryView.discovery-sort-order')}
                     options={[
-                      { value: 'Descending', label: t('降序', 'Descending') },
-                      { value: 'Ascending', label: t('升序', 'Ascending') },
+                      { value: 'Descending', label: t('discoveryView.descending') },
+                      { value: 'Ascending', label: t('discoveryView.ascending') },
                     ]}
                   />
                 </div>
@@ -1051,7 +1053,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 </div>
                 <div className="text-center space-y-1.5">
                   <p className="text-foreground dark:text-muted-foreground font-medium text-sm">
-                    {t('正在获取数据…', 'Fetching data…')}
+                    {t('discoveryView.fetching-data')}
                   </p>
                   <p className="text-xs text-muted-foreground dark:text-muted-foreground">
                     {selectedDiscoveryChannel === 'weekly' && weeklyStatusText
@@ -1060,7 +1062,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       ? xTweetStatusText
                       : selectedDiscoveryChannel === 'telegram' && telegramStatusText
                       ? telegramStatusText
-                      : t('GitHub API 响应中', 'Waiting for GitHub API response')}
+                      : t('discoveryView.waiting-for-github-api-response')}
                   </p>
                 </div>
               </div>
@@ -1081,10 +1083,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('仓库搜索', 'Repo Search')}
+                        {t('discoveryView.repo-search')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('输入关键字搜索 GitHub 仓库', 'Enter keywords to search GitHub repositories')}
+                        {t('discoveryView.enter-keywords-to-search-github-repositories')}
                       </p>
                     </div>
                   </>
@@ -1101,10 +1103,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('X 推文', 'X Tweets')}
+                        {t('discoveryView.x-tweets')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('直连 x.com 抓取关注博主最新推文中的 GitHub 项目，需要桌面版或服务端模式', 'Fetches GitHub projects from followed accounts\' latest tweets on x.com; requires the desktop or server build')}
+                        {t('discoveryView.fetches-github-projects-from-followed-accounts-l')}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-center gap-2">
@@ -1117,7 +1119,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                           : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
                       >
                         <RefreshCw className="w-4 h-4" />
-                        {t('开始同步', 'Start Sync')}
+                        {t('discoveryView.start-sync')}
                       </Button>
                       <Button
                         variant="outline"
@@ -1126,7 +1128,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         className="flex items-center gap-2 rounded-xl border border-border dark:border-border bg-card dark:bg-muted/40 px-6 py-2.5 text-sm font-medium text-foreground dark:text-foreground transition-colors hover:bg-accent dark:hover:bg-accent"
                       >
                         <Users className="w-4 h-4" />
-                        {t('关注列表', 'Follow List')}
+                        {t('discoveryView.follow-list')}
                       </Button>
                     </div>
                   </>
@@ -1143,10 +1145,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('Telegram 频道', 'Telegram Channels')}
+                        {t('discoveryView.telegram-channels')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('直连 t.me 公开预览抓取关注频道消息中的 GitHub 项目，需要桌面版或服务端模式', 'Fetches GitHub projects from followed channels\' messages via the t.me public preview; requires the desktop or server build')}
+                        {t('discoveryView.fetches-github-projects-from-followed-channels-m')}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center justify-center gap-2">
@@ -1159,7 +1161,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                           : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
                       >
                         <RefreshCw className="w-4 h-4" />
-                        {t('开始同步', 'Start Sync')}
+                        {t('discoveryView.start-sync')}
                       </Button>
                       <Button
                         variant="outline"
@@ -1168,7 +1170,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         className="flex items-center gap-2 rounded-xl border border-border dark:border-border bg-card dark:bg-muted/40 px-6 py-2.5 text-sm font-medium text-foreground dark:text-foreground transition-colors hover:bg-accent dark:hover:bg-accent"
                       >
                         <Users className="w-4 h-4" />
-                        {t('频道列表', 'Channel List')}
+                        {t('discoveryView.channel-list')}
                       </Button>
                     </div>
                   </>
@@ -1185,10 +1187,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('阮一峰周刊', 'Ruanyifeng Weekly')}
+                        {t('discoveryView.ruanyifeng-weekly')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('同步科技爱好者周刊的开源项目投稿，加载更多时自动获取更早的投稿', 'Sync open-source submissions from the weekly. Earlier submissions are fetched as you load more')}
+                        {t('discoveryView.sync-open-source-submissions-from-the-weekly-ear')}
                       </p>
                     </div>
                     <Button
@@ -1200,7 +1202,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
                     >
                       <RefreshCw className="w-4 h-4" />
-                      {t('开始同步', 'Start Sync')}
+                      {t('discoveryView.start-sync')}
                     </Button>
                   </>
                 ) : (
@@ -1216,10 +1218,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                     <div className="space-y-2 max-w-xs">
                       <p className="text-muted-foreground dark:text-muted-foreground font-medium text-base">
-                        {t('暂无数据', 'No data yet')}
+                        {t('discoveryView.no-data-yet')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('点击刷新按钮获取最新排行数据', 'Click refresh to fetch latest rankings')}
+                        {t('discoveryView.click-refresh-to-fetch-latest-rankings')}
                       </p>
                     </div>
                     <Button
@@ -1231,7 +1233,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         : 'flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90'}
                     >
                       <RefreshCw className="w-4 h-4" />
-                      {t('立即刷新', 'Refresh Now')}
+                      {t('discoveryView.refresh-now')}
                     </Button>
                   </>
                 )}
@@ -1251,7 +1253,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             {currentIsLoadingMore && (
               <div className="flex items-center justify-center py-6 gap-3">
                 <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载更多…', 'Loading more…')}</span>
+                <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('discoveryView.loading-more')}</span>
               </div>
             )}
 
@@ -1271,7 +1273,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors flex items-center gap-2"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  {t('重试', 'Retry')}
+                  {t('discoveryView.retry')}
                 </Button>
               </div>
             )}
@@ -1284,7 +1286,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span>
-                    {t('共', 'Total')} <strong className="text-foreground dark:text-foreground">{allRepos.length}</strong> {t('个项目', 'items')}
+                    {t('discoveryView.total')} <strong className="text-foreground dark:text-foreground">{allRepos.length}</strong> {t('discoveryView.items')}
                   </span>
                 </div>
 

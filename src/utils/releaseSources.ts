@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../i18n/languages';
 import type {
   AppState,
   CustomReleaseRepository,
@@ -12,10 +13,24 @@ export const STARRED_RELEASE_SOURCE_ID: ReleaseSourceId = 'starred-release-subsc
 export const WATCH_CUSTOM_RELEASE_SOURCE_ID: ReleaseSourceId = 'watch-custom-release';
 export const CUSTOM_RELEASE_SOURCE_ID: ReleaseSourceId = 'custom-release';
 
-export const RELEASE_SOURCE_LABELS: Record<ReleaseSourceId, { zh: string; en: string }> = {
-  'starred-release-subscription': { zh: '星标订阅', en: 'Starred subscriptions' },
-  'watch-custom-release': { zh: 'Watch 仓库', en: 'Watch repositories' },
-  'custom-release': { zh: '自定义订阅', en: 'Custom subscriptions' },
+type ReleaseSourceLabelEntry = { zh: string; en: string } & Partial<Record<AppLanguage, string>>;
+
+export const RELEASE_SOURCE_LABELS: Record<ReleaseSourceId, ReleaseSourceLabelEntry> = {
+  'starred-release-subscription': {
+    zh: '星标订阅', en: 'Starred subscriptions', ja: 'スター購読', es: 'Suscripciones de estrellas',
+    'pt-BR': 'Assinaturas de estrelas', ru: 'Подписки на звёзды', 'zh-TW': '星標訂閱',
+    fr: 'Abonnements étoiles', de: 'Star-Abos', ko: '스타 구독',
+  },
+  'watch-custom-release': {
+    zh: 'Watch 仓库', en: 'Watch repositories', ja: 'ウォッチ リポジトリ', es: 'Repositorios watch',
+    'pt-BR': 'Repositórios monitorados', ru: 'Watch-репозитории', 'zh-TW': 'Watch 儲存庫',
+    fr: 'Dépôts watch', de: 'Watch-Repositories', ko: '워치 저장소',
+  },
+  'custom-release': {
+    zh: '自定义订阅', en: 'Custom subscriptions', ja: 'カスタム購読', es: 'Suscripciones personalizadas',
+    'pt-BR': 'Assinaturas personalizadas', ru: 'Пользовательские подписки', 'zh-TW': '自訂訂閱',
+    fr: 'Abonnements personnalisés', de: 'Benutzerdefinierte Abos', ko: '커스텀 구독',
+  },
 };
 
 const RELEASE_SOURCE_IDS: ReleaseSourceId[] = [
@@ -48,9 +63,9 @@ export const isReleaseSourceId = (value: unknown): value is ReleaseSourceId => (
   typeof value === 'string' && RELEASE_SOURCE_IDS.includes(value as ReleaseSourceId)
 );
 
-export const getReleaseSourceLabel = (sourceId: ReleaseSourceId, language: 'zh' | 'en'): string => {
+export const getReleaseSourceLabel = (sourceId: ReleaseSourceId, language: AppLanguage): string => {
   const label = RELEASE_SOURCE_LABELS[sourceId];
-  return language === 'zh' ? label.zh : label.en;
+  return language === 'zh' ? label.zh : label[language] ?? label.en;
 };
 
 export const normalizeGitHubRepoInput = (input: string): NormalizedGitHubRepoInput | null => {

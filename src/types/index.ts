@@ -1,4 +1,5 @@
 import type { ThemePresetId } from '../constants/themePresets';
+import type { AppLanguage } from '../i18n/languages';
 
 import type { RepositoryChatSettings } from './repositoryChat';
 export type { RepositoryChatSettings } from './repositoryChat';
@@ -497,7 +498,7 @@ export interface AppState {
   themePreset: ThemePresetId;
   currentView: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription';
   selectedCategory: string;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   /** README 文档翻译引擎（微软 / Google / AI），见 TranslationEngine */
   translationEngine: TranslationEngine;
   isSidebarCollapsed: boolean;

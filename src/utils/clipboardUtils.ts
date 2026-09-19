@@ -1,3 +1,10 @@
+import { makeT } from '../i18n/useT';
+import { getCurrentAppLanguage } from '../i18n';
+
+
+
+
+
 /**
  * 剪贴板工具函数
  * 提供兼容性检查和降级方案
@@ -42,31 +49,24 @@ export const isReadSupported = (): boolean => {
  */
 export const getClipboardErrorMessage = (
   operation: 'read' | 'write',
-  language: 'zh' | 'en' = 'zh'
+  language: AppLanguage = getCurrentAppLanguage()
 ): string => {
+  const t = makeT(language, 'app');
   const support = checkClipboardSupport();
 
   if (!support.isSecureContext) {
-    return language === 'zh'
-      ? '剪贴板功能需要使用 HTTPS 协议访问'
-      : 'Clipboard requires HTTPS protocol';
+    return t('clipboardUtils.clipboard-requires-https-protocol');
   }
 
   if (operation === 'write' && !support.writeText) {
-    return language === 'zh'
-      ? '您的浏览器不支持剪贴板写入功能，请升级浏览器'
-      : 'Your browser does not support clipboard write. Please upgrade your browser';
+    return t('clipboardUtils.your-browser-does-not-support-clipboard-write-pl');
   }
 
   if (operation === 'read' && !support.readText) {
-    return language === 'zh'
-      ? '您的浏览器不支持剪贴板读取功能，请升级浏览器'
-      : 'Your browser does not support clipboard read. Please upgrade your browser';
+    return t('clipboardUtils.your-browser-does-not-support-clipboard-read-ple');
   }
 
-  return language === 'zh'
-    ? '剪贴板操作失败，请检查浏览器权限设置'
-    : 'Clipboard operation failed. Please check browser permissions';
+  return t('clipboardUtils.clipboard-operation-failed-please-check-browser');
 };
 
 /**
@@ -138,4 +138,5 @@ export const safeReadText = async (): Promise<{ success: boolean; text?: string;
       error: getClipboardErrorMessage('read'),
     };
   }
-};
+};import type { AppLanguage } from '../i18n/languages';
+

@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "Токен GitHub не найден. Войдите снова.",
+    "fork-owner-not-found-please-login-again": "Владелец склада вилок не найден, пожалуйста, войдите снова.",
+    "refresh-completed-found-newcount-new-forks": "Обновление завершено! Обнаружено {{newCount}} новых разветвлений.",
+    "refresh-completed": "Обновление завершено!",
+    "fork-refresh-failed-please-check-your-network-co": "Не удалось обновить вилку. Проверьте сетевое соединение.",
+    "failed-to-load-branches-please-check-your-networ": "Не удалось загрузить ветку. Проверьте сетевое соединение и повторите попытку.",
+    "v1-is-already-up-to-date": "{{v1}} уже является последней версией и не нуждается в обновлении.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} успешно обновлен до последней основной версии.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} не является складом Fork и не может быть синхронизирован с исходным кодом.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "Синхронизация не удалась: у {{v1}} конфликт слияния с вышестоящим хранилищем. Пожалуйста, решите проблему вручную и повторите попытку.",
+    "sync-failed-message": "Синхронизация не удалась: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "Рабочий процесс \"{{workflowName}}\" запущен в ветке {{branch}}.",
+    "failed-to-run-workflow": "Не удалось запустить рабочий процесс.",
+    "failed-to-load-organizations-please-check-github": "Не удалось загрузить список организаций. Проверьте разрешения токена GitHub."
+  }
+}

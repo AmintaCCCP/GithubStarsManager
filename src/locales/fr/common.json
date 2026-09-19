@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "Jeton GitHub introuvable, veuillez vous reconnecter.",
+    "fork-owner-not-found-please-login-again": "Le propriétaire de l'entrepôt de fourches est introuvable, veuillez vous reconnecter.",
+    "refresh-completed-found-newcount-new-forks": "Actualisation terminée ! {{newCount}} nouvelles fourches trouvées.",
+    "refresh-completed": "Actualisation terminée !",
+    "fork-refresh-failed-please-check-your-network-co": "Échec de l'actualisation du Fork, veuillez vérifier la connexion réseau.",
+    "failed-to-load-branches-please-check-your-networ": "Échec du chargement de la branche, veuillez vérifier la connexion réseau et réessayer.",
+    "v1-is-already-up-to-date": "{{v1}} est déjà la dernière version et n'a pas besoin d'être mise à jour.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} a été mis à jour avec succès vers la dernière version en amont.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} n'est pas un entrepôt Fork et ne peut pas être synchronisé en amont.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "Échec de la synchronisation : {{v1}} a un conflit de fusion avec l'entrepôt en amont. Veuillez le résoudre manuellement et réessayer.",
+    "sync-failed-message": "Échec de la synchronisation : {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "Le workflow \"{{workflowName}}\" a été déclenché sur la branche {{branch}}.",
+    "failed-to-run-workflow": "Échec de l'exécution du flux de travail.",
+    "failed-to-load-organizations-please-check-github": "La liste des organisations n'a pas pu être chargée. Veuillez vérifier les autorisations du jeton GitHub."
+  }
+}

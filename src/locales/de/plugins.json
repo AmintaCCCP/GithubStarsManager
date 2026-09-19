@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "Kanalnachricht für {{v1}}",
+    "open-in-telegram": "Auf Telegram öffnen",
+    "this-message-is-media-only-and-has-no-text-conte": "Diese Nachricht ist ein reiner Medieninhalt und hat keinen Textinhalt."
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "Bitte geben Sie einen gültigen Kanalnamen ein, z. B. https://t.me/geekhub23 oder @geekhub23.",
+    "this-channel-is-already-in-the-list": "Der Kanal ist bereits in der Watchlist.",
+    "channel-added-to-the-follow-list": "Dem Kanal folgen hinzugefügt.",
+    "unfollowed-v1": "@{{v1}} wurde nicht mehr verfolgt.",
+    "telegram-channels-settings": "Telegram-Kanaleinstellungen",
+    "refreshing-incrementally-pulls-the-latest-messag": "Beim Aktualisieren werden nach und nach die neuesten Nachrichten des Kanals, dem Sie folgen, abgerufen. Einträge, die GitHub-Warehouse-Links in den News enthalten, werden als Listenelemente angezeigt; „Mehr laden“ ruft frühere historische Nachrichten seitenweise ab. Die Daten werden von der Anwendung erfasst, die direkt mit der öffentlichen Vorschau von t.me verbunden ist. Hierzu ist eine Desktop-Version oder ein Servermodus erforderlich (der reine Browsermodus unterliegt domänenübergreifenden Einschränkungen). Private Kanäle können nicht erfasst werden.",
+    "follow-list": "Beobachtungsliste",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "Unterstützt t.me-Kanallink, @channel-Namen oder nackten Kanalnamen. Rufen Sie beim Aktualisieren die neuesten Nachrichten Kanal für Kanal ab.",
+    "enter-a-valid-channel-name": "Bitte geben Sie einen gültigen Kanalnamen ein.",
+    "fill-in-or-add-a-channel-to-test-first": "Bitte füllen Sie zunächst einen Kanal zum Testen aus oder fügen Sie ihn hinzu.",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "Nehmen Sie den Kanal wirklich einmal auf, führen Sie eine öffentliche Vorschau durch und überprüfen Sie den Aufnahmekanal",
+    "testing": "Testen…",
+    "test-connection": "Testverbindung",
+    "channel-name": "Kanalname",
+    "add": "Hinzufügen zu",
+    "no-followed-channels-yet": "Es gibt noch keine Kanäle, denen man folgen kann.",
+    "unfollow": "Nicht mehr folgen",
+    "unfollow-v1": "@{{v1}} nicht mehr folgen",
+    "done": "Beenden"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "Tweets von @{{v1}}",
+    "open-on-x": "Geöffnet um X",
+    "this-tweet-has-no-text-content": "Der Tweettext ist leer"
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "Bitte geben Sie einen gültigen X-Benutzernamen ein, z. B. @geekbb oder einen Homepage-Link.",
+    "this-account-is-already-in-the-list": "Dieser Blogger steht bereits auf der Beobachtungsliste.",
+    "account-added-to-the-follow-list": "Blogger wurde zum Folgen hinzugefügt.",
+    "unfollowed-v1": "@{{v1}} wurde nicht mehr verfolgt.",
+    "both-auth-token-and-ct0-must-contain-valid-value": "Sowohl auth_token als auch ct0 müssen gültigen Inhalt ausfüllen.",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "Das Authentifizierungscookie wurde gespeichert und wird nach der Aktualisierung im GraphQL-Modus abgerufen.",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "Das Authentifizierungscookie wurde wirksam, wurde jedoch nicht auf der Festplatte gespeichert und geht möglicherweise nach einem Neustart verloren.",
+    "auth-cookies-saved-current-session-only": "Authentifizierungscookie gespeichert (nur für diese Sitzung gültig).",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "Authentifizierungscookies wurden gelöscht und in den Crawling-Modus ohne Anmeldung zurückversetzt.",
+    "x-tweets-channel-settings": "X Tweet-Kanaleinstellungen",
+    "refreshing-incrementally-pulls-the-latest-tweets": "Beim Aktualisieren werden die neuesten Tweets der Blogger, denen Sie folgen, schrittweise abgerufen und Elemente, die GitHub-Repository-Links in den Tweets enthalten, werden als Listenelemente angezeigt. Die Daten werden von der direkt mit x.com verbundenen Anwendung erfasst, die eine Desktop-Version oder einen Servermodus erfordert (der reine Browsermodus unterliegt domänenübergreifenden Einschränkungen). Füllen Sie optional das Cookie zur Anmeldeauthentifizierung aus, um mehr Tweets und das Umblättern von Verlaufsseiten zu ermöglichen.",
+    "follow-list": "Beobachtungsliste",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "Unterstützt @Benutzername, Benutzername oder den Link zur x.com-Homepage. Rufen Sie beim Aktualisieren die neuesten Tweets des Bloggers ab.",
+    "enter-a-valid-x-handle": "Bitte geben Sie einen gültigen X-Benutzernamen ein.",
+    "fill-in-or-add-an-account-to-test-first": "Bitte füllen Sie zum Testen zuerst einen Blogger aus oder fügen Sie ihn hinzu.",
+    "fetch-a-profile-once-to-verify-the-pipeline": "Crawlen Sie die Homepage wirklich einmal, um den Crawling-Kanal zu überprüfen",
+    "testing": "Testen…",
+    "test-connection": "Testverbindung",
+    "x-handle": "X-Benutzername",
+    "add": "Hinzufügen zu",
+    "no-followed-accounts-yet": "Es gibt noch keine Blogger, denen man folgen kann.",
+    "unfollow": "Nicht mehr folgen",
+    "unfollow-v1": "@{{v1}} nicht mehr folgen",
+    "auth-cookies-optional": "Authentifizierungs-Cookie (optional)",
+    "once-set-fetching-switches-to-the-signed-in-grap": "Wechseln Sie nach dem Ausfüllen zur GraphQL-Schnittstelle mit dem Anmeldestatus: Jeder Blogger verfügt über etwa 20 Tweets pro Seite und klicken Sie auf „Mehr laden“, um den Verlauf seitenweise anzuzeigen. Lassen Sie das Feld leer, um nicht protokolliertes Crawling zu verwenden (jeweils nur die neueste kleine Charge für jeden Blogger). Nachdem sich der Browser bei x.com angemeldet hat, kopieren Sie auth_token und ct0 in DevTools → Anwendung → Cookies und speichern Sie sie nur in den lokalen Anwendungsdaten.",
+    "auth-token": "auth_token",
+    "hide-auth-token": "Auth_token ausblenden",
+    "show-auth-token": "auth_token anzeigen",
+    "ct0": "ct0",
+    "hide-ct0": "ct0 ausblenden",
+    "show-ct0": "ct0 anzeigen",
+    "authenticated-fetching-is-on": "Die Authentifizierungserfassung ist derzeit aktiviert",
+    "signed-out-fetching-mode": "Derzeit im Crawling-Modus ohne Anmeldung",
+    "clear": "Klar",
+    "update-auth": "Authentifizierung aktualisieren",
+    "saved": "gespeichert",
+    "save-auth": "Authentifizierung speichern",
+    "done": "Beenden"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "Im Browser geöffnet",
+    "plugin-result-copied": "Plugin-Ergebnisse kopiert",
+    "plugin-result-saved": "Plugin-Ergebnisse gespeichert",
+    "plugin-action-completed": "Plug-in-Vorgang abgeschlossen"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "Maßgeschneiderte Dienstleistungen",
+    "allow-plugin-ai-request": "Plugins erlauben, KI aufzurufen?",
+    "the-host-may-relay-this-through-its-configured-b": "Kann von einem aktivierten Hosting-Backend-Proxy weitergeleitet werden.",
+    "send-to-ai": "An AI senden",
+    "allow-plugin-ai-body": "Plugin {{pluginName}} hat die Verwendung der AI-Konfiguration „{{configName}}“ (Modell {{model}}) angefordert.\nZieladresse: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nBenutzer:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "Plug-in-Netzwerksuche zulassen?",
+    "search-query": "Suchbegriffe:",
+    "send-search-query": "Suchbegriffe senden"
+  }
+}

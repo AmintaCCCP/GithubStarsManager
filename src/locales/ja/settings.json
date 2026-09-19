@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "AIサービス接続成功！",
+    "ai-service-test-failed-please-check-network-conn": "AI サービスのテストに失敗しました。ネットワーク接続と構成を確認してください。"
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "無効なバックエンド アドレス: リモート バックエンドには HTTPS が必要です。HTTP を使用できるのはローカルホストのみです",
+    "backend-connection-failed-please-check-the-serve": "バックエンド接続に失敗しました。サーバーのステータスまたは API シークレットが正しいかどうかを確認してください。",
+    "backend-connection-successful": "バックエンド接続に成功しました!",
+    "backend-not-available": "バックエンドが利用できません",
+    "partial-sync-failure-v1-failed-v2-succeeded": "部分的な同期に失敗しました: {{v1}} は失敗しました、{{v2}} は成功しました",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "バックエンドに同期: ウェアハウス {{v1}}、リリース {{v2}}、AI 構成 {{v3}}、WebDAV 構成 {{v4}}",
+    "sync-failed": "同期に失敗しました",
+    "sync-from-backend": "バックエンドから同期する",
+    "syncing-from-backend-will-overwrite-local-data-c": "バックエンドから同期するとローカル データが上書きされます。続行しますか?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "バックエンドから同期: ウェアハウス {{v1}}、リリース {{v2}}、AI 構成 {{v3}}、WebDAV 構成 {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "最初に WebDAV サービスを設定してアクティブ化してください。",
+    "data-backup-successful": "データのバックアップが成功しました。",
+    "data-backup-failed": "データのバックアップに失敗しました!",
+    "backup-failed": "バックアップに失敗しました",
+    "restore-data": "データを回復する",
+    "restoring-data-will-overwrite-all-current-data-c": "データを復元すると、現在のデータがすべて上書きされます。続けますか?",
+    "no-backup-files-found": "バックアップファイルが見つかりません。",
+    "backup-file-is-empty-cannot-restore": "バックアップ ファイルの内容は空なので復元できません。",
+    "data-restored-from-backup-repositories-v1-releas": "バックアップから復元されたデータ: ウェアハウス {{v1}}、リリース {{v2}}、カスタム分類 {{v3}}。",
+    "restore-failed": "回復に失敗しました"
+  },
+  "useDesktopActions": {
+    "load-failed": "読み込みに失敗しました",
+    "save-failed": "保存に失敗しました"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "有効な GitHub アクセス トークンを入力してください",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "このトークンは {{v1}} に属しており、現在のアカウントは {{v2}} です。まずログアウトしてから、別のアカウントでログインしてください。ローカル データはアカウントごとに保持されます。",
+    "failed-to-save-the-new-token-to-the-backend-loca": "新しいトークンをバックエンドに保存できませんでした。ローカル認証情報は更新されませんでした。後でもう一度試してください。",
+    "github-token-updated": "GitHubトークンが更新されました",
+    "github-token-has-expired-or-is-invalid": "GitHub トークンの有効期限が切れているか無効です",
+    "update-failed-please-try-again": "アップデートに失敗しました。後でもう一度お試しください"
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "MCPサービスが開始されました",
+    "mcp-server-disabled": "MCP サービスがダウンしています",
+    "mcp-server-enabled-local": "MCP サービスが開始されます (ローカル)",
+    "backend-or-desktop-client-required-for-mcp": "MCP を使用するにはバックエンドまたはクライアントが必要です",
+    "operation-failed": "操作が失敗しました",
+    "enable-mcp-before-resetting-the-token": "最初に MCP サービスを有効にしてからトークンをリセットしてください",
+    "reset-mcp-token": "MCPトークンをリセット",
+    "the-old-token-will-stop-working-immediately-upda": "リセット後、古いトークンはすぐに無効になるため、エージェント構成を更新する必要があります。続く？",
+    "token-reset": "トークンがリセットされました",
+    "reset-failed": "リセットに失敗しました"
+  },
+  "useNetworkActions": {
+    "save-failed": "保存に失敗しました"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "GitHub にログインしていません。最初に接続してください",
+    "push-categories-to-github-lists": "倉庫分類を GitHub リストに同期する",
+    "push-confirm-body": "各ローカル カテゴリ (デフォルト カテゴリとカスタム カテゴリを含む) を同じ名前で GitHub リストに書き戻します。\n\n· 同じ名前のリストはそのメンバーを上書きします (カテゴリに一致しないリポジトリはリストから削除されます)\n· 同じ名前のリストがない場合は、新しいリストを作成します (デフォルトではプライベート)\n· 倉庫は、一致する分類に従って対応するリストに追加されます\n· ローカル カテゴリに属さない他のリスト メンバーシップは保持されます。\n\n続行してもよろしいですか?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "WebDAV URLは必須です",
+    "webdav-url-must-start-with-http-or-https": "WebDAV URL は http:// または https:// で始まる必要があります",
+    "username-is-required": "ユーザー名は必須です",
+    "password-is-required": "パスワードが必要です",
+    "path-is-required": "パスは必須です",
+    "path-must-start-with": "パスは / で始まる必要があります",
+    "webdav-connection-successful": "WebDAV接続に成功しました！",
+    "webdav-connection-failed-please-check-configurat": "WebDAV 接続に失敗しました。構成を確認してください。",
+    "webdav-test-failed": "WebDAVテストに失敗しました"
+  },
+  "generalPanel": {
+    "account-token-hint": "現在のアカウント {{login}}。有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。",
+    "token-hint": "有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。"
+  }
+}

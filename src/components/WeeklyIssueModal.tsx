@@ -1,3 +1,5 @@
+import { getIntlLocale } from '../i18n/format';
+import { useT } from "../i18n/useT";
 import React from 'react';
 import { ExternalLink, Loader2, Calendar } from 'lucide-react';
 import { Modal } from './Modal';
@@ -20,20 +22,20 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
   const language = useAppStore(state => state.language);
   const { issueData, loading, error } = useWeeklyIssueBody(issue.number, isOpen);
 
-  const t = React.useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('discovery');
 
   const collectedLabel = issue.labels.find(label => label.toLowerCase() === 'weekly');
   const issueNumberLabel = issue.labels.find(label => /^issue-\d+$/i.test(label));
   const issueNumber = issueNumberLabel ? Number(issueNumberLabel.replace(/^\D+/i, '')) : null;
   const submittedDate = issue.createdAt && Number.isFinite(Date.parse(issue.createdAt))
-    ? new Date(issue.createdAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US')
+    ? new Date(issue.createdAt).toLocaleDateString(getIntlLocale(language))
     : '';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={issue.title || t(`投稿 #${issue.number}`, `Submission #${issue.number}`)}
+      title={issue.title || t('weeklyIssueModal.submission-v1', { v1: issue.number })}
       maxWidth="max-w-4xl"
       scrollable
       footer={
@@ -41,12 +43,12 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
           <div className="flex flex-wrap items-center gap-1.5 min-w-0">
             {collectedLabel && (
               <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-primary/10 text-primary dark:text-primary">
-                {t('周刊收录', 'In Weekly')}
+                {t('weeklyIssueModal.in-weekly')}
               </span>
             )}
             {issueNumber != null && (
               <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground dark:text-muted-foreground">
-                {t(`第 ${issueNumber} 期`, `Issue #${issueNumber}`)}
+                {t('weeklyIssueModal.issue-issuenumber', { issueNumber: issueNumber })}
               </span>
             )}
             {submittedDate && (
@@ -63,7 +65,7 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
-            {t('在 GitHub 打开', 'Open on GitHub')}
+            {t('weeklyIssueModal.open-on-github')}
           </a>
         </div>
       }
@@ -71,7 +73,7 @@ export const WeeklyIssueModal: React.FC<WeeklyIssueModalProps> = ({ isOpen, onCl
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('正在加载原贴…', 'Loading original post…')}</p>
+          <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('weeklyIssueModal.loading-original-post')}</p>
         </div>
       ) : error ? (
         <div className="py-10 text-center text-sm text-muted-foreground dark:text-muted-foreground">{error}</div>

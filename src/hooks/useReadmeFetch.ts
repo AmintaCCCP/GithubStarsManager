@@ -1,3 +1,5 @@
+
+import { useT } from '../i18n/useT';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { GitHubApiService } from '../services/githubApi';
@@ -28,12 +30,12 @@ export interface ReadmeFetchActions {
 }
 
 export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFetchActions => {
-  const { githubToken, language } = useAppStore(useShallow((state) => ({
+  const { githubToken } = useAppStore(useShallow((state) => ({
     githubToken: state.githubToken,
-    language: state.language,
   })));
 
   const contentAbortRef = useRef<AbortController | null>(null);
+  const t = useT('app');
   const candidatesAbortRef = useRef<AbortController | null>(null);
 
   const cancel = useCallback(() => {
@@ -59,7 +61,7 @@ export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFe
 
     const fetchFromGitHubApi = async (): Promise<string> => {
       if (!githubToken) {
-        throw new Error(language === 'zh' ? '未登录且后端不可用，无法加载 README' : 'Not logged in and backend unavailable, cannot load README');
+        throw new Error(t('useReadmeFetch.not-logged-in-and-backend-unavailable-cannot-loa'));
       }
       const githubApi = new GitHubApiService(githubToken);
       return variant.isDefault || !variant.path
@@ -90,7 +92,7 @@ export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFe
       if (signal.aborted) throw abortOperation();
       return content;
     }
-  }, [owner, name, githubToken, language]);
+  }, [owner, name, githubToken, t]);
 
   const fetchReadmeCandidates = useCallback(async (defaultBranch: string | undefined): Promise<GitHubReadmeCandidateItem[]> => {
     if (candidatesAbortRef.current) {

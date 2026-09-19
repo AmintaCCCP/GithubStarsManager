@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { AIConfig, WebDAVConfig } from '../../../types';
@@ -6,7 +8,7 @@ import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
 
 interface UseBackupActionsOptions {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export interface BackupActions {
@@ -64,7 +66,7 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
 
   const backup = useCallback(async () => {
     if (!activeConfig) {
-      toast(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'), 'error');
+      toast(t('useBackupActions.please-configure-and-activate-webdav-service-fir'), 'error');
       return;
     }
     setIsBackingUp(true);
@@ -103,14 +105,14 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
       const success = await new WebDAVService(activeConfig).uploadFile(filename, JSON.stringify(backupData, null, 2));
       if (success) {
         state.setLastBackup(new Date().toISOString());
-        toast(t('数据备份成功！', 'Data backup successful!'), 'success');
+        toast(t('useBackupActions.data-backup-successful'), 'success');
       } else {
         console.error('Backup failed: uploadFile returned falsy');
-        toast(t('数据备份失败！', 'Data backup failed!'), 'error');
+        toast(t('useBackupActions.data-backup-failed'), 'error');
       }
     } catch (error) {
       console.error('Backup failed:', error);
-      toast(`${t('备份失败', 'Backup failed')}: ${(error as Error).message}`, 'error');
+      toast(`${t('useBackupActions.backup-failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsBackingUp(false);
     }
@@ -118,12 +120,12 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
 
   const restore = useCallback(async () => {
     if (!activeConfig) {
-      toast(t('请先配置并激活WebDAV服务。', 'Please configure and activate WebDAV service first.'), 'error');
+      toast(t('useBackupActions.please-configure-and-activate-webdav-service-fir'), 'error');
       return;
     }
     const confirmed = await confirm(
-      t('恢复数据', 'Restore Data'),
-      t('恢复数据将覆盖当前所有数据，是否继续？', 'Restoring data will overwrite all current data. Continue?'),
+      t('useBackupActions.restore-data'),
+      t('useBackupActions.restoring-data-will-overwrite-all-current-data-c'),
       { type: 'warning' },
     );
     if (!confirmed) return;
@@ -134,12 +136,12 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
       const files = await service.listFiles();
       const backupFiles = files.filter((file) => file.startsWith('github-stars-backup-'));
       if (backupFiles.length === 0) {
-        toast(t('未找到备份文件。', 'No backup files found.'), 'error');
+        toast(t('useBackupActions.no-backup-files-found'), 'error');
         return;
       }
       const content = await service.downloadFile(backupFiles.sort().reverse()[0]);
       if (!content) {
-        toast(t('备份文件内容为空，无法恢复。', 'Backup file is empty, cannot restore.'), 'error');
+        toast(t('useBackupActions.backup-file-is-empty-cannot-restore'), 'error');
         return;
       }
       const backupData = JSON.parse(content) as Record<string, unknown>;
@@ -267,13 +269,10 @@ export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions 
       } catch (error) {
         console.warn('恢复后端 API 密钥时发生问题：', error);
       }
-      toast(t(
-        `已从备份恢复数据：仓库 ${(backupData.repositories as unknown[] | undefined)?.length ?? 0}，发布 ${(backupData.releases as unknown[] | undefined)?.length ?? 0}，自定义分类 ${(backupData.customCategories as unknown[] | undefined)?.length ?? 0}。`,
-        `Data restored from backup: repositories ${(backupData.repositories as unknown[] | undefined)?.length ?? 0}, releases ${(backupData.releases as unknown[] | undefined)?.length ?? 0}, custom categories ${(backupData.customCategories as unknown[] | undefined)?.length ?? 0}.`,
-      ), 'success');
+      toast(t('useBackupActions.data-restored-from-backup-repositories-v1-releas', { v1: (backupData.repositories as unknown[] | undefined)?.length ?? 0, v2: (backupData.releases as unknown[] | undefined)?.length ?? 0, v3: (backupData.customCategories as unknown[] | undefined)?.length ?? 0 }), 'success');
     } catch (error) {
       console.error('Restore failed:', error);
-      toast(`${t('恢复失败', 'Restore failed')}: ${(error as Error).message}`, 'error');
+      toast(`${t('useBackupActions.restore-failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsRestoring(false);
     }

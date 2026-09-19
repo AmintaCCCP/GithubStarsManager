@@ -14,6 +14,7 @@ import { useAppStore } from './store/useAppStore';
 import { selectAppShellState } from './store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { applyThemePreset } from './lib/themePresets';
+import { changeAppLanguage } from './i18n';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
@@ -145,6 +146,7 @@ function App() {
     selectedCategory,
     theme,
     themePreset,
+    language,
     hasHydrated,
     searchResults,
     searchFilters,
@@ -205,6 +207,12 @@ function App() {
   useEffect(() => {
     applyThemePreset(themePreset);
   }, [themePreset]);
+
+  // Language side effect: zustand 的 language 是唯一事实源，这里只负责装载
+  // 语言包、切换 i18next 并同步 <html lang>。
+  useEffect(() => {
+    void changeAppLanguage(language);
+  }, [language]);
 
   const handleCategorySelect = useCallback((category: string) => {
     // 相似仓库视图下点击分类 = 离开相似视图并切换到该分类，避免交互歧义

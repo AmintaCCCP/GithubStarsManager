@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "Подключение службы AI выполнено успешно!",
+    "ai-service-test-failed-please-check-network-conn": "Проверка службы AI не удалась, проверьте сетевое соединение и конфигурацию."
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "Неверный адрес бэкэнда: удаленному бэкэнду требуется HTTPS, только локальный хост может использовать HTTP.",
+    "backend-connection-failed-please-check-the-serve": "Не удалось подключиться к серверной части. Проверьте правильность статуса сервера или секрета API.",
+    "backend-connection-successful": "Серверное соединение выполнено успешно!",
+    "backend-not-available": "Серверная часть недоступна",
+    "partial-sync-failure-v1-failed-v2-succeeded": "Частичная синхронизация не удалась: {{v1}} не удалось, {{v2}} удалось.",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "Синхронизировано с серверной частью: хранилище {{v1}}, выпуск {{v2}}, конфигурация AI {{v3}}, конфигурация WebDAV {{v4}}",
+    "sync-failed": "Синхронизация не удалась",
+    "sync-from-backend": "Синхронизировать с серверной части",
+    "syncing-from-backend-will-overwrite-local-data-c": "Синхронизация с серверной части перезапишет локальные данные. Продолжить?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Синхронизировано с серверной части: хранилище {{v1}}, выпуск {{v2}}, конфигурация AI {{v3}}, конфигурация WebDAV {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "Сначала настройте и активируйте службу WebDAV.",
+    "data-backup-successful": "Резервное копирование данных выполнено успешно!",
+    "data-backup-failed": "Резервное копирование данных не удалось!",
+    "backup-failed": "Резервное копирование не выполнено",
+    "restore-data": "Восстановить данные",
+    "restoring-data-will-overwrite-all-current-data-c": "При восстановлении данных все текущие данные будут перезаписаны. Вы хотите продолжить?",
+    "no-backup-files-found": "Файл резервной копии не найден.",
+    "backup-file-is-empty-cannot-restore": "Содержимое файла резервной копии пусто и не может быть восстановлено.",
+    "data-restored-from-backup-repositories-v1-releas": "Данные восстановлены из резервной копии: хранилище {{v1}}, выпуск {{v2}}, пользовательская классификация {{v3}}.",
+    "restore-failed": "Восстановление не удалось"
+  },
+  "useDesktopActions": {
+    "load-failed": "Загрузка не удалась",
+    "save-failed": "Сохранить не удалось"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "Введите действительный токен доступа GitHub.",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "Этот токен принадлежит {{v1}}, а текущая учетная запись — {{v2}}. Пожалуйста, сначала выйдите из системы, а затем войдите под другой учетной записью. Локальные данные будут сохранены в учетной записи.",
+    "failed-to-save-the-new-token-to-the-backend-loca": "Не удалось сохранить новый токен на серверной стороне, локальные учетные данные не обновлены. Пожалуйста, повторите попытку позже.",
+    "github-token-updated": "Токен GitHub обновлен.",
+    "github-token-has-expired-or-is-invalid": "Срок действия токена GitHub истек или он недействителен.",
+    "update-failed-please-try-again": "Обновление не удалось. Повторите попытку позже."
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "Служба MCP запущена.",
+    "mcp-server-disabled": "Служба MCP не работает",
+    "mcp-server-enabled-local": "Служба MCP запущена (локально)",
+    "backend-or-desktop-client-required-for-mcp": "Для использования MCP требуется серверная часть или клиент.",
+    "operation-failed": "Операция не удалась",
+    "enable-mcp-before-resetting-the-token": "Сначала включите службу MCP, а затем сбросьте токен.",
+    "reset-mcp-token": "Сбросить токен MCP",
+    "the-old-token-will-stop-working-immediately-upda": "После сброса старый Токен сразу становится недействительным, и конфигурацию Агента необходимо обновить. Продолжать?",
+    "token-reset": "Токен сброшен",
+    "reset-failed": "Сбросить не удалось"
+  },
+  "useNetworkActions": {
+    "save-failed": "Сохранить не удалось"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "Вы не вошли в GitHub, сначала подключитесь",
+    "push-categories-to-github-lists": "Синхронизировать классификацию склада со списком GitHub.",
+    "push-confirm-body": "Запишите каждую локальную категорию (включая категории по умолчанию и пользовательские категории) обратно в список GitHub с тем же именем:\n\n· Список с таким же названием перезапишет своих участников (хранилища, не соответствующие категории, будут удалены из списка)\n· Если списка с таким названием нет, создайте новый (по умолчанию частный)\n· Склад будет добавлен в соответствующий список в соответствии с соответствующей ему классификацией.\n· Другие членства в списках, не принадлежащие к местной категории, будут сохранены.\n\nВы уверены, что хотите продолжить?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "Требуется URL-адрес WebDAV.",
+    "webdav-url-must-start-with-http-or-https": "URL-адрес WebDAV должен начинаться с http:// или https://.",
+    "username-is-required": "Требуется имя пользователя",
+    "password-is-required": "Требуется пароль",
+    "path-is-required": "требуется путь",
+    "path-must-start-with": "Путь должен начинаться с /",
+    "webdav-connection-successful": "Соединение WebDAV успешно!",
+    "webdav-connection-failed-please-check-configurat": "Не удалось подключиться к WebDAV. Проверьте конфигурацию.",
+    "webdav-test-failed": "Тест WebDAV не пройден"
+  },
+  "generalPanel": {
+    "account-token-hint": "Текущий счет {{login}}. По истечении срока действия вы можете напрямую заменить токен здесь, не выходя из системы.",
+    "token-hint": "По истечении срока действия вы можете напрямую заменить токен здесь, не выходя из системы."
+  }
+}

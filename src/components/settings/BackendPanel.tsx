@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -9,7 +11,7 @@ import { useAppStore } from '../../store/useAppStore';
 import type { RouteMode } from '../../types';
 
 interface BackendPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
@@ -33,18 +35,18 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const routeOptions: Array<{ value: RouteMode; label: string; hint: string }> = [
     {
       value: 'auto',
-      label: t('智能', 'Auto'),
-      hint: t('有后端走后端，无后端走本机网络', 'Use backend when available, otherwise this device'),
+      label: t('backendPanel.auto'),
+      hint: t('backendPanel.use-backend-when-available-otherwise-this-device'),
     },
     {
       value: 'backend',
-      label: t('优先走后端', 'Prefer backend'),
-      hint: t('支持后端代理的请求族优先经后端服务器出站', 'Backend-proxied request families prefer the backend egress'),
+      label: t('backendPanel.prefer-backend'),
+      hint: t('backendPanel.backend-proxied-request-families-prefer-the-back'),
     },
     {
       value: 'browser',
-      label: t('浏览器直连', 'Browser direct'),
-      hint: t('跳过后端代理，走当前设备网络', 'Skip backend proxying and use this device network'),
+      label: t('backendPanel.browser-direct'),
+      hint: t('backendPanel.skip-backend-proxying-and-use-this-device-networ'),
     },
   ];
 
@@ -62,11 +64,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
   const getStatusText = () => {
     switch (status) {
       case 'connected':
-        return t('已连接', 'Connected');
+        return t('backendPanel.connected');
       case 'checking':
-        return t('检查中…', 'Checking…');
+        return t('backendPanel.checking');
       default:
-        return t('未连接', 'Not Connected');
+        return t('backendPanel.not-connected');
     }
   };
 
@@ -76,7 +78,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         <div className="flex items-center space-x-3">
           <Server className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('后端服务器', 'Backend Server')}
+            {t('backendPanel.backend-server')}
           </h3>
         </div>
         <Badge
@@ -93,11 +95,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           <div className="flex items-center space-x-2 mb-2">
             <CheckCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
             <span className="font-medium text-foreground dark:text-foreground">
-              {t('连接正常', 'Connection OK')}
+              {t('backendPanel.connection-ok')}
             </span>
           </div>
           <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-            {t('版本', 'Version')}: {health.version}
+            {t('backendPanel.version')}: {health.version}
           </p>
         </div>
       )}
@@ -106,14 +108,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         <div className="flex items-center space-x-2 mb-1">
           <Route className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
           <h4 className="text-sm font-medium text-foreground dark:text-foreground">
-            {t('网络请求路由', 'Network Request Routing')}
+            {t('backendPanel.network-request-routing')}
           </h4>
         </div>
         <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-3">
-          {t(
-            '选择支持后端代理的 GitHub/Release 请求从哪里发出。此项仅影响本设备，不参与后端与自动同步。',
-            'Choose where backend-proxied GitHub/Release requests originate. This only affects this device and is never synced.'
-          )}
+          {t('backendPanel.choose-where-backend-proxied-github-release-requ')}
         </p>
         <RadioGroup
           value={routeMode}
@@ -136,23 +135,17 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
         </RadioGroup>
         {!backendAvailable && (
           <p className="text-xs text-warning mt-3">
-            {t(
-              '当前后端不可达，「智能 / 优先走后端」与「浏览器直连」实际效果一致（都从本设备网络发出），切换不会改变现状。',
-              'The backend is unreachable right now, so "Auto / Prefer backend" and "Browser direct" behave identically (both use this device). Switching will not change current behavior.'
-            )}
+            {t('backendPanel.the-backend-is-unreachable-right-now-so-auto-pre')}
           </p>
         )}
         <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-3">
-          {t(
-            '提示：服务器（如境内 VPS）访问不了 GitHub 时选「浏览器直连」。aria2 的下载流量由 aria2 进程所在机器发出，与本设置无关。浏览器直连下载有鉴权的大体积资产会占用标签页内存。',
-            'Tip: pick "Browser direct" when the server (e.g. a mainland-China VPS) cannot reach GitHub. aria2 download traffic leaves from wherever aria2 runs and is unaffected. Authenticated large assets downloaded via browser direct consume tab memory.'
-          )}
+          {t('backendPanel.tip-pick-browser-direct-when-the-server-e-g-a-ma')}
         </p>
       </div>
 
       <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
         <label htmlFor="backend-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
-          {t('后端地址', 'Backend URL')}
+          {t('backendPanel.backend-url')}
         </label>
         <Input
           id="backend-url"
@@ -163,7 +156,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           placeholder="https://example.com"
         />
         <label htmlFor="backend-api-secret" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
-          {t('API 密钥', 'API Secret')}
+          {t('backendPanel.api-secret')}
         </label>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <Input
@@ -172,7 +165,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
             className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-            placeholder={t('输入后端 API_SECRET（可选）', 'Enter backend API_SECRET (optional)')}
+            placeholder={t('backendPanel.enter-backend-api-secret-optional')}
           />
           <Button
             onClick={handleTestConnection}
@@ -184,14 +177,11 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             ) : (
               <TestTube className="w-4 h-4" />
             )}
-            <span>{t('测试连接', 'Test Connection')}</span>
+            <span>{t('backendPanel.test-connection')}</span>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
-          {t(
-            '后端地址与登录页「已有后端数据」使用同一配置：修改后点击"测试连接"重新探测并记住，留空则自动探测（优先记住的地址，否则当前站点）。如果后端设置了 API_SECRET 环境变量，在下方输入相同的值，未设置则留空。',
-            'The backend URL is shared with the login screen\'s "Already have backend data" flow: edit it and press "Test Connection" to re-probe and remember it; leave empty to auto-detect (remembered URL first, then the current site). If the backend has API_SECRET env var set, enter the same value below. Leave empty if not set.'
-          )}
+          {t('backendPanel.the-backend-url-is-shared-with-the-login-screen')}
         </p>
       </div>
 
@@ -202,10 +192,10 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
               <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
               <div>
                 <h4 className="font-medium text-foreground dark:text-foreground">
-                  {t('同步到后端', 'Sync to Backend')}
+                  {t('backendPanel.sync-to-backend')}
                 </h4>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('将本地数据上传到后端', 'Upload local data to backend')}
+                  {t('backendPanel.upload-local-data-to-backend')}
                 </p>
               </div>
             </div>
@@ -219,7 +209,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
               ) : (
                 <Upload className="w-5 h-5" />
               )}
-              <span>{isSyncingToBackend ? t('同步中…', 'Syncing…') : t('开始同步', 'Start Sync')}</span>
+              <span>{isSyncingToBackend ? t('backendPanel.syncing') : t('backendPanel.start-sync')}</span>
             </Button>
           </div>
 
@@ -228,10 +218,10 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
               <Download className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
               <div>
                 <h4 className="font-medium text-foreground dark:text-foreground">
-                  {t('从后端同步', 'Sync from Backend')}
+                  {t('backendPanel.sync-from-backend')}
                 </h4>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('从后端下载数据到本地', 'Download data from backend to local')}
+                  {t('backendPanel.download-data-from-backend-to-local')}
                 </p>
               </div>
             </div>
@@ -245,7 +235,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
               ) : (
                 <Download className="w-5 h-5" />
               )}
-              <span>{isSyncingFromBackend ? t('同步中…', 'Syncing…') : t('开始同步', 'Start Sync')}</span>
+              <span>{isSyncingFromBackend ? t('backendPanel.syncing') : t('backendPanel.start-sync')}</span>
             </Button>
           </div>
         </div>
@@ -253,14 +243,14 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
 
       <div className="p-4 bg-background dark:bg-muted/40 rounded-lg">
         <h4 className="font-medium text-foreground dark:text-foreground mb-2">
-          {t('同步内容包括：', 'Sync includes:')}
+          {t('backendPanel.sync-includes')}
         </h4>
         <ul className="text-sm text-muted-foreground dark:text-muted-foreground space-y-1">
-          <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
-          <li>• {t('Release 发布信息', 'Release information')}</li>
-          <li>• {t('AI 服务配置', 'AI service configurations')}</li>
-          <li>• {t('WebDAV 配置', 'WebDAV configurations')}</li>
-          <li>• {t('分类显示设置', 'Category visibility settings')}</li>
+          <li>• {t('backendPanel.github-stars-repository-list')}</li>
+          <li>• {t('backendPanel.release-information')}</li>
+          <li>• {t('backendPanel.ai-service-configurations')}</li>
+          <li>• {t('backendPanel.webdav-configurations')}</li>
+          <li>• {t('backendPanel.category-visibility-settings')}</li>
         </ul>
       </div>
     </div>

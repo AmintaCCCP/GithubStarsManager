@@ -2,6 +2,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleasePluginRecommendations } from './ReleasePluginRecommendations';
 
+const storeState: Record<string, unknown> = { language: 'en' };
+
+vi.mock('../store/useAppStore', () => ({
+  useAppStore: vi.fn((selector?: (state: unknown) => unknown) =>
+    selector ? selector(storeState) : storeState),
+}));
+
 const mocks = vi.hoisted(() => ({
   runProcessor: vi.fn(),
   download: vi.fn(),

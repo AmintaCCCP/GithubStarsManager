@@ -39,9 +39,10 @@ vi.mock('../../features/settings/hooks/useGitHubTokenActions', () => ({
   }),
 }));
 
+import { makeT } from '../../i18n/useT';
 import { GeneralPanel } from './GeneralPanel';
 
-const t = (zh: string) => zh;
+const t = makeT('zh', 'app');
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "Channel message from {{v1}}",
+    "open-in-telegram": "Open in Telegram",
+    "this-message-is-media-only-and-has-no-text-conte": "This message is media-only and has no text content"
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "Enter a valid channel name, e.g. https://t.me/geekhub23 or @geekhub23.",
+    "this-channel-is-already-in-the-list": "This channel is already in the list.",
+    "channel-added-to-the-follow-list": "Channel added to the follow list.",
+    "unfollowed-v1": "Unfollowed @{{v1}}.",
+    "telegram-channels-settings": "Telegram Channels Settings",
+    "refreshing-incrementally-pulls-the-latest-messag": "Refreshing incrementally pulls the latest messages of followed channels; messages containing GitHub repository links are listed, and \"Load more\" pages back through history. The app fetches the t.me public preview directly and requires the desktop or server build (browsers are CORS-restricted). Private channels cannot be fetched.",
+    "follow-list": "Follow list",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "Accepts a t.me channel URL, @name, or a bare channel name. Channels are fetched one by one on refresh.",
+    "enter-a-valid-channel-name": "Enter a valid channel name.",
+    "fill-in-or-add-a-channel-to-test-first": "Fill in or add a channel to test first.",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "Fetch a channel preview once to verify the pipeline",
+    "testing": "Testing…",
+    "test-connection": "Test Connection",
+    "channel-name": "Channel name",
+    "add": "Add",
+    "no-followed-channels-yet": "No followed channels yet.",
+    "unfollow": "Unfollow",
+    "unfollow-v1": "Unfollow @{{v1}}",
+    "done": "Done"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "Tweet from @{{v1}}",
+    "open-on-x": "Open on X",
+    "this-tweet-has-no-text-content": "This tweet has no text content"
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "Enter a valid X handle, e.g. @geekbb or a profile URL.",
+    "this-account-is-already-in-the-list": "This account is already in the list.",
+    "account-added-to-the-follow-list": "Account added to the follow list.",
+    "unfollowed-v1": "Unfollowed @{{v1}}.",
+    "both-auth-token-and-ct0-must-contain-valid-value": "Both auth_token and ct0 must contain valid values.",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "Auth cookies saved; refreshes now use the GraphQL mode.",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "Auth cookies applied but failed to persist to disk; they may be lost on restart.",
+    "auth-cookies-saved-current-session-only": "Auth cookies saved (current session only).",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "Auth cookies cleared; back to the signed-out mode.",
+    "x-tweets-channel-settings": "X Tweets Channel Settings",
+    "refreshing-incrementally-pulls-the-latest-tweets": "Refreshing incrementally pulls the latest tweets of followed accounts; tweets containing GitHub repository links are listed. The app fetches x.com directly and requires the desktop or server build (browsers are CORS-restricted). Optional auth cookies unlock more tweets and history paging.",
+    "follow-list": "Follow list",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "Accepts @handle, handle, or an x.com profile URL. Timelines are fetched account by account on refresh.",
+    "enter-a-valid-x-handle": "Enter a valid X handle.",
+    "fill-in-or-add-an-account-to-test-first": "Fill in or add an account to test first.",
+    "fetch-a-profile-once-to-verify-the-pipeline": "Fetch a profile once to verify the pipeline",
+    "testing": "Testing…",
+    "test-connection": "Test Connection",
+    "x-handle": "X handle",
+    "add": "Add",
+    "no-followed-accounts-yet": "No followed accounts yet.",
+    "unfollow": "Unfollow",
+    "unfollow-v1": "Unfollow @{{v1}}",
+    "auth-cookies-optional": "Auth Cookies (optional)",
+    "once-set-fetching-switches-to-the-signed-in-grap": "Once set, fetching switches to the signed-in GraphQL API: ~20 tweets per account per page and \"Load more\" pages back through history. Leave empty for signed-out fetching (a small latest batch per account). Copy auth_token and ct0 from DevTools → Application → Cookies after signing in to x.com; they are stored locally only.",
+    "auth-token": "auth_token",
+    "hide-auth-token": "Hide auth_token",
+    "show-auth-token": "Show auth_token",
+    "ct0": "ct0",
+    "hide-ct0": "Hide ct0",
+    "show-ct0": "Show ct0",
+    "authenticated-fetching-is-on": "Authenticated fetching is on",
+    "signed-out-fetching-mode": "Signed-out fetching mode",
+    "clear": "Clear",
+    "update-auth": "Update Auth",
+    "saved": "Saved",
+    "save-auth": "Save Auth",
+    "done": "Done"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "Opened in browser",
+    "plugin-result-copied": "Plugin result copied",
+    "plugin-result-saved": "Plugin result saved",
+    "plugin-action-completed": "Plugin action completed"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "Custom endpoint",
+    "allow-plugin-ai-request": "Allow plugin AI request?",
+    "the-host-may-relay-this-through-its-configured-b": "The Host may relay this through its configured backend.",
+    "send-to-ai": "Send to AI",
+    "allow-plugin-ai-body": "Plugin {{pluginName}} requests the AI configuration \"{{configName}}\" (model {{model}}).\nDestination: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nUser:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "Allow plugin web search?",
+    "search-query": "Search query:",
+    "send-search-query": "Send search query"
+  }
+}

@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import { ListChecks, Star } from 'lucide-react';
 import React, { useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
@@ -18,12 +23,11 @@ import {
  * 该弹窗是阻塞式（blocking）模态：必须完成选择，不可关闭、不可点背景跳过。
  */
 export const SyncModeChoiceModal: React.FC = () => {
-  const language = useAppStore((state) => state.language);
   const syncModeConfigured = useAppStore((state) => state.syncModeConfigured);
   const setSyncMode = useAppStore((state) => state.setSyncMode);
   const setSyncModeConfigured = useAppStore((state) => state.setSyncModeConfigured);
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
   const isOpen = !syncModeConfigured;
   const firstActionRef = useRef<HTMLButtonElement>(null);
   const optionClassName = 'h-auto w-full justify-start gap-3 whitespace-normal rounded-xl border border-border bg-card p-4 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-card dark:border-border dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent';
@@ -44,9 +48,9 @@ export const SyncModeChoiceModal: React.FC = () => {
         className="max-w-md p-6 sm:p-7"
       >
         <AlertDialogHeader>
-          <AlertDialogTitle>{t('选择同步范围', 'Choose sync scope')}</AlertDialogTitle>
+          <AlertDialogTitle>{t('syncModeChoiceModal.choose-sync-scope')}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('您希望同步哪些数据？此选择可在设置中随时切换。', 'What should be synced? You can change this anytime in Settings.')}
+            {t('syncModeChoiceModal.what-should-be-synced-you-can-change-this-anytim')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-3">
@@ -57,9 +61,9 @@ export const SyncModeChoiceModal: React.FC = () => {
           >
             <Star className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <span>
-              <span className="block font-medium">{t('仅同步星标仓库', 'Starred repos only')}</span>
+              <span className="block font-medium">{t('syncModeChoiceModal.starred-repos-only')}</span>
               <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">
-                {t('同步你的全部星标仓库（默认，与以前行为一致）。', 'Sync all your starred repositories (default, same as before).')}
+                {t('syncModeChoiceModal.sync-all-your-starred-repositories-default-same')}
               </span>
             </span>
           </AlertDialogAction>
@@ -69,9 +73,9 @@ export const SyncModeChoiceModal: React.FC = () => {
           >
             <ListChecks className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
             <span>
-              <span className="block font-medium">{t('同步星标仓库及 list', 'Starred repos & lists')}</span>
+              <span className="block font-medium">{t('syncModeChoiceModal.starred-repos-lists')}</span>
               <span className="mt-1 block text-xs font-normal text-muted-foreground dark:text-muted-foreground">
-                {t('除星标仓库外，还将拉取你的 Lists（星标列表）并按标签归类；未锁定分类的仓库会被自动锁定。', 'Also fetch your Lists and categorize by tags; unlocked repos will be auto-locked.')}
+                {t('syncModeChoiceModal.also-fetch-your-lists-and-categorize-by-tags-unl')}
               </span>
             </span>
           </AlertDialogAction>

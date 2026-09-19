@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useT";
 import { Button } from './ui/button';
 import React, { useId, useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
@@ -51,28 +52,28 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
       await onCategorize(category.name);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('分类失败', 'Categorization failed'));
+      setError(err instanceof Error ? err.message : t('bulkCategorizeModal.categorization-failed'));
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t('批量分类', 'Bulk Categorize')}
+      title={t('bulkCategorizeModal.bulk-categorize')}
     >
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-          {t(`将为 ${repositories.length} 个仓库设置分类：`, `Will set category for ${repositories.length} repositories:`)}
+          {t('bulkCategorizeModal.will-set-category-for-v1-repositories', { v1: repositories.length })}
         </p>
 
         <div className="space-y-2">
           <h3 id={categorySelectionLabelId} className="mb-2 block text-sm font-medium text-foreground dark:text-foreground">
-            {t('选择分类', 'Select Category')}
+            {t('bulkCategorizeModal.select-category')}
           </h3>
 
           <div
@@ -115,7 +116,7 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
 
         <div className="bg-muted dark:bg-warning/10 border border-border dark:border-warning/20 rounded-lg p-3">
           <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-            {t('提示：此操作将覆盖这些仓库现有的自定义分类。', 'Note: This operation will overwrite the existing custom categories of these repositories.')}
+            {t('bulkCategorizeModal.note-this-operation-will-overwrite-the-existing')}
           </p>
         </div>
 
@@ -125,14 +126,14 @@ export const BulkCategorizeModal: React.FC<BulkCategorizeModalProps> = ({
             disabled={isProcessing}
             className="px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-50"
           >
-            {t('取消', 'Cancel')}
+            {t('bulkCategorizeModal.cancel')}
           </Button>
           <Button
             onClick={handleCategorize}
             disabled={!selectedCategory || isProcessing}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary dark:hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isProcessing ? t('处理中…', 'Processing…') : t('确认分类', 'Confirm Categorize')}
+            {isProcessing ? t('bulkCategorizeModal.processing') : t('bulkCategorizeModal.confirm-categorize')}
           </Button>
         </div>
       </div>

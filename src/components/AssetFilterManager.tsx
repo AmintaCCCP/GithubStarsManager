@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
 import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Package } from 'lucide-react';
 import { SiAndroid, SiApple, SiLinux } from '@icons-pack/react-simple-icons';
@@ -40,7 +45,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   onFilterToggle,
   onClearFilters
 }) => {
-  const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter, language } = useAppStore(useShallow((state) => ({
+  const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter } = useAppStore(useShallow((state) => ({
     assetFilters: state.assetFilters,
     addAssetFilter: state.addAssetFilter,
     updateAssetFilter: state.updateAssetFilter,
@@ -79,9 +84,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
   const handleDeleteFilter = async (filterId: string) => {
     const confirmed = await confirm(
-      t('删除过滤器', 'Delete Filter'),
-      language === 'zh' ? '确定要删除这个过滤器吗？' : 'Are you sure you want to delete this filter?',
-      { type: 'danger', confirmText: t('删除', 'Delete') }
+      t('assetFilterManager.delete-filter'),
+      t('assetFilterManager.are-you-sure-you-want-to-delete-this-filter'),
+      { type: 'danger', confirmText: t('assetFilterManager.delete') }
     );
 
     if (!confirmed) return;
@@ -104,7 +109,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     onFilterToggle(presetId);
   };
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
 
   return (
     <div className="space-y-3">
@@ -115,7 +120,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             variant="ghost"
             onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center space-x-2 px-3 py-2 bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent transition-all group"
-          title={isExpanded ? t('收起过滤器', 'Collapse filters') : t('展开过滤器', 'Expand filters')}
+          title={isExpanded ? t('assetFilterManager.collapse-filters') : t('assetFilterManager.expand-filters')}
           aria-expanded={isExpanded}
           aria-controls="asset-filter-panel"
         >
@@ -123,7 +128,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
             isExpanded ? 'text-primary dark:text-primary' : ''
           }`} aria-hidden="true" />
           <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-            {t('过滤器', 'Filters')}
+            {t('assetFilterManager.filters')}
           </span>
           {selectedFilters.length > 0 && (
             <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs rounded-full">
@@ -143,23 +148,23 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               variant="ghost"
               onClick={onClearFilters}
               className="flex items-center space-x-1 px-2 py-1.5 text-xs text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
-              title={t('清除所有筛选', 'Clear all filters')}
+              title={t('assetFilterManager.clear-all-filters')}
               type="button"
-              aria-label={t('清除所有筛选', 'Clear all filters')}
+              aria-label={t('assetFilterManager.clear-all-filters')}
             >
               <X className="w-3 h-3" aria-hidden="true" />
-              <span className="hidden sm:inline">{t('清除所有筛选', 'Clear all filters')}</span>
+              <span className="hidden sm:inline">{t('assetFilterManager.clear-all-filters')}</span>
             </Button>
           )}
           <Button
             onClick={handleCreateFilter}
             className="flex items-center space-x-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
-            title={t('新建过滤器', 'New Filter')}
+            title={t('assetFilterManager.new-filter')}
             type="button"
-            aria-label={t('新建过滤器', 'New Filter')}
+            aria-label={t('assetFilterManager.new-filter')}
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{t('新建', 'New')}</span>
+            <span className="hidden sm:inline">{t('assetFilterManager.new')}</span>
           </Button>
         </div>
       </div>
@@ -175,7 +180,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           {presetFilters.length > 0 && (
             <div>
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-2">
-                {t('预设筛选器', 'Preset Filters')}
+                {t('assetFilterManager.preset-filters')}
               </p>
               <div className="flex flex-wrap gap-2">
                 {presetFilters.map(preset => {
@@ -207,9 +212,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                           variant="ghost"
                           onClick={() => handleEditFilter(preset)}
                           className="h-6 w-6 rounded p-0 hover:bg-accent hover:text-accent-foreground transition-colors"
-                          title={t('编辑', 'Edit')}
+                          title={t('assetFilterManager.edit')}
                           type="button"
-                          aria-label={t('编辑', 'Edit')}
+                          aria-label={t('assetFilterManager.edit')}
                         >
                           <Edit3 className="w-3 h-3" aria-hidden="true" />
                         </Button>
@@ -225,7 +230,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           {customFilters.length > 0 && (
             <div>
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-2">
-                {t('自定义筛选器', 'Custom Filters')}
+                {t('assetFilterManager.custom-filters')}
               </p>
               <div className="flex flex-wrap gap-2">
                 {customFilters.map(filter => (
@@ -257,9 +262,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                         variant="ghost"
                         onClick={() => handleEditFilter(filter)}
                         className="h-6 w-6 rounded p-0 hover:bg-accent dark:hover:bg-accent transition-colors"
-                        title={t('编辑', 'Edit')}
+                        title={t('assetFilterManager.edit')}
                         type="button"
-                        aria-label={t('编辑', 'Edit')}
+                        aria-label={t('assetFilterManager.edit')}
                       >
                         <Edit3 className="w-3 h-3" aria-hidden="true" />
                       </Button>
@@ -267,9 +272,9 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                         variant="destructive"
                         onClick={() => handleDeleteFilter(filter.id)}
                         className="h-6 w-6 rounded p-0 transition-colors"
-                        title={t('删除', 'Delete')}
+                        title={t('assetFilterManager.delete')}
                         type="button"
-                        aria-label={t('删除', 'Delete')}
+                        aria-label={t('assetFilterManager.delete')}
                       >
                         <Trash2 className="w-3 h-3" aria-hidden="true" />
                       </Button>
@@ -283,7 +288,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
           {presetFilters.length === 0 && customFilters.length === 0 && (
             <div className="text-center py-4 bg-background dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
               <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                {t('暂无过滤器，点击"新建"创建', 'No filters, click "New" to create')}
+                {t('assetFilterManager.no-filters-click-new-to-create')}
               </p>
             </div>
           )}

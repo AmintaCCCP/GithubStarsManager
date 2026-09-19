@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "AI service connection successful!",
+    "ai-service-test-failed-please-check-network-conn": "AI service test failed. Please check network connection and configuration."
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "Invalid backend URL: remote backends must use HTTPS; only localhost may use HTTP",
+    "backend-connection-failed-please-check-the-serve": "Backend connection failed. Please check the server status or whether the API Secret is correct.",
+    "backend-connection-successful": "Backend connection successful!",
+    "backend-not-available": "Backend not available",
+    "partial-sync-failure-v1-failed-v2-succeeded": "Partial sync failure: {{v1}} failed, {{v2}} succeeded",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "Synced to backend: repos {{v1}}, releases {{v2}}, AI configs {{v3}}, WebDAV configs {{v4}}",
+    "sync-failed": "Sync failed",
+    "sync-from-backend": "Sync from Backend",
+    "syncing-from-backend-will-overwrite-local-data-c": "Syncing from backend will overwrite local data. Continue?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Synced from backend: repos {{v1}}, releases {{v2}}, AI configs {{v3}}, WebDAV configs {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "Please configure and activate WebDAV service first.",
+    "data-backup-successful": "Data backup successful!",
+    "data-backup-failed": "Data backup failed!",
+    "backup-failed": "Backup failed",
+    "restore-data": "Restore Data",
+    "restoring-data-will-overwrite-all-current-data-c": "Restoring data will overwrite all current data. Continue?",
+    "no-backup-files-found": "No backup files found.",
+    "backup-file-is-empty-cannot-restore": "Backup file is empty, cannot restore.",
+    "data-restored-from-backup-repositories-v1-releas": "Data restored from backup: repositories {{v1}}, releases {{v2}}, custom categories {{v3}}.",
+    "restore-failed": "Restore failed"
+  },
+  "useDesktopActions": {
+    "load-failed": "Load failed",
+    "save-failed": "Save failed"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "Please enter a valid GitHub access token",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "This token belongs to {{v1}}, but you are signed in as {{v2}}. Log out first to switch accounts; local data is kept per GitHub account.",
+    "failed-to-save-the-new-token-to-the-backend-loca": "Failed to save the new token to the backend. Local credentials were not updated. Please try again later.",
+    "github-token-updated": "GitHub token updated",
+    "github-token-has-expired-or-is-invalid": "GitHub token has expired or is invalid",
+    "update-failed-please-try-again": "Update failed. Please try again"
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "MCP server enabled",
+    "mcp-server-disabled": "MCP server disabled",
+    "mcp-server-enabled-local": "MCP server enabled (local)",
+    "backend-or-desktop-client-required-for-mcp": "Backend or desktop client required for MCP",
+    "operation-failed": "Operation failed",
+    "enable-mcp-before-resetting-the-token": "Enable MCP before resetting the token",
+    "reset-mcp-token": "Reset MCP Token",
+    "the-old-token-will-stop-working-immediately-upda": "The old token will stop working immediately. Update your agent config. Continue?",
+    "token-reset": "Token reset",
+    "reset-failed": "Reset failed"
+  },
+  "useNetworkActions": {
+    "save-failed": "Save failed"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "Not connected to GitHub yet",
+    "push-categories-to-github-lists": "Push categories to GitHub lists",
+    "push-confirm-body": "Each local category (default & custom) will be written to a GitHub List of the same name:\n\n· Existing same-name lists will be overwritten (repos no longer matching are removed)\n· Missing lists will be created (private by default)\n· Repos are added to the lists matching their category\n· Memberships in lists not managed locally are preserved\n\nContinue?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "WebDAV URL is required",
+    "webdav-url-must-start-with-http-or-https": "WebDAV URL must start with http:// or https://",
+    "username-is-required": "Username is required",
+    "password-is-required": "Password is required",
+    "path-is-required": "Path is required",
+    "path-must-start-with": "Path must start with /",
+    "webdav-connection-successful": "WebDAV connection successful!",
+    "webdav-connection-failed-please-check-configurat": "WebDAV connection failed. Please check configuration.",
+    "webdav-test-failed": "WebDAV test failed"
+  },
+  "generalPanel": {
+    "account-token-hint": "Signed in as {{login}}. Update an expired token here without logging out.",
+    "token-hint": "Update an expired token here without logging out."
+  }
+}

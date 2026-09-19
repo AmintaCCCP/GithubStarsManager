@@ -1,0 +1,472 @@
+{
+  "defaultCategoryIds": [
+    "all",
+    "web",
+    "mobile",
+    "desktop",
+    "database",
+    "ai",
+    "devtools",
+    "security",
+    "game",
+    "design",
+    "productivity",
+    "education",
+    "social",
+    "analytics"
+  ],
+  "getAllCategories": {
+    "zh": [
+      {
+        "id": "all",
+        "name": "全部分类",
+        "icon": "📁",
+        "keywords": []
+      },
+      {
+        "id": "web",
+        "name": "Web应用",
+        "icon": "🌐",
+        "keywords": [
+          "web应用",
+          "web",
+          "website",
+          "frontend",
+          "react",
+          "vue",
+          "angular"
+        ]
+      },
+      {
+        "id": "mobile",
+        "name": "移动应用",
+        "icon": "📱",
+        "keywords": [
+          "移动应用",
+          "mobile",
+          "android",
+          "ios",
+          "flutter",
+          "react-native"
+        ]
+      },
+      {
+        "id": "desktop",
+        "name": "桌面应用",
+        "icon": "💻",
+        "keywords": [
+          "桌面应用",
+          "desktop",
+          "electron",
+          "gui",
+          "qt",
+          "gtk"
+        ]
+      },
+      {
+        "id": "database",
+        "name": "数据库",
+        "icon": "🗄️",
+        "keywords": [
+          "数据库",
+          "database",
+          "sql",
+          "nosql",
+          "mongodb",
+          "mysql",
+          "postgresql"
+        ]
+      },
+      {
+        "id": "ai",
+        "name": "AI/机器学习",
+        "icon": "🤖",
+        "keywords": [
+          "ai工具",
+          "ai",
+          "ml",
+          "machine learning",
+          "deep learning",
+          "neural"
+        ]
+      },
+      {
+        "id": "devtools",
+        "name": "开发工具",
+        "icon": "🔧",
+        "keywords": [
+          "开发工具",
+          "tool",
+          "cli",
+          "build",
+          "deploy",
+          "debug",
+          "test",
+          "automation"
+        ]
+      },
+      {
+        "id": "security",
+        "name": "安全工具",
+        "icon": "🛡️",
+        "keywords": [
+          "安全工具",
+          "security",
+          "encryption",
+          "auth",
+          "vulnerability"
+        ]
+      },
+      {
+        "id": "game",
+        "name": "游戏",
+        "icon": "🎮",
+        "keywords": [
+          "游戏",
+          "game",
+          "gaming",
+          "unity",
+          "unreal",
+          "godot"
+        ]
+      },
+      {
+        "id": "design",
+        "name": "设计工具",
+        "icon": "🎨",
+        "keywords": [
+          "设计工具",
+          "design",
+          "ui",
+          "ux",
+          "graphics",
+          "image"
+        ]
+      },
+      {
+        "id": "productivity",
+        "name": "效率工具",
+        "icon": "⚡",
+        "keywords": [
+          "效率工具",
+          "productivity",
+          "note",
+          "todo",
+          "calendar",
+          "task"
+        ]
+      },
+      {
+        "id": "education",
+        "name": "教育学习",
+        "icon": "📚",
+        "keywords": [
+          "教育学习",
+          "education",
+          "learning",
+          "tutorial",
+          "course"
+        ]
+      },
+      {
+        "id": "social",
+        "name": "社交网络",
+        "icon": "👥",
+        "keywords": [
+          "社交网络",
+          "social",
+          "chat",
+          "messaging",
+          "communication"
+        ]
+      },
+      {
+        "id": "analytics",
+        "name": "数据分析",
+        "icon": "📊",
+        "keywords": [
+          "数据分析",
+          "analytics",
+          "data",
+          "visualization",
+          "chart"
+        ]
+      }
+    ],
+    "en": [
+      {
+        "id": "all",
+        "name": "All Categories",
+        "icon": "📁",
+        "keywords": []
+      },
+      {
+        "id": "web",
+        "name": "Web Apps",
+        "icon": "🌐",
+        "keywords": [
+          "web应用",
+          "web",
+          "website",
+          "frontend",
+          "react",
+          "vue",
+          "angular"
+        ]
+      },
+      {
+        "id": "mobile",
+        "name": "Mobile Apps",
+        "icon": "📱",
+        "keywords": [
+          "移动应用",
+          "mobile",
+          "android",
+          "ios",
+          "flutter",
+          "react-native"
+        ]
+      },
+      {
+        "id": "desktop",
+        "name": "Desktop Apps",
+        "icon": "💻",
+        "keywords": [
+          "桌面应用",
+          "desktop",
+          "electron",
+          "gui",
+          "qt",
+          "gtk"
+        ]
+      },
+      {
+        "id": "database",
+        "name": "Database",
+        "icon": "🗄️",
+        "keywords": [
+          "数据库",
+          "database",
+          "sql",
+          "nosql",
+          "mongodb",
+          "mysql",
+          "postgresql"
+        ]
+      },
+      {
+        "id": "ai",
+        "name": "AI/Machine Learning",
+        "icon": "🤖",
+        "keywords": [
+          "ai工具",
+          "ai",
+          "ml",
+          "machine learning",
+          "deep learning",
+          "neural"
+        ]
+      },
+      {
+        "id": "devtools",
+        "name": "Development Tools",
+        "icon": "🔧",
+        "keywords": [
+          "开发工具",
+          "tool",
+          "cli",
+          "build",
+          "deploy",
+          "debug",
+          "test",
+          "automation"
+        ]
+      },
+      {
+        "id": "security",
+        "name": "Security Tools",
+        "icon": "🛡️",
+        "keywords": [
+          "安全工具",
+          "security",
+          "encryption",
+          "auth",
+          "vulnerability"
+        ]
+      },
+      {
+        "id": "game",
+        "name": "Games",
+        "icon": "🎮",
+        "keywords": [
+          "游戏",
+          "game",
+          "gaming",
+          "unity",
+          "unreal",
+          "godot"
+        ]
+      },
+      {
+        "id": "design",
+        "name": "Design Tools",
+        "icon": "🎨",
+        "keywords": [
+          "设计工具",
+          "design",
+          "ui",
+          "ux",
+          "graphics",
+          "image"
+        ]
+      },
+      {
+        "id": "productivity",
+        "name": "Productivity Tools",
+        "icon": "⚡",
+        "keywords": [
+          "效率工具",
+          "productivity",
+          "note",
+          "todo",
+          "calendar",
+          "task"
+        ]
+      },
+      {
+        "id": "education",
+        "name": "Education",
+        "icon": "📚",
+        "keywords": [
+          "教育学习",
+          "education",
+          "learning",
+          "tutorial",
+          "course"
+        ]
+      },
+      {
+        "id": "social",
+        "name": "Social Network",
+        "icon": "👥",
+        "keywords": [
+          "社交网络",
+          "social",
+          "chat",
+          "messaging",
+          "communication"
+        ]
+      },
+      {
+        "id": "analytics",
+        "name": "Data Analytics",
+        "icon": "📊",
+        "keywords": [
+          "数据分析",
+          "analytics",
+          "data",
+          "visualization",
+          "chart"
+        ]
+      }
+    ]
+  },
+  "translateCategoryName": {
+    "inputs": [
+      "全部分类",
+      "Web应用",
+      "移动应用",
+      "桌面应用",
+      "数据库",
+      "AI/机器学习",
+      "开发工具",
+      "安全工具",
+      "游戏",
+      "设计工具",
+      "效率工具",
+      "教育学习",
+      "社交网络",
+      "数据分析"
+    ],
+    "outputs": [
+      "All Categories",
+      "Web Apps",
+      "Mobile Apps",
+      "Desktop Apps",
+      "Database",
+      "AI/Machine Learning",
+      "Development Tools",
+      "Security Tools",
+      "Games",
+      "Design Tools",
+      "Productivity Tools",
+      "Education",
+      "Social Network",
+      "Data Analytics"
+    ]
+  },
+  "categoryNameVariants": {
+    "devtools": [
+      "开发工具",
+      "Development Tools",
+      "開発ツール",
+      "Herramientas de desarrollo",
+      "Ferramentas de desenvolvimento",
+      "Инструменты разработки",
+      "開發工具",
+      "Outils de développement",
+      "Entwicklungstools",
+      "개발 도구"
+    ],
+    "web": [
+      "Web应用",
+      "Web Apps",
+      "Webアプリ",
+      "Aplicaciones web",
+      "Aplicativos web",
+      "Веб-приложения",
+      "網頁應用",
+      "Applications web",
+      "Web-Apps",
+      "웹 앱"
+    ],
+    "untouchedCustomName": [
+      "My Tools"
+    ],
+    "withOverride": [
+      "开发工具",
+      "Development Tools",
+      "開発ツール",
+      "Herramientas de desarrollo",
+      "Ferramentas de desenvolvimento",
+      "Инструменты разработки",
+      "開發工具",
+      "Outils de développement",
+      "Entwicklungstools",
+      "개발 도구",
+      "My Tools"
+    ]
+  },
+  "matchesCategory": {
+    "lockedZhName_vs_zhWeb": true,
+    "lockedZhName_vs_enWeb": true,
+    "lockedEnName_vs_enWeb": true,
+    "lockedEnName_vs_zhWeb": true,
+    "lockedCustomExactName": true,
+    "emptyCustomCategory_vs_zhWeb": false,
+    "zhAiTags_vs_zhDevtools": true,
+    "enAiTags_vs_enDevtools": true,
+    "enAiTags_vs_zhDevtools": true,
+    "effectiveCustomTagsBeatAiTags": true,
+    "repoTextFallback_vs_enDesktop": true
+  },
+  "resolveCategoryAssignment": {
+    "customHit_returnsName": "部署",
+    "lockedKept_whenValid": "部署",
+    "emptyCleared_kept": ""
+  },
+  "computeCustomCategory": {
+    "empty": "",
+    "otherwise": "My Tools"
+  }
+}

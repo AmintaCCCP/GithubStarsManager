@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../../../i18n/useT';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Release, ReleaseAsset, Repository } from '../../../types';
@@ -109,7 +114,7 @@ const downloadBrowserBlob = (blob: Blob, fileName: string) => {
 
 export const useRepositoryReleaseSheet = (repository: Repository) => {
   const {
-    language,
+
     githubToken,
     rpcDownloadConfig,
   } = useAppStore(useShallow((state) => ({
@@ -132,7 +137,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
   // 同样使用版本化 key，与 RPC 状态合并后对外暴露。
   const [browserDownloadStates, setBrowserDownloadStates] = useState<Record<string, 'idle' | 'sending'>>({});
   const fetchAbortRef = useRef<AbortController | null>(null);
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('repositories');
 
   const cancelPendingRequests = useCallback(() => {
     fetchAbortRef.current?.abort();
@@ -192,7 +197,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
 
       if (liveReleases === null) {
         if (!githubToken) {
-          throw backendError || new Error(t('请先在设置中配置 GitHub Token，或连接后端服务。', 'Configure a GitHub token in Settings or connect the backend service first.'));
+          throw backendError || new Error(t('useRepositoryReleaseSheet.configure-a-github-token-in-settings-or-connect'));
         }
         const githubApi = new GitHubApiService(githubToken);
         liveReleases = await fetchAllPages(
@@ -241,7 +246,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
           },
         });
         if (!response.ok) {
-          throw new Error(`${t('下载失败', 'Download failed')} (${response.status})`);
+          throw new Error(`${t('useRepositoryReleaseSheet.download-failed')} (${response.status})`);
         }
         blob = await response.blob();
       } else if (!shouldBypassBackend() && backend.isAvailable && link.authenticatedPath) {
@@ -255,7 +260,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
       setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
     } catch (downloadError) {
       setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
-      toast(`${t('下载失败', 'Download failed')}: ${getErrorMessage(downloadError)}`, 'error');
+      toast(`${t('useRepositoryReleaseSheet.download-failed')}: ${getErrorMessage(downloadError)}`, 'error');
     }
   }, [browserDownloadStates, githubToken, rpcDownloadConfig.enabled, sendAssetToRpc, t, toast]);
 

@@ -1,3 +1,4 @@
+import type { AppLanguage } from '../../../i18n/languages';
 import { useEffect, useRef, useState } from 'react';
 import type { RepositoryChatMessage } from '../../../types/repositoryChat';
 
@@ -7,7 +8,7 @@ export type TurnAnnouncementStatus = '' | RepositoryChatMessage['status'];
  * 仅在回答由流式进入终态时产出一次性的屏幕阅读器通报文本。
  * 进入流式状态时先清空旧通报，保证连续两轮回答完成时同一文案也能再次播报。
  */
-export const useTurnStatusAnnouncement = (lastAssistantStatus: TurnAnnouncementStatus, language: 'zh' | 'en'): string => {
+export const useTurnStatusAnnouncement = (lastAssistantStatus: TurnAnnouncementStatus, language: AppLanguage): string => {
   const [announcement, setAnnouncement] = useState('');
   const previousStatusRef = useRef<TurnAnnouncementStatus>('');
 

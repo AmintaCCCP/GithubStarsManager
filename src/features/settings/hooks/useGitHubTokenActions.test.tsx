@@ -1,3 +1,4 @@
+import { makeT } from '../../../i18n/useT';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGitHubTokenActions } from './useGitHubTokenActions';
@@ -39,7 +40,7 @@ describe('useGitHubTokenActions', () => {
   });
 
   it('updates the token for the same GitHub user without logging out', async () => {
-    const { result } = renderHook(() => useGitHubTokenActions({ t: (zh) => zh }));
+    const { result } = renderHook(() => useGitHubTokenActions({ t: makeT('zh', 'settings') }));
     act(() => result.current.setTokenInput('ghp_new'));
 
     await act(async () => {
@@ -54,7 +55,7 @@ describe('useGitHubTokenActions', () => {
 
   it('refuses a token that belongs to a different GitHub account', async () => {
     mocks.getCurrentUser.mockResolvedValue({ id: 2, login: 'other', name: 'Other', avatar_url: '', email: null });
-    const { result } = renderHook(() => useGitHubTokenActions({ t: (zh) => zh }));
+    const { result } = renderHook(() => useGitHubTokenActions({ t: makeT('zh', 'settings') }));
     act(() => result.current.setTokenInput('ghp_other'));
 
     await act(async () => {

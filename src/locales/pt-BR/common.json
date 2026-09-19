@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "Token GitHub não encontrado, faça login novamente.",
+    "fork-owner-not-found-please-login-again": "Proprietário do armazém Fork não encontrado, faça login novamente.",
+    "refresh-completed-found-newcount-new-forks": "Atualização concluída! {{newCount}} novos garfos encontrados.",
+    "refresh-completed": "Atualização concluída!",
+    "fork-refresh-failed-please-check-your-network-co": "Falha na atualização do fork. Verifique a conexão de rede.",
+    "failed-to-load-branches-please-check-your-networ": "Falha ao carregar a ramificação. Verifique a conexão de rede e tente novamente.",
+    "v1-is-already-up-to-date": "{{v1}} já é a versão mais recente e não precisa ser atualizado.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} foi atualizado com sucesso para a versão upstream mais recente.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} não é um armazém Fork e não pode ser sincronizado upstream.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "Falha na sincronização: {{v1}} tem um conflito de mesclagem com o warehouse upstream. Resolva o problema manualmente e tente novamente.",
+    "sync-failed-message": "Falha na sincronização: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "O fluxo de trabalho \"{{workflowName}}\" foi acionado na ramificação {{branch}}.",
+    "failed-to-run-workflow": "Falha ao executar o fluxo de trabalho.",
+    "failed-to-load-organizations-please-check-github": "Falha ao carregar a lista da organização. Verifique as permissões do token GitHub."
+  }
+}

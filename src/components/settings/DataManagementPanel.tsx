@@ -1,3 +1,6 @@
+
+import { TranslateFn } from '../../i18n/useT';
+import type { AppLanguage } from '../../i18n/languages';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -77,7 +80,7 @@ import {
 } from '../../utils/releaseSources';
 
 interface DataManagementPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 type DeleteOperation =
@@ -134,7 +137,7 @@ interface ExportData {
     categoryOrder?: string[];
     theme?: 'light' | 'dark';
     themePreset?: ThemePresetId;
-    language?: 'zh' | 'en';
+    language?: AppLanguage;
     isSidebarCollapsed?: boolean;
     releaseViewMode?: 'timeline' | 'repository';
     releaseSelectedFilters?: string[];
@@ -296,17 +299,17 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     fileName: string;
   }>({ data: null, isOpen: false, fileName: '' });
   const exportItems = useMemo(() => [
-    { key: 'repositories', label: t('仓库数据', 'Repositories') },
-    { key: 'releases', label: t('Release数据', 'Releases') },
-    { key: 'aiConfigs', label: t('AI配置', 'AI Configs') },
-    { key: 'webdavConfigs', label: t('WebDAV配置', 'WebDAV Configs') },
-    { key: 'customCategories', label: t('分类设置', 'Categories') },
-    { key: 'assetFilters', label: t('资源过滤器', 'Asset Filters') },
-    { key: 'discoveryRepos', label: t('发现页数据', 'Discovery Data') },
-    { key: 'subscriptionRepos', label: t('订阅页数据', 'Subscription Data') },
-    { key: 'releaseSubscriptions', label: t('Release订阅', 'Release Subscriptions') },
-    { key: 'searchFilters', label: t('搜索过滤器', 'Search Filters') },
-    { key: 'uiSettings', label: t('UI设置', 'UI Settings') },
+    { key: 'repositories', label: t('dataManagementPanel.repositories') },
+    { key: 'releases', label: t('dataManagementPanel.releases') },
+    { key: 'aiConfigs', label: t('dataManagementPanel.ai-configs') },
+    { key: 'webdavConfigs', label: t('dataManagementPanel.webdav-configs') },
+    { key: 'customCategories', label: t('dataManagementPanel.categories') },
+    { key: 'assetFilters', label: t('dataManagementPanel.asset-filters') },
+    { key: 'discoveryRepos', label: t('dataManagementPanel.discovery-data') },
+    { key: 'subscriptionRepos', label: t('dataManagementPanel.subscription-data') },
+    { key: 'releaseSubscriptions', label: t('dataManagementPanel.release-subscriptions') },
+    { key: 'searchFilters', label: t('dataManagementPanel.search-filters') },
+    { key: 'uiSettings', label: t('dataManagementPanel.ui-settings') },
   ], [t]);
   const [selectedExportTypes, setSelectedExportTypes] = useState<string[]>(() => exportItems.map((item) => item.key));
 
@@ -375,15 +378,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteRepositories = async () => {
     try {
       setRepositories([], { allowEmpty: true });
-      addLog(t('删除 Stars 仓库数据', 'Delete Stars repositories'), true);
-      showSuccess(t('Stars 仓库数据已删除', 'Stars repositories deleted'));
+      addLog(t('dataManagementPanel.delete-stars-repositories'), true);
+      showSuccess(t('dataManagementPanel.stars-repositories-deleted'));
     } catch (error) {
       addLog(
-        t('删除 Stars 仓库数据', 'Delete Stars repositories'),
+        t('dataManagementPanel.delete-stars-repositories'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -391,15 +394,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteReleases = async () => {
     try {
       setReleases([], { allowEmpty: true });
-      addLog(t('删除 Release 发布记录', 'Delete Release records'), true);
-      showSuccess(t('Release 发布记录已删除', 'Release records deleted'));
+      addLog(t('dataManagementPanel.delete-release-records'), true);
+      showSuccess(t('dataManagementPanel.release-records-deleted'));
     } catch (error) {
       addLog(
-        t('删除 Release 发布记录', 'Delete Release records'),
+        t('dataManagementPanel.delete-release-records'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -409,15 +412,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const store = useAppStore.getState();
       store.setAIConfigs([]);
       store.setActiveAIConfig(null);
-      addLog(t('删除 AI 服务配置', 'Delete AI service configs'), true);
-      showSuccess(t('AI 服务配置已删除', 'AI service configs deleted'));
+      addLog(t('dataManagementPanel.delete-ai-service-configs'), true);
+      showSuccess(t('dataManagementPanel.ai-service-configs-deleted'));
     } catch (error) {
       addLog(
-        t('删除 AI 服务配置', 'Delete AI service configs'),
+        t('dataManagementPanel.delete-ai-service-configs'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -427,15 +430,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const store = useAppStore.getState();
       store.setWebDAVConfigs([]);
       store.setActiveWebDAVConfig(null);
-      addLog(t('删除 WebDAV 同步配置', 'Delete WebDAV sync configs'), true);
-      showSuccess(t('WebDAV 同步配置已删除', 'WebDAV sync configs deleted'));
+      addLog(t('dataManagementPanel.delete-webdav-sync-configs'), true);
+      showSuccess(t('dataManagementPanel.webdav-sync-configs-deleted'));
     } catch (error) {
       addLog(
-        t('删除 WebDAV 同步配置', 'Delete WebDAV sync configs'),
+        t('dataManagementPanel.delete-webdav-sync-configs'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -457,15 +460,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         collapsedSidebarCategoryCount: 20,
         isSidebarCollapsed: false
       });
-      addLog(t('删除分类与显示设置', 'Delete category & display settings'), true);
-      showSuccess(t('分类与显示设置已删除', 'Category & display settings deleted'));
+      addLog(t('dataManagementPanel.delete-category-display-settings'), true);
+      showSuccess(t('dataManagementPanel.category-display-settings-deleted'));
     } catch (error) {
       addLog(
-        t('删除分类与显示设置', 'Delete category & display settings'),
+        t('dataManagementPanel.delete-category-display-settings'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -473,15 +476,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const deleteAssetFilters = async () => {
     try {
       useAppStore.setState({ assetFilters: [] });
-      addLog(t('删除资源过滤器预设', 'Delete asset filter presets'), true);
-      showSuccess(t('资源过滤器预设已删除', 'Asset filter presets deleted'));
+      addLog(t('dataManagementPanel.delete-asset-filter-presets'), true);
+      showSuccess(t('dataManagementPanel.asset-filter-presets-deleted'));
     } catch (error) {
       addLog(
-        t('删除资源过滤器预设', 'Delete asset filter presets'),
+        t('dataManagementPanel.delete-asset-filter-presets'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -525,15 +528,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         discoveryIsLoadingMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false },
         discoveryLoadMoreError: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'x-tweet': null, 'telegram': null, 'weekly': null, 'search': null, 'code-search': null },
       });
-      addLog(t('删除发现页缓存数据', 'Delete discovery cache data'), true);
-      showSuccess(t('发现页缓存数据已删除', 'Discovery cache data deleted'));
+      addLog(t('dataManagementPanel.delete-discovery-cache-data'), true);
+      showSuccess(t('dataManagementPanel.discovery-cache-data-deleted'));
     } catch (error) {
       addLog(
-        t('删除发现页缓存数据', 'Delete discovery cache data'),
+        t('dataManagementPanel.delete-discovery-cache-data'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   }, [addLog, showSuccess, showError, t]);
@@ -548,15 +551,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           'trending': [],
         },
       });
-      addLog(t('删除订阅源缓存数据', 'Delete subscription feed cache'), true);
-      showSuccess(t('订阅源缓存数据已删除', 'Subscription feed cache deleted'));
+      addLog(t('dataManagementPanel.delete-subscription-feed-cache'), true);
+      showSuccess(t('dataManagementPanel.subscription-feed-cache-deleted'));
     } catch (error) {
       addLog(
-        t('删除订阅源缓存数据', 'Delete subscription feed cache'),
+        t('dataManagementPanel.delete-subscription-feed-cache'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -568,15 +571,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         releaseSourceSettings: normalizeReleaseSourceSettings(null),
         readReleases: new Set<number>()
       });
-      addLog(t('删除 Release 订阅与已读', 'Delete release subscriptions & read'), true);
-      showSuccess(t('Release 订阅与已读已删除', 'Release subscriptions & read deleted'));
+      addLog(t('dataManagementPanel.delete-release-subscriptions-read'), true);
+      showSuccess(t('dataManagementPanel.release-subscriptions-read-deleted'));
     } catch (error) {
       addLog(
-        t('删除 Release 订阅与已读', 'Delete release subscriptions & read'),
+        t('dataManagementPanel.delete-release-subscriptions-read'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -599,15 +602,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       localStorage.removeItem('github-stars-search-history');
       localStorage.removeItem('lastSearchTime');
       setSearchHistoryVersion(v => v + 1);
-      addLog(t('删除搜索历史记录', 'Delete search history'), true);
-      showSuccess(t('搜索历史记录已删除', 'Search history deleted'));
+      addLog(t('dataManagementPanel.delete-search-history'), true);
+      showSuccess(t('dataManagementPanel.search-history-deleted'));
     } catch (error) {
       addLog(
-        t('删除搜索历史记录', 'Delete search history'),
+        t('dataManagementPanel.delete-search-history'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -705,11 +708,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      addLog(t('导出数据', 'Export data'), true);
-      showSuccess(t('数据导出成功', 'Data exported successfully'));
+      addLog(t('dataManagementPanel.export-data'), true);
+      showSuccess(t('dataManagementPanel.data-exported-successfully'));
     } catch (error) {
-      addLog(t('导出数据', 'Export data'), false, String(error));
-      showError(t('导出失败，请重试', 'Export failed, please try again'));
+      addLog(t('dataManagementPanel.export-data'), false, String(error));
+      showError(t('dataManagementPanel.export-failed-please-try-again'));
     } finally {
       setIsExporting(false);
     }
@@ -726,13 +729,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         const data = JSON.parse(content) as ExportData;
         
         if (!data.version || !data.data) {
-          showError(t('无效的备份文件格式', 'Invalid backup file format'));
+          showError(t('dataManagementPanel.invalid-backup-file-format'));
           return;
         }
 
         setImportPreview({ data, isOpen: true, fileName: file.name });
       } catch {
-        showError(t('解析文件失败，请确保是有效的JSON文件', 'Failed to parse file, ensure it is a valid JSON file'));
+        showError(t('dataManagementPanel.failed-to-parse-file-ensure-it-is-a-valid-json-f'));
       }
     };
     reader.readAsText(file);
@@ -1088,19 +1091,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
 
       // 如果导入的数据包含屏蔽的密钥，提示用户
       if (hasMaskedSecrets(importedData)) {
-        showSuccess(t(
-          '数据导入成功。部分密钥已屏蔽，请在相应配置中重新输入。',
-          'Data imported successfully. Some secrets were masked, please re-enter them in the respective configurations.'
-        ));
+        showSuccess(t('dataManagementPanel.data-imported-successfully-some-secrets-were-mas'));
       } else {
-        showSuccess(t('数据导入成功', 'Data imported successfully'));
+        showSuccess(t('dataManagementPanel.data-imported-successfully'));
       }
 
-      addLog(t('导入数据', 'Import data'), true);
+      addLog(t('dataManagementPanel.import-data'), true);
       setImportPreview({ data: null, isOpen: false, fileName: '' });
     } catch (error) {
-      addLog(t('导入数据', 'Import data'), false, String(error));
-      showError(t('导入失败，请重试', 'Import failed, please try again'));
+      addLog(t('dataManagementPanel.import-data'), false, String(error));
+      showError(t('dataManagementPanel.import-failed-please-try-again'));
     } finally {
       setIsImporting(false);
     }
@@ -1216,14 +1216,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           break;
         }
         case 'unanalyzedRepos':
-          showSuccess(t('未分析仓库无法直接清理，请通过 AI 分析功能处理', 'Unanalyzed repos cannot be cleaned directly. Use AI analysis to process them.'));
+          showSuccess(t('dataManagementPanel.unanalyzed-repos-cannot-be-cleaned-directly-use'));
           return;
       }
-      addLog(t('清理数据', 'Cleanup data'), true);
-      showSuccess(t('数据清理成功', 'Data cleanup successful'));
+      addLog(t('dataManagementPanel.cleanup-data'), true);
+      showSuccess(t('dataManagementPanel.data-cleanup-successful'));
     } catch (error) {
-      addLog(t('清理数据', 'Cleanup data'), false, String(error));
-      showError(t('清理失败，请重试', 'Cleanup failed, please try again'));
+      addLog(t('dataManagementPanel.cleanup-data'), false, String(error));
+      showError(t('dataManagementPanel.cleanup-failed-please-try-again'));
     }
   }, [releases, readReleases, deleteDiscoveryData, addLog, showSuccess, showError, t]);
 
@@ -1237,28 +1237,28 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       try {
         await clearAllStorage();
       } catch (e) {
-        pendingStorages.push(t('主应用存储', 'app storage'));
+        pendingStorages.push(t('dataManagementPanel.app-storage'));
         throw e;
       }
       // 周刊/推文频道数据在独立 IndexedDB，一并清空
       try {
         await weeklyIssuesStorage.clearAll();
       } catch (e) {
-        pendingStorages.push(t('周刊数据', 'weekly data'));
+        pendingStorages.push(t('dataManagementPanel.weekly-data'));
         throw e;
       }
       try {
         await abortXTweetSync();
         await xTweetStorage.clearAll();
       } catch (e) {
-        pendingStorages.push(t('X 推文数据', 'X tweet data'));
+        pendingStorages.push(t('dataManagementPanel.x-tweet-data'));
         throw e;
       }
       try {
         await abortTelegramSync();
         await telegramStorage.clearAll();
       } catch (e) {
-        pendingStorages.push(t('Telegram 频道数据', 'Telegram channel data'));
+        pendingStorages.push(t('dataManagementPanel.telegram-channel-data'));
         throw e;
       }
 
@@ -1324,8 +1324,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         },
       });
 
-      addLog(t('删除所有数据', 'Delete all data'), true);
-      showSuccess(t('所有数据已删除，应用将重新加载', 'All data deleted, app will reload'));
+      addLog(t('dataManagementPanel.delete-all-data'), true);
+      showSuccess(t('dataManagementPanel.all-data-deleted-app-will-reload'));
 
       // Reload page after a short delay
       setTimeout(() => {
@@ -1334,12 +1334,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     } catch (error) {
       addLog(
         pendingStorages.length > 0
-          ? `${t('删除所有数据', 'Delete all data')} (${t('未完成', 'pending')}: ${pendingStorages.join(', ')})`
-          : t('删除所有数据', 'Delete all data'),
+          ? `${t('dataManagementPanel.delete-all-data')} (${t('dataManagementPanel.pending')}: ${pendingStorages.join(', ')})`
+          : t('dataManagementPanel.delete-all-data'),
         false,
         String(error)
       );
-      showError(t('删除失败，请重试', 'Delete failed, please try again'));
+      showError(t('dataManagementPanel.delete-failed-please-try-again'));
       throw error;
     }
   };
@@ -1350,7 +1350,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     // Verify GitHub username for "delete all" operation
     if (confirmation.type === 'all') {
       if (!user || confirmation.githubUsernameInput !== user.login) {
-        showError(t('GitHub用户名验证失败', 'GitHub username verification failed'));
+        showError(t('dataManagementPanel.github-username-verification-failed'));
         return;
       }
     }
@@ -1415,60 +1415,27 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const getDeleteDescription = (type: DeleteOperation): string => {
     switch (type) {
       case 'repositories':
-        return t(
-          '将删除所有 Stars 仓库数据，包括仓库信息、AI 摘要、标签和平台信息。删除后需重新同步 GitHub Stars，此操作不可恢复。',
-          'This will delete all Stars repository data, including AI summaries, tags, and platform info. Re-sync required after deletion. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-stars-repository-data-inclu');
       case 'releases':
-        return t(
-          '将删除所有 Release 发布记录，包括版本说明和资源文件信息。删除后需重新拉取，此操作不可恢复。',
-          'This will delete all Release records, including release notes and asset info. Re-fetch required after deletion. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-release-records-including-r');
       case 'aiConfigs':
-        return t(
-          '将删除所有 AI 服务配置，包括 API 密钥、模型和并发设置。删除后 AI 分析功能将不可用，此操作不可恢复。',
-          'This will delete all AI service configs, including API keys, models, and concurrency. AI analysis unavailable after deletion. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-ai-service-configs-includin');
       case 'webdavConfigs':
-        return t(
-          '将删除所有 WebDAV 同步配置，包括服务器地址和认证信息。删除后云备份与恢复功能将不可用，此操作不可恢复。',
-          'This will delete all WebDAV sync configs, including server addresses and credentials. Cloud backup & restore unavailable after deletion. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-webdav-sync-configs-includi');
       case 'categorySettings':
-        return t(
-          '将删除所有分类与显示设置，包括自定义分类、默认分类覆盖和隐藏分类。删除后侧边栏分类将恢复默认，此操作不可恢复。',
-          'This will delete all category & display settings, including custom categories, overrides, and hidden categories. Sidebar resets to defaults. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-category-display-settings-i');
       case 'assetFilters':
-        return t(
-          '将删除所有资源过滤器预设。删除后需重新创建过滤规则，此操作不可恢复。',
-          'This will delete all asset filter presets. Re-create filter rules after deletion. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-asset-filter-presets-re-cre');
       case 'discoveryData':
-        return t(
-          '将删除发现页各频道的仓库缓存数据。下次访问时将自动重新加载，此操作不可恢复。',
-          'This will delete cached repos from discovery channels. Data auto-refreshes on next visit. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-cached-repos-from-discovery-cha');
       case 'subscriptionData':
-        return t(
-          '将删除订阅源各频道的仓库缓存数据。下次访问时将自动重新加载，此操作不可恢复。',
-          'This will delete cached repos from subscription feeds. Data auto-refreshes on next visit. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-cached-repos-from-subscription');
       case 'releaseSubscriptions':
-        return t(
-          '将删除所有 Release 订阅和已读标记。删除后 Release 时间线将不显示订阅状态和已读标记，此操作不可恢复。',
-          'This will delete all release subscriptions and read marks. Subscription status and read marks lost. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-all-release-subscriptions-and-r');
       case 'searchHistory':
-        return t(
-          '将删除搜索历史关键词和当前筛选条件。删除后搜索建议和筛选状态将清空，此操作不可恢复。',
-          'This will delete search history and current filter settings. Search suggestions and filters cleared. This action cannot be undone.'
-        );
+        return t('dataManagementPanel.this-will-delete-search-history-and-current-filt');
       case 'all':
-        return t(
-          '将删除所有应用程序数据，包括用户数据、GitHub 令牌、所有配置文件等。应用程序将重置为初始状态，此操作不可恢复！',
-          'This will delete ALL application data, including user data, GitHub tokens, and all configs. The app will reset to its initial state. This action cannot be undone!'
-        );
+        return t('dataManagementPanel.this-will-delete-all-application-data-including');
       default:
         return '';
     }
@@ -1477,27 +1444,27 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const getDeleteTitle = (type: DeleteOperation): string => {
     switch (type) {
       case 'repositories':
-        return t('删除 Stars 仓库数据', 'Delete Stars Repositories');
+        return t('dataManagementPanel.delete-stars-repositories-2');
       case 'releases':
-        return t('删除 Release 发布记录', 'Delete Release Records');
+        return t('dataManagementPanel.delete-release-records-2');
       case 'aiConfigs':
-        return t('删除 AI 服务配置', 'Delete AI Service Configs');
+        return t('dataManagementPanel.delete-ai-service-configs-2');
       case 'webdavConfigs':
-        return t('删除 WebDAV 同步配置', 'Delete WebDAV Sync Configs');
+        return t('dataManagementPanel.delete-webdav-sync-configs-2');
       case 'categorySettings':
-        return t('删除分类与显示设置', 'Delete Category & Display Settings');
+        return t('dataManagementPanel.delete-category-display-settings-2');
       case 'assetFilters':
-        return t('删除资源过滤器预设', 'Delete Asset Filter Presets');
+        return t('dataManagementPanel.delete-asset-filter-presets-2');
       case 'discoveryData':
-        return t('删除发现页缓存数据', 'Delete Discovery Cache');
+        return t('dataManagementPanel.delete-discovery-cache');
       case 'subscriptionData':
-        return t('删除订阅源缓存数据', 'Delete Subscription Feed Cache');
+        return t('dataManagementPanel.delete-subscription-feed-cache-2');
       case 'releaseSubscriptions':
-        return t('删除 Release 订阅与已读', 'Delete Release Subscriptions & Read');
+        return t('dataManagementPanel.delete-release-subscriptions-read-2');
       case 'searchHistory':
-        return t('删除搜索历史记录', 'Delete Search History');
+        return t('dataManagementPanel.delete-search-history-2');
       case 'all':
-        return t('删除所有数据', 'Delete All Data');
+        return t('dataManagementPanel.delete-all-data-2');
       default:
         return '';
     }
@@ -1525,9 +1492,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
   const dataStats = [
     {
       key: 'repositories',
-      label: t('Stars 仓库数据', 'Stars Repositories'),
-      description: t('管理的 GitHub Stars 仓库列表，含 AI 摘要、标签和平台信息。删除后需重新同步。',
-        'GitHub Stars repositories with AI summaries, tags, and platform info. Re-sync required after deletion.'),
+      label: t('dataManagementPanel.stars-repositories'),
+      description: t('dataManagementPanel.github-stars-repositories-with-ai-summaries-tags'),
       count: repositories.length,
       icon: <Github className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1535,9 +1501,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'releases',
-      label: t('Release 发布记录', 'Release Records'),
-      description: t('已订阅仓库的 Release 版本信息，含发布说明和资源文件。删除后需重新拉取。',
-        'Release version info for subscribed repos, including notes and assets. Re-fetch required after deletion.'),
+      label: t('dataManagementPanel.release-records'),
+      description: t('dataManagementPanel.release-version-info-for-subscribed-repos-includ'),
       count: releases.length,
       icon: <Tag className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1545,9 +1510,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'aiConfigs',
-      label: t('AI 服务配置', 'AI Service Configs'),
-      description: t('AI 分析服务的连接配置，含 API 密钥、模型和并发设置。删除后 AI 分析功能将不可用。',
-        'AI analysis service configs including API keys, models, and concurrency. AI analysis unavailable after deletion.'),
+      label: t('dataManagementPanel.ai-service-configs'),
+      description: t('dataManagementPanel.ai-analysis-service-configs-including-api-keys-m'),
       count: aiConfigs.length,
       icon: <Bot className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1555,9 +1519,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'webdavConfigs',
-      label: t('WebDAV 同步配置', 'WebDAV Sync Configs'),
-      description: t('WebDAV 云同步的服务器地址和认证信息。删除后云备份与恢复功能将不可用。',
-        'WebDAV server addresses and credentials. Cloud backup & restore unavailable after deletion.'),
+      label: t('dataManagementPanel.webdav-sync-configs'),
+      description: t('dataManagementPanel.webdav-server-addresses-and-credentials-cloud-ba'),
       count: webdavConfigs.length,
       icon: <Cloud className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1565,9 +1528,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'categorySettings',
-      label: t('分类与显示设置', 'Category & Display Settings'),
-      description: t('自定义分类、默认分类覆盖和隐藏分类设置。删除后侧边栏分类将恢复默认。',
-        'Custom categories, default category overrides, and hidden categories. Sidebar resets to defaults after deletion.'),
+      label: t('dataManagementPanel.category-display-settings'),
+      description: t('dataManagementPanel.custom-categories-default-category-overrides-and'),
       count: customCategories.length + Object.keys(defaultCategoryOverrides).length + hiddenDefaultCategoryIds.length,
       icon: <FolderTree className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1575,9 +1537,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'assetFilters',
-      label: t('资源过滤器预设', 'Asset Filter Presets'),
-      description: t('Release 资源文件的筛选规则预设。删除后需重新创建过滤规则。',
-        'Release asset filtering rule presets. Re-create filter rules after deletion.'),
+      label: t('dataManagementPanel.asset-filter-presets'),
+      description: t('dataManagementPanel.release-asset-filtering-rule-presets-re-create-f'),
       count: assetFilters.length,
       icon: <Filter className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1585,9 +1546,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'discoveryData',
-      label: t('发现页缓存数据', 'Discovery Cache'),
-      description: t('发现页各频道的仓库缓存，可安全清理，下次访问时自动刷新。',
-        'Cached repos from discovery channels. Safe to clean — auto-refreshes on next visit.'),
+      label: t('dataManagementPanel.discovery-cache'),
+      description: t('dataManagementPanel.cached-repos-from-discovery-channels-safe-to-cle'),
       count: totalDiscoveryReposCount,
       icon: <Sparkles className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1595,9 +1555,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'subscriptionData',
-      label: t('订阅源缓存数据', 'Subscription Feed Cache'),
-      description: t('订阅页各频道的仓库缓存，可安全清理，下次访问时自动刷新。',
-        'Cached repos from subscription feeds. Safe to clean — auto-refreshes on next visit.'),
+      label: t('dataManagementPanel.subscription-feed-cache'),
+      description: t('dataManagementPanel.cached-repos-from-subscription-feeds-safe-to-cle'),
       count: totalSubscriptionReposCount,
       icon: <Rss className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1605,9 +1564,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'releaseSubscriptions',
-      label: t('Release 订阅与已读', 'Release Subscriptions & Read'),
-      description: t('已订阅 Release 的仓库列表、来源设置和已读标记。删除后 Release 时间线将不显示订阅状态和已读标记。',
-        'Subscribed repo list, source settings, and read marks for releases. Subscription status and read marks lost after deletion.'),
+      label: t('dataManagementPanel.release-subscriptions-read'),
+      description: t('dataManagementPanel.subscribed-repo-list-source-settings-and-read-ma'),
       count: releaseSubscriptions.size + releaseSourceSettings.watchCustomReleaseRepos.length + releaseSourceSettings.customReleaseRepos.length,
       icon: <Eye className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1615,9 +1573,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     },
     {
       key: 'searchHistory',
-      label: t('搜索历史记录', 'Search History'),
-      description: t('搜索栏的历史关键词和当前筛选条件。删除后搜索建议和筛选状态将清空。',
-        'Search bar history and current filter settings. Search suggestions and filters cleared after deletion.'),
+      label: t('dataManagementPanel.search-history'),
+      description: t('dataManagementPanel.search-bar-history-and-current-filter-settings-s'),
       count: searchHistoryCount,
       icon: <Search className="w-5 h-5" />,
       color: 'text-muted-foreground dark:text-muted-foreground',
@@ -1647,7 +1604,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       <section>
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
           <Database className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
-          {t('数据概览', 'Data Overview')}
+          {t('dataManagementPanel.data-overview')}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {dataStats.map((stat) => (
@@ -1677,7 +1634,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       <section>
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
           <HardDrive className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
-          {t('数据导出与导入', 'Data Export & Import')}
+          {t('dataManagementPanel.data-export-import')}
         </h3>
 
         {/* Include Keys Toggle - Independent Container */}
@@ -1693,8 +1650,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <Download className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-foreground dark:text-foreground">{t('导出数据', 'Export Data')}</h4>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('将数据导出为JSON文件', 'Export data to JSON file')}</p>
+                <h4 className="font-medium text-foreground dark:text-foreground">{t('dataManagementPanel.export-data-2')}</h4>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('dataManagementPanel.export-data-to-json-file')}</p>
               </div>
             </div>
 
@@ -1719,7 +1676,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             <Button
               onClick={() => {
                 if (selectedExportTypes.length === 0) {
-                  showError(t('请至少选择一项数据类型', 'Please select at least one data type'));
+                  showError(t('dataManagementPanel.please-select-at-least-one-data-type'));
                   return;
                 }
                 exportData(selectedExportTypes);
@@ -1730,12 +1687,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               {isExporting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t('导出中…', 'Exporting…')}</span>
+                  <span>{t('dataManagementPanel.exporting')}</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  <span>{t('导出选中数据', 'Export Selected')}</span>
+                  <span>{t('dataManagementPanel.export-selected')}</span>
                 </>
               )}
             </Button>
@@ -1748,21 +1705,21 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <Upload className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-medium text-foreground dark:text-foreground">{t('导入数据', 'Import Data')}</h4>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('从JSON文件导入数据', 'Import data from JSON file')}</p>
+                <h4 className="font-medium text-foreground dark:text-foreground">{t('dataManagementPanel.import-data-2')}</h4>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground">{t('dataManagementPanel.import-data-from-json-file')}</p>
               </div>
             </div>
             <div className="border-2 border-dashed border-border dark:border-border rounded-lg p-6 text-center">
               <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground/70 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-2">
-                {t('点击选择文件或拖拽文件到此处', 'Click to select or drag file here')}
+                {t('dataManagementPanel.click-to-select-or-drag-file-here')}
               </p>
               <Input type="file" accept=".json" onChange={handleImportFile} className="peer sr-only" id="import-file-input" />
               <label
                 htmlFor="import-file-input"
                 className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
               >
-                {t('选择文件', 'Select File')}
+                {t('dataManagementPanel.select-file')}
               </label>
             </div>
           </div>
@@ -1774,11 +1731,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         <section>
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
             <RefreshCw className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
-            {t('数据清理建议', 'Data Cleanup Suggestions')}
+            {t('dataManagementPanel.data-cleanup-suggestions')}
           </h3>
           <div className="bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg p-4 mb-4">
             <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-              {t('以下数据可以安全清理以释放存储空间，不会影响核心功能。', 'The following data can be safely cleaned to free up storage without affecting core functionality.')}
+              {t('dataManagementPanel.the-following-data-can-be-safely-cleaned-to-free')}
             </p>
           </div>
           <div className="space-y-3">
@@ -1802,13 +1759,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 </div>
                 <div className="flex items-center space-x-3">
                   <span className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
-                    {suggestion.count} {t('条', 'items')}
+                    {suggestion.count} {t('dataManagementPanel.items')}
                   </span>
                   <Button
                     onClick={() => handleCleanup(suggestion.key)}
                     className="px-3 py-1.5 text-sm font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors"
                   >
-                    {t('清理', 'Clean')}
+                    {t('dataManagementPanel.clean')}
                   </Button>
                 </div>
               </div>
@@ -1821,7 +1778,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       <section>
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
           <Trash2 className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground " />
-          {t('选择性删除数据', 'Selective Data Deletion')}
+          {t('dataManagementPanel.selective-data-deletion')}
         </h3>
         <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
           <div className="divide-y divide-border/60 dark:divide-border">
@@ -1840,7 +1797,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       {stat.description}
                     </p>
                     <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 mt-1">
-                      {stat.count} {t('条记录', 'records')}
+                      {stat.count} {t('dataManagementPanel.records')}
                     </p>
                   </div>
                 </div>
@@ -1851,7 +1808,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-accent dark:hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span>{t('删除', 'Delete')}</span>
+                  <span>{t('dataManagementPanel.delete')}</span>
                 </Button>
               </div>
             ))}
@@ -1863,7 +1820,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       <section>
         <h3 className="text-lg font-semibold text-destructive mb-4 flex items-center">
           <AlertTriangle className="w-5 h-5 mr-2" />
-          {t('危险区域', 'Danger Zone')}
+          {t('dataManagementPanel.danger-zone')}
         </h3>
         <Card className="border-destructive/40 py-5">
           <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -1872,13 +1829,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             </div>
             <div className="min-w-0 flex-1">
               <h4 className="text-base font-semibold text-foreground dark:text-foreground">
-                {t('删除所有数据', 'Delete All Data')}
+                {t('dataManagementPanel.delete-all-data-2')}
               </h4>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground dark:text-muted-foreground">
-                {t(
-                  '此操作将永久删除所有应用程序数据，包括所有用户数据、GitHub令牌、配置文件等。应用程序将重置为初始状态。此操作不可恢复！',
-                  'This will permanently delete ALL application data, including all user data, GitHub tokens, configuration files, etc. The application will be reset to its initial state. This action cannot be undone!'
-                )}
+                {t('dataManagementPanel.this-will-permanently-delete-all-application-dat')}
               </p>
               <Button
                 variant="destructive"
@@ -1887,7 +1841,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 className="mt-4"
               >
                 <Trash2 />
-                <span>{t('删除所有数据', 'Delete All Data')}</span>
+                <span>{t('dataManagementPanel.delete-all-data-2')}</span>
               </Button>
             </div>
           </CardContent>
@@ -1898,7 +1852,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       {operationLogs.length > 0 && (
         <section>
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4">
-            {t('操作日志', 'Operation Logs')}
+            {t('dataManagementPanel.operation-logs')}
           </h3>
           <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border overflow-hidden">
             <div className="max-h-64 overflow-y-auto">
@@ -1906,13 +1860,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <thead className="bg-background dark:bg-muted/40 sticky top-0">
                   <tr>
                     <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
-                      {t('时间', 'Time')}
+                      {t('dataManagementPanel.time')}
                     </th>
                     <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
-                      {t('操作', 'Operation')}
+                      {t('dataManagementPanel.operation')}
                     </th>
                     <th className="px-4 py-2 text-left text-muted-foreground dark:text-muted-foreground">
-                      {t('状态', 'Status')}
+                      {t('dataManagementPanel.status')}
                     </th>
                   </tr>
                 </thead>
@@ -1927,12 +1881,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                         {log.success ? (
                           <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-muted-foreground dark:text-muted-foreground bg-muted dark:bg-muted/40 rounded-full">
                             <CheckCircle className="w-3 h-3 mr-1" />
-                            {t('成功', 'Success')}
+                            {t('dataManagementPanel.success')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-muted-foreground dark:text-muted-foreground bg-destructive/10 dark:bg-destructive/20 rounded-full">
                             <XCircle className="w-3 h-3 mr-1" />
-                            {t('失败', 'Failed')}
+                            {t('dataManagementPanel.failed')}
                           </span>
                         )}
                       </td>
@@ -1974,10 +1928,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               {confirmation.type === 'all' && user && (
                 <div className="space-y-2">
                   <label htmlFor="delete-all-github-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground">
-                    {t(
-                      '请输入您的GitHub用户名以确认此操作：',
-                      'Please enter your GitHub username to confirm this action:'
-                    )}
+                    {t('dataManagementPanel.please-enter-your-github-username-to-confirm-thi')}
                     <span className="ml-2 font-mono text-muted-foreground dark:text-muted-foreground">
                       {user.login}
                     </span>
@@ -1992,7 +1943,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                         githubUsernameInput: e.target.value,
                       }))
                     }
-                    placeholder={t('输入GitHub用户名', 'Enter GitHub username')}
+                    placeholder={t('dataManagementPanel.enter-github-username')}
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring dark:bg-muted/40 dark:text-foreground"
                   />
                 </div>
@@ -2004,7 +1955,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 disabled={isDeleting}
                 className="flex-1 bg-muted text-foreground hover:bg-accent dark:bg-muted/40 dark:text-muted-foreground dark:hover:bg-accent"
               >
-                {t('取消', 'Cancel')}
+                {t('dataManagementPanel.cancel')}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={(event) => {
@@ -2021,12 +1972,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 {isDeleting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{t('删除中…', 'Deleting…')}</span>
+                    <span>{t('dataManagementPanel.deleting')}</span>
                   </>
                 ) : (
                   <>
                     <Trash2 className="h-4 w-4" />
-                    <span>{t('确认删除', 'Confirm Delete')}</span>
+                    <span>{t('dataManagementPanel.confirm-delete')}</span>
                   </>
                 )}
               </AlertDialogAction>
@@ -2046,55 +1997,55 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             }
           }}
         >
-          <DialogContent className="max-w-lg" closeLabel={t('关闭', 'Close')}>
+          <DialogContent className="max-w-lg" closeLabel={t('dataManagementPanel.close')}>
             <DialogHeader className="rounded-lg bg-background dark:bg-card">
               <DialogTitle className="flex items-center gap-3 text-muted-foreground">
                 <Upload className="h-6 w-6" />
-                {t('导入数据预览', 'Import Data Preview')}
+                {t('dataManagementPanel.import-data-preview')}
               </DialogTitle>
               <DialogDescription>
-                {t('确认备份文件内容后选择导入方式。', 'Review the backup contents before choosing an import mode.')}
+                {t('dataManagementPanel.review-the-backup-contents-before-choosing-an-im')}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
               <div className="text-sm text-muted-foreground dark:text-muted-foreground">
-                <p><strong>{t('文件名:', 'File:')}</strong> {importPreview.fileName}</p>
-                <p><strong>{t('导出日期:', 'Export Date:')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
-                <p><strong>{t('版本:', 'Version:')}</strong> {importPreview.data.appVersion}</p>
+                <p><strong>{t('dataManagementPanel.file')}</strong> {importPreview.fileName}</p>
+                <p><strong>{t('dataManagementPanel.export-date')}</strong> {new Date(importPreview.data.exportDate).toLocaleString()}</p>
+                <p><strong>{t('dataManagementPanel.version')}</strong> {importPreview.data.appVersion}</p>
               </div>
 
               <div className="border-t border-border dark:border-border pt-4">
-                <p className="text-sm font-medium text-foreground dark:text-muted-foreground mb-2">{t('包含的数据:', 'Included Data:')}</p>
+                <p className="text-sm font-medium text-foreground dark:text-muted-foreground mb-2">{t('dataManagementPanel.included-data')}</p>
                 <div className="space-y-1 text-sm">
                   {importPreview.data.data.repositories && (
                     <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('仓库数据', 'Repositories')}: {importPreview.data.data.repositories.length} {t('条', 'items')}
+                      • {t('dataManagementPanel.repositories')}: {importPreview.data.data.repositories.length} {t('dataManagementPanel.items')}
                     </p>
                   )}
                   {importPreview.data.data.releases && (
                     <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('Release数据', 'Releases')}: {importPreview.data.data.releases.length} {t('条', 'items')}
+                      • {t('dataManagementPanel.releases')}: {importPreview.data.data.releases.length} {t('dataManagementPanel.items')}
                     </p>
                   )}
                   {importPreview.data.data.aiConfigs && (
                     <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('AI配置', 'AI Configs')}: {importPreview.data.data.aiConfigs.length} {t('条', 'items')}
+                      • {t('dataManagementPanel.ai-configs')}: {importPreview.data.data.aiConfigs.length} {t('dataManagementPanel.items')}
                     </p>
                   )}
                   {importPreview.data.data.webdavConfigs && (
                     <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('WebDAV配置', 'WebDAV Configs')}: {importPreview.data.data.webdavConfigs.length} {t('条', 'items')}
+                      • {t('dataManagementPanel.webdav-configs')}: {importPreview.data.data.webdavConfigs.length} {t('dataManagementPanel.items')}
                     </p>
                   )}
                   {importPreview.data.data.customCategories && (
                     <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('分类设置', 'Categories')}: {importPreview.data.data.customCategories.length} {t('条', 'items')}
+                      • {t('dataManagementPanel.categories')}: {importPreview.data.data.customCategories.length} {t('dataManagementPanel.items')}
                     </p>
                   )}
                   {importPreview.data.data.assetFilters && (
                     <p className="text-muted-foreground dark:text-muted-foreground">
-                      • {t('资源过滤器', 'Asset Filters')}: {importPreview.data.data.assetFilters.length} {t('条', 'items')}
+                      • {t('dataManagementPanel.asset-filters')}: {importPreview.data.data.assetFilters.length} {t('dataManagementPanel.items')}
                     </p>
                   )}
                 </div>
@@ -2105,10 +2056,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 <div className="flex items-start space-x-3 text-warning bg-warning/10 p-4 rounded-lg border border-warning/30">
                   <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p className="text-sm">
-                    {t(
-                      '警告：此备份中的部分密钥已被屏蔽。导入后请在相应配置中重新输入密钥。',
-                      'Warning: Some secrets in this backup are masked. Please re-enter them in the respective configurations after import.'
-                    )}
+                    {t('dataManagementPanel.warning-some-secrets-in-this-backup-are-masked-p')}
                   </p>
                 </div>
               )}
@@ -2120,7 +2068,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   disabled={isImporting}
                   className="flex-1 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
                 >
-                  {t('取消', 'Cancel')}
+                  {t('dataManagementPanel.cancel')}
                 </Button>
                 <Button
                   onClick={() => {
@@ -2132,10 +2080,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   {isImporting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{t('导入中…', 'Importing…')}</span>
+                      <span>{t('dataManagementPanel.importing')}</span>
                     </>
                   ) : (
-                    <span>{t('合并导入', 'Merge Import')}</span>
+                    <span>{t('dataManagementPanel.merge-import')}</span>
                   )}
                 </Button>
                 <Button
@@ -2149,10 +2097,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                   {isImporting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{t('导入中…', 'Importing…')}</span>
+                      <span>{t('dataManagementPanel.importing')}</span>
                     </>
                   ) : (
-                    <span>{t('覆盖导入', 'Replace Import')}</span>
+                    <span>{t('dataManagementPanel.replace-import')}</span>
                   )}
                 </Button>
               </DialogFooter>

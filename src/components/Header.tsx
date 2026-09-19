@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
 import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X } from 'lucide-react';
 import { Button } from './ui/button';
@@ -30,7 +35,7 @@ export const Header: React.FC = () => {
     setTheme,
     setCurrentView,
     logout,
-    language,
+
   } = useAppStore(useShallow((state) => ({
     user: state.user,
     theme: state.theme,
@@ -53,7 +58,7 @@ export const Header: React.FC = () => {
     [headerMenuConfig]
   );
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
 
   return (
     <header className="linear-header sticky top-0 z-50 hd-drag lg:hd-drag relative">
@@ -86,9 +91,9 @@ export const Header: React.FC = () => {
           {/* Navigation - Desktop & Tablet (≥768px) */}
           <nav className="hidden items-center gap-1 hd-btns md:flex lg:hd-btns">
             {visibleMenus.map(menuItem => {
-              const meta = MENU_META[menuItem.id];
+                        const meta = MENU_META[menuItem.id];
               const Icon = meta.icon;
-              const label = t(meta.labelZh, meta.labelEn);
+              const label = t(`header.menu-${menuItem.id}`);
               const isActive = currentView === menuItem.id;
               return (
                 <Button
@@ -117,14 +122,14 @@ export const Header: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 className="md:hidden"
-                aria-label={t('菜单', 'Menu')}
+                aria-label={t('header.menu')}
               >
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 md:hidden">
               {visibleMenus.map(menuItem => {
-                const meta = MENU_META[menuItem.id];
+                            const meta = MENU_META[menuItem.id];
                 const Icon = meta.icon;
                 const isActive = currentView === menuItem.id;
                 return (
@@ -138,7 +143,7 @@ export const Header: React.FC = () => {
                     className={isActive ? 'bg-muted dark:bg-accent' : undefined}
                   >
                     <Icon className="mr-3 h-4 w-4" />
-                    {t(meta.labelZh, meta.labelEn)}
+                    {t(`header.menu-${menuItem.id}`)}
                   </DropdownMenuItem>
                 );
               })}
@@ -155,12 +160,12 @@ export const Header: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                  aria-label={t('切换主题', 'Toggle theme')}
+                  aria-label={t('header.toggle-theme')}
                 >
                   {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{t('切换主题', 'Toggle theme')}</TooltipContent>
+              <TooltipContent>{t('header.toggle-theme')}</TooltipContent>
             </Tooltip>
 
             {/* User Profile */}
@@ -184,22 +189,20 @@ export const Header: React.FC = () => {
                       size="icon"
                       onClick={async () => {
                         const confirmed = await confirm(
-                          t('退出登录确认', 'Logout Confirmation'),
-                          language === 'zh'
-                            ? '退出后仅清除登录凭证。仓库、AI 分析和分类等本地数据会保留；同一 GitHub 账号换 token 再登录会自动继承。如需完全清除所有数据，请前往「设置 → 数据管理」。'
-                            : 'Logout only clears credentials. Repositories, AI analysis, and categories stay on this device; signing back in with the same GitHub account (even a new token) restores them. To completely clear all data, go to Settings → Data Management.',
+                          t('header.logout-confirmation'),
+                          t('header.logout-only-clears-credentials-repositories-ai-a'),
                           { type: 'warning' }
                         );
                         if (confirmed) {
                           logout();
                         }
                       }}
-                      aria-label={t('退出登录', 'Logout')}
+                      aria-label={t('header.logout')}
                     >
                       <LogOut className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{t('退出登录', 'Logout')}</TooltipContent>
+                  <TooltipContent>{t('header.logout')}</TooltipContent>
                 </Tooltip>
               </div>
             )}

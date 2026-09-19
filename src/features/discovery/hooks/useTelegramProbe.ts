@@ -1,6 +1,10 @@
+
+
+
+
+import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { probeTelegramSource } from '../../../services/telegramService';
-import { useAppStore } from '../../../store/useAppStore';
 
 /**
  * Telegram 频道"测试连接"的编排 hook：真实抓取一个频道最新页并解析，
@@ -8,6 +12,7 @@ import { useAppStore } from '../../../store/useAppStore';
  */
 export const useTelegramProbe = () => {
   const [isProbing, setIsProbing] = useState(false);
+  const t = useT('discovery');
   const [probeResult, setProbeResult] = useState<string | null>(null);
 
   const probe = useCallback(async (channel: string) => {
@@ -25,19 +30,16 @@ export const useTelegramProbe = () => {
     }
   }, []);
 
-  const language = useAppStore((state) => state.language);
   const message = probeResult === null
     ? null
     : probeResult.startsWith('OK|')
       ? (() => {
           const [, messageCount, repoCount] = probeResult.split('|');
-          return language === 'zh'
-            ? `连接成功：解析到 ${messageCount} 条频道消息，其中 ${repoCount} 个 GitHub 仓库链接。`
-            : `Connected: parsed ${messageCount} channel messages with ${repoCount} GitHub repo links.`;
+          return t('useTelegramProbe.connected-parsed-messagecount-channel-messages-w', { messageCount: messageCount, repoCount: repoCount });
         })()
       : (() => {
           const [, error] = probeResult.split('|');
-          return language === 'zh' ? `连接失败：${error}` : `Failed: ${error}`;
+          return t('useTelegramProbe.failed-error', { error: error });
         })();
   const probeOk = probeResult?.startsWith('OK|') ?? null;
 

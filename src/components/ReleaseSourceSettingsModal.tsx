@@ -1,3 +1,9 @@
+
+
+
+
+import { useT } from '../i18n/useT';
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import React, { useId, useMemo, useState } from 'react';
@@ -9,10 +15,10 @@ import { useDialog } from '../hooks/useDialog';
 import { useWatchedSourcesSync } from '../features/releases/hooks/useWatchedSourcesSync';
 import {
   CUSTOM_RELEASE_SOURCE_ID,
-  RELEASE_SOURCE_LABELS,
   STARRED_RELEASE_SOURCE_ID,
   WATCH_CUSTOM_RELEASE_SOURCE_ID,
   createCustomReleaseRepository,
+  getReleaseSourceLabel,
   normalizeRepoKey,
 } from '../utils/releaseSources';
 
@@ -27,23 +33,23 @@ interface RepoListEditorProps {
   title: string;
   description: string;
   placeholder: string;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 interface PaginatedRepoListProps {
   repos: CustomReleaseRepository[];
-  language: 'zh' | 'en';
+  language: AppLanguage;
   emptyText: string;
   renderActions?: (repo: CustomReleaseRepository) => React.ReactNode;
 }
 
 const PAGE_SIZE = 8;
 
-const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, emptyText, renderActions }) => {
+const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, emptyText, renderActions }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [page, setPage] = useState(1);
   const repositoryListId = useId();
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
   const totalPages = Math.max(1, Math.ceil(repos.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const visibleRepos = repos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -61,7 +67,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
         aria-controls={repositoryListId}
         className="flex w-full items-center justify-between rounded-lg bg-card px-3 py-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-card dark:bg-card/[0.03] dark:text-muted-foreground dark:hover:bg-accent"
       >
-        <span>{t(`仓库列表（${repos.length}）`, `Repositories (${repos.length})`)}</span>
+        <span>{t('releaseSourceSettingsModal.repositories-v1', { v1: repos.length })}</span>
         <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </Button>
 
@@ -86,7 +92,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
 
           {repos.length > PAGE_SIZE && (
             <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-              <span>{t(`第 ${currentPage}/${totalPages} 页`, `Page ${currentPage}/${totalPages}`)}</span>
+              <span>{t('releaseSourceSettingsModal.page-currentpage-totalpages', { currentPage: currentPage, totalPages: totalPages })}</span>
               <div className="flex items-center gap-1">
                 <Button
                   type="button"
@@ -95,7 +101,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
                   className="h-8 w-8 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
-                  aria-label={t('上一页', 'Previous page')}
+                  aria-label={t('releaseSourceSettingsModal.previous-page')}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -106,7 +112,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
                   className="h-8 w-8 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
-                  aria-label={t('下一页', 'Next page')}
+                  aria-label={t('releaseSourceSettingsModal.next-page')}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -132,25 +138,25 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
   const { toast } = useDialog();
   const [input, setInput] = useState('');
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
 
   const repoKeys = useMemo(() => new Set(repos.map(repo => normalizeRepoKey(repo.full_name))), [repos]);
 
   const handleAdd = () => {
     const repo = createCustomReleaseRepository(input, sourceId);
     if (!repo) {
-      toast(t('请输入有效的 GitHub 仓库地址，例如 owner/repo。', 'Enter a valid GitHub repository, for example owner/repo.'), 'error');
+      toast(t('releaseSourceSettingsModal.enter-a-valid-github-repository-for-example-owne'), 'error');
       return;
     }
 
     if (repoKeys.has(normalizeRepoKey(repo.full_name))) {
-      toast(t('该仓库已在列表中。', 'This repository is already in the list.'), 'info');
+      toast(t('releaseSourceSettingsModal.this-repository-is-already-in-the-list'), 'info');
       return;
     }
 
     addReleaseSourceRepository(sourceId, repo);
     setInput('');
-    toast(t('已添加 Release 来源仓库。', 'Release source repository added.'), 'success');
+    toast(t('releaseSourceSettingsModal.release-source-repository-added'), 'success');
   };
 
   return (
@@ -163,7 +169,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
       <div className="flex gap-2">
         <Input
           type="text"
-          aria-label={t('仓库名称', 'Repository name')}
+          aria-label={t('releaseSourceSettingsModal.repository-name')}
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => {
@@ -178,22 +184,22 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" />
-          {t('添加', 'Add')}
+          {t('releaseSourceSettingsModal.add')}
         </Button>
       </div>
 
       <PaginatedRepoList
         repos={repos}
         language={language}
-        emptyText={t('暂无仓库。', 'No repositories yet.')}
+        emptyText={t('releaseSourceSettingsModal.no-repositories-yet')}
         renderActions={(repo) => (
           <Button
             type="button"
             variant="ghost"
             onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
             className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
-            title={t('移除仓库', 'Remove repository')}
-            aria-label={t('移除仓库', 'Remove repository')}
+            title={t('releaseSourceSettingsModal.remove-repository')}
+            aria-label={t('releaseSourceSettingsModal.remove-repository')}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -205,7 +211,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
 
 interface WatchCustomReleaseSyncPanelProps {
   repos: CustomReleaseRepository[];
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = ({ repos, language }) => {
@@ -214,7 +220,7 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
   const { syncWatchedSources, isSyncingWatchedSources } = useWatchedSourcesSync();
   const isSyncing = isSyncingWatchedSources;
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
 
   const handleSync = () => {
     void syncWatchedSources();
@@ -224,12 +230,9 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
     <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('Watch 仓库同步', 'Watch repository sync')}</h4>
+          <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('releaseSourceSettingsModal.watch-repository-sync')}</h4>
           <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-            {t(
-              '点击同步会拉取当前 GitHub 账号 Watch 的仓库，并作为 Release 来源。',
-              'Sync pulls repositories watched by the current GitHub account and uses them as release sources.'
-            )}
+            {t('releaseSourceSettingsModal.sync-pulls-repositories-watched-by-the-current-g')}
           </p>
         </div>
         <Button
@@ -239,14 +242,14 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
           className="inline-flex min-h-10 min-w-24 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? t('同步中…', 'Syncing…') : t('同步', 'Sync')}
+          {isSyncing ? t('releaseSourceSettingsModal.syncing') : t('releaseSourceSettingsModal.sync')}
         </Button>
       </div>
 
       <PaginatedRepoList
         repos={repos}
         language={language}
-        emptyText={t('暂无已同步仓库。', 'No synced repositories yet.')}
+        emptyText={t('releaseSourceSettingsModal.no-synced-repositories-yet')}
         renderActions={(repo) => {
           const hidden = !!repo.release_hidden;
           return (
@@ -256,8 +259,8 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
               onClick={() => updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, { release_hidden: !hidden })}
               aria-pressed={hidden}
               className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              title={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
-              aria-label={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
+              title={hidden ? t('releaseSourceSettingsModal.show-and-check-releases') : t('releaseSourceSettingsModal.hide-and-skip-release-checks')}
+              aria-label={hidden ? t('releaseSourceSettingsModal.show-and-check-releases') : t('releaseSourceSettingsModal.hide-and-skip-release-checks')}
             >
               {hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
@@ -275,46 +278,43 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
   const toggleReleaseSource = useAppStore(state => state.toggleReleaseSource);
   const { toast } = useDialog();
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
   const enabledSources = new Set(releaseSourceSettings.enabledSourceIds);
 
   const sourceRows: Array<{ id: ReleaseSourceId; title: string; description: string; count: number }> = [
     {
       id: STARRED_RELEASE_SOURCE_ID,
-      title: t('星标铃铛订阅', 'Starred bell subscriptions'),
-      description: t('当前在仓库卡片点击铃铛订阅的 Release 来源，默认启用。', 'Existing release source from repository cards where the bell is enabled. Enabled by default.'),
+      title: t('releaseSourceSettingsModal.starred-bell-subscriptions'),
+      description: t('releaseSourceSettingsModal.existing-release-source-from-repository-cards-wh'),
       count: releaseSubscriptions.size,
     },
     {
       id: WATCH_CUSTOM_RELEASE_SOURCE_ID,
-      title: RELEASE_SOURCE_LABELS[WATCH_CUSTOM_RELEASE_SOURCE_ID][language],
-      description: t('从 Watch 仓库同步的 Release 来源。', 'Release source synced from Watch repositories.'),
+      title: getReleaseSourceLabel(WATCH_CUSTOM_RELEASE_SOURCE_ID, language),
+      description: t('releaseSourceSettingsModal.release-source-synced-from-watch-repositories'),
       count: releaseSourceSettings.watchCustomReleaseRepos.length,
     },
     {
       id: CUSTOM_RELEASE_SOURCE_ID,
-      title: t('自定义 Release 来源', 'Custom release source'),
-      description: t('手动输入 GitHub 仓库地址，刷新时一并检查 Release。', 'Manually enter GitHub repositories to check during release refresh.'),
+      title: t('releaseSourceSettingsModal.custom-release-source'),
+      description: t('releaseSourceSettingsModal.manually-enter-github-repositories-to-check-duri'),
       count: releaseSourceSettings.customReleaseRepos.length,
     },
   ];
 
   const handleToggle = (sourceId: ReleaseSourceId) => {
     if (enabledSources.has(sourceId) && enabledSources.size === 1) {
-      toast(t('至少需要保留一个 Release 来源。', 'Keep at least one release source enabled.'), 'error');
+      toast(t('releaseSourceSettingsModal.keep-at-least-one-release-source-enabled'), 'error');
       return;
     }
     toggleReleaseSource(sourceId);
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('Release 来源设置', 'Release Source Settings')} maxWidth="max-w-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('releaseSourceSettingsModal.release-source-settings')} maxWidth="max-w-2xl">
       <div className="space-y-5">
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground dark:text-muted-foreground">
-          {t(
-            '选择刷新 Release 时要检查的来源。多个来源包含同一仓库时会自动去重。',
-            'Choose the sources checked when refreshing releases. Repositories appearing in multiple sources are deduplicated.'
-          )}
+          {t('releaseSourceSettingsModal.choose-the-sources-checked-when-refreshing-relea')}
         </div>
 
         <div className="space-y-2">
@@ -367,8 +367,8 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
           <RepoListEditor
             sourceId={CUSTOM_RELEASE_SOURCE_ID}
             repos={releaseSourceSettings.customReleaseRepos}
-            title={t('自定义仓库列表', 'Custom repositories')}
-            description={t('勾选自定义来源后，刷新会检查此列表中的仓库。', 'When custom source is enabled, refresh checks repositories in this list.')}
+            title={t('releaseSourceSettingsModal.custom-repositories')}
+            description={t('releaseSourceSettingsModal.when-custom-source-is-enabled-refresh-checks-rep')}
             placeholder="owner/repo or https://github.com/owner/repo"
             language={language}
           />
@@ -380,7 +380,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
             onClick={onClose}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            {t('完成', 'Done')}
+            {t('releaseSourceSettingsModal.done')}
           </Button>
         </div>
       </div>

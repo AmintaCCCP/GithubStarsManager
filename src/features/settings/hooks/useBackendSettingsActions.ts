@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
@@ -7,7 +9,7 @@ import { normalizeBackendUrl } from '../../../utils/backendUrl';
 import { syncLocalGitHubTokenToBackend, tryRestoreAuthFromBackend } from '../../../services/autoSync';
 
 interface UseBackendSettingsActionsOptions {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 type BackendStatus = 'connected' | 'disconnected' | 'checking';
@@ -87,10 +89,7 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
   const testConnection = useCallback(async () => {
     const trimmedUrl = urlInput.trim();
     if (trimmedUrl && !normalizeBackendUrl(trimmedUrl)) {
-      toast(t(
-        '后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP',
-        'Invalid backend URL: remote backends must use HTTPS; only localhost may use HTTP'
-      ), 'error');
+      toast(t('useBackendSettingsActions.invalid-backend-url-remote-backends-must-use-htt'), 'error');
       return;
     }
     const previousUrl = backend.backendUrl;
@@ -100,7 +99,7 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
     const connected = await checkConnection(false, trimmedUrl || undefined);
     if (!connected) {
       await backend.init(previousUrl ?? undefined);
-      toast(t('后端连接失败，请检查服务器状态或 API Secret 是否正确。', 'Backend connection failed. Please check the server status or whether the API Secret is correct.'), 'error');
+      toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
       return;
     }
     try {
@@ -109,7 +108,7 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
       // Health and auth both passed — remember the address (shared with the
       // login screen prefill).
       backend.rememberActiveUrl();
-      toast(t('后端连接成功！', 'Backend connection successful!'), 'success');
+      toast(t('useBackendSettingsActions.backend-connection-successful'), 'success');
       // These are deliberate manual settings actions; app-start restoration is not moved here.
       void tryRestoreAuthFromBackend();
       void syncLocalGitHubTokenToBackend();
@@ -117,13 +116,13 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
       await backend.init(previousUrl ?? undefined);
       setStatus('disconnected');
       setHealth(null);
-      toast(t('后端连接失败，请检查服务器状态或 API Secret 是否正确。', 'Backend connection failed. Please check the server status or whether the API Secret is correct.'), 'error');
+      toast(t('useBackendSettingsActions.backend-connection-failed-please-check-the-serve'), 'error');
     }
   }, [checkConnection, secretInput, state, t, toast, urlInput]);
 
   const syncToBackend = useCallback(async () => {
     if (!backend.isAvailable) {
-      toast(t('后端不可用', 'Backend not available'), 'error');
+      toast(t('useBackendSettingsActions.backend-not-available'), 'error');
       return;
     }
     setIsSyncingToBackend(true);
@@ -147,16 +146,13 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
       const successes = results.filter((result) => result.status === 'fulfilled');
       if (failures.length) {
         console.warn('Some syncs failed:', failures.map((failure) => (failure as PromiseRejectedResult).reason));
-        toast(t(`同步部分失败：${failures.length} 项失败，${successes.length} 项成功`, `Partial sync failure: ${failures.length} failed, ${successes.length} succeeded`), 'error');
+        toast(t('useBackendSettingsActions.partial-sync-failure-v1-failed-v2-succeeded', { v1: failures.length, v2: successes.length }), 'error');
       } else {
-        toast(t(
-          `已同步到后端：仓库 ${state.repositories.length}，发布 ${state.releases.length}，AI配置 ${state.aiConfigs.length}，WebDAV配置 ${state.webdavConfigs.length}`,
-          `Synced to backend: repos ${state.repositories.length}, releases ${state.releases.length}, AI configs ${state.aiConfigs.length}, WebDAV configs ${state.webdavConfigs.length}`,
-        ), 'success');
+        toast(t('useBackendSettingsActions.synced-to-backend-repos-v1-releases-v2-ai-config', { v1: state.repositories.length, v2: state.releases.length, v3: state.aiConfigs.length, v4: state.webdavConfigs.length }), 'success');
       }
     } catch (error) {
       console.error('Sync to backend failed:', error);
-      toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
+      toast(`${t('useBackendSettingsActions.sync-failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsSyncingToBackend(false);
     }
@@ -164,12 +160,12 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
 
   const syncFromBackend = useCallback(async () => {
     if (!backend.isAvailable) {
-      toast(t('后端不可用', 'Backend not available'), 'error');
+      toast(t('useBackendSettingsActions.backend-not-available'), 'error');
       return;
     }
     const confirmed = await confirm(
-      t('从后端同步', 'Sync from Backend'),
-      t('从后端同步将覆盖本地数据，是否继续？', 'Syncing from backend will overwrite local data. Continue?'),
+      t('useBackendSettingsActions.sync-from-backend'),
+      t('useBackendSettingsActions.syncing-from-backend-will-overwrite-local-data-c'),
       { type: 'warning' },
     );
     if (!confirmed) return;
@@ -191,13 +187,10 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
       for (const categoryId of state.hiddenDefaultCategoryIds) {
         if (typeof categoryId === 'string' && !serverHidden.includes(categoryId)) state.showDefaultCategory(categoryId);
       }
-      toast(t(
-        `已从后端同步：仓库 ${repoData.repositories.length}，发布 ${releaseData.releases.length}，AI配置 ${aiConfigData.length}，WebDAV配置 ${webdavConfigData.length}`,
-        `Synced from backend: repos ${repoData.repositories.length}, releases ${releaseData.releases.length}, AI configs ${aiConfigData.length}, WebDAV configs ${webdavConfigData.length}`,
-      ), 'success');
+      toast(t('useBackendSettingsActions.synced-from-backend-repos-v1-releases-v2-ai-conf', { v1: repoData.repositories.length, v2: releaseData.releases.length, v3: aiConfigData.length, v4: webdavConfigData.length }), 'success');
     } catch (error) {
       console.error('Sync from backend failed:', error);
-      toast(`${t('同步失败', 'Sync failed')}: ${(error as Error).message}`, 'error');
+      toast(`${t('useBackendSettingsActions.sync-failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsSyncingFromBackend(false);
     }

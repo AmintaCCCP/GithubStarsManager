@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../i18n/useT';
 import React, { useEffect, useRef, useState } from 'react';
 import { pluginClient } from '../plugins/pluginClient';
 import { validatePluginPageMessage } from '../plugins/pluginPageMessages';
@@ -10,7 +12,7 @@ interface PluginPageViewerProps {
   pageId: string;
   pageTitle: string;
   onClose: () => void;
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pluginName, pageId, pageTitle, onClose, t }) => {
@@ -41,7 +43,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
       if (result.success) setUrl(result.url);
       else setError(result.error.message);
     }).catch(() => {
-      if (!disposed) setError(t('插件页面加载失败', 'Failed to load plugin page'));
+      if (!disposed) setError(t('pluginPageViewer.failed-to-load-plugin-page'));
     });
     return () => { disposed = true; };
   }, [pluginId, pageId, t]);
@@ -86,10 +88,10 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
         let result;
         try {
           result = request.method === 'ai.generate'
-            ? await generateAI(pluginId, pluginName, pageId, request.args, t,
+            ? await generateAI(pluginId, pluginName, pageId, request.args,
               () => mountedRef.current && tokenRef.current === requestToken, aiController!.signal)
             : request.method === 'web.search'
-              ? await searchWeb(pluginId, pluginName, pageId, request.args, t,
+              ? await searchWeb(pluginId, pluginName, pageId, request.args,
                 () => mountedRef.current && tokenRef.current === requestToken)
             : await pluginClient.requestPageCapability({ pluginId, pageId, method: request.method, args: request.args });
         } catch {
@@ -114,10 +116,10 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold">{pluginName} · {pageTitle}</h3>
-          <p className="text-xs text-muted-foreground">{t('此页面由本地插件提供，数据请求仍需经过宿主权限检查。', 'This page comes from a local plugin; data requests still require Host permission checks.')}</p>
+          <p className="text-xs text-muted-foreground">{t('pluginPageViewer.this-page-comes-from-a-local-plugin-data-request')}</p>
         </div>
         <button type="button" onClick={onClose} className="rounded border border-border px-3 py-1.5 text-sm">
-          {t('返回插件列表', 'Back to plugins')}
+          {t('pluginPageViewer.back-to-plugins')}
         </button>
       </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> :
@@ -136,7 +138,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
               type: 'plugin-page:init', pluginId, pageId, token: tokenRef.current,
             }, '*');
           }}
-        /> : <p role="status">{t('正在加载插件页面…', 'Loading plugin page…')}</p>}
+        /> : <p role="status">{t('pluginPageViewer.loading-plugin-page')}</p>}
     </section>
   );
 };

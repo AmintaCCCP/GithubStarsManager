@@ -1,3 +1,4 @@
+import { makeT } from '../../i18n/useT';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NetworkPanel } from './NetworkPanel';
@@ -50,7 +51,7 @@ describe('NetworkPanel', () => {
   });
 
   it('automatically expands proxy authentication when restored credentials exist', () => {
-    render(<NetworkPanel t={(_zh, en) => en} />);
+    render(<NetworkPanel t={makeT('en', 'app')} />);
 
     expect(screen.getByLabelText('Username')).toHaveValue('stored-user');
   });

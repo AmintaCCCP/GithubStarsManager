@@ -1,3 +1,4 @@
+import { useT } from "../../../i18n/useT";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
@@ -83,7 +84,7 @@ export const useRepositoryAnalysisJob = ({
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('repositories');
 
   const resetVisibleState = useCallback(() => {
     setLoading(false);
@@ -132,8 +133,8 @@ export const useRepositoryAnalysisJob = ({
     if (!isRunningRef.current) return false;
 
     const confirmed = await confirm(
-      t('停止AI分析', 'Stop AI Analysis'),
-      t('确定要停止 AI 分析吗？已分析的结果将会保存。', 'Are you sure you want to stop AI analysis? Analyzed results will be saved.'),
+      t('useRepositoryAnalysisJob.stop-ai-analysis'),
+      t('useRepositoryAnalysisJob.are-you-sure-you-want-to-stop-ai-analysis-analyz'),
       { type: 'warning' },
     );
     if (!confirmed || !isRunningRef.current) return false;
@@ -156,51 +157,47 @@ export const useRepositoryAnalysisJob = ({
     if (isRunningRef.current) return false;
 
     if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+      toast(t('useRepositoryAnalysisJob.github-token-not-found-please-login-again'), 'error');
       return false;
     }
 
     const activeConfig = aiConfigs.find((config) => config.id === activeAIConfig);
     if (!activeConfig) {
-      toast(language === 'zh' ? '请先在设置中配置AI服务。' : 'Please configure AI service in settings first.', 'error');
+      toast(t('useRepositoryAnalysisJob.please-configure-ai-service-in-settings-first'), 'error');
       return false;
     }
 
     if (scope !== 'selected' && (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty')) {
-      toast(language === 'zh' ? 'AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。' : 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.', 'error');
+      toast(t('useRepositoryAnalysisJob.the-ai-service-api-key-could-not-be-decrypted-or'), 'error');
       return false;
     }
 
     if (scope !== 'selected' && (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model)) {
-      toast(language === 'zh' ? 'AI服务配置不完整，请检查API端点、密钥和模型名称。' : 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.', 'error');
+      toast(t('useRepositoryAnalysisJob.ai-service-configuration-is-incomplete-please-ch'), 'error');
       return false;
     }
 
     if (repositories.length === 0) {
       const message = scope === 'failed'
-        ? t('没有分析失败的仓库！', 'No failed repositories to re-analyze!')
+        ? t('useRepositoryAnalysisJob.no-failed-repositories-to-re-analyze')
         : scope === 'unanalyzed'
-          ? t('所有仓库都已经分析过了！', 'All repositories have been analyzed!')
-          : t('没有可分析的仓库！', 'No repositories to analyze!');
+          ? t('useRepositoryAnalysisJob.all-repositories-have-been-analyzed')
+          : t('useRepositoryAnalysisJob.no-repositories-to-analyze');
       toast(message, 'info');
       return false;
     }
 
     const actionText = scope === 'failed'
-      ? (language === 'zh' ? '失败' : 'failed')
+      ? (t('useRepositoryAnalysisJob.failed'))
       : scope === 'unanalyzed'
-        ? (language === 'zh' ? '未分析' : 'unanalyzed')
-        : (language === 'zh' ? '全部' : 'all');
+        ? (t('useRepositoryAnalysisJob.unanalyzed'))
+        : (t('useRepositoryAnalysisJob.all'));
     const confirmationMessage = scope === 'selected'
-      ? (language === 'zh'
-        ? `将对 ${repositories.length} 个仓库进行 AI 分析，这可能需要几分钟时间。是否继续？`
-        : `Will analyze ${repositories.length} repositories with AI. This may take several minutes. Continue?`)
-      : (language === 'zh'
-        ? `将对 ${repositories.length} 个${actionText}仓库进行AI分析，这可能需要几分钟时间。是否继续？`
-        : `Will analyze ${repositories.length} ${actionText} repositories with AI. This may take several minutes. Continue?`);
+      ? (t('useRepositoryAnalysisJob.will-analyze-v1-repositories-with-ai-this-may-ta', { v1: repositories.length }))
+      : (t('useRepositoryAnalysisJob.will-analyze-v1-actiontext-repositories-with-ai', { v1: repositories.length, actionText: actionText }));
 
     const confirmed = await confirm(
-      t('AI分析确认', 'AI Analysis Confirmation'),
+      t('useRepositoryAnalysisJob.ai-analysis-confirmation'),
       confirmationMessage,
       { type: 'warning' },
     );
@@ -279,20 +276,14 @@ export const useRepositoryAnalysisJob = ({
 
       if (scope === 'selected') {
         toast(
-          language === 'zh'
-            ? `成功分析 ${successCount} 个仓库，失败 ${failedCount} 个 (平均响应: ${stats.averageResponseTime}ms)`
-            : `Successfully analyzed ${successCount} repositories, ${failedCount} failed (avg: ${stats.averageResponseTime}ms)`,
+          t('useRepositoryAnalysisJob.successfully-analyzed-successcount-repositories', { successCount: successCount, failedCount: failedCount, v3: stats.averageResponseTime }),
           failedCount > 0 ? 'error' : 'success',
         );
       } else {
         toast(
           stopRequestedRef.current
-            ? (language === 'zh'
-              ? `AI分析已停止！成功: ${successCount}, 失败: ${failedCount}`
-              : `AI analysis stopped! Success: ${successCount}, Failed: ${failedCount}`)
-            : (language === 'zh'
-              ? `AI分析完成！成功: ${successCount}, 失败: ${failedCount} (平均响应: ${stats.averageResponseTime}ms)`
-              : `AI analysis completed! Success: ${successCount}, Failed: ${failedCount} (avg: ${stats.averageResponseTime}ms)`),
+            ? (t('useRepositoryAnalysisJob.ai-analysis-stopped-success-successcount-failed', { successCount: successCount, failedCount: failedCount }))
+            : (t('useRepositoryAnalysisJob.ai-analysis-completed-success-successcount-faile', { successCount: successCount, failedCount: failedCount, v3: stats.averageResponseTime })),
           'success',
         );
       }
@@ -301,8 +292,8 @@ export const useRepositoryAnalysisJob = ({
       console.error(scope === 'selected' ? 'Bulk AI analysis failed:' : 'AI analysis failed:', error);
       toast(
         scope === 'selected'
-          ? (language === 'zh' ? '批量AI分析失败' : 'Bulk AI analysis failed')
-          : (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接。' : 'AI analysis failed. Please check AI configuration and network connection.'),
+          ? (t('useRepositoryAnalysisJob.bulk-ai-analysis-failed'))
+          : (t('useRepositoryAnalysisJob.ai-analysis-failed-please-check-ai-configuration')),
         'error',
       );
       return false;

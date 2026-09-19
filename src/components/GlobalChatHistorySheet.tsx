@@ -1,3 +1,5 @@
+import { getIntlLocale } from '../i18n/format';
+import { useT } from "../i18n/useT";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { History, Search, Trash2 } from 'lucide-react';
 import type { Repository } from '../types';
@@ -34,7 +36,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   onSelectSession,
 }) => {
   const language = useAppStore((state) => state.language);
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('chat');
   const [sessions, setSessions] = useState<RepositoryChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -59,11 +61,11 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
       setSessions(nextSessions);
     } catch {
       if (requestId !== requestIdRef.current) return;
-      setLoadError(language === 'zh' ? '历史加载失败，请重试。' : 'Failed to load history. Please retry.');
+      setLoadError(t('globalChatHistorySheet.failed-to-load-history-please-retry'));
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, [language]);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -90,7 +92,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   const formatTime = useCallback((value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US', {
+    return date.toLocaleString(getIntlLocale(language), {
       month: 'numeric',
       day: 'numeric',
       hour: '2-digit',
@@ -103,7 +105,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
       <SheetContent
         side="right"
         className="w-[min(100vw-1rem,32rem)] sm:max-w-none"
-        closeLabel={t('关闭问答历史', 'Close chat history')}
+        closeLabel={t('globalChatHistorySheet.close-chat-history')}
         onPointerDownOutside={(event) => {
           event.preventDefault();
           window.setTimeout(onClose, 0);
@@ -112,10 +114,10 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-base">
             <History className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {t('问答历史', 'Chat history')}
+            {t('globalChatHistorySheet.chat-history')}
           </SheetTitle>
           <SheetDescription>
-            {t('汇总各仓库的问答会话，点击进入对应仓库继续对话。', 'Conversations across repositories. Select one to continue in its repository.')}
+            {t('globalChatHistorySheet.conversations-across-repositories-select-one-to')}
           </SheetDescription>
         </SheetHeader>
 
@@ -125,27 +127,27 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             className="h-8 pl-8 text-xs"
-            placeholder={t('搜索标题或仓库名', 'Search title or repository')}
-            aria-label={t('搜索问答历史', 'Search chat history')}
+            placeholder={t('globalChatHistorySheet.search-title-or-repository')}
+            aria-label={t('globalChatHistorySheet.search-chat-history')}
           />
         </div>
 
-        <section aria-label={t('问答历史列表', 'Chat history list')} className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <section aria-label={t('globalChatHistorySheet.chat-history-list')} className="min-h-0 flex-1 overflow-y-auto pr-1">
           {isLoading ? (
-            <p className="py-10 text-center text-sm text-muted-foreground" role="status">{t('正在加载历史…', 'Loading history…')}</p>
+            <p className="py-10 text-center text-sm text-muted-foreground" role="status">{t('globalChatHistorySheet.loading-history')}</p>
           ) : loadError && visibleSessions.length === 0 ? (
             <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-md border border-destructive/40 px-4 text-center text-sm" role="alert">
               <p className="text-destructive">{loadError}</p>
               <Button type="button" variant="secondary" size="sm" onClick={() => void refresh()}>
-                {t('重试', 'Retry')}
+                {t('globalChatHistorySheet.retry')}
               </Button>
             </div>
           ) : visibleSessions.length === 0 ? (
             <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">
               <History className="h-5 w-5" aria-hidden="true" />
               <p>{sessions.length === 0
-                ? t('还没有保存的问答会话。', 'No saved conversations yet.')
-                : t('没有匹配的会话。', 'No matching conversations found.')}</p>
+                ? t('globalChatHistorySheet.no-saved-conversations-yet')
+                : t('globalChatHistorySheet.no-matching-conversations-found')}</p>
             </div>
           ) : (
             <>
@@ -153,7 +155,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive" role="alert">
                   <span>{loadError}</span>
                   <Button type="button" variant="secondary" size="sm" className="h-7" onClick={() => void refresh()}>
-                    {t('重试', 'Retry')}
+                    {t('globalChatHistorySheet.retry')}
                   </Button>
                 </div>
               )}
@@ -170,7 +172,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                         if (repository) onSelectSession(repository, session.id);
                       }}
                       disabled={!repository}
-                      title={repository ? t(`进入 ${session.repoFullName} 的会话`, `Open conversation in ${session.repoFullName}`) : t('对应仓库已不在列表中', 'The repository is no longer in the list')}
+                      title={repository ? t('globalChatHistorySheet.open-conversation-in-v1', { v1: session.repoFullName }) : t('globalChatHistorySheet.the-repository-is-no-longer-in-the-list')}
                     >
                       {repository && (
                         <img src={repository.owner.avatar_url} alt="" className="h-7 w-7 shrink-0 rounded-md border border-border" />
@@ -186,7 +188,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                       size="icon"
                       className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
                       onClick={() => setPendingDeletion(session)}
-                      aria-label={t(`删除会话：${session.title}`, `Delete conversation: ${session.title}`)}
+                      aria-label={t('globalChatHistorySheet.delete-conversation-v1', { v1: session.title })}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
@@ -201,16 +203,13 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
         <AlertDialog open={Boolean(pendingDeletion)} onOpenChange={(open) => !open && setPendingDeletion(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('删除此会话？', 'Delete this conversation?')}</AlertDialogTitle>
+              <AlertDialogTitle>{t('globalChatHistorySheet.delete-this-conversation')}</AlertDialogTitle>
               <AlertDialogDescription>
-                {t(
-                  '仅删除此设备/账户保存的对话与工具轨迹，不会影响 GitHub 仓库、Star、README 或既有向量索引。',
-                  'This only deletes the conversation and tool trace saved for this device/account. It does not affect the GitHub repository, stars, README, or existing vector index.',
-                )}
+                {t('globalChatHistorySheet.this-only-deletes-the-conversation-and-tool-trac')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>{t('取消', 'Cancel')}</AlertDialogCancel>
+              <AlertDialogCancel>{t('globalChatHistorySheet.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => {
@@ -218,7 +217,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                   setPendingDeletion(null);
                 }}
               >
-                {t('删除会话', 'Delete conversation')}
+                {t('globalChatHistorySheet.delete-conversation')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

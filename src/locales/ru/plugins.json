@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "Сообщение канала для {{v1}}",
+    "open-in-telegram": "Открыть в Telegram",
+    "this-message-is-media-only-and-has-no-text-conte": "Данное сообщение является чисто медиаконтентом и не имеет текстового содержания."
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "Введите допустимое название канала, например https://t.me/geekhub23 или @geekhub23.",
+    "this-channel-is-already-in-the-list": "Канал уже в списке наблюдения.",
+    "channel-added-to-the-follow-list": "Следите за добавленным каналом.",
+    "unfollowed-v1": "@{{v1}} отменили подписку.",
+    "telegram-channels-settings": "Настройки телеграм-канала",
+    "refreshing-incrementally-pulls-the-latest-messag": "При обновлении последние новости с канала, на который вы подписаны, будут постепенно извлекаться. Записи, содержащие ссылки на склад GitHub в новостях, будут отображаться как элементы списка; «Загрузить больше» позволит получить более ранние исторические сообщения по страницам. Данные собираются приложением, напрямую подключенным к общедоступной предварительной версии t.me, для которой требуется настольная версия или серверный режим (чистый режим браузера подлежит междоменным ограничениям); частные каналы не могут быть захвачены.",
+    "follow-list": "список наблюдения",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "Поддерживает ссылку на канал t.me, имя @channel или чистое имя канала. Получайте последние новости по каналам при обновлении.",
+    "enter-a-valid-channel-name": "Введите допустимое название канала.",
+    "fill-in-or-add-a-channel-to-test-first": "Пожалуйста, сначала заполните или добавьте канал для тестирования.",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "Действительно захватить канал один раз, сделать общедоступный предварительный просмотр и проверить канал захвата.",
+    "testing": "Тестирование…",
+    "test-connection": "тестовое соединение",
+    "channel-name": "Название канала",
+    "add": "добавить в",
+    "no-followed-channels-yet": "Пока нет каналов, на которые можно было бы подписаться.",
+    "unfollow": "Отписаться",
+    "unfollow-v1": "Отписаться от @{{v1}}",
+    "done": "Заканчивать"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "Твиты от @{{v1}}",
+    "open-on-x": "Открыто в X",
+    "this-tweet-has-no-text-content": "Текст твита пуст"
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "Введите действительное имя пользователя X, например @geekbb, или ссылку на домашнюю страницу.",
+    "this-account-is-already-in-the-list": "Этот блоггер уже в списке наблюдения.",
+    "account-added-to-the-follow-list": "Blogger добавлен в подписку.",
+    "unfollowed-v1": "@{{v1}} отменили подписку.",
+    "both-auth-token-and-ct0-must-contain-valid-value": "И auth_token, и ct0 должны содержать действительный контент.",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "Файл cookie аутентификации сохранен и будет получен в режиме GraphQL после обновления.",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "Файл cookie аутентификации вступил в силу, но не был сохранен на диске и может быть утерян после перезапуска.",
+    "auth-cookies-saved-current-session-only": "Файл cookie аутентификации сохранен (действителен только для этого сеанса).",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "Файлы cookie аутентификации удалены и возвращены в режим сканирования без входа в систему.",
+    "x-tweets-channel-settings": "X Настройки канала твита",
+    "refreshing-incrementally-pulls-the-latest-tweets": "При обновлении последние твиты блоггеров, на которых вы подписаны, будут постепенно извлекаться, а элементы, содержащие в твитах ссылки на репозиторий GitHub, будут отображаться как элементы списка. Данные собираются приложением, напрямую подключенным к x.com, для которого требуется настольная версия или серверный режим (чистый режим браузера подлежит междоменным ограничениям). При желании заполните файл cookie аутентификации входа, чтобы включить больше твитов и перелистывание страниц истории.",
+    "follow-list": "список наблюдения",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "Поддерживает @username, имя пользователя или ссылку на домашнюю страницу x.com. Получайте последние твиты блоггера при обновлении.",
+    "enter-a-valid-x-handle": "Пожалуйста, введите действительное имя пользователя X.",
+    "fill-in-or-add-an-account-to-test-first": "Пожалуйста, сначала заполните или добавьте блоггера для тестирования.",
+    "fetch-a-profile-once-to-verify-the-pipeline": "Действительно просканируйте домашнюю страницу один раз, чтобы проверить канал сканирования.",
+    "testing": "Тестирование…",
+    "test-connection": "тестовое соединение",
+    "x-handle": "X имя пользователя",
+    "add": "добавить в",
+    "no-followed-accounts-yet": "Пока нет блоггеров, на которых можно подписаться.",
+    "unfollow": "Отписаться",
+    "unfollow-v1": "Отписаться от @{{v1}}",
+    "auth-cookies-optional": "Файл cookie аутентификации (необязательно)",
+    "once-set-fetching-switches-to-the-signed-in-grap": "После заполнения перейдите в состояние входа в интерфейс GraphQL: каждый блоггер имеет около 20 твитов на странице и «загрузите больше», чтобы просмотреть историю по страницам. Оставьте пустым, чтобы использовать сканирование без регистрации (только последний небольшой пакет для каждого блоггера одновременно). После входа в браузере на x.com скопируйте auth_token и ct0 в DevTools → Application → Cookies и сохраните их только в данных локального приложения.",
+    "auth-token": "auth_token",
+    "hide-auth-token": "Скрыть auth_token",
+    "show-auth-token": "показать auth_token",
+    "ct0": "ct0",
+    "hide-ct0": "Скрыть ct0",
+    "show-ct0": "показать ct0",
+    "authenticated-fetching-is-on": "Захват аутентификации в настоящее время включен",
+    "signed-out-fetching-mode": "В настоящее время в режиме сканирования без входа в систему",
+    "clear": "Прозрачный",
+    "update-auth": "Обновить аутентификацию",
+    "saved": "сохранено",
+    "save-auth": "Сохранить аутентификацию",
+    "done": "Заканчивать"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "Открыто в браузере",
+    "plugin-result-copied": "Результаты плагина скопированы.",
+    "plugin-result-saved": "Результаты плагина сохранены.",
+    "plugin-action-completed": "Операция подключения завершена"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "Таможенные услуги",
+    "allow-plugin-ai-request": "Разрешить плагинам вызывать ИИ?",
+    "the-host-may-relay-this-through-its-configured-b": "Может быть перенаправлен включенным серверным прокси-сервером хостинга.",
+    "send-to-ai": "Отправить в ИИ",
+    "allow-plugin-ai-body": "Плагин {{pluginName}} запросил использование конфигурации AI \"{{configName}}\" (модель {{model}}).\nАдрес назначения: {{destination}}\n{{relayNote}}\n\nСистема:\n{{system}}\n\nПользователь:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "Разрешить поиск сети подключаемым модулем?",
+    "search-query": "Условия поиска:",
+    "send-search-query": "Отправить условия поиска"
+  }
+}

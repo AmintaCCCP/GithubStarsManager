@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -9,7 +11,7 @@ import { useDialog } from '../../hooks/useDialog';
 import { validateCategoryName } from '../../utils/categoryUtils';
 
 interface CategoryPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
@@ -106,7 +108,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   };
 
   const handleSaveEdit = () => {
-    const validation = validateCategoryName(editName, t, ['分类名称不能为空', 'Category name cannot be empty']);
+    const validation = validateCategoryName(editName, t, 'categoryUtils.empty-category-name');
     if (validation.error !== null) {
       toast(validation.error, 'error');
       return;
@@ -157,9 +159,9 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
 
   const handleDeleteCategory = async (categoryId: string) => {
     const confirmed = await confirm(
-      t('确定要删除这个自定义分类吗？', 'Delete Custom Category?'),
-      t('此操作无法撤销。', 'This action cannot be undone.'),
-      { type: 'danger', confirmText: t('删除', 'Delete') }
+      t('categoryPanel.delete-custom-category'),
+      t('categoryPanel.this-action-cannot-be-undone'),
+      { type: 'danger', confirmText: t('categoryPanel.delete') }
     );
     if (confirmed) {
       deleteCustomCategory(categoryId);
@@ -202,8 +204,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   // 重置分类排序
   const handleResetOrder = async () => {
     const confirmed = await confirm(
-      t('确定要重置分类排序吗？', 'Reset Category Order?'),
-      t('这将恢复默认顺序。', 'This will restore the default order.'),
+      t('categoryPanel.reset-category-order'),
+      t('categoryPanel.this-will-restore-the-default-order'),
       { type: 'warning' }
     );
     if (confirmed) {
@@ -270,7 +272,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
         <div className="flex items-center space-x-3">
           <Package className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('分类管理', 'Category Management')}
+            {t('categoryPanel.category-management')}
           </h3>
         </div>
         <Button
@@ -278,7 +280,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>{t('添加分类', 'Add Category')}</span>
+          <span>{t('categoryPanel.add-category')}</span>
         </Button>
       </div>
 
@@ -289,16 +291,13 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
             <div>
               <h4 className="font-medium text-foreground dark:text-foreground">
-                {t('折叠侧边栏显示设置', 'Collapsed Sidebar Display')}
+                {t('categoryPanel.collapsed-sidebar-display')}
               </h4>
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('设置折叠状态下显示的分类个数', 'Set the number of categories to display when collapsed')}
+                {t('categoryPanel.set-the-number-of-categories-to-display-when-col')}
               </p>
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                {t(
-                  '提示：折叠侧边栏仅影响显示，所有分类仍可在展开状态下查看。只显示分类顺序前N个分类。',
-                  'Tip: The collapsed sidebar only affects display; all categories remain accessible when expanded. Only the first N categories in the order are displayed.'
-                )}
+                {t('categoryPanel.tip-the-collapsed-sidebar-only-affects-display-a')}
               </p>
             </div>
           </div>
@@ -308,8 +307,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               onChange={setCollapsedSidebarCategoryCount}
               min={1}
               step={1}
-              decreaseLabel={t('减少分类数量', 'Decrease category count')}
-              increaseLabel={t('增加分类数量', 'Increase category count')}
+              decreaseLabel={t('categoryPanel.decrease-category-count')}
+              increaseLabel={t('categoryPanel.increase-category-count')}
             />
           </div>
         </div>
@@ -320,27 +319,21 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
         <div className="flex items-center space-x-3 mb-2">
           <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
           <h4 id="category-match-mode-label" className="font-medium text-foreground dark:text-foreground">
-            {t('仓库归类方式', 'Repository Categorization')}
+            {t('categoryPanel.repository-categorization')}
           </h4>
         </div>
         <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3">
-          {t(
-            '选择仓库如何被归入侧边栏的分类中。切换后侧边栏的仓库数量会相应变化。你手动设置的分类归属始终保留，不会被 AI 分析覆盖。',
-            'Choose how repositories are assigned to categories in the sidebar. Switching will update the category counts. Categories you assign manually are always kept and will not be overridden by AI analysis.'
-          )}
+          {t('categoryPanel.choose-how-repositories-are-assigned-to-categori')}
         </p>
         <RadioGroup aria-labelledby="category-match-mode-label" value={categoryMatchMode} onValueChange={(value) => setCategoryMatchMode(value as 'effective' | 'legacy')} className="space-y-3">
           <div className="flex items-start space-x-3">
             <RadioGroupItem value="effective" id="category-match-effective" aria-labelledby="category-match-effective-label" className="mt-1" />
             <div>
               <label id="category-match-effective-label" htmlFor="category-match-effective" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
-                {t('按卡片显示的分类标签归类（推荐）', 'Match by tags shown on cards (Recommended)')}
+                {t('categoryPanel.match-by-tags-shown-on-cards-recommended')}
               </label>
               <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                {t(
-                  '仓库会按卡片上实际看到的标签进入分类；你编辑的自定义标签优先。',
-                  'Repositories are grouped by the tags actually shown on their cards; your custom tags take priority.'
-                )}
+                {t('categoryPanel.repositories-are-grouped-by-the-tags-actually-sh')}
               </span>
             </div>
           </div>
@@ -348,13 +341,10 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
             <RadioGroupItem value="legacy" id="category-match-legacy" aria-labelledby="category-match-legacy-label" className="mt-1" />
             <div>
               <label id="category-match-legacy-label" htmlFor="category-match-legacy" className="block cursor-pointer text-sm font-medium text-foreground dark:text-foreground">
-                {t('仅按 AI 生成标签归类（旧版）', 'Match by AI-generated tags only (Legacy)')}
+                {t('categoryPanel.match-by-ai-generated-tags-only-legacy')}
               </label>
               <span className="block text-xs text-muted-foreground dark:text-muted-foreground mt-0.5">
-                {t(
-                  '使用早期版本逻辑，仅根据 AI 生成的标签归类，适合习惯旧版分类方式的用户。',
-                  'Uses the legacy logic that categorizes only by AI-generated tags, for users who prefer the old behavior.'
-                )}
+                {t('categoryPanel.uses-the-legacy-logic-that-categorizes-only-by-a')}
               </span>
             </div>
           </div>
@@ -364,12 +354,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
       {showAddForm && (
         <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
           <h4 className="font-medium text-foreground dark:text-foreground mb-4">
-            {t('添加自定义分类', 'Add Custom Category')}
+            {t('categoryPanel.add-custom-category')}
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label htmlFor="category-panel-new-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('分类名称', 'Category Name')} *
+                {t('categoryPanel.category-name')} *
               </label>
               <Input
                 id="category-panel-new-name"
@@ -377,12 +367,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
                 className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('例如: 我的项目', 'e.g., My Projects')}
+                placeholder={t('categoryPanel.e-g-my-projects')}
               />
             </div>
             <div>
               <label htmlFor="category-panel-new-icon" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('图标', 'Icon')}
+                {t('categoryPanel.icon')}
               </label>
               <Input
                 id="category-panel-new-icon"
@@ -402,7 +392,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           </div>
           <div className="mb-4">
             <label htmlFor="category-panel-new-keywords" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-              {t('关键词', 'Keywords')}
+              {t('categoryPanel.keywords')}
             </label>
             <Input
               id="category-panel-new-keywords"
@@ -410,10 +400,10 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
               className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-              placeholder={t('用逗号分隔关键词', 'Comma-separated keywords')}
+              placeholder={t('categoryPanel.comma-separated-keywords')}
             />
             <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-              {t('用于自动匹配仓库到此分类', 'Used to automatically match repositories to this category')}
+              {t('categoryPanel.used-to-automatically-match-repositories-to-this')}
             </p>
           </div>
           <div className="flex space-x-3">
@@ -423,7 +413,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${newCategoryName.trim() ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground cursor-not-allowed'}`}
             >
               <Save className="w-4 h-4" />
-              <span>{t('保存', 'Save')}</span>
+              <span>{t('categoryPanel.save')}</span>
             </Button>
             <Button
               onClick={() => {
@@ -435,7 +425,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
             >
               <X className="w-4 h-4" />
-              <span>{t('取消', 'Cancel')}</span>
+              <span>{t('categoryPanel.cancel')}</span>
             </Button>
           </div>
         </div>
@@ -447,7 +437,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
               <GripVertical className="w-4 h-4 mr-2" />
-              {t('分类排序', 'Category Order')}
+              {t('categoryPanel.category-order')}
               <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
                 ({allVisibleCategories.length})
               </span>
@@ -461,14 +451,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     : 'bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
-                {isReordering ? t('完成', 'Done') : t('调整顺序', 'Reorder')}
+                {isReordering ? t('categoryPanel.done') : t('categoryPanel.reorder')}
               </Button>
               {categoryOrder.length > 0 && (
                 <Button
                   onClick={handleResetOrder}
                   className="px-3 py-1.5 rounded-lg text-sm bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
-                  {t('重置', 'Reset')}
+                  {t('categoryPanel.reset')}
                 </Button>
               )}
             </div>
@@ -477,14 +467,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           {isReordering && (
             <div className="mb-3 p-3 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border dark:border-border dark:border-border">
               <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-                {t('提示：拖拽分类可快速调整顺序，或使用按钮进行置顶/置底操作', 'Tip: Drag categories to quickly reorder, or use buttons to move to top/bottom')}
+                {t('categoryPanel.tip-drag-categories-to-quickly-reorder-or-use-bu')}
               </p>
             </div>
           )}
 
           {allVisibleCategories.length === 0 ? (
             <p className="text-sm text-muted-foreground dark:text-muted-foreground py-4">
-              {t('暂无可见分类', 'No visible categories')}
+              {t('categoryPanel.no-visible-categories')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -525,11 +515,11 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     <>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                          {t('编辑分类', 'Edit Category')}
+                          {t('categoryPanel.edit-category')}
                         </span>
                         {isDefault && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
-                            {t('默认分类', 'Default Category')}
+                            {t('categoryPanel.default-category')}
                           </span>
                         )}
                       </div>
@@ -537,10 +527,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                       {isDefault && isModified && originalCategory && (
                         <div className="mb-2 p-2 bg-muted dark:bg-muted/40 rounded border border-border dark:border-border dark:border-border dark:border-border">
                           <p className="text-xs text-muted-foreground dark:text-muted-foreground ">
-                            {t(
-                              `已修改。原始值：${originalCategory.icon} ${originalCategory.name}`,
-                              `Modified. Original: ${originalCategory.icon} ${originalCategory.name}`
-                            )}
+                            {t('categoryPanel.modified-original-v1-v2', { v1: originalCategory.icon, v2: originalCategory.name })}
                           </p>
                         </div>
                       )}
@@ -549,7 +536,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         <div className="flex items-center space-x-2">
                           <Input
                             type="text"
-                            aria-label={t('编辑分类图标', 'Edit category icon')}
+                            aria-label={t('categoryPanel.edit-category-icon')}
                             value={editIcon}
                             onChange={(e) => {
                               const value = e.target.value;
@@ -563,29 +550,29 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                           />
                           <Input
                             type="text"
-                            aria-label={t('编辑分类名称', 'Edit category name')}
+                            aria-label={t('categoryPanel.edit-category-name')}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
                             className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                            placeholder={t('分类名称', 'Category name')}
+                            placeholder={t('categoryPanel.category-name-2')}
                           />
                         </div>
                         <div className="flex items-center space-x-2">
                           <Input
                             type="text"
-                            aria-label={t('编辑分类关键词', 'Edit category keywords')}
+                            aria-label={t('categoryPanel.edit-category-keywords')}
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
                             className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                            placeholder={t('关键词（逗号分隔）', 'Keywords (comma separated)')}
+                            placeholder={t('categoryPanel.keywords-comma-separated')}
                           />
                           <Button
                             size="icon"
                             onClick={handleSaveEdit}
                             disabled={!hasChanges}
                             className={`h-8 w-8 p-0 rounded ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground cursor-not-allowed'}`}
-                            aria-label={t('保存', 'Save')}
-                            title={t('保存', 'Save')}
+                            aria-label={t('categoryPanel.save')}
+                            title={t('categoryPanel.save')}
                           >
                             <Save className="w-4 h-4" />
                           </Button>
@@ -593,15 +580,15 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             size="icon"
                             onClick={handleCancelEdit}
                             className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
-                            aria-label={t('取消', 'Cancel')}
-                            title={t('取消', 'Cancel')}
+                            aria-label={t('categoryPanel.cancel')}
+                            title={t('categoryPanel.cancel')}
                           >
                             <X className="w-4 h-4" />
                           </Button>
                         </div>
                         {isDefault && isModified && (
                           <div className="flex items-center space-x-2 pt-1">
-                            <span className="text-xs text-muted-foreground dark:text-muted-foreground">{t('还原:', 'Reset:')}</span>
+                            <span className="text-xs text-muted-foreground dark:text-muted-foreground">{t('categoryPanel.reset-2')}</span>
                             {hasNameIconModified(category.id) && (
                               <Button
                                 onClick={() => {
@@ -613,7 +600,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 }}
                                 className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               >
-                                {t('名字/图标', 'Name/Icon')}
+                                {t('categoryPanel.name-icon')}
                               </Button>
                             )}
                             {hasKeywordsModified(category.id) && (
@@ -626,14 +613,14 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 }}
                                 className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                               >
-                                {t('关键词', 'Keywords')}
+                                {t('categoryPanel.keywords')}
                               </Button>
                             )}
                             <Button
                               onClick={() => handleResetDefault(category.id, originalCategory)}
                               className="h-auto rounded bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                             >
-                              {t('全部', 'All')}
+                              {t('categoryPanel.all')}
                             </Button>
                           </div>
                         )}
@@ -651,12 +638,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         </span>
                         {category.isCustom && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
-                            {t('自定义', 'Custom')}
+                            {t('categoryPanel.custom')}
                           </span>
                         )}
                         {!category.isCustom && isModified && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
-                            {t('已修改', 'Modified')}
+                            {t('categoryPanel.modified')}
                           </span>
                         )}
                       </div>
@@ -668,8 +655,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveToTop(index)}
                             disabled={index === 0}
                             className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('置顶', 'Move to top')}
-                            title={t('置顶', 'Move to top')}
+                            aria-label={t('categoryPanel.move-to-top')}
+                            title={t('categoryPanel.move-to-top')}
                           >
                             <ArrowUpToLine className="w-4 h-4" />
                           </Button>
@@ -678,8 +665,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveCategory(index, 'up')}
                             disabled={index === 0}
                             className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('上移', 'Move up')}
-                            title={t('上移', 'Move up')}
+                            aria-label={t('categoryPanel.move-up')}
+                            title={t('categoryPanel.move-up')}
                           >
                             <ArrowUp className="w-4 h-4" />
                           </Button>
@@ -688,8 +675,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveCategory(index, 'down')}
                             disabled={index === allVisibleCategories.length - 1}
                             className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('下移', 'Move down')}
-                            title={t('下移', 'Move down')}
+                            aria-label={t('categoryPanel.move-down')}
+                            title={t('categoryPanel.move-down')}
                           >
                             <ArrowDown className="w-4 h-4" />
                           </Button>
@@ -698,8 +685,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onClick={() => handleMoveToBottom(index)}
                             disabled={index === allVisibleCategories.length - 1}
                             className="rounded bg-muted p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                            aria-label={t('置底', 'Move to bottom')}
-                            title={t('置底', 'Move to bottom')}
+                            aria-label={t('categoryPanel.move-to-bottom')}
+                            title={t('categoryPanel.move-to-bottom')}
                           >
                             <ArrowDownToLine className="w-4 h-4" />
                           </Button>
@@ -712,8 +699,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 size="icon"
                                 onClick={() => handleStartEdit(category)}
                                 className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                aria-label={t('编辑', 'Edit')}
-                                title={t('编辑', 'Edit')}
+                                aria-label={t('categoryPanel.edit')}
+                                title={t('categoryPanel.edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
                               </Button>
@@ -721,8 +708,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 size="icon"
                                 onClick={() => handleDeleteCategory(category.id)}
                                 className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                aria-label={t('删除', 'Delete')}
-                                title={t('删除', 'Delete')}
+                                aria-label={t('categoryPanel.delete')}
+                                title={t('categoryPanel.delete')}
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -733,8 +720,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 size="icon"
                                 onClick={() => handleStartEdit(category)}
                                 className="h-8 w-8 rounded bg-muted p-0 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                                aria-label={t('编辑', 'Edit')}
-                                title={t('编辑', 'Edit')}
+                                aria-label={t('categoryPanel.edit')}
+                                title={t('categoryPanel.edit')}
                               >
                                 <Edit3 className="w-4 h-4" />
                               </Button>
@@ -742,8 +729,8 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 size="icon"
                                 onClick={() => hideDefaultCategory(category.id)}
                                 className="h-8 w-8 p-0 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent"
-                                aria-label={t('隐藏', 'Hide')}
-                                title={t('隐藏', 'Hide')}
+                                aria-label={t('categoryPanel.hide')}
+                                title={t('categoryPanel.hide')}
                               >
                                 <EyeOff className="w-4 h-4" />
                               </Button>
@@ -764,7 +751,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
           <div className="border-t border-border dark:border-border pt-4">
             <h4 className="font-medium text-foreground dark:text-foreground mb-3 flex items-center">
               <EyeOff className="w-4 h-4 mr-2" />
-              {t('隐藏的默认分类', 'Hidden Default Categories')}
+              {t('categoryPanel.hidden-default-categories')}
               <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
                 ({hiddenDefaultCategories.length})
               </span>
