@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "Encuentra almacenes similares",
     "find-similar": "Encuentra almacenes similares",
     "deselect": "Deseleccionar",
-    "select": "elegir"
+    "select": "elegir",
+    "last-pushed-time": "Envío reciente {{time}}",
+    "analyzed-on-date": "Analizado el {{date}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Editar información del almacén",

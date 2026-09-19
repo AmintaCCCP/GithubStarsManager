@@ -8,6 +8,8 @@
   },
   "discoveryView": {
     "all-loaded": "Все загружено",
+    "total-totalcount-items": "Всего {{totalCount}} элементов",
+    "loading": "загрузка…",
     "load-more": "загрузить больше",
     "total": "общий",
     "items": "предметы",
@@ -75,9 +77,7 @@
     "refresh-now": "Обновить сейчас",
     "loading-more": "Загрузка еще…",
     "retry": "Попробуйте еще раз",
-    "platform-filter-v1": "Фильтр платформы: {{v1}}",
-    "loading": "загрузка…",
-    "total-totalcount-items": "Всего {{totalCount}} элементов"
+    "platform-filter-v1": "Фильтр платформы: {{v1}}"
   },
   "weeklyIssueModal": {
     "submission-v1": "Вклад №{{v1}}",
@@ -98,7 +98,9 @@
     "ai-service-configuration-is-incomplete-please-ch": "Конфигурация службы AI не завершена. Проверьте конечную точку API, ключ и название модели.",
     "all-loaded-projects-have-been-analyzed": "Все загруженные проекты прошли анализ ИИ.",
     "ai-analysis-complete-successcount-succeeded-v2": "Анализ ИИ завершен! Успешно {{successCount}}{{v2}}",
-    "ai-analysis-failed-please-check-your-ai-configur": "Анализ AI не удался, проверьте конфигурацию AI."
+    "ai-analysis-failed-please-check-your-ai-configur": "Анализ AI не удался, проверьте конфигурацию AI.",
+    "ai-analysis-complete": "Анализ ИИ завершен! {{successCount}} успешно",
+    "ai-analysis-complete-with-failures": "Анализ ИИ завершен! {{successCount}} успешно, {{failCount}} не удалось"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "Не удалось отменить подписку Star. Проверьте сетевое соединение или разрешения токена GitHub.",

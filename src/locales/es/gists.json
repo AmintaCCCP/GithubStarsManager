@@ -64,7 +64,14 @@
     "new": "Nuevo",
     "v1-gists": "{{v1}} puntos esenciales en total",
     "search-applied": "Búsqueda aplicada",
-    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Aún no hay esencias. Haga clic en Sincronizar para obtener datos o crear una nueva esencia."
+    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Aún no hay esencias. Haga clic en Sincronizar para obtener datos o crear una nueva esencia.",
+    "sort-updated": "por hora de actualización",
+    "sort-created": "por el tiempo de creación",
+    "sort-name": "por nombre",
+    "sort-files": "Por número de archivos",
+    "category-all": "todas las esencias",
+    "category-starred": "esencia estelar",
+    "category-mine": "mi esencia"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "No se encontró el token de GitHub. Inicie sesión nuevamente.",
@@ -94,6 +101,9 @@
     "are-you-sure-you-want-to-delete-this-gist-this-c": "¿Estás seguro de que deseas eliminar esta esencia? Esta acción no se puede deshacer.",
     "delete": "borrar",
     "gist-deleted": "Esencia eliminada",
-    "failed-to-delete-gist-v1-v2": "No se pudo eliminar Gist{{v1}}{{v2}}"
+    "failed-to-delete-gist-v1-v2": "No se pudo eliminar Gist{{v1}}{{v2}}",
+    "gist-update-failed": "Error en la actualización esencial: {{message}}{{permissionNote}}",
+    "gist-create-failed": "Error al crear la esencia: {{message}}{{permissionNote}}",
+    "gist-permission-note": "(Confirme que el token haya verificado el permiso esencial y vuelva a ingresar el inicio de sesión del token en la configuración)"
   }
 }

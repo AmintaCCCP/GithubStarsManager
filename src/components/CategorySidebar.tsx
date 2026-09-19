@@ -417,7 +417,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                             ? 'bg-accent text-accent-foreground font-medium'
                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }`}
-                    title={category.id !== 'all' ? category.name + " — " + t('categorySidebar.drag-repository-cards-here-to-quickly-change-cat') : (isUncategorizeHotspot ? t('categorySidebar.drop-here-to-remove-category') : undefined)}
+                    title={category.id !== 'all' ? t('categorySidebar.drag-hint', { name: category.name }) : (isUncategorizeHotspot ? t('categorySidebar.drop-here-to-remove-category') : undefined)}
                     aria-pressed={isSelected}
                     aria-current={isSelected ? 'page' : undefined}
                   >
@@ -529,7 +529,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                     ? 'bg-accent text-accent-foreground font-medium'
                                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                             }`}
-                            title={category.id !== 'all' ? category.name + " — " + t('categorySidebar.drag-repository-cards-here-to-quickly-change-cat') : (isUncategorizeHotspot ? t('categorySidebar.uncategorize-drop-here-to-remove-category') : category.name)}
+                            title={category.id !== 'all' ? t('categorySidebar.drag-hint', { name: category.name }) : (isUncategorizeHotspot ? t('categorySidebar.uncategorize-drop-here-to-remove-category') : category.name)}
                             aria-label={isUncategorizeHotspot ? t('categorySidebar.uncategorize') : category.name}
                           >
                             {isUncategorizeHotspot ? <Undo2 className="h-4 w-4" /> : category.icon}
@@ -638,7 +638,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                                   ? 'bg-accent text-accent-foreground font-medium'
                                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                           } ${showText ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-3'}`}
-                          title={category.id !== 'all' ? category.name + " — " + t('categorySidebar.drag-repository-cards-here-to-quickly-change-cat') : (isUncategorizeHotspot ? t('categorySidebar.uncategorize-drop-here-to-remove-category') : undefined)}
+                          title={category.id !== 'all' ? t('categorySidebar.drag-hint', { name: category.name }) : (isUncategorizeHotspot ? t('categorySidebar.uncategorize-drop-here-to-remove-category') : undefined)}
                         >
                           <div className="flex items-center space-x-3 min-w-0 flex-1">
                             <span className="text-base flex-shrink-0">

@@ -22,7 +22,8 @@
     "original": "原文",
     "translated": "译文",
     "bilingual": "双语",
-    "translating": "翻译中…"
+    "translating": "翻译中…",
+    "content-already-in-language": "内容已是{{language}}，无需翻译"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "插件操作失败",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "折叠侧栏",
     "edit-category": "编辑分类",
     "delete-category": "删除分类",
-    "hide-default-category": "隐藏默认分类"
+    "hide-default-category": "隐藏默认分类",
+    "drag-hint": "{{name}} — 拖动仓库卡片到此处可快速修改分类"
   },
   "codeSearchView": {
     "show-less": "收起",
@@ -168,7 +170,13 @@
     "toggle-theme": "切换主题",
     "logout-confirmation": "退出登录确认",
     "logout": "退出登录",
-    "logout-only-clears-credentials-repositories-ai-a": "退出后仅清除登录凭证。仓库、AI 分析和分类等本地数据会保留；同一 GitHub 账号换 token 再登录会自动继承。如需完全清除所有数据，请前往「设置 → 数据管理」。"
+    "logout-only-clears-credentials-repositories-ai-a": "退出后仅清除登录凭证。仓库、AI 分析和分类等本地数据会保留；同一 GitHub 账号换 token 再登录会自动继承。如需完全清除所有数据，请前往「设置 → 数据管理」。",
+    "menu-repositories": "仓库",
+    "menu-gists": "Gist",
+    "menu-releases": "发布",
+    "menu-forks": "复刻",
+    "menu-subscription": "发现",
+    "menu-settings": "设置"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分类到 GitHub list"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "加载 README 失败，请检查网络连接或稍后重试",
     "failed-to-load-selected-readme-please-try-again": "加载所选 README 失败，请稍后重试",
     "loading-readme": "正在加载 README…",
-    "default-readme": "默认 README"
+    "default-readme": "默认 README",
+    "cycle-font-size": "切换字号"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "滚动到底部"
@@ -316,7 +325,8 @@
     "recent-updates": "近期更新",
     "within-30-days": "30天内",
     "search-query": "搜索查询:",
-    "ai-analyzed": "个已AI分析"
+    "ai-analyzed": "个已AI分析",
+    "ai-analyzed-count": "已 AI 分析 {{count}} 个仓库"
   },
   "searchShortcutsHelp": {
     "shortcuts": "快捷键",
@@ -907,7 +917,8 @@
     "copy-sse-json": "复制 SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "只读工具：gsm_status / gsm_search_repos / gsm_get_repo / gsm_list_categories / gsm_list_repos_by_category / gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "可选：gsm_vector_search（需已配置向量搜索）",
-    "prefer-streamable-http-json-above-if-the-client": "优先使用 Streamable HTTP（上面 JSON）。若客户端只支持旧版 SSE，用下方 SSE URL：GET 打开流后 POST 到 messages。"
+    "prefer-streamable-http-json-above-if-the-client": "优先使用 Streamable HTTP（上面 JSON）。若客户端只支持旧版 SSE，用下方 SSE URL：GET 打开流后 POST 到 messages。",
+    "status-with-value": "状态: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "菜单管理",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "插件安装目录会被删除。请选择是否同时删除该插件的存储数据和日志。",
     "cancel": "取消",
     "uninstall-keep-data": "保留数据并卸载",
-    "uninstall-and-delete-data": "卸载并删除数据"
+    "uninstall-and-delete-data": "卸载并删除数据",
+    "open-page-named": "打开页面：{{name}}"
   },
   "starSyncPanel": {
     "star-sync": "星标同步",
@@ -1099,7 +1111,10 @@
     "note-redeployment-does-not-require-recreating-th": "注意：更新部署不需要重新创建 Vectorize 索引，已有向量数据不受影响。",
     "must-rebuild-index-after-changing-embedding-mode": "更换 Embedding 模型后必须重建索引",
     "different-models-produce-vectors-with-different": "不同模型生成的向量维度不同，混用会导致查询失败。更换模型后需要：① 删除旧索引并创建新索引（维度需匹配） ② 点击下方「重建向量索引」",
-    "for-detailed-instructions-see": "详细部署指南请参考"
+    "for-detailed-instructions-see": "详细部署指南请参考",
+    "connection-successful-dimensions": "连接成功 — 维度: {{dimensions}}",
+    "connection-failed-detail": "连接失败：{{error}}",
+    "connection-successful-vectors": "连接成功 — 向量: {{vectorCount}}，维度: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "暂无仓库可回写",
     "no-repos-matched-any-category": "没有仓库命中任何分类",
     "pushed-v1-lists-updated-updatedcount-repos": "已同步 {{v1}} 个 list、更新 {{updatedCount}} 个仓库",
-    "push-failed": "同步失败"
+    "push-failed": "同步失败",
+    "push-failed-detail": "推送失败: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "{{count}} 分钟前",
+    "hours-ago": "{{count}} 小时前"
+  },
+  "forkCard": {
+    "run-workflow-named": "运行工作流：{{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} 字",
+    "tag-count": "{{count}} 个标签"
   }
 }

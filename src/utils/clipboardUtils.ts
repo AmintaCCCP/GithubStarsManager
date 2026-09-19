@@ -1,4 +1,5 @@
 import { makeT } from '../i18n/useT';
+import { getCurrentAppLanguage } from '../i18n';
 
 
 
@@ -48,7 +49,7 @@ export const isReadSupported = (): boolean => {
  */
 export const getClipboardErrorMessage = (
   operation: 'read' | 'write',
-  language: AppLanguage = 'zh'
+  language: AppLanguage = getCurrentAppLanguage()
 ): string => {
   const t = makeT(language, 'app');
   const support = checkClipboardSupport();

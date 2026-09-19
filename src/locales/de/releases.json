@@ -58,7 +58,7 @@
     "retry-ai-summary": "AI-Zusammenfassung erneut versuchen",
     "ai-summary-of-this-update": "AI fasst dieses Update zusammen",
     "summary": "Zusammenfassen",
-    "unsubscribe-from-releases": "Abonnieren Sie die Veröffentlichung",
+    "unsubscribe-from-releases": "Release-Abonnement beenden",
     "view-on-github": "Sehen Sie es sich auf GitHub an",
     "download-files": "Datei herunterladen",
     "asset-updated": "Asset aktualisiert",
@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "KI-Zusammenfassung",
     "analyzing-update": "Updates werden analysiert...",
-    "failed-to-generate-summary-please-try-again": "Die Generierung der Zusammenfassung ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+    "failed-to-generate-summary-please-try-again": "Die Generierung der Zusammenfassung ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "download-count": "{{count}} Downloads"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Die Plugin-Analyse ist fehlgeschlagen",

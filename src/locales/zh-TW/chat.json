@@ -86,14 +86,31 @@
     "task-depth-controls-retrieval-rounds-and-read-sc": "任務深度決定取證輪數與讀取範圍",
     "v1-rounds": "{{v1}} 輪",
     "current-default": "（當前預設）",
-    "rounds": "輪"
+    "rounds": "輪",
+    "stage-understanding": "理解問題",
+    "stage-planning": "制定閱讀計劃",
+    "stage-context": "查看專案結構",
+    "stage-retrieval": "閱讀相關資料",
+    "stage-verification": "評估問題是否已回答",
+    "stage-replanning": "補充閱讀計劃",
+    "stage-escalation": "補充實現細節",
+    "stage-answer": "整理最終回答",
+    "stage-tool": "工具調用",
+    "depth-default": "預設",
+    "depth-default-desc": "跟隨設定中的進階參數",
+    "depth-quick": "快速",
+    "depth-deep": "深入",
+    "depth-deep-desc": "多輪取證並讀取程式碼，適合細節與對比",
+    "depth-unlimited": "不限",
+    "depth-unlimited-desc": "放開所有限制，注意耗時與額度",
+    "depth-quick-desc": "少量文檔取證，盡快出答"
   },
   "citationBadge": {
     "open-source-path-linestart": "看來源 {{path}}:{{lineStart}}",
     "click-to-open-the-source-on-github": "點選開啟 GitHub 對應位置"
   },
   "useRepositoryChat": {
-    "the-ai-service-is-temporarily-unavailable-your-q": "AI 服務暫時無法使用。问题和已读取的仓库证据已保留，请稍后重试。",
+    "the-ai-service-is-temporarily-unavailable-your-q": "AI 服務暫時無法使用。問題與已讀取的倉庫證據已保留，請稍後重試。",
     "answer-generation-failed-check-the-ai-configurat": "回答生成失敗。請檢查 AI 配置後重試。",
     "repository-chat-is-disabled-in-ai-settings": "倉庫問答已在 AI 配置中關閉。",
     "configure-a-github-token-first": "請先設定 GitHub token。",

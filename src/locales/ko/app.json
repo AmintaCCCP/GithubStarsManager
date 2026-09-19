@@ -22,7 +22,8 @@
     "original": "원래의",
     "translated": "번역",
     "bilingual": "이중 언어",
-    "translating": "번역 중…"
+    "translating": "번역 중…",
+    "content-already-in-language": "콘텐츠가 이미 {{language}}이므로 번역할 필요가 없습니다."
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "플러그인 작업 실패",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "사이드바 접기",
     "edit-category": "카테고리 수정",
     "delete-category": "카테고리 삭제",
-    "hide-default-category": "기본 카테고리 숨기기"
+    "hide-default-category": "기본 카테고리 숨기기",
+    "drag-hint": "{{name}} - 분류를 빠르게 수정하려면 창고 카드를 여기로 드래그하세요."
   },
   "codeSearchView": {
     "show-less": "닫다",
@@ -168,7 +170,13 @@
     "toggle-theme": "테마 전환",
     "logout-confirmation": "로그아웃 확인",
     "logout": "로그아웃",
-    "logout-only-clears-credentials-repositories-ai-a": "로그아웃 후에는 로그인 자격 증명만 지워집니다. 창고, AI 분석, 분류 등의 로컬 데이터는 유지됩니다. 토큰을 변경하고 동일한 GitHub 계정으로 다시 로그인하면 자동으로 상속됩니다. 모든 데이터를 완전히 삭제하려면 \"설정 → 데이터 관리\"로 이동하세요."
+    "logout-only-clears-credentials-repositories-ai-a": "로그아웃 후에는 로그인 자격 증명만 지워집니다. 창고, AI 분석, 분류 등의 로컬 데이터는 유지됩니다. 토큰을 변경하고 동일한 GitHub 계정으로 다시 로그인하면 자동으로 상속됩니다. 모든 데이터를 완전히 삭제하려면 \"설정 → 데이터 관리\"로 이동하세요.",
+    "menu-gists": "Gist",
+    "menu-repositories": "창고",
+    "menu-releases": "풀어 주다",
+    "menu-forks": "레플리카",
+    "menu-subscription": "발견하다",
+    "menu-settings": "설정"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "카테고리를 GitHub 목록에 동기화"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "README를 로드하지 못했습니다. 네트워크 연결을 확인하거나 나중에 다시 시도하세요.",
     "failed-to-load-selected-readme-please-try-again": "선택한 README를 로드하지 못했습니다. 나중에 다시 시도해 주세요.",
     "loading-readme": "추가 정보 로드 중…",
-    "default-readme": "기본 읽어보기"
+    "default-readme": "기본 읽어보기",
+    "cycle-font-size": "글꼴 크기 전환"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "맨 아래로 스크롤"
@@ -316,7 +325,8 @@
     "recent-updates": "최근 업데이트",
     "within-30-days": "30일 이내",
     "search-query": "검색어:",
-    "ai-analyzed": "AI가 분석한"
+    "ai-analyzed": "AI가 분석한",
+    "ai-analyzed-count": "{{count}} 창고가 AI로 분석되었습니다."
   },
   "searchShortcutsHelp": {
     "shortcuts": "단축키",
@@ -907,7 +917,8 @@
     "copy-sse-json": "SSE JSON 복사",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "읽기 전용 도구: gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "선택사항: gsm_Vector_search(벡터 검색을 구성해야 함)",
-    "prefer-streamable-http-json-above-if-the-client": "스트리밍 가능한 HTTP(위의 JSON)를 선호하세요. 클라이언트가 이전 버전의 SSE만 지원하는 경우 SSE URL: GET을 사용하여 스트림을 연 다음 메시지에 POST를 수행합니다."
+    "prefer-streamable-http-json-above-if-the-client": "스트리밍 가능한 HTTP(위의 JSON)를 선호하세요. 클라이언트가 이전 버전의 SSE만 지원하는 경우 SSE URL: GET을 사용하여 스트림을 연 다음 메시지에 POST를 수행합니다.",
+    "status-with-value": "상태: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "메뉴 관리",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "플러그인 설치 디렉터리가 삭제됩니다. 플러그인에 저장된 데이터와 로그를 동시에 삭제할지 여부를 선택해 주세요.",
     "cancel": "취소",
     "uninstall-keep-data": "데이터 보관 및 제거",
-    "uninstall-and-delete-data": "데이터 제거 및 삭제"
+    "uninstall-and-delete-data": "데이터 제거 및 삭제",
+    "open-page-named": "페이지 열기: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "스타싱크",
@@ -1099,7 +1111,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "Embedding 모델을 교체한 후 인덱스를 다시 작성해야 합니다.",
     "different-models-produce-vectors-with-different": "서로 다른 모델에서 생성된 벡터 차원은 다르므로 이를 혼합하면 쿼리 오류가 발생합니다. 모델을 교체한 후 다음을 수행해야 합니다. ① 기존 인덱스를 삭제하고 새 인덱스를 생성합니다(치수가 일치해야 함). ② 아래의 \"벡터 인덱스 재구축\"을 클릭합니다.",
     "for-detailed-instructions-see": "자세한 배포 가이드를 참조하세요.",
-    "text": ")"
+    "text": "텍스트",
+    "connection-failed-detail": "연결 실패: {{error}}",
+    "connection-successful-vectors": "연결 성공 — 벡터: {{vectorCount}}, 크기: {{dimensions}}",
+    "connection-successful-dimensions": "연결 성공 - 측정기준: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV 구성",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "현재 다시 쓸 창고가 없습니다.",
     "no-repos-matched-any-category": "카테고리에 해당하는 창고가 없습니다.",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} 목록이 동기화되었으며 {{updatedCount}} 창고가 업데이트되었습니다.",
-    "push-failed": "동기화 실패"
+    "push-failed": "동기화 실패",
+    "push-failed-detail": "푸시 실패: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "{{count}}분 전",
+    "hours-ago": "{{count}}시간 전"
+  },
+  "forkCard": {
+    "run-workflow-named": "워크플로 실행: {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} 단어",
+    "tag-count": "{{count}} 태그"
   }
 }

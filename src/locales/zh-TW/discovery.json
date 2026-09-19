@@ -98,7 +98,9 @@
     "ai-service-configuration-is-incomplete-please-ch": "AI服務配置不完整，請檢查API端點、金鑰和模型名稱。",
     "all-loaded-projects-have-been-analyzed": "已載入的所有項目均已完成AI分析。",
     "ai-analysis-complete-successcount-succeeded-v2": "AI分析完成！成功 {{successCount}} 個{{v2}}",
-    "ai-analysis-failed-please-check-your-ai-configur": "AI分析失敗，請檢查AI配置。"
+    "ai-analysis-failed-please-check-your-ai-configur": "AI分析失敗，請檢查AI配置。",
+    "ai-analysis-complete": "AI分析完成！成功 {{successCount}} 個",
+    "ai-analysis-complete-with-failures": "AI分析完成！成功 {{successCount}} 個，失敗 {{failCount}} 個"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "取消 Star 失敗，請檢查網路連線或 GitHub Token 權限。",

@@ -139,7 +139,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
           </code>
           {stats.aiAnalyzed > 0 && (
             <span className="ml-2 text-xs text-success">
-              {stats.aiAnalyzed} {t('searchResultStats.ai-analyzed')}
+              {t('searchResultStats.ai-analyzed-count', { count: stats.aiAnalyzed })}
             </span>
           )}
         </div>

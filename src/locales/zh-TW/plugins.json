@@ -11,7 +11,7 @@
     "unfollowed-v1": "已取消關注 @{{v1}}。",
     "telegram-channels-settings": "Telegram 頻道設定",
     "refreshing-incrementally-pulls-the-latest-messag": "刷新時增量拉取關注頻道的最新消息，訊息中包含 GitHub 倉庫連結的條目會顯示為清單項目；\"載入更多\"按頁抓取更早的歷史訊息。資料由應用程式直連 t.me 公開預覽抓取，需要桌面版或服務端模式（純瀏覽器模式受跨網域限制）；私有頻道無法抓取。",
-    "follow-list": "注意列表",
+    "follow-list": "關注清單",
     "accepts-a-t-me-channel-url-name-or-a-bare-channe": "支援 t.me 頻道連結、@頻道名稱或裸頻道名稱。刷新时逐个频道抓取最新消息。",
     "enter-a-valid-channel-name": "請輸入有效的頻道名稱。",
     "fill-in-or-add-a-channel-to-test-first": "請先填寫或新增一個頻道進行測試。",
@@ -80,7 +80,8 @@
     "custom-endpoint": "自訂服務",
     "allow-plugin-ai-request": "允許插件調用 AI？",
     "the-host-may-relay-this-through-its-configured-b": "可能經已啟用的宿主後端代理轉發。",
-    "send-to-ai": "發送給 AI"
+    "send-to-ai": "發送給 AI",
+    "allow-plugin-ai-body": "外掛程式 {{pluginName}} 請求使用 AI 來配置「{{configName}}」（模型 {{model}}）。\n目標位址: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nUser:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "允許插件連網搜尋？",

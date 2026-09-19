@@ -161,7 +161,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             <AlertCircle className="w-4 h-4 text-muted-foreground" />
           )}
           <span className="text-muted-foreground dark:text-muted-foreground">
-            {t('mcpSettingsPanel.status')}: {statusLabel}
+            {t('mcpSettingsPanel.status-with-value', { status: statusLabel })}
           </span>
           {backendMode && (
             <Button

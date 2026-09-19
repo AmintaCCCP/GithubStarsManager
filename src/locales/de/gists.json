@@ -64,7 +64,14 @@
     "new": "Neu",
     "v1-gists": "Insgesamt {{v1}} Gists",
     "search-applied": "Suche angewendet",
-    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Es gibt noch keine Kernaussagen. Klicken Sie auf „Synchronisieren“, um Daten abzurufen oder einen neuen Gist zu erstellen."
+    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Es gibt noch keine Kernaussagen. Klicken Sie auf „Synchronisieren“, um Daten abzurufen oder einen neuen Gist zu erstellen.",
+    "sort-created": "nach Erstellungszeit",
+    "sort-updated": "nach Aktualisierungszeit",
+    "sort-files": "Nach Anzahl der Dateien",
+    "sort-name": "mit Namen",
+    "category-starred": "Der Kern des Sterns",
+    "category-all": "Alles Wesentliche",
+    "category-mine": "mein Kern"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub-Token nicht gefunden, bitte melden Sie sich erneut an.",
@@ -94,6 +101,9 @@
     "are-you-sure-you-want-to-delete-this-gist-this-c": "Sind Sie sicher, dass Sie diesen Kerninhalt löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
     "delete": "löschen",
     "gist-deleted": "Wesentlich gelöscht",
-    "failed-to-delete-gist-v1-v2": "Gist konnte nicht gelöscht werden{{v1}}{{v2}}"
+    "failed-to-delete-gist-v1-v2": "Gist konnte nicht gelöscht werden{{v1}}{{v2}}",
+    "gist-update-failed": "Kernaktualisierung fehlgeschlagen: {{message}}{{permissionNote}}",
+    "gist-create-failed": "Kernerstellung fehlgeschlagen: {{message}}{{permissionNote}}",
+    "gist-permission-note": "(Bitte bestätigen Sie, dass das Token die Kernberechtigung überprüft hat, und geben Sie die Token-Anmeldung erneut in den Einstellungen ein.)"
   }
 }

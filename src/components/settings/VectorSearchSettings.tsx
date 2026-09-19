@@ -354,8 +354,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {embeddingTestResult.success ? <CheckCircle className="h-4 w-4" aria-hidden="true" /> : <XCircle className="h-4 w-4" aria-hidden="true" />}
             <AlertDescription>
               {embeddingTestResult.success
-                ? `${t('vectorSearchSettings.connection-successful')} — ${t('vectorSearchSettings.dimensions')}: ${embeddingTestResult.dimensions}`
-                : `${t('vectorSearchSettings.connection-failed')}: ${embeddingTestResult.error}`}
+                ? t('vectorSearchSettings.connection-successful-dimensions', { dimensions: embeddingTestResult.dimensions })
+                : t('vectorSearchSettings.connection-failed-detail', { error: embeddingTestResult.error }) }
             </AlertDescription>
           </Alert>
         )}
@@ -427,8 +427,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {workerTestResult.success ? <CheckCircle className="h-4 w-4" aria-hidden="true" /> : <XCircle className="h-4 w-4" aria-hidden="true" />}
             <AlertDescription>
               {workerTestResult.success
-                ? `${t('vectorSearchSettings.connection-successful')} — ${t('vectorSearchSettings.vectors')}: ${workerTestResult.vectorCount}, ${t('vectorSearchSettings.dimensions')}: ${workerTestResult.dimensions}`
-                : `${t('vectorSearchSettings.connection-failed')}: ${workerTestResult.error}`}
+                ? t('vectorSearchSettings.connection-successful-vectors', { vectorCount: workerTestResult.vectorCount, dimensions: workerTestResult.dimensions })
+                : t('vectorSearchSettings.connection-failed-detail', { error: workerTestResult.error }) }
             </AlertDescription>
           </Alert>
         )}

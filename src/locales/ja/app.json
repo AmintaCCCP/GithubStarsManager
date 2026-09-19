@@ -22,7 +22,8 @@
     "original": "オリジナル",
     "translated": "翻訳",
     "bilingual": "バイリンガル",
-    "translating": "翻訳中…"
+    "translating": "翻訳中…",
+    "content-already-in-language": "コンテンツはすでに {{language}} なので、翻訳する必要はありません"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "プラグインの操作に失敗しました",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "サイドバーを折りたたむ",
     "edit-category": "カテゴリを編集する",
     "delete-category": "カテゴリの削除",
-    "hide-default-category": "デフォルトのカテゴリを非表示にする"
+    "hide-default-category": "デフォルトのカテゴリを非表示にする",
+    "drag-hint": "{{name}} - 倉庫カードをここにドラッグすると、分類をすばやく変更できます"
   },
   "codeSearchView": {
     "show-less": "近い",
@@ -168,7 +170,13 @@
     "toggle-theme": "テーマを切り替える",
     "logout-confirmation": "ログアウトの確認",
     "logout": "ログアウト",
-    "logout-only-clears-credentials-repositories-ai-a": "ログアウト後にクリアされるのは、ログイン資格情報のみです。倉庫、AI 分析、分類などのローカル データは保持されます。トークンを変更して同じGitHubアカウントで再度ログインすると自動的に引き継がれます。すべてのデータを完全に消去するには、「設定→データ管理」に移動します。"
+    "logout-only-clears-credentials-repositories-ai-a": "ログアウト後にクリアされるのは、ログイン資格情報のみです。倉庫、AI 分析、分類などのローカル データは保持されます。トークンを変更して同じGitHubアカウントで再度ログインすると自動的に引き継がれます。すべてのデータを完全に消去するには、「設定→データ管理」に移動します。",
+    "menu-gists": "Gist",
+    "menu-repositories": "倉庫",
+    "menu-releases": "リリース",
+    "menu-forks": "レプリカ",
+    "menu-subscription": "発見する",
+    "menu-settings": "設定"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "カテゴリを GitHub リストに同期する"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "README をロードできませんでした。ネットワーク接続を確認するか、後でもう一度試してください。",
     "failed-to-load-selected-readme-please-try-again": "選択した README をロードできませんでした。後でもう一度お試しください。",
     "loading-readme": "READMEを読み込み中…",
-    "default-readme": "デフォルトの README"
+    "default-readme": "デフォルトの README",
+    "cycle-font-size": "フォントサイズを切り替える"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "一番下までスクロールする"
@@ -316,7 +325,8 @@
     "recent-updates": "最近の更新",
     "within-30-days": "30日以内",
     "search-query": "検索クエリ:",
-    "ai-analyzed": "AIで分析した"
+    "ai-analyzed": "AIで分析した",
+    "ai-analyzed-count": "{{count}} 個の倉庫が AI によって分析されました"
   },
   "searchShortcutsHelp": {
     "shortcuts": "ショートカットキー",
@@ -907,7 +917,8 @@
     "copy-sse-json": "SSE JSON をコピー",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "読み取り専用ツール: gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "オプション: gsm_vector_search (ベクトル検索を構成する必要があります)",
-    "prefer-streamable-http-json-above-if-the-client": "ストリーミング可能な HTTP (上記の JSON) を優先します。クライアントが古いバージョンの SSE のみをサポートしている場合は、次の SSE URL を使用します: GET でストリームを開き、メッセージに POST します。"
+    "prefer-streamable-http-json-above-if-the-client": "ストリーミング可能な HTTP (上記の JSON) を優先します。クライアントが古いバージョンの SSE のみをサポートしている場合は、次の SSE URL を使用します: GET でストリームを開き、メッセージに POST します。",
+    "status-with-value": "ステータス: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "メニュー管理",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "プラグインのインストールディレクトリが削除されます。プラグインの保存データとログを同時に削除するかどうかを選択してください。",
     "cancel": "キャンセル",
     "uninstall-keep-data": "データを保持してアンインストールする",
-    "uninstall-and-delete-data": "データのアンインストールと削除"
+    "uninstall-and-delete-data": "データのアンインストールと削除",
+    "open-page-named": "ページを開く: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "スターシンク",
@@ -1099,7 +1111,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "埋め込みモデルを置き換えた後、インデックスを再構築する必要があります",
     "different-models-produce-vectors-with-different": "異なるモデルによって生成されるベクトルの次元は異なるため、それらを混合するとクエリが失敗する原因になります。モデルを置き換えた後、次の操作を行う必要があります。 ① 古いインデックスを削除し、新しいインデックスを作成します (次元が一致している必要があります) ② 下の「ベクトル インデックスの再構築」をクリックします。",
     "for-detailed-instructions-see": "詳細な導入ガイドを参照してください。",
-    "text": ")"
+    "text": "テキスト",
+    "connection-failed-detail": "接続に失敗しました: {{error}}",
+    "connection-successful-dimensions": "接続成功 - ディメンション: {{dimensions}}",
+    "connection-successful-vectors": "接続成功 — ベクトル: {{vectorCount}}、次元: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV設定",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "現在、書き戻すウェアハウスがありません",
     "no-repos-matched-any-category": "どのカテゴリにも該当する倉庫はありません",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} 個のリストが同期され、{{updatedCount}} 個のウェアハウスが更新されました。",
-    "push-failed": "同期に失敗しました"
+    "push-failed": "同期に失敗しました",
+    "push-failed-detail": "プッシュに失敗しました: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "{{count}}分前",
+    "hours-ago": "{{count}}時間前"
+  },
+  "forkCard": {
+    "run-workflow-named": "ワークフローの実行: {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}}語",
+    "tag-count": "{{count}} 個のタグ"
   }
 }

@@ -33,7 +33,7 @@ export function usePluginAI() {
     try { destination = new URL(config.baseUrl).origin; } catch { /* Provider name remains visible. */ }
     const approved = await confirm(
       t('usePluginAI.allow-plugin-ai-request'),
-      `${pluginName}\n${config.name} · ${config.model}\n${destination}\n${t('usePluginAI.the-host-may-relay-this-through-its-configured-b')}\n\nSystem:\n${system}\n\nUser:\n${user}`,
+      t('usePluginAI.allow-plugin-ai-body', { pluginName, configName: config.name, model: config.model, destination, relayNote: t('usePluginAI.the-host-may-relay-this-through-its-configured-b'), system, user }),
       { confirmText: t('usePluginAI.send-to-ai'), type: 'warning' },
     );
     if (!approved) {

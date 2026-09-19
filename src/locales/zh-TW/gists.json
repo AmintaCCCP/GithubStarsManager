@@ -64,7 +64,14 @@
     "new": "新建",
     "v1-gists": "共 {{v1}} 個 gist",
     "search-applied": "已應用程式搜尋",
-    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "暫無 gist。點選同步取得數據，或新建一個 gist。"
+    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "暫無 gist。點選同步取得數據，或新建一個 gist。",
+    "sort-created": "按創建時間",
+    "sort-updated": "按更新時間",
+    "sort-name": "按名稱",
+    "sort-files": "按文件數",
+    "category-starred": "星標 gist",
+    "category-all": "全部 gist",
+    "category-mine": "我的 gist"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub token 找不到，請重新登入。",
@@ -94,6 +101,9 @@
     "are-you-sure-you-want-to-delete-this-gist-this-c": "確定要刪除這個 gist 嗎？此操作不可撤銷。",
     "delete": "刪除",
     "gist-deleted": "Gist 已刪除",
-    "failed-to-delete-gist-v1-v2": "刪除 Gist 失敗{{v1}}{{v2}}"
+    "failed-to-delete-gist-v1-v2": "刪除 Gist 失敗{{v1}}{{v2}}",
+    "gist-update-failed": "Gist 更新失敗：{{message}}{{permissionNote}}",
+    "gist-create-failed": "Gist 建立失敗：{{message}}{{permissionNote}}",
+    "gist-permission-note": "（請確認 token 已勾選 gist 權限，並在設定中重新輸入 token 登入）"
   }
 }

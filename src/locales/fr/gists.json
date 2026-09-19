@@ -64,7 +64,14 @@
     "new": "Nouveau",
     "v1-gists": "{{v1}} résumés au total",
     "search-applied": "Recherche appliquée",
-    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Il n’y a pas encore d’essentiel. Cliquez sur Synchroniser pour obtenir des données ou créer un nouvel aperçu."
+    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Il n’y a pas encore d’essentiel. Cliquez sur Synchroniser pour obtenir des données ou créer un nouvel aperçu.",
+    "sort-updated": "par heure de mise à jour",
+    "sort-created": "par heure de création",
+    "sort-name": "par nom",
+    "category-all": "tout l'essentiel",
+    "sort-files": "Par nombre de fichiers",
+    "category-starred": "l'essentiel des étoiles",
+    "category-mine": "mon résumé"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "Jeton GitHub introuvable, veuillez vous reconnecter.",
@@ -94,6 +101,9 @@
     "are-you-sure-you-want-to-delete-this-gist-this-c": "Êtes-vous sûr de vouloir supprimer cet élément essentiel ? Cette action ne peut pas être annulée.",
     "delete": "supprimer",
     "gist-deleted": "L'essentiel a été supprimé",
-    "failed-to-delete-gist-v1-v2": "Échec de la suppression de Gist{{v1}}{{v2}}"
+    "failed-to-delete-gist-v1-v2": "Échec de la suppression de Gist{{v1}}{{v2}}",
+    "gist-create-failed": "Échec de la création de l'essentiel : {{message}}{{permissionNote}}",
+    "gist-update-failed": "Échec de la mise à jour générale : {{message}}{{permissionNote}}",
+    "gist-permission-note": "(Veuillez confirmer que le jeton a vérifié l'autorisation essentielle et ressaisissez la connexion du jeton dans les paramètres)"
   }
 }

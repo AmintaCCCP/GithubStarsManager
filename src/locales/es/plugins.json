@@ -80,7 +80,8 @@
     "custom-endpoint": "Servicios personalizados",
     "allow-plugin-ai-request": "¿Permitir que los complementos llamen a la IA?",
     "the-host-may-relay-this-through-its-configured-b": "Puede ser reenviado por un proxy backend de alojamiento habilitado.",
-    "send-to-ai": "Enviar a IA"
+    "send-to-ai": "Enviar a IA",
+    "allow-plugin-ai-body": "El complemento {{pluginName}} solicitó utilizar la configuración de IA \"{{configName}}\" (modelo {{model}}).\nDirección de destino: {{destination}}\n{{relayNote}}\n\nSistema:\n{{system}}\n\nUsuario:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "¿Permitir la búsqueda de red de complementos?",

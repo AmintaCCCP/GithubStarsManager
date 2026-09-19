@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "查找相似仓库",
     "find-similar": "查找相似仓库",
     "deselect": "取消选择",
-    "select": "选择"
+    "select": "选择",
+    "analyzed-on-date": "分析于 {{date}}",
+    "last-pushed-time": "最近提交 {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "编辑仓库信息",

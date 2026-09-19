@@ -80,7 +80,8 @@
     "custom-endpoint": "Таможенные услуги",
     "allow-plugin-ai-request": "Разрешить плагинам вызывать ИИ?",
     "the-host-may-relay-this-through-its-configured-b": "Может быть перенаправлен включенным серверным прокси-сервером хостинга.",
-    "send-to-ai": "Отправить в ИИ"
+    "send-to-ai": "Отправить в ИИ",
+    "allow-plugin-ai-body": "Плагин {{pluginName}} запросил использование конфигурации AI \"{{configName}}\" (модель {{model}}).\nАдрес назначения: {{destination}}\n{{relayNote}}\n\nСистема:\n{{system}}\n\nПользователь:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "Разрешить поиск сети подключаемым модулем?",

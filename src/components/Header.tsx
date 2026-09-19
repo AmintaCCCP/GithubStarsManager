@@ -94,7 +94,7 @@ export const Header: React.FC = () => {
             {visibleMenus.map(menuItem => {
                         const meta = MENU_META[menuItem.id];
               const Icon = meta.icon;
-              const label = tPair(meta.labelZh, meta.labelEn);
+              const label = t(`header.menu-${menuItem.id}`);
               const isActive = currentView === menuItem.id;
               return (
                 <Button

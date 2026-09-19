@@ -98,7 +98,9 @@
     "ai-service-configuration-is-incomplete-please-ch": "AI service configuration is incomplete. Please check the API endpoint, key, and model name.",
     "all-loaded-projects-have-been-analyzed": "All loaded projects have been analyzed.",
     "ai-analysis-complete-successcount-succeeded-v2": "AI analysis complete! {{successCount}} succeeded{{v2}}",
-    "ai-analysis-failed-please-check-your-ai-configur": "AI analysis failed. Please check your AI configuration."
+    "ai-analysis-failed-please-check-your-ai-configur": "AI analysis failed. Please check your AI configuration.",
+    "ai-analysis-complete": "AI analysis complete! {{successCount}} succeeded",
+    "ai-analysis-complete-with-failures": "AI analysis complete! {{successCount}} succeeded, {{failCount}} failed"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "Failed to unstar repository. Please check your network connection or GitHub Token permissions.",

@@ -88,10 +88,11 @@ function removeUnusedAt(content, line, name) {
 for (const [file, issues] of fileIssues) {
   const filePath = path.join(rootDir, file);
   let content = readFileSync(filePath, 'utf8');
-  content = normalizeImports(content);
-  for (const { line, name } of issues) {
+  // 先按 tsc 行号降序移除（避免行号偏移），再归一化 import（会增删行）
+  for (const { line, name } of [...issues].sort((a, b) => b.line - a.line)) {
     content = removeUnusedAt(content, line, name);
   }
+  content = normalizeImports(content);
   writeFileSync(filePath, content);
   console.log(`cleaned ${file} (${issues.length} issues)`);
 }

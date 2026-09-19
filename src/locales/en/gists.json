@@ -64,7 +64,14 @@
     "new": "New",
     "v1-gists": "{{v1}} gists",
     "search-applied": "Search applied",
-    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "No gists yet. Sync to fetch data, or create a new gist."
+    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "No gists yet. Sync to fetch data, or create a new gist.",
+    "sort-updated": "Updated",
+    "sort-created": "Created",
+    "sort-name": "Name",
+    "sort-files": "Files",
+    "category-all": "All gists",
+    "category-starred": "Starred gists",
+    "category-mine": "My gists"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub token not found. Please login again.",
@@ -94,6 +101,9 @@
     "are-you-sure-you-want-to-delete-this-gist-this-c": "Are you sure you want to delete this gist? This cannot be undone.",
     "delete": "Delete",
     "gist-deleted": "Gist deleted",
-    "failed-to-delete-gist-v1-v2": "Failed to delete gist{{v1}}{{v2}}"
+    "failed-to-delete-gist-v1-v2": "Failed to delete gist{{v1}}{{v2}}",
+    "gist-update-failed": "Failed to update Gist: {{message}}{{permissionNote}}",
+    "gist-create-failed": "Failed to create Gist: {{message}}{{permissionNote}}",
+    "gist-permission-note": " (Please confirm the token has gist scope, then re-enter the token in Settings to log in again)"
   }
 }

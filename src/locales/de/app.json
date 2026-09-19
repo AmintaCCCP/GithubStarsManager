@@ -22,7 +22,8 @@
     "translated": "Übersetzung",
     "bilingual": "zweisprachig",
     "translating": "Übersetzen…",
-    "original": "Original"
+    "original": "Original",
+    "content-already-in-language": "Der Inhalt ist bereits {{language}} und muss nicht übersetzt werden"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "Der Plug-in-Vorgang ist fehlgeschlagen",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "Seitenleiste einklappen",
     "edit-category": "Kategorie bearbeiten",
     "delete-category": "Kategorie löschen",
-    "hide-default-category": "Standardkategorien ausblenden"
+    "hide-default-category": "Standardkategorien ausblenden",
+    "drag-hint": "{{name}} – Ziehen Sie die Lagerkarte hierher, um die Klassifizierung schnell zu ändern"
   },
   "codeSearchView": {
     "show-less": "schließen",
@@ -168,7 +170,13 @@
     "toggle-theme": "Thema wechseln",
     "logout-confirmation": "Abmeldebestätigung",
     "logout": "Abmelden",
-    "logout-only-clears-credentials-repositories-ai-a": "Nach der Abmeldung werden nur die Anmeldedaten gelöscht. Lokale Daten wie Lager, KI-Analyse und Klassifizierung bleiben erhalten; Es wird automatisch vererbt, wenn Sie das Token ändern und sich erneut mit demselben GitHub-Konto anmelden. Um alle Daten vollständig zu löschen, gehen Sie zu „Einstellungen → Datenverwaltung“."
+    "logout-only-clears-credentials-repositories-ai-a": "Nach der Abmeldung werden nur die Anmeldedaten gelöscht. Lokale Daten wie Lager, KI-Analyse und Klassifizierung bleiben erhalten; Es wird automatisch vererbt, wenn Sie das Token ändern und sich erneut mit demselben GitHub-Konto anmelden. Um alle Daten vollständig zu löschen, gehen Sie zu „Einstellungen → Datenverwaltung“.",
+    "menu-gists": "Gist",
+    "menu-repositories": "Lagerhaus",
+    "menu-releases": "freigeben",
+    "menu-forks": "Replik",
+    "menu-subscription": "Entdecken",
+    "menu-settings": "aufstellen"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Kategorien mit der GitHub-Liste synchronisieren"
@@ -218,7 +226,8 @@
     "failed-to-load-selected-readme-please-try-again": "Die ausgewählte README-Datei konnte nicht geladen werden. Bitte versuchen Sie es später noch einmal",
     "loading-readme": "README wird geladen…",
     "default-readme": "Standard-README",
-    "original": "Original"
+    "original": "Original",
+    "cycle-font-size": "Schriftgröße ändern"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "nach unten scrollen"
@@ -316,7 +325,8 @@
     "recent-updates": "Aktuelle Updates",
     "within-30-days": "Innerhalb von 30 Tagen",
     "search-query": "Suchanfrage:",
-    "ai-analyzed": "von KI analysiert"
+    "ai-analyzed": "von KI analysiert",
+    "ai-analyzed-count": "{{count}} Lagerhäuser wurden von KI analysiert"
   },
   "searchShortcutsHelp": {
     "shortcuts": "Tastenkombination",
@@ -907,7 +917,8 @@
     "copy-sse-json": "Kopieren Sie SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "Schreibgeschützte Tools: gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "Optional: gsm_vector_search (Vektorsuche muss konfiguriert sein)",
-    "prefer-streamable-http-json-above-if-the-client": "Bevorzugen Sie Streamable HTTP (JSON oben). Wenn der Client nur die alte Version von SSE unterstützt, verwenden Sie die folgende SSE-URL: GET, um den Stream zu öffnen, und dann POST an Nachrichten."
+    "prefer-streamable-http-json-above-if-the-client": "Bevorzugen Sie Streamable HTTP (JSON oben). Wenn der Client nur die alte Version von SSE unterstützt, verwenden Sie die folgende SSE-URL: GET, um den Stream zu öffnen, und dann POST an Nachrichten.",
+    "status-with-value": "Status: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "Menüverwaltung",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "Das Plug-in-Installationsverzeichnis wird gelöscht. Bitte wählen Sie aus, ob gleichzeitig auch die gespeicherten Daten und Protokolle des Plug-ins gelöscht werden sollen.",
     "cancel": "Stornieren",
     "uninstall-keep-data": "Daten behalten und deinstallieren",
-    "uninstall-and-delete-data": "Daten deinstallieren und löschen"
+    "uninstall-and-delete-data": "Daten deinstallieren und löschen",
+    "open-page-named": "Seite öffnen: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "Star-Synchronisierung",
@@ -1099,7 +1111,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "Der Index muss nach dem Ersetzen des Einbettungsmodells neu erstellt werden",
     "different-models-produce-vectors-with-different": "Die von verschiedenen Modellen generierten Vektordimensionen sind unterschiedlich, und ihre Mischung führt zu Abfragefehlern. Nach dem Ersetzen des Modells müssen Sie Folgendes tun: ① Löschen Sie den alten Index und erstellen Sie einen neuen Index (Abmessungen müssen übereinstimmen). ② Klicken Sie unten auf „Vektorindex neu erstellen“.",
     "for-detailed-instructions-see": "Bitte beachten Sie die ausführliche Bereitstellungsanleitung",
-    "text": ")"
+    "text": ")",
+    "connection-failed-detail": "Verbindung fehlgeschlagen: {{error}}",
+    "connection-successful-dimensions": "Verbindung erfolgreich – Dimension: {{dimensions}}",
+    "connection-successful-vectors": "Verbindung erfolgreich – Vektor: {{vectorCount}}, Abmessungen: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV-Konfiguration",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "Derzeit gibt es kein Lager, in das zurückgeschrieben werden kann",
     "no-repos-matched-any-category": "Kein Lager trifft auf irgendeine Kategorie",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} Listen wurden synchronisiert und {{updatedCount}} Lager wurden aktualisiert.",
-    "push-failed": "Die Synchronisierung ist fehlgeschlagen"
+    "push-failed": "Die Synchronisierung ist fehlgeschlagen",
+    "push-failed-detail": "Push fehlgeschlagen: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "Vor {{count}} Minuten",
+    "hours-ago": "Vor {{count}} Stunden"
+  },
+  "forkCard": {
+    "run-workflow-named": "Workflow ausführen: {{name}}"
+  },
+  "repositoryEditModal": {
+    "tag-count": "{{count}}-Tags",
+    "char-count": "{{count}} Wörter"
   }
 }

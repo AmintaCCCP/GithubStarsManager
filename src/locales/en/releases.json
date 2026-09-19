@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "AI Summary",
     "analyzing-update": "Analyzing update…",
-    "failed-to-generate-summary-please-try-again": "Failed to generate summary. Please try again."
+    "failed-to-generate-summary-please-try-again": "Failed to generate summary. Please try again.",
+    "download-count": "{{count}} downloads"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Plugin analysis failed",

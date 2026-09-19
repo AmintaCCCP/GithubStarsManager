@@ -1,4 +1,5 @@
 import { useT } from '../i18n/useT';
+import { languageDefinition } from '../i18n/languages';
 import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import { memo, useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
@@ -145,7 +146,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
     const targetLang = language;
 
     if (detected === targetLang) {
-      setError(t('bilingualMarkdownRenderer.content-is-already-in-english'));
+      setError(t('bilingualMarkdownRenderer.content-already-in-language', { language: languageDefinition(targetLang).nativeName }));
       updateStatus('error');
       return;
     }

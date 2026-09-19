@@ -21,7 +21,7 @@
     "v1-personal": "{{v1}} (個人)",
     "loading-organizations": "組織を読み込み中…",
     "last-refresh": "最終更新日:",
-    "refreshing": "爽やか…",
+    "refreshing": "更新中…",
     "refresh": "リフレッシュする",
     "search-forks": "サーチフォーク",
     "search-forks-2": "検索フォーク…",
@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "AIの概要",
     "analyzing-update": "アップデートを分析中...",
-    "failed-to-generate-summary-please-try-again": "概要の生成に失敗しました。もう一度お試しください。"
+    "failed-to-generate-summary-please-try-again": "概要の生成に失敗しました。もう一度お試しください。",
+    "download-count": "{{count}} 件のダウンロード"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "プラグイン解析に失敗しました",
@@ -118,7 +119,7 @@
     "subscribe-to-repository-releases-from-the-reposi": "ここで更新を確認するには、リポジトリ ページからリポジトリ リリースを購読します。",
     "you-re-subscribed-to-subscribedrepocount-reposit": "{{subscribedRepoCount}} リポジトリをサブスクライブしましたが、最も近いリリースが見つかりませんでした。最新の更新を取得するには、下の更新ボタンをクリックしてください。",
     "include-pre-release": "プレリリースが含まれています",
-    "refreshing": "爽やか…",
+    "refreshing": "更新中…",
     "refresh-releases": "リフレッシュリリース",
     "release-source-settings": "リリース元の設定",
     "sources": "ソース設定",
@@ -139,7 +140,9 @@
     "view-mode": "ビューモード",
     "timeline-view": "日付順に並べ替える",
     "repository-view": "倉庫分類",
+    "showing-v1-v2-of-v3-unread-total-v4": "表示中 {{v1}}-{{v2}}（未読 {{v3}}、合計 {{v4}}）",
     "showing-v1-v2-of-v3-releases": "合計 {{v1}}～{{v2}} 件のリリースを表示中 {{v3}}",
+    "showing-v1-v2-of-v3-unread-repos-total-v4": "表示中 {{v1}}-{{v2}}（未読リポジトリ {{v3}}、合計 {{v4}}）",
     "showing-v1-v2-of-v3-repositories": "合計 {{v1}}-{{v2}} 個の倉庫を表示しています {{v3}}",
     "unread": "未読",
     "filtered": "フィルタリングされた",
@@ -167,9 +170,7 @@
     "first-page": "最初のページ",
     "previous-page": "前のページへ",
     "next-page": "次のページ",
-    "last-page": "最後のページ",
-    "showing-v1-v2-of-v3-unread-total-v4": "表示中 {{v1}}-{{v2}}（未読 {{v3}}、合計 {{v4}}）",
-    "showing-v1-v2-of-v3-unread-repos-total-v4": "表示中 {{v1}}-{{v2}}（未読リポジトリ {{v3}}、合計 {{v4}}）"
+    "last-page": "最後のページ"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "このリリースにはダウンロード可能なアセットはありません。",

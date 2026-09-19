@@ -40,33 +40,31 @@ const formatToolDuration = (durationMs?: number): string | null => {
 };
 
 const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: AppLanguage): string => {
-  const zh = language === 'zh';
-  if (stage === 'understanding') return zh ? '理解问题' : 'Understand question';
-  if (stage === 'context') return zh ? '查看项目结构' : 'Inspect repository structure';
-  if (stage === 'planning') return zh ? '制定阅读计划' : 'Plan what to read';
-  if (stage === 'retrieval') return zh ? '阅读相关资料' : 'Read relevant sources';
-  if (stage === 'verification') return zh ? '评估问题是否已可回答' : 'Assess whether the question is answerable';
-  if (stage === 'replanning') return zh ? '补充阅读计划' : 'Plan additional reading';
-  if (stage === 'escalation') return zh ? '补充实现细节' : 'Inspect implementation details';
-  if (stage === 'answer') return zh ? '整理最终回答' : 'Prepare final answer';
-  return zh ? '工具调用' : 'Tool call';
+  const t = makeT(language, 'chat');
+  const known: Record<string, string> = {
+    understanding: 'stage-understanding', context: 'stage-context', planning: 'stage-planning',
+    retrieval: 'stage-retrieval', verification: 'stage-verification', replanning: 'stage-replanning',
+    escalation: 'stage-escalation', answer: 'stage-answer',
+  };
+  return t(known[stage ?? ''] ?? 'stage-tool');
 };
 
-const TASK_DEPTH_OPTIONS: Array<{ value: RepositoryChatTaskDepth; zh: string; en: string; descZh: string; descEn: string }> = [
-  { value: 'default', zh: '默认', en: 'Default', descZh: '跟随设置中的高级参数', descEn: 'Follow the advanced settings' },
-  { value: 'quick', zh: '快速', en: 'Quick', descZh: '少量文档取证，尽快出答', descEn: 'Read fewer documents, answer fast' },
-  { value: 'deep', zh: '深入', en: 'Deep', descZh: '多轮取证并读代码，适合细节与对比', descEn: 'More rounds, reads code too; best for details' },
-  { value: 'unlimited', zh: '不限', en: 'Unlimited', descZh: '放开所有限制，注意耗时与额度', descEn: 'No limits; expect longer runs and higher usage' },
+const TASK_DEPTH_OPTIONS: Array<{ value: RepositoryChatTaskDepth; key: string }> = [
+  { value: 'default', key: 'depth-default' },
+  { value: 'quick', key: 'depth-quick' },
+  { value: 'deep', key: 'depth-deep' },
+  { value: 'unlimited', key: 'depth-unlimited' },
 ];
 
 const depthMeta = (depth: RepositoryChatTaskDepth, language: AppLanguage): { label: string; description: string } => {
   const t = makeT(language, 'chat');
-  const option = TASK_DEPTH_OPTIONS.find((item) => item.value === depth) ?? TASK_DEPTH_OPTIONS[0];
+  const option = TASK_DEPTH_OPTIONS.find((item) => item.value === depth) ?? TASK_DEPTH_OPTIONS[0]!;
   const budget = depth !== 'default' ? TASK_DEPTH_PRESETS[depth].budget : null;
+  const optionLabel = t(`repositoryChatSheet.${option.key}`);
   const label = budget
-    ? `${language === 'zh' ? option.zh : option.en} · ${budget.maxTurns}${t('repositoryChatSheet.rounds')}/${Math.round(budget.maxDurationMs / 1000)}s`
-    : (language === 'zh' ? option.zh : option.en);
-  return { label, description: language === 'zh' ? option.descZh : option.descEn };
+    ? `${optionLabel} · ${budget.maxTurns}${t('repositoryChatSheet.rounds')}/${Math.round(budget.maxDurationMs / 1000)}s`
+    : optionLabel;
+  return { label, description: t(`repositoryChatSheet.${option.key}-desc`) };
 };
 
 const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: AppLanguage; isRunning: boolean }> = ({ events, language, isRunning }) => {
@@ -589,11 +587,11 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                       onSelect={() => setRepositoryChatSettings({ taskDepth: option.value })}
                     >
                       <span className="flex w-full items-center gap-2 text-sm font-medium">
-                        {language === 'zh' ? option.zh : option.en}
+                        {t(`repositoryChatSheet.${option.key}`)}
                         <span className="text-xs font-normal text-muted-foreground">{suffix}</span>
                         {option.value === 'default' && <span className="text-xs font-normal text-muted-foreground">{t('repositoryChatSheet.current-default')}</span>}
                       </span>
-                      <span className="text-xs text-muted-foreground">{language === 'zh' ? option.descZh : option.descEn}</span>
+                      <span className="text-xs text-muted-foreground">{t(`repositoryChatSheet.${option.key}-desc`)}</span>
                     </DropdownMenuItem>
                   );
                 })}

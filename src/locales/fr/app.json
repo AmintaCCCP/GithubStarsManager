@@ -22,7 +22,8 @@
     "original": "original",
     "translated": "traduction",
     "bilingual": "bilingue",
-    "translating": "Traduire…"
+    "translating": "Traduire…",
+    "content-already-in-language": "Le contenu est déjà en {{language}}, pas besoin de traduire"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "L'opération du plug-in a échoué",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "Réduire la barre latérale",
     "edit-category": "Modifier la catégorie",
     "delete-category": "Supprimer la catégorie",
-    "hide-default-category": "Masquer les catégories par défaut"
+    "hide-default-category": "Masquer les catégories par défaut",
+    "drag-hint": "{{name}} – Faites glisser la fiche d'entrepôt ici pour modifier rapidement la classification"
   },
   "codeSearchView": {
     "show-less": "fermer",
@@ -168,7 +170,13 @@
     "toggle-theme": "changer de thème",
     "logout-confirmation": "Confirmation de déconnexion",
     "logout": "Se déconnecter",
-    "logout-only-clears-credentials-repositories-ai-a": "Seules les informations de connexion sont effacées après la déconnexion. Les données locales telles que les entrepôts, l'analyse de l'IA et la classification seront conservées ; il sera automatiquement hérité si vous modifiez le jeton et vous reconnectez avec le même compte GitHub. Pour effacer complètement toutes les données, allez dans « Paramètres → Gestion des données »."
+    "logout-only-clears-credentials-repositories-ai-a": "Seules les informations de connexion sont effacées après la déconnexion. Les données locales telles que les entrepôts, l'analyse de l'IA et la classification seront conservées ; il sera automatiquement hérité si vous modifiez le jeton et vous reconnectez avec le même compte GitHub. Pour effacer complètement toutes les données, allez dans « Paramètres → Gestion des données ».",
+    "menu-gists": "Gist",
+    "menu-repositories": "entrepôt",
+    "menu-releases": "libérer",
+    "menu-forks": "réplique",
+    "menu-subscription": "Découvrir",
+    "menu-settings": "installation"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Synchroniser les catégories avec la liste GitHub"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "Échec du chargement du fichier README, veuillez vérifier la connexion réseau ou réessayer plus tard",
     "failed-to-load-selected-readme-please-try-again": "Échec du chargement du fichier README sélectionné, veuillez réessayer plus tard",
     "loading-readme": "Chargement du fichier README…",
-    "default-readme": "README par défaut"
+    "default-readme": "README par défaut",
+    "cycle-font-size": "Changer la taille de la police"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "faire défiler vers le bas"
@@ -316,7 +325,8 @@
     "recent-updates": "Mises à jour récentes",
     "within-30-days": "Dans les 30 jours",
     "search-query": "Requête de recherche :",
-    "ai-analyzed": "analysé par l'IA"
+    "ai-analyzed": "analysé par l'IA",
+    "ai-analyzed-count": "{{count}} entrepôts ont été analysés par l'IA"
   },
   "searchShortcutsHelp": {
     "shortcuts": "touche de raccourci",
@@ -907,7 +917,8 @@
     "copy-sse-json": "Copier SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "Outils en lecture seule : gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "Facultatif : gsm_vector_search (la recherche vectorielle doit être configurée)",
-    "prefer-streamable-http-json-above-if-the-client": "Préférez le HTTP Streamable (JSON ci-dessus). Si le client ne prend en charge que l'ancienne version de SSE, utilisez l'URL SSE suivante : GET pour ouvrir le flux, puis POST dans les messages."
+    "prefer-streamable-http-json-above-if-the-client": "Préférez le HTTP Streamable (JSON ci-dessus). Si le client ne prend en charge que l'ancienne version de SSE, utilisez l'URL SSE suivante : GET pour ouvrir le flux, puis POST dans les messages.",
+    "status-with-value": "Statut : {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "Gestion des menus",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "Le répertoire d'installation du plug-in sera supprimé. Veuillez choisir si vous souhaitez supprimer simultanément les données et les journaux stockés dans le plug-in.",
     "cancel": "Annuler",
     "uninstall-keep-data": "Conserver les données et désinstaller",
-    "uninstall-and-delete-data": "Désinstaller et supprimer des données"
+    "uninstall-and-delete-data": "Désinstaller et supprimer des données",
+    "open-page-named": "Page ouverte : {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "Synchronisation des étoiles",
@@ -1099,7 +1111,10 @@
     "different-models-produce-vectors-with-different": "Les dimensions vectorielles générées par différents modèles sont différentes et leur mélange entraînera un échec de la requête. Après avoir remplacé le modèle, vous devez : ① Supprimer l'ancien index et créer un nouvel index (les dimensions doivent correspondre) ② Cliquez sur \"Reconstruire l'index vectoriel\" ci-dessous.",
     "for-detailed-instructions-see": "Veuillez vous référer au guide de déploiement détaillé",
     "dimensions": "Dimensions",
-    "text": ")"
+    "text": ")",
+    "connection-failed-detail": "Échec de la connexion : {{error}}",
+    "connection-successful-dimensions": "Connexion réussie – Dimension : {{dimensions}}",
+    "connection-successful-vectors": "Connexion réussie – vecteur : {{vectorCount}}, dimensions : {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuration WebDAV",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "Il n'y a actuellement aucun entrepôt vers lequel répondre",
     "no-repos-matched-any-category": "Aucun entrepôt n'appartient à aucune catégorie",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} listes ont été synchronisées et {{updatedCount}} entrepôts ont été mis à jour.",
-    "push-failed": "La synchronisation a échoué"
+    "push-failed": "La synchronisation a échoué",
+    "push-failed-detail": "Échec de la transmission : {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "il y a {{count}} minutes",
+    "hours-ago": "Il y a {{count}} heures"
+  },
+  "forkCard": {
+    "run-workflow-named": "Exécuter le workflow : {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} mots",
+    "tag-count": "{{count}} balises"
   }
 }

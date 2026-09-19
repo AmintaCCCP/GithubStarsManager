@@ -22,7 +22,8 @@
     "original": "original",
     "translated": "traducción",
     "bilingual": "bilingüe",
-    "translating": "Traductorio…"
+    "translating": "Traductorio…",
+    "content-already-in-language": "El contenido ya es {{language}}, no es necesario traducir"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "Error en la operación del complemento",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "Contraer barra lateral",
     "edit-category": "Editar categoría",
     "delete-category": "Eliminar categoría",
-    "hide-default-category": "Ocultar categorías predeterminadas"
+    "hide-default-category": "Ocultar categorías predeterminadas",
+    "drag-hint": "{{name}} — Arrastre la tarjeta de almacén aquí para modificar rápidamente la clasificación"
   },
   "codeSearchView": {
     "show-less": "cerca",
@@ -168,7 +170,13 @@
     "toggle-theme": "cambiar de tema",
     "logout-confirmation": "Confirmación de cierre de sesión",
     "logout": "Finalizar la sesión",
-    "logout-only-clears-credentials-repositories-ai-a": "Sólo las credenciales de inicio de sesión se borran después de cerrar la sesión. Se conservarán datos locales como almacenes, análisis de IA y clasificación; se heredará automáticamente si cambia el token e inicia sesión nuevamente con la misma cuenta de GitHub. Para borrar completamente todos los datos, vaya a \"Configuración → Gestión de datos\"."
+    "logout-only-clears-credentials-repositories-ai-a": "Sólo las credenciales de inicio de sesión se borran después de cerrar la sesión. Se conservarán datos locales como almacenes, análisis de IA y clasificación; se heredará automáticamente si cambia el token e inicia sesión nuevamente con la misma cuenta de GitHub. Para borrar completamente todos los datos, vaya a \"Configuración → Gestión de datos\".",
+    "menu-gists": "Gist",
+    "menu-repositories": "almacén",
+    "menu-releases": "liberar",
+    "menu-subscription": "Descubrir",
+    "menu-forks": "réplica",
+    "menu-settings": "configuración"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Sincronizar categorías con la lista de GitHub"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "No se pudo cargar el archivo README. Verifique la conexión de red o vuelva a intentarlo más tarde.",
     "failed-to-load-selected-readme-please-try-again": "No se pudo cargar el archivo README seleccionado. Vuelva a intentarlo más tarde.",
     "loading-readme": "Cargando LÉAME…",
-    "default-readme": "LÉAME predeterminado"
+    "default-readme": "LÉAME predeterminado",
+    "cycle-font-size": "Cambiar tamaño de fuente"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "desplazarse hacia abajo"
@@ -316,7 +325,8 @@
     "recent-updates": "Actualizaciones recientes",
     "within-30-days": "Dentro de 30 días",
     "search-query": "Consulta de búsqueda:",
-    "ai-analyzed": "analizado por IA"
+    "ai-analyzed": "analizado por IA",
+    "ai-analyzed-count": "{{count}} almacenes han sido analizados por IA"
   },
   "searchShortcutsHelp": {
     "shortcuts": "tecla de acceso directo",
@@ -907,7 +917,8 @@
     "copy-sse-json": "Copiar SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "Herramientas de solo lectura: gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "Opcional: gsm_vector_search (se debe configurar la búsqueda de vectores)",
-    "prefer-streamable-http-json-above-if-the-client": "Prefiere HTTP Streamable (JSON arriba). Si el cliente solo admite la versión anterior de SSE, use la siguiente URL de SSE: GET para abrir la transmisión y luego PUBLICAR en los mensajes."
+    "prefer-streamable-http-json-above-if-the-client": "Prefiere HTTP Streamable (JSON arriba). Si el cliente solo admite la versión anterior de SSE, use la siguiente URL de SSE: GET para abrir la transmisión y luego PUBLICAR en los mensajes.",
+    "status-with-value": "Estado: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "Gestión de menús",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "Se eliminará el directorio de instalación del complemento. Elija si desea eliminar los datos y registros almacenados del complemento al mismo tiempo.",
     "cancel": "Cancelar",
     "uninstall-keep-data": "Conservar datos y desinstalar",
-    "uninstall-and-delete-data": "Desinstalar y eliminar datos"
+    "uninstall-and-delete-data": "Desinstalar y eliminar datos",
+    "open-page-named": "Abrir página: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "Sincronización de estrellas",
@@ -1099,7 +1111,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "El índice debe reconstruirse después de reemplazar el modelo de incrustación.",
     "different-models-produce-vectors-with-different": "Las dimensiones vectoriales generadas por diferentes modelos son diferentes y mezclarlas provocará un error en la consulta. Después de reemplazar el modelo, debe: ① Eliminar el índice anterior y crear un nuevo índice (las dimensiones deben coincidir) ② Haga clic en \"Reconstruir índice de vectores\" a continuación",
     "for-detailed-instructions-see": "Consulte la guía de implementación detallada.",
-    "text": ")"
+    "text": "Texto",
+    "connection-successful-dimensions": "Conexión exitosa - Dimensión: {{dimensions}}",
+    "connection-failed-detail": "Error de conexión: {{error}}",
+    "connection-successful-vectors": "Conexión exitosa: vector: {{vectorCount}}, dimensiones: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuración WebDAV",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "Actualmente no hay ningún almacén al que escribir",
     "no-repos-matched-any-category": "Ningún almacén afecta a ninguna categoría.",
     "pushed-v1-lists-updated-updatedcount-repos": "Se han sincronizado {{v1}} listas y se han actualizado {{updatedCount}} almacenes.",
-    "push-failed": "Error de sincronización"
+    "push-failed": "Error de sincronización",
+    "push-failed-detail": "Error al enviar: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "Hace {{count}} minutos",
+    "hours-ago": "Hace {{count}} horas"
+  },
+  "forkCard": {
+    "run-workflow-named": "Ejecutar flujo de trabajo: {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} palabras",
+    "tag-count": "{{count}} etiquetas"
   }
 }

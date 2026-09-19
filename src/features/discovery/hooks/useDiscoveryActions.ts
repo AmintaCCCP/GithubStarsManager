@@ -223,7 +223,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         else currentState.setDiscoveryLoading(channelId, false);
       }
     }
-  }, [captureSession, isCurrentSession, scrollContainerRef, t, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t 仅用于 toast 文案，语言切换不应重建 refreshChannel（引用稳定性优先）
+  }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
 
   const handleAnalyzePage = useCallback(async () => {
     const analysisState = latestStateRef.current;
@@ -306,7 +307,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       const successCount = results.filter(result => result.success).length;
       const failCount = results.length - successCount;
-      toast(t('useDiscoveryActions.ai-analysis-complete-successcount-succeeded-v2', { successCount: successCount, v2: failCount > 0 ? `，失败 ${failCount} 个` : '' }), successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success');
+      toast(t(failCount > 0 ? 'useDiscoveryActions.ai-analysis-complete-with-failures' : 'useDiscoveryActions.ai-analysis-complete', { successCount: successCount, failCount: failCount }), successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success');
     } catch (error) {
       if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       console.error('AI analysis error:', error);

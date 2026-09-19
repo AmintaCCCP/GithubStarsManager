@@ -16,7 +16,7 @@
   "forkTimeline": {
     "personal-account": "개인 계정",
     "fork": "레플리카",
-    "manage-v2-forked-repositories-for-v2": "Manage {{v2}} forked repositories for {{v2}}",
+    "manage-v2-forked-repositories-for-v2": "{{currentOwnerLabel}}의 포크 저장소 {{v2}}개 관리",
     "owner": "소유자:",
     "v1-personal": "{{v1}}(개인)",
     "loading-organizations": "조직 로드 중…",
@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "AI 요약",
     "analyzing-update": "업데이트 분석 중...",
-    "failed-to-generate-summary-please-try-again": "요약을 생성하지 못했습니다. 다시 시도해 주세요."
+    "failed-to-generate-summary-please-try-again": "요약을 생성하지 못했습니다. 다시 시도해 주세요.",
+    "download-count": "{{count}} 다운로드"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "플러그인 분석 실패",
@@ -185,14 +186,14 @@
     "summary": "요약",
     "this-release-has-no-release-notes": "이 릴리스에는 변경 로그가 제공되지 않습니다.",
     "this-release-has-no-notes-to-summarize": "이 릴리스에는 요약할 변경 로그가 없습니다.",
-    "summary-generation-failed-please-try-again": "요약을 생성하지 못했습니다. 다시 시도해 주세요.",
     "generating-summary": "요약 생성 중...",
+    "summary-generation-failed-please-try-again": "요약을 생성하지 못했습니다. 다시 시도해 주세요.",
     "this-tab-uses-the-current-ai-configuration-to-ge": "이 탭으로 전환하면 현재 AI 구성을 사용하여 요약이 생성됩니다.",
-    "generate-summary": "요약 생성",
     "retry-summary": "재시도 요약",
+    "generate-summary": "요약 생성",
+    "close-release-sheet": "릴리스 사이드바 닫기",
     "repository-releases": "릴리스 보기",
     "refresh": "새로 고치다",
-    "close-release-sheet": "릴리스 사이드바 닫기",
     "loading-latest-releases": "최신 릴리스를 받는 중…",
     "retry": "다시 시도해 보세요",
     "this-repository-has-no-releases": "현재 이 저장소에는 릴리스가 없습니다.",
@@ -200,6 +201,10 @@
     "release-pagination": "릴리스 페이징"
   },
   "subscriptionRepoCard": {
+    "re-analyze": "재분석",
+    "ai-analyze": "AI 분석",
+    "open-in-zread": "ZRead에서 열기",
+    "view-original-channel-message": "채널 메시지의 원본 텍스트 보기",
     "view-original-post": "원본 게시물 보기",
     "open-on-github": "GitHub에서 열기",
     "unstar": "취소별",
@@ -210,11 +215,7 @@
     "confirm-unstar": "확인 취소 별표",
     "cancel": "취소",
     "confirm-unstar-2": "취소 확인",
-    "are-you-sure-you-want-to-unstar-v1-this-will-rem": "별표 \"{{v1}}\"을(를) 취소하시겠습니까? 그러면 GitHub 컬렉션에서 저장소가 제거됩니다.",
-    "re-analyze": "재분석",
-    "ai-analyze": "AI 분석",
-    "open-in-zread": "ZRead에서 열기",
-    "view-original-channel-message": "채널 메시지의 원본 텍스트 보기"
+    "are-you-sure-you-want-to-unstar-v1-this-will-rem": "별표 \"{{v1}}\"을(를) 취소하시겠습니까? 그러면 GitHub 컬렉션에서 저장소가 제거됩니다."
   },
   "useReleaseTimelineActions": {
     "all-marked-as-read": "모두 읽음으로 표시됨",

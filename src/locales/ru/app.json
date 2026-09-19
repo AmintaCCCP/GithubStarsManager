@@ -22,7 +22,8 @@
     "original": "оригинальный",
     "translated": "перевод",
     "bilingual": "двуязычный",
-    "translating": "Перевод…"
+    "translating": "Перевод…",
+    "content-already-in-language": "Содержимое уже {{language}}, переводить не нужно."
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "Операция плагина не удалась",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "Свернуть боковую панель",
     "edit-category": "Изменить категорию",
     "delete-category": "Удалить категорию",
-    "hide-default-category": "Скрыть категории по умолчанию"
+    "hide-default-category": "Скрыть категории по умолчанию",
+    "drag-hint": "{{name}} – перетащите сюда карточку склада, чтобы быстро изменить классификацию."
   },
   "codeSearchView": {
     "show-less": "закрывать",
@@ -143,6 +145,8 @@
     "starred-only": "Показывать только мои любимые склады",
     "filters": "фильтр",
     "selections-re-search-automatically": "Автоматический повторный поиск после проверки",
+    "clear-filters": "Очистить фильтр",
+    "repository": "склад",
     "language": "язык",
     "path": "путь",
     "searching-code": "Ищем код…",
@@ -159,16 +163,20 @@
     "loading-more": "Загрузка еще…",
     "load-more-v1-v2": "Загрузить еще ({{v1}}/{{v2}} загружено)",
     "rate-limited": "Ограничение тока поиска кода триггера (429), повторите попытку позже.",
-    "search-failed": "Поиск не удался, попробуйте еще раз",
-    "repository": "склад",
-    "clear-filters": "Очистить фильтр"
+    "search-failed": "Поиск не удался, попробуйте еще раз"
   },
   "header": {
     "menu": "меню",
     "toggle-theme": "переключить тему",
     "logout-confirmation": "Подтверждение выхода из системы",
     "logout": "Выйти",
-    "logout-only-clears-credentials-repositories-ai-a": "После выхода из системы удаляются только учетные данные для входа. Локальные данные, такие как склады, анализ ИИ и классификация, будут сохранены; он будет автоматически унаследован, если вы измените токен и снова войдете в систему с той же учетной записью GitHub. Чтобы полностью очистить все данные, перейдите в «Настройки → Управление данными»."
+    "logout-only-clears-credentials-repositories-ai-a": "После выхода из системы удаляются только учетные данные для входа. Локальные данные, такие как склады, анализ ИИ и классификация, будут сохранены; он будет автоматически унаследован, если вы измените токен и снова войдете в систему с той же учетной записью GitHub. Чтобы полностью очистить все данные, перейдите в «Настройки → Управление данными».",
+    "menu-gists": "Gist",
+    "menu-repositories": "склад",
+    "menu-releases": "выпускать",
+    "menu-forks": "копия",
+    "menu-subscription": "Обнаружить",
+    "menu-settings": "настраивать"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Синхронизировать категории со списком GitHub"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "Не удалось загрузить README. Проверьте сетевое соединение или повторите попытку позже.",
     "failed-to-load-selected-readme-please-try-again": "Не удалось загрузить выбранный файл README. Повторите попытку позже.",
     "loading-readme": "Загрузка README…",
-    "default-readme": "README по умолчанию"
+    "default-readme": "README по умолчанию",
+    "cycle-font-size": "Переключить размер шрифта"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "прокрутить вниз"
@@ -316,7 +325,8 @@
     "recent-updates": "Последние обновления",
     "within-30-days": "В течение 30 дней",
     "search-query": "Поисковый запрос:",
-    "ai-analyzed": "анализируется ИИ"
+    "ai-analyzed": "анализируется ИИ",
+    "ai-analyzed-count": "{{count}} складов проанализировано искусственным интеллектом."
   },
   "searchShortcutsHelp": {
     "shortcuts": "быстрая клавиша",
@@ -907,7 +917,8 @@
     "copy-sse-json": "Копировать SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "Инструменты только для чтения: gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "Необязательно: gsm_vector_search (необходимо настроить векторный поиск)",
-    "prefer-streamable-http-json-above-if-the-client": "Предпочитайте потоковый HTTP (JSON выше). Если клиент поддерживает только старую версию SSE, используйте следующий URL-адрес SSE: GET, чтобы открыть поток, а затем POST для сообщений."
+    "prefer-streamable-http-json-above-if-the-client": "Предпочитайте потоковый HTTP (JSON выше). Если клиент поддерживает только старую версию SSE, используйте следующий URL-адрес SSE: GET, чтобы открыть поток, а затем POST для сообщений.",
+    "status-with-value": "Статус: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "Управление меню",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "Каталог установки плагина будет удален. Пожалуйста, выберите, следует ли одновременно удалять сохраненные данные и журналы плагина.",
     "cancel": "Отмена",
     "uninstall-keep-data": "Сохраните данные и удалите",
-    "uninstall-and-delete-data": "Удаление и удаление данных"
+    "uninstall-and-delete-data": "Удаление и удаление данных",
+    "open-page-named": "Открыть страницу: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "Звездная синхронизация",
@@ -1099,7 +1111,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "Индекс необходимо перестроить после замены модели внедрения.",
     "different-models-produce-vectors-with-different": "Размерности векторов, созданные разными моделями, различны, и их смешивание приведет к сбою запроса. После замены модели вам необходимо: ① Удалить старый индекс и создать новый индекс (размеры должны совпадать) ② Нажмите «Перестроить векторный индекс» ниже.",
     "for-detailed-instructions-see": "Пожалуйста, обратитесь к подробному руководству по развертыванию.",
-    "text": ")"
+    "text": "Текст",
+    "connection-failed-detail": "Не удалось подключиться: {{error}}",
+    "connection-successful-dimensions": "Соединение успешно выполнено – Размер: {{dimensions}}",
+    "connection-successful-vectors": "Соединение успешно — вектор: {{vectorCount}}, размеры: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "Конфигурация WebDAV",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "В настоящее время нет склада, на который можно было бы написать ответ.",
     "no-repos-matched-any-category": "Ни один склад не попадает ни в одну категорию",
     "pushed-v1-lists-updated-updatedcount-repos": "Списки {{v1}} синхронизированы, а склады {{updatedCount}} обновлены.",
-    "push-failed": "Синхронизация не удалась"
+    "push-failed": "Синхронизация не удалась",
+    "push-failed-detail": "Не удалось отправить: {{message}}"
+  },
+  "discoverySidebar": {
+    "hours-ago": "{{count}} часа назад",
+    "minutes-ago": "{{count}} минуты назад"
+  },
+  "forkCard": {
+    "run-workflow-named": "Запустить рабочий процесс: {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} слов",
+    "tag-count": "{{count}} тегов"
   }
 }

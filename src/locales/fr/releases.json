@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "Résumé de l'IA",
     "analyzing-update": "Analyse des mises à jour...",
-    "failed-to-generate-summary-please-try-again": "La génération du résumé a échoué. Veuillez réessayer."
+    "failed-to-generate-summary-please-try-again": "La génération du résumé a échoué. Veuillez réessayer.",
+    "download-count": "{{count}} téléchargements"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "L'analyse du plugin a échoué",

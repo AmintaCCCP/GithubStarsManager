@@ -653,7 +653,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={t('readmeModal.font-size-v1', { v1: FONT_SIZES[fontSizeIndex].label })}
+                aria-label={t('readmeModal.cycle-font-size')}
                 onClick={cycleFontSize}
                 className="h-8 w-8 rounded-lg p-0 text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 title={t('readmeModal.font-size-v1', { v1: FONT_SIZES[fontSizeIndex].label })}

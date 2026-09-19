@@ -98,7 +98,9 @@
     "ai-service-configuration-is-incomplete-please-ch": "Die Konfiguration des AI-Dienstes ist unvollständig. Bitte überprüfen Sie den API-Endpunkt, den Schlüssel und den Modellnamen.",
     "all-loaded-projects-have-been-analyzed": "Alle geladenen Projekte haben die KI-Analyse abgeschlossen.",
     "ai-analysis-complete-successcount-succeeded-v2": "KI-Analyse abgeschlossen! Erfolgreich {{successCount}}{{v2}}",
-    "ai-analysis-failed-please-check-your-ai-configur": "Die KI-Analyse ist fehlgeschlagen. Bitte überprüfen Sie die KI-Konfiguration."
+    "ai-analysis-failed-please-check-your-ai-configur": "Die KI-Analyse ist fehlgeschlagen. Bitte überprüfen Sie die KI-Konfiguration.",
+    "ai-analysis-complete": "KI-Analyse abgeschlossen! {{successCount}} erfolgreich",
+    "ai-analysis-complete-with-failures": "KI-Analyse abgeschlossen! {{successCount}} erfolgreich, {{failCount}} fehlgeschlagen"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "Das Abbrechen von Star ist fehlgeschlagen. Bitte überprüfen Sie die Netzwerkverbindung oder die GitHub-Token-Berechtigungen.",

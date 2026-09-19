@@ -1,4 +1,4 @@
-import { languageDefinition, type AppLanguage } from './languages';
+import { FALLBACK_LANGUAGE, isAppLanguage, languageDefinition, type AppLanguage } from './languages';
 
 /**
  * AI prompt 语言策略（业务约束：AI 生成内容与用户设置的 UI 语言一致）。
@@ -17,7 +17,9 @@ export const resolvePromptTemplateLang = (language: AppLanguage | string): Promp
 
 /** 面向用户输出的语言指令；zh/en 返回空串（保持既有 prompt 逐字节不变）。 */
 export const getOutputLanguageDirective = (language: AppLanguage | string): string => {
-  if (language === 'zh' || language === 'en') return '';
-  const definition = languageDefinition(language as AppLanguage);
+  // 先规范化：aiService 的 language 是自由 string，非法值（如旧数据）统一按英文回退处理
+  const normalized = isAppLanguage(language) ? language : FALLBACK_LANGUAGE;
+  if (normalized === 'zh' || normalized === 'en') return '';
+  const definition = languageDefinition(normalized);
   return `IMPORTANT: Write ALL user-facing output in ${definition.englishName} (${definition.nativeName}). Keep code, identifiers, and technical terms in their original form.`;
 };

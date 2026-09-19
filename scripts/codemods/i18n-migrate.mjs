@@ -241,12 +241,43 @@ function ensureSymbolInScope(sourceFile, node, symbolName, declText, importNames
 const ensureTInScope = (sourceFile, node, ns, filePath) =>
   ensureSymbolInScope(sourceFile, node, 't', `const t = useT('${ns}');`, ['useT'], ns, filePath);
 
+
+/** 单趟占位符重映射：en 模板的参数名对齐到 zh 模板（按位序），避免链式 replaceAll 的名称碰撞 */
+function renamePlaceholders(text, enNames, zhNames) {
+  return text.replace(/\{\{(\w+)\}\}/g, (matched, name) => {
+    const index = enNames.indexOf(name);
+    if (index < 0 || enNames.indexOf(name) !== enNames.lastIndexOf(name)) return matched;
+    return `{{${zhNames[index]}}}`;
+  });
+}
+
+
+/** 校验 t 标识符来自受支持的翻译函数来源（本地定义/useT/TranslateFn 参数），避免误改同名函数 */
+function isSupportedTSource(sourceFile, call) {
+  const expr = call.getExpression();
+  const definition = expr.getDefinitionNodes?.()[0] ?? expr.getDefinition?.()[0]?.getDeclarationNode?.();
+  if (!definition) return false;
+  if (Node.isParameter(definition)) {
+    const typeText = definition.getTypeNode()?.getText() ?? '';
+    return definition.getName() === 't' && (typeText.includes('TranslateFn') || typeText.includes('zh'));
+  }
+  if (Node.isVariableDeclaration(definition)) {
+    const initText = definition.getInitializer()?.getText() ?? '';
+    return definition.getName() === 't' && (initText.includes('useT(') || initText.includes("language === 'zh'") || initText.includes('makeT('));
+  }
+  if (Node.isPropertySignature(definition) || Node.isPropertyAssignment(definition)) {
+    return definition.getName() === 't';
+  }
+  return false;
+}
+
 /** 找到第一个匹配的 t 双参调用并改写；返回是否找到 */
 function rewriteOneTCall(sourceFile, ns, componentKey, filePath) {
   for (const call of sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)) {
     if (call.wasForgotten()) continue;
     const expr = call.getExpression();
     if (!Node.isIdentifier(expr) || expr.getText() !== 't') continue;
+    if (!isSupportedTSource(sourceFile, call)) continue;
     const args = call.getArguments();
     if (args.length < 2) continue;
     if (args.length === 2 && Node.isObjectLiteralExpression(args[1])) continue; // 已转换的插值调用
@@ -267,11 +298,7 @@ function rewriteOneTCall(sourceFile, ns, componentKey, filePath) {
     }
     const zhNames = zhSide.params.map((p) => p.name);
     const enNames = enSide.params.map((p) => p.name);
-    for (let i = 0; i < enSide.params.length; i += 1) {
-      if (zhNames[i] !== enNames[i]) {
-        enSide.text = enSide.text.replaceAll(`{{${enNames[i]}}}`, `{{${zhNames[i]}}}`);
-      }
-    }
+    enSide.text = renamePlaceholders(enSide.text, enNames, zhNames);
     const key = keyFor(zhSide.text, enSide.text, ns, componentKey);
     if (zhSide.params.length === 0) {
       call.replaceWithText(`t('${key}')`);
@@ -315,11 +342,7 @@ function rewriteOneTernary(sourceFile, ns, componentKey, filePath) {
     if (status === 'failed') continue;
     const zhNames = zhSide.params.map((p) => p.name);
     const enNames = enSide.params.map((p) => p.name);
-    for (let i = 0; i < enSide.params.length; i += 1) {
-      if (zhNames[i] !== enNames[i]) {
-        enSide.text = enSide.text.replaceAll(`{{${enNames[i]}}}`, `{{${zhNames[i]}}}`);
-      }
-    }
+    enSide.text = renamePlaceholders(enSide.text, enNames, zhNames);
     const key = keyFor(zhSide.text, enSide.text, ns, componentKey);
     if (zhSide.params.length === 0) {
       conditional.replaceWithText(`t('${key}')`);

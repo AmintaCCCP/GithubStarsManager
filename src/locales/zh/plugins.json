@@ -80,7 +80,8 @@
     "custom-endpoint": "自定义服务",
     "allow-plugin-ai-request": "允许插件调用 AI？",
     "the-host-may-relay-this-through-its-configured-b": "可能经已启用的宿主后端代理转发。",
-    "send-to-ai": "发送给 AI"
+    "send-to-ai": "发送给 AI",
+    "allow-plugin-ai-body": "插件 {{pluginName}} 请求使用 AI 配置「{{configName}}」（模型 {{model}}）。\n目标地址: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nUser:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "允许插件联网搜索？",

@@ -80,7 +80,8 @@
     "custom-endpoint": "Custom endpoint",
     "allow-plugin-ai-request": "Allow plugin AI request?",
     "the-host-may-relay-this-through-its-configured-b": "The Host may relay this through its configured backend.",
-    "send-to-ai": "Send to AI"
+    "send-to-ai": "Send to AI",
+    "allow-plugin-ai-body": "Plugin {{pluginName}} requests the AI configuration \"{{configName}}\" (model {{model}}).\nDestination: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nUser:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "Allow plugin web search?",

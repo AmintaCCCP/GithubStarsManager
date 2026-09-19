@@ -98,7 +98,9 @@
     "ai-service-configuration-is-incomplete-please-ch": "AI サービスの構成が不完全です。API エンドポイント、キー、モデル名を確認してください。",
     "all-loaded-projects-have-been-analyzed": "読み込まれたすべてのプロジェクトは AI 分析を完了しています。",
     "ai-analysis-complete-successcount-succeeded-v2": "AI解析完了！成功しました {{successCount}}{{v2}}",
-    "ai-analysis-failed-please-check-your-ai-configur": "AI 分析に失敗しました。AI の構成を確認してください。"
+    "ai-analysis-failed-please-check-your-ai-configur": "AI 分析に失敗しました。AI の構成を確認してください。",
+    "ai-analysis-complete": "AI解析完了！ {{successCount}} が成功しました",
+    "ai-analysis-complete-with-failures": "AI解析完了！ {{successCount}} は成功しました、{{failCount}} は失敗しました"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "スターのキャンセルに失敗しました。ネットワーク接続または GitHub トークンの権限を確認してください。",

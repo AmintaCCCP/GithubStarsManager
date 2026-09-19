@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "Find similar repositories",
     "find-similar": "Find similar",
     "deselect": "Deselect",
-    "select": "Select"
+    "select": "Select",
+    "analyzed-on-date": "Analyzed on {{date}}",
+    "last-pushed-time": "Last pushed {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Edit Repository Info",

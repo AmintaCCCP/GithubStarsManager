@@ -268,7 +268,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                         className="mt-3 mr-2"
                         onClick={() => setSelectedPage({ pluginId: plugin.manifest.id, pageId: pageContribution.id })}
                       >
-                        {t('pluginSettingsPanel.open-page')}{pageContribution.title}
+                        {t('pluginSettingsPanel.open-page-named', { name: pageContribution.title })}
                       </Button>
                     ))}
                     {plugin.lastError && (

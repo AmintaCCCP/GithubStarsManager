@@ -22,7 +22,8 @@
     "original": "Original",
     "translated": "Translated",
     "bilingual": "Bilingual",
-    "translating": "Translating…"
+    "translating": "Translating…",
+    "content-already-in-language": "Content is already in {{language}}; no translation needed"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "Plugin action failed",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "Collapse Sidebar",
     "edit-category": "Edit category",
     "delete-category": "Delete category",
-    "hide-default-category": "Hide default category"
+    "hide-default-category": "Hide default category",
+    "drag-hint": "{{name}} — Drag repository cards here to quickly change category"
   },
   "codeSearchView": {
     "show-less": "Show less",
@@ -168,7 +170,13 @@
     "toggle-theme": "Toggle theme",
     "logout-confirmation": "Logout Confirmation",
     "logout": "Logout",
-    "logout-only-clears-credentials-repositories-ai-a": "Logout only clears credentials. Repositories, AI analysis, and categories stay on this device; signing back in with the same GitHub account (even a new token) restores them. To completely clear all data, go to Settings → Data Management."
+    "logout-only-clears-credentials-repositories-ai-a": "Logout only clears credentials. Repositories, AI analysis, and categories stay on this device; signing back in with the same GitHub account (even a new token) restores them. To completely clear all data, go to Settings → Data Management.",
+    "menu-repositories": "Repositories",
+    "menu-gists": "Gist",
+    "menu-releases": "Releases",
+    "menu-forks": "Forks",
+    "menu-subscription": "Discover",
+    "menu-settings": "Settings"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Pushing categories to lists"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "Failed to load README. Please check your network connection and try again later",
     "failed-to-load-selected-readme-please-try-again": "Failed to load selected README. Please try again later",
     "loading-readme": "Loading README…",
-    "default-readme": "Default README"
+    "default-readme": "Default README",
+    "cycle-font-size": "Cycle font size"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "Scroll to bottom"
@@ -316,7 +325,8 @@
     "recent-updates": "Recent Updates",
     "within-30-days": "Within 30 days",
     "search-query": "Search Query:",
-    "ai-analyzed": "AI analyzed"
+    "ai-analyzed": "AI analyzed",
+    "ai-analyzed-count": "{{count}} AI-analyzed"
   },
   "searchShortcutsHelp": {
     "shortcuts": "Shortcuts",
@@ -907,7 +917,8 @@
     "copy-sse-json": "Copy SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "Read-only tools: gsm_status / gsm_search_repos / gsm_get_repo / gsm_list_categories / gsm_list_repos_by_category / gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "Optional: gsm_vector_search (when vector search is configured)",
-    "prefer-streamable-http-json-above-if-the-client": "Prefer Streamable HTTP (JSON above). If the client only supports legacy SSE, use the SSE URL below: GET opens the stream, then POST to messages."
+    "prefer-streamable-http-json-above-if-the-client": "Prefer Streamable HTTP (JSON above). If the client only supports legacy SSE, use the SSE URL below: GET opens the stream, then POST to messages.",
+    "status-with-value": "Status: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "Menu Management",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "The installed plugin directory is deleted. Choose whether to also delete this plugin’s stored data and logs.",
     "cancel": "Cancel",
     "uninstall-keep-data": "Uninstall, keep data",
-    "uninstall-and-delete-data": "Uninstall and delete data"
+    "uninstall-and-delete-data": "Uninstall and delete data",
+    "open-page-named": "Open page: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "Star Sync",
@@ -1099,7 +1111,10 @@
     "note-redeployment-does-not-require-recreating-th": "Note: Redeployment does not require recreating the Vectorize index. Existing vector data is preserved.",
     "must-rebuild-index-after-changing-embedding-mode": "Must rebuild index after changing Embedding model",
     "different-models-produce-vectors-with-different": "Different models produce vectors with different dimensions. After changing model: ① Delete old index and create new one (dimensions must match) ② Click \"Rebuild Vector Index\" below",
-    "for-detailed-instructions-see": "For detailed instructions, see"
+    "for-detailed-instructions-see": "For detailed instructions, see",
+    "connection-successful-dimensions": "Connection successful — dimensions: {{dimensions}}",
+    "connection-failed-detail": "Connection failed: {{error}}",
+    "connection-successful-vectors": "Connection successful — vectors: {{vectorCount}}, dimensions: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV Configuration",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "No repositories to push",
     "no-repos-matched-any-category": "No repos matched any category",
     "pushed-v1-lists-updated-updatedcount-repos": "Pushed {{v1}} lists, updated {{updatedCount}} repos",
-    "push-failed": "Push failed"
+    "push-failed": "Push failed",
+    "push-failed-detail": "Push failed: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "{{count}}m ago",
+    "hours-ago": "{{count}}h ago"
+  },
+  "forkCard": {
+    "run-workflow-named": "Run workflow: {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} chars",
+    "tag-count": "{{count}} tags"
   }
 }

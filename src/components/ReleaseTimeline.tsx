@@ -1,3 +1,4 @@
+import { getDateFnsLocale } from '../i18n/format';
 import { useT } from "../i18n/useT";
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -9,7 +10,6 @@ import { Release } from '../types';
 import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import { useAppStore } from '../store/useAppStore';
 import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
@@ -566,7 +566,7 @@ export const ReleaseTimeline: React.FC = () => {
              </div>
             {lastRefreshTime && (
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('releaseTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                {t('releaseTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
               </p>
             )}
           </div>
@@ -638,7 +638,7 @@ export const ReleaseTimeline: React.FC = () => {
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('releaseTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                {t('releaseTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
               </span>
             )}
 
@@ -946,7 +946,7 @@ export const ReleaseTimeline: React.FC = () => {
                           </span>
                           {latestEffectiveTime && (
                             <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap">
-                              {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                              {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
                               {latestAssetsUpdated && (
                                 <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium">
                                   {t('releaseTimeline.assets-updated')}

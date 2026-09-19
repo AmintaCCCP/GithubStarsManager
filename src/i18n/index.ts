@@ -70,9 +70,15 @@ export function getCurrentAppLanguage(): AppLanguage {
  * 切换应用语言：装载目标语言与回退语言包 → 切换 i18next → 更新 <html lang>。
  * 由 App 的 language 副作用调用；zustand 仍是事实源。
  */
+let languageSwitchSeq = 0;
+
 export async function changeAppLanguage(language: AppLanguage): Promise<void> {
+  const requestId = ++languageSwitchSeq;
   await Promise.all([ensureLanguageLoaded(language), ensureLanguageLoaded(FALLBACK_LANGUAGE)]);
+  // 快速连续切换时仅应用最后一次请求，避免旧请求晚到覆盖新语言
+  if (requestId !== languageSwitchSeq) return;
   await i18next.changeLanguage(language);
+  if (requestId !== languageSwitchSeq) return;
   document.documentElement.lang = languageDefinition(language).intlLocale;
 }
 

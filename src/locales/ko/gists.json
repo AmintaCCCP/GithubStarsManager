@@ -64,7 +64,14 @@
     "new": "새로운",
     "v1-gists": "총 {{v1}}개 요지",
     "search-applied": "검색 적용됨",
-    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "아직 요점이 없습니다. 동기화를 클릭하여 데이터를 가져오거나 새 요점을 만듭니다."
+    "no-gists-yet-sync-to-fetch-data-or-create-a-new": "아직 요점이 없습니다. 동기화를 클릭하여 데이터를 가져오거나 새 요점을 만듭니다.",
+    "sort-created": "생성 시간별",
+    "sort-updated": "업데이트 시간별",
+    "sort-name": "이름으로",
+    "sort-files": "파일 수별",
+    "category-all": "모든 요점",
+    "category-starred": "별 요지",
+    "category-mine": "내 요점"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub 토큰을 찾을 수 없습니다. 다시 로그인하세요.",
@@ -94,6 +101,9 @@
     "are-you-sure-you-want-to-delete-this-gist-this-c": "이 요지를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
     "delete": "삭제",
     "gist-deleted": "요점이 삭제되었습니다.",
-    "failed-to-delete-gist-v1-v2": "Gist를 삭제하지 못했습니다.{{v1}}{{v2}}"
+    "failed-to-delete-gist-v1-v2": "Gist를 삭제하지 못했습니다.{{v1}}{{v2}}",
+    "gist-update-failed": "요점 업데이트 실패: {{message}}{{permissionNote}}",
+    "gist-create-failed": "요점 생성 실패: {{message}}{{permissionNote}}",
+    "gist-permission-note": "(토큰이 요지권한을 확인했는지 확인하시고, 설정에서 토큰 로그인을 다시 입력해주세요)"
   }
 }

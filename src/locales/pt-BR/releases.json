@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "Resumo de IA",
     "analyzing-update": "Analisando atualizações...",
-    "failed-to-generate-summary-please-try-again": "Falha na geração do resumo. Tente novamente."
+    "failed-to-generate-summary-please-try-again": "Falha na geração do resumo. Tente novamente.",
+    "download-count": "{{count}} downloads"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Falha na análise do plug-in",

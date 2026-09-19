@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "類似の倉庫を探す",
     "find-similar": "類似の倉庫を探す",
     "deselect": "選択を解除します",
-    "select": "選ぶ"
+    "select": "選ぶ",
+    "analyzed-on-date": "{{date}}で分析されました",
+    "last-pushed-time": "最近の提出物 {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "倉庫情報の編集",
@@ -205,7 +207,7 @@
   "useSearchActions": {
     "ai-semantic-analysis": "AI セマンティック分析…",
     "ai-selecting-relevant-repositories": "AIが関連倉庫を選択…",
-    "ai-request-failed-fell-back-to-local-lexical-sea": "AI リクエストが失敗しました。ローカル語彙検索はロールバックされました。",
+    "ai-request-failed-fell-back-to-local-lexical-sea": "AIリクエストが失敗したため、ローカルの語彙検索にフォールバックしました。",
     "ai-analyzing-query": "AI分析クエリ…",
     "generating-query-vector": "クエリ ベクトルを生成します…",
     "searching-vector-index": "ベクター ライブラリを検索…",

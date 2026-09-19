@@ -228,7 +228,8 @@ export const BulkActionToolbar: React.FC<BulkActionToolbarProps> = ({
           'restore': { zh: '批量还原', en: 'Bulk Restore' },
         };
         const label = actionLabels[action];
-        const message = t('bulkActionToolbar.click-again-to-confirm-v1', { v1: label?.zh || '' });
+        const label_text = language === 'zh' ? label?.zh : label?.en;
+        const message = t('bulkActionToolbar.click-again-to-confirm-v1', { v1: label_text || '' });
         setTooltip({
           action,
           message,

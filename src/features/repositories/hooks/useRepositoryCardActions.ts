@@ -91,7 +91,7 @@ export const useRepositoryCardActions = ({
   useEffect(() => () => {
     abortControllerRef.current?.abort();
     setAnalyzingRepository(repoId, false);
-  }, [repoId, setAnalyzingRepository, t]);
+  }, [repoId, setAnalyzingRepository]);
 
   const vectorSearchAvailable = useMemo(() => {
     const activeConfig = embeddingConfigs.find((config) => config.id === activeEmbeddingConfig);

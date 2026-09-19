@@ -355,7 +355,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                             <span>{formatFileSize(link.size)}</span>
                           )}
                           {link.downloadCount > 0 && (
-                            <span>{link.downloadCount.toLocaleString()} {t('releaseCard.downloads')}</span>
+                            <span>{t('releaseCard.download-count', { count: link.downloadCount.toLocaleString() })}</span>
                           )}
                         </div>
                       </Button>
@@ -397,7 +397,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           <span>{formatFileSize(link.size)}</span>
                         )}
                         {link.downloadCount > 0 && (
-                          <span>{link.downloadCount.toLocaleString()} {t('releaseCard.downloads')}</span>
+                          <span>{t('releaseCard.download-count', { count: link.downloadCount.toLocaleString() })}</span>
                         )}
                       </div>
                     </a>

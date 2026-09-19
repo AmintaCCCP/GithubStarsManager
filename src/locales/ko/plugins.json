@@ -80,7 +80,8 @@
     "custom-endpoint": "맞춤형 서비스",
     "allow-plugin-ai-request": "플러그인이 AI를 호출하도록 허용하시겠습니까?",
     "the-host-may-relay-this-through-its-configured-b": "활성화된 호스팅 백엔드 프록시에 의해 전달될 수 있습니다.",
-    "send-to-ai": "AI로 보내기"
+    "send-to-ai": "AI로 보내기",
+    "allow-plugin-ai-body": "플러그인 {{pluginName}}이(가) AI 구성 \"{{configName}}\"(모델 {{model}})을 사용하도록 요청했습니다.\n대상 주소: {{destination}}\n{{relayNote}}\n\n시스템:\n{{system}}\n\n사용자:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "플러그인 네트워크 검색을 허용하시겠습니까?",

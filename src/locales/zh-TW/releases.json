@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "AI 總結",
     "analyzing-update": "正在分析更新內容…",
-    "failed-to-generate-summary-please-try-again": "總結生成失敗，請重試。"
+    "failed-to-generate-summary-please-try-again": "總結生成失敗，請重試。",
+    "download-count": "{{count}} 次下載"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "插件分析失敗",

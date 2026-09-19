@@ -22,7 +22,8 @@
     "original": "original",
     "translated": "tradução",
     "bilingual": "bilíngue",
-    "translating": "Traduzindo…"
+    "translating": "Traduzindo…",
+    "content-already-in-language": "O conteúdo já é {{language}}, não há necessidade de tradução"
   },
   "bulkActionToolbar": {
     "plugin-action-failed": "Falha na operação do plug-in",
@@ -122,7 +123,8 @@
     "collapse-sidebar": "Recolher barra lateral",
     "edit-category": "Editar categoria",
     "delete-category": "Excluir categoria",
-    "hide-default-category": "Ocultar categorias padrão"
+    "hide-default-category": "Ocultar categorias padrão",
+    "drag-hint": "{{name}} — Arraste o cartão do armazém aqui para modificar rapidamente a classificação"
   },
   "codeSearchView": {
     "show-less": "fechar",
@@ -168,7 +170,13 @@
     "toggle-theme": "mudar tema",
     "logout-confirmation": "Confirmação de logout",
     "logout": "Sair",
-    "logout-only-clears-credentials-repositories-ai-a": "Somente as credenciais de login são apagadas após o logout. Dados locais, como armazéns, análise de IA e classificação, serão retidos; ele será herdado automaticamente se você alterar o token e fazer login novamente com a mesma conta GitHub. Para limpar completamente todos os dados, vá em “Configurações → Gerenciamento de Dados”."
+    "logout-only-clears-credentials-repositories-ai-a": "Somente as credenciais de login são apagadas após o logout. Dados locais, como armazéns, análise de IA e classificação, serão retidos; ele será herdado automaticamente se você alterar o token e fazer login novamente com a mesma conta GitHub. Para limpar completamente todos os dados, vá em “Configurações → Gerenciamento de Dados”.",
+    "menu-gists": "Gist",
+    "menu-repositories": "armazém",
+    "menu-releases": "liberar",
+    "menu-forks": "réplica",
+    "menu-subscription": "Descobrir",
+    "menu-settings": "configurar"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Sincronize categorias com a lista do GitHub"
@@ -218,7 +226,8 @@
     "failed-to-load-readme-please-check-your-network": "Falha ao carregar o README. Verifique a conexão de rede ou tente novamente mais tarde",
     "failed-to-load-selected-readme-please-try-again": "Falha ao carregar o README selecionado. Tente novamente mais tarde",
     "loading-readme": "Carregando LEIA-ME…",
-    "default-readme": "LEIA-ME padrão"
+    "default-readme": "LEIA-ME padrão",
+    "cycle-font-size": "Mudar tamanho da fonte"
   },
   "scrollToBottom": {
     "scroll-to-bottom": "role para baixo"
@@ -316,7 +325,8 @@
     "recent-updates": "Atualizações recentes",
     "within-30-days": "Dentro de 30 dias",
     "search-query": "Consulta de pesquisa:",
-    "ai-analyzed": "analisado pela IA"
+    "ai-analyzed": "analisado pela IA",
+    "ai-analyzed-count": "{{count}} armazéns foram analisados ​​pela IA"
   },
   "searchShortcutsHelp": {
     "shortcuts": "tecla de atalho",
@@ -907,7 +917,8 @@
     "copy-sse-json": "Copiar SSE JSON",
     "read-only-tools-gsm-status-gsm-search-repos-gsm": "Ferramentas somente leitura: gsm_status/gsm_search_repos/gsm_get_repo/gsm_list_categories/gsm_list_repos_by_category/gsm_stats",
     "optional-gsm-vector-search-when-vector-search-is": "Opcional: gsm_vector_search (a pesquisa vetorial deve ser configurada)",
-    "prefer-streamable-http-json-above-if-the-client": "Prefira HTTP Streamable (JSON acima). Se o cliente oferecer suporte apenas à versão antiga do SSE, use a seguinte URL do SSE: GET para abrir o fluxo e, em seguida, POST nas mensagens."
+    "prefer-streamable-http-json-above-if-the-client": "Prefira HTTP Streamable (JSON acima). Se o cliente oferecer suporte apenas à versão antiga do SSE, use a seguinte URL do SSE: GET para abrir o fluxo e, em seguida, POST nas mensagens.",
+    "status-with-value": "Estado: {{status}}"
   },
   "menuManagementPanel": {
     "menu-management": "Gerenciamento de cardápio",
@@ -991,7 +1002,8 @@
     "the-installed-plugin-directory-is-deleted-choose": "O diretório de instalação do plug-in será excluído. Escolha se deseja excluir os dados e registros armazenados do plug-in ao mesmo tempo.",
     "cancel": "Cancelar",
     "uninstall-keep-data": "Mantenha os dados e desinstale",
-    "uninstall-and-delete-data": "Desinstalar e excluir dados"
+    "uninstall-and-delete-data": "Desinstalar e excluir dados",
+    "open-page-named": "Página aberta: {{name}}"
   },
   "starSyncPanel": {
     "star-sync": "Sincronização de estrelas",
@@ -1099,7 +1111,10 @@
     "must-rebuild-index-after-changing-embedding-mode": "O índice deve ser reconstruído após a substituição do modelo de incorporação",
     "different-models-produce-vectors-with-different": "As dimensões vetoriais geradas por diferentes modelos são diferentes e misturá-las causará falha na consulta. Após substituir o modelo, você precisa: ① Excluir o índice antigo e criar um novo índice (as dimensões precisam corresponder) ② Clique em \"Reconstruir Índice de Vetor\" abaixo",
     "for-detailed-instructions-see": "Consulte o guia de implantação detalhado",
-    "text": ")"
+    "text": ")",
+    "connection-failed-detail": "Falha na conexão: {{error}}",
+    "connection-successful-dimensions": "Conexão bem-sucedida - Dimensão: {{dimensions}}",
+    "connection-successful-vectors": "Conexão bem-sucedida — vetor: {{vectorCount}}, dimensões: {{dimensions}}"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuração WebDAV",
@@ -1133,6 +1148,18 @@
     "no-repositories-to-push": "Atualmente não há depósito para responder",
     "no-repos-matched-any-category": "Nenhum armazém atinge qualquer categoria",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} listas foram sincronizadas e {{updatedCount}} armazéns foram atualizados.",
-    "push-failed": "Falha na sincronização"
+    "push-failed": "Falha na sincronização",
+    "push-failed-detail": "Falha no envio: {{message}}"
+  },
+  "discoverySidebar": {
+    "minutes-ago": "{{count}} minutos atrás",
+    "hours-ago": "{{count}} horas atrás"
+  },
+  "forkCard": {
+    "run-workflow-named": "Execute o fluxo de trabalho: {{name}}"
+  },
+  "repositoryEditModal": {
+    "char-count": "{{count}} palavras",
+    "tag-count": "{{count}} etiquetas"
   }
 }

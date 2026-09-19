@@ -80,7 +80,8 @@
     "custom-endpoint": "Maßgeschneiderte Dienstleistungen",
     "allow-plugin-ai-request": "Plugins erlauben, KI aufzurufen?",
     "the-host-may-relay-this-through-its-configured-b": "Kann von einem aktivierten Hosting-Backend-Proxy weitergeleitet werden.",
-    "send-to-ai": "An AI senden"
+    "send-to-ai": "An AI senden",
+    "allow-plugin-ai-body": "Plugin {{pluginName}} hat die Verwendung der AI-Konfiguration „{{configName}}“ (Modell {{model}}) angefordert.\nZieladresse: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nBenutzer:\n{{user}}"
   },
   "usePluginWebSearch": {
     "allow-plugin-web-search": "Plug-in-Netzwerksuche zulassen?",

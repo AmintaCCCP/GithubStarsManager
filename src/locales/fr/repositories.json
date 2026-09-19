@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "Trouver des entrepôts similaires",
     "find-similar": "Trouver des entrepôts similaires",
     "deselect": "Désélectionner",
-    "select": "choisir"
+    "select": "choisir",
+    "analyzed-on-date": "Analysé le {{date}}",
+    "last-pushed-time": "Soumission récente {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Modifier les informations de l'entrepôt",

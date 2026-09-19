@@ -69,7 +69,8 @@
     "github": "GitHub",
     "ai-summary": "Обзор ИИ",
     "analyzing-update": "Анализ обновлений...",
-    "failed-to-generate-summary-please-try-again": "Не удалось создать сводку. Повторите попытку."
+    "failed-to-generate-summary-please-try-again": "Не удалось создать сводку. Повторите попытку.",
+    "download-count": "{{count}} загрузок"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Анализ плагина не удался",

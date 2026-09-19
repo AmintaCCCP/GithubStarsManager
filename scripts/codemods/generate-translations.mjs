@@ -6,7 +6,7 @@
  * - 每个命名空间完成即落盘，可断点续跑（已有译文的语言文件整体重译）
  * 用法：node scripts/codemods/generate-translations.mjs [ja,es,...] [--ns=common,login]
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -118,6 +118,7 @@ async function main() {
       }
       await Promise.all(Array.from({ length: CONCURRENCY }, worker));
       const target = path.join(localesDir, lang, `${ns}.json`);
+      mkdirSync(path.dirname(target), { recursive: true });
       writeFileSync(target, `${JSON.stringify(out, null, 2)}\n`);
       console.log(`  ${ns}: ${count} translated`);
     }

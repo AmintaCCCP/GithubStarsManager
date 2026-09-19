@@ -98,7 +98,9 @@
     "ai-service-configuration-is-incomplete-please-ch": "A configuração do serviço de IA está incompleta, verifique o endpoint da API, a chave e o nome do modelo.",
     "all-loaded-projects-have-been-analyzed": "Todos os projetos carregados concluíram a análise de IA.",
     "ai-analysis-complete-successcount-succeeded-v2": "Análise de IA concluída! Com sucesso {{successCount}}{{v2}}",
-    "ai-analysis-failed-please-check-your-ai-configur": "A análise de IA falhou, verifique a configuração de IA."
+    "ai-analysis-failed-please-check-your-ai-configur": "A análise de IA falhou, verifique a configuração de IA.",
+    "ai-analysis-complete": "Análise de IA concluída! {{successCount}} bem-sucedido",
+    "ai-analysis-complete-with-failures": "Análise de IA concluída! {{successCount}} bem-sucedido, {{failCount}} falhou"
   },
   "useDiscoveryRepoActions": {
     "failed-to-unstar-repository-please-check-your-ne": "Falha no cancelamento do Star. Verifique a conexão de rede ou as permissões do token GitHub.",

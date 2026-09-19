@@ -1165,7 +1165,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           ) : displayContent.isAnalyzed ? (
             <div
               className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary border border-primary/20 dark:border-primary/20"
-              title={displayContent.analyzedAt ? `${t('repositoryCard.analyzed-on')} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
+              title={displayContent.analyzedAt ? t('repositoryCard.analyzed-on-date', { date: new Date(displayContent.analyzedAt).toLocaleString() }) : ''}
             >
               <Sparkles className="w-3 h-3" />
               <span>{t('repositoryCard.ai-analyzed')}</span>
@@ -1258,7 +1258,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
-              {t('repositoryCard.last-pushed')} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) })}
+              {t('repositoryCard.last-pushed-time', { time: formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
             </span>
 
             {viewMode === 'grid' && vectorSearchAvailable && !selectionMode && (

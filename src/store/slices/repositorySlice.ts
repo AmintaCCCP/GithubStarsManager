@@ -330,7 +330,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error('Push categories to lists failed:', error);
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.push-failed') + `: ${message}` } });
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.push-failed-detail', { message }) } });
         }
       },
       deleteRepository: (repoId) => set((state) => {

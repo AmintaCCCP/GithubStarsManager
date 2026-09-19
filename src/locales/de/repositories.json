@@ -15,7 +15,7 @@
     "repository-actions": "Lagerbetrieb",
     "analyze-with-ai-2": "KI-Analyse",
     "ask-this-repository": "Stellen Sie dieses Repository in Frage",
-    "unsubscribe-from-releases": "Abonnieren Sie die Veröffentlichung",
+    "unsubscribe-from-releases": "Release-Abonnement beenden",
     "subscribe-to-releases": "Abonnieren Sie die Veröffentlichung",
     "find-similar-repositories": "Finden Sie ähnliche Lager",
     "plugin-actions": "Plug-in-Betrieb",
@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "Finden Sie ähnliche Lager",
     "find-similar": "Finden Sie ähnliche Lager",
     "deselect": "Abwählen",
-    "select": "wählen"
+    "select": "wählen",
+    "analyzed-on-date": "Analysiert am {{date}}",
+    "last-pushed-time": "Letzte Einreichung {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Lagerinformationen bearbeiten",

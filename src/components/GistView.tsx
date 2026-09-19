@@ -2,7 +2,7 @@
 
 
 
-import { useT, useTPair } from '../i18n/useT';
+import { useT } from '../i18n/useT';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -52,7 +52,6 @@ export const GistView: React.FC = () => {
     submitGist,
   } = useGistActions();
   const t = useT('gists');
-  const tPair = useTPair();
   const [query, setQuery] = useState(gistSearchFilters.query);
   const [detailGist, setDetailGist] = useState<Gist | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -146,7 +145,7 @@ export const GistView: React.FC = () => {
                 >
                   <span className="inline-flex items-center gap-2">
                     <Icon className="h-4 w-4" />
-                    {tPair(category.name, category.nameEn)}
+                    {t(`gistView.category-${category.id}`)}
                   </span>
                   <span className={`font-medium ${active ? 'text-accent-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'}`}>
                     {categoryItems[category.id].length}
@@ -217,7 +216,7 @@ export const GistView: React.FC = () => {
                 <SelectContent>
                   {sortOptions.map(option => (
                     <SelectItem key={option.value} value={option.value}>
-                      {tPair(option.labelZh, option.labelEn)}
+                      {t(`gistView.sort-${option.value}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>

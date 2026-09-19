@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "Найти похожие склады",
     "find-similar": "Найти похожие склады",
     "deselect": "Отменить выбор",
-    "select": "выбирать"
+    "select": "выбирать",
+    "analyzed-on-date": "Проанализировано на {{date}}",
+    "last-pushed-time": "Последняя подача {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Редактировать информацию о складе",
@@ -205,7 +207,7 @@
   "useSearchActions": {
     "ai-semantic-analysis": "Семантический анализ ИИ…",
     "ai-selecting-relevant-repositories": "ИИ выбрал соответствующий склад…",
-    "ai-request-failed-fell-back-to-local-lexical-sea": "Запрос AI не выполнен, локальный лексический поиск отменён.",
+    "ai-request-failed-fell-back-to-local-lexical-sea": "Запрос ИИ не выполнен, выполнен откат к локальному лексическому поиску.",
     "ai-analyzing-query": "Запрос на анализ ИИ…",
     "generating-query-vector": "Создать вектор запроса…",
     "searching-vector-index": "Найти векторную библиотеку…",

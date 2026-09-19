@@ -20,7 +20,7 @@
     "find-similar-repositories": "유사한 창고 찾기",
     "plugin-actions": "플러그인 작동",
     "view-releases": "릴리스 보기",
-    "view-on-deepwiki": "즈레드에서 보기",
+    "view-on-deepwiki": "DeepWiki에서 보기",
     "view-on-github": "GitHub에서 보기",
     "unstar": "취소 별표",
     "edit-repository-category": "창고 카테고리 수정",
@@ -43,7 +43,9 @@
     "find-similar-repositories-2": "유사한 창고 찾기",
     "find-similar": "유사한 창고 찾기",
     "deselect": "선택 취소",
-    "select": "선택하다"
+    "select": "선택하다",
+    "analyzed-on-date": "{{date}}에 분석됨",
+    "last-pushed-time": "최근 제출물 {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "창고 정보 편집",

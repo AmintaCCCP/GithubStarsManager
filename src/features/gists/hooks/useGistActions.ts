@@ -182,7 +182,10 @@ export const useGistActions = () => {
       const message = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(message);
       toast(
-        t('useGistActions.failed-to-v1-gist-v2-v3', { v1: editingGist ? '更新' : '创建', v2: message || '未知错误', v3: isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : '' }),
+        t(editingGist ? 'useGistActions.gist-update-failed' : 'useGistActions.gist-create-failed', {
+          message: message || t('useGistActions.unknown-error'),
+          permissionNote: isPermission ? t('useGistActions.gist-permission-note') : '',
+        }),
         'error',
       );
     }
