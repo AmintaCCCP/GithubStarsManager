@@ -653,4 +653,14 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.10.0/github-stars-manager-0.10.0.dmg</downloadUrl>
   </version>
+  <version>
+    <number>0.11.0</number>
+    <releaseDate>2026-09-19</releaseDate>
+    <changelog>
+      <item>feat: Added batch repository intake extraction: pasted text, Markdown and JSON are normalized to owner/repo candidates, covering plain slugs, github.com URLs (release/issue/PR/tree/blob and other sub-paths) and .git/query/fragment variants.</item>
+      <item>feat: Treated GitHub site paths (orgs, topics, settings, sponsors, marketplace, apps) as explicit invalid entries with a reason instead of dropping them silently, and deduplicated candidates case-insensitively while keeping first-seen order, casing and the original fragment.</item>
+      <item>fix: Kept bare owner/repo detection conservative: code-like directory names, file extensions and common word pairs such as src/utils, docs/guide.md, and/or and TCP/IP are rejected, and accepted bare slugs are marked low confidence for user review.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.11.0/github-stars-manager-0.11.0.dmg</downloadUrl>
+  </version>
 </versions>

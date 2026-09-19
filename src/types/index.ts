@@ -23,6 +23,17 @@ export type {
   InstallablePackageType,
   InstallablePlatform,
 } from './installableAsset';
+export type {
+  ImportCandidateConfidence,
+  ImportCandidateMatchedBy,
+  ImportCandidateStatus,
+  ImportedRepositoryCandidate,
+  ImportFailureReason,
+  ImportSource,
+  RepositoryImportExtractionOptions,
+  RepositoryImportExtractionResult,
+  RepositoryImportInputError,
+} from './repositoryImport';
 
 export interface Repository {
   id: number;
