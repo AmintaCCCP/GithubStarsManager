@@ -16,6 +16,15 @@ const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
   'category_locked',
   'last_edited',
   'vector_indexed_at',
+  // GitHub 原生状态字段：后端不存储，但 Repository Health / 筛选依赖它们。
+  // 必须同时出现在 CLIENT_ONLY_REPOSITORY_FIELDS（不参与后端同步指纹），
+  // 否则每次拉取都会把它们清空并触发一次多余的「已变化」判定。
+  'archived',
+  'disabled',
+  'fork',
+  'is_template',
+  'open_issues_count',
+  'default_branch',
 ];
 
 /**
@@ -30,6 +39,13 @@ export const CLIENT_ONLY_REPOSITORY_FIELDS: ReadonlySet<keyof Repository> = new 
   'analysis_error',
   'has_fetched_releases',
   'last_release_fetch_time',
+  // 见 LOCAL_REPOSITORY_FIELDS 中的同名字段：成对出现，缺一不可。
+  'archived',
+  'disabled',
+  'fork',
+  'is_template',
+  'open_issues_count',
+  'default_branch',
 ]);
 
 /** Drop client-only fields from a repo list, projecting the shape the backend

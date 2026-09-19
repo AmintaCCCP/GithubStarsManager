@@ -87,6 +87,18 @@ function sanitizeRepository(repository) {
       ? repository.topics.filter((topic) => typeof topic === 'string').slice(0, 100)
       : [],
     license: typeof repository.license === 'string' ? repository.license : null,
+    // Repository Health 客观事实（见 docs/plans/2026-09-17-product-roadmap.md §4）。
+    // 全部来自公开仓库元数据，属于既有 `repositories:read` 权限范围，不新增能力；
+    // 未知一律为 null，插件据此可以区分「未归档」与「本地没有这个事实」。
+    archived: typeof repository.archived === 'boolean' ? repository.archived : null,
+    disabled: typeof repository.disabled === 'boolean' ? repository.disabled : null,
+    fork: typeof repository.fork === 'boolean' ? repository.fork : null,
+    is_template: typeof repository.is_template === 'boolean' ? repository.is_template : null,
+    open_issues_count: Number.isFinite(repository.open_issues_count)
+      ? repository.open_issues_count
+      : null,
+    default_branch: typeof repository.default_branch === 'string' ? repository.default_branch : null,
+    has_fetched_releases: repository.has_fetched_releases === true,
   };
 }
 

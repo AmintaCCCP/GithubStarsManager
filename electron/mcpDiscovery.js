@@ -1,3 +1,9 @@
+const {
+  deriveRepositoryHealthFacts,
+  hasRecentActivity,
+  isArchivedRepository,
+} = require('./repoHealth');
+
 const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
 const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
 
@@ -75,6 +81,17 @@ function matchesRepoFilters(repo, filters = {}) {
   }
   if (filters.minStars !== undefined && (repo.stargazers_count || 0) < filters.minStars) return false;
   if (filters.maxStars !== undefined && (repo.stargazers_count || 0) > filters.maxStars) return false;
+  // Repository Health 事实过滤：与 src/utils/repoSearch.ts 同一套语义，保证 UI 与 MCP 结果一致。
+  if (filters.healthArchived !== undefined && isArchivedRepository(repo) !== filters.healthArchived) {
+    return false;
+  }
+  if (filters.healthRecentActivity !== undefined && hasRecentActivity(repo) !== filters.healthRecentActivity) {
+    return false;
+  }
+  if (filters.healthHasLicense !== undefined) {
+    const hasLicense = normalizeLicense(repo.license) !== NO_LICENSE_SENTINEL;
+    if (hasLicense !== filters.healthHasLicense) return false;
+  }
   if (filters.category && filters.category !== 'all' && repo.custom_category !== filters.category) {
     return false;
   }
@@ -91,6 +108,8 @@ function sortableValue(repo, sortBy) {
       return String(repo.name || '').toLowerCase();
     case 'starred':
       return repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
+    case 'created':
+      return repo.created_at ? new Date(repo.created_at).getTime() : 0;
     default:
       return new Date(repo.pushed_at || repo.updated_at || 0).getTime();
   }
@@ -212,12 +231,17 @@ function buildBatchLookupResult(inputs, resolve) {
   };
 }
 
-function buildRepoEvidence(repo, latestRelease) {
+function buildRepoEvidence(repo, latestRelease, releases) {
   const analysisStatus = repo.analyzed_at
     ? repo.analysis_failed
       ? 'failed'
       : 'analyzed'
     : 'not_analyzed';
+  // Repository Health 客观事实：与 UI / 插件同源（见 repoHealth.js）。
+  // 传 releases 时补全 Release 相关事实；不传时这些字段为 null（未知）而不是 0。
+  const health = deriveRepositoryHealthFacts(repo, releases);
+  // archived 只在记录中确实存在该布尔值时才断言，否则保持 null 并声明限制。
+  const hasArchivedFlag = typeof repo.archived === 'boolean';
   return {
     repository: projectRepo(repo, 2000),
     evidence: {
@@ -235,8 +259,9 @@ function buildRepoEvidence(repo, latestRelease) {
         subscribed_to_releases: !!repo.subscribed_to_releases,
         analysis_status: analysisStatus,
         analyzed_at: repo.analyzed_at ?? null,
-        archived: null,
+        archived: hasArchivedFlag ? repo.archived : null,
       },
+      health,
       latest_release: latestRelease || null,
       sources: {
         repository: 'repositories',
@@ -256,7 +281,10 @@ function buildRepoEvidence(repo, latestRelease) {
         ],
       },
       limitations: [
-        'archived is not stored locally',
+        // 只有本地确实没有该事实时才声明这项限制；有了就不要再谎称拿不到。
+        ...(hasArchivedFlag ? [] : ['archived is not stored locally']),
+        'health facts cover the stored repository record and locally cached releases only',
+        'contributors, closed issues, security policy, CI and README presence require extra GitHub requests and are not stored locally',
         'release evidence is limited to locally cached releases',
       ],
     },

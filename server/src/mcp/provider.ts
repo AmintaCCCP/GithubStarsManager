@@ -18,6 +18,7 @@ import {
   VECTOR_CANDIDATE_LIMIT,
 } from './discovery.js';
 import { buildRepoEvidence, type McpReleaseEvidence } from './evidence.js';
+import type { HealthReleaseInput } from './repoHealth.js';
 
 function parseJsonColumn(value: unknown): unknown[] {
   if (typeof value !== 'string' || !value) return [];
@@ -120,7 +121,38 @@ export function getLatestRelease(repoId: number): McpReleaseEvidence | null {
 export function getRepoEvidence(idOrFullName: string | number) {
   const repo = getRepository(idOrFullName);
   if (!repo) return { error: 'not_found' as const, idOrFullName: String(idOrFullName) };
-  return buildRepoEvidence(repo, getLatestRelease(repo.id));
+  return buildRepoEvidence(repo, getLatestRelease(repo.id), getRepositoryReleases(repo.id));
+}
+
+/** Soft cap on how many cached releases feed the health facts of a single repository. */
+const MAX_RELEASES_PER_REPO_EVIDENCE = 500;
+
+/**
+ * 单个仓库的轻量 Release 行（已按发布时间降序）。
+ * Repository Health 需要 Release 数量、最新稳定版本与发布频率，这些都要看完整列表
+ * 而不只是最新一条；因此这里单独取一份最小列集合并限制上限。
+ *
+ * 注意 SQLite 把布尔存成 0/1，这里显式归一化为 boolean，否则 `prerelease === true`
+ * 永远为假，预发布会被误当成稳定版（与 getLatestRelease 的 `!!row.prerelease` 一致）。
+ */
+export function getRepositoryReleases(repoId: number): HealthReleaseInput[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT repo_id, tag_name, published_at, prerelease
+       FROM releases
+       WHERE repo_id = ?
+       ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
+       LIMIT ?`
+    )
+    .all(repoId, MAX_RELEASES_PER_REPO_EVIDENCE) as Array<Record<string, unknown>>;
+
+  return rows.map((row) => ({
+    repo_id: typeof row.repo_id === 'number' ? row.repo_id : Number(row.repo_id),
+    tag_name: typeof row.tag_name === 'string' ? row.tag_name : null,
+    published_at: typeof row.published_at === 'string' ? row.published_at : null,
+    prerelease: row.prerelease === 1 || row.prerelease === true,
+  }));
 }
 
 export function listCategories(): Array<Record<string, unknown>> {

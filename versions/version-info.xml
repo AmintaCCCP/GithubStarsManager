@@ -632,4 +632,15 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.1</downloadUrl>
   </version>
+  <version>
+    <number>0.9.0</number>
+    <releaseDate>2026-09-19</releaseDate>
+    <changelog>
+      <item>feat: Added objective Repository Health facts (status, activity, release, community, maintenance and maturity) with grouped Activity/Maintenance/Community/Maturity display in the repository release sheet; Core reports conservative observations only and never an overall health score.</item>
+      <item>feat: Reused Repository Health facts across repository filters, sorting, MCP evidence, AI analysis prompts and the plugin snapshot, and captured GitHub&apos;s archived/disabled/fork/template/open-issues/default-branch fields locally.</item>
+      <item>feat: Added a trusted local plugin platform with a sandboxed plugin page host, capability router, isolated per-plugin storage, permission and lifecycle management, and a documented Plugin API v1.</item>
+      <item>feat: Added release processors, repository actions, exporters, host-mediated plugin AI and web search, and the Smart Release Recommendation example plugin, all behind explicit manifest permissions.</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/download/v0.9.0/github-stars-manager-0.9.0.dmg</downloadUrl>
+  </version>
 </versions>

@@ -1,6 +1,6 @@
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History } from 'lucide-react';
+import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History, Archive } from 'lucide-react';
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -23,13 +23,14 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
-type SortBy = 'stars' | 'updated' | 'name' | 'starred';
+type SortBy = 'stars' | 'updated' | 'name' | 'starred' | 'created';
 
 const sortOptions: { value: SortBy; labelZh: string; labelEn: string }[] = [
   { value: 'stars', labelZh: '按星标排序', labelEn: 'Sort by Stars' },
   { value: 'updated', labelZh: '按更新排序', labelEn: 'Sort by Updated' },
   { value: 'name', labelZh: '按名称排序', labelEn: 'Sort by Name' },
   { value: 'starred', labelZh: '按加星时间排序', labelEn: 'Sort by Starred Time' },
+  { value: 'created', labelZh: '按创建时间排序', labelEn: 'Sort by Created' },
 ];
 
 interface SortByDropdownProps {
@@ -592,6 +593,9 @@ export const SearchBar: React.FC = () => {
       isEdited: undefined,
       isCategoryLocked: undefined,
       analysisFailed: undefined,
+      healthArchived: undefined,
+      healthRecentActivity: undefined,
+      healthHasLicense: undefined,
     });
   };
 
@@ -606,7 +610,10 @@ export const SearchBar: React.FC = () => {
     (searchFilters.isSubscribed !== undefined ? 1 : 0) +
     (searchFilters.isEdited !== undefined ? 1 : 0) +
     (searchFilters.isCategoryLocked !== undefined ? 1 : 0) +
-    (searchFilters.analysisFailed !== undefined ? 1 : 0);
+    (searchFilters.analysisFailed !== undefined ? 1 : 0) +
+    (searchFilters.healthArchived !== undefined ? 1 : 0) +
+    (searchFilters.healthRecentActivity !== undefined ? 1 : 0) +
+    (searchFilters.healthHasLicense !== undefined ? 1 : 0);
 
   // 平台图标与显示名统一由 platformMeta 模块提供
 
@@ -1325,6 +1332,58 @@ export const SearchBar: React.FC = () => {
                   ≥{preset.label}
                 </Button>
               ))}
+            </div>
+          </div>
+
+          {/* Repository Health 客观事实过滤（见 src/utils/repositoryHealth.ts）。
+              这里刻意不放「健康 / 不健康」之类主观筛选，只按可验证事实过滤。 */}
+          <div>
+            <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
+              {t('仓库健康事实', 'Repository Health Facts')}
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setSearchFilters({
+                  healthArchived: searchFilters.healthArchived === true ? undefined : true,
+                })}
+                aria-pressed={searchFilters.healthArchived === true}
+                title={t('只显示已归档的仓库', 'Show only archived repositories')}
+                variant="ghost"
+                className={`${filterChipBaseClass} ${
+                  searchFilters.healthArchived === true ? filterChipActiveClass : filterChipInactiveClass
+                }`}
+              >
+                <Archive className="w-4 h-4" />
+                <span>{t('已归档', 'Archived')}</span>
+              </Button>
+              <Button
+                onClick={() => setSearchFilters({
+                  healthRecentActivity: searchFilters.healthRecentActivity === true ? undefined : true,
+                })}
+                aria-pressed={searchFilters.healthRecentActivity === true}
+                title={t('只显示近 12 个月内有推送的仓库', 'Show only repositories pushed within the last 12 months')}
+                variant="ghost"
+                className={`${filterChipBaseClass} ${
+                  searchFilters.healthRecentActivity === true ? filterChipActiveClass : filterChipInactiveClass
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>{t('近 12 个月有推送', 'Pushed in 12 months')}</span>
+              </Button>
+              <Button
+                onClick={() => setSearchFilters({
+                  healthHasLicense: searchFilters.healthHasLicense === false ? undefined : false,
+                })}
+                aria-pressed={searchFilters.healthHasLicense === false}
+                title={t('只显示未声明许可证的仓库', 'Show only repositories without a declared license')}
+                variant="ghost"
+                className={`${filterChipBaseClass} ${
+                  searchFilters.healthHasLicense === false ? filterChipActiveClass : filterChipInactiveClass
+                }`}
+              >
+                <AlertCircle className="w-4 h-4" />
+                <span>{t('未声明许可证', 'No declared license')}</span>
+              </Button>
             </div>
           </div>
         </div>

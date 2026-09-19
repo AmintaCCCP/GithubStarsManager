@@ -34,6 +34,9 @@ export const initialSearchFilters: SearchFilters = {
   isEdited: undefined,
   isCategoryLocked: undefined,
   analysisFailed: undefined,
+  healthArchived: undefined,
+  healthRecentActivity: undefined,
+  healthHasLicense: undefined,
 };
 
 export const initialGistSearchFilters: GistSearchFilters = {

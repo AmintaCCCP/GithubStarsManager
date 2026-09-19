@@ -2,6 +2,18 @@ import type { ThemePresetId } from '../constants/themePresets';
 
 import type { RepositoryChatSettings } from './repositoryChat';
 export type { RepositoryChatSettings } from './repositoryChat';
+export type {
+  RepositoryHealthEnrichment,
+  RepositoryHealthFact,
+  RepositoryHealthFactId,
+  RepositoryHealthFactKind,
+  RepositoryHealthFactSource,
+  RepositoryHealthGroup,
+  RepositoryHealthGroupView,
+  RepositoryHealthSignal,
+  RepositoryHealthSignalId,
+  RepositoryHealthSnapshot,
+} from './health';
 
 export interface Repository {
   id: number;
@@ -22,6 +34,20 @@ export interface Repository {
     avatar_url: string;
   };
   topics: string[];
+  /**
+   * GitHub 原生状态字段。`/user/starred` 原始响应本就包含这些字段，
+   * 这里把它们纳入类型以便 Repository Health 与筛选复用。
+   *
+   * 后端不持久化这些字段，因此 `src/utils/repositoryMerge.ts` 把它们同时列入
+   * `CLIENT_ONLY_REPOSITORY_FIELDS`（不参与后端同步指纹，避免 Issue #304 的哈希抖动）
+   * 与 `LOCAL_REPOSITORY_FIELDS`（拉取时保留本地值，不被后端响应清空）。
+   */
+  archived?: boolean;
+  disabled?: boolean;
+  fork?: boolean;
+  is_template?: boolean;
+  open_issues_count?: number;
+  default_branch?: string;
   ai_summary?: string;
   ai_tags?: string[];
   ai_platforms?: string[];
@@ -354,7 +380,7 @@ export interface SearchFilters {
   tags: string[];
   languages: string[];
   platforms: string[]; // 新增：平台过滤
-  sortBy: 'stars' | 'updated' | 'name' | 'starred';
+  sortBy: 'stars' | 'updated' | 'name' | 'starred' | 'created';
   sortOrder: 'desc' | 'asc';
   minStars?: number;
   maxStars?: number;
@@ -365,6 +391,15 @@ export interface SearchFilters {
   analysisFailed?: boolean; // 新增：分析是否失败
   /** SPDX id 过滤；过滤面板可采用 `NO_LICENSE_SENTINEL` 表示「无/未声明 license」。 */
   licenses: string[]; // 新增：开源许可过滤
+  /**
+   * Repository Health 客观事实施加的筛选（见 `src/utils/repositoryHealth.ts`）。
+   * 仅使用本地已存在的 `Repository` 字段，不触发额外网络请求；
+   * 依赖 Release 的事实（是否有 Release、最新版本）由 Health 面板与 MCP/AI 复用，
+   * 不进列表筛选——列表筛选器拿不到 Release 数组，硬塞会产生全量重渲染。
+   */
+  healthArchived?: boolean;
+  healthRecentActivity?: boolean;
+  healthHasLicense?: boolean;
 }
 
 export type CategoryMatchMode = 'legacy' | 'effective';
