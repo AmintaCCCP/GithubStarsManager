@@ -275,7 +275,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
         <Button
           type="button"
           variant="ghost"
-          aria-label={t('discoveryView.platform-filter-v1', { v1: selectedPlatform?.name ?? '全部平台' })}
+          aria-label={t('discoveryView.platform-filter-v1', { v1: discoveryPlatformName(selectedPlatform ?? { id: 'All', name: '全部平台', nameEn: 'All Platforms' }, language) })}
           className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
         >
           <Filter className="h-4 w-4" />
