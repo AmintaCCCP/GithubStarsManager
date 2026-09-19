@@ -1,0 +1,5 @@
+# 翻译文件包含 password/senha/パスワード 等界面标签文本，
+# 会被密钥检测器误报为硬编码凭据（例如 "password": "senha" 的表单标签）。
+# 本目录均为展示文案，不含任何真实凭据。
+paths_ignore:
+  - 'src/locales/**'
