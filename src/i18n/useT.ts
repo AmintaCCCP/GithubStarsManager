@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useReducer } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../store/useAppStore';
 import { i18n } from './index';
@@ -12,6 +12,19 @@ export type TranslateFn = (key: string, params?: Record<string, unknown>) => str
  */
 export function useT(namespace?: I18nNamespace): TranslateFn {
   const language = useAppStore(useShallow((state) => state.language));
+  // 语言包懒加载是异步的：store 切换语言时组件会立即重渲染，此时目标语言包
+  // 可能尚未装载（临时回退英文）。订阅 i18next 的资源装载/语言切换事件，
+  // 语言包就绪后强制重渲染，避免界面停留在回退语言。
+  const [, forceUpdate] = useReducer((count: number) => count + 1, 0);
+  useEffect(() => {
+    const handler = () => forceUpdate();
+    i18n.on('languageChanged', handler);
+    i18n.store.on('added', handler);
+    return () => {
+      i18n.off('languageChanged', handler);
+      i18n.store.off('added', handler);
+    };
+  }, []);
   return useMemo(
     () => (key: string, params?: Record<string, unknown>) =>
       i18n.getFixedT(language, namespace ?? 'common')(key, params) as string,
