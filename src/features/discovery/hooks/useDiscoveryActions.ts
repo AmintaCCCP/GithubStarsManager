@@ -65,7 +65,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   }, [authSessionIdentity, setAnalysisProgress]);
   const t = useT('discovery');
   const tRef = useRef(t);
-  tRef.current = t;
+  useEffect(() => {
+    // 提交完成后同步引用，避免渲染期副作用
+    tRef.current = t;
+  }, [t]);
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page = 1, append = false) => {
     const currentState = latestStateRef.current;
