@@ -1,3 +1,4 @@
+import { useT } from "../../../i18n/useT";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { DiscoveryRepo, Repository } from '../../../types';
@@ -58,7 +59,7 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
 
   const { toast } = useDialog();
 
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('discovery');
 
   const [isStarring, setIsStarring] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -110,7 +111,7 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
       // 操作失败，回滚乐观状态
       setOptimisticStarred(null);
       console.error('Failed to unstar repository:', error);
-      const errorMessage = t('取消 Star 失败，请检查网络连接或 GitHub Token 权限。', 'Failed to unstar repository. Please check your network connection or GitHub Token permissions.');
+      const errorMessage = t('useDiscoveryRepoActions.failed-to-unstar-repository-please-check-your-ne');
       toast(errorMessage, 'error');
     } finally {
       setIsStarring(false);
@@ -143,12 +144,12 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
       // 操作成功，清除乐观状态
       setOptimisticStarred(null);
 
-      toast(t('已成功添加 Star', 'Successfully starred'), 'success');
+      toast(t('useDiscoveryRepoActions.successfully-starred'), 'success');
     } catch (error) {
       // 操作失败，回滚乐观状态
       setOptimisticStarred(null);
       console.error('Failed to star repository:', error);
-      const errorMessage = t('Star 操作失败，请检查网络连接或 GitHub Token 权限。', 'Failed to star repository. Please check your network connection or GitHub Token permissions.');
+      const errorMessage = t('useDiscoveryRepoActions.failed-to-star-repository-please-check-your-netw');
       toast(errorMessage, 'error');
     } finally {
       setIsStarring(false);
@@ -158,23 +159,23 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
   // 单卡 AI 分析（无 forceSync、成功无 toast、重新分析无 confirm——与 RepositoryCard 不同，勿"补齐"）
   const analyze = useCallback(async (onAnalyzed?: (repo: DiscoveryRepo) => void) => {
     if (!githubToken) {
-      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      toast(t('useDiscoveryRepoActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
 
     const activeConfig = aiConfigs.find(c => c.id === activeAIConfig);
     if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
+      toast(t('useDiscoveryRepoActions.please-configure-ai-service-in-settings-first'), 'error');
       return;
     }
 
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务的API密钥无法解密或为空，请在设置中重新输入并保存该配置。', 'The AI service API key could not be decrypted or is empty. Please re-enter and save the configuration in settings.'), 'error');
+      toast(t('useDiscoveryRepoActions.the-ai-service-api-key-could-not-be-decrypted-or'), 'error');
       return;
     }
 
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
+      toast(t('useDiscoveryRepoActions.ai-service-configuration-is-incomplete-please-ch'), 'error');
       return;
     }
 
@@ -217,7 +218,7 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
         console.error('AI analysis error:', error);
         const errorMsg = error instanceof Error && error.message
           ? error.message
-          : t('AI分析失败，请检查AI配置和网络连接', 'AI analysis failed, please check AI configuration and network connection');
+          : t('useDiscoveryRepoActions.ai-analysis-failed-please-check-ai-configuration');
         const failedResult = createFailedAnalysisResult(errorMsg);
         const failedRepo = applyDiscoveryAnalysisFailure(repo, {
           analyzedAt: failedResult.analyzed_at,
@@ -225,7 +226,7 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
           analysisError: failedResult.analysis_error,
         });
         updateDiscoveryRepo(failedRepo);
-        toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
+        toast(t('useDiscoveryRepoActions.ai-analysis-failed-please-check-your-ai-configur'), 'error');
       }
     } finally {
       if (!controller.signal.aborted) {

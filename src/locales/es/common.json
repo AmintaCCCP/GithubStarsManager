@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "No se encontró el token de GitHub. Inicie sesión nuevamente.",
+    "fork-owner-not-found-please-login-again": "No se encontró el propietario del almacén de Fork, inicie sesión nuevamente.",
+    "refresh-completed-found-newcount-new-forks": "¡Actualización completa! {{newCount}} nuevas bifurcaciones encontradas.",
+    "refresh-completed": "¡Actualización completa!",
+    "fork-refresh-failed-please-check-your-network-co": "Error al actualizar la bifurcación, verifique la conexión de red.",
+    "failed-to-load-branches-please-check-your-networ": "No se pudo cargar la sucursal. Verifique la conexión de red e inténtelo nuevamente.",
+    "v1-is-already-up-to-date": "{{v1}} ya es la última versión y no es necesario actualizarla.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} se ha actualizado correctamente a la última versión ascendente.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} no es un almacén de Fork y no se puede sincronizar en sentido ascendente.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "Error de sincronización: {{v1}} tiene un conflicto de fusión con el almacén ascendente. Resuélvelo manualmente y vuelve a intentarlo.",
+    "sync-failed-message": "Error de sincronización: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "El flujo de trabajo \"{{workflowName}}\" se ha activado en la rama {{branch}}.",
+    "failed-to-run-workflow": "No se pudo ejecutar el flujo de trabajo.",
+    "failed-to-load-organizations-please-check-github": "No se pudo cargar la lista de organizaciones; verifique los permisos del token de GitHub."
+  }
+}

@@ -1,5 +1,5 @@
-
 import type { StoreApi } from 'zustand';
+import type { AppLanguage } from '../i18n/languages';
 import type {
   AppState,
   Gist,
@@ -172,7 +172,7 @@ export interface AppActions {
   setThemePreset: (preset: ThemePresetId) => void;
   setCurrentView: (view: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription') => void;
   setSelectedCategory: (category: string) => void;
-  setLanguage: (language: 'zh' | 'en') => void;
+  setLanguage: (language: AppLanguage) => void;
   setTranslationEngine: (engine: TranslationEngine) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setReadmeModalOpen: (open: boolean) => void;

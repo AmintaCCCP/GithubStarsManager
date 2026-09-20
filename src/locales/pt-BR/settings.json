@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "Conexão de serviço de IA bem-sucedida!",
+    "ai-service-test-failed-please-check-network-conn": "O teste do serviço de IA falhou, verifique a conexão e configuração da rede."
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "Endereço de back-end inválido: o back-end remoto requer HTTPS, apenas localhost pode usar HTTP",
+    "backend-connection-failed-please-check-the-serve": "A conexão de back-end falhou. Verifique se o status do servidor ou o segredo da API estão corretos.",
+    "backend-connection-successful": "Conexão de back-end bem-sucedida!",
+    "backend-not-available": "O back-end não está disponível",
+    "partial-sync-failure-v1-failed-v2-succeeded": "Falha na sincronização parcial: {{v1}} falhou, {{v2}} foi bem-sucedida",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "Sincronizado com o back-end: warehouse {{v1}}, versão {{v2}}, configuração de IA {{v3}}, configuração de WebDAV {{v4}}",
+    "sync-failed": "Falha na sincronização",
+    "sync-from-backend": "Sincronizar do back-end",
+    "syncing-from-backend-will-overwrite-local-data-c": "A sincronização do back-end substituirá os dados locais. Quer continuar?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Sincronizado do back-end: Warehouse {{v1}}, Release {{v2}}, Configuração de IA {{v3}}, Configuração WebDAV {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "Configure e ative o serviço WebDAV primeiro.",
+    "data-backup-successful": "Backup de dados bem-sucedido!",
+    "data-backup-failed": "Falha no backup de dados!",
+    "backup-failed": "Falha no backup",
+    "restore-data": "Recuperar dados",
+    "restoring-data-will-overwrite-all-current-data-c": "A restauração dos dados substituirá todos os dados atuais. Você quer continuar?",
+    "no-backup-files-found": "Arquivo de backup não encontrado.",
+    "backup-file-is-empty-cannot-restore": "O conteúdo do arquivo de backup está vazio e não pode ser restaurado.",
+    "data-restored-from-backup-repositories-v1-releas": "Dados restaurados do backup: Armazém {{v1}}, Versão {{v2}}, Classificação Customizada {{v3}}.",
+    "restore-failed": "Falha na recuperação"
+  },
+  "useDesktopActions": {
+    "load-failed": "Falha no carregamento",
+    "save-failed": "Falha ao salvar"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "Insira um token de acesso GitHub válido",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "Este token pertence a {{v1}} e a conta atual é {{v2}}. Saia primeiro e depois faça login com outra conta. Os dados locais serão retidos por conta.",
+    "failed-to-save-the-new-token-to-the-backend-loca": "Falha ao salvar o novo token no back-end. As credenciais locais não foram atualizadas. Por favor, tente novamente mais tarde.",
+    "github-token-updated": "O token GitHub foi atualizado",
+    "github-token-has-expired-or-is-invalid": "O token GitHub expirou ou é inválido",
+    "update-failed-please-try-again": "Falha na atualização, tente novamente mais tarde"
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "O serviço MCP é iniciado",
+    "mcp-server-disabled": "O serviço MCP está inativo",
+    "mcp-server-enabled-local": "O serviço MCP é iniciado (local)",
+    "backend-or-desktop-client-required-for-mcp": "É necessário um back-end ou cliente para usar o MCP",
+    "operation-failed": "Falha na operação",
+    "enable-mcp-before-resetting-the-token": "Ative o serviço MCP primeiro e depois redefina o token",
+    "reset-mcp-token": "Redefinir token MCP",
+    "the-old-token-will-stop-working-immediately-upda": "Após a redefinição, o Token antigo torna-se imediatamente inválido e a configuração do Agente precisa ser atualizada. Continuar?",
+    "token-reset": "O token foi redefinido",
+    "reset-failed": "Falha na redefinição"
+  },
+  "useNetworkActions": {
+    "save-failed": "Falha ao salvar"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "Não conectado ao GitHub, conecte-se primeiro",
+    "push-categories-to-github-lists": "Sincronize a classificação do warehouse com a lista do GitHub",
+    "push-confirm-body": "Escreva cada categoria local (incluindo categorias padrão e personalizadas) de volta na lista do GitHub com o mesmo nome:\n\n· Uma lista com o mesmo nome substituirá seus membros (repositórios que não correspondam à categoria serão removidos da lista)\n· Se não houver lista com o mesmo nome, crie uma nova (privada por padrão)\n· O armazém será adicionado à lista correspondente de acordo com a classificação correspondente\n· Outras associações à lista que não pertençam à categoria local serão mantidas\n\nTem certeza de que deseja continuar?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "O URL do WebDAV é obrigatório",
+    "webdav-url-must-start-with-http-or-https": "O URL do WebDAV deve começar com http:// ou https://",
+    "username-is-required": "O nome de usuário é obrigatório",
+    "password-is-required": "A senha é obrigatória",
+    "path-is-required": "o caminho é obrigatório",
+    "path-must-start-with": "O caminho deve começar com /",
+    "webdav-connection-successful": "Conexão WebDAV bem-sucedida!",
+    "webdav-connection-failed-please-check-configurat": "A conexão WebDAV falhou, verifique a configuração.",
+    "webdav-test-failed": "Falha no teste WebDAV"
+  },
+  "generalPanel": {
+    "account-token-hint": "Conta corrente {{login}}. Após a expiração, você pode substituir o token diretamente aqui, sem sair.",
+    "token-hint": "Após a expiração, você pode substituir o token diretamente aqui, sem sair."
+  }
+}

@@ -1,3 +1,4 @@
+import { i18n } from '../../i18n';
 import type { Repository } from '../../types';
 import { logger } from '../../services/logger';
 import { matchesCategory } from '../../utils/categoryUtils';
@@ -159,19 +160,19 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
       setCategoryListIdMap: (categoryId, listId) => set((state) => ({ categoryListIdMap: { ...state.categoryListIdMap, [categoryId]: listId } })),
       pushCategoriesToLists: async (api) => {
         const state = get();
-        const t = (zh: string, en: string) => (state.language === 'zh' ? zh : en);
+        const t = i18n.getFixedT(state.language, 'app');
         // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员
         if (state.listsPush.isRunning) return;
         if (!state.githubToken) {
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('未登录 GitHub，请先连接', 'Not connected to GitHub yet') } });
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.not-connected-to-github-yet') } });
           return;
         }
         if (!state.user) {
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('缺少用户信息，请重新连接', 'Missing user info, reconnect') } });
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.missing-user-info-reconnect') } });
           return;
         }
         if (state.repositories.length === 0) {
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('暂无仓库可回写', 'No repositories to push') } });
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.no-repositories-to-push') } });
           return;
         }
 
@@ -294,7 +295,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           }
 
           if (reposToUpdate.size === 0) {
-            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: t('没有仓库命中任何分类', 'No repos matched any category'), error: null } });
+            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: t('repositorySlice.no-repos-matched-any-category'), error: null } });
             return;
           }
 
@@ -325,14 +326,11 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             updatedCount++;
           }
 
-          set({ listsPush: { isRunning: false, total, done, currentLabel: null, message: t(
-            `已同步 ${listIdByCategoryId.size} 个 list、更新 ${updatedCount} 个仓库`,
-            `Pushed ${listIdByCategoryId.size} lists, updated ${updatedCount} repos`
-          ), error: null }, categoryListIdMap: nextCategoryListIdMap });
+          set({ listsPush: { isRunning: false, total, done, currentLabel: null, message: t('repositorySlice.pushed-v1-lists-updated-updatedcount-repos', { v1: listIdByCategoryId.size, updatedCount: updatedCount }), error: null }, categoryListIdMap: nextCategoryListIdMap });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           console.error('Push categories to lists failed:', error);
-          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('同步失败', 'Push failed') + `: ${message}` } });
+          set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.push-failed-detail', { message }) } });
         }
       },
       deleteRepository: (repoId) => set((state) => {

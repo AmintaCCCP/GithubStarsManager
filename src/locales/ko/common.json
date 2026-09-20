@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "GitHub 토큰을 찾을 수 없습니다. 다시 로그인하세요.",
+    "fork-owner-not-found-please-login-again": "포크 창고 주인을 찾을 수 없습니다. 다시 로그인해주세요.",
+    "refresh-completed-found-newcount-new-forks": "새로고침 완료! {{newCount}}개의 새 포크가 발견되었습니다.",
+    "refresh-completed": "새로고침 완료!",
+    "fork-refresh-failed-please-check-your-network-co": "포크 새로고침에 실패했습니다. 네트워크 연결을 확인하세요.",
+    "failed-to-load-branches-please-check-your-networ": "브랜치를 로드하지 못했습니다. 네트워크 연결을 확인한 후 다시 시도해 주세요.",
+    "v1-is-already-up-to-date": "{{v1}}은(는) 이미 최신 버전이므로 업데이트할 필요가 없습니다.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}}이(가) 최신 업스트림 버전으로 성공적으로 업데이트되었습니다.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}}은(는) Fork 창고가 아니므로 업스트림으로 동기화할 수 없습니다.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "동기화 실패: {{v1}}에 업스트림 웨어하우스와 병합 충돌이 있습니다. 수동으로 해결한 후 다시 시도해 주세요.",
+    "sync-failed-message": "동기화 실패: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "워크플로 \"{{workflowName}}\"이(가) {{branch}} 분기에서 트리거되었습니다.",
+    "failed-to-run-workflow": "워크플로를 실행하지 못했습니다.",
+    "failed-to-load-organizations-please-check-github": "조직 목록을 로드하지 못했습니다. GitHub 토큰 권한을 확인하세요."
+  }
+}

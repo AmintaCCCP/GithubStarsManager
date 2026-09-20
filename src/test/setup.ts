@@ -105,3 +105,25 @@ vi.mock('../store/useAppStore', () => ({
     return selector ? selector(state) : state;
   }),
 }));
+
+// 测试环境不走生产端的语言包懒加载：直接从磁盘把全部语言资源同步装载进
+// i18next，组件经 useT 按 store mock 的 language（默认 zh）取词。
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { i18n } from '../i18n';
+
+const localesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../locales');
+for (const language of readdirSync(localesDir)) {
+  const languageDir = path.join(localesDir, language);
+  for (const file of readdirSync(languageDir)) {
+    if (!file.endsWith('.json')) continue;
+    i18n.addResourceBundle(
+      language,
+      file.replace(/\.json$/, ''),
+      JSON.parse(readFileSync(path.join(languageDir, file), 'utf8')),
+      true,
+      true,
+    );
+  }
+}

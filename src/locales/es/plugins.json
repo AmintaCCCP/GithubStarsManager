@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "Mensaje de canal para {{v1}}",
+    "open-in-telegram": "Abrir en Telegram",
+    "this-message-is-media-only-and-has-no-text-conte": "Este mensaje es contenido puramente multimedia y no tiene contenido de texto."
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "Ingrese un nombre de canal válido, como https://t.me/geekhub23 o @geekhub23.",
+    "this-channel-is-already-in-the-list": "El canal ya está en la lista de seguimiento.",
+    "channel-added-to-the-follow-list": "Seguir canal agregado.",
+    "unfollowed-v1": "@{{v1}} ha dejado de seguirse.",
+    "telegram-channels-settings": "Configuración del canal de Telegram",
+    "refreshing-incrementally-pulls-the-latest-messag": "Al actualizar, se extraerán de forma incremental las últimas noticias del canal que sigues. Las entradas que contengan enlaces al almacén de GitHub en las noticias se mostrarán como elementos de lista; \"Cargar más\" recuperará mensajes históricos anteriores por página. Los datos son capturados por la aplicación conectada directamente a la vista previa pública de t.me, que requiere la versión de escritorio o el modo de servidor (el modo de navegador puro está sujeto a restricciones entre dominios); Los canales privados no se pueden capturar.",
+    "follow-list": "lista de seguimiento",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "Admite enlace de canal t.me, nombre de canal @ o nombre de canal desnudo. Obtenga las últimas noticias canal por canal al actualizar.",
+    "enter-a-valid-channel-name": "Por favor ingresa un nombre de canal válido.",
+    "fill-in-or-add-a-channel-to-test-first": "Primero complete o agregue un canal para realizar la prueba.",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "Capture realmente el canal una vez, obtenga una vista previa pública y verifique el canal de captura",
+    "testing": "Pruebas…",
+    "test-connection": "conexión de prueba",
+    "channel-name": "Nombre del canal",
+    "add": "añadir",
+    "no-followed-channels-yet": "Aún no hay canales para seguir.",
+    "unfollow": "Dejar de seguir",
+    "unfollow-v1": "Dejar de seguir a @{{v1}}",
+    "done": "Finalizar"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "Tweets de @{{v1}}",
+    "open-on-x": "Abierto a las X",
+    "this-tweet-has-no-text-content": "El texto del tweet está vacío."
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "Ingrese un nombre de usuario X válido, como @geekbb o un enlace a la página de inicio.",
+    "this-account-is-already-in-the-list": "Este blogger ya está en la lista de seguimiento.",
+    "account-added-to-the-follow-list": "Blogger ha sido agregado para seguir.",
+    "unfollowed-v1": "@{{v1}} ha dejado de seguirse.",
+    "both-auth-token-and-ct0-must-contain-valid-value": "Tanto auth_token como ct0 deben completar contenido válido.",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "La cookie de autenticación se guardó y se recuperará en modo GraphQL después de la actualización.",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "La cookie de autenticación ha entrado en vigor pero no se ha conservado en el disco y es posible que se pierda después de reiniciar.",
+    "auth-cookies-saved-current-session-only": "Cookie de autenticación guardada (válida solo para esta sesión).",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "Las cookies de autenticación se borraron y se regresaron al modo de rastreo sin inicio de sesión.",
+    "x-tweets-channel-settings": "Configuración del canal X Tweet",
+    "refreshing-incrementally-pulls-the-latest-tweets": "Al actualizar, los últimos tweets de los blogueros que sigue se extraerán de forma incremental y los elementos que contengan enlaces al repositorio de GitHub en los tweets se mostrarán como elementos de lista. Los datos son capturados por la aplicación conectada directamente a x.com, que requiere la versión de escritorio o el modo de servidor (el modo de navegador puro está sujeto a restricciones entre dominios). Opcionalmente, complete la cookie de autenticación de inicio de sesión para permitir más tweets y pasar páginas del historial.",
+    "follow-list": "lista de seguimiento",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "Admite @nombre de usuario, nombre de usuario o enlace a la página de inicio de x.com. Obtenga los últimos tweets del blogger al actualizar.",
+    "enter-a-valid-x-handle": "Por favor ingrese un nombre de usuario X válido.",
+    "fill-in-or-add-an-account-to-test-first": "Primero complete o agregue un blogger para realizar la prueba.",
+    "fetch-a-profile-once-to-verify-the-pipeline": "Rastree realmente la página de inicio una vez para verificar el canal de rastreo",
+    "testing": "Pruebas…",
+    "test-connection": "conexión de prueba",
+    "x-handle": "X nombre de usuario",
+    "add": "añadir",
+    "no-followed-accounts-yet": "Aún no hay bloggers a quienes seguir.",
+    "unfollow": "Dejar de seguir",
+    "unfollow-v1": "Dejar de seguir a @{{v1}}",
+    "auth-cookies-optional": "Cookie de autenticación (opcional)",
+    "once-set-fetching-switches-to-the-signed-in-grap": "Después de completar, cambie a la interfaz GraphQL del estado de inicio de sesión: cada blogger tiene alrededor de 20 tweets por página y \"cargue más\" para revisar el historial por página. Déjelo en blanco para utilizar el rastreo no registrado (solo el último lote pequeño para cada blogger a la vez). Después de que el navegador inicie sesión en x.com, copie auth_token y ct0 en DevTools → Aplicación → Cookies y guárdelos solo en los datos de la aplicación local.",
+    "auth-token": "auth_token",
+    "hide-auth-token": "Ocultar auth_token",
+    "show-auth-token": "mostrar auth_token",
+    "ct0": "ct0",
+    "hide-ct0": "Ocultar ct0",
+    "show-ct0": "mostrar ct0",
+    "authenticated-fetching-is-on": "La captura de autenticación está actualmente habilitada",
+    "signed-out-fetching-mode": "Actualmente en modo de rastreo sin inicio de sesión",
+    "clear": "Claro",
+    "update-auth": "Actualizar autenticación",
+    "saved": "salvado",
+    "save-auth": "Guardar autenticación",
+    "done": "Finalizar"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "Abierto en el navegador",
+    "plugin-result-copied": "Resultados del complemento copiados",
+    "plugin-result-saved": "Resultados del complemento guardados",
+    "plugin-action-completed": "Operación de complemento completada"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "Servicios personalizados",
+    "allow-plugin-ai-request": "¿Permitir que los complementos llamen a la IA?",
+    "the-host-may-relay-this-through-its-configured-b": "Puede ser reenviado por un proxy backend de alojamiento habilitado.",
+    "send-to-ai": "Enviar a IA",
+    "allow-plugin-ai-body": "El complemento {{pluginName}} solicitó utilizar la configuración de IA \"{{configName}}\" (modelo {{model}}).\nDirección de destino: {{destination}}\n{{relayNote}}\n\nSistema:\n{{system}}\n\nUsuario:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "¿Permitir la búsqueda de red de complementos?",
+    "search-query": "Términos de búsqueda:",
+    "send-search-query": "Enviar términos de búsqueda"
+  }
+}

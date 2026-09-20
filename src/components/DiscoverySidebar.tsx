@@ -1,3 +1,6 @@
+import { discoveryChannelName } from '../i18n/discoveryNames';
+import { useT } from "../i18n/useT";
+import type { AppLanguage } from '../i18n/languages';
 import React from 'react';
 import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search, Newspaper } from 'lucide-react';
 import { SiX, SiTelegram } from '@icons-pack/react-simple-icons';
@@ -23,7 +26,7 @@ interface DiscoverySidebarProps {
   isLoading: Record<DiscoveryChannelId, boolean>;
   lastRefresh: Record<DiscoveryChannelId, string | null>;
   isAnalyzing: boolean;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
@@ -36,7 +39,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
   isAnalyzing,
   language,
 }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('discovery');
 
   const formatLastRefresh = (timestamp: string | null | undefined) => {
     if (!timestamp) return '';
@@ -44,10 +47,10 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / (1000 * 60));
-    if (diffMin < 1) return t('刚刚', 'Just now');
-    if (diffMin < 60) return `${diffMin}${t('分钟前', 'm ago')}`;
+    if (diffMin < 1) return t('discoverySidebar.just-now');
+    if (diffMin < 60) return t('discoverySidebar.minutes-ago', { count: diffMin });
     const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return `${diffHours}${t('小时前', 'h ago')}`;
+    if (diffHours < 24) return t('discoverySidebar.hours-ago', { count: diffHours });
     return date.toLocaleDateString();
   };
 
@@ -60,7 +63,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
       <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('发现频道', 'Discovery Channels')}
+            {t('discoverySidebar.discovery-channels')}
           </h3>
           <Button
             type="button"
@@ -68,8 +71,8 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
             size="icon"
             onClick={onRefreshAll}
             disabled={anyLoading || isAnalyzing}
-            aria-label={t('刷新全部', 'Refresh All')}
-            title={t('刷新全部', 'Refresh All')}
+            aria-label={t('discoverySidebar.refresh-all')}
+            title={t('discoverySidebar.refresh-all')}
             className="h-8 w-8"
           >
             <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
@@ -97,7 +100,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
                 <span className="flex items-center gap-2.5">
                   <ChannelIcon className="w-4 h-4" />
                   <span className="font-medium text-sm">
-                    {language === 'zh' ? channel.name : channel.nameEn}
+                    {discoveryChannelName(channel, language)}
                   </span>
                 </span>
                 <span className="flex items-center gap-2.5">

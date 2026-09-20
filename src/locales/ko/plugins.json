@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "{{v1}}에 대한 채널 메시지",
+    "open-in-telegram": "텔레그램에서 열기",
+    "this-message-is-media-only-and-has-no-text-conte": "이 메시지는 순전히 미디어 콘텐츠이며 텍스트 콘텐츠가 없습니다."
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "https://t.me/geekhub23 또는 @geekhub23과 같은 유효한 채널 이름을 입력하세요.",
+    "this-channel-is-already-in-the-list": "채널이 이미 관심 목록에 있습니다.",
+    "channel-added-to-the-follow-list": "팔로우 채널이 추가되었습니다.",
+    "unfollowed-v1": "@{{v1}} 님을 팔로우 해제했습니다.",
+    "telegram-channels-settings": "텔레그램 채널 설정",
+    "refreshing-incrementally-pulls-the-latest-messag": "새로고침하면 팔로우하는 채널의 최신 뉴스가 점진적으로 표시됩니다. 뉴스에 GitHub 창고 링크가 포함된 항목은 목록 항목으로 표시됩니다. \"더 로드\"는 이전 기록 메시지를 페이지별로 가져옵니다. 데이터는 데스크탑 버전이나 서버 모드가 필요한 t.me 공개 미리보기에 직접 연결된 애플리케이션에 의해 캡처됩니다(순수 브라우저 모드는 도메인 간 제한이 적용됩니다). 비공개 채널은 캡처할 수 없습니다.",
+    "follow-list": "관심 목록",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "t.me 채널 링크, @채널 이름 또는 기본 채널 이름을 지원합니다. 새로 고침 시 채널별 최신 뉴스를 가져옵니다.",
+    "enter-a-valid-channel-name": "유효한 채널 이름을 입력하세요.",
+    "fill-in-or-add-a-channel-to-test-first": "먼저 테스트할 채널을 입력하거나 추가하세요.",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "실제로 채널을 한 번 캡처하고, 캡처 채널을 공개 미리 보고 확인하세요.",
+    "testing": "테스트 중…",
+    "test-connection": "테스트 연결",
+    "channel-name": "채널 이름",
+    "add": "다음에 추가",
+    "no-followed-channels-yet": "아직 팔로우할 채널이 없습니다.",
+    "unfollow": "언팔로우",
+    "unfollow-v1": "@{{v1}} 팔로우 해제",
+    "done": "마치다"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "@{{v1}}의 트윗",
+    "open-on-x": "X에 영업 시작",
+    "this-tweet-has-no-text-content": "트윗 텍스트가 비어 있습니다."
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "@geekbb 또는 홈페이지 링크와 같은 유효한 X 사용자 이름을 입력하세요.",
+    "this-account-is-already-in-the-list": "이 블로거는 이미 관심 목록에 있습니다.",
+    "account-added-to-the-follow-list": "팔로우에 Blogger가 추가되었습니다.",
+    "unfollowed-v1": "@{{v1}} 님을 팔로우 해제했습니다.",
+    "both-auth-token-and-ct0-must-contain-valid-value": "auth_token과 ct0 모두 유효한 콘텐츠를 입력해야 합니다.",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "인증 쿠키가 저장되었으며 새로 고침 후 GraphQL 모드에서 가져옵니다.",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "인증 쿠키가 적용되었지만 디스크에 유지되지 않았으며 다시 시작한 후 손실될 수 있습니다.",
+    "auth-cookies-saved-current-session-only": "인증 쿠키가 저장되었습니다(이 세션에만 유효함).",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "인증 쿠키가 삭제되어 비로그인 크롤링 모드로 돌아갔습니다.",
+    "x-tweets-channel-settings": "X 트윗 채널 설정",
+    "refreshing-incrementally-pulls-the-latest-tweets": "새로고침하면 팔로우하는 블로거의 최신 트윗이 점진적으로 추출되고, 트윗에 GitHub 저장소 링크가 포함된 항목이 목록 항목으로 표시됩니다. 데이터는 x.com에 직접 연결된 애플리케이션에 의해 캡처됩니다. 이를 위해서는 데스크톱 버전이나 서버 모드가 필요합니다(순수 브라우저 모드에는 도메인 간 제한이 적용됩니다). 더 많은 트윗과 기록 페이지 넘김을 활성화하려면 선택적으로 로그인 인증 쿠키를 입력하세요.",
+    "follow-list": "관심 목록",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "@username, 사용자 이름 또는 x.com 홈 페이지 링크를 지원합니다. 새로 고칠 때 블로거의 최신 트윗을 가져옵니다.",
+    "enter-a-valid-x-handle": "유효한 X 사용자 이름을 입력하세요.",
+    "fill-in-or-add-an-account-to-test-first": "테스트를 위해 먼저 블로거를 입력하거나 추가하세요.",
+    "fetch-a-profile-once-to-verify-the-pipeline": "크롤링 채널을 확인하기 위해 홈페이지를 한 번 크롤링해 보세요.",
+    "testing": "테스트 중…",
+    "test-connection": "테스트 연결",
+    "x-handle": "X 사용자 이름",
+    "add": "다음에 추가",
+    "no-followed-accounts-yet": "아직 팔로우할 블로거가 없습니다.",
+    "unfollow": "언팔로우",
+    "unfollow-v1": "@{{v1}} 팔로우 해제",
+    "auth-cookies-optional": "인증 쿠키(선택 사항)",
+    "once-set-fetching-switches-to-the-signed-in-grap": "내용을 입력한 후 로그인 상태 GraphQL 인터페이스로 변경합니다. 각 블로거는 페이지당 약 20개의 트윗을 갖고 있으며 \"추가 로드\"를 통해 페이지별로 기록을 검토할 수 있습니다. 기록되지 않은 크롤링을 사용하려면 비워 두세요(한 번에 각 블로거에 대한 최신 소규모 배치만). 브라우저가 x.com에 로그인한 후 DevTools → Application → Cookies에서 auth_token 및 ct0을 복사하여 로컬 애플리케이션 데이터에만 저장합니다.",
+    "auth-token": "auth_token",
+    "hide-auth-token": "auth_token 숨기기",
+    "show-auth-token": "인증 토큰 표시",
+    "ct0": "ct0",
+    "hide-ct0": "ct0 숨기기",
+    "show-ct0": "ct0 표시",
+    "authenticated-fetching-is-on": "현재 인증 캡처가 활성화되어 있습니다.",
+    "signed-out-fetching-mode": "현재 비로그인 크롤링 모드입니다.",
+    "clear": "분명한",
+    "update-auth": "인증 업데이트",
+    "saved": "저장됨",
+    "save-auth": "인증 저장",
+    "done": "마치다"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "브라우저에서 열림",
+    "plugin-result-copied": "플러그인 결과가 복사되었습니다.",
+    "plugin-result-saved": "플러그인 결과가 저장되었습니다.",
+    "plugin-action-completed": "플러그인 작업 완료"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "맞춤형 서비스",
+    "allow-plugin-ai-request": "플러그인이 AI를 호출하도록 허용하시겠습니까?",
+    "the-host-may-relay-this-through-its-configured-b": "활성화된 호스팅 백엔드 프록시에 의해 전달될 수 있습니다.",
+    "send-to-ai": "AI로 보내기",
+    "allow-plugin-ai-body": "플러그인 {{pluginName}}이(가) AI 구성 \"{{configName}}\"(모델 {{model}})을 사용하도록 요청했습니다.\n대상 주소: {{destination}}\n{{relayNote}}\n\n시스템:\n{{system}}\n\n사용자:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "플러그인 네트워크 검색을 허용하시겠습니까?",
+    "search-query": "검색어:",
+    "send-search-query": "검색어 보내기"
+  }
+}

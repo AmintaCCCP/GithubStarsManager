@@ -1,3 +1,4 @@
+import { makeT, useT } from "../../../i18n/useT";
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Gist } from '../../../types';
@@ -42,11 +43,11 @@ export const useGistActions = () => {
     (gistId: string) => analyzingGistIds.has(gistId),
     [analyzingGistIds],
   );
-  const t = useCallback((zh: string, en: string) => state.language === 'zh' ? zh : en, [state.language]);
+  const t = useT('gists');
 
   const refreshGists = useCallback(async () => {
     if (!state.githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      toast(t('useGistActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
     setIsRefreshing(true);
@@ -59,9 +60,9 @@ export const useGistActions = () => {
       const starredIds = new Set(starred.map(gist => gist.id));
       state.setGists(mine.map(gist => ({ ...gist, starred: starredIds.has(gist.id) || gist.starred })));
       state.setStarredGists(starred);
-      toast(t('Gist 同步完成', 'Gists synced'), 'success');
+      toast(t('useGistActions.gists-synced'), 'success');
     } catch (error) {
-      toast(error instanceof Error ? error.message : t('Gist 同步失败', 'Failed to sync gists'), 'error');
+      toast(error instanceof Error ? error.message : t('useGistActions.failed-to-sync-gists'), 'error');
     } finally {
       setIsRefreshing(false);
     }
@@ -97,24 +98,24 @@ export const useGistActions = () => {
 
   const analyzeVisibleGists = useCallback(async () => {
     if (!state.githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      toast(t('useGistActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
     const activeConfig = state.aiConfigs.find(config => config.id === state.activeAIConfig);
     if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
+      toast(t('useGistActions.please-configure-ai-service-in-settings-first'), 'error');
       return;
     }
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model || activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务配置不完整，请检查设置。', 'AI service configuration is incomplete. Please check settings.'), 'error');
+      toast(t('useGistActions.ai-service-configuration-is-incomplete-please-ch'), 'error');
       return;
     }
     const targets = state.gistSearchResults.filter(gist => !gist.analyzed_at || gist.analysis_failed);
     if (targets.length === 0) {
-      toast(t('当前列表没有需要分析的 gist', 'No gists need analysis in the current list'), 'info');
+      toast(t('useGistActions.no-gists-need-analysis-in-the-current-list'), 'info');
       return;
     }
-    const confirmed = await confirm(t('批量 AI 分析', 'Batch AI Analysis'), t(`将分析 ${targets.length} 个 gist，是否继续？`, `Analyze ${targets.length} gists. Continue?`), { type: 'warning' });
+    const confirmed = await confirm(t('useGistActions.batch-ai-analysis'), t('useGistActions.analyze-v1-gists-continue', { v1: targets.length }), { type: 'warning' });
     if (!confirmed) return;
 
     setIsAnalyzingAll(true);
@@ -141,7 +142,7 @@ export const useGistActions = () => {
       for (let index = 0; index < targets.length; index += concurrency) {
         await Promise.all(targets.slice(index, index + concurrency).map(analyzeOne));
       }
-      toast(t(`AI分析完成：成功 ${success}，失败 ${failed}`, `AI analysis done: ${success} succeeded, ${failed} failed`), failed > 0 ? 'error' : 'success');
+      toast(t('useGistActions.ai-analysis-done-success-succeeded-failed-failed', { success: success, failed: failed }), failed > 0 ? 'error' : 'success');
     } finally {
       setIsAnalyzingAll(false);
     }
@@ -156,10 +157,10 @@ export const useGistActions = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (/5\d{2}/.test(message)) {
-        toast(t('GitHub Gist API 暂时不可用，已使用缓存数据打开。文件内容将按需加载。', 'GitHub Gist API is temporarily unavailable. Opening with cached data. File content will load on demand.'), 'warning');
+        toast(t('useGistActions.github-gist-api-is-temporarily-unavailable-openi'), 'warning');
         return null;
       }
-      toast(t(`获取 Gist 详情失败${message ? `：${message}` : ''}`, `Failed to load gist details${message ? `: ${message}` : ''}`), 'error');
+      toast(t(message ? 'useGistActions.failed-to-load-gist-details' : 'useGistActions.failed-to-load-gist-details-empty', { message }), 'error');
       return null;
     }
   }, [state, t, toast]);
@@ -171,20 +172,20 @@ export const useGistActions = () => {
       if (editingGist) {
         const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
         state.updateGist({ ...updated, last_edited: new Date().toISOString() });
-        toast(t('Gist 已更新', 'Gist updated'), 'success');
+        toast(t('useGistActions.gist-updated'), 'success');
         return;
       }
       const created = await api.createGist(input as GistCreateInput);
       state.updateGist({ ...created, last_edited: new Date().toISOString() });
-      toast(t('Gist 已创建', 'Gist created'), 'success');
+      toast(t('useGistActions.gist-created'), 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(message);
       toast(
-        t(
-          `Gist ${editingGist ? '更新' : '创建'}失败：${message || '未知错误'}${isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : ''}`,
-          `Failed to ${editingGist ? 'update' : 'create'} gist: ${message || 'Unknown error'}${isPermission ? ' (Make sure your token has the gist scope and re-login with the updated token)' : ''}`,
-        ),
+        t(editingGist ? 'useGistActions.gist-update-failed' : 'useGistActions.gist-create-failed', {
+          message: message || t('useGistActions.unknown-error'),
+          permissionNote: isPermission ? t('useGistActions.gist-permission-note') : '',
+        }),
         'error',
       );
     }
@@ -194,23 +195,23 @@ export const useGistActions = () => {
   // 重新分析覆盖确认在本 hook 内（View 只保留 stopPropagation 前置）。
   const analyzeOne = useCallback(async (gist: Gist) => {
     if (!state.githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      toast(t('useGistActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
     const activeConfig = state.aiConfigs.find(config => config.id === state.activeAIConfig);
     if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
+      toast(t('useGistActions.please-configure-ai-service-in-settings-first'), 'error');
       return;
     }
     if (!activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model || activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty') {
-      toast(t('AI服务配置不完整，请检查设置。', 'AI service configuration is incomplete. Please check settings.'), 'error');
+      toast(t('useGistActions.ai-service-configuration-is-incomplete-please-ch'), 'error');
       return;
     }
 
     if (gist.analyzed_at) {
       const shouldContinue = await confirm(
-        t('重新分析确认', 'Re-analyze Confirmation'),
-        t('此 gist 已经分析过，是否覆盖现有摘要？', 'This gist has already been analyzed. Overwrite the existing summary?'),
+        t('useGistActions.re-analyze-confirmation'),
+        t('useGistActions.this-gist-has-already-been-analyzed-overwrite-th'),
         { type: 'warning' }
       );
       if (!shouldContinue) return;
@@ -223,10 +224,10 @@ export const useGistActions = () => {
       const aiService = new AIService(activeConfig, state.language);
       const summary = await aiService.analyzeGist(detail, githubApi.getGistContentPreview(detail));
       state.updateGist(applyGistAnalysisSuccess(detail, summary, new Date().toISOString()));
-      toast(t('Gist AI分析完成', 'Gist AI analysis completed'), 'success');
+      toast(t('useGistActions.gist-ai-analysis-completed'), 'success');
     } catch (error) {
       state.updateGist(applyGistAnalysisFailure(gist, error instanceof Error ? error.message : String(error), new Date().toISOString()));
-      toast(t('Gist AI分析失败', 'Gist AI analysis failed'), 'error');
+      toast(t('useGistActions.gist-ai-analysis-failed'), 'error');
     } finally {
       state.setAnalyzingGist(gist.id, false);
     }
@@ -235,9 +236,9 @@ export const useGistActions = () => {
   const unstarGist = useCallback(async (gist: Gist, onUnstarred?: (gistId: string) => void) => {
     if (!state.githubToken) return;
     const confirmed = await confirm(
-      t('取消收藏 Gist', 'Unstar Gist'),
-      t('确定要取消收藏这个 gist 吗？', 'Are you sure you want to unstar this gist?'),
-      { type: 'warning', confirmText: t('取消收藏', 'Unstar') }
+      t('useGistActions.unstar-gist'),
+      t('useGistActions.are-you-sure-you-want-to-unstar-this-gist'),
+      { type: 'warning', confirmText: t('useGistActions.unstar') }
     );
     if (!confirmed) return;
 
@@ -246,9 +247,9 @@ export const useGistActions = () => {
       await createGitHubApiService(state.githubToken).unstarGist(gist.id);
       onUnstarred?.(gist.id);
       state.updateGist({ ...gist, starred: false });
-      toast(t('已取消收藏', 'Unstarred'), 'success');
+      toast(t('useGistActions.unstarred'), 'success');
     } catch {
-      toast(t('取消收藏失败', 'Failed to unstar'), 'error');
+      toast(t('useGistActions.failed-to-unstar'), 'error');
     } finally {
       setIsMutating(false);
     }
@@ -260,9 +261,9 @@ export const useGistActions = () => {
   const deleteGist = useCallback(async (gist: Gist, onDeleted?: (gistId: string) => void) => {
     if (!state.githubToken || gist.owner?.login !== state.user?.login) return;
     const confirmed = await confirm(
-      t('删除 Gist', 'Delete Gist'),
-      t('确定要删除这个 gist 吗？此操作不可撤销。', 'Are you sure you want to delete this gist? This cannot be undone.'),
-      { type: 'danger', confirmText: t('删除', 'Delete') }
+      t('useGistActions.delete-gist'),
+      t('useGistActions.are-you-sure-you-want-to-delete-this-gist-this-c'),
+      { type: 'danger', confirmText: t('useGistActions.delete') }
     );
     if (!confirmed) return;
 
@@ -271,15 +272,15 @@ export const useGistActions = () => {
       await createGitHubApiService(state.githubToken).deleteGist(gist.id);
       state.deleteGist(gist.id);
       onDeleted?.(gist.id);
-      toast(t('Gist 已删除', 'Gist deleted'), 'success');
+      toast(t('useGistActions.gist-deleted'), 'success');
     } catch (error) {
       const msg = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
       toast(
-        t(
-          `删除 Gist 失败${msg ? `：${msg}` : ''}${isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : ''}`,
-          `Failed to delete gist${msg ? `: ${msg}` : ''}${isPermission ? ' (Make sure your token has the gist scope and re-login with the updated token)' : ''}`
-        ),
+        t(msg ? 'useGistActions.failed-to-delete-gist' : 'useGistActions.failed-to-delete-gist-empty', {
+          message: msg,
+          permissionNote: isPermission ? t('useGistActions.gist-permission-note') : '',
+        }),
         'error'
       );
     } finally {
@@ -295,9 +296,7 @@ export const useGistActions = () => {
   const fetchGistFileRaw = useCallback(async (rawUrl: string, signal?: AbortSignal): Promise<string> => {
     if (!state.githubToken) {
       const currentLanguage = useAppStore.getState().language;
-      throw new Error(currentLanguage === 'zh'
-        ? '未配置 GitHub token，无法加载文件内容'
-        : 'GitHub token not configured, cannot load file content');
+      throw new Error(makeT(currentLanguage, 'gists')('useGistActions.github-token-not-configured'));
     }
     return createGitHubApiService(state.githubToken).getGistFileRaw(rawUrl, signal);
   }, [state.githubToken]);

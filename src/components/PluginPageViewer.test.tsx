@@ -12,13 +12,21 @@ const { getPage, requestPageCapability, getSearchEndpoint, searchWeb, confirm, g
 }));
 vi.mock('../plugins/pluginClient', () => ({ pluginClient: { getPage, requestPageCapability, getSearchEndpoint, searchWeb } }));
 vi.mock('../hooks/useDialog', () => ({ useDialog: () => ({ confirm }) }));
-vi.mock('../store/useAppStore', () => ({ useAppStore: { getState } }));
+const storeState: Record<string, unknown> = { language: 'zh', getState };
+
+vi.mock('../store/useAppStore', () => ({
+  useAppStore: Object.assign(
+    (selector?: (state: unknown) => unknown) => (selector ? selector(storeState) : storeState),
+    { getState: (...args: unknown[]) => getState(...(args as [])) },
+  ),
+}));
 vi.mock('../services/aiService', () => ({ AIService: class { generateChatText = generateChatText; } }));
 
+import { makeT } from '../i18n/useT';
 import { PluginPageViewer } from './PluginPageViewer';
 import { validatePluginPageMessage } from '../plugins/pluginPageMessages';
 
-const t = (zh: string) => zh;
+const t = makeT('zh', 'app');
 
 describe('PluginPageViewer', () => {
   afterEach(() => {

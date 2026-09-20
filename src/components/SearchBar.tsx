@@ -1,3 +1,9 @@
+
+
+
+
+import { getIntlLocale } from '../i18n/format';
+import { useT } from '../i18n/useT';
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History } from 'lucide-react';
@@ -25,27 +31,21 @@ import {
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
 
-const sortOptions: { value: SortBy; labelZh: string; labelEn: string }[] = [
-  { value: 'stars', labelZh: '按星标排序', labelEn: 'Sort by Stars' },
-  { value: 'updated', labelZh: '按更新排序', labelEn: 'Sort by Updated' },
-  { value: 'name', labelZh: '按名称排序', labelEn: 'Sort by Name' },
-  { value: 'starred', labelZh: '按加星时间排序', labelEn: 'Sort by Starred Time' },
-];
+const sortOptions: SortBy[] = ['stars', 'updated', 'name', 'starred'];
 
 interface SortByDropdownProps {
   value: SortBy;
   onChange: (value: SortBy) => void;
-  t: (zh: string, en: string) => string;
 }
 
-const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) => {
-  const selected = sortOptions.find(o => o.value === value);
+const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
+  const t = useT('app');
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="gap-2">
-          <span>{t(selected?.labelZh ?? '', selected?.labelEn ?? '')}</span>
+          <span>{t(`searchBar.sort-${value}`)}</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -53,11 +53,11 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) =
         <DropdownMenuRadioGroup value={value} onValueChange={(nextValue) => onChange(nextValue as SortBy)}>
           {sortOptions.map((option) => (
             <DropdownMenuRadioItem
-              key={option.value}
-              value={option.value}
-              className={value === option.value ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
+              key={option}
+              value={option}
+              className={value === option ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
             >
-              {t(option.labelZh, option.labelEn)}
+              {t(`searchBar.sort-${option}`)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -610,23 +610,15 @@ export const SearchBar: React.FC = () => {
 
   // 平台图标与显示名统一由 platformMeta 模块提供
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
 
   // 同步星标仓库及 list：先确认（警告会覆盖未锁定仓库的分类并加锁），再执行。
   // 'auto'/'stars-only' 入口原无确认，勿加（B8）。
   const handleStarAndListSync = async () => {
+
     const confirmed = await confirm(
-      t('同步星标仓库及 list', 'Sync starred repos & lists'),
-      t(
-        '将拉取你的 GitHub Lists（星标列表）并应用到本地仓库：\n\n' +
-        '· 每个 list 名会作为标签添加到对应仓库（一个仓库可属于多个 list/分类）\n' +
-        '· 未锁定分类的仓库将应用 list 对应的分类并默认锁定\n' +
-        '· 已锁定分类的仓库保持不变\n\n确定继续吗？',
-        'This will fetch your GitHub Lists and apply them to local repositories:\n\n' +
-        '· Each list name is added as a tag (a repo can belong to multiple lists/categories)\n' +
-        '· Unlocked repos get the list category applied and locked\n' +
-        '· Locked repos are left unchanged\n\nContinue?'
-      ),
+      t('searchBar.sync-starred-repos-lists'),
+      t('searchBar.sync-lists-confirm-body'),
       { type: 'warning' }
     );
     if (!confirmed) return;
@@ -634,15 +626,15 @@ export const SearchBar: React.FC = () => {
   };
 
   const formatLastSync = (timestamp: string | null) => {
-    if (!timestamp) return t('从未同步', 'Never');
+    if (!timestamp) return t('searchBar.never');
     const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return t('从未同步', 'Never');
+    if (Number.isNaN(date.getTime())) return t('searchBar.never');
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours < 1) return t('刚刚', 'Just now');
-    if (diffHours < 24) return t(`${diffHours}小时前`, `${diffHours}h ago`);
-    return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
+    if (diffHours < 1) return t('searchBar.just-now');
+    if (diffHours < 24) return t('searchBar.diffhours-h-ago', { diffHours: diffHours });
+    return date.toLocaleDateString(getIntlLocale(language));
   };
 
   // 全局快捷键支持（Ctrl/Cmd+K、Ctrl/Cmd+Shift+F、/、Escape）
@@ -673,13 +665,10 @@ export const SearchBar: React.FC = () => {
         <Input
           ref={searchInputRef}
           type="text"
-          aria-label={t('搜索仓库', 'Search repositories')}
+          aria-label={t('searchBar.search-repositories')}
           aria-expanded={showSearchHistory || showSuggestions}
           aria-controls={showSearchHistory ? 'search-history-dropdown' : showSuggestions ? 'search-suggestions-dropdown' : undefined}
-          placeholder={t(
-            "输入关键词实时搜索，或使用AI搜索进行语义理解",
-            "Type keywords for real-time search, or use AI search for semantic understanding"
-          )}
+          placeholder={t('searchBar.type-keywords-for-real-time-search-or-use-ai-sea')}
           value={searchQuery}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -699,7 +688,7 @@ export const SearchBar: React.FC = () => {
           >
             <div className="p-2 border-b border-border/60 dark:border-border/60 flex items-center justify-between">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                {t('搜索历史', 'Search History')}
+                {t('searchBar.search-history')}
               </span>
               <Button
                 type="button"
@@ -707,7 +696,7 @@ export const SearchBar: React.FC = () => {
                 onClick={clearSearchHistory}
                 className="text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
-                {t('清除', 'Clear')}
+                {t('searchBar.clear')}
               </Button>
             </div>
             {searchHistory.map((historyQuery, index) => (
@@ -736,7 +725,7 @@ export const SearchBar: React.FC = () => {
           >
             <div className="p-2 border-b border-border/60 dark:border-border/60">
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-                {t('搜索建议', 'Search Suggestions')}
+                {t('searchBar.search-suggestions')}
               </span>
             </div>
             {searchSuggestions
@@ -770,10 +759,10 @@ export const SearchBar: React.FC = () => {
               type="button"
               variant="ghost"
               onClick={handleClearSearch}
-              aria-label={t('清除搜索', 'Clear search')}
+              aria-label={t('searchBar.clear-search')}
               size="icon"
               className="h-8 w-8 text-muted-foreground"
-              title={t('清除搜索', 'Clear search')}
+              title={t('searchBar.clear-search')}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -781,15 +770,15 @@ export const SearchBar: React.FC = () => {
           <Button
             onClick={handleAISearch}
             variant="default"
-            aria-label={isSearching ? t('AI搜索中…', 'AI Searching…') : t('AI搜索', 'AI Search')}
+            aria-label={isSearching ? t('searchBar.ai-searching') : t('searchBar.ai-search')}
             disabled={isSearching || !searchQuery.trim()}
             className="flex shrink-0 items-center sm:px-4"
             title={activeAIConfig
-              ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
-              : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
+              ? t('searchBar.use-configured-ai-service-for-semantic-search-an')
+              : t('searchBar.use-local-intelligent-ranking-algorithm-for-sear')}
           >
             <Bot className="w-4 h-4" />
-            <span className="hidden sm:inline">{isSearching ? t('AI搜索中…', 'AI Searching…') : t('AI搜索', 'AI Search')}</span>
+            <span className="hidden sm:inline">{isSearching ? t('searchBar.ai-searching') : t('searchBar.ai-search')}</span>
           </Button>
           {isSearching && searchPhase && (
             <span className="max-w-[12rem] truncate text-xs text-muted-foreground dark:text-muted-foreground animate-pulse whitespace-nowrap">
@@ -802,22 +791,16 @@ export const SearchBar: React.FC = () => {
                 type="button"
                 variant="ghost"
                 size="icon"
-                aria-label={t('关于 AI 搜索', 'About AI Search')}
+                aria-label={t('searchBar.about-ai-search')}
                 className="h-8 w-8 shrink-0 text-muted-foreground"
               >
                 <AlertCircle className="h-4 w-4" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end" className="w-80 max-w-xs whitespace-normal break-words text-left">
-              <p className="mb-1 font-medium">{t('关于AI搜索', 'About AI Search')}</p>
+              <p className="mb-1 font-medium">{t('searchBar.about-ai-search-2')}</p>
               <p className="leading-relaxed text-primary-foreground/80">
-                {activeAIConfig ? t(
-                  'AI语义搜索模式：使用配置的AI服务进行智能语义理解和重排序。AI将分析查询意图，理解上下文关系，并提供语义相关的搜索结果。支持自然语言查询和概念匹配。',
-                  'AI semantic search mode: Uses configured AI service for intelligent semantic understanding and reranking. AI analyzes query intent, understands context, and provides semantically relevant search results. Supports natural language queries and concept matching.'
-                ) : t(
-                  '回退模式：基础文本搜索与默认排序。当未配置AI服务时，系统将使用基础文本匹配进行搜索（支持名称、描述、标签、语言等字段），并应用标准的排序和过滤控制。此为轻量级搜索方案，无语义理解能力。',
-                  'Fallback mode: Basic text search with default sorting. When no AI service is configured, the system uses basic text matching for search (supports name, description, tags, language, etc.) and applies standard sort and filter controls. This is a lightweight search solution without semantic understanding capabilities.'
-                )}
+                {activeAIConfig ? t('searchBar.ai-semantic-search-mode-uses-configured-ai-servi') : t('searchBar.fallback-mode-basic-text-search-with-default-sor')}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -832,18 +815,18 @@ export const SearchBar: React.FC = () => {
             {isRealTimeSearch ? (
               <div className="flex items-center space-x-2 text-primary dark:text-primary">
                 <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                <span>{t('实时搜索模式 - 匹配仓库名称', 'Real-time search mode - matching repository names')}</span>
+                <span>{t('searchBar.real-time-search-mode-matching-repository-names')}</span>
               </div>
             ) : searchFilters.query ? (
               <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground ">
                 <Bot className="w-4 h-4" />
-                <span>{t('AI语义搜索模式 - 智能匹配和排序', 'AI semantic search mode - intelligent matching and ranking')}</span>
+                <span>{t('searchBar.ai-semantic-search-mode-intelligent-matching-and')}</span>
               </div>
             ) : null}
           </div>
           {isRealTimeSearch && (
             <div className="text-muted-foreground dark:text-muted-foreground">
-              {t('按回车键或点击AI搜索进行深度搜索', 'Press Enter or click AI Search for deep search')}
+              {t('searchBar.press-enter-or-click-ai-search-for-deep-search')}
             </div>
           )}
         </div>
@@ -862,7 +845,7 @@ export const SearchBar: React.FC = () => {
             }`}
           >
             <SlidersHorizontal className="w-4 h-4" />
-            <span>{t('过滤器', 'Filters')}</span>
+            <span>{t('searchBar.filters')}</span>
             {activeFiltersCount > 0 && (
               <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
                 {activeFiltersCount}
@@ -875,11 +858,11 @@ export const SearchBar: React.FC = () => {
             variant="ghost"
             onClick={openGlobalChatHistory}
             className="linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm"
-            aria-label={t('问答历史', 'Chat history')}
-            title={t('查看各仓库的问答历史', 'View chat history across repositories')}
+            aria-label={t('searchBar.chat-history')}
+            title={t('searchBar.view-chat-history-across-repositories')}
           >
             <History className="w-4 h-4" aria-hidden="true" />
-            <span>{t('问答历史', 'Chat history')}</span>
+            <span>{t('searchBar.chat-history')}</span>
             {globalHistoryCount > 0 && (
               <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
                 {globalHistoryCount > 99 ? '99+' : globalHistoryCount}
@@ -894,7 +877,7 @@ export const SearchBar: React.FC = () => {
               className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground transition-colors"
             >
               <X className="w-4 h-4" />
-              <span>{t('清除全部', 'Clear all')}</span>
+              <span>{t('searchBar.clear-all')}</span>
             </Button>
           )}
 
@@ -905,14 +888,13 @@ export const SearchBar: React.FC = () => {
           <SortByDropdown
             value={searchFilters.sortBy}
             onChange={(value) => setSearchFilters({ sortBy: value as 'stars' | 'updated' | 'name' | 'starred' })}
-            t={t}
           />
           <Button
             onClick={() => setSearchFilters({
               sortOrder: searchFilters.sortOrder === 'desc' ? 'asc' : 'desc'
             })}
             variant="ghost"
-            aria-label={searchFilters.sortOrder === 'desc' ? t('按降序排列', 'Sort descending') : t('按升序排列', 'Sort ascending')}
+            aria-label={searchFilters.sortOrder === 'desc' ? t('searchBar.sort-descending') : t('searchBar.sort-ascending')}
             className="ui-button px-3 py-2 text-sm"
           >
             {searchFilters.sortOrder === 'desc' ? <ArrowDown className="w-4 h-4" aria-hidden="true" /> : <ArrowUp className="w-4 h-4" aria-hidden="true" />}
@@ -928,18 +910,18 @@ export const SearchBar: React.FC = () => {
                     onClick={() => { void syncStars(); }}
                     disabled={isSyncingStars}
                     className="inline-flex items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
-                    title={t('同步星标仓库列表', 'Sync starred repositories')}
+                    title={t('searchBar.sync-starred-repositories')}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
-                    <span className="whitespace-nowrap">{t('同步', 'Sync')}</span>
+                    <span className="whitespace-nowrap">{t('searchBar.sync')}</span>
                   </Button>
                   <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
                       disabled={isSyncingStars}
-                      aria-label={t('更多同步选项', 'More sync options')}
+                      aria-label={t('searchBar.more-sync-options')}
                       className="group inline-flex items-center rounded-none border-0 bg-transparent px-1.5 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
-                      title={t('更多同步选项', 'More sync options')}
+                      title={t('searchBar.more-sync-options')}
                     >
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
                     </Button>
@@ -952,14 +934,14 @@ export const SearchBar: React.FC = () => {
                   onSelect={() => { void syncStars('stars-only'); }}
                   className="justify-start text-sm"
                 >
-                  <span className="whitespace-nowrap">{t('只同步星标仓库', 'Sync starred repos only')}</span>
+                  <span className="whitespace-nowrap">{t('searchBar.sync-starred-repos-only')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={isSyncingStars}
                   onSelect={() => { void handleStarAndListSync(); }}
                   className="justify-start text-sm"
                 >
-                  <span className="whitespace-nowrap">{t('同步星标仓库及 list', 'Sync starred repos & lists')}</span>
+                  <span className="whitespace-nowrap">{t('searchBar.sync-starred-repos-lists')}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -969,14 +951,14 @@ export const SearchBar: React.FC = () => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={t('最近更新时间', 'Last synced')}
+                  aria-label={t('searchBar.last-synced')}
                   className="h-8 w-8 shrink-0 text-muted-foreground"
                 >
                   <Clock className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" align="end" className="whitespace-nowrap">
-                <p className="font-medium">{t('最近更新时间', 'Last synced')}</p>
+                <p className="font-medium">{t('searchBar.last-synced')}</p>
                 <p className="mt-1 text-primary-foreground/80">{formatLastSync(lastSync)}</p>
               </TooltipContent>
             </Tooltip>
@@ -990,7 +972,7 @@ export const SearchBar: React.FC = () => {
           {/* Status Filters */}
           <div>
             <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
-              {t('状态过滤', 'Status Filters')}
+              {t('searchBar.status-filters')}
             </h4>
             <div className="flex flex-wrap gap-2">
               {/* 已AI分析 - 仅在存在已分析仓库或当前已选择时显示，且与"分析失败"互斥 */}
@@ -1000,7 +982,7 @@ export const SearchBar: React.FC = () => {
                     isAnalyzed: searchFilters.isAnalyzed === true ? undefined : true 
                   })}
                   aria-pressed={searchFilters.isAnalyzed === true}
-                  title={t('显示已完成AI分析的仓库', 'Show repositories with AI analysis completed')}
+                  title={t('searchBar.show-repositories-with-ai-analysis-completed')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isAnalyzed === true
@@ -1009,7 +991,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>{t('已AI分析', 'AI Analyzed')}</span>
+                  <span>{t('searchBar.ai-analyzed')}</span>
                   <span className="text-xs opacity-70">({statusStats.analyzed})</span>
                 </Button>
               )}
@@ -1020,7 +1002,7 @@ export const SearchBar: React.FC = () => {
                     isAnalyzed: searchFilters.isAnalyzed === false ? undefined : false 
                   })}
                   aria-pressed={searchFilters.isAnalyzed === false}
-                  title={t('显示尚未进行AI分析的仓库', 'Show repositories without AI analysis')}
+                  title={t('searchBar.show-repositories-without-ai-analysis')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isAnalyzed === false
@@ -1029,7 +1011,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <X className="w-4 h-4" />
-                  <span>{t('未AI分析', 'Not Analyzed')}</span>
+                  <span>{t('searchBar.not-analyzed')}</span>
                   <span className="text-xs opacity-70">({statusStats.notAnalyzed})</span>
                 </Button>
               )}
@@ -1040,7 +1022,7 @@ export const SearchBar: React.FC = () => {
                     analysisFailed: searchFilters.analysisFailed === true ? undefined : true 
                   })}
                   aria-pressed={searchFilters.analysisFailed === true}
-                  title={t('显示AI分析失败的仓库', 'Show repositories with failed AI analysis')}
+                  title={t('searchBar.show-repositories-with-failed-ai-analysis')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.analysisFailed === true
@@ -1049,7 +1031,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <AlertCircle className="w-4 h-4" />
-                  <span>{t('分析失败', 'Analysis Failed')}</span>
+                  <span>{t('searchBar.analysis-failed')}</span>
                   <span className="text-xs opacity-70">({statusStats.failed})</span>
                 </Button>
               )}
@@ -1060,7 +1042,7 @@ export const SearchBar: React.FC = () => {
                     isSubscribed: searchFilters.isSubscribed === true ? undefined : true 
                   })}
                   aria-pressed={searchFilters.isSubscribed === true}
-                  title={t('显示已订阅Release通知的仓库', 'Show repositories subscribed to release notifications')}
+                  title={t('searchBar.show-repositories-subscribed-to-release-notifica')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isSubscribed === true
@@ -1069,7 +1051,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <Bell className="w-4 h-4" />
-                  <span>{t('已订阅Release', 'Subscribed to Releases')}</span>
+                  <span>{t('searchBar.subscribed-to-releases')}</span>
                   <span className="text-xs opacity-70">({statusStats.subscribed})</span>
                 </Button>
               )}
@@ -1080,7 +1062,7 @@ export const SearchBar: React.FC = () => {
                     isSubscribed: searchFilters.isSubscribed === false ? undefined : false 
                   })}
                   aria-pressed={searchFilters.isSubscribed === false}
-                  title={t('显示未订阅Release通知的仓库', 'Show repositories not subscribed to releases')}
+                  title={t('searchBar.show-repositories-not-subscribed-to-releases')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isSubscribed === false
@@ -1089,7 +1071,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <BellOff className="w-4 h-4" />
-                  <span>{t('未订阅Release', 'Not Subscribed to Releases')}</span>
+                  <span>{t('searchBar.not-subscribed-to-releases')}</span>
                   <span className="text-xs opacity-70">({statusStats.notSubscribed})</span>
                 </Button>
               )}
@@ -1100,7 +1082,7 @@ export const SearchBar: React.FC = () => {
                     isEdited: searchFilters.isEdited === true ? undefined : true
                   })}
                   aria-pressed={searchFilters.isEdited === true}
-                  title={t('显示已自定义的仓库（包括自定义描述、标签、分类）', 'Show customized repositories (including custom description, tags, category)')}
+                  title={t('searchBar.show-customized-repositories-including-custom-de')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isEdited === true
@@ -1109,7 +1091,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <Edit3 className="w-4 h-4" />
-                  <span>{t('已自定义', 'Customized')}</span>
+                  <span>{t('searchBar.customized')}</span>
                   <span className="text-xs opacity-70">({statusStats.edited})</span>
                 </Button>
               )}
@@ -1120,7 +1102,7 @@ export const SearchBar: React.FC = () => {
                     isCategoryLocked: searchFilters.isCategoryLocked === true ? undefined : true
                   })}
                   aria-pressed={searchFilters.isCategoryLocked === true}
-                  title={t('显示分类已锁定的仓库（同步时不会自动更改分类）', 'Show repositories with locked category (won\'t auto-change during sync)')}
+                  title={t('searchBar.show-repositories-with-locked-category-won-t-aut')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isCategoryLocked === true
@@ -1129,7 +1111,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <Lock className="w-4 h-4" />
-                  <span>{t('分类已锁定', 'Category Locked')}</span>
+                  <span>{t('searchBar.category-locked')}</span>
                   <span className="text-xs opacity-70">({statusStats.locked})</span>
                 </Button>
               )}
@@ -1140,7 +1122,7 @@ export const SearchBar: React.FC = () => {
                     isCategoryLocked: searchFilters.isCategoryLocked === false ? undefined : false
                   })}
                   aria-pressed={searchFilters.isCategoryLocked === false}
-                  title={t('显示分类未锁定的仓库（同步时可能会被自动更改分类）', 'Show repositories with unlocked category (may be auto-changed during sync)')}
+                  title={t('searchBar.show-repositories-with-unlocked-category-may-be')}
                   variant="ghost"
                   className={`${filterChipBaseClass} ${
                     searchFilters.isCategoryLocked === false
@@ -1149,7 +1131,7 @@ export const SearchBar: React.FC = () => {
                   }`}
                 >
                   <Unlock className="w-4 h-4" />
-                  <span>{t('分类未锁定', 'Category Unlocked')}</span>
+                  <span>{t('searchBar.category-unlocked')}</span>
                   <span className="text-xs opacity-70">({statusStats.notLocked})</span>
                 </Button>
               )}
@@ -1160,7 +1142,7 @@ export const SearchBar: React.FC = () => {
           {availableLanguages.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
-                {t('编程语言', 'Programming Languages')}
+                {t('searchBar.programming-languages')}
               </h4>
               <div className="flex flex-wrap gap-2">
                 {availableLanguages.slice(0, 12).map(language => (
@@ -1186,7 +1168,7 @@ export const SearchBar: React.FC = () => {
           {availablePlatforms.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
-                {t('支持平台', 'Supported Platforms')}
+                {t('searchBar.supported-platforms')}
               </h4>
               <div className="flex flex-wrap gap-2">
                 {availablePlatforms.map(platform => (
@@ -1213,7 +1195,7 @@ export const SearchBar: React.FC = () => {
           {availableLicenses.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
-                {t('开源许可', 'License')}
+                {t('searchBar.license')}
               </h4>
               <div className="flex flex-wrap gap-2">
                 {availableLicenses.map(license => (
@@ -1229,7 +1211,7 @@ export const SearchBar: React.FC = () => {
                     }`}
                   >
                     {license === NO_LICENSE_SENTINEL
-                      ? t('无/未声明 license', 'No license')
+                      ? t('searchBar.no-license')
                       : license}
                   </Button>
                 ))}
@@ -1241,7 +1223,7 @@ export const SearchBar: React.FC = () => {
           {availableTags.length > 0 && (
             <div>
               <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
-                {t('标签', 'Tags')}
+                {t('searchBar.tags')}
               </h4>
               <div className="flex flex-wrap gap-2">
                 {availableTags.slice(0, 15).map(tag => (
@@ -1266,12 +1248,12 @@ export const SearchBar: React.FC = () => {
           {/* Star Range */}
           <div>
             <h4 className="text-sm font-medium text-foreground dark:text-foreground mb-3">
-              {t('Star数量范围', 'Star Count Range')}
+              {t('searchBar.star-count-range')}
             </h4>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4 sm:gap-4">
               <div className="flex items-center space-x-2">
                 <label htmlFor="minimum-stars" className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('最小:', 'Min:')}
+                  {t('searchBar.min')}
                 </label>
                 <NumberInput
                   id="minimum-stars"
@@ -1286,7 +1268,7 @@ export const SearchBar: React.FC = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <label htmlFor="maximum-stars" className="text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('最大:', 'Max:')}
+                  {t('searchBar.max')}
                 </label>
                 <NumberInput
                   id="maximum-stars"
@@ -1303,7 +1285,7 @@ export const SearchBar: React.FC = () => {
             {searchFilters.minStars !== undefined && searchFilters.maxStars !== undefined && searchFilters.minStars > searchFilters.maxStars && (
               <p className="text-xs text-destructive mt-1.5 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
-                {t('最小值不能大于最大值', 'Min cannot be greater than max')}
+                {t('searchBar.min-cannot-be-greater-than-max')}
               </p>
             )}
             <div className="flex flex-wrap gap-1.5 mt-2">

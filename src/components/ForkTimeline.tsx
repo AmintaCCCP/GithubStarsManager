@@ -1,15 +1,18 @@
+
+import { getDateFnsLocale } from '../i18n/format';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import ForkCard from './ForkCard';
 import { useForkTimelineActions } from '../features/forks/hooks/useForkTimelineActions';
+import { useT } from '../i18n/useT';
 import { Modal } from './Modal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 export const ForkTimeline: React.FC = () => {
+  const t = useT('releases');
   const {
     readForks,
     language,
@@ -33,7 +36,6 @@ export const ForkTimeline: React.FC = () => {
     setSyncModal,
     syncModalBranches,
     isFetchingBranches,
-    t,
     handleRefresh,
     handleForkOwnerChange,
     toggleWorkflows,
@@ -45,7 +47,7 @@ export const ForkTimeline: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const searchQuery = forkSearchQuery;
-  const currentOwnerLabel = activeForkOwner || t('个人账号', 'Personal account');
+  const currentOwnerLabel = activeForkOwner || t('forkTimeline.personal-account');
   const isForkUnread = (forkId: number) => !readForks.has(forkId);
   const handleForkOwnerSelection = (ownerLogin: string) => {
     handleForkOwnerChange(ownerLogin);
@@ -132,33 +134,33 @@ export const ForkTimeline: React.FC = () => {
         <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
-              {t('复刻', 'Fork')}
+              {t('forkTimeline.fork')}
             </h2>
             <p className="text-muted-foreground dark:text-muted-foreground">
-              {t(`管理 ${currentOwnerLabel} 的 ${ownerForks.length} 个Fork仓库`, `Manage ${ownerForks.length} forked repositories for ${currentOwnerLabel}`)}
+              {t('forkTimeline.manage-v2-forked-repositories-for-v2', { currentOwnerLabel: currentOwnerLabel, v2: ownerForks.length })}
             </p>
           </div>
           <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:max-w-full lg:justify-end">
             {/* Fork owner selector */}
             <div className="flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap">
-              <span id="fork-owner-label" className="shrink-0 whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('拥有者:', 'Owner:')}</span>
+              <span id="fork-owner-label" className="shrink-0 whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('forkTimeline.owner')}</span>
               <Select value={activeForkOwner} onValueChange={handleForkOwnerSelection} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
                 <SelectTrigger className="ui-field h-9 w-48 max-w-[calc(100vw-8rem)] shrink px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
-                <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t(`${owner.login}（个人）`, `${owner.login} (Personal)`) : owner.login}</SelectItem>)}</SelectContent>
+                <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t('forkTimeline.v1-personal', { v1: owner.login }) : owner.login}</SelectItem>)}</SelectContent>
               </Select>
             </div>
 
             {isLoadingOrganizations && (
               <span className="flex items-center space-x-1 text-sm text-muted-foreground dark:text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{t('加载组织中…', 'Loading organizations…')}</span>
+                <span>{t('forkTimeline.loading-organizations')}</span>
               </span>
             )}
 
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
+                {t('forkTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
               </span>
             )}
 
@@ -169,7 +171,7 @@ export const ForkTimeline: React.FC = () => {
               className="ui-button-primary flex h-auto shrink-0 items-center space-x-2 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{forkIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新', 'Refresh')}</span>
+              <span>{forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}</span>
             </Button>
           </div>
         </div>
@@ -180,8 +182,8 @@ export const ForkTimeline: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
             <Input
               type="text"
-              aria-label={t('搜索 Fork', 'Search forks')}
-              placeholder={t('搜索Fork…', 'Search forks…')}
+              aria-label={t('forkTimeline.search-forks')}
+              placeholder={t('forkTimeline.search-forks-2')}
               value={searchQuery}
               onChange={(e) => {
                 setForkSearchQuery(e.target.value);
@@ -198,7 +200,7 @@ export const ForkTimeline: React.FC = () => {
                   setForkSearchQuery('');
                   setCurrentPage(1);
                 }}
-                aria-label={t('清除搜索', 'Clear search')}
+                aria-label={t('forkTimeline.clear-search')}
                 className="absolute right-3 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="w-4 h-4" />
@@ -211,14 +213,11 @@ export const ForkTimeline: React.FC = () => {
         <div className="flex w-full min-w-0 flex-col gap-2 mb-4 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t(
-                `显示 ${displayStart}-${displayEnd} 共 ${filteredForks.length} 个Fork`,
-                `Showing ${displayStart}-${displayEnd} of ${filteredForks.length} forks`
-              )}
+              {t('forkTimeline.showing-displaystart-displayend-of-v3-forks', { displayStart: displayStart, displayEnd: displayEnd, v3: filteredForks.length })}
             </span>
             {searchQuery && (
               <span className="text-sm text-primary dark:text-primary">
-                ({t('已筛选', 'filtered')})
+                ({t('forkTimeline.filtered')})
               </span>
             )}
           </div>
@@ -226,7 +225,7 @@ export const ForkTimeline: React.FC = () => {
           <div className="flex w-full min-w-0 flex-wrap items-center justify-end gap-3 sm:w-auto sm:gap-4 lg:w-auto lg:justify-self-end">
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <span id="fork-page-size-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+              <span id="fork-page-size-label" className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('forkTimeline.per-page')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
                 <SelectTrigger aria-labelledby="fork-page-size-label" className="ui-field h-9 w-20 max-w-20 min-w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
@@ -241,7 +240,7 @@ export const ForkTimeline: React.FC = () => {
                   variant="ghost"
                   onClick={() => handlePageChange(1)}
                   disabled={clampedPage === 1}
-                  aria-label={t('第一页', 'First page')}
+                  aria-label={t('forkTimeline.first-page')}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronsLeft className="w-4 h-4" />
@@ -251,7 +250,7 @@ export const ForkTimeline: React.FC = () => {
                   variant="ghost"
                   onClick={() => handlePageChange(clampedPage - 1)}
                   disabled={clampedPage === 1}
-                  aria-label={t('上一页', 'Previous page')}
+                  aria-label={t('forkTimeline.previous-page')}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronLeft className="w-4 h-4" />
@@ -285,7 +284,7 @@ export const ForkTimeline: React.FC = () => {
                   variant="ghost"
                   onClick={() => handlePageChange(clampedPage + 1)}
                   disabled={clampedPage === totalPages}
-                  aria-label={t('下一页', 'Next page')}
+                  aria-label={t('forkTimeline.next-page')}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -295,7 +294,7 @@ export const ForkTimeline: React.FC = () => {
                   variant="ghost"
                   onClick={() => handlePageChange(totalPages)}
                   disabled={clampedPage === totalPages}
-                  aria-label={t('最后一页', 'Last page')}
+                  aria-label={t('forkTimeline.last-page')}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ChevronsRight className="w-4 h-4" />
@@ -312,19 +311,19 @@ export const ForkTimeline: React.FC = () => {
           <div className="ui-empty-state text-center py-12">
             <Package className="w-12 h-12 text-muted-foreground dark:text-muted-foreground mx-auto mb-3" />
             <h3 className="text-lg font-medium text-foreground dark:text-muted-foreground mb-1">
-              {searchQuery ? t('无符合条件的结果', 'No matching results') : t('没有Fork仓库', 'No Forked Repositories')}
+              {searchQuery ? t('forkTimeline.no-matching-results') : t('forkTimeline.no-forked-repositories')}
             </h3>
             <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               {searchQuery
-                ? t('没有找到匹配的 Fork', 'No matching forks found.')
-                : t(`${currentOwnerLabel} 下暂无 Fork 仓库，请刷新或切换拥有者。`, `No forked repositories found for ${currentOwnerLabel}. Refresh or switch owner.`)}
+                ? t('forkTimeline.no-matching-forks-found')
+                : t('forkTimeline.no-forked-repositories-found-for-currentownerlab', { currentOwnerLabel: currentOwnerLabel })}
             </p>
             {searchQuery && (
               <Button
                 onClick={() => setForkSearchQuery('')}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
-                {t('清除搜索', 'Clear Search')}
+                {t('forkTimeline.clear-search-2')}
               </Button>
             )}
           </div>
@@ -369,7 +368,7 @@ export const ForkTimeline: React.FC = () => {
               variant="ghost"
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
-              aria-label={t('第一页', 'First page')}
+              aria-label={t('forkTimeline.first-page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -379,7 +378,7 @@ export const ForkTimeline: React.FC = () => {
               variant="ghost"
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
-              aria-label={t('上一页', 'Previous page')}
+              aria-label={t('forkTimeline.previous-page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -413,7 +412,7 @@ export const ForkTimeline: React.FC = () => {
               variant="ghost"
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
-              aria-label={t('下一页', 'Next page')}
+              aria-label={t('forkTimeline.next-page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
@@ -423,7 +422,7 @@ export const ForkTimeline: React.FC = () => {
               variant="ghost"
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
-              aria-label={t('最后一页', 'Last page')}
+              aria-label={t('forkTimeline.last-page')}
               className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />
@@ -436,23 +435,21 @@ export const ForkTimeline: React.FC = () => {
       <Modal
         isOpen={syncModal.isOpen}
         onClose={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
-        title={language === 'zh' ? '同步上游代码 (Sync upstream)' : 'Sync Upstream'}
+        title={t('forkTimeline.sync-upstream')}
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-            {language === 'zh' 
-              ? `选择要将上游变更合并到的分支 (${syncModal.full_name})：`
-              : `Select the branch to merge upstream changes into for ${syncModal.full_name}:`}
+            {t('forkTimeline.select-the-branch-to-merge-upstream-changes-into', { v1: syncModal.full_name })}
           </p>
 
           <div className="flex flex-col space-y-2">
             <span id="fork-target-branch-label" className="text-sm font-medium text-foreground dark:text-muted-foreground">
-              {language === 'zh' ? '目标分支 (Target Branch)' : 'Target Branch'}
+              {t('forkTimeline.target-branch')}
             </span>
             {isFetchingBranches ? (
               <div className="flex items-center space-x-2 text-sm text-muted-foreground dark:text-muted-foreground py-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{language === 'zh' ? '加载分支列表中…' : 'Loading branches…'}</span>
+                <span>{t('forkTimeline.loading-branches')}</span>
               </div>
             ) : (
               <Select value={syncModal.branch} onValueChange={(value) => setSyncModal(prev => ({ ...prev, branch: value }))}>
@@ -468,14 +465,14 @@ export const ForkTimeline: React.FC = () => {
               onClick={() => setSyncModal(prev => ({ ...prev, isOpen: false }))}
               className="px-4 py-2 text-sm font-medium"
             >
-              {language === 'zh' ? '取消' : 'Cancel'}
+              {t('forkTimeline.cancel')}
             </Button>
             <Button
               onClick={confirmSyncUpstream}
               disabled={isFetchingBranches || !syncModal.branch}
               className="ui-button-primary px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {language === 'zh' ? '确认同步' : 'Sync Branch'}
+              {t('forkTimeline.sync-branch')}
             </Button>
           </div>
         </div>

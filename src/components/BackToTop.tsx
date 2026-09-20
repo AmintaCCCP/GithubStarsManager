@@ -1,12 +1,17 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from './ui/button';
 
 export const BackToTop: React.FC = () => {
+    const t = useT('app');
   const [isVisible, setIsVisible] = useState(false);
   const [isBouncing, setIsBouncing] = useState(false);
-  const language = useAppStore(state => state.language);
   // 当 README 模态框打开时隐藏按钮，避免遮挡模态框内容
   const readmeModalOpen = useAppStore(state => state.readmeModalOpen);
   const bounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,10 +95,10 @@ export const BackToTop: React.FC = () => {
         sm:bottom-28 sm:right-6
         lg:bottom-24 lg:right-10
       `}
-      aria-label={language === 'zh' ? '回到顶部' : 'Back to top'}
+      aria-label={t('backToTop.back-to-top')}
       aria-hidden={!isVisible || readmeModalOpen}
       tabIndex={isVisible && !readmeModalOpen ? 0 : -1}
-      title={language === 'zh' ? '回到顶部' : 'Back to top'}
+      title={t('backToTop.back-to-top')}
     >
       <ArrowUp className="h-5 w-5 sm:h-6 sm:w-6" />
     </Button>

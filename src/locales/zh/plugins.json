@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "{{v1}} 的频道消息",
+    "open-in-telegram": "在 Telegram 打开",
+    "this-message-is-media-only-and-has-no-text-conte": "该消息为纯媒体内容，无文字正文"
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "请输入有效的频道名，例如 https://t.me/geekhub23 或 @geekhub23。",
+    "this-channel-is-already-in-the-list": "该频道已在关注列表中。",
+    "channel-added-to-the-follow-list": "已添加关注频道。",
+    "unfollowed-v1": "已取消关注 @{{v1}}。",
+    "telegram-channels-settings": "Telegram 频道设置",
+    "refreshing-incrementally-pulls-the-latest-messag": "刷新时增量拉取关注频道的最新消息，消息中包含 GitHub 仓库链接的条目会展示为列表项；\"加载更多\"按页抓取更早的历史消息。数据由应用直连 t.me 公开预览抓取，需要桌面版或服务端模式（纯浏览器模式受跨域限制）；私有频道无法抓取。",
+    "follow-list": "关注列表",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "支持 t.me 频道链接、@频道名或裸频道名。刷新时逐个频道抓取最新消息。",
+    "enter-a-valid-channel-name": "请输入有效的频道名。",
+    "fill-in-or-add-a-channel-to-test-first": "请先填写或添加一个频道用于测试。",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "真实抓取一次频道公开预览验证抓取通道",
+    "testing": "测试中…",
+    "test-connection": "测试连接",
+    "channel-name": "频道名",
+    "add": "添加",
+    "no-followed-channels-yet": "暂无关注频道。",
+    "unfollow": "取消关注",
+    "unfollow-v1": "取消关注 @{{v1}}",
+    "done": "完成"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "@{{v1}} 的推文",
+    "open-on-x": "在 X 打开",
+    "this-tweet-has-no-text-content": "推文正文为空"
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "请输入有效的 X 用户名，例如 @geekbb 或主页链接。",
+    "this-account-is-already-in-the-list": "该博主已在关注列表中。",
+    "account-added-to-the-follow-list": "已添加关注博主。",
+    "unfollowed-v1": "已取消关注 @{{v1}}。",
+    "both-auth-token-and-ct0-must-contain-valid-value": "auth_token 与 ct0 都需要填写有效内容。",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "已保存鉴权 Cookie，刷新后按 GraphQL 模式抓取。",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "鉴权 Cookie 已生效但未能持久化保存到磁盘，重启后可能丢失。",
+    "auth-cookies-saved-current-session-only": "已保存鉴权 Cookie（仅本次会话有效）。",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "已清除鉴权 Cookie，回到未登录抓取模式。",
+    "x-tweets-channel-settings": "X 推文频道设置",
+    "refreshing-incrementally-pulls-the-latest-tweets": "刷新时会增量拉取关注博主的最新推文，推文中包含 GitHub 仓库链接的条目会展示为列表项。数据由应用直连 x.com 抓取，需要桌面版或服务端模式（纯浏览器模式受跨域限制）。可选填写登录鉴权 Cookie 以启用更多推文与历史翻页。",
+    "follow-list": "关注列表",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "支持 @用户名、用户名或 x.com 主页链接。刷新时逐位博主抓取最新推文。",
+    "enter-a-valid-x-handle": "请输入有效的 X 用户名。",
+    "fill-in-or-add-an-account-to-test-first": "请先填写或添加一位博主用于测试。",
+    "fetch-a-profile-once-to-verify-the-pipeline": "真实抓取一次主页验证抓取通道",
+    "testing": "测试中…",
+    "test-connection": "测试连接",
+    "x-handle": "X 用户名",
+    "add": "添加",
+    "no-followed-accounts-yet": "暂无关注博主。",
+    "unfollow": "取消关注",
+    "unfollow-v1": "取消关注 @{{v1}}",
+    "auth-cookies-optional": "鉴权 Cookie（可选）",
+    "once-set-fetching-switches-to-the-signed-in-grap": "填写后改走登录态 GraphQL 接口：每位博主每页约 20 条推文，\"加载更多\"按页回溯历史。留空使用未登录抓取（每位博主每次仅最新一小批）。浏览器登录 x.com 后在 DevTools → Application → Cookies 中复制 auth_token 与 ct0，仅保存在本机应用数据中。",
+    "auth-token": "auth_token",
+    "hide-auth-token": "隐藏 auth_token",
+    "show-auth-token": "显示 auth_token",
+    "ct0": "ct0",
+    "hide-ct0": "隐藏 ct0",
+    "show-ct0": "显示 ct0",
+    "authenticated-fetching-is-on": "当前已启用鉴权抓取",
+    "signed-out-fetching-mode": "当前为未登录抓取模式",
+    "clear": "清除",
+    "update-auth": "更新鉴权",
+    "saved": "已保存",
+    "save-auth": "保存鉴权",
+    "done": "完成"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "已在浏览器中打开",
+    "plugin-result-copied": "插件结果已复制",
+    "plugin-result-saved": "插件结果已保存",
+    "plugin-action-completed": "插件操作完成"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "自定义服务",
+    "allow-plugin-ai-request": "允许插件调用 AI？",
+    "the-host-may-relay-this-through-its-configured-b": "可能经已启用的宿主后端代理转发。",
+    "send-to-ai": "发送给 AI",
+    "allow-plugin-ai-body": "插件 {{pluginName}} 请求使用 AI 配置「{{configName}}」（模型 {{model}}）。\n目标地址: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nUser:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "允许插件联网搜索？",
+    "search-query": "搜索词：",
+    "send-search-query": "发送搜索词"
+  }
+}

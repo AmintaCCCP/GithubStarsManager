@@ -1,3 +1,7 @@
+
+import { getDateFnsLocale, getIntlLocale } from '../i18n/format';
+import { useT } from '../i18n/useT';
+import type { AppLanguage } from '../i18n/languages';
 import React, { Suspense, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -11,7 +15,6 @@ import { useAppStore } from '../store/useAppStore';
 import { useRepositoryDragStore } from '../store/useRepositoryDragStore';
 import { getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { RepositoryEditModal } from './RepositoryEditModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
@@ -146,9 +149,10 @@ interface RepositoryCardProps {
 const PluginRepositoryActionItems: React.FC<{
   actions: RegisteredPluginAction[];
   repository: Repository;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }> = ({ actions, repository, language }) => {
   const { toast } = useDialog();
+  const t = useT('repositories');
 
   const run = async (action: RegisteredPluginAction) => {
     try {
@@ -163,7 +167,7 @@ const PluginRepositoryActionItems: React.FC<{
       }
       await applyPluginActionResult(operation.result, toast, language);
     } catch {
-      toast(language === 'zh' ? '无法应用插件结果' : 'Failed to apply plugin result', 'error');
+      toast(t('repositoryCard.failed-to-apply-plugin-result'), 'error');
     }
   };
 
@@ -195,6 +199,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   viewMode = 'grid',
   onAskRepository,
 }) => {
+    const t = useT('repositories');
   const language = useAppStore((state) => state.language);
   const pluginActions = usePluginActions('repository-card');
   const {
@@ -365,7 +370,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
     if (isExplicitlyCleared) {
       // 用户明确清空描述
-      content = language === 'zh' ? '（无描述）' : '(No description)';
+      content = t('repositoryCard.no-description');
       contentSource = 'empty';
     } else if (repository.custom_description) {
       // 有自定义描述
@@ -381,13 +386,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       contentSource = 'original';
     } else {
       // 无可用描述
-      content = language === 'zh' ? '暂无描述' : 'No description available';
+      content = t('repositoryCard.no-description-available');
       contentSource = 'empty';
     }
 
     if (showAISummary && repository.analysis_failed) {
       if (isExplicitlyCleared) {
-        content = language === 'zh' ? '（无描述）' : '(No description)';
+        content = t('repositoryCard.no-description');
         contentSource = 'empty';
       } else if (repository.custom_description) {
         content = repository.custom_description;
@@ -396,7 +401,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         content = repository.description;
         contentSource = 'original';
       } else {
-        content = language === 'zh' ? '暂无描述' : 'No description available';
+        content = t('repositoryCard.no-description-available');
         contentSource = 'empty';
       }
     }
@@ -442,7 +447,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       isExplicitlyCleared,
       isCustomized
     };
-  }, [repository, showAISummary, language, allCategories]);
+  }, [repository, showAISummary, allCategories, t]);
 
   // 使用 useMemo 缓存标签计算
   // 逻辑：优先显示自定义标签，如果没有则按AI分析状态显示AI标签或Topics
@@ -495,18 +500,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const aiButtonTitle = useMemo(() => {
     if (repository.analysis_failed) {
       const analyzeTime = new Date(repository.analyzed_at!).toLocaleString();
-      return language === 'zh'
-        ? `分析失败于 ${analyzeTime}，点击重新分析`
-        : `Analysis failed on ${analyzeTime}, click to retry`;
+      return t('repositoryCard.analysis-failed-on-analyzetime-click-to-retry', { analyzeTime: analyzeTime });
     } else if (repository.analyzed_at) {
       const analyzeTime = new Date(repository.analyzed_at).toLocaleString();
-      return language === 'zh'
-        ? `已于 ${analyzeTime} 分析过，点击重新分析`
-        : `Analyzed on ${analyzeTime}, click to re-analyze`;
+      return t('repositoryCard.analyzed-on-analyzetime-click-to-re-analyze', { analyzeTime: analyzeTime });
     } else {
-      return language === 'zh' ? 'AI分析此仓库' : 'Analyze with AI';
+      return t('repositoryCard.analyze-with-ai');
     }
-  }, [repository.analysis_failed, repository.analyzed_at, language]);
+  }, [repository.analysis_failed, repository.analyzed_at, t]);
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
@@ -771,17 +772,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             {displayContent.isAnalysisFailed ? (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
                   <Bot className="w-3 h-3" />
-                  {language === 'zh' ? '分析失败' : 'Analysis failed'}
+                  {t('repositoryCard.analysis-failed')}
                 </span>
             ) : displayContent.isAnalyzed ? (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary">
                 <Sparkles className="w-3 h-3" />
-                {language === 'zh' ? '已分析' : 'Analyzed'}
+                {t('repositoryCard.analyzed')}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Bot className="w-3 h-3" />
-                {language === 'zh' ? '待分析' : 'Not analyzed'}
+                {t('repositoryCard.not-analyzed')}
               </span>
             )}
             {!selectionMode && (
@@ -794,8 +795,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 variant="ghost"
                 size="icon"
                 className="text-primary"
-                title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
-                aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+                title={displayContent.isCustomized ? (t('repositoryCard.customized-edit-repository-info')) : (t('repositoryCard.edit-repository-info'))}
+                aria-label={t('repositoryCard.edit-repository-info')}
               >
                 <Edit3 className="w-4 h-4" />
               </Button>
@@ -810,8 +811,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 type="button"
                 variant="ghost"
                 size="icon"
-                title={language === 'zh' ? '更多操作' : 'More actions'}
-                aria-label={language === 'zh' ? '更多操作' : 'More actions'}
+                title={t('repositoryCard.more-actions')}
+                aria-label={t('repositoryCard.more-actions')}
                 onClick={(event) => event.stopPropagation()}
               >
                 <MoreHorizontal className="h-4 w-4" />
@@ -827,41 +828,41 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 }
               }}
             >
-              <DropdownMenuLabel>{language === 'zh' ? '仓库操作' : 'Repository actions'}</DropdownMenuLabel>
+              <DropdownMenuLabel>{t('repositoryCard.repository-actions')}</DropdownMenuLabel>
               <DropdownMenuItem
                 disabled={isAnalyzing}
                 onSelect={() => void handleAIAnalyze()}
               >
                 {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
-                {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
+                {t('repositoryCard.analyze-with-ai-2')}
               </DropdownMenuItem>
               {onAskRepository && (
                 <DropdownMenuItem onSelect={() => onAskRepository(repository)}>
                   <MessageSquareText className="mr-2 h-3.5 w-3.5" />
-                  {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+                  {t('repositoryCard.ask-this-repository')}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
                 {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
-                {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
+                {isSubscribed ? (t('repositoryCard.unsubscribe-from-releases')) : (t('repositoryCard.subscribe-to-releases'))}
               </DropdownMenuItem>
               {vectorSearchAvailable && (
                 <DropdownMenuItem disabled={isFindingSimilar} onSelect={() => handleFindSimilar()}>
                   {isFindingSimilar ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-2 h-3.5 w-3.5" />}
-                  {language === 'zh' ? '查找同类仓库' : 'Find similar repositories'}
+                  {t('repositoryCard.find-similar-repositories')}
                 </DropdownMenuItem>
               )}
               {pluginActions.actions.length > 0 && (
                 <>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel>{language === 'zh' ? '插件操作' : 'Plugin actions'}</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t('repositoryCard.plugin-actions')}</DropdownMenuLabel>
                   <PluginRepositoryActionItems actions={pluginActions.actions} repository={repository} language={language} />
                 </>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setReleaseSheetOpen(true)}>
                 <PackageOpen className="mr-2 h-3.5 w-3.5" />
-                {language === 'zh' ? '查看 Release' : 'View releases'}
+                {t('repositoryCard.view-releases')}
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <a
@@ -870,19 +871,19 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   rel="noopener noreferrer"
                 >
                   <BookOpen className="mr-2 h-3.5 w-3.5" />
-                  {language === 'zh' ? '在 Zread 中查看' : 'View on DeepWiki'}
+                  {t('repositoryCard.view-on-deepwiki')}
                 </a>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                  {language === 'zh' ? '在 GitHub 中查看' : 'View on GitHub'}
+                  {t('repositoryCard.view-on-github')}
                 </a>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
                 <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
-                {language === 'zh' ? '取消 Star' : 'Unstar'}
+                {t('repositoryCard.unstar')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -921,16 +922,16 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onTouchEnd={handleTouchEnd}
               tabIndex={0}
               role="button"
-              aria-label={language === 'zh' ? '编辑仓库分类' : 'Edit repository category'}
+              aria-label={t('repositoryCard.edit-repository-category')}
               className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing touch-manipulation"
-              title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
+              title={t('repositoryCard.drag-me-to-sidebar-to-categorize')}
             >
               <GripVertical className="w-4 h-4" />
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
               <div className="absolute top-full right-0 z-50 mt-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-dialog animate-fade-in">
-                {language === 'zh' ? '拖拽我到左侧分类栏' : 'Drag me to left sidebar'}
+                {t('repositoryCard.drag-me-to-left-sidebar')}
                 {/* 气泡箭头 */}
                 <div className="absolute bottom-full right-3 h-0 w-0 border-x-4 border-b-4 border-l-transparent border-r-transparent border-b-popover"></div>
               </div>
@@ -959,8 +960,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onClick={() => onAskRepository(repository)}
               selectionMode={selectionMode}
               className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              title={language === 'zh' ? '问答此仓库' : 'Ask this repository'}
-              aria-label={language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+              title={t('repositoryCard.ask-this-repository')}
+              aria-label={t('repositoryCard.ask-this-repository')}
             >
               <MessageSquareText className="w-4 h-4" />
             </SelectionAwareButton>
@@ -973,8 +974,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground'
               }`}
-              title={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
-              aria-label={isSubscribed ? (language === 'zh' ? '取消订阅发布' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅发布' : 'Subscribe to releases')}
+              title={isSubscribed ? (t('repositoryCard.unsubscribe-from-releases-2')) : (t('repositoryCard.subscribe-to-releases-2'))}
+              aria-label={isSubscribed ? (t('repositoryCard.unsubscribe-from-releases-2')) : (t('repositoryCard.subscribe-to-releases-2'))}
               aria-pressed={isSubscribed}
             >
               {isSubscribed ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
@@ -985,8 +986,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onClick={() => setEditModalOpen(true)}
               selectionMode={selectionMode}
               variant="edit"
-              title={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
-              aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+              title={t('repositoryCard.edit-repository-info')}
+              aria-label={t('repositoryCard.edit-repository-info')}
             >
               <Edit3 className="w-4 h-4" />
             </SelectionAwareButton>
@@ -996,8 +997,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               onClick={() => setReleaseSheetOpen(true)}
               selectionMode={selectionMode}
               className="bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              title={language === 'zh' ? '查看 Release' : 'View releases'}
-              aria-label={language === 'zh' ? '查看 Release' : 'View releases'}
+              title={t('repositoryCard.view-releases')}
+              aria-label={t('repositoryCard.view-releases')}
             >
               <PackageOpen className="w-4 h-4" />
             </SelectionAwareButton>
@@ -1009,7 +1010,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               rel="noopener noreferrer"
               onClick={(event) => selectionMode && event.preventDefault()}
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
-              title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
+              title={t('repositoryCard.view-on-deepwiki-2')}
             >
               <BookOpen className="w-4 h-4" />
             </a>
@@ -1021,7 +1022,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               rel="noopener noreferrer"
               onClick={(event) => selectionMode && event.preventDefault()}
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
-              title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
+              title={t('repositoryCard.view-on-github-2')}
             >
               <ExternalLink className="w-4 h-4" />
             </a>
@@ -1032,7 +1033,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               disabled={unstarring}
               selectionMode={selectionMode}
               variant="unstar"
-              title={language === 'zh' ? '取消 Star' : 'Unstar'}
+              title={t('repositoryCard.unstar')}
             >
               <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
             </SelectionAwareButton>
@@ -1046,8 +1047,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   size="icon"
                   disabled={selectionMode}
                   className="h-8 w-8 shrink-0 rounded-md bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  aria-label={language === 'zh' ? '更多仓库操作' : 'More repository actions'}
-                  title={language === 'zh' ? '更多仓库操作' : 'More repository actions'}
+                  aria-label={t('repositoryCard.more-repository-actions')}
+                  title={t('repositoryCard.more-repository-actions')}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -1056,38 +1057,38 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 {visibleGridActionCount < 1 && (
                   <DropdownMenuItem disabled={isAnalyzing} onSelect={() => void handleAIAnalyze()}>
                     {isAnalyzing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-2 h-3.5 w-3.5" />}
-                    {language === 'zh' ? 'AI 分析' : 'Analyze with AI'}
+                    {t('repositoryCard.analyze-with-ai-2')}
                   </DropdownMenuItem>
                 )}
                 {onAskRepository && visibleGridActionCount < 2 && (
                   <DropdownMenuItem onSelect={() => onAskRepository(repository)}>
                     <MessageSquareText className="mr-2 h-3.5 w-3.5" />
-                    {language === 'zh' ? '问答此仓库' : 'Ask this repository'}
+                    {t('repositoryCard.ask-this-repository')}
                   </DropdownMenuItem>
                 )}
                 {visibleGridActionCount < 3 && (
                   <DropdownMenuItem onSelect={() => toggleReleaseSubscription()}>
                     {isSubscribed ? <Bell className="mr-2 h-3.5 w-3.5" /> : <BellOff className="mr-2 h-3.5 w-3.5" />}
-                    {isSubscribed ? (language === 'zh' ? '取消订阅 Release' : 'Unsubscribe from releases') : (language === 'zh' ? '订阅 Release' : 'Subscribe to releases')}
+                    {isSubscribed ? (t('repositoryCard.unsubscribe-from-releases')) : (t('repositoryCard.subscribe-to-releases'))}
                   </DropdownMenuItem>
                 )}
                 {visibleGridActionCount < 4 && (
                   <DropdownMenuItem onSelect={() => setEditModalOpen(true)}>
                     <Edit3 className="mr-2 h-3.5 w-3.5" />
-                    {language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
+                    {t('repositoryCard.edit-repository-info')}
                   </DropdownMenuItem>
                 )}
                 {visibleGridActionCount < 5 && (
                   <DropdownMenuItem onSelect={() => setReleaseSheetOpen(true)}>
                     <PackageOpen className="mr-2 h-3.5 w-3.5" />
-                    {language === 'zh' ? '查看 Release' : 'View releases'}
+                    {t('repositoryCard.view-releases')}
                   </DropdownMenuItem>
                 )}
                 {visibleGridActionCount < 6 && (
                   <DropdownMenuItem asChild>
                     <a href={language === 'zh' ? getZreadUrl(repository.full_name) : getDeepWikiUrl(repository.html_url)} target="_blank" rel="noopener noreferrer">
                       <BookOpen className="mr-2 h-3.5 w-3.5" />
-                      {language === 'zh' ? '在 Zread 中查看' : 'View on DeepWiki'}
+                      {t('repositoryCard.view-on-deepwiki')}
                     </a>
                   </DropdownMenuItem>
                 )}
@@ -1095,20 +1096,20 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   <DropdownMenuItem asChild>
                     <a href={repository.html_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                      {language === 'zh' ? '在 GitHub 中查看' : 'View on GitHub'}
+                      {t('repositoryCard.view-on-github')}
                     </a>
                   </DropdownMenuItem>
                 )}
                 {visibleGridActionCount < 8 && (
                   <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void handleUnstar()}>
                     <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
-                    {language === 'zh' ? '取消 Star' : 'Unstar'}
+                    {t('repositoryCard.unstar')}
                   </DropdownMenuItem>
                 )}
                 {pluginActions.actions.length > 0 && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuLabel>{language === 'zh' ? '插件操作' : 'Plugin actions'}</DropdownMenuLabel>
+                    <DropdownMenuLabel>{t('repositoryCard.plugin-actions')}</DropdownMenuLabel>
                     <PluginRepositoryActionItems actions={pluginActions.actions} repository={repository} language={language} />
                   </>
                 )}
@@ -1141,21 +1142,21 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <div className="flex items-center space-x-2 flex-wrap gap-y-1">
           {/* 已自定义标签 - 与筛选器逻辑一致 */}
           {displayContent.isCustomized && (
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground dark:text-muted-foreground" title={language === 'zh' ? '此仓库已自定义（描述、标签或分类）' : 'This repository has been customized (description, tags or category)'}>
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground dark:text-muted-foreground" title={t('repositoryCard.this-repository-has-been-customized-description')}>
               <Edit3 className="w-3 h-3" />
-              <span>{language === 'zh' ? '已自定义' : 'Customized'}</span>
+              <span>{t('repositoryCard.customized')}</span>
             </div>
           )}
           {/* AI 分析状态标签 (合并展示) */}
           {displayContent.isAnalysisFailed ? (
-            <div className="flex items-center space-x-1 text-xs text-destructive dark:text-destructive" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
+            <div className="flex items-center space-x-1 text-xs text-destructive dark:text-destructive" title={t('repositoryCard.ai-analysis-failed-click-ai-button-to-retry')}>
               <Bot className="w-3 h-3" />
-              <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
+              <span>{t('repositoryCard.failed')}</span>
               <div className="group relative">
                 <HelpCircle className="w-3 h-3 text-destructive/70 dark:text-destructive/70 cursor-help" />
                 <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-[opacity,visibility] whitespace-normal break-words shadow-lg">
                   <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                    {repository.analysis_error || (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection')}
+                    {repository.analysis_error || (t('repositoryCard.ai-analysis-failed-please-check-ai-configuration'))}
                   </p>
                   <div className="absolute top-[-4px] left-3 h-2 w-2 rotate-45 transform border-l border-t border-border bg-popover"></div>
                 </div>
@@ -1164,10 +1165,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           ) : displayContent.isAnalyzed ? (
             <div
               className="flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 dark:bg-primary/20 text-primary border border-primary/20 dark:border-primary/20"
-              title={displayContent.analyzedAt ? `${language === 'zh' ? '分析于' : 'Analyzed on'} ${new Date(displayContent.analyzedAt).toLocaleString()}` : ''}
+              title={displayContent.analyzedAt ? t('repositoryCard.analyzed-on-date', { date: new Date(displayContent.analyzedAt).toLocaleString(getIntlLocale(language)) }) : ''}
             >
               <Sparkles className="w-3 h-3" />
-              <span>{language === 'zh' ? 'AI已分析' : 'AI Analyzed'}</span>
+              <span>{t('repositoryCard.ai-analyzed')}</span>
             </div>
           ) : null}
         </div>
@@ -1194,7 +1195,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       {viewMode === 'grid' && displayPlatforms.length > 0 && (
         <div className="flex items-center space-x-2 mb-4">
           <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {language === 'zh' ? '支持平台:' : 'Platforms:'}
+            {t('repositoryCard.platforms')}
           </span>
           <div className="flex space-x-1">
             {displayPlatforms.slice(0, 6).map((platform, index) => {
@@ -1257,7 +1258,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
             <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
             <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
-              {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
+              {t('repositoryCard.last-pushed-time', { time: formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
             </span>
 
             {viewMode === 'grid' && vectorSearchAvailable && !selectionMode && (
@@ -1269,10 +1270,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 }}
                 disabled={isFindingSimilar}
                 className="absolute -inset-y-1 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
-                title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
+                title={t('repositoryCard.find-similar-repositories-2')}
               >
                 {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                <span>{language === 'zh' ? '查找相似仓库' : 'Find similar'}</span>
+                <span>{t('repositoryCard.find-similar')}</span>
               </Button>
             )}
           </div>
@@ -1292,8 +1293,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
-              title={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
-              aria-label={isSelected ? (language === 'zh' ? '取消选择' : 'Deselect') : (language === 'zh' ? '选择' : 'Select')}
+              title={isSelected ? (t('repositoryCard.deselect')) : (t('repositoryCard.select'))}
+              aria-label={isSelected ? (t('repositoryCard.deselect')) : (t('repositoryCard.select'))}
               aria-pressed={isSelected}
             >
               {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}

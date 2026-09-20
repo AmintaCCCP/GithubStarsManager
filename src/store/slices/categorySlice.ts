@@ -1,7 +1,8 @@
 
 import type { AppStoreSlice } from '../types';
 import { defaultCategories } from '../schema';
-import { getAllCategories, getCategoryNameVariants, sortCategoriesByOrder, translateCategoryName } from '../helpers/categoryHelpers';
+import { getAllCategories, getCategoryNameVariants, sortCategoriesByOrder } from '../helpers/categoryHelpers';
+import { categoryName } from '../../constants/categoryI18n';
 
 export const createCategorySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'addCustomCategory'
@@ -56,7 +57,7 @@ export const createCategorySlice: AppStoreSlice<Pick<import('../types').AppActio
         if (!defaultCat) return {};
 
         const originalName = defaultCat.name;
-        const displayedName = state.language === 'en' ? translateCategoryName(originalName) : originalName;
+        const displayedName = categoryName(id, state.language);
         const originalIcon = defaultCat.icon;
         const originalKeywords = defaultCat.keywords || [];
         const currentOverride = state.defaultCategoryOverrides[id];

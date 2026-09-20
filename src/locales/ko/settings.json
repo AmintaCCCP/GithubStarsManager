@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "AI 서비스 연결 성공!",
+    "ai-service-test-failed-please-check-network-conn": "AI 서비스 테스트에 실패했습니다. 네트워크 연결 및 구성을 확인하세요."
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "잘못된 백엔드 주소: 원격 백엔드에는 HTTPS가 필요하며 로컬 호스트만 HTTP를 사용할 수 있습니다.",
+    "backend-connection-failed-please-check-the-serve": "백엔드 연결에 실패했습니다. 서버 상태나 API 비밀번호가 올바른지 확인하세요.",
+    "backend-connection-successful": "백엔드 연결 성공!",
+    "backend-not-available": "백엔드를 사용할 수 없습니다.",
+    "partial-sync-failure-v1-failed-v2-succeeded": "부분 동기화 실패: {{v1}} 실패, {{v2}} 성공",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "백엔드에 동기화됨: 웨어하우스 {{v1}}, 릴리스 {{v2}}, AI 구성 {{v3}}, WebDAV 구성 {{v4}}",
+    "sync-failed": "동기화 실패",
+    "sync-from-backend": "백엔드에서 동기화",
+    "syncing-from-backend-will-overwrite-local-data-c": "백엔드에서 동기화하면 로컬 데이터를 덮어쓰게 됩니다. 계속하시겠습니까?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "백엔드에서 동기화됨: 웨어하우스 {{v1}}, 릴리스 {{v2}}, AI 구성 {{v3}}, WebDAV 구성 {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "먼저 WebDAV 서비스를 구성하고 활성화하십시오.",
+    "data-backup-successful": "데이터 백업 성공!",
+    "data-backup-failed": "데이터 백업에 실패했습니다!",
+    "backup-failed": "백업 실패",
+    "restore-data": "데이터 복구",
+    "restoring-data-will-overwrite-all-current-data-c": "데이터를 복원하면 현재 데이터를 모두 덮어쓰게 됩니다. 계속하시겠습니까?",
+    "no-backup-files-found": "백업 파일을 찾을 수 없습니다.",
+    "backup-file-is-empty-cannot-restore": "백업 파일 내용이 비어 있어 복원할 수 없습니다.",
+    "data-restored-from-backup-repositories-v1-releas": "백업에서 복원된 데이터: 창고 {{v1}}, 릴리스 {{v2}}, 사용자 정의 분류 {{v3}}.",
+    "restore-failed": "복구 실패"
+  },
+  "useDesktopActions": {
+    "load-failed": "로드 실패",
+    "save-failed": "저장 실패"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "유효한 GitHub 액세스 토큰을 입력하세요.",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "이 토큰은 {{v1}}에 속하며 현재 계정은 {{v2}}입니다. 먼저 로그아웃한 후 다른 계정으로 로그인해 주세요. 로컬 데이터는 계정별로 유지됩니다.",
+    "failed-to-save-the-new-token-to-the-backend-loca": "새 토큰을 백엔드에 저장하지 못했습니다. 로컬 자격 증명이 업데이트되지 않았습니다. 나중에 다시 시도해 주세요.",
+    "github-token-updated": "GitHub 토큰이 업데이트되었습니다.",
+    "github-token-has-expired-or-is-invalid": "GitHub 토큰이 만료되었거나 유효하지 않습니다.",
+    "update-failed-please-try-again": "업데이트하지 못했습니다. 나중에 다시 시도해 주세요."
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "MCP 서비스가 시작되었습니다",
+    "mcp-server-disabled": "MCP 서비스가 다운되었습니다",
+    "mcp-server-enabled-local": "MCP 서비스가 시작되었습니다(로컬).",
+    "backend-or-desktop-client-required-for-mcp": "MCP를 사용하려면 백엔드 또는 클라이언트가 필요합니다.",
+    "operation-failed": "작업 실패",
+    "enable-mcp-before-resetting-the-token": "먼저 MCP 서비스를 활성화한 후 토큰을 재설정하세요.",
+    "reset-mcp-token": "MCP 토큰 재설정",
+    "the-old-token-will-stop-working-immediately-upda": "재설정 후에는 이전 토큰이 즉시 유효하지 않게 되며 에이전트 구성을 업데이트해야 합니다. 계속하다?",
+    "token-reset": "토큰이 재설정되었습니다.",
+    "reset-failed": "재설정 실패"
+  },
+  "useNetworkActions": {
+    "save-failed": "저장 실패"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "GitHub에 로그인되어 있지 않습니다. 먼저 연결하세요.",
+    "push-categories-to-github-lists": "창고 분류를 GitHub 목록에 동기화",
+    "push-confirm-body": "각 로컬 카테고리(기본 및 사용자 정의 카테고리 포함)를 동일한 이름으로 GitHub 목록에 다시 작성합니다.\n\n· 동일한 이름을 가진 목록은 해당 구성원을 덮어씁니다(범주와 일치하지 않는 저장소는 목록에서 제거됩니다).\n· 같은 이름의 목록이 없을 경우 새로 생성(기본적으로 비공개)\n· 일치하는 분류에 따라 창고가 해당 목록에 추가됩니다.\n· 지역 카테고리에 속하지 않는 기타 목록 멤버십은 유지됩니다.\n\n계속하시겠습니까?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "WebDAV URL이 필요합니다",
+    "webdav-url-must-start-with-http-or-https": "WebDAV URL은 http:// 또는 https://로 시작해야 합니다.",
+    "username-is-required": "사용자 이름이 필요합니다",
+    "password-is-required": "비밀번호가 필요합니다",
+    "path-is-required": "경로는 필수입니다",
+    "path-must-start-with": "경로는 /로 시작해야 합니다.",
+    "webdav-connection-successful": "WebDAV 연결이 성공했습니다!",
+    "webdav-connection-failed-please-check-configurat": "WebDAV 연결에 실패했습니다. 구성을 확인하십시오.",
+    "webdav-test-failed": "WebDAV 테스트 실패"
+  },
+  "generalPanel": {
+    "account-token-hint": "현재 계정 {{login}}. 만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다.",
+    "token-hint": "만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다."
+  }
+}

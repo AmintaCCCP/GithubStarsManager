@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Button } from '../ui/button';
 import React from 'react';
 import { Download, Upload, RefreshCw, Cloud, AlertCircle } from 'lucide-react';
@@ -6,7 +8,7 @@ import { IncludeKeysToggle } from './IncludeKeysToggle';
 import { useBackupActions } from '../../features/settings/hooks/useBackupActions';
 
 interface BackupPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
@@ -18,7 +20,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       <div className="flex items-center space-x-3">
         <Cloud className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-          {t('备份与恢复', 'Backup & Restore')}
+          {t('backupPanel.backup-restore')}
         </h3>
       </div>
 
@@ -28,10 +30,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             <AlertCircle className="w-5 h-5 text-muted-foreground dark:text-muted-foreground mt-0.5" />
             <div>
               <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-                {t('请先配置并激活WebDAV服务', 'Please configure and activate WebDAV service first')}
+                {t('backupPanel.please-configure-and-activate-webdav-service-fir')}
               </p>
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                {t('备份和恢复功能需要WebDAV服务支持', 'Backup and restore features require WebDAV service')}
+                {t('backupPanel.backup-and-restore-features-require-webdav-servi')}
               </p>
             </div>
           </div>
@@ -41,7 +43,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
       {lastBackup && (
         <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg">
           <p className="text-sm text-muted-foreground dark:text-muted-foreground ">
-            <span className="font-medium">{t('上次备份:', 'Last backup:')}</span>{' '}
+            <span className="font-medium">{t('backupPanel.last-backup')}</span>{' '}
             {new Date(lastBackup).toLocaleString()}
           </p>
         </div>
@@ -55,10 +57,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             <Upload className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
             <div>
               <h4 className="font-medium text-foreground dark:text-foreground">
-                {t('备份数据', 'Backup Data')}
+                {t('backupPanel.backup-data')}
               </h4>
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('将数据备份到WebDAV', 'Backup data to WebDAV')}
+                {t('backupPanel.backup-data-to-webdav')}
               </p>
             </div>
           </div>
@@ -72,7 +74,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             ) : (
               <Upload className="w-5 h-5" />
             )}
-            <span>{isBackingUp ? t('备份中…', 'Backing up…') : t('开始备份', 'Start Backup')}</span>
+            <span>{isBackingUp ? t('backupPanel.backing-up') : t('backupPanel.start-backup')}</span>
           </Button>
         </div>
 
@@ -81,10 +83,10 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             <Download className="w-8 h-8 text-muted-foreground dark:text-muted-foreground" />
             <div>
               <h4 className="font-medium text-foreground dark:text-foreground">
-                {t('恢复数据', 'Restore Data')}
+                {t('backupPanel.restore-data')}
               </h4>
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('从WebDAV恢复数据', 'Restore data from WebDAV')}
+                {t('backupPanel.restore-data-from-webdav')}
               </p>
             </div>
           </div>
@@ -98,22 +100,22 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
             ) : (
               <Download className="w-5 h-5" />
             )}
-            <span>{isRestoring ? t('恢复中…', 'Restoring…') : t('开始恢复', 'Start Restore')}</span>
+            <span>{isRestoring ? t('backupPanel.restoring') : t('backupPanel.start-restore')}</span>
           </Button>
         </div>
       </div>
 
       <div className="p-4 bg-background dark:bg-muted/40 rounded-lg">
         <h4 className="font-medium text-foreground dark:text-foreground mb-2">
-          {t('备份内容包括：', 'Backup includes:')}
+          {t('backupPanel.backup-includes')}
         </h4>
         <ul className="text-sm text-muted-foreground dark:text-muted-foreground space-y-1">
-          <li>• {t('GitHub Stars 仓库列表', 'GitHub Stars repository list')}</li>
-          <li>• {t('Release 发布信息', 'Release information')}</li>
-          <li>• {t('自定义分类', 'Custom categories')}</li>
-          <li>• {t('AI 服务配置', 'AI service configurations')}</li>
-          <li>• {t('WebDAV 配置', 'WebDAV configurations')}</li>
-          <li>• {t('Release 订阅、来源与已读状态', 'Release subscriptions, sources & read state')}</li>
+          <li>• {t('backupPanel.github-stars-repository-list')}</li>
+          <li>• {t('backupPanel.release-information')}</li>
+          <li>• {t('backupPanel.custom-categories')}</li>
+          <li>• {t('backupPanel.ai-service-configurations')}</li>
+          <li>• {t('backupPanel.webdav-configurations')}</li>
+          <li>• {t('backupPanel.release-subscriptions-sources-read-state')}</li>
         </ul>
       </div>
     </div>

@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "Connexion au service IA réussie !",
+    "ai-service-test-failed-please-check-network-conn": "Le test du service AI a échoué, veuillez vérifier la connexion réseau et la configuration."
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "Adresse du backend invalide : le backend distant nécessite HTTPS, seul l'hôte local peut utiliser HTTP",
+    "backend-connection-failed-please-check-the-serve": "La connexion backend a échoué, veuillez vérifier si l'état du serveur ou le secret API est correct.",
+    "backend-connection-successful": "Connexion back-end réussie !",
+    "backend-not-available": "Le backend n'est pas disponible",
+    "partial-sync-failure-v1-failed-v2-succeeded": "Échec de la synchronisation partielle : {{v1}} a échoué, {{v2}} a réussi",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "Synchronisé avec le backend : entrepôt {{v1}}, version {{v2}}, configuration IA {{v3}}, configuration WebDAV {{v4}}",
+    "sync-failed": "La synchronisation a échoué",
+    "sync-from-backend": "Synchronisation depuis le backend",
+    "syncing-from-backend-will-overwrite-local-data-c": "La synchronisation depuis le backend écrasera les données locales. Voulez-vous continuer ?",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "Synchronisé depuis le backend : Warehouse {{v1}}, Release {{v2}}, Configuration AI {{v3}}, Configuration WebDAV {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "Veuillez d'abord configurer et activer le service WebDAV.",
+    "data-backup-successful": "Sauvegarde des données réussie !",
+    "data-backup-failed": "La sauvegarde des données a échoué !",
+    "backup-failed": "La sauvegarde a échoué",
+    "restore-data": "Récupérer des données",
+    "restoring-data-will-overwrite-all-current-data-c": "La restauration des données écrasera toutes les données actuelles. Voulez-vous continuer ?",
+    "no-backup-files-found": "Fichier de sauvegarde introuvable.",
+    "backup-file-is-empty-cannot-restore": "Le contenu du fichier de sauvegarde est vide et ne peut pas être restauré.",
+    "data-restored-from-backup-repositories-v1-releas": "Données restaurées à partir de la sauvegarde : entrepôt {{v1}}, version {{v2}}, classification personnalisée {{v3}}.",
+    "restore-failed": "La récupération a échoué"
+  },
+  "useDesktopActions": {
+    "load-failed": "Le chargement a échoué",
+    "save-failed": "Échec de l'enregistrement"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "Veuillez saisir un jeton d'accès GitHub valide",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "Ce jeton appartient à {{v1}} et le compte actuel est {{v2}}. Veuillez d'abord vous déconnecter, puis vous connecter avec un autre compte. Les données locales seront conservées par compte.",
+    "failed-to-save-the-new-token-to-the-backend-loca": "Échec de l'enregistrement du nouveau jeton dans le backend, les informations d'identification locales n'ont pas été mises à jour. Veuillez réessayer plus tard.",
+    "github-token-updated": "Le jeton GitHub a été mis à jour",
+    "github-token-has-expired-or-is-invalid": "Le jeton GitHub a expiré ou n'est pas valide",
+    "update-failed-please-try-again": "La mise à jour a échoué, veuillez réessayer plus tard"
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "Le service MCP est démarré",
+    "mcp-server-disabled": "Le service MCP est en panne",
+    "mcp-server-enabled-local": "Le service MCP est démarré (local)",
+    "backend-or-desktop-client-required-for-mcp": "Un backend ou un client est requis pour utiliser MCP",
+    "operation-failed": "L'opération a échoué",
+    "enable-mcp-before-resetting-the-token": "Veuillez d'abord activer le service MCP, puis réinitialiser le jeton.",
+    "reset-mcp-token": "Réinitialiser le jeton MCP",
+    "the-old-token-will-stop-working-immediately-upda": "Après la réinitialisation, l'ancien jeton devient immédiatement invalide et la configuration de l'agent doit être mise à jour. Continuer?",
+    "token-reset": "Le jeton a été réinitialisé",
+    "reset-failed": "Échec de la réinitialisation"
+  },
+  "useNetworkActions": {
+    "save-failed": "Échec de l'enregistrement"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "Vous n'êtes pas connecté à GitHub, veuillez d'abord vous connecter",
+    "push-categories-to-github-lists": "Synchroniser la classification des entrepôts avec la liste GitHub",
+    "push-confirm-body": "Écrivez chaque catégorie locale (y compris les catégories par défaut et personnalisées) dans la liste GitHub avec le même nom :\n\n· Une liste portant le même nom écrasera ses membres (les référentiels qui ne correspondent pas à la catégorie seront supprimés de la liste)\n· S'il n'y a pas de liste du même nom, créez-en une nouvelle (privée par défaut)\n· L'entrepôt sera ajouté à la liste correspondante selon sa classification correspondante\n· Les autres adhésions à la liste n'appartenant pas à la catégorie locale seront conservées\n\nÊtes-vous sûr de vouloir continuer ?"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "L'URL WebDAV est requise",
+    "webdav-url-must-start-with-http-or-https": "L'URL WebDAV doit commencer par http:// ou https://",
+    "username-is-required": "Le nom d'utilisateur est requis",
+    "password-is-required": "Le mot de passe est requis",
+    "path-is-required": "le chemin est obligatoire",
+    "path-must-start-with": "Le chemin doit commencer par /",
+    "webdav-connection-successful": "Connexion WebDAV réussie !",
+    "webdav-connection-failed-please-check-configurat": "La connexion WebDAV a échoué, veuillez vérifier la configuration.",
+    "webdav-test-failed": "Le test WebDAV a échoué"
+  },
+  "generalPanel": {
+    "account-token-hint": "Compte courant {{login}}. Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",
+    "token-hint": "Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter."
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "telegramMessageModal": {
+    "channel-message-from-v1": "{{v1}} 的頻道訊息",
+    "open-in-telegram": "在 Telegram 打開",
+    "this-message-is-media-only-and-has-no-text-conte": "訊息為純媒體內容，無文字正文"
+  },
+  "telegramSettingsModal": {
+    "enter-a-valid-channel-name-e-g-https-t-me-geekhu": "請輸入有效的頻道名，例如 https://t.me/geekhub23 或 @geekhub23。",
+    "this-channel-is-already-in-the-list": "該頻道已在關注清單中。",
+    "channel-added-to-the-follow-list": "已新增關注頻道。",
+    "unfollowed-v1": "已取消關注 @{{v1}}。",
+    "telegram-channels-settings": "Telegram 頻道設定",
+    "refreshing-incrementally-pulls-the-latest-messag": "刷新時增量拉取關注頻道的最新消息，訊息中包含 GitHub 倉庫連結的條目會顯示為清單項目；\"載入更多\"按頁抓取更早的歷史訊息。資料由應用程式直連 t.me 公開預覽抓取，需要桌面版或服務端模式（純瀏覽器模式受跨網域限制）；私有頻道無法抓取。",
+    "follow-list": "關注清單",
+    "accepts-a-t-me-channel-url-name-or-a-bare-channe": "支援 t.me 頻道連結、@頻道名稱或裸頻道名稱。刷新时逐个频道抓取最新消息。",
+    "enter-a-valid-channel-name": "請輸入有效的頻道名稱。",
+    "fill-in-or-add-a-channel-to-test-first": "請先填寫或新增一個頻道進行測試。",
+    "fetch-a-channel-preview-once-to-verify-the-pipel": "真實抓取一次頻道公開預覽驗證抓取頻道",
+    "testing": "測試中…",
+    "test-connection": "測試連接",
+    "channel-name": "頻道名",
+    "add": "添加",
+    "no-followed-channels-yet": "暫無關注頻道。",
+    "unfollow": "取消追蹤",
+    "unfollow-v1": "取消追蹤 @{{v1}}",
+    "done": "完成"
+  },
+  "xTweetModal": {
+    "tweet-from-v1": "@{{v1}} 的推文",
+    "open-on-x": "在 X 開啟",
+    "this-tweet-has-no-text-content": "推文正文為空"
+  },
+  "xTweetSettingsModal": {
+    "enter-a-valid-x-handle-e-g-geekbb-or-a-profile-u": "請輸入有效的 X 使用者名，例如 @geekbb 或主頁連結。",
+    "this-account-is-already-in-the-list": "該部落客已在關注清單中。",
+    "account-added-to-the-follow-list": "已新增關注部落客。",
+    "unfollowed-v1": "已取消關注 @{{v1}}。",
+    "both-auth-token-and-ct0-must-contain-valid-value": "auth_token 與 ct0 都需要填入有效內容。",
+    "auth-cookies-saved-refreshes-now-use-the-graphql": "已儲存鑑權 Cookie，刷新後按 GraphQL 模式抓取。",
+    "auth-cookies-applied-but-failed-to-persist-to-di": "鑑權 Cookie 已生效但未能持久化儲存到磁碟，重啟後可能會遺失。",
+    "auth-cookies-saved-current-session-only": "已儲存鑑權 Cookie（僅本次會話有效）。",
+    "auth-cookies-cleared-back-to-the-signed-out-mode": "已清除鑑權 Cookie，回到未登入抓取模式。",
+    "x-tweets-channel-settings": "X 推文頻道設置",
+    "refreshing-incrementally-pulls-the-latest-tweets": "刷新時會增量拉取追蹤部落客的最新推文，推文中包含 GitHub 倉庫連結的條目會展示為清單項目。資料由應用程式直連 x.com 抓取，需要桌面版或服務端模式（純瀏覽器模式受跨網域限制）。可選填寫登入鑑權 Cookie 以啟用更多推文與歷史翻頁。",
+    "follow-list": "注意列表",
+    "accepts-handle-handle-or-an-x-com-profile-url-ti": "支援 @用戶名、用戶名或 x.com 主頁連結。刷新時逐位部落客抓取最新推文。",
+    "enter-a-valid-x-handle": "請輸入有效的 X 使用者名稱。",
+    "fill-in-or-add-an-account-to-test-first": "請先填寫或新增一位部落客用於測試。",
+    "fetch-a-profile-once-to-verify-the-pipeline": "真實抓取一次主頁驗證抓取頻道",
+    "testing": "測試中…",
+    "test-connection": "測試連接",
+    "x-handle": "X 使用者名稱",
+    "add": "添加",
+    "no-followed-accounts-yet": "暫無關注部落客。",
+    "unfollow": "取消追蹤",
+    "unfollow-v1": "取消追蹤 @{{v1}}",
+    "auth-cookies-optional": "鑑權 Cookie（可選）",
+    "once-set-fetching-switches-to-the-signed-in-grap": "填寫後改走登入態 GraphQL 介面：每位部落客每頁約 20 則推文，\"載入更多\"按頁回溯歷史。留空使用未登入抓取（每位部落客每次僅最新一小批）。瀏覽器登入 x.com 後在 DevTools → Application → Cookies 中複製 auth_token 與 ct0，僅儲存在本機應用程式資料中。",
+    "auth-token": "auth_token",
+    "hide-auth-token": "隱藏 auth_token",
+    "show-auth-token": "顯示 auth_token",
+    "ct0": "ct0",
+    "hide-ct0": "隱藏 ct0",
+    "show-ct0": "顯示 ct0",
+    "authenticated-fetching-is-on": "目前已啟用鑑權抓取",
+    "signed-out-fetching-mode": "目前為未登入抓取模式",
+    "clear": "清除",
+    "update-auth": "更新鑑權",
+    "saved": "已儲存",
+    "save-auth": "保存鑑權",
+    "done": "完成"
+  },
+  "applyPluginActionResult": {
+    "opened-in-browser": "已在瀏覽器中開啟",
+    "plugin-result-copied": "插件結果已複製",
+    "plugin-result-saved": "插件結果已儲存",
+    "plugin-action-completed": "插件操作完成"
+  },
+  "usePluginAI": {
+    "custom-endpoint": "自訂服務",
+    "allow-plugin-ai-request": "允許插件調用 AI？",
+    "the-host-may-relay-this-through-its-configured-b": "可能經已啟用的宿主後端代理轉發。",
+    "send-to-ai": "發送給 AI",
+    "allow-plugin-ai-body": "外掛程式 {{pluginName}} 請求使用 AI 來配置「{{configName}}」（模型 {{model}}）。\n目標位址: {{destination}}\n{{relayNote}}\n\nSystem:\n{{system}}\n\nUser:\n{{user}}"
+  },
+  "usePluginWebSearch": {
+    "allow-plugin-web-search": "允許插件連網搜尋？",
+    "search-query": "搜尋字詞：",
+    "send-search-query": "傳送搜尋字詞"
+  }
+}

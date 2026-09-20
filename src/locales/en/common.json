@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "GitHub token not found. Please login again.",
+    "fork-owner-not-found-please-login-again": "Fork owner not found. Please login again.",
+    "refresh-completed-found-newcount-new-forks": "Refresh completed! Found {{newCount}} new forks.",
+    "refresh-completed": "Refresh completed!",
+    "fork-refresh-failed-please-check-your-network-co": "Fork refresh failed. Please check your network connection.",
+    "failed-to-load-branches-please-check-your-networ": "Failed to load branches. Please check your network connection and try again.",
+    "v1-is-already-up-to-date": "{{v1}} is already up to date.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} has been successfully updated from upstream.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} is not a fork. Cannot sync upstream.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "Sync failed: {{v1}} has merge conflicts with upstream. Please resolve manually.",
+    "sync-failed-message": "Sync failed: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "Triggered workflow \"{{workflowName}}\" on branch {{branch}}.",
+    "failed-to-run-workflow": "Failed to run workflow.",
+    "failed-to-load-organizations-please-check-github": "Failed to load organizations. Please check GitHub token permissions."
+  }
+}

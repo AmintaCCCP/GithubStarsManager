@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "GitHub token 找不到，請重新登入。",
+    "fork-owner-not-found-please-login-again": "Fork 倉庫擁有者未找到，請重新登入。",
+    "refresh-completed-found-newcount-new-forks": "刷新完成！發現 {{newCount}} 個新Fork。",
+    "refresh-completed": "刷新完成！",
+    "fork-refresh-failed-please-check-your-network-co": "Fork刷新失敗，請檢查網路連線。",
+    "failed-to-load-branches-please-check-your-networ": "載入分支失敗，請檢查網路連線後重試。",
+    "v1-is-already-up-to-date": "{{v1}} 已是最新版本，無需更新。",
+    "v1-has-been-successfully-updated-from-upstream": "已將 {{v1}} 成功更新到上游最新版本。",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} 不是 Fork 倉庫，無法同步上游。",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "同步失敗：{{v1}} 與上游倉庫有合併衝突，請手動解決後重試。",
+    "sync-failed-message": "同步失敗: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "已觸發工作流程 \"{{workflowName}}\" 在 {{branch}} 分支。",
+    "failed-to-run-workflow": "運行工作流程失敗。",
+    "failed-to-load-organizations-please-check-github": "組織清單載入失敗，請檢查 GitHub token 權限。"
+  }
+}

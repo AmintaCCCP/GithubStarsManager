@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Button } from '../ui/button';
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
@@ -19,7 +21,7 @@ import { Switch } from '../ui/switch';
 import { HeaderMenuId } from '../../types';
 
 interface MenuManagementPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 const MENU_META: Record<HeaderMenuId, {
@@ -111,7 +113,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
       <div className="flex items-center space-x-3">
         <Layout className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-          {t('菜单管理', 'Menu Management')}
+          {t('menuManagementPanel.menu-management')}
         </h3>
       </div>
 
@@ -119,10 +121,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
       <div className="flex items-start gap-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <p>
-          {t(
-            '通过开关控制顶栏菜单的显示与隐藏，拖拽或点击箭头调整顺序。「仓库」和「设置」为必显菜单，不可关闭。',
-            'Toggle menu visibility and drag to reorder. "Repositories" and "Settings" are always visible and cannot be hidden.'
-          )}
+          {t('menuManagementPanel.toggle-menu-visibility-and-drag-to-reorder-repos')}
         </p>
       </div>
 
@@ -130,6 +129,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
       <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border">
         <div className="space-y-2">
           {sortedConfig.map((item, index) => {
+
             const meta = MENU_META[item.id];
             const Icon = meta.icon;
             const isDragging = dragIndex === index;
@@ -157,9 +157,9 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 {/* Menu icon + label + lock */}
                 <Icon className="w-5 h-5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
                 <span className="flex-1 flex items-center gap-1.5 text-sm font-medium text-foreground dark:text-foreground">
-                  <span>{t(meta.labelZh, meta.labelEn)}</span>
+                  <span>{t(`header.menu-${item.id}`)}</span>
                   {!meta.canHide && (
-                    <span className="text-muted-foreground dark:text-muted-foreground flex-shrink-0" title={t('必显', 'Always visible')}>
+                    <span className="text-muted-foreground dark:text-muted-foreground flex-shrink-0" title={t('menuManagementPanel.always-visible')}>
                       <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                       </svg>
@@ -176,8 +176,8 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                     onClick={() => handleMoveUp(index)}
                     disabled={index === 0}
                     className="h-5 w-5 rounded p-0.5 hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                    title={t('上移', 'Move up')}
-                    aria-label={t(`${meta.labelZh}上移`, `Move ${meta.labelEn} up`)}
+                    title={t('menuManagementPanel.move-up')}
+                    aria-label={t('menuManagementPanel.move-v1-up', { v1: meta.labelZh })}
                   >
                     <ChevronUp className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
                   </Button>
@@ -188,8 +188,8 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                     onClick={() => handleMoveDown(index)}
                     disabled={index === sortedConfig.length - 1}
                     className="h-5 w-5 rounded p-0.5 hover:bg-accent dark:hover:bg-accent disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                    title={t('下移', 'Move down')}
-                    aria-label={t(`${meta.labelZh}下移`, `Move ${meta.labelEn} down`)}
+                    title={t('menuManagementPanel.move-down')}
+                    aria-label={t('menuManagementPanel.move-v1-down', { v1: meta.labelZh })}
                   >
                     <ChevronDown className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
                   </Button>
@@ -200,8 +200,8 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                   checked={item.visible}
                   onCheckedChange={() => handleToggle(item.id)}
                   disabled={!meta.canHide}
-                  title={!meta.canHide ? t('此菜单不可关闭', 'This menu cannot be hidden') : undefined}
-                  aria-label={t(`切换${meta.labelZh}显示`, `Toggle ${meta.labelEn} visibility`)}
+                  title={!meta.canHide ? t('menuManagementPanel.this-menu-cannot-be-hidden') : undefined}
+                  aria-label={t('menuManagementPanel.toggle-v1-visibility', { v1: meta.labelZh })}
                   className="shrink-0"
                 />
               </div>

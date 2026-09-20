@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -27,7 +29,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useDiagnosticBackendActions } from '../../features/settings/hooks/useDiagnosticBackendActions';
 
 interface DiagnosticLogsPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 const LEVEL_BADGE_VARIANTS: Record<LogLevel, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -81,7 +83,7 @@ const PAGE_SIZE = 100;
 interface LogDetailModalProps {
   entry: LogEntry;
   language: string;
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
   onClose: () => void;
 }
 
@@ -95,33 +97,33 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
       case 'general':
         return (
           <div className="space-y-3 text-sm">
-            <Row label={t('级别', 'Level')}>
+            <Row label={t('diagnosticLogsPanel.level')}>
               <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
             </Row>
-            <Row label={t('来源', 'Source')}>
+            <Row label={t('diagnosticLogsPanel.source')}>
               <Badge variant="secondary">
-                {entry.source === 'frontend' ? t('前端', 'Frontend') : t('后端', 'Backend')}
+                {entry.source === 'frontend' ? t('diagnosticLogsPanel.frontend') : t('diagnosticLogsPanel.backend')}
               </Badge>
             </Row>
-            <Row label={t('事件类型', 'Event Type')}>
+            <Row label={t('diagnosticLogsPanel.event-type')}>
               <span className="text-sm">{language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}</span>
             </Row>
-            <Row label={t('模块', 'Module')}>
+            <Row label={t('diagnosticLogsPanel.module')}>
               <span className="font-mono text-xs">{entry.module}</span>
             </Row>
-            <Row label={t('消息', 'Message')}>
+            <Row label={t('diagnosticLogsPanel.message')}>
               <span className="break-words">{entry.message}</span>
             </Row>
-            <Row label={t('时间', 'Timestamp')}>
+            <Row label={t('diagnosticLogsPanel.timestamp')}>
               <span className="font-mono text-xs">{entry.timestamp}</span>
             </Row>
             {(entryData?.url != null || entryData?.endpoint != null || entryData?.path != null) && (
-              <Row label={t('请求地址', 'URL')}>
+              <Row label={t('diagnosticLogsPanel.url')}>
                 <span className="font-mono text-xs break-all">{String(entryData.url ?? entryData.endpoint ?? entryData.path)}</span>
               </Row>
             )}
             {entryData?.status != null && (
-              <Row label={t('状态码', 'Status')}>
+              <Row label={t('diagnosticLogsPanel.status')}>
                 <span className={`font-bold ${getStatusColor(entryData.status)}`}>{String(entryData.status)}</span>
               </Row>
             )}
@@ -131,48 +133,48 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
         return (
           <div className="space-y-3 text-sm">
             {entryData?.durationMs != null && (
-              <Row label={t('耗时', 'Duration')}>
+              <Row label={t('diagnosticLogsPanel.duration')}>
                 <span className="font-mono">{String(entryData.durationMs)}ms</span>
               </Row>
             )}
             {entryData?.method != null && (
-              <Row label={t('方法', 'Method')}>
+              <Row label={t('diagnosticLogsPanel.method')}>
                 <span className="font-mono">{String(entryData.method)}</span>
               </Row>
             )}
             {(entryData?.endpoint != null || entryData?.path != null) && (
-              <Row label={t('路径', 'Path')}>
+              <Row label={t('diagnosticLogsPanel.path')}>
                 <span className="font-mono break-all">{String(entryData.endpoint ?? entryData.path)}</span>
               </Row>
             )}
             {entryData?.apiType != null && (
-              <Row label={t('API 类型', 'API Type')}>
+              <Row label={t('diagnosticLogsPanel.api-type')}>
                 <span className="font-mono">{String(entryData.apiType)}</span>
               </Row>
             )}
             {entryData?.model != null && (
-              <Row label={t('模型', 'Model')}>
+              <Row label={t('diagnosticLogsPanel.model')}>
                 <span className="font-mono">{String(entryData.model)}</span>
               </Row>
             )}
             {entryData?.responseLength != null && (
-              <Row label={t('响应长度', 'Response Length')}>
+              <Row label={t('diagnosticLogsPanel.response-length')}>
                 <span className="font-mono">{String(entryData.responseLength)} chars</span>
               </Row>
             )}
             {entryData?.durationMs == null && entryData?.method == null && (
-              <p className="text-muted-foreground dark:text-muted-foreground/70 italic">{t('无耗时信息（需开启调试模式）', 'No timing info (enable debug mode)')}</p>
+              <p className="text-muted-foreground dark:text-muted-foreground/70 italic">{t('diagnosticLogsPanel.no-timing-info-enable-debug-mode')}</p>
             )}
           </div>
         );
       case 'requestHeader':
-        return <DataBlock data={entryData?.requestHeaders} emptyText={t('无请求头数据', 'No request header data')} />;
+        return <DataBlock data={entryData?.requestHeaders} emptyText={t('diagnosticLogsPanel.no-request-header-data')} />;
       case 'requestBody':
-        return <DataBlock data={entryData?.requestBody} emptyText={t('无请求体数据', 'No request body data')} />;
+        return <DataBlock data={entryData?.requestBody} emptyText={t('diagnosticLogsPanel.no-request-body-data')} />;
       case 'responseHeader':
-        return <DataBlock data={entryData?.responseHeaders} emptyText={t('无返回头数据', 'No response header data')} />;
+        return <DataBlock data={entryData?.responseHeaders} emptyText={t('diagnosticLogsPanel.no-response-header-data')} />;
       case 'responseBody':
-        return <DataBlock data={entryData?.responseBody ?? entryData?.data} emptyText={t('无返回体数据（完整数据见概览标签）', 'No response body data (see General tab)')} />;
+        return <DataBlock data={entryData?.responseBody ?? entryData?.data} emptyText={t('diagnosticLogsPanel.no-response-body-data-see-general-tab')} />;
       default:
         return null;
     }
@@ -195,7 +197,7 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
             variant="ghost"
             size="icon"
             onClick={onClose}
-            aria-label={t('关闭日志详情', 'Close log details')}
+            aria-label={t('diagnosticLogsPanel.close-log-details')}
             className="ml-2 h-8 w-8 shrink-0"
           >
             <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
@@ -405,7 +407,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         format: 'github-stars-manager-logs-v1',
         exportDate: new Date().toISOString(),
         appVersion, environment,
-        sanitizationNote: t('所有 Token、API Key、密码、邮箱已脱敏为 ***格式', 'All tokens, API keys, passwords, and emails have been masked as ***<last4>'),
+        sanitizationNote: t('diagnosticLogsPanel.all-tokens-api-keys-passwords-and-emails-have-be'),
         frontendLogs, backendLogs,
       };
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
@@ -436,47 +438,47 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         <section>
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
             <ScrollText className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
-            {t('调试模式', 'Debug Mode')}
+            {t('diagnosticLogsPanel.debug-mode')}
           </h3>
           <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
-                  <span className="font-medium text-foreground dark:text-foreground">{t('前端调试', 'Frontend Debug')}</span>
+                  <span className="font-medium text-foreground dark:text-foreground">{t('diagnosticLogsPanel.frontend-debug')}</span>
                   <Badge variant={frontendDebug ? 'default' : 'secondary'}>
-                    {frontendDebug ? t('已开启', 'ON') : t('已关闭', 'OFF')}
+                    {frontendDebug ? t('diagnosticLogsPanel.on') : t('diagnosticLogsPanel.off')}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">
-                  {t('开启后将记录所有前端 HTTP 请求详情（方法、路径、状态码、耗时）', 'Records all frontend HTTP request details (method, path, status, duration)')}
+                  {t('diagnosticLogsPanel.records-all-frontend-http-request-details-method')}
                 </p>
               </div>
               <Switch
                 checked={frontendDebug}
                 onCheckedChange={() => toggleFrontendDebug()}
-                aria-label={t('切换前端调试', 'Toggle frontend debug')}
+                aria-label={t('diagnosticLogsPanel.toggle-frontend-debug')}
               />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
-                  <span className={`font-medium ${backendAvailable ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground/70'}`}>{t('后端调试', 'Backend Debug')}</span>
+                  <span className={`font-medium ${backendAvailable ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground/70'}`}>{t('diagnosticLogsPanel.backend-debug')}</span>
                   <Badge variant={backendAvailable && backendDebug ? 'default' : 'secondary'}>
-                    {backendAvailable ? (backendDebug ? t('已开启', 'ON') : t('已关闭', 'OFF')) : t('后端未连接', 'Not connected')}
+                    {backendAvailable ? (backendDebug ? t('diagnosticLogsPanel.on') : t('diagnosticLogsPanel.off')) : t('diagnosticLogsPanel.not-connected')}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">{t('开启后将记录所有后端 HTTP 请求详情', 'Records all backend HTTP request details')}</p>
+                <p className="text-sm text-muted-foreground dark:text-muted-foreground mt-1">{t('diagnosticLogsPanel.records-all-backend-http-request-details')}</p>
               </div>
               <Switch
                 checked={backendDebug}
                 onCheckedChange={() => toggleBackendDebug()}
                 disabled={!backendAvailable}
-                aria-label={t('切换后端调试', 'Toggle backend debug')}
+                aria-label={t('diagnosticLogsPanel.toggle-backend-debug')}
               />
             </div>
             <p className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>{t('调试模式会产生大量日志，仅用于排障时短暂开启', 'Debug mode produces many logs — enable briefly only for troubleshooting')}</span>
+              <span>{t('diagnosticLogsPanel.debug-mode-produces-many-logs-enable-briefly-onl')}</span>
             </p>
           </div>
         </section>
@@ -484,7 +486,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
         {/* Privacy Notice */}
         <p className="flex items-center gap-2 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
           <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{t('日志仅记录端点、模型、状态、耗时和错误摘要。所有 Token、API Key、密码、邮箱已自动脱敏为 ***格式', 'Logs store only endpoints, models, status, duration, and error summaries. All sensitive info is automatically masked as ***')}</span>
+          <span>{t('diagnosticLogsPanel.logs-store-only-endpoints-models-status-duration')}</span>
         </p>
 
         {/* Toolbar */}
@@ -492,14 +494,14 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             <Input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              aria-label={t('搜索日志模块或消息', 'Search log modules or messages')}
-              placeholder={t('搜索模块或消息…', 'Search module or message…')}
+              aria-label={t('diagnosticLogsPanel.search-log-modules-or-messages')}
+              placeholder={t('diagnosticLogsPanel.search-module-or-message')}
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
           </div>
 
           {/* Level pills — debug pill always clickable */}
           <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-foreground dark:text-foreground">{t('级别', 'Level')}:</span>
+            <span className="text-sm font-medium text-foreground dark:text-foreground">{t('diagnosticLogsPanel.level')}:</span>
             {(['debug', 'info', 'warn', 'error'] as LogLevel[]).map(level => (
               <Button
                 key={level}
@@ -525,19 +527,19 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                   variant={selectedScope === scope ? 'default' : 'outline'}
                   size="sm"
                   className={`h-8 rounded-none border-0 px-3 text-sm first:rounded-l-md last:rounded-r-md ${scope === 'backend' && !backendAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                  {scope === 'all' ? t('全部', 'All') : scope === 'frontend' ? t('前端', 'Frontend') : t('后端', 'Backend')}
+                  {scope === 'all' ? t('diagnosticLogsPanel.all') : scope === 'frontend' ? t('diagnosticLogsPanel.frontend') : t('diagnosticLogsPanel.backend')}
                 </Button>
               ))}
             </div>
             <DropdownMenu open={showEventTypeDropdown} onOpenChange={setShowEventTypeDropdown}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" type="button" className="h-8 gap-1 px-3 text-sm">
-                  <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('类型', 'types')}` : t('事件类型', 'Event Type')}</span>
+                  <span>{selectedEventTypes.size > 0 ? `${selectedEventTypes.size} ${t('diagnosticLogsPanel.types')}` : t('diagnosticLogsPanel.event-type')}</span>
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="max-h-48 min-w-[180px] overflow-y-auto">
-                <DropdownMenuLabel>{t('事件类型过滤', 'Event type filters')}</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('diagnosticLogsPanel.event-type-filters')}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {availableEventTypes.map(et => (
                   <DropdownMenuCheckboxItem
@@ -553,25 +555,25 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             </DropdownMenu>
             <div className="flex items-center space-x-2 ml-auto">
                 <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing || !backendAvailable}
-                aria-label={t('刷新', 'Refresh')} className="size-9" title={t('刷新', 'Refresh')}>
+                aria-label={t('diagnosticLogsPanel.refresh')} className="size-9" title={t('diagnosticLogsPanel.refresh')}>
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               </Button>
               <Button variant="secondary" onClick={handleClear} className="h-9 gap-1 px-3 text-sm font-medium">
-                <Trash2 className="w-4 h-4" /><span>{t('清空', 'Clear')}</span>
+                <Trash2 className="w-4 h-4" /><span>{t('diagnosticLogsPanel.clear')}</span>
               </Button>
               <Button onClick={handleExport} disabled={isExporting}
                 className="h-9 gap-1 px-3 text-sm font-medium">
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                <span>{isExporting ? t('导出中…', 'Exporting…') : t('导出', 'Export')}</span>
+                <span>{isExporting ? t('diagnosticLogsPanel.exporting') : t('diagnosticLogsPanel.export')}</span>
               </Button>
             </div>
           </div>
 
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {t(`显示 ${filteredEntries.length} / ${totalCount} 条`, `Showing ${filteredEntries.length} / ${totalCount} entries`)}
-            {(frontendDebug || backendDebug) && <Badge variant="secondary" className="ml-2">{t('调试模式已开启', 'Debug mode ON')}</Badge>}
-            {selectedScope !== 'backend' && <span className="ml-1">· {t(`前端 ${frontendCounts.total}`, `Frontend ${frontendCounts.total}`)}</span>}
-            {selectedScope !== 'frontend' && backendAvailable && <span className="ml-1">· {t(`后端 ${backendLogCount}`, `Backend ${backendLogCount}`)}</span>}
+            {t('diagnosticLogsPanel.showing-v1-totalcount-entries', { v1: filteredEntries.length, totalCount: totalCount })}
+            {(frontendDebug || backendDebug) && <Badge variant="secondary" className="ml-2">{t('diagnosticLogsPanel.debug-mode-on')}</Badge>}
+            {selectedScope !== 'backend' && <span className="ml-1">· {t('diagnosticLogsPanel.frontend-v1', { v1: frontendCounts.total })}</span>}
+            {selectedScope !== 'frontend' && backendAvailable && <span className="ml-1">· {t('diagnosticLogsPanel.backend-backendlogcount', { backendLogCount: backendLogCount })}</span>}
           </div>
         </section>
 
@@ -580,7 +582,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
           {filteredEntries.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground dark:text-muted-foreground/70">
               <ScrollText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              {totalCount === 0 ? t('暂无日志', 'No logs yet') : t('无匹配日志', 'No matching logs')}
+              {totalCount === 0 ? t('diagnosticLogsPanel.no-logs-yet') : t('diagnosticLogsPanel.no-matching-logs')}
             </div>
           ) : (
             <>
@@ -606,7 +608,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       key={entry.id}
                       role={hasHttpDetail ? 'button' : undefined}
                       tabIndex={hasHttpDetail ? 0 : undefined}
-                      aria-label={hasHttpDetail ? t(`查看 HTTP 详情：${entry.module} ${entry.message}`, `View HTTP details: ${entry.module} ${entry.message}`) : undefined}
+                      aria-label={hasHttpDetail ? t('diagnosticLogsPanel.view-http-details-v1-v2', { v1: entry.module, v2: entry.message }) : undefined}
                       className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset' : ''}`}
                       onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}
                       onKeyDown={hasHttpDetail ? (event) => {
@@ -619,7 +621,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                         <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]}>{entry.level}</Badge>
                         <Badge variant="secondary">
-                          {entry.source === 'frontend' ? t('前端', 'FE') : t('后端', 'BE')}
+                          {entry.source === 'frontend' ? t('diagnosticLogsPanel.fe') : t('diagnosticLogsPanel.be')}
                         </Badge>
                         <Badge variant="outline">
                           {language === 'zh' ? EVENT_TYPE_LABELS[eventType].zh : EVENT_TYPE_LABELS[eventType].en}
@@ -646,7 +648,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                 <div className="border-t border-border p-3 text-center">
                   <Button variant="ghost" onClick={() => setVisibleCount(prev => prev + PAGE_SIZE)}
                     className="text-sm text-primary hover:text-primary/90 transition-colors">
-                    {t(`加载更多（还有 ${filteredEntries.length - visibleCount} 条）`, `Load more (${filteredEntries.length - visibleCount} remaining)`)}
+                    {t('diagnosticLogsPanel.load-more-v1-remaining', { v1: filteredEntries.length - visibleCount })}
                   </Button>
                 </div>
               )}

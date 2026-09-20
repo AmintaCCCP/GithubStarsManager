@@ -1,3 +1,5 @@
+import { isAppLanguage, type AppLanguage } from '../i18n/languages';
+
 const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   // Auth
   UNAUTHORIZED: { zh: '未授权，请检查 API Secret', en: 'Unauthorized, please check API Secret' },
@@ -62,13 +64,13 @@ const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   INTERNAL_SERVER_ERROR: { zh: '服务器内部错误', en: 'Internal server error' },
 };
 
-function getCurrentLanguage(): 'zh' | 'en' {
+function getCurrentLanguage(): AppLanguage {
   try {
     const storeData = localStorage.getItem('github-stars-manager');
     if (storeData) {
       const parsed = JSON.parse(storeData);
       const lang = parsed.state?.language;
-      if (lang === 'en') return 'en';
+      if (isAppLanguage(lang)) return lang;
     }
   } catch { /* ignore */ }
   return 'zh';
@@ -79,5 +81,6 @@ export function translateBackendError(code: string | undefined, fallback: string
   const entry = ERROR_MESSAGES[code];
   if (!entry) return fallback;
   const lang = getCurrentLanguage();
-  return entry[lang];
+  return lang === 'zh' ? entry.zh : entry.en;
 }
+

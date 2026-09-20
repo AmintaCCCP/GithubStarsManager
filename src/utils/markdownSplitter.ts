@@ -100,7 +100,7 @@ export const isEnglishText = (text: string): boolean => {
 
 export const getTranslateDirection = (
   detected: DetectedLanguage,
-  target: 'zh' | 'en'
+  target: AppLanguage
 ): { from?: string; to: string } => {
   if (detected === 'unknown') {
     return { to: target };
@@ -109,4 +109,5 @@ export const getTranslateDirection = (
     from: detected,
     to: target,
   };
-};
+};import type { AppLanguage } from '../i18n/languages';
+

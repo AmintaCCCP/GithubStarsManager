@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import React, { useState } from 'react';
@@ -20,14 +25,13 @@ interface TelegramSettingsModalProps {
  * 服务端），无需用户配置任何第三方实例。
  */
 export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ isOpen, onClose }) => {
-  const language = useAppStore(state => state.language);
   const telegramFollows = useAppStore(state => state.telegramFollows);
   const addTelegramFollow = useAppStore(state => state.addTelegramFollow);
   const removeTelegramFollow = useAppStore(state => state.removeTelegramFollow);
   const { toast } = useDialog();
   const { probe, isProbing, message, probeOk } = useTelegramProbe();
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('plugins');
   const [input, setInput] = useState('');
 
   const handleKeys = new Set(telegramFollows.map(follow => follow.channel.toLowerCase()));
@@ -35,43 +39,37 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
   const handleAdd = () => {
     const channel = normalizeTelegramChannelInput(input);
     if (!channel) {
-      toast(t('请输入有效的频道名，例如 https://t.me/geekhub23 或 @geekhub23。', 'Enter a valid channel name, e.g. https://t.me/geekhub23 or @geekhub23.'), 'error');
+      toast(t('telegramSettingsModal.enter-a-valid-channel-name-e-g-https-t-me-geekhu'), 'error');
       return;
     }
     if (handleKeys.has(channel.toLowerCase())) {
-      toast(t('该频道已在关注列表中。', 'This channel is already in the list.'), 'info');
+      toast(t('telegramSettingsModal.this-channel-is-already-in-the-list'), 'info');
       return;
     }
     addTelegramFollow(channel);
     setInput('');
-    toast(t('已添加关注频道。', 'Channel added to the follow list.'), 'success');
+    toast(t('telegramSettingsModal.channel-added-to-the-follow-list'), 'success');
   };
 
   const handleRemove = (follow: TelegramFollow) => {
     removeTelegramFollow(follow.channel);
-    toast(t(`已取消关注 @${follow.channel}。`, `Unfollowed @${follow.channel}.`), 'info');
+    toast(t('telegramSettingsModal.unfollowed-v1', { v1: follow.channel }), 'info');
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('Telegram 频道设置', 'Telegram Channels Settings')} maxWidth="max-w-2xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('telegramSettingsModal.telegram-channels-settings')} maxWidth="max-w-2xl">
       <div className="space-y-5">
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground dark:text-muted-foreground">
-          {t(
-            '刷新时增量拉取关注频道的最新消息，消息中包含 GitHub 仓库链接的条目会展示为列表项；"加载更多"按页抓取更早的历史消息。数据由应用直连 t.me 公开预览抓取，需要桌面版或服务端模式（纯浏览器模式受跨域限制）；私有频道无法抓取。',
-            'Refreshing incrementally pulls the latest messages of followed channels; messages containing GitHub repository links are listed, and "Load more" pages back through history. The app fetches the t.me public preview directly and requires the desktop or server build (browsers are CORS-restricted). Private channels cannot be fetched.',
-          )}
+          {t('telegramSettingsModal.refreshing-incrementally-pulls-the-latest-messag')}
         </div>
 
         <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
           <div className="mb-3 flex items-start gap-2">
             <Users className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
             <div className="flex-1">
-              <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('关注列表', 'Follow list')}</h4>
+              <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('telegramSettingsModal.follow-list')}</h4>
               <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">
-                {t(
-                  '支持 t.me 频道链接、@频道名或裸频道名。刷新时逐个频道抓取最新消息。',
-                  'Accepts a t.me channel URL, @name, or a bare channel name. Channels are fetched one by one on refresh.',
-                )}
+                {t('telegramSettingsModal.accepts-a-t-me-channel-url-name-or-a-bare-channe')}
               </p>
             </div>
             <Button
@@ -80,22 +78,22 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
               onClick={() => {
                 const normalizedInput = normalizeTelegramChannelInput(input);
                 if (input.trim() && !normalizedInput) {
-                  toast(t('请输入有效的频道名。', 'Enter a valid channel name.'), 'error');
+                  toast(t('telegramSettingsModal.enter-a-valid-channel-name'), 'error');
                   return;
                 }
                 const channel = normalizedInput || telegramFollows[0]?.channel;
                 if (!channel) {
-                  toast(t('请先填写或添加一个频道用于测试。', 'Fill in or add a channel to test first.'), 'error');
+                  toast(t('telegramSettingsModal.fill-in-or-add-a-channel-to-test-first'), 'error');
                   return;
                 }
                 void probe(channel);
               }}
               disabled={isProbing || (!input.trim() && telegramFollows.length === 0)}
               className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-              title={t('真实抓取一次频道公开预览验证抓取通道', 'Fetch a channel preview once to verify the pipeline')}
+              title={t('telegramSettingsModal.fetch-a-channel-preview-once-to-verify-the-pipel')}
             >
               <PlugZap className={`h-4 w-4 ${isProbing ? 'animate-pulse' : ''}`} />
-              {isProbing ? t('测试中…', 'Testing…') : t('测试连接', 'Test Connection')}
+              {isProbing ? t('telegramSettingsModal.testing') : t('telegramSettingsModal.test-connection')}
             </Button>
           </div>
           {message && (
@@ -114,7 +112,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
           <div className="flex gap-2">
             <Input
               type="text"
-              aria-label={t('频道名', 'Channel name')}
+              aria-label={t('telegramSettingsModal.channel-name')}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -129,14 +127,14 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
               className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
-              {t('添加', 'Add')}
+              {t('telegramSettingsModal.add')}
             </Button>
           </div>
 
           <div className="mt-3 space-y-2">
             {telegramFollows.length === 0 ? (
               <p className="rounded-lg bg-card dark:bg-card/[0.03] px-3 py-2 text-xs text-muted-foreground dark:text-muted-foreground">
-                {t('暂无关注频道。', 'No followed channels yet.')}
+                {t('telegramSettingsModal.no-followed-channels-yet')}
               </p>
             ) : telegramFollows.map((follow) => (
               <div
@@ -160,8 +158,8 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
                   variant="ghost"
                   onClick={() => handleRemove(follow)}
                   className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
-                  title={t('取消关注', 'Unfollow')}
-                  aria-label={t(`取消关注 @${follow.channel}`, `Unfollow @${follow.channel}`)}
+                  title={t('telegramSettingsModal.unfollow')}
+                  aria-label={t('telegramSettingsModal.unfollow-v1', { v1: follow.channel })}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -176,7 +174,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
             onClick={onClose}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            {t('完成', 'Done')}
+            {t('telegramSettingsModal.done')}
           </Button>
         </div>
       </div>

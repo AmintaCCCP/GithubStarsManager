@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -10,7 +12,7 @@ import { useWebDAVActions } from '../../features/settings/hooks/useWebDAVActions
 import { useDialog } from '../../hooks/useDialog';
 
 interface WebDAVPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
@@ -76,7 +78,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         <div className="flex items-center space-x-3">
           <Cloud className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('WebDAV配置', 'WebDAV Configuration')}
+            {t('webDAVPanel.webdav-configuration')}
           </h3>
         </div>
         <Button
@@ -84,20 +86,20 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
           className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>{t('添加WebDAV', 'Add WebDAV')}</span>
+          <span>{t('webDAVPanel.add-webdav')}</span>
         </Button>
       </div>
 
       {showForm && (
         <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
           <h4 className="font-medium text-foreground dark:text-foreground mb-4">
-            {editingId ? t('编辑WebDAV配置', 'Edit WebDAV Configuration') : t('添加WebDAV配置', 'Add WebDAV Configuration')}
+            {editingId ? t('webDAVPanel.edit-webdav-configuration') : t('webDAVPanel.add-webdav-configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label htmlFor="webdav-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('配置名称', 'Configuration Name')} *
+                {t('webDAVPanel.configuration-name')} *
               </label>
               <Input
                 id="webdav-name"
@@ -105,13 +107,13 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('例如: 坚果云', 'e.g., Nutstore')}
+                placeholder={t('webDAVPanel.e-g-nutstore')}
               />
             </div>
             
             <div>
               <label htmlFor="webdav-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('WebDAV URL', 'WebDAV URL')} *
+                {t('webDAVPanel.webdav-url')} *
               </label>
               <Input
                 id="webdav-url"
@@ -125,7 +127,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             
             <div>
               <label htmlFor="webdav-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('用户名', 'Username')} *
+                {t('webDAVPanel.username')} *
               </label>
               <Input
                 id="webdav-username"
@@ -133,13 +135,13 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 value={form.username}
                 onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
                 className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('WebDAV用户名', 'WebDAV username')}
+                placeholder={t('webDAVPanel.webdav-username')}
               />
             </div>
             
             <div>
               <label htmlFor="webdav-password" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('密码', 'Password')} *
+                {t('webDAVPanel.password')} *
               </label>
               <Input
                 id="webdav-password"
@@ -147,13 +149,13 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 value={form.password}
                 onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
                 className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('WebDAV密码', 'WebDAV password')}
+                placeholder={t('webDAVPanel.webdav-password')}
               />
             </div>
             
             <div className="md:col-span-2">
               <label htmlFor="webdav-path" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('路径', 'Path')} *
+                {t('webDAVPanel.path')} *
               </label>
               <Input
                 id="webdav-path"
@@ -172,14 +174,14 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
               className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Save className="w-4 h-4" />
-              <span>{t('保存', 'Save')}</span>
+              <span>{t('webDAVPanel.save')}</span>
             </Button>
             <Button
               onClick={resetForm}
               className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
             >
               <X className="w-4 h-4" />
-              <span>{t('取消', 'Cancel')}</span>
+              <span>{t('webDAVPanel.cancel')}</span>
             </Button>
           </div>
         </div>
@@ -188,7 +190,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       <RadioGroup
         value={activeWebDAVConfig || ''}
         onValueChange={setActiveWebDAVConfig}
-        aria-label={t('当前 WebDAV 配置', 'Active WebDAV configuration')}
+        aria-label={t('webDAVPanel.active-webdav-configuration')}
         className="space-y-3"
       >
         {webdavConfigs.map(config => (
@@ -205,7 +207,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 <RadioGroupItem
                   value={config.id}
                   id={`active-webdav-${config.id}`}
-                  aria-label={config.name || t('WebDAV 配置', 'WebDAV configuration')}
+                  aria-label={config.name || t('webDAVPanel.webdav-configuration-2')}
                 />
                 <div>
                   <h4 className="font-medium text-foreground dark:text-foreground">{config.name}</h4>
@@ -214,10 +216,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   </p>
                   {config.passwordStatus === 'decrypt_failed' && (
                     <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground ">
-                      {t(
-                        '存储的 WebDAV 密码无法解密，请重新输入并保存该配置。',
-                        'The stored WebDAV password could not be decrypted. Please re-enter and save this configuration.'
-                      )}
+                      {t('webDAVPanel.the-stored-webdav-password-could-not-be-decrypte')}
                     </p>
                   )}
                 </div>
@@ -228,8 +227,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors disabled:opacity-50"
-                  aria-label={t('测试连接', 'Test Connection')}
-                  title={t('测试连接', 'Test Connection')}
+                  aria-label={t('webDAVPanel.test-connection')}
+                  title={t('webDAVPanel.test-connection')}
                 >
                   {testingId === config.id ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -240,25 +239,25 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                 <Button
                   onClick={() => handleEdit(config)}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
-                  aria-label={t('编辑', 'Edit')}
-                  title={t('编辑', 'Edit')}
+                  aria-label={t('webDAVPanel.edit')}
+                  title={t('webDAVPanel.edit')}
                 >
                   <Edit3 className="w-4 h-4" />
                 </Button>
                 <Button
                   onClick={async () => {
                     const confirmed = await confirm(
-                      t('确定要删除这个WebDAV配置吗？', 'Delete WebDAV Configuration?'),
-                      t('此操作无法撤销。', 'This action cannot be undone.'),
-                      { type: 'danger', confirmText: t('删除', 'Delete') }
+                      t('webDAVPanel.delete-webdav-configuration'),
+                      t('webDAVPanel.this-action-cannot-be-undone'),
+                      { type: 'danger', confirmText: t('webDAVPanel.delete') }
                     );
                     if (confirmed) {
                       deleteWebDAVConfig(config.id);
                     }
                   }}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
-                  aria-label={t('删除', 'Delete')}
-                  title={t('删除', 'Delete')}
+                  aria-label={t('webDAVPanel.delete')}
+                  title={t('webDAVPanel.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -270,8 +269,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         {webdavConfigs.length === 0 && (
           <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
             <Cloud className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>{t('还没有配置WebDAV服务', 'No WebDAV services configured yet')}</p>
-            <p className="text-sm">{t('点击上方按钮添加WebDAV配置', 'Click the button above to add WebDAV configuration')}</p>
+            <p>{t('webDAVPanel.no-webdav-services-configured-yet')}</p>
+            <p className="text-sm">{t('webDAVPanel.click-the-button-above-to-add-webdav-configurati')}</p>
           </div>
         )}
     </div>

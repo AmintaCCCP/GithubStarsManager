@@ -1,3 +1,4 @@
+import { useT } from "../../../i18n/useT";
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { DiscoveryChannelId, DiscoveryRepo, PaginatedDiscoveryRepositories } from '../../../types';
@@ -62,12 +63,17 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       optimizerRef.current = null;
     };
   }, [authSessionIdentity, setAnalysisProgress]);
-  const t = useCallback((zh: string, en: string) => state.language === 'zh' ? zh : en, [state.language]);
+  const t = useT('discovery');
+  const tRef = useRef(t);
+  useEffect(() => {
+    // 提交完成后同步引用，避免渲染期副作用
+    tRef.current = t;
+  }, [t]);
 
   const refreshChannel = useCallback(async (channelId: DiscoveryChannelId, page = 1, append = false) => {
     const currentState = latestStateRef.current;
     if (!currentState.githubToken) {
-      toast(t('GitHub Token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      toast(tRef.current('useDiscoveryActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
     const requestVersion = (channelRequestVersionRef.current[channelId] ?? 0) + 1;
@@ -196,15 +202,15 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (!isCurrentRequest()) return;
       console.error(`Failed to refresh channel ${channelId}:`, error);
       if (append) {
-        currentState.setDiscoveryLoadMoreError(channelId, t('加载更多失败，请重试', 'Failed to load more, please retry'));
+        currentState.setDiscoveryLoadMoreError(channelId, tRef.current('useDiscoveryActions.failed-to-load-more-please-retry'));
       } else {
         const errorMsg = error instanceof Error ? error.message : '';
         if (channelId === 'x-tweet') {
-          toast(errorMsg ? `${t('X 推文获取失败', 'Failed to fetch X tweets')}: ${errorMsg}` : t('获取 X 推文失败，请检查网络连接或在设置中核对 X 鉴权 Cookie。', 'Failed to fetch X tweets. Please check your network connection or X auth cookies in settings.'), 'error');
+          toast(errorMsg ? `${tRef.current('useDiscoveryActions.failed-to-fetch-x-tweets')}: ${errorMsg}` : tRef.current('useDiscoveryActions.failed-to-fetch-x-tweets-please-check-your-netwo'), 'error');
         } else if (channelId === 'telegram') {
-          toast(errorMsg ? `${t('Telegram 消息获取失败', 'Failed to fetch Telegram messages')}: ${errorMsg}` : t('获取 Telegram 消息失败，请检查网络连接或关注频道。', 'Failed to fetch Telegram messages. Please check your network connection or followed channels.'), 'error');
+          toast(errorMsg ? `${tRef.current('useDiscoveryActions.failed-to-fetch-telegram-messages')}: ${errorMsg}` : tRef.current('useDiscoveryActions.failed-to-fetch-telegram-messages-please-check-y'), 'error');
         } else {
-          toast(errorMsg || t('获取数据失败，请检查网络连接或GitHub Token。', 'Failed to fetch data. Please check your network connection or GitHub Token.'), 'error');
+          toast(errorMsg || tRef.current('useDiscoveryActions.failed-to-fetch-data-please-check-your-network-c'), 'error');
         }
       }
     } finally {
@@ -222,24 +228,24 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         else currentState.setDiscoveryLoading(channelId, false);
       }
     }
-  }, [captureSession, isCurrentSession, scrollContainerRef, t, toast]);
+  }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
 
   const handleAnalyzePage = useCallback(async () => {
     const analysisState = latestStateRef.current;
     if (!analysisState.githubToken) return;
     const activeConfig = analysisState.aiConfigs.find(config => config.id === analysisState.activeAIConfig);
     if (!activeConfig) {
-      toast(t('请先在设置中配置AI服务。', 'Please configure AI service in settings first.'), 'error');
+      toast(t('useDiscoveryActions.please-configure-ai-service-in-settings-first'), 'error');
       return;
     }
     if (activeConfig.apiKeyStatus === 'decrypt_failed' || activeConfig.apiKeyStatus === 'empty' || !activeConfig.baseUrl || !activeConfig.apiKey || !activeConfig.model) {
-      toast(t('AI服务配置不完整，请检查API端点、密钥和模型名称。', 'AI service configuration is incomplete. Please check the API endpoint, key, and model name.'), 'error');
+      toast(t('useDiscoveryActions.ai-service-configuration-is-incomplete-please-ch'), 'error');
       return;
     }
     const pageRepos = analysisState.discoveryRepos[analysisState.selectedDiscoveryChannel] || [];
     const unanalyzed = pageRepos.filter(repo => !repo.analyzed_at || repo.analysis_failed);
     if (unanalyzed.length === 0) {
-      toast(t('已加载的所有项目均已完成AI分析。', 'All loaded projects have been analyzed.'), 'info');
+      toast(t('useDiscoveryActions.all-loaded-projects-have-been-analyzed'), 'info');
       return;
     }
 
@@ -305,11 +311,11 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       const successCount = results.filter(result => result.success).length;
       const failCount = results.length - successCount;
-      toast(t(`AI分析完成！成功 ${successCount} 个${failCount > 0 ? `，失败 ${failCount} 个` : ''}`, `AI analysis complete! ${successCount} succeeded${failCount > 0 ? `, ${failCount} failed` : ''}`), successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success');
+      toast(t(failCount > 0 ? 'useDiscoveryActions.ai-analysis-complete-with-failures' : 'useDiscoveryActions.ai-analysis-complete', { successCount: successCount, failCount: failCount }), successCount === 0 ? 'error' : failCount > 0 ? 'info' : 'success');
     } catch (error) {
       if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;
       console.error('AI analysis error:', error);
-      toast(t('AI分析失败，请检查AI配置。', 'AI analysis failed. Please check your AI configuration.'), 'error');
+      toast(t('useDiscoveryActions.ai-analysis-failed-please-check-your-ai-configur'), 'error');
     } finally {
       if (optimizerRef.current === optimizer) optimizerRef.current = null;
       if (isCurrentSession(analysisSession)) {

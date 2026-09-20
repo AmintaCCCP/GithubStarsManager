@@ -1,3 +1,6 @@
+import { useT } from '../i18n/useT';
+import { languageDefinition } from '../i18n/languages';
+import type { AppLanguage } from '../i18n/languages';
 import { Button } from './ui/button';
 import { memo, useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -27,7 +30,7 @@ interface BilingualMarkdownRendererProps {
   baseUrl?: string;
   headingIds?: Map<string, string>;
   fontSize?: 'small' | 'medium' | 'large';
-  language?: 'zh' | 'en';
+  language?: AppLanguage;
   defaultDisplayMode?: DisplayMode;
   displayMode?: DisplayMode;
   onDisplayModeChange?: (mode: DisplayMode) => void;
@@ -72,6 +75,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
   onHeadingsTranslated,
   autoTranslate = false,
 }, ref) => {
+  const t = useT('app');
   const containerRef = useRef<HTMLDivElement>(null);
   const segmentsRef = useRef<DomBlockSegment[]>([]);
   const translationElementsRef = useRef<Map<number, HTMLElement>>(new Map());
@@ -142,7 +146,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
     const targetLang = language;
 
     if (detected === targetLang) {
-      setError(language === 'zh' ? '内容已是中文，无需翻译' : 'Content is already in English');
+      setError(t('bilingualMarkdownRenderer.content-already-in-language', { language: languageDefinition(targetLang).nativeName }));
       updateStatus('error');
       return;
     }
@@ -291,7 +295,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
       setError(err instanceof Error ? err.message : 'Translation failed');
       updateStatus('error');
     }
-  }, [language, scan, updateStatus, removeTranslations, translateBatch]);
+  }, [language, scan, updateStatus, removeTranslations, translateBatch, t]);
 
   const revert = useCallback(() => {
     if (abortRef.current) {
@@ -349,17 +353,17 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
             {
               mode: 'original' as DisplayMode,
               icon: FileText,
-              label: language === 'zh' ? '原文' : 'Original',
+              label: t('bilingualMarkdownRenderer.original'),
             },
             {
               mode: 'translated' as DisplayMode,
               icon: Languages,
-              label: language === 'zh' ? '译文' : 'Translated',
+              label: t('bilingualMarkdownRenderer.translated'),
             },
             {
               mode: 'bilingual' as DisplayMode,
               icon: Eye,
-              label: language === 'zh' ? '双语' : 'Bilingual',
+              label: t('bilingualMarkdownRenderer.bilingual'),
             },
           ].map(({ mode, icon: Icon, label }) => {
             const active = displayMode === mode;
@@ -403,7 +407,7 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
         <div className="flex items-center justify-center py-4 gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span>
-            {language === 'zh' ? '翻译中…' : 'Translating…'}
+            {t('bilingualMarkdownRenderer.translating')}
             {progress.total > 0 && ` ${progress.current}/${progress.total}`}
           </span>
         </div>

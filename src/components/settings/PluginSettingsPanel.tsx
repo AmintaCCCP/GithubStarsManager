@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { AlertTriangle, FolderPlus, Loader2, Plug, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { useDialog } from '../../hooks/useDialog';
@@ -19,7 +21,7 @@ import {
 } from '../ui/alert-dialog';
 
 interface PluginSettingsPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) => {
@@ -40,7 +42,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     try {
       await pluginRegistry.refresh();
     } catch (error) {
-      toast(error instanceof Error ? error.message : t('插件列表加载失败', 'Failed to load plugins'), 'error');
+      toast(error instanceof Error ? error.message : t('pluginSettingsPanel.failed-to-load-plugins'), 'error');
     } finally {
       setLoading(false);
     }
@@ -49,7 +51,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   useEffect(() => {
     void refresh();
     void pluginClient.getSearchEndpoint().then((result) => setSearchEndpoint(result.endpoint ?? '')).catch(() => {
-      toast(t('搜索服务设置加载失败', 'Failed to load search service settings'), 'error');
+      toast(t('pluginSettingsPanel.failed-to-load-search-service-settings'), 'error');
     });
     // The registry is the source of truth; refresh only when this panel mounts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,11 +61,11 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     try {
       const result = await pluginClient.configureWebSearch(searchEndpoint.trim() || null);
       toast(result.success
-        ? t('搜索服务设置已保存', 'Search service settings saved')
+        ? t('pluginSettingsPanel.search-service-settings-saved')
         : result.error.message, result.success ? 'success' : 'error');
     } catch (error) {
       toast(
-        error instanceof Error ? error.message : t('搜索服务设置保存失败', 'Failed to save search service settings'),
+        error instanceof Error ? error.message : t('pluginSettingsPanel.failed-to-save-search-service-settings'),
         'error'
       );
     }
@@ -73,21 +75,15 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     const permissions = plugin.manifest.permissions;
     const permissionText = permissions.length > 0
       ? permissions.map((permission) => `• ${permission}`).join('\n')
-      : t('无额外 Host 权限', 'No additional Host permissions');
+      : t('pluginSettingsPanel.no-additional-host-permissions');
     const repositoryDataNotice = permissions.some((permission) =>
       permission === 'repositories:read' || permission === 'privateRepositories:read')
-      ? t(
-        '\n\n注意：仓库读取权限会包含你已收藏的私有仓库元数据。',
-        '\n\nNote: repository read access includes metadata of your private starred repositories.'
-      )
+      ? t('pluginSettingsPanel.note-repository-read-access-includes-metadata-of')
       : '';
     const approved = await confirm(
-      t(`启用 ${plugin.manifest.name}`, `Enable ${plugin.manifest.name}`),
-      `${t(
-        '带 worker.js 的本地插件拥有 Node.js 权限，Worker 不是安全沙箱。仅启用你信任的代码。',
-        'Local plugins with worker.js have Node.js access; a Worker is not a security sandbox. Enable only code you trust.'
-      )}\n\n${t('请求权限：', 'Requested permissions:')}\n${permissionText}${repositoryDataNotice}`,
-      { confirmText: t('确认并启用', 'Confirm and enable'), type: 'warning' }
+      t('pluginSettingsPanel.enable-v1', { v1: plugin.manifest.name }),
+      `${t('pluginSettingsPanel.local-plugins-with-worker-js-have-node-js-access')}\n\n${t('pluginSettingsPanel.requested-permissions')}\n${permissionText}${repositoryDataNotice}`,
+      { confirmText: t('pluginSettingsPanel.confirm-and-enable'), type: 'warning' }
     );
     if (!approved) return;
 
@@ -95,9 +91,9 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     try {
       const result = await pluginRegistry.enable(plugin.manifest.id, permissions);
       if (!result.success) toast(result.error.message, 'error');
-      else toast(t('插件已启用', 'Plugin enabled'), 'success');
+      else toast(t('pluginSettingsPanel.plugin-enabled'), 'success');
     } catch (error) {
-      toast(error instanceof Error ? error.message : t('插件启用失败', 'Failed to enable plugin'), 'error');
+      toast(error instanceof Error ? error.message : t('pluginSettingsPanel.failed-to-enable-plugin'), 'error');
     } finally {
       setBusyPluginId(null);
     }
@@ -109,7 +105,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
       const result = await pluginRegistry.disable(plugin.manifest.id);
       if (!result.success) toast(result.error.message, 'error');
     } catch (error) {
-      toast(error instanceof Error ? error.message : t('插件停用失败', 'Failed to disable plugin'), 'error');
+      toast(error instanceof Error ? error.message : t('pluginSettingsPanel.failed-to-disable-plugin'), 'error');
     } finally {
       setBusyPluginId(null);
     }
@@ -122,7 +118,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     try {
       result = await pluginRegistry.uninstall(plugin.manifest.id, removePluginData);
     } catch (error) {
-      toast(error instanceof Error ? error.message : t('插件卸载失败', 'Plugin uninstall failed'), 'error');
+      toast(error instanceof Error ? error.message : t('pluginSettingsPanel.plugin-uninstall-failed'), 'error');
       return;
     } finally {
       setBusyPluginId(null);
@@ -132,12 +128,12 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
       return;
     }
     if (removePluginData && result.dataRemoved === false) {
-      toast(t('插件已卸载，但部分数据未能删除', 'Plugin uninstalled, but some data could not be deleted'), 'warning');
+      toast(t('pluginSettingsPanel.plugin-uninstalled-but-some-data-could-not-be-de'), 'warning');
       return;
     }
     toast(removePluginData
-      ? t('插件已卸载，数据已删除', 'Plugin uninstalled and its data was deleted')
-      : t('插件已卸载，数据已保留', 'Plugin uninstalled; its data was kept'), 'success');
+      ? t('pluginSettingsPanel.plugin-uninstalled-and-its-data-was-deleted')
+      : t('pluginSettingsPanel.plugin-uninstalled-its-data-was-kept'), 'success');
   };
 
   const install = async () => {
@@ -145,12 +141,12 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     try {
       const result = await pluginRegistry.installFromDirectory();
       if (!result.success && !result.canceled) {
-        toast(result.error?.message || t('插件安装失败', 'Plugin installation failed'), 'error');
+        toast(result.error?.message || t('pluginSettingsPanel.plugin-installation-failed'), 'error');
       } else if (result.success) {
-        toast(t('插件已安装，启用前请检查权限', 'Plugin installed; review permissions before enabling'), 'success');
+        toast(t('pluginSettingsPanel.plugin-installed-review-permissions-before-enabl'), 'success');
       }
     } catch (error) {
-      toast(error instanceof Error ? error.message : t('插件安装失败', 'Plugin installation failed'), 'error');
+      toast(error instanceof Error ? error.message : t('pluginSettingsPanel.plugin-installation-failed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -159,7 +155,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   if (!pluginClient.isSupported()) {
     return (
       <div className="rounded-lg border border-border bg-muted/30 p-5 text-sm text-muted-foreground">
-        {t('插件系统目前仅在 Electron 桌面端可用。', 'The plugin system is currently available only in the Electron desktop app.')}
+        {t('pluginSettingsPanel.the-plugin-system-is-currently-available-only-in')}
       </div>
     );
   }
@@ -182,11 +178,10 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
     <div className="space-y-5">
       <div className="rounded-lg border border-border p-4">
         <label htmlFor="plugin-search-endpoint" className="block text-sm font-medium">
-          {t('插件网页搜索服务（SearXNG）', 'Plugin web search service (SearXNG)')}
+          {t('pluginSettingsPanel.plugin-web-search-service-searxng')}
         </label>
         <p className="mt-1 text-xs text-muted-foreground">
-          {t('填写你信任的 HTTPS 实例地址；实例需启用 JSON 输出。留空并保存可关闭网页搜索。插件发出搜索词前会逐次确认。',
-            'Enter a trusted HTTPS instance URL with JSON output enabled. Save an empty value to disable search. Each plugin query requires confirmation.')}
+          {t('pluginSettingsPanel.enter-a-trusted-https-instance-url-with-json-out')}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <input id="plugin-search-endpoint" type="url" value={searchEndpoint}
@@ -194,7 +189,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
             placeholder="https://search.example.com"
             className="min-w-[240px] flex-1 rounded border border-border bg-background px-3 py-2 text-sm" />
           <Button type="button" variant="outline" onClick={() => void saveSearchEndpoint()}>
-            {t('保存搜索服务', 'Save search service')}
+            {t('pluginSettingsPanel.save-search-service')}
           </Button>
         </div>
       </div>
@@ -202,40 +197,37 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">
             <Plug className="h-5 w-5" />
-            {t('本地插件', 'Local plugins')}
+            {t('pluginSettingsPanel.local-plugins')}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {t('插件从应用数据目录的 plugins 文件夹加载，默认禁用。', 'Plugins load from the app-data plugins folder and are disabled by default.')}
+            {t('pluginSettingsPanel.plugins-load-from-the-app-data-plugins-folder-an')}
           </p>
         </div>
         <div className="flex gap-2">
           <Button type="button" size="sm" onClick={() => void install()} disabled={loading}>
             <FolderPlus className="mr-2 h-4 w-4" />
-            {t('安装本地插件', 'Install local plugin')}
+            {t('pluginSettingsPanel.install-local-plugin')}
           </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {t('刷新', 'Refresh')}
+            {t('pluginSettingsPanel.refresh')}
           </Button>
         </div>
       </div>
 
       <div className="flex gap-3 rounded-lg border border-status-amber/40 bg-status-amber/5 p-4 text-sm">
         <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-amber" />
-        <p>{t(
-          '带 worker.js 的本地插件属于受信任代码；页面插件在受限 iframe 中运行。Worker 不能阻止恶意代码访问本机资源。',
-          'Local plugins with worker.js are trusted code; page plugins run in a restricted iframe. Workers cannot stop malicious code from accessing local resources.'
-        )}</p>
+        <p>{t('pluginSettingsPanel.local-plugins-with-worker-js-are-trusted-code-pa')}</p>
       </div>
 
       {loading && snapshot.plugins.length === 0 ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          {t('正在扫描插件…', 'Scanning plugins…')}
+          {t('pluginSettingsPanel.scanning-plugins')}
         </div>
       ) : snapshot.plugins.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          {t('尚未发现插件。', 'No plugins found.')}
+          {t('pluginSettingsPanel.no-plugins-found')}
         </div>
       ) : (
         <div className="space-y-3">
@@ -255,7 +247,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                             ? 'bg-destructive/10 text-destructive'
                             : 'bg-muted text-muted-foreground'
                       }`}>
-                        {plugin.status === 'active' ? t('已启用', 'Active') : plugin.status === 'error' ? t('错误', 'Error') : t('已禁用', 'Disabled')}
+                        {plugin.status === 'active' ? t('pluginSettingsPanel.active') : plugin.status === 'error' ? t('pluginSettingsPanel.error') : t('pluginSettingsPanel.disabled')}
                       </span>
                     </div>
                     <p className="mt-1 break-all text-xs text-muted-foreground">{plugin.manifest.id}</p>
@@ -276,7 +268,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                         className="mt-3 mr-2"
                         onClick={() => setSelectedPage({ pluginId: plugin.manifest.id, pageId: pageContribution.id })}
                       >
-                        {t('打开页面：', 'Open page: ')}{pageContribution.title}
+                        {t('pluginSettingsPanel.open-page-named', { name: pageContribution.title })}
                       </Button>
                     ))}
                     {plugin.lastError && (
@@ -291,7 +283,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                     <Switch
                       checked={plugin.enabled}
                       disabled={busy}
-                      aria-label={t(`启用 ${plugin.manifest.name}`, `Enable ${plugin.manifest.name}`)}
+                      aria-label={t('pluginSettingsPanel.enable-v1', { v1: plugin.manifest.name })}
                       onCheckedChange={(checked) => void (checked ? enable(plugin) : disable(plugin))}
                     />
                     <Button
@@ -300,7 +292,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                       size="icon"
                       disabled={busy}
                       onClick={() => setUninstallTarget(plugin)}
-                      aria-label={t(`卸载 ${plugin.manifest.name}`, `Uninstall ${plugin.manifest.name}`)}
+                      aria-label={t('pluginSettingsPanel.uninstall-v1', { v1: plugin.manifest.name })}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
@@ -314,7 +306,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
 
       {snapshot.invalidPlugins.length > 0 && (
         <div className="space-y-2">
-          <h4 className="font-medium text-destructive">{t('无法加载的插件', 'Invalid plugins')}</h4>
+          <h4 className="font-medium text-destructive">{t('pluginSettingsPanel.invalid-plugins')}</h4>
           {snapshot.invalidPlugins.map((plugin) => (
             <div key={`${plugin.directoryName}:${plugin.code}`} className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm">
               <p className="font-medium">{plugin.directoryName}</p>
@@ -328,28 +320,25 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t(`卸载 ${uninstallTarget?.manifest.name ?? ''}`, `Uninstall ${uninstallTarget?.manifest.name ?? ''}`)}
+              {t('pluginSettingsPanel.uninstall-v1', { v1: uninstallTarget?.manifest.name ?? '' })}
             </AlertDialogTitle>
             <AlertDialogDescription className="whitespace-pre-wrap break-all">
-              {t(
-                '插件安装目录会被删除。请选择是否同时删除该插件的存储数据和日志。',
-                'The installed plugin directory is deleted. Choose whether to also delete this plugin’s stored data and logs.'
-              )}
+              {t('pluginSettingsPanel.the-installed-plugin-directory-is-deleted-choose')}
               {uninstallTarget ? `\n\n${uninstallTarget.manifest.id}` : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('取消', 'Cancel')}</AlertDialogCancel>
+            <AlertDialogCancel>{t('pluginSettingsPanel.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => { if (uninstallTarget) void removePlugin(uninstallTarget, false); }}
             >
-              {t('保留数据并卸载', 'Uninstall, keep data')}
+              {t('pluginSettingsPanel.uninstall-keep-data')}
             </AlertDialogAction>
             <AlertDialogAction
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => { if (uninstallTarget) void removePlugin(uninstallTarget, true); }}
             >
-              {t('卸载并删除数据', 'Uninstall and delete data')}
+              {t('pluginSettingsPanel.uninstall-and-delete-data')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

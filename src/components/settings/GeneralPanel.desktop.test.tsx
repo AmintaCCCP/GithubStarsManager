@@ -39,9 +39,10 @@ vi.mock('../../features/settings/hooks/useGitHubTokenActions', () => ({
   }),
 }));
 
+import { makeT } from '../../i18n/useT';
 import { GeneralPanel } from './GeneralPanel';
 
-const t = (zh: string) => zh;
+const t = makeT('zh', 'app');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -54,6 +55,15 @@ describe('GeneralPanel desktop section', () => {
     render(<GeneralPanel t={t} />);
     expect(screen.queryByText('桌面选项')).toBeNull();
     expect(screen.queryByLabelText('开机自动启动')).toBeNull();
+  });
+
+  it('lets language cards fill the settings row instead of wrapping early', () => {
+    mocks.isSupported.mockReturnValue(false);
+    const { container } = render(<GeneralPanel t={t} />);
+    const languageGrid = container.querySelector('[aria-labelledby="language-settings-title"]');
+    expect(languageGrid?.className).toContain('w-full');
+    expect(languageGrid?.className).toContain('grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]');
+    expect(languageGrid?.className).not.toContain('max-w-lg');
   });
 
   it('shows auto-launch and tray toggles in the Electron client', async () => {

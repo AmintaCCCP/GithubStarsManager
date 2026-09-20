@@ -1,3 +1,9 @@
+
+
+
+
+import { useT } from '../i18n/useT';
+import type { AppLanguage } from '../i18n/languages';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, ExternalLink, Loader2, PackageOpen, RefreshCw, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -79,9 +85,9 @@ const ReleaseAssetsTable: React.FC<{
   onAssetPageChange: (page: number) => void;
   downloadStates: Record<string, 'idle' | 'sending' | 'sent'>;
   onDownload: (link: ReleaseDownloadLink) => void;
-  language: 'zh' | 'en';
-}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, language }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  language: AppLanguage;
+}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload }) => {
+  const t = useT('releases');
   const links = useMemo(() => buildReleaseDownloadLinks(release), [release]);
   const totalPages = Math.max(1, Math.ceil(links.length / ASSETS_PER_PAGE));
   const currentPage = Math.min(assetPage, totalPages);
@@ -92,17 +98,17 @@ const ReleaseAssetsTable: React.FC<{
   }, [assetPage, currentPage, onAssetPageChange]);
 
   if (links.length === 0) {
-    return <p className="py-5 text-center text-xs text-muted-foreground">{t('该 Release 没有可下载的资产。', 'This release has no downloadable assets.')}</p>;
+    return <p className="py-5 text-center text-xs text-muted-foreground">{t('repositoryReleaseSheet.this-release-has-no-downloadable-assets')}</p>;
   }
 
   return (
     <>
-      <Table aria-label={t(`${release.tag_name} 资产`, `${release.tag_name} assets`)}>
+      <Table aria-label={t('repositoryReleaseSheet.v1-assets', { v1: release.tag_name })}>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('文件名', 'File')}</TableHead>
-            <TableHead className="w-20 text-right">{t('大小', 'Size')}</TableHead>
-            <TableHead className="w-24 text-right">{t('操作', 'Action')}</TableHead>
+            <TableHead>{t('repositoryReleaseSheet.file')}</TableHead>
+            <TableHead className="w-20 text-right">{t('repositoryReleaseSheet.size')}</TableHead>
+            <TableHead className="w-24 text-right">{t('repositoryReleaseSheet.action')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -129,7 +135,7 @@ const ReleaseAssetsTable: React.FC<{
                     onClick={() => onDownload(link)}
                   >
                     {isSending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
-                    {isSent ? t('已发送', 'Sent') : t('下载', 'Download')}
+                    {isSent ? t('repositoryReleaseSheet.sent') : t('repositoryReleaseSheet.download')}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -141,7 +147,7 @@ const ReleaseAssetsTable: React.FC<{
         page={currentPage}
         totalPages={totalPages}
         onPageChange={onAssetPageChange}
-        label={t(`${release.tag_name} 资产分页`, `${release.tag_name} asset pagination`)}
+        label={t('repositoryReleaseSheet.v1-asset-pagination', { v1: release.tag_name })}
       />
     </>
   );
@@ -155,10 +161,10 @@ const ReleaseContent: React.FC<{
   onDownload: (link: ReleaseDownloadLink) => void;
   summary: { status: 'idle' | 'loading' | 'done' | 'error'; content?: string; error?: string } | undefined;
   onGenerateSummary: () => void;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   repository: Repository;
 }> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, summary, onGenerateSummary, language, repository }) => {
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
   const [activeTab, setActiveTab] = useState('assets');
   const hasBody = Boolean(release.body?.trim());
 
@@ -170,9 +176,9 @@ const ReleaseContent: React.FC<{
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid h-8 w-full grid-cols-3">
-        <TabsTrigger className="text-xs" value="assets">{t('资产', 'Assets')}</TabsTrigger>
-        <TabsTrigger className="text-xs" value="notes">{t('更新日志', 'Notes')}</TabsTrigger>
-        <TabsTrigger className="text-xs" value="summary">{t('总结', 'Summary')}</TabsTrigger>
+        <TabsTrigger className="text-xs" value="assets">{t('repositoryReleaseSheet.assets')}</TabsTrigger>
+        <TabsTrigger className="text-xs" value="notes">{t('repositoryReleaseSheet.notes')}</TabsTrigger>
+        <TabsTrigger className="text-xs" value="summary">{t('repositoryReleaseSheet.summary')}</TabsTrigger>
       </TabsList>
       <TabsContent value="assets" className="mt-3">
         <ReleasePluginRecommendations release={release} repository={repository} language={language} />
@@ -191,16 +197,16 @@ const ReleaseContent: React.FC<{
             <MarkdownRenderer content={release.body || ''} shouldRender fontSize="small" />
           </div>
         ) : (
-          <p className="py-5 text-center text-xs text-muted-foreground">{t('该 Release 未提供更新日志。', 'This release has no release notes.')}</p>
+          <p className="py-5 text-center text-xs text-muted-foreground">{t('repositoryReleaseSheet.this-release-has-no-release-notes')}</p>
         )}
       </TabsContent>
       <TabsContent value="summary" className="mt-3">
         {!hasBody ? (
-          <p className="py-5 text-center text-xs text-muted-foreground">{t('该 Release 没有可总结的更新日志。', 'This release has no notes to summarize.')}</p>
+          <p className="py-5 text-center text-xs text-muted-foreground">{t('repositoryReleaseSheet.this-release-has-no-notes-to-summarize')}</p>
         ) : summary?.status === 'loading' ? (
           <div className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {t('正在生成总结…', 'Generating summary…')}
+            {t('repositoryReleaseSheet.generating-summary')}
           </div>
         ) : summary?.status === 'done' && summary.content ? (
           <div className="rounded-md border border-border bg-muted/20 px-3 py-3">
@@ -210,12 +216,12 @@ const ReleaseContent: React.FC<{
           <div className="flex flex-col items-center gap-3 py-5 text-center">
             <p className="text-xs text-muted-foreground">
               {summary?.status === 'error'
-                ? t('总结生成失败，请重试。', 'Summary generation failed. Please try again.')
-                : t('切换到此标签时会使用当前 AI 配置生成总结。', 'This tab uses the current AI configuration to generate a summary.')}
+                ? t('repositoryReleaseSheet.summary-generation-failed-please-try-again')
+                : t('repositoryReleaseSheet.this-tab-uses-the-current-ai-configuration-to-ge')}
             </p>
             <Button type="button" variant="secondary" size="sm" onClick={onGenerateSummary}>
               <Sparkles className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-              {summary?.status === 'error' ? t('重试总结', 'Retry summary') : t('生成总结', 'Generate summary')}
+              {summary?.status === 'error' ? t('repositoryReleaseSheet.retry-summary') : t('repositoryReleaseSheet.generate-summary')}
             </Button>
           </div>
         )}
@@ -245,7 +251,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
   const [releasePage, setReleasePage] = useState(1);
   const [assetPages, setAssetPages] = useState<Record<number, number>>({});
   const [expandedReleaseIds, setExpandedReleaseIds] = useState<string[]>([]);
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
 
   const totalReleasePages = Math.max(1, Math.ceil(releases.length / RELEASES_PER_PAGE));
   const currentReleasePage = Math.min(releasePage, totalReleasePages);
@@ -277,7 +283,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        closeLabel={t('关闭 Release 侧栏', 'Close release sheet')}
+        closeLabel={t('repositoryReleaseSheet.close-release-sheet')}
         onPointerDownOutside={(event) => {
           // Keep the overlay mounted through the current click sequence. Closing
           // immediately can retarget the browser click to the card beneath it.
@@ -290,13 +296,13 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
         }}
       >
         <SheetHeader>
-          <SheetTitle>{t('查看 Release', 'Repository releases')}</SheetTitle>
+          <SheetTitle>{t('repositoryReleaseSheet.repository-releases')}</SheetTitle>
           <SheetDescription className="truncate" title={repository.full_name}>{repository.full_name}</SheetDescription>
         </SheetHeader>
         <div className="flex shrink-0 items-center gap-2 border-b border-border pb-3">
           <Button type="button" variant="secondary" size="sm" onClick={refresh} disabled={isLoading}>
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
-            {t('刷新', 'Refresh')}
+            {t('repositoryReleaseSheet.refresh')}
           </Button>
           <Button asChild type="button" variant="ghost" size="sm">
             <a href={`${repository.html_url}/releases`} target="_blank" rel="noopener noreferrer">
@@ -309,22 +315,22 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
           {isLoading ? (
             <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-              {t('正在获取最新 Release…', 'Loading latest releases…')}
+              {t('repositoryReleaseSheet.loading-latest-releases')}
             </div>
           ) : error ? (
             <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
               <p className="max-w-sm text-sm text-destructive">{error}</p>
-              <Button type="button" variant="secondary" size="sm" onClick={refresh}>{t('重试', 'Retry')}</Button>
+              <Button type="button" variant="secondary" size="sm" onClick={refresh}>{t('repositoryReleaseSheet.retry')}</Button>
             </div>
           ) : releases.length === 0 ? (
             <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
               <PackageOpen className="h-7 w-7" aria-hidden="true" />
-              <p className="text-sm">{t('该仓库暂无 Release。', 'This repository has no releases.')}</p>
+              <p className="text-sm">{t('repositoryReleaseSheet.this-repository-has-no-releases')}</p>
             </div>
           ) : (
             <>
               <p className="mb-2 text-xs text-muted-foreground">
-                {t(`已实时获取 ${releases.length} 条 Release`, `${releases.length} live releases loaded`)}
+                {t('repositoryReleaseSheet.v1-live-releases-loaded', { v1: releases.length })}
               </p>
               <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="rounded-md border border-border px-3">
                 {visibleReleases.map((release) => (
@@ -362,7 +368,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
                   setReleasePage(page);
                   setExpandedReleaseIds([]);
                 }}
-                label={t('Release 分页', 'Release pagination')}
+                label={t('repositoryReleaseSheet.release-pagination')}
               />
             </>
           )}

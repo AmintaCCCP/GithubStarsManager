@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Settings,
@@ -209,7 +214,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onClose,
   isModal = false 
 }) => {
-  const { language, setCurrentView } = useAppStore(useShallow((state) => ({
+  const { setCurrentView } = useAppStore(useShallow((state) => ({
     language: state.language,
     setCurrentView: state.setCurrentView,
   })));
@@ -219,7 +224,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const tabChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tabResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
+  const t = useT('app');
   const backendAvailable = useBackendAvailability();
 
   const handleClose = () => {
@@ -321,73 +326,73 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const tabs: SettingsTabItem[] = [
     {
       id: 'general',
-      label: t('通用', 'General'),
+      label: t('settingsPanel.general'),
       icon: <Globe className="w-5 h-5" />,
     },
     {
       id: 'starSync',
-      label: t('星标同步', 'Star Sync'),
+      label: t('settingsPanel.star-sync'),
       icon: <Star className="w-5 h-5" />,
     },
     {
       id: 'ai',
-      label: t('AI配置', 'AI Config'),
+      label: t('settingsPanel.ai-config'),
       icon: <Bot className="w-5 h-5" />,
     },
     {
       id: 'webdav',
-      label: t('WebDAV', 'WebDAV'),
+      label: t('settingsPanel.webdav'),
       icon: <Cloud className="w-5 h-5" />,
     },
     {
       id: 'backup',
-      label: t('备份恢复', 'Backup'),
+      label: t('settingsPanel.backup'),
       icon: <Database className="w-5 h-5" />,
     },
     {
       id: 'backend',
-      label: t('后端同步', 'Backend'),
+      label: t('settingsPanel.backend'),
       icon: <Server className="w-5 h-5" />,
     },
     {
       id: 'category',
-      label: t('分类管理', 'Categories'),
+      label: t('settingsPanel.categories'),
       icon: <Package className="w-5 h-5" />,
     },
     {
       id: 'menu',
-      label: t('菜单管理', 'Menu'),
+      label: t('settingsPanel.menu'),
       icon: <Layout className="w-5 h-5" />,
     },
     {
       id: 'data',
-      label: t('数据管理', 'Data Management'),
+      label: t('settingsPanel.data-management'),
       icon: <Trash2 className="w-5 h-5" />,
     },
     {
       id: 'logs',
-      label: t('诊断日志', 'Diagnostic Logs'),
+      label: t('settingsPanel.diagnostic-logs'),
       icon: <ScrollText className="w-5 h-5" />,
     },
     ...((isElectron() || backendAvailable) ? [{
       id: 'network' as SettingsTab,
-      label: t('网络设置', 'Network'),
+      label: t('settingsPanel.network'),
       icon: <Wifi className="w-5 h-5" />,
     }] : []),
     ...(isElectron() ? [{
       id: 'plugins' as SettingsTab,
-      label: t('插件', 'Plugins'),
+      label: t('settingsPanel.plugins'),
       icon: <Plug className="w-5 h-5" />,
     }] : []),
     {
       id: 'vectorSearch' as SettingsTab,
-      label: t('向量搜索', 'Vector Search'),
+      label: t('settingsPanel.vector-search'),
       icon: <Search className="w-5 h-5" />,
     },
     // MCP requires a long-lived process: backend or Electron main. Hide for pure SPA.
     ...((isElectron() || backendAvailable) ? [{
       id: 'mcp' as SettingsTab,
-      label: t('MCP服务', 'MCP Server'),
+      label: t('settingsPanel.mcp-server'),
       icon: <Cable className="w-5 h-5" />,
     }] : []),
   ];
@@ -432,7 +437,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div
         role="tabpanel"
         id={`settings-tabpanel-${displayTab}`}
-        aria-label={tabs.find((tab) => tab.id === displayTab)?.label ?? t('设置内容', 'Settings content')}
+        aria-label={tabs.find((tab) => tab.id === displayTab)?.label ?? t('settingsPanel.settings-content')}
         className={`
           transition-all duration-100 ease-out
           ${isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}
@@ -455,17 +460,17 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex items-center space-x-3">
                 <Settings className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
                 <DialogTitle id="settings-modal-title" className="text-xl font-semibold text-foreground dark:text-foreground">
-                  {t('设置', 'Settings')}
+                  {t('settingsPanel.settings')}
                 </DialogTitle>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={handleClose} aria-label={t('关闭设置', 'Close settings')}>
+              <Button type="button" variant="ghost" size="icon" onClick={handleClose} aria-label={t('settingsPanel.close-settings')}>
                 <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
               </Button>
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
               <div className="hidden w-64 overflow-y-auto border-r ui-divider bg-background dark:bg-card md:block">
-                <nav className="space-y-1 p-4" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
+                <nav className="space-y-1 p-4" role="tablist" aria-label={t('settingsPanel.settings-tabs')}>
                   {tabs.map((tab) => (
                     <Button
                       key={tab.id}
@@ -506,7 +511,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="flex items-center space-x-3 mb-6">
         <Settings className="h-5 w-5 text-muted-foreground" />
         <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          {t('设置', 'Settings')}
+          {t('settingsPanel.settings')}
         </h2>
       </div>
 
@@ -514,7 +519,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* 桌面端侧边栏 */}
         <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
           <div className="ui-panel overflow-hidden rounded-md">
-            <nav className="p-2 space-y-1" role="tablist" aria-label={t('设置标签页', 'Settings tabs')}>
+            <nav className="p-2 space-y-1" role="tablist" aria-label={t('settingsPanel.settings-tabs')}>
               {tabs.map((tab) => (
                 <Button
                   key={tab.id}

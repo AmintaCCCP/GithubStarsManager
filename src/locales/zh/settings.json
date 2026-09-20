@@ -1,0 +1,77 @@
+{
+  "useAIConfigActions": {
+    "ai-service-connection-successful": "AI服务连接成功！",
+    "ai-service-test-failed-please-check-network-conn": "AI服务测试失败，请检查网络连接和配置。"
+  },
+  "useBackendSettingsActions": {
+    "invalid-backend-url-remote-backends-must-use-htt": "后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP",
+    "backend-connection-failed-please-check-the-serve": "后端连接失败，请检查服务器状态或 API Secret 是否正确。",
+    "backend-connection-successful": "后端连接成功！",
+    "backend-not-available": "后端不可用",
+    "partial-sync-failure-v1-failed-v2-succeeded": "同步部分失败：{{v1}} 项失败，{{v2}} 项成功",
+    "synced-to-backend-repos-v1-releases-v2-ai-config": "已同步到后端：仓库 {{v1}}，发布 {{v2}}，AI配置 {{v3}}，WebDAV配置 {{v4}}",
+    "sync-failed": "同步失败",
+    "sync-from-backend": "从后端同步",
+    "syncing-from-backend-will-overwrite-local-data-c": "从后端同步将覆盖本地数据，是否继续？",
+    "synced-from-backend-repos-v1-releases-v2-ai-conf": "已从后端同步：仓库 {{v1}}，发布 {{v2}}，AI配置 {{v3}}，WebDAV配置 {{v4}}"
+  },
+  "useBackupActions": {
+    "please-configure-and-activate-webdav-service-fir": "请先配置并激活WebDAV服务。",
+    "data-backup-successful": "数据备份成功！",
+    "data-backup-failed": "数据备份失败！",
+    "backup-failed": "备份失败",
+    "restore-data": "恢复数据",
+    "restoring-data-will-overwrite-all-current-data-c": "恢复数据将覆盖当前所有数据，是否继续？",
+    "no-backup-files-found": "未找到备份文件。",
+    "backup-file-is-empty-cannot-restore": "备份文件内容为空，无法恢复。",
+    "data-restored-from-backup-repositories-v1-releas": "已从备份恢复数据：仓库 {{v1}}，发布 {{v2}}，自定义分类 {{v3}}。",
+    "restore-failed": "恢复失败"
+  },
+  "useDesktopActions": {
+    "load-failed": "加载失败",
+    "save-failed": "保存失败"
+  },
+  "useGitHubTokenActions": {
+    "please-enter-a-valid-github-access-token": "请输入有效的 GitHub Access Token",
+    "this-token-belongs-to-v1-but-you-are-signed-in-a": "该 token 属于 {{v1}}，当前账号是 {{v2}}。请先退出再登录另一个账号，本地数据会按账号分别保留。",
+    "failed-to-save-the-new-token-to-the-backend-loca": "未能将新 Token 保存到后端，本地凭证未更新。请稍后重试。",
+    "github-token-updated": "GitHub Token 已更新",
+    "github-token-has-expired-or-is-invalid": "GitHub token 已过期或无效",
+    "update-failed-please-try-again": "更新失败，请稍后重试"
+  },
+  "useMcpActions": {
+    "mcp-server-enabled": "MCP 服务已开启",
+    "mcp-server-disabled": "MCP 服务已关闭",
+    "mcp-server-enabled-local": "MCP 服务已开启（本地）",
+    "backend-or-desktop-client-required-for-mcp": "需要后端或客户端才能使用 MCP",
+    "operation-failed": "操作失败",
+    "enable-mcp-before-resetting-the-token": "请先开启 MCP 服务再重置 Token",
+    "reset-mcp-token": "重置 MCP Token",
+    "the-old-token-will-stop-working-immediately-upda": "重置后旧 Token 立即失效，需要更新 Agent 配置。是否继续？",
+    "token-reset": "Token 已重置",
+    "reset-failed": "重置失败"
+  },
+  "useNetworkActions": {
+    "save-failed": "保存失败"
+  },
+  "useStarSyncActions": {
+    "not-connected-to-github-yet": "未登录 GitHub，请先连接",
+    "push-categories-to-github-lists": "同步仓库分类到 GitHub list",
+    "push-confirm-body": "将每个本地分类（含默认与自定义分类）写回为同名 GitHub List：\n\n· 同名 list 将覆盖其成员（未匹配分类的仓库会从该 list 移除）\n· 无同名 list 则新建（默认私有）\n· 仓库将按其匹配的分类加入对应 list\n· 不属于本地分类的其他 list 成员关系会被保留\n\n确定继续吗？"
+  },
+  "useWebDAVActions": {
+    "webdav-url-is-required": "WebDAV URL是必需的",
+    "webdav-url-must-start-with-http-or-https": "WebDAV URL必须以 http:// 或 https:// 开头",
+    "username-is-required": "用户名是必需的",
+    "password-is-required": "密码是必需的",
+    "path-is-required": "路径是必需的",
+    "path-must-start-with": "路径必须以 / 开头",
+    "webdav-connection-successful": "WebDAV连接成功！",
+    "webdav-connection-failed-please-check-configurat": "WebDAV连接失败，请检查配置。",
+    "webdav-test-failed": "WebDAV测试失败"
+  },
+  "generalPanel": {
+    "account-token-hint": "当前账号 {{login}}。过期后可在此直接更换 token，不必退出登录。",
+    "token-hint": "过期后可在此直接更换 token，不必退出登录。"
+  }
+}

@@ -1,3 +1,8 @@
+
+
+
+
+import { useT, TranslateFn } from '../i18n/useT';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink, FileCode2, Loader2, RefreshCw, Search, Star, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -35,7 +40,7 @@ const FacetGroup: React.FC<{
   buckets: GrepFacetBucket[];
   selected: Set<string>;
   onToggle: (val: string) => void;
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
   maxShown?: number;
 }> = ({ title, buckets, selected, onToggle, t, maxShown = 8 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -72,7 +77,7 @@ const FacetGroup: React.FC<{
           onClick={() => setExpanded((v) => !v)}
           className="text-xs text-primary hover:underline"
         >
-          {expanded ? t('收起', 'Show less') : t(`展开全部 ${buckets.length} 项`, `Show all ${buckets.length}`)}
+          {expanded ? t('codeSearchView.show-less') : t('codeSearchView.show-all-v1', { v1: buckets.length })}
         </button>
       )}
     </div>
@@ -80,7 +85,7 @@ const FacetGroup: React.FC<{
 };
 
 /** 单条代码命中卡片：消毒后的 snippet 经 innerHTML 渲染，链接均指向 GitHub。 */
-const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, en: string) => string }> = ({
+const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: TranslateFn }> = ({
   hit,
   isStarred,
   t,
@@ -111,14 +116,14 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, 
         {isStarred && (
           <Badge variant="secondary" className="gap-1">
             <Star className="h-3 w-3" />
-            {t('已收藏', 'Starred')}
+            {t('codeSearchView.starred')}
           </Badge>
         )}
         <span className="text-xs text-muted-foreground">{hit.branch}</span>
         {hit.language && <Badge variant="outline">{hit.language}</Badge>}
         {hit.totalMatches && (
           <span className="text-xs text-muted-foreground">
-            {hit.totalMatches} {t('处匹配', 'matches')}
+            {hit.totalMatches} {t('codeSearchView.matches')}
           </span>
         )}
       </div>
@@ -137,7 +142,7 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, 
           dangerouslySetInnerHTML={{ __html: snippet }}
         />
       ) : (
-        <p className="text-xs text-muted-foreground">{t('无片段预览', 'No snippet preview')}</p>
+        <p className="text-xs text-muted-foreground">{t('codeSearchView.no-snippet-preview')}</p>
       )}
       <div className="mt-2 flex justify-end">
         <a
@@ -146,7 +151,7 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, 
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
         >
-          {t('在 GitHub 查看文件', 'View file on GitHub')}
+          {t('codeSearchView.view-file-on-github')}
           <ExternalLink className="h-3 w-3" />
         </a>
       </div>
@@ -156,10 +161,10 @@ const HitCard: React.FC<{ hit: GrepCodeHit; isStarred: boolean; t: (zh: string, 
 
 /** 代码高级搜索视图：实时防抖查询 + 匹配模式 + 分面筛选 + 收藏过滤 + 分页。 */
 export const CodeSearchView: React.FC = () => {
-  const { repositories, language } = useAppStore(
-    useShallow((state) => ({ repositories: state.repositories, language: state.language }))
+  const { repositories } = useAppStore(
+    useShallow((state) => ({ repositories: state.repositories }))
   );
-  const t = useCallback((zh: string, en: string) => (language === 'zh' ? zh : en), [language]);
+  const t = useT('app');
   // 错误文案经 ref 读取，避免纯语言切换触发网络重搜
   const tRef = useRef(t);
   tRef.current = t;
@@ -230,13 +235,12 @@ export const CodeSearchView: React.FC = () => {
         setPage(nextPage);
       } catch (err) {
         if (controller.signal.aborted || requestIdRef.current !== requestId) return;
-        const translate = tRef.current;
-        setError(
+              setError(
           isGrepRateLimitError(err)
-            ? translate('触发代码搜索限流（429），请稍后重试', 'Code search rate limited (429), please retry later')
+            ? tRef.current('codeSearchView.rate-limited')
             : err instanceof Error
               ? err.message
-              : translate('搜索失败，请重试', 'Search failed, please retry')
+              : tRef.current('codeSearchView.search-failed')
         );
       } finally {
         if (requestIdRef.current === requestId) {
@@ -300,7 +304,7 @@ export const CodeSearchView: React.FC = () => {
             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              aria-label={t('代码搜索关键词', 'Code search keywords')}
+              aria-label={t('codeSearchView.code-search-keywords')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -310,14 +314,14 @@ export const CodeSearchView: React.FC = () => {
                 }
                 if (e.key === 'Escape') setQuery('');
               }}
-              placeholder={t('输入关键字实时搜索代码…（至少 2 个字符）', 'Type to search code live… (min 2 chars)')}
+              placeholder={t('codeSearchView.type-to-search-code-live-min-2-chars')}
               className="ui-field h-auto w-full py-2.5 pl-10 pr-9"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                aria-label={t('清空', 'Clear')}
+                aria-label={t('codeSearchView.clear')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 <X className="h-4 w-4" />
@@ -333,7 +337,7 @@ export const CodeSearchView: React.FC = () => {
             className="shrink-0 gap-2"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            {t('搜索', 'Search')}
+            {t('codeSearchView.search')}
           </Button>
         </div>
 
@@ -343,38 +347,38 @@ export const CodeSearchView: React.FC = () => {
             value={mode}
             onValueChange={(v) => setMode(v as GrepMatchMode)}
             className="flex flex-wrap items-center gap-4"
-            aria-label={t('匹配模式', 'Match mode')}
+            aria-label={t('codeSearchView.match-mode')}
           >
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="fuzzy" id="grep-mode-fuzzy" />
               <Label htmlFor="grep-mode-fuzzy" className="cursor-pointer text-sm font-normal">
-                {t('模糊', 'Fuzzy')}
+                {t('codeSearchView.fuzzy')}
               </Label>
             </div>
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="words" id="grep-mode-words" />
               <Label htmlFor="grep-mode-words" className="cursor-pointer text-sm font-normal">
-                {t('全词精确', 'Whole word')}
+                {t('codeSearchView.whole-word')}
               </Label>
             </div>
             <div className="flex items-center gap-1.5">
               <RadioGroupItem value="regexp" id="grep-mode-regexp" />
               <Label htmlFor="grep-mode-regexp" className="cursor-pointer text-sm font-normal">
-                {t('正则 (RE2)', 'Regexp (RE2)')}
+                {t('codeSearchView.regexp-re2')}
               </Label>
             </div>
           </RadioGroup>
           <div className="flex items-center gap-2">
             <Switch id="grep-case" checked={caseSensitive} onCheckedChange={setCaseSensitive} />
             <Label htmlFor="grep-case" className="cursor-pointer text-sm font-normal">
-              {t('区分大小写', 'Match case')}
+              {t('codeSearchView.match-case')}
             </Label>
           </div>
           <div className="flex items-center gap-2">
             <Switch id="grep-starred" checked={starredOnly} onCheckedChange={setStarredOnly} />
             <Label htmlFor="grep-starred" className="flex cursor-pointer items-center gap-1 text-sm font-normal">
               <Star className="h-3.5 w-3.5" />
-              {t('只显示我收藏的仓库', 'Starred only')}
+              {t('codeSearchView.starred-only')}
             </Label>
           </div>
         </div>
@@ -384,35 +388,35 @@ export const CodeSearchView: React.FC = () => {
           <div className="space-y-3 border-t border-border/60 pt-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">
-                {t('筛选', 'Filters')}
+                {t('codeSearchView.filters')}
                 {hasActiveFilters && (
                   <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    {t('勾选后自动重新搜索', 'Selections re-search automatically')}
+                    {t('codeSearchView.selections-re-search-automatically')}
                   </span>
                 )}
               </p>
               {hasActiveFilters && (
                 <button type="button" onClick={clearFilters} className="text-xs text-primary hover:underline">
-                  {t('清空筛选', 'Clear filters')}
+                  {t('codeSearchView.clear-filters')}
                 </button>
               )}
             </div>
             <FacetGroup
-              title={t('仓库', 'Repository')}
+              title={t('codeSearchView.repository')}
               buckets={result.repoFacets}
               selected={selectedRepos}
               onToggle={(v) => setSelectedRepos((prev) => toggleInSet(prev, v))}
               t={t}
             />
             <FacetGroup
-              title={t('语言', 'Language')}
+              title={t('codeSearchView.language')}
               buckets={result.langFacets}
               selected={selectedLangs}
               onToggle={(v) => setSelectedLangs((prev) => toggleInSet(prev, v))}
               t={t}
             />
             <FacetGroup
-              title={t('路径', 'Path')}
+              title={t('codeSearchView.path')}
               buckets={result.pathFacets}
               selected={selectedPaths}
               onToggle={(v) => setSelectedPaths((prev) => toggleInSet(prev, v))}
@@ -426,7 +430,7 @@ export const CodeSearchView: React.FC = () => {
       {loading && !result && (
         <div className="flex flex-col items-center justify-center gap-3 py-14">
           <Loader2 className="h-7 w-7 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">{t('正在搜索代码…', 'Searching code…')}</p>
+          <p className="text-sm text-muted-foreground">{t('codeSearchView.searching-code')}</p>
         </div>
       )}
       {error && (
@@ -434,19 +438,16 @@ export const CodeSearchView: React.FC = () => {
           <p className="max-w-md text-sm text-destructive">{error}</p>
           <Button variant="outline" size="sm" onClick={() => void runSearch(1, false)} className="gap-2">
             <RefreshCw className="h-3.5 w-3.5" />
-            {t('重试', 'Retry')}
+            {t('codeSearchView.retry')}
           </Button>
         </div>
       )}
       {!loading && !error && !result && (
         <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
           <Search className="h-8 w-8 text-muted-foreground/50" />
-          <p className="font-medium text-muted-foreground">{t('代码搜索', 'Code Search')}</p>
+          <p className="font-medium text-muted-foreground">{t('codeSearchView.code-search')}</p>
           <p className="max-w-sm text-sm text-muted-foreground">
-            {t(
-              '公开仓库代码全文检索，支持模糊 / 全词 / 正则与仓库·路径·语言过滤。',
-              'Full-text code search across public repos with fuzzy / whole-word / regexp and repo·path·language facets.'
-            )}
+            {t('codeSearchView.full-text-code-search-across-public-repos-with-f')}
           </p>
         </div>
       )}
@@ -454,14 +455,14 @@ export const CodeSearchView: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
-              {t('共', 'Total')} <strong className="text-foreground">{starredOnly ? visibleHits.length : result.total}</strong>{' '}
-              {t('条结果', 'results')}
+              {t('codeSearchView.total')} <strong className="text-foreground">{starredOnly ? visibleHits.length : result.total}</strong>{' '}
+              {t('codeSearchView.results')}
               {starredOnly && (
                 <span className="ml-1">
-                  {t(`（已按收藏过滤，全网 ${result.total} 条）`, `(starred filter, ${result.total} total)`)}
+                  {t('codeSearchView.starred-filter-v1-total', { v1: result.total })}
                 </span>
               )}
-              {loading && <span className="ml-2">{t('搜索中…', 'Searching…')}</span>}
+              {loading && <span className="ml-2">{t('codeSearchView.searching')}</span>}
             </span>
           </div>
           {visibleHits.length === 0 ? (
@@ -469,12 +470,12 @@ export const CodeSearchView: React.FC = () => {
               <Star className="h-6 w-6 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
                 {starredOnly
-                  ? t('收藏的仓库中没有命中，试试关闭“只显示我收藏的仓库”', 'No hits in starred repos, try turning off starred-only')
-                  : t('没有匹配结果，换个关键词或放宽过滤器试试', 'No matches, try another keyword or looser filters')}
+                  ? t('codeSearchView.no-hits-in-starred-repos-try-turning-off-starred')
+                  : t('codeSearchView.no-matches-try-another-keyword-or-looser-filters')}
               </p>
               {starredOnly && (
                 <Button variant="outline" size="sm" onClick={() => setStarredOnly(false)}>
-                  {t('关闭收藏过滤', 'Turn off starred-only')}
+                  {t('codeSearchView.turn-off-starred-only')}
                 </Button>
               )}
             </div>
@@ -491,7 +492,7 @@ export const CodeSearchView: React.FC = () => {
           {loadingMore && (
             <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {t('正在加载更多…', 'Loading more…')}
+              {t('codeSearchView.loading-more')}
             </div>
           )}
           {!loadingMore && hasMore && (visibleHits.length > 0 || starredOnly) && (
@@ -502,7 +503,7 @@ export const CodeSearchView: React.FC = () => {
                 disabled={loading}
                 className="gap-2"
               >
-                {t(`加载更多（已加载 ${result.hits.length}/${result.total}）`, `Load more (${result.hits.length}/${result.total})`)}
+                {t('codeSearchView.load-more-v1-v2', { v1: result.hits.length, v2: result.total })}
               </Button>
             </div>
           )}

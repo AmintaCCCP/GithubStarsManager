@@ -81,26 +81,31 @@ export const useSearchShortcuts = ({
  */
 export const searchShortcuts = [
   {
+    id: 'focus-search',
     key: 'Ctrl/Cmd + K',
     description: '聚焦搜索框',
     descriptionEn: 'Focus search box'
   },
   {
+    id: 'clear-search',
     key: 'Escape',
     description: '清除搜索',
     descriptionEn: 'Clear search'
   },
   {
+    id: 'toggle-filters',
     key: 'Ctrl/Cmd + Shift + F',
     description: '切换过滤器',
     descriptionEn: 'Toggle filters'
   },
   {
+    id: 'quick-search',
     key: '/',
     description: '快速搜索',
     descriptionEn: 'Quick search'
   },
   {
+    id: 'ai-search',
     key: 'Enter',
     description: 'AI搜索',
     descriptionEn: 'AI search'

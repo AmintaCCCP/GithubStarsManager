@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -271,6 +276,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   alt,
   baseUrl
 }) => {
+    const t = useT('app');
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -286,9 +292,6 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   const dragStartRef = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
   const zoomOverlayRef = useRef<HTMLDivElement>(null);
-  const { language } = useAppStore(useShallow((state) => ({
-    language: state.language,
-  })));
 
   const imageUrl = useMemo(() => resolveImageSrc(src || '', baseUrl), [src, baseUrl]);
 
@@ -450,7 +453,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
         <span className="text-muted-foreground dark:text-muted-foreground">
-          {language === 'zh' ? '图片加载失败' : 'Image failed'}
+          {t('markdownRenderer.image-failed')}
         </span>
         {alt && <span className="text-muted-foreground dark:text-muted-foreground/70 truncate max-w-[120px]">{alt}</span>}
         <Button
@@ -458,7 +461,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           onClick={handleRetry}
           className="ml-auto px-2 py-0.5 text-xs text-primary hover:text-primary/80 transition-colors flex-shrink-0"
         >
-          {language === 'zh' ? '重试' : 'Retry'}
+          {t('markdownRenderer.retry')}
         </Button>
       </span>
     );
@@ -503,7 +506,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-xs text-muted-foreground dark:text-muted-foreground/70">{language === 'zh' ? '加载中…' : 'Loading…'}</span>
+              <span className="text-xs text-muted-foreground dark:text-muted-foreground/70">{t('markdownRenderer.loading')}</span>
             </span>
           )}
 
@@ -536,8 +539,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             <span data-translate="false" className="text-center mt-2 text-xs text-muted-foreground dark:text-muted-foreground opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex items-center gap-3">
               <span>
                 {isInsideLink
-                  ? (language === 'zh' ? '单击放大 · Ctrl+点击打开链接' : 'Click to zoom · Ctrl+Click to open link')
-                  : (language === 'zh' ? '点击可放大' : 'Click to zoom')
+                  ? (t('markdownRenderer.click-to-zoom-ctrl-click-to-open-link'))
+                  : (t('markdownRenderer.click-to-zoom'))
                 }
               </span>
               {naturalWidth > 0 && (
@@ -600,7 +603,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                     window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
                   }}
                   className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
-                  title={language === 'zh' ? '打开链接' : 'Open link'}
+                  title={t('markdownRenderer.open-link')}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -617,7 +620,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 }}
                 disabled={isDownloading}
                 className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
-                title={language === 'zh' ? '下载图片' : 'Download image'}
+                title={t('markdownRenderer.download-image')}
               >
                 <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
               </Button>
@@ -630,7 +633,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   setZoomScale(prev => Math.min(5, prev + 0.5));
                 }}
                 className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
-                title={language === 'zh' ? '放大' : 'Zoom in'}
+                title={t('markdownRenderer.zoom-in')}
               >
                 +
               </Button>
@@ -646,7 +649,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   setZoomScale(prev => Math.max(0.5, prev - 0.5));
                 }}
                 className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
-                title={language === 'zh' ? '缩小' : 'Zoom out'}
+                title={t('markdownRenderer.zoom-out')}
               >
                 −
               </Button>
@@ -660,7 +663,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   setZoomPos({ x: 0, y: 0 });
                 }}
                 className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-xs"
-                title={language === 'zh' ? '重置' : 'Reset'}
+                title={t('markdownRenderer.reset')}
               >
                 1:1
               </Button>
@@ -673,7 +676,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   e.stopPropagation();
                   closeZoom();
                 }}
-                title={language === 'zh' ? '关闭 (Esc)' : 'Close (Esc)'}
+                title={t('markdownRenderer.close-esc')}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -729,9 +732,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           </div>
 
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-overlay-foreground/50 text-xs pointer-events-none flex items-center gap-3">
-            <span>{language === 'zh' ? '滚轮缩放 · 拖拽移动' : 'Scroll to zoom · Drag to pan'}</span>
+            <span>{t('markdownRenderer.scroll-to-zoom-drag-to-pan')}</span>
             <span className="text-overlay-foreground/30">|</span>
-            <span>{language === 'zh' ? 'Esc 或点击背景关闭' : 'Esc or click background to close'}</span>
+            <span>{t('markdownRenderer.esc-or-click-background-to-close')}</span>
           </div>
         </div>,
         document.body

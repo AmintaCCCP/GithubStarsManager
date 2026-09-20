@@ -1,0 +1,18 @@
+{
+  "useForkTimelineActions": {
+    "github-token-not-found-please-login-again": "GitHub-Token nicht gefunden, bitte melden Sie sich erneut an.",
+    "fork-owner-not-found-please-login-again": "Gabellagerbesitzer nicht gefunden, bitte melden Sie sich erneut an.",
+    "refresh-completed-found-newcount-new-forks": "Aktualisierung abgeschlossen! {{newCount}} neue Forks gefunden.",
+    "refresh-completed": "Aktualisierung abgeschlossen!",
+    "fork-refresh-failed-please-check-your-network-co": "Fork-Aktualisierung ist fehlgeschlagen. Bitte überprüfen Sie die Netzwerkverbindung.",
+    "failed-to-load-branches-please-check-your-networ": "Der Zweig konnte nicht geladen werden. Bitte überprüfen Sie die Netzwerkverbindung und versuchen Sie es erneut.",
+    "v1-is-already-up-to-date": "{{v1}} ist bereits die neueste Version und muss nicht aktualisiert werden.",
+    "v1-has-been-successfully-updated-from-upstream": "{{v1}} wurde erfolgreich auf die neueste Upstream-Version aktualisiert.",
+    "v1-is-not-a-fork-cannot-sync-upstream": "{{v1}} ist kein Fork-Warehouse und kann nicht im Upstream synchronisiert werden.",
+    "sync-failed-v1-has-merge-conflicts-with-upstream": "Synchronisierung fehlgeschlagen: {{v1}} hat einen Zusammenführungskonflikt mit dem Upstream-Warehouse. Bitte beheben Sie das Problem manuell und versuchen Sie es erneut.",
+    "sync-failed-message": "Synchronisierung fehlgeschlagen: {{message}}",
+    "triggered-workflow-workflowname-on-branch-branch": "Der Workflow „{{workflowName}}“ wurde im Zweig {{branch}} ausgelöst.",
+    "failed-to-run-workflow": "Der Workflow konnte nicht ausgeführt werden.",
+    "failed-to-load-organizations-please-check-github": "Die Organisationsliste konnte nicht geladen werden. Bitte überprüfen Sie die GitHub-Token-Berechtigungen."
+  }
+}

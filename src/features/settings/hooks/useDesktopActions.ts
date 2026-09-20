@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_DESKTOP_PREFS,
@@ -6,7 +8,7 @@ import {
 } from '../../../services/electronProxy';
 
 interface UseDesktopActionsOptions {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export interface DesktopActions {
@@ -47,7 +49,7 @@ export const useDesktopActions = ({ t }: UseDesktopActionsOptions): DesktopActio
       })
       .catch((reason: unknown) => {
         if (!cancelled) {
-          setError(reason instanceof Error ? reason.message : t('加载失败', 'Load failed'));
+          setError(reason instanceof Error ? reason.message : t('useDesktopActions.load-failed'));
         }
       })
       .finally(() => {
@@ -74,11 +76,11 @@ export const useDesktopActions = ({ t }: UseDesktopActionsOptions): DesktopActio
           setPrefs(result.prefs);
         } else {
           setPrefs(previous);
-          setError(result.error || t('保存失败', 'Save failed'));
+          setError(result.error || t('useDesktopActions.save-failed'));
         }
       } catch (reason: unknown) {
         setPrefs(previous);
-        setError(reason instanceof Error ? reason.message : t('保存失败', 'Save failed'));
+        setError(reason instanceof Error ? reason.message : t('useDesktopActions.save-failed'));
       } finally {
         savingRef.current = false;
         setSaving(false);

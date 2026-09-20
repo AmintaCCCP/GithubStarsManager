@@ -1,3 +1,9 @@
+
+
+
+
+import { makeT, useT } from '../../../i18n/useT';
+import type { AppLanguage } from '../../../i18n/languages';
 import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
@@ -34,11 +40,10 @@ export interface BulkRepositoryActions {
   unlockCategory: (repositories: Repository[]) => Promise<boolean>;
 }
 
-const formatFailures = (language: 'zh' | 'en', failedRepositories: string[]) => {
+const formatFailures = (language: AppLanguage, failedRepositories: string[]) => {
+  const t = makeT(language, 'repositories');
   if (failedRepositories.length === 0) return '';
-  return language === 'zh'
-    ? `\n\n失败 (${failedRepositories.length} 个):\n${failedRepositories.join('\n')}`
-    : `\n\nFailed (${failedRepositories.length}):\n${failedRepositories.join('\n')}`;
+  return t('useBulkRepositoryActions.failed-v1-v2', { v1: failedRepositories.length, v2: failedRepositories.join('\n') });
 };
 
 /**
@@ -68,20 +73,18 @@ export const useBulkRepositoryActions = ({
   })));
 
   const { toast, confirm } = useDialog();
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('repositories');
 
   const unstar = useCallback(async (repositories: Repository[]) => {
     if (!githubToken) {
-      toast(language === 'zh' ? 'GitHub token 未找到，请重新登录。' : 'GitHub token not found. Please login again.', 'error');
+      toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
       return false;
     }
 
     const confirmed = await confirm(
-      t('取消Star确认', 'Unstar Confirmation'),
-      language === 'zh'
-        ? `确定要取消 ${repositories.length} 个仓库的 Star 吗？此操作不可撤销！`
-        : `Are you sure you want to unstar ${repositories.length} repositories? This action cannot be undone!`,
-      { type: 'danger', confirmText: t('取消Star', 'Unstar') },
+      t('useBulkRepositoryActions.unstar-confirmation'),
+      t('useBulkRepositoryActions.are-you-sure-you-want-to-unstar-v1-repositories', { v1: repositories.length }),
+      { type: 'danger', confirmText: t('useBulkRepositoryActions.unstar') },
     );
     if (!confirmed) return false;
 
@@ -107,9 +110,7 @@ export const useBulkRepositoryActions = ({
     await forceSyncToBackend();
     const failures = formatFailures(language, failedRepositories);
     toast(
-      language === 'zh'
-        ? `成功取消 ${successIds.length} 个仓库的 Star${failures}`
-        : `Successfully unstarred ${successIds.length} repositories${failures}`,
+      t('useBulkRepositoryActions.successfully-unstarred-v1-repositories-failures', { v1: successIds.length, failures: failures }),
       failedRepositories.length > 0 ? 'error' : 'success',
     );
     return true;
@@ -136,13 +137,11 @@ export const useBulkRepositoryActions = ({
     await forceSyncToBackend();
     const failures = formatFailures(language, failedRepositories);
     toast(
-      language === 'zh'
-        ? `成功还原 ${successCount} 个仓库${failures}`
-        : `Successfully restored ${successCount} repositories${failures}`,
+      t('useBulkRepositoryActions.successfully-restored-successcount-repositories', { successCount: successCount, failures: failures }),
       failedRepositories.length > 0 ? 'error' : 'success',
     );
     return true;
-  }, [language, toast, updateRepository]);
+  }, [language, toast, updateRepository, t]);
 
   const categorize = useCallback(async (repositories: Repository[], categoryName: string) => {
     const failedRepositories: string[] = [];
@@ -162,13 +161,11 @@ export const useBulkRepositoryActions = ({
     const successCount = repositories.length - failedRepositories.length;
     const failures = formatFailures(language, failedRepositories);
     toast(
-      language === 'zh'
-        ? `成功为 ${successCount} 个仓库设置分类：${categoryName}${failures}`
-        : `Successfully categorized ${successCount} repositories as: ${categoryName}${failures}`,
+      t('useBulkRepositoryActions.successfully-categorized-successcount-repositori', { successCount: successCount, categoryName: categoryName, failures: failures }),
       failedRepositories.length > 0 ? 'error' : 'success',
     );
     return true;
-  }, [allCategories, language, toast, updateRepository]);
+  }, [allCategories, language, toast, updateRepository, t]);
 
   const subscribe = useCallback(async (repositories: Repository[]) => {
     let successCount = 0;
@@ -186,18 +183,16 @@ export const useBulkRepositoryActions = ({
 
     await forceSyncToBackend();
     toast(
-      language === 'zh'
-        ? `成功订阅 ${successCount} 个仓库的版本发布`
-        : `Successfully subscribed to ${successCount} repositories releases`,
+      t('useBulkRepositoryActions.successfully-subscribed-to-successcount-reposito', { successCount: successCount }),
       'success',
     );
     return true;
-  }, [language, releaseSubscriptions, toast, toggleReleaseSubscription, updateRepository]);
+  }, [releaseSubscriptions, toast, toggleReleaseSubscription, updateRepository, t]);
 
   const unsubscribe = useCallback(async (repositories: Repository[]) => {
     const subscribedRepositories = repositories.filter((repository) => releaseSubscriptions.has(repository.id));
     if (subscribedRepositories.length === 0) {
-      toast(t('选中的仓库中没有被订阅的', 'None of the selected repositories are subscribed'), 'info');
+      toast(t('useBulkRepositoryActions.none-of-the-selected-repositories-are-subscribed'), 'info');
       return false;
     }
 
@@ -216,9 +211,7 @@ export const useBulkRepositoryActions = ({
     const successCount = subscribedRepositories.length - failedRepositories.length;
     const failures = formatFailures(language, failedRepositories);
     toast(
-      language === 'zh'
-        ? `成功取消 ${successCount} 个仓库的版本发布订阅${failures}`
-        : `Successfully unsubscribed ${successCount} repositories from releases${failures}`,
+      t('useBulkRepositoryActions.successfully-unsubscribed-successcount-repositor', { successCount: successCount, failures: failures }),
       failedRepositories.length > 0 ? 'error' : 'success',
     );
     return true;
@@ -245,17 +238,15 @@ export const useBulkRepositoryActions = ({
 
     await forceSyncToBackend();
     const skipped = skippedCount > 0
-      ? (language === 'zh' ? `\n\n跳过 ${skippedCount} 个没有自定义分类的仓库` : `\n\nSkipped ${skippedCount} repositories without custom category`)
+      ? (t('useBulkRepositoryActions.skipped-skippedcount-repositories-without-custom', { skippedCount: skippedCount }))
       : '';
     const failures = formatFailures(language, failedRepositories);
     toast(
-      language === 'zh'
-        ? `成功锁定 ${successCount} 个仓库的分类${failures}${skipped}`
-        : `Successfully locked categories for ${successCount} repositories${failures}${skipped}`,
+      t('useBulkRepositoryActions.successfully-locked-categories-for-successcount', { successCount: successCount, failures: failures, skipped: skipped }),
       failedRepositories.length > 0 ? 'error' : 'success',
     );
     return true;
-  }, [language, toast, updateRepository]);
+  }, [language, toast, updateRepository, t]);
 
   const unlockCategory = useCallback(async (repositories: Repository[]) => {
     let successCount = 0;
@@ -273,13 +264,11 @@ export const useBulkRepositoryActions = ({
     await forceSyncToBackend();
     const failures = formatFailures(language, failedRepositories);
     toast(
-      language === 'zh'
-        ? `成功解锁 ${successCount} 个仓库的分类${failures}`
-        : `Successfully unlocked categories for ${successCount} repositories${failures}`,
+      t('useBulkRepositoryActions.successfully-unlocked-categories-for-successcoun', { successCount: successCount, failures: failures }),
       failedRepositories.length > 0 ? 'error' : 'success',
     );
     return true;
-  }, [language, toast, updateRepository]);
+  }, [language, toast, updateRepository, t]);
 
   return {
     unstar,

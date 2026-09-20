@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -9,13 +14,13 @@ import { useDialog } from '../hooks/useDialog';
  * 进度浮层，并在完成/失败时给出 toast 反馈。
  */
 export const ListsPushIndicator: React.FC = () => {
-  const { language, listsPush, resetListsPush } = useAppStore(useShallow((state) => ({
+  const { listsPush, resetListsPush } = useAppStore(useShallow((state) => ({
     language: state.language,
     listsPush: state.listsPush,
     resetListsPush: state.resetListsPush,
   })));
   const { toast } = useDialog();
-  const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
+  const t = useT('app');
 
   const prevRunningRef = useRef(listsPush.isRunning);
 
@@ -44,7 +49,7 @@ export const ListsPushIndicator: React.FC = () => {
     <div className="fixed bottom-4 right-4 z-[9999] w-80 max-w-[calc(100vw_-_2rem)] bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-lg p-4">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-sm font-medium text-foreground dark:text-foreground">
-          {t('同步分类到 GitHub list', 'Pushing categories to lists')}
+          {t('listsPushIndicator.pushing-categories-to-lists')}
         </span>
         <span className="text-xs text-muted-foreground dark:text-muted-foreground shrink-0">
           {listsPush.total > 0 ? `${listsPush.done}/${listsPush.total}` : '…'}

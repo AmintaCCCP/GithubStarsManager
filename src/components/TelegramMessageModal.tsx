@@ -1,3 +1,5 @@
+import { getIntlLocale } from '../i18n/format';
+import { useT } from "../i18n/useT";
 import React from 'react';
 import { ExternalLink, Calendar } from 'lucide-react';
 import { Modal } from './Modal';
@@ -18,17 +20,17 @@ interface TelegramMessageModalProps {
  */
 export const TelegramMessageModal: React.FC<TelegramMessageModalProps> = ({ isOpen, onClose, message }) => {
   const language = useAppStore(state => state.language);
-  const t = React.useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('plugins');
 
   const messageDate = message.createdAt && Number.isFinite(Date.parse(message.createdAt))
-    ? new Date(message.createdAt).toLocaleString(language === 'zh' ? 'zh-CN' : 'en-US')
+    ? new Date(message.createdAt).toLocaleString(getIntlLocale(language))
     : '';
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={t(`${message.displayName} 的频道消息`, `Channel message from ${message.displayName}`)}
+      title={t('telegramMessageModal.channel-message-from-v1', { v1: message.displayName })}
       maxWidth="max-w-4xl"
       scrollable
       footer={
@@ -51,7 +53,7 @@ export const TelegramMessageModal: React.FC<TelegramMessageModalProps> = ({ isOp
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
-            {t('在 Telegram 打开', 'Open in Telegram')}
+            {t('telegramMessageModal.open-in-telegram')}
           </a>
         </div>
       }
@@ -64,7 +66,7 @@ export const TelegramMessageModal: React.FC<TelegramMessageModalProps> = ({ isOp
         />
       ) : (
         <div className="py-10 text-center text-sm text-muted-foreground dark:text-muted-foreground">
-          {t('该消息为纯媒体内容，无文字正文', 'This message is media-only and has no text content')}
+          {t('telegramMessageModal.this-message-is-media-only-and-has-no-text-conte')}
         </div>
       )}
     </Modal>

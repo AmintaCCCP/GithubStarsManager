@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useT";
 import React, { useState, useCallback, useRef } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Database, Github, Key, Link, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -12,6 +13,8 @@ import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { APP_LANGUAGES, type AppLanguage } from '../i18n/languages';
 
 export const LoginScreen: React.FC = () => {
   const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend } = useLoginActions();
@@ -61,7 +64,7 @@ export const LoginScreen: React.FC = () => {
     theme: state.theme,
     setTheme: state.setTheme,
   })));
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('login');
   const parkedWorkspaces = Object.values(accountWorkspaces ?? {});
   const cachedRepoCount = repositories.length > 0
     ? repositories.length
@@ -81,7 +84,7 @@ export const LoginScreen: React.FC = () => {
 
   const handleConnect = async () => {
     if (!token.trim()) {
-      setError(language === 'zh' ? '请输入有效的GitHub token' : 'Please enter a valid GitHub token');
+      setError(t('loginScreen.please-enter-a-valid-github-token'));
       return;
     }
 
@@ -98,9 +101,7 @@ export const LoginScreen: React.FC = () => {
       // real failure surfaces the warning banner below.
       const { ok } = await syncTokenToBackend(token);
       if (!ok) {
-        setError(language === 'zh'
-          ? '已登录，但 GitHub Token 未能保存到后端，README 等后端代理功能可能不可用。'
-          : 'Signed in, but failed to save GitHub token to backend. README and other backend proxy features may be unavailable.');
+        setError(t('loginScreen.signed-in-but-failed-to-save-github-token-to-bac'));
       }
 
       console.log('Successfully authenticated user:', user);
@@ -109,7 +110,7 @@ export const LoginScreen: React.FC = () => {
       setError(
         error instanceof Error
           ? error.message
-          : (language === 'zh' ? '认证失败，请检查您的token。' : 'Failed to authenticate. Please check your token.')
+          : (t('loginScreen.failed-to-authenticate-please-check-your-token'))
       );
     } finally {
       setIsLoading(false);
@@ -120,14 +121,11 @@ export const LoginScreen: React.FC = () => {
     const url = backendUrl.trim();
     const apiKey = backendApiKey.trim();
     if (!url || !apiKey) {
-      setError(t('请输入后端 URL 和 API Key', 'Please enter the backend URL and API key'));
+      setError(t('loginScreen.please-enter-the-backend-url-and-api-key'));
       return;
     }
     if (!normalizeBackendUrl(url)) {
-      setError(t(
-        '后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP',
-        'Invalid backend URL: remote backends must use HTTPS; only localhost may use HTTP'
-      ));
+      setError(t('loginScreen.invalid-backend-url-remote-backends-must-use-htt'));
       return;
     }
 
@@ -139,13 +137,13 @@ export const LoginScreen: React.FC = () => {
     try {
       const result = await restoreBackendSession(url);
       if (result.status === 'backend-unavailable') {
-        throw new Error(t('无法连接到该后端 URL', 'Unable to connect to this backend URL'));
+        throw new Error(t('loginScreen.unable-to-connect-to-this-backend-url'));
       }
       if (result.status === 'unauthorized') {
-        throw new Error(t('API Key 无效，请检查后重试', 'Invalid API key. Please check it and try again'));
+        throw new Error(t('loginScreen.invalid-api-key-please-check-it-and-try-again'));
       }
       if (result.status === 'restore-failed') {
-        throw new Error(t('读取后端登录数据失败', 'Failed to read login data from the backend'));
+        throw new Error(t('loginScreen.failed-to-read-login-data-from-the-backend'));
       }
       if (result.status === 'restored-token-invalid') {
         setTokenSetupReason('invalid');
@@ -199,7 +197,7 @@ export const LoginScreen: React.FC = () => {
       setUser(result.user);
     } catch (error) {
       setBackendApiSecret(previousApiSecret);
-      setError(error instanceof Error ? error.message : t('登录失败，请稍后重试', 'Sign-in failed. Please try again'));
+      setError(error instanceof Error ? error.message : t('loginScreen.sign-in-failed-please-try-again'));
     } finally {
       setIsLoading(false);
     }
@@ -208,7 +206,7 @@ export const LoginScreen: React.FC = () => {
   const handleBackendTokenSetup = async () => {
     const githubToken = backendGithubToken.trim();
     if (!githubToken) {
-      setError(t('请输入有效的 GitHub Access Token', 'Please enter a valid GitHub access token'));
+      setError(t('loginScreen.please-enter-a-valid-github-access-token'));
       return;
     }
 
@@ -220,7 +218,7 @@ export const LoginScreen: React.FC = () => {
       setGitHubToken(githubToken);
       setUser(user);
     } catch (error) {
-      setError(error instanceof Error ? error.message : t('配置失败，请稍后重试', 'Setup failed. Please try again'));
+      setError(error instanceof Error ? error.message : t('loginScreen.setup-failed-please-try-again'));
     } finally {
       setIsLoading(false);
     }
@@ -277,21 +275,27 @@ export const LoginScreen: React.FC = () => {
     <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground transition-colors duration-300">
       <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
         <div className="flex items-center overflow-hidden rounded-md border border-border bg-card">
-          <Button type="button" variant={language === 'zh' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('zh')} aria-pressed={language === 'zh'} className="w-16 rounded-none">
-            中文
-          </Button>
-          <Button type="button" variant={language === 'en' ? 'secondary' : 'ghost'} size="sm" onClick={() => setLanguage('en')} aria-pressed={language === 'en'} className="w-16 rounded-none">
-            EN
-          </Button>
+          <Select value={language} onValueChange={(value) => setLanguage(value as AppLanguage)}>
+            <SelectTrigger aria-label={t('loginScreen.interface-language')} className="h-9 w-[150px] rounded-none border-0 bg-card shadow-none focus:ring-0 focus:ring-offset-0">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {APP_LANGUAGES.map((definition) => (
+                <SelectItem key={definition.code} value={definition.code}>
+                  {definition.nativeName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('切换主题', 'Toggle theme')}>
+            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('loginScreen.toggle-theme')}>
               {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>{t('切换主题', 'Toggle theme')}</TooltipContent>
+          <TooltipContent>{t('loginScreen.toggle-theme')}</TooltipContent>
         </Tooltip>
       </div>
 
@@ -301,7 +305,7 @@ export const LoginScreen: React.FC = () => {
             <img src="./icon.png" alt="GitHub Stars Manager" className="h-full w-full object-cover" />
           </div>
           <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">GitHub Stars Manager</h1>
-          <p className="text-sm text-muted-foreground">{t('AI驱动的仓库管理工具', 'AI-powered repository management')}</p>
+          <p className="text-sm text-muted-foreground">{t('loginScreen.ai-powered-repository-management')}</p>
         </div>
 
         <Card className="border-border bg-card p-6 shadow-sm sm:p-7">
@@ -311,19 +315,19 @@ export const LoginScreen: React.FC = () => {
               : <Database className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />}
             <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">
               {loginMode === 'github'
-                ? t('连接GitHub', 'Connect with GitHub')
+                ? t('loginScreen.connect-with-github')
                 : backendStep === 'credentials'
-                  ? t('连接已有后端', 'Connect to your backend')
-                  : t('配置 GitHub Access Token', 'Set up GitHub access token')}
+                  ? t('loginScreen.connect-to-your-backend')
+                  : t('loginScreen.set-up-github-access-token')}
             </h2>
             <p className="text-sm text-muted-foreground">
               {loginMode === 'github'
-                ? t('输入您的GitHub个人访问令牌以开始使用', 'Enter your GitHub personal access token to get started')
+                ? t('loginScreen.enter-your-github-personal-access-token-to-get-s')
                 : backendStep === 'credentials'
-                  ? t('输入后端地址和 API Key 恢复账号与数据', 'Enter the backend URL and API key to restore your account and data')
+                  ? t('loginScreen.enter-the-backend-url-and-api-key-to-restore-you')
                   : tokenSetupReason === 'invalid'
-                    ? t('后端保存的 GitHub Token 无法使用，请重新配置', 'The GitHub token stored on the backend is not working. Please set it up again')
-                    : t('后端尚未配置 Token，请完成首次设置', 'No token is configured on this backend. Complete the initial setup')}
+                    ? t('loginScreen.the-github-token-stored-on-the-backend-is-not-wo')
+                    : t('loginScreen.no-token-is-configured-on-this-backend-complete')}
             </p>
           </div>
 
@@ -331,16 +335,16 @@ export const LoginScreen: React.FC = () => {
             <div className="mb-4 rounded-md border border-success/30 bg-success/10 p-3 text-success">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-success" />
-                <span className="text-sm font-medium">{t(`已缓存 ${cachedRepoCount} 个仓库`, `${cachedRepoCount} repositories cached`)}</span>
+                <span className="text-sm font-medium">{t('loginScreen.cachedrepocount-repositories-cached', { cachedRepoCount: cachedRepoCount })}</span>
               </div>
-              {cachedLastSync && <p className="mt-1 text-xs text-success">{t('上次同步:', 'Last sync:')} {new Date(cachedLastSync).toLocaleString()}</p>}
+              {cachedLastSync && <p className="mt-1 text-xs text-success">{t('loginScreen.last-sync')} {new Date(cachedLastSync).toLocaleString()}</p>}
             </div>
           )}
 
           <div className="space-y-4">
             {loginMode === 'backend' && backendStep === 'credentials' && (
               <div className="space-y-2">
-                <Label htmlFor="backend-url">{t('后端 URL', 'Backend URL')}</Label>
+                <Label htmlFor="backend-url">{t('loginScreen.backend-url')}</Label>
                 <div className="relative">
                   <Link className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70" />
                   <Input
@@ -371,7 +375,7 @@ export const LoginScreen: React.FC = () => {
                   id={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}
                   type="password"
                   autoComplete="current-password"
-                  placeholder={loginMode === 'github' || backendStep === 'githubToken' ? 'ghp_xxxxxxxxxxxxxxxxxxxx' : t('输入后端 API_SECRET', 'Enter backend API_SECRET')}
+                  placeholder={loginMode === 'github' || backendStep === 'githubToken' ? 'ghp_xxxxxxxxxxxxxxxxxxxx' : t('loginScreen.enter-backend-api-secret')}
                   value={loginMode === 'github' ? token : backendStep === 'credentials' ? backendApiKey : backendGithubToken}
                   onChange={(e) => {
                     if (loginMode === 'github') {
@@ -406,16 +410,16 @@ export const LoginScreen: React.FC = () => {
               {isLoading ? (
                 <>
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  <span>{t('连接中…', 'Connecting…')}</span>
+                  <span>{t('loginScreen.connecting')}</span>
                 </>
               ) : (
                 <>
                   <span>
                     {loginMode === 'github'
-                      ? t('连接到GitHub', 'Connect to GitHub')
+                      ? t('loginScreen.connect-to-github')
                       : backendStep === 'credentials'
-                        ? t('连接并恢复数据', 'Connect and restore data')
-                        : t('保存并继续', 'Save and continue')}
+                        ? t('loginScreen.connect-and-restore-data')
+                        : t('loginScreen.save-and-continue')}
                   </span>
                   <ArrowRight className="h-4 w-4" />
                 </>
@@ -424,16 +428,16 @@ export const LoginScreen: React.FC = () => {
           </div>
 
           {loginMode === 'github' && <div className="mt-6 rounded-md border border-border bg-muted/50 p-4">
-            <h3 className="mb-2 text-sm font-medium text-foreground">{t('如何创建GitHub token:', 'How to create a GitHub token:')}</h3>
+            <h3 className="mb-2 text-sm font-medium text-foreground">{t('loginScreen.how-to-create-a-github-token')}</h3>
             <ol className="space-y-1 text-xs leading-5 text-muted-foreground">
-              <li>1. {t('访问GitHub Settings → Developer settings → Personal access tokens', 'Go to GitHub Settings → Developer settings → Personal access tokens')}</li>
-              <li>2. {t('点击"Generate new token (classic)"', 'Click "Generate new token (classic)"')}</li>
-              <li>3. {t('选择权限范围：', 'Select scopes:')} <strong>repo</strong>、<strong>user</strong> {t('和', 'and')} <strong>gist</strong></li>
-              <li>4. {t('复制生成的token并粘贴到上方', 'Copy the generated token and paste it above')}</li>
+              <li>1. {t('loginScreen.go-to-github-settings-developer-settings-persona')}</li>
+              <li>2. {t('loginScreen.click-generate-new-token-classic')}</li>
+              <li>3. {t('loginScreen.select-scopes')} <strong>repo</strong>、<strong>user</strong> {t('loginScreen.and')} <strong>gist</strong></li>
+              <li>4. {t('loginScreen.copy-the-generated-token-and-paste-it-above')}</li>
             </ol>
             <div className="mt-3">
               <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
-                {t('在GitHub上创建token →', 'Create token on GitHub →')}
+                {t('loginScreen.create-token-on-github')}
               </a>
             </div>
           </div>}
@@ -447,13 +451,13 @@ export const LoginScreen: React.FC = () => {
           >
             {loginMode === 'github' ? (
               <>
-                <span>{t('已有后端数据', 'Already have backend data')}</span>
+                <span>{t('loginScreen.already-have-backend-data')}</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             ) : (
               <>
                 <ArrowLeft className="h-4 w-4" />
-                <span>{t('使用 GitHub Token 登录', 'Sign in with GitHub token')}</span>
+                <span>{t('loginScreen.sign-in-with-github-token')}</span>
               </>
             )}
           </Button>
@@ -462,13 +466,10 @@ export const LoginScreen: React.FC = () => {
 
       <ConfirmDialog
         isOpen={conflictDialogOpen}
-        title={t('本地数据冲突', 'Local Data Conflict')}
-        message={t(
-          '本地已缓存该账号的仓库数据。是否用后端数据覆盖本地数据？选择“保留本地”将跳过同步并直接登录。',
-          'This account already has cached repository data locally. Overwrite it with the backend data? Choose "Keep local" to skip the sync and sign in directly.',
-        )}
-        confirmText={t('使用后端数据', 'Use backend data')}
-        cancelText={t('保留本地', 'Keep local')}
+        title={t('loginScreen.local-data-conflict')}
+        message={t('loginScreen.this-account-already-has-cached-repository-data')}
+        confirmText={t('loginScreen.use-backend-data')}
+        cancelText={t('loginScreen.keep-local')}
         onConfirm={handleConflictConfirm}
         onCancel={handleConflictCancel}
         type="warning"

@@ -4,6 +4,7 @@ import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { logger } from './logger';
+import { getOutputLanguageDirective } from '../i18n/aiLanguage';
 
 interface OpenAIResponseContentPart {
   text?: string;
@@ -1231,9 +1232,13 @@ ${options.user}` : options.user;
       : this.createAnalysisPrompt(repository, readmeContent, customCategories, categoryHints);
 
     try {
+      const outputLanguageDirective = getOutputLanguageDirective(this.language);
       const system = this.language === 'zh'
         ? '你是一个专业的GitHub仓库分析助手。请严格按照用户指定的语言进行分析，无论原始内容是什么语言。请用中文简洁地分析仓库，提供实用的概述、分类标签和支持的平台类型。只输出合法JSON，不要输出思考过程、Markdown、代码块标记或任何额外文本。summary字段只能描述仓库功能，不得复述提示词、输出格式或“只输出JSON”等要求。'
-        : 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.';
+        : this.language === 'en'
+          ? 'You are a professional GitHub repository analysis assistant. Please strictly analyze in the language specified by the user, regardless of the original content language. Please analyze repositories concisely in English, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.'
+          : 'You are a professional GitHub repository analysis assistant. Analyze repositories concisely, providing practical overviews, category tags, and supported platform types. Only output valid JSON. Do not output thinking process, Markdown, code block markers, or any extra text. The summary field must describe repository functionality only; never restate the prompt, output format, or JSON-only requirements.'
+            + (outputLanguageDirective ? `\n\n${outputLanguageDirective}` : '');
 
       let lastContent = '';
       let lastInvalidReason = '';
@@ -1294,9 +1299,13 @@ ${options.user}` : options.user;
       .map(file => `${file.filename}${file.language ? ` (${file.language})` : ''}, ${file.size} bytes`)
       .join('\n');
 
+    const outputLanguageDirective = getOutputLanguageDirective(this.language);
     const system = this.language === 'zh'
       ? '你是一个专业的 GitHub Gist 分析助手。请用中文简洁总结 gist 的用途、关键内容和可能的使用场景。只输出摘要文本，不要 Markdown 标题。'
-      : 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely in English. Output summary text only, no Markdown heading.';
+      : this.language === 'en'
+        ? 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely in English. Output summary text only, no Markdown heading.'
+        : 'You are a professional GitHub Gist analysis assistant. Summarize the gist purpose, key content, and likely use case concisely. Output summary text only, no Markdown heading.'
+          + (outputLanguageDirective ? `\n\n${outputLanguageDirective}` : '');
 
     const user = this.language === 'zh'
       ? `
@@ -1310,7 +1319,8 @@ ${this.sanitizeForPrompt(fileList || '无文件')}
 内容预览：
 ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
       `.trim()
-      : `
+      : this.language === 'en'
+        ? `
 Analyze this GitHub Gist and output an English summary under 80 words.
 
 Description: ${this.sanitizeForPrompt(gist.description || 'No description')}
@@ -1320,7 +1330,19 @@ ${this.sanitizeForPrompt(fileList || 'No files')}
 
 Content preview:
 ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
-      `.trim();
+        `.trim()
+        : `
+Analyze this GitHub Gist and output a summary under 80 words.
+
+Description: ${this.sanitizeForPrompt(gist.description || 'No description')}
+Owner: ${gist.owner?.login || 'Unknown'}
+Files:
+${this.sanitizeForPrompt(fileList || 'No files')}
+
+Content preview:
+${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
+${outputLanguageDirective ? `\n${outputLanguageDirective}` : ''}
+        `.trim();
 
     return this.requestText({
       system,
@@ -1353,10 +1375,12 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
       en: 'English',
       ja: 'Japanese',
       ko: 'Korean',
+      'pt-BR': 'Brazilian Portuguese',
       fr: 'French',
       de: 'German',
       es: 'Spanish',
       ru: 'Russian',
+      'zh-TW': 'Traditional Chinese',
       pt: 'Portuguese',
     };
     const targetName = LANGUAGE_NAMES[targetLanguage] || targetLanguage;
@@ -1420,9 +1444,13 @@ ${this.sanitizeForPrompt(contentPreview).slice(0, 6000)}
       throw new Error(this.language === 'zh' ? 'Release 内容为空，无法分析。' : 'Release body is empty, cannot analyze.');
     }
 
+    const outputLanguageDirective = getOutputLanguageDirective(this.language);
     const system = this.language === 'zh'
       ? '你是一个专业的 GitHub Release 更新日志分析助手。请用简体中文，以通俗易懂的语言总结本次更新。直接输出 Markdown，不要输出任何额外解释、代码块标记或“以下是总结”之类的开场白。排版需易读，使用列表形式，并按重要程度从高到低排序。'
-      : 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand English. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.';
+      : this.language === 'en'
+        ? 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand English. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.'
+        : 'You are a professional GitHub Release changelog analysis assistant. Summarize this update in plain, easy-to-understand language. Output Markdown directly, without any extra explanation, code fences, or opening remarks such as "Here is the summary". Use a readable layout with lists, ordered from most to least important.'
+          + (outputLanguageDirective ? `\n\n${outputLanguageDirective}` : '');
 
     const repoName = this.sanitizeForPrompt(meta.repoName);
     const tagName = this.sanitizeForPrompt(meta.tagName);
@@ -1691,7 +1719,8 @@ ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
         : 'Custom category hints:\n' + sanitizedHints}`;
     }
 
-    return customPrompt;
+    const outputLanguageDirective = getOutputLanguageDirective(this.language);
+    return outputLanguageDirective ? `${customPrompt.trim()}\n\n${outputLanguageDirective}` : customPrompt;
   }
 
   private createAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string): string {
@@ -1735,25 +1764,35 @@ Dockerfile/docker-compose=docker；CLI/命令行/终端=cli；浏览器/前端/A
 仓库信息：
 ${repoInfo}
       `.trim();
-    } else {
-      const categoriesLine = customCategories && customCategories.length > 0
-        ? `\nAvailable categories (tags should prioritize these): ${customCategories.join(', ')}`
-        : '';
-      const hintLine = categoryHints && categoryHints.length > 0
-        ? `\n\nCustom category hint: The following are user-defined custom categories with their keywords. When the repository keywords, description, Topics, or README clearly relate to these keywords, include the custom category name as-is in tags (3-5 tags total).\n${this.sanitizeForPrompt(categoryHints)}`
-        : '';
-      return `
+    }
+
+    const categoriesLine = customCategories && customCategories.length > 0
+      ? `\nAvailable categories (tags should prioritize these): ${customCategories.join(', ')}`
+      : '';
+    const hintLine = categoryHints && categoryHints.length > 0
+      ? `\n\nCustom category hint: The following are user-defined custom categories with their keywords. When the repository keywords, description, Topics, or README clearly relate to these keywords, include the custom category name as-is in tags (3-5 tags total).\n${this.sanitizeForPrompt(categoryHints)}`
+      : '';
+    const outputLanguageDirective = getOutputLanguageDirective(this.language);
+    const summaryRequirement = this.language === 'en'
+      ? 'A concise English overview explaining the main functionality and purpose, no more than 50 words.'
+      : 'A concise overview explaining the main functionality and purpose, no more than 50 words.';
+    const tagsRequirement = this.language === 'en'
+      ? `3-5 English application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.`
+      : `3-5 application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.`;
+    const summaryExample = this.language === 'en' ? 'English overview' : 'overview';
+
+    return `
 Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
 
 Requirements:
-- summary: A concise English overview explaining the main functionality and purpose, no more than 50 words.
+- summary: ${summaryRequirement}
   Do not include prompt restatements such as "asked to", "only output JSON", "based on repository information", or "summary/tags/platforms".
-- tags: 3-5 English application type tags${customCategories && customCategories.length > 0 ? ', please prioritize from the available categories above' : ', similar to app store categories such as: development tools, web apps, mobile apps, database, AI tools, etc.'}.${categoriesLine}${hintLine}
+- tags: ${tagsRequirement}${categoriesLine}${hintLine}
 - platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
 
 Output format:
 {
-  "summary": "English overview",
+  "summary": "${summaryExample}",
   "tags": ["tag1", "tag2", "tag3"],
   "platforms": ["web", "cli"]
 }
@@ -1762,9 +1801,8 @@ Platform hints:
 Dockerfile/docker-compose=docker; CLI/command-line/terminal=cli; browser/frontend/API=web; iOS/Swift/Xcode=ios; Android/Kotlin/Gradle=android; macOS/Homebrew=mac; Windows/.exe/MSI=windows; Linux/systemd/apt=linux.
 
 Repository information:
-${repoInfo}
-      `.trim();
-    }
+${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
+    `.trim();
   }
 
   private static readonly VALID_PLATFORMS = ['mac', 'windows', 'linux', 'ios', 'android', 'docker', 'web', 'cli'];

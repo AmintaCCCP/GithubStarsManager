@@ -1,3 +1,5 @@
+import { getDateFnsLocale } from '../i18n/format';
+import { useT } from "../i18n/useT";
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -8,7 +10,6 @@ import { Release } from '../types';
 import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import { useAppStore } from '../store/useAppStore';
 import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
@@ -440,7 +441,7 @@ export const ReleaseTimeline: React.FC = () => {
     return rangeWithDots;
   };
 
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('releases');
 
   const isReleaseUnread = useCallback((releaseId: number) => {
     return !readReleases.has(releaseId);
@@ -520,12 +521,12 @@ export const ReleaseTimeline: React.FC = () => {
       <div className="text-center py-12">
                <Package className="w-16 h-16 text-muted-foreground dark:text-quaternary mx-auto mb-4" />
          <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-2">
-          {subscribedRepoCount === 0 ? t('没有Release订阅', 'No Release Subscriptions') : t('没有最近的Release', 'No Recent Releases')}
+          {subscribedRepoCount === 0 ? t('releaseTimeline.no-release-subscriptions') : t('releaseTimeline.no-recent-releases')}
         </h3>
              <p className="text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
                {subscribedRepoCount === 0
-                 ? t('从仓库页面订阅仓库Release以在此查看更新。', 'Subscribe to repository releases from the Repositories tab to see updates here.')
-                 : t(`您已订阅 ${subscribedRepoCount} 个仓库，但没有找到最近的Release。点击下方刷新按钮获取最新更新。`, `You're subscribed to ${subscribedRepoCount} repositories, but no recent releases were found. Click the refresh button below to get the latest updates.`)
+                 ? t('releaseTimeline.subscribe-to-repository-releases-from-the-reposi')
+                 : t('releaseTimeline.you-re-subscribed-to-subscribedrepocount-reposit', { subscribedRepoCount: subscribedRepoCount })
                }
              </p>
         
@@ -537,10 +538,10 @@ export const ReleaseTimeline: React.FC = () => {
                <Switch
                  checked={includePreRelease}
                  onCheckedChange={setIncludePreRelease}
-                 aria-label={t('包含 Pre-release', 'Include Pre-release')}
+                 aria-label={t('releaseTimeline.include-pre-release')}
                />
                <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-                 {t('包含 Pre-release', 'Include Pre-release')}
+                 {t('releaseTimeline.include-pre-release')}
                </span>
              </div>
 
@@ -552,20 +553,20 @@ export const ReleaseTimeline: React.FC = () => {
                  className="flex items-center space-x-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                >
                  <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-                 <span>{releaseIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新Release', 'Refresh Releases')}</span>
+                 <span>{releaseIsRefreshing ? t('releaseTimeline.refreshing') : t('releaseTimeline.refresh-releases')}</span>
                </Button>
                <Button
                  onClick={() => setIsReleaseSourceSettingsOpen(true)}
                  className="flex items-center space-x-2 px-4 py-3 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
-                 title={t('Release 来源设置', 'Release Source Settings')}
+                 title={t('releaseTimeline.release-source-settings')}
                >
                  <Settings className="w-5 h-5" />
-                 <span>{t('来源设置', 'Sources')}</span>
+                 <span>{t('releaseTimeline.sources')}</span>
                </Button>
              </div>
             {lastRefreshTime && (
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                {t('releaseTimeline.last-refresh-time', { time: formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
               </p>
             )}
           </div>
@@ -579,32 +580,32 @@ export const ReleaseTimeline: React.FC = () => {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
-                  {t('订阅仓库Release', 'Subscribe to Repository Releases')}
+                  {t('releaseTimeline.subscribe-to-repository-releases')}
                 </h3>
                 <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3 leading-relaxed">
-                  {t('订阅后，您可以在这里查看所有关注仓库的最新发布版本，第一时间获取更新动态。', 'Subscribe to receive the latest release updates from your favorite repositories in one place.')}
+                  {t('releaseTimeline.subscribe-to-receive-the-latest-release-updates')}
                 </p>
                 <div className="bg-card dark:bg-card/60 rounded-lg p-3 text-sm">
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium mb-2">
                     <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs">1</span>
-                    <span>{t('前往仓库页面', 'Go to Repositories')}</span>
+                    <span>{t('releaseTimeline.go-to-repositories')}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium">
                     <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs">2</span>
-                    <span>{t('点击仓库卡片上的铃铛图标', 'Click the bell icon on any repository card')}</span>
+                    <span>{t('releaseTimeline.click-the-bell-icon-on-any-repository-card')}</span>
                   </div>
                 </div>
                 <div className="mt-4 rounded-lg bg-card dark:bg-card/60 p-3 text-sm text-muted-foreground dark:text-muted-foreground">
                   <p className="mb-3">
-                    {t('也可以通过 Watch 仓库同步或自定义仓库列表作为 Release 来源。', 'You can also use Watch repository sync or a custom repository list as release sources.')}
+                    {t('releaseTimeline.you-can-also-use-watch-repository-sync-or-a-cust')}
                   </p>
                   <Button
                     onClick={() => setIsReleaseSourceSettingsOpen(true)}
                     className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    title={t('Release 来源设置', 'Release Source Settings')}
+                    title={t('releaseTimeline.release-source-settings')}
                   >
                     <Settings className="w-4 h-4" />
-                    <span>{t('配置 Release 来源', 'Configure Release Sources')}</span>
+                    <span>{t('releaseTimeline.configure-release-sources')}</span>
                   </Button>
                 </div>
               </div>
@@ -627,17 +628,17 @@ export const ReleaseTimeline: React.FC = () => {
         <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
-              {t('Release时间线', 'Release Timeline')}
+              {t('releaseTimeline.release-timeline')}
             </h2>
             <p className="text-muted-foreground dark:text-muted-foreground">
-              {t(`来自您的 ${activeReleaseRepoCount} 个订阅仓库的最新Release`, `Latest releases from your ${activeReleaseRepoCount} subscribed repositories`)}
+              {t('releaseTimeline.latest-releases-from-your-activereleaserepocount', { activeReleaseRepoCount: activeReleaseRepoCount })}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('上次刷新:', 'Last refresh:')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                {t('releaseTimeline.last-refresh-time', { time: formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
               </span>
             )}
 
@@ -646,10 +647,10 @@ export const ReleaseTimeline: React.FC = () => {
               <Switch
                 checked={includePreRelease}
                 onCheckedChange={setIncludePreRelease}
-                aria-label={t('包含 Pre-release', 'Include Pre-release')}
+                aria-label={t('releaseTimeline.include-pre-release')}
               />
               <span className="hidden text-xs text-muted-foreground dark:text-muted-foreground sm:inline">
-                {t('Pre', 'Pre')}
+                {t('releaseTimeline.pre')}
               </span>
             </div>
 
@@ -660,16 +661,16 @@ export const ReleaseTimeline: React.FC = () => {
               className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{releaseIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新', 'Refresh')}</span>
+              <span>{releaseIsRefreshing ? t('releaseTimeline.refreshing') : t('releaseTimeline.refresh')}</span>
             </Button>
             <Button
               onClick={() => setIsReleaseSourceSettingsOpen(true)}
               variant="ghost"
               className="ui-button flex items-center space-x-2 px-3 py-2"
-              title={t('Release 来源设置', 'Release Source Settings')}
+              title={t('releaseTimeline.release-source-settings')}
             >
               <Settings className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('来源', 'Sources')}</span>
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('releaseTimeline.sources-2')}</span>
             </Button>
           </div>
         </div>
@@ -681,7 +682,7 @@ export const ReleaseTimeline: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
             <Input
               type="text"
-              placeholder={t('搜索Release…', 'Search releases…')}
+              placeholder={t('releaseTimeline.search-releases')}
               value={searchQuery}
               onChange={(e) => {
                 setReleaseSearchQuery(e.target.value);
@@ -697,7 +698,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setReleaseSearchQuery('');
                   setCurrentPage(1);
                 }}
-                aria-label={t('清除搜索', 'Clear search')}
+                aria-label={t('releaseTimeline.clear-search')}
                 className="absolute right-2 top-1/2 h-8 w-8 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
               >
                 <X className="w-4 h-4" />
@@ -726,14 +727,14 @@ export const ReleaseTimeline: React.FC = () => {
               }}
             >
               <SelectTrigger
-                aria-label={t('视图模式', 'View mode')}
+                aria-label={t('releaseTimeline.view-mode')}
                 className="ui-field h-9 w-48 px-3 py-1 text-sm"
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="timeline">{t('按日期排序', 'Timeline View')}</SelectItem>
-                <SelectItem value="repository">{t('仓库分类', 'Repository View')}</SelectItem>
+                <SelectItem value="timeline">{t('releaseTimeline.timeline-view')}</SelectItem>
+                <SelectItem value="repository">{t('releaseTimeline.repository-view')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -745,38 +746,26 @@ export const ReleaseTimeline: React.FC = () => {
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {viewMode === 'timeline'
                 ? releaseShowMode === 'unread'
-                  ? t(
-                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个未读 (总计 ${preUnreadFilteredReleases.length})`,
-                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} unread (total: ${preUnreadFilteredReleases.length})`
-                    )
-                  : t(
-                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} 共 ${filteredReleases.length} 个Release`,
-                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, filteredReleases.length)} of ${filteredReleases.length} releases`
-                    )
+                  ? t('releaseTimeline.showing-v1-v2-of-v3-unread-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length, v4: preUnreadFilteredReleases.length })
+                  : t('releaseTimeline.showing-v1-v2-of-v3-releases', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length })
                 : releaseShowMode === 'unread'
-                  ? t(
-                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} 共 ${repositoryGroups.length} 个未读仓库 (总计 ${preUnreadFilteredReleases.length})`,
-                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} of ${repositoryGroups.length} unread repos (total: ${preUnreadFilteredReleases.length})`
-                    )
-                  : t(
-                      `显示 ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} 共 ${repositoryGroups.length} 个仓库`,
-                      `Showing ${startIndex + 1}-${Math.min(startIndex + itemsPerPage, repositoryGroups.length)} of ${repositoryGroups.length} repositories`
-                    )
+                  ? t('releaseTimeline.showing-v1-v2-of-v3-unread-repos-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, repositoryGroups.length), v3: repositoryGroups.length, v4: preUnreadFilteredReleases.length })
+                  : t('releaseTimeline.showing-v1-v2-of-v3-repositories', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, repositoryGroups.length), v3: repositoryGroups.length })
               }
             </span>
             {releaseShowMode === 'all' && unreadCount > 0 && (
               <span className="text-sm text-primary dark:text-primary">
-                ({unreadCount} {t('未读', 'unread')})
+                ({unreadCount} {t('releaseTimeline.unread')})
               </span>
             )}
             {(searchQuery || selectedFilters.length > 0) && (
               <span className="text-sm text-primary dark:text-primary">
-                ({t('已筛选', 'filtered')})
+                ({t('releaseTimeline.filtered')})
               </span>
             )}
             {releaseLatestMode === 'latest' && (
               <span className="text-sm text-primary dark:text-primary">
-                ({t('仅最新', 'latest only')})
+                ({t('releaseTimeline.latest-only')})
               </span>
             )}
           </div>
@@ -787,14 +776,14 @@ export const ReleaseTimeline: React.FC = () => {
               if (value === 'all' || value === 'unread') handleShowModeChange(value);
             }}>
               <SelectTrigger
-                aria-label={t('显示范围', 'Display range')}
+                aria-label={t('releaseTimeline.display-range')}
                 className="ui-field h-9 w-44 px-3 py-1 text-sm"
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('显示全部', 'Show All')}</SelectItem>
-                <SelectItem value="unread">{t('仅显示未读', 'Unread Only')}</SelectItem>
+                <SelectItem value="all">{t('releaseTimeline.show-all')}</SelectItem>
+                <SelectItem value="unread">{t('releaseTimeline.unread-only')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -803,22 +792,22 @@ export const ReleaseTimeline: React.FC = () => {
               if (value === 'all' || value === 'latest') handleLatestModeChange(value);
             }}>
               <SelectTrigger
-                aria-label={t('版本范围', 'Version range')}
+                aria-label={t('releaseTimeline.version-range')}
                 className="ui-field h-9 w-48 px-3 py-1 text-sm"
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('显示全部版本', 'Show All Versions')}</SelectItem>
-                <SelectItem value="latest">{t('仅显示最新版本', 'Latest Version Only')}</SelectItem>
+                <SelectItem value="all">{t('releaseTimeline.show-all-versions')}</SelectItem>
+                <SelectItem value="latest">{t('releaseTimeline.latest-version-only')}</SelectItem>
               </SelectContent>
             </Select>
 
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <span className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+              <span className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('releaseTimeline.per-page')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger aria-label={t('每页条数', 'Items per page')} className="ui-field h-9 w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('releaseTimeline.items-per-page')} className="ui-field h-9 w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>
@@ -829,10 +818,10 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={handleMarkAllRead}
               disabled={isMarkingAllRead || unreadCount === 0}
               className="flex shrink-0 items-center space-x-2 rounded-lg bg-muted px-3 py-2 transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted/40 dark:hover:bg-accent"
-              title={t('全部标记为已读', 'Mark all as read')}
+              title={t('releaseTimeline.mark-all-as-read')}
             >
               {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('全部已读', 'Mark All Read')}</span>
+              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('releaseTimeline.mark-all-read')}</span>
             </Button>
           </div>
         </div>
@@ -845,22 +834,22 @@ export const ReleaseTimeline: React.FC = () => {
             <Package className="w-12 h-12 text-muted-foreground dark:text-muted-foreground mx-auto mb-3" />
             <h3 className="text-lg font-medium text-foreground dark:text-muted-foreground mb-1">
               {releaseShowMode === 'unread'
-                ? t('没有未读的 Release', 'No unread releases')
-                : t('无符合条件的结果', 'No matching results')}
+                ? t('releaseTimeline.no-unread-releases')
+                : t('releaseTimeline.no-matching-results')}
             </h3>
             <p className="text-sm text-muted-foreground dark:text-muted-foreground">
               {releaseShowMode === 'unread'
-                ? t('所有 Release 都已标记为已读', 'All releases have been marked as read')
+                ? t('releaseTimeline.all-releases-have-been-marked-as-read')
                 : selectedFilters.length > 0
-                  ? t('当前过滤器没有匹配到任何资产，请尝试其他过滤条件', 'No assets match the current filters. Try different filter criteria.')
-                  : t('没有找到匹配的 Release', 'No matching releases found.')}
+                  ? t('releaseTimeline.no-assets-match-the-current-filters-try-differen')
+                  : t('releaseTimeline.no-matching-releases-found')}
             </p>
             {releaseShowMode === 'unread' && (
               <Button
                 onClick={() => handleShowModeChange('all')}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
-                {t('查看全部', 'Show All')}
+                {t('releaseTimeline.show-all-2')}
               </Button>
             )}
             {selectedFilters.length > 0 && releaseShowMode !== 'unread' && (
@@ -868,7 +857,7 @@ export const ReleaseTimeline: React.FC = () => {
                 onClick={handleClearFilters}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
-                {t('清除过滤器', 'Clear Filters')}
+                {t('releaseTimeline.clear-filters')}
               </Button>
             )}
           </div>
@@ -948,19 +937,19 @@ export const ReleaseTimeline: React.FC = () => {
                   <span className="flex items-center space-x-2 min-w-0 ml-2">
                     <span className="text-right min-w-0">
                       <span className="block text-xs text-muted-foreground dark:text-muted-foreground hidden sm:block">
-                        {releases.length} {t('个版本', 'releases')}
+                        {releases.length} {t('releaseTimeline.releases')}
                       </span>
                       {latestRelease && (
                         <>
                           <span className="block text-xs text-muted-foreground dark:text-muted-foreground truncate">
-                            {t('最新:', 'Latest:')} {latestRelease.tag_name}
+                            {t('releaseTimeline.latest')} {latestRelease.tag_name}
                           </span>
                           {latestEffectiveTime && (
                             <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70 whitespace-nowrap">
-                              {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: language === 'zh' ? zhCN : undefined })}
+                              {formatDistanceToNow(new Date(latestEffectiveTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
                               {latestAssetsUpdated && (
                                 <span className="text-xs px-1 py-px rounded bg-primary/10 text-primary font-medium">
-                                  {t('资产已更新', 'Assets updated')}
+                                  {t('releaseTimeline.assets-updated')}
                                 </span>
                               )}
                             </span>
@@ -1036,7 +1025,7 @@ export const ReleaseTimeline: React.FC = () => {
               size="icon"
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
-              aria-label={t('第一页', 'First page')}
+              aria-label={t('releaseTimeline.first-page')}
               className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -1047,7 +1036,7 @@ export const ReleaseTimeline: React.FC = () => {
               size="icon"
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
-              aria-label={t('上一页', 'Previous page')}
+              aria-label={t('releaseTimeline.previous-page')}
               className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -1081,7 +1070,7 @@ export const ReleaseTimeline: React.FC = () => {
               size="icon"
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
-              aria-label={t('下一页', 'Next page')}
+              aria-label={t('releaseTimeline.next-page')}
               className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
@@ -1092,7 +1081,7 @@ export const ReleaseTimeline: React.FC = () => {
               size="icon"
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
-              aria-label={t('最后一页', 'Last page')}
+              aria-label={t('releaseTimeline.last-page')}
               className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />

@@ -1,3 +1,9 @@
+
+
+
+
+import { useT } from '../i18n/useT';
+import type { AppLanguage } from '../i18n/languages';
 import React, { useMemo, useState } from 'react';
 import { Download, Loader2, Sparkles } from 'lucide-react';
 import type { Release, Repository } from '../types';
@@ -10,16 +16,17 @@ import { useDialog } from '../hooks/useDialog';
 export const ReleasePluginRecommendations: React.FC<{
   release: Release;
   repository?: Repository;
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }> = ({ release, repository, language }) => {
+    const t = useT('releases');
   const { processors, runProcessor, download } = useReleaseProcessors();
   if (processors.length === 0 || release.assets.length === 0) return null;
 
   return (
-    <section className="mb-3 rounded-md border border-border bg-muted/20 p-3" aria-label={language === 'zh' ? '插件资产推荐' : 'Plugin asset recommendations'}>
+    <section className="mb-3 rounded-md border border-border bg-muted/20 p-3" aria-label={t('releasePluginRecommendations.plugin-asset-recommendations')}>
       <div className="mb-2 flex items-center gap-2 text-xs font-medium">
         <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-        {language === 'zh' ? '插件资产推荐' : 'Plugin asset recommendations'}
+        {t('releasePluginRecommendations.plugin-asset-recommendations')}
       </div>
       <div className="space-y-2">
         {processors.map((processor) => (
@@ -42,15 +49,15 @@ const RecommendationItem: React.FC<{
   processor: RegisteredReleaseProcessor;
   release: Release;
   repository?: Repository;
-  language: 'zh' | 'en';
+  language: AppLanguage;
   runProcessor: ReturnType<typeof useReleaseProcessors>['runProcessor'];
   download: ReturnType<typeof useReleaseProcessors>['download'];
-}> = ({ processor, release, repository, language, runProcessor, download }) => {
+}> = ({ processor, release, repository, runProcessor, download }) => {
   const { toast } = useDialog();
   const [running, setRunning] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, PluginReleaseRecommendation>>({});
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('releases');
   const assets = useMemo(() => new Map(release.assets.map((asset) => [asset.id, asset])), [release.assets]);
 
   const key = `${processor.pluginId}:${processor.id}`;
@@ -76,14 +83,14 @@ const RecommendationItem: React.FC<{
               if (operation.success) setResults((previous) => ({ ...previous, [key]: operation.result }));
               else toast(operation.error.message, 'error');
             } catch (error) {
-              toast(error instanceof Error ? error.message : t('插件分析失败', 'Plugin analysis failed'), 'error');
+              toast(error instanceof Error ? error.message : t('releasePluginRecommendations.plugin-analysis-failed'), 'error');
             } finally {
               setRunning(null);
             }
           }}
         >
           {running === key && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
-          {result ? t('重新分析', 'Analyze again') : t('分析', 'Analyze')}
+          {result ? t('releasePluginRecommendations.analyze-again') : t('releasePluginRecommendations.analyze')}
         </Button>
       </div>
       {result && asset && (
@@ -91,7 +98,7 @@ const RecommendationItem: React.FC<{
           <div className="min-w-0">
             <p className="truncate font-medium" title={asset.name}>{asset.name}</p>
             <p className="mt-1 text-muted-foreground">{result.reason}</p>
-            <p className="mt-1 text-muted-foreground">{t('置信度', 'Confidence')}: {Math.round(result.confidence * 100)}%</p>
+            <p className="mt-1 text-muted-foreground">{t('releasePluginRecommendations.confidence')}: {Math.round(result.confidence * 100)}%</p>
           </div>
           {processor.canDownload && (
             <Button
@@ -105,17 +112,17 @@ const RecommendationItem: React.FC<{
                 setDownloading(key);
                 try {
                   const operation = await download(processor, release.id, asset.id);
-                  if (operation.success) toast(t(`已保存 ${operation.fileName}`, `Saved ${operation.fileName}`), 'success');
-                  else if (!operation.canceled) toast(operation.error?.message || t('下载失败', 'Download failed'), 'error');
+                  if (operation.success) toast(t('releasePluginRecommendations.saved-v1', { v1: operation.fileName }), 'success');
+                  else if (!operation.canceled) toast(operation.error?.message || t('releasePluginRecommendations.download-failed'), 'error');
                 } catch (error) {
-                  toast(error instanceof Error ? error.message : t('下载失败', 'Download failed'), 'error');
+                  toast(error instanceof Error ? error.message : t('releasePluginRecommendations.download-failed'), 'error');
                 } finally {
                   setDownloading(null);
                 }
               }}
             >
               {downloading === key ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
-              {t('宿主下载', 'Host download')}
+              {t('releasePluginRecommendations.host-download')}
             </Button>
           )}
         </div>

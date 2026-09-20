@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -10,8 +15,8 @@ interface ScrollToBottomProps {
 export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({ 
   scrollContainerRef 
 }) => {
+    const t = useT('app');
   const [isVisible, setIsVisible] = useState(false);
-  const language = useAppStore(state => state.language);
   // 当 README 模态框打开时隐藏按钮，避免遮挡模态框内容
   const readmeModalOpen = useAppStore(state => state.readmeModalOpen);
   const containerRef = useRef<HTMLElement | null>(null);
@@ -100,10 +105,10 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({
         sm:bottom-28 sm:left-6
         lg:bottom-24 lg:left-10
       `}
-      aria-label={language === 'zh' ? '滚动到底部' : 'Scroll to bottom'}
+      aria-label={t('scrollToBottom.scroll-to-bottom')}
       aria-hidden={!isVisible || readmeModalOpen}
       tabIndex={isVisible && !readmeModalOpen ? 0 : -1}
-      title={language === 'zh' ? '滚动到底部' : 'Scroll to bottom'}
+      title={t('scrollToBottom.scroll-to-bottom')}
     >
       <ArrowDown className="h-5 w-5 sm:h-6 sm:w-6" />
     </Button>

@@ -1,3 +1,4 @@
+import { useT } from "../i18n/useT";
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
@@ -319,7 +320,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     };
   }, []);
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('repositories');
 
   const handleAIAnalyze = (analyzeUnanalyzedOnly: boolean = false, analyzeFailedOnly: boolean = false) => {
     const scope = analyzeFailedOnly ? 'failed' : analyzeUnanalyzedOnly ? 'unanalyzed' : 'all';
@@ -467,7 +468,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           completed = await bulkActions.unlockCategory(selectedRepositories);
           break;
         default:
-          toast(language === 'zh' ? '未知操作' : 'Unknown action', 'error');
+          toast(t('repositoryList.unknown-action'), 'error');
           completed = true;
       }
 
@@ -476,7 +477,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       }
     } catch (error) {
       console.error('Bulk action failed:', error);
-      toast(language === 'zh' ? '批量操作失败' : 'Bulk action failed', 'error');
+      toast(t('repositoryList.bulk-action-failed'), 'error');
     }
   };
 
@@ -496,7 +497,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const chatPortal = activeChatRepository && createPortal(
     <ErrorBoundary>
-      <React.Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 text-sm text-muted-foreground" role="status">{t('正在打开仓库问答…', 'Opening repository chat…')}</div>}>
+      <React.Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 text-sm text-muted-foreground" role="status">{t('repositoryList.opening-repository-chat')}</div>}>
         <LazyRepositoryChatSheet
           isOpen
           repository={activeChatRepository}
@@ -531,27 +532,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           </div>
           <p className="font-medium text-foreground">
           {searchFilters?.query ? (
-            language === 'zh'
-              ? `未找到与"${searchFilters.query}"相关的仓库`
-              : `No repositories found for "${searchFilters.query}"`
+            t('repositoryList.no-repositories-found-for-v1', { v1: searchFilters.query })
           ) : selectedCategory === 'all'
-            ? (language === 'zh' ? '未找到仓库' : 'No repositories found')
-            : (language === 'zh'
-                ? `在"${categoryName}"分类中未找到仓库`
-                : `No repositories found in "${categoryName}"`
+            ? (t('repositoryList.no-repositories-found'))
+            : (t('repositoryList.no-repositories-found-in-categoryname', { categoryName: categoryName })
               )
           }
         </p>
         <p className="mt-1.5 max-w-md text-sm text-muted-foreground dark:text-muted-foreground">
           {searchFilters?.query ? (
-            language === 'zh'
-              ? '尝试使用不同的关键词、使用AI搜索进行语义匹配，或检查拼写。'
-              : 'Try different keywords, use AI search for semantic matching, or check spelling.'
+            t('repositoryList.try-different-keywords-use-ai-search-for-semanti')
           ) : selectedCategory === 'all'
-            ? (language === 'zh' ? '点击同步加载您的星标仓库。' : 'Click sync to load your starred repositories.')
-            : (language === 'zh'
-                ? '切换到其他分类，或使用同步加载更多仓库。'
-                : 'Switch to another category, or sync to load more repositories.'
+            ? (t('repositoryList.click-sync-to-load-your-starred-repositories'))
+            : (t('repositoryList.switch-to-another-category-or-sync-to-load-more')
               )
           }
         </p>
@@ -564,7 +557,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             className="mt-5"
           >
             <X className="w-4 h-4" />
-            {language === 'zh' ? '清除全部筛选' : 'Clear all filters'}
+            {t('repositoryList.clear-all-filters')}
           </Button>
         )}
         </div>
@@ -599,25 +592,25 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 type="button"
                 variant="outline"
                 disabled={isLoading}
-                aria-label={t('AI 分析操作', 'AI analysis actions')}
+                aria-label={t('repositoryList.ai-analysis-actions')}
                 className="ui-field h-9 w-auto min-w-32 justify-between gap-2 px-3 py-1 text-sm font-medium"
               >
                 <Bot className="h-4 w-4 shrink-0" />
                 {isLoading
-                  ? t(`分析中… (${analysisProgress.current}/${analysisProgress.total})`, `Analyzing… (${analysisProgress.current}/${analysisProgress.total})`)
-                  : t('AI分析', 'AI Analysis')}
+                  ? t('repositoryList.analyzing-v1-v2', { v1: analysisProgress.current, v2: analysisProgress.total })
+                  : t('repositoryList.ai-analysis')}
                 <ChevronDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuItem onSelect={() => void handleAIAnalyze(false)}>
-                {t(`分析全部（${filteredRepositories.length}）`, `Analyze All (${filteredRepositories.length})`)}
+                {t('repositoryList.analyze-all-v1', { v1: filteredRepositories.length })}
               </DropdownMenuItem>
               <DropdownMenuItem disabled={unanalyzedCount === 0} onSelect={() => void handleAIAnalyze(true)}>
-                {t(`分析未分析的（${unanalyzedCount}）`, `Analyze Unanalyzed (${unanalyzedCount})`)}
+                {t('repositoryList.analyze-unanalyzed-unanalyzedcount', { unanalyzedCount: unanalyzedCount })}
               </DropdownMenuItem>
               <DropdownMenuItem disabled={failedCount === 0} onSelect={() => void handleAIAnalyze(false, true)}>
-                {t(`重新分析失败的（${failedCount}）`, `Re-analyze Failed (${failedCount})`)}
+                {t('repositoryList.re-analyze-failed-failedcount', { failedCount: failedCount })}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -639,8 +632,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 size="icon"
                 onClick={handlePauseResume}
                 className="h-7 w-7 p-0 rounded-lg bg-muted text-muted-foreground dark:bg-warning/20 dark:text-warning hover:bg-accent dark:hover:bg-warning/30 transition-colors"
-                aria-label={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
-                title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
+                aria-label={isPaused ? t('repositoryList.resume') : t('repositoryList.pause')}
+                title={isPaused ? t('repositoryList.resume') : t('repositoryList.pause')}
               >
                 {isPaused ? <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               </Button>
@@ -649,7 +642,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={handleStop}
                 className="h-7 px-2 sm:px-3 py-1 rounded-lg bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
               >
-                {t('停止', 'Stop')}
+                {t('repositoryList.stop')}
               </Button>
             </div>
           )}
@@ -658,16 +651,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           {!isLoading && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
               <span id="repository-display-content-label" className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('显示内容:', 'Display:')}
+                {t('repositoryList.display')}
               </span>
               <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="flex items-center space-x-3 sm:space-x-4">
-                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}>
+                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('repositoryList.show-ai-generated-analysis-summary') : t('repositoryList.no-ai-analysis-content-available')}>
                   <RadioGroupItem value="ai" id="display-content-ai" aria-labelledby="display-content-ai-label" disabled={!hasAnalyzedRepos} />
-                  <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('AI分析内容', 'AI Analysis')}</span>
+                  <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('repositoryList.ai-analysis-2')}</span>
                 </label>
-                <label onClick={() => setShowAISummary(false)} className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('显示仓库原始描述', 'Show repository original description')}>
+                <label onClick={() => setShowAISummary(false)} className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('repositoryList.show-repository-original-description')}>
                   <RadioGroupItem value="original" id="display-content-original" aria-labelledby="display-content-original-label" />
-                  <span id="display-content-original-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('原始描述', 'Original')}</span>
+                  <span id="display-content-original-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('repositoryList.original')}</span>
                 </label>
               </RadioGroup>
             </div>
@@ -680,30 +673,27 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
             <div className="flex items-center justify-between">
               <div>
-                {t(
-                  `第 ${startIndex}-${endIndex} / 共 ${filteredRepositories.length} 个仓库`,
-                  `Showing ${startIndex}-${endIndex} of ${filteredRepositories.length} repositories`
-                )}
+                {t('repositoryList.showing-startindex-endindex-of-v3-repositories', { startIndex: startIndex, endIndex: endIndex, v3: filteredRepositories.length })}
                 {repositories.length !== filteredRepositories.length && (
                   <span className="ml-2 text-primary dark:text-primary">
-                    {t(`(从 ${repositories.length} 个中筛选)`, `(filtered from ${repositories.length})`)}
+                    {t('repositoryList.filtered-from-v1', { v1: repositories.length })}
                   </span>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {analyzedCount > 0 && (
                   <span className="text-xs sm:text-sm">
-                    • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
+                    • {analyzedCount} {t('repositoryList.ai-analyzed')}
                   </span>
                 )}
                 {failedCount > 0 && (
                   <span className="text-xs sm:text-sm">
-                    • {failedCount} {t('个分析失败', 'analysis failed')}
+                    • {failedCount} {t('repositoryList.analysis-failed')}
                   </span>
                 )}
                 {unanalyzedCount > 0 && (
                   <span className="text-xs sm:text-sm">
-                    • {unanalyzedCount} {t('个未分析', 'unanalyzed')}
+                    • {unanalyzedCount} {t('repositoryList.unanalyzed')}
                   </span>
                 )}
               </div>
@@ -711,16 +701,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           </div>
 
           {!isLoading && (
-            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('仓库布局', 'Repository layout')}>
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('repositoryList.repository-layout')}>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
-                aria-label={t('多列卡片', 'Grid view')}
+                aria-label={t('repositoryList.grid-view')}
                 className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
-                title={t('多列卡片', 'Grid view')}
+                title={t('repositoryList.grid-view')}
               >
                 <LayoutGrid className="w-4 h-4" />
               </Button>
@@ -730,9 +720,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 size="icon"
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
-                aria-label={t('单列列表', 'List view')}
+                aria-label={t('repositoryList.list-view')}
                 className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
-                title={t('单列列表', 'List view')}
+                title={t('repositoryList.list-view')}
               >
                 <List className="w-4 h-4" />
               </Button>

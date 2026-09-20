@@ -1,8 +1,14 @@
-import React, { memo, useCallback } from 'react';
+
+
+
+
+import { getDateFnsLocale } from '../i18n/format';
+import { useT } from '../i18n/useT';
+import type { AppLanguage } from '../i18n/languages';
+import React, { memo } from 'react';
 import { ExternalLink, GitFork, RefreshCw, ChevronDown, ChevronUp, FolderOpen, Folder, Play, Loader2 } from 'lucide-react';
 import { ForkRepo, WorkflowDefinition } from '../types';
 import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { Button } from './ui/button';
 
 interface ForkCardProps {
@@ -18,7 +24,7 @@ interface ForkCardProps {
   isSyncing: boolean;
   isRunningWorkflow: boolean;
   needsSync: boolean; // true = out-of-date, can sync; false = already up-to-date
-  language: 'zh' | 'en';
+  language: AppLanguage;
 }
 
 const ForkCard: React.FC<ForkCardProps> = memo(({
@@ -36,7 +42,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
   needsSync,
   language,
 }) => {
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('releases');
 
   const sourceFullName = fork.source?.full_name || fork.parent?.full_name || '';
 
@@ -73,7 +79,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
               </p>
               {sourceFullName && (
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate mt-0.5 flex items-center gap-1">
-                  <span>{t('派生自', 'Forked from')}</span>
+                  <span>{t('forkCard.forked-from')}</span>
                   {fork.parent?.html_url || fork.source?.html_url ? (
                     <a
                       href={fork.parent?.html_url || fork.source?.html_url}
@@ -101,7 +107,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>
                   {fork.updated_at
-                    ? formatDistanceToNow(new Date(fork.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })
+                    ? formatDistanceToNow(new Date(fork.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) })
                     : '-'}
                 </span>
               </div>
@@ -109,7 +115,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 <div className="flex items-center gap-1.5">
                   <GitFork className="w-3.5 h-3.5" />
                   <span>
-                    {formatDistanceToNow(new Date(fork.source.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
+                    {formatDistanceToNow(new Date(fork.source.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) })}
                   </span>
                 </div>
               )}
@@ -124,12 +130,12 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onMarkAsRead();
                 }}
                 className="h-8 shrink-0 gap-1 whitespace-nowrap px-2 text-xs"
-                title={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}
-                aria-label={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}
+                title={isWorkflowsExpanded ? t('forkCard.hide-workflows') : t('forkCard.show-workflows')}
+                aria-label={isWorkflowsExpanded ? t('forkCard.hide-workflows') : t('forkCard.show-workflows')}
                 aria-expanded={isWorkflowsExpanded}
               >
                 {isWorkflowsExpanded ? <FolderOpen className="w-3.5 h-3.5" /> : <Folder className="w-3.5 h-3.5" />}
-                <span className="text-xs font-medium">{isWorkflowsExpanded ? t('隐藏', 'Hide') : t('工作流', 'Workflows')}</span>
+                <span className="text-xs font-medium">{isWorkflowsExpanded ? t('forkCard.hide') : t('forkCard.workflows')}</span>
                 {isWorkflowsExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </Button>
 
@@ -148,11 +154,11 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                     : 'bg-transparent text-muted-foreground/50 dark:text-muted-foreground/50 cursor-not-allowed'
                 } ${isSyncing ? 'opacity-50' : ''}`}
                 title={needsSync
-                  ? t('更新分支', 'Update branch')
-                  : t('已是最新版本', 'Already up to date')}
+                  ? t('forkCard.update-branch')
+                  : t('forkCard.already-up-to-date')}
                 aria-label={needsSync
-                  ? t('更新分支', 'Update branch')
-                  : t('已是最新版本', 'Already up to date')}
+                  ? t('forkCard.update-branch')
+                  : t('forkCard.already-up-to-date')}
               >
                 {isSyncing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -167,8 +173,8 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-1 rounded bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                title={t('在GitHub上查看', 'View on GitHub')}
-                aria-label={t('在GitHub上查看', 'View on GitHub')}
+                title={t('forkCard.view-on-github')}
+                aria-label={t('forkCard.view-on-github')}
                 onClick={(e) => {
                   e.stopPropagation();
                   onMarkAsRead();
@@ -192,19 +198,19 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="w-5 h-5 animate-spin text-muted-foreground dark:text-muted-foreground" />
                 <span className="ml-2 text-sm text-muted-foreground dark:text-muted-foreground">
-                  {t('加载工作流中…', 'Loading workflows…')}
+                  {t('forkCard.loading-workflows')}
                 </span>
               </div>
             ) : workflows.length === 0 ? (
               <div className="py-4 text-center text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('暂无工作流', 'No workflows')}
+                {t('forkCard.no-workflows')}
               </div>
             ) : (
               <div className="py-2">
                 <div className="flex items-center space-x-2 mb-3">
                   <Folder className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
                   <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
-                    {t('工作流', 'Workflows')}
+                    {t('forkCard.workflows')}
                   </span>
                   <span className="text-xs text-muted-foreground dark:text-muted-foreground">
                     ({workflows.length})
@@ -243,12 +249,12 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         variant="secondary"
                         className="ml-2 h-8 w-8 shrink-0 p-0"
                         aria-label={workflow.state === 'disabled'
-                          ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
-                          : `${language === 'zh' ? '运行工作流' : 'Run workflow'}: ${workflow.name}`
+                          ? (t('forkCard.workflow-disabled'))
+                          : t('forkCard.run-workflow-named', { name: workflow.name })
                         }
                         title={workflow.state === 'disabled'
-                          ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
-                          : (language === 'zh' ? '运行工作流' : 'Run workflow')
+                          ? (t('forkCard.workflow-disabled'))
+                          : (t('forkCard.run-workflow'))
                         }
                       >
                         {isRunningWorkflow ? (

@@ -1,8 +1,11 @@
+
+
+
+
+import { useT } from '../i18n/useT';
 import React from 'react';
 import { Search, Bot, Clock, TrendingUp } from 'lucide-react';
 import { Repository } from '../types';
-import { useAppStore } from '../store/useAppStore';
-import { useShallow } from 'zustand/react/shallow';
 
 interface SearchResultStatsProps {
   repositories: Repository[];
@@ -19,11 +22,8 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
   isRealTimeSearch,
   searchTime
 }) => {
-  const { language } = useAppStore(useShallow((state) => ({
-    language: state.language,
-  })));
 
-  const t = (zh: string, en: string) => language === 'zh' ? zh : en;
+  const t = useT('app');
 
   if (!searchQuery) return null;
 
@@ -55,14 +55,14 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
               <Search className="w-4 h-4" />
               <span className="font-medium text-sm">
-                {t('实时搜索结果', 'Real-time Search Results')}
+                {t('searchResultStats.real-time-search-results')}
               </span>
             </div>
           ) : (
             <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground ">
               <Bot className="w-4 h-4" />
               <span className="font-medium text-sm">
-                {t('AI语义搜索结果', 'AI Semantic Search Results')}
+                {t('searchResultStats.ai-semantic-search-results')}
               </span>
             </div>
           )}
@@ -82,10 +82,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
             {foundRepos}
           </div>
           <div className="text-muted-foreground dark:text-muted-foreground">
-            {t('找到仓库', 'Found Repos')}
+            {t('searchResultStats.found-repos')}
           </div>
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {filterRate}% {t('匹配率', 'Match Rate')}
+            {filterRate}% {t('searchResultStats.match-rate')}
           </div>
         </div>
 
@@ -94,7 +94,7 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
             {stats.languages.length}
           </div>
           <div className="text-muted-foreground dark:text-muted-foreground">
-            {t('编程语言', 'Languages')}
+            {t('searchResultStats.languages')}
           </div>
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
             {stats.languages.slice(0, 2).join(', ')}
@@ -107,11 +107,11 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
             {stats.avgStars.toLocaleString()}
           </div>
           <div className="text-muted-foreground dark:text-muted-foreground">
-            {t('平均星标', 'Avg Stars')}
+            {t('searchResultStats.avg-stars')}
           </div>
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
             <TrendingUp className="w-3 h-3 inline mr-1" />
-            {t('热度指标', 'Popularity')}
+            {t('searchResultStats.popularity')}
           </div>
         </div>
 
@@ -120,10 +120,10 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
             {stats.recentlyUpdated}
           </div>
           <div className="text-muted-foreground dark:text-muted-foreground">
-            {t('近期更新', 'Recent Updates')}
+            {t('searchResultStats.recent-updates')}
           </div>
           <div className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {t('30天内', 'Within 30 days')}
+            {t('searchResultStats.within-30-days')}
           </div>
         </div>
       </div>
@@ -132,14 +132,14 @@ export const SearchResultStats: React.FC<SearchResultStatsProps> = ({
       <div className="mt-3 pt-3 border-t border-border">
         <div className="flex items-center space-x-2 text-sm">
           <span className="text-muted-foreground dark:text-muted-foreground">
-            {t('搜索查询:', 'Search Query:')}
+            {t('searchResultStats.search-query')}
           </span>
           <code className="bg-card dark:bg-card px-2 py-1 rounded border text-foreground dark:text-foreground font-mono">
             "{searchQuery}"
           </code>
           {stats.aiAnalyzed > 0 && (
             <span className="ml-2 text-xs text-success">
-              {stats.aiAnalyzed} {t('个已AI分析', 'AI analyzed')}
+              {t('searchResultStats.ai-analyzed-count', { count: stats.aiAnalyzed })}
             </span>
           )}
         </div>

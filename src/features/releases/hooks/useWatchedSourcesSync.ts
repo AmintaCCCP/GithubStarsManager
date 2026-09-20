@@ -1,3 +1,8 @@
+
+
+
+
+import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { GitHubApiService } from '../../../services/githubApi';
@@ -17,10 +22,9 @@ import {
 export const useWatchedSourcesSync = () => {
   const githubToken = useAppStore((s) => s.githubToken);
   const setReleaseSourceRepositories = useAppStore((s) => s.setReleaseSourceRepositories);
-  const language = useAppStore((s) => s.language);
   const { toast } = useDialog();
   const [isSyncingWatchedSources, setIsSyncingWatchedSources] = useState(false);
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('releases');
 
   const syncWatchedSources = useCallback(async () => {
     if (!githubToken || isSyncingWatchedSources) return;
@@ -42,15 +46,12 @@ export const useWatchedSourcesSync = () => {
       }));
       setReleaseSourceRepositories(WATCH_CUSTOM_RELEASE_SOURCE_ID, sourceRepos);
       toast(
-        t(
-          `已同步 ${sourceRepos.length} 个 Watch 仓库。`,
-          `Synced ${sourceRepos.length} Watch repositories.`
-        ),
+        t('useWatchedSourcesSync.synced-v1-watch-repositories', { v1: sourceRepos.length }),
         'success'
       );
     } catch (error) {
       console.error('Failed to sync watched repositories:', error);
-      toast(t('同步 Watch 仓库失败，请检查网络或 Token 权限。', 'Failed to sync Watch repositories. Check network or token permissions.'), 'error');
+      toast(t('useWatchedSourcesSync.failed-to-sync-watch-repositories-check-network'), 'error');
     } finally {
       setIsSyncingWatchedSources(false);
     }

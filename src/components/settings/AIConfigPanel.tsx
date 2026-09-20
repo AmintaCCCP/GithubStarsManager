@@ -1,3 +1,5 @@
+
+import { TranslateFn } from '../../i18n/useT';
 import { Textarea } from '../ui/textarea';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -16,7 +18,7 @@ import { useDialog } from '../../hooks/useDialog';
 import { isToolCallCapableApiType } from '../../constants/aiCapabilities';
 
 interface AIConfigPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 type AIFormState = {
@@ -69,18 +71,18 @@ function getEndpointPlaceholder(apiType: AIApiType, mimoPlan: MiMoPlan): string 
   }
 }
 
-function getEndpointHelpText(apiType: AIApiType, t: (zh: string, en: string) => string): string {
+function getEndpointHelpText(apiType: AIApiType, t: TranslateFn): string {
   switch (apiType) {
     case 'openai-compatible':
-      return t('填写完整的API调用地址，包含完整路径', 'Enter the full API endpoint URL including the complete path');
+      return t('aIConfigPanel.enter-the-full-api-endpoint-url-including-the-co');
     case 'gemini':
-      return t('只填到 v1beta 即可，路径会自动生成', 'Only include the version prefix v1beta, the path will be generated automatically');
+      return t('aIConfigPanel.only-include-the-version-prefix-v1beta-the-path');
     case 'deepseek':
-      return t('填写到域名即可（如 https://api.deepseek.com），路径会自动生成', 'Only include the domain (e.g. https://api.deepseek.com), the path will be generated automatically');
+      return t('aIConfigPanel.only-include-the-domain-e-g-https-api-deepseek-c');
     case 'mimo':
-      return t('填写到 /v1 即可（如 https://api.xiaomimimo.com/v1），路径会自动生成', 'Only include up to /v1 (e.g. https://api.xiaomimimo.com/v1), the path will be generated automatically');
+      return t('aIConfigPanel.only-include-up-to-v1-e-g-https-api-xiaomimimo-c');
     default:
-      return t('只填到版本号即可（如 .../v1 或 .../v1beta），不要包含 /chat/completions、/responses、/messages', 'Only include the version prefix (e.g. .../v1 or .../v1beta). Do not include /chat/completions, /responses, or /messages.');
+      return t('aIConfigPanel.only-include-the-version-prefix-e-g-v1-or-v1beta');
   }
 }
 
@@ -207,7 +209,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
   const handleSave = () => {
     if (!form.name || !form.baseUrl || !form.apiKey || !form.model) {
-      toast(t('请填写所有必填字段', 'Please fill in all required fields'), 'error');
+      toast(t('aIConfigPanel.please-fill-in-all-required-fields'), 'error');
       return;
     }
 
@@ -284,7 +286,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
   const handleTestForm = async () => {
     if (!form.baseUrl || !form.apiKey || !form.model) {
-      toast(t('请先填写API端点、API密钥和模型名称', 'Please fill in API Endpoint, API Key and Model Name first'), 'error');
+      toast(t('aIConfigPanel.please-fill-in-api-endpoint-api-key-and-model-na'), 'error');
       return;
     }
     await testDraft({
@@ -325,7 +327,7 @@ Dockerfile/docker-compose=docker；CLI/命令行/终端=cli；浏览器/前端/A
 
 仓库信息：
 {REPO_INFO}`;
-    } else {
+    } else if (language === 'en') {
       return `Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
 
 Requirements:
@@ -348,6 +350,28 @@ Dockerfile/docker-compose=docker; CLI/command-line/terminal=cli; browser/fronten
 Repository information:
 {REPO_INFO}`;
     }
+
+    return `Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
+
+Requirements:
+- summary: A concise overview explaining the main functionality and purpose, no more than 50 words.
+  Do not include prompt restatements such as "asked to", "only output JSON", "based on repository information", or "summary/tags/platforms".
+- tags: 3-5 application type tags, please prioritize from the provided categories.
+{CATEGORIES_INFO}
+- platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
+
+Output format:
+{
+  "summary": "overview",
+  "tags": ["tag1", "tag2", "tag3"],
+  "platforms": ["web", "cli"]
+}
+
+Platform hints:
+Dockerfile/docker-compose=docker; CLI/command-line/terminal=cli; browser/frontend/API=web; iOS/Swift/Xcode=ios; Android/Kotlin/Gradle=android; macOS/Homebrew=mac; Windows/.exe/MSI=windows; Linux/systemd/apt=linux.
+
+Repository information:
+{REPO_INFO}`;
   }, [language]);
 
   const isCustomPromptModified = useMemo(() => {
@@ -374,7 +398,7 @@ Repository information:
       setShowCustomPrompt(true);
       setShowDefaultPrompt(false);
       if (form.customPrompt.trim() === '') {
-        showNotification('info', t('已自动填充默认提示词，您可以进行修改', 'Default prompt auto-filled, you can modify it'));
+        showNotification('info', t('aIConfigPanel.default-prompt-auto-filled-you-can-modify-it'));
       }
     } else {
       setShowCustomPrompt(false);
@@ -383,7 +407,7 @@ Repository information:
 
   const handleToggleDefaultPrompt = useCallback(() => {
     if (showCustomPrompt) {
-      showNotification('info', t('请先关闭自定义提示词编辑区域', 'Please close the custom prompt editor first'));
+      showNotification('info', t('aIConfigPanel.please-close-the-custom-prompt-editor-first'));
       return;
     }
     setShowDefaultPrompt(prev => !prev);
@@ -391,21 +415,21 @@ Repository information:
 
   const handleRestoreDefaultPrompt = useCallback(async () => {
     if (isCustomPromptSameAsDefault) {
-      showNotification('info', t('当前提示词已是默认值', 'Current prompt is already the default'));
+      showNotification('info', t('aIConfigPanel.current-prompt-is-already-the-default'));
       return;
     }
 
     if (isCustomPromptModified) {
       const confirmed = await confirm(
-        t('确定要恢复默认提示词吗？', 'Restore Default Prompt?'),
-        t('这将覆盖您当前的修改。', 'This will overwrite your current changes.'),
+        t('aIConfigPanel.restore-default-prompt'),
+        t('aIConfigPanel.this-will-overwrite-your-current-changes'),
         { type: 'warning' }
       );
       if (!confirmed) return;
     }
 
     setForm(prev => ({ ...prev, customPrompt: defaultPrompt }));
-    showNotification('success', t('已恢复默认提示词', 'Default prompt restored'));
+    showNotification('success', t('aIConfigPanel.default-prompt-restored'));
   }, [defaultPrompt, isCustomPromptModified, isCustomPromptSameAsDefault, showNotification, t, confirm]);
 
   return (
@@ -414,7 +438,7 @@ Repository information:
         <div className="flex items-center space-x-3">
           <Bot className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-            {t('AI服务配置', 'AI Service Configuration')}
+            {t('aIConfigPanel.ai-service-configuration')}
           </h3>
         </div>
         <Button
@@ -422,20 +446,20 @@ Repository information:
           className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>{t('添加AI配置', 'Add AI Config')}</span>
+          <span>{t('aIConfigPanel.add-ai-config')}</span>
         </Button>
       </div>
 
       {showForm && (
         <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
           <h4 className="font-medium text-foreground dark:text-foreground mb-4">
-            {editingId ? t('编辑AI配置', 'Edit AI Configuration') : t('添加AI配置', 'Add AI Configuration')}
+            {editingId ? t('aIConfigPanel.edit-ai-configuration') : t('aIConfigPanel.add-ai-configuration')}
           </h4>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label htmlFor="ai-config-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('配置名称', 'Configuration Name')} *
+                {t('aIConfigPanel.configuration-name')} *
               </label>
               <Input
                 id="ai-config-name"
@@ -443,13 +467,13 @@ Repository information:
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('例如: OpenAI GPT-4', 'e.g., OpenAI GPT-4')}
+                placeholder={t('aIConfigPanel.e-g-openai-gpt-4')}
               />
             </div>
 
             <div>
               <label id="ai-api-type-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('接口格式', 'API Format')} *
+                {t('aIConfigPanel.api-format')} *
               </label>
               <Select value={form.apiType} onValueChange={(value) => setForm(prev => ({ ...prev, apiType: value as AIApiType }))}>
                 <SelectTrigger aria-labelledby="ai-api-type-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
@@ -460,23 +484,23 @@ Repository information:
             {form.apiType === 'mimo' && (
               <div>
                 <label id="ai-mimo-plan-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                  {t('MiMo 渠道', 'MiMo Channel')} *
+                  {t('aIConfigPanel.mimo-channel')} *
                 </label>
                 <Select value={form.mimoPlan} onValueChange={(value) => setForm(prev => ({ ...prev, mimoPlan: value as MiMoPlan }))}>
                   <SelectTrigger aria-labelledby="ai-mimo-plan-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="api">{t('API（按量付费）', 'API (Pay-as-you-go)')}</SelectItem><SelectItem value="token-plan">{t('Token Plan（订阅制）', 'Token Plan (Subscription)')}</SelectItem></SelectContent>
+                  <SelectContent><SelectItem value="api">{t('aIConfigPanel.api-pay-as-you-go')}</SelectItem><SelectItem value="token-plan">{t('aIConfigPanel.token-plan-subscription')}</SelectItem></SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
                   {form.mimoPlan === 'api'
-                    ? t('API Key 以 sk- 开头，端点 api.xiaomimimo.com', 'API Key starts with sk-, endpoint api.xiaomimimo.com')
-                    : t('API Key 以 tp- 开头，端点 token-plan-cn.xiaomimimo.com', 'API Key starts with tp-, endpoint token-plan-cn.xiaomimimo.com')}
+                    ? t('aIConfigPanel.api-key-starts-with-sk-endpoint-api-xiaomimimo-c')
+                    : t('aIConfigPanel.api-key-starts-with-tp-endpoint-token-plan-cn-xi')}
                 </p>
               </div>
             )}
             
             <div>
               <label htmlFor="ai-base-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('API端点', 'API Endpoint')} *
+                {t('aIConfigPanel.api-endpoint')} *
               </label>
               <Input
                 id="ai-base-url"
@@ -491,7 +515,7 @@ Repository information:
               </p>
               {form.baseUrl && (
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                  {t('最终请求地址: ', 'Final request URL: ')}
+                  {t('aIConfigPanel.final-request-url')}
                   <span className="font-mono break-all">
                     {buildFinalApiUrl(form.baseUrl, form.apiType)}
                   </span>
@@ -501,7 +525,7 @@ Repository information:
             
             <div>
               <label htmlFor="ai-api-key" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('API密钥', 'API Key')} *
+                {t('aIConfigPanel.api-key')} *
               </label>
               <Input
                 id="ai-api-key"
@@ -509,13 +533,13 @@ Repository information:
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
                 className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('输入API密钥', 'Enter API key')}
+                placeholder={t('aIConfigPanel.enter-api-key')}
               />
             </div>
             
             <div>
               <label htmlFor="ai-model-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('模型名称', 'Model Name')} *
+                {t('aIConfigPanel.model-name')} *
               </label>
               <Input
                 id="ai-model-name"
@@ -529,34 +553,31 @@ Repository information:
             
             <div>
               <label id="ai-concurrency-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('并发数', 'Concurrency')}
+                {t('aIConfigPanel.concurrency')}
               </label>
               <SliderInput
                 value={form.concurrency}
-                label={t('并发数', 'Concurrency')}
+                label={t('aIConfigPanel.concurrency')}
                 onChange={(v) => setForm(prev => ({ ...prev, concurrency: v }))}
                 min={1}
                 max={10}
                 showMarks={false}
               />
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                {t('同时进行AI分析的仓库数量 (1-10)', 'Number of repositories to analyze simultaneously (1-10)')}
+                {t('aIConfigPanel.number-of-repositories-to-analyze-simultaneously')}
               </p>
             </div>
 
             <div>
               <label id="ai-reasoning-effort-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('推理强度', 'Reasoning Effort')}
+                {t('aIConfigPanel.reasoning-effort')}
               </label>
               <Select value={form.reasoningEffort || 'default'} onValueChange={(value) => setForm(prev => ({ ...prev, reasoningEffort: value === 'default' ? '' : value as AIReasoningEffort }))}>
                 <SelectTrigger aria-labelledby="ai-reasoning-effort-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="default">{t('默认 / 不传', 'Default / Do not send')}</SelectItem><SelectItem value="none">{t('none — 不推理', 'none — No reasoning')}</SelectItem><SelectItem value="low">{t('low — 快速响应', 'low — Quick response')}</SelectItem><SelectItem value="medium">{t('medium — 均衡模式', 'medium — Balanced')}</SelectItem><SelectItem value="high">{t('high — 深度推理', 'high — Deep reasoning')}</SelectItem><SelectItem value="xhigh">{t('xhigh — 最深推理', 'xhigh — Deepest reasoning')}</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="default">{t('aIConfigPanel.default-do-not-send')}</SelectItem><SelectItem value="none">{t('aIConfigPanel.none-no-reasoning')}</SelectItem><SelectItem value="low">{t('aIConfigPanel.low-quick-response')}</SelectItem><SelectItem value="medium">{t('aIConfigPanel.medium-balanced')}</SelectItem><SelectItem value="high">{t('aIConfigPanel.high-deep-reasoning')}</SelectItem><SelectItem value="xhigh">{t('aIConfigPanel.xhigh-deepest-reasoning')}</SelectItem></SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                {t(
-                  '仅对 OpenAI 兼容接口生效。留空时保持旧模式兼容，不额外传 reasoning。',
-                  'Only applies to OpenAI-compatible APIs. Leave empty to preserve legacy behavior and omit reasoning.'
-                )}
+                {t('aIConfigPanel.only-applies-to-openai-compatible-apis-leave-emp')}
               </p>
             </div>
 
@@ -565,9 +586,9 @@ Repository information:
                 <label className="flex items-start gap-2 text-sm text-foreground">
                   <Checkbox checked={form.supportsToolCalls} onCheckedChange={(checked) => setForm(prev => ({ ...prev, supportsToolCalls: checked === true }))} />
                   <span>
-                    {t('支持工具调用（Function Calling）', 'Supports tool calling (function calling)')}
+                    {t('aIConfigPanel.supports-tool-calling-function-calling')}
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      {t('勾选后仓库问答可对该模型启用实验性的工具循环模式；端点实际不支持时会自动回退。', 'Lets repository chat use the experimental tool-loop mode with this model; falls back automatically if the endpoint rejects tools.')}
+                      {t('aIConfigPanel.lets-repository-chat-use-the-experimental-tool-l')}
                     </span>
                   </span>
                 </label>
@@ -606,7 +627,7 @@ Repository information:
                     className="cursor-pointer text-left text-sm font-medium text-foreground dark:text-muted-foreground"
                     onClick={() => handleUseCustomPromptChange(!form.useCustomPrompt)}
                   >
-                    {t('使用自定义提示词', 'Use Custom Prompt')}
+                    {t('aIConfigPanel.use-custom-prompt')}
                   </span>
                 </div>
                 <Button
@@ -621,7 +642,7 @@ Repository information:
                   }`}
                 >
                   {showDefaultPrompt ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  <span>{showDefaultPrompt ? t('隐藏默认提示词', 'Hide Default Prompt') : t('查看默认提示词', 'View Default Prompt')}</span>
+                  <span>{showDefaultPrompt ? t('aIConfigPanel.hide-default-prompt') : t('aIConfigPanel.view-default-prompt')}</span>
                 </Button>
               </div>
               {form.useCustomPrompt && (
@@ -631,7 +652,7 @@ Repository information:
                   onClick={handleRestoreDefaultPrompt}
                   className="text-sm text-muted-foreground hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
                 >
-                  {t('恢复默认提示词', 'Restore Default Prompt')}
+                  {t('aIConfigPanel.restore-default-prompt-2')}
                 </Button>
               )}
             </div>
@@ -639,7 +660,7 @@ Repository information:
             {showDefaultPrompt && !showCustomPrompt && (
               <div className="mb-3">
                 <label className="block text-xs font-medium text-muted-foreground dark:text-muted-foreground mb-1">
-                  {t('默认提示词（只读）', 'Default Prompt (Read-only)')}
+                  {t('aIConfigPanel.default-prompt-read-only')}
                 </label>
                 <pre className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-background dark:bg-card text-foreground dark:text-muted-foreground font-mono text-xs whitespace-pre-wrap overflow-auto max-h-64">
                   {defaultPrompt}
@@ -651,20 +672,20 @@ Repository information:
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label htmlFor="ai-custom-prompt" className="block text-xs font-medium text-muted-foreground dark:text-muted-foreground">
-                    {t('自定义提示词', 'Custom Prompt')}
+                    {t('aIConfigPanel.custom-prompt')}
                     {isCustomPromptModified && (
                       <span className="ml-2 text-muted-foreground dark:text-muted-foreground ">
-                        ({t('已修改', 'Modified')})
+                        ({t('aIConfigPanel.modified')})
                       </span>
                     )}
                     {isCustomPromptSameAsDefault && (
                       <span className="ml-2 text-muted-foreground dark:text-muted-foreground">
-                        ({t('默认值', 'Default')})
+                        ({t('aIConfigPanel.default')})
                       </span>
                     )}
                   </label>
                   <span className="text-xs text-muted-foreground dark:text-muted-foreground/70">
-                    {form.customPrompt.length} {t('字符', 'characters')}
+                    {form.customPrompt.length} {t('aIConfigPanel.characters')}
                   </span>
                 </div>
                 <Textarea
@@ -673,7 +694,7 @@ Repository information:
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
                   className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
-                  placeholder={t('在此输入自定义提示词…', 'Enter custom prompt here…')}
+                  placeholder={t('aIConfigPanel.enter-custom-prompt-here')}
                 />
               </div>
             )}
@@ -685,7 +706,7 @@ Repository information:
               className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Save className="w-4 h-4" />
-              <span>{t('保存', 'Save')}</span>
+              <span>{t('aIConfigPanel.save')}</span>
             </Button>
             <Button
               onClick={handleTestForm}
@@ -697,21 +718,21 @@ Repository information:
               ) : (
                 <TestTube className="w-4 h-4" />
               )}
-              <span>{t('测试连接', 'Test Connection')}</span>
+              <span>{t('aIConfigPanel.test-connection')}</span>
             </Button>
             <Button
               onClick={resetForm}
               className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
             >
               <X className="w-4 h-4" />
-              <span>{t('取消', 'Cancel')}</span>
+              <span>{t('aIConfigPanel.cancel')}</span>
             </Button>
           </div>
         </div>
       )}
 
       <h4 id="active-ai-config-heading" className="mb-3 text-sm font-medium text-foreground">
-        {t('当前 AI 配置', 'Active AI configuration')}
+        {t('aIConfigPanel.active-ai-configuration')}
       </h4>
       <RadioGroup aria-labelledby="active-ai-config-heading" value={activeAIConfig || ''} onValueChange={setActiveAIConfig} className="space-y-3">
         {aiConfigs.map(config => (
@@ -728,7 +749,7 @@ Repository information:
                 <RadioGroupItem
                   value={config.id}
                   id={`active-ai-${config.id}`}
-                  aria-label={config.name || t('AI配置', 'AI configuration')}
+                  aria-label={config.name || t('aIConfigPanel.ai-configuration')}
                 />
                 <div>
                   <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
@@ -736,20 +757,17 @@ Repository information:
                     {config.useCustomPrompt && (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
                         <MessageSquare className="w-3 h-3 mr-1" />
-                        {t('自定义提示词', 'Custom Prompt')}
+                        {t('aIConfigPanel.custom-prompt')}
                       </span>
                     )}
                   </h4>
                   <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                    {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
+                    {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('aIConfigPanel.concurrency')}: {config.concurrency || 1}
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
                   {(config.apiKeyStatus === 'decrypt_failed' || config.apiKeyStatus === 'empty') && (
                     <p className="mt-1 text-sm text-muted-foreground dark:text-muted-foreground ">
-                      {t(
-                        '存储的 API Key 无法解密或为空，请重新输入并保存该配置。',
-                        'The stored API key could not be decrypted or is empty. Please re-enter and save this configuration.'
-                      )}
+                      {t('aIConfigPanel.the-stored-api-key-could-not-be-decrypted-or-is')}
                     </p>
                   )}
                 </div>
@@ -762,7 +780,7 @@ Repository information:
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
                   className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
-                  title={t('测试连接', 'Test Connection')}
+                  title={t('aIConfigPanel.test-connection')}
                 >
                   {testingId === config.id ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -775,7 +793,7 @@ Repository information:
                   size="icon"
                   onClick={() => handleEdit(config)}
                   className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
-                  title={t('编辑', 'Edit')}
+                  title={t('aIConfigPanel.edit')}
                 >
                   <Edit3 className="w-4 h-4" />
                 </Button>
@@ -784,21 +802,21 @@ Repository information:
                   size="icon"
                   onClick={async () => {
                     const confirmed = await confirm(
-                      t('确定要删除这个AI配置吗？', 'Delete AI Configuration?'),
-                      t('此操作无法撤销。', 'This action cannot be undone.'),
-                      { type: 'danger', confirmText: t('删除', 'Delete') }
+                      t('aIConfigPanel.delete-ai-configuration'),
+                      t('aIConfigPanel.this-action-cannot-be-undone'),
+                      { type: 'danger', confirmText: t('aIConfigPanel.delete') }
                     );
                     if (confirmed) {
                       if (config.id) {
                         if (repositoryChatSettings.chatConfigId === config.id) setRepositoryChatSettings({ chatConfigId: null });
                         deleteAIConfig(config.id);
                       } else {
-                        toast(t('删除失败：配置ID无效', 'Delete failed: Invalid config ID'), 'error');
+                        toast(t('aIConfigPanel.delete-failed-invalid-config-id'), 'error');
                       }
                     }
                   }}
                   className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
-                  title={t('删除', 'Delete')}
+                  title={t('aIConfigPanel.delete')}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
@@ -810,70 +828,70 @@ Repository information:
         {aiConfigs.length === 0 && (
           <div className="text-center py-8 text-muted-foreground dark:text-muted-foreground">
             <Bot className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p>{t('还没有配置AI服务', 'No AI services configured yet')}</p>
-            <p className="text-sm">{t('点击上方按钮添加AI配置', 'Click the button above to add AI configuration')}</p>
+            <p>{t('aIConfigPanel.no-ai-services-configured-yet')}</p>
+            <p className="text-sm">{t('aIConfigPanel.click-the-button-above-to-add-ai-configuration')}</p>
           </div>
         )}
 
       <section className="mt-6 rounded-lg border border-border bg-background p-4 dark:border-border dark:bg-muted/40" aria-labelledby="repository-chat-settings-heading">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h4 id="repository-chat-settings-heading" className="text-sm font-medium text-foreground">{t('仓库问答', 'Repository chat')}</h4>
-            <p className="mt-1 text-xs text-muted-foreground">{t('按需读取固定版本源码并保留本机对话；不会更新或重建既有向量索引。', 'Reads pinned source on demand and keeps local conversations; it never updates or rebuilds the existing vector index.')}</p>
+            <h4 id="repository-chat-settings-heading" className="text-sm font-medium text-foreground">{t('aIConfigPanel.repository-chat')}</h4>
+            <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.reads-pinned-source-on-demand-and-keeps-local-co')}</p>
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground">
             <Checkbox checked={repositoryChatSettings.enabled} onCheckedChange={(checked) => setRepositoryChatSettings({ enabled: checked === true })} />
-            {t('启用仓库问答', 'Enable repository chat')}
+            {t('aIConfigPanel.enable-repository-chat')}
           </label>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <label id="repository-chat-model-label" className="mb-1 block text-sm font-medium text-foreground">{t('问答模型', 'Chat model')}</label>
+            <label id="repository-chat-model-label" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.chat-model')}</label>
             <Select value={repositoryChatSettings.chatConfigId ?? '__active__'} onValueChange={(value) => setRepositoryChatSettings({ chatConfigId: value === '__active__' ? null : value })}>
               <SelectTrigger aria-labelledby="repository-chat-model-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__active__">{t('跟随当前 AI 配置', 'Use active AI configuration')}</SelectItem>
+                <SelectItem value="__active__">{t('aIConfigPanel.use-active-ai-configuration')}</SelectItem>
                 {aiConfigs.map((config) => <SelectItem key={config.id} value={config.id}>{config.name} · {config.model}</SelectItem>)}
               </SelectContent>
             </Select>
-            <p className="mt-1 text-xs text-muted-foreground">{t('仅保存配置 ID，不会复制 API Key、Base URL 或模型凭据。', 'Only the configuration ID is saved; no API key, base URL, or credential is copied.')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.only-the-configuration-id-is-saved-no-api-key-ba')}</p>
           </div>
           <div>
-            <label htmlFor="repository-chat-retention-days" className="mb-1 block text-sm font-medium text-foreground">{t('保留本机会话（天）', 'Retain local conversations (days)')}</label>
+            <label htmlFor="repository-chat-retention-days" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.retain-local-conversations-days')}</label>
             <Input id="repository-chat-retention-days" type="number" min={1} max={365} value={repositoryChatSettings.retainSessionDays} onChange={(event) => {
               const parsed = Number(event.target.value);
               setRepositoryChatSettings({ retainSessionDays: Number.isFinite(parsed) ? Math.min(365, Math.max(1, parsed)) : 90 });
             }} />
-            <p className="mt-1 text-xs text-muted-foreground">{t('删除单个会话始终立即生效。', 'Deleting an individual conversation always takes effect immediately.')}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.deleting-an-individual-conversation-always-takes')}</p>
           </div>
         </div>
         <details className="mt-4 rounded-md border border-border px-3 py-2">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">{t('高级设置', 'Advanced settings')}<span className="ml-2 text-xs font-normal text-muted-foreground">{t('聊天窗口任务深度选“默认”时使用这些参数', 'Used by the chat window when task depth is “Default”')}</span></summary>
+          <summary className="cursor-pointer text-sm font-medium text-foreground">{t('aIConfigPanel.advanced-settings')}<span className="ml-2 text-xs font-normal text-muted-foreground">{t('aIConfigPanel.used-by-the-chat-window-when-task-depth-is-defau')}</span></summary>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
-            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('外部网页搜索与抓取', 'External web search and fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('默认关闭；当前版本不会将其暴露为工具。', 'Disabled by default; the current version does not expose it as a tool.')}</span></span></label>
-            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableAgentToolLoop} onCheckedChange={(checked) => setRepositoryChatSettings({ enableAgentToolLoop: checked === true })} /><span>{t('工具循环模式（实验性）', 'Tool-loop mode (experimental)')}<span className="mt-1 block text-xs text-muted-foreground">{t('取证改由模型原生 function calling 驱动；仅对勾选了“支持工具调用”的问答模型生效，不支持时自动回退。', 'Evidence gathering is driven by native function calling; applies only to chat models marked as supporting tool calling, with automatic fallback otherwise.')}</span></span></label>
+            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('aIConfigPanel.external-web-search-and-fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('aIConfigPanel.disabled-by-default-the-current-version-does-not')}</span></span></label>
+            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableAgentToolLoop} onCheckedChange={(checked) => setRepositoryChatSettings({ enableAgentToolLoop: checked === true })} /><span>{t('aIConfigPanel.tool-loop-mode-experimental')}<span className="mt-1 block text-xs text-muted-foreground">{t('aIConfigPanel.evidence-gathering-is-driven-by-native-function')}</span></span></label>
             <div>
-              <label id="repository-chat-streaming-label" className="mb-1 block text-sm font-medium text-foreground">{t('流式回答', 'Streaming answers')}</label>
+              <label id="repository-chat-streaming-label" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.streaming-answers')}</label>
               <Select value={repositoryChatSettings.streamingMode} onValueChange={(value) => setRepositoryChatSettings({ streamingMode: value === 'off' ? 'off' : 'auto' })}>
                 <SelectTrigger aria-labelledby="repository-chat-streaming-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">{t('自动（不支持时降级为整段返回）', 'Auto (falls back to full response when unsupported)')}</SelectItem>
-                  <SelectItem value="off">{t('关闭', 'Off')}</SelectItem>
+                  <SelectItem value="auto">{t('aIConfigPanel.auto-falls-back-to-full-response-when-unsupporte')}</SelectItem>
+                  <SelectItem value="off">{t('aIConfigPanel.off')}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="mt-1 text-xs text-muted-foreground">{t('仅对最终回答生效，取证过程仍按步骤进行；走后端代理时自动降级为整段返回。', 'Applies to the final answer only; retrieval still runs step by step. Falls back to a full response when the backend proxy is used.')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.applies-to-the-final-answer-only-retrieval-still')}</p>
             </div>
             <div>
-              <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('单轮工具调用上限', 'Maximum tool calls per turn')}</label>
+              <label htmlFor="repository-chat-tool-limit" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.maximum-tool-calls-per-turn')}</label>
               <Input id="repository-chat-tool-limit" type="number" min={1} max={48} value={repositoryChatSettings.agentBudget.maxToolCalls} onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const maxToolCalls = Number.isFinite(parsed) ? Math.min(48, Math.max(1, Math.trunc(parsed))) : 20;
                 setRepositoryChatSettings({ maxToolsPerTurn: maxToolCalls, agentBudget: { ...repositoryChatSettings.agentBudget, maxToolCalls } });
               }} />
-              <p className="mt-1 text-xs text-muted-foreground">{t('限制只读工具总调用次数，防止无边界检索。', 'Limits all read-only tool calls to prevent unbounded retrieval.')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.limits-all-read-only-tool-calls-to-prevent-unbou')}</p>
             </div>
             <div>
-              <label htmlFor="repository-chat-turn-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大取证轮数', 'Maximum evidence rounds')}</label>
+              <label htmlFor="repository-chat-turn-limit" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.maximum-evidence-rounds')}</label>
               <Input id="repository-chat-turn-limit" type="number" min={1} max={8} value={repositoryChatSettings.agentBudget.maxTurns} onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const maxTurns = Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.trunc(parsed))) : 4;
@@ -881,16 +899,16 @@ Repository information:
               }} />
             </div>
             <div>
-              <label htmlFor="repository-chat-no-progress-limit" className="mb-1 block text-sm font-medium text-foreground">{t('连续无进展轮次上限', 'Maximum consecutive no-progress rounds')}</label>
+              <label htmlFor="repository-chat-no-progress-limit" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.maximum-consecutive-no-progress-rounds')}</label>
               <Input id="repository-chat-no-progress-limit" type="number" min={1} max={4} value={repositoryChatSettings.agentBudget.maxNoProgressRounds} onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const maxNoProgressRounds = Number.isFinite(parsed) ? Math.min(4, Math.max(1, Math.trunc(parsed))) : 2;
                 setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxNoProgressRounds } });
               }} />
-              <p className="mt-1 text-xs text-muted-foreground">{t('连续轮次未取得新的可引用来源时停止，避免重复读取。标准值为 2。', 'Stops repeated retrieval after consecutive rounds without new citable sources. Standard: 2.')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.stops-repeated-retrieval-after-consecutive-round')}</p>
             </div>
             <div>
-              <label htmlFor="repository-chat-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大文件读取数', 'Maximum files read')}</label>
+              <label htmlFor="repository-chat-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.maximum-files-read')}</label>
               <Input id="repository-chat-read-limit" type="number" min={1} max={16} value={repositoryChatSettings.agentBudget.maxReadFiles} onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const maxReadFiles = Number.isFinite(parsed) ? Math.min(16, Math.max(1, Math.trunc(parsed))) : 6;
@@ -898,16 +916,16 @@ Repository information:
               }} />
             </div>
             <div>
-              <label htmlFor="repository-chat-code-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最大代码文件读取数', 'Maximum code files read')}</label>
+              <label htmlFor="repository-chat-code-read-limit" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.maximum-code-files-read')}</label>
               <Input id="repository-chat-code-read-limit" type="number" min={0} max={12} value={repositoryChatSettings.agentBudget.maxCodeReads} onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const maxCodeReads = Number.isFinite(parsed) ? Math.min(repositoryChatSettings.agentBudget.maxReadFiles, Math.min(12, Math.max(0, Math.trunc(parsed)))) : 3;
                 setRepositoryChatSettings({ agentBudget: { ...repositoryChatSettings.agentBudget, maxCodeReads } });
               }} />
-              <p className="mt-1 text-xs text-muted-foreground">{t('代码只会在文档证据不足且 Evidence Gate 明确要求时读取。', 'Code is read only when documentation evidence is insufficient and the Evidence Gate requests it.')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.code-is-read-only-when-documentation-evidence-is')}</p>
             </div>
             <div>
-              <label htmlFor="repository-chat-duration-limit" className="mb-1 block text-sm font-medium text-foreground">{t('最长执行时间（秒）', 'Maximum execution time (seconds)')}</label>
+              <label htmlFor="repository-chat-duration-limit" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.maximum-execution-time-seconds')}</label>
               <Input id="repository-chat-duration-limit" type="number" min={15} max={300} value={Math.round(repositoryChatSettings.agentBudget.maxDurationMs / 1000)} onChange={(event) => {
                 const parsed = Number(event.target.value);
                 const maxDurationMs = (Number.isFinite(parsed) ? Math.min(300, Math.max(15, Math.trunc(parsed))) : 90) * 1000;
@@ -922,38 +940,29 @@ Repository information:
         <div className="flex items-center space-x-2 mb-3">
           <Languages className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
           <h4 className="text-sm font-medium text-foreground dark:text-foreground">
-            {t('翻译引擎', 'Translation Engine')}
+            {t('aIConfigPanel.translation-engine')}
           </h4>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label id="translation-engine-label" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-              {t('README 文档翻译使用的引擎', 'Engine used for README document translation')}
+              {t('aIConfigPanel.engine-used-for-readme-document-translation')}
             </label>
             <Select value={translationEngine} onValueChange={(value) => setTranslationEngine(value as TranslationEngine)}>
               <SelectTrigger aria-labelledby="translation-engine-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="microsoft">{t('微软翻译（免费）', 'Microsoft Translate (Free)')}</SelectItem>
-                <SelectItem value="google">{t('Google 翻译（免费）', 'Google Translate (Free)')}</SelectItem>
-                <SelectItem value="ai">{t('AI 翻译（使用当前激活的 AI 配置）', 'AI Translation (uses the active AI configuration)')}</SelectItem>
+                <SelectItem value="microsoft">{t('aIConfigPanel.microsoft-translate-free')}</SelectItem>
+                <SelectItem value="google">{t('aIConfigPanel.google-translate-free')}</SelectItem>
+                <SelectItem value="ai">{t('aIConfigPanel.ai-translation-uses-the-active-ai-configuration')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground self-end pb-1">
             {translationEngine === 'ai'
-              ? t(
-                  'AI 翻译质量通常更高，但速度较慢且消耗 API 额度，将使用上方当前激活的 AI 配置。',
-                  'AI translation usually has higher quality, but is slower and consumes API quota. It uses the active AI configuration above.'
-                )
+              ? t('aIConfigPanel.ai-translation-usually-has-higher-quality-but-is')
               : translationEngine === 'google'
-                ? t(
-                    'Google 免费接口，无需配置；部分地区可能无法直连。',
-                    'Free Google endpoint, no configuration needed; may be unreachable in some regions.'
-                  )
-                : t(
-                    '微软 Edge 免费接口，无需配置，直连速度快。',
-                    'Free Microsoft Edge endpoint, no configuration needed, fast direct connection.'
-                  )}
+                ? t('aIConfigPanel.free-google-endpoint-no-configuration-needed-may')
+                : t('aIConfigPanel.free-microsoft-edge-endpoint-no-configuration-ne')}
           </p>
         </div>
       </div>

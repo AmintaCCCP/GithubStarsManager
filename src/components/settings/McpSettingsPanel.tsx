@@ -1,3 +1,8 @@
+
+
+
+
+import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
@@ -21,11 +26,11 @@ import { useMcpActions } from '../../features/settings/hooks/useMcpActions';
 import { MCP_DEFAULT_PORT, normalizeMcpHost } from '../../utils/mcpHost';
 
 interface McpSettingsPanelProps {
-  t: (zh: string, en: string) => string;
+  t: TranslateFn;
 }
 
 export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
-  const { mcpConfig, setMcpConfig, language } = useAppStore(useShallow((state) => ({
+  const { mcpConfig, setMcpConfig } = useAppStore(useShallow((state) => ({
     mcpConfig: state.mcpConfig,
     setMcpConfig: state.setMcpConfig,
     language: state.language,
@@ -93,31 +98,28 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedKey(key);
-      toast(t('已复制', 'Copied'), 'success');
+      toast(t('mcpSettingsPanel.copied'), 'success');
       setTimeout(() => setCopiedKey(null), 1500);
     } catch {
-      toast(t('复制失败', 'Copy failed'), 'error');
+      toast(t('mcpSettingsPanel.copy-failed'), 'error');
     }
   };
 
   const statusLabel = mcpConfig.enabled
-    ? t('运行中', 'Running')
-    : t('已停止', 'Stopped');
+    ? t('mcpSettingsPanel.running')
+    : t('mcpSettingsPanel.stopped');
 
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-3">
         <Cable className="w-6 h-6 text-muted-foreground dark:text-muted-foreground" />
         <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
-          {t('MCP 服务', 'MCP Server')}
+          {t('mcpSettingsPanel.mcp-server')}
         </h3>
       </div>
 
       <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-        {t(
-          '让 Claude Code / Cursor 等 Agent 通过 Streamable HTTP 读取本应用中的星标仓库、AI 摘要与标签。默认关闭；开启后无需安装额外软件。',
-          'Let agents (Claude Code, Cursor, etc.) read your starred repos, AI summaries, and tags via Streamable HTTP. Off by default; no extra install when enabled.'
-        )}
+        {t('mcpSettingsPanel.let-agents-claude-code-cursor-etc-read-your-star')}
       </p>
 
       {error && (
@@ -132,21 +134,21 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
         <div className="flex items-center justify-between gap-4">
           <div>
             <h4 className="font-medium text-foreground dark:text-foreground">
-              {t('启用 MCP 服务', 'Enable MCP Server')}
+              {t('mcpSettingsPanel.enable-mcp-server')}
             </h4>
             <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
               {backendMode
-                ? t('后端模式：挂载于 /mcp', 'Backend mode: mounted at /mcp')
+                ? t('mcpSettingsPanel.backend-mode-mounted-at-mcp')
                 : isElectronApp
-                  ? t('客户端本地模式：127.0.0.1', 'Desktop local mode: 127.0.0.1')
-                  : t('需要后端连接', 'Requires backend connection')}
+                  ? t('mcpSettingsPanel.desktop-local-mode-127-0-0-1')
+                  : t('mcpSettingsPanel.requires-backend-connection')}
             </p>
           </div>
           <Switch
             checked={mcpConfig.enabled}
             disabled={saving || loading}
             onCheckedChange={(checked) => void handleToggle(checked)}
-            aria-label={t('启用 MCP 服务', 'Enable MCP service')}
+            aria-label={t('mcpSettingsPanel.enable-mcp-service')}
           />
         </div>
 
@@ -159,7 +161,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             <AlertCircle className="w-4 h-4 text-muted-foreground" />
           )}
           <span className="text-muted-foreground dark:text-muted-foreground">
-            {t('状态', 'Status')}: {statusLabel}
+            {t('mcpSettingsPanel.status-with-value', { status: statusLabel })}
           </span>
           {backendMode && (
             <Button
@@ -168,7 +170,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               size="icon"
               onClick={() => void refreshFromBackend()}
               className="ml-auto h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
-              aria-label={t('刷新', 'Refresh')}
+              aria-label={t('mcpSettingsPanel.refresh')}
             >
               <RefreshCw className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -177,15 +179,12 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
 
         {vectorAvailable === false && (
           <p className="text-xs text-warning">
-            {t(
-              '向量搜索未配置：Agent 不会看到 gsm_vector_search 工具。可在「向量搜索」中配置。',
-              'Vector search not configured: gsm_vector_search will not be listed. Configure under Vector Search.'
-            )}
+            {t('mcpSettingsPanel.vector-search-not-configured-gsm-vector-search-w')}
           </p>
         )}
         {vectorAvailable === true && (
           <p className="text-xs text-success">
-            {t('向量搜索已启用，将暴露 gsm_vector_search。', 'Vector search enabled; gsm_vector_search is listed.')}
+            {t('mcpSettingsPanel.vector-search-enabled-gsm-vector-search-is-liste')}
           </p>
         )}
       </div>
@@ -194,11 +193,11 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       {isElectronApp && !backendMode && (
         <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
           <h4 className="font-medium text-foreground dark:text-foreground">
-            {t('本地监听', 'Local Listen')}
+            {t('mcpSettingsPanel.local-listen')}
           </h4>
           <div className="grid grid-cols-2 gap-3 max-w-md">
             <label className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('主机', 'Host')}
+              {t('mcpSettingsPanel.host')}
               <Input
                 type="text"
                 value={mcpConfig.host}
@@ -207,7 +206,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               />
             </label>
             <label className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('端口', 'Port')}
+              {t('mcpSettingsPanel.port')}
               <NumberInput
                 min={1}
                 max={65535}
@@ -229,7 +228,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             </label>
           </div>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-            {t('默认仅绑定 127.0.0.1，仅本机 Agent 可访问。', 'Binds to 127.0.0.1 by default; local agents only.')}
+            {t('mcpSettingsPanel.binds-to-127-0-0-1-by-default-local-agents-only')}
           </p>
         </div>
       )}
@@ -238,7 +237,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="font-medium text-foreground dark:text-foreground">
-            {t('访问 Token', 'Access Token')}
+            {t('mcpSettingsPanel.access-token')}
           </h4>
           <Button
             type="button"
@@ -247,27 +246,24 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             disabled={saving || !mcpConfig.enabled}
             title={
               !mcpConfig.enabled
-                ? t('请先开启 MCP 服务', 'Enable MCP first')
+                ? t('mcpSettingsPanel.enable-mcp-first')
                 : undefined
             }
             className="text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {t('重置 Token', 'Reset Token')}
+            {t('mcpSettingsPanel.reset-token')}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-          {t(
-            'Token 会固定保存，重启后不变，可随时查看与复制。仅当你点击「重置 Token」时才会更换，旧配置会失效。请勿泄露。',
-            'Token is stored permanently and stays the same across restarts. It only changes when you click Reset Token (old agent configs then stop working). Do not share it.'
-          )}
+          {t('mcpSettingsPanel.token-is-stored-permanently-and-stays-the-same-a')}
         </p>
         <div className="flex items-center gap-2">
           <Input
-            aria-label={t('访问 Token', 'Access Token')}
+            aria-label={t('mcpSettingsPanel.access-token')}
             type={showToken ? 'text' : 'password'}
             readOnly
             value={mcpConfig.token || ''}
-            placeholder={t('开启服务后自动生成', 'Generated when enabled')}
+            placeholder={t('mcpSettingsPanel.generated-when-enabled')}
             className="flex-1 px-3 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm font-mono"
           />
           <Button
@@ -276,7 +272,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             size="icon"
             onClick={() => setShowToken((v) => !v)}
             className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent"
-            aria-label={showToken ? t('隐藏', 'Hide') : t('显示', 'Show')}
+            aria-label={showToken ? t('mcpSettingsPanel.hide') : t('mcpSettingsPanel.show')}
           >
             {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </Button>
@@ -287,7 +283,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
             onClick={() => void copyText('token', mcpConfig.token)}
             disabled={!mcpConfig.token}
             className="h-8 w-8 p-2 rounded-lg hover:bg-accent dark:hover:bg-accent disabled:opacity-40"
-            aria-label={t('复制 Token', 'Copy token')}
+            aria-label={t('mcpSettingsPanel.copy-token')}
           >
             {copiedKey === 'token' ? (
               <CheckCircle className="w-4 h-4 text-success" />
@@ -301,7 +297,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
       {/* URLs + copy config */}
       <div className="p-6 bg-card dark:bg-card rounded-xl border border-border dark:border-border space-y-4">
         <h4 className="font-medium text-foreground dark:text-foreground">
-          {t('连接信息', 'Connection')}
+          {t('mcpSettingsPanel.connection')}
         </h4>
         <div className="space-y-2 text-sm">
           <div className="flex items-center gap-2">
@@ -317,14 +313,14 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               size="icon"
               onClick={() => void copyText('http', mcpHttpUrl)}
               className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
-              aria-label={t('复制 Streamable HTTP 地址', 'Copy Streamable HTTP URL')}
+              aria-label={t('mcpSettingsPanel.copy-streamable-http-url')}
             >
               <Copy className="w-3.5 h-3.5" />
             </Button>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground dark:text-muted-foreground w-36 flex-shrink-0">
-              SSE ({t('兼容', 'legacy')})
+              SSE ({t('mcpSettingsPanel.legacy')})
             </span>
             <code className="flex-1 truncate text-xs font-mono text-foreground dark:text-foreground">
               {mcpSseUrl}
@@ -335,7 +331,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               size="icon"
               onClick={() => void copyText('sse', mcpSseUrl)}
               className="h-8 w-8 p-1.5 rounded-lg hover:bg-accent dark:hover:bg-accent"
-              aria-label={t('复制 SSE 地址', 'Copy SSE URL')}
+              aria-label={t('mcpSettingsPanel.copy-sse-url')}
             >
               <Copy className="w-3.5 h-3.5" />
             </Button>
@@ -345,7 +341,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('一键复制 Agent 配置 (JSON)', 'Copy agent config (JSON)')}
+              {t('mcpSettingsPanel.copy-agent-config-json')}
             </span>
             <Button
               type="button"
@@ -354,20 +350,18 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg"
             >
               <Copy className="w-3.5 h-3.5" />
-              {copiedKey === 'json' ? t('已复制', 'Copied') : t('复制 JSON', 'Copy JSON')}
+              {copiedKey === 'json' ? t('mcpSettingsPanel.copied') : t('mcpSettingsPanel.copy-json')}
             </Button>
           </div>
           <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-muted/40 overflow-x-auto text-foreground dark:text-muted-foreground border border-border/60 dark:border-border">
             {maskToken(agentConfigJson)}
           </pre>
           <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-2">
-            {language === 'zh'
-              ? '优先使用 Streamable HTTP（上面 JSON）。若客户端只支持旧版 SSE，用下方 SSE URL：GET 打开流后 POST 到 messages。'
-              : 'Prefer Streamable HTTP (JSON above). If the client only supports legacy SSE, use the SSE URL below: GET opens the stream, then POST to messages.'}
+            {t('mcpSettingsPanel.prefer-streamable-http-json-above-if-the-client')}
           </p>
           <div className="flex items-center justify-between mb-2 mt-4">
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {t('SSE 兼容配置 (JSON)', 'SSE-compatible config (JSON)')}
+              {t('mcpSettingsPanel.sse-compatible-config-json')}
             </span>
             <Button
               type="button"
@@ -376,7 +370,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
               className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-border dark:border-border hover:bg-accent dark:hover:bg-accent text-muted-foreground dark:text-muted-foreground"
             >
               <Copy className="w-3.5 h-3.5" />
-              {copiedKey === 'sse-json' ? t('已复制', 'Copied') : t('复制 SSE JSON', 'Copy SSE JSON')}
+              {copiedKey === 'sse-json' ? t('mcpSettingsPanel.copied') : t('mcpSettingsPanel.copy-sse-json')}
             </Button>
           </div>
           <pre className="text-xs font-mono p-3 rounded-lg bg-background dark:bg-muted/40 overflow-x-auto text-foreground dark:text-muted-foreground border border-border/60 dark:border-border">
@@ -387,16 +381,10 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
 
       <div className="p-4 rounded-xl border border-border dark:border-border bg-background/50 dark:bg-muted/20 text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
         <p>
-          {t(
-            '只读工具：gsm_status / gsm_search_repos / gsm_get_repo / gsm_list_categories / gsm_list_repos_by_category / gsm_stats',
-            'Read-only tools: gsm_status / gsm_search_repos / gsm_get_repo / gsm_list_categories / gsm_list_repos_by_category / gsm_stats'
-          )}
+          {t('mcpSettingsPanel.read-only-tools-gsm-status-gsm-search-repos-gsm')}
         </p>
         <p>
-          {t(
-            '可选：gsm_vector_search（需已配置向量搜索）',
-            'Optional: gsm_vector_search (when vector search is configured)'
-          )}
+          {t('mcpSettingsPanel.optional-gsm-vector-search-when-vector-search-is')}
         </p>
       </div>
     </div>

@@ -1,3 +1,5 @@
+
+import { useT } from '../../../i18n/useT';
 import { useEffect, useState } from 'react';
 import { GitHubApiService } from '../../../services/githubApi';
 import { fetchWeeklyIssueBody } from '../../../services/weeklyIssuesService';
@@ -11,6 +13,7 @@ import { useAppStore } from '../../../store/useAppStore';
 export const useWeeklyIssueBody = (issueNumber: number, enabled: boolean) => {
   const githubToken = useAppStore(state => state.githubToken);
   const language = useAppStore(state => state.language);
+  const t = useT('discovery');
   const [issueData, setIssueData] = useState<WeeklyStoredIssue | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +39,7 @@ export const useWeeklyIssueBody = (issueNumber: number, enabled: boolean) => {
         }
       } catch {
         if (!cancelled) {
-          setError(language === 'zh'
-            ? '正文加载失败，请检查网络后重试'
-            : 'Failed to load content. Please check your network and retry.');
+          setError(t('useWeeklyIssueBody.failed-to-load-content-please-check-your-network'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -48,7 +49,7 @@ export const useWeeklyIssueBody = (issueNumber: number, enabled: boolean) => {
     return () => {
       cancelled = true;
     };
-  }, [enabled, issueNumber, githubToken, language]);
+  }, [enabled, issueNumber, githubToken, language, t]);
 
   return { issueData, loading, error };
 };

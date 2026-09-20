@@ -1,3 +1,4 @@
+import { useT } from "../../../i18n/useT";
 import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
@@ -244,7 +245,7 @@ export const useSearchActions = (): SearchActions => {
   const skipNextTextSearchRef = useRef(false);
   // 当前在途 AI 搜索的控制器：新搜索启动时中止旧请求（超代语义）
   const aiSearchAbortRef = useRef<AbortController | null>(null);
-  const t = useCallback((zh: string, en: string) => language === 'zh' ? zh : en, [language]);
+  const t = useT('repositories');
 
   const keywordSearch = useCallback(async (
     query: string,
@@ -258,19 +259,19 @@ export const useSearchActions = (): SearchActions => {
     if (activeConfig) {
       try {
         // 无向量降级链：查询扩展+意图复述 → 词法候选召回 → LLM 精选排序
-        setSearchPhase(t('AI 语义分析…', 'AI semantic analysis…'));
+        setSearchPhase(t('useSearchActions.ai-semantic-analysis'));
         const aiService = new AIService(activeConfig, language);
         const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
           signal: options?.signal,
           onPhase: (phase) => {
             setSearchPhase(phase === 'selecting'
-              ? t('AI 精选相关仓库…', 'AI selecting relevant repositories…')
-              : t('AI 语义分析…', 'AI semantic analysis…'));
+              ? t('useSearchActions.ai-selecting-relevant-repositories')
+              : t('useSearchActions.ai-semantic-analysis'));
           },
           onFallback: (reason) => {
             // 端点抖动/配置问题时用户看到的不能只是"空结果"：明确告知已降级
             if (reason === 'ai_failed') {
-              toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
+              toast(t('useSearchActions.ai-request-failed-fell-back-to-local-lexical-sea'), 'warning');
             }
           },
         });
@@ -281,7 +282,7 @@ export const useSearchActions = (): SearchActions => {
         // 取消不是失败：向上传播交给 aiSearch 静默结束，不产出兜底结果
         if (isAbortError(error)) throw error;
         console.warn('❌ AI search failed, falling back to basic search:', error);
-        toast(t('AI 请求失败，已回退本地词法搜索', 'AI request failed, fell back to local lexical search'), 'warning');
+        toast(t('useSearchActions.ai-request-failed-fell-back-to-local-lexical-sea'), 'warning');
         filtered = performBasicTextSearch(repositories, query);
       }
     } else {
@@ -347,7 +348,7 @@ export const useSearchActions = (): SearchActions => {
             const hydeAbort = new AbortController();
             let hydeTimer: ReturnType<typeof setTimeout> | null = null;
             try {
-              setSearchPhase(t('AI 分析查询…', 'AI analyzing query…'));
+              setSearchPhase(t('useSearchActions.ai-analyzing-query'));
               const hydeService = new AIService(hydeConfig, language);
               embeddingQuery = await Promise.race([
                 hydeService.generateHyDEQuery(query, hydeAbort.signal).catch(() => query),
@@ -370,11 +371,11 @@ export const useSearchActions = (): SearchActions => {
           }
 
           // 2. 前端调用 Embedding API 生成查询向量
-          setSearchPhase(t('生成查询向量…', 'Generating query vector…'));
+          setSearchPhase(t('useSearchActions.generating-query-vector'));
           const queryVectors = await embeddingClient.embed([embeddingQuery], 'query');
           if (queryVectors && queryVectors.length > 0) {
             // 2. 前端将查询向量发送到 Worker
-            setSearchPhase(t('检索向量库…', 'Searching vector index…'));
+            setSearchPhase(t('useSearchActions.searching-vector-index'));
             const vectorResults = await vectorService.query(queryVectors[0], {
               topK: vsConfig.searchTopK ?? 30,
               threshold: vsConfig.searchThreshold ?? 0.35,
@@ -401,7 +402,7 @@ export const useSearchActions = (): SearchActions => {
                 const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
                 if (rerankConfig && vsConfig.enableReranking !== false) {
                   try {
-                    setSearchPhase(t('AI 语义重排序…', 'AI semantic reranking…'));
+                    setSearchPhase(t('useSearchActions.ai-semantic-reranking'));
                     const rerankService = new AIService(rerankConfig, language);
                     reranked = await rerankService.searchRepositoriesWithSemanticReranking(scoredRepos, query);
                     rerankSucceeded = true;
@@ -463,7 +464,7 @@ export const useSearchActions = (): SearchActions => {
 
   const syncStars = useCallback(async (mode: 'auto' | 'stars-only' | 'stars-and-lists' = 'auto') => {
     if (!githubToken) {
-      toast(t('GitHub token 未找到，请重新登录。', 'GitHub token not found. Please login again.'), 'error');
+      toast(t('useSearchActions.github-token-not-found-please-login-again'), 'error');
       return;
     }
 
@@ -488,7 +489,7 @@ export const useSearchActions = (): SearchActions => {
           const listsApi = createGitHubListsApiService(githubToken);
           const login = user?.login;
           if (!login) {
-            throw new Error(t('无法获取 GitHub 用户名，请重新登录。', 'Failed to get GitHub username. Please login again.'));
+            throw new Error(t('useSearchActions.failed-to-get-github-username-please-login-again'));
           }
           const lists = await listsApi.getUserLists(login);
 
@@ -517,28 +518,16 @@ export const useSearchActions = (): SearchActions => {
               .map(([name, count]) => `${name}(${count})`)
               .join('、');
             const createdHint = createdCategoriesCount > 0
-              ? t(
-                  `（新建 ${createdCategoriesCount} 个分类）`,
-                  ` (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created)`
-                )
+              ? t('useSearchActions.list-sync-new-categories', { count: createdCategoriesCount })
               : '';
-            toast(t(
-              `已同步 ${lists.length} 个 list，并应用到 ${appliedTotal} 个未锁定仓库：${listSummary}${createdHint}`,
-              `Synced ${lists.length} lists, applied to ${appliedTotal} unlocked repositories: ${listSummary}${createdHint}`
-            ), 'info');
+            toast(t('useSearchActions.synced-v1-lists-applied-to-appliedtotal-unlocked', { v1: lists.length, appliedTotal: appliedTotal, listSummary: listSummary, createdHint: createdHint }), 'info');
           } else if (createdCategoriesCount > 0) {
             // 命中数为 0，但本次新建了分类（云端 list 与本地无交集但仍有其名分类）
-            toast(t(
-              `已同步 ${lists.length} 个 list（新建 ${createdCategoriesCount} 个分类）。`,
-              `Synced ${lists.length} lists (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created).`
-            ), 'info');
+            toast(t('useSearchActions.list-sync-complete', { lists: lists.length, newCount: createdCategoriesCount }), 'info');
           }
         } catch (listError) {
           console.error('List sync failed:', listError);
-          toast(t(
-            'List 同步失败，星标仓库已同步。请稍后重试，或检查 GitHub Token 权限（需 user scope）。',
-            'List sync failed, starred repositories were synced. Retry later, or check the GitHub Token has the user scope.'
-          ), 'error');
+          toast(t('useSearchActions.list-sync-failed-starred-repositories-were-synce'), 'error');
           // 不中断：星标同步结果仍然生效
         }
       }
@@ -552,17 +541,17 @@ export const useSearchActions = (): SearchActions => {
       setLastSync(new Date().toISOString());
 
       if (newRepoCount > 0) {
-        toast(t(`同步完成！发现 ${newRepoCount} 个新仓库。`, `Sync completed! Found ${newRepoCount} new repositories.`), 'success');
+        toast(t('useSearchActions.sync-completed-found-newrepocount-new-repositori', { newRepoCount: newRepoCount }), 'success');
       } else {
-        toast(t('同步完成！所有仓库都是最新的。', 'Sync completed! All repositories are up to date.'), 'info');
+        toast(t('useSearchActions.sync-completed-all-repositories-are-up-to-date'), 'info');
       }
 
     } catch (error) {
       console.error('Sync failed:', error);
       if (error instanceof Error && error.message.includes('token')) {
-        toast(t('GitHub token 已过期或无效，请重新登录。', 'GitHub token has expired or is invalid. Please login again.'), 'error');
+        toast(t('useSearchActions.github-token-has-expired-or-is-invalid-please-lo'), 'error');
       } else {
-        toast(t('同步失败，请检查网络连接或稍后重试。', 'Sync failed. Please check your network connection or try again later.'), 'error');
+        toast(t('useSearchActions.sync-failed-please-check-your-network-connection'), 'error');
       }
     } finally {
       setSyncingStars(false);

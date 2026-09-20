@@ -1,3 +1,4 @@
+import { makeT } from '../../../i18n/useT';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAppStore } from '../../../store/useAppStore';
@@ -72,7 +73,7 @@ describe('useBackendSettingsActions 后端地址配置', () => {
     )) as never);
   });
 
-  const render = () => renderHook(() => useBackendSettingsActions({ t: (zh: string) => zh }));
+  const render = () => renderHook(() => useBackendSettingsActions({ t: makeT('zh', 'settings') }));
 
   it('urlInput 预填记住的后端地址并自动去掉 /api', () => {
     const { result } = render();
