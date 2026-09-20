@@ -138,5 +138,16 @@
   },
   "discoveryPlatform": {
     "All": "Все платформы"
+  },
+  "trendingHistoryPanel": {
+    "title": "Изменения рейтинга",
+    "hint": "В сравнении с предыдущим записанным днём",
+    "new-entry": "Новое в списке",
+    "rising": "Рост",
+    "falling": "Падение",
+    "streak-days": "{{v1}} дней подряд",
+    "stars-gained": "+{{v1}} stars с первого наблюдения",
+    "first-seen": "Первая запись о лидере: {{v1}}"
   }
+
 }

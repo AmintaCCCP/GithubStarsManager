@@ -40,6 +40,7 @@ import type {
   SyncMode,
   TranslationEngine,
   RepositoryChatSettings,
+  TrendingSnapshot,
 } from '../types';
 import type { ThemePresetId } from '../constants/themePresets';
 import type { GitHubListsApiService } from '../services/githubListsApi';
@@ -261,6 +262,9 @@ export interface AppActions {
   addTelegramFollow: (channel: string) => void;
   removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
+
+  /** Trending 快照（开发守则 §7）：记一份榜单快照，去重与上限在 utils 里处理。 */
+  recordTrendingSnapshot: (snapshot: TrendingSnapshot) => void;
 }
 
 export type AppStoreState = AppState & AppActions;

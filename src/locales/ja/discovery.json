@@ -138,5 +138,16 @@
   },
   "discoveryPlatform": {
     "All": "すべてのプラットフォーム"
+  },
+  "trendingHistoryPanel": {
+    "title": "ランキングの変化",
+    "hint": "前回記録した日との比較",
+    "new-entry": "新登場",
+    "rising": "上昇",
+    "falling": "下降",
+    "streak-days": "{{v1}} 日連続",
+    "stars-gained": "初回記録から +{{v1}} stars",
+    "first-seen": "首位は{{v1}}に初記録"
   }
+
 }

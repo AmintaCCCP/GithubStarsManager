@@ -138,5 +138,16 @@
   },
   "discoveryPlatform": {
     "All": "All Platforms"
+  },
+  "trendingHistoryPanel": {
+    "title": "Ranking changes",
+    "hint": "Compared with the previous recorded day",
+    "new-entry": "New entry",
+    "rising": "Up",
+    "falling": "Down",
+    "streak-days": "{{v1}} days in a row",
+    "stars-gained": "+{{v1}} stars since we first recorded it",
+    "first-seen": "Top entry first recorded {{v1}}"
   }
+
 }

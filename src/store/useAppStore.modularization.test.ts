@@ -80,6 +80,7 @@ const currentPersistedKeys = [
   'categoryMatchMode',
   'defaultCategoryOverrides',
   'assetFilters',
+  'trendingSnapshots',
   'theme',
   'themePreset',
   'currentView',

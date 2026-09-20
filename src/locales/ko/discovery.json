@@ -138,5 +138,16 @@
   },
   "discoveryPlatform": {
     "All": "모든 플랫폼"
+  },
+  "trendingHistoryPanel": {
+    "title": "순위 변화",
+    "hint": "이전에 기록한 날과 비교",
+    "new-entry": "신규 진입",
+    "rising": "상승",
+    "falling": "하락",
+    "streak-days": "{{v1}}일 연속",
+    "stars-gained": "처음 기록한 뒤 +{{v1}} stars",
+    "first-seen": "1위는 {{v1}}에 처음 기록"
   }
+
 }

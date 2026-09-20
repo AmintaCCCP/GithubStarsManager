@@ -24,6 +24,8 @@ export const createInitialState = (): AppState => ({
       isAuthenticated: false,
       accountWorkspaces: {},
       repositories: [],
+      // Trending 快照（开发守则 §7）：本地榜单历史，默认空
+      trendingSnapshots: [],
       gists: [],
       starredGists: [],
       gistSearchFilters: initialGistSearchFilters,
