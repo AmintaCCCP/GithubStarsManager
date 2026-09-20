@@ -35,6 +35,9 @@ partialize: (state) => ({
   repositories: state.repositories,
   lastSync: state.lastSync,
 
+  // Theme token（开发守则 §14）：声明式外观偏好
+  themeTokens: state.themeTokens,
+
   // 持久化 Gist 数据
   gists: state.gists,
   starredGists: state.starredGists,

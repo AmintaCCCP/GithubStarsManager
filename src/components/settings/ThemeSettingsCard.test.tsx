@@ -37,6 +37,11 @@ beforeEach(() => {
     setThemePreset: vi.fn((preset: string) => {
       mocks.state.themePreset = preset;
     }),
+    // Theme token（开发守则 §14）：局部更新，内部与当前值合并
+    themeTokens: { accentColor: null, fontScale: 1, radius: 'default', animation: 'normal' },
+    updateThemeTokens: vi.fn((patch: Record<string, unknown>) => {
+      mocks.state.themeTokens = { ...(mocks.state.themeTokens as Record<string, unknown>), ...patch };
+    }),
   });
 });
 
@@ -91,5 +96,39 @@ describe('ThemeSettingsCard', () => {
     render(<ThemeSettingsCard t={t} />);
     await user.click(screen.getByText('浅色'));
     expect(mocks.state.theme).toBe('light');
+  });
+
+  it('writes theme tokens through the store action', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+
+    await user.click(screen.getByRole('button', { name: '绿色 (#16a34a)' }));
+    expect(mocks.state.themeTokens).toMatchObject({ accentColor: '#16a34a', radius: 'default' });
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '圆角' }), 'large');
+    expect(mocks.state.themeTokens).toMatchObject({ accentColor: '#16a34a', radius: 'large' });
+
+    await user.selectOptions(screen.getByRole('combobox', { name: '字号' }), '1.25');
+    expect(mocks.state.themeTokens).toMatchObject({ fontScale: 1.25 });
+
+    await user.click(screen.getByRole('switch', { name: '减弱动效' }));
+    expect(mocks.state.themeTokens).toMatchObject({ animation: 'reduced' });
+  });
+
+  it('labels palette colors and shows the active preset color in the picker', () => {
+    render(<ThemeSettingsCard t={t} />);
+
+    expect(screen.getByRole('button', { name: '蓝色 (#2563eb)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText('自定义强调色')).toHaveValue('#f8fafc');
+  });
+
+  it('resets every token back to the presets', async () => {
+    const user = userEvent.setup();
+    mocks.state.themeTokens = { accentColor: '#2563eb', fontScale: 1.25, radius: 'large', animation: 'reduced' };
+    render(<ThemeSettingsCard t={t} />);
+
+    await user.click(screen.getByRole('button', { name: '恢复默认外观' }));
+
+    expect(mocks.state.themeTokens).toEqual({ accentColor: null, fontScale: 1, radius: 'default', animation: 'normal' });
   });
 });

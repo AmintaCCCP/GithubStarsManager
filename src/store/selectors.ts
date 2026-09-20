@@ -11,6 +11,7 @@ export const selectAppShellState = (state: AppStoreState) => ({
   selectedCategory: state.selectedCategory,
   theme: state.theme,
   themePreset: state.themePreset,
+  themeTokens: state.themeTokens,
   language: state.language,
   hasHydrated: state.hasHydrated,
   searchResults: state.searchResults,

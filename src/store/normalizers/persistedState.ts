@@ -10,6 +10,7 @@ import { defaultHeaderMenuConfig, defaultSubscriptionChannels } from '../../type
 import { DEFAULT_THEME_PRESET_ID, isThemePresetId } from '../../constants/themePresets';
 import { isAppLanguage } from '../../i18n/languages';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
+import { normalizeThemeTokens } from '../../utils/themeTokens';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import type { AppStoreState } from '../types';
@@ -96,6 +97,7 @@ export const normalizePersistedState = (
     themePreset: isThemePresetId(safePersisted.themePreset)
       ? safePersisted.themePreset
       : DEFAULT_THEME_PRESET_ID,
+    themeTokens: normalizeThemeTokens((safePersisted as Record<string, unknown>).themeTokens),
     repositories: migratedRepositories,
     gists,
     starredGists,

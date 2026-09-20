@@ -1,10 +1,12 @@
 
 import type { AppStoreSlice } from '../types';
 import { REQUIRED_HEADER_MENU_IDS } from '../schema';
+import { normalizeThemeTokens } from '../../utils/themeTokens';
 
 export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setTheme'
   | 'setThemePreset'
+  | 'updateThemeTokens'
   | 'setCurrentView'
   | 'setSelectedCategory'
   | 'setLanguage'
@@ -36,6 +38,11 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       // UI actions
       setTheme: (theme) => set({ theme }),
       setThemePreset: (themePreset) => set({ themePreset }),
+      // Theme token 只存声明式偏好；写 CSS 变量的副作用在 App 的 effect 里。
+      // 合并当前值后再 normalize，调用方传局部即可，脏值也进不了根节点。
+      updateThemeTokens: (patch) => set((state) => ({
+        themeTokens: normalizeThemeTokens({ ...state.themeTokens, ...patch }),
+      })),
       setCurrentView: (currentView) => set({ currentView }),
       setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
       setLanguage: (language) => set({ language }),

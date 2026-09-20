@@ -14,6 +14,7 @@ import { useAppStore } from './store/useAppStore';
 import { selectAppShellState } from './store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { applyThemePreset } from './lib/themePresets';
+import { applyThemeTokens } from './utils/themeTokens';
 import { changeAppLanguage } from './i18n';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
@@ -146,6 +147,7 @@ function App() {
     selectedCategory,
     theme,
     themePreset,
+    themeTokens,
     language,
     hasHydrated,
     searchResults,
@@ -207,6 +209,12 @@ function App() {
   useEffect(() => {
     applyThemePreset(themePreset);
   }, [themePreset]);
+
+  // Theme token（开发守则 §14）：内联 CSS 变量覆盖预设；恢复默认时删掉内联值，
+  // 预设的 --radius / --primary 自然重新生效。排在预设 effect 之后即可。
+  useEffect(() => {
+    applyThemeTokens(themeTokens);
+  }, [themeTokens, theme, themePreset]);
 
   // Language side effect: zustand 的 language 是唯一事实源，这里只负责装载
   // 语言包、切换 i18next 并同步 <html lang>。

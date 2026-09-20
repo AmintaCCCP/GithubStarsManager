@@ -102,6 +102,16 @@
   }
 }
 
+/* User-selected reduced motion applies independently of the OS preference. */
+html[data-animation='reduced'] *,
+html[data-animation='reduced'] *::before,
+html[data-animation='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 .hd-drag {
   -webkit-app-region: drag;
   -webkit-user-select: none;
@@ -807,9 +817,14 @@ textarea:focus-visible,
 }
 
 .ui-chip-active {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-emphasis, var(--primary)));
   background: hsl(var(--primary) / 0.1);
   border-color: hsl(var(--primary) / 0.35);
+}
+
+/* `--primary` remains the user's solid fill; text uses the contrast-safe derivative. */
+.text-primary {
+  color: hsl(var(--primary-emphasis, var(--primary)));
 }
 
 /* Component-level class consolidation for existing Tailwind primitives. */
@@ -934,7 +949,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
    instead of solid accent, which is vivid in several theme presets. */
 .linear-filter-toggle.is-active,
 .linear-filter-chip.is-active {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-emphasis, var(--primary)));
   background: hsl(var(--primary) / 0.1);
   border-color: hsl(var(--primary) / 0.35);
 }
