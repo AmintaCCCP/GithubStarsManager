@@ -261,6 +261,9 @@ export interface AppActions {
   addTelegramFollow: (channel: string) => void;
   removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
+
+  // Clipboard GitHub link detection（开发守则 §11）
+  setClipboardDetectionEnabled: (enabled: boolean) => void;
 }
 
 export type AppStoreState = AppState & AppActions;

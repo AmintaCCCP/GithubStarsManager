@@ -64,6 +64,7 @@ export type PersistedAppState = Partial<
     | 'aiConfigs'
     | 'activeAIConfig'
     | 'repositoryChatSettings'
+    | 'clipboardDetectionEnabled'
     | 'embeddingConfigs'
     | 'activeEmbeddingConfig'
     | 'vectorSearchConfig'

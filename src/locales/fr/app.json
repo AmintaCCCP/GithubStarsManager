@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}} mots",
     "tag-count": "{{count}} balises"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "Un lien GitHub se trouve dans le presse-papiers : {{v1}}",
+    "open": "Ouvrir",
+    "dismiss": "Ignorer"
   }
+
 }

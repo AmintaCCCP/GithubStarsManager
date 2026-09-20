@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "当前账号 {{login}}。过期后可在此直接更换 token，不必退出登录。",
-    "token-hint": "过期后可在此直接更换 token，不必退出登录。"
+    "token-hint": "过期后可在此直接更换 token，不必退出登录。",
+    "clipboard-detection": "剪贴板识别",
+    "clipboard-detection-hint": "开启后只在你切回窗口时读取一次剪贴板，用来识别 GitHub 链接。非 GitHub 内容立即丢弃，不保存剪贴板内容，也不在后台监控。"
   }
 }

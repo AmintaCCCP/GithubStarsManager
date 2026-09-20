@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "현재 계정 {{login}}. 만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다.",
-    "token-hint": "만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다."
+    "token-hint": "만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다.",
+    "clipboard-detection": "클립보드 감지",
+    "clipboard-detection-hint": "켜면 창으로 돌아올 때마다 클립보드를 한 번만 읽어 GitHub 링크인지 확인합니다. GitHub이 아닌 내용은 즉시 버려지며, 저장하거나 백그라운드에서 감시하지 않습니다."
   }
 }

@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}} 단어",
     "tag-count": "{{count}} 태그"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "클립보드에 GitHub 링크가 있습니다: {{v1}}",
+    "open": "열기",
+    "dismiss": "무시"
   }
+
 }

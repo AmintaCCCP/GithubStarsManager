@@ -101,6 +101,10 @@ vi.mock('../store/useAppStore', () => ({
       language: 'zh',
       githubToken: null,
       setReadmeModalOpen: vi.fn(),
+      repositories: [],
+      // 开发守则 §11：剪贴板识别默认关闭
+      clipboardDetectionEnabled: false,
+      setClipboardDetectionEnabled: vi.fn(),
     };
     return selector ? selector(state) : state;
   }),

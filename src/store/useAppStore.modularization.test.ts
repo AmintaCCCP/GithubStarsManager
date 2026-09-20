@@ -51,6 +51,7 @@ const currentPersistedKeys = [
   'accountWorkspaces',
   'repositories',
   'lastSync',
+  'clipboardDetectionEnabled',
   'gists',
   'starredGists',
   'gistSearchFilters',

@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}} chars",
     "tag-count": "{{count}} tags"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "GitHub link on your clipboard: {{v1}}",
+    "open": "Open",
+    "dismiss": "Dismiss"
   }
+
 }

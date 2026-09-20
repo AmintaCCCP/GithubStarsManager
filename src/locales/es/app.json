@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}} palabras",
     "tag-count": "{{count}} etiquetas"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "Hay un enlace de GitHub en el portapapeles: {{v1}}",
+    "open": "Abrir",
+    "dismiss": "Descartar"
   }
+
 }

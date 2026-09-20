@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "Signed in as {{login}}. Update an expired token here without logging out.",
-    "token-hint": "Update an expired token here without logging out."
+    "token-hint": "Update an expired token here without logging out.",
+    "clipboard-detection": "Clipboard detection",
+    "clipboard-detection-hint": "When enabled, the clipboard is read once each time you switch back to the window, only to recognize GitHub links. Anything else is discarded immediately; the clipboard is never stored and never watched in the background."
   }
 }

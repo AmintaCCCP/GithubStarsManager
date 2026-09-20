@@ -18,6 +18,7 @@ import { changeAppLanguage } from './i18n';
 import { useAutoUpdateCheck } from './hooks/useAutoUpdateCheck';
 import { logger } from './services/logger';
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
+import { ClipboardLinkBanner } from './components/ClipboardLinkBanner';
 import { ListsPushIndicator } from './components/ListsPushIndicator';
 import { useBackendLifecycle } from './features/lifecycle/hooks/useBackendLifecycle';
 import type { AppState } from './types';
@@ -273,6 +274,7 @@ function App() {
       <UpdateNotificationBanner />
       <Header />
       <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+        <ClipboardLinkBanner />
         {currentViewContent}
       </main>
       <BackToTop />

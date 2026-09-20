@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}} слов",
     "tag-count": "{{count}} тегов"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "В буфере обмена есть ссылка GitHub: {{v1}}",
+    "open": "Открыть",
+    "dismiss": "Пропустить"
   }
+
 }

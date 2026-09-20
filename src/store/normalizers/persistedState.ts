@@ -96,6 +96,7 @@ export const normalizePersistedState = (
     themePreset: isThemePresetId(safePersisted.themePreset)
       ? safePersisted.themePreset
       : DEFAULT_THEME_PRESET_ID,
+    clipboardDetectionEnabled: safePersisted.clipboardDetectionEnabled === true,
     repositories: migratedRepositories,
     gists,
     starredGists,

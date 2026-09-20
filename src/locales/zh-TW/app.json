@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}} 字",
     "tag-count": "{{count}} 個標籤"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "剪貼簿裡有一個 GitHub 連結：{{v1}}",
+    "open": "開啟",
+    "dismiss": "略過"
   }
+
 }

@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "Conta corrente {{login}}. Após a expiração, você pode substituir o token diretamente aqui, sem sair.",
-    "token-hint": "Após a expiração, você pode substituir o token diretamente aqui, sem sair."
+    "token-hint": "Após a expiração, você pode substituir o token diretamente aqui, sem sair.",
+    "clipboard-detection": "Detecção da área de transferência",
+    "clipboard-detection-hint": "Ao ativar, a área de transferência é lida uma vez sempre que você volta para a janela, apenas para reconhecer links do GitHub. O resto é descartado na hora; nunca é guardado nem monitorado em segundo plano."
   }
 }

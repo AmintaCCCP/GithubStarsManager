@@ -476,6 +476,10 @@ export interface AppState {
   analyzingRepositoryIds: Set<number>;
   repositoryViewMode: 'grid' | 'list';
 
+  // Clipboard GitHub link detection（开发守则 §11）
+  /** 默认关闭；开启后只在前台 focus 时读一次剪贴板，不做后台监控。 */
+  clipboardDetectionEnabled: boolean;
+
   // Gists
   gists: Gist[];
   starredGists: Gist[];

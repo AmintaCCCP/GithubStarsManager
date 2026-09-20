@@ -35,6 +35,9 @@ partialize: (state) => ({
   repositories: state.repositories,
   lastSync: state.lastSync,
 
+  // 剪贴板识别偏好（开发守则 §11）：默认关闭，只是本地开关
+  clipboardDetectionEnabled: state.clipboardDetectionEnabled,
+
   // 持久化 Gist 数据
   gists: state.gists,
   starredGists: state.starredGists,

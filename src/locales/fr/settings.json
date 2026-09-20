@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "Compte courant {{login}}. Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",
-    "token-hint": "Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter."
+    "token-hint": "Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",
+    "clipboard-detection": "Détection du presse-papiers",
+    "clipboard-detection-hint": "Une fois activé, le presse-papiers est lu une seule fois à chaque retour dans la fenêtre, uniquement pour reconnaître les liens GitHub. Le reste est écarté immédiatement ; rien n'est conservé ni surveillé en arrière-plan."
   }
 }

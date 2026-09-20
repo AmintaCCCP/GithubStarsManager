@@ -1188,5 +1188,11 @@
   "repositoryEditModal": {
     "char-count": "{{count}}語",
     "tag-count": "{{count}} 個のタグ"
+  },
+  "clipboardLinkBanner": {
+    "github-link-found": "クリップボードに GitHub リンクがあります: {{v1}}",
+    "open": "開く",
+    "dismiss": "無視"
   }
+
 }

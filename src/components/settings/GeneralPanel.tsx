@@ -1,7 +1,7 @@
 
 import { TranslateFn } from '../../i18n/useT';
 import React from 'react';
-import { ExternalLink, Github, Globe, Key, Mail, Monitor, Package, Twitter } from 'lucide-react';
+import { ExternalLink, Github, Globe, Key, Mail, Monitor, Package, ClipboardPaste, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -23,10 +23,18 @@ interface GeneralPanelProps {
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-  const { language, setLanguage, user } = useAppStore(useShallow((state) => ({
+  const {
+    language,
+    setLanguage,
+    user,
+    clipboardDetectionEnabled,
+    setClipboardDetectionEnabled,
+  } = useAppStore(useShallow((state) => ({
     language: state.language,
     setLanguage: state.setLanguage,
     user: state.user,
+    clipboardDetectionEnabled: state.clipboardDetectionEnabled,
+    setClipboardDetectionEnabled: state.setClipboardDetectionEnabled,
   })));
   const desktop = useDesktopActions({ t });
   const githubToken = useGitHubTokenActions({ t });
@@ -157,6 +165,25 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <ClipboardPaste className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <CardTitle>{t('generalPanel.clipboard-detection')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">{t('generalPanel.clipboard-detection-hint')}</p>
+            <Switch
+              aria-label={t('generalPanel.clipboard-detection')}
+              checked={clipboardDetectionEnabled}
+              onCheckedChange={setClipboardDetectionEnabled}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

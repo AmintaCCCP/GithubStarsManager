@@ -24,6 +24,8 @@ export const createInitialState = (): AppState => ({
       isAuthenticated: false,
       accountWorkspaces: {},
       repositories: [],
+      // 剪贴板识别默认关闭（开发守则 §11）
+      clipboardDetectionEnabled: false,
       gists: [],
       starredGists: [],
       gistSearchFilters: initialGistSearchFilters,

@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "Cuenta corriente {{login}}. Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión.",
-    "token-hint": "Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión."
+    "token-hint": "Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión.",
+    "clipboard-detection": "Detección del portapapeles",
+    "clipboard-detection-hint": "Al activarlo, el portapapeles se lee una vez cada vez que vuelves a la ventana, solo para reconocer enlaces de GitHub. Lo demás se descarta de inmediato; nunca se guarda ni se vigila en segundo plano."
   }
 }

@@ -832,6 +832,20 @@ describe('useAppStore repository view mode', () => {
   });
 });
 
+describe('useAppStore clipboard detection preference', () => {
+  it('only restores an explicit boolean true value', () => {
+    expect(normalizePersistedState({}, useAppStore.getState()).clipboardDetectionEnabled).toBe(false);
+    expect(normalizePersistedState(
+      { clipboardDetectionEnabled: 'true' as never },
+      useAppStore.getState(),
+    ).clipboardDetectionEnabled).toBe(false);
+    expect(normalizePersistedState(
+      { clipboardDetectionEnabled: true },
+      useAppStore.getState(),
+    ).clipboardDetectionEnabled).toBe(true);
+  });
+});
+
 describe('useAppStore theme preset', () => {
   it('defaults the theme preset for legacy persisted state', () => {
     const normalized = normalizePersistedState({}, useAppStore.getState());

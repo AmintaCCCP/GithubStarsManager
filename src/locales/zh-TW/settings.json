@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "當前帳號 {{login}}。過期後可在此直接更換 token，不必登出登入。",
-    "token-hint": "過期後可在此直接更換 token，不必登出登入。"
+    "token-hint": "過期後可在此直接更換 token，不必登出登入。",
+    "clipboard-detection": "剪貼簿辨識",
+    "clipboard-detection-hint": "開啟後只在你切回視窗時讀取一次剪貼簿，用來辨識 GitHub 連結。非 GitHub 內容立即丟棄，不儲存剪貼簿內容，也不在背景監控。"
   }
 }

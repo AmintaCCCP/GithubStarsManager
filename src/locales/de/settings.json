@@ -72,6 +72,8 @@
   },
   "generalPanel": {
     "account-token-hint": "Girokonto {{login}}. Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden.",
-    "token-hint": "Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden."
+    "token-hint": "Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden.",
+    "clipboard-detection": "Zwischenablage erkennen",
+    "clipboard-detection-hint": "Wenn aktiviert, wird die Zwischenablage einmal gelesen, sobald du zum Fenster zurückkehrst – nur um GitHub-Links zu erkennen. Alles andere wird sofort verworfen; der Inhalt wird weder gespeichert noch im Hintergrund überwacht."
   }
 }
