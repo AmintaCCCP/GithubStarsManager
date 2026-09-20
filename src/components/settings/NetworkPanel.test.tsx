@@ -53,5 +53,6 @@ describe('NetworkPanel', () => {
     render(<NetworkPanel t={(_zh, en) => en} />);
 
     expect(screen.getByLabelText('Username')).toHaveValue('stored-user');
+    expect(screen.getByRole('button', { name: 'Show password' })).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
   });
 });

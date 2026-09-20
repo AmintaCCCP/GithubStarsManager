@@ -410,8 +410,8 @@ Repository information:
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center space-x-3">
           <Bot className="w-6 h-6 text-muted-foreground dark:text-muted-foreground " />
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('AI服务配置', 'AI Service Configuration')}
@@ -672,14 +672,14 @@ Repository information:
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-base sm:text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
                   placeholder={t('在此输入自定义提示词…', 'Enter custom prompt here…')}
                 />
               </div>
             )}
           </div>
 
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-3">
             <Button
               onClick={handleSave}
               className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -723,15 +723,15 @@ Repository information:
                 : 'border-border dark:border-border hover:border-border dark:hover:border-border-strong'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-2">
                 <RadioGroupItem
                   value={config.id}
                   id={`active-ai-${config.id}`}
                   aria-label={config.name || t('AI配置', 'AI configuration')}
                 />
-                <div>
-                  <h4 className="font-medium text-foreground dark:text-foreground flex items-center">
+                <div className="min-w-0 flex-1">
+                  <h4 className="flex min-w-0 items-center font-medium text-foreground dark:text-foreground">
                     {config.name}
                     {config.useCustomPrompt && (
                       <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground">
@@ -740,7 +740,7 @@ Repository information:
                       </span>
                     )}
                   </h4>
-                  <p className="text-sm text-muted-foreground dark:text-muted-foreground">
+                  <p className="break-all text-sm text-muted-foreground dark:text-muted-foreground">
                     {(config.apiType || 'openai').toUpperCase()} • {config.baseUrl} • {config.model} • {t('并发数', 'Concurrency')}: {config.concurrency || 1}
                     {config.reasoningEffort ? ` • reasoning: ${config.reasoningEffort}` : ''}
                   </p>
@@ -761,7 +761,8 @@ Repository information:
                   size="icon"
                   onClick={() => handleTest(config)}
                   disabled={testingId === config.id}
-                  className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50"
+                  className="h-11 w-11 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors disabled:opacity-50 sm:h-9 sm:w-9"
+                  aria-label={t('测试连接', 'Test Connection')}
                   title={t('测试连接', 'Test Connection')}
                 >
                   {testingId === config.id ? (
@@ -774,7 +775,8 @@ Repository information:
                   variant="ghost"
                   size="icon"
                   onClick={() => handleEdit(config)}
-                  className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
+                  className="h-11 w-11 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors sm:h-9 sm:w-9"
+                  aria-label={t('编辑', 'Edit')}
                   title={t('编辑', 'Edit')}
                 >
                   <Edit3 className="w-4 h-4" />
@@ -797,7 +799,8 @@ Repository information:
                       }
                     }
                   }}
-                  className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
+                  className="h-11 w-11 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors sm:h-9 sm:w-9"
+                  aria-label={t('删除', 'Delete')}
                   title={t('删除', 'Delete')}
                 >
                   <Trash2 className="w-4 h-4" />

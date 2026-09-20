@@ -147,14 +147,14 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
 
   return (
     <div 
-      className="relative w-full border-b border-border dark:border-border bg-background/95 dark:bg-card/95 backdrop-blur-sm"
+      className="relative w-full max-w-full overflow-hidden border-b border-border bg-background/95 backdrop-blur-sm dark:border-border dark:bg-card/95"
     >
       {/* 滚动容器 */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
         role="tablist"
-        className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
+        className="flex max-w-full snap-x snap-mandatory gap-1 overflow-x-auto px-2 py-2 scrollbar-hide"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -179,7 +179,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
             id={`settings-tab-mobile-${tab.id}`}
             aria-selected={activeTab === tab.id}
             aria-controls={`settings-tabpanel-${tab.id}`}
-            className="min-h-[36px] shrink-0 snap-center rounded-full touch-manipulation"
+            className="min-h-11 shrink-0 snap-center rounded-full touch-manipulation sm:min-h-[36px]"
             style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             <span className="h-4 w-4 shrink-0">{tab.icon}</span>
@@ -449,16 +449,16 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   if (isModal) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent showClose={false} aria-labelledby="settings-modal-title" aria-describedby={undefined} className="h-[85vh] max-w-5xl overflow-hidden p-0">
+        <DialogContent showClose={false} aria-labelledby="settings-modal-title" aria-describedby={undefined} className="h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] w-[calc(100%_-_2rem)] max-w-[calc(100vw-2rem)] overflow-hidden p-0 sm:h-[85vh] sm:max-w-5xl">
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b ui-divider bg-background px-5 py-4 dark:bg-card sm:px-6">
+            <div className="flex items-center justify-between border-b bg-background pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] py-[calc(1rem+env(safe-area-inset-top))] ui-divider dark:bg-card sm:px-6 sm:py-4">
               <div className="flex items-center space-x-3">
                 <Settings className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
                 <DialogTitle id="settings-modal-title" className="text-xl font-semibold text-foreground dark:text-foreground">
                   {t('设置', 'Settings')}
                 </DialogTitle>
               </div>
-              <Button type="button" variant="ghost" size="icon" onClick={handleClose} aria-label={t('关闭设置', 'Close settings')}>
+              <Button type="button" variant="ghost" size="icon" onClick={handleClose} aria-label={t('关闭设置', 'Close settings')} className="h-11 w-11 sm:h-auto sm:w-auto">
                 <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
               </Button>
             </div>
@@ -490,7 +490,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <MobileTabNav tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-6">
+              <div className="min-h-0 flex-1 overflow-y-auto pl-[calc(1rem+env(safe-area-inset-left))] pr-[calc(1rem+env(safe-area-inset-right))] py-4 sm:p-6">
                 <div className="mx-auto max-w-3xl">{renderTabContent()}</div>
               </div>
             </div>
@@ -502,7 +502,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // 独立页面模式（兼容原有代码）
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto min-w-0 max-w-full sm:max-w-6xl">
       <div className="flex items-center space-x-3 mb-6">
         <Settings className="h-5 w-5 text-muted-foreground" />
         <h2 className="text-lg font-semibold tracking-tight text-foreground">
@@ -536,7 +536,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         {/* 移动端标签导航 */}
-        <div className="lg:hidden -mx-4 sm:-mx-6">
+        <div className="max-w-full overflow-hidden lg:hidden">
           <MobileTabNav
             tabs={tabs}
             activeTab={activeTab}

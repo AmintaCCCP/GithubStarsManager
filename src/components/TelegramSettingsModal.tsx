@@ -63,7 +63,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
         </div>
 
         <div className="rounded-lg border border-border dark:border-border bg-muted/50 dark:bg-muted/20 p-4">
-          <div className="mb-3 flex items-start gap-2">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start">
             <Users className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
             <div className="flex-1">
               <h4 className="text-sm font-semibold text-foreground dark:text-foreground">{t('关注列表', 'Follow list')}</h4>
@@ -91,7 +91,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
                 void probe(channel);
               }}
               disabled={isProbing || (!input.trim() && telegramFollows.length === 0)}
-              className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               title={t('真实抓取一次频道公开预览验证抓取通道', 'Fetch a channel preview once to verify the pipeline')}
             >
               <PlugZap className={`h-4 w-4 ${isProbing ? 'animate-pulse' : ''}`} />
@@ -111,7 +111,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
             </p>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               type="text"
               aria-label={t('频道名', 'Channel name')}
@@ -121,12 +121,12 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
                 if (event.key === 'Enter' && !event.nativeEvent.isComposing) handleAdd();
               }}
               placeholder="https://t.me/geekhub23 / @geekhub23 / geekhub23"
-              className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
+              className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-base text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring sm:text-sm"
             />
             <Button
               type="button"
               onClick={handleAdd}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
             >
               <Plus className="h-4 w-4" />
               {t('添加', 'Add')}
@@ -141,7 +141,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
             ) : telegramFollows.map((follow) => (
               <div
                 key={follow.channel.toLowerCase()}
-                className="flex items-center justify-between gap-3 rounded-lg bg-card dark:bg-muted/40 px-3 py-2"
+                className="flex min-w-0 flex-col items-stretch gap-2 rounded-lg bg-card dark:bg-muted/40 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground dark:text-foreground">@{follow.channel}</div>
@@ -150,7 +150,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(event) => event.stopPropagation()}
-                    className="truncate text-xs text-muted-foreground dark:text-muted-foreground hover:text-foreground transition-colors"
+                    className="block min-w-0 truncate text-xs text-muted-foreground dark:text-muted-foreground hover:text-foreground transition-colors"
                   >
                     https://t.me/{follow.channel}
                   </a>
@@ -159,7 +159,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
                   type="button"
                   variant="ghost"
                   onClick={() => handleRemove(follow)}
-                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
+                  className="h-11 w-11 self-end rounded-md p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive sm:h-8 sm:w-8 sm:self-auto"
                   title={t('取消关注', 'Unfollow')}
                   aria-label={t(`取消关注 @${follow.channel}`, `Unfollow @${follow.channel}`)}
                 >
@@ -170,11 +170,11 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:justify-end">
           <Button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:w-auto"
           >
             {t('完成', 'Done')}
           </Button>

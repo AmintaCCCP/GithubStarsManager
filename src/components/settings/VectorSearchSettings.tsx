@@ -141,11 +141,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex min-w-0 items-start gap-3 mb-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted text-foreground">
           <Search className="h-5 w-5" aria-hidden="true" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('向量语义搜索', 'Vector Semantic Search')}
           </h2>
@@ -159,8 +159,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
       </div>
 
       {/* Toggle */}
-      <div className="flex items-center justify-between p-4 bg-accent/50 dark:bg-card/50 rounded-lg">
-        <div>
+      <div className="flex min-w-0 flex-col gap-3 p-4 bg-accent/50 dark:bg-card/50 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <div className="font-medium text-foreground dark:text-foreground">
             {t('启用向量搜索', 'Enable Vector Search')}
           </div>
@@ -172,6 +172,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           checked={vectorSearchConfig.enabled}
           onCheckedChange={(enabled) => setVectorSearchConfig({ enabled })}
           aria-label={t('启用向量搜索', 'Enable Vector Search')}
+          className="shrink-0"
         />
       </div>
 
@@ -233,7 +234,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'http://localhost:11434'
                 : 'https://api.example.com/v1/embeddings'
             }
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-base sm:text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
@@ -249,14 +250,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formApiKey}
               onChange={(e) => setFormApiKey(e.target.value)}
               placeholder={formApiType === 'ollama' ? t('可留空', 'Optional') : 'sk-xxx'}
-              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full px-3 py-2 pr-12 text-base sm:pr-10 sm:text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <Button
               type="button"
               variant="ghost"
               aria-label={showApiKey ? t('隐藏 API Key', 'Hide API key') : t('显示 API Key', 'Show API key')}
               onClick={() => setShowApiKey(!showApiKey)}
-              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
+              className="absolute right-1 top-1/2 h-11 w-11 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground sm:right-2 sm:h-8 sm:w-8"
             >
               {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -287,7 +288,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'nomic-embed-text'
                 : 'model-name'
             }
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-base sm:text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
@@ -296,7 +297,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <label htmlFor="embedding-dimensions" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
             {t('向量维度', 'Vector Dimensions')}
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <NumberInput
               id="embedding-dimensions"
               ref={dimensionsInputRef}
@@ -308,7 +309,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 setFormDimensions(dimensions);
                 setFormDimensionsInput(String(dimensions));
               }}
-              className="flex-1 text-sm"
+              className="flex-1 text-base sm:text-sm"
             />
             <Button
               onClick={() => {
@@ -319,7 +320,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 dimensionsInputRef.current?.focus();
                 dimensionsInputRef.current?.select();
               }}
-              className="px-3 py-2 text-sm bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-accent dark:hover:bg-accent"
+              className="h-11 w-full px-3 py-2 text-sm bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground rounded-md hover:bg-accent dark:hover:bg-accent sm:h-9 sm:w-auto"
             >
               {t('自动检测', 'Auto Detect')}
             </Button>
@@ -330,11 +331,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </div>
 
         {/* Test & Save */}
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             onClick={handleTestEmbedding}
             disabled={testingEmbedding || !formBaseUrl || !formModel}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testingEmbedding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {t('测试 Embedding 连接', 'Test Embedding Connection')}
@@ -342,7 +343,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Button
             onClick={handleSaveEmbeddingConfig}
             variant={embeddingSaved ? 'default' : 'outline'}
-            className="h-9 px-4 text-sm"
+            className="h-11 w-full px-4 text-sm sm:h-9 sm:w-auto"
           >
             {embeddingSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存配置', 'Save Config')}
           </Button>
@@ -379,7 +380,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             value={formWorkerUrl}
             onChange={(e) => setFormWorkerUrl(e.target.value)}
             placeholder="https://github-stars-vectorize.your-name.workers.dev"
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-base sm:text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
@@ -395,14 +396,14 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formAuthToken}
               onChange={(e) => setFormAuthToken(e.target.value)}
               placeholder={t('Worker 认证令牌', 'Worker authentication token')}
-              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full px-3 py-2 pr-12 text-base sm:pr-10 sm:text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <Button
               type="button"
               variant="ghost"
               aria-label={showAuthToken ? t('隐藏认证 Token', 'Hide auth token') : t('显示认证 Token', 'Show auth token')}
               onClick={() => setShowAuthToken(!showAuthToken)}
-              className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground"
+              className="absolute right-1 top-1/2 h-11 w-11 -translate-y-1/2 p-0 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground sm:right-2 sm:h-8 sm:w-8"
             >
               {showAuthToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
@@ -410,11 +411,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </div>
 
         {/* Test */}
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             onClick={handleTestWorker}
             disabled={testingWorker || !formWorkerUrl}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {testingWorker ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {t('测试 Worker 连接', 'Test Worker Connection')}
@@ -561,7 +562,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 setFormReadmeMaxChars(maxChars);
                 setFormReadmeMaxCharsInput(String(maxChars));
               }}
-              className="w-full text-sm"
+              className="w-full text-base sm:text-sm"
             />
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               {t('建议 4000-8000，越长精度越高但索引越慢', 'Recommended 4000-8000. Longer = higher precision but slower indexing')}
@@ -573,16 +574,16 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         <Button
           onClick={handleSaveWorkerConfig}
           variant={workerSaved ? 'default' : 'outline'}
-          className="h-9 px-4 text-sm"
+          className="h-11 w-full px-4 text-sm sm:h-9 sm:w-auto"
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存索引配置', 'Save Index Config')}
         </Button>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Button
             onClick={handleRebuildIndex}
             disabled={isIndexing || !isConfigComplete}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-11 w-full sm:h-9 sm:w-auto flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('重建向量索引', 'Rebuild Vector Index')}
@@ -590,7 +591,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
           <Button
             onClick={handleIncrementalIndex}
             disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
-            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm text-accent-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-11 w-full sm:h-9 sm:w-auto flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm text-accent-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             {t('增量索引', 'Incremental Index')}
@@ -602,7 +603,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             <Button
               onClick={handleAbortIndexing}
               variant="destructive"
-              className="h-9 gap-2 px-4 text-sm"
+              className="h-11 w-full gap-2 px-4 text-sm sm:h-9 sm:w-auto"
             >
               <Square className="w-4 h-4" />
               {t('中止', 'Abort')}
@@ -613,7 +614,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* Progress */}
         {isIndexing && phaseTotal > 0 && (
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-muted-foreground dark:text-muted-foreground">
+            <div className="flex flex-wrap justify-between gap-2 text-sm text-muted-foreground dark:text-muted-foreground">
               <span>
                 {phase === 'readme' && `📖 ${t('获取 README', 'Fetching README')}`}
                 {phase === 'embedding' && `🧠 ${t('生成向量', 'Generating embeddings')}`}
@@ -687,7 +688,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               setFormSearchTopK(topK);
               setFormSearchTopKInput(String(topK));
             }}
-            className="w-full text-sm"
+            className="w-full text-base sm:text-sm"
           />
           <p className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('向量检索返回的最大结果数，越多召回越广但 LLM 重排序成本越高', 'Max results from vector search. More = wider recall but higher LLM reranking cost')}
@@ -695,8 +696,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </div>
 
         {/* HyDE Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex min-w-0 items-start gap-3 sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <div className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               {t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
             </div>
@@ -708,12 +709,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             checked={formEnableHyDE}
             onCheckedChange={setFormEnableHyDE}
             aria-label={t('HyDE 查询预处理', 'HyDE Query Preprocessing')}
+            className="shrink-0"
           />
         </div>
 
         {/* Reranking Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex min-w-0 items-start gap-3 sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <div className="text-sm font-medium text-muted-foreground dark:text-muted-foreground">
               {t('LLM 语义重排序', 'LLM Semantic Reranking')}
             </div>
@@ -725,6 +727,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             checked={formEnableReranking}
             onCheckedChange={setFormEnableReranking}
             aria-label={t('LLM 语义重排序', 'LLM Semantic Reranking')}
+            className="shrink-0"
           />
         </div>
 
@@ -732,7 +735,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         <Button
           onClick={handleSaveWorkerConfig}
           variant={workerSaved ? 'default' : 'outline'}
-          className="h-9 px-4 text-sm"
+          className="h-11 w-full px-4 text-sm sm:h-9 sm:w-auto"
         >
           {workerSaved ? `✓ ${t('已保存', 'Saved')}` : t('保存搜索参数', 'Save Search Parameters')}
         </Button>
@@ -750,7 +753,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             'If you changed the Embedding model (different dimensions), you need to delete the old index and recreate it.'
           )}
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             onClick={async () => {
               const cmd = 'npx wrangler vectorize delete github-stars';
@@ -761,7 +764,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 toast(t('复制删除命令失败', 'Failed to copy delete command'), 'error');
               }
             }}
-            className="rounded-md bg-accent px-4 py-2 text-sm text-accent-foreground hover:bg-muted hover:text-foreground"
+            className="h-11 w-full rounded-md bg-accent px-4 py-2 text-sm text-accent-foreground hover:bg-muted hover:text-foreground sm:h-9 sm:w-auto"
           >
             {t('复制删除命令', 'Copy Delete Command')}
           </Button>
@@ -775,7 +778,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 toast(t('复制创建命令失败', 'Failed to copy create command'), 'error');
               }
             }}
-            className="rounded-md bg-accent px-4 py-2 text-sm text-accent-foreground hover:bg-muted hover:text-foreground"
+            className="h-11 w-full rounded-md bg-accent px-4 py-2 text-sm text-accent-foreground hover:bg-muted hover:text-foreground sm:h-9 sm:w-auto"
           >
             {t('复制创建命令', 'Copy Create Command')}
           </Button>
@@ -787,7 +790,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
 
       {/* Section 7: Deploy Guide */}
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 p-4">
           <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
             <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">⑦</span>
             {t('部署指南', 'Deploy Guide')}
@@ -800,13 +803,13 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             aria-expanded={showDeployGuide}
             aria-controls="vector-deploy-guide"
             aria-label={t('切换部署指南', 'Toggle deploy guide')}
-            className="h-8 w-8 p-0"
+            className="h-11 w-11 shrink-0 p-0 sm:h-8 sm:w-8"
           >
             {showDeployGuide ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           </Button>
         </div>
 
-        <div id="vector-deploy-guide" hidden={!showDeployGuide} className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
+        <div id="vector-deploy-guide" hidden={!showDeployGuide} className="overflow-x-auto px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
             {/* 首次部署 */}
             <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
               <p className="font-medium text-foreground dark:text-foreground mb-2">
