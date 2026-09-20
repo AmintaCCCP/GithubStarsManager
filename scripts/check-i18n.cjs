@@ -206,7 +206,11 @@ function keyExists(zhKeys, rawKey, preferredNs) {
     for (const candidate of zhKeys) {
       if (candidate.startsWith(`${preferredNs}:`) && keyMatches(localKey(candidate), rawKey)) return true;
     }
-    return false;
+    // Short keys stay namespace-bound (useT('app') + t('save') must not
+    // pass just because common:save exists). Dotted keys are component
+    // prefixes unique across dictionaries, so a miss in the bound ns can
+    // still resolve e.g. app:discoverySidebar.minutes-ago.
+    if (!rawKey.includes('.')) return false;
   }
   for (const candidate of zhKeys) {
     if (keyMatches(localKey(candidate), rawKey)) return true;

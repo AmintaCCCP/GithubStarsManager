@@ -163,6 +163,21 @@ test('bound useT namespace does not fall back to another namespace', () =>
     assert.match(result.stderr, /missing from zh locales/);
   }));
 
+test('dotted keys may resolve outside the bound namespace', () =>
+  withRepo((root) => {
+    for (const language of LANGUAGES) {
+      writeJson(path.join(root, 'src', 'locales', language, 'app.json'), {
+        'panel.hello': language === 'zh' || language === 'zh-TW' ? '你好世界' : `${language} hello world`,
+      });
+    }
+    fs.writeFileSync(
+      path.join(root, 'src', 'components', 'Hello.tsx'),
+      "import { useT } from '../i18n/useT';\nexport const Hello = () => {\n  const t = useT('discovery');\n  return <span>{t('panel.hello')}</span>;\n};\n",
+    );
+    const result = runScript(root);
+    assert.equal(result.code, 0, result.stderr);
+  }));
+
 test('i18next plural suffixes satisfy a base t() key', () =>
   withRepo((root) => {
     for (const language of LANGUAGES) {
