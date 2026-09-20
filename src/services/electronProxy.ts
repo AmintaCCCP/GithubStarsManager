@@ -79,6 +79,11 @@ interface ElectronAPI {
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
   plugins?: ElectronPluginAPI;
+  /** Deep Link（开发守则 §12）：主进程转发的 githubstarsmanager:// 链接 */
+  deepLink?: {
+    consumePending: () => Promise<string | null>;
+    onOpen: (listener: (url: string) => void) => () => void;
+  };
 }
 
 declare global {

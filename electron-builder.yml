@@ -16,6 +16,11 @@ files:
 extraMetadata:
   main: electron/main.js
 
+protocols:
+  - name: GitHub Stars Manager
+    schemes:
+      - githubstarsmanager
+
 # Windows配置
 win:
   target:

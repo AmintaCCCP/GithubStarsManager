@@ -17,7 +17,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run && npm run test:electron:mcp && npm run test:electron:plugins && npm run test:update-version && npm run test:ci-gates",
-    "test:electron:mcp": "node --test electron/mcpLocalServer.test.js electron/repoHealth.test.js electron/desktopPrefs.test.js electron/xAuthStorage.test.js",
+    "test:electron:mcp": "node --test electron/mcpLocalServer.test.js electron/repoHealth.test.js electron/deepLink.test.js electron/desktopPrefs.test.js electron/xAuthStorage.test.js",
     "test:electron:plugins": "node --test electron/plugins/*.test.js",
     "test:update-version": "node --test scripts/update-version.test.cjs",
     "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs",

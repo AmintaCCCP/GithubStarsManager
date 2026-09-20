@@ -27,6 +27,15 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     stop: () => ipcRenderer.invoke('mcp:stop'),
     getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
   },
+  deepLink: {
+    // 冷启动时链接先落在主进程，渲染进程就绪后取一次
+    consumePending: () => ipcRenderer.invoke('deeplink:consumePending'),
+    onOpen: (listener) => {
+      const handler = (_event, url) => listener(url);
+      ipcRenderer.on('deeplink:open', handler);
+      return () => ipcRenderer.removeListener('deeplink:open', handler);
+    },
+  },
   plugins: {
     list: () => ipcRenderer.invoke('plugins:list'),
     installFromDirectory: () => ipcRenderer.invoke('plugins:installFromDirectory'),
