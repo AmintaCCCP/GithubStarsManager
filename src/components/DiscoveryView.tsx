@@ -193,7 +193,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
         ref={scrollContainerRef}
         onScroll={handleScroll}
         role="tablist"
-        className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
+        className="flex max-w-full overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -215,7 +215,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
             role="tab"
             aria-selected={selectedChannel === channel.id}
             className={`
-              relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
+              relative h-11 flex-shrink-0 px-4 py-2 rounded-lg text-base font-medium snap-start sm:h-9 sm:text-sm
               transition-all duration-200 ease-out
               focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
               ${selectedChannel === channel.id
@@ -270,7 +270,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
           aria-label={language === 'zh'
             ? `平台筛选：${selectedPlatform?.name ?? '全部平台'}`
             : `Platform filter: ${selectedPlatform?.nameEn ?? 'All Platforms'}`}
-          className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
+          className="flex h-11 max-w-full items-center gap-2 rounded-lg px-3 text-base font-medium bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors sm:h-9 sm:text-sm"
         >
           <Filter className="h-4 w-4" />
           <span className="hidden xl:inline">{language === 'zh' ? selectedPlatform?.name : selectedPlatform?.nameEn}</span>
@@ -327,7 +327,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
           type="button"
           variant="outline"
           aria-label={ariaLabel ?? selectedOption?.label}
-          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
+          className={`flex h-11 max-w-full items-center gap-2 rounded-lg px-3 text-base font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors sm:h-9 sm:text-sm ${className}`}
         >
           {selectedOption?.icon && <span className="h-4 w-4">{selectedOption.icon}</span>}
           <span>{selectedOption?.label}</span>
@@ -756,13 +756,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
         <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
-            className={`flex-shrink-0 pr-2 transition-transform duration-300 ease-in-out z-10 ${
+            className={`max-w-full flex-shrink-0 pr-0 transition-transform duration-300 ease-in-out z-10 sm:pr-2 ${
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
-            <div className="ui-toolbar p-3.5 sm:p-4 mb-4">
+            <div className="ui-toolbar mb-4 max-w-full p-3.5 sm:p-4">
               {/* 第一行：标题和刷新按钮 */}
-              <div className="flex items-center justify-between gap-2 mb-2.5">
+              <div className="flex min-w-0 max-w-full items-center justify-between gap-2 mb-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
                     {currentChannelIconNode}
@@ -787,13 +787,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     size="icon"
                     onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
                     disabled={currentIsLoading || isAnalyzing}
-                    className="p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-11 w-11 p-2 disabled:opacity-50 disabled:cursor-not-allowed sm:h-9 sm:w-9"
+                    aria-label={t('刷新', 'Refresh')}
                     title={t('刷新', 'Refresh')}
                   >
                     <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
                   </Button>
                   {selectedDiscoveryChannel === 'hot-release' && (
-                    <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
+                    <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 group-focus-within/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 group-focus-within/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
                       <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                         {t('每次刷新都能看到不一样的内容', 'Each refresh shows different content')}
                       </div>
@@ -806,12 +807,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
               
               {/* 第二行：筛选和操作按钮（代码搜索频道使用自有工具条，此处隐藏仓库维度控件） */}
               {selectedDiscoveryChannel !== 'code-search' && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex min-w-0 max-w-full items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'trending' && (
             <div className="flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
               <Select value={trendingTimeRange} onValueChange={(value) => setTrendingTimeRange(value as TrendingTimeRange)}>
-                <SelectTrigger aria-label={t('时间范围', 'Time range')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('时间范围', 'Time range')} className="ui-field h-11 w-auto max-w-full min-w-28 px-3 text-base font-medium text-foreground dark:text-foreground sm:h-9 sm:text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">{t('今日', 'Today')}</SelectItem>
                   <SelectItem value="weekly">{t('本周', 'This Week')}</SelectItem>
@@ -822,7 +823,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           )}
         {selectedDiscoveryChannel === 'topic' && (
                   <Select value={discoverySelectedTopic || 'all'} onValueChange={(value) => setDiscoverySelectedTopic(value === 'all' ? null : value as TopicCategory)}>
-                    <SelectTrigger aria-label={t('主题筛选', 'Topic filter')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue placeholder={t('主题', 'Topic')} /></SelectTrigger>
+                    <SelectTrigger aria-label={t('主题筛选', 'Topic filter')} className="ui-field h-11 w-auto max-w-full min-w-28 px-3 text-base font-medium text-foreground dark:text-foreground sm:h-9 sm:text-sm"><SelectValue placeholder={t('主题', 'Topic')} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t('主题', 'Topic')}</SelectItem>
                       <SelectItem value="ai">{t('人工智能', 'AI')}</SelectItem>
@@ -841,7 +842,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     type="button"
                     onClick={() => setWeeklyOnlyCollected(!weeklyOnlyCollected)}
                     aria-pressed={weeklyOnlyCollected}
-                    className={`flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                    className={`flex h-11 max-w-full items-center gap-1.5 px-3 rounded-lg text-base font-medium border transition-colors sm:h-9 sm:text-sm ${
                       weeklyOnlyCollected
                         ? 'bg-primary/10 text-primary border-primary/30 dark:text-primary'
                         : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground'
@@ -868,7 +869,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <button
                     type="button"
                     onClick={() => setTweetSettingsOpen(true)}
-                    className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
+                    className="flex h-11 max-w-full items-center gap-1.5 px-3 rounded-lg text-base font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground sm:h-9 sm:text-sm"
                     title={t('管理关注博主列表', 'Manage the follow list')}
                   >
                     <Users className="w-4 h-4" />
@@ -885,14 +886,14 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <button
                     type="button"
                     onClick={() => setTelegramSettingsOpen(true)}
-                    className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-sm font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground"
+                    className="flex h-11 max-w-full items-center gap-1.5 px-3 rounded-lg text-base font-medium border transition-colors bg-muted/50 text-muted-foreground border-transparent hover:bg-accent hover:text-accent-foreground sm:h-9 sm:text-sm"
                     title={t('管理关注频道列表', 'Manage the channel list')}
                   >
                     <Users className="w-4 h-4" />
                     {t('频道列表', 'Channel List')}
                   </button>
                 )}
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex min-w-0 max-w-full items-center gap-1.5 flex-wrap">
                   {selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
                     <PlatformFilter
                       platform={discoveryPlatform}
@@ -900,10 +901,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       language={language}
                     />
                   )}
-                  <SortAlgorithmTooltip
-                    channelId={selectedDiscoveryChannel}
-                    language={language}
-                  />
+                  <div className="[&_button]:h-11 [&_button]:w-11 sm:[&_button]:h-6 sm:[&_button]:w-6">
+                    <SortAlgorithmTooltip
+                      channelId={selectedDiscoveryChannel}
+                      language={language}
+                    />
+                  </div>
                   {isAnalyzingThisChannel ? (
                     <div className="flex items-center gap-1">
                       <div className="relative">
@@ -931,7 +934,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         onClick={handleAbortAnalysis}
                         aria-label={t('停止分析', 'Stop analysis')}
                         title={t('停止', 'Stop')}
-                        className="h-8 w-8"
+                        className="h-11 w-11 sm:h-8 sm:w-8"
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -942,7 +945,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       variant="default"
                       onClick={handleAnalyzePage}
                       disabled={isAnalyzing || currentIsLoading}
-                      className="h-9 shrink-0 gap-1.5 px-3 py-1.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-11 shrink-0 gap-1.5 px-3 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed sm:h-9 sm:text-sm"
                       title={t('AI分析', 'Analyze with AI')}
                     >
                       <Bot className="w-4 h-4" />
@@ -963,7 +966,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
           {/* 内容区域 */}
           <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto space-y-4 pr-2"
+            className="flex-1 min-w-0 max-w-full space-y-4 pr-0 lg:overflow-y-auto lg:pr-2"
           >
             {selectedDiscoveryChannel === 'code-search' && <CodeSearchView />}
             {selectedDiscoveryChannel !== 'code-search' && (
@@ -972,8 +975,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
               <div className={isDesktopSafeMode
                 ? 'ui-toolbar p-4 space-y-4'
                 : 'ui-toolbar p-5 space-y-4'}>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="flex-1 relative">
+                <div className="flex min-w-0 max-w-full flex-col gap-3 sm:flex-row">
+                  <div className="relative min-w-0 flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                     <Input
                       type="text"
@@ -982,13 +985,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       placeholder={t('搜索仓库…', 'Search repositories…')}
-                      className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
+                      className="ui-field h-11 w-full py-2.5 pl-10 pr-4 text-base text-foreground dark:text-foreground sm:h-9 sm:text-sm" />
                   </div>
                   <Button
                     onClick={handleSearch}
                     aria-label={t('搜索', 'Search')}
                     disabled={!searchInput.trim() || currentIsLoading}
-                    className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                    className="ui-button-primary h-11 w-full px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-base font-medium sm:h-9 sm:w-auto sm:text-sm"
                   >
                     <Search className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('搜索', 'Search')}</span>
@@ -997,7 +1000,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 
                 <div className="flex flex-wrap gap-2.5">
                   <Select value={discoveryLanguage} onValueChange={(value) => setDiscoveryLanguage(value as ProgrammingLanguage)}>
-                    <SelectTrigger aria-label={t('编程语言', 'Programming language')} className="ui-field h-9 w-auto min-w-32 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                    <SelectTrigger aria-label={t('编程语言', 'Programming language')} className="ui-field h-11 w-auto max-w-full min-w-32 px-3 text-base font-medium text-foreground dark:text-foreground sm:h-9 sm:text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="All">{t('所有语言', 'All Languages')}</SelectItem>
                       <SelectItem value="JavaScript">JavaScript</SelectItem>

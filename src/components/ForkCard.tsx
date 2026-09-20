@@ -49,7 +49,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
     >
       {/* Header */}
       <div className="p-3 sm:p-4">
-        <div className="flex items-stretch justify-between gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
           <div className="flex items-center min-w-0 flex-1">
             {isUnread && (
               <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse mr-2"></div>
@@ -72,14 +72,14 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 {fork.full_name}
               </p>
               {sourceFullName && (
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate mt-0.5 flex items-center gap-1">
-                  <span>{t('派生自', 'Forked from')}</span>
+                <p className="mt-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground dark:text-muted-foreground/70">
+                  <span className="shrink-0">{t('派生自', 'Forked from')}</span>
                   {fork.parent?.html_url || fork.source?.html_url ? (
                     <a
                       href={fork.parent?.html_url || fork.source?.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline truncate"
+                      className="inline-flex min-h-11 min-w-0 items-center truncate text-primary hover:underline sm:min-h-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         onMarkAsRead();
@@ -88,14 +88,14 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                       {sourceFullName}
                     </a>
                   ) : (
-                    <span className="text-primary truncate">{sourceFullName}</span>
+                    <span className="min-w-0 truncate text-primary">{sourceFullName}</span>
                   )}
                 </p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-4 flex-shrink-0 self-stretch">
+          <div className="flex w-full flex-wrap items-center gap-4 self-stretch md:w-auto md:flex-nowrap">
             <div className="hidden md:flex min-w-[140px] flex-col justify-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -114,7 +114,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 </div>
               )}
             </div>
-            <div className="flex items-center space-x-1 flex-shrink-0">
+            <div data-testid="fork-card-actions" className="flex w-full flex-wrap items-center gap-1 md:w-auto md:flex-nowrap">
               {/* Workflows dropdown */}
               <Button
                 variant={isWorkflowsExpanded ? 'secondary' : 'ghost'}
@@ -123,7 +123,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onToggleWorkflows();
                   onMarkAsRead();
                 }}
-                className="h-8 shrink-0 gap-1 whitespace-nowrap px-2 text-xs"
+                className="h-11 shrink-0 gap-1 whitespace-nowrap px-2 text-base sm:h-8 sm:text-xs"
                 title={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}
                 aria-label={isWorkflowsExpanded ? t('隐藏工作流', 'Hide Workflows') : t('显示工作流', 'Show Workflows')}
                 aria-expanded={isWorkflowsExpanded}
@@ -142,7 +142,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onMarkAsRead();
                 }}
                 disabled={isSyncing || !needsSync}
-                className={`h-7 w-7 p-1 rounded transition-colors disabled:cursor-not-allowed ${
+                className={`h-11 w-11 shrink-0 rounded p-1 transition-colors disabled:cursor-not-allowed sm:h-7 sm:w-7 ${
                   needsSync
                     ? 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     : 'bg-transparent text-muted-foreground/50 dark:text-muted-foreground/50 cursor-not-allowed'
@@ -166,7 +166,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 href={fork.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1 rounded bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded bg-muted p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:h-7 sm:w-7"
                 title={t('在GitHub上查看', 'View on GitHub')}
                 aria-label={t('在GitHub上查看', 'View on GitHub')}
                 onClick={(e) => {
@@ -241,7 +241,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         }}
                         disabled={workflow.state === 'disabled' || isRunningWorkflow}
                         variant="secondary"
-                        className="ml-2 h-8 w-8 shrink-0 p-0"
+                        className="ml-2 h-11 w-11 shrink-0 p-0 sm:h-8 sm:w-8"
                         aria-label={workflow.state === 'disabled'
                           ? (language === 'zh' ? '工作流已禁用' : 'Workflow disabled')
                           : `${language === 'zh' ? '运行工作流' : 'Run workflow'}: ${workflow.name}`

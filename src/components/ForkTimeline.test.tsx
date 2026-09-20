@@ -348,6 +348,40 @@ describe('ForkTimeline async session and sync contracts', () => {
 });
 
 
+describe('ForkTimeline mobile layout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    mockUseAppStore.mockImplementation(() => storeState as ReturnType<typeof useAppStore>);
+    MockGitHubApiService.mockImplementation(function () { return {
+      getUserOrganizations: vi.fn().mockResolvedValue([]),
+      getUserForks: vi.fn().mockResolvedValue([personalFork]),
+      getOrganizationForks: vi.fn().mockResolvedValue([]),
+      getCurrentUser: vi.fn().mockResolvedValue(storeState.user),
+      checkForkSyncNeeded: vi.fn().mockResolvedValue({ needsSync: true }),
+      getRepositoryWorkflows: vi.fn().mockResolvedValue([]),
+      getBranches: vi.fn().mockResolvedValue(['main']),
+    } as unknown as GitHubApiService; });
+  });
+
+  it('uses contained, 44px mobile controls and a contained sync modal', async () => {
+    render(<ForkTimeline />);
+
+    expect(await screen.findByRole('combobox', { name: '拥有者:' })).toHaveClass('h-11', 'text-base', 'sm:h-9');
+    expect(screen.getByRole('button', { name: '刷新' })).toHaveClass('h-11', 'sm:h-auto');
+    expect(screen.getByRole('textbox', { name: '搜索 Fork' })).toHaveClass('h-11', 'text-base', 'sm:h-auto');
+    expect(screen.getByRole('combobox', { name: '每页:' })).toHaveClass('h-11', 'text-base', 'sm:h-9');
+
+    fireEvent.click(screen.getByRole('button', { name: '更新分支' }));
+    expect(await screen.findByRole('combobox', { name: '目标分支 (Target Branch)' })).toHaveClass('h-11', 'text-base', 'sm:h-10');
+    expect(screen.getByRole('button', { name: '取消' })).toHaveClass('h-11', 'sm:h-auto');
+    expect(screen.getByRole('button', { name: '确认同步' })).toHaveClass('h-11', 'sm:h-auto');
+    const repositoryNames = screen.getAllByText(/tamina\/personal-fork/);
+    expect(repositoryNames[repositoryNames.length - 1]).toHaveClass('min-w-0', 'break-words');
+  });
+});
+
+
 describe('ForkTimeline branch request ordering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
