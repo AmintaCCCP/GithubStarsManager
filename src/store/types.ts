@@ -39,6 +39,7 @@ import type {
   HeaderMenuItem,
   SyncMode,
   TranslationEngine,
+  RepositoryCardFieldId,
   RepositoryChatSettings,
 } from '../types';
 import type { ThemePresetId } from '../constants/themePresets';
@@ -261,6 +262,10 @@ export interface AppActions {
   addTelegramFollow: (channel: string) => void;
   removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
+
+  // 仓库卡片可见字段（开发守则 §14）
+  /** 切换某个字段的显示；未提供的字段沿用当前值。 */
+  setRepositoryCardField: (id: RepositoryCardFieldId, visible: boolean) => void;
 }
 
 export type AppStoreState = AppState & AppActions;

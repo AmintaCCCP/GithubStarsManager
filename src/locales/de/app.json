@@ -1045,7 +1045,15 @@
     "light": "helle Farbe",
     "dark": "Dunkel",
     "theme-color": "Farbanpassung des Themas",
-    "switch-the-interface-color-scheme-instantly-chan": "Ändern Sie die Farbe der Benutzeroberfläche mit einem Klick. Sie wird sofort wirksam und automatisch gespeichert."
+    "switch-the-interface-color-scheme-instantly-chan": "Ändern Sie die Farbe der Benutzeroberfläche mit einem Klick. Sie wird sofort wirksam und automatisch gespeichert.",
+    "card-fields": "Felder der Repository-Karte",
+    "card-fields-hint": "Ändert nur, was die Karten in der Liste anzeigen; die Daten selbst bleiben unberührt.",
+    "card-field-description": "Beschreibung",
+    "card-field-tags": "Tags",
+    "card-field-language": "Sprache",
+    "card-field-stars": "Stars",
+    "card-field-license": "Lizenz",
+    "card-field-lastUpdated": "Letzter Push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Vektorsemantische Suche",
