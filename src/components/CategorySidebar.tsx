@@ -1,4 +1,5 @@
 import { Button } from './ui/button';
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
@@ -8,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Undo2,
+  X,
 } from 'lucide-react';
 import { Category, Repository } from '../types';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../store/useAppStore';
@@ -17,6 +19,25 @@ import { CategoryEditModal } from './CategoryEditModal';
 import { useCategorySyncActions } from '../features/repositories/hooks/useCategorySyncActions';
 import { getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
 import { useDialog } from '../hooks/useDialog';
+
+const SIDEBAR_WIDTH_KEY = 'github-stars-category-sidebar-width';
+const SIDEBAR_WIDTH_DEFAULT = 256;
+const SIDEBAR_WIDTH_MIN = 220;
+const SIDEBAR_WIDTH_MAX = 480;
+
+const clampSidebarWidth = (width: number) => Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, width));
+
+const getSidebarWidth = () => {
+  if (typeof window === 'undefined') return SIDEBAR_WIDTH_DEFAULT;
+  try {
+    const storedWidth = window.localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    if (storedWidth === null) return SIDEBAR_WIDTH_DEFAULT;
+    const width = Number(storedWidth);
+    return Number.isFinite(width) ? clampSidebarWidth(width) : SIDEBAR_WIDTH_DEFAULT;
+  } catch {
+    return SIDEBAR_WIDTH_DEFAULT;
+  }
+};
 
 interface CategorySidebarProps {
   repositories: Repository[];
@@ -88,6 +109,53 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   // 滚动条显示定时器 ref
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(getSidebarWidth);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const resizeStartRef = useRef<{
+    x: number;
+    width: number;
+    currentWidth: number;
+    cursor: string;
+    userSelect: string;
+  } | null>(null);
+
+  const setPersistedSidebarWidth = useCallback((width: number) => {
+    const nextWidth = clampSidebarWidth(width);
+    setSidebarWidth(nextWidth);
+    try {
+      window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(nextWidth));
+    } catch {
+      // Rendering and resizing still work when storage is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    const stopResizing = (persist = true) => {
+      const resize = resizeStartRef.current;
+      if (!resize) return;
+      resizeStartRef.current = null;
+      document.body.style.cursor = resize.cursor;
+      document.body.style.userSelect = resize.userSelect;
+      if (persist) setPersistedSidebarWidth(resize.currentWidth);
+    };
+    const resize = (event: PointerEvent) => {
+      const start = resizeStartRef.current;
+      if (!start) return;
+      const width = clampSidebarWidth(start.width + event.clientX - start.x);
+      start.currentWidth = width;
+      setSidebarWidth(width);
+    };
+    const finishResizing = () => stopResizing();
+    window.addEventListener('pointermove', resize);
+    window.addEventListener('pointerup', finishResizing);
+    window.addEventListener('pointercancel', finishResizing);
+    return () => {
+      window.removeEventListener('pointermove', resize);
+      window.removeEventListener('pointerup', finishResizing);
+      window.removeEventListener('pointercancel', finishResizing);
+      stopResizing(false);
+    };
+  }, [setPersistedSidebarWidth]);
 
   // 监听侧栏状态变化，同步更新文字显示状态
   useEffect(() => {
@@ -367,94 +435,117 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     <>
       {/* 移动端：始终显示完整侧栏 */}
       {isMobile ? (
-        <div className="w-full overflow-hidden rounded-md border border-border bg-card p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-card-foreground">
-              {t('应用分类', 'Categories')}
-            </h2>
-            <Button
-              variant="ghost"
-              onClick={handleAddCategory}
-              size="icon"
-              className="h-8 w-8"
-              title={t('添加分类', 'Add Category')}
-              aria-label={t('添加分类', 'Add Category')}
-            >
-              <Plus className="w-4 h-4" />
+        <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="min-h-11 w-full justify-between">
+              <span>{t('应用分类', 'Categories')}</span>
+              <span>{allCategories.length}</span>
+              <span className="sr-only">Categories {allCategories.length}</span>
             </Button>
-          </div>
+          </SheetTrigger>
+          <SheetContent side="left" showClose={false} className="w-[90vw] max-w-sm overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>{t('应用分类', 'Categories')}</SheetTitle>
+            </SheetHeader>
+            <SheetClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-4 top-4 min-h-11 min-w-11"
+                title={t('关闭分类', 'Close categories')}
+                aria-label={t('关闭分类', 'Close categories')}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </SheetClose>
+            <div className="flex items-center justify-end">
+              <Button
+                variant="ghost"
+                onClick={handleAddCategory}
+                size="icon"
+                className="min-h-11 min-w-11"
+                title={t('添加分类', 'Add Category')}
+                aria-label={t('添加分类', 'Add Category')}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            <div role="list" aria-label="Categories" className="flex flex-col gap-2 overflow-y-auto">
+              {allCategories.map(category => {
+                const count = getCategoryCount(category);
+                const isSelected = selectedCategory === category.id;
+                const isDragTarget = dragOverCategoryId === category.id;
+                // 拖拽仓库时「全部分类」变为「取消分类」拖放热区
+                const isUncategorizeHotspot = category.id === 'all' && isRepoDragging;
 
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {allCategories.map(category => {
-              const count = getCategoryCount(category);
-              const isSelected = selectedCategory === category.id;
-              const isDragTarget = dragOverCategoryId === category.id;
-              // 拖拽仓库时「全部分类」变为「取消分类」拖放热区
-              const isUncategorizeHotspot = category.id === 'all' && isRepoDragging;
-
-              return (
-                <div
-                  key={category.id}
-                  className="group shrink-0"
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOverCategoryId(category.id);
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverCategoryId === category.id) {
-                      setDragOverCategoryId(null);
-                    }
-                  }}
-                  onDrop={(event) => handleDropOnCategory(event, category)}
-                >
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleCategoryClick(category.id)}
-                    size="sm"
-                    className={`relative flex min-w-[140px] items-center justify-between rounded-md text-left transition-colors ${
-                      isDragTarget
-                        ? isUncategorizeHotspot
-                          ? 'bg-warning/10 text-warning ring-1 ring-warning/40'
-                          : 'bg-success/10 text-success ring-1 ring-success/40'
-                        : isUncategorizeHotspot
-                          ? 'border border-dashed border-warning/50 bg-warning/5 text-warning'
-                          : isSelected
-                            ? 'bg-accent text-accent-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    }`}
-                    title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : (isUncategorizeHotspot ? t('拖到这里取消分类', 'Drop here to remove category') : undefined)}
-                    aria-pressed={isSelected}
-                    aria-current={isSelected ? 'page' : undefined}
+                return (
+                  <div
+                    key={category.id}
+                    className="group shrink-0"
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setDragOverCategoryId(category.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverCategoryId === category.id) {
+                        setDragOverCategoryId(null);
+                      }
+                    }}
+                    onDrop={(event) => handleDropOnCategory(event, category)}
                   >
-                    <div className="flex items-center space-x-3 min-w-0 flex-1">
-                      <span className="text-base flex-shrink-0">
-                        {isUncategorizeHotspot ? <Undo2 className="h-4 w-4" /> : category.icon}
-                      </span>
-                      <span className="text-sm font-medium truncate">
-                        {isUncategorizeHotspot ? t('取消分类', 'Uncategorize') : category.name}
-                      </span>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        handleCategoryClick(category.id);
+                        setMobileSheetOpen(false);
+                      }}
+                      size="sm"
+                      className={`relative flex min-h-11 w-full items-center justify-between rounded-md text-left transition-colors ${
                         isDragTarget
                           ? isUncategorizeHotspot
-                            ? 'bg-warning/10 text-warning'
-                            : 'bg-success/10 text-success'
+                            ? 'bg-warning/10 text-warning ring-1 ring-warning/40'
+                            : 'bg-success/10 text-success ring-1 ring-success/40'
                           : isUncategorizeHotspot
-                            ? 'bg-warning/10 text-warning'
+                            ? 'border border-dashed border-warning/50 bg-warning/5 text-warning'
                             : isSelected
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-muted text-muted-foreground'
+                              ? 'bg-accent text-accent-foreground font-medium'
+                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       }`}
+                      title={category.id !== 'all' ? category.name + " — " + t('可将仓库卡片拖到这里快速改分类', 'Drag repository cards here to quickly change category') : (isUncategorizeHotspot ? t('拖到这里取消分类', 'Drop here to remove category') : undefined)}
+                      aria-label={isUncategorizeHotspot ? t('取消分类', 'Uncategorize') : category.name}
+                      aria-pressed={isSelected}
+                      aria-current={isSelected ? 'page' : undefined}
                     >
-                      {count}
-                    </span>
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        <span className="text-base flex-shrink-0">
+                          {isUncategorizeHotspot ? <Undo2 className="h-4 w-4" /> : category.icon}
+                        </span>
+                        <span className="text-sm font-medium truncate">
+                          {isUncategorizeHotspot ? t('取消分类', 'Uncategorize') : category.name}
+                        </span>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${
+                          isDragTarget
+                            ? isUncategorizeHotspot
+                              ? 'bg-warning/10 text-warning'
+                              : 'bg-success/10 text-success'
+                            : isUncategorizeHotspot
+                              ? 'bg-warning/10 text-warning'
+                              : isSelected
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </SheetContent>
+        </Sheet>
       ) : (
         /* 桌面端：可折叠侧栏 - sticky定位，滚动时保持可见 */
         <div className="relative flex shrink-0 lg:sticky lg:top-16 lg:self-start z-10">
@@ -463,10 +554,11 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               className={`linear-sidebar relative overflow-visible transition-all duration-200 ease-out ${
               isSidebarCollapsed
                 ? 'w-14 p-2'
-                : 'w-64 p-4'
+                : 'p-4 min-w-0'
             }`}
             style={{
-              maxHeight: isSidebarCollapsed ? 'calc(100vh - 8rem)' : 'calc(100vh - 8rem)',
+              width: isSidebarCollapsed ? undefined : `${sidebarWidth}px`,
+              maxHeight: 'calc(100vh - 8rem)',
               transitionProperty: 'width, padding, max-height',
             }}
           >
@@ -731,6 +823,43 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               </div>
             )}
           </div>
+          {!isSidebarCollapsed && (
+            <div
+              role="separator"
+              aria-label="Resize categories"
+              aria-orientation="vertical"
+              aria-valuemin={SIDEBAR_WIDTH_MIN}
+              aria-valuemax={SIDEBAR_WIDTH_MAX}
+              aria-valuenow={sidebarWidth}
+              tabIndex={0}
+              className="w-2 cursor-col-resize touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onPointerDown={(event) => {
+                resizeStartRef.current = {
+                  x: event.clientX,
+                  width: sidebarWidth,
+                  currentWidth: sidebarWidth,
+                  cursor: document.body.style.cursor,
+                  userSelect: document.body.style.userSelect,
+                };
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+              }}
+              onKeyDown={(event) => {
+                const widths: Record<string, number> = {
+                  ArrowLeft: sidebarWidth - 8,
+                  ArrowRight: sidebarWidth + 8,
+                  Home: SIDEBAR_WIDTH_MIN,
+                  End: SIDEBAR_WIDTH_MAX,
+                };
+                if (event.key in widths) {
+                  event.preventDefault();
+                  setPersistedSidebarWidth(widths[event.key]);
+                }
+              }}
+              onDoubleClick={() => setPersistedSidebarWidth(SIDEBAR_WIDTH_DEFAULT)}
+            />
+          )}
         </div>
       )}
 

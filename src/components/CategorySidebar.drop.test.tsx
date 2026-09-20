@@ -68,13 +68,25 @@ const storeState = {
 };
 
 const mockUseAppStore = vi.mocked(useAppStore);
+const sidebarWidthStorageKey = 'github-stars-category-sidebar-width';
 
-const renderSidebar = (repositories: Repository[]) =>
+const firePointerEvent = (target: Window | HTMLElement, type: string, clientX: number) => {
+  const event = new Event(type, { bubbles: true });
+  Object.defineProperty(event, 'clientX', { value: clientX });
+  fireEvent(target, event);
+};
+
+const setViewport = (width: number) => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  window.dispatchEvent(new Event('resize'));
+};
+
+const renderSidebar = (repositories: Repository[], onCategorySelect = vi.fn()) =>
   render(
     <CategorySidebar
       repositories={repositories}
       selectedCategory="cat-b"
-      onCategorySelect={vi.fn()}
+      onCategorySelect={onCategorySelect}
     />
   );
 
@@ -88,6 +100,8 @@ const dropOnCategory = async (categoryName: string, repoId: string) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
+  act(() => setViewport(1440));
   useRepositoryDragStore.getState().endDrag();
   syncMocks.forceSyncToBackend.mockReset().mockResolvedValue(undefined);
   mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
@@ -164,5 +178,112 @@ describe('CategorySidebar drop-to-uncategorize (issue #353 suggestion)', () => {
     expect(rollback.custom_category).toBe('分类B');
     expect(rollback.category_locked).toBe(true);
     expect(syncMocks.toast).toHaveBeenCalledWith('同步到后端失败，已恢复分类更改。', 'error');
+  });
+});
+
+describe('CategorySidebar responsive behavior', () => {
+  it('uses a Categories drawer with vertical 44px category controls on mobile', () => {
+    act(() => setViewport(390));
+    const onCategorySelect = vi.fn();
+    renderSidebar([categorizedRepo], onCategorySelect);
+
+    const trigger = screen.getByRole('button', { name: /Categories.*3/i });
+    expect(trigger).toHaveClass('min-h-11');
+    expect(screen.queryByRole('button', { name: '分类B' })).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    const addButton = screen.getByRole('button', { name: '添加分类' });
+    const closeButton = screen.getByRole('button', { name: '关闭分类' });
+    expect(addButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(closeButton).toHaveClass('min-h-11', 'min-w-11');
+    fireEvent.click(closeButton);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    const list = screen.getByRole('list', { name: /Categories/i });
+    expect(list).toHaveClass('flex-col');
+    const categoryButton = screen.getByRole('button', { name: '分类B' });
+    for (const button of screen.getAllByRole('button', { name: /^(全部分类|分类B|分类C)$/ })) {
+      expect(button).toHaveClass('min-h-11');
+    }
+    fireEvent.click(categoryButton);
+
+    expect(onCategorySelect).toHaveBeenCalledWith('cat-b');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('exposes a keyboard-operable desktop resize separator and persists width', () => {
+    const { container } = renderSidebar([categorizedRepo]);
+    const separator = screen.getByRole('separator', { name: /resize categories/i });
+
+    expect(separator).toHaveAttribute('aria-orientation', 'vertical');
+    expect(separator).toHaveAttribute('aria-valuemin', '220');
+    expect(separator).toHaveAttribute('aria-valuemax', '480');
+    expect(separator).toHaveAttribute('aria-valuenow', '256');
+    fireEvent.keyDown(separator, { key: 'ArrowRight' });
+    expect(separator).toHaveAttribute('aria-valuenow', '264');
+    expect(window.localStorage.getItem(sidebarWidthStorageKey)).toBe('264');
+    expect(container.querySelector('.linear-sidebar')).toHaveStyle({ width: '264px' });
+    fireEvent.keyDown(separator, { key: 'Home' });
+    expect(separator).toHaveAttribute('aria-valuenow', '220');
+    fireEvent.keyDown(separator, { key: 'End' });
+    expect(separator).toHaveAttribute('aria-valuenow', '480');
+    fireEvent.doubleClick(separator);
+    expect(separator).toHaveAttribute('aria-valuenow', '256');
+  });
+
+  it('resizes from pointer dragging and persists the clamped width', () => {
+    const { container } = renderSidebar([categorizedRepo]);
+    const separator = screen.getByRole('separator', { name: /resize categories/i });
+
+    firePointerEvent(separator, 'pointerdown', 100);
+    firePointerEvent(window, 'pointermove', 180);
+
+    expect(separator).toHaveAttribute('aria-valuenow', '336');
+    expect(window.localStorage.getItem(sidebarWidthStorageKey)).toBeNull();
+    firePointerEvent(window, 'pointerup', 180);
+
+    expect(separator).toHaveAttribute('aria-valuenow', '336');
+    expect(container.querySelector('.linear-sidebar')).toHaveStyle({ width: '336px' });
+    expect(window.localStorage.getItem(sidebarWidthStorageKey)).toBe('336');
+  });
+
+  it('restores a persisted desktop width after remount', () => {
+    window.localStorage.setItem(sidebarWidthStorageKey, '320');
+    const first = renderSidebar([categorizedRepo]);
+    expect(screen.getByRole('separator', { name: /resize categories/i })).toHaveAttribute('aria-valuenow', '320');
+    first.unmount();
+
+    renderSidebar([categorizedRepo]);
+    expect(screen.getByRole('separator', { name: /resize categories/i })).toHaveAttribute('aria-valuenow', '320');
+  });
+
+  it('safely falls back or clamps invalid persisted desktop widths', () => {
+    window.localStorage.setItem(sidebarWidthStorageKey, 'not-a-width');
+    const invalid = renderSidebar([categorizedRepo]);
+    expect(screen.getByRole('separator', { name: /resize categories/i })).toHaveAttribute('aria-valuenow', '256');
+    invalid.unmount();
+
+    window.localStorage.setItem(sidebarWidthStorageKey, '100');
+    const belowMinimum = renderSidebar([categorizedRepo]);
+    expect(screen.getByRole('separator', { name: /resize categories/i })).toHaveAttribute('aria-valuenow', '220');
+    belowMinimum.unmount();
+
+    window.localStorage.setItem(sidebarWidthStorageKey, '500');
+    renderSidebar([categorizedRepo]);
+    expect(screen.getByRole('separator', { name: /resize categories/i })).toHaveAttribute('aria-valuenow', '480');
+  });
+
+  it('keeps the collapsed desktop sidebar narrow without an active resize separator', () => {
+    storeState.isSidebarCollapsed = true;
+    try {
+      const { container } = renderSidebar([categorizedRepo]);
+      expect(container.querySelector('.linear-sidebar')).toHaveClass('w-14');
+      expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+    } finally {
+      storeState.isSidebarCollapsed = false;
+    }
   });
 });
