@@ -145,6 +145,49 @@ test('allows unrelated file changes', () =>
     assert.equal(result.code, 0, result.stderr);
   }));
 
+test('split history uses merge-base, not current main, for before versions', () =>
+  withRepo((root) => {
+    git(root, ['checkout', '-b', 'contributor']);
+    const lockPath = path.join(root, 'package-lock.json');
+    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    lock.packages['node_modules/left-pad'].version = '1.0.1';
+    writeJson(lockPath, lock);
+    git(root, ['add', 'package-lock.json']);
+    git(root, ['commit', '-m', 'deps only']);
+
+    git(root, ['checkout', 'main']);
+    writeJson(path.join(root, 'package.json'), { name: 'app', version: '0.8.2' });
+    lock.version = '0.8.2';
+    lock.packages[''].version = '0.8.2';
+    writeJson(lockPath, lock);
+    git(root, ['add', 'package.json', 'package-lock.json']);
+    git(root, ['commit', '-m', 'owner bump']);
+
+    const falsePositive = spawnSync(
+      process.execPath,
+      [SCRIPT, '--root', root, '--base', 'main', '--head', 'contributor'],
+      { encoding: 'utf8' },
+    );
+    assert.equal(falsePositive.status, 0, falsePositive.stderr);
+
+    git(root, ['checkout', 'contributor']);
+    writeJson(path.join(root, 'package.json'), { name: 'app', version: '0.8.2' });
+    const contributorLock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    contributorLock.version = '0.8.2';
+    contributorLock.packages[''].version = '0.8.2';
+    writeJson(lockPath, contributorLock);
+    git(root, ['add', 'package.json', 'package-lock.json']);
+    git(root, ['commit', '-m', 'copy current main version']);
+
+    const bypass = spawnSync(
+      process.execPath,
+      [SCRIPT, '--root', root, '--base', 'main', '--head', 'contributor'],
+      { encoding: 'utf8' },
+    );
+    assert.equal(bypass.status, 1, bypass.stderr);
+    assert.match(bypass.stderr, /package\.json: version changed/);
+  }));
+
 test('missing git objects fail with a fetch diagnostic, not a false pass', () =>
   withRepo((root) => {
     const result = spawnSync(

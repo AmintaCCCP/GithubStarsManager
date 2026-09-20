@@ -25,6 +25,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const ts = require('typescript');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 
@@ -55,7 +56,22 @@ const T_CALL_RE = /\bt\s*\(\s*(['"])([^'"]+)\1/g;
 const JSX_TEXT_RE = />\s*([^<{]+?)\s*</g;
 const UI_PROP_RE =
   /\b(?:placeholder|title|aria-label|aria-description|alt|label|description|confirmText|cancelText|closeLabel|emptyText|helperText)\s*=\s*(['"`])([^'"`]+)\1/g;
-const CJK_RE = /[\u3400-\u9fff]/;
+const CJK_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const UI_PROP_NAMES = new Set([
+  'placeholder',
+  'title',
+  'aria-label',
+  'aria-description',
+  'alt',
+  'label',
+  'description',
+  'confirmText',
+  'cancelText',
+  'closeLabel',
+  'emptyText',
+  'helperText',
+]);
+const T_PAIR_NAMES = new Set(['useTPair', 'makeTPair', 'tPair']);
 const ENGLISH_SENTENCE_RE = /\b[A-Za-z][A-Za-z'’-]*\s+[A-Za-z][A-Za-z'’-]*\s+[A-Za-z][A-Za-z'’-]*/;
 const LOWERCASE_WORD_RE = /\b[a-z]{3,}\b/;
 const TEST_FILE_RE = /\.test\.(ts|tsx)$/;
@@ -190,6 +206,7 @@ function keyExists(zhKeys, rawKey, preferredNs) {
     for (const candidate of zhKeys) {
       if (candidate.startsWith(`${preferredNs}:`) && keyMatches(localKey(candidate), rawKey)) return true;
     }
+    return false;
   }
   for (const candidate of zhKeys) {
     if (keyMatches(localKey(candidate), rawKey)) return true;
@@ -316,8 +333,9 @@ function parseAddedSourceLines(diffText) {
 
 function looksHardcodedCopy(text) {
   const trimmed = text.trim();
-  if (!trimmed || ALLOW_LITERAL_RE.test(trimmed)) return false;
+  if (!trimmed) return false;
   if (T_PAIR_RE.test(trimmed)) return 'new tPair/useTPair/makeTPair call';
+  if (ALLOW_LITERAL_RE.test(trimmed)) return false;
   if (trimmed.startsWith('//') || trimmed.startsWith('*')) return false;
   if (trimmed.includes('t(') || trimmed.includes('useT(') || trimmed.includes('makeT(')) return false;
 
@@ -340,13 +358,86 @@ function looksHardcodedCopy(text) {
   return false;
 }
 
+function offsetToLine(sourceFile, pos) {
+  return sourceFile.getLineAndCharacterOfPosition(pos).line + 1;
+}
+
+function nodeTouchesAddedLines(sourceFile, node, addedLines) {
+  const start = offsetToLine(sourceFile, node.getStart(sourceFile));
+  const end = offsetToLine(sourceFile, node.end);
+  for (let line = start; line <= end; line += 1) {
+    if (addedLines.has(line)) return start;
+  }
+  return null;
+}
+
+function callName(node) {
+  if (ts.isIdentifier(node.expression)) return node.expression.text;
+  return null;
+}
+
+function collectHardcodedNodes(source, filePath, addedLines) {
+  const scriptKind = filePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true, scriptKind);
+  const sourceLines = source.split('\n');
+  const violations = [];
+
+  const visit = (node) => {
+    if (ts.isCallExpression(node)) {
+      const name = callName(node);
+      if (name && T_PAIR_NAMES.has(name)) {
+        const line = nodeTouchesAddedLines(sourceFile, node, addedLines);
+        if (line != null) {
+          violations.push(`${filePath}:${line}: new tPair/useTPair/makeTPair call`);
+        }
+      }
+    }
+
+    if (ts.isJsxText(node)) {
+      const value = node.getText(sourceFile).replace(/\s+/g, ' ').trim();
+      if (value && (CJK_RE.test(value) || ENGLISH_SENTENCE_RE.test(value))) {
+        const line = nodeTouchesAddedLines(sourceFile, node, addedLines);
+        if (line != null && !ALLOW_LITERAL_RE.test(sourceLines[line - 1] || '')) {
+          violations.push(`${filePath}:${line}: hardcoded JSX text ${JSON.stringify(value)}`);
+        }
+      }
+    }
+
+    if (ts.isJsxAttribute(node) && UI_PROP_NAMES.has(node.name.getText(sourceFile))) {
+      const initializer = node.initializer;
+      if (initializer && ts.isStringLiteral(initializer)) {
+        const value = initializer.text.trim();
+        if (value && (CJK_RE.test(value) || ENGLISH_SENTENCE_RE.test(value))) {
+          const line = nodeTouchesAddedLines(sourceFile, initializer, addedLines);
+          if (line != null && !ALLOW_LITERAL_RE.test(sourceLines[line - 1] || '')) {
+            violations.push(`${filePath}:${line}: hardcoded UI string ${JSON.stringify(value)}`);
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return violations;
+}
+
 function checkAddedLines(root, base, head) {
   const diff = git(root, ['diff', '-U0', `${base}...${head}`, '--', 'src']);
   const added = parseAddedSourceLines(diff);
-  const violations = [];
+  const addedByFile = new Map();
   for (const line of added) {
-    const reason = looksHardcodedCopy(line.text);
-    if (reason) violations.push(`${line.file}:${line.line}: ${reason}`);
+    const lines = addedByFile.get(line.file) || new Set();
+    lines.add(line.line);
+    addedByFile.set(line.file, lines);
+  }
+
+  const violations = [];
+  for (const [filePath, addedLines] of addedByFile) {
+    const source = showFile(root, head, filePath);
+    if (source == null) continue;
+    violations.push(...collectHardcodedNodes(source, filePath, addedLines));
   }
   return violations;
 }
@@ -437,6 +528,7 @@ module.exports = {
   checkChangedTranslations,
   parseAddedSourceLines,
   looksHardcodedCopy,
+  collectHardcodedNodes,
   isPhraseLike,
   run,
 };

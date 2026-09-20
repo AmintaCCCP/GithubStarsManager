@@ -93,11 +93,14 @@ test('APP_LANGUAGES and namespaces stay in sync with the TypeScript source', () 
 
 test('looksHardcodedCopy flags JSX and UI props, and honors the allow comment', () => {
   assert.equal(Boolean(gate.looksHardcodedCopy('      <p>保存失败</p>')), true);
+  assert.equal(Boolean(gate.looksHardcodedCopy('      <p>こんにちは</p>')), true);
+  assert.equal(Boolean(gate.looksHardcodedCopy('      <p>안녕하세요</p>')), true);
   assert.equal(Boolean(gate.looksHardcodedCopy('      <p>Save failed now</p>')), true);
   assert.equal(Boolean(gate.looksHardcodedCopy('      <p>保存失败</p> // i18n-allow-literal')), false);
   assert.equal(Boolean(gate.looksHardcodedCopy('      placeholder="Search"')), false);
   assert.equal(Boolean(gate.looksHardcodedCopy('      placeholder="Enter your GitHub token"')), true);
   assert.equal(Boolean(gate.looksHardcodedCopy('      const tPair = useTPair();')), true);
+  assert.equal(Boolean(gate.looksHardcodedCopy('      const tPair = useTPair(); // i18n-allow-literal')), true);
   assert.equal(Boolean(gate.looksHardcodedCopy("      return <span>{t('hello')}</span>;")), false);
 });
 
@@ -143,6 +146,23 @@ test('prop-drilled t() still resolves keys from any namespace', () =>
     assert.equal(result.code, 0, result.stderr);
   }));
 
+test('bound useT namespace does not fall back to another namespace', () =>
+  withRepo((root) => {
+    for (const language of LANGUAGES) {
+      writeJson(path.join(root, 'src', 'locales', language, 'app.json'), { other: `${language} other` });
+      writeJson(path.join(root, 'src', 'locales', language, 'common.json'), {
+        hello: language === 'zh' || language === 'zh-TW' ? '你好世界' : `${language} hello world`,
+      });
+    }
+    fs.writeFileSync(
+      path.join(root, 'src', 'components', 'Hello.tsx'),
+      "import { useT } from '../i18n/useT';\nexport const Hello = () => {\n  const t = useT('app');\n  return <span>{t('hello')}</span>;\n};\n",
+    );
+    const result = runScript(root);
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /missing from zh locales/);
+  }));
+
 test('i18next plural suffixes satisfy a base t() key', () =>
   withRepo((root) => {
     for (const language of LANGUAGES) {
@@ -179,6 +199,29 @@ test('PR added hardcoded copy fails, allow-literal does not', () =>
     git(root, ['commit', '-m', 'allowed']);
     const allowed = runScript(root, ['--base', 'HEAD~2', '--head', 'HEAD']);
     assert.equal(allowed.code, 0, allowed.stderr);
+  }));
+
+test('multiline JSX and same-line t() plus hardcoded copy both fail', () =>
+  withRepo((root) => {
+    fs.writeFileSync(
+      path.join(root, 'src', 'components', 'Hello.tsx'),
+      "import { useT } from '../i18n/useT';\nexport const Hello = () => {\n  const t = useT('app');\n  return (\n    <>\n      <span>{t('hello')}</span>\n      <button>Save this now</button>\n    </>\n  );\n};\n",
+    );
+    git(root, ['add', '.']);
+    git(root, ['commit', '-m', 'same line']);
+    const sameLine = runScript(root, ['--base', 'HEAD~1', '--head', 'HEAD']);
+    assert.equal(sameLine.code, 1, sameLine.stderr);
+    assert.match(sameLine.stderr, /hardcoded JSX text/);
+
+    fs.writeFileSync(
+      path.join(root, 'src', 'components', 'Hello.tsx'),
+      "export const Hello = () => (\n  <button>\n    Save this now\n  </button>\n);\n",
+    );
+    git(root, ['add', '.']);
+    git(root, ['commit', '-m', 'multiline']);
+    const multiline = runScript(root, ['--base', 'HEAD~1', '--head', 'HEAD']);
+    assert.equal(multiline.code, 1, multiline.stderr);
+    assert.match(multiline.stderr, /hardcoded JSX text/);
   }));
 
 test('new locale values that copy English fail; translated values pass', () =>

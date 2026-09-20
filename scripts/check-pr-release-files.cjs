@@ -116,6 +116,7 @@ function lockfileRootVersions(doc) {
 }
 
 function collectViolations(root, base, head) {
+  const comparisonBase = git(root, ['merge-base', base, head]).trim();
   const files = new Set(changedFiles(root, base, head));
   const violations = [];
 
@@ -125,7 +126,9 @@ function collectViolations(root, base, head) {
 
   for (const filePath of PACKAGE_VERSION_FILES) {
     if (!files.has(filePath)) continue;
-    const before = packageVersion(readJson(showFile(root, base, filePath), `${base}:${filePath}`));
+    const before = packageVersion(
+      readJson(showFile(root, comparisonBase, filePath), `${comparisonBase}:${filePath}`),
+    );
     const after = packageVersion(readJson(showFile(root, head, filePath), `${head}:${filePath}`));
     if (before !== after) {
       violations.push(
@@ -136,7 +139,9 @@ function collectViolations(root, base, head) {
 
   for (const filePath of LOCKFILE_VERSION_FILES) {
     if (!files.has(filePath)) continue;
-    const before = lockfileRootVersions(readJson(showFile(root, base, filePath), `${base}:${filePath}`));
+    const before = lockfileRootVersions(
+      readJson(showFile(root, comparisonBase, filePath), `${comparisonBase}:${filePath}`),
+    );
     const after = lockfileRootVersions(readJson(showFile(root, head, filePath), `${head}:${filePath}`));
     if (before.version !== after.version) {
       violations.push(
