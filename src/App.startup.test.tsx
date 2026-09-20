@@ -81,9 +81,10 @@ vi.mock('./services/autoSync', async () => {
 
 vi.mock('./components/LoginScreen', () => ({ LoginScreen: () => null }));
 vi.mock('./components/Header', () => ({ Header: () => null }));
-vi.mock('./components/SearchBar', () => ({ SearchBar: () => null }));
-vi.mock('./components/RepositoryList', () => ({ RepositoryList: () => <div data-testid="repositories-view" /> }));
-vi.mock('./components/CategorySidebar', () => ({ CategorySidebar: () => null }));
+vi.mock('./components/RepositoriesView', () => {
+  mocks.loadedViews.add('repositories');
+  return { RepositoriesView: () => <div data-testid="repositories-view" /> };
+});
 vi.mock('./components/ReleaseTimeline', () => {
   mocks.loadedViews.add('releases');
   return { ReleaseTimeline: () => <div data-testid="releases-view" /> };
@@ -131,32 +132,18 @@ describe('App backend initialization', () => {
     );
   });
 
-  it('continues backend loading after a pending local token sync reaches its deadline', async () => {
-    render(<App />);
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(mocks.syncFromBackend).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
-    });
-
-    expect(mocks.backend.syncSettings).toHaveBeenCalledOnce();
-    expect(mocks.syncFromBackend).toHaveBeenCalledOnce();
-    expect(mocks.startAutoSync).toHaveBeenCalledOnce();
-  });
-
   it('renders repositories before dormant views load, then resolves every lazy primary view after a view switch', async () => {
     vi.useRealTimers();
     const { rerender } = render(<App />);
 
-    expect(screen.getByTestId('repositories-view')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
+    expect(mocks.loadedViews).toEqual(new Set());
+
     await act(async () => {
       await Promise.resolve();
     });
-    expect(mocks.loadedViews).toEqual(new Set());
+    expect(await screen.findByTestId('repositories-view')).toBeInTheDocument();
+    expect(mocks.loadedViews).toEqual(new Set(['repositories']));
 
     const lazyViews = [
       ['settings', 'settings-view'],
@@ -175,5 +162,22 @@ describe('App backend initialization', () => {
       expect(screen.getByTestId(testId)).toBeInTheDocument();
       expect(mocks.loadedViews).toContain(currentView);
     }
+  });
+
+  it('continues backend loading after a pending local token sync reaches its deadline', async () => {
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mocks.syncFromBackend).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(mocks.backend.syncSettings).toHaveBeenCalledOnce();
+    expect(mocks.syncFromBackend).toHaveBeenCalledOnce();
+    expect(mocks.startAutoSync).toHaveBeenCalledOnce();
   });
 });
