@@ -76,6 +76,13 @@ describe('SubscriptionRepoCard weekly channel', () => {
     expect(screen.getByText('第 300 期')).toBeInTheDocument();
   });
 
+  it('keeps essential card actions named and touch-sized on mobile', () => {
+    render(<TooltipProvider><SubscriptionRepoCard repo={makeWeeklyRepo()} /></TooltipProvider>);
+    for (const name of ['AI分析', '在ZRead打开', '查看原贴', '在GitHub打开', '添加Star']) {
+      expect(screen.getByLabelText(name)).toHaveClass('h-11', 'w-11');
+    }
+  });
+
   it('does not render weekly badges without a weekly issue', () => {
     const repo = makeWeeklyRepo();
     delete repo.weeklyIssue;

@@ -85,7 +85,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
           ))}
 
           {repos.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground dark:text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-muted-foreground dark:text-muted-foreground">
               <span>{t(`第 ${currentPage}/${totalPages} 页`, `Page ${currentPage}/${totalPages}`)}</span>
               <div className="flex items-center gap-1">
                 <Button
@@ -94,7 +94,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                   size="icon"
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="h-8 w-8 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
+                  className="h-11 w-11 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 dark:hover:bg-accent"
                   aria-label={t('上一页', 'Previous page')}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -105,7 +105,7 @@ const PaginatedRepoList: React.FC<PaginatedRepoListProps> = ({ repos, language, 
                   size="icon"
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="h-8 w-8 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-accent"
+                  className="h-11 w-11 rounded-md p-0 hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 sm:h-8 sm:w-8 dark:hover:bg-accent"
                   aria-label={t('下一页', 'Next page')}
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -160,7 +160,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
         <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{description}</p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Input
           type="text"
           aria-label={t('仓库名称', 'Repository name')}
@@ -170,7 +170,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
             if (event.key === 'Enter' && !event.nativeEvent.isComposing) handleAdd();
           }}
           placeholder={placeholder}
-          className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
+          className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-base text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring sm:text-sm"
         />
         <Button
           type="button"
@@ -191,7 +191,7 @@ const RepoListEditor: React.FC<RepoListEditorProps> = ({
             type="button"
             variant="ghost"
             onClick={() => removeReleaseSourceRepository(sourceId, repo.full_name)}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive"
+            className="h-11 w-11 rounded-md p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-destructive sm:h-8 sm:w-8"
             title={t('移除仓库', 'Remove repository')}
             aria-label={t('移除仓库', 'Remove repository')}
           >
@@ -255,7 +255,7 @@ const WatchCustomReleaseSyncPanel: React.FC<WatchCustomReleaseSyncPanelProps> = 
               variant="ghost"
               onClick={() => updateReleaseSourceRepository(WATCH_CUSTOM_RELEASE_SOURCE_ID, repo.full_name, { release_hidden: !hidden })}
               aria-pressed={hidden}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              className="h-11 w-11 rounded-md p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:h-8 sm:w-8"
               title={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
               aria-label={hidden ? t('显示并检查 Release', 'Show and check releases') : t('隐藏并跳过 Release 检查', 'Hide and skip release checks')}
             >
@@ -326,7 +326,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                 type="button"
                 onClick={() => handleToggle(source.id)}
                 aria-pressed={checked}
-                className={`h-auto flex w-full items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
+                className={`h-auto flex w-full flex-wrap items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
                   checked
                     // hover 必须显式声明：默认 variant 自带 hover:bg-primary/90，
                     // 深色实心底会压过内部 text-foreground 造成 WCAG 对比度不达标
@@ -334,16 +334,16 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                     : 'border-border bg-card hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-card/[0.05]'
                 }`}
               >
-                <span className="flex items-start gap-3">
+                <span className="flex min-w-0 items-start gap-3">
                   <span className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                     <Bell className="h-4 w-4" />
                   </span>
-                  <span>
+                  <span className="min-w-0">
                     <span className="block text-sm font-semibold text-foreground dark:text-foreground">{source.title}</span>
                     <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">{source.description}</span>
                   </span>
                 </span>
-                <span className="flex flex-shrink-0 items-center gap-3">
+                <span className="ml-auto flex flex-shrink-0 items-center gap-3">
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                     {source.count}
                   </span>

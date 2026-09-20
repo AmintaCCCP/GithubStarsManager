@@ -621,11 +621,11 @@ export const ReleaseTimeline: React.FC = () => {
   }
 
   return (
-    <div className="max-w-full mx-auto px-2 sm:px-4">
+    <div className="min-w-0 max-w-full mx-auto px-2 sm:px-4">
       {/* Header */}
       <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+        <div className="flex min-w-0 flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
             <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
               {t('Release时间线', 'Release Timeline')}
             </h2>
@@ -633,7 +633,7 @@ export const ReleaseTimeline: React.FC = () => {
               {t(`来自您的 ${activeReleaseRepoCount} 个订阅仓库的最新Release`, `Latest releases from your ${activeReleaseRepoCount} subscribed repositories`)}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             {/* Last Refresh Time */}
             {lastRefreshTime && (
               <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
@@ -657,7 +657,7 @@ export const ReleaseTimeline: React.FC = () => {
             <Button
               onClick={handleRefresh}
               disabled={releaseIsRefreshing}
-              className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ui-button-primary flex h-11 items-center space-x-2 px-4 py-2 sm:h-9 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
               <span>{releaseIsRefreshing ? t('刷新中…', 'Refreshing…') : t('刷新', 'Refresh')}</span>
@@ -665,7 +665,7 @@ export const ReleaseTimeline: React.FC = () => {
             <Button
               onClick={() => setIsReleaseSourceSettingsOpen(true)}
               variant="ghost"
-              className="ui-button flex items-center space-x-2 px-3 py-2"
+              className="ui-button flex h-11 items-center space-x-2 px-3 py-2 sm:h-9"
               title={t('Release 来源设置', 'Release Source Settings')}
             >
               <Settings className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
@@ -687,7 +687,7 @@ export const ReleaseTimeline: React.FC = () => {
                 setReleaseSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="ui-field w-full pl-10 pr-12 py-2 text-foreground dark:text-foreground"
+              className="ui-field h-11 w-full min-w-0 pl-10 pr-14 py-2 text-base text-foreground dark:text-foreground sm:h-9 sm:pr-12 sm:text-sm"
             />
             {searchQuery && (
               <Button
@@ -698,7 +698,7 @@ export const ReleaseTimeline: React.FC = () => {
                   setCurrentPage(1);
                 }}
                 aria-label={t('清除搜索', 'Clear search')}
-                className="absolute right-2 top-1/2 h-8 w-8 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
+                className="absolute right-0 top-1/2 h-11 w-11 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground sm:right-2 sm:h-8 sm:w-8 dark:text-muted-foreground dark:hover:text-muted-foreground"
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -706,8 +706,8 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
 
           {/* Filters and View Toggle Row */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="flex-1">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
               <AssetFilterManager
                 selectedFilters={selectedFilters}
                 onFilterToggle={handleFilterToggle}
@@ -727,7 +727,7 @@ export const ReleaseTimeline: React.FC = () => {
             >
               <SelectTrigger
                 aria-label={t('视图模式', 'View mode')}
-                className="ui-field h-9 w-48 px-3 py-1 text-sm"
+                className="ui-field h-11 w-full max-w-full px-3 py-1 text-base sm:h-9 sm:w-48 sm:text-sm"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -740,8 +740,8 @@ export const ReleaseTimeline: React.FC = () => {
         </div>
 
         {/* Results Info and Controls */}
-        <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <div className="flex min-w-0 flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-4">
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {viewMode === 'timeline'
                 ? releaseShowMode === 'unread'
@@ -781,14 +781,14 @@ export const ReleaseTimeline: React.FC = () => {
             )}
           </div>
 
-          <div className="flex w-full flex-wrap items-center justify-start gap-3 lg:w-auto lg:justify-end">
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-start gap-3 lg:w-auto lg:justify-end">
             {/* Show Mode Select */}
             <Select value={releaseShowMode} onValueChange={(value) => {
               if (value === 'all' || value === 'unread') handleShowModeChange(value);
             }}>
               <SelectTrigger
                 aria-label={t('显示范围', 'Display range')}
-                className="ui-field h-9 w-44 px-3 py-1 text-sm"
+                className="ui-field h-11 w-full max-w-full px-3 py-1 text-base sm:h-9 sm:w-44 sm:text-sm"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -804,7 +804,7 @@ export const ReleaseTimeline: React.FC = () => {
             }}>
               <SelectTrigger
                 aria-label={t('版本范围', 'Version range')}
-                className="ui-field h-9 w-48 px-3 py-1 text-sm"
+                className="ui-field h-11 w-full max-w-full px-3 py-1 text-base sm:h-9 sm:w-48 sm:text-sm"
               >
                 <SelectValue />
               </SelectTrigger>
@@ -815,10 +815,10 @@ export const ReleaseTimeline: React.FC = () => {
             </Select>
 
             {/* Items per page selector */}
-            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-              <span className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
+            <div className="flex max-w-full items-center gap-2">
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">{t('每页:', 'Per page:')}</span>
               <Select value={String(itemsPerPage)} onValueChange={(value) => { setItemsPerPage(Number(value)); setCurrentPage(1); }}>
-                <SelectTrigger aria-label={t('每页条数', 'Items per page')} className="ui-field h-9 w-20 shrink-0 px-3 py-1 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('每页条数', 'Items per page')} className="ui-field h-11 w-20 shrink-0 px-3 py-1 text-base sm:h-9 sm:text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="20">20</SelectItem><SelectItem value="50">50</SelectItem><SelectItem value="100">100</SelectItem><SelectItem value="200">200</SelectItem></SelectContent>
               </Select>
             </div>
@@ -828,7 +828,7 @@ export const ReleaseTimeline: React.FC = () => {
               variant="ghost"
               onClick={handleMarkAllRead}
               disabled={isMarkingAllRead || unreadCount === 0}
-              className="flex shrink-0 items-center space-x-2 rounded-lg bg-muted px-3 py-2 transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted/40 dark:hover:bg-accent"
+              className="flex h-11 shrink-0 items-center space-x-2 rounded-lg bg-muted px-3 py-2 transition-all hover:bg-accent sm:h-9 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted/40 dark:hover:bg-accent"
               title={t('全部标记为已读', 'Mark all as read')}
             >
               {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
@@ -920,23 +920,23 @@ export const ReleaseTimeline: React.FC = () => {
             );
 
             return (
-              <div key={repository.id} className="ui-card overflow-hidden">
+              <div key={repository.id} className="ui-card min-w-0 max-w-full overflow-hidden">
                 {/* Repository Header */}
                 <Button
                   variant="ghost"
                   onClick={() => toggleReleaseExpandedRepository(repository.id)}
                   aria-expanded={isExpanded}
                   aria-controls={`release-group-${repository.id}`}
-                  className="h-auto w-full flex items-center justify-between p-2 hover:bg-background dark:hover:bg-accent/50 transition-colors"
+                  className="min-h-11 h-auto w-full min-w-0 flex items-center justify-between p-2 hover:bg-background sm:min-h-0 dark:hover:bg-accent/50 transition-colors"
                 >
-                  <span className="flex items-center space-x-2">
+                  <span className="flex min-w-0 items-center space-x-2">
                     {hasUnread && (
                       <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse"></span>
                     )}
                     <span className="flex items-center justify-center w-6 h-6 bg-primary/20 rounded flex-shrink-0">
                       <LayoutGrid className="w-3.5 h-3.5 text-primary" />
                     </span>
-                    <span className="text-left">
+                    <span className="min-w-0 text-left">
                       <span className="block font-semibold text-sm text-foreground dark:text-foreground">
                         {repository.name}
                       </span>
@@ -1028,8 +1028,8 @@ export const ReleaseTimeline: React.FC = () => {
 
       {/* Bottom Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center mt-8">
-          <div className="flex items-center space-x-1">
+        <div className="mt-8 max-w-full overflow-x-auto">
+          <div className="flex w-max min-w-full items-center justify-center space-x-1 px-1">
             <Button
               type="button"
               variant="ghost"
@@ -1037,7 +1037,7 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(1)}
               disabled={clampedPage === 1}
               aria-label={t('第一页', 'First page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 w-11 rounded-lg sm:h-9 sm:w-9 bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsLeft className="w-4 h-4" />
             </Button>
@@ -1048,7 +1048,7 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(clampedPage - 1)}
               disabled={clampedPage === 1}
               aria-label={t('上一页', 'Previous page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 w-11 rounded-lg sm:h-9 sm:w-9 bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -1060,7 +1060,7 @@ export const ReleaseTimeline: React.FC = () => {
                   type="button"
                   aria-current={page === clampedPage ? 'page' : undefined}
                   onClick={() => handlePageChange(page)}
-                  className={`px-3 py-2 rounded-lg text-sm ${
+                  className={`h-11 min-w-11 px-3 py-2 rounded-lg text-sm sm:h-9 sm:min-w-9 ${
                     page === clampedPage
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
@@ -1082,7 +1082,7 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(clampedPage + 1)}
               disabled={clampedPage === totalPages}
               aria-label={t('下一页', 'Next page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 w-11 rounded-lg sm:h-9 sm:w-9 bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -1093,7 +1093,7 @@ export const ReleaseTimeline: React.FC = () => {
               onClick={() => handlePageChange(totalPages)}
               disabled={clampedPage === totalPages}
               aria-label={t('最后一页', 'Last page')}
-              className="h-9 w-9 rounded-lg bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 w-11 rounded-lg sm:h-9 sm:w-9 bg-muted p-0 text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ChevronsRight className="w-4 h-4" />
             </Button>

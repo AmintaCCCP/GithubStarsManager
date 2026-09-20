@@ -179,6 +179,15 @@ describe('ReleaseTimeline unread snapshot', () => {
     });
   });
 
+  it('uses mobile-safe search and select controls', () => {
+    render(<ReleaseTimeline />);
+
+    expect(screen.getByPlaceholderText('搜索Release…')).toHaveClass('h-11', 'text-base', 'sm:h-9', 'sm:text-sm');
+    expect(screen.getByRole('combobox', { name: '视图模式' })).toHaveClass('h-11', 'w-full', 'max-w-full', 'sm:h-9', 'sm:w-48');
+    expect(screen.getByRole('combobox', { name: '显示范围' })).toHaveClass('h-11', 'w-full', 'max-w-full', 'sm:h-9', 'sm:w-44');
+    expect(screen.getByRole('combobox', { name: '版本范围' })).toHaveClass('h-11', 'w-full', 'max-w-full', 'sm:h-9', 'sm:w-48');
+  });
+
   it('expanding an asset-updated release keeps it visible under unread-only mode', async () => {
     const user = userEvent.setup();
     render(<ReleaseTimeline />);

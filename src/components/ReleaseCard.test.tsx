@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ReleaseCard from './ReleaseCard';
+import { useAppStore } from '../store/useAppStore';
 import type { Release } from '../types';
 
 vi.mock('../store/useAppStore', () => ({
@@ -187,6 +188,35 @@ describe('ReleaseCard asset updated indicator', () => {
     fireEvent.click(v2Row);
     await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByRole('button', { name: /app\.dmg/ }).querySelector('.text-success')).not.toBeNull());
+  });
+
+  it('uses wrapping mobile header actions with 44px touch targets', () => {
+    renderCard({
+      language: 'en',
+      release: makeRelease(1, { body: 'release notes', updated_asset_ids: [101] }),
+    });
+
+    const assets = screen.getByRole('button', { name: 'Hide Assets' });
+    expect(assets.parentElement).toHaveClass('flex-wrap', 'md:flex-nowrap', 'md:w-[344px]');
+    expect(assets.parentElement?.parentElement).toHaveClass('w-full', 'md:w-auto');
+    expect(assets).toHaveClass('h-11', 'sm:h-8');
+    expect(screen.getByRole('button', { name: 'Show Changelog' })).toHaveClass('h-11', 'sm:h-8');
+    expect(screen.getByRole('button', { name: 'AI Summary of this update' })).toHaveClass('h-11', 'sm:h-8');
+    expect(screen.getByRole('button', { name: 'Unsubscribe from releases' })).toHaveClass('h-11', 'w-11', 'sm:h-auto', 'sm:w-auto');
+    expect(screen.getByRole('link', { name: 'View on GitHub' })).toHaveClass('inline-flex', 'items-center', 'justify-center', 'h-11', 'w-11', 'sm:h-auto', 'sm:w-auto');
+    expect(screen.getByText('v1')).toHaveClass('min-w-0', 'max-w-full', 'truncate', 'sm:max-w-none', 'sm:shrink-0');
+    expect(screen.getByRole('button', { name: /app\.dmg/ }).lastElementChild).toHaveClass('w-full', 'flex-wrap', 'sm:w-auto', 'sm:flex-nowrap', 'sm:shrink-0');
+  });
+
+  it('stacks ordinary asset metadata on mobile too', () => {
+    vi.mocked(useAppStore).mockReturnValueOnce({
+      rpcDownloadConfig: { enabled: false, host: '', port: 6800 },
+    } as ReturnType<typeof useAppStore>);
+    renderCard({ language: 'en' });
+
+    expect(screen.getByRole('link', { name: /app\.dmg/ }).lastElementChild).toHaveClass(
+      'w-full', 'flex-wrap', 'sm:w-auto', 'sm:flex-nowrap', 'sm:shrink-0'
+    );
   });
 
   it('renders all five English header controls when body and download links exist', () => {
