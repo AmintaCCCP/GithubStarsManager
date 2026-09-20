@@ -93,6 +93,20 @@ test('Electron discovery mirrors structured similarity text and vector filtering
   assert.equal(hasActiveVectorFilters({ isSubscribed: false }), true);
 });
 
+test('Electron health facts cap locally cached releases at 500 newest', () => {
+  const value = repo({ id: 1, created_at: '2020-01-01T00:00:00.000Z', has_fetched_releases: true });
+  const releases = Array.from({ length: 520 }, (_, index) => ({
+    id: index + 1,
+    repo_id: 1,
+    tag_name: `v1.${index}.0`,
+    published_at: new Date(Date.UTC(2026, 0, 1) + index * 86400000).toISOString(),
+    prerelease: false,
+  }));
+  const result = buildRepoEvidence(value, releases[releases.length - 1], releases);
+  assert.equal(result.evidence.health.release_count, 500);
+  assert.match(result.evidence.limitations.join('\n'), /at most 500 locally cached releases/);
+});
+
 test('Electron evidence is cache-only and does not infer unavailable fields', () => {
   const value = repo({ updated_at: '2026-02-04T00:00:00.000Z' });
   const result = buildRepoEvidence(value, {

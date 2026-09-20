@@ -115,7 +115,8 @@ test('Electron release lookup filters by repo and sorts newest first', () => {
 });
 
 test('Electron filter predicates match the renderer semantics', () => {
-  assert.equal(isArchivedRepository({}), false);
+  assert.equal(isArchivedRepository({}), undefined);
+  assert.equal(isArchivedRepository({ archived: false }), false);
   assert.equal(isArchivedRepository({ archived: true }), true);
   assert.equal(hasRecentActivity({ pushed_at: '2026-09-10T00:00:00.000Z' }, NOW), true);
   assert.equal(hasRecentActivity({ pushed_at: '2024-01-01T00:00:00.000Z' }, NOW), false);

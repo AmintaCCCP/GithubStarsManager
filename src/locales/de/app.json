@@ -298,7 +298,14 @@
     "sort-files": "Nach Anzahl der Dateien",
     "sort-stars": "Nach Stern sortieren",
     "sort-starred": "Sortieren nach Sternadditionszeit",
-    "sync-lists-confirm-body": "Ruft Ihre GitHub-Listen (Sternlisten) ab und wendet sie auf Ihr lokales Repository an:\n\n· Jeder Listenname wird dem entsprechenden Lager als Bezeichnung hinzugefügt (ein Lager kann zu mehreren Listen/Kategorien gehören).\n· Lager mit entsperrten Kategorien wenden die der Liste entsprechende Kategorie an und sind standardmäßig gesperrt\n· Lager mit gesperrten Kategorien bleiben unverändert\n\nSind Sie sicher, dass Sie fortfahren möchten?"
+    "sync-lists-confirm-body": "Ruft Ihre GitHub-Listen (Sternlisten) ab und wendet sie auf Ihr lokales Repository an:\n\n· Jeder Listenname wird dem entsprechenden Lager als Bezeichnung hinzugefügt (ein Lager kann zu mehreren Listen/Kategorien gehören).\n· Lager mit entsperrten Kategorien wenden die der Liste entsprechende Kategorie an und sind standardmäßig gesperrt\n· Lager mit gesperrten Kategorien bleiben unverändert\n\nSind Sie sicher, dass Sie fortfahren möchten?",
+    "repository-health-facts": "Repository-Gesundheitsdaten",
+    "show-only-archived-repositories": "Nur archivierte Repositories anzeigen",
+    "archived": "Archiviert",
+    "show-only-repositories-pushed-within-the-last-12": "Nur Repositories mit Push in den letzten 12 Monaten anzeigen",
+    "pushed-in-12-months": "Push in 12 Monaten",
+    "show-only-repositories-without-a-declared-licens": "Nur Repositories ohne deklarierte Lizenz anzeigen",
+    "no-declared-license": "Keine deklarierte Lizenz"
   },
   "searchDemo": {
     "search-feature-upgrade": "Upgrade der Suchfunktion",

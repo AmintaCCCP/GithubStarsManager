@@ -298,7 +298,14 @@
     "sort-files": "파일 수별",
     "sort-stars": "별표순으로 정렬",
     "sync-lists-confirm-body": "GitHub 목록(별표 표시된 목록)을 가져와 로컬 저장소에 적용합니다.\n\n· 각 목록 이름은 해당 창고에 라벨로 추가됩니다(하나의 창고가 여러 목록/카테고리에 속할 수 있음).\n· 잠금 해제된 카테고리가 있는 창고는 목록에 해당하는 카테고리가 적용되며 기본적으로 잠겨 있습니다.\n· 잠긴 카테고리가 있는 창고는 변경되지 않습니다.\n\n계속하시겠습니까?",
-    "sort-starred": "별 추가 시간을 기준으로 정렬"
+    "sort-starred": "별 추가 시간을 기준으로 정렬",
+    "repository-health-facts": "저장소 상태 사실",
+    "show-only-archived-repositories": "보관된 저장소만 표시",
+    "archived": "보관됨",
+    "show-only-repositories-pushed-within-the-last-12": "최근 12개월 이내에 푸시된 저장소만 표시",
+    "pushed-in-12-months": "12개월 내 푸시",
+    "show-only-repositories-without-a-declared-licens": "라이선스가 선언되지 않은 저장소만 표시",
+    "no-declared-license": "라이선스 미선언"
   },
   "searchDemo": {
     "search-feature-upgrade": "검색 기능 업그레이드",

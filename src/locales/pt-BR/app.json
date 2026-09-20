@@ -298,7 +298,14 @@
     "sort-files": "Por número de arquivos",
     "sort-stars": "Classificar por estrela",
     "sort-starred": "Classificar por tempo de adição de estrela",
-    "sync-lists-confirm-body": "Irá extrair suas listas do GitHub (listas com estrela) e aplicá-las ao seu repositório local:\n\n· Cada nome de lista será adicionado ao armazém correspondente como um rótulo (um armazém pode pertencer a múltiplas listas/categorias)\n· Armazéns com categorias desbloqueadas aplicarão a categoria correspondente à lista e serão bloqueados por padrão\n· Armazéns com categorias bloqueadas permanecem inalterados\n\nTem certeza de que deseja continuar?"
+    "sync-lists-confirm-body": "Irá extrair suas listas do GitHub (listas com estrela) e aplicá-las ao seu repositório local:\n\n· Cada nome de lista será adicionado ao armazém correspondente como um rótulo (um armazém pode pertencer a múltiplas listas/categorias)\n· Armazéns com categorias desbloqueadas aplicarão a categoria correspondente à lista e serão bloqueados por padrão\n· Armazéns com categorias bloqueadas permanecem inalterados\n\nTem certeza de que deseja continuar?",
+    "repository-health-facts": "Fatos de saúde do repositório",
+    "show-only-archived-repositories": "Mostrar apenas repositórios arquivados",
+    "archived": "Arquivado",
+    "show-only-repositories-pushed-within-the-last-12": "Mostrar apenas repositórios com push nos últimos 12 meses",
+    "pushed-in-12-months": "Push em 12 meses",
+    "show-only-repositories-without-a-declared-licens": "Mostrar apenas repositórios sem licença declarada",
+    "no-declared-license": "Sem licença declarada"
   },
   "searchDemo": {
     "search-feature-upgrade": "Atualização da função de pesquisa",

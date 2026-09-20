@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
 import { AlertTriangle, Archive, Ban, PackageOpen } from 'lucide-react';
 import type { Release, Repository } from '../types';
 import type {
@@ -10,6 +9,7 @@ import type {
   RepositoryHealthSignalId,
 } from '../types/health';
 import { Badge } from './ui/badge';
+import { formatNumber, getDateFnsLocale } from '../i18n/format';
 import { useT, type TranslateFn } from '../i18n/useT';
 import type { AppLanguage } from '../i18n/languages';
 import {
@@ -87,8 +87,8 @@ const SIGNAL_ICONS: Record<RepositoryHealthSignalId, React.ComponentType<{ class
 };
 
 /** 千分位数字；非有限值原样回落，避免显示 NaN。 */
-function formatCount(value: number): string {
-  return Number.isFinite(value) ? value.toLocaleString('en-US') : '—';
+function formatCount(value: number, language: AppLanguage): string {
+  return Number.isFinite(value) ? formatNumber(value, language) : '—';
 }
 
 /** 绝对日期（YYYY-MM-DD），用于 tooltip 与相对时间的兜底。 */
@@ -122,15 +122,15 @@ function formatFactValue(
     case 'count':
       if (fact.value === null) return { text: '—', muted: true };
       if (fact.id === 'releasesPerYear') {
-        return { text: t('repositoryHealthPanel.v1-year', { v1: formatCount(fact.value as number) }), muted: false };
+        return { text: t('repositoryHealthPanel.v1-year', { v1: formatCount(fact.value as number, language) }), muted: false };
       }
-      return { text: formatCount(fact.value as number), muted: false };
+      return { text: formatCount(fact.value as number, language), muted: false };
     case 'duration': {
       if (fact.value === null) return { text: '—', muted: true };
       const days = fact.value as number;
       const years = Math.round((days / 365.25) * 10) / 10;
       return {
-        text: t('repositoryHealthPanel.v1-days-years-years', { v1: formatCount(days), years: years }),
+        text: t('repositoryHealthPanel.v1-days-years-years', { v1: formatCount(days, language), years: years }),
         muted: false,
       };
     }
@@ -142,7 +142,7 @@ function formatFactValue(
       return {
         text: formatDistanceToNow(timestamp, {
           addSuffix: true,
-          locale: language === 'zh' ? zhCN : undefined,
+          locale: getDateFnsLocale(language),
         }),
         title: formatAbsoluteDate(raw),
         muted: false,

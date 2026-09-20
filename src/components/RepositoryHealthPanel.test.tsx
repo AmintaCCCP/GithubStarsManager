@@ -37,6 +37,19 @@ const release: Release = {
 
 // 文案经 useT 取词，测试环境默认语言为 zh（见 src/test/setup.ts），因此断言中文。
 describe('RepositoryHealthPanel', () => {
+  it('相对时间跟随 language 使用对应 date-fns locale', () => {
+    render(
+      <RepositoryHealthPanel
+        repository={makeRepo({ created_at: '2020-09-17T00:00:00.000Z' })}
+        releases={[release]}
+        language="ja"
+      />,
+    );
+
+    // language 只驱动 date-fns；ja locale 用「約N年前」，可与中文「约N年前」区分。
+    expect(screen.getByText(/約\d+(\.\d+)?年前/)).toBeInTheDocument();
+  });
+
   it('按固定四个分组展示事实', () => {
     render(<RepositoryHealthPanel repository={makeRepo()} releases={[release]} language="zh" />);
 

@@ -298,7 +298,14 @@
     "sort-files": "ファイル数別",
     "sort-stars": "星順に並べ替える",
     "sort-starred": "スター追加時間順に並べ替える",
-    "sync-lists-confirm-body": "GitHub リスト (スター付きリスト) を取得し、ローカル リポジトリに適用します。\n\n· 各リスト名は対応する倉庫にラベルとして追加されます (1 つの倉庫が複数のリスト/カテゴリに属することができます)\n· ロックされていないカテゴリを持つウェアハウスは、リストに対応するカテゴリを適用し、デフォルトでロックされます。\n· ロックされたカテゴリを持つ倉庫は変更されません。\n\n続行してもよろしいですか?"
+    "sync-lists-confirm-body": "GitHub リスト (スター付きリスト) を取得し、ローカル リポジトリに適用します。\n\n· 各リスト名は対応する倉庫にラベルとして追加されます (1 つの倉庫が複数のリスト/カテゴリに属することができます)\n· ロックされていないカテゴリを持つウェアハウスは、リストに対応するカテゴリを適用し、デフォルトでロックされます。\n· ロックされたカテゴリを持つ倉庫は変更されません。\n\n続行してもよろしいですか?",
+    "repository-health-facts": "リポジトリの健全性ファクト",
+    "show-only-archived-repositories": "アーカイブ済みのリポジトリのみ表示",
+    "archived": "アーカイブ済み",
+    "show-only-repositories-pushed-within-the-last-12": "過去12か月以内にプッシュされたリポジトリのみ表示",
+    "pushed-in-12-months": "12か月以内にプッシュ",
+    "show-only-repositories-without-a-declared-licens": "ライセンス未宣言のリポジトリのみ表示",
+    "no-declared-license": "ライセンス未宣言"
   },
   "searchDemo": {
     "search-feature-upgrade": "検索機能のアップグレード",

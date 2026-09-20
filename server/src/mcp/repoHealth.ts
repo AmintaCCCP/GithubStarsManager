@@ -167,7 +167,7 @@ export function deriveRepositoryHealthFacts(
     releases_per_year: releasesPerYear,
 
     stars: toCount(repo?.stargazers_count),
-    forks: repo?.forks_count != null ? toCount(repo.forks_count) : toCount(repo?.forks),
+    forks: repo?.forks_count !== undefined ? toCount(repo.forks_count) : toCount(repo?.forks),
     open_issues_count: repo?.open_issues_count === undefined ? null : toCount(repo.open_issues_count),
     default_branch: repo?.default_branch ?? null,
     license: repo?.license ?? null,

@@ -298,7 +298,14 @@
     "sort-files": "Par nombre de fichiers",
     "sort-stars": "Trier par étoile",
     "sort-starred": "Trier par heure d'ajout des étoiles",
-    "sync-lists-confirm-body": "Extraira vos listes GitHub (listes favorites) et les appliquera à votre référentiel local :\n\n· Chaque nom de liste sera ajouté à l'entrepôt correspondant sous forme d'étiquette (un entrepôt peut appartenir à plusieurs listes/catégories)\n· Les entrepôts avec des catégories déverrouillées appliqueront la catégorie correspondant à la liste et seront verrouillés par défaut\n· Les entrepôts avec des catégories verrouillées restent inchangés\n\nÊtes-vous sûr de vouloir continuer ?"
+    "sync-lists-confirm-body": "Extraira vos listes GitHub (listes favorites) et les appliquera à votre référentiel local :\n\n· Chaque nom de liste sera ajouté à l'entrepôt correspondant sous forme d'étiquette (un entrepôt peut appartenir à plusieurs listes/catégories)\n· Les entrepôts avec des catégories déverrouillées appliqueront la catégorie correspondant à la liste et seront verrouillés par défaut\n· Les entrepôts avec des catégories verrouillées restent inchangés\n\nÊtes-vous sûr de vouloir continuer ?",
+    "repository-health-facts": "Faits de santé du dépôt",
+    "show-only-archived-repositories": "Afficher uniquement les dépôts archivés",
+    "archived": "Archivé",
+    "show-only-repositories-pushed-within-the-last-12": "Afficher uniquement les dépôts poussés au cours des 12 derniers mois",
+    "pushed-in-12-months": "Poussé en 12 mois",
+    "show-only-repositories-without-a-declared-licens": "Afficher uniquement les dépôts sans licence déclarée",
+    "no-declared-license": "Aucune licence déclarée"
   },
   "searchDemo": {
     "search-feature-upgrade": "Mise à niveau de la fonction de recherche",

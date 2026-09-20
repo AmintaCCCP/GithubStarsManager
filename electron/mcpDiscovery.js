@@ -2,7 +2,11 @@ const {
   deriveRepositoryHealthFacts,
   hasRecentActivity,
   isArchivedRepository,
+  releasesForRepository,
 } = require('./repoHealth');
+
+/** Soft cap matching server/src/mcp/provider.ts MAX_RELEASES_PER_REPO_EVIDENCE. */
+const MAX_RELEASES_PER_REPO_EVIDENCE = 500;
 
 const NO_LICENSE_SENTINEL = '__NO_LICENSE__';
 const NOASSERTION_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
@@ -239,7 +243,11 @@ function buildRepoEvidence(repo, latestRelease, releases) {
     : 'not_analyzed';
   // Repository Health 客观事实：与 UI / 插件同源（见 repoHealth.js）。
   // 传 releases 时补全 Release 相关事实；不传时这些字段为 null（未知）而不是 0。
-  const health = deriveRepositoryHealthFacts(repo, releases);
+  // 每仓只取最新 500 条，与后端 getRepositoryReleases 上限一致，避免 limitations 撒谎。
+  const cappedReleases = Array.isArray(releases)
+    ? releasesForRepository(releases, repo.id).slice(0, MAX_RELEASES_PER_REPO_EVIDENCE)
+    : releases;
+  const health = deriveRepositoryHealthFacts(repo, cappedReleases);
   // archived 只在记录中确实存在该布尔值时才断言，否则保持 null 并声明限制。
   const hasArchivedFlag = typeof repo.archived === 'boolean';
   return {
