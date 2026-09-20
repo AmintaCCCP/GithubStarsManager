@@ -190,12 +190,12 @@ const highlightCache = new Map<string, React.ReactNode>();
 const countVisibleOverflowActions = (
   width: number,
   primaryActionCount: number,
-  hasPluginActions: boolean,
+  hasPersistentMenu: boolean,
 ): number => {
   if (width === 0) return primaryActionCount;
   const capacity = Math.max(1, Math.floor((width + ACTION_SLOT_GAP) / ACTION_SLOT_STRIDE));
-  if (hasPluginActions) {
-    return Math.max(0, Math.min(primaryActionCount - 1, capacity - 1));
+  if (hasPersistentMenu) {
+    return Math.max(0, Math.min(primaryActionCount, capacity - 1));
   }
   return capacity >= primaryActionCount ? primaryActionCount : Math.max(0, capacity - 1);
 };
@@ -545,8 +545,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         setVisibleOverflowActionCount(primaryOverflowActionCount);
         return;
       }
+      const hasPersistentMenu =
+        pluginActions.actions.length > 0 ||
+        (viewMode === 'list' && vectorSearchAvailable);
       setVisibleOverflowActionCount(
-        countVisibleOverflowActions(width, primaryOverflowActionCount, pluginActions.actions.length > 0),
+        countVisibleOverflowActions(width, primaryOverflowActionCount, hasPersistentMenu),
       );
     };
 
@@ -558,7 +561,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       observer.disconnect();
       window.removeEventListener('resize', updateVisibleActionCount);
     };
-  }, [viewMode, primaryOverflowActionCount, pluginActions.actions.length, selectionMode]);
+  }, [viewMode, primaryOverflowActionCount, pluginActions.actions.length, selectionMode, vectorSearchAvailable]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {

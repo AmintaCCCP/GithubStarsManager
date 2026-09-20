@@ -384,6 +384,19 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
   });
+
+  it('keeps the persistent list more-actions menu visible when eight primary slots would otherwise fill the row', async () => {
+    renderRepositoryCard('list', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('list-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 298 });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
+    expect(screen.queryByTitle('取消 Star')).not.toBeInTheDocument();
+  });
 });
 
 describe('RepositoryCard interactive-element click exemption (issue #353)', () => {
