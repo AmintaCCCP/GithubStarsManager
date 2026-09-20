@@ -8,6 +8,14 @@ describe('StepperInput', () => {
     vi.useRealTimers();
   });
 
+  it('uses 44px mobile controls and restores compact dimensions at sm', () => {
+    const { container } = render(<StepperInput value={2} onChange={vi.fn()} min={0} max={5} />);
+    for (const button of [screen.getByRole('button', { name: 'Decrease' }), screen.getByRole('button', { name: 'Increase' })]) {
+      expect(button).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+    }
+    expect(container.querySelector('span')).toHaveClass('h-11', 'sm:h-8');
+  });
+
   it('stops long-press repeat at both bounds', async () => {
     vi.useFakeTimers();
     const decrementOnChange = vi.fn();

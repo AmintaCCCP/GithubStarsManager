@@ -32,9 +32,9 @@ type SheetSide = 'top' | 'right' | 'bottom' | 'left';
 
 const sideClasses: Record<SheetSide, string> = {
   top: 'inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
-  right: 'inset-y-0 right-0 h-full w-full border-l sm:max-w-xl data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
+  right: 'inset-y-0 right-0 h-[100dvh] w-full border-l sm:max-w-xl data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
   bottom: 'inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
-  left: 'inset-y-0 left-0 h-full w-full border-r sm:max-w-xl data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
+  left: 'inset-y-0 left-0 h-[100dvh] w-full border-r sm:max-w-xl data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
 };
 
 const SheetContent = React.forwardRef<
@@ -50,7 +50,7 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed z-50 flex flex-col gap-4 bg-card p-5 text-card-foreground shadow-dialog transition ease-in-out data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:duration-300 data-[state=open]:duration-500',
+        'fixed z-50 flex max-h-[100dvh] max-w-[100vw] flex-col gap-4 overflow-y-auto bg-card p-4 pt-[calc(1rem+env(safe-area-inset-top))] pr-[calc(1rem+env(safe-area-inset-right))] pb-[calc(1rem+env(safe-area-inset-bottom))] pl-[calc(1rem+env(safe-area-inset-left))] text-card-foreground shadow-dialog transition ease-in-out sm:p-5 data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:duration-300 data-[state=open]:duration-500',
         sideClasses[side],
         className,
       )}
@@ -66,7 +66,7 @@ const SheetContent = React.forwardRef<
     >
       {children}
       {showClose && (
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
+        <DialogPrimitive.Close className="absolute right-[calc(0.5rem+env(safe-area-inset-right))] top-[calc(0.5rem+env(safe-area-inset-top))] h-11 w-11 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:right-4 sm:top-4 sm:h-auto sm:w-auto disabled:pointer-events-none">
           <X className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">{closeLabel}</span>
         </DialogPrimitive.Close>
