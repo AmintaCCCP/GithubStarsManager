@@ -13,6 +13,8 @@ Run the following locally in this order before pushing:
 
 ```bash
 npm run check:boundaries   # frontend layering guard (offline, fast)
+npm run check:i18n -- --base origin/main
+npm run check:pr-release-files -- --base origin/main
 npm run lint               # eslint incl. no-restricted-imports boundary rules
 npm run typecheck          # tsc -b --noEmit
 npm run test:run           # vitest run (contract + unit tests)
@@ -21,7 +23,9 @@ git diff --check           # whitespace / merge-marker hygiene
 ```
 
 CI runs the same set (see `.github/workflows/ci.yml`), with `check:boundaries` first so a
-layering violation fails the job before the slower steps.
+layering violation fails the job before the slower steps. Contributor PRs that bump
+`package.json` / lockfile root `version` or edit `versions/version-info.xml` fail CI.
+New UI copy must go through `src/locales/{zh,en,ja,es,pt-BR,ru,zh-TW,fr,de,ko}/`.
 
 ## Scope checklist
 
@@ -36,6 +40,8 @@ layering violation fails the job before the slower steps.
 - [ ] No new `import` of React/JSX/the Store/any service into `src/features/*/application/**`
       (static or dynamic).
 - [ ] No inline `eslint-disable` to bypass the boundary rules — fix the layering instead.
+- [ ] No app version bump (`package.json` / `server/package.json` / lockfile root `version`) and no `versions/version-info.xml` edit. Releases are owner-only on `main`.
+- [ ] New user-facing copy uses `t()` / locale JSON, not hardcoded strings. Every built-in language has a real translation (not an English/zh copy). Brand tokens may use `// i18n-allow-literal`.
 
 ### Runtime / persistence / UI changes (if any)
 

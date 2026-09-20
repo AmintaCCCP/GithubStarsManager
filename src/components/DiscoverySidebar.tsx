@@ -48,9 +48,9 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
     const diffMs = now.getTime() - date.getTime();
     const diffMin = Math.floor(diffMs / (1000 * 60));
     if (diffMin < 1) return t('discoverySidebar.just-now');
-    if (diffMin < 60) return t('discoverySidebar.minutes-ago', { count: diffMin });
+    if (diffMin < 60) return t('app:discoverySidebar.minutes-ago', { count: diffMin });
     const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return t('discoverySidebar.hours-ago', { count: diffHours });
+    if (diffHours < 24) return t('app:discoverySidebar.hours-ago', { count: diffHours });
     return date.toLocaleDateString();
   };
 

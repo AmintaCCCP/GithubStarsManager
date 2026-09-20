@@ -23,6 +23,10 @@ jobs:
         uses: actions/checkout@v5
         with:
           persist-credentials: false
+          # Always full history. Do not write `&& 0 || 1`: GitHub treats 0 as
+          # falsy, so that expression would force fetch-depth: 1 on PRs and
+          # `git diff base...head` would fail with "invalid symmetric difference".
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -35,6 +39,31 @@ jobs:
 
       - name: Frontend layering boundaries
         run: node scripts/check-boundaries.cjs
+
+      - name: Fetch pull request endpoints
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin \
+            "${{ github.event.pull_request.base.sha }}" \
+            "pull/${{ github.event.pull_request.number }}/head"
+
+      - name: Block contributor version and update-feed edits
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-pr-release-files.cjs --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
+
+      - name: i18n completeness and hardcoded-copy gate
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            node scripts/check-i18n.cjs --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
+          else
+            node scripts/check-i18n.cjs
+          fi
 
       - name: Lint
         run: npm run lint
