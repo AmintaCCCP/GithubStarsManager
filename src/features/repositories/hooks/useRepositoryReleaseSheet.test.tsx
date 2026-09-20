@@ -82,6 +82,7 @@ describe('useRepositoryReleaseSheet', () => {
     mocks.backend.isAvailable = false;
     mocks.store.githubToken = 'token';
     mocks.store.routeMode = 'auto';
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
   });
 
   it('uses the live backend GitHub proxy when available and maps repository identity locally', async () => {
@@ -288,5 +289,119 @@ describe('useRepositoryReleaseSheet', () => {
     await act(async () => { await pending; });
 
     expect(result.current.summaries[sheetRelease.id]).toEqual({ status: 'done', content: '# Summary' });
+  });
+});
+
+describe('useRepositoryReleaseSheet desktop downloads', () => {
+  const desktopLink = {
+    id: 'asset-1',
+    name: 'private.zip',
+    url: 'https://github.com/owner/repo/releases/download/v1/private.zip',
+    authenticatedUrl: 'https://api.github.com/repos/owner/repo/releases/assets/1',
+    size: 6,
+    isSourceCode: false,
+    assetId: 1,
+  };
+  const downloadKey = `${desktopLink.url}@`;
+
+  const installDownloadsBridge = () => {
+    const saveReleaseAsset = vi.fn();
+    const cancel = vi.fn().mockResolvedValue({ success: true });
+    let emitProgress: ((progress: unknown) => void) | null = null;
+    const onProgress = vi.fn((listener: (progress: unknown) => void) => {
+      emitProgress = listener;
+      return () => { emitProgress = null; };
+    });
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      downloads: { saveReleaseAsset, cancel, onProgress },
+    };
+    return { saveReleaseAsset, cancel, onProgress, progress: () => emitProgress };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.backend.isAvailable = false;
+    mocks.store.githubToken = 'token';
+    mocks.store.routeMode = 'auto';
+    mocks.store.rpcDownloadConfig = { enabled: false, host: '', port: 6800, secret: '' };
+  });
+
+  it('streams the asset through the desktop bridge instead of buffering a blob', async () => {
+    const bridge = installDownloadsBridge();
+    let resolveSave: (value: unknown) => void = () => {};
+    bridge.saveReleaseAsset.mockImplementation(() => new Promise((resolve) => { resolveSave = resolve; }));
+    const fetchMock = vi.mocked(window.fetch);
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.downloadAsset(desktopLink);
+    });
+
+    expect(bridge.onProgress).toHaveBeenCalledOnce();
+    expect(bridge.saveReleaseAsset).toHaveBeenCalledWith({
+      transferId: downloadKey,
+      url: 'https://api.github.com/repos/owner/repo/releases/assets/1',
+      fileName: 'private.zip',
+      expectedSize: 6,
+      authorization: 'Bearer token',
+    });
+    expect(result.current.downloadProgress[downloadKey]).toEqual({ receivedBytes: 0, totalBytes: 6 });
+    // 关键回归点：桌面端不再走 fetch + blob，整包不经过渲染进程内存
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    act(() => {
+      bridge.progress()?.({ transferId: downloadKey, receivedBytes: 3, totalBytes: 6 });
+    });
+    expect(result.current.downloadProgress[downloadKey]).toEqual({ receivedBytes: 3, totalBytes: 6 });
+    expect(result.current.downloadStates[downloadKey]).toBe('sending');
+
+    resolveSave({ success: true, fileName: 'private.zip', bytes: 6 });
+    await act(async () => { await pending; });
+
+    expect(result.current.downloadProgress[downloadKey]).toBeUndefined();
+    expect(result.current.downloadStates[downloadKey]).toBe('idle');
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the public download URL when no token is configured', async () => {
+    const bridge = installDownloadsBridge();
+    mocks.store.githubToken = null;
+    bridge.saveReleaseAsset.mockResolvedValue({ success: true, bytes: 6 });
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => { await result.current.downloadAsset(desktopLink); });
+
+    expect(bridge.saveReleaseAsset).toHaveBeenCalledWith(expect.objectContaining({
+      url: desktopLink.url,
+      authorization: undefined,
+    }));
+  });
+
+  it('surfaces a desktop transfer failure and a user cancel differently', async () => {
+    const bridge = installDownloadsBridge();
+    bridge.saveReleaseAsset.mockResolvedValue({
+      success: false,
+      error: { code: 'DOWNLOAD_SIZE_MISMATCH', message: 'size mismatch' },
+    });
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => { await result.current.downloadAsset(desktopLink); });
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('size mismatch'), 'error');
+
+    mocks.toast.mockClear();
+    bridge.saveReleaseAsset.mockResolvedValue({ success: false, canceled: true });
+    await act(async () => { await result.current.downloadAsset(desktopLink); });
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('cancels an in-flight desktop transfer by its download key', async () => {
+    const bridge = installDownloadsBridge();
+    bridge.saveReleaseAsset.mockResolvedValue({ success: true, bytes: 6 });
+    const { result } = renderHook(() => useRepositoryReleaseSheet(repository));
+
+    await act(async () => { await result.current.cancelDownload(desktopLink); });
+
+    expect(bridge.cancel).toHaveBeenCalledWith(downloadKey);
   });
 });

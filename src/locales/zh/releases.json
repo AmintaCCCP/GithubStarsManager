@@ -181,6 +181,7 @@
     "action": "操作",
     "sent": "已发送",
     "download": "下载",
+    "cancel-download": "取消下载",
     "v1-asset-pagination": "{{v1}} 资产分页",
     "assets": "资产",
     "notes": "更新日志",

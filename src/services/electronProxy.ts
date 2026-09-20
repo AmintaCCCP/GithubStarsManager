@@ -7,6 +7,7 @@ import type {
   Release,
 } from '../types';
 import type { ElectronPluginAPI } from '../plugins/types';
+import type { DownloadsElectronAPI } from './desktopDownloadService';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
 export type McpLocalConfig = McpServiceConfig;
@@ -79,6 +80,8 @@ interface ElectronAPI {
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
   plugins?: ElectronPluginAPI;
+  /** 桌面端 release 资产流式落盘（进度 + 取消），见 desktopDownloadService。 */
+  downloads?: DownloadsElectronAPI;
 }
 
 declare global {

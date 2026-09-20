@@ -6,6 +6,7 @@ const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
 const { createPluginManager } = require('./plugins/pluginManager');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
+const { cancelReleaseAssetTransfer, saveReleaseAssetToDisk } = require('./releaseAssetTransfer');
 const { PAGE_SCHEME, pageCsp } = require('./plugins/pluginPage');
 const {
   DEFAULT_DESKTOP_PREFS,
@@ -935,6 +936,23 @@ ipcMain.handle('plugins:downloadReleaseAsset', async (_event, request) => {
 });
 ipcMain.handle('plugins:runExporter', async (_event, request) =>
   getPluginManager().runExporter(request)
+);
+// 用户从 Repository Release 面板点下载：主进程流式落盘，渲染进程只收进度。
+// 认证头由渲染进程随请求传入（主进程不持有 GitHub Token），公开资产则不带。
+ipcMain.handle('downloads:saveReleaseAsset', async (event, request) =>
+  isMainPluginFrame(event) ? saveReleaseAssetToDisk({
+    fetchImpl: (url, options) => net.fetch(url, options),
+    showSaveDialog: (...args) => dialog.showSaveDialog(...args),
+    ownerWindow: mainWindow,
+    defaultDirectory: app.getPath('downloads'),
+    request,
+    onProgress: (progress) => {
+      if (!event.sender.isDestroyed()) event.sender.send('downloads:progress', progress);
+    },
+  }) : { success: false, error: { code: 'DOWNLOAD_IPC_DENIED', message: 'Downloads require the main frame' } }
+);
+ipcMain.handle('downloads:cancel', async (event, transferId) =>
+  isMainPluginFrame(event) ? cancelReleaseAssetTransfer(transferId) : { success: false }
 );
 function isMainPluginFrame(event) {
   return mainWindow && event.sender === mainWindow.webContents &&

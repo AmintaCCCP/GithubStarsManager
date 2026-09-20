@@ -181,6 +181,7 @@
     "action": "操作する",
     "sent": "送信済み",
     "download": "ダウンロード",
+    "cancel-download": "ダウンロードをキャンセル",
     "v1-asset-pagination": "{{v1}} アセットのページネーション",
     "assets": "資産",
     "notes": "変更ログ",

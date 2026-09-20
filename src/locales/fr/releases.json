@@ -181,6 +181,7 @@
     "action": "fonctionner",
     "sent": "Envoyé",
     "download": "télécharger",
+    "cancel-download": "Annuler le téléchargement",
     "v1-asset-pagination": "{{v1}} Pagination des éléments",
     "assets": "actifs",
     "notes": "Journal des modifications",

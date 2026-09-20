@@ -27,6 +27,16 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     stop: () => ipcRenderer.invoke('mcp:stop'),
     getStatus: () => ipcRenderer.invoke('mcp:getStatus'),
   },
+  downloads: {
+    saveReleaseAsset: (request) => ipcRenderer.invoke('downloads:saveReleaseAsset', request),
+    cancel: (transferId) => ipcRenderer.invoke('downloads:cancel', transferId),
+    // 返回取消订阅函数，供 React effect 清理；主进程只推进度，不带任何凭据。
+    onProgress: (listener) => {
+      const handler = (_event, progress) => listener(progress);
+      ipcRenderer.on('downloads:progress', handler);
+      return () => ipcRenderer.removeListener('downloads:progress', handler);
+    },
+  },
   plugins: {
     list: () => ipcRenderer.invoke('plugins:list'),
     installFromDirectory: () => ipcRenderer.invoke('plugins:installFromDirectory'),

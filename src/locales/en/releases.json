@@ -181,6 +181,7 @@
     "action": "Action",
     "sent": "Sent",
     "download": "Download",
+    "cancel-download": "Cancel download",
     "v1-asset-pagination": "{{v1}} asset pagination",
     "assets": "Assets",
     "notes": "Notes",

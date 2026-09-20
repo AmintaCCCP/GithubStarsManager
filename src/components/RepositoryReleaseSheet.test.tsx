@@ -8,6 +8,7 @@ const hookMocks = vi.hoisted(() => ({
   loadReleases: vi.fn(),
   sendAssetToRpc: vi.fn(),
   downloadAsset: vi.fn(),
+  cancelDownload: vi.fn(),
   generateSummary: vi.fn(),
   cancelPendingRequests: vi.fn(),
   state: {
@@ -16,6 +17,7 @@ const hookMocks = vi.hoisted(() => ({
     error: null as string | null,
     summaries: {} as Record<number, { status: 'idle' | 'loading' | 'done' | 'error'; content?: string; error?: string }>,
     downloadStates: {} as Record<string, 'idle' | 'sending' | 'sent'>,
+    downloadProgress: {} as Record<string, { receivedBytes: number; totalBytes: number | null }>,
     isRpcEnabled: false,
   },
 }));
@@ -30,6 +32,7 @@ vi.mock('../features/repositories/hooks/useRepositoryReleaseSheet', () => ({
     loadReleases: hookMocks.loadReleases,
     sendAssetToRpc: hookMocks.sendAssetToRpc,
     downloadAsset: hookMocks.downloadAsset,
+    cancelDownload: hookMocks.cancelDownload,
     generateSummary: hookMocks.generateSummary,
     cancelPendingRequests: hookMocks.cancelPendingRequests,
   }),
@@ -89,8 +92,8 @@ const renderSheet = () => render(
   />
 );
 
-// 侧栏现在还会渲染 Repository Health 事实面板，面板里的「最新稳定版本」同样是 tag 名�?
-// 因此针对 Release 条目的查询必须限定在 Release 列表容器内，避免与事实面板串台�?
+// 侧栏现在还会渲染 Repository Health 事实面板，面板里的「最新稳定版本」同样是 tag 名。
+// 因此针对 Release 条目的查询必须限定在 Release 列表容器内，避免与事实面板串台。
 const releaseList = () => within(screen.getByTestId('release-list'));
 
 describe('RepositoryReleaseSheet', () => {
@@ -101,6 +104,7 @@ describe('RepositoryReleaseSheet', () => {
     hookMocks.state.error = null;
     hookMocks.state.summaries = {};
     hookMocks.state.downloadStates = {};
+    hookMocks.state.downloadProgress = {};
     hookMocks.state.isRpcEnabled = false;
   });
 
@@ -159,15 +163,15 @@ describe('RepositoryReleaseSheet', () => {
 
     await user.click(releaseList().getByText('v1').closest('button')!);
 
-    // 可识别平台的资产渲染品牌徽章（与 ReleaseCard �?AssetLeadingIcon 一致）�?
-    // getAllByTitle：simple-icons �?svg 内部也带 <title>，需按徽�?class 过滤出外�?span�?
+    // 可识别平台的资产渲染品牌徽章（与 ReleaseCard 的 AssetLeadingIcon 一致）。
+    // getAllByTitle：simple-icons 的 svg 内部也带 <title>，需按徽章 class 过滤出外层 span。
     const getBadge = (title: string) =>
       screen.getAllByTitle(title).find((el) => el.classList.contains('asset-platform-badge'));
     expect(getBadge('macOS')).toBeDefined();
     expect(getBadge('Windows')).toBeDefined();
     expect(getBadge('Linux')).toBeDefined();
 
-    // 平台不可识别的资产回退到通用下载图标，不猜平�?
+    // 平台不可识别的资产回退到通用下载图标，不猜平台
     const zipRow = screen.getByText('myapp-1.0.zip').closest('tr');
     expect(zipRow).not.toBeNull();
     expect(zipRow!.querySelector('.asset-platform-badge')).toBeNull();
@@ -186,5 +190,35 @@ describe('RepositoryReleaseSheet', () => {
       name: 'asset-1-1.zip',
       url: 'https://example.com/asset-1-1.zip',
     }));
+  });
+
+  it('shows desktop transfer progress and cancels the in-flight download', async () => {
+    const user = userEvent.setup();
+    const zipUrl = 'https://example.com/asset-1-1.zip';
+    const downloadKey = `${zipUrl}@2026-01-01T00:00:00.000Z`;
+    hookMocks.state.downloadStates = { [downloadKey]: 'sending' };
+    hookMocks.state.downloadProgress = { [downloadKey]: { receivedBytes: 512, totalBytes: 2048 } };
+    renderSheet();
+
+    await user.click(releaseList().getByText('v1').closest('button')!);
+
+    // 25% = 512 / 2048，按钮文案在桌面端下载期间让位给百分比
+    const progressButton = screen.getByRole('button', { name: '25%' });
+    expect(progressButton).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: '取消下载' }));
+    expect(hookMocks.cancelDownload).toHaveBeenCalledWith(expect.objectContaining({ url: zipUrl }));
+  });
+
+  it('keeps the plain download label when the platform reports no byte progress', async () => {
+    const user = userEvent.setup();
+    const zipUrl = 'https://example.com/asset-1-1.zip';
+    hookMocks.state.downloadStates = { [`${zipUrl}@2026-01-01T00:00:00.000Z`]: 'sending' };
+    renderSheet();
+
+    await user.click(releaseList().getByText('v1').closest('button')!);
+
+    expect(screen.getAllByRole('button', { name: '下载' }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: '取消下载' })).not.toBeInTheDocument();
   });
 });

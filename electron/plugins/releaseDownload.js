@@ -5,25 +5,13 @@ const path = require('node:path');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 
-const MAX_RELEASE_ASSET_BYTES = 8 * 1024 * 1024 * 1024;
-
-function isAllowedGitHubDownloadUrl(value) {
-  try {
-    const url = new URL(value);
-    const host = url.hostname.toLowerCase();
-    return url.protocol === 'https:' && !url.username && !url.password && (
-      host === 'github.com' ||
-      host.endsWith('.githubusercontent.com')
-    );
-  } catch {
-    return false;
-  }
-}
-
-function safeAssetName(name) {
-  const result = path.basename(typeof name === 'string' ? name : '').replace(/[\x00-\x1f<>:"/\\|?*]/g, '_');
-  return result && result !== '.' ? result : 'release-asset';
-}
+// 下载地址白名单、大小上限与文件名规范化与核心下载路径共用一份实现
+// （core 路径见 electron/releaseAssetTransfer.js），避免两处安全校验各自漂移。
+const {
+  MAX_RELEASE_ASSET_BYTES,
+  isAllowedGitHubDownloadUrl,
+  safeAssetName,
+} = require('../releaseAssetTransfer');
 
 async function downloadReleaseAsset({ fetchImpl, showSaveDialog, ownerWindow, release, asset }) {
   if (!isAllowedGitHubDownloadUrl(asset.browser_download_url)) {

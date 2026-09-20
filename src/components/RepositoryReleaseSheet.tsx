@@ -5,14 +5,14 @@
 import { useT } from '../i18n/useT';
 import type { AppLanguage } from '../i18n/languages';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, ExternalLink, Loader2, PackageOpen, RefreshCw, Sparkles } from 'lucide-react';
+import { Calendar, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, ExternalLink, Loader2, PackageOpen, RefreshCw, Sparkles, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import type { Release, Repository } from '../types';
 import MarkdownRenderer from './MarkdownRenderer';
 import AssetLeadingIcon from './AssetLeadingIcon';
 import { useAppStore } from '../store/useAppStore';
-import { useRepositoryReleaseSheet } from '../features/repositories/hooks/useRepositoryReleaseSheet';
+import { useRepositoryReleaseSheet, type ReleaseDownloadProgress } from '../features/repositories/hooks/useRepositoryReleaseSheet';
 import { computeRpcDownloadKey } from '../hooks/useReleaseArtifactActions';
 import { buildReleaseDownloadLinks, type ReleaseDownloadLink } from '../utils/releaseDownloadLinks';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
@@ -86,9 +86,11 @@ const ReleaseAssetsTable: React.FC<{
   assetPage: number;
   onAssetPageChange: (page: number) => void;
   downloadStates: Record<string, 'idle' | 'sending' | 'sent'>;
+  downloadProgress: Record<string, ReleaseDownloadProgress>;
   onDownload: (link: ReleaseDownloadLink) => void;
+  onCancelDownload: (link: ReleaseDownloadLink) => void;
   language: AppLanguage;
-}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload }) => {
+}> = ({ release, assetPage, onAssetPageChange, downloadStates, downloadProgress, onDownload, onCancelDownload }) => {
   const t = useT('releases');
   const links = useMemo(() => buildReleaseDownloadLinks(release), [release]);
   const totalPages = Math.max(1, Math.ceil(links.length / ASSETS_PER_PAGE));
@@ -115,9 +117,15 @@ const ReleaseAssetsTable: React.FC<{
         </TableHeader>
         <TableBody>
           {displayedLinks.map((link) => {
-            const downloadState = downloadStates[computeRpcDownloadKey(link)] ?? 'idle';
+            const downloadKey = computeRpcDownloadKey(link);
+            const downloadState = downloadStates[downloadKey] ?? 'idle';
             const isSending = downloadState === 'sending';
             const isSent = downloadState === 'sent';
+            const progress = downloadProgress[downloadKey];
+            // 只有桌面端流式下载会上报字节数；浏览器分支没有进度，按钮退回原来的文案。
+            const percent = progress && progress.totalBytes
+              ? Math.min(100, Math.floor((progress.receivedBytes / progress.totalBytes) * 100))
+              : null;
             return (
               <TableRow key={link.id} className={link.isSourceCode ? 'bg-muted/30' : undefined}>
                 <TableCell className="max-w-0">
@@ -128,17 +136,35 @@ const ReleaseAssetsTable: React.FC<{
                 </TableCell>
                 <TableCell className="text-right text-xs text-muted-foreground">{formatFileSize(link.size)}</TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    disabled={isSending || isSent}
-                    onClick={() => onDownload(link)}
-                  >
-                    {isSending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
-                    {isSent ? t('repositoryReleaseSheet.sent') : t('repositoryReleaseSheet.download')}
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      disabled={isSending || isSent}
+                      onClick={() => onDownload(link)}
+                    >
+                      {isSending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : isSent ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" /> : <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />}
+                      {isSent
+                        ? t('repositoryReleaseSheet.sent')
+                        : percent === null
+                          ? t('repositoryReleaseSheet.download')
+                          : `${percent}%`}
+                    </Button>
+                    {isSending && progress ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        aria-label={t('repositoryReleaseSheet.cancel-download')}
+                        onClick={() => onCancelDownload(link)}
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -160,12 +186,14 @@ const ReleaseContent: React.FC<{
   assetPage: number;
   onAssetPageChange: (page: number) => void;
   downloadStates: Record<string, 'idle' | 'sending' | 'sent'>;
+  downloadProgress: Record<string, ReleaseDownloadProgress>;
   onDownload: (link: ReleaseDownloadLink) => void;
+  onCancelDownload: (link: ReleaseDownloadLink) => void;
   summary: { status: 'idle' | 'loading' | 'done' | 'error'; content?: string; error?: string } | undefined;
   onGenerateSummary: () => void;
   language: AppLanguage;
   repository: Repository;
-}> = ({ release, assetPage, onAssetPageChange, downloadStates, onDownload, summary, onGenerateSummary, language, repository }) => {
+}> = ({ release, assetPage, onAssetPageChange, downloadStates, downloadProgress, onDownload, onCancelDownload, summary, onGenerateSummary, language, repository }) => {
   const t = useT('releases');
   const [activeTab, setActiveTab] = useState('assets');
   const hasBody = Boolean(release.body?.trim());
@@ -189,7 +217,9 @@ const ReleaseContent: React.FC<{
           assetPage={assetPage}
           onAssetPageChange={onAssetPageChange}
           downloadStates={downloadStates}
+          downloadProgress={downloadProgress}
           onDownload={onDownload}
+          onCancelDownload={onCancelDownload}
           language={language}
         />
       </TabsContent>
@@ -245,8 +275,10 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
     error,
     summaries,
     downloadStates,
+    downloadProgress,
     loadReleases,
     downloadAsset,
+    cancelDownload,
     generateSummary,
     cancelPendingRequests,
   } = useRepositoryReleaseSheet(repository);
@@ -360,7 +392,9 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
                         assetPage={assetPages[release.id] ?? 1}
                         onAssetPageChange={(page) => setAssetPages((previous) => ({ ...previous, [release.id]: page }))}
                         downloadStates={downloadStates}
+                        downloadProgress={downloadProgress}
                         onDownload={(link) => void downloadAsset(link)}
+                        onCancelDownload={(link) => void cancelDownload(link)}
                         summary={summaries[release.id]}
                         onGenerateSummary={() => void generateSummary(release)}
                         language={language}

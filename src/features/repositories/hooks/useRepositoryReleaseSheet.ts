@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Release, ReleaseAsset, Repository } from '../../../types';
 import { backend } from '../../../services/backendAdapter';
+import { desktopDownloadService } from '../../../services/desktopDownloadService';
 import { GitHubApiService } from '../../../services/githubApi';
 import { shouldBypassBackend } from '../../../services/routeMode';
 import { useAppStore } from '../../../store/useAppStore';
@@ -16,6 +17,8 @@ import type { ReleaseDownloadLink } from '../../../utils/releaseDownloadLinks';
 
 const REMOTE_RELEASE_PAGE_SIZE = 100;
 const MAX_LIVE_RELEASES = 200;
+/** 浏览器分支的 blob URL 延迟释放时间，见 downloadBrowserBlob。 */
+const BLOB_URL_REVOKE_DELAY_MS = 10_000;
 
 const isAbortError = (error: unknown): boolean => (
   error instanceof DOMException && error.name === 'AbortError'
@@ -109,8 +112,16 @@ const downloadBrowserBlob = (blob: Blob, fileName: string) => {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(objectUrl);
+  // 同步 revoke 会和大文件的下载启动抢跑（点击只是排入队列，读取是异步的），
+  // 推迟释放；blob 在此之前一直有效，代价只是晚一点回收。
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), BLOB_URL_REVOKE_DELAY_MS);
 };
+
+/** 单次下载的字节进度，按 computeRpcDownloadKey 索引，与 downloadStates 同键。 */
+export interface ReleaseDownloadProgress {
+  receivedBytes: number;
+  totalBytes: number | null;
+}
 
 export const useRepositoryReleaseSheet = (repository: Repository) => {
   const {
@@ -136,8 +147,18 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
   // 非 RPC（浏览器）下载路径的行内 sending 状态不属 RPC 委托范围，留在本 hook；
   // 同样使用版本化 key，与 RPC 状态合并后对外暴露。
   const [browserDownloadStates, setBrowserDownloadStates] = useState<Record<string, 'idle' | 'sending'>>({});
+  // 桌面端流式下载的字节进度，键与 browserDownloadStates 相同；浏览器分支不会写入这里。
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, ReleaseDownloadProgress>>({});
   const fetchAbortRef = useRef<AbortController | null>(null);
   const t = useT('repositories');
+
+  // 主进程上报的进度按 transferId（即 computeRpcDownloadKey）归位；下载结束时由 downloadAsset 清理。
+  useEffect(() => desktopDownloadService.subscribe((progress) => {
+    setDownloadProgress((previous) => ({
+      ...previous,
+      [progress.transferId]: { receivedBytes: progress.receivedBytes, totalBytes: progress.totalBytes },
+    }));
+  }), []);
 
   const cancelPendingRequests = useCallback(() => {
     fetchAbortRef.current?.abort();
@@ -236,6 +257,42 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
     if (browserDownloadStates[downloadKey] === 'sending') return;
     setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'sending' }));
 
+    const clearDownloadState = () => {
+      setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
+      setDownloadProgress((previous) => {
+        if (!(downloadKey in previous)) return previous;
+        const next = { ...previous };
+        delete next[downloadKey];
+        return next;
+      });
+    };
+
+    // 桌面端：主进程流式写盘，渲染进程只订阅进度与取消。
+    // 这里不再经过 response.blob()，否则数百 MB 的资产会整包驻留在渲染进程。
+    if (desktopDownloadService.isAvailable()) {
+      // 先建立 0-byte 进度，让慢连接在收到首个数据块之前也能显示取消按钮。
+      setDownloadProgress((previous) => ({
+        ...previous,
+        [downloadKey]: { receivedBytes: 0, totalBytes: link.size },
+      }));
+      try {
+        const result = await desktopDownloadService.saveReleaseAsset({
+          transferId: downloadKey,
+          // 有 Token 时走资产 API（私有仓库可用），否则直接用公开下载地址。
+          url: githubToken && link.authenticatedUrl ? link.authenticatedUrl : link.url,
+          fileName: link.name,
+          expectedSize: link.size,
+          authorization: githubToken ? `Bearer ${githubToken}` : undefined,
+        });
+        if (!result.success && !result.canceled) {
+          toast(`${t('useRepositoryReleaseSheet.download-failed')}: ${result.error?.message ?? ''}`, 'error');
+        }
+      } finally {
+        clearDownloadState();
+      }
+      return;
+    }
+
     try {
       let blob: Blob;
       if (githubToken && link.authenticatedUrl) {
@@ -253,16 +310,21 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         blob = await backend.downloadGitHubResource(link.authenticatedPath);
       } else {
         window.open(link.url, '_blank', 'noopener,noreferrer');
-        setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
+        clearDownloadState();
         return;
       }
       downloadBrowserBlob(blob, link.name);
-      setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
+      clearDownloadState();
     } catch (downloadError) {
-      setBrowserDownloadStates((previous) => ({ ...previous, [downloadKey]: 'idle' }));
+      clearDownloadState();
       toast(`${t('useRepositoryReleaseSheet.download-failed')}: ${getErrorMessage(downloadError)}`, 'error');
     }
   }, [browserDownloadStates, githubToken, rpcDownloadConfig.enabled, sendAssetToRpc, t, toast]);
+
+  /** 取消桌面端正在进行的下载；浏览器分支没有可取消的传输，直接忽略。 */
+  const cancelDownload = useCallback(async (link: ReleaseDownloadLink) => {
+    await desktopDownloadService.cancel(computeRpcDownloadKey(link));
+  }, []);
 
   const generateSummary = artifactActions.generateSummary;
 
@@ -276,9 +338,11 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
       [browserDownloadStates, artifactActions.rpcDownloadStates],
     ),
     isRpcEnabled: rpcDownloadConfig.enabled,
+    downloadProgress,
     loadReleases,
     sendAssetToRpc,
     downloadAsset,
+    cancelDownload,
     generateSummary,
     cancelPendingRequests,
   };

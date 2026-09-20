@@ -181,6 +181,7 @@
     "action": "작동하다",
     "sent": "전송된",
     "download": "다운로드",
+    "cancel-download": "다운로드 취소",
     "v1-asset-pagination": "{{v1}} 자산 페이지 매김",
     "assets": "자산",
     "notes": "변경 로그",

@@ -181,6 +181,7 @@
     "action": "arbeiten",
     "sent": "Gesendet",
     "download": "herunterladen",
+    "cancel-download": "Download abbrechen",
     "v1-asset-pagination": "{{v1}} Asset-Paginierung",
     "assets": "Vermögenswerte",
     "notes": "Änderungsprotokoll",

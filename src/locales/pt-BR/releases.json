@@ -181,6 +181,7 @@
     "action": "operar",
     "sent": "Enviado",
     "download": "download",
+    "cancel-download": "Cancelar download",
     "v1-asset-pagination": "{{v1}} Paginação de recursos",
     "assets": "ativos",
     "notes": "Registro de alterações",
