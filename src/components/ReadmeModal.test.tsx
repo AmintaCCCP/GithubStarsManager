@@ -30,11 +30,12 @@ vi.mock('../services/githubApi', () => ({
   GitHubApiService: vi.fn(),
 }));
 
-let mockStoreState: { language: 'zh' | 'en'; githubToken: string | null; routeMode: RouteMode; setReadmeModalOpen: () => void } = {
+let mockStoreState: { language: 'zh' | 'en'; githubToken: string | null; routeMode: RouteMode; setReadmeModalOpen: () => void; recordRepositoryView: () => void } = {
   language: 'zh',
   githubToken: null,
   routeMode: 'auto',
   setReadmeModalOpen: vi.fn(),
+  recordRepositoryView: vi.fn(),
 };
 
 vi.mock('../store/useAppStore', () => ({
@@ -53,6 +54,7 @@ const setMockStore = (githubToken: string | null = null) => {
     githubToken,
     routeMode: 'auto' as RouteMode,
     setReadmeModalOpen: vi.fn(),
+    recordRepositoryView: vi.fn(),
   };
   (useAppStore as unknown as ReturnType<typeof vi.fn>).mockImplementation((selector?: (state: unknown) => unknown) => selector ? selector(mockStoreState) : mockStoreState);
 };
@@ -98,6 +100,16 @@ describe('ReadmeModal multilingual README switching', () => {
       { path: 'README_zh.md', type: 'blob' },
       { path: 'docs/README.ja.md', type: 'blob' },
     ]);
+  });
+
+  it('records the repository when the README closes, not while it is still open', async () => {
+    const onClose = vi.fn();
+    render(<ReadmeModal isOpen onClose={onClose} repository={mockRepository} />);
+
+    expect(mockStoreState.recordRepositoryView).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: '关闭' }));
+    expect(mockStoreState.recordRepositoryView).toHaveBeenCalledWith(mockRepository);
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('loads the default README first and then shows all detected README variants', async () => {

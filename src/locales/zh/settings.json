@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "当前账号 {{login}}。过期后可在此直接更换 token，不必退出登录。",
-    "token-hint": "过期后可在此直接更换 token，不必退出登录。"
+    "token-hint": "过期后可在此直接更换 token，不必退出登录。",
+    "recently-viewed": "最近浏览",
+    "record-recently-viewed": "记录最近浏览",
+    "recently-viewed-hint": "仅保存在本地，不上传远端，也不会提供给插件。",
+    "recently-viewed-count-kept-locally": "已保留 {{count}} 条记录",
+    "clear-recently-viewed": "清空浏览历史"
   }
 }

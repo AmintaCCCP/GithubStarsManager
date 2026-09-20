@@ -46,7 +46,16 @@ const t = makeT('zh', 'app');
 
 beforeEach(() => {
   vi.clearAllMocks();
-    Object.assign(mocks.state, { language: 'zh', setLanguage: vi.fn(), user: null });
+    Object.assign(mocks.state, {
+      language: 'zh',
+      setLanguage: vi.fn(),
+      user: null,
+      // 开发守则 §9：最近浏览卡片会读这几个字段
+      recentlyViewed: [],
+      recentlyViewedEnabled: true,
+      setRecentlyViewedEnabled: vi.fn(),
+      clearRecentlyViewed: vi.fn(),
+    });
 });
 
 describe('GeneralPanel desktop section', () => {

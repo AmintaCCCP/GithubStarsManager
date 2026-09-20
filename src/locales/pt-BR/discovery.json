@@ -79,7 +79,9 @@
     "platform-filter-v1": "Filtro de plataforma: {{v1}}",
     "items-count": "{{currentCount}} itens",
     "items-count-with-total": "{{currentCount}} itens ({{totalCount}} itens no total)",
-    "total-2": "(total"
+    "total-2": "(total",
+    "hide-seen-repositories": "Ocultar os já vistos",
+    "all-repositories-are-hidden-as-seen": "Todos os repositórios desta página já foram vistos e estão ocultos conforme sua configuração."
   },
   "weeklyIssueModal": {
     "submission-v1": "Contribuição #{{v1}}",

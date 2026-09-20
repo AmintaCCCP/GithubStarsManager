@@ -21,6 +21,11 @@ const mocks = vi.hoisted(() => {
     repositories: [],
     githubToken: 'ghp-local-token',
     setSelectedCategory: vi.fn(),
+    // 开发守则 §9：App 里的最近浏览条带会读这几个字段
+    recentlyViewed: [],
+    recentlyViewedEnabled: true,
+    discoveryHideSeen: false,
+    clearRecentlyViewed: vi.fn(),
   };
 
   return {

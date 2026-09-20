@@ -12,6 +12,7 @@ import { isAppLanguage } from '../../i18n/languages';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
+import { normalizeRecentlyViewed } from '../../utils/recentlyViewed';
 import type { AppStoreState } from '../types';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import { readAuthMirror } from '../persistence/authStorage';
@@ -97,6 +98,15 @@ export const normalizePersistedState = (
       ? safePersisted.themePreset
       : DEFAULT_THEME_PRESET_ID,
     repositories: migratedRepositories,
+    recentlyViewed: normalizeRecentlyViewed(safePersisted.recentlyViewed),
+    recentlyViewedEnabled:
+      typeof safePersisted.recentlyViewedEnabled === 'boolean'
+        ? safePersisted.recentlyViewedEnabled
+        : true,
+    discoveryHideSeen:
+      typeof safePersisted.discoveryHideSeen === 'boolean'
+        ? safePersisted.discoveryHideSeen
+        : false,
     gists,
     starredGists,
     gistSearchResults: Array.isArray(safePersisted.gistSearchResults) ? safePersisted.gistSearchResults : gists,

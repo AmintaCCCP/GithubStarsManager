@@ -263,5 +263,10 @@
     "v1-days-years-years": "{{v1}} дн. (~{{years}} лет)",
     "repository-health-facts": "Факты о состоянии репозитория",
     "these-are-objective-facts-with-no-overall-score": "Это объективные факты без общей оценки. «Неизвестно» означает, что факт ещё не получен."
+  },
+  "recentlyViewedStrip": {
+    "recently-viewed": "Недавно просмотренные",
+    "clear": "Очистить"
   }
+
 }

@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
+import { RecentlyViewedStrip } from './features/repositories/components/RecentlyViewedStrip';
 
 import { DebugModeIndicator } from './components/DebugModeIndicator';
 
@@ -94,6 +95,7 @@ const RepositoriesView = React.memo(({
       />
       <div className="flex-1 space-y-6">
         <SearchBar />
+        <RecentlyViewedStrip />
         <RepositoryList
           repositories={listRepositories}
           selectedCategory={similarView?.active ? 'all' : selectedCategory}

@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "Signed in as {{login}}. Update an expired token here without logging out.",
-    "token-hint": "Update an expired token here without logging out."
+    "token-hint": "Update an expired token here without logging out.",
+    "recently-viewed": "Recently viewed",
+    "record-recently-viewed": "Record recently viewed repositories",
+    "recently-viewed-hint": "Kept on this device only. Nothing is uploaded and plugins cannot read it.",
+    "recently-viewed-count-kept-locally": "{{count}} entries kept",
+    "clear-recently-viewed": "Clear history"
   }
 }

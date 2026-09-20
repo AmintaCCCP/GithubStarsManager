@@ -1,7 +1,7 @@
 
 import { TranslateFn } from '../../i18n/useT';
 import React from 'react';
-import { ExternalLink, Github, Globe, Key, Mail, Monitor, Package, Twitter } from 'lucide-react';
+import { ExternalLink, Github, Globe, Key, Mail, Monitor, Package, Clock, Twitter } from 'lucide-react';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -23,10 +23,22 @@ interface GeneralPanelProps {
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-  const { language, setLanguage, user } = useAppStore(useShallow((state) => ({
+  const {
+    language,
+    setLanguage,
+    user,
+    recentlyViewedEnabled,
+    setRecentlyViewedEnabled,
+    recentlyViewedCount,
+    clearRecentlyViewed,
+  } = useAppStore(useShallow((state) => ({
     language: state.language,
     setLanguage: state.setLanguage,
     user: state.user,
+    recentlyViewedEnabled: state.recentlyViewedEnabled,
+    setRecentlyViewedEnabled: state.setRecentlyViewedEnabled,
+    recentlyViewedCount: state.recentlyViewed.length,
+    clearRecentlyViewed: state.clearRecentlyViewed,
   })));
   const desktop = useDesktopActions({ t });
   const githubToken = useGitHubTokenActions({ t });
@@ -157,6 +169,42 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-3">
+            <Clock className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
+            <CardTitle>{t('generalPanel.recently-viewed')}</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground dark:text-foreground">{t('generalPanel.record-recently-viewed')}</p>
+              <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{t('generalPanel.recently-viewed-hint')}</p>
+            </div>
+            <Switch
+              aria-label={t('generalPanel.record-recently-viewed')}
+              checked={recentlyViewedEnabled}
+              onCheckedChange={setRecentlyViewedEnabled}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+              {t('generalPanel.recently-viewed-count-kept-locally', { count: recentlyViewedCount })}
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={recentlyViewedCount === 0}
+              onClick={clearRecentlyViewed}
+            >
+              {t('generalPanel.clear-recently-viewed')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

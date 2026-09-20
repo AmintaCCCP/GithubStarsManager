@@ -261,6 +261,13 @@ export interface AppActions {
   addTelegramFollow: (channel: string) => void;
   removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
+
+  // Recently viewed（开发守则 §9）
+  /** 记录一次仓库浏览（关闭记录时是 no-op）。 */
+  recordRepositoryView: (repository: Repository) => void;
+  clearRecentlyViewed: () => void;
+  setRecentlyViewedEnabled: (enabled: boolean) => void;
+  setDiscoveryHideSeen: (enabled: boolean) => void;
 }
 
 export type AppStoreState = AppState & AppActions;

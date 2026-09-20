@@ -79,7 +79,9 @@
     "retry": "다시 시도해 보세요",
     "platform-filter-v1": "플랫폼 필터: {{v1}}",
     "items-count": "{{currentCount}}개 항목",
-    "items-count-with-total": "{{currentCount}}개 항목(총 {{totalCount}}개 항목)"
+    "items-count-with-total": "{{currentCount}}개 항목(총 {{totalCount}}개 항목)",
+    "hide-seen-repositories": "본 항목 숨기기",
+    "all-repositories-are-hidden-as-seen": "이 페이지의 저장소는 모두 본 항목이라 설정에 따라 숨겨졌습니다."
   },
   "weeklyIssueModal": {
     "submission-v1": "기여 #{{v1}}",

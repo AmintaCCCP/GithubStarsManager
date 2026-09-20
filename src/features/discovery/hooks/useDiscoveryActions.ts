@@ -193,8 +193,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       currentState.setDiscoveryLastRefresh(channelId, new Date().toISOString());
       if (append && !replacesOnAppend && scrollContainerRef.current) {
         requestAnimationFrame(() => {
-          const cards = scrollContainerRef.current?.querySelectorAll('[data-repo-index]');
-          const target = cards?.[previousCount] as HTMLElement | undefined;
+          const cards = scrollContainerRef.current?.querySelectorAll<HTMLElement>('[data-repo-index]');
+          const target = cards
+            ? Array.from(cards).find((card) => Number(card.dataset.repoIndex) >= previousCount)
+            : undefined;
           target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
       }

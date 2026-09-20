@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "現在のアカウント {{login}}。有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。",
-    "token-hint": "有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。"
+    "token-hint": "有効期限が切れたら、ログアウトせずにここでトークンを直接置き換えることができます。",
+    "recently-viewed": "最近見たもの",
+    "record-recently-viewed": "閲覧履歴を記録する",
+    "recently-viewed-hint": "この端末にのみ保存されます。アップロードされず、プラグインからも参照できません。",
+    "recently-viewed-count-kept-locally": "{{count}} 件を保存中",
+    "clear-recently-viewed": "履歴を消去"
   }
 }

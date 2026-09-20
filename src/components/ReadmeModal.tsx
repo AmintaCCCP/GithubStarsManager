@@ -50,9 +50,10 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   onCloseAutoFocus,
   repository
 }) => {
-  const { language, setReadmeModalOpen } = useAppStore(useShallow((state) => ({
+  const { language, setReadmeModalOpen, recordRepositoryView } = useAppStore(useShallow((state) => ({
     language: state.language,
     setReadmeModalOpen: state.setReadmeModalOpen,
+    recordRepositoryView: state.recordRepositoryView,
   })));
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -72,6 +73,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [selectedReadmeKey, setSelectedReadmeKey] = useState('default');
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [readmeCache, setReadmeCache] = useState<Record<string, string>>({});
+
+  const handleClose = useCallback(() => {
+    if (repository) recordRepositoryView(repository);
+    onClose();
+  }, [onClose, recordRepositoryView, repository]);
 
   const defaultReadmeVariant = useMemo(() => getDefaultReadmeVariant(language), [language]);
 
@@ -498,7 +504,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const currentReadmeVariant = pickReadmeCandidate(readmeVariants, selectedReadmeKey, defaultReadmeVariant);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
         showClose={false}
         aria-describedby={undefined}
@@ -672,7 +678,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               </a>
               <Button
                 variant="ghost"
-                onClick={onClose}
+                onClick={handleClose}
                 className="p-2 rounded-lg text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
                 aria-label={t('readmeModal.close')}
               >

@@ -18,6 +18,7 @@ import {
   Crown,
   Filter,
   ChevronDown,
+  EyeOff,
   Globe,
   X,
   Calendar,
@@ -27,6 +28,8 @@ import {
 import { SiAndroid, SiApple, SiLinux, SiX, SiTelegram } from '@icons-pack/react-simple-icons';
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
+import { recentlyViewedIds } from '../utils/recentlyViewed';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
@@ -483,6 +486,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
   } = useDiscoveryActions(scrollContainerRef);
 
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
+
+  // 「隐藏已浏览」所需的本地状态（开发守则 §9）。Set 在渲染期用 useMemo 派生，
+  // 避免在 store selector 里造新对象导致每次 store 变化都换引用。
+  const { hideSeen, setHideSeen, recentlyViewed, starredRepositories } = useAppStore(useShallow((state) => ({
+    hideSeen: state.discoveryHideSeen,
+    setHideSeen: state.setDiscoveryHideSeen,
+    recentlyViewed: state.recentlyViewed,
+    starredRepositories: state.repositories,
+  })));
+  const seenIds = useMemo(() => recentlyViewedIds(recentlyViewed), [recentlyViewed]);
+  const starredIds = useMemo(
+    () => new Set(starredRepositories.map((repo) => repo.id)),
+    [starredRepositories],
+  );
   
   const sidebarRef = useRef<HTMLDivElement>(null);
   // X 推文频道：关注列表设置弹窗
@@ -514,6 +531,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
     () => (discoveryRepos && discoveryRepos[selectedDiscoveryChannel]) || [],
     [discoveryRepos, selectedDiscoveryChannel]
   );
+  const allRepoIndexes = useMemo(
+    () => new Map(allRepos.map((repo, index) => [repo.id, index])),
+    [allRepos],
+  );
+
+  // 「隐藏已浏览」：已 Star 的仓库不因"看过"而永久消失。
+  const visibleRepos = useMemo(() => {
+    if (!hideSeen) return allRepos;
+    return allRepos.filter((repo) => !seenIds.has(repo.id) || starredIds.has(repo.id));
+  }, [allRepos, hideSeen, seenIds, starredIds]);
 
   // 从 store 获取当前频道的总数量
   const currentTotalCount = discoveryTotalCount?.[selectedDiscoveryChannel] ?? 0;
@@ -951,8 +978,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       <span className="hidden sm:inline">{t('discoveryView.ai-analyze')}</span>
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    variant={hideSeen ? 'default' : 'ghost'}
+                    size="sm"
+                    aria-pressed={hideSeen}
+                    onClick={() => setHideSeen(!hideSeen)}
+                    className="h-9 shrink-0 gap-1.5 px-3 text-sm"
+                    title={t('discoveryView.hide-seen-repositories')}
+                  >
+                    <EyeOff className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('discoveryView.hide-seen-repositories')}</span>
+                  </Button>
                   <DataStats
-                    currentCount={allRepos.length}
+                    currentCount={visibleRepos.length}
                     totalCount={currentTotalCount}
                     language={language}
                   />
@@ -1240,10 +1279,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
               </div>
             )}
 
-            {allRepos.length > 0 && (
+            {visibleRepos.length > 0 && (
               <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
-                {allRepos.map((repo, index) => (
-                  <div key={repo.id} data-repo-index={index}>
+                {visibleRepos.map((repo) => (
+                  <div key={repo.id} data-repo-index={allRepoIndexes.get(repo.id)}>
                     <SubscriptionRepoCard repo={repo} desktopSafeMode={isDesktopSafeMode} />
                   </div>
                 ))}
@@ -1278,15 +1317,23 @@ export const DiscoveryView: React.FC = React.memo(() => {
               </div>
             )}
 
+            {/* 隐藏已浏览时空结果提示：数据在，只是都被过滤掉了 */}
+            {hideSeen && !currentIsLoading && allRepos.length > 0 && visibleRepos.length === 0 && (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                <EyeOff className="w-4 h-4" />
+                <span>{t('discoveryView.all-repositories-are-hidden-as-seen')}</span>
+              </div>
+            )}
+
             {/* Page Info */}
-            {!currentIsLoading && allRepos.length > 0 && (
+            {!currentIsLoading && visibleRepos.length > 0 && (
               <div className={isDesktopSafeMode
                 ? 'flex items-center justify-between py-3.5 px-5 bg-background dark:bg-card rounded-lg border border-border dark:border-border text-sm'
                 : 'flex items-center justify-between py-3.5 px-5 bg-gradient-to-r from-muted/60 to-muted/30 rounded-xl border border-border/60 dark:border-border/50 text-sm'}>
                 <div className="flex items-center gap-2 text-muted-foreground dark:text-muted-foreground">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   <span>
-                    {t('discoveryView.total')} <strong className="text-foreground dark:text-foreground">{allRepos.length}</strong> {t('discoveryView.items')}
+                    {t('discoveryView.total')} <strong className="text-foreground dark:text-foreground">{visibleRepos.length}</strong> {t('discoveryView.items')}
                   </span>
                 </div>
 

@@ -263,5 +263,10 @@
     "v1-days-years-years": "{{v1}} días (~{{years}} años)",
     "repository-health-facts": "Hechos de salud del repositorio",
     "these-are-objective-facts-with-no-overall-score": "Son hechos objetivos, sin puntuación global. “Desconocido” significa que el dato aún no se ha obtenido."
+  },
+  "recentlyViewedStrip": {
+    "recently-viewed": "Vistos recientemente",
+    "clear": "Vaciar"
   }
+
 }

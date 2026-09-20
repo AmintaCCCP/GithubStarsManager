@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "Girokonto {{login}}. Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden.",
-    "token-hint": "Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden."
+    "token-hint": "Nach Ablauf können Sie den Token hier direkt ersetzen, ohne sich abzumelden.",
+    "recently-viewed": "Zuletzt angesehen",
+    "record-recently-viewed": "Zuletzt angesehene aufzeichnen",
+    "recently-viewed-hint": "Wird nur auf diesem Gerät gespeichert. Nichts wird hochgeladen, Plugins haben keinen Zugriff.",
+    "recently-viewed-count-kept-locally": "{{count}} Einträge gespeichert",
+    "clear-recently-viewed": "Verlauf löschen"
   }
 }

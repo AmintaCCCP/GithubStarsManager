@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "Cuenta corriente {{login}}. Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión.",
-    "token-hint": "Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión."
+    "token-hint": "Después del vencimiento, puede reemplazar el token directamente aquí sin cerrar sesión.",
+    "recently-viewed": "Vistos recientemente",
+    "record-recently-viewed": "Registrar los vistos recientemente",
+    "recently-viewed-hint": "Solo se guarda en este dispositivo. No se sube nada y los plugins no pueden leerlo.",
+    "recently-viewed-count-kept-locally": "{{count}} entradas guardadas",
+    "clear-recently-viewed": "Borrar historial"
   }
 }

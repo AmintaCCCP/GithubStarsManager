@@ -263,5 +263,10 @@
     "v1-days-years-years": "{{v1}} 日（約 {{years}} 年）",
     "repository-health-facts": "リポジトリの健全性ファクト",
     "these-are-objective-facts-with-no-overall-score": "これらは客観的な事実であり、総合スコアはありません。「不明」はまだ取得していないことを意味します。"
+  },
+  "recentlyViewedStrip": {
+    "recently-viewed": "最近見たもの",
+    "clear": "クリア"
   }
+
 }

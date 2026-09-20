@@ -79,7 +79,9 @@
     "platform-filter-v1": "プラットフォームフィルター: {{v1}}",
     "items-count": "{{currentCount}} 個のアイテム",
     "items-count-with-total": "{{currentCount}} 個のアイテム (合計 {{totalCount}} 個のアイテム)",
-    "ai": "AI"
+    "ai": "AI",
+    "hide-seen-repositories": "閲覧済みを隠す",
+    "all-repositories-are-hidden-as-seen": "このページのリポジトリはすべて閲覧済みのため、設定により非表示になっています。"
   },
   "weeklyIssueModal": {
     "submission-v1": "貢献番号{{v1}}",

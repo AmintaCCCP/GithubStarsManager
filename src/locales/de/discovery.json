@@ -79,7 +79,9 @@
     "retry": "Versuchen Sie es erneut",
     "platform-filter-v1": "Plattformfilter: {{v1}}",
     "items-count": "{{currentCount}} Artikel",
-    "items-count-with-total": "{{currentCount}} Artikel ({{totalCount}} Artikel insgesamt)"
+    "items-count-with-total": "{{currentCount}} Artikel ({{totalCount}} Artikel insgesamt)",
+    "hide-seen-repositories": "Gesehene ausblenden",
+    "all-repositories-are-hidden-as-seen": "Alle Repositorys auf dieser Seite wurden bereits angesehen und sind laut Einstellung ausgeblendet."
   },
   "weeklyIssueModal": {
     "submission-v1": "Beitrag #{{v1}}",

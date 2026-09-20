@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "Compte courant {{login}}. Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",
-    "token-hint": "Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter."
+    "token-hint": "Après expiration, vous pouvez directement remplacer le token ici sans vous déconnecter.",
+    "recently-viewed": "Consultés récemment",
+    "record-recently-viewed": "Enregistrer les dépôts consultés",
+    "recently-viewed-hint": "Conservé uniquement sur cet appareil. Rien n'est envoyé et les plugins n'y ont pas accès.",
+    "recently-viewed-count-kept-locally": "{{count}} entrées conservées",
+    "clear-recently-viewed": "Effacer l'historique"
   }
 }

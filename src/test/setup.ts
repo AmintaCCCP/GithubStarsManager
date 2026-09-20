@@ -101,6 +101,14 @@ vi.mock('../store/useAppStore', () => ({
       language: 'zh',
       githubToken: null,
       setReadmeModalOpen: vi.fn(),
+      // 开发守则 §9：最近浏览的默认 state（组件与设置面板会读到）
+      recentlyViewed: [],
+      recentlyViewedEnabled: true,
+      discoveryHideSeen: false,
+      recordRepositoryView: vi.fn(),
+      clearRecentlyViewed: vi.fn(),
+      setRecentlyViewedEnabled: vi.fn(),
+      setDiscoveryHideSeen: vi.fn(),
     };
     return selector ? selector(state) : state;
   }),

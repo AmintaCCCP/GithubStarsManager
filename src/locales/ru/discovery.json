@@ -79,7 +79,9 @@
     "retry": "Попробуйте еще раз",
     "platform-filter-v1": "Фильтр платформы: {{v1}}",
     "items-count": "{{currentCount}} элементов",
-    "items-count-with-total": "{{currentCount}} элементов (всего {{totalCount}} элементов)"
+    "items-count-with-total": "{{currentCount}} элементов (всего {{totalCount}} элементов)",
+    "hide-seen-repositories": "Скрыть просмотренные",
+    "all-repositories-are-hidden-as-seen": "Все репозитории на этой странице уже просмотрены и скрыты согласно настройкам."
   },
   "weeklyIssueModal": {
     "submission-v1": "Вклад №{{v1}}",

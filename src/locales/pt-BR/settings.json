@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "Conta corrente {{login}}. Após a expiração, você pode substituir o token diretamente aqui, sem sair.",
-    "token-hint": "Após a expiração, você pode substituir o token diretamente aqui, sem sair."
+    "token-hint": "Após a expiração, você pode substituir o token diretamente aqui, sem sair.",
+    "recently-viewed": "Vistos recentemente",
+    "record-recently-viewed": "Registrar os vistos recentemente",
+    "recently-viewed-hint": "Fica apenas neste dispositivo. Nada é enviado e plugins não podem ler.",
+    "recently-viewed-count-kept-locally": "{{count}} entradas guardadas",
+    "clear-recently-viewed": "Apagar histórico"
   }
 }

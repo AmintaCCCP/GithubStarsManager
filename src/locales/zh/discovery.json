@@ -79,7 +79,9 @@
     "retry": "重试",
     "platform-filter-v1": "平台筛选：{{v1}}",
     "items-count": "{{currentCount}} 项",
-    "items-count-with-total": "{{currentCount}} 项（共 {{totalCount}} 项）"
+    "items-count-with-total": "{{currentCount}} 项（共 {{totalCount}} 项）",
+    "hide-seen-repositories": "隐藏已浏览",
+    "all-repositories-are-hidden-as-seen": "本页仓库都已浏览过，已按设置隐藏。"
   },
   "weeklyIssueModal": {
     "submission-v1": "投稿 #{{v1}}",

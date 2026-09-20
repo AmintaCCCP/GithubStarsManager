@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "當前帳號 {{login}}。過期後可在此直接更換 token，不必登出登入。",
-    "token-hint": "過期後可在此直接更換 token，不必登出登入。"
+    "token-hint": "過期後可在此直接更換 token，不必登出登入。",
+    "recently-viewed": "最近瀏覽",
+    "record-recently-viewed": "記錄最近瀏覽",
+    "recently-viewed-hint": "僅儲存在本機，不上傳遠端，也不會提供給外掛。",
+    "recently-viewed-count-kept-locally": "已保留 {{count}} 筆記錄",
+    "clear-recently-viewed": "清除瀏覽紀錄"
   }
 }

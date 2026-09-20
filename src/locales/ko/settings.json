@@ -72,6 +72,11 @@
   },
   "generalPanel": {
     "account-token-hint": "현재 계정 {{login}}. 만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다.",
-    "token-hint": "만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다."
+    "token-hint": "만료 후에는 로그아웃하지 않고도 여기에서 토큰을 직접 교체할 수 있습니다.",
+    "recently-viewed": "최근 본 항목",
+    "record-recently-viewed": "최근 본 항목 기록",
+    "recently-viewed-hint": "이 기기에만 저장됩니다. 업로드되지 않으며 플러그인도 읽을 수 없습니다.",
+    "recently-viewed-count-kept-locally": "{{count}}개 저장됨",
+    "clear-recently-viewed": "기록 지우기"
   }
 }

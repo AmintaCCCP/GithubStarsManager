@@ -3,6 +3,8 @@ import type { AppLanguage } from '../i18n/languages';
 
 import type { RepositoryChatSettings } from './repositoryChat';
 export type { RepositoryChatSettings } from './repositoryChat';
+import type { RecentlyViewedEntry } from './recentlyViewed';
+export type { RecentlyViewedEntry } from './recentlyViewed';
 export type {
   RepositoryHealthEnrichment,
   RepositoryHealthFact,
@@ -475,6 +477,13 @@ export interface AppState {
   lastSync: string | null;
   analyzingRepositoryIds: Set<number>;
   repositoryViewMode: 'grid' | 'list';
+
+  // Recently viewed (开发守则 §9)：纯本地，不上传远端、不进插件快照
+  recentlyViewed: RecentlyViewedEntry[];
+  /** 关闭后停止记录新浏览，已有记录保留到用户清空。 */
+  recentlyViewedEnabled: boolean;
+  /** Discovery 是否隐藏已浏览过的仓库。 */
+  discoveryHideSeen: boolean;
 
   // Gists
   gists: Gist[];

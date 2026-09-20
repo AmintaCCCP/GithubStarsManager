@@ -24,6 +24,10 @@ export const createInitialState = (): AppState => ({
       isAuthenticated: false,
       accountWorkspaces: {},
       repositories: [],
+      // 最近浏览默认开启记录，纯本地保存（开发守则 §9）
+      recentlyViewed: [],
+      recentlyViewedEnabled: true,
+      discoveryHideSeen: false,
       gists: [],
       starredGists: [],
       gistSearchFilters: initialGistSearchFilters,

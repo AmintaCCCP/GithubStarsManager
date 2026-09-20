@@ -10,6 +10,7 @@ import { createDiscoverySlice } from './slices/discoverySlice';
 import { createGistSlice } from './slices/gistSlice';
 import { createPreferenceSlice } from './slices/preferenceSlice';
 import { createRepositorySlice } from './slices/repositorySlice';
+import { createRecentlyViewedSlice } from './slices/recentlyViewedSlice';
 import { createTimelineSlice } from './slices/timelineSlice';
 import type { AppStoreState } from './types';
 
@@ -39,6 +40,7 @@ export const useAppStore = create<AppStoreState>()(
       ...createCategorySlice(set, get),
       ...createPreferenceSlice(set, get),
       ...createDiscoverySlice(set, get),
+      ...createRecentlyViewedSlice(set, get),
     }),
     appPersistenceOptions,
   ),
