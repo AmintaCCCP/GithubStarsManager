@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
-import { repositoryPayloadHash, syncFromBackend } from './autoSync';
+import { repositoryPayloadHash, startAutoSync, stopAutoSync, syncFromBackend } from './autoSync';
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
@@ -270,6 +270,49 @@ describe('syncFromBackend two-pull loop (Issue #304 end-to-end)', () => {
     await syncFromBackend({ force: true });
 
     expect(useAppStore.getState().repositories).toEqual([]);
+  });
+});
+
+describe('syncFromBackend category settings hydration', () => {
+  let originalState: ReturnType<typeof useAppStore.getState>;
+  let unsubscribe: (() => void) | undefined;
+
+  beforeEach(() => {
+    originalState = useAppStore.getState();
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: [], total: 0 });
+    vi.mocked(backend.fetchReleases).mockResolvedValue({ releases: [], total: 0 });
+    vi.mocked(backend.fetchAIConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchWebDAVConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchEmbeddingConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchVectorSearchConfig).mockResolvedValue({
+      enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '', indexMode: 'readme', readmeMaxChars: 6000,
+    });
+    useAppStore.setState({
+      hiddenDefaultCategoryIds: [], categoryOrder: [], customCategories: [], assetFilters: [],
+      defaultCategoryOverrides: {}, collapsedSidebarCategoryCount: 20,
+    });
+    unsubscribe = startAutoSync();
+  });
+
+  afterEach(() => {
+    if (unsubscribe) stopAutoSync(unsubscribe);
+    useAppStore.setState(originalState);
+  });
+
+  it('applies all normalized category settings, including default overrides', async () => {
+    const settings = {
+      hiddenDefaultCategoryIds: ['hidden'],
+      categoryOrder: ['custom-1', 'hidden'],
+      customCategories: [{ id: 'custom-1', name: 'Custom', icon: 'folder', keywords: ['custom'] }],
+      assetFilters: [{ id: 'zip', name: 'Archives', keywords: ['zip'], icon: 'archive' }],
+      defaultCategoryOverrides: { default: { name: 'Override', keywords: ['override'], isHidden: true } },
+      collapsedSidebarCategoryCount: 34,
+    };
+    vi.mocked(backend.fetchSettings).mockResolvedValue(settings);
+
+    await syncFromBackend();
+
+    expect(useAppStore.getState()).toMatchObject(settings);
   });
 });
 

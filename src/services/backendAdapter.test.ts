@@ -76,6 +76,100 @@ function makeHealthOkResponse(): Response {
   } as unknown as Response;
 }
 
+describe('backendAdapter settings hydration', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+  });
+
+  it('normalizes JSON-serialized settings returned by the backend', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        customCategories: '[{"id":"custom-1","name":"Custom","icon":"folder","keywords":["custom"],"isCustom":true}]',
+        hiddenDefaultCategoryIds: '["hidden-default"]',
+        categoryOrder: '["custom-1","hidden-default"]',
+        assetFilters: '[{"id":"zip","name":"Archives","keywords":["zip"],"isPreset":true,"icon":"archive"}]',
+        releaseSourceSettings: '{"source":"github"}',
+        defaultCategoryOverrides: '{"default":{"name":"Override"}}',
+        collapsedSidebarCategoryCount: '34',
+      }),
+      headers: { forEach: () => {} },
+      clone: () => ({ text: async () => '' }),
+    } as unknown as Response);
+
+    await expect(backend.fetchSettings()).resolves.toEqual({
+      customCategories: [{ id: 'custom-1', name: 'Custom', icon: 'folder', keywords: ['custom'], isCustom: true }],
+      hiddenDefaultCategoryIds: ['hidden-default'],
+      categoryOrder: ['custom-1', 'hidden-default'],
+      assetFilters: [{ id: 'zip', name: 'Archives', keywords: ['zip'], isPreset: true, icon: 'archive' }],
+      releaseSourceSettings: { source: 'github' },
+      defaultCategoryOverrides: { default: { name: 'Override' } },
+      collapsedSidebarCategoryCount: 34,
+    });
+  });
+
+  it('keeps already typed settings unchanged', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    const customCategories = [{ id: 'custom-1' }];
+    const releaseSourceSettings = { source: 'github' };
+    vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ customCategories, releaseSourceSettings, collapsedSidebarCategoryCount: 20 }),
+      headers: { forEach: () => {} },
+      clone: () => ({ text: async () => '' }),
+    } as unknown as Response);
+
+    const settings = await backend.fetchSettings();
+    expect(settings.customCategories).toBe(customCategories);
+    expect(settings.releaseSourceSettings).toBe(releaseSourceSettings);
+    expect(settings.collapsedSidebarCategoryCount).toBe(20);
+  });
+
+  it('preserves nested malformed, wrong-shaped, and non-allowlisted string settings', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    const response = {
+      customCategories: '[{"id":"custom-1","name":"Custom","icon":"folder","keywords":[1]}]',
+      hiddenDefaultCategoryIds: '["hidden", 1]',
+      categoryOrder: 'null',
+      assetFilters: '[{"id":"zip","name":"Archives","keywords":["zip"],"isPreset":"yes"}]',
+      releaseSourceSettings: '[]',
+      defaultCategoryOverrides: '{"default":{"name":1},"other":{"unsupported":true}}',
+      collapsedSidebarCategoryCount: '0',
+      language: 'en',
+      githubToken: '***',
+      unknownSetting: '["must stay a string"]',
+    };
+    vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => response,
+      headers: { forEach: () => {} },
+      clone: () => ({ text: async () => '' }),
+    } as unknown as Response);
+
+    await expect(backend.fetchSettings()).resolves.toEqual(response);
+  });
+
+  it.each([null, [], 'settings', 1])('rejects invalid top-level settings payloads: %j', async payload => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => payload,
+      headers: { forEach: () => {} },
+      clone: () => ({ text: async () => '' }),
+    } as unknown as Response);
+
+    await expect(backend.fetchSettings()).rejects.toThrow('invalid settings response');
+  });
+});
+
 describe('backendAdapter 后端 URL 安全策略', () => {
   const adapter = backend as unknown as BackendAdapterLike;
   const STORAGE_KEY = 'github-stars-manager-backend-url';

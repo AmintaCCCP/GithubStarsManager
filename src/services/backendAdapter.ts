@@ -17,6 +17,60 @@ interface GitHubTreeResponse {
 }
 
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
+const SETTINGS_KEYS = new Set([
+  'hiddenDefaultCategoryIds', 'categoryOrder', 'customCategories', 'assetFilters',
+  'releaseSourceSettings', 'defaultCategoryOverrides', 'collapsedSidebarCategoryCount',
+]);
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every(item => typeof item === 'string');
+
+const isCategory = (value: unknown): boolean =>
+  isPlainObject(value) &&
+  typeof value.id === 'string' &&
+  typeof value.name === 'string' &&
+  typeof value.icon === 'string' &&
+  isStringArray(value.keywords) &&
+  (value.isCustom === undefined || typeof value.isCustom === 'boolean') &&
+  (value.isHidden === undefined || typeof value.isHidden === 'boolean');
+
+const isAssetFilter = (value: unknown): boolean =>
+  isPlainObject(value) &&
+  typeof value.id === 'string' &&
+  typeof value.name === 'string' &&
+  isStringArray(value.keywords) &&
+  (value.isPreset === undefined || typeof value.isPreset === 'boolean') &&
+  (value.icon === undefined || typeof value.icon === 'string');
+
+const isDefaultCategoryOverrides = (value: unknown): boolean =>
+  isPlainObject(value) && Object.values(value).every(override =>
+    isPlainObject(override) && Object.entries(override).every(([key, field]) =>
+      (key === 'name' || key === 'icon') ? typeof field === 'string' :
+        key === 'keywords' ? isStringArray(field) :
+          (key === 'isCustom' || key === 'isHidden') && typeof field === 'boolean'
+    )
+  );
+
+const normalizeBackendSettings = (settings: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(settings).map(([key, value]) => {
+    if (typeof value !== 'string' || !SETTINGS_KEYS.has(key)) return [key, value];
+    try {
+      const parsed = key === 'collapsedSidebarCategoryCount' ? Number(value) : JSON.parse(value);
+      const valid =
+        (key === 'hiddenDefaultCategoryIds' || key === 'categoryOrder') ? isStringArray(parsed) :
+          key === 'customCategories' ? Array.isArray(parsed) && parsed.every(isCategory) :
+            key === 'assetFilters' ? Array.isArray(parsed) && parsed.every(isAssetFilter) :
+              key === 'releaseSourceSettings' ? isPlainObject(parsed) :
+                key === 'defaultCategoryOverrides' ? isDefaultCategoryOverrides(parsed) :
+                  key === 'collapsedSidebarCategoryCount' && Number.isFinite(parsed) && parsed >= 1;
+      return [key, valid ? parsed : value];
+    } catch {
+      return [key, value];
+    }
+  }));
 
 /**
  * 共享 helper：构造后端 API 鉴权头（fullstack Web 模式下 API_SECRET 的
@@ -805,7 +859,11 @@ class BackendAdapter {
       headers: this.getAuthHeaders()
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch settings error');
-    return res.json() as Promise<Record<string, unknown>>;
+    const settings = await res.json();
+    if (settings === null || typeof settings !== 'object' || Array.isArray(settings)) {
+      throw new Error('invalid settings response');
+    }
+    return normalizeBackendSettings(settings as Record<string, unknown>);
   }
 
   async exportData(): Promise<Record<string, unknown>> {
