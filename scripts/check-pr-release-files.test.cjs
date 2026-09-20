@@ -144,3 +144,22 @@ test('allows unrelated file changes', () =>
     const result = runScript(root);
     assert.equal(result.code, 0, result.stderr);
   }));
+
+test('missing git objects fail with a fetch diagnostic, not a false pass', () =>
+  withRepo((root) => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        SCRIPT,
+        '--root',
+        root,
+        '--base',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '--head',
+        'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      ],
+      { encoding: 'utf8' },
+    );
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Invalid symmetric difference|unknown revision|failed/);
+  }));
