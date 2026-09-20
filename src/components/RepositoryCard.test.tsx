@@ -147,44 +147,36 @@ beforeEach(() => {
 });
 
 describe('RepositoryCard view modes', () => {
-  it('moves single-card actions into an accessible more-actions menu in list mode', async () => {
+  it('keeps list actions on the same row as edit and only folds overflow into a more-actions menu', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('list', { onAskRepository: vi.fn() });
 
     const lastPushed = screen.getByText(/最近提交/);
     expect(lastPushed).toBeInTheDocument();
     expect(lastPushed).not.toHaveClass('group-hover:opacity-0');
-    expect(screen.getByRole('button', { name: '更多操作' })).toBeInTheDocument();
+    expect(screen.getByTestId('list-action-row')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '编辑仓库信息' })).toBeInTheDocument();
+    expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();
+    expect(screen.getByTitle('取消订阅发布')).toBeInTheDocument();
     expect(screen.getByText('test')).toBeInTheDocument();
     expect(screen.getByText('TypeScript')).toBeInTheDocument();
-    expect(screen.queryByTitle('AI分析此仓库')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '更多操作' }));
-
-    expect(screen.getByText('仓库操作')).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'AI 分析' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
+    const moreActions = screen.getByRole('button', { name: '更多仓库操作' });
+    await user.click(moreActions);
     expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '查看 Release' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: '在 GitHub 中查看' })).toHaveAttribute('href', repository.html_url);
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument());
   });
 
   it('only exposes similar-repository search in the menu when vector search is available', async () => {
-    const user = userEvent.setup();
     const originalVectorSearchAvailable = actionMocks.actions.vectorSearchAvailable;
     try {
       actionMocks.actions.vectorSearchAvailable = false;
       renderRepositoryCard('list');
 
-      await user.click(screen.getByRole('button', { name: '更多操作' }));
+      expect(screen.queryByRole('button', { name: '更多仓库操作' })).not.toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument();
       expect(screen.queryByText('查找同类')).not.toBeInTheDocument();
-      await user.keyboard('{Escape}');
-      await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
     } finally {
       actionMocks.actions.vectorSearchAvailable = originalVectorSearchAvailable;
     }
@@ -194,7 +186,7 @@ describe('RepositoryCard view modes', () => {
     const user = userEvent.setup();
     renderRepositoryCard('list');
 
-    await user.click(screen.getByRole('button', { name: '更多操作' }));
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
     await user.click(screen.getByRole('menuitem', { name: '查找同类仓库' }));
 
     expect(actionMocks.actions.findSimilar).toHaveBeenCalledOnce();
@@ -203,29 +195,29 @@ describe('RepositoryCard view modes', () => {
   it('closes the list action menu from card whitespace, page whitespace, or Escape', async () => {
     const user = userEvent.setup();
     const { container } = renderRepositoryCard('list');
-    const moreActions = screen.getByRole('button', { name: '更多操作' });
+    const moreActions = screen.getByRole('button', { name: '更多仓库操作' });
     const card = container.firstElementChild as HTMLElement;
 
     await user.click(moreActions);
-    expect(screen.getByText('仓库操作')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
     await act(async () => {
       fireEvent.pointerDown(card);
       fireEvent.click(card);
     });
-    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument());
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     await user.click(moreActions);
     await act(async () => {
       fireEvent.pointerDown(document.body);
     });
-    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument());
 
     await user.click(moreActions);
     await act(async () => {
       fireEvent.keyDown(document, { key: 'Escape' });
     });
-    await waitFor(() => expect(screen.queryByText('仓库操作')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument());
   });
 
 
@@ -233,16 +225,17 @@ describe('RepositoryCard view modes', () => {
     const user = userEvent.setup();
     renderRepositoryCard('list');
 
-    const moreActions = screen.getByRole('button', { name: '更多操作' });
+    const moreActions = screen.getByRole('button', { name: '更多仓库操作' });
     moreActions.focus();
     await user.keyboard('{Enter}');
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
 
-    const unsubscribe = await screen.findByRole('menuitem', { name: '取消订阅 Release' });
+    const unsubscribe = screen.getByRole('button', { name: '取消订阅发布' });
     unsubscribe.focus();
     await user.keyboard('{Enter}');
     expect(actionMocks.actions.toggleReleaseSubscription).toHaveBeenCalledOnce();
-    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消订阅 Release' })).not.toBeInTheDocument());
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
 
     const editAction = screen.getByRole('button', { name: '编辑仓库信息' });
@@ -272,8 +265,7 @@ describe('RepositoryCard view modes', () => {
     unmount();
 
     renderRepositoryCard('list', { onAskRepository });
-    await user.click(screen.getByRole('button', { name: '更多操作' }));
-    await user.click(screen.getByRole('menuitem', { name: '问答此仓库' }));
+    await user.click(screen.getByRole('button', { name: '问答此仓库' }));
     expect(onAskRepository).toHaveBeenCalledTimes(2);
   });
 
@@ -293,8 +285,7 @@ describe('RepositoryCard view modes', () => {
     const user = userEvent.setup();
     renderRepositoryCard('list');
 
-    await user.click(screen.getByRole('button', { name: '更多操作' }));
-    await user.click(screen.getByRole('menuitem', { name: '查看 Release' }));
+    await user.click(screen.getByRole('button', { name: '查看 Release' }));
 
     expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
@@ -336,7 +327,7 @@ describe('RepositoryCard view modes', () => {
   it('retains the existing quick action row in grid mode', () => {
     renderRepositoryCard('grid', { onAskRepository: vi.fn() });
 
-    expect(screen.queryByRole('button', { name: '更多操作' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '更多仓库操作' })).not.toBeInTheDocument();
     expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();
     expect(screen.getByTitle('问答此仓库')).toBeInTheDocument();
     expect(screen.getByTitle('取消订阅发布')).toBeInTheDocument();
@@ -372,6 +363,39 @@ describe('RepositoryCard view modes', () => {
       window.dispatchEvent(new Event('resize'));
     });
     expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
+  });
+
+  it('collapses trailing list actions into a more-actions menu when the row is narrow', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('list', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('list-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 190 });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(screen.queryByTitle('在Zread中查看')).not.toBeInTheDocument();
+    const moreActions = screen.getByRole('button', { name: '更多仓库操作' });
+    await user.click(moreActions);
+
+    expect(screen.getByRole('menuitem', { name: '在 Zread 中查看' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '在 GitHub 中查看' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: '查找同类仓库' })).toBeInTheDocument();
+  });
+
+  it('keeps the persistent list more-actions menu visible when eight primary slots would otherwise fill the row', async () => {
+    renderRepositoryCard('list', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('list-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 298 });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
+    expect(screen.queryByTitle('取消 Star')).not.toBeInTheDocument();
   });
 });
 
