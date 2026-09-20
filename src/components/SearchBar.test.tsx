@@ -289,6 +289,58 @@ describe('SearchBar', () => {
     }
   });
 
+  it('exposes touch-safe, wrap-safe mobile search controls', () => {
+    localStorage.setItem('github-stars-search-history', JSON.stringify(['react']));
+    currentState = createStoreState({
+      searchFilters: { ...defaultSearchFilters, query: 'react' },
+    });
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
+
+    render(<SearchBar />);
+
+    expect(screen.getByRole('textbox', { name: '搜索仓库' })).toHaveClass('h-11', 'text-base', 'sm:h-10', 'sm:text-sm');
+    for (const button of [
+      screen.getByRole('button', { name: '清除搜索' }),
+      screen.getByRole('button', { name: 'AI搜索' }),
+      screen.getByRole('button', { name: '关于 AI 搜索' }),
+      screen.getByRole('button', { name: '过滤器' }),
+      screen.getByRole('button', { name: '问答历史' }),
+      screen.getByRole('button', { name: '按降序排列' }),
+      screen.getByRole('button', { name: '同步' }),
+      screen.getByRole('button', { name: '更多同步选项' }),
+      screen.getByRole('button', { name: '最近更新时间' }),
+    ]) {
+      expect(button.className).toMatch(/(?:^|\s)(?:h|min-h)-11(?:\s|$)/);
+    }
+    expect(screen.getByRole('button', { name: 'AI搜索' })).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-0', 'sm:min-w-0');
+    expect(screen.getByRole('button', { name: '清除搜索' })).toHaveClass('sm:h-8', 'sm:w-8');
+    expect(screen.getByRole('button', { name: '关于 AI 搜索' })).toHaveClass('sm:h-8', 'sm:w-8');
+    expect(screen.getByRole('button', { name: '最近更新时间' })).toHaveClass('sm:h-8', 'sm:w-8');
+    expect(screen.getByRole('button', { name: '过滤器' }).parentElement).toHaveClass('min-w-0', 'flex-wrap');
+    expect(screen.getByRole('button', { name: '按降序排列' }).parentElement).toHaveClass('min-w-0', 'flex-wrap');
+
+    const searchInput = screen.getByRole('textbox', { name: '搜索仓库' });
+    fireEvent.change(searchInput, { target: { value: '' } });
+    fireEvent.focus(searchInput);
+    expect(screen.getByRole('button', { name: '清除' })).toHaveClass('min-h-11', 'sm:min-h-0');
+    expect(screen.getByRole('button', { name: 'react' })).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+
+  it('keeps star presets touch-sized and applies their existing filter', () => {
+    const setSearchFilters = vi.fn();
+    currentState = createStoreState({ setSearchFilters });
+    mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);
+
+    render(<SearchBar />);
+    fireEvent.click(screen.getByRole('button', { name: '过滤器' }));
+    fireEvent.click(screen.getByRole('button', { name: '≥1K' }));
+
+    expect(setSearchFilters).toHaveBeenCalledWith({ minStars: 1000 });
+    expect(screen.getByRole('button', { name: '≥1K' })).toHaveClass('h-11', 'sm:h-7');
+    expect(screen.getByLabelText('最小:')).toHaveClass('text-base', 'sm:text-sm');
+    expect(screen.getByLabelText('最大:')).toHaveClass('text-base', 'sm:text-sm');
+  });
+
   it('dispatches the global history open event from the 问答历史 button', () => {
     currentState = createStoreState({});
     mockUseAppStore.mockReturnValue(currentState as ReturnType<typeof useAppStore>);

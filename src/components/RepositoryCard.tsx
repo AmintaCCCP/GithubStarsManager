@@ -16,6 +16,7 @@ import { RepositoryEditModal } from './RepositoryEditModal';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { useRepositoryCardActions } from '../features/repositories/hooks/useRepositoryCardActions';
 import { Button } from './ui/button';
@@ -100,7 +101,7 @@ const SelectionAwareButton: React.FC<SelectionAwareButtonProps> = ({
   onClick,
   ...props
 }) => {
-  const baseClasses = 'h-8 w-8 p-0 rounded-md transition-colors disabled:opacity-50';
+  const baseClasses = 'h-11 w-11 p-0 rounded-md transition-colors disabled:opacity-50 sm:h-8 sm:w-8';
   const selectionClasses = selectionMode ? 'pointer-events-none' : '';
 
   const variantClasses = {
@@ -240,7 +241,10 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       // A zero width occurs during hidden/JSDOM rendering; retain all actions
       // until a real layout measurement is available.
       if (width === 0) return;
-      const capacity = Math.max(1, Math.floor((width + 6) / 38));
+      const isDesktop = typeof window.matchMedia === 'function'
+        && window.matchMedia('(min-width: 640px)').matches;
+      const buttonFootprint = isDesktop ? 32 : 44;
+      const capacity = Math.max(1, Math.floor((width + 6) / (buttonFootprint + 6)));
       if (pluginActions.actions.length > 0) {
         setVisibleGridActionCount(Math.max(0, Math.min(7, capacity - 1)));
       } else {
@@ -750,7 +754,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
-      <div className="flex items-start space-x-3 mb-3">
+      <div className="flex min-w-0 items-start space-x-3 mb-3">
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
@@ -793,7 +797,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 }}
                 variant="ghost"
                 size="icon"
-                className="text-primary"
+                className="h-11 w-11 text-primary sm:h-10 sm:w-10"
                 title={displayContent.isCustomized ? (language === 'zh' ? '已自定义，编辑仓库信息' : 'Customized, edit repository info') : (language === 'zh' ? '编辑仓库信息' : 'Edit repository info')}
                 aria-label={language === 'zh' ? '编辑仓库信息' : 'Edit repository info'}
               >
@@ -813,6 +817,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 title={language === 'zh' ? '更多操作' : 'More actions'}
                 aria-label={language === 'zh' ? '更多操作' : 'More actions'}
                 onClick={(event) => event.stopPropagation()}
+                className="h-11 w-11 sm:h-10 sm:w-10"
               >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
@@ -922,14 +927,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               tabIndex={0}
               role="button"
               aria-label={language === 'zh' ? '编辑仓库分类' : 'Edit repository category'}
-              className="linear-icon-button flex items-center justify-center w-8 h-8 cursor-grab active:cursor-grabbing touch-manipulation"
+              className="linear-icon-button flex items-center justify-center h-11 w-11 cursor-grab active:cursor-grabbing touch-manipulation sm:h-8 sm:w-8"
               title={language === 'zh' ? '拖拽我到侧栏以分类' : 'Drag me to sidebar to categorize'}
             >
               <GripVertical className="w-4 h-4" />
             </div>
             {/* 弱气泡提示 */}
             {showDragHint && (
-              <div className="absolute top-full right-0 z-50 mt-2 whitespace-nowrap rounded-lg border border-border bg-popover px-3 py-1.5 text-xs text-popover-foreground shadow-dialog animate-fade-in">
+              <div className="absolute top-full right-0 z-50 mt-2 w-[min(320px,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] whitespace-normal break-words rounded-lg border border-border bg-popover px-3 py-1.5 text-right text-xs text-popover-foreground shadow-dialog animate-fade-in">
                 {language === 'zh' ? '拖拽我到左侧分类栏' : 'Drag me to left sidebar'}
                 {/* 气泡箭头 */}
                 <div className="absolute bottom-full right-3 h-0 w-0 border-x-4 border-b-4 border-l-transparent border-r-transparent border-b-popover"></div>
@@ -1008,7 +1013,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(event) => selectionMode && event.preventDefault()}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:h-8 sm:w-8 ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
               title={language === 'zh' ? '在Zread中查看' : 'View on DeepWiki'}
             >
               <BookOpen className="w-4 h-4" />
@@ -1020,7 +1025,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(event) => selectionMode && event.preventDefault()}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:h-8 sm:w-8 ${selectionMode ? 'pointer-events-none opacity-50' : ''}`}
               title={language === 'zh' ? '在GitHub上查看' : 'View on GitHub'}
             >
               <ExternalLink className="w-4 h-4" />
@@ -1045,7 +1050,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   variant="ghost"
                   size="icon"
                   disabled={selectionMode}
-                  className="h-8 w-8 shrink-0 rounded-md bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  className="h-11 w-11 shrink-0 rounded-md bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground sm:h-8 sm:w-8"
                   aria-label={language === 'zh' ? '更多仓库操作' : 'More repository actions'}
                   title={language === 'zh' ? '更多仓库操作' : 'More repository actions'}
                 >
@@ -1151,15 +1156,26 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
             <div className="flex items-center space-x-1 text-xs text-destructive dark:text-destructive" title={language === 'zh' ? 'AI分析失败，点击AI按钮重新分析' : 'AI analysis failed, click AI button to retry'}>
               <Bot className="w-3 h-3" />
               <span>{language === 'zh' ? '分析失败' : 'Failed'}</span>
-              <div className="group relative">
-                <HelpCircle className="w-3 h-3 text-destructive/70 dark:text-destructive/70 cursor-help" />
-                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-[opacity,visibility] whitespace-normal break-words shadow-lg">
-                  <p className="text-muted-foreground dark:text-muted-foreground leading-relaxed">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={language === 'zh' ? '分析失败详情' : 'Analysis failure details'}
+                    title={language === 'zh' ? '分析失败详情' : 'Analysis failure details'}
+                    className="h-11 w-11 text-destructive/70 sm:h-6 sm:w-6"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-[calc(100vw-2rem)] max-w-xs p-3 text-xs">
+                  <p className="leading-relaxed text-muted-foreground">
                     {repository.analysis_error || (language === 'zh' ? 'AI分析失败，请检查AI配置和网络连接' : 'AI analysis failed, please check AI configuration and network connection')}
                   </p>
-                  <div className="absolute top-[-4px] left-3 h-2 w-2 rotate-45 transform border-l border-t border-border bg-popover"></div>
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
             </div>
           ) : displayContent.isAnalyzed ? (
             <div
@@ -1255,8 +1271,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         <div className={viewMode === 'list' ? 'basis-full flex-none' : 'mt-4'}>
         <div className={`flex items-center justify-between text-muted-foreground dark:text-muted-foreground border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
           <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
-            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
-            <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
+            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'hidden sm:block sm:group-hover:opacity-0' : ''}`} />
+            <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'hidden sm:inline sm:group-hover:opacity-0' : ''}`}>
               {language === 'zh' ? '最近提交' : 'Last pushed'} {formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, ...(language === 'zh' ? { locale: zhCN } : {}) })}
             </span>
 
@@ -1268,7 +1284,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className="absolute -inset-y-1 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
+                className="static flex min-h-11 items-center space-x-1 text-primary dark:text-primary font-medium opacity-100 pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline sm:absolute sm:-inset-y-1 sm:left-0 sm:h-auto sm:min-h-0 sm:opacity-0 sm:pointer-events-none sm:group-hover:opacity-100 sm:focus-visible:opacity-100 sm:group-hover:pointer-events-auto sm:focus-visible:pointer-events-auto"
                 title={language === 'zh' ? '查找相似仓库' : 'Find similar repositories'}
               >
                 {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
@@ -1287,7 +1303,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
+              className={`flex h-11 w-11 items-center justify-center rounded-md p-0 transition-colors sm:h-7 sm:w-7 ${
                 isSelected
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'

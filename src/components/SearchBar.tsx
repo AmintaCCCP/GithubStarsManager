@@ -44,7 +44,7 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange, t }) =
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="gap-2">
+        <Button type="button" variant="outline" size="sm" className="h-11 gap-2 text-base sm:h-8 sm:text-sm">
           <span>{t(selected?.labelZh ?? '', selected?.labelEn ?? '')}</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
@@ -687,7 +687,7 @@ export const SearchBar: React.FC = () => {
           onBlur={handleInputBlur}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
-          className="h-10 w-full pl-10 pr-3"
+          className="h-11 w-full pl-10 pr-3 text-base sm:h-10 sm:text-sm"
         />
 
         {/* Search History Dropdown */}
@@ -705,7 +705,7 @@ export const SearchBar: React.FC = () => {
                 type="button"
                 variant="ghost"
                 onClick={clearSearchHistory}
-                className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                className="min-h-11 text-xs text-muted-foreground transition-colors hover:text-foreground sm:min-h-0"
               >
                 {t('清除', 'Clear')}
               </Button>
@@ -718,7 +718,7 @@ export const SearchBar: React.FC = () => {
                 data-search-option
                 onClick={() => handleHistoryItemClick(historyQuery)}
                 onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
-                className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
+                className="flex min-h-11 w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent sm:min-h-0"
               >
                 <Search className="w-4 h-4 text-muted-foreground dark:text-muted-foreground/70" />
                 <span className="truncate">{historyQuery}</span>
@@ -753,7 +753,7 @@ export const SearchBar: React.FC = () => {
                   data-search-option
                   onClick={() => handleSuggestionClick(suggestion)}
                   onKeyDown={(e) => handleSearchOptionKeyDown(e, index)}
-                  className="flex w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent"
+                  className="flex min-h-11 w-full items-center justify-start space-x-2 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-accent sm:min-h-0"
                 >
                   <div className="w-4 h-4 flex items-center justify-center">
                     <div className="w-2 h-2 bg-muted dark:bg-muted/40 rounded-full"></div>
@@ -772,7 +772,7 @@ export const SearchBar: React.FC = () => {
               onClick={handleClearSearch}
               aria-label={t('清除搜索', 'Clear search')}
               size="icon"
-              className="h-8 w-8 text-muted-foreground"
+              className="h-11 w-11 text-muted-foreground sm:h-8 sm:w-8"
               title={t('清除搜索', 'Clear search')}
             >
               <X className="w-4 h-4" />
@@ -783,7 +783,7 @@ export const SearchBar: React.FC = () => {
             variant="default"
             aria-label={isSearching ? t('AI搜索中…', 'AI Searching…') : t('AI搜索', 'AI Search')}
             disabled={isSearching || !searchQuery.trim()}
-            className="flex shrink-0 items-center sm:px-4"
+            className="flex min-h-11 min-w-11 shrink-0 items-center text-base sm:min-h-0 sm:min-w-0 sm:text-sm sm:px-4"
             title={activeAIConfig
               ? t('使用配置的AI服务进行语义搜索和重排序', 'Use configured AI service for semantic search and reranking')
               : t('使用本地智能排序算法进行搜索', 'Use local intelligent ranking algorithm for search')}
@@ -803,7 +803,7 @@ export const SearchBar: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 aria-label={t('关于 AI 搜索', 'About AI Search')}
-                className="h-8 w-8 shrink-0 text-muted-foreground"
+                className="min-h-11 min-w-11 shrink-0 text-muted-foreground sm:h-8 sm:w-8 sm:min-h-0 sm:min-w-0"
               >
                 <AlertCircle className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -827,8 +827,8 @@ export const SearchBar: React.FC = () => {
 
       {/* Search Status Indicator */}
       {searchQuery && (
-        <div className="mb-4 flex items-center justify-between text-sm">
-          <div className="flex items-center space-x-2">
+        <div className="mb-4 flex min-w-0 flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center space-x-2">
             {isRealTimeSearch ? (
               <div className="flex items-center space-x-2 text-primary dark:text-primary">
                 <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -850,14 +850,14 @@ export const SearchBar: React.FC = () => {
       )}
 
       {/* Filter Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             aria-expanded={showFilters}
             aria-controls="advanced-filters-panel"
             onClick={() => setShowFilters(!showFilters)}
-            className={`linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm ${
+            className={`linear-filter-toggle flex min-h-11 items-center space-x-2 px-3 py-2 text-sm sm:min-h-9 ${
               showFilters || activeFiltersCount > 0 ? 'is-active' : ''
             }`}
           >
@@ -874,7 +874,7 @@ export const SearchBar: React.FC = () => {
             type="button"
             variant="ghost"
             onClick={openGlobalChatHistory}
-            className="linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm"
+            className="linear-filter-toggle flex min-h-11 items-center space-x-2 px-3 py-2 text-sm sm:min-h-9"
             aria-label={t('问答历史', 'Chat history')}
             title={t('查看各仓库的问答历史', 'View chat history across repositories')}
           >
@@ -891,7 +891,7 @@ export const SearchBar: React.FC = () => {
             <Button
               variant="ghost"
               onClick={clearFilters}
-              className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-muted-foreground transition-colors"
+              className="flex min-h-11 items-center space-x-1 px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground dark:text-muted-foreground dark:hover:text-muted-foreground sm:min-h-9"
             >
               <X className="w-4 h-4" />
               <span>{t('清除全部', 'Clear all')}</span>
@@ -901,7 +901,7 @@ export const SearchBar: React.FC = () => {
         </div>
 
         {/* Sort Controls + Sync Button */}
-        <div className="flex items-center gap-2 relative z-30">
+        <div className="relative z-30 flex min-w-0 flex-wrap items-center gap-2">
           <SortByDropdown
             value={searchFilters.sortBy}
             onChange={(value) => setSearchFilters({ sortBy: value as 'stars' | 'updated' | 'name' | 'starred' })}
@@ -913,13 +913,13 @@ export const SearchBar: React.FC = () => {
             })}
             variant="ghost"
             aria-label={searchFilters.sortOrder === 'desc' ? t('按降序排列', 'Sort descending') : t('按升序排列', 'Sort ascending')}
-            className="ui-button px-3 py-2 text-sm"
+            className="ui-button min-h-11 min-w-11 px-3 py-2 text-sm sm:min-h-0 sm:min-w-0"
           >
             {searchFilters.sortOrder === 'desc' ? <ArrowDown className="w-4 h-4" aria-hidden="true" /> : <ArrowUp className="w-4 h-4" aria-hidden="true" />}
           </Button>
 
           {/* Sync Button */}
-          <div className="flex items-center gap-2 ml-1">
+          <div className="ml-1 flex min-w-0 flex-wrap items-center gap-2">
             <DropdownMenu>
               <div className="flex items-center">
                 <div className="ui-button-primary inline-flex items-stretch overflow-hidden">
@@ -927,7 +927,7 @@ export const SearchBar: React.FC = () => {
                     type="button"
                     onClick={() => { void syncStars(); }}
                     disabled={isSyncingStars}
-                    className="inline-flex items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-none border-0 bg-transparent px-3 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50 sm:min-h-0"
                     title={t('同步星标仓库列表', 'Sync starred repositories')}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncingStars ? 'animate-spin' : ''}`} />
@@ -938,7 +938,7 @@ export const SearchBar: React.FC = () => {
                       type="button"
                       disabled={isSyncingStars}
                       aria-label={t('更多同步选项', 'More sync options')}
-                      className="group inline-flex items-center rounded-none border-0 bg-transparent px-1.5 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50"
+                      className="group inline-flex min-h-11 min-w-11 items-center rounded-none border-0 bg-transparent px-1.5 py-2 text-inherit shadow-none hover:bg-primary/90 disabled:opacity-50 sm:min-h-0 sm:min-w-0"
                       title={t('更多同步选项', 'More sync options')}
                     >
                       <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
@@ -970,7 +970,7 @@ export const SearchBar: React.FC = () => {
                   variant="ghost"
                   size="icon"
                   aria-label={t('最近更新时间', 'Last synced')}
-                  className="h-8 w-8 shrink-0 text-muted-foreground"
+                  className="min-h-11 min-w-11 shrink-0 text-muted-foreground sm:h-8 sm:w-8 sm:min-h-0 sm:min-w-0"
                 >
                   <Clock className="h-4 w-4" aria-hidden="true" />
                 </Button>
@@ -1281,7 +1281,7 @@ export const SearchBar: React.FC = () => {
                   step={1}
                   placeholder="0"
                   allowUndefined
-                  className="w-24 text-sm py-1.5 dark:bg-muted/40"
+                  className="w-24 py-1.5 text-base dark:bg-muted/40 sm:text-sm"
                 />
               </div>
               <div className="flex items-center space-x-2">
@@ -1296,7 +1296,7 @@ export const SearchBar: React.FC = () => {
                   step={1}
                   placeholder="∞"
                   allowUndefined
-                  className="w-24 text-sm py-1.5 dark:bg-muted/40"
+                  className="w-24 py-1.5 text-base dark:bg-muted/40 sm:text-sm"
                 />
               </div>
             </div>
@@ -1320,7 +1320,7 @@ export const SearchBar: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setSearchFilters({ minStars: preset.value })}
-                  className="h-7 rounded px-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
+                  className="h-11 rounded px-2 text-xs text-muted-foreground transition-colors hover:bg-accent sm:h-7"
                 >
                   ≥{preset.label}
                 </Button>

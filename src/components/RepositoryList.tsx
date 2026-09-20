@@ -561,7 +561,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             variant="outline"
             size="sm"
             onClick={clearAllFilters}
-            className="mt-5"
+            className="mt-5 min-h-11 sm:min-h-9"
           >
             <X className="w-4 h-4" />
             {language === 'zh' ? '清除全部筛选' : 'Clear all filters'}
@@ -589,8 +589,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       )}
 
       {/* Controls Bar */}
-      <div className="ui-toolbar flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 sm:gap-0">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+      <div className="ui-toolbar flex min-w-0 flex-col flex-wrap gap-3 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0 sm:p-4">
+        <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center sm:gap-4">
 
           {/* AI Analysis Select */}
           <DropdownMenu>
@@ -600,7 +600,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 variant="outline"
                 disabled={isLoading}
                 aria-label={t('AI 分析操作', 'AI analysis actions')}
-                className="ui-field h-9 w-auto min-w-32 justify-between gap-2 px-3 py-1 text-sm font-medium"
+                className="ui-field h-11 w-auto min-w-32 justify-between gap-2 px-3 py-1 text-base font-medium sm:h-9 sm:text-sm"
               >
                 <Bot className="h-4 w-4 shrink-0" />
                 {isLoading
@@ -624,7 +624,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           {/* Progress Bar and Controls - 移动端优化 */}
           {isLoading && analysisProgress.total > 0 && (
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex min-w-0 flex-wrap items-center space-x-2 sm:space-x-3">
               <div className="w-20 sm:w-32 bg-accent dark:bg-accent rounded-full h-2">
                 <div
                   className="bg-primary dark:bg-primary h-2 rounded-full transition-[width] duration-300"
@@ -638,7 +638,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={handlePauseResume}
-                className="h-7 w-7 p-0 rounded-lg bg-muted text-muted-foreground dark:bg-warning/20 dark:text-warning hover:bg-accent dark:hover:bg-warning/30 transition-colors"
+                className="h-11 w-11 rounded-lg bg-muted p-0 text-muted-foreground transition-colors hover:bg-accent dark:bg-warning/20 dark:text-warning dark:hover:bg-warning/30 sm:h-7 sm:w-7"
                 aria-label={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
                 title={isPaused ? t('继续', 'Resume') : t('暂停', 'Pause')}
               >
@@ -647,7 +647,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               <Button
                 variant="ghost"
                 onClick={handleStop}
-                className="h-7 px-2 sm:px-3 py-1 rounded-lg bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive hover:bg-accent dark:hover:bg-destructive/30 transition-colors text-xs sm:text-sm"
+                className="min-h-11 rounded-lg bg-muted px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent dark:bg-destructive/20 dark:text-destructive dark:hover:bg-destructive/30 sm:min-h-7 sm:px-3 sm:text-sm"
               >
                 {t('停止', 'Stop')}
               </Button>
@@ -656,16 +656,16 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="flex min-w-0 flex-col flex-wrap gap-2 sm:flex-row sm:items-center sm:gap-3">
               <span id="repository-display-content-label" className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
                 {t('显示内容:', 'Display:')}
               </span>
               <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="flex items-center space-x-3 sm:space-x-4">
-                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}>
+                <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex min-h-11 items-center space-x-1.5 sm:min-h-0 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('显示AI生成的分析总结', 'Show AI-generated analysis summary') : t('当前没有AI分析内容', 'No AI analysis content available')}>
                   <RadioGroupItem value="ai" id="display-content-ai" aria-labelledby="display-content-ai-label" disabled={!hasAnalyzedRepos} />
                   <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('AI分析内容', 'AI Analysis')}</span>
                 </label>
-                <label onClick={() => setShowAISummary(false)} className="flex cursor-pointer items-center space-x-1.5 sm:space-x-2" title={t('显示仓库原始描述', 'Show repository original description')}>
+                <label onClick={() => setShowAISummary(false)} className="flex min-h-11 cursor-pointer items-center space-x-1.5 sm:min-h-0 sm:space-x-2" title={t('显示仓库原始描述', 'Show repository original description')}>
                   <RadioGroupItem value="original" id="display-content-original" aria-labelledby="display-content-original-label" />
                   <span id="display-content-original-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('原始描述', 'Original')}</span>
                 </label>
@@ -676,9 +676,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
         </div>
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
-        <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
-            <div className="flex items-center justify-between">
+        <div className={`ml-auto flex min-w-0 w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
+          <div className="mt-0.5 min-w-0 break-words text-xs text-muted-foreground tabular-nums dark:text-muted-foreground sm:text-right">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2">
               <div>
                 {t(
                   `第 ${startIndex}-${endIndex} / 共 ${filteredRepositories.length} 个仓库`,
@@ -690,7 +690,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                 {analyzedCount > 0 && (
                   <span className="text-xs sm:text-sm">
                     • {analyzedCount} {t('个已AI分析', 'AI analyzed')}
@@ -711,7 +711,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           </div>
 
           {!isLoading && (
-            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('仓库布局', 'Repository layout')}>
+            <div className="flex min-w-0 shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('仓库布局', 'Repository layout')}>
               <Button
                 type="button"
                 variant="ghost"
@@ -719,7 +719,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('多列卡片', 'Grid view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-md p-0 transition-colors sm:h-7 sm:w-8 ${repositoryViewMode === 'grid' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
                 title={t('多列卡片', 'Grid view')}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -731,7 +731,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('单列列表', 'List view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-md p-0 transition-colors sm:h-7 sm:w-8 ${repositoryViewMode === 'list' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
                 title={t('单列列表', 'List view')}
               >
                 <List className="w-4 h-4" />

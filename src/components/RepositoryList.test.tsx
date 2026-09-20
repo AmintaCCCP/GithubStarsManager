@@ -13,6 +13,20 @@ vi.mock('../hooks/useDialog', () => ({
   useDialog: () => ({ toast: vi.fn(), confirm: vi.fn() }),
 }));
 
+const analysisJob = vi.hoisted(() => ({
+  run: vi.fn(),
+  pause: vi.fn(),
+  resume: vi.fn(),
+  requestStop: vi.fn(),
+  isRunning: false,
+  isPaused: false,
+  progress: { current: 0, total: 0 },
+}));
+
+vi.mock('../features/repositories/hooks/useRepositoryAnalysisJob', () => ({
+  useRepositoryAnalysisJob: () => analysisJob,
+}));
+
 vi.mock('./RepositoryCard', () => ({
   RepositoryCard: ({ repository, viewMode }: { repository: Repository; viewMode: string }) => (
     <div data-testid={`repository-card-${repository.id}`} data-view-mode={viewMode}>{repository.name}</div>
@@ -83,6 +97,7 @@ const mockUseAppStore = vi.mocked(useAppStore);
 beforeEach(() => {
   vi.clearAllMocks();
   storeState.repositoryViewMode = 'grid';
+  Object.assign(analysisJob, { isRunning: false, isPaused: false, progress: { current: 0, total: 0 } });
   storeState.similarView = null;
   Object.assign(searchFilters, { sortBy: 'stars', sortOrder: 'desc' });
   mockUseAppStore.mockImplementation(() => storeState as ReturnType<typeof useAppStore>);
@@ -124,6 +139,42 @@ describe('RepositoryList view mode controls', () => {
       'second-by-vector-score',
       'repository-one',
     ]);
+  });
+
+  it('exposes touch-safe, stackable mobile repository controls', () => {
+    render(<RepositoryList repositories={[repository]} selectedCategory="all" />);
+
+    const analysisActions = screen.getByRole('button', { name: 'AI 分析操作' });
+    expect(analysisActions).toHaveClass('h-11', 'sm:h-9');
+    for (const button of [
+      screen.getByRole('button', { name: '多列卡片' }),
+      screen.getByRole('button', { name: '单列列表' }),
+    ]) {
+      expect(button).toHaveClass('h-11', 'w-11', 'sm:h-7', 'sm:w-8');
+    }
+    for (const label of [
+      screen.getByText('AI分析内容').closest('label'),
+      screen.getByText('原始描述').closest('label'),
+    ]) {
+      expect(label).toHaveClass('min-h-11', 'sm:min-h-0');
+    }
+
+    const toolbar = analysisActions.closest('.ui-toolbar');
+    expect(toolbar).toHaveClass('min-w-0');
+    expect(analysisActions.parentElement?.parentElement).toHaveClass('min-w-0', 'flex-wrap');
+    expect(screen.getByRole('group', { name: '仓库布局' }).parentElement).toHaveClass('min-w-0');
+  });
+
+  it('keeps running analysis controls touch-safe', () => {
+    Object.assign(analysisJob, { isRunning: true, isPaused: false, progress: { current: 1, total: 2 } });
+    const { rerender } = render(<RepositoryList repositories={[repository]} selectedCategory="all" />);
+
+    expect(screen.getByRole('button', { name: '暂停' })).toHaveClass('h-11', 'w-11', 'sm:h-7', 'sm:w-7');
+    expect(screen.getByRole('button', { name: '停止' })).toHaveClass('min-h-11', 'sm:min-h-7');
+
+    analysisJob.isPaused = true;
+    rerender(<RepositoryList repositories={[repository]} selectedCategory="all" />);
+    expect(screen.getByRole('button', { name: '继续' })).toHaveClass('h-11', 'w-11', 'sm:h-7', 'sm:w-7');
   });
 
   it('keeps the established grid as default and switches cards to the compact list mode', () => {

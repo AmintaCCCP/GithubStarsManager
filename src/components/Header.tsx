@@ -56,7 +56,7 @@ export const Header: React.FC = () => {
   const t = (zh: string, en: string) => language === 'zh' ? zh : en;
 
   return (
-    <header className="linear-header sticky top-0 z-50 hd-drag lg:hd-drag relative">
+    <header className="linear-header sticky top-0 z-50 pt-[env(safe-area-inset-top)] hd-drag lg:hd-drag relative">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="linear-header-inner flex h-14 items-center justify-between">
           {/* Logo and Title */}
@@ -169,7 +169,7 @@ export const Header: React.FC = () => {
                 <img
                   src={user.avatar_url}
                   alt={user.name || user.login}
-                  className="w-8 h-8 rounded-full"
+                  className="hidden h-8 w-8 rounded-full sm:block"
                 />
                 <div className="min-w-0 hidden sm:block">
                   <p className="truncate text-sm font-medium text-foreground">

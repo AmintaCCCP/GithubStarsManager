@@ -121,7 +121,7 @@ const mockUseAppStore = vi.mocked(useAppStore);
 
 const renderRepositoryCard = (
   viewMode: 'list' | 'grid',
-  options: { onAskRepository?: (repository: Repository) => void; selectionMode?: boolean } = {},
+  options: { onAskRepository?: (repository: Repository) => void; onSelect?: (id: number) => void; selectionMode?: boolean } = {},
 ) => render(
   <TooltipProvider>
     <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} {...options} />
@@ -251,6 +251,75 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 
+  it('opens named analysis failure help with keyboard and pointer activation', async () => {
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <RepositoryCard
+          repository={{ ...repository, analyzed_at: '2026-01-03T00:00:00.000Z', analysis_failed: true, analysis_error: 'The AI service rejected this request.' }}
+          allCategories={[]}
+          viewMode="grid"
+        />
+      </TooltipProvider>
+    );
+
+    const help = screen.getByRole('button', { name: '分析失败详情' });
+    expect(help).toHaveClass('h-11', 'w-11', 'sm:h-6', 'sm:w-6');
+
+    help.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByText('The AI service rejected this request.')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    await user.click(help);
+    expect(screen.getByText('The AI service rejected this request.')).toBeInTheDocument();
+  });
+
+  it('gives mobile controls 44px targets while restoring compact sizes at sm', () => {
+    const { unmount } = renderRepositoryCard('grid', { onAskRepository: vi.fn(), onSelect: vi.fn() });
+
+    for (const control of [
+      screen.getByTitle('AI分析此仓库'),
+      screen.getByTitle('问答此仓库'),
+      screen.getByTitle('编辑仓库信息'),
+      screen.getByTitle('在Zread中查看'),
+      screen.getByTitle('在GitHub上查看'),
+      screen.getByRole('button', { name: '选择' }),
+    ]) {
+      expect(control).toHaveClass('h-11', 'w-11');
+    }
+    expect(screen.getByTitle('AI分析此仓库')).toHaveClass('sm:h-8', 'sm:w-8');
+    unmount();
+
+    renderRepositoryCard('list', { onSelect: vi.fn() });
+    expect(screen.getByRole('button', { name: '选择' })).toHaveClass('h-11', 'w-11', 'sm:h-7', 'sm:w-7');
+    expect(screen.getByRole('button', { name: '编辑仓库信息' })).toHaveClass('h-11', 'w-11', 'sm:h-10', 'sm:w-10');
+    expect(screen.getByRole('button', { name: '更多操作' })).toHaveClass('h-11', 'w-11', 'sm:h-10', 'sm:w-10');
+  });
+
+  it('keeps Find Similar touch-visible below sm and hover/focus-revealed at sm', () => {
+    renderRepositoryCard('grid');
+
+    const findSimilar = screen.getByRole('button', { name: '查找相似仓库' });
+    expect(findSimilar).toHaveClass('static', 'min-h-11', 'opacity-100', 'pointer-events-auto', 'sm:absolute', 'sm:opacity-0', 'sm:group-hover:opacity-100', 'sm:focus-visible:opacity-100');
+    expect(screen.getByText(/最近提交/)).toHaveClass('hidden', 'sm:inline');
+  });
+
+  it('keeps the category drag handle touch-sized and constrains its hint', () => {
+    renderRepositoryCard('grid');
+
+    const handle = screen.getByRole('button', { name: '编辑仓库分类' });
+    expect(handle).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+
+    fireEvent.click(handle);
+    expect(screen.getByText('拖拽我到左侧分类栏')).toHaveClass(
+      'w-[min(320px,calc(100vw-2rem))]',
+      'max-w-[calc(100vw-2rem)]',
+      'whitespace-normal',
+      'break-words',
+      'text-right',
+    );
+  });
+
   it('delegates grid quick actions to the domain Hook without changing their presentation', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('grid');
@@ -347,6 +416,43 @@ describe('RepositoryCard view modes', () => {
 
     const footer = screen.getByText(/最近提交/).closest('.border-t');
     expect(footer?.parentElement).toHaveClass('mt-4');
+  });
+
+  it('uses mobile and desktop button footprints when measuring grid action capacity', async () => {
+    let resize: (() => void) | undefined;
+    const ResizeObserverMock = class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    };
+    const originalResizeObserver = window.ResizeObserver;
+    const originalMatchMedia = window.matchMedia;
+
+    window.ResizeObserver = ResizeObserverMock as unknown as typeof window.ResizeObserver;
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === '(min-width: 640px)', media: query } as MediaQueryList));
+
+    let unmount: (() => void) | undefined;
+    try {
+      ({ unmount } = renderRepositoryCard('grid', { onAskRepository: vi.fn() }));
+      const actionRow = screen.getByTestId('grid-action-row');
+      Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 190 });
+
+      await act(async () => resize?.());
+      expect(screen.getByTitle('问答此仓库')).toBeInTheDocument();
+      expect(screen.getByTitle('编辑仓库信息')).toBeInTheDocument();
+
+      window.matchMedia = vi.fn(() => ({ matches: false, media: '(min-width: 640px)' } as MediaQueryList));
+      await act(async () => window.dispatchEvent(new Event('resize')));
+
+      expect(screen.getByTitle('问答此仓库')).toBeInTheDocument();
+      expect(screen.queryByTitle('编辑仓库信息')).not.toBeInTheDocument();
+    } finally {
+      unmount?.();
+      window.ResizeObserver = originalResizeObserver;
+      window.matchMedia = originalMatchMedia;
+    }
   });
 
   it('collapses trailing grid actions into a more-actions menu when the card is narrow', async () => {
