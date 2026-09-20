@@ -295,7 +295,19 @@ function getMcpToolDefinitions(vectorAvailable) {
           maxStars: { type: 'number' },
           isAnalyzed: { type: 'boolean' },
           isSubscribed: { type: 'boolean' },
-          sortBy: { type: 'string', enum: ['stars', 'updated', 'name', 'starred'] },
+          healthArchived: {
+            type: 'boolean',
+            description: 'Repository Health fact filter: true = only archived repositories, false = only non-archived',
+          },
+          healthRecentActivity: {
+            type: 'boolean',
+            description: 'Repository Health fact filter: true = pushed within the last 12 months',
+          },
+          healthHasLicense: {
+            type: 'boolean',
+            description: 'Repository Health fact filter: true = has a declared SPDX license, false = no declared license',
+          },
+          sortBy: { type: 'string', enum: ['stars', 'updated', 'name', 'starred', 'created'] },
           sortOrder: { type: 'string', enum: ['asc', 'desc'] },
           limit: { type: 'number' },
           offset: { type: 'number' },
@@ -352,7 +364,19 @@ function getMcpToolDefinitions(vectorAvailable) {
           category: { type: 'string' },
           limit: { type: 'number' },
           offset: { type: 'number' },
-          sortBy: { type: 'string', enum: ['stars', 'updated', 'name', 'starred'] },
+          healthArchived: {
+            type: 'boolean',
+            description: 'Repository Health fact filter: true = only archived repositories, false = only non-archived',
+          },
+          healthRecentActivity: {
+            type: 'boolean',
+            description: 'Repository Health fact filter: true = pushed within the last 12 months',
+          },
+          healthHasLicense: {
+            type: 'boolean',
+            description: 'Repository Health fact filter: true = has a declared SPDX license, false = no declared license',
+          },
+          sortBy: { type: 'string', enum: ['stars', 'updated', 'name', 'starred', 'created'] },
           sortOrder: { type: 'string', enum: ['asc', 'desc'] },
         },
         required: ['category'],
@@ -488,7 +512,7 @@ async function callTool(name, args, snapshot) {
       const key = String(args?.idOrFullName || '').trim();
       const repo = findSnapshotRepository(repos, key);
       if (!repo) return text({ error: 'not_found', idOrFullName: key });
-      return text(buildRepoEvidence(repo, getLatestCachedRelease(releases, repo.id)));
+      return text(buildRepoEvidence(repo, getLatestCachedRelease(releases, repo.id), releases));
     }
     case 'gsm_list_categories':
       return text({ categories });

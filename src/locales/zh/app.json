@@ -298,7 +298,14 @@
     "sort-files": "按文件数",
     "sort-stars": "按星标排序",
     "sort-starred": "按加星时间排序",
-    "sync-lists-confirm-body": "将拉取你的 GitHub Lists（星标列表）并应用到本地仓库：\n\n· 每个 list 名会作为标签添加到对应仓库（一个仓库可属于多个 list/分类）\n· 未锁定分类的仓库将应用 list 对应的分类并默认锁定\n· 已锁定分类的仓库保持不变\n\n确定继续吗？"
+    "sync-lists-confirm-body": "将拉取你的 GitHub Lists（星标列表）并应用到本地仓库：\n\n· 每个 list 名会作为标签添加到对应仓库（一个仓库可属于多个 list/分类）\n· 未锁定分类的仓库将应用 list 对应的分类并默认锁定\n· 已锁定分类的仓库保持不变\n\n确定继续吗？",
+    "repository-health-facts": "仓库健康事实",
+    "show-only-archived-repositories": "只显示已归档的仓库",
+    "archived": "已归档",
+    "show-only-repositories-pushed-within-the-last-12": "只显示近 12 个月内有推送的仓库",
+    "pushed-in-12-months": "近 12 个月有推送",
+    "show-only-repositories-without-a-declared-licens": "只显示未声明许可证的仓库",
+    "no-declared-license": "未声明许可证"
   },
   "searchDemo": {
     "search-feature-upgrade": "搜索功能升级",

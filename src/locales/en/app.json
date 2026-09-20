@@ -298,7 +298,14 @@
     "sort-files": "Files",
     "sort-stars": "Sort by Stars",
     "sort-starred": "Sort by Starred Time",
-    "sync-lists-confirm-body": "This will fetch your GitHub Lists and apply them to local repositories:\n\n· Each list name is added as a tag (a repo can belong to multiple lists/categories)\n· Unlocked repos get the list category applied and locked\n· Locked repos are left unchanged\n\nContinue?"
+    "sync-lists-confirm-body": "This will fetch your GitHub Lists and apply them to local repositories:\n\n· Each list name is added as a tag (a repo can belong to multiple lists/categories)\n· Unlocked repos get the list category applied and locked\n· Locked repos are left unchanged\n\nContinue?",
+    "repository-health-facts": "Repository Health Facts",
+    "show-only-archived-repositories": "Show only archived repositories",
+    "archived": "Archived",
+    "show-only-repositories-pushed-within-the-last-12": "Show only repositories pushed within the last 12 months",
+    "pushed-in-12-months": "Pushed in 12 months",
+    "show-only-repositories-without-a-declared-licens": "Show only repositories without a declared license",
+    "no-declared-license": "No declared license"
   },
   "searchDemo": {
     "search-feature-upgrade": "Search Feature Upgrade",

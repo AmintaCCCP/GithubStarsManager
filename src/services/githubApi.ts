@@ -114,6 +114,13 @@ export interface GitHubRepoDetailRead {
   topics: string[];
   owner: { login: string; avatar_url: string };
   license: string | null;
+  /** GitHub 原生状态字段：Repository Health 的客观事实来源（详情路径免费携带）。 */
+  archived?: boolean;
+  disabled?: boolean;
+  fork?: boolean;
+  is_template?: boolean;
+  open_issues_count?: number;
+  default_branch?: string;
 }
 
 interface GitHubStarredItem {
@@ -190,6 +197,12 @@ function mapRestRepoDetail(data: Record<string, unknown>): GitHubRepoDetailRead 
       avatar_url: typeof owner.avatar_url === 'string' ? owner.avatar_url : '',
     },
     license: toLicenseSpdxId(data.license),
+    archived: data.archived === true,
+    disabled: data.disabled === true,
+    fork: data.fork === true,
+    is_template: data.is_template === true,
+    open_issues_count: typeof data.open_issues_count === 'number' ? data.open_issues_count : 0,
+    default_branch: typeof data.default_branch === 'string' ? data.default_branch : '',
   };
 }
 
@@ -225,6 +238,18 @@ function mapGraphqlRepoDetail(node: Record<string, unknown>): GitHubRepoDetailRe
       avatar_url: typeof owner.avatarUrl === 'string' ? owner.avatarUrl : '',
     },
     license: licenseInfo && typeof licenseInfo.spdxId === 'string' ? licenseInfo.spdxId : null,
+    archived: node.isArchived === true,
+    disabled: node.isDisabled === true,
+    fork: node.isFork === true,
+    is_template: node.isTemplate === true,
+    open_issues_count:
+      typeof (node.openIssues as { totalCount?: unknown } | undefined)?.totalCount === 'number'
+        ? (node.openIssues as { totalCount: number }).totalCount
+        : 0,
+    default_branch:
+      typeof (node.defaultBranchRef as { name?: unknown } | null | undefined)?.name === 'string'
+        ? (node.defaultBranchRef as { name: string }).name
+        : '',
   };
 }
 
@@ -1300,7 +1325,7 @@ export class GitHubApiService {
         const [owner, name] = fullName.split('/');
         return `a${idx}: repository(owner: "${escapeGraphQlString(owner)}", name: "${escapeGraphQlString(name)}") { ...WeeklyRepoDetailFragment }`;
       });
-      const query = `query WeeklyRepoBatch {\n${aliases.join('\n')}\n}\nfragment WeeklyRepoDetailFragment on Repository {\n  databaseId\n  name\n  nameWithOwner\n  description\n  url\n  stargazerCount\n  forkCount\n  primaryLanguage { name }\n  createdAt\n  updatedAt\n  pushedAt\n  repositoryTopics(first: 20) { nodes { topic { name } } }\n  owner { login avatarUrl }\n  licenseInfo { spdxId }\n}`;
+      const query = `query WeeklyRepoBatch {\n${aliases.join('\n')}\n}\nfragment WeeklyRepoDetailFragment on Repository {\n  databaseId\n  name\n  nameWithOwner\n  description\n  url\n  stargazerCount\n  forkCount\n  primaryLanguage { name }\n  createdAt\n  updatedAt\n  pushedAt\n  repositoryTopics(first: 20) { nodes { topic { name } } }\n  owner { login avatarUrl }\n  licenseInfo { spdxId }\n  isArchived\n  isDisabled\n  isFork\n  isTemplate\n  openIssues { totalCount }\n  defaultBranchRef { name }\n}`;
       const response = await this.makeRequest<{ data?: Record<string, unknown> | null; errors?: Array<{ message?: string }> }>(
         '/graphql',
         {
