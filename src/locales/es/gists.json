@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "No se pudo eliminar Gist{{v1}}{{v2}}",
     "gist-update-failed": "Error en la actualización esencial: {{message}}{{permissionNote}}",
     "gist-create-failed": "Error al crear la esencia: {{message}}{{permissionNote}}",
-    "gist-permission-note": "(Confirme que el token haya verificado el permiso esencial y vuelva a ingresar el inicio de sesión del token en la configuración)"
+    "gist-permission-note": "(Confirme que el token haya verificado el permiso esencial y vuelva a ingresar el inicio de sesión del token en la configuración)",
+    "unknown-error": "Error desconocido",
+    "failed-to-load-gist-details": "No se pudieron cargar los detalles del gist: {{message}}",
+    "failed-to-load-gist-details-empty": "No se pudieron cargar los detalles del gist",
+    "failed-to-delete-gist": "No se pudo eliminar el gist: {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "No se pudo eliminar el gist{{permissionNote}}",
+    "github-token-not-configured": "GitHub token no configurado; no se puede cargar el contenido del archivo"
   }
 }

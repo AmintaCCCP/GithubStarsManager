@@ -124,7 +124,8 @@
     "edit-category": "Edit category",
     "delete-category": "Delete category",
     "hide-default-category": "Hide default category",
-    "drag-hint": "{{name}} — Drag repository cards here to quickly change category"
+    "drag-hint": "{{name}} — Drag repository cards here to quickly change category",
+    "sync-failed-reverted": "Failed to sync to backend. Category change has been reverted."
   },
   "codeSearchView": {
     "show-less": "Show less",

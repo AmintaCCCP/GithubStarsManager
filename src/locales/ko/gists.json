@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "Gist를 삭제하지 못했습니다.{{v1}}{{v2}}",
     "gist-update-failed": "요점 업데이트 실패: {{message}}{{permissionNote}}",
     "gist-create-failed": "요점 생성 실패: {{message}}{{permissionNote}}",
-    "gist-permission-note": "(토큰이 요지권한을 확인했는지 확인하시고, 설정에서 토큰 로그인을 다시 입력해주세요)"
+    "gist-permission-note": "(토큰이 요지권한을 확인했는지 확인하시고, 설정에서 토큰 로그인을 다시 입력해주세요)",
+    "unknown-error": "알 수 없는 오류",
+    "failed-to-load-gist-details": "Gist 세부정보를 불러오지 못했습니다: {{message}}",
+    "failed-to-load-gist-details-empty": "Gist 세부정보를 불러오지 못했습니다",
+    "failed-to-delete-gist": "Gist를 삭제하지 못했습니다: {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "Gist를 삭제하지 못했습니다{{permissionNote}}",
+    "github-token-not-configured": "GitHub token이 설정되지 않아 파일 내용을 불러올 수 없습니다"
   }
 }

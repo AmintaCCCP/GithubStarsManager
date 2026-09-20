@@ -124,7 +124,8 @@
     "edit-category": "카테고리 수정",
     "delete-category": "카테고리 삭제",
     "hide-default-category": "기본 카테고리 숨기기",
-    "drag-hint": "{{name}} - 분류를 빠르게 수정하려면 창고 카드를 여기로 드래그하세요."
+    "drag-hint": "{{name}} - 분류를 빠르게 수정하려면 창고 카드를 여기로 드래그하세요.",
+    "sync-failed-reverted": "백엔드 동기화에 실패하여 카테고리 변경을 되돌렸습니다."
   },
   "codeSearchView": {
     "show-less": "닫다",

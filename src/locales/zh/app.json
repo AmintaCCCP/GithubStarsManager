@@ -124,7 +124,8 @@
     "edit-category": "编辑分类",
     "delete-category": "删除分类",
     "hide-default-category": "隐藏默认分类",
-    "drag-hint": "{{name}} — 拖动仓库卡片到此处可快速修改分类"
+    "drag-hint": "{{name}} — 拖动仓库卡片到此处可快速修改分类",
+    "sync-failed-reverted": "同步到后端失败，已恢复分类更改。"
   },
   "codeSearchView": {
     "show-less": "收起",

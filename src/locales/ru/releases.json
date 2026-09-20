@@ -235,7 +235,9 @@
     "refresh-completed-found-v1-new-releases-updatedp-2": "Обновление завершено! Найден {{v1}} новый выпуск{{updatedPart}}.",
     "release-refresh-failed-please-check-your-network": "Не удалось обновить выпуск. Проверьте сетевое соединение.",
     "v1-is-not-in-any-release-source-confirming-will": "\"{{v1}}\" в настоящее время отсутствует ни в одном источнике выпуска. После подтверждения удаляются только локально кэшированные записи Release.",
-    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" поступает из нескольких источников выпуска одновременно: {{v2}}. Подтверждением будет отписка и от этих источников."
+    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" поступает из нескольких источников выпуска одновременно: {{v2}}. Подтверждением будет отписка и от этих источников.",
+    "releases-updated_one": ", обновлён {{count}} релиз",
+    "releases-updated_other": ", обновлено релизов: {{count}}"
   },
   "useWatchedSourcesSync": {
     "synced-v1-watch-repositories": "{{v1}} Репозитории часов синхронизированы.",

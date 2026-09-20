@@ -124,7 +124,8 @@
     "edit-category": "編輯分類",
     "delete-category": "刪除分類",
     "hide-default-category": "隱藏預設分類",
-    "drag-hint": "{{name}} — 拖曳倉庫卡片到此處可快速修改分類"
+    "drag-hint": "{{name}} — 拖曳倉庫卡片到此處可快速修改分類",
+    "sync-failed-reverted": "同步到後端失敗，已恢復分類更改。"
   },
   "codeSearchView": {
     "show-less": "收起",

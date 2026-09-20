@@ -124,7 +124,8 @@
     "edit-category": "カテゴリを編集する",
     "delete-category": "カテゴリの削除",
     "hide-default-category": "デフォルトのカテゴリを非表示にする",
-    "drag-hint": "{{name}} - 倉庫カードをここにドラッグすると、分類をすばやく変更できます"
+    "drag-hint": "{{name}} - 倉庫カードをここにドラッグすると、分類をすばやく変更できます",
+    "sync-failed-reverted": "バックエンドへの同期に失敗したため、カテゴリの変更を元に戻しました。"
   },
   "codeSearchView": {
     "show-less": "近い",

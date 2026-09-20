@@ -124,7 +124,8 @@
     "edit-category": "Editar categoria",
     "delete-category": "Excluir categoria",
     "hide-default-category": "Ocultar categorias padrão",
-    "drag-hint": "{{name}} — Arraste o cartão do armazém aqui para modificar rapidamente a classificação"
+    "drag-hint": "{{name}} — Arraste o cartão do armazém aqui para modificar rapidamente a classificação",
+    "sync-failed-reverted": "Falha ao sincronizar com o backend. A alteração de categoria foi revertida."
   },
   "codeSearchView": {
     "show-less": "fechar",

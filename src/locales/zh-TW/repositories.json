@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "同步完成！發現 {{newRepoCount}} 個新倉庫。",
     "sync-completed-all-repositories-are-up-to-date": "同步完成！所有倉庫都是最新的。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token 已過期或無效，請重新登入。",
-    "sync-failed-please-check-your-network-connection": "同步失敗，請檢查網路連線或稍後重試。"
+    "sync-failed-please-check-your-network-connection": "同步失敗，請檢查網路連線或稍後重試。",
+    "list-sync-new-categories_one": "（新建 {{count}} 個分類）",
+    "list-sync-new-categories_other": "（新建 {{count}} 個分類）",
+    "list-sync-complete": "已同步 {{lists}} 個 list（新建 {{newCount}} 個分類）。"
   }
 }

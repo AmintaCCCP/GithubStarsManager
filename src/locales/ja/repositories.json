@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "同期が完了しました！ {{newRepoCount}} 個の新しいリポジトリが見つかりました。",
     "sync-completed-all-repositories-are-up-to-date": "同期が完了しました！すべてのリポジトリは最新です。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub トークンの有効期限が切れているか、無効です。再度ログインしてください。",
-    "sync-failed-please-check-your-network-connection": "同期に失敗しました。ネットワーク接続を確認するか、後でもう一度試してください。"
+    "sync-failed-please-check-your-network-connection": "同期に失敗しました。ネットワーク接続を確認するか、後でもう一度試してください。",
+    "list-sync-new-categories_one": "（{{count}} 個の分類を新規作成）",
+    "list-sync-new-categories_other": "（{{count}} 個の分類を新規作成）",
+    "list-sync-complete": "{{lists}} 個の list を同期しました（{{newCount}} 個の分類を新規作成）。"
   }
 }

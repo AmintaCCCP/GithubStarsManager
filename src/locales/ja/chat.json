@@ -92,7 +92,7 @@
     "stage-planning": "読書計画を立てる",
     "stage-retrieval": "関連情報を読む",
     "stage-verification": "質問に答えられるかどうかを評価する",
-    "stage-replanning": "追加読み取り計画",
+    "stage-replanning": "再計画",
     "stage-escalation": "実装の詳細を追加する",
     "stage-answer": "最終的な答えを整理する",
     "stage-tool": "ツール呼び出し",

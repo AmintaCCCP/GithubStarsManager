@@ -33,7 +33,6 @@ export const useReleaseTimelineActions = () => {
   const handleRefresh = useCallback(async () => {
     const {
       githubToken,
-      language,
       setReleaseIsRefreshing,
       updateRepository,
       updateReleaseSourceRepository,
@@ -94,9 +93,7 @@ export const useReleaseTimelineActions = () => {
 
       // updatedReleases 既含资产变化也含正文回填（空日志补回），文案不再只提资产。
       const updatedPart = updatedReleases.length > 0
-        ? (language === 'zh'
-          ? `，${updatedReleases.length} 个Release有更新`
-          : `, ${updatedReleases.length} release${updatedReleases.length === 1 ? '' : 's'} updated`)
+        ? t('useReleaseTimelineActions.releases-updated', { count: updatedReleases.length })
         : '';
       const message = failedRepos.length > 0
         ? (t('useReleaseTimelineActions.refresh-completed-found-v1-new-releases-updatedp', { v1: actuallyNewReleases.length, updatedPart: updatedPart, v3: failedRepos.length }))

@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "Не удалось удалить Gist{{v1}}{{v2}}",
     "gist-update-failed": "Не удалось обновить Gist: {{message}}{{permissionNote}}",
     "gist-create-failed": "Не удалось создать Gist: {{message}}{{permissionNote}}",
-    "gist-permission-note": "(Подтвердите, что токен проверил разрешение gist, и повторно введите логин токена в настройках)"
+    "gist-permission-note": "(Подтвердите, что токен проверил разрешение gist, и повторно введите логин токена в настройках)",
+    "unknown-error": "Неизвестная ошибка",
+    "failed-to-load-gist-details": "Не удалось загрузить сведения о gist: {{message}}",
+    "failed-to-load-gist-details-empty": "Не удалось загрузить сведения о gist",
+    "failed-to-delete-gist": "Не удалось удалить gist: {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "Не удалось удалить gist{{permissionNote}}",
+    "github-token-not-configured": "GitHub token не настроен, содержимое файла загрузить нельзя"
   }
 }

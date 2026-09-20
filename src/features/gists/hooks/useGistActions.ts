@@ -1,4 +1,4 @@
-import { useT } from "../../../i18n/useT";
+import { makeT, useT } from "../../../i18n/useT";
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Gist } from '../../../types';
@@ -160,7 +160,7 @@ export const useGistActions = () => {
         toast(t('useGistActions.github-gist-api-is-temporarily-unavailable-openi'), 'warning');
         return null;
       }
-      toast(t('useGistActions.failed-to-load-gist-details-v1', { v1: message ? `：${message}` : '' }), 'error');
+      toast(t(message ? 'useGistActions.failed-to-load-gist-details' : 'useGistActions.failed-to-load-gist-details-empty', { message }), 'error');
       return null;
     }
   }, [state, t, toast]);
@@ -277,7 +277,10 @@ export const useGistActions = () => {
       const msg = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
       toast(
-        t('useGistActions.failed-to-delete-gist-v1-v2', { v1: msg ? `：${msg}` : '', v2: isPermission ? '（请确认 token 已勾选 gist 权限，并在设置中重新输入 token 登录）' : '' }),
+        t(msg ? 'useGistActions.failed-to-delete-gist' : 'useGistActions.failed-to-delete-gist-empty', {
+          message: msg,
+          permissionNote: isPermission ? t('useGistActions.gist-permission-note') : '',
+        }),
         'error'
       );
     } finally {
@@ -293,9 +296,7 @@ export const useGistActions = () => {
   const fetchGistFileRaw = useCallback(async (rawUrl: string, signal?: AbortSignal): Promise<string> => {
     if (!state.githubToken) {
       const currentLanguage = useAppStore.getState().language;
-      throw new Error(currentLanguage === 'zh'
-        ? '未配置 GitHub token，无法加载文件内容'
-        : 'GitHub token not configured, cannot load file content');
+      throw new Error(makeT(currentLanguage, 'gists')('useGistActions.github-token-not-configured'));
     }
     return createGitHubApiService(state.githubToken).getGistFileRaw(rawUrl, signal);
   }, [state.githubToken]);

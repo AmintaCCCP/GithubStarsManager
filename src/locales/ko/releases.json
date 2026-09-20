@@ -235,7 +235,9 @@
     "refresh-completed-found-v1-new-releases-updatedp-2": "새로고침 완료! {{v1}} 새 릴리스{{updatedPart}}를 찾았습니다.",
     "release-refresh-failed-please-check-your-network": "릴리스 새로고침에 실패했습니다. 네트워크 연결을 확인하세요.",
     "v1-is-not-in-any-release-source-confirming-will": "\"{{v1}}\"은(는) 현재 릴리스 소스에 없습니다. 확인 후에는 로컬에 캐시된 릴리스 레코드만 제거됩니다.",
-    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\"은(는) 여러 릴리스 소스에서 동시에 제공됩니다: {{v2}}. 확인하면 이러한 소스에서도 구독이 취소됩니다."
+    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\"은(는) 여러 릴리스 소스에서 동시에 제공됩니다: {{v2}}. 확인하면 이러한 소스에서도 구독이 취소됩니다.",
+    "releases-updated_one": ", Release {{count}}개가 업데이트됨",
+    "releases-updated_other": ", Release {{count}}개가 업데이트됨"
   },
   "useWatchedSourcesSync": {
     "synced-v1-watch-repositories": "{{v1}} 감시 저장소가 동기화되었습니다.",

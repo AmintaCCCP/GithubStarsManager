@@ -39,13 +39,13 @@
     "analyzed-on": "analysiert in",
     "ai-analyzed": "KI analysiert",
     "platforms": "Unterstützte Plattformen:",
-    "last-pushed": "Zuletzt aktualisiert",
+    "last-pushed": "Zuletzt gepusht",
     "find-similar-repositories-2": "Finden Sie ähnliche Lager",
     "find-similar": "Finden Sie ähnliche Lager",
     "deselect": "Abwählen",
     "select": "wählen",
     "analyzed-on-date": "Analysiert am {{date}}",
-    "last-pushed-time": "Zuletzt aktualisiert {{time}}"
+    "last-pushed-time": "Zuletzt gepusht: {{time}}"
   },
   "repositoryEditModal": {
     "edit-repository-info": "Lagerinformationen bearbeiten",
@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "Synchronisierung abgeschlossen! {{newRepoCount}} neue Repositorys gefunden.",
     "sync-completed-all-repositories-are-up-to-date": "Synchronisierung abgeschlossen! Alle Repositories sind auf dem neuesten Stand.",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub-Token ist abgelaufen oder ungültig, bitte melden Sie sich erneut an.",
-    "sync-failed-please-check-your-network-connection": "Die Synchronisierung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung oder versuchen Sie es später erneut."
+    "sync-failed-please-check-your-network-connection": "Die Synchronisierung ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung oder versuchen Sie es später erneut.",
+    "list-sync-new-categories_one": " ({{count}} neue Kategorie erstellt)",
+    "list-sync-new-categories_other": " ({{count}} neue Kategorien erstellt)",
+    "list-sync-complete": "{{lists}} Listen synchronisiert ({{newCount}} neue Kategorien erstellt)."
   }
 }

@@ -235,7 +235,9 @@
     "refresh-completed-found-v1-new-releases-updatedp-2": "刷新完成！發現 {{v1}} 個新Release{{updatedPart}}。",
     "release-refresh-failed-please-check-your-network": "Release刷新失敗，請檢查網路連線。",
     "v1-is-not-in-any-release-source-confirming-will": "\"{{v1}}\" 目前不在任何 Release 來源中。確認後僅移除本機已快取的 Release 記錄。",
-    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" 同時來自多個 Release 來源：{{v2}}。確認後將從這些來源中一併取消訂閱。"
+    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" 同時來自多個 Release 來源：{{v2}}。確認後將從這些來源中一併取消訂閱。",
+    "releases-updated_one": "，{{count}} 個Release有更新",
+    "releases-updated_other": "，{{count}} 個Release有更新"
   },
   "useWatchedSourcesSync": {
     "synced-v1-watch-repositories": "已同步 {{v1}} 個 Watch 倉庫。",

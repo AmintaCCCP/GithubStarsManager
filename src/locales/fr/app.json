@@ -124,7 +124,8 @@
     "edit-category": "Modifier la catégorie",
     "delete-category": "Supprimer la catégorie",
     "hide-default-category": "Masquer les catégories par défaut",
-    "drag-hint": "{{name}} – Faites glisser la fiche d'entrepôt ici pour modifier rapidement la classification"
+    "drag-hint": "{{name}} – Faites glisser la fiche d'entrepôt ici pour modifier rapidement la classification",
+    "sync-failed-reverted": "Échec de la synchronisation avec le backend. La modification de catégorie a été annulée."
   },
   "codeSearchView": {
     "show-less": "fermer",

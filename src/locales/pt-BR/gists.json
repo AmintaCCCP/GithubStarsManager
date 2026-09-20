@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "Falha ao excluir o Gist{{v1}}{{v2}}",
     "gist-update-failed": "Falha na atualização do Gist: {{message}}{{permissionNote}}",
     "gist-create-failed": "Falha na criação do Gist: {{message}}{{permissionNote}}",
-    "gist-permission-note": "(Confirme se o token verificou a permissão Gist e insira novamente o login do token nas configurações)"
+    "gist-permission-note": "(Confirme se o token verificou a permissão Gist e insira novamente o login do token nas configurações)",
+    "unknown-error": "Erro desconhecido",
+    "failed-to-load-gist-details": "Falha ao carregar os detalhes do gist: {{message}}",
+    "failed-to-load-gist-details-empty": "Falha ao carregar os detalhes do gist",
+    "failed-to-delete-gist": "Falha ao excluir o gist: {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "Falha ao excluir o gist{{permissionNote}}",
+    "github-token-not-configured": "GitHub token não configurado; não é possível carregar o conteúdo do arquivo"
   }
 }

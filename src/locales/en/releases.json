@@ -235,7 +235,9 @@
     "refresh-completed-found-v1-new-releases-updatedp-2": "Refresh completed! Found {{v1}} new releases{{updatedPart}}.",
     "release-refresh-failed-please-check-your-network": "Release refresh failed. Please check your network connection.",
     "v1-is-not-in-any-release-source-confirming-will": "\"{{v1}}\" is not in any release source. Confirming will only remove locally cached releases.",
-    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" comes from multiple release sources: {{v2}}. Confirming will unsubscribe it from all of these sources."
+    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" comes from multiple release sources: {{v2}}. Confirming will unsubscribe it from all of these sources.",
+    "releases-updated_one": ", {{count}} release updated",
+    "releases-updated_other": ", {{count}} releases updated"
   },
   "useWatchedSourcesSync": {
     "synced-v1-watch-repositories": "Synced {{v1}} Watch repositories.",

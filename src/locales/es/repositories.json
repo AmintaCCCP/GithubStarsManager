@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "¡Sincronización completada! {{newRepoCount}} nuevos repositorios encontrados.",
     "sync-completed-all-repositories-are-up-to-date": "¡Sincronización completada! Todos los repositorios están actualizados.",
     "github-token-has-expired-or-is-invalid-please-lo": "El token de GitHub ha caducado o no es válido; inicie sesión nuevamente.",
-    "sync-failed-please-check-your-network-connection": "Error de sincronización. Verifique su conexión de red o vuelva a intentarlo más tarde."
+    "sync-failed-please-check-your-network-connection": "Error de sincronización. Verifique su conexión de red o vuelva a intentarlo más tarde.",
+    "list-sync-new-categories_one": " ({{count}} categoría nueva creada)",
+    "list-sync-new-categories_other": " ({{count}} categorías nuevas creadas)",
+    "list-sync-complete": "Se sincronizaron {{lists}} listas ({{newCount}} categorías nuevas creadas)."
   }
 }

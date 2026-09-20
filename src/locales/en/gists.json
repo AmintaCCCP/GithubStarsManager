@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "Failed to delete gist{{v1}}{{v2}}",
     "gist-update-failed": "Failed to update Gist: {{message}}{{permissionNote}}",
     "gist-create-failed": "Failed to create Gist: {{message}}{{permissionNote}}",
-    "gist-permission-note": " (Please confirm the token has gist scope, then re-enter the token in Settings to log in again)"
+    "gist-permission-note": " (Please confirm the token has gist scope, then re-enter the token in Settings to log in again)",
+    "unknown-error": "Unknown error",
+    "failed-to-load-gist-details": "Failed to load gist details: {{message}}",
+    "failed-to-load-gist-details-empty": "Failed to load gist details",
+    "failed-to-delete-gist": "Failed to delete gist: {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "Failed to delete gist{{permissionNote}}",
+    "github-token-not-configured": "GitHub token not configured, cannot load file content"
   }
 }

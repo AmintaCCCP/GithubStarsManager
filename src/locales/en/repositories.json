@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "Sync completed! Found {{newRepoCount}} new repositories.",
     "sync-completed-all-repositories-are-up-to-date": "Sync completed! All repositories are up to date.",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token has expired or is invalid. Please login again.",
-    "sync-failed-please-check-your-network-connection": "Sync failed. Please check your network connection or try again later."
+    "sync-failed-please-check-your-network-connection": "Sync failed. Please check your network connection or try again later.",
+    "list-sync-new-categories_one": " ({{count}} new category created)",
+    "list-sync-new-categories_other": " ({{count}} new categories created)",
+    "list-sync-complete": "Synced {{lists}} lists ({{newCount}} new categories created)."
   }
 }

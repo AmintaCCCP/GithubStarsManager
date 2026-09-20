@@ -235,7 +235,9 @@
     "refresh-completed-found-v1-new-releases-updatedp-2": "リフレッシュ完了！ {{v1}} 個の新しいリリース{{updatedPart}}が見つかりました。",
     "release-refresh-failed-please-check-your-network": "リリースの更新に失敗しました。ネットワーク接続を確認してください。",
     "v1-is-not-in-any-release-source-confirming-will": "「{{v1}}」は現在どのリリース ソースにもありません。確認後、ローカルにキャッシュされたリリース レコードのみが削除されます。",
-    "v1-comes-from-multiple-release-sources-v2-confir": "「{{v1}}」は複数のリリース ソースから同時に取得されます: {{v2}}。確認により、これらのソースからの購読も解除されます。"
+    "v1-comes-from-multiple-release-sources-v2-confir": "「{{v1}}」は複数のリリース ソースから同時に取得されます: {{v2}}。確認により、これらのソースからの購読も解除されます。",
+    "releases-updated_one": "、{{count}} 件の Release が更新されました",
+    "releases-updated_other": "、{{count}} 件の Release が更新されました"
   },
   "useWatchedSourcesSync": {
     "synced-v1-watch-repositories": "{{v1}} ウォッチ リポジトリが同期されました。",

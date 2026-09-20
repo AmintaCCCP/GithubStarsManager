@@ -3,7 +3,7 @@
 
 
 import { getIntlLocale } from '../i18n/format';
-import { useT, useTPair } from '../i18n/useT';
+import { useT } from '../i18n/useT';
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History } from 'lucide-react';
@@ -31,12 +31,7 @@ import {
 
 type SortBy = 'stars' | 'updated' | 'name' | 'starred';
 
-const sortOptions: { value: SortBy; labelZh: string; labelEn: string }[] = [
-  { value: 'stars', labelZh: '按星标排序', labelEn: 'Sort by Stars' },
-  { value: 'updated', labelZh: '按更新排序', labelEn: 'Sort by Updated' },
-  { value: 'name', labelZh: '按名称排序', labelEn: 'Sort by Name' },
-  { value: 'starred', labelZh: '按加星时间排序', labelEn: 'Sort by Starred Time' },
-];
+const sortOptions: SortBy[] = ['stars', 'updated', 'name', 'starred'];
 
 interface SortByDropdownProps {
   value: SortBy;
@@ -44,15 +39,13 @@ interface SortByDropdownProps {
 }
 
 const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
-  const tPair = useTPair();
-
-  const selected = sortOptions.find(o => o.value === value);
+  const t = useT('app');
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="gap-2">
-          <span>{tPair(selected?.labelZh ?? '', selected?.labelEn ?? '')}</span>
+          <span>{t(`searchBar.sort-${value}`)}</span>
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -60,11 +53,11 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
         <DropdownMenuRadioGroup value={value} onValueChange={(nextValue) => onChange(nextValue as SortBy)}>
           {sortOptions.map((option) => (
             <DropdownMenuRadioItem
-              key={option.value}
-              value={option.value}
-              className={value === option.value ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
+              key={option}
+              value={option}
+              className={value === option ? 'bg-primary/10 text-primary dark:bg-primary/20' : undefined}
             >
-              {tPair(option.labelZh, option.labelEn)}
+              {t(`searchBar.sort-${option}`)}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -618,7 +611,6 @@ export const SearchBar: React.FC = () => {
   // 平台图标与显示名统一由 platformMeta 模块提供
 
   const t = useT('app');
-  const tPair = useTPair();
 
   // 同步星标仓库及 list：先确认（警告会覆盖未锁定仓库的分类并加锁），再执行。
   // 'auto'/'stars-only' 入口原无确认，勿加（B8）。
@@ -626,7 +618,7 @@ export const SearchBar: React.FC = () => {
 
     const confirmed = await confirm(
       t('searchBar.sync-starred-repos-lists'),
-      tPair('将拉取你的 GitHub Lists（星标列表）并应用到本地仓库：\n\n' + '· 每个 list 名会作为标签添加到对应仓库（一个仓库可属于多个 list/分类）\n' + '· 未锁定分类的仓库将应用 list 对应的分类并默认锁定\n' + '· 已锁定分类的仓库保持不变\n\n确定继续吗？', 'This will fetch your GitHub Lists and apply them to local repositories:\n\n' + '· Each list name is added as a tag (a repo can belong to multiple lists/categories)\n' + '· Unlocked repos get the list category applied and locked\n' + '· Locked repos are left unchanged\n\nContinue?'),
+      t('searchBar.sync-lists-confirm-body'),
       { type: 'warning' }
     );
     if (!confirmed) return;

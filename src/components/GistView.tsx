@@ -22,12 +22,8 @@ const categoryIcons = {
   mine: User,
 };
 
-const sortOptions = [
-  { value: 'updated', labelZh: '按更新时间', labelEn: 'Updated' },
-  { value: 'created', labelZh: '按创建时间', labelEn: 'Created' },
-  { value: 'name', labelZh: '按名称', labelEn: 'Name' },
-  { value: 'files', labelZh: '按文件数', labelEn: 'Files' },
-] as const;
+const sortOptions = ['updated', 'created', 'name', 'files'] as const;
+const gistCategories: GistCategoryId[] = ['all', 'starred', 'mine'];
 
 export const GistView: React.FC = () => {
   const {
@@ -78,12 +74,6 @@ export const GistView: React.FC = () => {
     setGistSearchResults(filterAndSortGists(currentCategoryItems, gistSearchFilters));
   }, [currentCategoryItems, gistSearchFilters, setGistSearchResults]);
 
-  const categories: Array<{ id: GistCategoryId; name: string; nameEn: string }> = [
-    { id: 'all', name: '全部gist', nameEn: 'All gists' },
-    { id: 'starred', name: '星标gist', nameEn: 'Starred gists' },
-    { id: 'mine', name: '我的gist', nameEn: 'My gists' },
-  ];
-
   const basicSearch = () => {
     setGistSearchFilters({ query });
   };
@@ -129,15 +119,15 @@ export const GistView: React.FC = () => {
             </div>
           </div>
           <div className="space-y-1">
-            {categories.map(category => {
-              const Icon = categoryIcons[category.id];
-              const active = selectedGistCategory === category.id;
+            {gistCategories.map(categoryId => {
+              const Icon = categoryIcons[categoryId];
+              const active = selectedGistCategory === categoryId;
               return (
                 <Button
-                  key={category.id}
+                  key={categoryId}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => setSelectedGistCategory(category.id)}
+                  onClick={() => setSelectedGistCategory(categoryId)}
                   variant="ghost"
                   className={`linear-settings-nav-item group flex w-full items-center justify-between px-3 py-2 text-sm text-muted-foreground hover:text-accent-foreground ${
                     active ? 'is-active' : ''
@@ -145,10 +135,10 @@ export const GistView: React.FC = () => {
                 >
                   <span className="inline-flex items-center gap-2">
                     <Icon className="h-4 w-4" />
-                    {t(`gistView.category-${category.id}`)}
+                    {t(`gistView.category-${categoryId}`)}
                   </span>
                   <span className={`font-medium ${active ? 'text-accent-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'}`}>
-                    {categoryItems[category.id].length}
+                    {categoryItems[categoryId].length}
                   </span>
                 </Button>
               );
@@ -205,8 +195,8 @@ export const GistView: React.FC = () => {
               <Select
                 value={gistSearchFilters.sortBy}
                 onValueChange={(value) => {
-                  if (sortOptions.some((option) => option.value === value)) {
-                    setGistSearchFilters({ sortBy: value as typeof sortOptions[number]['value'] });
+                  if (sortOptions.some((option) => option === value)) {
+                    setGistSearchFilters({ sortBy: value as typeof sortOptions[number] });
                   }
                 }}
               >
@@ -215,8 +205,8 @@ export const GistView: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {sortOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {t(`gistView.sort-${option.value}`)}
+                    <SelectItem key={option} value={option}>
+                      {t(`gistView.sort-${option}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>

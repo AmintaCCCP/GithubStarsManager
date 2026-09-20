@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "同步完成！发现 {{newRepoCount}} 个新仓库。",
     "sync-completed-all-repositories-are-up-to-date": "同步完成！所有仓库都是最新的。",
     "github-token-has-expired-or-is-invalid-please-lo": "GitHub token 已过期或无效，请重新登录。",
-    "sync-failed-please-check-your-network-connection": "同步失败，请检查网络连接或稍后重试。"
+    "sync-failed-please-check-your-network-connection": "同步失败，请检查网络连接或稍后重试。",
+    "list-sync-new-categories_one": "（新建 {{count}} 个分类）",
+    "list-sync-new-categories_other": "（新建 {{count}} 个分类）",
+    "list-sync-complete": "已同步 {{lists}} 个 list（新建 {{newCount}} 个分类）。"
   }
 }

@@ -235,7 +235,9 @@
     "refresh-completed-found-v1-new-releases-updatedp-2": "Atualização concluída! Encontrada {{v1}} nova versão{{updatedPart}}.",
     "release-refresh-failed-please-check-your-network": "Falha na atualização da versão. Verifique a conexão de rede.",
     "v1-is-not-in-any-release-source-confirming-will": "\"{{v1}}\" não está atualmente em nenhuma fonte de lançamento. Após a confirmação, apenas os registros de versão armazenados em cache local serão removidos.",
-    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" vem de diversas fontes de lançamento ao mesmo tempo: {{v2}}. A confirmação também cancelará a assinatura dessas fontes."
+    "v1-comes-from-multiple-release-sources-v2-confir": "\"{{v1}}\" vem de diversas fontes de lançamento ao mesmo tempo: {{v2}}. A confirmação também cancelará a assinatura dessas fontes.",
+    "releases-updated_one": ", {{count}} lançamento atualizado",
+    "releases-updated_other": ", {{count}} lançamentos atualizados"
   },
   "useWatchedSourcesSync": {
     "synced-v1-watch-repositories": "{{v1}} Os repositórios de observação foram sincronizados.",

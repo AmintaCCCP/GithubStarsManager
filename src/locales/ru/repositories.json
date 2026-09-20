@@ -219,6 +219,9 @@
     "sync-completed-found-newrepocount-new-repositori": "Синхронизация завершена! {{newRepoCount}} найдено новых репозиториев.",
     "sync-completed-all-repositories-are-up-to-date": "Синхронизация завершена! Все репозитории актуальны.",
     "github-token-has-expired-or-is-invalid-please-lo": "Срок действия токена GitHub истек или он недействителен. Войдите снова.",
-    "sync-failed-please-check-your-network-connection": "Не удалось синхронизировать. Проверьте сетевое подключение или повторите попытку позже."
+    "sync-failed-please-check-your-network-connection": "Не удалось синхронизировать. Проверьте сетевое подключение или повторите попытку позже.",
+    "list-sync-new-categories_one": " (создана {{count}} новая категория)",
+    "list-sync-new-categories_other": " (создано {{count}} новых категорий)",
+    "list-sync-complete": "Синхронизировано списков: {{lists}} (создано категорий: {{newCount}})."
   }
 }

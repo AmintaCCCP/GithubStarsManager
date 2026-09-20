@@ -1,4 +1,4 @@
-import { useT, useTPair } from "../../../i18n/useT";
+import { useT } from "../../../i18n/useT";
 import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
@@ -246,7 +246,6 @@ export const useSearchActions = (): SearchActions => {
   // 当前在途 AI 搜索的控制器：新搜索启动时中止旧请求（超代语义）
   const aiSearchAbortRef = useRef<AbortController | null>(null);
   const t = useT('repositories');
-  const tPair = useTPair();
 
   const keywordSearch = useCallback(async (
     query: string,
@@ -519,12 +518,12 @@ export const useSearchActions = (): SearchActions => {
               .map(([name, count]) => `${name}(${count})`)
               .join('、');
             const createdHint = createdCategoriesCount > 0
-              ? tPair(`（新建 ${createdCategoriesCount} 个分类）`, ` (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created)`)
+              ? t('useSearchActions.list-sync-new-categories', { count: createdCategoriesCount })
               : '';
             toast(t('useSearchActions.synced-v1-lists-applied-to-appliedtotal-unlocked', { v1: lists.length, appliedTotal: appliedTotal, listSummary: listSummary, createdHint: createdHint }), 'info');
           } else if (createdCategoriesCount > 0) {
             // 命中数为 0，但本次新建了分类（云端 list 与本地无交集但仍有其名分类）
-            toast(tPair(`已同步 ${lists.length} 个 list（新建 ${createdCategoriesCount} 个分类）。`, `Synced ${lists.length} lists (${createdCategoriesCount} new categor${createdCategoriesCount > 1 ? 'ies' : 'y'} created).`), 'info');
+            toast(t('useSearchActions.list-sync-complete', { lists: lists.length, newCount: createdCategoriesCount }), 'info');
           }
         } catch (listError) {
           console.error('List sync failed:', listError);
@@ -557,7 +556,7 @@ export const useSearchActions = (): SearchActions => {
     } finally {
       setSyncingStars(false);
     }
-  }, [githubToken, setSyncingStars, syncMode, user, t, toast, addCustomCategory, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, setRepositories, setLastSync, tPair]);
+  }, [githubToken, setSyncingStars, syncMode, user, t, toast, addCustomCategory, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, setRepositories, setLastSync]);
 
   return useMemo(() => ({
     isSearching,

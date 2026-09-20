@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "刪除 Gist 失敗{{v1}}{{v2}}",
     "gist-update-failed": "Gist 更新失敗：{{message}}{{permissionNote}}",
     "gist-create-failed": "Gist 建立失敗：{{message}}{{permissionNote}}",
-    "gist-permission-note": "（請確認 token 已勾選 gist 權限，並在設定中重新輸入 token 登入）"
+    "gist-permission-note": "（請確認 token 已勾選 gist 權限，並在設定中重新輸入 token 登入）",
+    "unknown-error": "未知錯誤",
+    "failed-to-load-gist-details": "取得 Gist 詳情失敗：{{message}}",
+    "failed-to-load-gist-details-empty": "取得 Gist 詳情失敗",
+    "failed-to-delete-gist": "刪除 Gist 失敗：{{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "刪除 Gist 失敗{{permissionNote}}",
+    "github-token-not-configured": "未設定 GitHub token，無法載入檔案內容"
   }
 }

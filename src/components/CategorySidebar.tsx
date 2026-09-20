@@ -62,6 +62,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
   const { toast, confirm } = useDialog();
   const { forceSyncToBackend } = useCategorySyncActions();
+  const t = useT('app');
   // 仓库卡片拖拽中：驱动「全部分类」变为「取消分类」热区提示
   const isRepoDragging = useRepositoryDragStore((state) => state.isDragging);
 
@@ -265,9 +266,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     updateRepository(originalRepo);
     setDragOverCategoryId(null);
     toast(
-      language === 'zh'
-        ? `同步到后端失败，已恢复分类更改。`
-        : `Failed to sync to backend. Category change has been reverted.`,
+      t('categorySidebar.sync-failed-reverted'),
       'error'
     );
   };
@@ -355,8 +354,6 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     }
     onCategorySelect(categoryId);
   };
-
-  const t = useT('app');
 
   return (
     <>

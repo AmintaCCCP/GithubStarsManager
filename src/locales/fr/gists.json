@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "Échec de la suppression de Gist{{v1}}{{v2}}",
     "gist-update-failed": "Échec de la mise à jour générale : {{message}}{{permissionNote}}",
     "gist-create-failed": "Échec de la création de l'essentiel : {{message}}{{permissionNote}}",
-    "gist-permission-note": "(Veuillez confirmer que le jeton a vérifié l'autorisation essentielle et ressaisissez la connexion du jeton dans les paramètres)"
+    "gist-permission-note": "(Veuillez confirmer que le jeton a vérifié l'autorisation essentielle et ressaisissez la connexion du jeton dans les paramètres)",
+    "unknown-error": "Erreur inconnue",
+    "failed-to-load-gist-details": "Échec du chargement des détails du gist : {{message}}",
+    "failed-to-load-gist-details-empty": "Échec du chargement des détails du gist",
+    "failed-to-delete-gist": "Échec de la suppression du gist : {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "Échec de la suppression du gist{{permissionNote}}",
+    "github-token-not-configured": "GitHub token non configuré, impossible de charger le contenu du fichier"
   }
 }

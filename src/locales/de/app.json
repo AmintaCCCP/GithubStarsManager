@@ -124,7 +124,8 @@
     "edit-category": "Kategorie bearbeiten",
     "delete-category": "Kategorie löschen",
     "hide-default-category": "Standardkategorien ausblenden",
-    "drag-hint": "{{name}} – Ziehen Sie die Lagerkarte hierher, um die Klassifizierung schnell zu ändern"
+    "drag-hint": "{{name}} – Ziehen Sie die Lagerkarte hierher, um die Klassifizierung schnell zu ändern",
+    "sync-failed-reverted": "Synchronisierung mit dem Backend fehlgeschlagen. Die Kategorieänderung wurde rückgängig gemacht."
   },
   "codeSearchView": {
     "show-less": "schließen",

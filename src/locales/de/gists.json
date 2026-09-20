@@ -104,6 +104,12 @@
     "failed-to-delete-gist-v1-v2": "Gist konnte nicht gelöscht werden{{v1}}{{v2}}",
     "gist-update-failed": "Kernaktualisierung fehlgeschlagen: {{message}}{{permissionNote}}",
     "gist-create-failed": "Kernerstellung fehlgeschlagen: {{message}}{{permissionNote}}",
-    "gist-permission-note": "(Bitte bestätigen Sie, dass das Token die Kernberechtigung überprüft hat, und geben Sie die Token-Anmeldung erneut in den Einstellungen ein.)"
+    "gist-permission-note": "(Bitte bestätigen Sie, dass das Token die Kernberechtigung überprüft hat, und geben Sie die Token-Anmeldung erneut in den Einstellungen ein.)",
+    "unknown-error": "Unbekannter Fehler",
+    "failed-to-load-gist-details": "Gist-Details konnten nicht geladen werden: {{message}}",
+    "failed-to-load-gist-details-empty": "Gist-Details konnten nicht geladen werden",
+    "failed-to-delete-gist": "Gist konnte nicht gelöscht werden: {{message}}{{permissionNote}}",
+    "failed-to-delete-gist-empty": "Gist konnte nicht gelöscht werden{{permissionNote}}",
+    "github-token-not-configured": "GitHub-Token nicht konfiguriert, Dateiinhalt kann nicht geladen werden"
   }
 }
