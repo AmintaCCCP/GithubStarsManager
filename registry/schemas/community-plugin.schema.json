@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/AmintaCCCP/GithubStarsManager/registry/schemas/community-plugin.schema.json",
+  "title": "Community plugin registry",
+  "description": "Accepted community plugin versions. The client installs exactly the listed version and verifies sha256 before unpacking.",
+  "type": "array",
+  "$comment": "CI additionally enforces unique (id, version) pairs and exact equality between network:* permissions and networkTargets.",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["id", "version", "apiVersion", "source", "releaseUrl", "sha256", "permissions", "networkTargets", "dataUsage", "review"],
+    "properties": {
+      "id": {
+        "type": "string",
+        "description": "Must match the plugin manifest id.",
+        "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$"
+      },
+      "version": {
+        "type": "string",
+        "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+      },
+      "apiVersion": {
+        "type": "string",
+        "description": "Plugin API version this entry was reviewed against.",
+        "enum": ["1"]
+      },
+      "source": {
+        "type": "string",
+        "format": "uri",
+        "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?$"
+      },
+      "releaseUrl": {
+        "type": "string",
+        "format": "uri",
+        "description": "Release asset URL for exactly this version. Integrity is enforced by sha256.",
+        "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/download/[^/?#]+/[^/?#]+$"
+      },
+      "sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "permissions": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "enum": [
+                "repositories:read",
+                "repositories:write",
+                "privateRepositories:read",
+                "releases:read",
+                "gists:read",
+                "storage",
+                "clipboard:write",
+                "external:open",
+                "ai:invoke",
+                "web:search",
+                "downloads:create"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^network:(?=.{1,253}$)(?!-)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+            }
+          ]
+        },
+        "uniqueItems": true
+      },
+      "networkTargets": {
+        "type": "array",
+        "description": "Declared hosts. CI requires these to exactly match the domains in network:* permissions; an empty array means the plugin must not reach the network.",
+        "items": {
+          "type": "string",
+          "pattern": "^(?=.{1,253}$)(?!-)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$"
+        },
+        "uniqueItems": true
+      },
+      "dataUsage": {
+        "type": "string",
+        "minLength": 10,
+        "description": "Plain-language statement of what data leaves the device, reviewed by a human."
+      },
+      "review": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["status", "date", "commit"],
+        "properties": {
+          "status": { "type": "string", "enum": ["approved"] },
+          "date": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+        }
+      }
+    }
+  }
+}
