@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   syncLocalGitHubTokenToBackend: vi.fn(),
   tryRestoreAuthFromBackend: vi.fn(),
-  useAppStore: vi.fn(),
+  useAppStore: Object.assign(vi.fn(), { setState: vi.fn() }),
 }));
 
 vi.mock('../../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
@@ -48,6 +48,7 @@ const storeState = {
   categoryOrder: [] as string[],
   customCategories: [],
   assetFilters: [],
+  defaultCategoryOverrides: {},
   collapsedSidebarCategoryCount: 0,
   backendApiSecret: null as string | null,
   setBackendApiSecret: mocks.setBackendApiSecret,

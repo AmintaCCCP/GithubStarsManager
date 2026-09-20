@@ -2,6 +2,7 @@
 import { TranslateFn } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import type { Category } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
@@ -45,6 +46,7 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
     categoryOrder: store.categoryOrder,
     customCategories: store.customCategories,
     assetFilters: store.assetFilters,
+    defaultCategoryOverrides: store.defaultCategoryOverrides,
     collapsedSidebarCategoryCount: store.collapsedSidebarCategoryCount,
     backendApiSecret: store.backendApiSecret,
     setBackendApiSecret: store.setBackendApiSecret,
@@ -139,6 +141,7 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
           categoryOrder: state.categoryOrder,
           customCategories: state.customCategories,
           assetFilters: state.assetFilters,
+          defaultCategoryOverrides: state.defaultCategoryOverrides,
           collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
         }),
       ]);
@@ -186,6 +189,15 @@ export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOption
       for (const categoryId of serverHidden) if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
       for (const categoryId of state.hiddenDefaultCategoryIds) {
         if (typeof categoryId === 'string' && !serverHidden.includes(categoryId)) state.showDefaultCategory(categoryId);
+      }
+      if (
+        settingsData.defaultCategoryOverrides !== null
+        && typeof settingsData.defaultCategoryOverrides === 'object'
+        && !Array.isArray(settingsData.defaultCategoryOverrides)
+      ) {
+        useAppStore.setState({
+          defaultCategoryOverrides: settingsData.defaultCategoryOverrides as Record<string, Partial<Category>>,
+        });
       }
       toast(t('useBackendSettingsActions.synced-from-backend-repos-v1-releases-v2-ai-conf', { v1: repoData.repositories.length, v2: releaseData.releases.length, v3: aiConfigData.length, v4: webdavConfigData.length }), 'success');
     } catch (error) {

@@ -512,6 +512,15 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       if (Array.isArray(settings.assetFilters)) {
         useAppStore.setState({ assetFilters: settings.assetFilters });
       }
+      if (
+        settings.defaultCategoryOverrides !== null
+        && typeof settings.defaultCategoryOverrides === 'object'
+        && !Array.isArray(settings.defaultCategoryOverrides)
+      ) {
+        useAppStore.setState({
+          defaultCategoryOverrides: settings.defaultCategoryOverrides as typeof state.defaultCategoryOverrides,
+        });
+      }
       if (settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object') {
         state.setReleaseSourceSettings(settings.releaseSourceSettings as typeof state.releaseSourceSettings);
       }
@@ -583,6 +592,7 @@ export async function syncToBackend(): Promise<void> {
         categoryOrder: state.categoryOrder,
         customCategories: state.customCategories,
         assetFilters: state.assetFilters,
+        defaultCategoryOverrides: state.defaultCategoryOverrides,
         releaseSourceSettings: state.releaseSourceSettings,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       }),
@@ -617,6 +627,7 @@ export async function syncToBackend(): Promise<void> {
         categoryOrder: state.categoryOrder,
         customCategories: state.customCategories,
         assetFilters: state.assetFilters,
+        defaultCategoryOverrides: state.defaultCategoryOverrides,
         releaseSourceSettings: state.releaseSourceSettings,
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       });
@@ -687,6 +698,7 @@ export function startAutoSync(): () => void {
       state.categoryOrder !== prevState.categoryOrder ||
       state.customCategories !== prevState.customCategories ||
       state.assetFilters !== prevState.assetFilters ||
+      state.defaultCategoryOverrides !== prevState.defaultCategoryOverrides ||
       state.releaseSourceSettings !== prevState.releaseSourceSettings ||
       state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount;
 
