@@ -2,7 +2,16 @@ import type { ThemePresetId } from '../constants/themePresets';
 import type { AppLanguage } from '../i18n/languages';
 
 import type { RepositoryChatSettings } from './repositoryChat';
+import type { LinkedApplication } from './linkedApplication';
 export type { RepositoryChatSettings } from './repositoryChat';
+export type {
+  CreateLinkedApplicationInput,
+  LinkedApplication,
+  LinkedApplicationArchitecture,
+  LinkedApplicationEditablePatch,
+  LinkedApplicationLinkSource,
+  LinkedApplicationPlatform,
+} from './linkedApplication';
 export type {
   RepositoryHealthEnrichment,
   RepositoryHealthFact,
@@ -422,7 +431,7 @@ export interface AssetFilter {
   icon?: string;
 }
 
-export type HeaderMenuId = 'repositories' | 'gists' | 'releases' | 'forks' | 'subscription' | 'settings';
+export type HeaderMenuId = 'repositories' | 'gists' | 'releases' | 'forks' | 'subscription' | 'apps' | 'settings';
 
 export interface HeaderMenuItem {
   id: HeaderMenuId;
@@ -436,7 +445,8 @@ export const defaultHeaderMenuConfig: HeaderMenuItem[] = [
   { id: 'releases', visible: true, order: 2 },
   { id: 'forks', visible: true, order: 3 },
   { id: 'subscription', visible: true, order: 4 },
-  { id: 'settings', visible: true, order: 5 },
+  { id: 'apps', visible: true, order: 5 },
+  { id: 'settings', visible: true, order: 6 },
 ];
 
 export interface AccountWorkspace {
@@ -526,12 +536,15 @@ export interface AppState {
   
   // Asset Filters
   assetFilters: AssetFilter[]; // 新增：资源过滤器
-  
+
+  // My Apps（开发守则 §3）：本机安装的软件与已收藏仓库的手动关联记录，纯本地
+  linkedApplications: LinkedApplication[];
+
   // UI
   theme: 'light' | 'dark';
   /** 主题配色预设（默认 + 内置精选），见 constants/themePresets */
   themePreset: ThemePresetId;
-  currentView: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription';
+  currentView: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription' | 'apps';
   selectedCategory: string;
   language: AppLanguage;
   /** README 文档翻译引擎（微软 / Google / AI），见 TranslationEngine */

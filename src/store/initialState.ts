@@ -64,6 +64,8 @@ export const createInitialState = (): AppState => ({
       collapsedSidebarCategoryCount: 20,
       categoryMatchMode: 'effective',
       assetFilters: defaultPresetFilters,
+      // My Apps（开发守则 §3）：默认没有任何本地关联记录
+      linkedApplications: [],
       theme: 'dark',
       themePreset: DEFAULT_THEME_PRESET_ID,
       hasHydrated: false,

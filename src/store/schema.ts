@@ -80,6 +80,7 @@ export type PersistedAppState = Partial<
     | 'collapsedSidebarCategoryCount'
     | 'categoryMatchMode'
     | 'assetFilters'
+    | 'linkedApplications'
     | 'theme'
     | 'themePreset'
     | 'currentView'

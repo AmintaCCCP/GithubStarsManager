@@ -4,7 +4,7 @@
 
 import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
-import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X } from 'lucide-react';
+import { Settings, Calendar, Search, Moon, Sun, LogOut, Compass, GitFork, FileCode2, Menu, X, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -23,6 +23,7 @@ const MENU_META: Record<HeaderMenuId, {
   releases: { icon: Calendar, labelZh: '发布', labelEn: 'Releases' },
   forks: { icon: GitFork, labelZh: '复刻', labelEn: 'Forks' },
   subscription: { icon: Compass, labelZh: '发现', labelEn: 'Discover' },
+  apps: { icon: Package, labelZh: '我的应用', labelEn: 'My Apps' },
   settings: { icon: Settings, labelZh: '设置', labelEn: 'Settings' },
 };
 

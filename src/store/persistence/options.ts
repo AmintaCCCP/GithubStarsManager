@@ -172,6 +172,8 @@ rpcDownloadConfig: {
   secret: state.rpcDownloadConfig.secret,
 },
 routeMode: state.routeMode,
+// My Apps（开发守则 §3）：手动关联记录，纯本地数据，不参与后端/自动同步
+linkedApplications: state.linkedApplications,
 }),
 migrate: (persistedState) => {
   // 版本升级适配处理

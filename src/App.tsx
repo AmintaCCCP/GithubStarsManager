@@ -39,6 +39,9 @@ const LazyDiscoveryView = React.lazy(() =>
 const LazyGistView = React.lazy(() =>
   import('./components/GistView').then((module) => ({ default: module.GistView }))
 );
+const LazyMyAppsView = React.lazy(() =>
+  import('./features/apps/components/MyAppsView').then((module) => ({ default: module.MyAppsView }))
+);
 
 const ViewLoadingFallback: React.FC = () => (
   <div className="flex min-h-[12rem] items-center justify-center bg-background text-foreground" role="status" aria-live="polite">
@@ -131,6 +134,13 @@ const SettingsView = React.memo(() => (
   </LazyViewBoundary>
 ));
 SettingsView.displayName = 'SettingsView';
+
+const MyAppsView = React.memo(() => (
+  <LazyViewBoundary>
+    <LazyMyAppsView />
+  </LazyViewBoundary>
+));
+MyAppsView.displayName = 'MyAppsView';
 
 const DiscoverySubscriptionView = React.memo(() => (
   <Suspense fallback={<ViewLoadingFallback />}>
@@ -248,6 +258,8 @@ function App() {
         );
       case 'settings':
         return <SettingsView />;
+      case 'apps':
+        return <MyAppsView />;
       default:
         return null;
     }

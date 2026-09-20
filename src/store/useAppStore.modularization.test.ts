@@ -120,6 +120,7 @@ const currentPersistedKeys = [
   'proxyConfig',
   'rpcDownloadConfig',
   'routeMode',
+  'linkedApplications',
 ] as const;
 
 const historicalSnapshots = (): PersistedSnapshot[] => [
@@ -160,6 +161,31 @@ const historicalSnapshots = (): PersistedSnapshot[] => [
       enableReranking: true,
       embeddingFormatVersion: 1,
     },
+  }),
+  // v17: 已有合法 My Apps 记录的快照——重复 migrate 必须原样保留（幂等）
+  buildPersistedSnapshot({
+    linkedApplications: [{
+      id: 'linked-1',
+      repositoryFullName: 'owner/tool',
+      displayName: 'Tool',
+      installedVersion: '1.0.0',
+      platform: 'linux',
+      architecture: 'x64',
+      linkSource: 'manual',
+      includePrereleases: false,
+      repositorySourceUrl: 'https://github.com/owner/tool',
+      linkedAt: '2026-03-01T00:00:00.000Z',
+    }],
+  }),
+  // v17: 损坏/半成品记录——必须在 migrate 里被收敛或丢弃，不得抛错
+  buildPersistedSnapshot({
+    linkedApplications: [
+      { repositoryFullName: 'owner/missing-id' },
+      { id: 'kept', repositoryFullName: 'Owner/Kept', installedVersion: 42, linkedAt: 'not-a-date' },
+      42,
+      null,
+      'junk',
+    ],
   }),
 ];
 
@@ -208,6 +234,46 @@ describe('PR-07 Store modularization compatibility', () => {
         options.merge(twice, actualStore.useAppStore.getInitialState()),
       );
     }
+  });
+
+  it('normalizes My Apps records during hydration without a version bump', () => {
+    const options = persistenceOptions();
+    const initialState = actualStore.useAppStore.getInitialState();
+
+    const legacy = options.merge(buildPersistedSnapshot(), initialState);
+    expect(legacy.linkedApplications).toEqual([]);
+
+    const migrated = options.merge(buildPersistedSnapshot({
+      linkedApplications: [
+        { repositoryFullName: 'owner/missing-id' },
+        {
+          id: 'kept',
+          repositoryFullName: 'Owner/Kept',
+          installedVersion: 42,
+          linkedAt: 'not-a-date',
+          includePrereleases: 'yes',
+        },
+      ],
+    }), initialState);
+
+    const records = migrated.linkedApplications as unknown as Array<Record<string, unknown>>;
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      id: 'kept',
+      repositoryFullName: 'Owner/Kept',
+      displayName: 'Kept',
+      installedVersion: null,
+      platform: 'unknown',
+      linkSource: 'manual',
+      // 非法值（'yes'）与缺失字段一样回落到"只跟踪稳定版"
+      includePrereleases: false,
+      repositorySourceUrl: 'https://github.com/Owner/Kept',
+      linkedAt: '',
+    });
+
+    // 幂等：对已规范化快照再走 hydration 结果不变
+    const twice = options.merge(buildPersistedSnapshot({ linkedApplications: records as never }), initialState);
+    expect(twice.linkedApplications).toEqual(records);
   });
 
   it('retains the historical normalize-only resets and release backfill behavior', () => {

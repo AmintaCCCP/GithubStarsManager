@@ -9,6 +9,7 @@ import {
   Calendar,
   GitFork,
   Compass,
+  Package,
   Settings,
   GripVertical,
   ChevronUp,
@@ -35,6 +36,8 @@ const MENU_META: Record<HeaderMenuId, {
   releases: { icon: Calendar, labelZh: '发布', labelEn: 'Releases', canHide: true },
   forks: { icon: GitFork, labelZh: '复刻', labelEn: 'Forks', canHide: true },
   subscription: { icon: Compass, labelZh: '发现', labelEn: 'Discover', canHide: true },
+  // 我的应用（开发守则 §3）：与其它功能视图一样允许隐藏
+  apps: { icon: Package, labelZh: '我的应用', labelEn: 'My Apps', canHide: true },
   settings: { icon: Settings, labelZh: '设置', labelEn: 'Settings', canHide: false },
 };
 

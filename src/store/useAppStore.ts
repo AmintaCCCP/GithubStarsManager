@@ -8,6 +8,7 @@ import { createCategorySlice } from './slices/categorySlice';
 import { createConfigurationSlice } from './slices/configurationSlice';
 import { createDiscoverySlice } from './slices/discoverySlice';
 import { createGistSlice } from './slices/gistSlice';
+import { createLinkedApplicationSlice } from './slices/linkedApplicationSlice';
 import { createPreferenceSlice } from './slices/preferenceSlice';
 import { createRepositorySlice } from './slices/repositorySlice';
 import { createTimelineSlice } from './slices/timelineSlice';
@@ -39,6 +40,7 @@ export const useAppStore = create<AppStoreState>()(
       ...createCategorySlice(set, get),
       ...createPreferenceSlice(set, get),
       ...createDiscoverySlice(set, get),
+      ...createLinkedApplicationSlice(set, get),
     }),
     appPersistenceOptions,
   ),

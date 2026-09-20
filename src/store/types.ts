@@ -43,6 +43,7 @@ import type {
 } from '../types';
 import type { ThemePresetId } from '../constants/themePresets';
 import type { GitHubListsApiService } from '../services/githubListsApi';
+import type { LinkedApplication, LinkedApplicationEditablePatch } from '../types/linkedApplication';
 
 export interface AppActions {
   // Auth actions
@@ -170,7 +171,7 @@ export interface AppActions {
   // UI actions
   setTheme: (theme: 'light' | 'dark') => void;
   setThemePreset: (preset: ThemePresetId) => void;
-  setCurrentView: (view: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription') => void;
+  setCurrentView: (view: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription' | 'apps') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: AppLanguage) => void;
   setTranslationEngine: (engine: TranslationEngine) => void;
@@ -200,6 +201,12 @@ export interface AppActions {
 
   // Repository list view actions
   setRepositoryViewMode: (mode: 'grid' | 'list') => void;
+
+  // My Apps actions（开发守则 §3，阶段 1a：只做手动关联与本地记录）
+  addLinkedApplication: (application: LinkedApplication) => void;
+  updateLinkedApplication: (id: string, patch: LinkedApplicationEditablePatch) => void;
+  removeLinkedApplication: (id: string) => void;
+  markLinkedApplicationChecked: (id: string, checkedAt: string) => void;
 
   // Release Timeline View actions
   setReleaseViewMode: (mode: 'timeline' | 'repository') => void;
