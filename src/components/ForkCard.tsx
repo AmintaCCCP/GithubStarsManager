@@ -250,7 +250,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                         className="ml-2 h-8 w-8 shrink-0 p-0"
                         aria-label={workflow.state === 'disabled'
                           ? (t('forkCard.workflow-disabled'))
-                          : t('forkCard.run-workflow-named', { name: workflow.name })
+                          : t('app:forkCard.run-workflow-named', { name: workflow.name })
                         }
                         title={workflow.state === 'disabled'
                           ? (t('forkCard.workflow-disabled'))

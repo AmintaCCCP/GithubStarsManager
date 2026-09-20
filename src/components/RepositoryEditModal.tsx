@@ -692,7 +692,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               </span>
             )}
             <span className="ml-auto text-xs text-muted-foreground dark:text-muted-foreground">
-              {formData.description.length > 0 ? t('repositoryEditModal.char-count', { count: formData.description.length }) : t('repositoryEditModal.empty')}
+              {formData.description.length > 0 ? t('app:repositoryEditModal.char-count', { count: formData.description.length }) : t('repositoryEditModal.empty')}
             </span>
           </div>
 

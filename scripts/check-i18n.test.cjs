@@ -163,7 +163,7 @@ test('bound useT namespace does not fall back to another namespace', () =>
     assert.match(result.stderr, /missing from zh locales/);
   }));
 
-test('dotted keys may resolve outside the bound namespace', () =>
+test('bound useT does not resolve dotted keys from another namespace', () =>
   withRepo((root) => {
     for (const language of LANGUAGES) {
       writeJson(path.join(root, 'src', 'locales', language, 'app.json'), {
@@ -174,8 +174,16 @@ test('dotted keys may resolve outside the bound namespace', () =>
       path.join(root, 'src', 'components', 'Hello.tsx'),
       "import { useT } from '../i18n/useT';\nexport const Hello = () => {\n  const t = useT('discovery');\n  return <span>{t('panel.hello')}</span>;\n};\n",
     );
-    const result = runScript(root);
-    assert.equal(result.code, 0, result.stderr);
+    const blocked = runScript(root);
+    assert.equal(blocked.code, 1);
+    assert.match(blocked.stderr, /missing from zh locales/);
+
+    fs.writeFileSync(
+      path.join(root, 'src', 'components', 'Hello.tsx'),
+      "import { useT } from '../i18n/useT';\nexport const Hello = () => {\n  const t = useT('discovery');\n  return <span>{t('app:panel.hello')}</span>;\n};\n",
+    );
+    const allowed = runScript(root);
+    assert.equal(allowed.code, 0, allowed.stderr);
   }));
 
 test('i18next plural suffixes satisfy a base t() key', () =>
