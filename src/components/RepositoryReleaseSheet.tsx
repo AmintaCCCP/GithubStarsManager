@@ -48,7 +48,7 @@ const Pagination: React.FC<{
         type="button"
         variant="ghost"
         size="icon"
-        className="h-7 w-7"
+        className="h-11 w-11 sm:h-7 sm:w-7"
         disabled={page === 1}
         onClick={() => onPageChange(page - 1)}
         aria-label={`${label} previous page`}
@@ -62,7 +62,7 @@ const Pagination: React.FC<{
         type="button"
         variant="ghost"
         size="icon"
-        className="h-7 w-7"
+        className="h-11 w-11 sm:h-7 sm:w-7"
         disabled={page === totalPages}
         onClick={() => onPageChange(page + 1)}
         aria-label={`${label} next page`}
@@ -97,7 +97,7 @@ const ReleaseAssetsTable: React.FC<{
 
   return (
     <>
-      <Table aria-label={t(`${release.tag_name} 资产`, `${release.tag_name} assets`)}>
+      <Table className="min-w-[28rem] table-fixed" aria-label={t(`${release.tag_name} 资产`, `${release.tag_name} assets`)}>
         <TableHeader>
           <TableRow>
             <TableHead>{t('文件名', 'File')}</TableHead>
@@ -124,7 +124,7 @@ const ReleaseAssetsTable: React.FC<{
                     type="button"
                     variant="secondary"
                     size="sm"
-                    className="h-7 px-2 text-xs"
+                    className="h-11 px-3 text-xs sm:h-7 sm:px-2"
                     disabled={isSending || isSent}
                     onClick={() => onDownload(link)}
                   >
@@ -169,10 +169,10 @@ const ReleaseContent: React.FC<{
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-      <TabsList className="grid h-8 w-full grid-cols-3">
-        <TabsTrigger className="text-xs" value="assets">{t('资产', 'Assets')}</TabsTrigger>
-        <TabsTrigger className="text-xs" value="notes">{t('更新日志', 'Notes')}</TabsTrigger>
-        <TabsTrigger className="text-xs" value="summary">{t('总结', 'Summary')}</TabsTrigger>
+      <TabsList className="grid h-11 w-full grid-cols-3 sm:h-8">
+        <TabsTrigger className="h-11 text-xs sm:h-8" value="assets">{t('资产', 'Assets')}</TabsTrigger>
+        <TabsTrigger className="h-11 text-xs sm:h-8" value="notes">{t('更新日志', 'Notes')}</TabsTrigger>
+        <TabsTrigger className="h-11 text-xs sm:h-8" value="summary">{t('总结', 'Summary')}</TabsTrigger>
       </TabsList>
       <TabsContent value="assets" className="mt-3">
         <ReleasePluginRecommendations release={release} repository={repository} language={language} />
@@ -288,12 +288,13 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
           event.preventDefault();
           onCloseAutoFocus?.();
         }}
+        className="min-w-0 max-w-full"
       >
-        <SheetHeader>
+        <SheetHeader className="min-w-0 max-w-full">
           <SheetTitle>{t('查看 Release', 'Repository releases')}</SheetTitle>
           <SheetDescription className="truncate" title={repository.full_name}>{repository.full_name}</SheetDescription>
         </SheetHeader>
-        <div className="flex shrink-0 items-center gap-2 border-b border-border pb-3">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border pb-3">
           <Button type="button" variant="secondary" size="sm" onClick={refresh} disabled={isLoading}>
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
             {t('刷新', 'Refresh')}
@@ -305,7 +306,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
             </a>
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-y-auto pr-1">
           {isLoading ? (
             <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
@@ -326,7 +327,7 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
               <p className="mb-2 text-xs text-muted-foreground">
                 {t(`已实时获取 ${releases.length} 条 Release`, `${releases.length} live releases loaded`)}
               </p>
-              <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="rounded-md border border-border px-3">
+              <Accordion type="multiple" value={expandedReleaseIds} onValueChange={setExpandedReleaseIds} className="min-w-0 max-w-full rounded-md border border-border px-3">
                 {visibleReleases.map((release) => (
                   <AccordionItem key={release.id} value={String(release.id)}>
                     <AccordionTrigger>

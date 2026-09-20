@@ -123,7 +123,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
                     return (
                       <li key={event.id} className="grid gap-1">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="font-medium text-foreground">{event.paramSummary}</span>
+                          <span className="min-w-0 break-words font-medium text-foreground">{event.paramSummary}</span>
                           <span className={`ml-auto text-xs ${event.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>{statusLabel}{eventDuration ? ` · ${eventDuration}` : ''}</span>
                         </div>
                         {event.detail && <p className="break-words text-muted-foreground">{event.detail}</p>}
@@ -310,7 +310,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="w-[min(100vw-1rem,48rem)] sm:max-w-none"
+        className="w-[min(100dvw_-_1rem,48rem)] max-w-full sm:max-w-none"
         closeLabel={t('关闭仓库问答', 'Close repository chat')}
         onPointerDownOutside={(event) => {
           event.preventDefault();
@@ -328,7 +328,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 px-2 text-xs text-muted-foreground"
+                className="h-11 px-2 text-xs text-muted-foreground sm:h-7"
                 onClick={onBack}
               >
                 <ArrowLeft className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
@@ -355,8 +355,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
           </div>
         </SheetHeader>
 
-        <div className="flex items-center gap-2 border-b border-border pb-3">
-          <Button type="button" variant="secondary" size="sm" onClick={handleCreateSession} disabled={isLoading || isSending}>
+        <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
+          <Button type="button" variant="secondary" size="sm" className="h-11 sm:h-8" onClick={handleCreateSession} disabled={isLoading || isSending}>
             {isLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />}
             {t('新建会话', 'New chat')}
           </Button>
@@ -364,7 +364,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
             type="button"
             variant={showHistory ? 'secondary' : 'ghost'}
             size="sm"
-            className="ml-auto"
+            className="ml-auto h-11 sm:h-8"
             onClick={() => setShowHistory((previous) => !previous)}
             aria-pressed={showHistory}
           >
@@ -375,7 +375,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
 
         <div className="min-h-0 flex flex-1 gap-4 overflow-hidden">
           {showHistory ? (
-            <div className="min-h-0 w-full max-w-sm border-r border-border pr-3">
+            <div className="min-h-0 w-full min-w-0 max-w-full border-r border-border pr-3 sm:max-w-sm">
               <RepositoryChatHistoryPanel
                 sessions={sessions}
                 activeSessionId={activeSession?.id}
@@ -389,7 +389,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
               />
             </div>
           ) : (
-            <div className="relative min-h-0 flex-1">
+            <div className="relative min-h-0 min-w-0 max-w-full flex-1">
               <div ref={messageRegionRef} onScroll={handleRegionScroll} className="h-full overflow-y-auto pr-1">
                 {error ? (
                   <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md border border-destructive/40 bg-muted/20 px-5 text-center">
@@ -439,7 +439,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   <div className="space-y-3">
                     {chatError && (
                       <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-muted/20 px-3 py-2 text-sm text-destructive">
-                        <span>{chatError}</span>
+                        <span className="min-w-0 break-words">{chatError}</span>
                         <Button type="button" variant="secondary" size="sm" onClick={() => void retry()}>{t('重试', 'Retry')}</Button>
                       </div>
                     )}
@@ -448,14 +448,14 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                       const isLastAssistant = message === lastMessage && message.role === 'assistant';
                       const canRegenerate = isLastAssistant && message.status !== 'streaming' && !isSending;
                       return (
-                      <article key={message.id} className={`group/message rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
+                      <article key={message.id} className={`group/message min-w-0 max-w-full rounded-md border border-border p-3 text-sm ${message.role === 'user' ? 'bg-muted/30' : 'bg-card'}`}>
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <p className="text-xs font-medium text-muted-foreground">{message.role === 'user' ? t('你', 'You') : t('仓库助手', 'Repository copilot')}</p>
                         </div>
                         {message.role === 'assistant' && messageToolEvents.length > 0 && (
                           <ExecutionTimeline events={messageToolEvents} language={language} isRunning={message.status === 'streaming'} />
                         )}
-                        <div className={message.role === 'assistant' && messageToolEvents.length > 0 ? 'mt-4' : ''}>
+                        <div className={`min-w-0 max-w-full ${message.role === 'assistant' && messageToolEvents.length > 0 ? 'mt-4' : ''}`}>
                           {message.content ? (
                             <AssistantMessageBody
                               content={message.content}
@@ -493,7 +493,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-7 sm:w-7"
                                 onClick={() => void handleCopyAnswer(message)}
                                 aria-label={t('复制回答', 'Copy answer')}
                                 title={t('复制回答（不包含引用标注）', 'Copy answer (without citation marks)')}
@@ -506,7 +506,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                className="h-11 w-11 text-muted-foreground hover:text-foreground sm:h-7 sm:w-7"
                                 onClick={() => void regenerate()}
                                 aria-label={t('重新生成', 'Regenerate')}
                                 title={t('重新生成本条回答', 'Regenerate this answer')}
@@ -527,7 +527,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="absolute bottom-3 right-3 h-8 w-8 rounded-full bg-background shadow-md"
+                  className="absolute bottom-3 right-3 h-11 w-11 rounded-full bg-background shadow-md sm:h-8 sm:w-8"
                   onClick={scrollToBottom}
                   aria-label={t('回到底部', 'Scroll to latest')}
                   title={t('回到底部', 'Scroll to latest')}
@@ -540,7 +540,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
         </div>
 
         <form
-          className="border-t border-border pt-3"
+          className="border-t border-border pt-3 pb-[env(safe-area-inset-bottom)]"
           onSubmit={handleSubmit}
         >
           <p role="status" className="sr-only">{statusAnnouncement}</p>
@@ -551,7 +551,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={t('例如：这个仓库是做什么的？如何安装和使用？', 'For example: What does this repository do? How do I install and use it?')}
-              className="min-h-20 resize-y text-sm"
+              className="min-h-20 resize-y text-base sm:text-sm"
               disabled={!activeSession || !canChat || isSending}
             />
             {isSending ? (
@@ -567,13 +567,13 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
           <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" disabled={!activeSession || isSending} title={depth.description}>
+                <Button type="button" variant="ghost" size="sm" className="h-11 px-2 text-xs text-muted-foreground sm:h-7" disabled={!activeSession || isSending} title={depth.description}>
                   <Gauge className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
                   {t('任务深度', 'Task depth')}：{depth.label}
                   <ChevronDown className="ml-1 h-3 w-3" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-72">
+              <DropdownMenuContent align="start" side="top" className="w-[calc(100dvw_-_1rem)] max-w-full sm:w-72">
                 <DropdownMenuLabel className="text-xs text-muted-foreground">{t('任务深度决定取证轮数与读取范围', 'Task depth controls retrieval rounds and read scope')}</DropdownMenuLabel>
                 {TASK_DEPTH_OPTIONS.map((option) => {
                   const budget = option.value !== 'default' ? TASK_DEPTH_PRESETS[option.value].budget : null;
@@ -582,21 +582,21 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   return (
                     <DropdownMenuItem
                       key={option.value}
-                      className={`flex-col items-start gap-0.5 py-2 ${active ? 'bg-muted/60' : ''}`}
+                      className={`flex-col items-start gap-0.5 py-2 whitespace-normal ${active ? 'bg-muted/60' : ''}`}
                       onSelect={() => setRepositoryChatSettings({ taskDepth: option.value })}
                     >
-                      <span className="flex w-full items-center gap-2 text-sm font-medium">
+                      <span className="flex w-full flex-wrap items-center gap-2 break-words text-sm font-medium">
                         {language === 'zh' ? option.zh : option.en}
                         <span className="text-xs font-normal text-muted-foreground">{suffix}</span>
                         {option.value === 'default' && <span className="text-xs font-normal text-muted-foreground">{t('（当前默认）', '(current default)')}</span>}
                       </span>
-                      <span className="text-xs text-muted-foreground">{language === 'zh' ? option.descZh : option.descEn}</span>
+                      <span className="max-w-full break-words text-xs text-muted-foreground">{language === 'zh' ? option.descZh : option.descEn}</span>
                     </DropdownMenuItem>
                   );
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
-            {!isSending && lastMessage?.role === 'assistant' && (lastMessage.status === 'error' || lastMessage.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
+            {!isSending && lastMessage?.role === 'assistant' && (lastMessage.status === 'error' || lastMessage.status === 'aborted') && <Button type="button" variant="ghost" size="sm" className="h-11 px-2 sm:h-7" onClick={() => void retry()}><RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{t('重试', 'Retry')}</Button>}
           </div>
         </form>
       </SheetContent>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -176,6 +176,47 @@ describe('MarkdownRenderer', () => {
       const img = container.querySelector('img');
       expect(img?.getAttribute('src')).toContain('github.com');
     });
+
+    it('keeps image dimensions natural while sizing the zoom wrapper for touch', () => {
+      const { container } = render(<MarkdownRenderer content="![Image](https://example.com/image.png)" />);
+      const image = container.querySelector('img')!;
+      Object.defineProperties(image, {
+        naturalWidth: { value: 640 },
+        naturalHeight: { value: 480 },
+      });
+      fireEvent.load(image);
+
+      const wrapper = screen.getByRole('button', { name: '打开图片' });
+      expect(wrapper).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'sm:min-h-0', 'sm:min-w-0');
+      expect(image).not.toHaveClass('min-h-[44px]', 'min-w-[44px]', 'min-h-[16px]');
+      expect(image).not.toHaveAttribute('aria-label');
+    });
+
+    it('zooms a non-linked image from Enter and Space', () => {
+      const { container } = render(<MarkdownRenderer content="![Image](https://example.com/image.png)" />);
+      const image = container.querySelector('img')!;
+      fireEvent.load(image);
+      const wrapper = screen.getByRole('button', { name: '打开图片' });
+
+      fireEvent.keyDown(wrapper, { key: 'Enter' });
+      expect(screen.getByText('Esc 或点击背景关闭')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+      fireEvent.keyDown(wrapper, { key: ' ' });
+      expect(screen.getByText('Esc 或点击背景关闭')).toBeInTheDocument();
+    });
+
+    it('keeps linked images as links without a nested button role', () => {
+      const { container } = render(
+        <MarkdownRenderer content="[![Image](https://example.com/image.png)](https://example.com/page)" />
+      );
+      const link = container.querySelector('a')!;
+      const image = container.querySelector('img')!;
+      const wrapper = image.parentElement!;
+
+      expect(link).toContainElement(image);
+      expect(wrapper).not.toHaveAttribute('role', 'button');
+      expect(wrapper).toHaveAttribute('aria-label', '打开图片');
+    });
   });
 
   describe('Code Blocks', () => {
@@ -189,10 +230,10 @@ describe('MarkdownRenderer', () => {
       expect(pre?.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(0);
     });
 
-    it('should provide a hover copy button for code blocks', () => {
+    it('keeps the code copy action touch-sized below sm', () => {
       const content = '```javascript\nconsole.log("hello");\n```';
-      const { container } = render(<MarkdownRenderer content={content} />);
-      expect(container.querySelector('button[aria-label="复制代码"]')).toBeInTheDocument();
+      render(<MarkdownRenderer content={content} />);
+      expect(screen.getByRole('button', { name: '复制代码' })).toHaveClass('h-11', 'w-11', 'sm:h-7', 'sm:w-7', 'sm:opacity-0');
     });
 
     it('should normalize language aliases', () => {

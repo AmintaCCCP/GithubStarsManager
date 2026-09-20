@@ -61,18 +61,18 @@ export const Modal: React.FC<ModalProps> = ({
 
   const content = scrollable ? (
     <>
-      <DialogHeader className="shrink-0 border-b border-border px-6 py-5 pr-12">
+      <DialogHeader className="shrink-0 border-b border-border px-4 py-5 pr-12 sm:px-6 sm:pr-12">
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
       <div
         data-testid="modal-scroll-area"
-        className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-on-scroll', isScrolling && 'scrolling')}
+        className={cn('min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-5 scrollbar-on-scroll sm:px-6', isScrolling && 'scrolling')}
         onScroll={handleScroll}
       >
         {children}
       </div>
       {footer && (
-        <div data-testid="modal-footer" className="shrink-0 border-t border-border px-6 py-4">
+        <div data-testid="modal-footer" className="shrink-0 border-t border-border px-4 py-4 sm:px-6">
           {footer}
         </div>
       )}
@@ -90,7 +90,7 @@ export const Modal: React.FC<ModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         aria-describedby={undefined}
-        className={cn(maxWidth, scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0')}
+        className={cn(maxWidth, scrollable && 'flex min-w-0 max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-h-[85vh]')}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
         onPointerDownOutside={onPointerDownOutside}

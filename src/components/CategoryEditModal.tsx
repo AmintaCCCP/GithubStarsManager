@@ -909,7 +909,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       variant="ghost"
       aria-pressed={formData.icon === iconItem.icon}
       onClick={() => handleIconSelect(iconItem.icon)}
-      className={`p-2 rounded-lg text-xl hover:bg-muted dark:hover:bg-accent transition-colors ${
+      className={`size-11 p-2 rounded-lg text-xl hover:bg-muted sm:size-auto dark:hover:bg-accent transition-colors ${
         formData.icon === iconItem.icon
           ? 'bg-primary/20 dark:bg-primary/30 ring-2 ring-ring'
           : 'bg-background dark:bg-muted/40'
@@ -975,7 +975,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           {/* Custom Icon Input */}
           {showCustomInput && (
             <div className="mb-3 p-3 bg-muted dark:bg-primary/10 border border-border dark:border-primary/20 rounded-lg">
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Input
                   aria-label={t('自定义图标', 'Custom icon')}
                   type="text"
@@ -988,7 +988,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                 <Button
                   onClick={handleCustomIconSubmit}
                   disabled={!customIcon.trim()}
-                  className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
                 >
                   {t('确定', 'OK')}
                 </Button>
@@ -998,7 +998,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     setShowCustomInput(false);
                     setCustomIcon('');
                   }}
-                  className="px-3 py-2 bg-muted hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:bg-accent dark:hover:bg-accent dark:text-muted-foreground"
+                  className="w-full px-3 py-2 bg-muted hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:bg-accent dark:hover:bg-accent dark:text-muted-foreground sm:w-auto"
                 >
                   {t('取消', 'Cancel')}
                 </Button>
@@ -1009,7 +1009,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             </div>
           )}
           
-          <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-border dark:border-border rounded-lg p-3">
+          <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto border border-border dark:border-border rounded-lg p-3 sm:grid-cols-8">
             {iconGrid}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
@@ -1019,7 +1019,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
               onClick={() => setShowCustomInput(true)}
               variant="ghost"
               size="sm"
-              className="h-8 gap-1 px-2 py-1 text-sm text-primary dark:text-primary hover:underline"
+              className="h-11 gap-1 px-2 py-1 text-sm text-primary dark:text-primary hover:underline sm:h-8"
             >
               <Plus className="h-3 w-3" />
               {t('自定义emoji', 'Custom emoji')}
@@ -1060,7 +1060,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                 `This default category has been modified. Original: ${originalCategory.icon} ${originalCategory.name}`
               )}
             </p>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-warning">{t('还原:', 'Reset:')}</span>
               {hasNameIconModified && (
                 <Button
@@ -1120,11 +1120,11 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-end space-x-3 pt-4 border-t dark:border-border mt-4">
+        <div className="flex flex-col gap-3 pt-4 border-t dark:border-border mt-4 sm:flex-row sm:justify-end">
           <Button
             variant="outline"
             onClick={handleClose}
-            className="flex items-center space-x-2 px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent dark:border dark:border-border transition-colors"
+            className="flex w-full items-center justify-center space-x-2 px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent dark:border dark:border-border transition-colors sm:w-auto"
           >
             <X className="w-4 h-4" />
             <span>{t('取消', 'Cancel')}</span>
@@ -1132,7 +1132,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
           <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed'}`}
+            className={`flex w-full items-center justify-center space-x-2 px-4 py-2 rounded-lg transition-colors sm:w-auto ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed'}`}
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>

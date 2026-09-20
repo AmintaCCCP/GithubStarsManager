@@ -499,14 +499,14 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       <DialogContent
         showClose={false}
         aria-describedby={undefined}
-        className="w-[calc(100%_-_2rem)] max-w-[1130px] min-w-0 overflow-hidden p-0"
+        className="max-h-[calc(100dvh_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] w-[calc(100%_-_2rem)] max-w-full sm:max-w-[1130px] min-w-0 overflow-hidden p-0"
         onCloseAutoFocus={(event) => {
           if (!onCloseAutoFocus) return;
           event.preventDefault();
           onCloseAutoFocus();
         }}
       >
-        <div className="relative flex max-h-[90vh] min-w-0 max-w-full w-full flex-col overflow-hidden bg-card dark:bg-card">
+        <div className="relative flex max-h-[calc(100dvh_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))] min-w-0 max-w-full w-full flex-col overflow-hidden bg-card pb-[env(safe-area-inset-bottom)] dark:bg-card">
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
               <div
@@ -516,18 +516,18 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-3 border-b border-border p-4 dark:border-border">
-            <div className="flex min-w-0 flex-1 items-center space-x-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3 border-b border-border p-4 dark:border-border">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <img
                 src={repository.owner.avatar_url}
                 alt={repository.owner.login}
                 className="w-8 h-8 rounded-full"
               />
-              <div>
-                <DialogTitle className="text-lg font-semibold text-foreground dark:text-foreground">
+              <div className="min-w-0">
+                <DialogTitle className="break-all text-lg font-semibold text-foreground dark:text-foreground">
                   {repository.full_name}
                 </DialogTitle>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate max-w-[260px]" title={currentReadmeVariant.path || 'README'}>
+                <p className="max-w-full truncate text-sm text-muted-foreground dark:text-muted-foreground" title={currentReadmeVariant.path || 'README'}>
                   {currentReadmeVariant.isDefault ? 'README' : currentReadmeVariant.path}
                 </p>
               </div>
@@ -535,7 +535,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
               {readmeVariants.length > 1 && (
                 <Select value={selectedReadmeKey} onValueChange={handleReadmeVariantChange} disabled={loading || variantsLoading}>
-                  <SelectTrigger className="h-9 w-auto min-w-[7rem] max-w-[220px] px-2 py-2 text-sm" title={t('切换 README 语言', 'Switch README language')} aria-label={t('切换 README 语言', 'Switch README language')}><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-11 w-auto min-w-[7rem] max-w-[220px] px-2 py-2 text-sm sm:h-9" title={t('切换 README 语言', 'Switch README language')} aria-label={t('切换 README 语言', 'Switch README language')}><SelectValue /></SelectTrigger>
                   <SelectContent>{readmeVariants.map((variant) => <SelectItem key={variant.key} value={variant.key}>{variant.label}</SelectItem>)}</SelectContent>
                 </Select>
               )}
@@ -545,8 +545,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     <Button
                       variant="ghost"
                       onClick={handleRevertTranslation}
-                      className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary"
+                      className="flex h-11 items-center space-x-1 rounded-lg px-3 py-2 text-sm transition-colors sm:h-9 bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary"
                       title={t('关闭翻译', 'Close Translation')}
+                      aria-label={t('关闭翻译', 'Close Translation')}
                     >
                       <Languages className="w-4 h-4" />
                       <span className="hidden sm:inline">{t('已翻译', 'Translated')}</span>
@@ -560,12 +561,13 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                         key={mode}
                         variant="ghost"
                         onClick={() => setDisplayMode(mode)}
-                        className={`flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors ${
+                        className={`flex h-11 items-center space-x-1 rounded-lg px-2 py-2 text-sm transition-colors sm:h-9 ${
                           displayMode === mode
                             ? 'bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary'
                             : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-card'
                         }`}
                         title={label}
+                        aria-label={label}
                       >
                         <Icon className="w-4 h-4" />
                         <span className="hidden sm:inline">{label}</span>
@@ -577,8 +579,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     <Button
                       variant="ghost"
                       onClick={handleTranslate}
-                      className="flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors text-warning hover:bg-warning/10"
+                      className="flex h-11 items-center space-x-1 rounded-lg px-3 py-2 text-sm transition-colors sm:h-9 text-warning hover:bg-warning/10"
                       title={t('重试翻译', 'Retry Translation')}
+                      aria-label={t('重试翻译', 'Retry Translation')}
                     >
                       <Languages className="w-4 h-4" />
                       <span className="hidden sm:inline">{t('重试', 'Retry')}</span>
@@ -586,8 +589,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     <Button
                       variant="ghost"
                       onClick={handleRevertTranslation}
-                      className="flex items-center space-x-1 px-2 py-2 text-sm rounded-lg transition-colors text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-card"
+                      className="flex h-11 items-center space-x-1 rounded-lg px-2 py-2 text-sm transition-colors sm:h-9 text-muted-foreground hover:text-muted-foreground dark:hover:text-muted-foreground hover:bg-muted dark:hover:bg-card"
                       title={t('关闭翻译', 'Close Translation')}
+                      aria-label={t('关闭翻译', 'Close Translation')}
                     >
                       <X className="w-4 h-4" />
                     </Button>
@@ -597,12 +601,13 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                     variant="ghost"
                     onClick={handleTranslate}
                     disabled={isTranslating}
-                    className={`flex items-center space-x-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    className={`flex h-11 items-center space-x-1 rounded-lg px-3 py-2 text-sm transition-colors sm:h-9 ${
                       isTranslating
                         ? 'text-muted-foreground dark:text-muted-foreground/70 cursor-not-allowed'
                         : 'text-muted-foreground dark:text-foreground hover:text-foreground hover:bg-muted dark:hover:bg-accent'
                     }`}
                     title={t('翻译文档', 'Translate Document')}
+                    aria-label={t('翻译文档', 'Translate Document')}
                   >
                     {isTranslating ? (
                       <>
@@ -624,7 +629,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               )}
               {translateError && (
                 <div
-                  className={`px-3 py-1 text-xs text-destructive bg-destructive/10 rounded-lg cursor-pointer ${errorExpanded ? 'max-w-[400px] whitespace-normal break-all' : 'max-w-[200px] truncate'}`}
+                  className={`max-w-full cursor-pointer break-all rounded-lg bg-destructive/10 px-3 py-1 text-xs text-destructive ${errorExpanded ? 'whitespace-normal' : 'sm:max-w-[200px] truncate'}`}
                   onClick={() => setErrorExpanded(!errorExpanded)}
                   title={!errorExpanded ? translateError : undefined}
                 >
@@ -637,7 +642,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   size="icon"
                   onClick={() => setShowToc(!showToc)}
                   aria-label={t('目录', 'Table of Contents')}
-                  className={`h-8 w-8 rounded-lg p-0 transition-colors ${
+                  className={`h-11 w-11 rounded-lg p-0 transition-colors sm:h-8 sm:w-8 ${
                     showToc
                       ? 'bg-primary/20 text-primary dark:bg-primary/10 dark:text-primary'
                       : 'text-muted-foreground hover:text-muted-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
@@ -652,7 +657,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 size="icon"
                 aria-label={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
                 onClick={cycleFontSize}
-                className="h-8 w-8 rounded-lg p-0 text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
+                className="h-11 w-11 rounded-lg p-0 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted dark:text-foreground dark:hover:text-foreground dark:hover:bg-accent sm:h-8 sm:w-8"
                 title={t(`字体大小: ${FONT_SIZES[fontSizeIndex].label}`, `Font Size: ${FONT_SIZES[fontSizeIndex].labelEn}`)}
               >
                 <Type className="w-4 h-4" />
@@ -661,8 +666,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 href={repository.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center space-x-1 px-3 py-2 text-sm text-muted-foreground dark:text-foreground hover:text-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
+                className="inline-flex h-11 items-center space-x-1 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground hover:bg-muted dark:text-foreground dark:hover:bg-accent sm:h-9"
                 title={t('在 GitHub 上查看', 'View on GitHub')}
+                aria-label={t('在 GitHub 上查看', 'View on GitHub')}
               >
                 <ExternalLink className="w-4 h-4" />
                 <span className="hidden sm:inline">{t('在 GitHub 上查看', 'View on GitHub')}</span>
@@ -670,7 +676,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 variant="ghost"
                 onClick={onClose}
-                className="p-2 rounded-lg text-muted-foreground dark:text-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent transition-colors"
+                className="h-11 w-11 rounded-lg p-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted dark:text-foreground dark:hover:text-foreground dark:hover:bg-accent sm:h-8 sm:w-8"
                 aria-label={t('关闭', 'Close')}
               >
                 <X className="w-5 h-5" />
@@ -678,12 +684,13 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div data-readme-layout className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:flex-row">
             {showToc && tocItems.length > 0 && (
               <>
                 <div
-                  className="border-r border-border dark:border-border overflow-y-auto p-4 flex-shrink-0 readme-scrollbar"
-                  style={{ width: tocWidth }}
+                  data-readme-toc
+                  className="max-h-[40dvh] w-full shrink-0 overflow-y-auto border-b border-border p-4 readme-scrollbar dark:border-border md:max-h-none md:w-[var(--toc-width)] md:border-b-0 md:border-r"
+                  style={{ '--toc-width': `${tocWidth}px` } as React.CSSProperties}
                 >
                   <h4 className="text-sm font-semibold text-foreground dark:text-foreground mb-3">
                     {t('目录', 'Contents')}
@@ -696,7 +703,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                           key={item.id}
                           variant="ghost"
                           onClick={() => scrollToHeading(item.id, item.text)}
-                          className={`h-auto block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
+                          className={`block min-h-11 w-full truncate rounded px-2 py-1 text-left text-sm transition-colors sm:h-8 sm:min-h-8 ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
                             activeHeadingId === item.id
                               ? 'bg-primary/10 text-primary dark:bg-primary/10 dark:text-primary font-medium'
                               : 'hover:bg-muted dark:hover:bg-card'
@@ -710,8 +717,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                   </nav>
                 </div>
                 <div
+                  data-readme-resizer
                   onMouseDown={handleResizeMouseDown}
-                  className="w-1.5 cursor-col-resize bg-transparent hover:bg-ring dark:hover:bg-ring transition-colors flex-shrink-0 relative group"
+                  className="relative hidden w-1.5 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-ring dark:hover:bg-ring md:block"
                 >
                   <div className="absolute inset-y-0 -left-1 -right-1" />
                 </div>
@@ -720,7 +728,8 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
             <div
               ref={contentRef}
-              className={`min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
+              className={`relative min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto p-4 ${currentFontSize} select-text readme-scrollbar sm:p-6`}
+              data-readme-content
               onScroll={handleScroll}
             >
             {loading ? (
@@ -771,7 +780,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 onClick={scrollToTop}
                 aria-label={t('回到顶部', 'Back to top')}
-                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-card dark:bg-muted rounded-full shadow-lg border border-border dark:border-border text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-foreground transition-all z-10"
+                className="absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] right-[calc(1rem+env(safe-area-inset-right))] h-11 w-11 rounded-full border border-border bg-card p-0 text-muted-foreground shadow-lg transition-all hover:bg-accent hover:text-foreground dark:border-border dark:bg-muted dark:text-muted-foreground dark:hover:bg-accent sm:bottom-4 sm:right-4 sm:h-8 sm:w-8 z-10"
                 title={t('回到顶部', 'Back to top')}
               >
                 <ArrowUp className="w-4 h-4" />

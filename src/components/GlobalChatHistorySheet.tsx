@@ -124,7 +124,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            className="h-8 pl-8 text-xs"
+            className="h-11 pl-8 text-base sm:h-8 sm:text-xs"
             placeholder={t('搜索标题或仓库名', 'Search title or repository')}
             aria-label={t('搜索问答历史', 'Search chat history')}
           />
@@ -136,7 +136,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
           ) : loadError && visibleSessions.length === 0 ? (
             <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-md border border-destructive/40 px-4 text-center text-sm" role="alert">
               <p className="text-destructive">{loadError}</p>
-              <Button type="button" variant="secondary" size="sm" onClick={() => void refresh()}>
+              <Button type="button" variant="secondary" size="sm" className="h-11 sm:h-8" onClick={() => void refresh()}>
                 {t('重试', 'Retry')}
               </Button>
             </div>
@@ -152,7 +152,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
               {loadError && (
                 <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-destructive/40 px-3 py-2 text-xs text-destructive" role="alert">
                   <span>{loadError}</span>
-                  <Button type="button" variant="secondary" size="sm" className="h-7" onClick={() => void refresh()}>
+                  <Button type="button" variant="secondary" size="sm" className="h-11 sm:h-7" onClick={() => void refresh()}>
                     {t('重试', 'Retry')}
                   </Button>
                 </div>
@@ -161,11 +161,11 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
               {visibleSessions.map((session) => {
                 const repository = repositoryById.get(session.repoId);
                 return (
-                  <li key={session.id} className="flex items-center gap-1 rounded-md border border-transparent hover:border-border">
+                  <li key={session.id} className="flex min-w-0 max-w-full items-center gap-1 rounded-md border border-transparent hover:border-border">
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-auto min-w-0 flex-1 items-center justify-start gap-2.5 px-2 py-2 text-left"
+                      className="h-auto min-h-11 min-w-0 max-w-full flex-1 items-center justify-start gap-2.5 px-2 py-2 text-left sm:min-h-0"
                       onClick={() => {
                         if (repository) onSelectSession(repository, session.id);
                       }}
@@ -184,7 +184,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive sm:h-7 sm:w-7"
                       onClick={() => setPendingDeletion(session)}
                       aria-label={t(`删除会话：${session.title}`, `Delete conversation: ${session.title}`)}
                     >

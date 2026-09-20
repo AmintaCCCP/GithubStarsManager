@@ -615,13 +615,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
   // Unified card styles with enhanced light mode optimization
   const sectionClass = "p-5 bg-card dark:bg-card rounded-xl border border-border dark:border-border shadow-sm";
-  const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
-  const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-[color,background-color,border-color] duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-border-strong text-[13px] leading-[1.625]";
+  const labelClass = "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
+  const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring dark:focus:ring-ring/50 dark:focus:border-ring transition-[color,background-color,border-color] duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-border-strong text-base sm:text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
-  const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
+  const buttonSecondaryClass = "h-11 sm:h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
   const infoBoxClass = "mt-3 p-3.5 border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
-  const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";
+  const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex min-w-0 items-start [&>span]:min-w-0";
 
   return (
     <Modal
@@ -638,10 +638,10 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         deferOutsideDismiss(event, handleClose);
       }}
       footer={(
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Button
             onClick={handleCloseWithConfirm}
-            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-border dark:border-border transition-all duration-200 shadow-sm"
+            className="flex w-full items-center justify-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-border dark:border-border transition-all duration-200 shadow-sm sm:w-auto"
           >
             <X className="w-4 h-4" />
             <span className="font-medium">{t('取消', 'Cancel')}</span>
@@ -649,7 +649,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           <Button
             onClick={() => void handleSave()}
             disabled={!hasChanges}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm font-medium"
+            className="flex w-full items-center justify-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm font-medium sm:w-auto"
           >
             <Save className="w-4 h-4" />
             <span>{t('保存', 'Save')}</span>
@@ -1014,7 +1014,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
           {/* Category Lock - Enhanced */}
           <div className="mt-4 p-4 bg-gradient-to-br from-muted to-muted/60 dark:from-foreground/[0.04] dark:to-warning/10 rounded-xl border border-border dark:border-warning/20 shadow-sm">
-            <div className="flex items-start space-x-3">
+            <div className="flex min-w-0 flex-wrap items-start gap-3">
               <div className="flex-shrink-0 mt-0.5">
                 {formData.categoryLocked && formData.category ? (
                   <Lock className="w-4 h-4 text-muted-foreground dark:text-warning" />
@@ -1022,8 +1022,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                   <Unlock className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                 )}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <span className="text-sm font-medium text-foreground dark:text-foreground">
                     {t('分类锁定', 'Category Lock')}
                   </span>
@@ -1077,7 +1077,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                       e.stopPropagation();
                       handleRemoveTag(tag);
                     }}
-                    className="ml-1.5 h-7 w-7 p-0 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:text-foreground dark:hover:text-foreground rounded transition-colors"
+                    className="ml-1.5 h-11 w-11 p-0 hover:bg-accent dark:hover:bg-accent hover:text-foreground dark:text-foreground dark:hover:text-foreground rounded transition-colors sm:h-7 sm:w-7"
                     title={t('移除', 'Remove')}
                     aria-label={t(`移除标签 ${tag}`, `Remove tag ${tag}`)}
                   >
@@ -1182,7 +1182,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           )}
 
           {/* Add New Tag */}
-          <div className="flex space-x-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
               aria-label={t('添加自定义标签', 'Add custom tag')}
               type="text"
@@ -1199,7 +1199,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 handleAddTag();
               }}
               disabled={!newTag.trim()}
-              className="flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90  disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex w-full items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors sm:w-auto"
             >
               <Plus className="w-4 h-4" />
             </Button>

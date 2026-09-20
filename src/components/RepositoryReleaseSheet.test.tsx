@@ -128,6 +128,25 @@ describe('RepositoryReleaseSheet', () => {
     expect(screen.getByText('Source code (v1.tar.gz)')).toBeInTheDocument();
   });
 
+  it('keeps release controls touch-sized below sm without changing their names or states', async () => {
+    const user = userEvent.setup();
+    renderSheet();
+
+    await user.click(screen.getByText('v1').closest('button')!);
+    for (const button of [
+      screen.getByRole('button', { name: 'Release 分页 next page' }),
+      screen.getByRole('button', { name: 'v1 资产分页 next page' }),
+      screen.getAllByRole('button', { name: '下载' })[0],
+    ]) {
+      expect(button).toHaveClass('h-11', 'sm:h-7');
+    }
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab).toHaveClass('h-11', 'sm:h-8');
+    }
+    expect(screen.getByRole('button', { name: 'Release 分页 previous page' })).toBeDisabled();
+    expect(screen.getByRole('table', { name: 'v1 资产' }).parentElement).toHaveClass('overflow-x-auto');
+  });
+
   it('renders small Markdown notes and lazily requests an AI summary on its tab', async () => {
     const user = userEvent.setup();
     renderSheet();

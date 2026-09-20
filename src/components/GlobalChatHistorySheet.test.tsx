@@ -34,6 +34,17 @@ describe('GlobalChatHistorySheet', () => {
     Object.defineProperty(window, 'indexedDB', { configurable: true, value: undefined });
   });
 
+  it('在移动端保留可触及的搜索和会话操作', async () => {
+    await repositoryChatStorage.saveSession(createSession('mobile', 1, 'owner/repo-one', '2026-08-26T00:00:00.000Z'));
+
+    render(<GlobalChatHistorySheet isOpen repositories={repositories} onClose={() => {}} onSelectSession={() => {}} />);
+
+    expect(screen.getByLabelText('搜索问答历史')).toHaveClass('h-11', 'text-base', 'sm:h-8', 'sm:text-xs');
+    const session = await screen.findByTitle('进入 owner/repo-one 的会话');
+    expect(session).toHaveClass('min-h-11', 'max-w-full', 'sm:min-h-0');
+    expect(within(session.closest('li') as HTMLElement).getByRole('button', { name: /删除会话/ })).toHaveClass('h-11', 'w-11', 'sm:h-7', 'sm:w-7');
+  });
+
   it('按更新时间倒序列出跨仓会话', async () => {
     await repositoryChatStorage.saveSession(createSession('older', 1, 'owner/repo-one', '2026-08-24T00:00:00.000Z'));
     await repositoryChatStorage.saveSession(createSession('newer', 2, 'owner/repo-two', '2026-08-26T00:00:00.000Z'));

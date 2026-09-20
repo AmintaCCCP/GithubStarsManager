@@ -65,18 +65,18 @@ export const RepositoryChatHistoryPanel: React.FC<RepositoryChatHistoryPanelProp
   };
 
   return (
-    <section aria-label={t('当前仓库的历史会话', 'History for this repository')} className="flex min-h-0 flex-1 flex-col gap-3">
+    <section aria-label={t('当前仓库的历史会话', 'History for this repository')} className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col gap-3">
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="h-8 pl-8 text-xs"
+          className="h-11 pl-8 text-base sm:h-8 sm:text-xs"
           placeholder={t('搜索当前仓库的对话', 'Search this repository')}
           aria-label={t('搜索当前仓库的历史会话', 'Search repository chat history')}
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+      <div className="min-h-0 min-w-0 max-w-full flex-1 overflow-y-auto pr-1">
         {!hasVisibleSessions ? (
           <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">
             <History className="h-5 w-5" aria-hidden="true" />
@@ -90,22 +90,22 @@ export const RepositoryChatHistoryPanel: React.FC<RepositoryChatHistoryPanelProp
               <h3 className="mb-1 px-1 text-xs font-medium text-muted-foreground">{groupLabels[group]}</h3>
               <ul className="space-y-1">
                 {groupedSessions[group].map((session) => (
-                  <li key={session.id} className="flex items-center gap-1">
+                  <li key={session.id} className="flex min-w-0 max-w-full items-center gap-1">
                     <Button
                       type="button"
                       variant={session.id === activeSessionId ? 'secondary' : 'ghost'}
-                      className="h-auto min-w-0 flex-1 justify-start px-2 py-2 text-left text-xs"
+                      className="h-auto min-h-11 min-w-0 max-w-full flex-1 justify-start px-2 py-2 text-left text-base sm:min-h-0 sm:text-xs"
                       onClick={() => onSelect(session.id)}
                       disabled={disabled}
                       aria-current={session.id === activeSessionId ? 'true' : undefined}
                     >
-                      <span className="truncate">{session.title}</span>
+                      <span className="min-w-0 max-w-full truncate">{session.title}</span>
                     </Button>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive sm:h-7 sm:w-7"
                       onClick={() => setPendingDeletion(session)}
                       disabled={disabled}
                       aria-label={t(`删除会话：${session.title}`, `Delete conversation: ${session.title}`)}

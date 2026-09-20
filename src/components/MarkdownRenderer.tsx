@@ -150,7 +150,7 @@ const CodeBlock: React.FC<{
         onClick={handleCopy}
         aria-label={uiLanguage === 'zh' ? '复制代码' : 'Copy code'}
         title={copyError || (uiLanguage === 'zh' ? '复制代码' : 'Copy code')}
-        className={`absolute top-2 right-2 z-10 h-7 w-7 rounded-md p-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 ${
+        className={`absolute top-2 right-2 z-10 h-11 w-11 rounded-md p-0 opacity-100 transition-opacity duration-150 sm:h-7 sm:w-7 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100 ${
           copyError
             ? 'text-destructive opacity-100'
             : copied
@@ -337,17 +337,25 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
     return () => overlay.removeEventListener('wheel', handleWheel);
   }, [isZoomed]);
 
+  const openZoom = useCallback(() => {
+    setIsZoomed(true);
+  }, []);
+
   const handleImageClick = useCallback((e: React.MouseEvent) => {
-    if (isInsideLink && parentLinkHref) {
-      if (e.ctrlKey || e.metaKey) {
-        window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
-        return;
-      }
+    if (isInsideLink && parentLinkHref && (e.ctrlKey || e.metaKey)) {
+      window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
+      return;
     }
     e.preventDefault();
     e.stopPropagation();
-    setIsZoomed(true);
-  }, [isInsideLink, parentLinkHref]);
+    openZoom();
+  }, [isInsideLink, parentLinkHref, openZoom]);
+
+  const handleWrapperKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (isInsideLink || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    openZoom();
+  }, [isInsideLink, openZoom]);
 
   const handleDownload = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -471,7 +479,14 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           {isLoading && (
             <span className="w-20 h-7 bg-muted dark:bg-muted/40 rounded animate-pulse inline-block" />
           )}
-          <span className="relative inline-block">
+          <span
+            className="relative inline-block min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+            onClick={handleImageClick}
+            onKeyDown={handleWrapperKeyDown}
+            role={isInsideLink ? undefined : 'button'}
+            tabIndex={isInsideLink ? undefined : 0}
+            aria-label={language === 'zh' ? '打开图片' : 'Open image'}
+          >
             <img
               ref={imgRef}
               src={imageUrl}
@@ -483,7 +498,6 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   : 'hover:opacity-80 transition-opacity duration-200 cursor-pointer'
                 }
                 ${isLoading ? 'opacity-0 absolute' : 'opacity-100'}
-                min-h-[16px]
               `}
               style={{
                 maxWidth: `${naturalWidth}px`,
@@ -492,7 +506,6 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               }}
               onLoad={handleImageLoad}
               onError={handleImageError}
-              onClick={handleImageClick}
             />
           </span>
         </span>
@@ -507,7 +520,14 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             </span>
           )}
 
-          <span className={`relative inline-block rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 ${isLoading ? 'hidden' : ''}`}>
+          <span
+            className={`relative inline-block min-h-[44px] min-w-[44px] rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 sm:min-h-0 sm:min-w-0 ${isLoading ? 'hidden' : ''}`}
+            onClick={handleImageClick}
+            onKeyDown={handleWrapperKeyDown}
+            role={isInsideLink ? undefined : 'button'}
+            tabIndex={isInsideLink ? undefined : 0}
+            aria-label={language === 'zh' ? '打开图片' : 'Open image'}
+          >
             <img
               ref={imgRef}
               src={imageUrl}
@@ -527,7 +547,6 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               }}
               onLoad={handleImageLoad}
               onError={handleImageError}
-              onClick={handleImageClick}
             />
             <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-foreground/5 dark:ring-foreground/10 pointer-events-none" />
           </span>
@@ -573,14 +592,14 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       {isZoomed && createPortal(
         <div
           ref={zoomOverlayRef}
-          className="fixed inset-0 z-[99999] bg-overlay/90 backdrop-blur-sm flex items-center justify-center cursor-default select-none"
+          className="fixed inset-0 z-[99999] flex h-[100dvh] max-h-[100dvh] w-[100dvw] max-w-[100dvw] items-center justify-center bg-overlay/90 cursor-default select-none backdrop-blur-sm"
           onClick={() => {
             if (!isDragging) {
               closeZoom();
             }
           }}
         >
-          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-overlay/60 to-transparent pointer-events-none">
+          <div className="absolute top-0 left-0 right-0 z-10 flex flex-wrap items-center justify-between gap-2 px-[max(1rem,env(safe-area-inset-left))] py-[max(0.75rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] bg-gradient-to-b from-overlay/60 to-transparent pointer-events-none">
             <div className="flex items-center gap-2 pointer-events-auto">
               {alt && (
                 <span className="text-overlay-foreground/70 text-sm truncate max-w-[300px]">{alt}</span>
@@ -589,7 +608,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 <span className="text-overlay-foreground/50 text-xs">{naturalWidth} × {naturalHeight}</span>
               )}
             </div>
-            <div className="flex items-center gap-2 pointer-events-auto">
+            <div className="flex max-w-full flex-wrap items-center justify-end gap-2 pointer-events-auto">
               {isInsideLink && parentLinkHref && (
                 <Button
                   type="button"
@@ -599,7 +618,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                     e.stopPropagation();
                     window.open(parentLinkHref, '_blank', 'noopener,noreferrer');
                   }}
-                  className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
+                  className="h-11 w-11 p-0 bg-overlay-foreground/10 text-overlay-foreground/80 rounded-lg transition-colors backdrop-blur-sm hover:bg-overlay-foreground/20 hover:text-overlay-foreground sm:h-8 sm:w-8"
+                  aria-label={language === 'zh' ? '打开链接' : 'Open link'}
                   title={language === 'zh' ? '打开链接' : 'Open link'}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -616,7 +636,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   handleDownload(e);
                 }}
                 disabled={isDownloading}
-                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
+                className="h-11 w-11 p-0 bg-overlay-foreground/10 text-overlay-foreground/80 rounded-lg transition-colors backdrop-blur-sm hover:bg-overlay-foreground/20 hover:text-overlay-foreground sm:h-8 sm:w-8"
+                aria-label={language === 'zh' ? '下载图片' : 'Download image'}
                 title={language === 'zh' ? '下载图片' : 'Download image'}
               >
                 <Download className={`w-4 h-4 ${isDownloading ? 'animate-bounce' : ''}`} />
@@ -629,7 +650,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   e.stopPropagation();
                   setZoomScale(prev => Math.min(5, prev + 0.5));
                 }}
-                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-11 w-11 p-0 bg-overlay-foreground/10 text-overlay-foreground/80 rounded-lg transition-colors backdrop-blur-sm hover:bg-overlay-foreground/20 hover:text-overlay-foreground sm:h-8 sm:w-8 text-sm font-bold"
+                aria-label={language === 'zh' ? '放大' : 'Zoom in'}
                 title={language === 'zh' ? '放大' : 'Zoom in'}
               >
                 +
@@ -645,7 +667,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   e.stopPropagation();
                   setZoomScale(prev => Math.max(0.5, prev - 0.5));
                 }}
-                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-sm font-bold"
+                className="h-11 w-11 p-0 bg-overlay-foreground/10 text-overlay-foreground/80 rounded-lg transition-colors backdrop-blur-sm hover:bg-overlay-foreground/20 hover:text-overlay-foreground sm:h-8 sm:w-8 text-sm font-bold"
+                aria-label={language === 'zh' ? '缩小' : 'Zoom out'}
                 title={language === 'zh' ? '缩小' : 'Zoom out'}
               >
                 −
@@ -659,7 +682,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                   setZoomScale(1);
                   setZoomPos({ x: 0, y: 0 });
                 }}
-                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm text-xs"
+                className="h-11 w-11 p-0 bg-overlay-foreground/10 text-overlay-foreground/80 rounded-lg transition-colors backdrop-blur-sm hover:bg-overlay-foreground/20 hover:text-overlay-foreground sm:h-8 sm:w-8 text-xs"
+                aria-label={language === 'zh' ? '重置' : 'Reset'}
                 title={language === 'zh' ? '重置' : 'Reset'}
               >
                 1:1
@@ -668,7 +692,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 p-0 bg-overlay-foreground/10 hover:bg-overlay-foreground/20 text-overlay-foreground/80 hover:text-overlay-foreground rounded-lg transition-colors backdrop-blur-sm"
+                className="h-11 w-11 p-0 bg-overlay-foreground/10 text-overlay-foreground/80 rounded-lg transition-colors backdrop-blur-sm hover:bg-overlay-foreground/20 hover:text-overlay-foreground sm:h-8 sm:w-8"
+                aria-label={language === 'zh' ? '关闭' : 'Close'}
                 onClick={(e) => {
                   e.stopPropagation();
                   closeZoom();
@@ -683,7 +708,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           </div>
 
           <div
-            className="flex items-center justify-center w-full h-full"
+            className="flex h-[100dvh] max-h-[100dvh] w-[100dvw] max-w-[100dvw] items-center justify-center"
             onMouseDown={(e) => {
               if (zoomScale > 1) {
                 setIsDragging(true);
@@ -718,7 +743,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             <img
               src={imageUrl}
               alt={alt || ''}
-              className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-100"
+              className="max-w-[90dvw] max-h-[85dvh] object-contain rounded-lg shadow-2xl transition-transform duration-100"
               style={{
                 transform: `scale(${zoomScale}) translate(${zoomPos.x / zoomScale}px, ${zoomPos.y / zoomScale}px)`,
                 cursor: zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
@@ -728,7 +753,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             />
           </div>
 
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-overlay-foreground/50 text-xs pointer-events-none flex items-center gap-3">
+          <div className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 flex max-w-[calc(100dvw-2rem)] -translate-x-1/2 items-center gap-3 text-xs text-overlay-foreground/50 pointer-events-none">
             <span>{language === 'zh' ? '滚轮缩放 · 拖拽移动' : 'Scroll to zoom · Drag to pan'}</span>
             <span className="text-overlay-foreground/30">|</span>
             <span>{language === 'zh' ? 'Esc 或点击背景关闭' : 'Esc or click background to close'}</span>

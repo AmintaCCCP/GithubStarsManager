@@ -371,8 +371,9 @@ const BilingualMarkdownRenderer = forwardRef<BilingualMarkdownRendererHandle, Bi
                 size="sm"
                 onClick={() => handleModeChange(mode)}
                 disabled={disabled}
+                aria-label={label}
                 aria-pressed={active}
-                className={`flex h-7 items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors ${
+                className={`flex h-11 items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors sm:h-7 sm:px-2 ${
                   active
                     ? 'bg-primary/20 text-primary dark:bg-primary/10'
                     : disabled

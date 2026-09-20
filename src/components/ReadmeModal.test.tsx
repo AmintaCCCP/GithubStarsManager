@@ -100,6 +100,34 @@ describe('ReadmeModal multilingual README switching', () => {
     ]);
   });
 
+  it('keeps the README controls touch-sized and the TOC stacked on mobile', async () => {
+    (backend.getRepositoryReadme as ReturnType<typeof vi.fn>).mockResolvedValue('# A heading\n\nREADME content');
+
+    render(<ReadmeModal isOpen onClose={vi.fn()} repository={mockRepository} />);
+
+    await screen.findByText('# A heading README content');
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.className).toContain('max-h-[calc(100dvh_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))]');
+    expect(dialog.className).toContain('min-w-0');
+    expect(dialog.className).toContain('max-w-full');
+    expect(dialog.querySelector('.relative.flex.flex-col')?.className).toContain('max-h-[calc(100dvh_-_2rem_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom))]');
+    expect(screen.getByText('owner/demo').className).toContain('break-all');
+    expect(screen.getByRole('button', { name: '关闭' }).className).toContain('h-11');
+    expect(screen.getByRole('link', { name: '在 GitHub 上查看' }).className).toContain('inline-flex');
+    expect(screen.getByRole('link', { name: '在 GitHub 上查看' }).className).toContain('h-11');
+    expect(screen.getByRole('button', { name: '目录' }).className).toContain('h-11');
+    expect(screen.getByRole('button', { name: /字体大小/ }).className).toContain('h-11');
+    expect(screen.getByRole('button', { name: '翻译文档' }).className).toContain('h-11');
+    expect(dialog.querySelector('[data-readme-layout]')?.className).toContain('flex-col');
+    expect(dialog.querySelector('[data-readme-layout]')?.className).toContain('md:flex-row');
+    expect(dialog.querySelector('[data-readme-toc]')?.className).toContain('w-full');
+    expect(dialog.querySelector('[data-readme-toc]')?.className).toContain('md:w-[var(--toc-width)]');
+    expect(dialog.querySelector('[data-readme-toc]')?.className).toContain('max-h-[40dvh]');
+    expect(dialog.querySelector('[data-readme-resizer]')?.className).toContain('hidden');
+    expect(dialog.querySelector('[data-readme-content]')?.className).toContain('p-4');
+    expect(dialog.querySelector('[data-readme-content]')?.className).toContain('sm:p-6');
+  });
+
   it('loads the default README first and then shows all detected README variants', async () => {
     render(<ReadmeModal isOpen onClose={vi.fn()} repository={mockRepository} />);
 
