@@ -327,7 +327,7 @@ Dockerfile/docker-compose=docker；CLI/命令行/终端=cli；浏览器/前端/A
 
 仓库信息：
 {REPO_INFO}`;
-    } else {
+    } else if (language === 'en') {
       return `Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
 
 Requirements:
@@ -350,6 +350,28 @@ Dockerfile/docker-compose=docker; CLI/command-line/terminal=cli; browser/fronten
 Repository information:
 {REPO_INFO}`;
     }
+
+    return `Please analyze the following GitHub repository information and only output a valid JSON object. Do not output thinking process, Markdown, code block markers, explanations, or any extra text.
+
+Requirements:
+- summary: A concise overview explaining the main functionality and purpose, no more than 50 words.
+  Do not include prompt restatements such as "asked to", "only output JSON", "based on repository information", or "summary/tags/platforms".
+- tags: 3-5 application type tags, please prioritize from the provided categories.
+{CATEGORIES_INFO}
+- platforms: Must only choose from ["mac","windows","linux","ios","android","docker","web","cli"]; use [] if unable to determine.
+
+Output format:
+{
+  "summary": "overview",
+  "tags": ["tag1", "tag2", "tag3"],
+  "platforms": ["web", "cli"]
+}
+
+Platform hints:
+Dockerfile/docker-compose=docker; CLI/command-line/terminal=cli; browser/frontend/API=web; iOS/Swift/Xcode=ios; Android/Kotlin/Gradle=android; macOS/Homebrew=mac; Windows/.exe/MSI=windows; Linux/systemd/apt=linux.
+
+Repository information:
+{REPO_INFO}`;
   }, [language]);
 
   const isCustomPromptModified = useMemo(() => {

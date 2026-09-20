@@ -83,7 +83,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
             aria-labelledby="language-settings-title"
             value={language}
             onValueChange={(value) => setLanguage(value as AppLanguage)}
-            className="grid max-w-lg grid-cols-2 gap-3 sm:grid-cols-3"
+            className="grid w-full grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-3"
           >
             {APP_LANGUAGES.map((definition) => (
               <Label

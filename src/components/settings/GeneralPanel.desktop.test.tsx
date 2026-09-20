@@ -57,6 +57,15 @@ describe('GeneralPanel desktop section', () => {
     expect(screen.queryByLabelText('开机自动启动')).toBeNull();
   });
 
+  it('lets language cards fill the settings row instead of wrapping early', () => {
+    mocks.isSupported.mockReturnValue(false);
+    const { container } = render(<GeneralPanel t={t} />);
+    const languageGrid = container.querySelector('[aria-labelledby="language-settings-title"]');
+    expect(languageGrid?.className).toContain('w-full');
+    expect(languageGrid?.className).toContain('grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]');
+    expect(languageGrid?.className).not.toContain('max-w-lg');
+  });
+
   it('shows auto-launch and tray toggles in the Electron client', async () => {
     mocks.isSupported.mockReturnValue(true);
     mocks.getPrefs.mockResolvedValue({ autoLaunch: false, closeToTray: true, minimizeToTray: true });

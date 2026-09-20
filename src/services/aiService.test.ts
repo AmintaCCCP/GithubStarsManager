@@ -478,3 +478,42 @@ describe('AIService.generateWithTools — native function calling', () => {
     expect(isToolCallCapableApiType('claude')).toBe(false);
   });
 });
+
+describe('AIService.analyzeRepository language following', () => {
+  const extractMessages = (body: unknown): Array<{ role: string; content: string }> => {
+    const parsed = body as { messages?: Array<{ role: string; content: string }>; input?: Array<{ role: string; content: string }> };
+    return parsed.messages ?? parsed.input ?? [];
+  };
+
+  const lastMessages = (): Array<{ role: string; content: string }> => {
+    const calls = (window.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const lastCall = calls[calls.length - 1] as [string, RequestInit] | undefined;
+    return extractMessages(JSON.parse(String(lastCall?.[1]?.body)));
+  };
+
+  beforeEach(() => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockReset();
+    (window.fetch as ReturnType<typeof vi.fn>).mockImplementation(async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: '{"summary":"A sample analysis of the repository.","tags":["tool"],"platforms":["web"]}' } }] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+  });
+
+  it('keeps the English user prompt verbatim for en', async () => {
+    const service = new AIService(makeConfig() as never, 'en');
+    await service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme');
+    const joined = lastMessages().map((message) => message.content).join('\n');
+    expect(joined).toContain('A concise English overview');
+    expect(joined).toContain('"summary": "English overview"');
+    expect(joined).not.toContain('Write ALL user-facing output');
+  });
+
+  it('does not force English output when the UI language is Japanese', async () => {
+    const service = new AIService(makeConfig() as never, 'ja');
+    await service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme');
+    const joined = lastMessages().map((message) => message.content).join('\n');
+    expect(joined).not.toContain('A concise English overview');
+    expect(joined).not.toContain('"summary": "English overview"');
+    expect(joined).toContain('Write ALL user-facing output in Japanese (日本語)');
+  });
+});
