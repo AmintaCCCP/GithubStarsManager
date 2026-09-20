@@ -76,6 +76,83 @@ function makeHealthOkResponse(): Response {
   } as unknown as Response;
 }
 
+function makeJsonResponse(payload: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => payload,
+    headers: { forEach: () => {} },
+    clone: () => ({ text: async () => '' }),
+  } as unknown as Response;
+}
+
+describe('backendAdapter settings hydration', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+  });
+
+  it('parses JSON-serialized object and array settings from SQLite TEXT values', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      customCategories: '[{"id":"custom-1","name":"Custom","icon":"folder","keywords":["custom"]}]',
+      hiddenDefaultCategoryIds: '["hidden-default"]',
+      categoryOrder: '["custom-1","hidden-default"]',
+      assetFilters: '[{"id":"zip","name":"Archives","keywords":["zip"]}]',
+      releaseSourceSettings: '{"source":"github"}',
+      defaultCategoryOverrides: '{"web":{"name":"Web Apps","keywords":["web"]}}',
+      collapsedSidebarCategoryCount: '34',
+    }));
+
+    await expect(backend.fetchSettings()).resolves.toEqual({
+      customCategories: [{ id: 'custom-1', name: 'Custom', icon: 'folder', keywords: ['custom'] }],
+      hiddenDefaultCategoryIds: ['hidden-default'],
+      categoryOrder: ['custom-1', 'hidden-default'],
+      assetFilters: [{ id: 'zip', name: 'Archives', keywords: ['zip'] }],
+      releaseSourceSettings: { source: 'github' },
+      defaultCategoryOverrides: { web: { name: 'Web Apps', keywords: ['web'] } },
+      collapsedSidebarCategoryCount: 34,
+    });
+  });
+
+  it('keeps already typed settings unchanged', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    const customCategories = [{ id: 'custom-1' }];
+    const defaultCategoryOverrides = { web: { name: 'Web' } };
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({
+      customCategories,
+      defaultCategoryOverrides,
+      collapsedSidebarCategoryCount: 20,
+    }));
+
+    const settings = await backend.fetchSettings();
+    expect(settings.customCategories).toBe(customCategories);
+    expect(settings.defaultCategoryOverrides).toBe(defaultCategoryOverrides);
+    expect(settings.collapsedSidebarCategoryCount).toBe(20);
+  });
+
+  it('leaves malformed JSON strings unchanged', async () => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    const response = {
+      defaultCategoryOverrides: '{not-json',
+      customCategories: '[]oops',
+      collapsedSidebarCategoryCount: '0',
+    };
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(response));
+
+    await expect(backend.fetchSettings()).resolves.toEqual(response);
+  });
+
+  it.each([null, [], 'settings', 1])('rejects invalid top-level settings payloads: %j', async payload => {
+    adapter._backendUrl = 'http://localhost:3000/api';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(payload));
+
+    await expect(backend.fetchSettings()).rejects.toThrow('invalid settings response');
+  });
+});
+
 describe('backendAdapter 后端 URL 安全策略', () => {
   const adapter = backend as unknown as BackendAdapterLike;
   const STORAGE_KEY = 'github-stars-manager-backend-url';
