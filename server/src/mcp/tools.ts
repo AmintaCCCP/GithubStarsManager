@@ -98,7 +98,19 @@ export function registerMcpTools(server: McpServer): void {
         maxStars: z.number().optional(),
         isAnalyzed: z.boolean().optional(),
         isSubscribed: z.boolean().optional(),
-        sortBy: z.enum(['stars', 'updated', 'name', 'starred']).optional(),
+        healthArchived: z
+          .boolean()
+          .optional()
+          .describe('Repository Health fact filter: true = only archived repositories, false = only non-archived'),
+        healthRecentActivity: z
+          .boolean()
+          .optional()
+          .describe('Repository Health fact filter: true = pushed within the last 12 months'),
+        healthHasLicense: z
+          .boolean()
+          .optional()
+          .describe('Repository Health fact filter: true = has a declared SPDX license, false = no declared license'),
+        sortBy: z.enum(['stars', 'updated', 'name', 'starred', 'created']).optional(),
         sortOrder: z.enum(['asc', 'desc']).optional(),
         limit: z.number().min(1).max(100).optional(),
         offset: z.number().min(0).optional(),
@@ -116,6 +128,9 @@ export function registerMcpTools(server: McpServer): void {
         maxStars: args.maxStars,
         isAnalyzed: args.isAnalyzed,
         isSubscribed: args.isSubscribed,
+        healthArchived: args.healthArchived,
+        healthRecentActivity: args.healthRecentActivity,
+        healthHasLicense: args.healthHasLicense,
         sortBy: args.sortBy,
         sortOrder: args.sortOrder,
         limit: args.limit,
@@ -187,7 +202,19 @@ export function registerMcpTools(server: McpServer): void {
         category: z.string().describe('custom_category value'),
         limit: z.number().min(1).max(100).optional(),
         offset: z.number().min(0).optional(),
-        sortBy: z.enum(['stars', 'updated', 'name', 'starred']).optional(),
+        healthArchived: z
+          .boolean()
+          .optional()
+          .describe('Repository Health fact filter: true = only archived repositories, false = only non-archived'),
+        healthRecentActivity: z
+          .boolean()
+          .optional()
+          .describe('Repository Health fact filter: true = pushed within the last 12 months'),
+        healthHasLicense: z
+          .boolean()
+          .optional()
+          .describe('Repository Health fact filter: true = has a declared SPDX license, false = no declared license'),
+        sortBy: z.enum(['stars', 'updated', 'name', 'starred', 'created']).optional(),
         sortOrder: z.enum(['asc', 'desc']).optional(),
       },
     },
@@ -196,6 +223,9 @@ export function registerMcpTools(server: McpServer): void {
         category: args.category,
         limit: args.limit,
         offset: args.offset,
+        healthArchived: args.healthArchived,
+        healthRecentActivity: args.healthRecentActivity,
+        healthHasLicense: args.healthHasLicense,
         sortBy: args.sortBy,
         sortOrder: args.sortOrder,
       });

@@ -3,6 +3,7 @@ import { isToolCallCapableApiType } from '../constants/aiCapabilities';
 import { backend } from './backendAdapter';
 import { buildApiUrl, buildFinalApiUrl } from '../utils/apiUrlBuilder';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
+import { deriveRepositoryHealthSnapshot } from '../utils/repositoryHealth';
 import { logger } from './logger';
 import { getOutputLanguageDirective } from '../i18n/aiLanguage';
 
@@ -1690,6 +1691,46 @@ ${previousOutput}
     `.trim();
   }
 
+  /**
+   * Repository Health 客观事实摘要，供 AI 分析提示复用。
+   *
+   * 只输出中性事实与保守观测，并显式标注「不是质量结论」：模型不应仅因为最近没有
+   * 提交就把成熟稳定项目判为劣质。主观评分属于插件（roadmap §4.3）。
+   * 分析路径拿不到 Release 列表，因此这里不包含 Release 相关事实，绝不猜测。
+   */
+  private formatRepositoryHealthFacts(repository: Repository): string {
+    const zh = this.language === 'zh';
+    const yes = zh ? '是' : 'yes';
+    const no = zh ? '否' : 'no';
+    const unknown = zh ? '未知' : 'unknown';
+    const toDate = (value?: string | null): string => {
+      if (!value || !Number.isFinite(Date.parse(value))) return unknown;
+      return new Date(value).toISOString().slice(0, 10);
+    };
+
+    const snapshot = deriveRepositoryHealthSnapshot(repository);
+    // 三态渲染：`undefined` 是「本地没有这个事实」，必须输出 unknown，
+    // 用 truthiness 会把它说成「否」，等于向模型伪造了一条事实。
+    const tri = (value: boolean | undefined): string =>
+      value === undefined ? unknown : value ? yes : no;
+    const status = [
+      `${zh ? '已归档' : 'archived'}=${tri(snapshot.archived)}`,
+      `${zh ? '已停用' : 'disabled'}=${tri(snapshot.disabled)}`,
+      `${zh ? 'Fork' : 'fork'}=${tri(snapshot.fork)}`,
+      `${zh ? '模板' : 'template'}=${tri(snapshot.isTemplate)}`,
+    ].join(', ');
+    const observations = snapshot.signals.length
+      ? snapshot.signals.map((signal) => signal.id).join(', ')
+      : (zh ? '无' : 'none');
+
+    return [
+      `${zh ? '状态' : 'Status'}: ${status}`,
+      `${zh ? '创建时间' : 'Created'}: ${toDate(repository.created_at)} | ${zh ? '最近推送' : 'Last push'}: ${toDate(repository.pushed_at)}`,
+      `License: ${repository.license || (zh ? '未声明' : 'none')} | ${zh ? 'Open Issues' : 'Open issues'}: ${repository.open_issues_count ?? unknown}`,
+      `${zh ? '保守观测' : 'Observations'}: ${observations}`,
+    ].join('\n');
+  }
+
   private createCustomAnalysisPrompt(repository: Repository, readmeContent: string, customCategories?: string[], categoryHints?: string): string {
     const repoInfo = `
 ${this.language === 'zh' ? '仓库名称' : 'Repository Name'}: ${repository.full_name}
@@ -1697,6 +1738,8 @@ ${this.language === 'zh' ? '描述' : 'Description'}: ${this.sanitizeForPrompt(r
 ${this.language === 'zh' ? '编程语言' : 'Programming Language'}: ${repository.language || (this.language === 'zh' ? '未知' : 'Unknown')}
 ${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
 ${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
+${this.language === 'zh' ? '客观事实（中性，不代表质量结论）' : 'Objective facts (neutral, not a quality verdict)'}:
+${this.sanitizeForPrompt(this.formatRepositoryHealthFacts(repository))}
 
 ${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
 ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}
@@ -1730,6 +1773,8 @@ ${this.language === 'zh' ? '描述' : 'Description'}: ${this.sanitizeForPrompt(r
 ${this.language === 'zh' ? '编程语言' : 'Programming Language'}: ${repository.language || (this.language === 'zh' ? '未知' : 'Unknown')}
 ${this.language === 'zh' ? 'Star数' : 'Stars'}: ${repository.stargazers_count}
 ${this.language === 'zh' ? '主题标签' : 'Topics'}: ${repository.topics?.join(', ') || (this.language === 'zh' ? '无' : 'None')}
+${this.language === 'zh' ? '客观事实（中性，不代表质量结论）' : 'Objective facts (neutral, not a quality verdict)'}:
+${this.sanitizeForPrompt(this.formatRepositoryHealthFacts(repository))}
 
 ${this.language === 'zh' ? 'README内容 (前2000字符)' : 'README Content (first 2000 characters)'}:
 ${this.sanitizeForPrompt(readmeContent.substring(0, 2000))}

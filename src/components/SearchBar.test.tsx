@@ -289,6 +289,45 @@ describe('SearchBar', () => {
     }
   });
 
+  it('re-runs search when a health filter chip is toggled', () => {
+    const archived = createRepository({
+      id: 1,
+      name: 'archived-repo',
+      full_name: 'owner/archived-repo',
+      archived: true,
+    });
+    const active = createRepository({
+      id: 2,
+      name: 'active-repo',
+      full_name: 'owner/active-repo',
+      archived: false,
+    });
+    const storeState = createStoreState({
+      repositories: [archived, active],
+      searchFilters: { ...defaultSearchFilters },
+    });
+    const setSearchResults = vi.fn();
+    const setSearchFilters = vi.fn((filters: Partial<SearchFilters>) => {
+      storeState.searchFilters = { ...storeState.searchFilters, ...filters };
+    });
+    storeState.setSearchResults = setSearchResults;
+    storeState.setSearchFilters = setSearchFilters;
+    currentState = storeState;
+    mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (selector ? selector(storeState) : storeState)) as unknown as typeof useAppStore);
+
+    const { rerender } = render(<SearchBar />);
+    fireEvent.click(screen.getByRole('button', { name: /过滤器/ }));
+    setSearchResults.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: '已归档' }));
+    expect(setSearchFilters).toHaveBeenCalledWith({ healthArchived: true });
+
+    rerender(<SearchBar />);
+    expect(setSearchResults).toHaveBeenCalledWith([
+      expect.objectContaining({ name: 'archived-repo' }),
+    ]);
+  });
+
   it('dispatches the global history open event from the 问答历史 button', () => {
     currentState = createStoreState({});
     mockUseAppStore.mockImplementation(((selector?: (state: unknown) => unknown) => (selector ? selector(currentState) : currentState)) as unknown as typeof useAppStore);

@@ -75,6 +75,56 @@ describe('backend/Electron MCP parity', () => {
     expect(electron.evidence.evidenceFreshness).toEqual(backend.evidence.evidenceFreshness);
   });
 
+  it('keeps Repository Health facts identical in both runtimes', async () => {
+    // Health 事实是三份镜像实现（src/utils/repositoryHealth.ts、electron/repoHealth.js、
+    // server/src/mcp/repoHealth.ts）。这里锁定 Electron 与后端两份，防止数字口径漂移。
+    const electronHealth = await import('../../../electron/repoHealth.js');
+    const backendHealth = await import('../../src/mcp/repoHealth.js');
+    const now = Date.parse('2026-09-17T00:00:00.000Z');
+    const fixture = {
+      id: 1,
+      name: 'alpha',
+      full_name: 'acme/alpha',
+      stargazers_count: 1500,
+      forks_count: 120,
+      created_at: '2020-09-17T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      pushed_at: '2024-01-01T00:00:00.000Z',
+      license: 'MIT',
+      has_fetched_releases: true,
+      archived: true,
+      disabled: false,
+      fork: false,
+      is_template: false,
+      open_issues_count: 32,
+      default_branch: 'main',
+    };
+    const releases = [
+      { repo_id: 1, tag_name: 'v1.0.0', published_at: '2025-01-01T00:00:00.000Z', prerelease: false },
+      { repo_id: 1, tag_name: 'v2.0.0-rc1', published_at: '2026-06-01T00:00:00.000Z', prerelease: true },
+      { repo_id: 99, tag_name: 'v9.0.0', published_at: '2026-07-01T00:00:00.000Z', prerelease: false },
+    ];
+
+    const electron = electronHealth.deriveRepositoryHealthFacts(fixture, releases, now);
+    const backend = backendHealth.deriveRepositoryHealthFacts(fixture, releases, now);
+
+    expect(electron).toEqual(backend);
+    expect(electron.signals).toEqual(['archived', 'no-recent-activity']);
+  });
+
+  it('keeps unknown health facts unknown in both runtimes', async () => {
+    const electronHealth = await import('../../../electron/repoHealth.js');
+    const backendHealth = await import('../../src/mcp/repoHealth.js');
+    const fixture = parityRepo({ id: 2, name: 'beta', full_name: 'acme/beta', stargazers_count: 5 });
+
+    const electron = electronHealth.deriveRepositoryHealthFacts(fixture, undefined, 0);
+    const backend = backendHealth.deriveRepositoryHealthFacts(fixture, undefined, 0);
+
+    expect(electron).toEqual(backend);
+    expect(electron.archived).toBeNull();
+    expect(electron.release_count).toBeNull();
+  });
+
   it('orders tied repos identically by full_name on both ends', () => {
     const fixtures = [
       parityRepo({ id: 1, name: 'zeta', full_name: 'acme/zeta', stargazers_count: 100 }),

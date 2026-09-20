@@ -2,6 +2,7 @@
  * Pure repo search helpers for MCP (mirrors src/utils/repoSearch.ts).
  * Kept server-local to avoid coupling the Express package to the Vite app tree.
  */
+import { hasRecentActivity, isArchivedRepository } from './repoHealth.js';
 
 /**
  * License 归一化的服务端镜像（与 src/utils/licenseFilter.ts 保持一致）。
@@ -52,6 +53,16 @@ export interface McpRepository {
   subscribed_to_releases?: boolean;
   owner?: { login: string; avatar_url?: string };
   license?: string | null;
+  /**
+   * GitHub 原生状态字段。当前后端 schema 不存储这些列，因此运行时为 undefined；
+   * Repository Health 事实据此保持 `null`（未知）而不是断言「未归档」。
+   */
+  archived?: boolean;
+  disabled?: boolean;
+  fork?: boolean;
+  is_template?: boolean;
+  open_issues_count?: number;
+  default_branch?: string;
 }
 
 export interface McpSearchFilters {
@@ -59,7 +70,7 @@ export interface McpSearchFilters {
   tags?: string[];
   languages?: string[];
   platforms?: string[];
-  sortBy?: 'stars' | 'updated' | 'name' | 'starred';
+  sortBy?: 'stars' | 'updated' | 'name' | 'starred' | 'created';
   sortOrder?: 'desc' | 'asc';
   minStars?: number;
   maxStars?: number;
@@ -70,6 +81,10 @@ export interface McpSearchFilters {
   category?: string;
   /** SPDX id 过滤；含 {@link NO_LICENSE_SENTINEL} 表示「无/未声明 license」。 */
   licenses?: string[];
+  /** Repository Health 客观事实过滤（与 src/utils/repoSearch.ts 同一套语义）。 */
+  healthArchived?: boolean;
+  healthRecentActivity?: boolean;
+  healthHasLicense?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -142,6 +157,20 @@ export function matchesRepoFilters(repo: McpRepository, filters: McpSearchFilter
   if (filters.maxStars !== undefined && (repo.stargazers_count ?? 0) > filters.maxStars) {
     return false;
   }
+  // Repository Health 事实过滤：与 Electron MCP / 前端同一套语义（见 repoHealth.ts）。
+  if (filters.healthArchived !== undefined && isArchivedRepository(repo) !== filters.healthArchived) {
+    return false;
+  }
+  if (
+    filters.healthRecentActivity !== undefined &&
+    hasRecentActivity(repo) !== filters.healthRecentActivity
+  ) {
+    return false;
+  }
+  if (filters.healthHasLicense !== undefined) {
+    const hasLicense = normalizeLicense(repo.license) !== NO_LICENSE_SENTINEL;
+    if (hasLicense !== filters.healthHasLicense) return false;
+  }
   if (filters.category && filters.category !== 'all' && repo.custom_category !== filters.category) {
     return false;
   }
@@ -158,6 +187,8 @@ function getSortValue(repo: McpRepository, sortBy: McpSearchFilters['sortBy']): 
       return repo.name.toLowerCase();
     case 'starred':
       return repo.starred_at ? new Date(repo.starred_at).getTime() : 0;
+    case 'created':
+      return repo.created_at ? new Date(repo.created_at).getTime() : 0;
     default:
       return new Date(repo.pushed_at || repo.updated_at || 0).getTime();
   }

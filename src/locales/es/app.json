@@ -298,7 +298,14 @@
     "sort-files": "Por número de archivos",
     "sort-stars": "Ordenar por estrella",
     "sync-lists-confirm-body": "Extraerá sus listas de GitHub (listas destacadas) y las aplicará a su repositorio local:\n\n· Cada nombre de lista se agregará al almacén correspondiente como una etiqueta (un almacén puede pertenecer a varias listas/categorías)\n· Los almacenes con categorías desbloqueadas aplicarán la categoría correspondiente a la lista y estarán bloqueados de forma predeterminada\n· Los almacenes con categorías bloqueadas permanecen sin cambios\n\n¿Estás seguro de que quieres continuar?",
-    "sort-starred": "Ordenar por tiempo de adición de estrellas"
+    "sort-starred": "Ordenar por tiempo de adición de estrellas",
+    "repository-health-facts": "Hechos de salud del repositorio",
+    "show-only-archived-repositories": "Mostrar solo repositorios archivados",
+    "archived": "Archivado",
+    "show-only-repositories-pushed-within-the-last-12": "Mostrar solo repositorios con push en los últimos 12 meses",
+    "pushed-in-12-months": "Push en 12 meses",
+    "show-only-repositories-without-a-declared-licens": "Mostrar solo repositorios sin licencia declarada",
+    "no-declared-license": "Sin licencia declarada"
   },
   "searchDemo": {
     "search-feature-upgrade": "Actualización de la función de búsqueda",

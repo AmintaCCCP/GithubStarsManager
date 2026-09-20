@@ -21,17 +21,12 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ReleasePluginRecommendations } from './ReleasePluginRecommendations';
+import { RepositoryHealthPanel } from './RepositoryHealthPanel';
 
 const RELEASES_PER_PAGE = 10;
 const ASSETS_PER_PAGE = 8;
 
-interface RepositoryReleaseSheetProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onCloseAutoFocus?: () => void;
-  repository: Repository;
-}
-
+/** 把字节数格式化为人类可读字符串；`null` 表示未知（例如 Source code 条目）。 */
 const formatFileSize = (bytes: number | null): string => {
   if (bytes === null) return '—';
   if (bytes === 0) return '0 B';
@@ -39,6 +34,13 @@ const formatFileSize = (bytes: number | null): string => {
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 };
+
+interface RepositoryReleaseSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCloseAutoFocus?: () => void;
+  repository: Repository;
+}
 
 const Pagination: React.FC<{
   page: number;
@@ -311,7 +313,14 @@ export const RepositoryReleaseSheet: React.FC<RepositoryReleaseSheetProps> = ({
             </a>
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <RepositoryHealthPanel
+          repository={repository}
+          // 拉取中/拉取失败时不把「本地没有 Release」当成事实——那样会把网络故障
+          // 误报成「该仓库没有 Release」。此时相关事实显示为「未知」。
+          releases={isLoading || error ? undefined : releases}
+          language={language}
+        />
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1" data-testid="release-list">
           {isLoading ? (
             <div className="flex h-40 items-center justify-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
               <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />

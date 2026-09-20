@@ -1,6 +1,11 @@
 import type { Category, Repository, SearchFilters } from '../types';
 import { isRepoCustomized } from './repoUtils';
 import { normalizeLicense } from './licenseFilter';
+import {
+  hasDeclaredLicense,
+  hasRecentActivity,
+  isArchivedRepository,
+} from './repositoryHealth';
 
 /** Partial filters used by MCP and UI search (all fields optional except when provided). */
 export type RepoSearchFilterInput = Partial<SearchFilters> & {
@@ -78,6 +83,9 @@ function getSortValue(repo: Repository, sortBy: SearchFilters['sortBy']): number
       return repo.name.toLocaleLowerCase();
     case 'starred':
       return toSortableTimestamp(repo.starred_at);
+    case 'created':
+      // “按创建时间排序”用于成熟度视角：越新创建的仓库排在越前（desc）。
+      return toSortableTimestamp(repo.created_at);
     default:
       return toUpdatedSortValue(repo);
   }
@@ -202,6 +210,24 @@ export function applyRepoFilters<T extends Repository>(
     filtered = filtered.filter((repo) => repo.stargazers_count <= searchFilters.maxStars!);
   }
 
+  // Repository Health 客观事实筛选。三态：undefined = 不筛选，true/false = 要求成立/不成立。
+  // 判定逻辑集中在 src/utils/repositoryHealth.ts，避免与 Health 面板的口径分裂。
+  if (searchFilters.healthArchived !== undefined) {
+    filtered = filtered.filter(
+      (repo) => isArchivedRepository(repo) === searchFilters.healthArchived,
+    );
+  }
+  if (searchFilters.healthRecentActivity !== undefined) {
+    filtered = filtered.filter(
+      (repo) => hasRecentActivity(repo) === searchFilters.healthRecentActivity,
+    );
+  }
+  if (searchFilters.healthHasLicense !== undefined) {
+    filtered = filtered.filter(
+      (repo) => hasDeclaredLicense(repo) === searchFilters.healthHasLicense,
+    );
+  }
+
   const sortBy = searchFilters.sortBy ?? 'stars';
   const sortOrder = searchFilters.sortOrder ?? 'desc';
   return sortRepositories(filtered, sortBy, sortOrder);
@@ -225,6 +251,9 @@ export function hasActiveSearchFilters(filters: SearchFilters): boolean {
     filters.isEdited !== undefined ||
     filters.isCategoryLocked !== undefined ||
     filters.analysisFailed !== undefined ||
+    filters.healthArchived !== undefined ||
+    filters.healthRecentActivity !== undefined ||
+    filters.healthHasLicense !== undefined ||
     filters.sortBy !== 'stars' ||
     filters.sortOrder !== 'desc'
   );
