@@ -29,6 +29,10 @@ const JSON_OBJECT_SETTING_KEYS = new Set([
   'defaultCategoryOverrides',
 ]);
 
+/**
+ * Parse a SQLite TEXT setting back into an object or array.
+ * Typed values and malformed JSON are returned unchanged.
+ */
 const parseJsonSetting = (value: unknown, expect: 'object' | 'array'): unknown => {
   if (typeof value !== 'string') return value;
   try {
@@ -43,6 +47,9 @@ const parseJsonSetting = (value: unknown, expect: 'object' | 'array'): unknown =
   return value;
 };
 
+/**
+ * Hydrate backend settings whose object/array values were stored as JSON TEXT.
+ */
 const hydrateBackendSettings = (settings: Record<string, unknown>): Record<string, unknown> => {
   const next = { ...settings };
   for (const key of JSON_ARRAY_SETTING_KEYS) {
@@ -838,6 +845,9 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Sync settings error');
   }
 
+  /**
+   * Fetch frontend settings from the backend and hydrate JSON TEXT values.
+   */
   async fetchSettings(): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
