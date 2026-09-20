@@ -1188,5 +1188,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}}語",
     "tag-count": "{{count}} 個のタグ"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "高信頼",
+    "confidence-medium": "中信頼",
+    "confidence-low": "低信頼",
+    "installable-candidates": "インストール可能な候補",
+    "platform-not-detected": "プラットフォームを検出できません",
+    "detecting-architecture": "アーキテクチャを検出中…",
+    "assets-for-this-device": "このデバイス向けのアセット",
+    "matches-this-device": "このデバイスに一致",
+    "download-this-build": "このビルドをダウンロード",
+    "other-candidates-v1": "その他の候補（{{v1}}）",
+    "download": "ダウンロード",
+    "detected-from-filenames-and-release-metadata-no": "ファイル名と Release メタデータから判定しています。安全性の検証は行わず、自動実行も行いません。下のアセット一覧からいつでも別のアセットを選べます。",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "このデバイスに該当しないアセット（ソースコード、チェックサム、署名、デバッグシンボル、blockmap、他のプラットフォームやアーキテクチャ）を {{v1}} 件除外しました。"
   }
+
 }

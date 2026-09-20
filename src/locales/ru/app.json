@@ -1188,5 +1188,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} слов",
     "tag-count": "{{count}} тегов"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "Высокая уверенность",
+    "confidence-medium": "Средняя уверенность",
+    "confidence-low": "Низкая уверенность",
+    "installable-candidates": "Возможные варианты установки",
+    "platform-not-detected": "Платформа не определена",
+    "detecting-architecture": "Определение архитектуры…",
+    "assets-for-this-device": "Файлы для этого устройства",
+    "matches-this-device": "Подходит для этого устройства",
+    "download-this-build": "Скачать эту сборку",
+    "other-candidates-v1": "Другие варианты ({{v1}})",
+    "download": "Скачать",
+    "detected-from-filenames-and-release-metadata-no": "Определяется по именам файлов и метаданным релиза. Безопасность не проверяется, ничего не запускается автоматически. Вы всегда можете выбрать другой файл в списке ниже.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Исключено файлов, не подходящих для этого устройства: {{v1}} (исходный код, контрольные суммы, подписи, отладочные символы, blockmap, другие платформы и архитектуры)."
   }
+
 }
