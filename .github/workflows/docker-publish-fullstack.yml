@@ -135,5 +135,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Keep this cache independent from frontend and server image builds.
-          cache-from: type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},timeout=5m
+          cache-from: |
+            type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},timeout=5m
+            type=gha,scope=github-stars-manager-fullstack-publish-branch,timeout=5m
           cache-to: type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true

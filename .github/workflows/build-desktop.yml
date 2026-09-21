@@ -413,7 +413,21 @@ jobs:
         CSC_KEY_PASSWORD_SECRET: ${{ secrets.CSC_KEY_PASSWORD }}
 
     - name: Build Electron app
-      run: npm run dist
+      shell: bash
+      run: |
+        n=0
+        until [ "$n" -ge 3 ]; do
+          npm run dist && break
+          n=$((n+1))
+          if [ "$n" -lt 3 ]; then
+            echo "Build Electron app failed, retrying in 15s... (attempt $n/3)"
+            sleep 15
+          fi
+        done
+        if [ "$n" -ge 3 ]; then
+          echo "Build Electron app failed after 3 attempts"
+          exit 1
+        fi
       env:
         # Only tagged release builds receive a token; PR and branch builds never
         # expose a credential to package scripts or electron-builder hooks.
@@ -518,7 +532,7 @@ jobs:
         ls -la release-files/ || echo "No files found"
       
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       with:
         files: release-files/*
         draft: false
