@@ -13,7 +13,10 @@ concurrency:
 jobs:
   quality:
     name: Quality gates
-    runs-on: ubuntu-latest
+    # Pin the image instead of `ubuntu-latest`: GitHub moves that label to
+    # Ubuntu 26 on 2026-10-19 (actions/runner-images#14748), which would swap the
+    # toolchain (glibc, prebuilt deps) under every gate without a code change.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
