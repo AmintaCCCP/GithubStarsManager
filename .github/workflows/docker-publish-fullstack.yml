@@ -35,8 +35,8 @@ env:
 jobs:
   validate:
     if: github.event_name == 'pull_request'
-    # Pinned: `ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19
-    # (actions/runner-images#14748).
+    # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
+    # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
     # Fork PRs can only read default-branch GHA caches, so a fork PR validate
     # runs the full multi-arch build cold; keep the timeout above that.
@@ -77,8 +77,8 @@ jobs:
     # branch, and a manual run elsewhere must neither publish images nor
     # overwrite the default branch's publish-branch cache scope.
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-    # Pinned: `ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19
-    # (actions/runner-images#14748).
+    # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
+    # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
     # A cache or registry outage must not leave a publishing run blocked forever.
     timeout-minutes: 30

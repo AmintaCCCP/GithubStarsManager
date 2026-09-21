@@ -16,8 +16,8 @@ permissions:
 jobs:
   verify-release-version:
     name: Verify release tag matches client version
-    # Pin the image instead of `ubuntu-latest`: GitHub moves that label to
-    # Ubuntu 26 on 2026-10-19 (actions/runner-images#14748).
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
@@ -37,11 +37,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Ubuntu is pinned instead of `ubuntu-latest`: GitHub migrates that label
-        # to Ubuntu 26 on 2026-10-19 (actions/runner-images#14748), which would
-        # silently rebuild the Linux AppImage against a newer glibc. Platform
-        # steps below match with startsWith(matrix.os, 'ubuntu'), so a future
-        # re-pin needs no edits.
+        # Ubuntu is pinned instead of `ubuntu-latest`: that label migrates to
+        # Ubuntu 26.04 between 2026-10-19 and 2026-11-19
+        # (actions/runner-images#14748), which would silently rebuild the Linux
+        # AppImage against a newer glibc. Platform steps below match with
+        # startsWith(matrix.os, 'ubuntu'), so a future re-pin needs no edits.
         os: [ubuntu-24.04, windows-latest, macos-latest]
         
     steps:
@@ -483,8 +483,8 @@ jobs:
 
   release:
     needs: [verify-release-version, build]
-    # Pinned: `ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19
-    # (actions/runner-images#14748).
+    # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
+    # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
     # Keep partial platform releases possible, but never publish when the tag
     # does not match the root package.json client version.

@@ -18,8 +18,8 @@ env:
 
 jobs:
   build-and-push:
-    # Pinned: `ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19
-    # (actions/runner-images#14748).
+    # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
+    # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
     # Avoid an unbounded blocked cache or registry operation.
     timeout-minutes: 30
