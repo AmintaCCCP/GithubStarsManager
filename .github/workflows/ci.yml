@@ -13,7 +13,10 @@ concurrency:
 jobs:
   quality:
     name: Quality gates
-    runs-on: ubuntu-latest
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748), which
+    # would swap the toolchain (glibc, prebuilt deps) under every gate.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read

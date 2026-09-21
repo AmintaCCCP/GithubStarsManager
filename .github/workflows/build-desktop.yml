@@ -16,7 +16,9 @@ permissions:
 jobs:
   verify-release-version:
     name: Verify release tag matches client version
-    runs-on: ubuntu-latest
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -35,7 +37,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Ubuntu is pinned instead of `ubuntu-latest`: that label migrates to
+        # Ubuntu 26.04 between 2026-10-19 and 2026-11-19
+        # (actions/runner-images#14748), which would silently rebuild the Linux
+        # AppImage against a newer glibc. Platform steps below match with
+        # startsWith(matrix.os, 'ubuntu'), so a future re-pin needs no edits.
+        os: [ubuntu-24.04, windows-latest, macos-latest]
         
     steps:
     - name: Checkout code
@@ -183,7 +190,7 @@ jobs:
         fi
       
     - name: Install system dependencies (Linux)
-      if: matrix.os == 'ubuntu-latest'
+      if: startsWith(matrix.os, 'ubuntu')
       run: |
         # Microsoft apt sources on GitHub runners occasionally return 403 and break
         # apt-get update for unrelated electron deps. Disable them before update.
@@ -425,7 +432,7 @@ jobs:
         echo "Looking for build artifacts:"
         find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" || echo "No build artifacts found"
         echo ""
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+        if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
           echo "Linux specific checks:"
           echo "AppImage files:"
           find . -name "*.AppImage" -exec ls -la {} \; || echo "No AppImage files found"
@@ -434,7 +441,7 @@ jobs:
         fi
         
     - name: Test Electron app (Linux only)
-      if: matrix.os == 'ubuntu-latest'
+      if: startsWith(matrix.os, 'ubuntu')
       shell: bash
       run: |
         # Install xvfb for headless testing (same MS apt 403 guard as above)
@@ -467,7 +474,7 @@ jobs:
         if-no-files-found: ignore
         
     - name: Upload artifacts (Linux)
-      if: matrix.os == 'ubuntu-latest' && success()
+      if: startsWith(matrix.os, 'ubuntu') && success()
       uses: actions/upload-artifact@v7
       with:
         name: linux-app
@@ -476,7 +483,9 @@ jobs:
 
   release:
     needs: [verify-release-version, build]
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
+    # 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
     # Keep partial platform releases possible, but never publish when the tag
     # does not match the root package.json client version.
     if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
