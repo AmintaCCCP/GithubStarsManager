@@ -21,6 +21,11 @@ import {
   Zap,
 } from 'lucide-react';
 import type { EmbeddingApiType } from '../../types';
+import {
+  DEFAULT_EMBEDDING_DIMENSIONS,
+  EMBEDDING_API_TYPES,
+  embeddingApiTypeLabelKey,
+} from '../../constants/embeddingApiTypes';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SliderInput } from '../ui/SliderInput';
@@ -30,24 +35,6 @@ import { useVectorSearchActions } from '../../features/settings/hooks/useVectorS
 interface VectorSearchSettingsProps {
   t: TranslateFn;
 }
-
-const EMBEDDING_API_TYPES: { value: EmbeddingApiType; label: string; labelEn: string }[] = [
-  { value: 'openai', label: 'OpenAI', labelEn: 'OpenAI' },
-  { value: 'openai-compatible', label: 'OpenAI 兼容端点', labelEn: 'OpenAI Compatible' },
-  { value: 'siliconflow', label: '硅基流动', labelEn: 'SiliconFlow' },
-  { value: 'gemini', label: 'Gemini', labelEn: 'Gemini' },
-  { value: 'cohere', label: 'Cohere', labelEn: 'Cohere' },
-  { value: 'ollama', label: 'Ollama (本地)', labelEn: 'Ollama (Local)' },
-];
-
-const DEFAULT_DIMENSIONS: Record<EmbeddingApiType, number> = {
-  openai: 1536,
-  'openai-compatible': 1536,
-  siliconflow: 1024,
-  gemini: 768,
-  cohere: 1024,
-  ollama: 768,
-};
 
 export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t }) => {
   const {
@@ -77,8 +64,12 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
   const [formBaseUrl, setFormBaseUrl] = useState(activeConfig?.baseUrl || '');
   const [formApiKey, setFormApiKey] = useState(activeConfig?.apiKey || '');
   const [formModel, setFormModel] = useState(activeConfig?.model || '');
-  const [formDimensions, setFormDimensions] = useState(activeConfig?.dimensions || 1536);
-  const [formDimensionsInput, setFormDimensionsInput] = useState(String(activeConfig?.dimensions || 1536));
+  const [formDimensions, setFormDimensions] = useState(
+    activeConfig?.dimensions || DEFAULT_EMBEDDING_DIMENSIONS.openai,
+  );
+  const [formDimensionsInput, setFormDimensionsInput] = useState(
+    String(activeConfig?.dimensions || DEFAULT_EMBEDDING_DIMENSIONS.openai),
+  );
   const dimensionsInputRef = React.useRef<HTMLInputElement>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [formWorkerUrl, setFormWorkerUrl] = useState(vectorSearchConfig.workerUrl || '');
@@ -187,23 +178,23 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             {t('vectorSearchSettings.model-source')}
           </h4>
           <div role="group" aria-labelledby="embedding-model-source-label" className="flex flex-wrap gap-2">
-            {EMBEDDING_API_TYPES.map((type) => (
+            {EMBEDDING_API_TYPES.map((apiType) => (
               <Button
-                key={type.value}
+                key={apiType}
                 onClick={() => {
-                  const dimensions = DEFAULT_DIMENSIONS[type.value];
-                  setFormApiType(type.value);
+                  const dimensions = DEFAULT_EMBEDDING_DIMENSIONS[apiType];
+                  setFormApiType(apiType);
                   setFormDimensions(dimensions);
                   setFormDimensionsInput(String(dimensions));
                 }}
-                aria-pressed={formApiType === type.value}
+                aria-pressed={formApiType === apiType}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  formApiType === type.value
+                  formApiType === apiType
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted dark:bg-card text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent'
                 }`}
               >
-                {t(`vectorSearchSettings.api-type-${type.value}`)}
+                {t(embeddingApiTypeLabelKey(apiType))}
               </Button>
             ))}
           </div>
@@ -239,7 +230,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         {/* API Key */}
         <div>
           <label htmlFor="embedding-api-key" className="block text-sm font-medium text-muted-foreground dark:text-muted-foreground mb-1.5">
-            API Key
+            {t('vectorSearchSettings.api-key')}
           </label>
           <div className="relative">
             <Input
@@ -303,7 +294,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               draftValue={formDimensionsInput}
               onDraftChange={setFormDimensionsInput}
               onDraftCommit={(parsed) => {
-                const dimensions = parsed !== null && parsed > 0 ? parsed : DEFAULT_DIMENSIONS[formApiType];
+                const dimensions = parsed !== null && parsed > 0 ? parsed : DEFAULT_EMBEDDING_DIMENSIONS[formApiType];
                 setFormDimensions(dimensions);
                 setFormDimensionsInput(String(dimensions));
               }}
@@ -311,7 +302,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             />
             <Button
               onClick={() => {
-                const dim = DEFAULT_DIMENSIONS[formApiType];
+                const dim = DEFAULT_EMBEDDING_DIMENSIONS[formApiType];
                 setFormDimensions(dim);
                 setFormDimensionsInput(String(dim));
                 // 临时高亮显示已设置的维度
