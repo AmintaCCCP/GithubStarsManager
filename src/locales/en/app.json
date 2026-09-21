@@ -1023,7 +1023,17 @@
     "cancel": "Cancel",
     "uninstall-keep-data": "Uninstall, keep data",
     "uninstall-and-delete-data": "Uninstall and delete data",
-    "open-page-named": "Open page: {{name}}"
+    "open-page-named": "Open page: {{name}}",
+    "community-registry": "Community plugin registry",
+    "community-registry-hint": "Read-only comparison: shows update and revocation status for your installed plugins. Nothing is downloaded or installed automatically.",
+    "update-available-v1": "Version {{v1}} available",
+    "up-to-date": "Up to date",
+    "revoked": "Revoked",
+    "blocked": "Blocked",
+    "not-in-registry": "Not in the registry",
+    "new-permissions-v1": "New permissions: {{v1}}",
+    "disable-now": "Disable now",
+    "v1-entries-failed-validation": "{{v1}} registry entries failed validation and were ignored."
   },
   "starSyncPanel": {
     "star-sync": "Star Sync",

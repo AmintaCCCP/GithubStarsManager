@@ -1023,7 +1023,17 @@
     "cancel": "취소",
     "uninstall-keep-data": "데이터 보관 및 제거",
     "uninstall-and-delete-data": "데이터 제거 및 삭제",
-    "open-page-named": "페이지 열기: {{name}}"
+    "open-page-named": "페이지 열기: {{name}}",
+    "community-registry": "커뮤니티 플러그인 등록부",
+    "community-registry-hint": "비교만 합니다: 설치된 플러그인의 업데이트와 철회 상태를 보여줄 뿐, 자동으로 내려받거나 설치하지 않습니다.",
+    "update-available-v1": "새 버전 {{v1}} 있음",
+    "up-to-date": "최신 상태",
+    "revoked": "철회됨",
+    "blocked": "차단됨",
+    "not-in-registry": "등록부에 없음",
+    "new-permissions-v1": "추가되는 권한: {{v1}}",
+    "disable-now": "지금 비활성화",
+    "v1-entries-failed-validation": "등록부 항목 {{v1}}개가 검증을 통과하지 못해 무시되었습니다."
   },
   "starSyncPanel": {
     "star-sync": "스타싱크",

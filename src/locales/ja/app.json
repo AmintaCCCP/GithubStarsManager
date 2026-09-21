@@ -1023,7 +1023,17 @@
     "cancel": "キャンセル",
     "uninstall-keep-data": "データを保持してアンインストールする",
     "uninstall-and-delete-data": "データのアンインストールと削除",
-    "open-page-named": "ページを開く: {{name}}"
+    "open-page-named": "ページを開く: {{name}}",
+    "community-registry": "コミュニティプラグイン登録簿",
+    "community-registry-hint": "照合のみ：インストール済みプラグインの更新・取り消し状況を表示します。自動でダウンロードやインストールは行いません。",
+    "update-available-v1": "新しいバージョン {{v1}} があります",
+    "up-to-date": "最新です",
+    "revoked": "取り消されました",
+    "blocked": "ブロックされました",
+    "not-in-registry": "登録簿にありません",
+    "new-permissions-v1": "追加される権限: {{v1}}",
+    "disable-now": "今すぐ無効化",
+    "v1-entries-failed-validation": "登録簿の {{v1}} 件が検証に通らず無視されました。"
   },
   "starSyncPanel": {
     "star-sync": "スターシンク",

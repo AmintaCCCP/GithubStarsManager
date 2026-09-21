@@ -44,5 +44,9 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     getSearchEndpoint: () => ipcRenderer.invoke('plugins:getSearchEndpoint'),
     configureWebSearch: (endpoint) => ipcRenderer.invoke('plugins:configureWebSearch', endpoint),
     searchWeb: (request) => ipcRenderer.invoke('plugins:searchWeb', request),
+    // 社区插件注册表（开发守则 §17）：只读校验过的注册表，不含安装动作
+    registry: {
+      load: () => ipcRenderer.invoke('plugins:loadRegistry'),
+    },
   },
 });

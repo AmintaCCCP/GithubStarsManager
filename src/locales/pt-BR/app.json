@@ -1023,7 +1023,17 @@
     "cancel": "Cancelar",
     "uninstall-keep-data": "Mantenha os dados e desinstale",
     "uninstall-and-delete-data": "Desinstalar e excluir dados",
-    "open-page-named": "Página aberta: {{name}}"
+    "open-page-named": "Página aberta: {{name}}",
+    "community-registry": "Registro de plugins da comunidade",
+    "community-registry-hint": "Apenas comparação: mostra atualização e revogação dos plugins instalados. Nada é baixado ou instalado automaticamente.",
+    "update-available-v1": "Versão {{v1}} disponível",
+    "up-to-date": "Atualizado",
+    "revoked": "Revogado",
+    "blocked": "Bloqueado",
+    "not-in-registry": "Não está no registro",
+    "new-permissions-v1": "Novas permissões: {{v1}}",
+    "disable-now": "Desativar agora",
+    "v1-entries-failed-validation": "{{v1}} entradas do registro não passaram na validação e foram ignoradas."
   },
   "starSyncPanel": {
     "star-sync": "Sincronização de estrelas",

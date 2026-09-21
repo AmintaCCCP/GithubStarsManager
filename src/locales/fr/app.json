@@ -1023,7 +1023,17 @@
     "cancel": "Annuler",
     "uninstall-keep-data": "Conserver les données et désinstaller",
     "uninstall-and-delete-data": "Désinstaller et supprimer des données",
-    "open-page-named": "Page ouverte : {{name}}"
+    "open-page-named": "Page ouverte : {{name}}",
+    "community-registry": "Registre de plugins communautaires",
+    "community-registry-hint": "Simple comparaison : affiche le statut de mise à jour et de révocation de vos plugins. Rien n’est téléchargé ni installé automatiquement.",
+    "update-available-v1": "Version {{v1}} disponible",
+    "up-to-date": "À jour",
+    "revoked": "Révoqué",
+    "blocked": "Bloqué",
+    "not-in-registry": "Absent du registre",
+    "new-permissions-v1": "Nouvelles autorisations : {{v1}}",
+    "disable-now": "Désactiver maintenant",
+    "v1-entries-failed-validation": "{{v1}} entrées du registre ont échoué à la validation et ont été ignorées."
   },
   "starSyncPanel": {
     "star-sync": "Synchronisation des étoiles",

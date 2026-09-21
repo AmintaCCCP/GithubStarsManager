@@ -6,6 +6,7 @@ import { useDialog } from '../../hooks/useDialog';
 import { pluginClient } from '../../plugins/pluginClient';
 import { pluginRegistry } from '../../plugins/pluginRegistry';
 import { PluginPageViewer } from '../PluginPageViewer';
+import { PluginRegistrySection } from './PluginRegistrySection';
 import type { InstalledPlugin } from '../../plugins/types';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
@@ -161,6 +162,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   }
 
   const pagePlugin = snapshot.plugins.find((plugin) => plugin.manifest.id === selectedPage?.pluginId);
+
   const page = pagePlugin?.manifest.contributes.pages?.find((item) => item.id === selectedPage?.pageId);
   if (selectedPage && pagePlugin && page) {
     return <PluginPageViewer
@@ -193,6 +195,9 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
           </Button>
         </div>
       </div>
+      {/* 社区插件注册表（开发守则 §17）：只读对照，不下载也不安装 */}
+      <PluginRegistrySection plugins={snapshot.plugins} t={t} onDisable={disable} />
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-semibold">

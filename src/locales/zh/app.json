@@ -1023,7 +1023,17 @@
     "cancel": "取消",
     "uninstall-keep-data": "保留数据并卸载",
     "uninstall-and-delete-data": "卸载并删除数据",
-    "open-page-named": "打开页面：{{name}}"
+    "open-page-named": "打开页面：{{name}}",
+    "community-registry": "社区插件注册表",
+    "community-registry-hint": "只做对照：显示已安装插件的更新与撤销状态，不会自动下载或安装任何东西。",
+    "update-available-v1": "有新版本 {{v1}}",
+    "up-to-date": "已是最新",
+    "revoked": "已被撤销",
+    "blocked": "已被拉黑",
+    "not-in-registry": "不在注册表中",
+    "new-permissions-v1": "新增权限：{{v1}}",
+    "disable-now": "立即停用",
+    "v1-entries-failed-validation": "注册表里有 {{v1}} 条记录没通过校验，已忽略。"
   },
   "starSyncPanel": {
     "star-sync": "星标同步",

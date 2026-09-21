@@ -1023,7 +1023,17 @@
     "cancel": "Stornieren",
     "uninstall-keep-data": "Daten behalten und deinstallieren",
     "uninstall-and-delete-data": "Daten deinstallieren und löschen",
-    "open-page-named": "Seite öffnen: {{name}}"
+    "open-page-named": "Seite öffnen: {{name}}",
+    "community-registry": "Community-Plugin-Register",
+    "community-registry-hint": "Nur ein Abgleich: zeigt Update- und Widerrufsstatus installierter Plugins. Es wird nichts automatisch geladen oder installiert.",
+    "update-available-v1": "Version {{v1}} verfügbar",
+    "up-to-date": "Aktuell",
+    "revoked": "Widerrufen",
+    "blocked": "Gesperrt",
+    "not-in-registry": "Nicht im Register",
+    "new-permissions-v1": "Neue Berechtigungen: {{v1}}",
+    "disable-now": "Jetzt deaktivieren",
+    "v1-entries-failed-validation": "{{v1}} Registereinträge haben die Prüfung nicht bestanden und wurden ignoriert."
   },
   "starSyncPanel": {
     "star-sync": "Star-Synchronisierung",
