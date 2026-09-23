@@ -1188,5 +1188,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} palavras",
     "tag-count": "{{count}} etiquetas"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "Confiança alta",
+    "confidence-medium": "Confiança média",
+    "confidence-low": "Confiança baixa",
+    "installable-candidates": "Candidatos instaláveis",
+    "platform-not-detected": "Plataforma não detectada",
+    "detecting-architecture": "Detectando arquitetura…",
+    "assets-for-this-device": "Arquivos para este dispositivo",
+    "matches-this-device": "Compatível com este dispositivo",
+    "download-this-build": "Baixar esta compilação",
+    "other-candidates-v1": "Outros candidatos ({{v1}})",
+    "download": "Baixar",
+    "detected-from-filenames-and-release-metadata-no": "Detectado a partir de nomes de arquivo e metadados da Release. Nenhuma verificação de segurança é feita e nada é executado automaticamente. Você sempre pode escolher outro arquivo na lista abaixo.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} arquivo(s) que não se aplicam a este dispositivo foram excluídos (código-fonte, somas de verificação, assinaturas, símbolos de depuração, blockmaps, outras plataformas ou arquiteturas)."
   }
+
 }
