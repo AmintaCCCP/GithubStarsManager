@@ -251,6 +251,9 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
               {FONT_SCALE_OPTIONS.map((scale) => (
                 <option key={scale} value={String(scale)}>{`${Math.round(scale * 100)}%`}</option>
               ))}
+              {!FONT_SCALE_OPTIONS.some((scale) => scale === themeTokens.fontScale) && (
+                <option value={String(themeTokens.fontScale)}>{`${Math.round(themeTokens.fontScale * 100)}%`}</option>
+              )}
             </select>
           </div>
 

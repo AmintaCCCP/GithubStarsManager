@@ -115,6 +115,14 @@ describe('ThemeSettingsCard', () => {
     expect(mocks.state.themeTokens).toMatchObject({ animation: 'reduced' });
   });
 
+  it.each([1.5, 1.13])('shows a persisted font scale of %s', (fontScale) => {
+    mocks.state.themeTokens = { accentColor: null, fontScale, radius: 'default', animation: 'normal' };
+    render(<ThemeSettingsCard t={t} />);
+
+    expect(screen.getByRole('combobox', { name: '字号' })).toHaveValue(String(fontScale));
+    expect((screen.getByRole('option', { name: `${Math.round(fontScale * 100)}%` }) as HTMLOptionElement).selected).toBe(true);
+  });
+
   it('labels palette colors and shows the active preset color in the picker', () => {
     render(<ThemeSettingsCard t={t} />);
 
