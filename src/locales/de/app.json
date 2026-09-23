@@ -1045,7 +1045,15 @@
     "light": "helle Farbe",
     "dark": "Dunkel",
     "theme-color": "Farbanpassung des Themas",
-    "switch-the-interface-color-scheme-instantly-chan": "Ändern Sie die Farbe der Benutzeroberfläche mit einem Klick. Sie wird sofort wirksam und automatisch gespeichert."
+    "switch-the-interface-color-scheme-instantly-chan": "Ändern Sie die Farbe der Benutzeroberfläche mit einem Klick. Sie wird sofort wirksam und automatisch gespeichert.",
+    "card-fields": "Felder der Repository-Karte",
+    "card-fields-hint": "Ändert nur, was die Karten in der Liste anzeigen; die Daten selbst bleiben unberührt.",
+    "card-field-description": "Beschreibung",
+    "card-field-tags": "Tags",
+    "card-field-language": "Sprache",
+    "card-field-stars": "Stars",
+    "card-field-license": "Lizenz",
+    "card-field-lastUpdated": "Letzter Push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Vektorsemantische Suche",
@@ -1188,5 +1196,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} Wörter",
     "tag-count": "{{count}}-Tags"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "Hohe Zuverlässigkeit",
+    "confidence-medium": "Mittlere Zuverlässigkeit",
+    "confidence-low": "Geringe Zuverlässigkeit",
+    "installable-candidates": "Installierbare Kandidaten",
+    "platform-not-detected": "Plattform nicht erkannt",
+    "detecting-architecture": "Architektur wird erkannt…",
+    "assets-for-this-device": "Dateien für dieses Gerät",
+    "matches-this-device": "Passt zu diesem Gerät",
+    "download-this-build": "Diesen Build herunterladen",
+    "other-candidates-v1": "Weitere Kandidaten ({{v1}})",
+    "download": "Herunterladen",
+    "detected-from-filenames-and-release-metadata-no": "Erkannt anhand von Dateinamen und Release-Metadaten. Es findet keine Sicherheitsprüfung statt und es wird nichts automatisch ausgeführt. Du kannst unten jederzeit eine andere Datei auswählen.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} Datei(en) ausgeschlossen, die nicht zu diesem Gerät passen (Quellcode, Prüfsummen, Signaturen, Debug-Symbole, Blockmaps, andere Plattformen oder Architekturen)."
   }
+
 }

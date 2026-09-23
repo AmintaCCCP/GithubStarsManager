@@ -81,6 +81,7 @@ export type PersistedAppState = Partial<
     | 'categoryMatchMode'
     | 'assetFilters'
     | 'trendingSnapshots'
+    | 'repositoryCardFields'
     | 'theme'
     | 'themePreset'
     | 'currentView'

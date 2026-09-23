@@ -1045,7 +1045,15 @@
     "light": "明るい色",
     "dark": "暗い",
     "theme-color": "テーマのカラーマッチング",
-    "switch-the-interface-color-scheme-instantly-chan": "インターフェイスの色をワンクリックで切り替えると、すぐに有効になり、自動的に保存されます。"
+    "switch-the-interface-color-scheme-instantly-chan": "インターフェイスの色をワンクリックで切り替えると、すぐに有効になり、自動的に保存されます。",
+    "card-fields": "リポジトリカードの表示項目",
+    "card-fields-hint": "一覧のカードに何を表示するかだけを変えます。データ自体は変わりません。",
+    "card-field-description": "説明",
+    "card-field-tags": "タグ",
+    "card-field-language": "言語",
+    "card-field-stars": "スター数",
+    "card-field-license": "ライセンス",
+    "card-field-lastUpdated": "最終プッシュ"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "ベクトル意味検索",
@@ -1188,5 +1196,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}}語",
     "tag-count": "{{count}} 個のタグ"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "高信頼",
+    "confidence-medium": "中信頼",
+    "confidence-low": "低信頼",
+    "installable-candidates": "インストール可能な候補",
+    "platform-not-detected": "プラットフォームを検出できません",
+    "detecting-architecture": "アーキテクチャを検出中…",
+    "assets-for-this-device": "このデバイス向けのアセット",
+    "matches-this-device": "このデバイスに一致",
+    "download-this-build": "このビルドをダウンロード",
+    "other-candidates-v1": "その他の候補（{{v1}}）",
+    "download": "ダウンロード",
+    "detected-from-filenames-and-release-metadata-no": "ファイル名と Release メタデータから判定しています。安全性の検証は行わず、自動実行も行いません。下のアセット一覧からいつでも別のアセットを選べます。",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "このデバイスに該当しないアセット（ソースコード、チェックサム、署名、デバッグシンボル、blockmap、他のプラットフォームやアーキテクチャ）を {{v1}} 件除外しました。"
   }
+
 }

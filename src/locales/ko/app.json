@@ -1045,7 +1045,15 @@
     "light": "연한 색",
     "dark": "어두운",
     "theme-color": "테마 색상 매칭",
-    "switch-the-interface-color-scheme-instantly-chan": "한 번의 클릭으로 인터페이스 색상을 전환하면 즉시 적용되며 자동으로 저장됩니다."
+    "switch-the-interface-color-scheme-instantly-chan": "한 번의 클릭으로 인터페이스 색상을 전환하면 즉시 적용되며 자동으로 저장됩니다.",
+    "card-fields": "저장소 카드에 표시할 항목",
+    "card-fields-hint": "목록의 카드에 무엇을 표시할지만 바꿉니다. 데이터는 그대로입니다.",
+    "card-field-description": "설명",
+    "card-field-tags": "태그",
+    "card-field-language": "언어",
+    "card-field-stars": "스타 수",
+    "card-field-license": "라이선스",
+    "card-field-lastUpdated": "최근 푸시"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "벡터 의미 검색",
@@ -1188,5 +1196,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} 단어",
     "tag-count": "{{count}} 태그"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "신뢰도 높음",
+    "confidence-medium": "신뢰도 보통",
+    "confidence-low": "신뢰도 낮음",
+    "installable-candidates": "설치 가능한 후보",
+    "platform-not-detected": "플랫폼을 감지하지 못함",
+    "detecting-architecture": "아키텍처 감지 중…",
+    "assets-for-this-device": "이 기기에 맞는 자산",
+    "matches-this-device": "이 기기와 일치",
+    "download-this-build": "이 빌드 다운로드",
+    "other-candidates-v1": "다른 후보 ({{v1}})",
+    "download": "다운로드",
+    "detected-from-filenames-and-release-metadata-no": "파일 이름과 Release 메타데이터로 판별합니다. 보안 검사는 하지 않으며 자동으로 실행되지 않습니다. 아래 자산 목록에서 언제든 다른 자산을 선택할 수 있습니다.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "이 기기에 해당하지 않는 자산 {{v1}}개를 제외했습니다(소스 코드, 체크섬, 서명, 디버그 기호, blockmap, 다른 플랫폼 또는 아키텍처)."
   }
+
 }

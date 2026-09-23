@@ -10,6 +10,9 @@ import { getThemeSwatch } from '../../lib/themePresets';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Switch } from '../ui/switch';
+import { REPOSITORY_CARD_FIELD_IDS } from '../../types/repositoryCardFields';
+import { isRepositoryCardFieldVisible } from '../../utils/repositoryCardFields';
 
 interface ThemeSettingsCardProps {
   t: TranslateFn;
@@ -17,11 +20,20 @@ interface ThemeSettingsCardProps {
 
 export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
   const tPair = useTPair();
-  const { theme, setTheme, themePreset, setThemePreset } = useAppStore(useShallow((state) => ({
+  const {
+    theme,
+    setTheme,
+    themePreset,
+    setThemePreset,
+    repositoryCardFields,
+    setRepositoryCardField,
+  } = useAppStore(useShallow((state) => ({
     theme: state.theme,
     setTheme: state.setTheme,
     themePreset: state.themePreset,
     setThemePreset: state.setThemePreset,
+    repositoryCardFields: state.repositoryCardFields,
+    setRepositoryCardField: state.setRepositoryCardField,
   })));
   const isDark = theme === 'dark';
 
@@ -153,6 +165,24 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* 仓库卡片可见字段（开发守则 §14）：只保存声明式开关 */}
+        <div className="border-t border-border pt-5">
+          <p className="text-sm font-medium text-foreground">{t('themeSettingsCard.card-fields')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('themeSettingsCard.card-fields-hint')}</p>
+          <div className="mt-3 space-y-2">
+            {REPOSITORY_CARD_FIELD_IDS.map((id) => (
+              <div key={id} className="flex items-center justify-between gap-4">
+                <span className="text-sm text-foreground">{t(`themeSettingsCard.card-field-${id}`)}</span>
+                <Switch
+                  aria-label={t(`themeSettingsCard.card-field-${id}`)}
+                  checked={isRepositoryCardFieldVisible(repositoryCardFields, id)}
+                  onCheckedChange={(checked) => setRepositoryCardField(id, checked)}
+                />
+              </div>
+            ))}
           </div>
         </div>
       </CardContent>
