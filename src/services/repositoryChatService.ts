@@ -946,10 +946,10 @@ const collapseHeadingText = (value: string): string => value
 export const evidenceSearchTerms = (question: string, extras: string[]): string[] => {
   const tokens = [...extras, question]
     .join(' ')
-    .split(/[^A-Za-z0-9_@.-]+/)
+    .split(/[^\p{L}\p{N}_@.-]+/u)
     .map((token) => token.trim())
-    .filter((token) => token.length >= 3 && !/^\d+$/.test(token));
-  return Array.from(new Set(tokens.map((token) => token.toLowerCase()))).slice(0, 12);
+    .filter((token) => token.length >= 2 && !/^\d+$/.test(token));
+  return Array.from(new Set(tokens.map((token) => token.toLocaleLowerCase()))).slice(0, 12);
 };
 
 /** Headingless files cannot be cited through section matching, so use question terms. */
@@ -1191,10 +1191,11 @@ export const synthesizeVerifiedAnswer = async (
       emit({ toolName: 'synthesize_answer', status: 'success', paramSummary: input.language === 'zh' ? '流式生成最终回答' : 'Stream the final answer', stage: 'answer', round, detail: answerEventDetail, durationMs: Date.now() - answerStartedAt, resultSize: streamed.length });
     } catch (error) {
       if (input.signal?.aborted) throw error;
-      // 流式失败时保留已经到达的正文。清空会把可核验回答丢掉，
-      // 随后若回答窗口已耗尽，阻塞降级也不会再执行。
-      answerRaw = streamed.trim() ? streamed : null;
-      if (!answerRaw) input.onAnswerChunk?.('');
+      // 只有已经能核验引用的片段才直接保留。标题或半段正文不能阻止
+      // 阻塞式完整回答；空输出则继续走原有降级。
+      const retainedStream = validAnswer(streamed);
+      answerRaw = retainedStream;
+      if (!retainedStream) input.onAnswerChunk?.('');
       // 失败的流式调用可能几乎耗尽共享窗口。保留一小段时间给阻塞降级，
       // 否则已有证据仍会停在来源清单。
       answerDeadlineAt = Math.max(answerDeadlineAt, Date.now() + 30_000);
@@ -1639,7 +1640,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       1,
     );
     const fallbackScope: RetrievalScope = codeEligible ? 'code' : 'documentation';
-    let plan = planRaw ? parseRetrievalPlan(planRaw, documentationSet, codeSet, metaSet, fallbackScope) : null;
+    const parsedPlan = planRaw ? parseRetrievalPlan(planRaw, documentationSet, codeSet, metaSet, fallbackScope) : null;
+    let plan = parsedPlan;
     if (!plan) {
       const fallbackPath = (fallbackScope === 'code' ? unreadCode : unreadDocumentation)[0];
       plan = fallbackPath ? { targets: [{ path: fallbackPath, sections: [], purpose: missing[0] || understanding.target, scope: fallbackScope }], rationale: 'bounded fallback after an unavailable plan' } : null;
@@ -1648,7 +1650,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     pendingTargets = [];
     // 大纲阶段可能已经下载了无标题文件。它们没有章节可匹配，若本轮不补证据，
     // 后续会因路径已读而永远跳过。只在规划失败时前置，避免挤掉有效计划。
-    if (!plan) {
+    if (!parsedPlan) {
       const uncoveredHeadingless = documentationCandidates.filter((path) => {
         const document = documents.get(path);
         return document !== undefined && document.headings.length === 0 && !hasCitableSegment(path);

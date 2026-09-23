@@ -332,7 +332,8 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
         initial_targets: ['README.md', '.github/workflows/build-release.yml', 'CHANGELOG.md'],
         target: 'offline release assets',
       }))
-      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
       .mockResolvedValueOnce(gate({
         sufficient: true,
         requirements: [requirement('difference between offline and non-offline release assets', 'verified', [workflowRef])],
@@ -345,6 +346,35 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(readPaths()[0]).toBe('README.md');
     expect(readPaths()).toContain('.github/workflows/build-release.yml');
     expect(result.content).toContain(workflowRef);
+  });
+
+  it('finds a Chinese term beyond the first 240 lines of a long headingless file', async () => {
+    const workflow = `${Array.from({ length: 260 }, () => 'name: unrelated').join('\n')}\n超时时间: 30 秒`;
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        information_scope: 'documentation',
+        explicit_requirements: ['超时时间'],
+        initial_targets: ['.github/workflows/build-release.yml'],
+        target: '超时时间',
+      }))
+      .mockResolvedValueOnce(plan(target('.github/workflows/build-release.yml', [], '超时时间')))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        expect(user).toContain('超时时间: 30 秒');
+        return gate({
+          sufficient: true,
+          requirements: [requirement('超时时间', 'verified', ['/.github/workflows/build-release.yml - 1-261'])],
+          nextAction: 'answer',
+        });
+      })
+      .mockResolvedValueOnce(answer('配置中的超时时间是 30 秒。', '/.github/workflows/build-release.yml - 1-261', '超时时间'));
+
+    const result = await runRepositoryChatTurn(turnInput('构建配置里的超时时间是多少？'));
+
+    expect(result.content).toContain('/.github/workflows/build-release.yml - 1-261');
   });
 
   it('honors the configured maximum evidence rounds before starting another retrieval plan', async () => {
@@ -723,6 +753,23 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(chunks).toEqual([partial]);
     expect(result.content).toContain(overviewRef);
     expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not let an uncitable streamed fragment block the full answer fallback', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      onChunk('## Overview\n\n');
+      throw new Error('stream closed');
+    });
+
+    const result = await runRepositoryChatTurn({ ...turnInput(), streaming: true, onAnswerChunk: () => undefined });
+
+    expect(result.content).toContain(overviewRef);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
   });
 
   it('automatically escalates to code reads when documentation stalls', async () => {
