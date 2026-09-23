@@ -54,7 +54,7 @@ describe('useTrendingSnapshotCapture', () => {
     expect(mocks.recordTrendingSnapshot).toHaveBeenCalledOnce();
     expect(mocks.recordTrendingSnapshot).toHaveBeenCalledWith(expect.objectContaining({
       period: 'daily',
-      language: 'All',
+      platform: 'All',
       entries: [
         { repositoryFullName: 'owner/first', rank: 1, stars: 100 },
         { repositoryFullName: 'owner/second', rank: 2, stars: 250 },

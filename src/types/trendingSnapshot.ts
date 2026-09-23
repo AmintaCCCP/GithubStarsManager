@@ -2,7 +2,7 @@
  * Trending 快照（开发守则 §7）。
  *
  * 现有 Trending 只是"即时展示"：刷新一次就覆盖，看不出排名变化、看不出谁是新上榜的。
- * 这里把每次看到的榜单按「周期 × 语言 × 自然日」存一份快照，历史只在本地保留有限条数。
+ * 这里把每次看到的榜单按「周期 × 平台 × 自然日」存一份快照，历史只在本地保留有限条数。
  *
  * 不维护独立的 Trending 详情模型：快照只记仓库名、排名与当时的 star 数，展示时统一回到
  * Repository 模型（与开发守则 §7 的要求一致）。
@@ -19,14 +19,14 @@ export interface TrendingSnapshotEntry {
 
 export interface TrendingSnapshot {
   period: TrendingTimeRange;
-  /** 'All' 或语言 id；与 Discovery 的语言筛选一致。 */
-  language: string;
+  /** 'All' 或平台 id；与 Trending 请求使用的平台筛选一致。 */
+  platform: string;
   /** ISO 时间戳。 */
   capturedAt: string;
   entries: TrendingSnapshotEntry[];
 }
 
-/** 每个「周期 × 语言」桶最多保留多少份快照。 */
+/** 每个「周期 × 平台」桶最多保留多少份快照。 */
 export const MAX_TRENDING_SNAPSHOTS_PER_BUCKET = 30;
 
 /** 单份快照只保留榜单头部，避免损坏的持久化数据无限扩张。 */

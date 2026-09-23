@@ -20,7 +20,7 @@ const at = (offset: number) => new Date(NOW + offset * DAY).toISOString();
 
 const snapshot = (capturedAt: string, entries: TrendingSnapshot['entries']): TrendingSnapshot => ({
   period: 'daily',
-  language: 'All',
+  platform: 'All',
   capturedAt,
   entries,
 });
@@ -45,21 +45,21 @@ describe('TrendingHistoryPanel', () => {
 
   it('renders nothing until there is something to compare with', () => {
     mocks.snapshots = [snapshot(at(0), [{ repositoryFullName: 'owner/up', rank: 1, stars: 1 }])];
-    const { container } = render(<TrendingHistoryPanel period="daily" language="All" />);
+    const { container } = render(<TrendingHistoryPanel period="daily" platform="All" />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders nothing for a different period or language', () => {
+  it('renders nothing for a different period or platform', () => {
     mocks.snapshots = twoDays();
-    const { container } = render(<TrendingHistoryPanel period="monthly" language="All" />);
+    const { container } = render(<TrendingHistoryPanel period="monthly" platform="All" />);
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it('surfaces risers, fallers and new entries with their rank change', () => {
     mocks.snapshots = twoDays();
-    render(<TrendingHistoryPanel period="daily" language="All" />);
+    render(<TrendingHistoryPanel period="daily" platform="All" />);
 
     expect(screen.getByTestId('trending-history')).toBeInTheDocument();
     expect(screen.getByTestId('trending-highlight-rising')).toHaveTextContent('owner/up');
@@ -71,7 +71,7 @@ describe('TrendingHistoryPanel', () => {
 
   it('labels the history as local and derived from our own records', () => {
     mocks.snapshots = twoDays();
-    render(<TrendingHistoryPanel period="daily" language="All" />);
+    render(<TrendingHistoryPanel period="daily" platform="All" />);
 
     expect(screen.getByTestId('trending-history')).toHaveTextContent('与上一天的本地记录相比');
     // "新增 stars" 明确写成"自首次记录"，不是 GitHub 本周新增

@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 interface TrendingHistoryPanelProps {
   period: TrendingTimeRange;
-  language: string;
+  platform: string;
 }
 
 /**
@@ -22,7 +22,7 @@ interface TrendingHistoryPanelProps {
  *
  * 只有一份快照时（第一天）不渲染：那时所有条目都会被算成"新上榜"，没有信息量。
  */
-export const TrendingHistoryPanel: React.FC<TrendingHistoryPanelProps> = ({ period, language }) => {
+export const TrendingHistoryPanel: React.FC<TrendingHistoryPanelProps> = ({ period, platform }) => {
   const t = useT('discovery');
   const { snapshots, appLanguage } = useAppStore(useShallow((state) => ({
     snapshots: state.trendingSnapshots,
@@ -30,13 +30,13 @@ export const TrendingHistoryPanel: React.FC<TrendingHistoryPanelProps> = ({ peri
   })));
 
   const bucketSize = useMemo(
-    () => snapshots.filter((snapshot) => snapshot.period === period && snapshot.language === language).length,
-    [snapshots, period, language],
+    () => snapshots.filter((snapshot) => snapshot.period === period && snapshot.platform === platform).length,
+    [snapshots, period, platform],
   );
 
   const rows = useMemo(
-    () => buildTrendingHistory(snapshots, period, language),
-    [snapshots, period, language],
+    () => buildTrendingHistory(snapshots, period, platform),
+    [snapshots, period, platform],
   );
   const highlights = useMemo(() => pickTrendingHighlights(rows, 2), [rows]);
 

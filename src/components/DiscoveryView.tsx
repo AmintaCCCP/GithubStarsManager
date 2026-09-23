@@ -519,13 +519,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
 
-  // Trending 快照（开发守则 §7）：只记 trending 频道，每天同一「周期 × 语言」保留一份
+  // Trending 快照（开发守则 §7）：只记 trending 频道，每天同一「周期 × 平台」保留一份
   useTrendingSnapshotCapture(
-    allRepos,
+    discoveryRepos?.trending ?? [],
     selectedDiscoveryChannel === 'trending',
     trendingTimeRange,
-    discoveryLanguage,
-    currentLastRefresh,
+    discoveryPlatform,
+    discoveryLastRefresh?.trending ?? null,
   );
 
   // 从 store 获取当前频道的总数量
@@ -1253,7 +1253,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {selectedDiscoveryChannel === 'trending' && (
-              <TrendingHistoryPanel period={trendingTimeRange} language={discoveryLanguage} />
+              <TrendingHistoryPanel period={trendingTimeRange} platform={discoveryPlatform} />
             )}
 
             {allRepos.length > 0 && (

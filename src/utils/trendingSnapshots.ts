@@ -42,7 +42,7 @@ const dayNumber = (iso: string): number => {
   return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
 };
 
-const bucketKey = (period: TrendingTimeRange, language: string): string => `${period}\u0000${language}`;
+const bucketKey = (period: TrendingTimeRange, platform: string): string => `${period}\u0000${platform}`;
 
 const isPeriod = (value: unknown): value is TrendingTimeRange => (
   typeof value === 'string' && (PERIODS as string[]).includes(value)
@@ -69,7 +69,7 @@ export const normalizeTrendingSnapshot = (value: unknown): TrendingSnapshot | nu
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
   if (!isPeriod(record.period)) return null;
-  const language = typeof record.language === 'string' && record.language.trim() ? record.language.trim() : 'All';
+  const platform = typeof record.platform === 'string' && record.platform.trim() ? record.platform.trim() : 'All';
   const capturedTimestamp = typeof record.capturedAt === 'string' ? toTimestamp(record.capturedAt) : null;
   if (capturedTimestamp === null) return null;
   const capturedAt = new Date(capturedTimestamp).toISOString();
@@ -89,7 +89,7 @@ export const normalizeTrendingSnapshot = (value: unknown): TrendingSnapshot | nu
   }
   if (entries.length === 0) return null;
 
-  return { period: record.period, language, capturedAt, entries };
+  return { period: record.period, platform, capturedAt, entries };
 };
 
 /** 逐份规范化并丢弃非法项。 */
@@ -115,7 +115,7 @@ export const pruneTrendingSnapshots = (
 
   const byBucket = new Map<string, TrendingSnapshot[]>();
   for (const snapshot of fresh) {
-    const key = bucketKey(snapshot.period, snapshot.language);
+    const key = bucketKey(snapshot.period, snapshot.platform);
     const bucket = byBucket.get(key) ?? [];
     bucket.push(snapshot);
     byBucket.set(key, bucket);
@@ -137,7 +137,7 @@ export const pruneTrendingSnapshots = (
 /**
  * 记一份快照。
  *
- * 同一个「周期 × 语言 × 自然日」只保留最后一次看到的榜单——一天之内翻页、切语言再切回来
+ * 同一个「周期 × 平台 × 自然日」只保留最后一次看到的榜单——一天之内翻页、切平台再切回来
  * 都不该留下多份互相矛盾的快照。写入时顺带裁掉超期与超量的历史。
  */
 export const recordTrendingSnapshot = (
@@ -150,7 +150,7 @@ export const recordTrendingSnapshot = (
 
   const sameBucketAndDay = (snapshot: TrendingSnapshot) => (
     snapshot.period === normalized.period
-    && snapshot.language === normalized.language
+    && snapshot.platform === normalized.platform
     && dayKey(snapshot.capturedAt) === dayKey(normalized.capturedAt)
   );
 
@@ -182,10 +182,10 @@ export interface TrendingHistoryRow {
 export const buildTrendingHistory = (
   snapshots: TrendingSnapshot[],
   period: TrendingTimeRange,
-  language: string,
+  platform: string,
 ): TrendingHistoryRow[] => {
   const bucket = snapshots
-    .filter((snapshot) => snapshot.period === period && snapshot.language === language)
+    .filter((snapshot) => snapshot.period === period && snapshot.platform === platform)
     .sort((a, b) => (toTimestamp(a.capturedAt) ?? 0) - (toTimestamp(b.capturedAt) ?? 0));
   if (bucket.length === 0) return [];
 

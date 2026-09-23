@@ -14,14 +14,14 @@ import {
 import type { TrendingSnapshot } from '../types/trendingSnapshot';
 
 const DAY = 24 * 60 * 60 * 1000;
-const NOW = Date.parse('2026-09-21T04:00:00.000Z');
+const NOW = new Date(2026, 8, 21, 12, 0, 0).getTime();
 const at = (dayOffset: number) => new Date(NOW + dayOffset * DAY).toISOString();
 
 const snapshot = (
   overrides: Partial<TrendingSnapshot> = {},
 ): TrendingSnapshot => ({
   period: 'daily',
-  language: 'All',
+  platform: 'All',
   capturedAt: at(0),
   entries: [{ repositoryFullName: 'owner/repo', rank: 1, stars: 100 }],
   ...overrides,
@@ -41,7 +41,7 @@ describe('normalizeTrendingSnapshot', () => {
     expect(normalizeTrendingSnapshot({ period: 'daily', capturedAt: at(0), entries: [] })).toBeNull();
   });
 
-  it('defaults the language, drops broken entries and keeps the valid ones', () => {
+  it('defaults the platform, drops broken entries and keeps the valid ones', () => {
     const normalized = normalizeTrendingSnapshot({
       period: 'weekly',
       capturedAt: at(0),
@@ -53,7 +53,7 @@ describe('normalizeTrendingSnapshot', () => {
       ],
     });
 
-    expect(normalized?.language).toBe('All');
+    expect(normalized?.platform).toBe('All');
     expect(normalized?.entries).toEqual([
       { repositoryFullName: 'owner/ok', rank: 2, stars: 10 },
       { repositoryFullName: 'owner/no-stars', rank: 3, stars: 0 },
@@ -76,7 +76,7 @@ describe('normalizeTrendingSnapshot', () => {
 });
 
 describe('recordTrendingSnapshot', () => {
-  it('keeps one snapshot per period, language and day', () => {
+  it('keeps one snapshot per period, platform and day', () => {
     const first = recordTrendingSnapshot([], snapshot({ capturedAt: at(0) }), NOW);
     const sameDay = recordTrendingSnapshot(first, snapshot({
       capturedAt: new Date(NOW + 60 * 60 * 1000).toISOString(),
@@ -99,11 +99,11 @@ describe('recordTrendingSnapshot', () => {
     expect(result[0].capturedAt).toBe(localEvening);
   });
 
-  it('keeps separate buckets for different periods and languages', () => {
+  it('keeps separate buckets for different periods and platforms', () => {
     let snapshots: TrendingSnapshot[] = [];
-    snapshots = recordTrendingSnapshot(snapshots, snapshot({ period: 'daily', language: 'All' }), NOW);
-    snapshots = recordTrendingSnapshot(snapshots, snapshot({ period: 'weekly', language: 'All' }), NOW);
-    snapshots = recordTrendingSnapshot(snapshots, snapshot({ period: 'daily', language: 'Rust' }), NOW);
+    snapshots = recordTrendingSnapshot(snapshots, snapshot({ period: 'daily', platform: 'All' }), NOW);
+    snapshots = recordTrendingSnapshot(snapshots, snapshot({ period: 'weekly', platform: 'All' }), NOW);
+    snapshots = recordTrendingSnapshot(snapshots, snapshot({ period: 'daily', platform: 'Windows' }), NOW);
 
     expect(snapshots).toHaveLength(3);
   });
