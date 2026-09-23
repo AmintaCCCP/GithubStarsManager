@@ -258,7 +258,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       ].filter(Boolean).join('\n');
     }
     const newSegments = segments.filter((segment) => {
-      const key = `${document.path}:${segment.lineStart}-${segment.lineEnd}`;
+      const key = `${encodeURIComponent(document.path)}:${segment.lineStart}-${segment.lineEnd}`;
       if (readSegments.has(key)) return false;
       readSegments.add(key);
       return true;

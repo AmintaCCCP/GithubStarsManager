@@ -1441,10 +1441,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const validReferences = () => new Set(sourceReferences(evidences));
 
   const targetKey = (target: RetrievalTarget): string => `${target.scope}:${target.path}:${target.sections.map((section) => section.toLowerCase().trim()).sort().join('|')}`;
-  const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => {
-    const separator = key.lastIndexOf(':');
-    return separator >= 0 && key.slice(0, separator) === path;
-  });
+  const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
+  const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => key.startsWith(`${encodeURIComponent(path)}:`));
   const isViableUnseenTarget = (target: RetrievalTarget): boolean => {
     if (target.scope === 'meta') return metaEligible && !metaFetched.has(target.path);
     const permitted = target.scope === 'code'
@@ -1458,10 +1456,10 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
         document,
         target.sections,
         evidenceSearchTerms(input.question, [...understanding.entities, ...understanding.searchConcepts, ...target.sections, target.purpose, understanding.target]),
-      ).some((segment) => !readSegments.has(`${target.path}:${segment.lineStart}-${segment.lineEnd}`));
+      ).some((segment) => !readSegments.has(segmentKey(target.path, segment.lineStart, segment.lineEnd)));
     }
     return buildEvidenceWindows(document.content, 'implementation', [...understanding.entities, ...target.sections, understanding.target])
-      .some((segment) => !readSegments.has(`${target.path}:${segment.lineStart}-${segment.lineEnd}`));
+      .some((segment) => !readSegments.has(segmentKey(target.path, segment.lineStart, segment.lineEnd)));
   };
 
   // meta 目标（Release / Issue）没有仓库文件那样的固定 SHA 行号：每条来源
@@ -1593,7 +1591,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       return 0;
     }
     const newSegments = segments.filter((segment) => {
-      const key = `${target.path}:${segment.lineStart}-${segment.lineEnd}`;
+      const key = segmentKey(target.path, segment.lineStart, segment.lineEnd);
       if (readSegments.has(key)) return false;
       readSegments.add(key);
       return true;
