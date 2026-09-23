@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const Ajv = require('ajv');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 
@@ -18,6 +19,22 @@ function readRegistry(root, relativePath) {
   return value;
 }
 
+function readSchema(root, relativePath) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
+  } catch (error) {
+    throw new Error(`${relativePath}: ${error.message}`);
+  }
+}
+
+function collectSchemaViolations(value, schema, relativePath) {
+  const validate = new Ajv({ allErrors: true, jsonPointers: true }).compile(schema);
+  if (validate(value)) return [];
+  return validate.errors.map((error) => (
+    `${relativePath}${error.dataPath || ''}: ${error.message}`
+  ));
+}
+
 function sortedUnique(values) {
   return [...new Set(values)].sort();
 }
@@ -29,7 +46,12 @@ function sameStrings(left, right) {
 function collectViolations(root = DEFAULT_ROOT) {
   const community = readRegistry(root, 'registry/community-plugins.json');
   const removed = readRegistry(root, 'registry/removed-plugins.json');
-  const violations = [];
+  const communitySchema = readSchema(root, 'registry/schemas/community-plugin.schema.json');
+  const removedSchema = readSchema(root, 'registry/schemas/removed-plugin.schema.json');
+  const violations = [
+    ...collectSchemaViolations(community, communitySchema, 'community-plugins.json'),
+    ...collectSchemaViolations(removed, removedSchema, 'removed-plugins.json'),
+  ];
   const versions = new Set();
 
   for (const [index, entry] of community.entries()) {
