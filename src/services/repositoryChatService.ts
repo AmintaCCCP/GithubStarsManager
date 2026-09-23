@@ -949,7 +949,7 @@ export const evidenceSearchTerms = (question: string, extras: string[]): string[
     .split(/[^\p{L}\p{N}_@.-]+/u)
     .map((token) => token.trim())
     .filter((token) => token.length >= 2 && !/^\d+$/.test(token));
-  return Array.from(new Set(tokens.map((token) => token.toLocaleLowerCase()))).slice(0, 12);
+  return Array.from(new Set(tokens.map((token) => token.toLocaleLowerCase())));
 };
 
 /** Headingless files cannot be cited through section matching, so use question terms. */
@@ -1441,7 +1441,10 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const validReferences = () => new Set(sourceReferences(evidences));
 
   const targetKey = (target: RetrievalTarget): string => `${target.scope}:${target.path}:${target.sections.map((section) => section.toLowerCase().trim()).sort().join('|')}`;
-  const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => key.startsWith(`${path}:`));
+  const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => {
+    const separator = key.lastIndexOf(':');
+    return separator >= 0 && key.slice(0, separator) === path;
+  });
   const isViableUnseenTarget = (target: RetrievalTarget): boolean => {
     if (target.scope === 'meta') return metaEligible && !metaFetched.has(target.path);
     const permitted = target.scope === 'code'

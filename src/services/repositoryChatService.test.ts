@@ -377,6 +377,66 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).toContain('/.github/workflows/build-release.yml - 1-261');
   });
 
+  it('keeps a headingless file distinct from a colon-suffixed sibling path', async () => {
+    const headingless = `${Array.from({ length: 260 }, () => 'unrelated').join('\n')}\nunique-headingless-term`;
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/a.md': headingless,
+      'docs/a.md:extra.md': '# Extra\n\nAlready read sibling.',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        explicit_requirements: ['unique headingless term'],
+        initial_targets: ['docs/a.md', 'docs/a.md:extra.md'],
+        target: 'unique headingless term',
+      }))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        expect(user).toContain('unique-headingless-term');
+        return gate({
+          sufficient: true,
+          requirements: [requirement('unique headingless term', 'verified', ['/docs/a.md - 1-261'])],
+          nextAction: 'answer',
+        });
+      })
+      .mockResolvedValueOnce(answer('The headingless file contains the unique term.', '/docs/a.md - 1-261', 'Headingless evidence'));
+
+    const result = await runRepositoryChatTurn(turnInput('Where is unique-headingless-term documented?'));
+
+    expect(readPaths()).toContain('docs/a.md');
+    expect(result.content).toContain('/docs/a.md - 1-261');
+  });
+
+  it('keeps a late question term when earlier terms fill the old twelve-term limit', async () => {
+    const filler = Array.from({ length: 20 }, (_, index) => `filler${index}`).join(' ');
+    const workflow = `${Array.from({ length: 260 }, () => 'unrelated').join('\n')}\nlate-unique-term`;
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        explicit_requirements: ['late unique term'],
+        initial_targets: ['.github/workflows/build-release.yml'],
+        target: 'late unique term',
+      }))
+      .mockResolvedValueOnce(plan(target('.github/workflows/build-release.yml', [], 'late unique term')))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        expect(user).toContain('late-unique-term');
+        return gate({
+          sufficient: true,
+          requirements: [requirement('late unique term', 'verified', ['/.github/workflows/build-release.yml - 1-261'])],
+          nextAction: 'answer',
+        });
+      })
+      .mockResolvedValueOnce(answer('The late term is present.', '/.github/workflows/build-release.yml - 1-261', 'Late term'));
+
+    const result = await runRepositoryChatTurn(turnInput(`${filler} late-unique-term`));
+
+    expect(result.content).toContain('/.github/workflows/build-release.yml - 1-261');
+  });
+
   it('honors the configured maximum evidence rounds before starting another retrieval plan', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
