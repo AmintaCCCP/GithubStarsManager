@@ -275,6 +275,174 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).toContain('2 consecutive rounds');
   });
 
+  it('keeps keyword evidence when the planner returns prose instead of a retrieval plan', async () => {
+    const workflow = [
+      'name: Build',
+      'jobs:',
+      '  release:',
+      '    steps:',
+      '      - name: Build normal and offline apps',
+      '        run: |',
+      '          xcodebuild SWIFT_ACTIVE_COMPILATION_CONDITIONS="OFFLINE" PRODUCT_NAME="macshot Offline"',
+    ].join('\n');
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+    });
+    const workflowRef = '/.github/workflows/build-release.yml - 1-7';
+    mocks.generateChatText
+      .mockResolvedValueOnce('我先看发布流程和文档里对 release 资产的说明，确认带 offline 和不带 offline 的区别。')
+      .mockResolvedValueOnce('我先在发布说明和构建配置里查 offline 资产是怎么定义的。')
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('directly answer the user question', 'verified', [workflowRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The offline asset is built with the OFFLINE compilation condition.', workflowRef, 'Release assets'));
+
+    const result = await runRepositoryChatTurn(turnInput('What is the difference between offline and non-offline release assets?'));
+
+    expect(readPaths()).toEqual(['README.md', '.github/workflows/build-release.yml']);
+    expect(result.content).toContain(workflowRef);
+    expect(result.content).not.toContain('consecutive rounds');
+  });
+
+  it('extracts a headingless workflow downloaded before the planner times out', async () => {
+    const workflow = [
+      'name: Build',
+      'jobs:',
+      '  release:',
+      '    steps:',
+      '      - name: Build normal and offline apps',
+      '        run: |',
+      '          xcodebuild SWIFT_ACTIVE_COMPILATION_CONDITIONS="OFFLINE" PRODUCT_NAME="macshot Offline"',
+    ].join('\n');
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+      'CHANGELOG.md': '# Changelog\n\n## Added\n\nUnrelated notes.',
+    });
+    const workflowRef = '/.github/workflows/build-release.yml - 1-7';
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        entities: ['offline', 'Release assets'],
+        search_concepts: ['offline release asset'],
+        information_scope: 'both',
+        explicit_requirements: ['difference between offline and non-offline release assets'],
+        initial_targets: ['README.md', '.github/workflows/build-release.yml', 'CHANGELOG.md'],
+        target: 'offline release assets',
+      }))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('difference between offline and non-offline release assets', 'verified', [workflowRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The offline asset is a separate OFFLINE build.', workflowRef, 'Release assets'));
+
+    const result = await runRepositoryChatTurn(turnInput('What is the difference between offline and non-offline release assets?'));
+
+    expect(readPaths()[0]).toBe('README.md');
+    expect(readPaths()).toContain('.github/workflows/build-release.yml');
+    expect(result.content).toContain(workflowRef);
+  });
+
+  it('finds a Chinese term beyond the first 240 lines of a long headingless file', async () => {
+    const workflow = `${Array.from({ length: 260 }, () => 'name: unrelated').join('\n')}\n超时时间: 30 秒`;
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        information_scope: 'documentation',
+        explicit_requirements: ['超时时间'],
+        initial_targets: ['.github/workflows/build-release.yml'],
+        target: '超时时间',
+      }))
+      .mockResolvedValueOnce(plan(target('.github/workflows/build-release.yml', [], '超时时间')))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        expect(user).toContain('超时时间: 30 秒');
+        return gate({
+          sufficient: true,
+          requirements: [requirement('超时时间', 'verified', ['/.github/workflows/build-release.yml - 1-261'])],
+          nextAction: 'answer',
+        });
+      })
+      .mockResolvedValueOnce(answer('配置中的超时时间是 30 秒。', '/.github/workflows/build-release.yml - 1-261', '超时时间'));
+
+    const result = await runRepositoryChatTurn(turnInput('构建配置里的超时时间是多少？'));
+
+    expect(result.content).toContain('/.github/workflows/build-release.yml - 1-261');
+  });
+
+  it('keeps a headingless file distinct from a colon-suffixed sibling path', async () => {
+    const headingless = `${Array.from({ length: 260 }, () => 'unrelated '.repeat(12).trim()).join('\n')}\nonly-headingless-marker`;
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/a.md': headingless,
+      'docs/a.md:extra.md': '# Extra\n\nSibling-only marker.',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        explicit_requirements: ['headingless marker'],
+        initial_targets: ['docs/a.md', 'docs/a.md:extra.md'],
+        target: 'headingless marker',
+      }))
+      .mockResolvedValueOnce(plan(target('docs/a.md:extra.md', ['Extra'], 'read sibling first')))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockRejectedValueOnce(new DOMException('Repository chat model step timed out.', 'TimeoutError'))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        const evidenceStart = user.indexOf('BEGIN UNTRUSTED REPOSITORY CONTENT');
+        expect(evidenceStart).toBeGreaterThanOrEqual(0);
+        expect(user.slice(evidenceStart)).toContain('only-headingless-marker');
+        expect(user.slice(evidenceStart)).toContain('Sibling-only marker');
+        return gate({
+          sufficient: true,
+          requirements: [requirement('headingless marker', 'verified', ['/docs/a.md - 237-261'])],
+          nextAction: 'answer',
+        });
+      })
+      .mockResolvedValueOnce(answer('The headingless file contains its own marker.', '/docs/a.md - 237-261', 'Headingless evidence'));
+
+    const result = await runRepositoryChatTurn(turnInput('Where is the headingless marker documented?'));
+
+    expect(readPaths()).toEqual(expect.arrayContaining(['docs/a.md:extra.md', 'docs/a.md']));
+    expect(result.content).toContain('/docs/a.md - 237-261');
+  });
+
+  it('keeps a late question term when earlier terms fill the old twelve-term limit', async () => {
+    const filler = Array.from({ length: 20 }, (_, index) => `filler${index}`).join(' ');
+    const workflow = `${Array.from({ length: 260 }, () => 'unrelated '.repeat(12).trim()).join('\n')}\nlate-unique-term`;
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        explicit_requirements: ['late unique term'],
+        initial_targets: ['.github/workflows/build-release.yml'],
+        target: 'late unique term',
+      }))
+      .mockResolvedValueOnce(plan(target('.github/workflows/build-release.yml', [], 'late unique term')))
+      .mockImplementationOnce(async ({ user }: { user: string }) => {
+        const evidenceStart = user.indexOf('BEGIN UNTRUSTED REPOSITORY CONTENT');
+        expect(evidenceStart).toBeGreaterThanOrEqual(0);
+        expect(user.slice(evidenceStart)).toContain('late-unique-term');
+        return gate({
+          sufficient: true,
+          requirements: [requirement('late unique term', 'verified', ['/.github/workflows/build-release.yml - 237-261'])],
+          nextAction: 'answer',
+        });
+      })
+      .mockResolvedValueOnce(answer('The late term is present.', '/.github/workflows/build-release.yml - 237-261', 'Late term'));
+
+    const result = await runRepositoryChatTurn(turnInput(`${filler} late-unique-term`));
+
+    expect(result.content).toContain('/.github/workflows/build-release.yml - 237-261');
+  });
+
   it('honors the configured maximum evidence rounds before starting another retrieval plan', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
@@ -627,6 +795,46 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).toContain(overviewRef);
     expect(result.content).not.toContain('insufficient');
     expect(chunks[chunks.length - 1]).toBe('');
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps a partial streamed answer when the stream fails after emitting citable text', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    const partial = `## Overview\n\nA documented example project. \`${overviewRef}\``;
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      onChunk(partial);
+      throw new Error('stream closed');
+    });
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(chunks).toEqual([partial]);
+    expect(result.content).toContain(overviewRef);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not let an uncitable streamed fragment block the full answer fallback', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(answer('The project is a documented example for repository research.', overviewRef, 'Overview'));
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      onChunk('## Overview\n\n');
+      throw new Error('stream closed');
+    });
+
+    const result = await runRepositoryChatTurn({ ...turnInput(), streaming: true, onAnswerChunk: () => undefined });
+
+    expect(result.content).toContain(overviewRef);
     expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
   });
 

@@ -19,7 +19,8 @@ import {
   parseJsonObject,
   rankedCandidatePaths,
   resolveTurnLimits,
-  sectionSegments,
+  citableSegmentsForDocument,
+  evidenceSearchTerms,
   splitOwnerAndRepo,
   synthesizeVerifiedAnswer,
   untrustedEvidenceBlock,
@@ -241,9 +242,14 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       return zh ? '已拒绝：读取失败、路径无效或读取预算已用尽。' : 'Rejected: the read failed, the path is invalid, or the read budget was exhausted.';
     }
     const sections = asStringArray(args.sections, 6);
-    const segments = scope === 'documentation' && sections.length > 0
-      ? sectionSegments(document, sections)
-      : buildEvidenceWindows(document.content, focus, sections.length > 0 ? sections : [input.question]);
+    const searchTerms = evidenceSearchTerms(input.question, sections);
+    const plannedSegments = scope === 'documentation'
+      ? citableSegmentsForDocument(document, sections, searchTerms)
+      : buildEvidenceWindows(document.content, focus, sections.length > 0 ? sections : searchTerms);
+    // 指定章节没有命中时，仍按问题术语取可引用窗口，避免无标题配置只返回目录。
+    const segments = plannedSegments.length > 0
+      ? plannedSegments
+      : buildEvidenceWindows(document.content, focus, searchTerms);
     if (segments.length === 0) {
       return [
         zh ? '未匹配到所请求的章节。该文件的可用章节如下（行号: 标题），请用精确标题重试：' : 'No section matched the request. Available headings (line: title) — retry with exact titles:',
@@ -252,7 +258,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       ].filter(Boolean).join('\n');
     }
     const newSegments = segments.filter((segment) => {
-      const key = `${document.path}:${segment.lineStart}-${segment.lineEnd}`;
+      const key = `${encodeURIComponent(document.path)}:${segment.lineStart}-${segment.lineEnd}`;
       if (readSegments.has(key)) return false;
       readSegments.add(key);
       return true;

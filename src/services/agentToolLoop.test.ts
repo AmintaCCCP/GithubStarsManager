@@ -198,6 +198,31 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/release-v1.0.0.md - 1-4');
   });
 
+  it('keeps keyword windows from a headingless workflow when the requested section does not exist', async () => {
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': [
+        'name: Build',
+        'jobs:',
+        '  release:',
+        '    steps:',
+        '      - name: Build normal and offline apps',
+        '        run: |',
+        '          xcodebuild SWIFT_ACTIVE_COMPILATION_CONDITIONS="OFFLINE"',
+      ].join('\n'),
+    });
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'read_documentation', { path: '.github/workflows/build-release.yml', sections: ['Build normal and offline apps'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c3', 'ready_to_answer', { missing: [] })]));
+    mocks.generateChatText.mockResolvedValueOnce('## Release assets\n\nThe offline variant sets the OFFLINE compilation condition. `/.github/workflows/build-release.yml - 1-7`');
+
+    const result = await runToolLoopRepositoryChatTurn(turnInput('What is the difference between offline and non-offline release assets?'));
+
+    expect(result.content).toContain('/.github/workflows/build-release.yml - 1-7');
+    expect(result.evidences.some((evidence) => evidence.path === '.github/workflows/build-release.yml')).toBe(true);
+  });
+
   it('returns the insufficient-evidence response when the model never gathers evidence', async () => {
     mocks.generateWithTools
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'docs/missing.md' })]))
