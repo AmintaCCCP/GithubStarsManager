@@ -29,6 +29,8 @@ import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { DiscoverySidebar } from './DiscoverySidebar';
+import { TrendingHistoryPanel } from '../features/discovery/components/TrendingHistoryPanel';
+import { useTrendingSnapshotCapture } from '../features/discovery/hooks/useTrendingSnapshotCapture';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
 import { CodeSearchView } from './CodeSearchView';
 import { SortAlgorithmTooltip } from './SortAlgorithmTooltip';
@@ -515,10 +517,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
     [discoveryRepos, selectedDiscoveryChannel]
   );
 
+  const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
+
+  // Trending 快照（开发守则 §7）：只记 trending 频道，每天同一「周期 × 平台」保留一份
+  useTrendingSnapshotCapture(
+    discoveryRepos?.trending ?? [],
+    selectedDiscoveryChannel === 'trending',
+    trendingTimeRange,
+    discoveryPlatform,
+    discoveryLastRefresh?.trending ?? null,
+  );
+
   // 从 store 获取当前频道的总数量
   const currentTotalCount = discoveryTotalCount?.[selectedDiscoveryChannel] ?? 0;
 
-  const currentLastRefresh = discoveryLastRefresh?.[selectedDiscoveryChannel] ?? null;
   const currentIsLoading = discoveryIsLoading?.[selectedDiscoveryChannel] ?? false;
   const currentIsLoadingMore = discoveryIsLoadingMore?.[selectedDiscoveryChannel] ?? false;
   const currentLoadMoreError = discoveryLoadMoreError?.[selectedDiscoveryChannel] ?? null;
@@ -1238,6 +1250,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   </>
                 )}
               </div>
+            )}
+
+            {selectedDiscoveryChannel === 'trending' && (
+              <TrendingHistoryPanel period={trendingTimeRange} platform={discoveryPlatform} />
             )}
 
             {allRepos.length > 0 && (

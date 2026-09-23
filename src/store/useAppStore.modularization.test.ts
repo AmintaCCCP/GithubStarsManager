@@ -81,6 +81,7 @@ const currentPersistedKeys = [
   'defaultCategoryOverrides',
   'assetFilters',
   'repositoryCardFields',
+  'trendingSnapshots',
   'theme',
   'themePreset',
   'currentView',

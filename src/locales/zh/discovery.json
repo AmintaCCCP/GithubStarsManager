@@ -138,5 +138,16 @@
   },
   "discoveryPlatform": {
     "All": "全部平台"
+  },
+  "trendingHistoryPanel": {
+    "title": "榜单变化",
+    "hint": "与上一天的本地记录相比",
+    "new-entry": "新上榜",
+    "rising": "上升",
+    "falling": "下降",
+    "streak-days": "连续 {{v1}} 天",
+    "stars-gained": "自首次记录新增 {{v1}} stars",
+    "first-seen": "榜首首次记录于{{v1}}"
   }
+
 }

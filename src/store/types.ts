@@ -41,6 +41,7 @@ import type {
   TranslationEngine,
   RepositoryCardFieldId,
   RepositoryChatSettings,
+  TrendingSnapshot,
 } from '../types';
 import type { ThemePresetId } from '../constants/themePresets';
 import type { GitHubListsApiService } from '../services/githubListsApi';
@@ -263,6 +264,8 @@ export interface AppActions {
   removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 
+  /** Trending 快照（开发守则 §7）：记一份榜单快照，去重与上限在 utils 里处理。 */
+  recordTrendingSnapshot: (snapshot: TrendingSnapshot) => void;
   // 仓库卡片可见字段（开发守则 §14）
   /** 切换某个字段的显示；未提供的字段沿用当前值。 */
   setRepositoryCardField: (id: RepositoryCardFieldId, visible: boolean) => void;

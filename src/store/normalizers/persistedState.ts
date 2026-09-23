@@ -10,6 +10,7 @@ import { defaultHeaderMenuConfig, defaultSubscriptionChannels } from '../../type
 import { DEFAULT_THEME_PRESET_ID, isThemePresetId } from '../../constants/themePresets';
 import { isAppLanguage } from '../../i18n/languages';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
+import { normalizeTrendingSnapshots } from '../../utils/trendingSnapshots';
 import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
@@ -175,6 +176,8 @@ export const normalizePersistedState = (
     collapsedSidebarCategoryCount: typeof safePersisted.collapsedSidebarCategoryCount === 'number' && safePersisted.collapsedSidebarCategoryCount > 0 ? safePersisted.collapsedSidebarCategoryCount : 20,
     categoryMatchMode: safePersisted.categoryMatchMode === 'legacy' ? 'legacy' : 'effective',
     assetFilters: Array.isArray(safePersisted.assetFilters) && safePersisted.assetFilters.length > 0 ? safePersisted.assetFilters : defaultPresetFilters,
+    // Trending 快照（开发守则 §7）：逐份校验并裁剪，坏快照不进内存
+    trendingSnapshots: normalizeTrendingSnapshots((safePersisted as Record<string, unknown>).trendingSnapshots),
     // 卡片可见字段（开发守则 §14）：逐项校验，非法值按默认（显示）处理
     repositoryCardFields: normalizeRepositoryCardFields((safePersisted as Record<string, unknown>).repositoryCardFields),
     language: isAppLanguage(safePersisted.language) ? safePersisted.language : currentState.language,
