@@ -39,6 +39,7 @@ import type {
   HeaderMenuItem,
   SyncMode,
   TranslationEngine,
+  RepositoryCardFieldId,
   RepositoryChatSettings,
   ThemeTokens,
 } from '../types';
@@ -266,6 +267,9 @@ export interface AppActions {
   // Theme tokens（开发守则 §14）
   /** 局部更新：内部与当前值合并，调用方不必自己展开（避免拿到过期的渲染值）。 */
   updateThemeTokens: (patch: Partial<ThemeTokens>) => void;
+  // 仓库卡片可见字段（开发守则 §14）
+  /** 切换某个字段的显示；未提供的字段沿用当前值。 */
+  setRepositoryCardField: (id: RepositoryCardFieldId, visible: boolean) => void;
 }
 
 export type AppStoreState = AppState & AppActions;

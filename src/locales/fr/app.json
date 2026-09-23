@@ -1065,7 +1065,15 @@
     "font-scale": "Taille du texte",
     "reduce-motion": "Réduire les animations",
     "reduce-motion-hint": "Raccourcit les animations et les transitions à presque zéro. La mise en page et les couleurs ne changent pas.",
-    "reset-appearance": "Réinitialiser l'apparence"
+    "reset-appearance": "Réinitialiser l'apparence",
+    "card-fields": "Champs de la carte",
+    "card-fields-hint": "Change uniquement ce que montre chaque carte de la liste ; vos données restent intactes.",
+    "card-field-description": "Description",
+    "card-field-tags": "Étiquettes",
+    "card-field-language": "Langage",
+    "card-field-stars": "Stars",
+    "card-field-license": "Licence",
+    "card-field-lastUpdated": "Dernier push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Recherche sémantique vectorielle",
@@ -1208,5 +1216,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} mots",
     "tag-count": "{{count}} balises"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "Confiance élevée",
+    "confidence-medium": "Confiance moyenne",
+    "confidence-low": "Confiance faible",
+    "installable-candidates": "Candidats installables",
+    "platform-not-detected": "Plateforme non détectée",
+    "detecting-architecture": "Détection de l'architecture…",
+    "assets-for-this-device": "Fichiers pour cet appareil",
+    "matches-this-device": "Compatible avec cet appareil",
+    "download-this-build": "Télécharger cette version",
+    "other-candidates-v1": "Autres candidats ({{v1}})",
+    "download": "Télécharger",
+    "detected-from-filenames-and-release-metadata-no": "Détecté à partir des noms de fichiers et des métadonnées de la Release. Aucun contrôle de sécurité n'est effectué et rien ne s'exécute automatiquement. Vous pouvez toujours choisir un autre fichier dans la liste ci-dessous.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} fichier(s) écarté(s) car ils ne concernent pas cet appareil (code source, sommes de contrôle, signatures, symboles de débogage, blockmaps, autres plateformes ou architectures)."
   }
+
 }

@@ -4,6 +4,7 @@ import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscript
 import { defaultRepositoryChatSettings } from '../types/repositoryChat';
 import { DEFAULT_THEME_PRESET_ID } from '../constants/themePresets';
 import { DEFAULT_THEME_TOKENS } from '../utils/themeTokens';
+import { DEFAULT_REPOSITORY_CARD_FIELDS } from '../types/repositoryCardFields';
 import { DEFAULT_XTWEET_FOLLOWS } from '../utils/xTweetFollows';
 import { DEFAULT_TELEGRAM_FOLLOWS } from '../utils/telegramFollows';
 import { readSessionBackendSecret } from './persistence/authStorage';
@@ -83,6 +84,8 @@ export const createInitialState = (): AppState => ({
       isSidebarCollapsed: false,
       readmeModalOpen: false,
       repositoryViewMode: 'grid',
+      // 卡片可见字段默认全开（开发守则 §14）
+      repositoryCardFields: { ...DEFAULT_REPOSITORY_CARD_FIELDS },
       releaseViewMode: 'timeline',
       releaseShowMode: 'all',
       releaseLatestMode: 'all',

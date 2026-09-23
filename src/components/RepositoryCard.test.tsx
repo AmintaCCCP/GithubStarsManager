@@ -90,6 +90,8 @@ const storeState = {
   activeAIConfig: null,
   setAnalyzingRepository: vi.fn(),
   language: 'zh' as const,
+  // 卡片可见字段（开发守则 §14）：默认全开，单个用例里按需改
+  repositoryCardFields: { description: true, tags: true, language: true, stars: true, license: true, lastUpdated: true },
   updateRepository: vi.fn(),
   deleteRepository: vi.fn(),
   vectorSearchConfig: {
@@ -133,6 +135,14 @@ beforeEach(() => {
   actionMocks.releaseSheet.suspend = null;
   useRepositoryDragStore.getState().endDrag();
   storeState.releaseSubscriptions = new Set<number>([1]);
+  storeState.repositoryCardFields = {
+    description: true,
+    tags: true,
+    language: true,
+    stars: true,
+    license: true,
+    lastUpdated: true,
+  };
   storeState.vectorSearchConfig.enabled = true;
   Object.assign(actionMocks.actions, {
     isSubscribed: true,
@@ -508,6 +518,49 @@ describe('RepositoryCard rapid touch drags (CodeRabbit round 2)', () => {
       expect(fireEvent.click(card)).toBe(true);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('honours the per-field visibility switches', () => {
+    storeState.repositoryCardFields = {
+      description: false,
+      tags: false,
+      language: false,
+      stars: true,
+      license: false,
+      lastUpdated: false,
+    };
+    renderRepositoryCard('grid');
+
+    // 关闭的字段不渲染：仓库没有语言/许可证可断言文案，这里断言描述与标签消失
+    expect(screen.queryByText('Repository description')).not.toBeInTheDocument();
+    expect(screen.queryByText('TypeScript')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'owner/example-repository' })).toBeInTheDocument();
+    // 仍然开着的字段照常显示
+    expect(screen.getByText('128')).toBeInTheDocument();
+  });
+
+  it('keeps analysis status visible when the description is hidden', () => {
+    repository.analyzed_at = '2026-01-04T00:00:00.000Z';
+    storeState.repositoryCardFields.description = false;
+
+    try {
+      renderRepositoryCard('grid');
+      expect(screen.queryByText('Repository description')).not.toBeInTheDocument();
+      expect(screen.getByText('AI已分析')).toBeInTheDocument();
+    } finally {
+      delete repository.analyzed_at;
+    }
+  });
+
+  it('shows customized status in list view', () => {
+    repository.custom_description = 'Customized description';
+
+    try {
+      renderRepositoryCard('list');
+      expect(screen.getByText('已自定义')).toBeInTheDocument();
+    } finally {
+      delete repository.custom_description;
     }
   });
 });

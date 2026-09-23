@@ -90,6 +90,8 @@ sortOrder: state.gistSearchFilters.sortOrder,
 
   // 持久化资源过滤器
   assetFilters: state.assetFilters,
+  // 卡片可见字段（开发守则 §14）
+  repositoryCardFields: state.repositoryCardFields,
 
   // 持久化UI设置
   theme: state.theme,

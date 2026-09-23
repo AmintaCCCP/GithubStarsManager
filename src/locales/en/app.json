@@ -1065,7 +1065,15 @@
     "font-scale": "Font size",
     "reduce-motion": "Reduce motion",
     "reduce-motion-hint": "Shortens animations and transitions to near zero. Layout and colours are unchanged.",
-    "reset-appearance": "Reset appearance"
+    "reset-appearance": "Reset appearance",
+    "card-fields": "Repository card fields",
+    "card-fields-hint": "Only changes what each card in the list shows; your data is untouched.",
+    "card-field-description": "Description",
+    "card-field-tags": "Tags",
+    "card-field-language": "Language",
+    "card-field-stars": "Stars",
+    "card-field-license": "License",
+    "card-field-lastUpdated": "Last pushed"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Vector Semantic Search",
@@ -1208,5 +1216,20 @@
   "repositoryEditModal": {
     "char-count": "{{count}} chars",
     "tag-count": "{{count}} tags"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "High confidence",
+    "confidence-medium": "Medium confidence",
+    "confidence-low": "Low confidence",
+    "installable-candidates": "Installable candidates",
+    "platform-not-detected": "Platform not detected",
+    "detecting-architecture": "Detecting architecture…",
+    "assets-for-this-device": "Assets for this device",
+    "matches-this-device": "Matches this device",
+    "download-this-build": "Download this build",
+    "other-candidates-v1": "Other candidates ({{v1}})",
+    "download": "Download",
+    "detected-from-filenames-and-release-metadata-no": "Detected from filenames and release metadata. No safety check is performed and nothing runs automatically. You can always pick another asset in the list below.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Excluded {{v1}} asset(s) that do not apply to this device (source code, checksums, signatures, debug symbols, blockmaps, other platforms or architectures)."
   }
 }

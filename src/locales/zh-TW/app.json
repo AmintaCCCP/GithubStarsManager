@@ -1065,7 +1065,15 @@
     "font-scale": "字級",
     "reduce-motion": "減弱動效",
     "reduce-motion-hint": "將動畫與轉場壓縮到接近零，版面與配色不變。",
-    "reset-appearance": "恢復預設外觀"
+    "reset-appearance": "恢復預設外觀",
+    "card-fields": "倉庫卡片顯示欄位",
+    "card-fields-hint": "只影響倉庫清單中每張卡片顯示什麼，不會改動資料本身。",
+    "card-field-description": "說明",
+    "card-field-tags": "標籤",
+    "card-field-language": "主要語言",
+    "card-field-stars": "Star 數",
+    "card-field-license": "授權條款",
+    "card-field-lastUpdated": "最近推送時間"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "向量語義搜尋",
@@ -1208,5 +1216,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} 字",
     "tag-count": "{{count}} 個標籤"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "高信心",
+    "confidence-medium": "中等信心",
+    "confidence-low": "低信心",
+    "installable-candidates": "可安裝候選",
+    "platform-not-detected": "未辨識出平台",
+    "detecting-architecture": "正在辨識架構…",
+    "assets-for-this-device": "適用於目前裝置的資產",
+    "matches-this-device": "適用於目前裝置",
+    "download-this-build": "下載此版本",
+    "other-candidates-v1": "其他可選資產（{{v1}}）",
+    "download": "下載",
+    "detected-from-filenames-and-release-metadata-no": "依檔名與 Release 中繼資料辨識，未驗證安裝包安全性，也不會自動執行。你隨時可以在下方資產清單中手動選擇其他資產。",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 個不適用於目前裝置的資產（原始碼、校驗和、簽章、偵錯符號、blockmap、其他平台/架構）。"
   }
+
 }

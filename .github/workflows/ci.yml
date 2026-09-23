@@ -57,6 +57,9 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/check-pr-release-files.cjs --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
 
+      - name: Validate community plugin registry semantics
+        run: node scripts/check-plugin-registry.cjs
+
       - name: i18n completeness and hardcoded-copy gate
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}

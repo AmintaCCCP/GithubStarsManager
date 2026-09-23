@@ -2,6 +2,7 @@
 import type { AppStoreSlice } from '../types';
 import { REQUIRED_HEADER_MENU_IDS } from '../schema';
 import { normalizeThemeTokens } from '../../utils/themeTokens';
+import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
 
 export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setTheme'
@@ -22,6 +23,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setRouteMode'
   | 'setRpcDownloadConfig'
   | 'setRepositoryViewMode'
+  | 'setRepositoryCardField'
   | 'setReleaseViewMode'
   | 'setReleaseShowMode'
   | 'setReleaseLatestMode'
@@ -71,6 +73,10 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       })),
 
       // Repository list view actions
+      // 卡片字段开关：合并当前值后 normalize，缺失字段自动按默认处理
+      setRepositoryCardField: (id, visible) => set((state) => ({
+        repositoryCardFields: normalizeRepositoryCardFields({ ...state.repositoryCardFields, [id]: visible }),
+      })),
       setRepositoryViewMode: (repositoryViewMode) => set({ repositoryViewMode }),
 
       // Release Timeline View actions

@@ -1065,7 +1065,15 @@
     "font-scale": "Tamaño de letra",
     "reduce-motion": "Reducir el movimiento",
     "reduce-motion-hint": "Acorta animaciones y transiciones casi a cero. El diseño y los colores no cambian.",
-    "reset-appearance": "Restablecer apariencia"
+    "reset-appearance": "Restablecer apariencia",
+    "card-fields": "Campos de la tarjeta",
+    "card-fields-hint": "Solo cambia lo que muestra cada tarjeta de la lista; tus datos no se tocan.",
+    "card-field-description": "Descripción",
+    "card-field-tags": "Etiquetas",
+    "card-field-language": "Lenguaje",
+    "card-field-stars": "Stars",
+    "card-field-license": "Licencia",
+    "card-field-lastUpdated": "Último push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Búsqueda semántica vectorial",
@@ -1208,5 +1216,21 @@
   "repositoryEditModal": {
     "char-count": "{{count}} palabras",
     "tag-count": "{{count}} etiquetas"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "Confianza alta",
+    "confidence-medium": "Confianza media",
+    "confidence-low": "Confianza baja",
+    "installable-candidates": "Candidatos instalables",
+    "platform-not-detected": "Plataforma no detectada",
+    "detecting-architecture": "Detectando arquitectura…",
+    "assets-for-this-device": "Recursos para este dispositivo",
+    "matches-this-device": "Coincide con este dispositivo",
+    "download-this-build": "Descargar esta compilación",
+    "other-candidates-v1": "Otros candidatos ({{v1}})",
+    "download": "Descargar",
+    "detected-from-filenames-and-release-metadata-no": "Se detecta a partir de nombres de archivo y metadatos del Release. No se comprueba la seguridad ni se ejecuta nada automáticamente. Siempre puedes elegir otro recurso en la lista de abajo.",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Se excluyeron {{v1}} recursos que no aplican a este dispositivo (código fuente, sumas de verificación, firmas, símbolos de depuración, blockmaps, otras plataformas o arquitecturas)."
   }
+
 }

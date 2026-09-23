@@ -1065,7 +1065,15 @@
     "font-scale": "字号",
     "reduce-motion": "减弱动效",
     "reduce-motion-hint": "把动画与过渡压缩到接近零，布局与配色不变。",
-    "reset-appearance": "恢复默认外观"
+    "reset-appearance": "恢复默认外观",
+    "card-fields": "仓库卡片显示字段",
+    "card-fields-hint": "只影响仓库列表里每张卡片显示什么，不改动数据本身。",
+    "card-field-description": "描述",
+    "card-field-tags": "标签",
+    "card-field-language": "主要语言",
+    "card-field-stars": "Star 数",
+    "card-field-license": "许可证",
+    "card-field-lastUpdated": "最近推送时间"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "向量语义搜索",
@@ -1208,5 +1216,20 @@
   "repositoryEditModal": {
     "char-count": "{{count}} 字",
     "tag-count": "{{count}} 个标签"
+  },
+  "installableAssetRecommendation": {
+    "confidence-high": "高置信",
+    "confidence-medium": "中等置信",
+    "confidence-low": "低置信",
+    "installable-candidates": "可安装候选",
+    "platform-not-detected": "未识别出平台",
+    "detecting-architecture": "正在识别架构…",
+    "assets-for-this-device": "适配当前设备的资产",
+    "matches-this-device": "适配当前设备",
+    "download-this-build": "下载此版本",
+    "other-candidates-v1": "其他可选资产（{{v1}}）",
+    "download": "下载",
+    "detected-from-filenames-and-release-metadata-no": "按文件名与 Release 元数据识别，未验证安装包安全性，也不会自动运行。你始终可以在下方资产列表中手动选择其他资产。",
+    "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 个不适用于当前设备的资产（源代码、校验和、签名、调试符号、blockmap、其他平台/架构）。"
   }
 }

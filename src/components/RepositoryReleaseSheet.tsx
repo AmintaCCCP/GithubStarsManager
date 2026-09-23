@@ -15,6 +15,7 @@ import { useAppStore } from '../store/useAppStore';
 import { useRepositoryReleaseSheet } from '../features/repositories/hooks/useRepositoryReleaseSheet';
 import { computeRpcDownloadKey } from '../hooks/useReleaseArtifactActions';
 import { buildReleaseDownloadLinks, type ReleaseDownloadLink } from '../utils/releaseDownloadLinks';
+import { formatFileSize } from '../utils/formatBytes';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
@@ -22,18 +23,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ReleasePluginRecommendations } from './ReleasePluginRecommendations';
 import { RepositoryHealthPanel } from './RepositoryHealthPanel';
+import { InstallableAssetRecommendation } from './InstallableAssetRecommendation';
 
 const RELEASES_PER_PAGE = 10;
 const ASSETS_PER_PAGE = 8;
-
-/** 把字节数格式化为人类可读字符串；`null` 表示未知（例如 Source code 条目）。 */
-const formatFileSize = (bytes: number | null): string => {
-  if (bytes === null) return '—';
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
-};
 
 interface RepositoryReleaseSheetProps {
   isOpen: boolean;
@@ -184,6 +177,11 @@ const ReleaseContent: React.FC<{
       </TabsList>
       <TabsContent value="assets" className="mt-3">
         <ReleasePluginRecommendations release={release} repository={repository} language={language} />
+        <InstallableAssetRecommendation
+          release={release}
+          downloadStates={downloadStates}
+          onDownload={onDownload}
+        />
         <ReleaseAssetsTable
           release={release}
           assetPage={assetPage}
