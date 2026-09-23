@@ -985,16 +985,16 @@ function registerDeepLinkProtocol() {
 function deliverDeepLink(value) {
   const url = normalizeDeepLink(value);
   if (!url) return;
-  if (!mainWindow || mainWindow.isDestroyed() || !deepLinkRendererReady) {
-    // 窗口或渲染进程还没准备好（例如冷启动），先存着等渲染进程来取。
+  if (!mainWindow || mainWindow.isDestroyed()) {
     pendingDeepLink = url;
-  } else {
-    mainWindow.webContents.send('deeplink:open', url);
+    // macOS 关闭最后一个窗口后应用仍会运行；系统再次唤起协议时要重建窗口。
+    // 冷启动的 app 尚未 ready，whenReady() 会按原流程创建窗口并消费 pending。
+    if (app.isReady()) restoreMainWindow();
+    return;
   }
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
+  if (!deepLinkRendererReady) pendingDeepLink = url;
+  else mainWindow.webContents.send('deeplink:open', url);
+  restoreMainWindow();
 }
 
 ipcMain.handle('deeplink:consumePending', (event) => {
