@@ -59,6 +59,7 @@ describe('ClipboardLinkBanner', () => {
     vi.clearAllMocks();
     mocks.target = null;
     mocks.repositories = [];
+    mocks.dismiss.mockImplementation(() => { mocks.target = null; });
   });
 
   it('renders nothing without a recognized target', () => {
@@ -86,6 +87,7 @@ describe('ClipboardLinkBanner', () => {
     await user.click(screen.getByRole('button', { name: '打开' }));
 
     expect(screen.getByTestId('readme-modal')).toHaveTextContent('owner/repo');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(mocks.dismiss).toHaveBeenCalledOnce();
   });
 

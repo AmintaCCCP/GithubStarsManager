@@ -42,32 +42,34 @@ export const ClipboardLinkBanner: React.FC = () => {
     dismiss();
   }, [dismiss, repositories, target]);
 
-  if (!target) return null;
+  if (!target && !localRepository) return null;
 
   return (
     <>
-      <div
-        role="status"
-        className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
-      >
-        <ClipboardPaste className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate" title={target.label}>
-          {t('clipboardLinkBanner.github-link-found', { v1: target.label })}
-        </span>
-        <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleOpen}>
-          {t('clipboardLinkBanner.open')}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          aria-label={t('clipboardLinkBanner.dismiss')}
-          onClick={dismiss}
+      {target && (
+        <div
+          role="status"
+          className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm"
         >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      </div>
+          <ClipboardPaste className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate" title={target.label}>
+            {t('clipboardLinkBanner.github-link-found', { v1: target.label })}
+          </span>
+          <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleOpen}>
+            {t('clipboardLinkBanner.open')}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            aria-label={t('clipboardLinkBanner.dismiss')}
+            onClick={dismiss}
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
       {localRepository && (
         <Suspense fallback={null}>
           <LazyReadmeModal
