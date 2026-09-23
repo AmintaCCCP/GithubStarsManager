@@ -106,13 +106,13 @@ export const LinkApplicationDialog: React.FC<LinkApplicationDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
+      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-2xl gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pb-4 pt-6">
           <DialogTitle>{t('myApps.link-dialog-title')}</DialogTitle>
           <DialogDescription>{t('myApps.link-dialog-description')}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 space-y-4 overflow-y-auto overflow-x-hidden px-6 pb-4">
           <div className="space-y-2">
             <Label htmlFor="my-apps-repository-search">{t('myApps.search-repositories')}</Label>
             <Input
@@ -142,9 +142,9 @@ export const LinkApplicationDialog: React.FC<LinkApplicationDialogProps> = ({
                         setDisplayName((current) => current || repository.name);
                         setOutcome(null);
                       }}
-                      className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
+                      className={`block w-full min-w-0 overflow-hidden px-3 py-2 text-left text-sm hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
                     >
-                      <span className="block font-medium text-foreground">{repository.full_name}</span>
+                      <span className="block truncate font-medium text-foreground">{repository.full_name}</span>
                       {repository.description ? (
                         <span className="block truncate text-xs text-muted-foreground">{repository.description}</span>
                       ) : null}
@@ -222,7 +222,7 @@ export const LinkApplicationDialog: React.FC<LinkApplicationDialogProps> = ({
           ) : null}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t border-border px-6 pb-6 pt-4">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>{t('useDialog.cancel')}</Button>
           <Button type="button" onClick={handleSubmit} disabled={!selectedRepository}>{t('myApps.link')}</Button>
         </DialogFooter>
