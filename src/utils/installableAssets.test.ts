@@ -116,6 +116,9 @@ describe('detectInstallableAssets — 排除非安装资产', () => {
     ['app-1.2.0-setup.exe.sig', 'signature file'],
     ['app-1.2.0.pdb', 'debug symbols'],
     ['App-1.2.0-setup.exe.blockmap', 'electron blockmap'],
+    ['App-win-x64.pdb.zip', 'debug symbols'],
+    ['App-win-x64.sig.zip', 'signature file'],
+    ['App-win-x64.blockmap.zip', 'electron blockmap'],
     ['app-1.2.0.sbom.json', 'software bill of materials'],
   ])('excludes %s', (name, expectedReason) => {
     const result = detectInstallableAssets([asset(1, name)], WINDOWS_DEVICE);
