@@ -1045,7 +1045,15 @@
     "light": "светлый цвет",
     "dark": "Темный",
     "theme-color": "Соответствие цветов темы",
-    "switch-the-interface-color-scheme-instantly-chan": "Переключите цвет интерфейса одним щелчком мыши, он вступит в силу немедленно и автоматически сохранится."
+    "switch-the-interface-color-scheme-instantly-chan": "Переключите цвет интерфейса одним щелчком мыши, он вступит в силу немедленно и автоматически сохранится.",
+    "card-fields": "Поля карточки репозитория",
+    "card-fields-hint": "Меняет только то, что показывают карточки в списке; сами данные не затрагиваются.",
+    "card-field-description": "Описание",
+    "card-field-tags": "Теги",
+    "card-field-language": "Язык",
+    "card-field-stars": "Звёзды",
+    "card-field-license": "Лицензия",
+    "card-field-lastUpdated": "Последний push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Векторный семантический поиск",

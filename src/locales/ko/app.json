@@ -1045,7 +1045,15 @@
     "light": "연한 색",
     "dark": "어두운",
     "theme-color": "테마 색상 매칭",
-    "switch-the-interface-color-scheme-instantly-chan": "한 번의 클릭으로 인터페이스 색상을 전환하면 즉시 적용되며 자동으로 저장됩니다."
+    "switch-the-interface-color-scheme-instantly-chan": "한 번의 클릭으로 인터페이스 색상을 전환하면 즉시 적용되며 자동으로 저장됩니다.",
+    "card-fields": "저장소 카드에 표시할 항목",
+    "card-fields-hint": "목록의 카드에 무엇을 표시할지만 바꿉니다. 데이터는 그대로입니다.",
+    "card-field-description": "설명",
+    "card-field-tags": "태그",
+    "card-field-language": "언어",
+    "card-field-stars": "스타 수",
+    "card-field-license": "라이선스",
+    "card-field-lastUpdated": "최근 푸시"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "벡터 의미 검색",

@@ -1045,7 +1045,15 @@
     "light": "淺色",
     "dark": "深色",
     "theme-color": "主題配色",
-    "switch-the-interface-color-scheme-instantly-chan": "一鍵切換介面配色，立即生效並自動儲存。"
+    "switch-the-interface-color-scheme-instantly-chan": "一鍵切換介面配色，立即生效並自動儲存。",
+    "card-fields": "倉庫卡片顯示欄位",
+    "card-fields-hint": "只影響倉庫清單中每張卡片顯示什麼，不會改動資料本身。",
+    "card-field-description": "說明",
+    "card-field-tags": "標籤",
+    "card-field-language": "主要語言",
+    "card-field-stars": "Star 數",
+    "card-field-license": "授權條款",
+    "card-field-lastUpdated": "最近推送時間"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "向量語義搜尋",

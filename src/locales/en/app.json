@@ -1045,7 +1045,15 @@
     "light": "Light",
     "dark": "Dark",
     "theme-color": "Theme Color",
-    "switch-the-interface-color-scheme-instantly-chan": "Switch the interface color scheme instantly; changes apply and persist automatically."
+    "switch-the-interface-color-scheme-instantly-chan": "Switch the interface color scheme instantly; changes apply and persist automatically.",
+    "card-fields": "Repository card fields",
+    "card-fields-hint": "Only changes what each card in the list shows; your data is untouched.",
+    "card-field-description": "Description",
+    "card-field-tags": "Tags",
+    "card-field-language": "Language",
+    "card-field-stars": "Stars",
+    "card-field-license": "License",
+    "card-field-lastUpdated": "Last pushed"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Vector Semantic Search",

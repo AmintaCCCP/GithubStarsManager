@@ -1045,7 +1045,15 @@
     "light": "浅色",
     "dark": "深色",
     "theme-color": "主题配色",
-    "switch-the-interface-color-scheme-instantly-chan": "一键切换界面配色，立即生效并自动保存。"
+    "switch-the-interface-color-scheme-instantly-chan": "一键切换界面配色，立即生效并自动保存。",
+    "card-fields": "仓库卡片显示字段",
+    "card-fields-hint": "只影响仓库列表里每张卡片显示什么，不改动数据本身。",
+    "card-field-description": "描述",
+    "card-field-tags": "标签",
+    "card-field-language": "主要语言",
+    "card-field-stars": "Star 数",
+    "card-field-license": "许可证",
+    "card-field-lastUpdated": "最近推送时间"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "向量语义搜索",

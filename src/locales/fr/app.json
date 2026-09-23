@@ -1045,7 +1045,15 @@
     "light": "couleur claire",
     "dark": "Sombre",
     "theme-color": "Correspondance des couleurs du thème",
-    "switch-the-interface-color-scheme-instantly-chan": "Changez la couleur de l'interface en un clic, elle prend effet immédiatement et est automatiquement enregistrée."
+    "switch-the-interface-color-scheme-instantly-chan": "Changez la couleur de l'interface en un clic, elle prend effet immédiatement et est automatiquement enregistrée.",
+    "card-fields": "Champs de la carte",
+    "card-fields-hint": "Change uniquement ce que montre chaque carte de la liste ; vos données restent intactes.",
+    "card-field-description": "Description",
+    "card-field-tags": "Étiquettes",
+    "card-field-language": "Langage",
+    "card-field-stars": "Stars",
+    "card-field-license": "Licence",
+    "card-field-lastUpdated": "Dernier push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Recherche sémantique vectorielle",

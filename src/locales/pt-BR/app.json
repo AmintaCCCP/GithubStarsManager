@@ -1045,7 +1045,15 @@
     "light": "cor clara",
     "dark": "Escuro",
     "theme-color": "Correspondência de cores do tema",
-    "switch-the-interface-color-scheme-instantly-chan": "Mude a cor da interface com um clique, ela entra em vigor imediatamente e é salva automaticamente."
+    "switch-the-interface-color-scheme-instantly-chan": "Mude a cor da interface com um clique, ela entra em vigor imediatamente e é salva automaticamente.",
+    "card-fields": "Campos do cartão",
+    "card-fields-hint": "Muda apenas o que cada cartão da lista mostra; seus dados não são alterados.",
+    "card-field-description": "Descrição",
+    "card-field-tags": "Etiquetas",
+    "card-field-language": "Linguagem",
+    "card-field-stars": "Stars",
+    "card-field-license": "Licença",
+    "card-field-lastUpdated": "Último push"
   },
   "vectorSearchSettings": {
     "vector-semantic-search": "Pesquisa semântica vetorial",
