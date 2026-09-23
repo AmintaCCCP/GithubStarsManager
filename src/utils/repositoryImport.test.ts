@@ -194,6 +194,13 @@ describe('extractRepositoryCandidates — 裸 owner/repo', () => {
   });
 
   it.each([
+    ['_foo/bar_', 'foo/bar'],
+    ['__foo/bar__', 'foo/bar'],
+  ])('normalizes Markdown underscore emphasis: %s', (input, expected) => {
+    expect(names(input)).toEqual([expected]);
+  });
+
+  it.each([
     ['src/utils', '代码目录名'],
     ['docs/plans', '代码目录名'],
     ['src/utils.ts', '文件扩展名'],

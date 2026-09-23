@@ -108,7 +108,7 @@ const SCHEMELESS_GITHUB_URL_PATTERN =
  * 前后用否定环视排除「更长路径的一部分」：`a/b/c` 里 `a/b` 与 `b/c` 都不会命中。
  */
 const BARE_SLUG_PATTERN =
-  /(?<![A-Za-z0-9._/-])([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9._-]{1,100})(?![A-Za-z0-9_/-])/g;
+  /(?<![A-Za-z0-9._/-])(?:(_{1,2})([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9._-]{1,100})\1|([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9._-]{1,100}))(?![A-Za-z0-9_/-])/g;
 
 /** URL 尾部常见的标点/包裹字符（`owner/repo.`、`owner/repo,`）。括号与引号已被捕获组排除。 */
 function trimUrlTail(value: string): string {
@@ -401,7 +401,8 @@ export function extractRepositoryCandidates(
 
     // URL 已经被消费过，屏蔽掉它们的路径段再找裸写法，避免 `releases/tag` 之类被误当成 slug。
     for (const match of maskUrls(text).matchAll(BARE_SLUG_PATTERN)) {
-      const [, owner, repo] = match;
+      const owner = match[2] ?? match[4];
+      const repo = match[3] ?? match[5];
       const trimmedRepo = repo.replace(/[.;:!?]+$/, '');
       if (!isPlausibleBareSlug(owner, trimmedRepo)) continue;
       const fullName = normalizeRepositoryFullName(owner, trimmedRepo);
