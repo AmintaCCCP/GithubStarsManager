@@ -275,6 +275,78 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).toContain('2 consecutive rounds');
   });
 
+  it('keeps keyword evidence when the planner returns prose instead of a retrieval plan', async () => {
+    const workflow = [
+      'name: Build',
+      'jobs:',
+      '  release:',
+      '    steps:',
+      '      - name: Build normal and offline apps',
+      '        run: |',
+      '          xcodebuild SWIFT_ACTIVE_COMPILATION_CONDITIONS="OFFLINE" PRODUCT_NAME="macshot Offline"',
+    ].join('\n');
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+    });
+    const workflowRef = '/.github/workflows/build-release.yml - 1-7';
+    mocks.generateChatText
+      .mockResolvedValueOnce('我先看发布流程和文档里对 release 资产的说明，确认带 offline 和不带 offline 的区别。')
+      .mockResolvedValueOnce('我先在发布说明和构建配置里查 offline 资产是怎么定义的。')
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('directly answer the user question', 'verified', [workflowRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The offline asset is built with the OFFLINE compilation condition.', workflowRef, 'Release assets'));
+
+    const result = await runRepositoryChatTurn(turnInput('What is the difference between offline and non-offline release assets?'));
+
+    expect(readPaths()).toEqual(['README.md', '.github/workflows/build-release.yml']);
+    expect(result.content).toContain(workflowRef);
+    expect(result.content).not.toContain('consecutive rounds');
+  });
+
+  it('extracts a headingless workflow downloaded before the planner times out', async () => {
+    const workflow = [
+      'name: Build',
+      'jobs:',
+      '  release:',
+      '    steps:',
+      '      - name: Build normal and offline apps',
+      '        run: |',
+      '          xcodebuild SWIFT_ACTIVE_COMPILATION_CONDITIONS="OFFLINE" PRODUCT_NAME="macshot Offline"',
+    ].join('\n');
+    configureTreeAndFiles({
+      'README.md': README,
+      '.github/workflows/build-release.yml': workflow,
+      'CHANGELOG.md': '# Changelog\n\n## Added\n\nUnrelated notes.',
+    });
+    const workflowRef = '/.github/workflows/build-release.yml - 1-7';
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({
+        entities: ['offline', 'Release assets'],
+        search_concepts: ['offline release asset'],
+        information_scope: 'both',
+        explicit_requirements: ['difference between offline and non-offline release assets'],
+        initial_targets: ['README.md', '.github/workflows/build-release.yml', 'CHANGELOG.md'],
+        target: 'offline release assets',
+      }))
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [requirement('difference between offline and non-offline release assets', 'verified', [workflowRef])],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('The offline asset is a separate OFFLINE build.', workflowRef, 'Release assets'));
+
+    const result = await runRepositoryChatTurn(turnInput('What is the difference between offline and non-offline release assets?'));
+
+    expect(readPaths()[0]).toBe('README.md');
+    expect(readPaths()).toContain('.github/workflows/build-release.yml');
+    expect(result.content).toContain(workflowRef);
+  });
+
   it('honors the configured maximum evidence rounds before starting another retrieval plan', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
@@ -628,6 +700,29 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).not.toContain('insufficient');
     expect(chunks[chunks.length - 1]).toBe('');
     expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps a partial streamed answer when the stream fails after emitting citable text', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding())
+      .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('project overview', 'verified', [overviewRef])], nextAction: 'answer' }));
+    const partial = `## Overview\n\nA documented example project. \`${overviewRef}\``;
+    mocks.generateChatTextStream.mockImplementation(async ({ onChunk }: { onChunk: (delta: string) => void }) => {
+      onChunk(partial);
+      throw new Error('stream closed');
+    });
+    const chunks: string[] = [];
+
+    const result = await runRepositoryChatTurn({
+      ...turnInput(),
+      streaming: true,
+      onAnswerChunk: (fullText) => chunks.push(fullText),
+    });
+
+    expect(chunks).toEqual([partial]);
+    expect(result.content).toContain(overviewRef);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
   });
 
   it('automatically escalates to code reads when documentation stalls', async () => {
