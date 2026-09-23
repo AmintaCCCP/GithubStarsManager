@@ -82,7 +82,9 @@ test('compares semantic versions and orders prereleases before releases', () => 
   assert.equal(compareVersions('1.0.0-beta.2', '1.0.0-beta.10'), -1);
   assert.equal(compareVersions('1.10.0+build.1', '1.9.0'), 1);
   assert.equal(compareVersions('1.0.0+build.1', '1.0.0+build.2'), 0);
-  assert.equal(compareVersions('1.2.0garbage', '1.2.0'), 1);
+  assert.equal(Number.isNaN(compareVersions('1.2.0garbage', '1.2.0')), true);
+  assert.equal(compareVersions('9007199254740993.0.0', '9007199254740992.0.0'), 1);
+  assert.equal(compareVersions('1.0.0-beta.9007199254740993', '1.0.0-beta.9007199254740992'), 1);
 });
 
 test('loads, validates and groups the registry, newest version first', async () => {

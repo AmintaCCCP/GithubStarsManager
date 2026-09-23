@@ -1028,6 +1028,7 @@
     "community-registry-hint": "비교만 합니다: 설치된 플러그인의 업데이트와 철회 상태를 보여줄 뿐, 자동으로 내려받거나 설치하지 않습니다.",
     "update-available-v1": "새 버전 {{v1}} 있음",
     "up-to-date": "최신 상태",
+    "version-unknown": "설치된 버전을 비교할 수 없음",
     "revoked": "철회됨",
     "blocked": "차단됨",
     "not-in-registry": "등록부에 없음",

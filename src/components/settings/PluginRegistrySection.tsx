@@ -104,6 +104,8 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ pl
                 <span className="block text-[11px] text-muted-foreground">
                   {assessment.status === 'update-available'
                     ? t('pluginSettingsPanel.update-available-v1', { v1: assessment.latestVersion ?? '' })
+                    : assessment.status === 'version-unknown'
+                      ? t('pluginSettingsPanel.version-unknown')
                     : assessment.status === 'up-to-date'
                       ? t('pluginSettingsPanel.up-to-date')
                       : assessment.status === 'revoked'

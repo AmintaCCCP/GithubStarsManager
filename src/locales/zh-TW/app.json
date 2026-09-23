@@ -1028,6 +1028,7 @@
     "community-registry-hint": "僅供對照：顯示已安裝外掛的更新與撤銷狀態，不會自動下載或安裝任何東西。",
     "update-available-v1": "版本 {{v1}} 已推出",
     "up-to-date": "已更新至最新",
+    "version-unknown": "無法比較已安裝版本",
     "revoked": "已遭撤銷",
     "blocked": "已遭封鎖",
     "not-in-registry": "不在登錄庫中",

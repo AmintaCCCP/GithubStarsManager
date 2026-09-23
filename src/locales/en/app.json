@@ -1028,6 +1028,7 @@
     "community-registry-hint": "Read-only comparison: shows update and revocation status for your installed plugins. Nothing is downloaded or installed automatically.",
     "update-available-v1": "Version {{v1}} available",
     "up-to-date": "Up to date",
+    "version-unknown": "Installed version cannot be compared",
     "revoked": "Revoked",
     "blocked": "Blocked",
     "not-in-registry": "Not in the registry",

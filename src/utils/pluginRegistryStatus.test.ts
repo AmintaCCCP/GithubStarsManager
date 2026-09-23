@@ -37,7 +37,10 @@ describe('comparePluginVersions', () => {
     expect(comparePluginVersions('1.0.0-beta.10', '1.0.0-beta.2')).toBe(1);
     expect(comparePluginVersions('1.10.0+build.1', '1.9.0')).toBe(1);
     expect(comparePluginVersions('1.0.0+build.1', '1.0.0+build.2')).toBe(0);
-    expect(comparePluginVersions('1.2.0garbage', '1.2.0')).toBe(1);
+    expect(Number.isNaN(comparePluginVersions('1.2.0garbage', '1.2.0'))).toBe(true);
+    expect(comparePluginVersions('9007199254740993.0.0', '9007199254740992.0.0')).toBe(1);
+    expect(comparePluginVersions('1.0.0-beta.9007199254740993', '1.0.0-beta.9007199254740992')).toBe(1);
+    expect(comparePluginVersions('1.0.0-beta.01.2', '1.0.0-beta.1.3')).toBe(-1);
   });
 });
 
@@ -80,6 +83,15 @@ describe('assessInstalledPlugins', () => {
 
     expect(assessment.status).toBe('up-to-date');
     expect(assessment.permissionDiff).toEqual({ added: [], removed: [] });
+  });
+
+  it('does not claim an update result for an installed version that cannot be compared', () => {
+    const [assessment] = assessInstalledPlugins(
+      [{ id: 'com.example.health', version: '1.9' }],
+      registry({ plugins: [{ id: 'com.example.health', versions: [entry({ version: '1.10.0' })] }] }),
+    );
+
+    expect(assessment).toMatchObject({ status: 'version-unknown', latestVersion: '1.10.0' });
   });
 
   it('flags revoked and blocked versions with the reason, before any update check', () => {

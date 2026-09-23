@@ -5,6 +5,7 @@ export type PluginRegistryStatus =
   | 'up-to-date'
   | 'revoked'
   | 'blocked'
+  | 'version-unknown'
   | 'not-in-registry';
 
 export interface PluginPermissionDiff {
@@ -34,17 +35,25 @@ export interface InstalledPluginForRegistry {
   declaredPermissions?: string[];
 }
 
-/** 语义化版本比较：预发布排在正式版之前。只用于判断"是否有更新"，不解析复杂范围。 */
+const compareNumericIdentifiers = (left: string, right: string): number => {
+  const a = left.replace(/^0+(?=\d)/, '');
+  const b = right.replace(/^0+(?=\d)/, '');
+  if (a.length !== b.length) return a.length > b.length ? 1 : -1;
+  return a === b ? 0 : (a > b ? 1 : -1);
+};
+
+/** 语义化版本比较；无法解析时返回 NaN，调用者须单独处理。 */
 export const comparePluginVersions = (left: string, right: string): number => {
   const parse = (value: string) => {
     const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(String(value).trim());
-    return match ? { numbers: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: match[4] ?? null } : null;
+    return match ? { numbers: [match[1], match[2], match[3]], prerelease: match[4] ?? null } : null;
   };
   const a = parse(left);
   const b = parse(right);
-  if (!a || !b) return left === right ? 0 : (left > right ? 1 : -1);
+  if (!a || !b) return NaN;
   for (let index = 0; index < 3; index += 1) {
-    if (a.numbers[index] !== b.numbers[index]) return a.numbers[index] > b.numbers[index] ? 1 : -1;
+    const comparison = compareNumericIdentifiers(a.numbers[index], b.numbers[index]);
+    if (comparison !== 0) return comparison;
   }
   if (a.prerelease === b.prerelease) return 0;
   if (a.prerelease === null) return 1;
@@ -59,7 +68,11 @@ export const comparePluginVersions = (left: string, right: string): number => {
     if (x === y) continue;
     const xNumeric = /^\d+$/.test(x);
     const yNumeric = /^\d+$/.test(y);
-    if (xNumeric && yNumeric) return Number(x) > Number(y) ? 1 : -1;
+    if (xNumeric && yNumeric) {
+      const comparison = compareNumericIdentifiers(x, y);
+      if (comparison !== 0) return comparison;
+      continue;
+    }
     if (xNumeric !== yNumeric) return xNumeric ? -1 : 1;
     return x > y ? 1 : -1;
   }
@@ -98,7 +111,7 @@ const SUPPORTED_API_VERSIONS = new Set(['1']);
 /** 取"客户端支持的最高版本"——不是注册表里的最新版本。 */
 export const pickInstallableEntry = (versions: PluginRegistryEntry[]): PluginRegistryEntry | null => {
   const compatible = versions
-    .filter((entry) => SUPPORTED_API_VERSIONS.has(entry.apiVersion))
+    .filter((entry) => SUPPORTED_API_VERSIONS.has(entry.apiVersion) && !Number.isNaN(comparePluginVersions(entry.version, entry.version)))
     .sort((left, right) => comparePluginVersions(right.version, left.version));
   return compatible[0] ?? null;
 };
@@ -144,7 +157,11 @@ export const assessInstalledPlugins = (
 
     const current = plugin.grantedPermissions ?? plugin.declaredPermissions ?? [];
     const permissionDiff = computePermissionDiff(entry.permissions, current);
-    const hasUpdate = comparePluginVersions(entry.version, plugin.version) > 0;
+    const versionComparison = comparePluginVersions(entry.version, plugin.version);
+    if (Number.isNaN(versionComparison)) {
+      return { ...base, status: 'version-unknown', latestVersion: entry.version, dataUsage: entry.dataUsage };
+    }
+    const hasUpdate = versionComparison > 0;
 
     return {
       ...base,

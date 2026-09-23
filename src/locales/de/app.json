@@ -1028,6 +1028,7 @@
     "community-registry-hint": "Nur ein Abgleich: zeigt Update- und Widerrufsstatus installierter Plugins. Es wird nichts automatisch geladen oder installiert.",
     "update-available-v1": "Version {{v1}} verfügbar",
     "up-to-date": "Aktuell",
+    "version-unknown": "Installierte Version kann nicht verglichen werden",
     "revoked": "Widerrufen",
     "blocked": "Gesperrt",
     "not-in-registry": "Nicht im Register",

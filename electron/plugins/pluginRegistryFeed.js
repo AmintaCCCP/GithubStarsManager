@@ -162,17 +162,25 @@ async function loadPluginRegistry({
   };
 }
 
-/** 简单的语义化版本比较；解析不出来时按字符串比较（返回 -1/0/1）。 */
+const compareNumericIdentifiers = (left, right) => {
+  const a = left.replace(/^0+(?=\d)/, '');
+  const b = right.replace(/^0+(?=\d)/, '');
+  if (a.length !== b.length) return a.length > b.length ? 1 : -1;
+  return a === b ? 0 : (a > b ? 1 : -1);
+};
+
+/** 比较注册表校验过的语义化版本。 */
 function compareVersions(left, right) {
   const parse = (value) => {
     const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(String(value));
-    return match ? { numbers: [Number(match[1]), Number(match[2]), Number(match[3])], prerelease: match[4] ?? null } : null;
+    return match ? { numbers: [match[1], match[2], match[3]], prerelease: match[4] ?? null } : null;
   };
   const a = parse(left);
   const b = parse(right);
-  if (!a || !b) return String(left) === String(right) ? 0 : (String(left) > String(right) ? 1 : -1);
+  if (!a || !b) return NaN;
   for (let index = 0; index < 3; index += 1) {
-    if (a.numbers[index] !== b.numbers[index]) return a.numbers[index] > b.numbers[index] ? 1 : -1;
+    const comparison = compareNumericIdentifiers(a.numbers[index], b.numbers[index]);
+    if (comparison !== 0) return comparison;
   }
   // 预发布版本排在正式版本之前
   if (a.prerelease === b.prerelease) return 0;
@@ -193,8 +201,8 @@ function comparePrerelease(left, right) {
     const aNumeric = /^\d+$/.test(a);
     const bNumeric = /^\d+$/.test(b);
     if (aNumeric && bNumeric) {
-      const diff = Number(a) - Number(b);
-      if (diff !== 0) return diff > 0 ? 1 : -1;
+      const diff = compareNumericIdentifiers(a, b);
+      if (diff !== 0) return diff;
       continue;
     }
     if (aNumeric !== bNumeric) return aNumeric ? -1 : 1;

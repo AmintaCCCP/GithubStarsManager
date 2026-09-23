@@ -1028,6 +1028,7 @@
     "community-registry-hint": "Simple comparaison : affiche le statut de mise à jour et de révocation de vos plugins. Rien n’est téléchargé ni installé automatiquement.",
     "update-available-v1": "Version {{v1}} disponible",
     "up-to-date": "À jour",
+    "version-unknown": "Version installée impossible à comparer",
     "revoked": "Révoqué",
     "blocked": "Bloqué",
     "not-in-registry": "Absent du registre",

@@ -1028,6 +1028,7 @@
     "community-registry-hint": "只做对照：显示已安装插件的更新与撤销状态，不会自动下载或安装任何东西。",
     "update-available-v1": "有新版本 {{v1}}",
     "up-to-date": "已是最新",
+    "version-unknown": "无法比较已安装版本",
     "revoked": "已被撤销",
     "blocked": "已被拉黑",
     "not-in-registry": "不在注册表中",

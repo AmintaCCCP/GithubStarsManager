@@ -1028,6 +1028,7 @@
     "community-registry-hint": "照合のみ：インストール済みプラグインの更新・取り消し状況を表示します。自動でダウンロードやインストールは行いません。",
     "update-available-v1": "新しいバージョン {{v1}} があります",
     "up-to-date": "最新です",
+    "version-unknown": "インストール済みバージョンを比較できません",
     "revoked": "取り消されました",
     "blocked": "ブロックされました",
     "not-in-registry": "登録簿にありません",
