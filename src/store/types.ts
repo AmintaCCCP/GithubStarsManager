@@ -177,6 +177,7 @@ export interface AppActions {
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: AppLanguage) => void;
   setTranslationEngine: (engine: TranslationEngine) => void;
+  setAutoTranslateRepoDescription: (enabled: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setReadmeModalOpen: (open: boolean) => void;
   setHeaderMenuConfig: (config: HeaderMenuItem[]) => void;

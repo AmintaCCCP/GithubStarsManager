@@ -6,6 +6,7 @@ import { getPlatformIcon as getSharedPlatformIcon } from './platformMeta';
 import type { DiscoveryRepo } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryRepoActions } from '../features/discovery/hooks/useDiscoveryRepoActions';
+import { useTranslatedDescription } from '../hooks/useTranslatedDescription';
 import { ReadmeModal } from './ReadmeModal';
 import { WeeklyIssueModal } from './WeeklyIssueModal';
 import { XTweetModal } from './XTweetModal';
@@ -27,6 +28,11 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
   const githubToken = useAppStore(state => state.githubToken);
 
   const t = useT('releases');
+
+  // 「自动翻译仓库描述」：发现页卡片原始描述与 AI 总结同时展示，有描述即翻译；
+  // 翻译中/失败/同语言时回退原文。
+  const translatedDescription = useTranslatedDescription(repo.description);
+  const displayDescription = translatedDescription ?? repo.description ?? null;
 
   const { analyze, star, executeUnstar, isAnalyzing, isStarring, isStarred } =
     useDiscoveryRepoActions({ repo });
@@ -286,17 +292,17 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                       className="relative mb-3 block w-full cursor-text text-left"
                     >
                       <span className="block text-sm text-muted-foreground dark:text-muted-foreground line-clamp-2 rounded px-1 -mx-1 hover:bg-accent/50 dark:hover:bg-card/[0.02] transition-colors duration-200">
-                        {repo.description}
+                        {displayDescription}
                       </span>
                     </button>
                   </PopoverTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words">
-                  {repo.description}
+                  {displayDescription}
                 </TooltipContent>
               </Tooltip>
               <PopoverContent side="top" align="start" className="max-w-lg whitespace-pre-wrap break-words" onClick={(event) => event.stopPropagation()}>
-                {repo.description}
+                {displayDescription}
               </PopoverContent>
             </Popover>
           ) : (

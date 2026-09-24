@@ -566,6 +566,8 @@
     "google-translate-free": "Google 翻译（免费）",
     "ai-translation-uses-the-active-ai-configuration": "AI 翻译（使用当前激活的 AI 配置）",
     "ai-translation-usually-has-higher-quality-but-is": "AI 翻译质量通常更高，但速度较慢且消耗 API 额度，将使用上方当前激活的 AI 配置。",
+    "auto-translate-repo-descriptions": "自动翻译仓库描述",
+    "when-enabled-card-repository-description": "开启后，仓库页与发现页卡片上的仓库原始描述会自动翻译成当前界面语言显示；已是界面语言的描述保持原文，翻译失败时也显示原文。",
     "free-google-endpoint-no-configuration-needed-may": "Google 免费接口，无需配置；部分地区可能无法直连。",
     "free-microsoft-edge-endpoint-no-configuration-ne": "微软 Edge 免费接口，无需配置，直连速度快。"
   },

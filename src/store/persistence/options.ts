@@ -103,6 +103,7 @@ sortOrder: state.gistSearchFilters.sortOrder,
   selectedCategory: state.selectedCategory,
   language: state.language,
   translationEngine: state.translationEngine,
+  autoTranslateRepoDescription: state.autoTranslateRepoDescription,
   isSidebarCollapsed: state.isSidebarCollapsed,
   headerMenuConfig: state.headerMenuConfig,
 

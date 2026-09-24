@@ -566,6 +566,8 @@
     "google-translate-free": "Traductor de Google (gratis)",
     "ai-translation-uses-the-active-ai-configuration": "Traducción de IA (usando la configuración de IA actualmente activada)",
     "ai-translation-usually-has-higher-quality-but-is": "La traducción de IA es generalmente de mayor calidad, pero más lenta y consume créditos de API, y utilizará la configuración de IA actualmente activa anterior.",
+    "auto-translate-repo-descriptions": "Traducir automáticamente las descripciones de repositorios",
+    "when-enabled-card-repository-description": "Si se activa, las descripciones originales de los repositorios en las tarjetas de las páginas de repositorios y descubrimiento se traducen automáticamente al idioma de la interfaz. Las descripciones que ya están en ese idioma se muestran sin cambios, y se muestra el texto original si la traducción falla.",
     "free-google-endpoint-no-configuration-needed-may": "La interfaz gratuita de Google no requiere configuración; Es posible que algunas áreas no estén conectadas directamente.",
     "free-microsoft-edge-endpoint-no-configuration-ne": "Interfaz gratuita de Microsoft Edge, no requiere configuración, la velocidad de conexión directa es rápida."
   },

@@ -566,6 +566,8 @@
     "google-translate-free": "Google Translate (Free)",
     "ai-translation-uses-the-active-ai-configuration": "AI Translation (uses the active AI configuration)",
     "ai-translation-usually-has-higher-quality-but-is": "AI translation usually has higher quality, but is slower and consumes API quota. It uses the active AI configuration above.",
+    "auto-translate-repo-descriptions": "Auto-translate repository descriptions",
+    "when-enabled-card-repository-description": "When enabled, repository descriptions on the repositories and discovery cards are automatically translated into the interface language. Descriptions already in that language stay unchanged, and the original text is shown if translation fails.",
     "free-google-endpoint-no-configuration-needed-may": "Free Google endpoint, no configuration needed; may be unreachable in some regions.",
     "free-microsoft-edge-endpoint-no-configuration-ne": "Free Microsoft Edge endpoint, no configuration needed, fast direct connection."
   },

@@ -565,6 +565,8 @@
     "google-translate-free": "Google Translate (kostenlos)",
     "ai-translation-uses-the-active-ai-configuration": "KI-Übersetzung (unter Verwendung der aktuell aktivierten KI-Konfiguration)",
     "ai-translation-usually-has-higher-quality-but-is": "Die KI-Übersetzung ist im Allgemeinen von höherer Qualität, aber langsamer, verbraucht API-Credits und verwendet die aktuell aktive KI-Konfiguration oben.",
+    "auto-translate-repo-descriptions": "Repository-Beschreibungen automatisch übersetzen",
+    "when-enabled-card-repository-description": "Wenn aktiviert, werden die ursprünglichen Repository-Beschreibungen auf den Karten der Repository- und Discovery-Seiten automatisch in die Oberflächensprache übersetzt. Bereits in dieser Sprache vorliegende Beschreibungen bleiben unverändert; bei fehlgeschlagener Übersetzung wird der Originaltext angezeigt.",
     "free-google-endpoint-no-configuration-needed-may": "Die kostenlose Benutzeroberfläche von Google erfordert keine Konfiguration; Einige Bereiche sind möglicherweise nicht direkt miteinander verbunden.",
     "free-microsoft-edge-endpoint-no-configuration-ne": "Kostenlose Microsoft Edge-Schnittstelle, keine Konfiguration erforderlich, schnelle direkte Verbindungsgeschwindigkeit.",
     "api-pay-as-you-go": "API (Pay-as-you-go)"

@@ -77,6 +77,7 @@ export const createInitialState = (): AppState => ({
       selectedCategory: 'all',
       language: detectInitialLanguage(),
       translationEngine: 'microsoft',
+      autoTranslateRepoDescription: false,
       updateNotification: null,
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),

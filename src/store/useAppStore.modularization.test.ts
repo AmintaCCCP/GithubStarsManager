@@ -89,6 +89,7 @@ const currentPersistedKeys = [
   'selectedCategory',
   'language',
   'translationEngine',
+  'autoTranslateRepoDescription',
   'isSidebarCollapsed',
   'headerMenuConfig',
   'backendApiSecret',
