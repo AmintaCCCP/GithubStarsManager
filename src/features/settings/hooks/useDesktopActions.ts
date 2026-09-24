@@ -1,15 +1,11 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_DESKTOP_PREFS,
   desktopBridge,
   type DesktopPrefs,
 } from '../../../services/electronProxy';
-
-interface UseDesktopActionsOptions {
-  t: TranslateFn;
-}
 
 export interface DesktopActions {
   supported: boolean;
@@ -27,7 +23,8 @@ export interface DesktopActions {
  * Web builds report `supported: false` and the caller hides the section.
  * Optimistic toggles roll back to the last confirmed prefs on IPC failure.
  */
-export const useDesktopActions = ({ t }: UseDesktopActionsOptions): DesktopActions => {
+export const useDesktopActions = (): DesktopActions => {
+  const t = useT('settings');
   const supported = desktopBridge.isSupported();
   const [prefs, setPrefs] = useState<DesktopPrefs>({ ...DEFAULT_DESKTOP_PREFS });
   const [loading, setLoading] = useState(supported);

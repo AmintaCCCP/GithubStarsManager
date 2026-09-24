@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "카테고리에 해당하는 창고가 없습니다.",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} 목록이 동기화되었으며 {{updatedCount}} 창고가 업데이트되었습니다.",
     "push-failed": "동기화 실패",
-    "push-failed-detail": "푸시 실패: {{message}}"
+    "push-failed-detail": "푸시 실패: {{message}}",
+    "lists-push-limit-name-item": "\"{{name}}\"(현재 {{length}}자, 제한 {{max}}자)",
+    "lists-push-limit-name-too-long": "다음 카테고리 이름이 GitHub List 이름의 {{max}}자 제한을 초과하여 동기화를 실행하지 않았습니다:\n{{items}}\n설정 → 카테고리 관리에서 이 카테고리 이름을 줄이거나, 동기화하지 않을 카테고리를 숨기거나 삭제한 후 다시 시도하세요(숨긴 카테고리는 GitHub에 동기화되지 않습니다).",
+    "lists-push-limit-count-exceeded": "GitHub는 계정당 최대 {{max}}개의 List를 허용합니다: 현재 {{existing}}개가 있고 이번에 {{needed}}개를 더 만들어야 하므로 한도를 초과하여 동기화를 실행하지 않았습니다.\n설정 → 카테고리 관리에서 동기화하지 않을 카테고리를 숨기거나 삭제한 후 다시 시도하거나, GitHub에서 불필요한 List를 삭제하세요(숨긴 카테고리는 GitHub에 동기화되지 않습니다)."
   },
   "discoverySidebar": {
     "minutes-ago": "{{count}}분 전",

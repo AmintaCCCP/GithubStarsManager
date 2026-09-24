@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "No repos matched any category",
     "pushed-v1-lists-updated-updatedcount-repos": "Pushed {{v1}} lists, updated {{updatedCount}} repos",
     "push-failed": "Push failed",
-    "push-failed-detail": "Push failed: {{message}}"
+    "push-failed-detail": "Push failed: {{message}}",
+    "lists-push-limit-name-item": "\"{{name}}\" (currently {{length}} chars, limit {{max}})",
+    "lists-push-limit-name-too-long": "The following category names exceed the GitHub List name limit of {{max}} characters, so the sync was not started:\n{{items}}\nShorten these category names, or hide/delete categories you don't want to sync in Settings → Category Management, then try again (hidden categories are not synced to GitHub).",
+    "lists-push-limit-count-exceeded": "GitHub allows at most {{max}} Lists per account: {{existing}} already exist and {{needed}} more would need to be created, which exceeds the limit, so the sync was not started.\nHide or delete categories you don't want to sync in Settings → Category Management, or delete unneeded Lists on GitHub, then try again (hidden categories are not synced to GitHub)."
   },
   "discoverySidebar": {
     "minutes-ago": "{{count}}m ago",

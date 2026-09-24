@@ -28,8 +28,8 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
     setLanguage: state.setLanguage,
     user: state.user,
   })));
-  const desktop = useDesktopActions({ t });
-  const githubToken = useGitHubTokenActions({ t });
+  const desktop = useDesktopActions();
+  const githubToken = useGitHubTokenActions();
 
   return (
     <div className="space-y-6">

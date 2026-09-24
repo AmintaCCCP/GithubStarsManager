@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "没有仓库命中任何分类",
     "pushed-v1-lists-updated-updatedcount-repos": "已同步 {{v1}} 个 list、更新 {{updatedCount}} 个仓库",
     "push-failed": "同步失败",
-    "push-failed-detail": "推送失败: {{message}}"
+    "push-failed-detail": "推送失败: {{message}}",
+    "lists-push-limit-name-item": "「{{name}}」（当前 {{length}} 字符，上限 {{max}}）",
+    "lists-push-limit-name-too-long": "以下分类名称超过 GitHub List 名称的 {{max}} 字符上限，本次同步未执行：\n{{items}}\n请在「设置 → 分类管理」中缩短这些分类的名称，或隐藏/删除不需要同步的分类后重试（隐藏的分类不会同步到 GitHub）。",
+    "lists-push-limit-count-exceeded": "GitHub 每个账号最多允许 {{max}} 个 List：当前已有 {{existing}} 个，本次还需新建 {{needed}} 个，已超出上限，本次同步未执行。\n请在「设置 → 分类管理」中隐藏或删除不需要同步的分类后重试（隐藏的分类不会同步到 GitHub），也可以登录 GitHub 删除不再需要的 List。"
   },
   "discoverySidebar": {
     "minutes-ago": "{{count}} 分钟前",

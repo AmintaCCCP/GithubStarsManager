@@ -1,15 +1,11 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { AIConfig, WebDAVConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
-
-interface UseBackupActionsOptions {
-  t: TranslateFn;
-}
 
 export interface BackupActions {
   activeConfig: WebDAVConfig | undefined;
@@ -23,7 +19,8 @@ export interface BackupActions {
  * Owns WebDAV backup and restore orchestration. The payload deliberately keeps
  * the existing key-masking rules, including proxy password and RPC secret.
  */
-export const useBackupActions = ({ t }: UseBackupActionsOptions): BackupActions => {
+export const useBackupActions = (): BackupActions => {
+  const t = useT('settings');
   const state = useAppStore(useShallow((store) => ({
     repositories: store.repositories,
     releases: store.releases,

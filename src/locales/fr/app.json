@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "Aucun entrepôt n'appartient à aucune catégorie",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} listes ont été synchronisées et {{updatedCount}} entrepôts ont été mis à jour.",
     "push-failed": "La synchronisation a échoué",
-    "push-failed-detail": "Échec de la transmission : {{message}}"
+    "push-failed-detail": "Échec de la transmission : {{message}}",
+    "lists-push-limit-name-item": "« {{name}} » (actuellement {{length}} caractères, limite {{max}})",
+    "lists-push-limit-name-too-long": "Les noms de catégories suivants dépassent la limite de {{max}} caractères des noms de listes GitHub ; la synchronisation n'a pas été lancée :\n{{items}}\nRaccourcissez ces noms de catégories, ou masquez/supprimez dans Paramètres → Gestion des catégories les catégories à ne pas synchroniser, puis réessayez (les catégories masquées ne sont pas synchronisées avec GitHub).",
+    "lists-push-limit-count-exceeded": "GitHub autorise au maximum {{max}} listes par compte : {{existing}} existent déjà et {{needed}} autres devraient être créées, ce qui dépasse la limite ; la synchronisation n'a pas été lancée.\nMasquez ou supprimez dans Paramètres → Gestion des catégories les catégories à ne pas synchroniser, ou supprimez sur GitHub les listes devenues inutiles, puis réessayez (les catégories masquées ne sont pas synchronisées avec GitHub)."
   },
   "discoverySidebar": {
     "minutes-ago": "il y a {{count}} minutes",

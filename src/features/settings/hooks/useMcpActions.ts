@@ -1,15 +1,11 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
 import { isElectron } from '../../../services/electronProxy';
-
-interface UseMcpActionsOptions {
-  t: TranslateFn;
-}
 
 const generateLocalToken = (): string => {
   const bytes = new Uint8Array(24);
@@ -33,7 +29,8 @@ export interface McpActions {
 }
 
 /** Keeps MCP backend operations and token lifecycle away from the form view. */
-export const useMcpActions = ({ t }: UseMcpActionsOptions): McpActions => {
+export const useMcpActions = (): McpActions => {
+  const t = useT('settings');
   const { mcpConfig, setMcpConfig } = useAppStore(useShallow((state) => ({
     mcpConfig: state.mcpConfig,
     setMcpConfig: state.setMcpConfig,

@@ -43,6 +43,7 @@ const rpcDownloadConfig = {
 };
 
 const storeState = {
+  language: 'zh',
   proxyConfig,
   setProxyConfig: mocks.setProxyConfig,
   rpcDownloadConfig,
@@ -63,7 +64,7 @@ describe('useNetworkActions', () => {
   });
 
   it('keeps settings usable when the optional backend is unavailable', async () => {
-    const { result } = renderHook(() => useNetworkActions({ t: (zh) => zh }));
+    const { result } = renderHook(() => useNetworkActions());
 
     expect(result.current.canUseProxy).toBe(false);
     await act(async () => { await result.current.testRpc(); });
@@ -71,7 +72,7 @@ describe('useNetworkActions', () => {
   });
 
   it('passes the proxy password to the Store so it persists with the proxy configuration', async () => {
-    const { result } = renderHook(() => useNetworkActions({ t: (zh) => zh }));
+    const { result } = renderHook(() => useNetworkActions());
 
     await act(async () => { await result.current.saveProxy(); });
 
@@ -79,7 +80,7 @@ describe('useNetworkActions', () => {
   });
 
   it('passes the RPC secret to the store action so its intentional persistence is retained', async () => {
-    const { result } = renderHook(() => useNetworkActions({ t: (zh) => zh }));
+    const { result } = renderHook(() => useNetworkActions());
 
     await act(async () => { await result.current.saveRpc(); });
 

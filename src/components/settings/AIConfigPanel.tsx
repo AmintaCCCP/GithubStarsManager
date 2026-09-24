@@ -116,7 +116,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   })));
 
   const { toast, confirm } = useDialog();
-  const { testingId, testingForm, testConfig, testDraft } = useAIConfigActions({ t });
+  const { testingId, testingForm, testConfig, testDraft } = useAIConfigActions();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

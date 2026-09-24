@@ -28,7 +28,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
     testConnection: handleTestConnection,
     syncToBackend: handleSyncToBackend,
     syncFromBackend: handleSyncFromBackend,
-  } = useBackendSettingsActions({ t });
+  } = useBackendSettingsActions();
   const routeMode = useAppStore((state) => state.routeMode);
   const setRouteMode = useAppStore((state) => state.setRouteMode);
 

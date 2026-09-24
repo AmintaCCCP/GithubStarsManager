@@ -29,7 +29,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   })));
 
   const { confirm } = useDialog();
-  const { testingId, save, test } = useWebDAVActions({ t });
+  const { testingId, save, test } = useWebDAVActions();
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

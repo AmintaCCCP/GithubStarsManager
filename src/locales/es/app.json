@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "Ningún almacén afecta a ninguna categoría.",
     "pushed-v1-lists-updated-updatedcount-repos": "Se han sincronizado {{v1}} listas y se han actualizado {{updatedCount}} almacenes.",
     "push-failed": "Error de sincronización",
-    "push-failed-detail": "Error al enviar: {{message}}"
+    "push-failed-detail": "Error al enviar: {{message}}",
+    "lists-push-limit-name-item": "«{{name}}» (actualmente {{length}} caracteres, límite {{max}})",
+    "lists-push-limit-name-too-long": "Los siguientes nombres de categoría superan el límite de {{max}} caracteres de los nombres de lista de GitHub, por lo que no se inició la sincronización:\n{{items}}\nAcorte estos nombres de categoría, u oculte o elimine en Ajustes → Gestión de categorías las categorías que no quiera sincronizar, y vuelva a intentarlo (las categorías ocultas no se sincronizan con GitHub).",
+    "lists-push-limit-count-exceeded": "GitHub permite como máximo {{max}} listas por cuenta: ya existen {{existing}} y habría que crear {{needed}} más, lo que supera el límite, por lo que no se inició la sincronización.\nOculte o elimine en Ajustes → Gestión de categorías las categorías que no quiera sincronizar, o elimine en GitHub las listas que ya no necesite, y vuelva a intentarlo (las categorías ocultas no se sincronizan con GitHub)."
   },
   "discoverySidebar": {
     "minutes-ago": "Hace {{count}} minutos",

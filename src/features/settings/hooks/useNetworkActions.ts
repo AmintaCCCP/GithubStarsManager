@@ -1,5 +1,5 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { ProxyConfig, RpcDownloadConfig } from '../../../types';
@@ -7,10 +7,6 @@ import { useAppStore } from '../../../store/useAppStore';
 import { backend } from '../../../services/backendAdapter';
 import { electronProxy, isElectron } from '../../../services/electronProxy';
 import { testRpcDownload } from '../../../services/rpcDownloadService';
-
-interface UseNetworkActionsOptions {
-  t: TranslateFn;
-}
 
 type ConnectionResult = { success: boolean; error?: string };
 type RpcConnectionResult = ConnectionResult & { version?: string };
@@ -48,7 +44,8 @@ export interface NetworkActions {
  * in the existing store, preserving its intentional proxy-password/RPC-secret
  * asymmetry.
  */
-export const useNetworkActions = ({ t }: UseNetworkActionsOptions): NetworkActions => {
+export const useNetworkActions = (): NetworkActions => {
+  const t = useT('settings');
   const { proxyConfig, setProxyConfig, rpcDownloadConfig, setRpcDownloadConfig, backendApiSecret } = useAppStore(useShallow((state) => ({
     proxyConfig: state.proxyConfig,
     setProxyConfig: state.setProxyConfig,

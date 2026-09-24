@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "Kein Lager trifft auf irgendeine Kategorie",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} Listen wurden synchronisiert und {{updatedCount}} Lager wurden aktualisiert.",
     "push-failed": "Die Synchronisierung ist fehlgeschlagen",
-    "push-failed-detail": "Push fehlgeschlagen: {{message}}"
+    "push-failed-detail": "Push fehlgeschlagen: {{message}}",
+    "lists-push-limit-name-item": "„{{name}}“ (aktuell {{length}} Zeichen, Limit {{max}})",
+    "lists-push-limit-name-too-long": "Die folgenden Kategorienamen überschreiten das Limit von {{max}} Zeichen für GitHub-Listennamen, die Synchronisation wurde nicht gestartet:\n{{items}}\nKürzen Sie diese Kategorienamen oder blenden Sie unter „Einstellungen → Kategorienverwaltung“ nicht zu synchronisierende Kategorien aus bzw. löschen Sie sie, und versuchen Sie es erneut (ausgeblendete Kategorien werden nicht mit GitHub synchronisiert).",
+    "lists-push-limit-count-exceeded": "GitHub erlaubt höchstens {{max}} Listen pro Konto: Es existieren bereits {{existing}} Listen und {{needed}} weitere müssten erstellt werden, was das Limit überschreitet, daher wurde die Synchronisation nicht gestartet.\nBlenden Sie unter „Einstellungen → Kategorienverwaltung“ nicht zu synchronisierende Kategorien aus bzw. löschen Sie sie, oder löschen Sie nicht mehr benötigte Listen auf GitHub, und versuchen Sie es erneut (ausgeblendete Kategorien werden nicht mit GitHub synchronisiert)."
   },
   "discoverySidebar": {
     "minutes-ago": "Vor {{count}} Minuten",
