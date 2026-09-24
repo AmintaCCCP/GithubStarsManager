@@ -650,4 +650,22 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.2</downloadUrl>
   </version>
+  <version>
+    <number>0.8.3</number>
+    <releaseDate>2026-09-25</releaseDate>
+    <changelog>
+      <item>feat: Release asset lists now detect the current platform and architecture and recommend the matching installer format while keeping the full asset list selectable. (contributed by @Khk-NL). (PR #386)</item>
+      <item>feat: Added the extraction and normalization layer for batch repository import, extracting repositories from GitHub URLs, Markdown, owner/repo text, and JSON with deduplication. (contributed by @Khk-NL). (PR #387)</item>
+      <item>feat: Plugin settings can now compare installed plugins with the community plugin registry, showing available updates, permission changes, and revoked or blocked status. (contributed by @Khk-NL). (PR #389)</item>
+      <item>feat: Repository card fields (description, tags, language, stars, license, and last-pushed time) are now individually configurable in appearance settings for both grid and list views. (contributed by @Khk-NL). (PR #390)</item>
+      <item>feat: Added daily local Trending snapshots with a ranking history panel showing rank changes, new entries, consecutive-day streaks, and star growth. (contributed by @Khk-NL). (PR #391)</item>
+      <item>feat: Added theme token customization in Appearance settings for accent color, corner radius, font scale, and reduced motion, with one-click restore to defaults. (contributed by @Khk-NL). (PR #392)</item>
+      <item>docs: Added the community plugin registry proposal documenting SHA-256 integrity checks and the contributor and maintainer review workflow. (contributed by @Khk-NL). (PR #394)</item>
+      <item>fix: The Repository Q&amp;A Assistant now keeps citable evidence from files without headings and preserves partial streamed answers when streaming fails. (PR #398)</item>
+      <item>fix: Discovery trending cards now show a localized &apos;No description available&apos; placeholder for repositories without a description instead of rendering the README text. (PR #399)</item>
+      <item>fix: Pushing categories to GitHub Lists now pre-validates the 32-list and 32-character name limits locally, aborting with zero writes and per-item guidance. (PR #400)</item>
+      <item>feat: Added an auto-translate repository descriptions toggle in Settings &gt; AI &gt; Translation Engine, translating descriptions that differ from the interface language with caching and graceful fallback. (PR #401)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.3</downloadUrl>
+  </version>
 </versions>
