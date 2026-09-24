@@ -202,6 +202,7 @@
     "release-pagination": "릴리스 페이징"
   },
   "subscriptionRepoCard": {
+    "no-description": "아직 설명이 없습니다",
     "re-analyze": "재분석",
     "ai-analyze": "AI 분석",
     "open-in-zread": "ZRead에서 열기",

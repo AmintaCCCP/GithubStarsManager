@@ -202,6 +202,7 @@
     "release-pagination": "Release 分页"
   },
   "subscriptionRepoCard": {
+    "no-description": "暂无描述",
     "re-analyze": "重新分析",
     "ai-analyze": "AI分析",
     "open-in-zread": "在ZRead打开",

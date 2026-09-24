@@ -202,6 +202,7 @@
     "release-pagination": "Liberar paginación"
   },
   "subscriptionRepoCard": {
+    "no-description": "Aún no hay descripción",
     "re-analyze": "Reanalizar",
     "ai-analyze": "análisis de IA",
     "open-in-zread": "Abrir en ZRead",
