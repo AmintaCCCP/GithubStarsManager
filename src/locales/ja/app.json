@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "どのカテゴリにも該当する倉庫はありません",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} 個のリストが同期され、{{updatedCount}} 個のウェアハウスが更新されました。",
     "push-failed": "同期に失敗しました",
-    "push-failed-detail": "プッシュに失敗しました: {{message}}"
+    "push-failed-detail": "プッシュに失敗しました: {{message}}",
+    "lists-push-limit-name-item": "「{{name}}」（現在 {{length}} 文字、上限 {{max}}）",
+    "lists-push-limit-name-too-long": "次のカテゴリ名が GitHub List 名の {{max}} 文字上限を超えているため、同期は実行されませんでした：\n{{items}}\n「設定 → カテゴリ管理」でこれらのカテゴリ名を短くするか、同期しないカテゴリを非表示・削除してから再試行してください（非表示のカテゴリは GitHub に同期されません）。",
+    "lists-push-limit-count-exceeded": "GitHub の List はアカウントごとに最大 {{max}} 個です：現在 {{existing}} 個あり、今回さらに {{needed}} 個を作成する必要があるため上限を超え、同期は実行されませんでした。\n「設定 → カテゴリ管理」で同期しないカテゴリを非表示または削除してから再試行するか、GitHub で不要な List を削除してください（非表示のカテゴリは GitHub に同期されません）。"
   },
   "discoverySidebar": {
     "minutes-ago": "{{count}}分前",

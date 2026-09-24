@@ -1216,7 +1216,10 @@
     "no-repos-matched-any-category": "沒有倉庫命中任何分類",
     "pushed-v1-lists-updated-updatedcount-repos": "已同步 {{v1}} 個 list、更新 {{updatedCount}} 個倉庫",
     "push-failed": "同步失敗",
-    "push-failed-detail": "推播失敗: {{message}}"
+    "push-failed-detail": "推播失敗: {{message}}",
+    "lists-push-limit-name-item": "「{{name}}」（目前 {{length}} 字元，上限 {{max}}）",
+    "lists-push-limit-name-too-long": "以下分類名稱超過 GitHub List 名稱的 {{max}} 字元上限，本次同步未執行：\n{{items}}\n請在「設定 → 分類管理」中縮短這些分類的名稱，或隱藏/刪除不需要同步的分類後重試（隱藏的分類不會同步到 GitHub）。",
+    "lists-push-limit-count-exceeded": "GitHub 每個帳號最多允許 {{max}} 個 List：目前已有 {{existing}} 個，本次還需新增 {{needed}} 個，已超出上限，本次同步未執行。\n請在「設定 → 分類管理」中隱藏或刪除不需要同步的分類後重試（隱藏的分類不會同步到 GitHub），也可以登入 GitHub 刪除不再需要的 List。"
   },
   "discoverySidebar": {
     "minutes-ago": "{{count}} 分鐘前",

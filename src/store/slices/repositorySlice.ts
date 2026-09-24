@@ -3,8 +3,9 @@ import type { Repository } from '../../types';
 import { logger } from '../../services/logger';
 import { matchesCategory } from '../../utils/categoryUtils';
 import type { AppStoreSlice } from '../types';
-import { defaultCategories, initialSearchFilters } from '../schema';
-import { getAllCategories, getCategoryNameVariants } from '../helpers/categoryHelpers';
+import { initialSearchFilters } from '../schema';
+import { getAllCategories } from '../helpers/categoryHelpers';
+import { buildListsPushPlan, validateListsPushPlan, GITHUB_LISTS_MAX_COUNT, GITHUB_LISTS_NAME_MAX_LENGTH } from '../helpers/listsPushPlan';
 import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
 import { shouldPreserveExisting } from '../helpers/accountWorkspace';
@@ -191,65 +192,72 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           // 1. 获取当前全部 list（含成员）
           const currentLists = await api.getUserLists(user!.login);
 
-          // 2. 构建"托管 list"映射：每个本地分类 → list id。
+          // 2. 构建"托管 list"映射计划：每个本地分类 → list id。
           //    使用分类的稳定身份（规范名 + 持久化 id 映射），而不是翻译后的 cat.name：
           //    否则在中文/英文间来回推送会创建并行 list（如 "Web应用" 与 "Web Apps"）。
           //    - 优先复用已持久化的 categoryListIdMap[cat.id]（跨语言稳定）
           //    - 否则按规范名及其本地化变体在既有 list 中查找（迁移历史 list，避免重复创建）
           //    - 仍找不到才新建，并用规范名命名，随后记录到映射
+          //    计划构建为纯本地计算，便于在写入前整体校验 GitHub Lists 硬限制。
+          const plan = buildListsPushPlan(allCategories, currentLists, categoryListIdMap, defaultCategoryOverrides);
+
+          // 3. 预校验硬限制（list 总数上限 32、list 名称上限 32 字符）：
+          //    任一触发即整体中止、零写入，并在错误中列出明细，引导用户到
+          //    分类管理中隐藏/删除/重命名后重试（隐藏的分类不参与回写）。
+          const planIssue = validateListsPushPlan(plan, currentLists.length);
+          if (planIssue) {
+            const parts: string[] = [];
+            if (planIssue.tooLongNames.length > 0) {
+              const items = planIssue.tooLongNames
+                .map(({ name, length }) => t('repositorySlice.lists-push-limit-name-item', { name, length, max: GITHUB_LISTS_NAME_MAX_LENGTH }))
+                .join('\n');
+              parts.push(t('repositorySlice.lists-push-limit-name-too-long', { max: GITHUB_LISTS_NAME_MAX_LENGTH, items }));
+            }
+            if (planIssue.countExceeded) {
+              parts.push(t('repositorySlice.lists-push-limit-count-exceeded', {
+                max: GITHUB_LISTS_MAX_COUNT,
+                existing: planIssue.countExceeded.existing,
+                needed: planIssue.countExceeded.needed,
+              }));
+            }
+            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: parts.join('\n\n') } });
+            return;
+          }
+
+          // 4. 执行计划（改名 best-effort：失败保留映射，下轮推送自然重试）
           const listIdByCategoryId = new Map<string, string>();
           const managedListIds = new Set<string>();
           const nextCategoryListIdMap = { ...categoryListIdMap };
           const renameFailures: string[] = [];
-          for (const cat of allCategories) {
-            const persistedId = categoryListIdMap[cat.id];
-            const existing = persistedId ? currentLists.find(l => l.id === persistedId) : undefined;
-            if (persistedId && existing) {
-              // auto-migrate name on language switch — best-effort, keep mapping even if rename fails (retry next push)
-              if (existing.name !== cat.name) {
-                try {
-                  await api.updateUserList(persistedId, cat.name);
-                } catch (e) {
-                  console.warn('rename list failed', persistedId, existing.name, '->', cat.name, e);
-                  renameFailures.push(`${existing.name} -> ${cat.name}`);
-                }
-              }
-              listIdByCategoryId.set(cat.id, persistedId);
-              managedListIds.add(persistedId);
+          const categoryById = new Map(allCategories.map(cat => [cat.id, cat]));
+          for (const entry of plan) {
+            const cat = categoryById.get(entry.categoryId)!;
+            if (entry.kind === 'create') {
+              const id = await api.createUserList(entry.name, true);
+              listIdByCategoryId.set(entry.categoryId, id);
+              nextCategoryListIdMap[entry.categoryId] = id;
+              managedListIds.add(id);
               continue;
             }
-            // 规范名：默认分类用其稳定中文名（除非被用户覆盖），自定义分类用其自身名称
-            const defaultCat = defaultCategories.find(d => d.id === cat.id);
-            const canonicalName = defaultCat ? defaultCat.name : cat.name;
-            const overrideName = defaultCategoryOverrides[cat.id]?.name;
-            const nameVariants = getCategoryNameVariants(canonicalName, overrideName);
-            const matchedList = currentLists.find(l =>
-              nameVariants.some(v => v.toLowerCase() === l.name.toLowerCase())
-            );
-            if (matchedList) {
-              // rename if language changed (e.g. 开发工具 -> Development Tools) — best-effort
-              if (matchedList.name !== cat.name) {
-                try {
-                  await api.updateUserList(matchedList.id, cat.name);
-                } catch (e) {
-                  console.warn('rename list failed', matchedList.id, matchedList.name, '->', cat.name, e);
-                  renameFailures.push(`${matchedList.name} -> ${cat.name}`);
-                }
+            // auto-migrate name on language switch
+            if (entry.remoteName !== cat.name) {
+              try {
+                await api.updateUserList(entry.listId, cat.name);
+              } catch (e) {
+                console.warn('rename list failed', entry.listId, entry.remoteName, '->', cat.name, e);
+                renameFailures.push(`${entry.remoteName} -> ${cat.name}`);
               }
-              listIdByCategoryId.set(cat.id, matchedList.id);
-              nextCategoryListIdMap[cat.id] = matchedList.id;
-              managedListIds.add(matchedList.id);
-              continue;
             }
-            const id = await api.createUserList(cat.name, true);
-            listIdByCategoryId.set(cat.id, id);
-            nextCategoryListIdMap[cat.id] = id;
-            managedListIds.add(id);
+            listIdByCategoryId.set(entry.categoryId, entry.listId);
+            managedListIds.add(entry.listId);
+            if (entry.kind === 'matched') {
+              nextCategoryListIdMap[entry.categoryId] = entry.listId;
+            }
           }
           if (renameFailures.length > 0) {
             logger.warn('githubLists', 'Some lists failed to rename, will retry next push', { failures: renameFailures });
           }
-          // 3. 每仓库当前的 list 成员（小写 full_name → list id 集合）
+          // 5. 每仓库当前的 list 成员（小写 full_name → list id 集合）
           const repoCurrentListIds = new Map<string, Set<string>>();
           const lowerToOriginal = new Map<string, string>();
           for (const list of currentLists) {
@@ -261,7 +269,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             }
           }
 
-          // 4. 每仓库命中的托管 list（effective 标签匹配）
+          // 6. 每仓库命中的托管 list（effective 标签匹配）
           const repoTargetListIds = new Map<string, Set<string>>();
           for (const repo of repositories) {
             const ownerLogin = repo.owner?.login;
@@ -282,7 +290,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             }
           }
 
-          // 5. 需要更新的仓库：命中托管 list 的，或当前已在托管 list 中的（用于清理过期成员）
+          // 7. 需要更新的仓库：命中托管 list 的，或当前已在托管 list 中的（用于清理过期成员）
           const reposToUpdate = new Map<string, Set<string>>();
           for (const [key, targetIds] of repoTargetListIds) {
             reposToUpdate.set(key, targetIds);
@@ -299,7 +307,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             return;
           }
 
-          // 6. 解析仓库 node id
+          // 8. 解析仓库 node id
           const ownerNamePairs = [...reposToUpdate.keys()].map(key => {
             const original = lowerToOriginal.get(key) || key;
             const idx = original.indexOf('/');
@@ -307,7 +315,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           });
           const nodeIdMap = await api.resolveRepositoryNodeIds(ownerNamePairs);
 
-          // 7. 覆盖写入（保留非托管 list 成员），逐仓库更新进度
+          // 9. 覆盖写入（保留非托管 list 成员），逐仓库更新进度
           let updatedCount = 0;
           let done = 0;
           const total = reposToUpdate.size;
