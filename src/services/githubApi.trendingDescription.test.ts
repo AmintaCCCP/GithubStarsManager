@@ -39,6 +39,45 @@ const stubFetch = (apiDescription: string | null) => {
   return fetchMock;
 };
 
+describe('GitHubApiService.searchTrending description source', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const RSS_WITH_COUNTS_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>owner/repo-a</title>
+    <link>https://github.com/owner/repo-a</link>
+    <description>&lt;p&gt;⭐ 1,234 | 🍴 456&lt;/p&gt; &lt;h1&gt;README WALL OF TEXT&lt;/h1&gt;</description>
+  </item>
+</channel></rss>`;
+
+  it('enriches the description via the GitHub API even when RSS provides non-zero stars and forks', async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('mshibanami.github.io')) {
+        return { ok: true, status: 200, text: async () => RSS_WITH_COUNTS_XML };
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => apiRepoDetail('Real description'),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    const result = await service.searchTrending(10, 'weekly');
+
+    expect(result).toHaveLength(1);
+    // stars/forks 非零也必须补全描述
+    expect(result[0].description).toBe('Real description');
+    // API 补全确实执行（stars 被响应值覆盖）
+    expect(result[0].stargazers_count).toBe(10);
+  });
+});
+
 describe('GitHubApiService.getTrendingRepositories description source', () => {
   afterEach(() => {
     vi.unstubAllGlobals();

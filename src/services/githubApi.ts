@@ -1646,8 +1646,9 @@ export class GitHubApiService {
         });
       }
 
-      // 如果 stars 或 forks 为 0，从 GitHub API 获取
-      const reposNeedUpdate = repos.filter(r => r.stargazers_count === 0 || r.forks_count === 0);
+      // stars/forks 缺失，或描述未补全（描述仅来自 GitHub API，RSS 不提供）时，
+      // 从 GitHub API 获取；不能让描述补全依赖 stars/forks 是否为零
+      const reposNeedUpdate = repos.filter(r => r.stargazers_count === 0 || r.forks_count === 0 || r.description === null);
       if (reposNeedUpdate.length > 0) {
         await Promise.all(reposNeedUpdate.map(async (r) => {
           try {
