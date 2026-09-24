@@ -1,6 +1,6 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useTranslatedDescription } from './useTranslatedDescription';
+import { MAX_CONCURRENT_TRANSLATIONS, useTranslatedDescription } from './useTranslatedDescription';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -35,6 +35,15 @@ const flushTranslation = async () => {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
+  });
+};
+
+// 更深的微任务冲刷：覆盖 排队→唤醒→发请求→结算 的多跳链路。
+const drain = async () => {
+  await act(async () => {
+    for (let i = 0; i < 12; i += 1) {
+      await Promise.resolve();
+    }
   });
 };
 
@@ -141,5 +150,88 @@ describe('useTranslatedDescription', () => {
     await flushTranslation();
     expect(result.current).toBe('高速ビルドツール');
     expect(mocks.translateText).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not flash the previous text\'s translation during the re-render commit', async () => {
+    setStore({ autoTranslateRepoDescription: true });
+    mocks.translateText.mockImplementation(async ({ text }: { text: string }) => ({
+      translatedText: `译文:${text}`,
+      detectedLanguage: 'en',
+    }));
+
+    // 渲染期探针：记录每次 render 返回的值（act 冲刷 effect 前的那次渲染
+    // 也在其中），从而能观测到「旧译文短暂显示给新 key」的缺陷。
+    const seen: Array<string | undefined> = [];
+    const { result, rerender } = renderHook(({ text }) => {
+      const value = useTranslatedDescription(text);
+      seen.push(value);
+      return value;
+    }, { initialProps: { text: 'First repository description' } });
+    await flushTranslation();
+    expect(result.current).toBe('译文:First repository description');
+
+    seen.length = 0;
+    rerender({ text: 'Second repository description' });
+    // 旧译文不允许出现在换文后的任何渲染帧中
+    expect(seen).not.toContain('译文:First repository description');
+    await flushTranslation();
+    expect(result.current).toBe('译文:Second repository description');
+  });
+
+  it('deduplicates concurrent mounts of the same text into a single request', async () => {
+    setStore({ autoTranslateRepoDescription: true });
+    let resolveTranslation: (r: { translatedText: string; detectedLanguage: string }) => void = () => {};
+    mocks.translateText.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveTranslation = resolve;
+      }));
+
+    const first = renderHook(() => useTranslatedDescription('Duplicated description text'));
+    const second = renderHook(() => useTranslatedDescription('Duplicated description text'));
+    await drain();
+
+    expect(mocks.translateText).toHaveBeenCalledTimes(1);
+
+    resolveTranslation({ translatedText: '去重后的译文', detectedLanguage: 'en' });
+    await drain();
+    expect(first.result.current).toBe('去重后的译文');
+    expect(second.result.current).toBe('去重后的译文');
+  });
+
+  it('keeps translating new texts after a full queue wave (no concurrency-slot leak)', async () => {
+    setStore({ autoTranslateRepoDescription: true });
+    const resolvers: Array<() => void> = [];
+    mocks.translateText.mockImplementation((options: { text: string }) =>
+      new Promise<{ translatedText: string; detectedLanguage: string }>((resolve) => {
+        resolvers.push(() => resolve({ translatedText: `译文:${options.text}`, detectedLanguage: 'en' }));
+      }));
+
+    const total = MAX_CONCURRENT_TRANSLATIONS * 2;
+    const hooks = Array.from({ length: total }, (_, i) =>
+      renderHook(() => useTranslatedDescription(`Batch description number ${i}`)));
+
+    await drain();
+    expect(mocks.translateText).toHaveBeenCalledTimes(MAX_CONCURRENT_TRANSLATIONS);
+
+    // 释放首批，槽位转交给排队中的请求
+    resolvers.splice(0).forEach((resolve) => resolve());
+    await drain();
+    resolvers.splice(0).forEach((resolve) => resolve());
+    await drain();
+
+    expect(mocks.translateText).toHaveBeenCalledTimes(total);
+    hooks.forEach((hook, i) => {
+      expect(hook.result.current).toBe(`译文:Batch description number ${i}`);
+    });
+
+    // 整波完成后新原文仍能获得翻译（槽位计数泄漏会导致这里永久卡死）
+    const next = renderHook(() => useTranslatedDescription('Brand new description after the wave'));
+    await drain();
+    expect(mocks.translateText).toHaveBeenCalledTimes(total + 1);
+    resolvers.splice(0).forEach((resolve) => resolve());
+    await drain();
+    await waitFor(() => {
+      expect(next.result.current).toBe('译文:Brand new description after the wave');
+    });
   });
 });

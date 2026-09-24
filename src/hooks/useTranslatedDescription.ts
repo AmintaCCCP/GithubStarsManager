@@ -14,7 +14,7 @@ import type { AppLanguage } from '../i18n/languages';
  */
 
 /** 同一时刻最多并发的翻译请求数：列表页几十张卡片同时挂载也不能打满翻译端点。 */
-const MAX_CONCURRENT_TRANSLATIONS = 4;
+export const MAX_CONCURRENT_TRANSLATIONS = 4;
 
 let activeTranslations = 0;
 const waitingQueue: Array<() => void> = [];
@@ -26,8 +26,8 @@ const acquireSlot = (): Promise<void> =>
       resolve();
       return;
     }
+    // 排队等待：回调只负责唤醒；槽位由 releaseSlot 直接转交，不重复计数。
     waitingQueue.push(() => {
-      activeTranslations += 1;
       resolve();
     });
   });
@@ -35,6 +35,7 @@ const acquireSlot = (): Promise<void> =>
 const releaseSlot = (): void => {
   const next = waitingQueue.shift();
   if (next) {
+    // 槽位转交：结束方与接手方一一对应，activeTranslations 保持不变。
     next();
   } else {
     activeTranslations -= 1;
@@ -65,6 +66,7 @@ const requestTranslation = (text: string, language: AppLanguage, key: string): P
       releaseSlot();
     }
   })();
+  inflightRequests.set(key, promise);
   void promise.then((value) => {
     if (!resolvedCache.has(key) && resolvedCache.size >= MAX_RESOLVED_CACHE_ENTRIES) {
       const oldest = resolvedCache.keys().next().value;
@@ -75,6 +77,12 @@ const requestTranslation = (text: string, language: AppLanguage, key: string): P
   });
   return promise;
 };
+
+/** 译文与其缓存 key 绑定保存，渲染期校验 key 匹配后才返回译文。 */
+interface TranslationState {
+  key: string;
+  value: string;
+}
 
 /**
  * 返回当前应展示的翻译文本；`undefined` 表示本次渲染没有可用的译文，
@@ -89,28 +97,30 @@ export const useTranslatedDescription = (
   const shouldTranslate = Boolean(enabled && text && text.trim() !== '');
   const key = shouldTranslate && text ? cacheKey(text, language) : null;
 
-  const [translatedText, setTranslatedText] = useState<string | undefined>(() => {
-    if (!key || !text) return undefined;
+  // 译文绑定 key：key 变化后的首次渲染（effect 尚未重跑）不能把旧 key 的
+  // 译文显示给新 key（卡片复用换了仓库、切换界面语言的场景）。
+  const [translation, setTranslation] = useState<TranslationState | null>(() => {
+    if (!key || !text) return null;
     const cached = resolvedCache.get(key);
-    return cached !== undefined && cached !== text ? cached : undefined;
+    return cached !== undefined && cached !== text ? { key, value: cached } : null;
   });
 
   useEffect(() => {
     if (!key || !text) {
-      setTranslatedText(undefined);
+      setTranslation(null);
       return;
     }
     const cached = resolvedCache.get(key);
     if (cached !== undefined) {
-      setTranslatedText(cached !== text ? cached : undefined);
+      setTranslation(cached !== text ? { key, value: cached } : null);
       return;
     }
-    setTranslatedText(undefined);
+    setTranslation(null);
     let cancelled = false;
     const pending = inflightRequests.get(key) ?? requestTranslation(text, language, key);
     void pending.then((value) => {
       if (!cancelled) {
-        setTranslatedText(value !== text ? value : undefined);
+        setTranslation(value !== text ? { key, value } : null);
       }
     });
     return () => {
@@ -118,5 +128,5 @@ export const useTranslatedDescription = (
     };
   }, [key, text, language]);
 
-  return translatedText;
+  return translation && translation.key === key ? translation.value : undefined;
 };
