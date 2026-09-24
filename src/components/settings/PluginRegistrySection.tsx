@@ -61,6 +61,8 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ pl
     registry,
   ), [plugins, registry]);
 
+  const pluginById = useMemo(() => new Map(plugins.map((plugin) => [plugin.manifest.id, plugin])), [plugins]);
+
   if (!available) return null;
 
   return (
@@ -93,7 +95,11 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ pl
 
       {registry && (
         <ul className="mt-3 space-y-2">
-          {assessments.map((assessment) => (
+          {assessments.map((assessment) => {
+            const target = pluginById.get(assessment.pluginId);
+            const canDisable = target?.enabled === true
+              && (assessment.status === 'revoked' || assessment.status === 'blocked');
+            return (
             <li
               key={assessment.pluginId}
               className="flex flex-wrap items-center justify-between gap-2 rounded border border-border px-3 py-2"
@@ -119,21 +125,21 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ pl
                   {assessment.reason ? ` · ${assessment.reason}` : ''}
                 </span>
               </span>
-              {(assessment.status === 'revoked' || assessment.status === 'blocked') && (
+              {canDisable && (
                 <Button
                   type="button"
                   variant="destructive"
                   size="sm"
                   onClick={() => {
-                    const plugin = plugins.find((candidate) => candidate.manifest.id === assessment.pluginId);
-                    if (plugin) void onDisable(plugin);
+                    if (target) void onDisable(target);
                   }}
                 >
                   {t('pluginSettingsPanel.disable-now')}
                 </Button>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 

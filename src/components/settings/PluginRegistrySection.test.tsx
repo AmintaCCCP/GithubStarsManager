@@ -110,6 +110,24 @@ describe('PluginRegistrySection', () => {
     expect(mocks.onDisable).toHaveBeenCalledWith(expect.objectContaining({ manifest: expect.objectContaining({ id: 'com.example.health' }) }));
   });
 
+  it('hides the disable action for a plugin that is already disabled', async () => {
+    mocks.load.mockResolvedValue({
+      success: true,
+      registry: {
+        fetchedAt: '2026-09-21T04:00:00.000Z',
+        plugins: [],
+        removed: [{ id: 'com.example.health', versions: ['1.0.0'], reason: '向第三方发送了仓库列表', date: '2026-09-21', action: 'revoke' }],
+        rejected: [],
+        error: null,
+      },
+    });
+    render(<PluginRegistrySection plugins={[plugin({ enabled: false, status: 'disabled' })]} t={t} onDisable={mocks.onDisable} />);
+
+    await waitFor(() => expect(screen.getByTestId('plugin-registry-com.example.health')).toHaveTextContent('已被撤销'));
+    expect(screen.queryByRole('button', { name: '立即停用' })).not.toBeInTheDocument();
+    expect(mocks.onDisable).not.toHaveBeenCalled();
+  });
+
   it('surfaces a registry load failure instead of staying silent', async () => {
     mocks.load.mockResolvedValue({ success: false, error: { code: 'REGISTRY_UNREACHABLE', message: 'offline' } });
     render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
