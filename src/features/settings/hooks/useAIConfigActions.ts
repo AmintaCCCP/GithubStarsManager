@@ -1,15 +1,11 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { AIConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIService } from '../../../services/aiService';
-
-interface UseAIConfigActionsOptions {
-  t: TranslateFn;
-}
 
 export interface AIConfigActions {
   testingId: string | null;
@@ -22,7 +18,8 @@ export interface AIConfigActions {
  * Encapsulates AI connection tests so settings presentation code never creates
  * service instances or turns provider failures into UI messages directly.
  */
-export const useAIConfigActions = ({ t }: UseAIConfigActionsOptions): AIConfigActions => {
+export const useAIConfigActions = (): AIConfigActions => {
+  const t = useT('settings');
   const language = useAppStore(useShallow((state) => state.language));
   const { toast } = useDialog();
   const [testingId, setTestingId] = useState<string | null>(null);

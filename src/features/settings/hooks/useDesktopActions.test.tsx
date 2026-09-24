@@ -21,7 +21,6 @@ vi.mock('../../../services/electronProxy', () => ({
   },
 }));
 
-const t = (zh: string) => zh;
 
 describe('useDesktopActions', () => {
   beforeEach(() => {
@@ -30,7 +29,7 @@ describe('useDesktopActions', () => {
 
   it('reports unsupported on web and skips IPC', () => {
     mocks.isSupported.mockReturnValue(false);
-    const { result } = renderHook(() => useDesktopActions({ t }));
+    const { result } = renderHook(() => useDesktopActions());
     expect(result.current.supported).toBe(false);
     expect(result.current.loading).toBe(false);
     expect(result.current.prefs).toEqual({ autoLaunch: false, closeToTray: true, minimizeToTray: true });
@@ -40,7 +39,7 @@ describe('useDesktopActions', () => {
   it('loads prefs from the Electron bridge', async () => {
     mocks.isSupported.mockReturnValue(true);
     mocks.getPrefs.mockResolvedValue({ autoLaunch: true, closeToTray: false, minimizeToTray: true });
-    const { result } = renderHook(() => useDesktopActions({ t }));
+    const { result } = renderHook(() => useDesktopActions());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.prefs).toEqual({ autoLaunch: true, closeToTray: false, minimizeToTray: true });
   });
@@ -52,7 +51,7 @@ describe('useDesktopActions', () => {
       success: true,
       prefs: { autoLaunch: true, closeToTray: true, minimizeToTray: true },
     });
-    const { result } = renderHook(() => useDesktopActions({ t }));
+    const { result } = renderHook(() => useDesktopActions());
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
       await result.current.toggleAutoLaunch(true);
@@ -66,7 +65,7 @@ describe('useDesktopActions', () => {
     mocks.isSupported.mockReturnValue(true);
     mocks.getPrefs.mockResolvedValue({ autoLaunch: false, closeToTray: true, minimizeToTray: true });
     mocks.setCloseToTray.mockResolvedValue({ success: false, error: 'OS denied' });
-    const { result } = renderHook(() => useDesktopActions({ t }));
+    const { result } = renderHook(() => useDesktopActions());
     await waitFor(() => expect(result.current.loading).toBe(false));
     await act(async () => {
       await result.current.toggleCloseToTray(false);
@@ -86,7 +85,7 @@ describe('useDesktopActions', () => {
           resolveFirst = resolve;
         }),
     );
-    const { result } = renderHook(() => useDesktopActions({ t }));
+    const { result } = renderHook(() => useDesktopActions());
     await waitFor(() => expect(result.current.loading).toBe(false));
     // Fire both toggles synchronously in one act: with only a render-snapshot
     // guard both would issue IPC writes; the ref lock must serialize them.

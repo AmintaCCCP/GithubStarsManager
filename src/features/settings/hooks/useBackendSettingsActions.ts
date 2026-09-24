@@ -1,5 +1,5 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category } from '../../../types';
@@ -8,10 +8,6 @@ import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
 import { normalizeBackendUrl } from '../../../utils/backendUrl';
 import { syncLocalGitHubTokenToBackend, tryRestoreAuthFromBackend } from '../../../services/autoSync';
-
-interface UseBackendSettingsActionsOptions {
-  t: TranslateFn;
-}
 
 type BackendStatus = 'connected' | 'disconnected' | 'checking';
 
@@ -34,7 +30,8 @@ export interface BackendSettingsActions {
  * Encapsulates manual settings-panel backend operations. Application-start auth
  * lifecycle remains outside this hook for the later lifecycle extraction work.
  */
-export const useBackendSettingsActions = ({ t }: UseBackendSettingsActionsOptions): BackendSettingsActions => {
+export const useBackendSettingsActions = (): BackendSettingsActions => {
+  const t = useT('settings');
   const state = useAppStore(useShallow((store) => ({
     repositories: store.repositories,
     releases: store.releases,

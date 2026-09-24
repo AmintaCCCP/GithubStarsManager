@@ -13,7 +13,7 @@ interface BackupPanelProps {
 
 export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   const lastBackup = useAppStore((state) => state.lastBackup);
-  const { activeConfig, isBackingUp, isRestoring, backup, restore } = useBackupActions({ t });
+  const { activeConfig, isBackingUp, isRestoring, backup, restore } = useBackupActions();
 
   return (
     <div className="space-y-6">

@@ -36,7 +36,7 @@ export const McpSettingsPanel: React.FC<McpSettingsPanelProps> = ({ t }) => {
     language: state.language,
   })));
   const { toast } = useDialog();
-  const { loading, saving, error, backendMode, vectorAvailable, endpoints, refresh: refreshFromBackend, toggle: handleToggle, resetToken: handleResetToken } = useMcpActions({ t });
+  const { loading, saving, error, backendMode, vectorAvailable, endpoints, refresh: refreshFromBackend, toggle: handleToggle, resetToken: handleResetToken } = useMcpActions();
   const [showToken, setShowToken] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [portInput, setPortInput] = useState(String(mcpConfig.port || MCP_DEFAULT_PORT));

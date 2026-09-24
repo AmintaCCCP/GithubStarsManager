@@ -1,15 +1,11 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { GitHubApiService, GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
 import { backend } from '../../../services/backendAdapter';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
-
-interface UseGitHubTokenActionsOptions {
-  t: TranslateFn;
-}
 
 export interface GitHubTokenActions {
   tokenInput: string;
@@ -18,7 +14,8 @@ export interface GitHubTokenActions {
   updateToken: () => Promise<void>;
 }
 
-export const useGitHubTokenActions = ({ t }: UseGitHubTokenActionsOptions): GitHubTokenActions => {
+export const useGitHubTokenActions = (): GitHubTokenActions => {
+  const t = useT('settings');
   const { user, setUser, setGitHubToken } = useAppStore(useShallow((state) => ({
     user: state.user,
     setUser: state.setUser,

@@ -1,4 +1,3 @@
-import { makeT } from '../../../i18n/useT';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWebDAVActions } from './useWebDAVActions';
@@ -19,6 +18,7 @@ vi.mock('../../../services/webdavService', () => ({
 }));
 
 const storeState = {
+  language: 'zh',
   webdavConfigs: [],
   addWebDAVConfig: vi.fn(),
   updateWebDAVConfig: vi.fn(),
@@ -35,7 +35,7 @@ describe('useWebDAVActions', () => {
 
   it('keeps the WebDAV URL validation message fully localized in Chinese', () => {
     mocks.validateConfig.mockReturnValue(['WebDAV URL必须以 http:// 或 https:// 开头']);
-    const { result } = renderHook(() => useWebDAVActions({ t: makeT('zh', 'settings') }));
+    const { result } = renderHook(() => useWebDAVActions());
 
     let saved!: boolean;
     act(() => {

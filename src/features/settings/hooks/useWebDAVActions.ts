@@ -1,15 +1,11 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { WebDAVConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
-
-interface UseWebDAVActionsOptions {
-  t: TranslateFn;
-}
 
 export type WebDAVForm = Pick<WebDAVConfig, 'name' | 'url' | 'username' | 'password' | 'path'>;
 
@@ -20,7 +16,8 @@ export interface WebDAVActions {
 }
 
 /** Keeps WebDAV validation and remote connection work outside the settings view. */
-export const useWebDAVActions = ({ t }: UseWebDAVActionsOptions): WebDAVActions => {
+export const useWebDAVActions = (): WebDAVActions => {
+  const t = useT('settings');
   const { webdavConfigs, addWebDAVConfig, updateWebDAVConfig } = useAppStore(useShallow((state) => ({
     webdavConfigs: state.webdavConfigs,
     addWebDAVConfig: state.addWebDAVConfig,

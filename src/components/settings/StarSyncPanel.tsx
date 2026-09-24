@@ -21,7 +21,7 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
     setSyncModeConfigured: state.setSyncModeConfigured,
     listsPush: state.listsPush,
   })));
-  const { pushCategoriesToLists: handlePushCategoriesToLists } = useStarSyncActions({ t });
+  const { pushCategoriesToLists: handlePushCategoriesToLists } = useStarSyncActions();
 
   const progressPercent = listsPush.total > 0 ? Math.min(100, Math.round((listsPush.done / listsPush.total) * 100)) : 0;
 

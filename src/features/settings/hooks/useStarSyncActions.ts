@@ -1,21 +1,20 @@
 
-import { TranslateFn } from '../../../i18n/useT';
+import { useT } from '../../../i18n/useT';
 import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { createGitHubListsApiService } from '../../../services/githubApiFactory';
 
-interface UseStarSyncActionsOptions {
-  t: TranslateFn;
-}
-
 export interface StarSyncActions {
   pushCategoriesToLists: () => Promise<void>;
 }
 
 /** Encapsulates the confirmed GitHub Lists synchronization workflow. */
-export const useStarSyncActions = ({ t }: UseStarSyncActionsOptions): StarSyncActions => {
+export const useStarSyncActions = (): StarSyncActions => {
+  // 本 hook 的文案都在 settings 命名空间；面板传入的 t 绑定 app 命名空间，
+  // 查不到 key 会原样渲染（历史 bug），故自行绑定 settings。
+  const t = useT('settings');
   const { githubToken, pushCategoriesToLists, setListsPushError } = useAppStore(useShallow((state) => ({
     githubToken: state.githubToken,
     pushCategoriesToLists: state.pushCategoriesToLists,

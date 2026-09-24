@@ -22,7 +22,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
     setForm, setRpcForm, clearStoredSecret,
     saveProxy: handleSave, testProxy: handleTest, toggleProxy: handleProxyToggle,
     saveRpc: handleRpcSave, testRpc: handleRpcTest, toggleRpc: handleRpcToggle,
-  } = useNetworkActions({ t });
+  } = useNetworkActions();
   const [showPassword, setShowPassword] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showSecret, setShowSecret] = useState(false);

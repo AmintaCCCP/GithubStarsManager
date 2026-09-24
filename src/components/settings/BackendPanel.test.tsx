@@ -5,6 +5,7 @@ import { BackendPanel } from './BackendPanel';
 
 const mocks = vi.hoisted(() => {
   const storeState = {
+    language: 'zh',
     repositories: [],
     releases: [],
     aiConfigs: [],
@@ -29,7 +30,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     storeState,
-    useAppStore: vi.fn(() => storeState),
+    useAppStore: vi.fn((selector?: (state: typeof storeState) => unknown) => (selector ? selector(storeState) : storeState)),
     backend: {
       init: vi.fn(),
       checkHealth: vi.fn(),
