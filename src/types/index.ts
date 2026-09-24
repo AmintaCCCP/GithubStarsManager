@@ -7,6 +7,8 @@ import type { RepositoryChatSettings } from './repositoryChat';
 export type { RepositoryChatSettings } from './repositoryChat';
 import type { ThemeTokens } from './themeTokens';
 export type { ThemeTokens } from './themeTokens';
+import type { TrendingSnapshot } from './trendingSnapshot';
+export type { TrendingSnapshot } from './trendingSnapshot';
 export type {
   RepositoryHealthEnrichment,
   RepositoryHealthFact,
@@ -610,6 +612,11 @@ export interface AppState {
   discoveryTotalCount: Record<DiscoveryChannelId, number>;
   discoveryScrollPositions: Record<DiscoveryChannelId, number>;
   trendingTimeRange: TrendingTimeRange;
+  /**
+   * Trending 快照历史（开发守则 §7）：本地记录每次看到的榜单，用于算排名变化、首次上榜与
+   * 连续上榜。按「周期 × 语言 × 自然日」去重，条数与天数都有上限。
+   */
+  trendingSnapshots: TrendingSnapshot[];
   /** 周刊频道过滤器：仅显示已被周刊收录（issue labels 含 'weekly'）的条目 */
   weeklyOnlyCollected: boolean;
   /** 周刊频道同步进度（会话级，不持久化） */

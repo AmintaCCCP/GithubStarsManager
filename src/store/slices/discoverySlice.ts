@@ -4,6 +4,7 @@ import { normalizeXTweetAuth, normalizeXTweetHandleInput } from '../../utils/xTw
 import { normalizeTelegramChannelInput } from '../../utils/telegramFollows';
 import { saveEncryptedXAuthViaDesktop, clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
 import { logger } from '../../services/logger';
+import { recordTrendingSnapshot } from '../../utils/trendingSnapshots';
 
 export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setSelectedDiscoveryChannel'
@@ -36,6 +37,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'addTelegramFollow'
   | 'removeTelegramFollow'
   | 'appendDiscoveryRepos'
+  | 'recordTrendingSnapshot'
 >> = (set) => ({
     // Discovery actions
     setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set((state) => ({
@@ -187,5 +189,10 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
         ...state.discoveryRepos,
         [channel]: [...(state.discoveryRepos[channel] || []), ...repos]
       },
+    })),
+    // Trending 快照（开发守则 §7）：去重、上限与超期清理都在 utils 的纯函数里，
+    // 这里只负责把结果写回 Store。
+    recordTrendingSnapshot: (snapshot) => set((state) => ({
+      trendingSnapshots: recordTrendingSnapshot(state.trendingSnapshots, snapshot),
     })),
 });

@@ -111,6 +111,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
   const [showCategorizeModal, setShowCategorizeModal] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [isExitingSelection, setIsExitingSelection] = useState(false);
+  const selectionExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeChatRepository, setActiveChatRepository] = useState<Repository | null>(null);
   const activeChatTriggerRef = useRef<HTMLElement | null>(null);
   // 全局问答历史（S4 入口）：抽屉 + 从历史进入单仓会话的目标会话。
@@ -376,13 +377,19 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
   const handleDeselectAll = useCallback(() => {
     setIsExitingSelection(true);
-    setTimeout(() => {
+    if (selectionExitTimerRef.current !== null) clearTimeout(selectionExitTimerRef.current);
+    selectionExitTimerRef.current = setTimeout(() => {
+      selectionExitTimerRef.current = null;
       setSelectedRepoIds(new Set());
       setShowBulkToolbar(false);
       requestAnimationFrame(() => {
         setIsExitingSelection(false);
       });
     }, 250);
+  }, []);
+
+  useEffect(() => () => {
+    if (selectionExitTimerRef.current !== null) clearTimeout(selectionExitTimerRef.current);
   }, []);
 
   // 处理单击空白处 - 触发回到顶部按钮跳跃动画

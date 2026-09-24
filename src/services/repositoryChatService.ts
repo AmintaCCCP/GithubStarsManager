@@ -943,6 +943,25 @@ const collapseHeadingText = (value: string): string => value
   .replace(/[：:，,。.（）()[\]{}'"！!？?、|/\\-]/g, '')
   .trim();
 
+export const evidenceSearchTerms = (question: string, extras: string[]): string[] => {
+  const tokens = [...extras, question]
+    .join(' ')
+    .split(/[^\p{L}\p{N}_@.-]+/u)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !/^\d+$/.test(token));
+  return Array.from(new Set(tokens.map((token) => token.toLocaleLowerCase())));
+};
+
+/** Headingless files cannot be cited through section matching, so use question terms. */
+export const citableSegmentsForDocument = (
+  document: CachedDocument,
+  requestedSections: string[],
+  searchTerms: string[],
+): Array<{ lineStart: number; lineEnd: number; excerpt: string; label?: string }> => {
+  if (document.headings.length > 0) return sectionSegments(document, requestedSections);
+  return buildEvidenceWindows(document.content, 'implementation', searchTerms);
+};
+
 export const sectionSegments = (document: CachedDocument, requestedSections: string[]): Array<{ lineStart: number; lineEnd: number; excerpt: string; label: string }> => {
   const lines = document.content.split('\n');
   const normalizedRequested = requestedSections.map((section) => collapseHeadingText(section)).filter(Boolean);
@@ -1136,7 +1155,7 @@ export const synthesizeVerifiedAnswer = async (
   };
   const answerEventDetail = input.language === 'zh' ? '证据充分；现在仅依据已验证来源生成回答。' : 'Evidence is sufficient; generate the answer only from verified sources.';
   // 回答阶段统一截止时间：流式与阻塞降级共享同一窗口，降级只能使用剩余时长。
-  const answerDeadlineAt = Date.now() + ANSWER_STEP_TIMEOUT_MS;
+  let answerDeadlineAt = Date.now() + ANSWER_STEP_TIMEOUT_MS;
 
   let answerRaw: string | null = null;
   if (input.streaming && input.onAnswerChunk) {
@@ -1172,9 +1191,14 @@ export const synthesizeVerifiedAnswer = async (
       emit({ toolName: 'synthesize_answer', status: 'success', paramSummary: input.language === 'zh' ? '流式生成最终回答' : 'Stream the final answer', stage: 'answer', round, detail: answerEventDetail, durationMs: Date.now() - answerStartedAt, resultSize: streamed.length });
     } catch (error) {
       if (input.signal?.aborted) throw error;
-      // 'auto' 语义：流式失败（含不支持流式的通道）静默降级为阻塞调用。
-      streamed = '';
-      input.onAnswerChunk?.('');
+      // 只有已经能核验引用的片段才直接保留。标题或半段正文不能阻止
+      // 阻塞式完整回答；空输出则继续走原有降级。
+      const retainedStream = validAnswer(streamed);
+      answerRaw = retainedStream;
+      if (!retainedStream) input.onAnswerChunk?.('');
+      // 失败的流式调用可能几乎耗尽共享窗口。保留一小段时间给阻塞降级，
+      // 否则已有证据仍会停在来源清单。
+      answerDeadlineAt = Math.max(answerDeadlineAt, Date.now() + 30_000);
       emit({
         toolName: 'synthesize_answer',
         status: 'error',
@@ -1417,6 +1441,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const validReferences = () => new Set(sourceReferences(evidences));
 
   const targetKey = (target: RetrievalTarget): string => `${target.scope}:${target.path}:${target.sections.map((section) => section.toLowerCase().trim()).sort().join('|')}`;
+  const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
+  const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => key.startsWith(`${encodeURIComponent(path)}:`));
   const isViableUnseenTarget = (target: RetrievalTarget): boolean => {
     if (target.scope === 'meta') return metaEligible && !metaFetched.has(target.path);
     const permitted = target.scope === 'code'
@@ -1426,10 +1452,14 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     const document = documents.get(target.path);
     if (!document) return true;
     if (target.scope === 'documentation') {
-      return sectionSegments(document, target.sections).some((segment) => !readSegments.has(`${target.path}:${segment.lineStart}-${segment.lineEnd}`));
+      return citableSegmentsForDocument(
+        document,
+        target.sections,
+        evidenceSearchTerms(input.question, [...understanding.entities, ...understanding.searchConcepts, ...target.sections, target.purpose, understanding.target]),
+      ).some((segment) => !readSegments.has(segmentKey(target.path, segment.lineStart, segment.lineEnd)));
     }
     return buildEvidenceWindows(document.content, 'implementation', [...understanding.entities, ...target.sections, understanding.target])
-      .some((segment) => !readSegments.has(`${target.path}:${segment.lineStart}-${segment.lineEnd}`));
+      .some((segment) => !readSegments.has(segmentKey(target.path, segment.lineStart, segment.lineEnd)));
   };
 
   // meta 目标（Release / Issue）没有仓库文件那样的固定 SHA 行号：每条来源
@@ -1538,9 +1568,16 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
         : (input.language === 'zh' ? `按证据缺口读取与“${target.purpose || understanding.target}”相关的实现文件。` : `Read an implementation file planned for “${target.purpose || understanding.target}”.`),
     );
     if (!document) return 0;
+    const searchTerms = evidenceSearchTerms(input.question, [
+      ...understanding.entities,
+      ...understanding.searchConcepts,
+      ...target.sections,
+      target.purpose,
+      understanding.target,
+    ]);
     const segments = target.scope === 'documentation'
-      ? sectionSegments(document, target.sections)
-      : buildEvidenceWindows(document.content, 'implementation', [...understanding.entities, ...target.sections, understanding.target]);
+      ? citableSegmentsForDocument(document, target.sections, searchTerms)
+      : buildEvidenceWindows(document.content, 'implementation', [...understanding.entities, ...target.sections, understanding.target, ...searchTerms]);
     if (segments.length === 0) {
       emit({
         toolName: 'read_repo_file',
@@ -1554,7 +1591,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       return 0;
     }
     const newSegments = segments.filter((segment) => {
-      const key = `${target.path}:${segment.lineStart}-${segment.lineEnd}`;
+      const key = segmentKey(target.path, segment.lineStart, segment.lineEnd);
       if (readSegments.has(key)) return false;
       readSegments.add(key);
       return true;
@@ -1604,13 +1641,26 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       1,
     );
     const fallbackScope: RetrievalScope = codeEligible ? 'code' : 'documentation';
-    let plan = planRaw ? parseRetrievalPlan(planRaw, documentationSet, codeSet, metaSet, fallbackScope) : null;
+    const parsedPlan = planRaw ? parseRetrievalPlan(planRaw, documentationSet, codeSet, metaSet, fallbackScope) : null;
+    let plan = parsedPlan;
     if (!plan) {
       const fallbackPath = (fallbackScope === 'code' ? unreadCode : unreadDocumentation)[0];
       plan = fallbackPath ? { targets: [{ path: fallbackPath, sections: [], purpose: missing[0] || understanding.target, scope: fallbackScope }], rationale: 'bounded fallback after an unavailable plan' } : null;
     }
     const plannedTargets = pendingTargets.length > 0 ? pendingTargets : (plan?.targets ?? []);
     pendingTargets = [];
+    // 大纲阶段可能已经下载了无标题文件。它们没有章节可匹配，若本轮不补证据，
+    // 后续会因路径已读而永远跳过。只在规划失败时前置，避免挤掉有效计划。
+    if (!parsedPlan) {
+      const uncoveredHeadingless = documentationCandidates.filter((path) => {
+        const document = documents.get(path);
+        return document !== undefined && document.headings.length === 0 && !hasCitableSegment(path);
+      });
+      for (const path of uncoveredHeadingless) {
+        if (plannedTargets.some((target) => target.scope === 'documentation' && target.path === path)) continue;
+        plannedTargets.unshift({ path, sections: [], purpose: missing[0] || understanding.target, scope: 'documentation' });
+      }
+    }
     // 计划驱动解锁：检索规划器提出 code 目标只是"请求"，只有文档优先已满足
     // （至少跑过一轮且文档检索出现过停滞）时才解锁代码读取，避免第 1 轮就
     // 抢占 README/docs 的读取预算。
@@ -1644,7 +1694,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     // 规划器只提出了（尚不可用的）code 目标时，回退到未读的文档候选，
     // 保证 README/docs 始终优先被读取。
     if (targets.length === 0) {
-      const fallbackDoc = unreadDocumentation[0] ?? documentationCandidates.find((path) => !readPaths.has(path));
+      const fallbackDoc = unreadDocumentation[0]
+        ?? documentationCandidates.find((path) => !readPaths.has(path));
       if (fallbackDoc) {
         targets = [{ path: fallbackDoc, sections: [], purpose: missing[0] || understanding.target, scope: 'documentation' }];
       }
@@ -1789,4 +1840,3 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const content = await synthesizeVerifiedAnswer(ai, input, evidences, turns, answerMaxTokens, ctx.callModelWithRetry);
   return { content, evidences };
 };
-

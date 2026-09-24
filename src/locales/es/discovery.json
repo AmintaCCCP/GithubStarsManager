@@ -138,5 +138,16 @@
   },
   "discoveryPlatform": {
     "All": "Todas las plataformas"
+  },
+  "trendingHistoryPanel": {
+    "title": "Cambios de ranking",
+    "hint": "Comparado con el último día registrado",
+    "new-entry": "Nuevo en la lista",
+    "rising": "Sube",
+    "falling": "Baja",
+    "streak-days": "{{v1}} días seguidos",
+    "stars-gained": "+{{v1}} stars desde la primera vez",
+    "first-seen": "El primero se registró {{v1}}"
   }
+
 }

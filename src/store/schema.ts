@@ -81,6 +81,7 @@ export type PersistedAppState = Partial<
     | 'collapsedSidebarCategoryCount'
     | 'categoryMatchMode'
     | 'assetFilters'
+    | 'trendingSnapshots'
     | 'repositoryCardFields'
     | 'theme'
     | 'themePreset'

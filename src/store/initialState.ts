@@ -28,6 +28,8 @@ export const createInitialState = (): AppState => ({
       repositories: [],
       // Theme token 默认全部"跟随预设"（开发守则 §14）
       themeTokens: { ...DEFAULT_THEME_TOKENS },
+      // Trending 快照（开发守则 §7）：本地榜单历史，默认空
+      trendingSnapshots: [],
       gists: [],
       starredGists: [],
       gistSearchFilters: initialGistSearchFilters,
