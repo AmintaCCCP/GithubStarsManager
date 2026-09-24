@@ -14,6 +14,7 @@ export const BackToTop: React.FC = () => {
   const [isBouncing, setIsBouncing] = useState(false);
   // 当 README 模态框打开时隐藏按钮，避免遮挡模态框内容
   const readmeModalOpen = useAppStore(state => state.readmeModalOpen);
+  const reduceMotion = useAppStore(state => state.themeTokens.animation === 'reduced');
   const bounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const toggleVisibility = useCallback(() => {
@@ -25,11 +26,13 @@ export const BackToTop: React.FC = () => {
   }, []);
 
   const scrollToTop = useCallback(() => {
+    const systemReduceMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     window.scrollTo({
       top: 0,
-      behavior: 'smooth',
+      behavior: reduceMotion || systemReduceMotion ? 'auto' : 'smooth',
     });
-  }, []);
+  }, [reduceMotion]);
 
   // 触发跳跃动画
   const triggerBounce = useCallback(() => {

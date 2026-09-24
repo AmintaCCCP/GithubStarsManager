@@ -41,6 +41,7 @@ import type {
   TranslationEngine,
   RepositoryCardFieldId,
   RepositoryChatSettings,
+  ThemeTokens,
   TrendingSnapshot,
 } from '../types';
 import type { ThemePresetId } from '../constants/themePresets';
@@ -264,6 +265,9 @@ export interface AppActions {
   removeTelegramFollow: (channel: string) => void;
   appendDiscoveryRepos: (channel: DiscoveryChannelId, repos: DiscoveryRepo[]) => void;
 
+  // Theme tokens（开发守则 §14）
+  /** 局部更新：内部与当前值合并，调用方不必自己展开（避免拿到过期的渲染值）。 */
+  updateThemeTokens: (patch: Partial<ThemeTokens>) => void;
   /** Trending 快照（开发守则 §7）：记一份榜单快照，去重与上限在 utils 里处理。 */
   recordTrendingSnapshot: (snapshot: TrendingSnapshot) => void;
   // 仓库卡片可见字段（开发守则 §14）

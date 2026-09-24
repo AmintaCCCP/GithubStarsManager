@@ -3,6 +3,7 @@ import type { AppState, TrendingTimeRange } from '../types';
 import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscriptionChannels } from '../types';
 import { defaultRepositoryChatSettings } from '../types/repositoryChat';
 import { DEFAULT_THEME_PRESET_ID } from '../constants/themePresets';
+import { DEFAULT_THEME_TOKENS } from '../utils/themeTokens';
 import { DEFAULT_REPOSITORY_CARD_FIELDS } from '../types/repositoryCardFields';
 import { DEFAULT_XTWEET_FOLLOWS } from '../utils/xTweetFollows';
 import { DEFAULT_TELEGRAM_FOLLOWS } from '../utils/telegramFollows';
@@ -25,6 +26,8 @@ export const createInitialState = (): AppState => ({
       isAuthenticated: false,
       accountWorkspaces: {},
       repositories: [],
+      // Theme token 默认全部"跟随预设"（开发守则 §14）
+      themeTokens: { ...DEFAULT_THEME_TOKENS },
       // Trending 快照（开发守则 §7）：本地榜单历史，默认空
       trendingSnapshots: [],
       gists: [],

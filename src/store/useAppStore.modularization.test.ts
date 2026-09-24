@@ -51,6 +51,7 @@ const currentPersistedKeys = [
   'accountWorkspaces',
   'repositories',
   'lastSync',
+  'themeTokens',
   'gists',
   'starredGists',
   'gistSearchFilters',
@@ -210,6 +211,20 @@ describe('PR-07 Store modularization compatibility', () => {
         options.merge(twice, actualStore.useAppStore.getInitialState()),
       );
     }
+  });
+
+  it('normalizes theme tokens at the hydration boundary without a persistence version bump', () => {
+    const merged = persistenceOptions().merge(
+      buildPersistedSnapshot({ themeTokens: { accentColor: 'javascript:bad', fontScale: 9 } as never }),
+      actualStore.useAppStore.getInitialState(),
+    );
+
+    expect(merged.themeTokens).toEqual({
+      accentColor: null,
+      fontScale: 1.5,
+      radius: 'default',
+      animation: 'normal',
+    });
   });
 
   it('retains the historical normalize-only resets and release backfill behavior', () => {

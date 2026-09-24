@@ -4,13 +4,23 @@ import React from 'react';
 import { Check, Moon, Palette, Sun } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { THEME_PRESETS } from '../../constants/themePresets';
+import { getThemePreset, THEME_PRESETS } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { getThemeSwatch } from '../../lib/themePresets';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Switch } from '../ui/switch';
+import {
+  ACCENT_PRESETS,
+  ACCENT_PRESET_NAME_KEYS,
+  DEFAULT_THEME_TOKENS,
+  FONT_SCALE_OPTIONS,
+  hslTripletToHex,
+  type ThemeRadius,
+} from '../../utils/themeTokens';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Switch } from '../ui/switch';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { REPOSITORY_CARD_FIELD_IDS } from '../../types/repositoryCardFields';
 import { isRepositoryCardFieldVisible } from '../../utils/repositoryCardFields';
 
@@ -25,6 +35,8 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     setTheme,
     themePreset,
     setThemePreset,
+    themeTokens,
+    updateThemeTokens,
     repositoryCardFields,
     setRepositoryCardField,
   } = useAppStore(useShallow((state) => ({
@@ -32,10 +44,16 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     setTheme: state.setTheme,
     themePreset: state.themePreset,
     setThemePreset: state.setThemePreset,
+    themeTokens: state.themeTokens,
+    updateThemeTokens: state.updateThemeTokens,
     repositoryCardFields: state.repositoryCardFields,
     setRepositoryCardField: state.setRepositoryCardField,
   })));
   const isDark = theme === 'dark';
+  const activePreset = getThemePreset(themePreset);
+  const presetAccentColor = hslTripletToHex(
+    (isDark ? activePreset.darkColors : activePreset.lightColors).primary,
+  ) ?? '#2563eb';
 
   // Roving tabindex: arrow keys move focus across preset options; selection
   // stays on click/Enter (Space) as with any button.
@@ -68,6 +86,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
   }, [setThemePreset]);
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center space-x-3">
@@ -168,24 +187,134 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
           </div>
         </div>
 
-        {/* 仓库卡片可见字段（开发守则 §14）：只保存声明式开关 */}
-        <div className="border-t border-border pt-5">
-          <p className="text-sm font-medium text-foreground">{t('themeSettingsCard.card-fields')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t('themeSettingsCard.card-fields-hint')}</p>
-          <div className="mt-3 space-y-2">
-            {REPOSITORY_CARD_FIELD_IDS.map((id) => (
-              <div key={id} className="flex items-center justify-between gap-4">
-                <span className="text-sm text-foreground">{t(`themeSettingsCard.card-field-${id}`)}</span>
-                <Switch
-                  aria-label={t(`themeSettingsCard.card-field-${id}`)}
-                  checked={isRepositoryCardFieldVisible(repositoryCardFields, id)}
-                  onCheckedChange={(checked) => setRepositoryCardField(id, checked)}
+        {/* Theme token（开发守则 §14）：强调色 / 圆角 / 字号 / 动效，全部落到 <html>
+            的 CSS 变量与 data 属性上，恢复默认即删掉内联值让预设重新生效。 */}
+        <Accordion type="single" collapsible className="border-t border-border">
+          <AccordionItem value="fine-tune" className="border-0">
+            <AccordionTrigger>{t('themeSettingsCard.fine-tune-appearance')}</AccordionTrigger>
+            <AccordionContent className="space-y-5">
+          <div>
+            <p className="mb-2 text-sm font-medium text-foreground">{t('themeSettingsCard.accent-color')}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={themeTokens.accentColor === null}
+                onClick={() => updateThemeTokens({ accentColor: null })}
+                className={`rounded-md border px-2.5 py-1 text-xs ${
+                  themeTokens.accentColor === null ? 'border-primary text-foreground' : 'border-border text-muted-foreground'
+                }`}
+              >
+                {t('themeSettingsCard.follow-the-theme-preset')}
+              </button>
+              {ACCENT_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  aria-label={`${t(ACCENT_PRESET_NAME_KEYS[hex])} (${hex})`}
+                  aria-pressed={themeTokens.accentColor === hex}
+                  onClick={() => updateThemeTokens({ accentColor: hex })}
+                  className={`h-7 w-7 rounded-full border-2 ${
+                    themeTokens.accentColor === hex ? 'border-foreground' : 'border-transparent'
+                  }`}
+                  style={{ background: hex }}
                 />
-              </div>
-            ))}
+              ))}
+              <input
+                type="color"
+                aria-label={t('themeSettingsCard.custom-accent-color')}
+                value={themeTokens.accentColor ?? presetAccentColor}
+                onChange={(event) => updateThemeTokens({ accentColor: event.target.value })}
+                className="h-7 w-10 cursor-pointer rounded border border-border bg-transparent"
+              />
+            </div>
           </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">{t('themeSettingsCard.border-radius')}</span>
+            <select
+              aria-label={t('themeSettingsCard.border-radius')}
+              value={themeTokens.radius}
+              onChange={(event) => updateThemeTokens({ radius: event.target.value as ThemeRadius })}
+              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            >
+              <option value="default">{t('themeSettingsCard.follow-the-theme-preset')}</option>
+              <option value="none">{t('themeSettingsCard.radius-none')}</option>
+              <option value="small">{t('themeSettingsCard.radius-small')}</option>
+              <option value="medium">{t('themeSettingsCard.radius-medium')}</option>
+              <option value="large">{t('themeSettingsCard.radius-large')}</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">{t('themeSettingsCard.font-scale')}</span>
+            <select
+              aria-label={t('themeSettingsCard.font-scale')}
+              value={String(themeTokens.fontScale)}
+              onChange={(event) => updateThemeTokens({ fontScale: Number(event.target.value) })}
+              className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
+            >
+              {FONT_SCALE_OPTIONS.map((scale) => (
+                <option key={scale} value={String(scale)}>{`${Math.round(scale * 100)}%`}</option>
+              ))}
+              {!FONT_SCALE_OPTIONS.some((scale) => scale === themeTokens.fontScale) && (
+                <option value={String(themeTokens.fontScale)}>{`${Math.round(themeTokens.fontScale * 100)}%`}</option>
+              )}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground">{t('themeSettingsCard.reduce-motion')}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('themeSettingsCard.reduce-motion-hint')}</p>
+            </div>
+            <Switch
+              aria-label={t('themeSettingsCard.reduce-motion')}
+              checked={themeTokens.animation === 'reduced'}
+              onCheckedChange={(checked) => updateThemeTokens({
+                animation: checked ? 'reduced' : 'normal',
+              })}
+            />
+          </div>
+
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => updateThemeTokens({ ...DEFAULT_THEME_TOKENS })}
+          >
+            {t('themeSettingsCard.reset-appearance')}
+          </Button>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('themeSettingsCard.card-fields')}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-3 text-xs text-muted-foreground">{t('themeSettingsCard.card-fields-hint')}</p>
+        <div className="flex flex-wrap gap-2">
+          {REPOSITORY_CARD_FIELD_IDS.map((id) => {
+            const visible = isRepositoryCardFieldVisible(repositoryCardFields, id);
+            return (
+              <Button
+                key={id}
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={visible}
+                onClick={() => setRepositoryCardField(id, !visible)}
+                className={visible ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15' : ''}
+              >
+                {t(`themeSettingsCard.card-field-${id}`)}
+              </Button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
+    </>
   );
 };
