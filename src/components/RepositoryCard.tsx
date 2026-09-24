@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { useRepositoryCardActions } from '../features/repositories/hooks/useRepositoryCardActions';
+import { useTranslatedDescription } from '../hooks/useTranslatedDescription';
 import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { usePluginActions } from '../plugins/hooks/usePluginActions';
@@ -503,6 +504,16 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 卡片可见字段（开发守则 §14）：未提供时按默认（显示）处理
   const cardFields = useAppStore((state) => state.repositoryCardFields);
   const showDescription = isRepositoryCardFieldVisible(cardFields, 'description');
+  // 「自动翻译仓库描述」：仅当卡片实际展示原始描述时才翻译
+  // （字段开关关闭 / 自定义描述 / AI 总结优先级更高时不发起翻译），翻译中/失败回退原文。
+  const showsOriginalDescription =
+    showDescription &&
+    !!repository.description &&
+    repository.custom_description === undefined &&
+    !(showAISummary && repository.ai_summary && !repository.analysis_failed);
+  const translatedDescription = useTranslatedDescription(
+    showsOriginalDescription ? repository.description : null
+  );
   const pluginActions = usePluginActions('repository-card');
   const {
     analyze: handleAIAnalyze,
@@ -685,8 +696,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       content = repository.ai_summary;
       contentSource = 'ai';
     } else if (repository.description) {
-      // 显示原始描述
-      content = repository.description;
+      // 显示原始描述（开启自动翻译时为译文，未完成/失败回退原文）
+      content = translatedDescription ?? repository.description;
       contentSource = 'original';
     } else {
       // 无可用描述
@@ -702,7 +713,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         content = repository.custom_description;
         contentSource = 'custom';
       } else if (repository.description) {
-        content = repository.description;
+        content = translatedDescription ?? repository.description;
         contentSource = 'original';
       } else {
         content = t('repositoryCard.no-description-available');
@@ -751,7 +762,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       isExplicitlyCleared,
       isCustomized
     };
-  }, [repository, showAISummary, allCategories, t]);
+  }, [repository, showAISummary, allCategories, t, translatedDescription]);
 
   // 使用 useMemo 缓存标签计算
   // 逻辑：优先显示自定义标签，如果没有则按AI分析状态显示AI标签或Topics

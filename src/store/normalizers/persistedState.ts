@@ -186,6 +186,9 @@ export const normalizePersistedState = (
     translationEngine: safePersisted.translationEngine === 'google' || safePersisted.translationEngine === 'ai'
       ? safePersisted.translationEngine
       : 'microsoft',
+    autoTranslateRepoDescription: typeof safePersisted.autoTranslateRepoDescription === 'boolean'
+      ? safePersisted.autoTranslateRepoDescription
+      : false,
     isAuthenticated: !!(resolvedUser && resolvedGithubToken),
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseShowMode: safePersisted.releaseShowMode === 'unread' ? 'unread' : 'all',

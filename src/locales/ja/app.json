@@ -566,6 +566,8 @@
     "google-translate-free": "Google翻訳（無料）",
     "ai-translation-uses-the-active-ai-configuration": "AI 翻訳 (現在有効化されている AI 構成を使用)",
     "ai-translation-usually-has-higher-quality-but-is": "AI 翻訳は一般に高品質ですが、速度が遅く API クレジットを消費するため、上記の現在アクティブな AI 構成が使用されます。",
+    "auto-translate-repo-descriptions": "リポジトリの説明を自動翻訳",
+    "when-enabled-card-repository-description": "有効にすると、リポジトリページとディスカバリーページのカードに表示されるリポジトリの元の説明が、自動的にインターフェースの言語に翻訳されます。すでにその言語の説明は元のまま表示され、翻訳に失敗した場合も元のテキストが表示されます。",
     "free-google-endpoint-no-configuration-needed-may": "Google の無料インターフェースは設定を必要としません。一部のエリアは直接接続できない場合があります。",
     "free-microsoft-edge-endpoint-no-configuration-ne": "Microsoft Edgeの無料インターフェイス、設定不要、直接接続速度は高速です。"
   },

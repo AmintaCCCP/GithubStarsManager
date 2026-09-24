@@ -547,6 +547,8 @@ export interface AppState {
   language: AppLanguage;
   /** README 文档翻译引擎（微软 / Google / AI），见 TranslationEngine */
   translationEngine: TranslationEngine;
+  /** 自动翻译卡片上的仓库原始描述为界面语言（默认关闭；同语言/失败时显示原文） */
+  autoTranslateRepoDescription: boolean;
   isSidebarCollapsed: boolean;
   readmeModalOpen: boolean;
   headerMenuConfig: HeaderMenuItem[];

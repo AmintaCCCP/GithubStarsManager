@@ -12,6 +12,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setSelectedCategory'
   | 'setLanguage'
   | 'setTranslationEngine'
+  | 'setAutoTranslateRepoDescription'
   | 'setSidebarCollapsed'
   | 'setReadmeModalOpen'
   | 'setHeaderMenuConfig'
@@ -49,6 +50,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       setSelectedCategory: (selectedCategory) => set({ selectedCategory }),
       setLanguage: (language) => set({ language }),
       setTranslationEngine: (translationEngine) => set({ translationEngine }),
+      setAutoTranslateRepoDescription: (autoTranslateRepoDescription) => set({ autoTranslateRepoDescription }),
       setSidebarCollapsed: (isSidebarCollapsed) => set({ isSidebarCollapsed }),
       setReadmeModalOpen: (readmeModalOpen) => set({ readmeModalOpen }),
       setHeaderMenuConfig: (config) => set({

@@ -566,6 +566,8 @@
     "google-translate-free": "Google 번역(무료)",
     "ai-translation-uses-the-active-ai-configuration": "AI 번역(현재 활성화된 AI 구성 사용)",
     "ai-translation-usually-has-higher-quality-but-is": "AI 번역은 일반적으로 품질이 더 높지만 속도가 느리고 API 크레딧을 소비하며 위의 현재 활성화된 AI 구성을 사용합니다.",
+    "auto-translate-repo-descriptions": "저장소 설명 자동 번역",
+    "when-enabled-card-repository-description": "사용하면 저장소 페이지와 발견 페이지 카드의 저장소 원본 설명이 인터페이스 언어로 자동 번역되어 표시됩니다. 이미 해당 언어인 설명은 원본 그대로 표시되며, 번역에 실패하면 원본 텍스트가 표시됩니다.",
     "free-google-endpoint-no-configuration-needed-may": "Google의 무료 인터페이스에는 구성이 필요하지 않습니다. 일부 지역은 직접 연결되지 않을 수 있습니다.",
     "free-microsoft-edge-endpoint-no-configuration-ne": "Microsoft Edge 무료 인터페이스, 구성이 필요하지 않으며 직접 연결 속도가 빠릅니다."
   },
