@@ -78,7 +78,7 @@ interface ElectronAPI {
   };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
-  plugins?: ElectronPluginAPI;
+  plugins?: ElectronPluginAPI & { registry?: { load: () => Promise<import('./pluginRegistryService').PluginRegistryLoadResult> } };
 }
 
 declare global {
