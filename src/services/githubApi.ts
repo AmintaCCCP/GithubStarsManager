@@ -1604,24 +1604,25 @@ export class GitHubApiService {
         const item = items[i];
         const title = item.querySelector('title')?.textContent || '';
         const link = item.querySelector('link')?.textContent || '';
-        // description 可能包含 HTML，需要解码
+        // description 元素是 README 渲染内容，不是仓库描述；
+        // 仅用于下方提取 stars/forks 标记，绝不写入 repo.description
         const descriptionEl = item.querySelector('description');
-        let description = descriptionEl?.textContent || '';
+        let readmeText = descriptionEl?.textContent || '';
         // 解码 HTML 实体
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = description;
-        description = tempDiv.textContent || tempDiv.innerText || description;
+        tempDiv.innerHTML = readmeText;
+        readmeText = tempDiv.textContent || tempDiv.innerText || readmeText;
         // 清理多余空白
-        description = description.replace(/\s+/g, ' ').trim();
+        readmeText = readmeText.replace(/\s+/g, ' ').trim();
 
         // 解析 link 获取 owner/repo 格式
         const match = link.match(/github\.com\/([^/]+)\/([^/?#]+)/);
         const owner = match?.[1] || '';
         const repoName = match?.[2] || title;
 
-        // 从 description 中提取 stars 和 forks（格式如 "⭐ 1,234 | 🍴 456"）
-        const starsMatch = description.match(/⭐\s*([\d,]+)/);
-        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        // 从 RSS 文本中提取 stars 和 forks（旧版 feed 格式如 "⭐ 1,234 | 🍴 456"）
+        const starsMatch = readmeText.match(/⭐\s*([\d,]+)/);
+        const forksMatch = readmeText.match(/🍴\s*([\d,]+)/);
         const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
         const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
 
@@ -1629,7 +1630,7 @@ export class GitHubApiService {
           id: i + 1,
           name: repoName,
           full_name: `${owner}/${repoName}`,
-          description: description.slice(0, 200),
+          description: null,
           html_url: link,
           stargazers_count: stars,
           forks_count: forks,
@@ -1661,9 +1662,8 @@ export class GitHubApiService {
             r.stargazers_count = data.stargazers_count ?? r.stargazers_count;
             r.forks_count = data.forks_count ?? r.forks_count;
             r.language = data.language;
-            if (data.description && !r.description) {
-              r.description = data.description;
-            }
+            // 描述以 GitHub API 为准；null（未填写描述）保持 null，由 UI 显示「暂无描述」
+            r.description = data.description;
           } catch (e) {
             logger.warn('githubApi', `Failed to fetch repo details for ${r.full_name}`, e);
           }
@@ -1812,15 +1812,16 @@ export class GitHubApiService {
         const title = item.querySelector('title')?.textContent || '';
         const link = item.querySelector('link')?.textContent || '';
 
-        // Parse description - strip XML/HTML tags
+        // RSS 的 description 元素是 README 渲染内容，不是仓库描述；
+        // 仅用于下方提取 stars/forks 标记，绝不写入 repo.description
         const descriptionEl = item.querySelector('description');
-        let description = descriptionEl?.textContent || '';
+        let readmeText = descriptionEl?.textContent || '';
         // Decode HTML entities and strip HTML tags
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = description;
-        description = tempDiv.textContent || tempDiv.innerText || '';
+        tempDiv.innerHTML = readmeText;
+        readmeText = tempDiv.textContent || tempDiv.innerText || '';
         // Clean up extra whitespace
-        description = description.replace(/\s+/g, ' ').trim();
+        readmeText = readmeText.replace(/\s+/g, ' ').trim();
 
         // Parse link to get owner/repo
         const match = link.match(/github\.com\/([^/]+)\/([^/?#]+)/);
@@ -1828,8 +1829,8 @@ export class GitHubApiService {
         const repoName = match?.[2] || title;
 
         // Extract stars and forks from description (format like "⭐ 1,234 | 🍴 456")
-        const starsMatch = description.match(/⭐\s*([\d,]+)/);
-        const forksMatch = description.match(/🍴\s*([\d,]+)/);
+        const starsMatch = readmeText.match(/⭐\s*([\d,]+)/);
+        const forksMatch = readmeText.match(/🍴\s*([\d,]+)/);
         const stars = starsMatch ? parseInt(starsMatch[1].replace(/,/g, '')) : 0;
         const forks = forksMatch ? parseInt(forksMatch[1].replace(/,/g, '')) : 0;
 
@@ -1837,7 +1838,7 @@ export class GitHubApiService {
           id: 0, // will be filled by GitHub API
           name: repoName,
           full_name: `${owner}/${repoName}`,
-          description: description,
+          description: null,
           html_url: link,
           stargazers_count: stars,
           forks_count: forks,
@@ -1885,10 +1886,9 @@ export class GitHubApiService {
             r.created_at = data.created_at ?? r.created_at;
             r.updated_at = data.updated_at ?? r.updated_at;
             r.pushed_at = data.pushed_at ?? r.pushed_at;
-            // Use GitHub API description as fallback (RSS description may contain emoji markers)
-            if (data.description) {
-              r.description = data.description;
-            }
+            // 仓库描述一律以 GitHub API 为准；null（仓库未填写描述）保持 null，
+            // 由 UI 显示「暂无描述」，不允许回退到 RSS 携带的 README 内容
+            r.description = data.description;
           } catch (e) {
             logger.warn('githubApi', `Failed to fetch repo details for ${r.full_name}`, e);
           }

@@ -275,7 +275,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
           </div>
 
           {/* Description */}
-          {repo.description && (
+          {repo.description ? (
             <Popover>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -299,6 +299,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 {repo.description}
               </PopoverContent>
             </Popover>
+          ) : (
+            <p className="mb-3 text-sm text-muted-foreground/70 dark:text-muted-foreground/70">
+              {t('subscriptionRepoCard.no-description')}
+            </p>
           )}
 
           {/* AI Summary */}
