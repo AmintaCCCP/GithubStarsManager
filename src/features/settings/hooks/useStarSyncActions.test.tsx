@@ -16,7 +16,7 @@ vi.mock('../../../services/githubApiFactory', () => ({
   createGitHubListsApiService: (token: string) => ({ __factory: true, token }),
 }));
 
-const storeState = {
+const storeState: { language: string; githubToken: string | null; pushCategoriesToLists: ReturnType<typeof vi.fn>; setListsPushError: ReturnType<typeof vi.fn> } = {
   language: 'zh',
   githubToken: 'token',
   pushCategoriesToLists: mocks.pushCategoriesToLists,
