@@ -92,10 +92,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     activeAIConfig,
     language,
     translationEngine,
-    autoTranslateRepoDescription,
     repositoryChatSettings,
     setTranslationEngine,
-    setAutoTranslateRepoDescription,
     setRepositoryChatSettings,
     addAIConfig,
     updateAIConfig,
@@ -107,10 +105,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     activeAIConfig: state.activeAIConfig,
     language: state.language,
     translationEngine: state.translationEngine,
-    autoTranslateRepoDescription: state.autoTranslateRepoDescription,
     repositoryChatSettings: state.repositoryChatSettings,
     setTranslationEngine: state.setTranslationEngine,
-    setAutoTranslateRepoDescription: state.setAutoTranslateRepoDescription,
     setRepositoryChatSettings: state.setRepositoryChatSettings,
     addAIConfig: state.addAIConfig,
     updateAIConfig: state.updateAIConfig,
@@ -969,19 +965,6 @@ Repository information:
                 : t('aIConfigPanel.free-microsoft-edge-endpoint-no-configuration-ne')}
           </p>
         </div>
-        <label className="mt-4 flex items-start gap-2 text-sm text-foreground dark:text-foreground">
-          <Checkbox
-            checked={autoTranslateRepoDescription}
-            onCheckedChange={(checked) => setAutoTranslateRepoDescription(checked === true)}
-            className="mt-0.5"
-          />
-          <span>
-            {t('aIConfigPanel.auto-translate-repo-descriptions')}
-            <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">
-              {t('aIConfigPanel.when-enabled-card-repository-description')}
-            </span>
-          </span>
-        </label>
       </div>
     </div>
   );
