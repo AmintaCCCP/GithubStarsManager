@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "모양 설정",
+    "fine-tune-appearance": "화면 모양 세부 조정",
     "display-mode": "디스플레이 모드",
     "light": "연한 색",
     "dark": "어두운",

@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "Darstellungseinstellungen",
+    "fine-tune-appearance": "Darstellung anpassen",
     "display-mode": "Anzeigemodus",
     "light": "helle Farbe",
     "dark": "Dunkel",

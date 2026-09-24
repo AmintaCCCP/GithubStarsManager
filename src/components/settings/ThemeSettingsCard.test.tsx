@@ -25,6 +25,7 @@ vi.mock('../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
 import { makeT } from '../../i18n/useT';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
 import { THEME_PRESETS } from '../../constants/themePresets';
+import { DEFAULT_REPOSITORY_CARD_FIELDS } from '../../types/repositoryCardFields';
 
 const t = makeT('zh', 'app');
 
@@ -42,6 +43,10 @@ beforeEach(() => {
     updateThemeTokens: vi.fn((patch: Record<string, unknown>) => {
       mocks.state.themeTokens = { ...(mocks.state.themeTokens as Record<string, unknown>), ...patch };
     }),
+    repositoryCardFields: { ...DEFAULT_REPOSITORY_CARD_FIELDS },
+    setRepositoryCardField: vi.fn((id: string, visible: boolean) => {
+      mocks.state.repositoryCardFields = { ...(mocks.state.repositoryCardFields as Record<string, boolean>), [id]: visible };
+    }),
   });
 });
 
@@ -50,6 +55,24 @@ function setStateTheme(mode: 'light' | 'dark') {
 }
 
 describe('ThemeSettingsCard', () => {
+  it('keeps fine-tuning collapsed by default while card fields remain visible', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+
+    expect(screen.queryByRole('combobox', { name: '字号' })).toBeNull();
+    expect(screen.getByRole('button', { name: '描述' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: '微调外观' }));
+    expect(screen.getByRole('combobox', { name: '字号' })).toBeTruthy();
+  });
+
+  it('toggles repository card fields independently from theme settings', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+
+    await user.click(screen.getByRole('button', { name: '描述' }));
+    expect(mocks.state.setRepositoryCardField).toHaveBeenCalledWith('description', false);
+  });
+
   it('renders every registered preset as a radio option', () => {
     render(<ThemeSettingsCard t={t} />);
     const presetGroup = screen.getByRole('radiogroup', { name: '主题配色' });
@@ -101,6 +124,7 @@ describe('ThemeSettingsCard', () => {
   it('writes theme tokens through the store action', async () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
+    await user.click(screen.getByRole('button', { name: '微调外观' }));
 
     await user.click(screen.getByRole('button', { name: '绿色 (#16a34a)' }));
     expect(mocks.state.themeTokens).toMatchObject({ accentColor: '#16a34a', radius: 'default' });
@@ -115,16 +139,20 @@ describe('ThemeSettingsCard', () => {
     expect(mocks.state.themeTokens).toMatchObject({ animation: 'reduced' });
   });
 
-  it.each([1.5, 1.13])('shows a persisted font scale of %s', (fontScale) => {
+  it.each([1.5, 1.13])('shows a persisted font scale of %s', async (fontScale) => {
+    const user = userEvent.setup();
     mocks.state.themeTokens = { accentColor: null, fontScale, radius: 'default', animation: 'normal' };
     render(<ThemeSettingsCard t={t} />);
+    await user.click(screen.getByRole('button', { name: '微调外观' }));
 
     expect(screen.getByRole('combobox', { name: '字号' })).toHaveValue(String(fontScale));
     expect((screen.getByRole('option', { name: `${Math.round(fontScale * 100)}%` }) as HTMLOptionElement).selected).toBe(true);
   });
 
-  it('labels palette colors and shows the active preset color in the picker', () => {
+  it('labels palette colors and shows the active preset color in the picker', async () => {
+    const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
+    await user.click(screen.getByRole('button', { name: '微调外观' }));
 
     expect(screen.getByRole('button', { name: '蓝色 (#2563eb)' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByLabelText('自定义强调色')).toHaveValue('#f8fafc');
@@ -134,6 +162,7 @@ describe('ThemeSettingsCard', () => {
     const user = userEvent.setup();
     mocks.state.themeTokens = { accentColor: '#2563eb', fontScale: 1.25, radius: 'large', animation: 'reduced' };
     render(<ThemeSettingsCard t={t} />);
+    await user.click(screen.getByRole('button', { name: '微调外观' }));
 
     await user.click(screen.getByRole('button', { name: '恢复默认外观' }));
 

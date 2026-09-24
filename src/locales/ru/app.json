@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "Настройки внешнего вида",
+    "fine-tune-appearance": "Тонкая настройка оформления",
     "display-mode": "режим отображения",
     "light": "светлый цвет",
     "dark": "Темный",

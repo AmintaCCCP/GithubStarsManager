@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "Paramètres d'apparence",
+    "fine-tune-appearance": "Ajuster l'apparence",
     "display-mode": "mode d'affichage",
     "light": "couleur claire",
     "dark": "Sombre",

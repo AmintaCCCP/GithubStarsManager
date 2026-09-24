@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "外观设置",
+    "fine-tune-appearance": "微调外观",
     "display-mode": "显示模式",
     "light": "浅色",
     "dark": "深色",

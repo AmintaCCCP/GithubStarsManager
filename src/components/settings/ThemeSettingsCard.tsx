@@ -20,6 +20,7 @@ import {
 } from '../../utils/themeTokens';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { REPOSITORY_CARD_FIELD_IDS } from '../../types/repositoryCardFields';
 import { isRepositoryCardFieldVisible } from '../../utils/repositoryCardFields';
 
@@ -85,6 +86,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
   }, [setThemePreset]);
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center space-x-3">
@@ -187,7 +189,10 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
 
         {/* Theme token（开发守则 §14）：强调色 / 圆角 / 字号 / 动效，全部落到 <html>
             的 CSS 变量与 data 属性上，恢复默认即删掉内联值让预设重新生效。 */}
-        <div className="space-y-5 border-t border-border pt-5">
+        <Accordion type="single" collapsible className="border-t border-border">
+          <AccordionItem value="fine-tune" className="border-0">
+            <AccordionTrigger>{t('themeSettingsCard.fine-tune-appearance')}</AccordionTrigger>
+            <AccordionContent className="space-y-5">
           <div>
             <p className="mb-2 text-sm font-medium text-foreground">{t('themeSettingsCard.accent-color')}</p>
             <div className="flex flex-wrap items-center gap-2">
@@ -279,26 +284,37 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
           >
             {t('themeSettingsCard.reset-appearance')}
           </Button>
-        </div>
-
-        {/* 仓库卡片可见字段（开发守则 §14）：只保存声明式开关 */}
-        <div className="border-t border-border pt-5">
-          <p className="text-sm font-medium text-foreground">{t('themeSettingsCard.card-fields')}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t('themeSettingsCard.card-fields-hint')}</p>
-          <div className="mt-3 space-y-2">
-            {REPOSITORY_CARD_FIELD_IDS.map((id) => (
-              <div key={id} className="flex items-center justify-between gap-4">
-                <span className="text-sm text-foreground">{t(`themeSettingsCard.card-field-${id}`)}</span>
-                <Switch
-                  aria-label={t(`themeSettingsCard.card-field-${id}`)}
-                  checked={isRepositoryCardFieldVisible(repositoryCardFields, id)}
-                  onCheckedChange={(checked) => setRepositoryCardField(id, checked)}
-                />
-              </div>
-            ))}
-          </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </CardContent>
+    </Card>
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('themeSettingsCard.card-fields')}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-3 text-xs text-muted-foreground">{t('themeSettingsCard.card-fields-hint')}</p>
+        <div className="flex flex-wrap gap-2">
+          {REPOSITORY_CARD_FIELD_IDS.map((id) => {
+            const visible = isRepositoryCardFieldVisible(repositoryCardFields, id);
+            return (
+              <Button
+                key={id}
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={visible}
+                onClick={() => setRepositoryCardField(id, !visible)}
+                className={visible ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15' : ''}
+              >
+                {t(`themeSettingsCard.card-field-${id}`)}
+              </Button>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
+    </>
   );
 };

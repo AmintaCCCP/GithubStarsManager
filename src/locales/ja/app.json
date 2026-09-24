@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "外観設定",
+    "fine-tune-appearance": "外観を微調整",
     "display-mode": "表示モード",
     "light": "明るい色",
     "dark": "暗い",

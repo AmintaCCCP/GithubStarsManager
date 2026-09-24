@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "Configuración de apariencia",
+    "fine-tune-appearance": "Ajustar la apariencia",
     "display-mode": "modo de visualización",
     "light": "color claro",
     "dark": "Oscuro",

@@ -1041,6 +1041,7 @@
   },
   "themeSettingsCard": {
     "appearance": "Appearance",
+    "fine-tune-appearance": "Fine-tune appearance",
     "display-mode": "Display Mode",
     "light": "Light",
     "dark": "Dark",
