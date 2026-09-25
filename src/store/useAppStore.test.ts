@@ -41,6 +41,51 @@ const createRepository = (id: number, overrides: Partial<Repository> = {}): Repo
   ...overrides,
 });
 
+describe('discovery channel visibility', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      discoveryChannels: useAppStore.getInitialState().discoveryChannels.map(channel => ({ ...channel })),
+      selectedDiscoveryChannel: 'telegram',
+    });
+  });
+
+  it('hides a channel and selects another visible channel', () => {
+    useAppStore.getState().toggleDiscoveryChannel('telegram');
+
+    const state = useAppStore.getState();
+    expect(state.discoveryChannels.find(channel => channel.id === 'telegram')?.enabled).toBe(false);
+    expect(state.selectedDiscoveryChannel).toBe('trending');
+  });
+
+  it('keeps the last visible channel available', () => {
+    useAppStore.setState({
+      discoveryChannels: useAppStore.getState().discoveryChannels.map(channel => ({
+        ...channel,
+        enabled: channel.id === 'trending',
+      })),
+      selectedDiscoveryChannel: 'trending',
+    });
+
+    useAppStore.getState().toggleDiscoveryChannel('trending');
+
+    expect(useAppStore.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+  });
+
+  it('restores a visible selection from persisted channel settings', () => {
+    const discoveryChannels = useAppStore.getInitialState().discoveryChannels.map(channel => ({
+      ...channel,
+      enabled: channel.id !== 'telegram',
+    }));
+    const normalized = normalizePersistedState(
+      { discoveryChannels, selectedDiscoveryChannel: 'telegram' },
+      useAppStore.getState()
+    );
+
+    expect(normalized.discoveryChannels?.find(channel => channel.id === 'telegram')?.enabled).toBe(false);
+    expect(normalized.selectedDiscoveryChannel).toBe('trending');
+  });
+});
+
 describe('useAppStore release source settings', () => {
   beforeEach(() => {
     useAppStore.setState({
