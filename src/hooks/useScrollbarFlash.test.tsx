@@ -62,15 +62,17 @@ describe('useScrollbarFlash', () => {
     act(() => {
       result.current.handleScroll();
     });
-    expect(result.current.isScrolling).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
 
     rerender({ active: false });
     expect(result.current.isScrolling).toBe(false);
+    // 挂起的定时器已被清除，而不是留着迟后触发。
+    expect(vi.getTimerCount()).toBe(0);
 
     act(() => {
       vi.advanceTimersByTime(700);
     });
-    // 挂起的定时器已被清除，不会在关闭后再次置位。
+    // 不会在关闭后再次置位。
     expect(result.current.isScrolling).toBe(false);
 
     rerender({ active: true });
@@ -87,7 +89,11 @@ describe('useScrollbarFlash', () => {
     act(() => {
       result.current.handleScroll();
     });
+    expect(vi.getTimerCount()).toBe(1);
+
     unmount();
+    // 卸载即清定时器：不残留会在卸载后触发 setState 的句柄。
+    expect(vi.getTimerCount()).toBe(0);
 
     expect(() => {
       act(() => {

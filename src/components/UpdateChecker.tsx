@@ -99,6 +99,8 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
               className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-on-scroll', isChangelogScrolling && 'scrolling')}
               onScroll={handleChangelogScroll}
               tabIndex={0}
+              role="region"
+              aria-label={t('updateChecker.what-s-new')}
             >
               <h4 className="mb-2 font-medium text-foreground dark:text-foreground">{t('updateChecker.what-s-new')}</h4>
               <ul className="space-y-1">{updateInfo.changelog.map((item, index) => <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground dark:text-muted-foreground"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /><span>{item}</span></li>)}</ul>
