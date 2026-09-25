@@ -51,7 +51,9 @@ interface ReleaseCardProps {
   isReleaseNotesExpanded: boolean;
   isFullContent: boolean;
   truncatedBody: string;
-  matchesActiveFilters: (linkName: string) => boolean;
+  matchesActiveFilters: (linkName: string, repoFullName: string) => boolean;
+  /** 过滤（黑名单/排除仓库）前的资产总数，作为"匹配/总数"徽标的分母 */
+  totalLinks: number;
   selectedFilters: string[];
   onToggleAssets: () => void;
   onToggleReleaseNotes: () => void;
@@ -72,6 +74,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   isFullContent,
   truncatedBody,
   matchesActiveFilters,
+  totalLinks,
   selectedFilters,
   onToggleAssets,
   onToggleReleaseNotes,
@@ -170,7 +173,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
           {/* 元信息列不设固定上限：出现“资产已更新”徽标时整行向左扩展（min-w 保证
               无徽标时仍维持 140px 栏宽对齐），否则 140px 内放不下徽标会把时间和
               徽标文字都挤到换行；按钮区仍固定 344px 靠右，位置不受影响。 */}
-          <div className="flex items-center gap-3 flex-shrink-0 self-center md:justify-end">
+          <div className="flex items-center gap-6 flex-shrink-0 self-center md:justify-end">
             <div className="hidden md:flex md:min-w-[140px] shrink-0 flex-col justify-center gap-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Calendar className="w-3.5 h-3.5" />
@@ -191,7 +194,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <Download className="w-3.5 h-3.5" />
                   <span>
                     {selectedFilters.length > 0
-                      ? `${downloadLinks.filter(link => matchesActiveFilters(link.name)).length}/${downloadLinks.length}`
+                      ? `${downloadLinks.filter(link => matchesActiveFilters(link.name, release.repository.full_name)).length}/${totalLinks}`
                       : downloadLinks.length}
                   </span>
                 </div>

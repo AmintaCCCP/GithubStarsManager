@@ -424,6 +424,16 @@ export interface AssetFilter {
   id: string;
   name: string;
   keywords: string[];
+  /**
+   * 黑名单关键词：资产文件名命中任一关键词时，即使命中 keywords 也不匹配。
+   * 用于在同平台过滤器内剔除安装包等噪声（如 "setup"、"installer"）。
+   */
+  excludeKeywords?: string[];
+  /**
+   * 排除仓库（Repository.full_name）：该过滤器激活时，这些仓库的 Release
+   * 不会出现在该过滤器的筛选结果中；未选过滤器时照常显示，也不影响订阅。
+   */
+  excludeRepos?: string[];
   isPreset?: boolean;
   icon?: string;
 }

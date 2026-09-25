@@ -12,7 +12,35 @@
     "edit": "편집하다",
     "custom-filters": "맞춤 필터",
     "no-filters-click-new-to-create": "아직 필터가 없습니다. 필터를 만들려면 '새로 만들기'를 클릭하세요.",
-    "are-you-sure-you-want-to-delete-this-filter": "이 필터를 삭제하시겠습니까?"
+    "are-you-sure-you-want-to-delete-this-filter": "이 필터를 삭제하시겠습니까?",
+    "filterModal": {
+      "title-new": "필터 만들기",
+      "title-edit": "필터 편집",
+      "name-label": "필터 이름",
+      "name-placeholder": "예: macOS",
+      "include-keywords-label": "포함 키워드",
+      "include-keywords-hint": "파일 이름을 매칭하려면 키워드를 1개 이상 추가하세요",
+      "keyword-input-placeholder": "키워드 입력 (예: mac, dmg)",
+      "add": "추가",
+      "remove-keyword-aria": "키워드 {{keyword}} 삭제",
+      "exclude-keywords-label": "제외 키워드 (선택)",
+      "exclude-keywords-hint": "파일 이름에 제외 키워드가 포함된 자산은 이 필터와 일치하지 않습니다",
+      "exclude-repos-label": "제외 저장소 (선택)",
+      "exclude-repos-empty": "제외된 저장소가 없습니다",
+      "exclude-repos-note": "제외된 저장소는 이 필터의 영향을 받지 않습니다. 릴리스는 Release 목록에 계속 표시되며, 이 필터가 활성화된 경우에만 매칭에서 제외됩니다.",
+      "add-exclude-repos": "제외 저장소 추가",
+      "remove-exclude-repo-aria": "제외 저장소 {{repo}} 해제",
+      "repo-picker-title": "제외할 저장소 선택",
+      "repo-picker-search-placeholder": "저장소 검색",
+      "repo-picker-selected-count": "{{count}}개 선택됨",
+      "repo-picker-empty": "일치하는 저장소가 없습니다",
+      "repo-picker-no-release-repos": "아직 Release를 구독 중인 저장소가 없습니다",
+      "repo-picker-done": "완료",
+      "tip-body": "키워드는 Release 자산 파일 이름에 매칭됩니다. 포함 키워드 중 하나를 포함하고 제외 키워드는 포함하지 않은 파일이 일치합니다. 예: \"mac\"과 \"dmg\"는 해당 문자가 포함된 파일에 일치합니다.",
+      "cancel": "취소",
+      "save": "저장",
+      "create": "만들기"
+    }
   },
   "backToTop": {
     "back-to-top": "맨 위로 돌아가기"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "파일 이름과 Release 메타데이터로 판별합니다. 보안 검사는 하지 않으며 자동으로 실행되지 않습니다. 아래 자산 목록에서 언제든 다른 자산을 선택할 수 있습니다.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "이 기기에 해당하지 않는 자산 {{v1}}개를 제외했습니다(소스 코드, 체크섬, 서명, 디버그 기호, blockmap, 다른 플랫폼 또는 아키텍처)."
   }
-
 }

@@ -233,54 +233,53 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 {t('assetFilterManager.custom-filters')}
               </p>
               <div className="flex flex-wrap gap-2">
-                {customFilters.map(filter => (
-                  <div
-                    key={filter.id}
-                    className={`group flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors ${
-                      selectedFilters.includes(filter.id)
-                        ? 'bg-primary border-transparent text-primary-foreground font-medium'
-                        : 'bg-muted border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    }`}
-                  >
-                    <Button
-                      variant="ghost"
-                      onClick={() => onFilterToggle(filter.id)}
-                      className="h-auto min-h-0 flex flex-1 items-center justify-start space-x-2 p-0"
-                      aria-pressed={selectedFilters.includes(filter.id)}
-                      aria-label={`${filter.name} (${filter.keywords.join(', ')})`}
-                      title={`${filter.name} (${filter.keywords.join(', ')})`}
-                      type="button"
+                {customFilters.map(filter => {
+                  const isSelected = selectedFilters.includes(filter.id);
+                  return (
+                    <div
+                      key={filter.id}
+                      className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
+                        isSelected
+                          ? 'bg-primary border-transparent text-primary-foreground font-medium'
+                          : 'bg-card border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                      }`}
                     >
-                      <span className="font-medium text-sm">{filter.name}</span>
-                      <span className="text-xs opacity-75 hidden lg:inline">
-                        ({filter.keywords.join(', ')})
-                      </span>
-                    </Button>
-                    
-                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
-                        onClick={() => handleEditFilter(filter)}
-                        className="h-6 w-6 rounded p-0 hover:bg-accent dark:hover:bg-accent transition-colors"
-                        title={t('assetFilterManager.edit')}
+                        onClick={() => onFilterToggle(filter.id)}
+                        className="h-auto min-h-0 flex items-center space-x-1.5 p-0"
+                        title={filter.keywords.join(', ')}
                         type="button"
-                        aria-label={t('assetFilterManager.edit')}
+                        aria-pressed={isSelected}
                       >
-                        <Edit3 className="w-3 h-3" aria-hidden="true" />
+                        <span>{filter.name}</span>
                       </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleDeleteFilter(filter.id)}
-                        className="h-6 w-6 rounded p-0 transition-colors"
-                        title={t('assetFilterManager.delete')}
-                        type="button"
-                        aria-label={t('assetFilterManager.delete')}
-                      >
-                        <Trash2 className="w-3 h-3" aria-hidden="true" />
-                      </Button>
+
+                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleEditFilter(filter)}
+                          className="h-6 w-6 rounded p-0 hover:bg-accent hover:text-accent-foreground transition-colors"
+                          title={t('assetFilterManager.edit')}
+                          type="button"
+                          aria-label={t('assetFilterManager.edit')}
+                        >
+                          <Edit3 className="w-3 h-3" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleDeleteFilter(filter.id)}
+                          className="h-6 w-6 rounded p-0 text-destructive hover:text-destructive transition-colors"
+                          title={t('assetFilterManager.delete')}
+                          type="button"
+                          aria-label={t('assetFilterManager.delete')}
+                        >
+                          <Trash2 className="w-3 h-3" aria-hidden="true" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

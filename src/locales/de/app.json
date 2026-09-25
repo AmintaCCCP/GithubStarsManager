@@ -12,7 +12,35 @@
     "edit": "bearbeiten",
     "custom-filters": "Benutzerdefinierte Filter",
     "no-filters-click-new-to-create": "Es gibt noch keinen Filter. Klicken Sie auf „Neu“, um ihn zu erstellen",
-    "are-you-sure-you-want-to-delete-this-filter": "Möchten Sie diesen Filter wirklich löschen?"
+    "are-you-sure-you-want-to-delete-this-filter": "Möchten Sie diesen Filter wirklich löschen?",
+    "filterModal": {
+      "title-new": "Neuer Filter",
+      "title-edit": "Filter bearbeiten",
+      "name-label": "Filtername",
+      "name-placeholder": "z. B. macOS",
+      "include-keywords-label": "Einschluss-Schlüsselwörter",
+      "include-keywords-hint": "Füge mindestens ein Schlüsselwort hinzu, um Asset-Dateinamen abzugleichen",
+      "keyword-input-placeholder": "Schlüsselwort eingeben, z. B. mac, dmg",
+      "add": "Hinzufügen",
+      "remove-keyword-aria": "Schlüsselwort {{keyword}} löschen",
+      "exclude-keywords-label": "Ausschluss-Schlüsselwörter (optional)",
+      "exclude-keywords-hint": "Assets, deren Dateiname eines dieser Schlüsselwörter enthält, passen nicht zu diesem Filter",
+      "exclude-repos-label": "Ausgeschlossene Repositories (optional)",
+      "exclude-repos-empty": "Keine ausgeschlossenen Repositories",
+      "exclude-repos-note": "Ausgeschlossene Repositories sind von diesem Filter nicht betroffen: ihre Releases bleiben stets in der Release-Liste sichtbar; sie werden nur ignoriert, solange dieser Filter aktiv ist.",
+      "add-exclude-repos": "Ausgeschlossene Repositories hinzufügen",
+      "remove-exclude-repo-aria": "Ausgeschlossenes Repository {{repo}} entfernen",
+      "repo-picker-title": "Auszuschließende Repositories wählen",
+      "repo-picker-search-placeholder": "Repositories durchsuchen",
+      "repo-picker-selected-count": "{{count}} ausgewählt",
+      "repo-picker-empty": "Keine passenden Repositories",
+      "repo-picker-no-release-repos": "Noch keine Repositories mit Release-Abos",
+      "repo-picker-done": "Fertig",
+      "tip-body": "Schlüsselwörter beziehen sich auf Dateinamen von Release-Assets: eine Datei passt, wenn sie ein Einschluss-Schlüsselwort und kein Ausschluss-Schlüsselwort enthält. Beispiel: „mac“ und „dmg“ passen zu Dateien mit diesen Zeichen.",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "create": "Erstellen"
+    }
   },
   "backToTop": {
     "back-to-top": "zurück nach oben"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "Erkannt anhand von Dateinamen und Release-Metadaten. Es findet keine Sicherheitsprüfung statt und es wird nichts automatisch ausgeführt. Du kannst unten jederzeit eine andere Datei auswählen.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} Datei(en) ausgeschlossen, die nicht zu diesem Gerät passen (Quellcode, Prüfsummen, Signaturen, Debug-Symbole, Blockmaps, andere Plattformen oder Architekturen)."
   }
-
 }

@@ -67,6 +67,7 @@ const buildCardProps = (props: Partial<Parameters<typeof ReleaseCard>[0]> = {}):
   isFullContent: false,
   truncatedBody: '',
   matchesActiveFilters: () => true,
+  totalLinks: 1,
   selectedFilters: [],
   onToggleAssets: () => {},
   onToggleReleaseNotes: () => {},

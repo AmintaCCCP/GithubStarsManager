@@ -12,7 +12,35 @@
     "edit": "Edit",
     "custom-filters": "Custom Filters",
     "no-filters-click-new-to-create": "No filters, click \"New\" to create",
-    "are-you-sure-you-want-to-delete-this-filter": "Are you sure you want to delete this filter?"
+    "are-you-sure-you-want-to-delete-this-filter": "Are you sure you want to delete this filter?",
+    "filterModal": {
+      "title-new": "New Filter",
+      "title-edit": "Edit Filter",
+      "name-label": "Filter name",
+      "name-placeholder": "e.g. macOS",
+      "include-keywords-label": "Include keywords",
+      "include-keywords-hint": "Add at least one keyword to match asset file names",
+      "keyword-input-placeholder": "Enter a keyword, e.g. mac, dmg",
+      "add": "Add",
+      "remove-keyword-aria": "Delete keyword {{keyword}}",
+      "exclude-keywords-label": "Exclude keywords (optional)",
+      "exclude-keywords-hint": "Assets whose file name contains any excluded keyword will not match this filter",
+      "exclude-repos-label": "Excluded repositories (optional)",
+      "exclude-repos-empty": "No excluded repositories",
+      "exclude-repos-note": "Excluded repositories are not affected by this filter: their releases always remain visible in the Releases list; they are only skipped while this filter is active.",
+      "add-exclude-repos": "Add excluded repositories",
+      "remove-exclude-repo-aria": "Remove excluded repository {{repo}}",
+      "repo-picker-title": "Select repositories to exclude",
+      "repo-picker-search-placeholder": "Search repositories",
+      "repo-picker-selected-count": "{{count}} selected",
+      "repo-picker-empty": "No matching repositories",
+      "repo-picker-no-release-repos": "No repositories with Release subscriptions yet",
+      "repo-picker-done": "Done",
+      "tip-body": "Keywords match release asset file names: a file matches when it contains any include keyword and none of the exclude keywords. For example, \"mac\" and \"dmg\" match files containing those characters.",
+      "cancel": "Cancel",
+      "save": "Save",
+      "create": "Create"
+    }
   },
   "backToTop": {
     "back-to-top": "Back to top"

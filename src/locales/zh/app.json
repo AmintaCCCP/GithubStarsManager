@@ -12,7 +12,35 @@
     "edit": "编辑",
     "custom-filters": "自定义筛选器",
     "no-filters-click-new-to-create": "暂无过滤器，点击\"新建\"创建",
-    "are-you-sure-you-want-to-delete-this-filter": "确定要删除这个过滤器吗？"
+    "are-you-sure-you-want-to-delete-this-filter": "确定要删除这个过滤器吗？",
+    "filterModal": {
+      "title-new": "新建过滤器",
+      "title-edit": "编辑过滤器",
+      "name-label": "过滤器名称",
+      "name-placeholder": "例如: macOS",
+      "include-keywords-label": "包含关键词",
+      "include-keywords-hint": "请添加至少一个关键词用于匹配资产文件名",
+      "keyword-input-placeholder": "输入关键词，如: mac, dmg",
+      "add": "添加",
+      "remove-keyword-aria": "删除关键词 {{keyword}}",
+      "exclude-keywords-label": "排除关键词（可选）",
+      "exclude-keywords-hint": "资产文件名包含任一排除关键词时，将不会命中该过滤器",
+      "exclude-repos-label": "排除仓库（可选）",
+      "exclude-repos-empty": "暂无排除仓库",
+      "exclude-repos-note": "排除仓库不受该过滤器影响：这些仓库的 Release 始终显示在 Release 列表中，仅在该过滤器启用时不参与匹配。",
+      "add-exclude-repos": "添加排除仓库",
+      "remove-exclude-repo-aria": "移除排除仓库 {{repo}}",
+      "repo-picker-title": "选择要排除的仓库",
+      "repo-picker-search-placeholder": "搜索仓库名",
+      "repo-picker-selected-count": "已选择 {{count}} 个仓库",
+      "repo-picker-empty": "没有匹配的仓库",
+      "repo-picker-no-release-repos": "暂无已关注 Release 的仓库",
+      "repo-picker-done": "完成",
+      "tip-body": "关键词匹配 Release 资产文件名：文件名包含任一包含关键词、且不含排除关键词时命中。例如添加 \"mac\" 和 \"dmg\" 可匹配包含这些字符的文件。",
+      "cancel": "取消",
+      "save": "保存",
+      "create": "创建"
+    }
   },
   "backToTop": {
     "back-to-top": "回到顶部"
