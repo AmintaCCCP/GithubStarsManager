@@ -163,7 +163,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 
   useEffect(() => {
     updateIndicator();
-  }, [updateIndicator]);
+  }, [updateIndicator, channels]);
 
   useEffect(() => {
     scrollToActiveTab();
