@@ -6,6 +6,7 @@ import { RefreshCw, Loader2, TrendingUp, Rocket, Crown, Tag, Search, Newspaper }
 import { SiX, SiTelegram } from '@icons-pack/react-simple-icons';
 import type { DiscoveryChannel, DiscoveryChannelId, DiscoveryChannelIcon } from '../types';
 import { Button } from './ui/button';
+import { DiscoveryChannelMenu } from './DiscoveryChannelMenu';
 
 const discoveryChannelIconMap: Record<DiscoveryChannelIcon, React.ComponentType<{ className?: string }>> = {
   trending: TrendingUp,
@@ -22,6 +23,7 @@ interface DiscoverySidebarProps {
   channels: DiscoveryChannel[];
   selectedChannel: DiscoveryChannelId;
   onChannelSelect: (channel: DiscoveryChannelId) => void;
+  onToggleChannel: (channel: DiscoveryChannelId) => void;
   onRefreshAll: () => void;
   isLoading: Record<DiscoveryChannelId, boolean>;
   lastRefresh: Record<DiscoveryChannelId, string | null>;
@@ -33,6 +35,7 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
   channels,
   selectedChannel,
   onChannelSelect,
+  onToggleChannel,
   onRefreshAll,
   isLoading,
   lastRefresh,
@@ -65,18 +68,26 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
           <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
             {t('discoverySidebar.discovery-channels')}
           </h3>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={onRefreshAll}
-            disabled={anyLoading || isAnalyzing}
-            aria-label={t('discoverySidebar.refresh-all')}
-            title={t('discoverySidebar.refresh-all')}
-            className="h-8 w-8"
-          >
-            <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <DiscoveryChannelMenu
+              channels={channels}
+              language={language}
+              onToggleChannel={onToggleChannel}
+              triggerClassName="h-8 w-8"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onRefreshAll}
+              disabled={anyLoading || isAnalyzing}
+              aria-label={t('discoverySidebar.refresh-all')}
+              title={t('discoverySidebar.refresh-all')}
+              className="h-8 w-8"
+            >
+              <RefreshCw className={`w-4 h-4 ${anyLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-1">

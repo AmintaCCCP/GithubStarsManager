@@ -4,6 +4,7 @@
     "m-ago": "минут назад",
     "h-ago": "часов назад",
     "discovery-channels": "канал обнаружения",
+    "manage-channels": "Управление каналами обнаружения",
     "refresh-all": "Обновить все"
   },
   "discoveryView": {

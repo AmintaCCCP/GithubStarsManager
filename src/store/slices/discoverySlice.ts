@@ -95,11 +95,25 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
         },
       };
     }),
-    toggleDiscoveryChannel: (channelId) => set((state) => ({
-      discoveryChannels: state.discoveryChannels.map(ch =>
+    toggleDiscoveryChannel: (channelId) => set((state) => {
+      const channel = state.discoveryChannels.find(ch => ch.id === channelId);
+      if (!channel || (channel.enabled && state.discoveryChannels.filter(ch => ch.enabled).length === 1)) {
+        return state;
+      }
+
+      const discoveryChannels = state.discoveryChannels.map(ch =>
         ch.id === channelId ? { ...ch, enabled: !ch.enabled } : ch
-      ),
-    })),
+      );
+      const selectedChannelEnabled = discoveryChannels.some(
+        ch => ch.id === state.selectedDiscoveryChannel && ch.enabled
+      );
+      return {
+        discoveryChannels,
+        selectedDiscoveryChannel: selectedChannelEnabled
+          ? state.selectedDiscoveryChannel
+          : discoveryChannels.find(ch => ch.enabled)?.id ?? state.selectedDiscoveryChannel,
+      };
+    }),
     setDiscoveryPlatform: (discoveryPlatform) => set({ discoveryPlatform }),
     setDiscoveryLanguage: (discoveryLanguage) => set({ discoveryLanguage }),
     setDiscoverySortBy: (discoverySortBy) => set({ discoverySortBy }),

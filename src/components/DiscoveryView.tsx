@@ -29,6 +29,7 @@ import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { DiscoverySidebar } from './DiscoverySidebar';
+import { DiscoveryChannelMenu } from './DiscoveryChannelMenu';
 import { TrendingHistoryPanel } from '../features/discovery/components/TrendingHistoryPanel';
 import { useTrendingSnapshotCapture } from '../features/discovery/hooks/useTrendingSnapshotCapture';
 import { SubscriptionRepoCard } from './SubscriptionRepoCard';
@@ -41,6 +42,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import type {
+  DiscoveryChannel,
   DiscoveryChannelId,
   DiscoveryChannelIcon,
   DiscoveryPlatform,
@@ -107,15 +109,19 @@ const discoveryChannelStyleMap: Record<DiscoveryChannelIcon, { gradient: string;
 
 interface MobileTabNavProps {
   channels: { id: DiscoveryChannelId; name: string; nameEn: string; icon: React.ReactNode }[];
+  allChannels: DiscoveryChannel[];
   selectedChannel: DiscoveryChannelId;
   onChannelSelect: (channel: DiscoveryChannelId) => void;
+  onToggleChannel: (channel: DiscoveryChannelId) => void;
   language: AppLanguage;
 }
 
 const MobileTabNav: React.FC<MobileTabNavProps> = ({ 
   channels, 
+  allChannels,
   selectedChannel, 
   onChannelSelect,
+  onToggleChannel,
   language 
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -157,7 +163,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
 
   useEffect(() => {
     updateIndicator();
-  }, [updateIndicator]);
+  }, [updateIndicator, channels]);
 
   useEffect(() => {
     scrollToActiveTab();
@@ -198,47 +204,55 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
     <div 
       className="relative w-full border-b border-border dark:border-border bg-background/95 dark:bg-card/95 backdrop-blur-sm lg:hidden"
     >
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        role="tablist"
-        className="flex overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
-        style={{
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {channels.map((channel) => (
-          <Button
-            key={channel.id}
-            ref={(el) => {
-              if (el) {
-                tabRefs.current.set(channel.id, el);
-              } else {
-                tabRefs.current.delete(channel.id);
-              }
-            }}
-            onClick={() => onChannelSelect(channel.id)}
-            variant="ghost"
-            role="tab"
-            aria-selected={selectedChannel === channel.id}
-            className={`
-              relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
-              transition-all duration-200 ease-out
-              focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-              ${selectedChannel === channel.id
-                ? 'text-foreground dark:text-foreground '
-                : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
-              }
-            `}
-          >
-            <span className="flex items-center gap-1.5 whitespace-nowrap">
-              {channel.icon}
-              {discoveryChannelName(channel, language)}
-            </span>
-          </Button>
-        ))}
+      <div className="flex min-w-0 items-center">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          role="tablist"
+          className="flex min-w-0 flex-1 overflow-x-auto scrollbar-hide py-2 px-2 gap-1 snap-x snap-mandatory"
+          style={{
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          {channels.map((channel) => (
+            <Button
+              key={channel.id}
+              ref={(el) => {
+                if (el) {
+                  tabRefs.current.set(channel.id, el);
+                } else {
+                  tabRefs.current.delete(channel.id);
+                }
+              }}
+              onClick={() => onChannelSelect(channel.id)}
+              variant="ghost"
+              role="tab"
+              aria-selected={selectedChannel === channel.id}
+              className={`
+                relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
+                transition-all duration-200 ease-out
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+                ${selectedChannel === channel.id
+                  ? 'text-foreground dark:text-foreground '
+                  : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
+                }
+              `}
+            >
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                {channel.icon}
+                {discoveryChannelName(channel, language)}
+              </span>
+            </Button>
+          ))}
+        </div>
+        <DiscoveryChannelMenu
+          channels={allChannels}
+          language={language}
+          onToggleChannel={onToggleChannel}
+          triggerClassName="h-11 w-11 shrink-0"
+        />
       </div>
       
       {/* Active indicator */}
@@ -438,6 +452,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
 
 export const DiscoveryView: React.FC = React.memo(() => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const toggleDiscoveryChannel = useAppStore(state => state.toggleDiscoveryChannel);
   const {
     githubToken,
     language,
@@ -726,7 +741,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
       {/* Mobile Tab Navigation */}
       <MobileTabNav
         channels={mobileChannels}
+        allChannels={safeDiscoveryChannels}
         selectedChannel={selectedDiscoveryChannel}
+        onToggleChannel={toggleDiscoveryChannel}
         onChannelSelect={(channel) => {
           if (channel === selectedDiscoveryChannel) {
             return;
@@ -749,6 +766,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
         >
           <DiscoverySidebar
             channels={safeDiscoveryChannels}
+            onToggleChannel={toggleDiscoveryChannel}
             selectedChannel={selectedDiscoveryChannel}
             onChannelSelect={(channel) => {
               if (channel === selectedDiscoveryChannel) {
