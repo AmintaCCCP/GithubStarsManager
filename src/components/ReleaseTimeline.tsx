@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from './ui/switch';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, ChevronDown, CheckCircle, Settings } from 'lucide-react';
-import { Release } from '../types';
+import { AssetFilter, Release } from '../types';
 import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import { useAppStore } from '../store/useAppStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -17,6 +17,7 @@ import { ReleaseSourceSettingsModal } from './ReleaseSourceSettingsModal';
 import {
   releaseBelongsToResolvedSources,
   resolveReleaseSources,
+  normalizeRepoKey,
 } from '../utils/releaseSources';
 import {
   effectiveReleaseTime,
@@ -87,23 +88,34 @@ export const ReleaseTimeline: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  // Helper function to check if a link matches any active filter
-  const matchesActiveFilters = useCallback((linkName: string): boolean => {
+  // 判断链接是否命中任一激活过滤器。
+  // 单个过滤器内：命中任一包含关键词，且不含排除关键词，且仓库未被排除；
+  // 多个过滤器之间仍为 OR。被排除仓库的 Release 在该过滤器视图下被跳过，
+  // 但列表本身（未选过滤器时）不受影响。
+  const matchesActiveFilters = useCallback((linkName: string, repoFullName: string): boolean => {
     if (selectedFilters.length === 0) return true;
-    
+
     const lowerLinkName = linkName.toLowerCase();
-    const activeCustomFilters = assetFilters.filter(filter => selectedFilters.includes(filter.id));
-    const activePresetFilters = PRESET_FILTERS.filter(filter => selectedFilters.includes(filter.id));
-    
-    const matchesCustom = activeCustomFilters.some(filter => 
-      filter.keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))
-    );
-    
-    const matchesPreset = activePresetFilters.some(filter => 
-      filter.keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))
-    );
-    
-    return matchesCustom || matchesPreset;
+    const lowerRepoKey = normalizeRepoKey(repoFullName);
+
+    return selectedFilters.some(filterId => {
+      // 预设过滤器可被编辑并持久化在 assetFilters 中，优先生效；
+      // 常量表仅兜底状态里缺失的预设 id，避免编辑被旧常量绕过。
+      const active: Pick<AssetFilter, 'id' | 'keywords'> & Partial<AssetFilter> | undefined =
+        assetFilters.find(filter => filter.id === filterId) ??
+        PRESET_FILTERS.find(preset => preset.id === filterId);
+      if (!active) return false;
+
+      if ((active.excludeRepos ?? []).some(name => normalizeRepoKey(name) === lowerRepoKey)) {
+        return false;
+      }
+
+      if (!active.keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))) {
+        return false;
+      }
+
+      return !(active.excludeKeywords ?? []).some(keyword => lowerLinkName.includes(keyword.toLowerCase()));
+    });
   }, [selectedFilters, assetFilters]);
 
   // Toggle assets expansion for a specific release
@@ -254,7 +266,7 @@ export const ReleaseTimeline: React.FC = () => {
     return subscribedReleases.map(release => {
       const allLinks = getDownloadLinks(release);
       const filteredLinks = selectedFilters.length > 0
-        ? allLinks.filter(link => matchesActiveFilters(link.name))
+        ? allLinks.filter(link => matchesActiveFilters(link.name, release.repository.full_name))
         : allLinks;
       return {
         release,

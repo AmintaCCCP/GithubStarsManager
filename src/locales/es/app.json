@@ -12,7 +12,35 @@
     "edit": "editar",
     "custom-filters": "Filtros personalizados",
     "no-filters-click-new-to-create": "Aún no hay filtro, haga clic en \"Nuevo\" para crearlo",
-    "are-you-sure-you-want-to-delete-this-filter": "¿Estás seguro de que deseas eliminar este filtro?"
+    "are-you-sure-you-want-to-delete-this-filter": "¿Estás seguro de que deseas eliminar este filtro?",
+    "filterModal": {
+      "title-new": "Nuevo filtro",
+      "title-edit": "Editar filtro",
+      "name-label": "Nombre del filtro",
+      "name-placeholder": "p. ej., macOS",
+      "include-keywords-label": "Palabras clave incluidas",
+      "include-keywords-hint": "Añade al menos una palabra clave para coincidir con nombres de archivo",
+      "keyword-input-placeholder": "Introduce una palabra clave, p. ej., mac, dmg",
+      "add": "Añadir",
+      "remove-keyword-aria": "Eliminar la palabra clave {{keyword}}",
+      "exclude-keywords-label": "Palabras clave excluidas (opcional)",
+      "exclude-keywords-hint": "Los archivos cuyo nombre contenga alguna palabra clave excluida no coincidirán con este filtro",
+      "exclude-repos-label": "Repositorios excluidos (opcional)",
+      "exclude-repos-empty": "Sin repositorios excluidos",
+      "exclude-repos-note": "Los repositorios excluidos no se ven afectados por este filtro: sus releases siguen siendo visibles en la lista de Releases; solo se omiten mientras este filtro esté activo.",
+      "add-exclude-repos": "Añadir repositorios excluidos",
+      "remove-exclude-repo-aria": "Quitar el repositorio excluido {{repo}}",
+      "repo-picker-title": "Seleccionar repositorios a excluir",
+      "repo-picker-search-placeholder": "Buscar repositorios",
+      "repo-picker-selected-count": "{{count}} seleccionados",
+      "repo-picker-empty": "No hay repositorios coincidentes",
+      "repo-picker-no-release-repos": "Aún no hay repositorios con releases seguidas",
+      "repo-picker-done": "Listo",
+      "tip-body": "Las palabras clave se aplican a los nombres de archivo de los assets: un archivo coincide si contiene alguna palabra clave incluida y ninguna excluida. Por ejemplo, \"mac\" y \"dmg\" coinciden con archivos que contengan esos caracteres.",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "create": "Crear"
+    }
   },
   "backToTop": {
     "back-to-top": "volver arriba"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "Se detecta a partir de nombres de archivo y metadatos del Release. No se comprueba la seguridad ni se ejecuta nada automáticamente. Siempre puedes elegir otro recurso en la lista de abajo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Se excluyeron {{v1}} recursos que no aplican a este dispositivo (código fuente, sumas de verificación, firmas, símbolos de depuración, blockmaps, otras plataformas o arquitecturas)."
   }
-
 }

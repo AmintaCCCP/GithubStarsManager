@@ -12,7 +12,35 @@
     "edit": "編輯",
     "custom-filters": "自訂篩選器",
     "no-filters-click-new-to-create": "暫無過濾器，點擊\"新建\"創建",
-    "are-you-sure-you-want-to-delete-this-filter": "確定要刪除這個過濾器嗎？"
+    "are-you-sure-you-want-to-delete-this-filter": "確定要刪除這個過濾器嗎？",
+    "filterModal": {
+      "title-new": "新增篩選器",
+      "title-edit": "編輯篩選器",
+      "name-label": "篩選器名稱",
+      "name-placeholder": "例如: macOS",
+      "include-keywords-label": "包含關鍵字",
+      "include-keywords-hint": "請至少新增一個關鍵字以比對資產檔案名稱",
+      "keyword-input-placeholder": "輸入關鍵字，如: mac, dmg",
+      "add": "新增",
+      "remove-keyword-aria": "刪除關鍵字 {{keyword}}",
+      "exclude-keywords-label": "排除關鍵字（選填）",
+      "exclude-keywords-hint": "資產檔案名稱包含任一排除關鍵字時，將不會命中此篩選器",
+      "exclude-repos-label": "排除儲存庫（選填）",
+      "exclude-repos-empty": "尚無排除的儲存庫",
+      "exclude-repos-note": "排除的儲存庫不受此篩選器影響：其 Release 仍會顯示在 Release 清單中，只在此篩選器啟用時不參與比對。",
+      "add-exclude-repos": "新增排除儲存庫",
+      "remove-exclude-repo-aria": "移除排除儲存庫 {{repo}}",
+      "repo-picker-title": "選擇要排除的儲存庫",
+      "repo-picker-search-placeholder": "搜尋儲存庫名稱",
+      "repo-picker-selected-count": "已選 {{count}} 個儲存庫",
+      "repo-picker-empty": "沒有符合的儲存庫",
+      "repo-picker-no-release-repos": "尚無已關注 Release 的儲存庫",
+      "repo-picker-done": "完成",
+      "tip-body": "關鍵字比對 Release 資產檔案名稱：檔名包含任一包含關鍵字、且不含排除關鍵字時命中。例如新增 \"mac\" 與 \"dmg\" 可比對含這些字元的檔案。",
+      "cancel": "取消",
+      "save": "儲存",
+      "create": "建立"
+    }
   },
   "backToTop": {
     "back-to-top": "回到頂部"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "依檔名與 Release 中繼資料辨識，未驗證安裝包安全性，也不會自動執行。你隨時可以在下方資產清單中手動選擇其他資產。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 個不適用於目前裝置的資產（原始碼、校驗和、簽章、偵錯符號、blockmap、其他平台/架構）。"
   }
-
 }

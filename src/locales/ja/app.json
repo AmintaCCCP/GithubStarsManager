@@ -12,7 +12,35 @@
     "edit": "編集",
     "custom-filters": "カスタムフィルター",
     "no-filters-click-new-to-create": "まだフィルターがありません。「新規」をクリックして作成します。",
-    "are-you-sure-you-want-to-delete-this-filter": "このフィルタを削除してもよろしいですか?"
+    "are-you-sure-you-want-to-delete-this-filter": "このフィルタを削除してもよろしいですか?",
+    "filterModal": {
+      "title-new": "フィルターを作成",
+      "title-edit": "フィルターを編集",
+      "name-label": "フィルター名",
+      "name-placeholder": "例: macOS",
+      "include-keywords-label": "包含キーワード",
+      "include-keywords-hint": "アセットファイル名のマッチには、キーワードを1つ以上追加してください",
+      "keyword-input-placeholder": "キーワードを入力（例: mac, dmg）",
+      "add": "追加",
+      "remove-keyword-aria": "キーワード {{keyword}} を削除",
+      "exclude-keywords-label": "除外キーワード（任意）",
+      "exclude-keywords-hint": "ファイル名に除外キーワードが含まれるアセットは、このフィルターに一致しません",
+      "exclude-repos-label": "除外リポジトリ（任意）",
+      "exclude-repos-empty": "除外リポジトリはありません",
+      "exclude-repos-note": "除外されたリポジトリはこのフィルターの影響を受けません。リリースは引き続きリリース一覧に表示され、このフィルター有効時だけマッチ対象外になります。",
+      "add-exclude-repos": "除外リポジトリを追加",
+      "remove-exclude-repo-aria": "除外リポジトリ {{repo}} を削除",
+      "repo-picker-title": "除外するリポジトリを選択",
+      "repo-picker-search-placeholder": "リポジトリを検索",
+      "repo-picker-selected-count": "{{count}} 件選択中",
+      "repo-picker-empty": "一致するリポジトリがありません",
+      "repo-picker-no-release-repos": "リリースを購読中のリポジトリはまだありません",
+      "repo-picker-done": "完了",
+      "tip-body": "キーワードはリリースアセットのファイル名に一致します。包含キーワードのいずれかを含み、除外キーワードを含まないファイルが一致します。例: \"mac\" と \"dmg\" はこれらの文字を含むファイルに一致します。",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "create": "作成"
+    }
   },
   "backToTop": {
     "back-to-top": "トップに戻る"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "ファイル名と Release メタデータから判定しています。安全性の検証は行わず、自動実行も行いません。下のアセット一覧からいつでも別のアセットを選べます。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "このデバイスに該当しないアセット（ソースコード、チェックサム、署名、デバッグシンボル、blockmap、他のプラットフォームやアーキテクチャ）を {{v1}} 件除外しました。"
   }
-
 }

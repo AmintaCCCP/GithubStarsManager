@@ -12,7 +12,35 @@
     "edit": "modifier",
     "custom-filters": "Filtres personnalisés",
     "no-filters-click-new-to-create": "Il n'y a pas encore de filtre, cliquez sur \"Nouveau\" pour le créer",
-    "are-you-sure-you-want-to-delete-this-filter": "Êtes-vous sûr de vouloir supprimer ce filtre ?"
+    "are-you-sure-you-want-to-delete-this-filter": "Êtes-vous sûr de vouloir supprimer ce filtre ?",
+    "filterModal": {
+      "title-new": "Nouveau filtre",
+      "title-edit": "Modifier le filtre",
+      "name-label": "Nom du filtre",
+      "name-placeholder": "ex. macOS",
+      "include-keywords-label": "Mots-clés inclus",
+      "include-keywords-hint": "Ajoutez au moins un mot-clé pour filtrer par nom de fichier",
+      "keyword-input-placeholder": "Saisir un mot-clé, ex. mac, dmg",
+      "add": "Ajouter",
+      "remove-keyword-aria": "Supprimer le mot-clé {{keyword}}",
+      "exclude-keywords-label": "Mots-clés exclus (facultatif)",
+      "exclude-keywords-hint": "Les fichiers dont le nom contient l’un de ces mots-clés ne correspondront pas à ce filtre",
+      "exclude-repos-label": "Dépôts exclus (facultatif)",
+      "exclude-repos-empty": "Aucun dépôt exclu",
+      "exclude-repos-note": "Les dépôts exclus ne sont pas affectés par ce filtre : leurs releases restent toujours visibles dans la liste Releases ; elles sont simplement ignorées tant que ce filtre est actif.",
+      "add-exclude-repos": "Ajouter des dépôts exclus",
+      "remove-exclude-repo-aria": "Retirer le dépôt exclu {{repo}}",
+      "repo-picker-title": "Sélectionner les dépôts à exclure",
+      "repo-picker-search-placeholder": "Rechercher des dépôts",
+      "repo-picker-selected-count": "{{count}} sélectionné(s)",
+      "repo-picker-empty": "Aucun dépôt correspondant",
+      "repo-picker-no-release-repos": "Aucun dépôt avec des releases suivies pour le moment",
+      "repo-picker-done": "Terminé",
+      "tip-body": "Les mots-clés s’appliquent aux noms de fichiers des releases : un fichier correspond s’il contient un mot-clé inclus et aucun mot-clé exclu. Par exemple, « mac » et « dmg » correspondent aux fichiers contenant ces caractères.",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "create": "Créer"
+    }
   },
   "backToTop": {
     "back-to-top": "retour en haut"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "Détecté à partir des noms de fichiers et des métadonnées de la Release. Aucun contrôle de sécurité n'est effectué et rien ne s'exécute automatiquement. Vous pouvez toujours choisir un autre fichier dans la liste ci-dessous.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} fichier(s) écarté(s) car ils ne concernent pas cet appareil (code source, sommes de contrôle, signatures, symboles de débogage, blockmaps, autres plateformes ou architectures)."
   }
-
 }

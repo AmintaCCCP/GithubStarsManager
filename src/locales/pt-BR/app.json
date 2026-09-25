@@ -12,7 +12,35 @@
     "edit": "editar",
     "custom-filters": "Filtros personalizados",
     "no-filters-click-new-to-create": "Ainda não há filtro, clique em \"Novo\" para criá-lo",
-    "are-you-sure-you-want-to-delete-this-filter": "Tem certeza de que deseja excluir este filtro?"
+    "are-you-sure-you-want-to-delete-this-filter": "Tem certeza de que deseja excluir este filtro?",
+    "filterModal": {
+      "title-new": "Novo filtro",
+      "title-edit": "Editar filtro",
+      "name-label": "Nome do filtro",
+      "name-placeholder": "ex.: macOS",
+      "include-keywords-label": "Palavras-chave incluídas",
+      "include-keywords-hint": "Adicione pelo menos uma palavra-chave para corresponder a nomes de arquivos",
+      "keyword-input-placeholder": "Digite uma palavra-chave, ex.: mac, dmg",
+      "add": "Adicionar",
+      "remove-keyword-aria": "Excluir palavra-chave {{keyword}}",
+      "exclude-keywords-label": "Palavras-chave excluídas (opcional)",
+      "exclude-keywords-hint": "Arquivos cujo nome contiver qualquer palavra-chave excluída não corresponderão a este filtro",
+      "exclude-repos-label": "Repositórios excluídos (opcional)",
+      "exclude-repos-empty": "Nenhum repositório excluído",
+      "exclude-repos-note": "Os repositórios excluídos não são afetados por este filtro: as releases deles continuam visíveis na lista de Releases; eles são apenas ignorados enquanto este filtro estiver ativo.",
+      "add-exclude-repos": "Adicionar repositórios excluídos",
+      "remove-exclude-repo-aria": "Remover repositório excluído {{repo}}",
+      "repo-picker-title": "Selecionar repositórios para excluir",
+      "repo-picker-search-placeholder": "Pesquisar repositórios",
+      "repo-picker-selected-count": "{{count}} selecionados",
+      "repo-picker-empty": "Nenhum repositório correspondente",
+      "repo-picker-no-release-repos": "Ainda não há repositórios com releases seguidas",
+      "repo-picker-done": "Concluído",
+      "tip-body": "As palavras-chave são aplicadas aos nomes de arquivo dos assets: um arquivo corresponde se contiver alguma palavra-chave incluída e nenhuma excluída. Por exemplo, \"mac\" e \"dmg\" correspondem a arquivos que contêm esses caracteres.",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "create": "Criar"
+    }
   },
   "backToTop": {
     "back-to-top": "voltar ao topo"
@@ -1249,5 +1277,4 @@
     "detected-from-filenames-and-release-metadata-no": "Detectado a partir de nomes de arquivo e metadados da Release. Nenhuma verificação de segurança é feita e nada é executado automaticamente. Você sempre pode escolher outro arquivo na lista abaixo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} arquivo(s) que não se aplicam a este dispositivo foram excluídos (código-fonte, somas de verificação, assinaturas, símbolos de depuração, blockmaps, outras plataformas ou arquiteturas)."
   }
-
 }
