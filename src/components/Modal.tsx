@@ -5,6 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { useScrollbarFlash } from '../hooks/useScrollbarFlash';
 import { cn } from '../lib/utils';
 
 type DialogContentPointerDownOutsideHandler = NonNullable<
@@ -34,30 +35,7 @@ export const Modal: React.FC<ModalProps> = ({
   onPointerDownOutside,
   onOverlayPointerDown,
 }) => {
-  const [isScrolling, setIsScrolling] = React.useState(false);
-  const scrollStopTimerRef = React.useRef<number | null>(null);
-
-  React.useEffect(() => () => {
-    if (scrollStopTimerRef.current) window.clearTimeout(scrollStopTimerRef.current);
-  }, []);
-
-  React.useEffect(() => {
-    if (isOpen) return;
-    if (scrollStopTimerRef.current) {
-      window.clearTimeout(scrollStopTimerRef.current);
-      scrollStopTimerRef.current = null;
-    }
-    setIsScrolling(false);
-  }, [isOpen]);
-
-  const handleScroll = () => {
-    setIsScrolling(true);
-    if (scrollStopTimerRef.current) window.clearTimeout(scrollStopTimerRef.current);
-    scrollStopTimerRef.current = window.setTimeout(() => {
-      setIsScrolling(false);
-      scrollStopTimerRef.current = null;
-    }, 700);
-  };
+  const { isScrolling, handleScroll } = useScrollbarFlash(isOpen);
 
   const content = scrollable ? (
     <>
