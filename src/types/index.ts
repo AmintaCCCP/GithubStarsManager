@@ -430,8 +430,8 @@ export interface AssetFilter {
    */
   excludeKeywords?: string[];
   /**
-   * 排除仓库（Repository.full_name）：该过滤器启用时，这些仓库的资产不参与
-   * 匹配（Release 列表本身不受影响，仅在过滤器视图下被跳过）。
+   * 排除仓库（Repository.full_name）：该过滤器激活时，这些仓库的 Release
+   * 不会出现在该过滤器的筛选结果中；未选过滤器时照常显示，也不影响订阅。
    */
   excludeRepos?: string[];
   isPreset?: boolean;
