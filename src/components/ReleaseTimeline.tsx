@@ -304,7 +304,9 @@ export const ReleaseTimeline: React.FC = () => {
       .map(({ release, allLinks, filteredLinks }) => ({
         release,
         // 如果有过滤器，只显示匹配的资产；否则显示全部
-        displayLinks: selectedFilters.length > 0 ? filteredLinks : allLinks
+        displayLinks: selectedFilters.length > 0 ? filteredLinks : allLinks,
+        // 过滤前的资产总数：卡片"匹配/总数"徽标的分母，需用排除前的量
+        totalLinks: allLinks.length
       }));
   }, [releasesWithLinks, searchQuery, selectedFilters]);
 
@@ -345,7 +347,7 @@ export const ReleaseTimeline: React.FC = () => {
       latestRelease: Release;
     }>();
 
-    filteredReleases.forEach(({ release, displayLinks }) => {
+    filteredReleases.forEach(({ release, displayLinks, totalLinks }) => {
       const repoId = release.repository.id;
       if (!groups.has(repoId)) {
         groups.set(repoId, {
@@ -355,7 +357,7 @@ export const ReleaseTimeline: React.FC = () => {
         });
       }
       const group = groups.get(repoId)!;
-      group.releases.push({ release, displayLinks });
+      group.releases.push({ release, displayLinks, totalLinks });
       // 更新最新发布
       if (new Date(release.published_at) > new Date(group.latestRelease.published_at)) {
         group.latestRelease = release;
@@ -875,7 +877,7 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
         ) : viewMode === 'timeline' ? (
           // 按日期排序视图
-          paginatedReleases.map(({ release, displayLinks }) => {
+          paginatedReleases.map(({ release, displayLinks, totalLinks }) => {
             const isUnread = isReleaseUnread(release.id);
             const isAssetsExpanded = expandedAssets.has(release.id);
             const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
@@ -887,6 +889,7 @@ export const ReleaseTimeline: React.FC = () => {
                 key={release.id}
                 release={release}
                 downloadLinks={displayLinks}
+                totalLinks={totalLinks}
                 isUnread={isUnread}
                 isAssetsExpanded={isAssetsExpanded}
                 isReleaseNotesExpanded={isReleaseNotesExpanded}
@@ -987,7 +990,7 @@ export const ReleaseTimeline: React.FC = () => {
                   <div className={`overflow-hidden min-h-0 ${isExpanded ? '' : 'collapse-hidden'}`}>
                     <div className="border-t ui-divider bg-background dark:bg-card/50">
                       <div className="p-1.5 space-y-1.5">
-                      {releases.map(({ release, displayLinks }) => {
+                      {releases.map(({ release, displayLinks, totalLinks }) => {
                         const isUnread = isReleaseUnread(release.id);
                         const isAssetsExpanded = expandedAssets.has(release.id);
                         const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
@@ -999,6 +1002,7 @@ export const ReleaseTimeline: React.FC = () => {
                             key={release.id}
                             release={release}
                             downloadLinks={displayLinks}
+                            totalLinks={totalLinks}
                             isUnread={isUnread}
                             isAssetsExpanded={isAssetsExpanded}
                             isReleaseNotesExpanded={isReleaseNotesExpanded}

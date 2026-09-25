@@ -17,7 +17,7 @@
       "title-new": "新增篩選器",
       "title-edit": "編輯篩選器",
       "name-label": "篩選器名稱",
-      "name-placeholder": "例如: macOS",
+      "name-placeholder": "範例: macOS",
       "include-keywords-label": "包含關鍵字",
       "include-keywords-hint": "請至少新增一個關鍵字以比對資產檔案名稱",
       "keyword-input-placeholder": "輸入關鍵字，如: mac, dmg",
@@ -35,9 +35,9 @@
       "repo-picker-selected-count": "已選 {{count}} 個儲存庫",
       "repo-picker-empty": "沒有符合的儲存庫",
       "repo-picker-no-release-repos": "尚無已關注 Release 的儲存庫",
-      "repo-picker-done": "完成",
+      "repo-picker-done": "確定",
       "tip-body": "關鍵字比對 Release 資產檔案名稱：檔名包含任一包含關鍵字、且不含排除關鍵字時命中。例如新增 \"mac\" 與 \"dmg\" 可比對含這些字元的檔案。",
-      "cancel": "取消",
+      "cancel": "關閉",
       "save": "儲存",
       "create": "建立"
     }

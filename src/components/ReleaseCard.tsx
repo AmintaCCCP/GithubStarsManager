@@ -52,6 +52,8 @@ interface ReleaseCardProps {
   isFullContent: boolean;
   truncatedBody: string;
   matchesActiveFilters: (linkName: string, repoFullName: string) => boolean;
+  /** 过滤（黑名单/排除仓库）前的资产总数，作为"匹配/总数"徽标的分母 */
+  totalLinks: number;
   selectedFilters: string[];
   onToggleAssets: () => void;
   onToggleReleaseNotes: () => void;
@@ -72,6 +74,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   isFullContent,
   truncatedBody,
   matchesActiveFilters,
+  totalLinks,
   selectedFilters,
   onToggleAssets,
   onToggleReleaseNotes,
@@ -191,7 +194,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <Download className="w-3.5 h-3.5" />
                   <span>
                     {selectedFilters.length > 0
-                      ? `${downloadLinks.filter(link => matchesActiveFilters(link.name, release.repository.full_name)).length}/${downloadLinks.length}`
+                      ? `${downloadLinks.filter(link => matchesActiveFilters(link.name, release.repository.full_name)).length}/${totalLinks}`
                       : downloadLinks.length}
                   </span>
                 </div>
