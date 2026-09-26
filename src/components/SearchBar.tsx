@@ -6,7 +6,8 @@ import { getIntlLocale } from '../i18n/format';
 import { useT } from '../i18n/useT';
 import { Input } from './ui/input';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History, Archive } from 'lucide-react';
+import { Search, X, SlidersHorizontal, CheckCircle, Bell, BellOff, Bot, Edit3, Lock, Unlock, AlertCircle, ChevronDown, RefreshCw, Clock, ArrowDown, ArrowUp, History, Archive, Link2 } from 'lucide-react';
+import { BatchStarImportDialog } from './BatchStarImportDialog';
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { useAppStore, getAllCategories } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -68,6 +69,8 @@ const SortByDropdown: React.FC<SortByDropdownProps> = ({ value, onChange }) => {
 };
 
 export const SearchBar: React.FC = () => {
+  const [batchStarOpen, setBatchStarOpen] = useState(false);
+  const repositoryT = useT('repositories');
   const {
     searchFilters,
     repositories,
@@ -877,6 +880,16 @@ export const SearchBar: React.FC = () => {
             )}
           </Button>
 
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setBatchStarOpen(true)}
+            className="linear-filter-toggle flex items-center space-x-2 px-3 py-2 text-sm"
+          >
+            <Link2 className="w-4 h-4" aria-hidden="true" />
+            <span>{repositoryT('batchStar.title')}</span>
+          </Button>
+
           {activeFiltersCount > 0 && (
             <Button
               variant="ghost"
@@ -971,6 +984,7 @@ export const SearchBar: React.FC = () => {
             </Tooltip>
           </div>
         </div>
+        {batchStarOpen && <BatchStarImportDialog isOpen onClose={() => setBatchStarOpen(false)} />}
       </div>
 
       {/* Advanced Filters */}

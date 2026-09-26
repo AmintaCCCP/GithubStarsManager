@@ -1533,6 +1533,19 @@ export class GitHubApiService {
     });
   }
 
+  /** GitHub returns 204 for a starred repository and 404 when it is not starred. */
+  async isRepositoryStarred(owner: string, repo: string): Promise<boolean> {
+    try {
+      await this.makeRequest<void>(`/user/starred/${owner}/${repo}`);
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('GitHub API error: 404 ')) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
   async checkRateLimit(): Promise<{ remaining: number; reset: number }> {
     const response = await this.makeRequest<GitHubRateLimitResponse>('/rate_limit');
     return {
