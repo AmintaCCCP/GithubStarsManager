@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { forceSyncToBackend } from '../../../services/autoSync';
+import { translateBatch } from '../../../services/translateService';
 import type { GitHubRepoDetailRead } from '../../../services/githubApi';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import type { Repository } from '../../../types';
 import type { ImportedRepositoryCandidate } from '../../../types/repositoryImport';
 import { extractRepositoryCandidates } from '../../../utils/repositoryImport';
+import { isLikelySameLanguage } from '../../../utils/textLanguage';
 
 const MAX_CANDIDATES = 50;
 const RESOLVE_BATCH_SIZE = 5;
@@ -21,6 +23,7 @@ export interface BatchStarRow {
 /** Resolves pasted repository links, then applies only the user's selected stars. */
 export function useBatchStarImport() {
   const githubToken = useAppStore(state => state.githubToken);
+  const language = useAppStore(state => state.language);
   const addRepository = useAppStore(state => state.addRepository);
   const [rows, setRows] = useState<BatchStarRow[]>([]);
   const [duplicateCount, setDuplicateCount] = useState(0);
@@ -28,13 +31,24 @@ export function useBatchStarImport() {
   const [isResolving, setIsResolving] = useState(false);
   const [isStarring, setIsStarring] = useState(false);
   const [syncError, setSyncError] = useState('');
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState('');
+  const [translationsVisible, setTranslationsVisible] = useState(false);
   const busyRef = useRef(false);
+
+  const resetTranslations = useCallback(() => {
+    setTranslations({});
+    setTranslationError('');
+    setTranslationsVisible(false);
+  }, []);
 
   const preview = useCallback(async (text: string) => {
     if (busyRef.current) return;
     setInputError('');
     setSyncError('');
     setRows([]);
+    resetTranslations();
     if (!githubToken) {
       setInputError('sign-in');
       return;
@@ -105,7 +119,7 @@ export function useBatchStarImport() {
       busyRef.current = false;
       setIsResolving(false);
     }
-  }, [githubToken]);
+  }, [githubToken, resetTranslations]);
 
   const toggleRow = useCallback((index: number) => {
     if (busyRef.current) return;
@@ -116,13 +130,81 @@ export function useBatchStarImport() {
     ));
   }, []);
 
+  const selectAll = useCallback(() => {
+    if (busyRef.current) return;
+    setRows(current => current.map(row =>
+      row.status === 'ready' ? { ...row, selected: true } : row
+    ));
+  }, []);
+
+  const invertSelection = useCallback(() => {
+    if (busyRef.current) return;
+    setRows(current => current.map(row =>
+      row.status === 'ready' ? { ...row, selected: !row.selected } : row
+    ));
+  }, []);
+
   const clearPreview = useCallback(() => {
     if (busyRef.current) return;
     setRows([]);
     setInputError('');
     setSyncError('');
     setDuplicateCount(0);
-  }, []);
+    resetTranslations();
+  }, [resetTranslations]);
+
+  /**
+   * 在原文与译文之间切换。切回原文（回退）只翻转展示开关，译文缓存保留，
+   * 再次切换立即可见；首次翻译时只请求与界面语言不同且尚未翻译过的描述，
+   * 同语言或译文为空的描述保持原文。
+   */
+  const toggleTranslations = useCallback(async () => {
+    if (busyRef.current) return;
+    if (translationsVisible) {
+      setTranslationsVisible(false);
+      return;
+    }
+
+    const targets: Array<{ fullName: string; description: string }> = [];
+    rows.forEach(row => {
+      const detail = row.detail;
+      if (!detail?.description) return;
+      if (isLikelySameLanguage(detail.description, language)) return;
+      if (detail.full_name in translations) return;
+      targets.push({ fullName: detail.full_name, description: detail.description });
+    });
+    if (targets.length > 0) {
+      busyRef.current = true;
+      setIsTranslating(true);
+      setTranslationError('');
+      try {
+        const results = await translateBatch(
+          targets.map(target => target.description),
+          language,
+          undefined,
+          undefined,
+          'plain',
+        );
+        setTranslations(current => {
+          const next = { ...current };
+          results.forEach((result, index) => {
+            const target = targets[index];
+            if (result.translatedText?.trim() && result.translatedText !== target.description) {
+              next[target.fullName] = result.translatedText;
+            }
+          });
+          return next;
+        });
+      } catch (error) {
+        setTranslationError(error instanceof Error ? error.message : String(error));
+        return;
+      } finally {
+        busyRef.current = false;
+        setIsTranslating(false);
+      }
+    }
+    setTranslationsVisible(true);
+  }, [language, rows, translations, translationsVisible]);
 
   const starSelected = useCallback(async () => {
     if (busyRef.current || !githubToken) return;
@@ -154,7 +236,7 @@ export function useBatchStarImport() {
       }
       if (starredCount > 0) {
         try {
-          await forceSyncToBackend();
+          await forceSyncToBackend({ reportFailures: true });
         } catch (error) {
           setSyncError(error instanceof Error ? error.message : String(error));
         }
@@ -165,5 +247,9 @@ export function useBatchStarImport() {
     }
   }, [addRepository, githubToken, rows]);
 
-  return { rows, duplicateCount, inputError, isResolving, isStarring, syncError, preview, toggleRow, clearPreview, starSelected };
+  return {
+    rows, duplicateCount, inputError, isResolving, isStarring, syncError,
+    translations, isTranslating, translationError, translationsVisible,
+    preview, toggleRow, selectAll, invertSelection, clearPreview, starSelected, toggleTranslations,
+  };
 }

@@ -4,19 +4,22 @@ import { useBatchStarImport } from './useBatchStarImport';
 
 const mocks = vi.hoisted(() => ({
   token: 'token',
+  language: 'zh',
   addRepository: vi.fn(),
   getRepositoryDetails: vi.fn(),
   isRepositoryStarred: vi.fn(),
   starRepository: vi.fn(),
   forceSyncToBackend: vi.fn(),
+  translateBatch: vi.fn(),
 }));
 vi.mock('../../../store/useAppStore', () => ({
   useAppStore: (selector: (state: unknown) => unknown) => selector({
-    githubToken: mocks.token, addRepository: mocks.addRepository,
+    githubToken: mocks.token, language: mocks.language, addRepository: mocks.addRepository,
   }),
 }));
 vi.mock('../../../services/githubApiFactory', () => ({ createGitHubApiService: () => mocks }));
 vi.mock('../../../services/autoSync', () => ({ forceSyncToBackend: mocks.forceSyncToBackend }));
+vi.mock('../../../services/translateService', () => ({ translateBatch: mocks.translateBatch }));
 
 const detail = (owner: string, name: string) => ({
   id: 1, name, full_name: `${owner}/${name}`, description: 'A repository',
@@ -30,10 +33,12 @@ describe('useBatchStarImport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.token = 'token';
+    mocks.language = 'zh';
     mocks.getRepositoryDetails.mockImplementation(async (owner, name) => detail(owner, name));
     mocks.isRepositoryStarred.mockResolvedValue(false);
     mocks.starRepository.mockResolvedValue(undefined);
     mocks.forceSyncToBackend.mockResolvedValue(undefined);
+    mocks.translateBatch.mockResolvedValue([]);
   });
 
   it('extracts seven unique repositories from a video summary without starring on preview', async () => {
@@ -79,6 +84,7 @@ describe('useBatchStarImport', () => {
     expect(result.current.rows.map(row => row.status)).toEqual(['failed', 'starred']);
     expect(mocks.addRepository).toHaveBeenCalledTimes(1);
     expect(mocks.addRepository.mock.calls[0][0].full_name).toBe('owner/second');
+    expect(mocks.forceSyncToBackend).toHaveBeenCalledWith({ reportFailures: true });
     expect(mocks.forceSyncToBackend).toHaveBeenCalledTimes(1);
   });
 
@@ -98,5 +104,77 @@ describe('useBatchStarImport', () => {
     await act(() => result.current.preview(Array.from({ length: 51 }, (_, i) => `https://github.com/owner/repo${i}`).join('\n')));
     expect(result.current.inputError).toBe('too-many-repositories');
     expect(mocks.getRepositoryDetails).not.toHaveBeenCalled();
+  });
+
+  it('selects and inverts only repositories that can still be starred', async () => {
+    mocks.isRepositoryStarred.mockResolvedValueOnce(true);
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/first https://github.com/owner/second'));
+    expect(result.current.rows.map(row => row.status)).toEqual(['already-starred', 'ready']);
+
+    act(() => result.current.selectAll());
+    expect(result.current.rows.map(row => row.selected)).toEqual([false, true]);
+    act(() => result.current.invertSelection());
+    expect(result.current.rows.map(row => row.selected)).toEqual([false, false]);
+    act(() => result.current.invertSelection());
+    expect(result.current.rows.map(row => row.selected)).toEqual([false, true]);
+  });
+
+  it('translates descriptions into the interface language and reverts by toggling', async () => {
+    mocks.translateBatch.mockResolvedValue([{ translatedText: '一个仓库', detectedLanguage: '' }]);
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+
+    await act(() => result.current.toggleTranslations());
+    expect(mocks.translateBatch).toHaveBeenCalledWith(['A repository'], 'zh', undefined, undefined, 'plain');
+    expect(result.current.translations).toEqual({ 'owner/repo': '一个仓库' });
+    expect(result.current.translationsVisible).toBe(true);
+    expect(result.current.translationError).toBe('');
+
+    await act(() => result.current.toggleTranslations());
+    expect(result.current.translationsVisible).toBe(false);
+
+    await act(() => result.current.toggleTranslations());
+    expect(result.current.translationsVisible).toBe(true);
+    expect(mocks.translateBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps same-language descriptions original without a translation request', async () => {
+    mocks.getRepositoryDetails.mockImplementation(async (owner, name) => ({ ...detail(owner, name), description: '中文描述' }));
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+
+    await act(() => result.current.toggleTranslations());
+    expect(mocks.translateBatch).not.toHaveBeenCalled();
+    expect(result.current.translations).toEqual({});
+    expect(result.current.translationsVisible).toBe(true);
+  });
+
+  it('reports translation failures and stays on the original descriptions', async () => {
+    mocks.translateBatch.mockRejectedValue(new Error('Translation failed: 429'));
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+
+    await act(() => result.current.toggleTranslations());
+    expect(result.current.translationsVisible).toBe(false);
+    expect(result.current.translations).toEqual({});
+    expect(result.current.translationError).toBe('Translation failed: 429');
+  });
+
+  it('resets translation state when the preview is re-run or cleared', async () => {
+    mocks.translateBatch.mockResolvedValue([{ translatedText: '一个仓库', detectedLanguage: '' }]);
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+    await act(() => result.current.toggleTranslations());
+    expect(result.current.translationsVisible).toBe(true);
+
+    await act(() => result.current.preview('https://github.com/owner/other'));
+    expect(result.current.translations).toEqual({});
+    expect(result.current.translationsVisible).toBe(false);
+
+    await act(() => result.current.toggleTranslations());
+    act(() => result.current.clearPreview());
+    expect(result.current.translations).toEqual({});
+    expect(result.current.translationsVisible).toBe(false);
   });
 });
