@@ -314,8 +314,14 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         if (arrivedRemotely.length > 0) {
           useAppStore.getState().setRepositories([...repositoriesNow, ...arrivedRemotely]);
         }
+        // A completed fetch — an empty list included — proves the store is
+        // complete against the server, so its queued push is safe to drain.
+        _hasPendingPush = true;
       }
-      _hasPendingPush = true;
+      // A failed repositories fetch leaves the remote state unknown: the pull
+      // must not trigger a push of an unverified list, which would delete
+      // remotely arrived repositories. Pending local edits still sync through
+      // their own change-driven push once the backend is reachable.
       return;
     }
 

@@ -530,4 +530,29 @@ describe('backend pushes requested during another sync', () => {
     expect(fullNames).not.toContain('owner/repo-1');
     expect(fullNames).toContain('owner/repo-3');
   });
+
+  it('does not queue a push when the repositories fetch fails during local edits', async () => {
+    vi.mocked(backend.fetchRepositories).mockRejectedValueOnce(new Error('offline'));
+    const pull = syncFromBackend();
+    useAppStore.getState().addRepository(createRepository(2));
+    await pull;
+
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
+  });
+
+  it('treats a successful empty repository list as valid when local edits queue a push', async () => {
+    const fetch = deferred<{ repositories: Repository[]; total: number }>();
+    vi.mocked(backend.fetchRepositories).mockReturnValueOnce(fetch.promise);
+    const pull = syncFromBackend();
+    useAppStore.getState().addRepository(createRepository(2));
+    fetch.resolve({ repositories: [], total: 0 });
+    await pull;
+
+    await vi.waitFor(() => expect(backend.syncRepositories).toHaveBeenCalled());
+    const pushedCalls = vi.mocked(backend.syncRepositories).mock.calls;
+    const pushed = pushedCalls[pushedCalls.length - 1][0];
+    expect(pushed.map(repo => repo.full_name)).toContain('owner/repo-2');
+    expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
+  });
 });
