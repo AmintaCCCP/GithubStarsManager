@@ -675,15 +675,18 @@ async function pushToBackend(): Promise<boolean> {
 /**
  * Immediately push current local state to backend.
  * Used for destructive/high-priority operations such as unstar/delete.
- * Rejects failed writes so explicit callers can show a synchronization warning.
+ * Silent by default: failures are logged and left pending for the next push,
+ * the contract every pre-existing caller was written against. Pass
+ * `reportFailures` to reject instead, so a caller can surface an explicit
+ * synchronization warning (e.g. the batch star import dialog).
  */
-export async function forceSyncToBackend(): Promise<void> {
+export async function forceSyncToBackend(options: { reportFailures?: boolean } = {}): Promise<void> {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
   _hasPendingLocalChanges = true;
-  if (!await syncToBackend()) {
+  if (!await syncToBackend() && options.reportFailures) {
     throw new Error('Failed to sync to backend');
   }
 }

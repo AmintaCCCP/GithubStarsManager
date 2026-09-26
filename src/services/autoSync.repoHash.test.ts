@@ -355,14 +355,16 @@ describe('explicit backend push error reporting', () => {
     vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
     await expect(syncToBackend()).resolves.toBe(false);
     vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
-    await expect(forceSyncToBackend()).rejects.toThrow('Failed to sync to backend');
+    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
+    await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
     // Failure must release the push lock, allowing a subsequent successful retry.
     await expect(forceSyncToBackend()).resolves.toBeUndefined();
   });
 
   it('reports synchronous adapter exceptions from the outer catch', async () => {
     vi.mocked(backend.syncRepositories).mockImplementationOnce(() => { throw new Error('adapter failed'); });
-    await expect(forceSyncToBackend()).rejects.toThrow('Failed to sync to backend');
+    await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
     await expect(forceSyncToBackend()).resolves.toBeUndefined();
   });
 
@@ -442,7 +444,7 @@ describe('backend pushes requested during another sync', () => {
     useAppStore.getState().addRepository(createRepository(2));
     vi.mocked(backend.syncRepositories).mockRejectedValue(new Error('offline'));
     let settled = false;
-    const forced = forceSyncToBackend();
+    const forced = forceSyncToBackend({ reportFailures: true });
     const outcome = forced.then(() => { settled = true; return ''; }, error => {
       settled = true;
       return (error as Error).message;
@@ -467,7 +469,7 @@ describe('backend pushes requested during another sync', () => {
     const initialPush = syncToBackend();
     useAppStore.getState().addRepository(createRepository(2));
     let settled = false;
-    const outcome = forceSyncToBackend().then(() => { settled = true; return ''; }, error => {
+    const outcome = forceSyncToBackend({ reportFailures: true }).then(() => { settled = true; return ''; }, error => {
       settled = true;
       return (error as Error).message;
     });
