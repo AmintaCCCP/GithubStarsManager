@@ -16,6 +16,7 @@ let _storeUnsubscribe: (() => void) | null = null;
 
 // Prevent overlapping pushes to backend
 let _isPushingToBackend = false;
+let _pushPromise: Promise<boolean> | null = null;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
 // Track unsynced local edits so backend polling does not overwrite them.
@@ -287,6 +288,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
   const doSync = async () => {
   const startTime = Date.now();
   try {
+    const repositoriesBeforeFetch = useAppStore.getState().repositories;
     const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
       backend.fetchReleases(),
@@ -296,6 +298,35 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       backend.fetchVectorSearchConfig(),
       backend.fetchSettings(),
     ]);
+
+    // Local edits made during the fetch must be pushed before applying the
+    // stale snapshot. The fetched repositories still matter: the queued full
+    // push would otherwise delete remotely arrived repositories missing from
+    // its request, so merge those into the store first. A fetched repository
+    // counts as arrived only when it was absent before the pull started —
+    // otherwise it was deleted locally during the fetch and must stay
+    // deleted — and is still absent from the store now.
+    if (_hasPendingLocalChanges) {
+      if (reposResult.status === 'fulfilled') {
+        const repositoriesNow = useAppStore.getState().repositories;
+        const knownBeforeFetch = new Set(repositoriesBeforeFetch.map(repo => repo.id));
+        const knownNow = new Set(repositoriesNow.map(repo => repo.id));
+        const arrivedRemotely = reposResult.value.repositories.filter(repo =>
+          !knownBeforeFetch.has(repo.id) && !knownNow.has(repo.id)
+        );
+        if (arrivedRemotely.length > 0) {
+          useAppStore.getState().setRepositories([...repositoriesNow, ...arrivedRemotely]);
+        }
+        // A completed fetch — an empty list included — proves the store is
+        // complete against the server, so its queued push is safe to drain.
+        _hasPendingPush = true;
+      }
+      // A failed repositories fetch leaves the remote state unknown: the pull
+      // must not trigger a push of an unverified list, which would delete
+      // remotely arrived repositories. Pending local edits still sync through
+      // their own change-driven push once the backend is reachable.
+      return;
+    }
 
     const changed = {
       repos: false, releases: false, ai: false, webdav: false,
@@ -561,20 +592,49 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
 /**
  * Push current local state to backend.
- * Silent: errors logged to console only.
+ * Silent: errors are logged and reported as false, not thrown.
+ * Queued callers wait for a push containing the latest local state.
  */
-export async function syncToBackend(): Promise<void> {
-  if (!backend.isAvailable) return;
-  // If a pull is in-flight, queue this push for after pull completes
+export async function syncToBackend(): Promise<boolean> {
+  if (!backend.isAvailable) return true;
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
-    return;
+    await waitForInFlightSync();
+    return syncToBackend();
   }
-  if (_isSyncingFromBackend) return;
-  if (_isPushingToBackend) return;
+  if (_pushPromise) {
+    _hasPendingPush = true;
+    return _pushPromise;
+  }
 
+  const pushLatest = async (): Promise<boolean> => {
+    let succeeded = await pushToBackend();
+    // Requests and edits arriving after the snapshot need a fresh push.
+    // Failed writes stay pending for retry without an automatic retry loop.
+    while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
+      succeeded = await pushToBackend();
+    }
+    return succeeded;
+  };
+  const currentPromise = pushLatest();
+  _pushPromise = currentPromise;
+  try {
+    return await currentPromise;
+  } finally {
+    if (_pushPromise === currentPromise) _pushPromise = null;
+  }
+}
+
+/**
+ * Push one snapshot of the current store slices to the backend.
+ * Reports per-slice write failures through the returned flag instead of
+ * throwing; local edits made while the snapshot is in flight stay pending
+ * for the next push.
+ */
+async function pushToBackend(): Promise<boolean> {
   _isPushingToBackend = true;
   _hasPendingPush = false;
+  _hasPendingLocalChanges = false;
   setRepositorySyncVisualState(true);
   const pushStartTime = Date.now();
   try {
@@ -608,7 +668,6 @@ export async function syncToBackend(): Promise<void> {
       _hasPendingLocalChanges = true;
     } else {
       logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
-      _hasPendingLocalChanges = false;
     }
 
     // Only update _lastHash for successfully synced slices.
@@ -635,8 +694,11 @@ export async function syncToBackend(): Promise<void> {
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       });
     }
+    return failures.length === 0;
   } catch (err) {
     logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err, { durationMs: Date.now() - pushStartTime });
+    _hasPendingLocalChanges = true;
+    return false;
   } finally {
     setRepositorySyncVisualState(false);
     _isPushingToBackend = false;
@@ -646,14 +708,20 @@ export async function syncToBackend(): Promise<void> {
 /**
  * Immediately push current local state to backend.
  * Used for destructive/high-priority operations such as unstar/delete.
+ * Silent by default: failures are logged and left pending for the next push,
+ * the contract every pre-existing caller was written against. Pass
+ * `reportFailures` to reject instead, so a caller can surface an explicit
+ * synchronization warning (e.g. the batch star import dialog).
  */
-export async function forceSyncToBackend(): Promise<void> {
+export async function forceSyncToBackend(options: { reportFailures?: boolean } = {}): Promise<void> {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
   _hasPendingLocalChanges = true;
-  await syncToBackend();
+  if (!await syncToBackend() && options.reportFailures) {
+    throw new Error('Failed to sync to backend');
+  }
 }
 
 /**
