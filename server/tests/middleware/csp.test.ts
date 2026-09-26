@@ -66,6 +66,7 @@ describeIfDb('helmet CSP for browser-direct route mode', () => {
     expect(connectSrc).toContain('https://api.github.com');
     expect(connectSrc).toContain('https://raw.githubusercontent.com');
     expect(connectSrc).toContain('https://gist.githubusercontent.com');
+    expect(connectSrc).toContain('https://mshibanami.github.io');
     expect(connectSrc).toContain('https://api.openai.com');
     expect(connectSrc).toContain('https://generativelanguage.googleapis.com');
   });

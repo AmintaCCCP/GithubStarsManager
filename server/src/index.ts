@@ -32,6 +32,8 @@ const BROWSER_CONNECT_ORIGINS = [
   'https://api.github.com',
   'https://raw.githubusercontent.com',
   'https://gist.githubusercontent.com',
+  // Trending discovery fetches GitHubTrendingRSS directly from the browser.
+  'https://mshibanami.github.io',
   'https://api.openai.com',
   'https://generativelanguage.googleapis.com',
 ];
