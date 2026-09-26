@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
-import { repositoryPayloadHash, resetSyncHashes, startAutoSync, stopAutoSync, syncFromBackend, syncToBackend } from './autoSync';
+import { forceSyncToBackend, repositoryPayloadHash, resetSyncHashes, startAutoSync, stopAutoSync, syncFromBackend, syncToBackend } from './autoSync';
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
@@ -341,6 +341,37 @@ describe('sync defaultCategoryOverrides with backend settings', () => {
         unsubscribe = undefined;
       }
       vi.useRealTimers();
+    }
+  });
+});
+
+describe('explicit backend push error reporting', () => {
+  it('resolves when all backend writes succeed', async () => {
+    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    expect(backend.syncRepositories).toHaveBeenCalled();
+  });
+
+  it('reports settled slice failures without rejecting automatic pushes', async () => {
+    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
+    await expect(syncToBackend()).resolves.toBe(false);
+    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
+    await expect(forceSyncToBackend()).rejects.toThrow('Failed to sync to backend');
+    // Failure must release the push lock, allowing a subsequent successful retry.
+    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+  });
+
+  it('reports synchronous adapter exceptions from the outer catch', async () => {
+    vi.mocked(backend.syncRepositories).mockImplementationOnce(() => { throw new Error('adapter failed'); });
+    await expect(forceSyncToBackend()).rejects.toThrow('Failed to sync to backend');
+    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+  });
+
+  it('keeps standalone mode a no-op when no backend is configured', async () => {
+    const available = vi.spyOn(backend, 'isAvailable', 'get').mockReturnValue(false);
+    try {
+      await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    } finally {
+      available.mockRestore();
     }
   });
 });

@@ -558,17 +558,18 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
 /**
  * Push current local state to backend.
- * Silent: errors logged to console only.
+ * Silent: errors are logged and reported as false, not thrown.
+ * Skipped/queued pushes preserve the existing no-op behavior.
  */
-export async function syncToBackend(): Promise<void> {
-  if (!backend.isAvailable) return;
+export async function syncToBackend(): Promise<boolean> {
+  if (!backend.isAvailable) return true;
   // If a pull is in-flight, queue this push for after pull completes
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
-    return;
+    return true;
   }
-  if (_isSyncingFromBackend) return;
-  if (_isPushingToBackend) return;
+  if (_isSyncingFromBackend) return true;
+  if (_isPushingToBackend) return true;
 
   _isPushingToBackend = true;
   _hasPendingPush = false;
@@ -632,8 +633,11 @@ export async function syncToBackend(): Promise<void> {
         collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
       });
     }
+    return failures.length === 0;
   } catch (err) {
     logger.errorFromError('sync.pushToBackend', 'Failed to sync to backend', err, { durationMs: Date.now() - pushStartTime });
+    _hasPendingLocalChanges = true;
+    return false;
   } finally {
     setRepositorySyncVisualState(false);
     _isPushingToBackend = false;
@@ -643,6 +647,7 @@ export async function syncToBackend(): Promise<void> {
 /**
  * Immediately push current local state to backend.
  * Used for destructive/high-priority operations such as unstar/delete.
+ * Rejects failed writes so explicit callers can show a synchronization warning.
  */
 export async function forceSyncToBackend(): Promise<void> {
   if (_debounceTimer) {
@@ -650,7 +655,9 @@ export async function forceSyncToBackend(): Promise<void> {
     _debounceTimer = null;
   }
   _hasPendingLocalChanges = true;
-  await syncToBackend();
+  if (!await syncToBackend()) {
+    throw new Error('Failed to sync to backend');
+  }
 }
 
 /**
