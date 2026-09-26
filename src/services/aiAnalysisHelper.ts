@@ -1,5 +1,5 @@
 import { Repository, AIConfig, Category, DiscoveryRepo } from '../types';
-import { GitHubApiService } from './githubApi';
+import { createGitHubApiService } from './githubApiFactory';
 import { AIService } from './aiService';
 import { backend } from './backendAdapter';
 import { shouldBypassBackend } from './routeMode';
@@ -31,7 +31,7 @@ export const analyzeRepository = async (options: AnalyzeRepositoryOptions): Prom
 
   onProgress?.('Initializing...');
   
-  const githubApi = new GitHubApiService(githubToken);
+  const githubApi = createGitHubApiService(githubToken);
   const aiService = new AIService(aiConfig, language);
 
   const [owner, name] = repository.full_name.split('/');

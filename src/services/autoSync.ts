@@ -2,7 +2,7 @@ import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { normalizeAssetFilters } from '../utils/assetFilters';
-import { GitHubApiService } from './githubApi';
+import { createGitHubApiService } from './githubApiFactory';
 import { logger } from './logger';
 import type { Repository } from '../types';
 
@@ -198,7 +198,7 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
     const latest = useAppStore.getState();
     if (latest.user || latest.githubToken) return false;
 
-    const githubApi = new GitHubApiService(restored.github_token);
+    const githubApi = createGitHubApiService(restored.github_token);
     const user = await githubApi.getCurrentUser();
 
     useAppStore.getState().setGitHubToken(restored.github_token);

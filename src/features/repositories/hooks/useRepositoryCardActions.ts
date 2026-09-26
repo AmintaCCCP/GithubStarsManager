@@ -8,7 +8,7 @@ import { useDialog } from '../../../hooks/useDialog';
 import { EmbeddingClient, VectorSearchService, findSimilarRepositories } from '../../../services/vectorSearchService';
 import { analyzeRepository, createFailedAnalysisResult } from '../../../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../../../services/autoSync';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
 import { applyAnalysisFailure, applyAnalysisSuccess } from '../application/repositoryPatches';
 
@@ -295,7 +295,7 @@ export const useRepositoryCardActions = ({
       });
       // Indexing enriches documents with README text in readme mode. Mirror that
       // source representation for card-level similarity without changing SearchBar.
-      const githubApi = githubToken ? new GitHubApiService(githubToken) : null;
+      const githubApi = githubToken ? createGitHubApiService(githubToken) : null;
       const readmeFetcher = githubApi
         ? (owner: string, repo: string, signal?: AbortSignal) => githubApi.getRepositoryReadme(owner, repo, signal)
         : undefined;
@@ -364,7 +364,7 @@ export const useRepositoryCardActions = ({
 
     setIsUnstarring(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const [owner, repo] = repository.full_name.split('/');
       await githubApi.unstarRepository(owner, repo);
       deleteRepository(repository.id);

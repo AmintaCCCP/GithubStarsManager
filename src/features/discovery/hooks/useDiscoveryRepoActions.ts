@@ -5,7 +5,7 @@ import type { DiscoveryRepo, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
 import { analyzeRepository, createFailedAnalysisResult } from '../../../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../../../services/autoSync';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { useDialog } from '../../../hooks/useDialog';
 import { applyDiscoveryAnalysisFailure, applyDiscoveryAnalysisSuccess } from '../../repositories/application/discoveryRepoPatches';
 
@@ -89,7 +89,7 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
     setIsStarring(true);
 
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const [owner, name] = repo.full_name.split('/');
 
       // 乐观更新：立即更新UI状态
@@ -125,7 +125,7 @@ export const useDiscoveryRepoActions = ({ repo }: UseDiscoveryRepoActionsOptions
     setIsStarring(true);
 
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const [owner, name] = repo.full_name.split('/');
 
       // 乐观更新：立即更新UI状态

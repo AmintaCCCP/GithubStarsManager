@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { GitHubApiService, GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
+import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { backend } from '../../../services/backendAdapter';
 import { syncFromBackend } from '../../../services/autoSync';
 import type { GitHubUser } from '../../../types';
@@ -23,7 +24,7 @@ export interface LoginActions {
 
 export const useLoginActions = (): LoginActions => {
   const authenticateWithGitHub = useCallback(async (token: string) => {
-    const api = new GitHubApiService(token);
+    const api = createGitHubApiService(token);
     return api.getCurrentUser();
   }, []);
   const syncTokenToBackend = useCallback(async (token: string) => {

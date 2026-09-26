@@ -108,6 +108,28 @@ export default tseslint.config(
   },
   {
     /**
+     * Route-mode rule: GitHub API clients must be built via createGitHubApiService()
+     * (services/githubApiFactory) so the route-mode preference (auto/backend/browser)
+     * attaches the backend proxy consistently. Direct `new GitHubApiService(...)`
+     * bypasses the factory and always calls api.github.com from the browser, which
+     * breaks login/sync in the fullstack deployment and ignores the route-mode
+     * setting. The factory itself and tests are exempt.
+     */
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/services/githubApiFactory.ts', 'src/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "NewExpression[callee.name='GitHubApiService']",
+          message:
+            'Build GitHub API clients with createGitHubApiService(token) from services/githubApiFactory so the route-mode setting (auto/backend/browser) applies. Direct construction skips backend proxying.',
+        },
+      ],
+    },
+  },
+  {
+    /**
      * Purity rule for application commands: no React, no JSX, no DOM globals, no service or
      * Store coupling — neither static nor dynamic. These modules are pure
      * (state, input) => state functions.

@@ -2,7 +2,8 @@
 import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { GitHubApiService, GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
+import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { backend } from '../../../services/backendAdapter';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
@@ -34,7 +35,7 @@ export const useGitHubTokenActions = (): GitHubTokenActions => {
 
     setIsSaving(true);
     try {
-      const nextUser = await new GitHubApiService(token).getCurrentUser();
+      const nextUser = await createGitHubApiService(token).getCurrentUser();
       if (user && nextUser.id !== user.id) {
         toast(
           t('useGitHubTokenActions.this-token-belongs-to-v1-but-you-are-signed-in-a', { v1: nextUser.login, v2: user.login }),

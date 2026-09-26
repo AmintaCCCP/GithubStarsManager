@@ -5,8 +5,7 @@ import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
-import { GitHubApiService } from '../../../services/githubApi';
-import { createGitHubListsApiService } from '../../../services/githubApiFactory';
+import { createGitHubApiService, createGitHubListsApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { useDialog } from '../../../hooks/useDialog';
 import type { GitHubList } from '../../../services/githubListsApi';
@@ -478,7 +477,7 @@ export const useSearchActions = (): SearchActions => {
 
     setSyncingStars(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const newRepositories = await githubApi.getAllStarredRepositories();
 
       const storeRepos = useAppStore.getState().repositories;
