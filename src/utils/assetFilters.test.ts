@@ -21,13 +21,43 @@ describe('normalizeAssetFilters', () => {
     ]);
   });
 
-  it('keeps filters untouched when no legacy field is present', () => {
-    const filters = [{ id: 'f1', name: 'Portable', keywords: ['portable'] }];
-    expect(normalizeAssetFilters(filters)).toEqual(filters);
+  it('preserves preset metadata and coerces non-string elements out of string arrays', () => {
+    expect(normalizeAssetFilters([
+      {
+        id: 'preset-windows',
+        name: 'Windows',
+        keywords: ['exe', 42, null],
+        excludeKeywords: ['setup'],
+        includeRepos: ['owner/beta', 7],
+        isPreset: true,
+        icon: 'Monitor',
+      },
+    ])).toEqual([
+      {
+        id: 'preset-windows',
+        name: 'Windows',
+        keywords: ['exe'],
+        excludeKeywords: ['setup'],
+        includeRepos: ['owner/beta'],
+        isPreset: true,
+        icon: 'Monitor',
+      },
+    ]);
+  });
+
+  it('drops filters missing required fields so keyword matching cannot throw', () => {
+    expect(normalizeAssetFilters([
+      { id: 'f1' },                              // 缺 name / keywords
+      { id: '', name: 'X', keywords: ['k'] },    // 空 id
+      { id: 'f2', keywords: ['k'] },             // 缺 name
+      { id: 'f3', name: 'X' },                   // 缺 keywords
+      { id: 'f4', name: 'X', keywords: 'oops' }, // keywords 不是数组
+      { id: 'ok', name: 'OK', keywords: ['k'] }, // 合法条目保留
+    ])).toEqual([{ id: 'ok', name: 'OK', keywords: ['k'] }]);
   });
 
   it('drops non-object entries and returns empty for non-arrays', () => {
-    expect(normalizeAssetFilters([null, 'oops', { id: 'f1' }])).toEqual([{ id: 'f1' }]);
+    expect(normalizeAssetFilters([null, 'oops', { id: 'f1' }])).toEqual([]);
     expect(normalizeAssetFilters(undefined)).toEqual([]);
     expect(normalizeAssetFilters('nope')).toEqual([]);
   });
