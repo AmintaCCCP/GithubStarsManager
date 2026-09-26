@@ -37,12 +37,15 @@ export function useBatchStarImport() {
   const [translationsVisible, setTranslationsVisible] = useState(false);
   const busyRef = useRef(false);
 
+  /** Clears the translation cache, failure message and visible-translation flag. */
   const resetTranslations = useCallback(() => {
     setTranslations({});
     setTranslationError('');
     setTranslationsVisible(false);
   }, []);
 
+  /** Parses pasted text into candidate repositories and resolves their live
+   *  details and star status without touching the GitHub account. */
   const preview = useCallback(async (text: string) => {
     if (busyRef.current) return;
     setInputError('');
@@ -121,6 +124,7 @@ export function useBatchStarImport() {
     }
   }, [githubToken, resetTranslations]);
 
+  /** Flips the selection of a starable row; other statuses cannot be toggled. */
   const toggleRow = useCallback((index: number) => {
     if (busyRef.current) return;
     setRows(current => current.map((row, rowIndex) =>
@@ -130,6 +134,7 @@ export function useBatchStarImport() {
     ));
   }, []);
 
+  /** Selects every starable row, leaving starred and unavailable rows untouched. */
   const selectAll = useCallback(() => {
     if (busyRef.current) return;
     setRows(current => current.map(row =>
@@ -137,6 +142,7 @@ export function useBatchStarImport() {
     ));
   }, []);
 
+  /** Inverts the selection of every starable row. */
   const invertSelection = useCallback(() => {
     if (busyRef.current) return;
     setRows(current => current.map(row =>
@@ -144,6 +150,8 @@ export function useBatchStarImport() {
     ));
   }, []);
 
+  /** Drops the preview results together with every transient error and
+   *  translation state. */
   const clearPreview = useCallback(() => {
     if (busyRef.current) return;
     setRows([]);
@@ -206,6 +214,9 @@ export function useBatchStarImport() {
     setTranslationsVisible(true);
   }, [language, rows, translations, translationsVisible]);
 
+  /** Stars the selected repositories one by one, records each result
+   *  independently, then syncs the store to the backend when at least one
+   *  star succeeded. */
   const starSelected = useCallback(async () => {
     if (busyRef.current || !githubToken) return;
     const selected = rows.map((row, index) => ({ row, index }))

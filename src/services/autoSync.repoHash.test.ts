@@ -497,4 +497,37 @@ describe('backend pushes requested during another sync', () => {
     expect(backend.syncRepositories).toHaveBeenCalledTimes(2);
     expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
   });
+
+  it('keeps remotely arrived repositories when local edits queue a push after the pull', async () => {
+    const fetch = deferred<{ repositories: Repository[]; total: number }>();
+    vi.mocked(backend.fetchRepositories).mockReturnValueOnce(fetch.promise);
+    const pull = syncFromBackend();
+    useAppStore.getState().addRepository(createRepository(2));
+    fetch.resolve({ repositories: [createRepository(1), createRepository(3)], total: 2 });
+    await pull;
+
+    const fullNames = useAppStore.getState().repositories.map(repo => repo.full_name);
+    expect(fullNames).toContain('owner/repo-2');
+    expect(fullNames).toContain('owner/repo-3');
+
+    await syncToBackend();
+    const pushedCalls = vi.mocked(backend.syncRepositories).mock.calls;
+    const pushed = pushedCalls[pushedCalls.length - 1][0];
+    const pushedNames = pushed.map(repo => repo.full_name);
+    expect(pushedNames).toContain('owner/repo-2');
+    expect(pushedNames).toContain('owner/repo-3');
+  });
+
+  it('does not resurrect repositories deleted locally during the pull', async () => {
+    const fetch = deferred<{ repositories: Repository[]; total: number }>();
+    vi.mocked(backend.fetchRepositories).mockReturnValueOnce(fetch.promise);
+    const pull = syncFromBackend();
+    useAppStore.getState().deleteRepository(createRepository(1).id);
+    fetch.resolve({ repositories: [createRepository(1), createRepository(3)], total: 2 });
+    await pull;
+
+    const fullNames = useAppStore.getState().repositories.map(repo => repo.full_name);
+    expect(fullNames).not.toContain('owner/repo-1');
+    expect(fullNames).toContain('owner/repo-3');
+  });
 });

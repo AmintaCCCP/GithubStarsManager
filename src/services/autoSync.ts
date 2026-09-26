@@ -285,6 +285,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
   const doSync = async () => {
   const startTime = Date.now();
   try {
+    const repositoriesBeforeFetch = useAppStore.getState().repositories;
     const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
       backend.fetchReleases(),
@@ -295,8 +296,25 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       backend.fetchSettings(),
     ]);
 
-    // Local edits made during the fetch must be pushed before applying old data.
+    // Local edits made during the fetch must be pushed before applying the
+    // stale snapshot. The fetched repositories still matter: the queued full
+    // push would otherwise delete remotely arrived repositories missing from
+    // its request, so merge those into the store first. A fetched repository
+    // counts as arrived only when it was absent before the pull started —
+    // otherwise it was deleted locally during the fetch and must stay
+    // deleted — and is still absent from the store now.
     if (_hasPendingLocalChanges) {
+      if (reposResult.status === 'fulfilled') {
+        const repositoriesNow = useAppStore.getState().repositories;
+        const knownBeforeFetch = new Set(repositoriesBeforeFetch.map(repo => repo.id));
+        const knownNow = new Set(repositoriesNow.map(repo => repo.id));
+        const arrivedRemotely = reposResult.value.repositories.filter(repo =>
+          !knownBeforeFetch.has(repo.id) && !knownNow.has(repo.id)
+        );
+        if (arrivedRemotely.length > 0) {
+          useAppStore.getState().setRepositories([...repositoriesNow, ...arrivedRemotely]);
+        }
+      }
       _hasPendingPush = true;
       return;
     }
@@ -598,6 +616,12 @@ export async function syncToBackend(): Promise<boolean> {
   }
 }
 
+/**
+ * Push one snapshot of the current store slices to the backend.
+ * Reports per-slice write failures through the returned flag instead of
+ * throwing; local edits made while the snapshot is in flight stay pending
+ * for the next push.
+ */
 async function pushToBackend(): Promise<boolean> {
   _isPushingToBackend = true;
   _hasPendingPush = false;

@@ -11,6 +11,12 @@ interface BatchStarImportDialogProps {
   onClose: () => void;
 }
 
+/**
+ * Dialog for starring repositories parsed from pasted text: previews their
+ * details, lets the user adjust the selection and optionally translate the
+ * descriptions into the interface language, then stars the selected ones
+ * with per-repository results.
+ */
 export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialogProps) {
   const t = useT('repositories');
   const [text, setText] = useState('');
