@@ -63,7 +63,7 @@ export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFe
       if (!githubToken) {
         throw new Error(t('useReadmeFetch.not-logged-in-and-backend-unavailable-cannot-loa'));
       }
-      const githubApi = createGitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken, { direct: true });
       return variant.isDefault || !variant.path
         ? githubApi.getRepositoryReadme(owner, name, signal)
         : githubApi.getRepositoryReadmeByPath(owner, name, variant.path, signal);
@@ -104,7 +104,7 @@ export const useReadmeFetch = ({ owner, name }: UseReadmeFetchOptions): ReadmeFe
 
     const fetchFromGitHubApi = async (): Promise<GitHubReadmeCandidateItem[]> => {
       if (!githubToken) return [];
-      const githubApi = createGitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken, { direct: true });
       return githubApi.listRepositoryReadmeCandidates(owner, name, defaultBranch, signal);
     };
 

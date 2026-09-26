@@ -199,7 +199,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         if (!githubToken) {
           throw backendError || new Error(t('useRepositoryReleaseSheet.configure-a-github-token-in-settings-or-connect'));
         }
-        const githubApi = createGitHubApiService(githubToken);
+        const githubApi = createGitHubApiService(githubToken, { direct: true });
         liveReleases = await fetchAllPages(
           (page, signal) => githubApi.getRepositoryReleasesPage(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal),
           controller.signal,
