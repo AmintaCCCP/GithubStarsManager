@@ -581,6 +581,7 @@ npm run dev
 | `API_SECRET` | 否 | API 认证令牌。未设置时禁用认证。 |
 | `ENCRYPTION_KEY` | 否 | 用于加密存储密钥的 AES-256 密钥。未设置时自动生成。 |
 | `PORT` | 否 | 服务器端口（默认：3000） |
+| `CSP_CONNECT_SRC` | 否 | 追加到 `connect-src` CSP 指令的额外来源（逗号分隔），用于浏览器直接访问的自定义 AI 服务商 / 向量搜索 worker 端点（如 `https://ai.example.com,https://worker.example.org`）。 |
 
 #### 前端连接后端
 1. 打开应用中的设置面板

@@ -23,11 +23,43 @@ import logsRouter from './routes/logs.js';
 import mcpAdminRouter from './routes/mcp.js';
 import { mountMcpRoutes } from './mcp/http.js';
 
+// Origins the SPA is allowed to call directly from the browser. 'self' covers
+// the backend proxy; the rest support the "browser direct" route mode
+// (GitHub REST/gist APIs and the default AI provider endpoints). Deployments
+// with custom AI/worker endpoints can extend this via CSP_CONNECT_SRC
+// (comma-separated origins).
+const BROWSER_CONNECT_ORIGINS = [
+  'https://api.github.com',
+  'https://raw.githubusercontent.com',
+  'https://gist.githubusercontent.com',
+  'https://api.openai.com',
+  'https://generativelanguage.googleapis.com',
+];
+
+function buildConnectSrc(): string[] {
+  const extra = (process.env.CSP_CONNECT_SRC ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return ["'self'", ...BROWSER_CONNECT_ORIGINS, ...extra];
+}
+
 export function createApp(): express.Express {
   const app = express();
 
-  // Keep default helmet (incl. CSP). MCP is a machine API; agents are not browser-CSP clients.
-  app.use(helmet());
+  // Helmet's default CSP blocks every browser-direct call (api.github.com,
+  // avatar images, AI providers), which breaks the supported "browser direct"
+  // route mode. Open connect-src/img-src just enough for those origins.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          'connect-src': buildConnectSrc(),
+          'img-src': ["'self'", 'data:', 'https:'],
+        },
+      },
+    }),
+  );
   app.use(
     cors({
       exposedHeaders: [
