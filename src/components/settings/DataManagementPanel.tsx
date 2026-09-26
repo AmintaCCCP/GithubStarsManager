@@ -788,7 +788,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             useAppStore.setState({ categoryOrder: importedData.categoryOrder });
           }
         }
-        if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
+        if (selectedTypes.includes('assetFilters') && Array.isArray(importedData.assetFilters)) {
           useAppStore.setState({ assetFilters: normalizeAssetFilters(importedData.assetFilters) });
         }
         if (selectedTypes.includes('discoveryRepos')) {
@@ -948,7 +948,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             });
           }
         }
-        if (selectedTypes.includes('assetFilters') && importedData.assetFilters) {
+        if (selectedTypes.includes('assetFilters') && Array.isArray(importedData.assetFilters)) {
           const existingIds = new Set(store.assetFilters.map(f => f.id));
           const newFilters = normalizeAssetFilters(importedData.assetFilters)
             .filter(f => !existingIds.has(f.id));
