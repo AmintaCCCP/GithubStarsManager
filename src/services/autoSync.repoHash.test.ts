@@ -405,3 +405,94 @@ describe('hasActiveSearchFilters (Issue #304 searchResults guard)', () => {
     expect(hasActiveSearchFilters({ ...baseFilters(), licenses: ['MIT'] })).toBe(true);
   });
 });
+
+
+describe('backend pushes requested during another sync', () => {
+  let originalState: ReturnType<typeof useAppStore.getState>;
+  let unsubscribe: () => void;
+  const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(done => { resolve = done; });
+    return { promise, resolve };
+  };
+
+  beforeEach(() => {
+    originalState = useAppStore.getState();
+    vi.mocked(backend.syncRepositories).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: [], total: 0 });
+    vi.mocked(backend.fetchReleases).mockResolvedValue({ releases: [], total: 0 });
+    vi.mocked(backend.fetchAIConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchWebDAVConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchEmbeddingConfigs).mockResolvedValue([]);
+    vi.mocked(backend.fetchSettings).mockResolvedValue({});
+    resetSyncHashes();
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    unsubscribe = startAutoSync();
+  });
+
+  afterEach(() => {
+    stopAutoSync(unsubscribe);
+    useAppStore.setState(originalState);
+  });
+
+  it('waits for the push queued behind a pull and reports its failure', async () => {
+    const fetch = deferred<{ repositories: Repository[]; total: number }>();
+    vi.mocked(backend.fetchRepositories).mockReturnValueOnce(fetch.promise);
+    const pull = syncFromBackend();
+    useAppStore.getState().addRepository(createRepository(2));
+    vi.mocked(backend.syncRepositories).mockRejectedValue(new Error('offline'));
+    let settled = false;
+    const forced = forceSyncToBackend();
+    const outcome = forced.then(() => { settled = true; return ''; }, error => {
+      settled = true;
+      return (error as Error).message;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    fetch.resolve({ repositories: [createRepository(1)], total: 1 });
+    await pull;
+    expect(await outcome).toBe('Failed to sync to backend');
+    expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
+    expect(backend.syncRepositories).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
+    vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
+    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+  });
+
+  it.each([false, true])('awaits the latest snapshot after an active push (failure: %s)', async fail => {
+    const first = deferred<void>();
+    const followUp = deferred<void>();
+    vi.mocked(backend.syncRepositories).mockReturnValueOnce(first.promise).mockImplementationOnce(() =>
+      followUp.promise.then(() => { if (fail) throw new Error('offline'); }),
+    );
+    const initialPush = syncToBackend();
+    useAppStore.getState().addRepository(createRepository(2));
+    let settled = false;
+    const outcome = forceSyncToBackend().then(() => { settled = true; return ''; }, error => {
+      settled = true;
+      return (error as Error).message;
+    });
+    first.resolve();
+    await vi.waitFor(() => expect(backend.syncRepositories).toHaveBeenCalledTimes(2));
+    expect(settled).toBe(false);
+    expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
+    followUp.resolve();
+    expect(await outcome).toBe(fail ? 'Failed to sync to backend' : '');
+    await initialPush;
+    if (fail) {
+      await syncFromBackend();
+      expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
+      await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    }
+  });
+
+  it('automatically pushes edits made after the active snapshot', async () => {
+    const first = deferred<void>();
+    vi.mocked(backend.syncRepositories).mockReturnValueOnce(first.promise);
+    const push = syncToBackend();
+    useAppStore.getState().addRepository(createRepository(2));
+    first.resolve();
+    await push;
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
+  });
+});

@@ -15,6 +15,7 @@ let _storeUnsubscribe: (() => void) | null = null;
 
 // Prevent overlapping pushes to backend
 let _isPushingToBackend = false;
+let _pushPromise: Promise<boolean> | null = null;
 // Queue a push if one is requested while a pull is in-flight
 let _hasPendingPush = false;
 // Track unsynced local edits so backend polling does not overwrite them.
@@ -294,6 +295,12 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       backend.fetchSettings(),
     ]);
 
+    // Local edits made during the fetch must be pushed before applying old data.
+    if (_hasPendingLocalChanges) {
+      _hasPendingPush = true;
+      return;
+    }
+
     const changed = {
       repos: false, releases: false, ai: false, webdav: false,
       embedding: false, vectorSearch: false, settings: false,
@@ -559,20 +566,42 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 /**
  * Push current local state to backend.
  * Silent: errors are logged and reported as false, not thrown.
- * Skipped/queued pushes preserve the existing no-op behavior.
+ * Queued callers wait for a push containing the latest local state.
  */
 export async function syncToBackend(): Promise<boolean> {
   if (!backend.isAvailable) return true;
-  // If a pull is in-flight, queue this push for after pull completes
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
-    return true;
+    await waitForInFlightSync();
+    return syncToBackend();
   }
-  if (_isSyncingFromBackend) return true;
-  if (_isPushingToBackend) return true;
+  if (_pushPromise) {
+    _hasPendingPush = true;
+    return _pushPromise;
+  }
 
+  const pushLatest = async (): Promise<boolean> => {
+    let succeeded = await pushToBackend();
+    // Requests and edits arriving after the snapshot need a fresh push.
+    // Failed writes stay pending for retry without an automatic retry loop.
+    while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
+      succeeded = await pushToBackend();
+    }
+    return succeeded;
+  };
+  const currentPromise = pushLatest();
+  _pushPromise = currentPromise;
+  try {
+    return await currentPromise;
+  } finally {
+    if (_pushPromise === currentPromise) _pushPromise = null;
+  }
+}
+
+async function pushToBackend(): Promise<boolean> {
   _isPushingToBackend = true;
   _hasPendingPush = false;
+  _hasPendingLocalChanges = false;
   setRepositorySyncVisualState(true);
   const pushStartTime = Date.now();
   try {
@@ -606,7 +635,6 @@ export async function syncToBackend(): Promise<boolean> {
       _hasPendingLocalChanges = true;
     } else {
       logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
-      _hasPendingLocalChanges = false;
     }
 
     // Only update _lastHash for successfully synced slices.
