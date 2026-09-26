@@ -4,7 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import type { ForkRepo, GitHubOrganization, WorkflowDefinition } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { selectForkTimelineState } from '../../../store/selectors';
-import { GitHubApiService } from '../../../services/githubApi';
+import type { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
 import { useDialog } from '../../../hooks/useDialog';
 import { useAuthSessionGeneration, type AuthSessionGeneration } from '../../../hooks/useAuthSessionGeneration';
@@ -84,7 +85,7 @@ export const useForkTimelineActions = () => {
     const loadOrganizations = async () => {
       setIsLoadingOrganizations(true);
       try {
-        const api = new GitHubApiService(state.githubToken!);
+        const api = createGitHubApiService(state.githubToken!);
         const userOrganizations = await api.getUserOrganizations();
         if (!isCancelled) setOrganizations(userOrganizations);
       } catch (error) {
@@ -125,7 +126,7 @@ export const useForkTimelineActions = () => {
     setLoadingWorkflows(previous => new Set(previous).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
-      const workflows = await new GitHubApiService(githubToken).getRepositoryWorkflows(owner, repo);
+      const workflows = await createGitHubApiService(githubToken).getRepositoryWorkflows(owner, repo);
       if (!isCurrentSession(requestSession)) return;
       setWorkflowsMap(previous => ({ ...previous, [forkId]: workflows }));
     } catch (error) {
@@ -159,7 +160,7 @@ export const useForkTimelineActions = () => {
     const startTime = Date.now();
     state.setForkIsRefreshing(true);
     try {
-      const api = new GitHubApiService(state.githubToken);
+      const api = createGitHubApiService(state.githubToken);
       const isPersonalOwner = isSameGitHubLogin(ownerLogin, personalOwnerLogin);
       const fetchedForks = isPersonalOwner ? await api.getUserForks() : await api.getOrganizationForks(ownerLogin);
       if (!isCurrentSession(requestSession)) return;
@@ -300,7 +301,7 @@ export const useForkTimelineActions = () => {
     setSyncModalBranches([]);
     setIsFetchingBranches(true);
     try {
-      const branches = await new GitHubApiService(state.githubToken).getBranches(owner, repo);
+      const branches = await createGitHubApiService(state.githubToken).getBranches(owner, repo);
       if (!isCurrentBranchRequest()) return;
       setSyncModalBranches(branches);
       if (branches.length > 0 && !branches.includes(defaultBranch)) setSyncModal(previous => ({ ...previous, branch: branches[0] }));
@@ -328,7 +329,7 @@ export const useForkTimelineActions = () => {
     setSyncModal(previous => ({ ...previous, isOpen: false }));
     setSyncingForks(previous => new Set(previous).add(fork.id));
     try {
-      const result = await new GitHubApiService(githubToken).syncFork(syncModal.owner, syncModal.repo, syncModal.branch);
+      const result = await createGitHubApiService(githubToken).syncFork(syncModal.owner, syncModal.repo, syncModal.branch);
       if (!isCurrentSession(requestSession)) return;
       logger.info('githubApi', 'Sync fork completed', { repo: fork.full_name, mergeType: result.mergeType, durationMs: Date.now() - syncStartTime });
       useAppStore.setState(current => {
@@ -376,7 +377,7 @@ export const useForkTimelineActions = () => {
     setRunningWorkflows(previous => new Set(previous).add(forkId));
     try {
       const [owner, repo] = fork.full_name.split('/');
-      await new GitHubApiService(current.githubToken).triggerWorkflowRun(owner, repo, workflowPath, branch);
+      await createGitHubApiService(current.githubToken).triggerWorkflowRun(owner, repo, workflowPath, branch);
       logger.info('githubApi', 'Trigger workflow completed', { repo: fork.full_name, workflow: workflowName, branch, durationMs: Date.now() - startTime });
       toast(t('useForkTimelineActions.triggered-workflow-workflowname-on-branch-branch', { workflowName: workflowName, branch: branch }), 'success');
       await loadWorkflows(forkId);

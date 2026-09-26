@@ -391,6 +391,7 @@ npm run dev
 | `API_SECRET` | No | Bearer token for API authentication. If unset, auth is disabled. |
 | `ENCRYPTION_KEY` | No | AES-256 key for encrypting stored secrets. Auto-generated if unset. |
 | `PORT` | No | Server port (default: 3000) |
+| `CSP_CONNECT_SRC` | No | Comma-separated extra origins appended to the `connect-src` CSP directive, for custom AI provider / vector-search worker endpoints called directly from the browser (e.g. `https://ai.example.com,https://worker.example.org`). |
 
 #### Connecting Frontend to Backend
 1. Open Settings panel in the app

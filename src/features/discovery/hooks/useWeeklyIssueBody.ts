@@ -1,7 +1,7 @@
 
 import { useT } from '../../../i18n/useT';
 import { useEffect, useState } from 'react';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { fetchWeeklyIssueBody } from '../../../services/weeklyIssuesService';
 import type { WeeklyStoredIssue } from '../../../services/weeklyIssuesStorage';
 import { useAppStore } from '../../../store/useAppStore';
@@ -27,7 +27,7 @@ export const useWeeklyIssueBody = (issueNumber: number, enabled: boolean) => {
     const load = async () => {
       // 缓存命中无需 token（logout 不清周刊缓存）；仅在缓存未命中且有 token 时才建 API 回源
       try {
-        const api = githubToken ? new GitHubApiService(githubToken) : null;
+        const api = githubToken ? createGitHubApiService(githubToken) : null;
         const result = await fetchWeeklyIssueBody(api, issueNumber);
         if (!cancelled) {
           setIssueData(result);

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Release, ReleaseAsset, Repository } from '../../../types';
 import { backend } from '../../../services/backendAdapter';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { shouldBypassBackend } from '../../../services/routeMode';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
@@ -199,7 +199,7 @@ export const useRepositoryReleaseSheet = (repository: Repository) => {
         if (!githubToken) {
           throw backendError || new Error(t('useRepositoryReleaseSheet.configure-a-github-token-in-settings-or-connect'));
         }
-        const githubApi = new GitHubApiService(githubToken);
+        const githubApi = createGitHubApiService(githubToken, { direct: true });
         liveReleases = await fetchAllPages(
           (page, signal) => githubApi.getRepositoryReleasesPage(owner, name, page, REMOTE_RELEASE_PAGE_SIZE, signal),
           controller.signal,

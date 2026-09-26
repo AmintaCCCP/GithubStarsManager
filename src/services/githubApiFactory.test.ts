@@ -68,6 +68,14 @@ describe('githubApiFactory routeMode', () => {
     expect(mocks.setBackendAuthToken).not.toHaveBeenCalled();
   });
 
+  it('direct option skips backend attach even when backend exists', () => {
+    mocks.routeMode = 'auto';
+    mocks.backendUrlGet.mockReturnValue('http://backend/api');
+    createGitHubApiService('token', { direct: true });
+    expect(mocks.setBackendUrl).not.toHaveBeenCalled();
+    expect(mocks.setBackendAuthToken).not.toHaveBeenCalled();
+  });
+
   it('keeps backend routing for the lists factory in auto mode', () => {
     mocks.backendUrlGet.mockReturnValue('http://backend/api');
     createGitHubListsApiService('token');

@@ -10,7 +10,7 @@ import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { forceSyncToBackend } from '../../../services/autoSync';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../../../utils/categoryUtils';
 import {
   applyCategoryAssignment,
@@ -88,7 +88,7 @@ export const useBulkRepositoryActions = ({
     );
     if (!confirmed) return false;
 
-    const githubApi = new GitHubApiService(githubToken);
+    const githubApi = createGitHubApiService(githubToken);
     const successIds: number[] = [];
     const failedRepositories: string[] = [];
 

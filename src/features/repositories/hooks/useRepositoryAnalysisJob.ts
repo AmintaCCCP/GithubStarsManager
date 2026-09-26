@@ -6,7 +6,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIAnalysisOptimizer, type AnalysisResult } from '../../../services/aiAnalysisOptimizer';
 import { AIService } from '../../../services/aiService';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { buildCategoryHints, resolveCategoryAssignment } from '../../../utils/categoryUtils';
 import { applyAnalysisFailure, applyAnalysisSuccess } from '../application/repositoryPatches';
@@ -220,7 +220,7 @@ export const useRepositoryAnalysisJob = ({
     let failedCount = 0;
 
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
       const categoryNames = allCategories.filter((category) => category.id !== 'all').map((category) => category.name);
       const aiCategoryHints = buildCategoryHints(allCategories);

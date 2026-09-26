@@ -5,7 +5,7 @@
 import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { useDialog } from '../../../hooks/useDialog';
 import {
   normalizeRepoKey,
@@ -31,7 +31,7 @@ export const useWatchedSourcesSync = () => {
 
     setIsSyncingWatchedSources(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       // 只拉 /user/subscriptions（含私有仓）。/users/{login}/subscriptions 已被 GitHub 改为
       // 恒定返回 204 空响应体，且其结果本就是前者的公开子集，并行合并只会拖垮整个同步。
       const watchedRepos = await githubApi.getAllWatchedRepositories();

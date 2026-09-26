@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { DiscoveryChannelId, DiscoveryRepo, PaginatedDiscoveryRepositories } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { selectDiscoveryViewState } from '../../../store/selectors';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { syncWeeklyChannel } from '../../../services/weeklyIssuesService';
 import { syncXTweetChannel } from '../../../services/xTweetService';
 import { syncTelegramChannel } from '../../../services/telegramService';
@@ -94,7 +94,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       currentState.setDiscoveryLoading(channelId, true);
     }
     try {
-      const api = new GitHubApiService(currentState.githubToken);
+      const api = createGitHubApiService(currentState.githubToken);
       let result: PaginatedDiscoveryRepositories;
       switch (channelId) {
         case 'trending':
@@ -266,7 +266,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     optimizerRef.current = optimizer;
     analysisState.setAnalysisProgress({ current: 0, total: unanalyzed.length });
     try {
-      const api = new GitHubApiService(analysisState.githubToken);
+      const api = createGitHubApiService(analysisState.githubToken);
       const service = new AIService(activeConfig, analysisState.language);
       const readmeCache = await optimizer.prefetchReadmes(unanalyzed, api);
       if (optimizer.isAborted() || !isCurrentSession(analysisSession)) return;

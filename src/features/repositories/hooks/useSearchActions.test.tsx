@@ -60,6 +60,9 @@ vi.mock('../../../services/githubApi', () => ({
 }));
 
 vi.mock('../../../services/githubApiFactory', () => ({
+  createGitHubApiService: () => ({
+    getAllStarredRepositories: mocks.getAllStarredRepositories,
+  }),
   createGitHubListsApiService: () => ({
     getUserLists: mocks.getUserLists,
   }),

@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { selectReleaseTimelineState } from '../../../store/selectors';
-import { GitHubApiService } from '../../../services/githubApi';
+import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { backend } from '../../../services/backendAdapter';
 import { useDialog } from '../../../hooks/useDialog';
@@ -59,7 +59,7 @@ export const useReleaseTimelineActions = () => {
 
     setReleaseIsRefreshing(true);
     try {
-      const githubApi = new GitHubApiService(githubToken);
+      const githubApi = createGitHubApiService(githubToken);
       const { releases: newReleases, latestReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
         subscribedRepos,
         { includePreRelease, refreshExistingAssets: true },
