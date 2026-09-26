@@ -1,6 +1,7 @@
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
+import { normalizeAssetFilters } from '../utils/assetFilters';
 import { GitHubApiService } from './githubApi';
 import { logger } from './logger';
 import type { Repository } from '../types';
@@ -510,7 +511,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         useAppStore.setState({ customCategories: settings.customCategories });
       }
       if (Array.isArray(settings.assetFilters)) {
-        useAppStore.setState({ assetFilters: settings.assetFilters });
+        useAppStore.setState({ assetFilters: normalizeAssetFilters(settings.assetFilters) });
       }
       if (
         settings.defaultCategoryOverrides !== null

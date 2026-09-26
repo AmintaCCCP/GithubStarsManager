@@ -430,10 +430,11 @@ export interface AssetFilter {
    */
   excludeKeywords?: string[];
   /**
-   * 排除仓库（Repository.full_name）：该过滤器激活时，这些仓库的 Release
-   * 不会出现在该过滤器的筛选结果中；未选过滤器时照常显示，也不影响订阅。
+   * 始终包含的仓库（Repository.full_name）：该过滤器启用时，这些仓库的 Release
+   * 无需命中关键词也会出现在筛选结果中（用于 Release 不含过滤器关键词的仓库，
+   * 如仅发布 zip 或源码归档的项目）；未选过滤器时列表不受影响，也不影响订阅。
    */
-  excludeRepos?: string[];
+  includeRepos?: string[];
   isPreset?: boolean;
   icon?: string;
 }
