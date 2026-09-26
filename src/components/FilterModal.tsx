@@ -93,7 +93,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   const [name, setName] = useState('');
   const [keywords, setKeywords] = useState<string[]>([]);
   const [excludeKeywords, setExcludeKeywords] = useState<string[]>([]);
-  const [excludeRepos, setExcludeRepos] = useState<string[]>([]);
+  const [includeRepos, setIncludeRepos] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
   const [newExcludeKeyword, setNewExcludeKeyword] = useState('');
   const [isRepoPickerOpen, setIsRepoPickerOpen] = useState(false);
@@ -104,12 +104,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       setName(filter.name);
       setKeywords([...filter.keywords]);
       setExcludeKeywords([...(filter.excludeKeywords ?? [])]);
-      setExcludeRepos([...(filter.excludeRepos ?? [])]);
+      setIncludeRepos([...(filter.includeRepos ?? [])]);
     } else {
       setName('');
       setKeywords([]);
       setExcludeKeywords([]);
-      setExcludeRepos([]);
+      setIncludeRepos([]);
     }
     setNewKeyword('');
     setNewExcludeKeyword('');
@@ -131,12 +131,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     return releaseRepos.filter(fullName => fullName.toLowerCase().includes(query));
   }, [releaseRepos, repoSearch]);
 
-  const isRepoExcluded = (fullName: string) =>
-    excludeRepos.some(name => normalizeRepoKey(name) === normalizeRepoKey(fullName));
+  const isRepoIncluded = (fullName: string) =>
+    includeRepos.some(name => normalizeRepoKey(name) === normalizeRepoKey(fullName));
 
-  const toggleRepoExcluded = (fullName: string) => {
-    setExcludeRepos(prev => (
-      isRepoExcluded(fullName)
+  const toggleRepoIncluded = (fullName: string) => {
+    setIncludeRepos(prev => (
+      isRepoIncluded(fullName)
         ? prev.filter(name => normalizeRepoKey(name) !== normalizeRepoKey(fullName))
         : [...prev, fullName]
     ));
@@ -174,13 +174,13 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     }
 
     // 新增字段始终写回（允许空数组）：updateAssetFilter 是 spread 合并，
-    // 省略键会导致清空后的黑名单/排除仓库残留旧值。
+    // 省略键会导致清空后的黑名单/始终包含仓库残留旧值。
     const savedFilter: AssetFilter = {
       id: filter?.id || Date.now().toString(),
       name: name.trim(),
       keywords: keywords.filter(k => k.trim()),
       excludeKeywords: excludeKeywords.filter(k => k.trim()),
-      excludeRepos: excludeRepos
+      includeRepos: includeRepos
     };
 
     onSave(savedFilter);
@@ -310,14 +310,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             />
           </div>
 
-          {/* Excluded repositories */}
+          {/* Always-included repositories（强制包含） */}
           <div>
             <div className="mb-2 flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1.5">
                 <span className="block text-sm font-medium text-foreground dark:text-foreground">
-                  {tModal('exclude-repos-label')}
+                  {tModal('include-repos-label')}
                 </span>
-                <FieldHint text={tModal('exclude-repos-note')} />
+                <FieldHint text={tModal('include-repos-note')} />
               </div>
               <Button
                 onClick={() => setIsRepoPickerOpen(!isRepoPickerOpen)}
@@ -326,34 +326,34 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {!isRepoPickerOpen && <Plus className="w-4 h-4" />}
-                <span>{isRepoPickerOpen ? tModal('repo-picker-done') : tModal('add-exclude-repos')}</span>
+                <span>{isRepoPickerOpen ? tModal('repo-picker-done') : tModal('add-include-repos')}</span>
               </Button>
             </div>
 
-            {excludeRepos.length > 0 ? (
+            {includeRepos.length > 0 ? (
               <KeywordChips
-                items={excludeRepos}
-                removeLabel={(repo) => tModal('remove-exclude-repo-aria', { repo })}
-                onRemove={(index) => setExcludeRepos(excludeRepos.filter((_, i) => i !== index))}
+                items={includeRepos}
+                removeLabel={(repo) => tModal('remove-include-repo-aria', { repo })}
+                onRemove={(index) => setIncludeRepos(includeRepos.filter((_, i) => i !== index))}
               />
             ) : (
               <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {tModal('exclude-repos-empty')}
+                {tModal('include-repos-empty')}
               </p>
             )}
           </div>
         </div>
 
-        {/* 右列：排除仓库选择器 */}
+        {/* 右列：始终包含仓库选择器 */}
         {isRepoPickerOpen && (
           <aside className="min-w-0 md:w-80 md:shrink-0 md:border-l md:border-border md:pl-5" aria-label={tModal('repo-picker-title')}>
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium text-foreground dark:text-foreground">
                 {tModal('repo-picker-title')}
               </p>
-              {excludeRepos.length > 0 && (
+              {includeRepos.length > 0 && (
                 <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs rounded-full whitespace-nowrap">
-                  {tModal('repo-picker-selected-count', { count: excludeRepos.length })}
+                  {tModal('repo-picker-selected-count', { count: includeRepos.length })}
                 </span>
               )}
             </div>
@@ -382,14 +382,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 </p>
               ) : (
                 filteredRepoOptions.map((fullName) => {
-                  const checked = isRepoExcluded(fullName);
+                  const checked = isRepoIncluded(fullName);
                   return (
                     <button
                       type="button"
                       key={fullName}
                       role="option"
                       aria-selected={checked}
-                      onClick={() => toggleRepoExcluded(fullName)}
+                      onClick={() => toggleRepoIncluded(fullName)}
                       className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-accent dark:hover:bg-accent transition-colors"
                     >
                       <span
