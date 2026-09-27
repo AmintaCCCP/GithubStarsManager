@@ -32,6 +32,12 @@ asar: false
 # --publish=never，双重保证 electron-builder 不会尝试自行发布。
 publish: null
 
+# 目标矩阵与 0.8.4 起实际发布的产物一致（Setup.exe / dmg x64+arm64 / AppImage）。
+# 旧版 yml 中的 win.ia32 与 linux.deb/rpm 从未生效：CI 一直用运行时注入的
+# package.json build 字段（已由 `loaded configuration file=package.json` 日志证实），
+# 本地构建则会因缺包失败——Electron 44 不再发布 win32-ia32 发行包；deb/rpm 即便
+# 构建成功也不会被发布（release job 只收集 exe/msi/dmg/AppImage）。如需新增产物
+# 类型，请连同 build-desktop.yml 的 Upload artifacts / Prepare release 步骤一起改。
 # Windows 配置
 win:
   target:
