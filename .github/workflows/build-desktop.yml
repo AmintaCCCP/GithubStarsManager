@@ -8,6 +8,12 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# Tag builds must never be cancelled (each tag produces a release); branch and
+# PR runs supersede their own earlier runs instead of queueing behind them.
+concurrency:
+  group: build-desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
 # Pull requests and ordinary builds receive only repository read access. The
 # release job elevates this explicitly when it creates a tagged GitHub release.
 permissions:
@@ -33,7 +39,7 @@ jobs:
     needs: verify-release-version
     runs-on: ${{ matrix.os }}
     continue-on-error: false
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -43,22 +49,22 @@ jobs:
         # AppImage against a newer glibc. Platform steps below match with
         # startsWith(matrix.os, 'ubuntu'), so a future re-pin needs no edits.
         os: [ubuntu-24.04, windows-latest, macos-latest]
-        
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
         persist-credentials: false
-      
+
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
         node-version: '24'
         cache: 'npm'
-        
+
     - name: Install dependencies
       run: npm ci
-      
+
     - name: Build web app
       run: npm run build
       # env:
@@ -72,7 +78,7 @@ jobs:
           echo "✓ dist directory and index.html found"
           echo "Contents of dist directory:"
           ls -la dist/ | head -10
-          
+
           # 检查 index.html 中的路径并修复
           echo "Checking and fixing asset paths in index.html..."
           if [ -f "dist/index.html" ]; then
@@ -91,104 +97,21 @@ jobs:
           cp templates/fallback-index.html dist/index.html
           echo "✓ Fallback index.html created from template"
         fi
-        
+
         # 显示最终的 index.html 内容（前几行）
         echo "Final index.html content (first 10 lines):"
         head -10 dist/index.html || echo "Could not read index.html"
-      
-    - name: Install sharp for icon generation
-      run: npm install sharp --save-dev
-      
-    - name: Create build directory
+
+    - name: Prepare build resources
       shell: bash
       run: |
-        node -e "
-        const fs = require('fs');
-        if (!fs.existsSync('build')) {
-          fs.mkdirSync('build', { recursive: true });
-        }
-        console.log('Build directory created');
-        "
-      
-    - name: Generate icons and app resources
-      shell: bash
-      run: |
-        node -e "
-        const fs = require('fs');
-        const path = require('path');
-        
-        function generateIcons() {
-          const buildDir = 'build';
-          if (!fs.existsSync(buildDir)) {
-            fs.mkdirSync(buildDir, { recursive: true });
-          }
-          
-          // Look for source icon in common locations (优先使用 assets/icon.png)
-          let sourceIcon = null;
-          const possiblePaths = [
-            'assets/icon.png',
-            'public/icon.png', 
-            'src/assets/icon.png',
-            'icon.png'
-          ];
-          
-          for (const iconPath of possiblePaths) {
-            if (fs.existsSync(iconPath)) {
-              sourceIcon = iconPath;
-              break;
-            }
-          }
-          
-          if (sourceIcon) {
-            console.log('Using source icon:', sourceIcon);
-            fs.copyFileSync(sourceIcon, 'build/icon.png');
-            fs.copyFileSync(sourceIcon, 'build/icon-512x512.png');
-          } else {
-            console.log('Creating default application icon');
-            // Create a better default icon
-            const iconSvg = \`<svg width=\"512\" height=\"512\" xmlns=\"http://www.w3.org/2000/svg\">
-              <defs>
-                <linearGradient id=\"grad1\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">
-                  <stop offset=\"0%\" style=\"stop-color:#667eea;stop-opacity:1\" />
-                  <stop offset=\"100%\" style=\"stop-color:#764ba2;stop-opacity:1\" />
-                </linearGradient>
-              </defs>
-              <rect width=\"512\" height=\"512\" fill=\"url(#grad1)\" rx=\"64\"/>
-              <text x=\"256\" y=\"280\" text-anchor=\"middle\" fill=\"white\" font-size=\"120\" font-family=\"Arial, sans-serif\" font-weight=\"bold\">⭐</text>
-              <text x=\"256\" y=\"380\" text-anchor=\"middle\" fill=\"white\" font-size=\"32\" font-family=\"Arial, sans-serif\">GitHub</text>
-              <text x=\"256\" y=\"420\" text-anchor=\"middle\" fill=\"white\" font-size=\"32\" font-family=\"Arial, sans-serif\">Stars</text>
-            </svg>\`;
-            fs.writeFileSync('build/icon.svg', iconSvg);
-          }
-          
-          console.log('Icon files prepared successfully');
-        }
-        
-        generateIcons();
-        "
-        
-    - name: Generate Windows ICO file
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        # For Windows, electron-builder can handle PNG to ICO conversion
-        if [ -f "build/icon.png" ]; then
-          cp build/icon.png build/icon.ico
-        else
-          echo "No icon file found, electron-builder will use default"
-        fi
-        
-    - name: Generate macOS ICNS file  
-      if: matrix.os == 'macos-latest'
-      shell: bash
-      run: |
-        # For macOS, electron-builder can handle PNG to ICNS conversion
-        if [ -f "build/icon.png" ]; then
-          cp build/icon.png build/icon.icns
-        else
-          echo "No icon file found, electron-builder will use default"
-        fi
-      
+        # electron-builder converts the source PNG to .ico/.icns itself.
+        mkdir -p build
+        cp assets/icon.png build/icon.png
+        cp assets/icon.png build/icon-512x512.png
+        echo "Build resources prepared:"
+        ls -la build/
+
     - name: Install system dependencies (Linux)
       if: startsWith(matrix.os, 'ubuntu')
       run: |
@@ -199,16 +122,7 @@ jobs:
           /etc/apt/sources.list.d/microsoft-prod.list.save 2>/dev/null || true
         sudo apt-get update -o Acquire::Retries=3
         sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
-        
-    - name: Install Electron dependencies
-      run: npm install --save-dev electron electron-builder
-      
-    - name: Setup Windows build environment
-      if: matrix.os == 'windows-latest'
-      run: |
-        # Install Windows SDK components if needed
-        echo "Setting up Windows build environment"
-        
+
     - name: Verify committed Electron sources
       shell: bash
       run: |
@@ -241,117 +155,7 @@ jobs:
         fi
         echo "Electron sources OK (MCP wired):"
         ls -la electron/
-        
-    - name: Update main package.json for Electron
-      shell: bash
-      run: |
-        node -e "
-        const fs = require('fs');
-        const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-        
-        packageJson.main = 'electron/main.js';
-        packageJson.homepage = './';
-        packageJson.scripts = packageJson.scripts || {};
-        
-        // 确保构建脚本使用正确的基础路径
-        packageJson.scripts.build = 'vite build --base=./ && npm run check:bundle-size';
-        packageJson.scripts['build:electron'] = 'vite build --base=./ && npm run check:bundle-size && electron-builder';
-        
-        // Ensure proper base path for Electron
-        if (!packageJson.build) packageJson.build = {};
-        packageJson.build.extraMetadata = {
-          main: 'electron/main.js'
-        };
-        packageJson.scripts.electron = 'electron .';
-        packageJson.scripts['electron-dev'] = 'NODE_ENV=development electron .';
-        packageJson.scripts.dist = 'npm run check:bundle-size && electron-builder --publish=never';
-        
-        packageJson.build = {
-          appId: 'com.github-stars-manager.app',
-          productName: 'GitHub Stars Manager',
-          directories: {
-            output: 'release',
-            buildResources: 'build'
-          },
-          files: [
-            'dist/**/*',
-            'build/**/*',
-            'electron/**/*',
-            'node_modules/**/*',
-            'package.json',
-            '!node_modules/.cache/**/*',
-            '!**/*.map'
-          ],
-          extraResources: [
-            {
-              from: 'dist',
-              to: 'dist',
-              filter: ['**/*']
-            }
-          ],
-          compression: 'normal',
-          asar: false, // 暂时禁用 ASAR 以简化调试
-          publish: null // 确保不会尝试发布
-        };
-        
-        fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
-        console.log('Package.json updated successfully');
-        "
-        
-    - name: Configure platform-specific build settings
-      shell: bash
-      run: |
-        node -e "
-        const fs = require('fs');
-        const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-        
-        if ('${{ matrix.os }}' === 'windows-latest') {
-          packageJson.build.win = {
-            target: [
-              {
-                target: 'nsis',
-                arch: ['x64']
-              }
-            ],
-            icon: 'build/icon.png',
-            requestedExecutionLevel: 'asInvoker'
-          };
-          packageJson.build.nsis = {
-            oneClick: false,
-            allowToChangeInstallationDirectory: true,
-            createDesktopShortcut: true,
-            createStartMenuShortcut: true,
-            shortcutName: 'GitHub Stars Manager'
-          };
-        } else if ('${{ matrix.os }}' === 'macos-latest') {
-          packageJson.build.mac = {
-            target: [
-              {
-                target: 'dmg',
-                arch: ['x64', 'arm64']
-              }
-            ],
-            icon: 'build/icon.png',
-            category: 'public.app-category.productivity',
-            gatekeeperAssess: false,
 
-          };
-          packageJson.build.dmg = {
-            title: 'GitHub Stars Manager',
-            icon: 'build/icon.png'
-          };
-        } else {
-          packageJson.build.linux = {
-            target: 'AppImage',
-            icon: 'build/icon-512x512.png',
-            category: 'Office'
-          };
-        }
-        
-        fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2));
-        console.log('Platform-specific settings configured');
-        "
-        
     - name: Debug before build
       shell: bash
       run: |
@@ -368,8 +172,8 @@ jobs:
         echo "Build directory contents:"
         ls -la build/ || echo "No build directory"
         echo ""
-        echo "Package.json build config:"
-        node -e "console.log(JSON.stringify(require('./package.json').build, null, 2))"
+        echo "Electron-builder config (electron-builder.yml):"
+        cat electron-builder.yml
         echo ""
         echo "Checking dist/index.html content:"
         if [ -f "dist/index.html" ]; then
@@ -417,7 +221,7 @@ jobs:
       run: |
         n=0
         until [ "$n" -ge 3 ]; do
-          npm run dist && break
+          npm run dist -- --publish=never && break
           n=$((n+1))
           if [ "$n" -lt 3 ]; then
             echo "Build Electron app failed, retrying in 15s... (attempt $n/3)"
@@ -433,9 +237,6 @@ jobs:
         # expose a credential to package scripts or electron-builder hooks.
         GH_TOKEN: ${{ github.ref_type == 'tag' && secrets.GITHUB_TOKEN || '' }}
         CI: true
-        DEBUG: electron-builder
-        # Linux 特定环境变量
-        ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
 
     - name: List build output
       shell: bash
@@ -453,7 +254,7 @@ jobs:
           echo "Checking AppImage permissions:"
           find . -name "*.AppImage" -exec file {} \; || echo "No AppImage files to check"
         fi
-        
+
     - name: Test Electron app (Linux only)
       if: startsWith(matrix.os, 'ubuntu')
       shell: bash
@@ -464,11 +265,11 @@ jobs:
           /etc/apt/sources.list.d/microsoft-prod.list.save 2>/dev/null || true
         sudo apt-get update -o Acquire::Retries=3
         sudo apt-get install -y xvfb
-        
+
         # Test if the app can start (will exit quickly but should not crash)
         echo "Testing Electron app startup..."
         timeout 10s xvfb-run -a npm run electron || echo "App test completed (timeout expected)"
-        
+
     - name: Upload artifacts (Windows)
       if: matrix.os == 'windows-latest' && success()
       uses: actions/upload-artifact@v7
@@ -478,7 +279,7 @@ jobs:
           release/*.exe
           release/*.msi
         if-no-files-found: ignore
-        
+
     - name: Upload artifacts (macOS)
       if: matrix.os == 'macos-latest' && success()
       uses: actions/upload-artifact@v7
@@ -486,7 +287,7 @@ jobs:
         name: macos-app
         path: release/*.dmg
         if-no-files-found: ignore
-        
+
     - name: Upload artifacts (Linux)
       if: startsWith(matrix.os, 'ubuntu') && success()
       uses: actions/upload-artifact@v7
@@ -505,12 +306,12 @@ jobs:
     if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
     permissions:
       contents: write
-    
+
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v8
       continue-on-error: true
-      
+
     - name: List downloaded files
       shell: bash
       run: |
@@ -518,7 +319,7 @@ jobs:
         find . -type f | head -20
         echo "Looking for build artifacts:"
         find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" | head -20
-        
+
     - name: Prepare release files
       shell: bash
       run: |
@@ -530,7 +331,7 @@ jobs:
         find . -name "*.AppImage" -exec cp {} release-files/ \; 2>/dev/null || true
         echo "Files prepared for release:"
         ls -la release-files/ || echo "No files found"
-      
+
     - name: Create Release
       uses: softprops/action-gh-release@v3
       with:
@@ -541,14 +342,14 @@ jobs:
         fail_on_unmatched_files: false
         body: |
           ## Desktop Application Release
-          
+
           This release includes desktop applications for multiple platforms.
-          
+
           ### Available Downloads:
           - Windows: `.exe` installer
-          - macOS: `.dmg` installer  
+          - macOS: `.dmg` installer
           - Linux: `.AppImage` portable executable
-          
+
           Note: Some platform builds may not be available if they failed during the build process.
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
