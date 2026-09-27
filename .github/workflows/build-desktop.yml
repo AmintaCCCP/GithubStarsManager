@@ -35,8 +35,59 @@ jobs:
         if: github.ref_type == 'tag'
         run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
 
-  build:
+  web:
+    name: Build web bundle
+    # The vite output (dist/) is platform-independent and identical for all
+    # three desktop targets, so it is built once here and shared via artifact
+    # instead of being rebuilt on every runner (previously 63-170s × 3).
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
     needs: verify-release-version
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Assert relative asset paths
+        shell: bash
+        run: |
+          # vite.config sets base:'./', so dist/index.html must already use
+          # relative paths. Gate on it instead of patching with sed: a config
+          # regression should fail loudly, not be silently rewritten.
+          if [ ! -f "dist/index.html" ]; then
+            echo "dist/index.html not found"
+            exit 1
+          fi
+          if grep -qE '(href|src)="/' dist/index.html; then
+            echo "dist/index.html contains absolute asset paths:"
+            grep -nE '(href|src)="/' dist/index.html | head -10
+            exit 1
+          fi
+          echo "✓ dist/index.html uses relative asset paths"
+
+      - name: Upload web bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: dist
+          if-no-files-found: error
+
+  build:
+    needs: [verify-release-version, web]
     runs-on: ${{ matrix.os }}
     continue-on-error: false
 
@@ -56,6 +107,19 @@ jobs:
       with:
         persist-credentials: false
 
+    - name: Cache Electron & electron-builder binaries
+      uses: actions/cache@v4
+      with:
+        # Electron dist zips (~100MB per arch) and electron-builder tool
+        # bundles (dmgbuild, icons, NSIS, winCodeSign) are re-downloaded on
+        # every run otherwise. Bump the key suffix when bumping electron or
+        # electron-builder majors.
+        path: |
+          ${{ runner.os == 'Linux' && '~/.cache/electron' || runner.os == 'macOS' && '~/Library/Caches/electron' || '~/AppData/Local/electron/Cache' }}
+          ${{ runner.os == 'Linux' && '~/.cache/electron-builder' || runner.os == 'macOS' && '~/Library/Caches/electron-builder' || '~/AppData/Local/electron-builder/Cache' }}
+        key: electron-bin-${{ runner.os }}-electron44-eb26
+        restore-keys: electron-bin-${{ runner.os }}-
+
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
@@ -65,42 +129,21 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Build web app
-      run: npm run build
-      # env:
-      #   VITE_BASE_PATH: './'
+    - name: Download web bundle
+      uses: actions/download-artifact@v8
+      with:
+        name: web-dist
+        path: dist
 
-    - name: Verify and fix web build
+    - name: Verify downloaded web bundle
       shell: bash
       run: |
-        echo "Checking if dist directory exists and contains files:"
-        if [ -d "dist" ] && [ -f "dist/index.html" ]; then
-          echo "✓ dist directory and index.html found"
-          echo "Contents of dist directory:"
-          ls -la dist/ | head -10
-
-          # 检查 index.html 中的路径并修复
-          echo "Checking and fixing asset paths in index.html..."
-          if [ -f "dist/index.html" ]; then
-            # 确保所有资源路径都是相对路径
-            sed -i.bak 's|href="/|href="./|g' dist/index.html
-            sed -i.bak 's|src="/|src="./|g' dist/index.html
-            sed -i.bak 's|href="\([^"]*\)"|href="./\1"|g' dist/index.html
-            sed -i.bak 's|src="\([^"]*\)"|src="./\1"|g' dist/index.html
-            # 移除备份文件
-            rm -f dist/index.html.bak
-            echo "✓ Asset paths fixed in index.html"
-          fi
-        else
-          echo "Creating fallback dist directory and index.html"
-          mkdir -p dist
-          cp templates/fallback-index.html dist/index.html
-          echo "✓ Fallback index.html created from template"
+        if [ ! -f "dist/index.html" ]; then
+          echo "dist/index.html missing from web-dist artifact"
+          exit 1
         fi
-
-        # 显示最终的 index.html 内容（前几行）
-        echo "Final index.html content (first 10 lines):"
-        head -10 dist/index.html || echo "Could not read index.html"
+        echo "✓ web bundle restored:"
+        ls -la dist/ | head -10
 
     - name: Prepare build resources
       shell: bash

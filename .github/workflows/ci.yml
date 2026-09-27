@@ -20,6 +20,11 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      # electron became a devDependency (needed by the desktop build jobs);
+      # the gates here only run node --test unit suites, which never start
+      # the Electron binary, so skip its ~100MB postinstall download.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
     steps:
       - name: Checkout repository
