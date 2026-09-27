@@ -468,4 +468,25 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
     await expectVisible('owner/beta');
     expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
   });
+
+  it('hides repositories outside both lists when a filter combines include and exclude repos', async () => {
+    const delta = makeRepo(10, 'delta', 'owner/delta');
+    storeState.repositories = [alpha, beta, delta];
+    storeState.releaseSubscriptions = new Set([alpha.id, beta.id, delta.id]);
+    storeState.releases = [
+      makeRepoRelease(101, alpha, ['alpha-1.0.zip']),
+      makeRepoRelease(201, beta, ['beta-1.0.zip']),
+      makeRepoRelease(401, delta, ['delta-1.0.zip']),
+    ];
+    activate(
+      [{ id: 'f1', name: 'Beta minus alpha', keywords: [], includeRepos: ['owner/beta'], alwaysExcludeRepos: ['owner/alpha'] }],
+      ['f1'],
+    );
+
+    render(<ReleaseTimeline />);
+    // 包含列表内的仓库显示；排除列表与两组之外的仓库都隐藏
+    await expectVisible('owner/beta');
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    expect(screen.queryByText('owner/delta')).not.toBeInTheDocument();
+  });
 });

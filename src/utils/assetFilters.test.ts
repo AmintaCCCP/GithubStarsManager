@@ -250,6 +250,18 @@ describe('filterMatchesRelease', () => {
     expect(match(filter, 'owner/beta', [], [])).toBe(true);
   });
 
+  it('keeps includeRepos whitelist semantics when both repo lists are configured', () => {
+    // 规则 7：两组都存在时，只命中包含列表中且不在排除列表中的仓库
+    const filter = {
+      keywords: [],
+      includeRepos: ['owner/beta'],
+      alwaysExcludeRepos: ['owner/alpha'],
+    };
+    expect(match(filter, 'owner/beta', [], [])).toBe(true);
+    expect(match(filter, 'owner/alpha', [], [])).toBe(false);
+    expect(match(filter, 'owner/gamma', [], [])).toBe(false);
+  });
+
   it('never matches a defense-grade empty filter', () => {
     expect(match({ keywords: [] }, 'owner/a', ['app.zip'])).toBe(false);
     // 含空字符串关键词的畸形 filter 不得变相匹配所有 Release

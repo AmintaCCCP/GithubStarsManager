@@ -121,8 +121,11 @@ export const filterMatchesRelease = (
   }
 
   if (!hasKeywords && !hasExcludeKeywords) {
-    // 纯排除仓库列表是有意支持的负向仓库过滤器：除排除仓库外的仓库均命中
-    if ((filter.alwaysExcludeRepos ?? []).length > 0) return true;
+    // 仓库白名单（includeRepos）存在时不命中其之外的仓库；仅排除列表是有意
+    // 支持的负向仓库过滤器：除排除仓库外的仓库均命中（第 2 节规则 7）
+    if ((filter.includeRepos ?? []).length === 0 && (filter.alwaysExcludeRepos ?? []).length > 0) {
+      return true;
+    }
   }
 
   return false;
