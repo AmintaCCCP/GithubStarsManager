@@ -1,4 +1,12 @@
-# Electron Builder配置文件
+# Electron Builder 配置 —— CI（build-desktop.yml）与本地（scripts/build-desktop.js）
+# 共用的唯一配置来源，内容与 0.8.4 及之前 CI 运行时注入 package.json 的
+# effective config 对齐（除下述三处有意变更：files 不再包含 node_modules、
+# 去掉重复打包 dist 的 extraResources、publish 固定为 null）。
+#
+# 注意：electron-builder 会按根 package.json 的 `dependencies` 自动收集生产
+# 依赖树打进安装包。dependencies 必须只保留 Electron 主进程运行时真正
+# require 的包（当前仅 undici，用于代理 ProxyAgent）；前端依赖全部放在
+# devDependencies，由 vite 在构建期打包进 dist/。
 appId: com.github-stars-manager.app
 productName: GitHub Stars Manager
 copyright: Copyright © 2024 GitHub Stars Manager
@@ -9,22 +17,30 @@ directories:
 
 files:
   - dist/**/*
+  - build/**/*
   - electron/**/*
-  - node_modules/**/*
   - package.json
+  - '!**/*.map'
 
 extraMetadata:
   main: electron/main.js
 
-# Windows配置
+compression: normal
+asar: false
+
+# 发布统一由 release job（softprops/action-gh-release）完成；构建命令同时带
+# --publish=never，双重保证 electron-builder 不会尝试自行发布。
+publish: null
+
+# Windows 配置
 win:
   target:
     - target: nsis
       arch:
         - x64
-        - ia32
-  icon: dist/vite.svg
-  
+  icon: build/icon.png
+  requestedExecutionLevel: asInvoker
+
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -32,52 +48,27 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: GitHub Stars Manager
 
-# macOS配置  
+# macOS 配置
 mac:
   target:
     - target: dmg
       arch:
         - x64
         - arm64
-  icon: dist/vite.svg
+  icon: build/icon.png
   category: public.app-category.productivity
+  gatekeeperAssess: false
 
 dmg:
   title: GitHub Stars Manager
-  icon: dist/vite.svg
-  window:
-    width: 540
-    height: 380
-  contents:
-    - x: 410
-      y: 230
-      type: link
-      path: /Applications
-    - x: 130
-      y: 230
-      type: file
+  icon: build/icon.png
 
-# Linux配置
+# Linux 配置
 linux:
-  target:
-    - target: AppImage
-      arch:
-        - x64
-    - target: deb
-      arch:
-        - x64
-    - target: rpm
-      arch:
-        - x64
-  icon: dist/vite.svg
+  target: AppImage
+  icon: build/icon-512x512.png
   category: Office
   synopsis: AI-powered GitHub starred repositories management tool
   description: >
-    GitHub Stars Manager is an intelligent tool for organizing and managing 
+    GitHub Stars Manager is an intelligent tool for organizing and managing
     your GitHub starred repositories with AI-powered analysis and release tracking.
-
-# 发布配置
-publish:
-  provider: github
-  owner: your-username
-  repo: your-repo-name
