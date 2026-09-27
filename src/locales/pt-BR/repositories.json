@@ -1,7 +1,15 @@
 {
   "batchStar": {
     "title": "Favoritar por links",
-    "hint": "Cole um resumo de vídeo ou texto com links do GitHub. Revise os repositórios antes de favoritar. Outros sites são ignorados.",
+    "hint": "Cole qualquer texto com links do GitHub, confira os repositórios e adicione uma estrela. Links de outros sites são ignorados.",
+    "history": "Histórico de textos",
+    "history-hint": "Escolha uma entrada para editar, salvar alterações ou gerar outra prévia. As dez entradas geradas mais recentemente ficam apenas neste dispositivo.",
+    "history-empty": "Ainda não há histórico",
+    "save-history": "Salvar alterações do histórico",
+    "history-error": "Não foi possível ler ou salvar o histórico.",
+    "view-readme": "Ver README de {{name}}",
+    "open-github": "Abrir {{name}} no GitHub",
+    "loading-readme": "Carregando README…",
     "input-label": "Texto com links de repositórios",
     "placeholder": "Cole texto ou Markdown com links do GitHub…",
     "close": "Fechar",

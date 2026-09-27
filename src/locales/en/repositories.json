@@ -1,7 +1,15 @@
 {
   "batchStar": {
     "title": "Star from links",
-    "hint": "Paste a video summary or any text containing GitHub links. Review the repositories before starring them. Other websites are ignored.",
+    "hint": "Paste any text containing GitHub links, review the repositories, then Star them. Links to other websites are ignored.",
+    "history": "Paste history",
+    "history-hint": "Choose an entry to edit its text, save changes or preview again. The ten most recently generated entries are kept on this device only.",
+    "history-empty": "No paste history yet",
+    "save-history": "Save history changes",
+    "history-error": "Could not read or save paste history.",
+    "view-readme": "View README for {{name}}",
+    "open-github": "Open {{name}} on GitHub",
+    "loading-readme": "Loading README…",
     "input-label": "Text containing repository links",
     "placeholder": "Paste text or Markdown with GitHub repository links…",
     "close": "Close",

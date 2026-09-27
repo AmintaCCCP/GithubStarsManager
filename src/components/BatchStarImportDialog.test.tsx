@@ -9,7 +9,12 @@ const mocks = vi.hoisted(() => ({
   isTranslating: false, translationError: '', translationsVisible: false, translations: {} as Record<string, string>,
   preview: vi.fn(), toggleRow: vi.fn(), selectAll: vi.fn(), invertSelection: vi.fn(),
   clearPreview: vi.fn(), starSelected: vi.fn(), toggleTranslations: vi.fn(),
+  history: [] as { text: string; generatedAt: number }[], historyError: false, record: vi.fn(), edit: vi.fn(),
 }));
+vi.mock('../features/repositories/hooks/useBatchStarHistory', () => ({ useBatchStarHistory: () => mocks }));
+vi.mock('./ReadmeModal', () => ({ ReadmeModal: ({ repository, onClose }: { repository: { full_name: string }; onClose: () => void }) => (
+  <div role="dialog" aria-label="README"><span>{repository.full_name}</span><button onClick={onClose}>Close README</button></div>
+) }));
 vi.mock('../features/repositories/hooks/useBatchStarImport', () => ({ useBatchStarImport: () => mocks }));
 vi.mock('../i18n/useT', () => ({ useT: () => (key: string, params?: Record<string, unknown>) => `${key}${params?.name ? ` ${params.name}` : ''}` }));
 
@@ -30,19 +35,50 @@ describe('BatchStarImportDialog', () => {
     mocks.translationsVisible = false;
     mocks.translations = {};
     mocks.rows = [row()];
+    mocks.history = [];
+    mocks.edit.mockReturnValue(true);
   });
 
   it('previews pasted text without starring until the user confirms', async () => {
     const user = userEvent.setup();
     render(<BatchStarImportDialog isOpen onClose={vi.fn()} />);
-    expect(screen.getByRole('link', { name: 'owner/repo' })).toHaveAttribute('href', 'https://github.com/owner/repo');
+    expect(screen.getByRole('link', { name: 'batchStar.open-github owner/repo' })).toHaveAttribute('href', 'https://github.com/owner/repo');
     await user.type(screen.getByRole('textbox', { name: 'batchStar.input-label' }), 'https://github.com/owner/repo');
     await user.click(screen.getByRole('button', { name: 'batchStar.preview' }));
     expect(mocks.preview).toHaveBeenCalledWith('https://github.com/owner/repo');
+    expect(mocks.record).toHaveBeenCalledWith('https://github.com/owner/repo', undefined);
     expect(mocks.clearPreview).toHaveBeenCalled();
     expect(mocks.starSelected).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'batchStar.star-selected' }));
     expect(mocks.starSelected).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens README without changing selection and restores the batch dialog', async () => {
+    const user = userEvent.setup();
+    render(<BatchStarImportDialog isOpen onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'batchStar.view-readme owner/repo' }));
+    expect(await screen.findByRole('dialog', { name: 'README' })).toBeVisible();
+    expect(mocks.toggleRow).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Close README' }));
+    expect(screen.getByRole('textbox', { name: 'batchStar.input-label' })).toBeVisible();
+  });
+
+  it('loads history for editing, saves changes and regenerates without starring', async () => {
+    mocks.history = [{ text: 'old text', generatedAt: 123 }];
+    const user = userEvent.setup();
+    render(<BatchStarImportDialog isOpen onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'batchStar.history' }));
+    await user.click(screen.getByRole('button', { name: /old text/ }));
+    const input = screen.getByRole('textbox', { name: 'batchStar.input-label' });
+    expect(input).toHaveValue('old text');
+    await user.clear(input);
+    await user.type(input, 'edited text');
+    await user.click(screen.getByRole('button', { name: 'batchStar.save-history' }));
+    expect(mocks.edit).toHaveBeenCalledWith('old text', 'edited text');
+    await user.click(screen.getByRole('button', { name: 'batchStar.preview' }));
+    expect(mocks.record).toHaveBeenCalledWith('edited text', 'edited text');
+    expect(mocks.preview).toHaveBeenCalledWith('edited text');
+    expect(mocks.starSelected).not.toHaveBeenCalled();
   });
 
   it('allows editing the repository selection', async () => {

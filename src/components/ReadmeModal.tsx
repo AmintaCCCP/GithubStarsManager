@@ -24,7 +24,7 @@ interface ReadmeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCloseAutoFocus?: () => void;
-  repository: Repository | null;
+  repository: Pick<Repository, 'full_name' | 'html_url' | 'owner' | 'default_branch'> | null;
 }
 
 const FONT_SIZES = [
@@ -376,7 +376,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     setVariantsLoading(true);
 
     try {
-      const defaultBranch = (repository as Repository & { default_branch?: string }).default_branch;
+      const defaultBranch = repository.default_branch;
       const candidates = await fetchReadmeCandidatesFromAvailableSource(defaultBranch);
 
       setReadmeVariants(buildReadmeVariants(candidates, language));
