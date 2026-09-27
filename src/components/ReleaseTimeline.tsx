@@ -24,24 +24,7 @@ import {
   latestEffectiveRelease,
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
-
-/** 判定单个过滤器是否命中一个 Release：仓库被「始终包含」即命中（无需关键词），
- * 或任一资产文件名「命中包含关键词且不含排除关键词」。
- * lowerRepoKey / lowerLinkNames 由调用方小写归一化；过滤器自身字段为原始值。 */
-const filterMatchesRelease = (
-  filter: Pick<AssetFilter, 'keywords'> & Partial<AssetFilter>,
-  lowerRepoKey: string,
-  lowerLinkNames: string[]
-): boolean => {
-  if ((filter.includeRepos ?? []).some(name => normalizeRepoKey(name) === lowerRepoKey)) {
-    return true;
-  }
-
-  return lowerLinkNames.some(lowerLinkName =>
-    filter.keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase())) &&
-    !(filter.excludeKeywords ?? []).some(keyword => lowerLinkName.includes(keyword.toLowerCase()))
-  );
-};
+import { filterMatchesRelease } from '../utils/assetFilters';
 
 export const ReleaseTimeline: React.FC = () => {
   const {
@@ -256,17 +239,20 @@ export const ReleaseTimeline: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscribedReleaseKey, releaseShowMode, releaseLatestMode]);
 
-  // 预计算每个 release 的下载链接和过滤器命中结果。
-  // 过滤器是 Release 级判定（关键词命中或仓库被「始终包含」），只决定 Release
-  // 是否出现在列表中，不裁剪卡片展示的资产。
+  // 预计算每个 release 的下载链接、真实上传资产名和过滤器命中结果。
+  // 过滤器是 Release 级判定（仓库排除 → 仓库包含 → 资产规则，见
+  // filterMatchesRelease），只决定 Release 是否出现在列表中，不裁剪卡片
+  // 展示的资产。资产规则的匹配范围按包含关键词是否有值区分：非空时匹配全部
+  // 下载链接名（含源码归档伪资产与正文提取链接），为空时只匹配真实上传资产名。
   const releasesWithLinks = useMemo(() => {
     return subscribedReleases.map(release => {
       const allLinks = getDownloadLinks(release);
       const lowerLinkNames = allLinks.map(link => link.name.toLowerCase());
+      const lowerRealAssetNames = (release.assets ?? []).map(asset => asset.name.toLowerCase());
       const lowerRepoKey = normalizeRepoKey(release.repository.full_name);
       const matchesFilters = selectedFilters.length === 0 || selectedFilters.some(filterId => {
         const active = resolveActiveFilter(filterId);
-        return !!active && filterMatchesRelease(active, lowerRepoKey, lowerLinkNames);
+        return !!active && filterMatchesRelease(active, lowerRepoKey, lowerLinkNames, lowerRealAssetNames);
       });
       return { release, allLinks, matchesFilters };
     });
@@ -287,8 +273,9 @@ export const ReleaseTimeline: React.FC = () => {
       );
     }
 
-    // 资产类型过滤 - 只显示命中过滤器的 release（关键词命中或仓库被始终包含）；
-    // 过滤器只决定 Release 是否出现，显示时展示该 Release 的全部资产
+    // 资产类型过滤 - 只显示命中任一已启用过滤器的 release（仓库排除 → 仓库包含
+    // → 资产规则，多过滤器取 OR）；过滤器只决定 Release 是否出现，显示时展示该
+    // Release 的全部资产
     if (selectedFilters.length > 0) {
       filtered = filtered.filter(({ matchesFilters }) => matchesFilters);
     }

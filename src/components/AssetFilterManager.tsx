@@ -169,6 +169,11 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
         </div>
       </div>
 
+      {/* 多过滤器组合说明：常驻可见（不藏 tooltip），解释 OR 组合与排除作用域 */}
+      <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+        {t('assetFilterManager.filter-scope-note')}
+      </p>
+
       {/* Expandable Content */}
       <div
         className="grid transition-[grid-template-rows] duration-300 ease-in-out"
