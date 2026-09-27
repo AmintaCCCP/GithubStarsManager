@@ -668,4 +668,16 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.3</downloadUrl>
   </version>
+  <version>
+    <number>0.8.4</number>
+    <releaseDate>2026-09-27</releaseDate>
+    <changelog>
+      <item>feat: Added &apos;Star from links&apos; to the repository toolbar: paste prose or Markdown that mentions GitHub repositories, preview each repository&apos;s description, language, stars, and starred status, then star the selected repositories in batches of up to 50 with per-repository results. (contributed by @Khk-NL). (PR #408)</item>
+      <item>feat: Discovery channels can now be managed from the sidebar on desktop and mobile: hide channels you do not use, keep at least one enabled, and automatically switch when the active channel is hidden. (contributed by @Khk-NL). (PR #403)</item>
+      <item>feat: Release asset filters gained keyword blacklists, per-filter always-include and always-exclude repository lists, and optional include keywords; the filter editor is reorganized into Assets and Repositories tabs, exclusions win within one filter, and any matching filter shows the release across filters. (PR #405, PR #409, PR #411)</item>
+      <item>feat: Polished the &apos;New Version Available&apos; dialog with a wider layout, a fixed header and footer while only the changelog scrolls, and a thin auto-hiding scrollbar; the header update banner now shows only the version and release date. (PR #406)</item>
+      <item>fix: Fixed fullstack deployments: all GitHub API clients are now created through the route-mode factory so requests honor the network routing setting, and the server CSP allows browser-direct GitHub and AI origins and owner avatars, fixing login and sync &apos;Failed to fetch&apos; errors and missing avatars. (PR #410)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.4</downloadUrl>
+  </version>
 </versions>
