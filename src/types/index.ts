@@ -435,6 +435,13 @@ export interface AssetFilter {
    * 如仅发布 zip 或源码归档的项目）；未选过滤器时列表不受影响，也不影响订阅。
    */
   includeRepos?: string[];
+  /**
+   * 始终排除的仓库（Repository.full_name）：仅作用于所属过滤器。该过滤器启用时，
+   * 这些仓库的 Release 不通过本过滤器（优先于本过滤器的关键词与 includeRepos），
+   * 但不会否决其它已启用过滤器的命中。不复用 #405 遗留的 `excludeRepos` 键，
+   * 避免历史数据被重新解释为该语义。
+   */
+  alwaysExcludeRepos?: string[];
   isPreset?: boolean;
   icon?: string;
 }

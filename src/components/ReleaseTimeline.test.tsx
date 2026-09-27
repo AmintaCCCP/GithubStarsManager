@@ -307,3 +307,186 @@ describe('ReleaseTimeline asset filter matching', () => {
     expect(screen.getByText('app-setup.exe')).toBeInTheDocument();
   });
 });
+
+describe('ReleaseTimeline per-filter repository exclusions', () => {
+  const beta = makeRepo(8, 'beta', 'owner/beta');
+  const gamma = makeRepo(9, 'gamma', 'owner/gamma');
+  const alpha = makeRepo(7, 'alpha', 'owner/alpha');
+
+  const activate = (filters: AssetFilter[], selectedIds: string[]) => {
+    storeState.assetFilters = filters;
+    storeState.releaseSelectedFilters = selectedIds;
+    storeState.releaseViewMode = 'timeline';
+    storeState.releaseShowMode = 'all';
+    storeState.releaseLatestMode = 'all';
+  };
+
+  const expectVisible = async (fullName: string) => {
+    expect(await screen.findByText(fullName)).toBeInTheDocument();
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    wireStoreMocks();
+  });
+
+  it('hides a release whose repo is always-excluded even with keyword hits and include listing', async () => {
+    storeState.repositories = [alpha];
+    storeState.releaseSubscriptions = new Set([alpha.id]);
+    storeState.releases = [makeRepoRelease(101, alpha, ['app.zip'])];
+    activate(
+      [{ id: 'f1', name: 'Zip', keywords: ['zip'], includeRepos: ['owner/alpha'], alwaysExcludeRepos: ['owner/alpha'] }],
+      ['f1'],
+    );
+
+    render(<ReleaseTimeline />);
+    await expectVisible('当前过滤器没有匹配到任何资产，请尝试其他过滤条件');
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+  });
+
+  it('lets always-include bypass the same filter\u2019s exclude keywords', async () => {
+    storeState.repositories = [beta];
+    storeState.releaseSubscriptions = new Set([beta.id]);
+    // 资产名同时命中包含词与排除词，但仓库被始终包含 → 绕过关键词判断
+    storeState.releases = [makeRepoRelease(201, beta, ['beta-app.zip'])];
+    activate(
+      [{ id: 'f1', name: 'App', keywords: ['app'], excludeKeywords: ['beta'], includeRepos: ['owner/beta'] }],
+      ['f1'],
+    );
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/beta');
+  });
+
+  it('shows only whitelisted repositories for a pure includeRepos filter', async () => {
+    storeState.repositories = [beta, gamma];
+    storeState.releaseSubscriptions = new Set([beta.id, gamma.id]);
+    storeState.releases = [
+      makeRepoRelease(201, beta, ['beta-1.0.zip']),
+      makeRepoRelease(301, gamma, ['gamma-1.0.zip']),
+    ];
+    activate([{ id: 'f1', name: 'Beta only', keywords: [], includeRepos: ['owner/beta'] }], ['f1']);
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/beta');
+    expect(screen.queryByText('owner/gamma')).not.toBeInTheDocument();
+  });
+
+  it('shows every other repository for a pure alwaysExcludeRepos filter', async () => {
+    storeState.repositories = [beta, gamma];
+    storeState.releaseSubscriptions = new Set([beta.id, gamma.id]);
+    storeState.releases = [
+      makeRepoRelease(201, beta, ['beta-1.0.zip']),
+      makeRepoRelease(301, gamma, ['gamma-1.0.zip']),
+    ];
+    activate([{ id: 'f1', name: 'No gamma', keywords: [], alwaysExcludeRepos: ['owner/gamma'] }], ['f1']);
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/beta');
+    expect(screen.queryByText('owner/gamma')).not.toBeInTheDocument();
+  });
+
+  it('hides releases whose real assets are all excluded, even when pseudo assets survive', async () => {
+    const excluded = makeRepoRelease(401, alpha, ['app-setup.exe']);
+    excluded.zipball_url = 'https://github.com/owner/alpha/zipball/v401';
+    const noRealAssets = makeRepoRelease(402, beta, []);
+    noRealAssets.zipball_url = 'https://github.com/owner/beta/zipball/v402';
+    const surviving = makeRepoRelease(403, gamma, ['app.zip', 'app-setup.exe']);
+    surviving.zipball_url = 'https://github.com/owner/gamma/zipball/v403';
+
+    storeState.repositories = [alpha, beta, gamma];
+    storeState.releaseSubscriptions = new Set([alpha.id, beta.id, gamma.id]);
+    storeState.releases = [excluded, noRealAssets, surviving];
+    activate([{ id: 'f1', name: 'No setup', keywords: [], excludeKeywords: ['setup'] }], ['f1']);
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/gamma');
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    expect(screen.queryByText('owner/beta')).not.toBeInTheDocument();
+  });
+
+  it('keeps pseudo-asset name matching when include keywords are present (preset-source regression)', async () => {
+    const release = makeRepoRelease(501, alpha, ['binary.bin']);
+    release.zipball_url = 'https://github.com/owner/alpha/zipball/v501';
+
+    storeState.repositories = [alpha];
+    storeState.releaseSubscriptions = new Set([alpha.id]);
+    storeState.releases = [release];
+    // preset-source 不在 assetFilters 中时由 PRESET_FILTERS 常量兜底
+    activate([], ['preset-source']);
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/alpha');
+  });
+
+  it('does not let one filter\u2019s exclusion veto another filter\u2019s match (OR across filters)', async () => {
+    storeState.repositories = [alpha];
+    storeState.releaseSubscriptions = new Set([alpha.id]);
+    storeState.releases = [makeRepoRelease(101, alpha, ['app-portable.zip'])];
+    activate(
+      [
+        { id: 'f1', name: 'Portable', keywords: ['portable'] },
+        { id: 'f2', name: 'No alpha', keywords: [], alwaysExcludeRepos: ['owner/alpha'] },
+      ],
+      ['f1', 'f2'],
+    );
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/alpha');
+  });
+
+  it('hides a release only when every selected filter misses it', async () => {
+    storeState.repositories = [alpha];
+    storeState.releaseSubscriptions = new Set([alpha.id]);
+    storeState.releases = [makeRepoRelease(101, alpha, ['app.zip'])];
+    activate(
+      [
+        { id: 'f1', name: 'Deb only', keywords: ['deb'] },
+        { id: 'f2', name: 'No alpha', keywords: [], alwaysExcludeRepos: ['owner/alpha'] },
+      ],
+      ['f1', 'f2'],
+    );
+
+    render(<ReleaseTimeline />);
+    await expectVisible('当前过滤器没有匹配到任何资产，请尝试其他过滤条件');
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+  });
+
+  it('matches repository keys case-insensitively for exclusions and includes', async () => {
+    storeState.repositories = [alpha, beta];
+    storeState.releaseSubscriptions = new Set([alpha.id, beta.id]);
+    storeState.releases = [
+      makeRepoRelease(101, alpha, ['alpha-1.0.zip']),
+      makeRepoRelease(201, beta, ['beta-1.0.zip']),
+    ];
+    activate(
+      [{ id: 'f1', name: 'Case', keywords: [], includeRepos: ['OWNER/BETA'], alwaysExcludeRepos: ['OWNER/ALPHA'] }],
+      ['f1'],
+    );
+
+    render(<ReleaseTimeline />);
+    await expectVisible('owner/beta');
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+  });
+
+  it('hides repositories outside both lists when a filter combines include and exclude repos', async () => {
+    const delta = makeRepo(10, 'delta', 'owner/delta');
+    storeState.repositories = [alpha, beta, delta];
+    storeState.releaseSubscriptions = new Set([alpha.id, beta.id, delta.id]);
+    storeState.releases = [
+      makeRepoRelease(101, alpha, ['alpha-1.0.zip']),
+      makeRepoRelease(201, beta, ['beta-1.0.zip']),
+      makeRepoRelease(401, delta, ['delta-1.0.zip']),
+    ];
+    activate(
+      [{ id: 'f1', name: 'Beta minus alpha', keywords: [], includeRepos: ['owner/beta'], alwaysExcludeRepos: ['owner/alpha'] }],
+      ['f1'],
+    );
+
+    render(<ReleaseTimeline />);
+    // 包含列表内的仓库显示；排除列表与两组之外的仓库都隐藏
+    await expectVisible('owner/beta');
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    expect(screen.queryByText('owner/delta')).not.toBeInTheDocument();
+  });
+});
