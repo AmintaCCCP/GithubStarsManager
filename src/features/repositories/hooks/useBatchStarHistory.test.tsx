@@ -75,6 +75,18 @@ describe('batch Star paste history', () => {
     expect(result.current.history[0].text).toBe('account one');
   });
 
+  it('applies new entries on top of the list stored by another window', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1);
+    const { result } = renderHook(useBatchStarHistory);
+    act(() => result.current.record('from this window'));
+    const key = 'github-stars-manager-batch-star-history-v1:1';
+    const stored = JSON.parse(localStorage.getItem(key) ?? '[]') as { text: string; generatedAt: number }[];
+    localStorage.setItem(key, JSON.stringify([{ text: 'from other window', generatedAt: 2 }, ...stored]));
+    clock.mockReturnValue(3);
+    act(() => result.current.record('later entry'));
+    expect(result.current.history.map(entry => entry.text)).toEqual(['later entry', 'from other window', 'from this window']);
+  });
+
   it('keeps a failed write bound to the account that started it', () => {
     const { result, rerender } = renderHook(useBatchStarHistory);
     act(() => result.current.record('account one'));

@@ -20,11 +20,12 @@ export function useBatchStarHistory() {
     }
   }, [accountId]);
 
-  const save = (entries: BatchStarHistoryEntry[]) => {
+  /** Applies an update to the list as stored right now, so a stale render cannot overwrite newer entries. */
+  const save = (update: (entries: BatchStarHistoryEntry[]) => BatchStarHistoryEntry[]) => {
     const writingAccountId = accountRef.current;
     if (writingAccountId == null) return false;
-    const next = normalizeBatchStarHistory(entries);
     try {
+      const next = normalizeBatchStarHistory(update(readBatchStarHistory(String(writingAccountId))));
       writeBatchStarHistory(String(writingAccountId), next);
       if (accountRef.current === writingAccountId) {
         setHistory(next);
@@ -39,15 +40,15 @@ export function useBatchStarHistory() {
 
   const record = (text: string, previousText?: string) => {
     if (!text.trim()) return false;
-    return save([
+    return save(entries => [
       { text, generatedAt: Date.now() },
-      ...history.filter(entry => entry.text !== text && entry.text !== previousText),
+      ...entries.filter(entry => entry.text !== text && entry.text !== previousText),
     ]);
   };
 
   const edit = (previousText: string, text: string) => {
     if (!text.trim()) return false;
-    return save(history.map(entry => entry.text === previousText ? { ...entry, text } : entry));
+    return save(entries => entries.map(entry => entry.text === previousText ? { ...entry, text } : entry));
   };
 
   return { history, historyError, record, edit };
