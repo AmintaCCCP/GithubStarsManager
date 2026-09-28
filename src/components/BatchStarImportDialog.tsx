@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { Component, lazy, Suspense, useState, type ErrorInfo, type ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { useT } from '../i18n/useT';
 import { useBatchStarImport } from '../features/repositories/hooks/useBatchStarImport';
@@ -6,12 +6,34 @@ import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Textarea } from './ui/textarea';
 import { Modal } from './Modal';
-import { ErrorBoundary } from './ErrorBoundary';
+import { logger } from '../services/logger';
 import { useBatchStarHistory } from '../features/repositories/hooks/useBatchStarHistory';
 import type { Repository } from '../types';
 
 const LazyReadmeModal = lazy(() => import('./ReadmeModal').then(module => ({ default: module.ReadmeModal })));
 type ReadmeRepository = Pick<Repository, 'full_name' | 'html_url' | 'owner' | 'default_branch'>;
+
+class ReadmeLoadBoundary extends Component<{ title: string; closeLabel: string; errorMessage: string; onClose: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    logger.errorFromError('ui.batchStar', 'Failed to load README preview', error, { componentStack: errorInfo.componentStack });
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <Modal isOpen onClose={this.props.onClose} title={this.props.title}>
+        <p role="alert">{this.props.errorMessage}</p>
+        <Button variant="outline" className="mt-4" onClick={this.props.onClose}>{this.props.closeLabel}</Button>
+      </Modal>
+    );
+  }
+}
 
 interface BatchStarImportDialogProps {
   isOpen: boolean;
@@ -84,7 +106,7 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
         className="min-h-32 resize-y"
       />
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button variant="outline" disabled={busy || !text.trim()} onClick={() => { record(text, editingText); setEditingText(text); void preview(text); }}>
+        <Button variant="outline" disabled={busy || !text.trim()} onClick={() => { if (record(text, editingText)) setEditingText(text); void preview(text); }}>
           {isResolving ? t('batchStar.checking') : t('batchStar.preview')}
         </Button>
         <Button variant="outline" disabled={busy} aria-expanded={historyOpen} onClick={() => setHistoryOpen(value => !value)}>
@@ -192,11 +214,16 @@ export function BatchStarImportDialog({ isOpen, onClose }: BatchStarImportDialog
         </div>
       )}
     </Modal>
-    {readmeRepository && <ErrorBoundary><Suspense fallback={
+    {readmeRepository && <ReadmeLoadBoundary
+      title={t('batchStar.view-readme', { name: readmeRepository.full_name })}
+      closeLabel={t('batchStar.close')}
+      errorMessage={t('batchStar.readme-load-error')}
+      onClose={() => setReadmeRepository(null)}
+    ><Suspense fallback={
       <Modal isOpen onClose={() => setReadmeRepository(null)} title={t('batchStar.view-readme', { name: readmeRepository.full_name })}>
         <p role="status">{t('batchStar.loading-readme')}</p>
       </Modal>
-    }><LazyReadmeModal isOpen repository={readmeRepository} onClose={() => setReadmeRepository(null)} /></Suspense></ErrorBoundary>}
+    }><LazyReadmeModal isOpen repository={readmeRepository} onClose={() => setReadmeRepository(null)} /></Suspense></ReadmeLoadBoundary>}
     </>
   );
 }

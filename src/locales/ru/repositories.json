@@ -9,6 +9,7 @@
     "history-error": "Не удалось прочитать или сохранить историю.",
     "view-readme": "Открыть README {{name}}",
     "open-github": "Открыть {{name}} на GitHub",
+    "readme-load-error": "Не удалось загрузить README. Закройте это окно, чтобы вернуться к импорту.",
     "loading-readme": "Загрузка README…",
     "input-label": "Текст со ссылками на репозитории",
     "placeholder": "Вставьте текст или Markdown со ссылками GitHub…",

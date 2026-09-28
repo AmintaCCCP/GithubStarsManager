@@ -9,6 +9,7 @@
     "history-error": "기록을 읽거나 저장하지 못했습니다.",
     "view-readme": "{{name}}의 README 보기",
     "open-github": "GitHub에서 {{name}} 열기",
+    "readme-load-error": "README를 불러오지 못했습니다. 이 화면을 닫고 일괄 가져오기로 돌아가세요.",
     "loading-readme": "README 불러오는 중…",
     "input-label": "저장소 링크가 포함된 텍스트",
     "placeholder": "GitHub 링크가 포함된 텍스트나 Markdown을 붙여 넣으세요…",

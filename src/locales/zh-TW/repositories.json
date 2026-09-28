@@ -9,6 +9,7 @@
     "history-error": "無法讀取或儲存貼上歷史。",
     "view-readme": "檢視 {{name}} 的 README",
     "open-github": "在 GitHub 開啟 {{name}}",
+    "readme-load-error": "無法載入 README，請關閉後返回批次匯入。",
     "loading-readme": "正在載入 README…",
     "input-label": "包含儲存庫連結的文字",
     "placeholder": "貼上含 GitHub 儲存庫連結的文字或 Markdown…",

@@ -53,9 +53,32 @@ describe('batch Star paste history', () => {
     account.id = 1;
     rerender();
     expect(result.current.history[0].text).toBe('account one');
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
-    act(() => result.current.record('unsaved'));
+    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    let recorded = true;
+    act(() => { recorded = result.current.record('unsaved'); });
+    expect(setItem).toHaveBeenCalled();
+    expect(recorded).toBe(false);
     expect(result.current.historyError).toBe(true);
     expect(result.current.history[0].text).toBe('account one');
+  });
+
+  it('keeps a failed write bound to the account that started it', () => {
+    const { result, rerender } = renderHook(useBatchStarHistory);
+    act(() => result.current.record('account one'));
+    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation((key) => {
+      account.id = 2;
+      rerender();
+      throw new Error(`quota:${String(key)}`);
+    });
+    let recorded = true;
+    act(() => { recorded = result.current.record('should stay with account one'); });
+    expect(setItem).toHaveBeenCalled();
+    expect(recorded).toBe(false);
+    expect(result.current.history).toEqual([]);
+    expect(result.current.historyError).toBe(false);
+    account.id = 1;
+    rerender();
+    expect(result.current.history[0].text).toBe('account one');
+    expect(result.current.historyError).toBe(false);
   });
 });

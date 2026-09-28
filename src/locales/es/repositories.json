@@ -9,6 +9,7 @@
     "history-error": "No se pudo leer o guardar el historial.",
     "view-readme": "Ver README de {{name}}",
     "open-github": "Abrir {{name}} en GitHub",
+    "readme-load-error": "No se pudo cargar el README. Cierre esta vista para volver a la importación.",
     "loading-readme": "Cargando README…",
     "input-label": "Texto con enlaces a repositorios",
     "placeholder": "Pega texto o Markdown con enlaces de GitHub…",

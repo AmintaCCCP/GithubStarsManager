@@ -9,6 +9,7 @@
     "history-error": "貼り付け履歴を読み込み、または保存できませんでした。",
     "view-readme": "{{name}} の README を表示",
     "open-github": "GitHub で {{name}} を開く",
+    "readme-load-error": "README を読み込めませんでした。この画面を閉じて一括インポートに戻ってください。",
     "loading-readme": "README を読み込み中…",
     "input-label": "リポジトリのリンクを含む文章",
     "placeholder": "GitHub のリンクを含む文章や Markdown を貼り付け…",

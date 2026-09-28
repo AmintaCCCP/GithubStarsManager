@@ -5,13 +5,17 @@ export interface BatchStarHistoryEntry {
 
 const keyFor = (accountId: string) => `github-stars-manager-batch-star-history-v1:${accountId}`;
 
+function isValidHistoryTimestamp(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && !Number.isNaN(new Date(value).getTime());
+}
+
 /** Exact text identity is intentional: whitespace edits are different inputs. */
 export function normalizeBatchStarHistory(value: unknown): BatchStarHistoryEntry[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
   return value.filter((entry): entry is BatchStarHistoryEntry =>
     Boolean(entry && typeof entry.text === 'string' && entry.text.trim()
-      && typeof entry.generatedAt === 'number' && Number.isFinite(entry.generatedAt))
+      && isValidHistoryTimestamp(entry.generatedAt))
   ).sort((a, b) => b.generatedAt - a.generatedAt).filter(entry => {
     if (seen.has(entry.text)) return false;
     seen.add(entry.text);

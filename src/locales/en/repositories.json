@@ -9,6 +9,7 @@
     "history-error": "Could not read or save paste history.",
     "view-readme": "View README for {{name}}",
     "open-github": "Open {{name}} on GitHub",
+    "readme-load-error": "Could not load the README. Close this view to return to the batch import.",
     "loading-readme": "Loading README…",
     "input-label": "Text containing repository links",
     "placeholder": "Paste text or Markdown with GitHub repository links…",

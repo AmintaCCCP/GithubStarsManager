@@ -9,6 +9,7 @@
     "history-error": "Der Verlauf konnte nicht gelesen oder gespeichert werden.",
     "view-readme": "README von {{name}} anzeigen",
     "open-github": "{{name}} auf GitHub öffnen",
+    "readme-load-error": "README konnte nicht geladen werden. Schließen Sie diese Ansicht, um zum Stapelimport zurückzukehren.",
     "loading-readme": "README wird geladen…",
     "input-label": "Text mit Repository-Links",
     "placeholder": "Text oder Markdown mit GitHub-Links einfügen…",

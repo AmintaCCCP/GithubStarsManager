@@ -9,6 +9,7 @@
     "history-error": "无法读取或保存粘贴历史。",
     "view-readme": "查看 {{name}} 的 README",
     "open-github": "在 GitHub 打开 {{name}}",
+    "readme-load-error": "无法加载 README，请关闭后返回批量导入。",
     "loading-readme": "正在加载 README…",
     "input-label": "包含仓库链接的文字",
     "placeholder": "粘贴含 GitHub 仓库链接的文字或 Markdown…",

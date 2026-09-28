@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   isTranslating: false, translationError: '', translationsVisible: false, translations: {} as Record<string, string>,
   preview: vi.fn(), toggleRow: vi.fn(), selectAll: vi.fn(), invertSelection: vi.fn(),
   clearPreview: vi.fn(), starSelected: vi.fn(), toggleTranslations: vi.fn(),
-  history: [] as { text: string; generatedAt: number }[], historyError: false, record: vi.fn(), edit: vi.fn(),
+  history: [] as { text: string; generatedAt: number }[], historyError: false, record: vi.fn(() => true), edit: vi.fn(),
+  readmeShouldFail: false,
 }));
 vi.mock('../features/repositories/hooks/useBatchStarHistory', () => ({ useBatchStarHistory: () => mocks }));
-vi.mock('./ReadmeModal', () => ({ ReadmeModal: ({ repository, onClose }: { repository: { full_name: string }; onClose: () => void }) => (
-  <div role="dialog" aria-label="README"><span>{repository.full_name}</span><button onClick={onClose}>Close README</button></div>
-) }));
+vi.mock('./ReadmeModal', () => ({ ReadmeModal: ({ repository, onClose }: { repository: { full_name: string }; onClose: () => void }) => {
+  if (mocks.readmeShouldFail) throw new Error('readme chunk failed');
+  return <div role="dialog" aria-label="README"><span>{repository.full_name}</span><button onClick={onClose}>Close README</button></div>;
+} }));
 vi.mock('../features/repositories/hooks/useBatchStarImport', () => ({ useBatchStarImport: () => mocks }));
 vi.mock('../i18n/useT', () => ({ useT: () => (key: string, params?: Record<string, unknown>) => `${key}${params?.name ? ` ${params.name}` : ''}` }));
 
@@ -27,6 +29,7 @@ const row = (overrides: Record<string, unknown> = {}) => ({
 
 describe('BatchStarImportDialog', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     mocks.isResolving = false;
     mocks.isStarring = false;
@@ -36,6 +39,8 @@ describe('BatchStarImportDialog', () => {
     mocks.translations = {};
     mocks.rows = [row()];
     mocks.history = [];
+    mocks.readmeShouldFail = false;
+    mocks.record.mockReturnValue(true);
     mocks.edit.mockReturnValue(true);
   });
 
@@ -61,6 +66,38 @@ describe('BatchStarImportDialog', () => {
     expect(mocks.toggleRow).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Close README' }));
     expect(screen.getByRole('textbox', { name: 'batchStar.input-label' })).toBeVisible();
+  });
+
+  it('returns to the batch dialog when the README fails to load', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mocks.readmeShouldFail = true;
+    mocks.rows = [row({
+      candidate: { repositoryFullName: 'broken/repo', originalValue: 'https://github.com/broken/repo', confidence: 'high' },
+      detail: { full_name: 'broken/repo', html_url: 'https://github.com/broken/repo', description: 'Broken', language: 'TypeScript', stargazers_count: 1 },
+    })];
+    render(<BatchStarImportDialog isOpen onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'batchStar.view-readme broken/repo' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('batchStar.readme-load-error');
+    await user.click(screen.getByRole('button', { name: 'batchStar.close' }));
+    expect(screen.getByRole('textbox', { name: 'batchStar.input-label' })).toBeVisible();
+  });
+
+  it('keeps the previous history target when recording fails', async () => {
+    mocks.history = [{ text: 'old text', generatedAt: 123 }];
+    mocks.record.mockReturnValue(false);
+    const user = userEvent.setup();
+    render(<BatchStarImportDialog isOpen onClose={vi.fn()} />);
+    await user.click(screen.getByRole('button', { name: 'batchStar.history' }));
+    await user.click(screen.getByRole('button', { name: /old text/ }));
+    const input = screen.getByRole('textbox', { name: 'batchStar.input-label' });
+    await user.clear(input);
+    await user.type(input, 'edited text');
+    await user.click(screen.getByRole('button', { name: 'batchStar.preview' }));
+    expect(mocks.record).toHaveBeenCalledWith('edited text', 'old text');
+    await user.type(input, ' again');
+    await user.click(screen.getByRole('button', { name: 'batchStar.save-history' }));
+    expect(mocks.edit).toHaveBeenCalledWith('old text', 'edited text again');
   });
 
   it('loads history for editing, saves changes and regenerates without starring', async () => {
