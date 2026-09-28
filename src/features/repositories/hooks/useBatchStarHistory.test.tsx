@@ -10,6 +10,19 @@ vi.mock('../../../store/useAppStore', () => ({
 describe('batch Star paste history', () => {
   beforeEach(() => { localStorage.clear(); account.id = 1; vi.restoreAllMocks(); });
 
+  /**
+   * Depending on the runtime, `localStorage` is either a plain shim object
+   * (own `setItem`) or jsdom's Storage (method on `Storage.prototype`), so
+   * stub both paths and report whether either one actually received a write.
+   */
+  const spyOnWrites = (impl: (key: string, value: string) => void) => {
+    const spies = [
+      vi.spyOn(window.localStorage, 'setItem').mockImplementation(impl),
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(impl),
+    ];
+    return { called: () => spies.some(spy => spy.mock.calls.length > 0) };
+  };
+
   it('keeps exact text once, moves regenerated text first, and persists ten entries', () => {
     const clock = vi.spyOn(Date, 'now');
     const { result, unmount } = renderHook(useBatchStarHistory);
@@ -53,10 +66,10 @@ describe('batch Star paste history', () => {
     account.id = 1;
     rerender();
     expect(result.current.history[0].text).toBe('account one');
-    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => { throw new Error('quota'); });
+    const writes = spyOnWrites(() => { throw new Error('quota'); });
     let recorded = true;
     act(() => { recorded = result.current.record('unsaved'); });
-    expect(setItem).toHaveBeenCalled();
+    expect(writes.called()).toBe(true);
     expect(recorded).toBe(false);
     expect(result.current.historyError).toBe(true);
     expect(result.current.history[0].text).toBe('account one');
@@ -65,14 +78,14 @@ describe('batch Star paste history', () => {
   it('keeps a failed write bound to the account that started it', () => {
     const { result, rerender } = renderHook(useBatchStarHistory);
     act(() => result.current.record('account one'));
-    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation((key) => {
+    const writes = spyOnWrites((key) => {
       account.id = 2;
       rerender();
       throw new Error(`quota:${String(key)}`);
     });
     let recorded = true;
     act(() => { recorded = result.current.record('should stay with account one'); });
-    expect(setItem).toHaveBeenCalled();
+    expect(writes.called()).toBe(true);
     expect(recorded).toBe(false);
     expect(result.current.history).toEqual([]);
     expect(result.current.historyError).toBe(false);

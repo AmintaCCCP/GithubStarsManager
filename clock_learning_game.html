@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>⏱️ 小小钟表探险家 - 儿童认识表盘趣味闯关游戏</title>
+  <style>
+    :root {
+      --bg-color: #f0f7ff;
+      --card-bg: #ffffff;
+      --primary: #4a90e2;
+      --primary-hover: #357abd;
+      --hour-color: #ff5252;
+      --hour-light: #ffebee;
+      --min-color: #1976d2;
+      --min-light: #e3f2fd;
+      --sec-color: #ff9800;
+      --correct: #4caf50;
+      --wrong: #f44336;
+      --text: #333333;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+      --font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Nunito', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background: linear-gradient(135deg, #e0f2fe 0%, #fef3c7 50%, #fce7f3 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 26px;
+      color: #1e3a8a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .stat-pill {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Tab navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 10px;
+      margin: 12px 0 16px;
+      background: rgba(255,255,255,0.7);
+      padding: 6px;
+      border-radius: 30px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .nav-btn {
+      border: none;
+      background: transparent;
+      padding: 8px 18px;
+      font-size: 15px;
+      font-weight: bold;
+      color: #64748b;
+      cursor: pointer;
+      border-radius: 24px;
+      transition: all 0.25s ease;
+      font-family: inherit;
+    }
+
+    .nav-btn.active {
+      background: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(59,130,246,0.35);
+      transform: translateY(-1px);
+    }
+
+    /* Main Container */
+    .game-box {
+      width: 100%;
+      max-width: 960px;
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      position: relative;
+    }
+
+    @media (max-width: 768px) {
+      .game-box {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Clock Stage */
+    .clock-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clock-wrapper {
+      position: relative;
+      width: 320px;
+      height: 320px;
+      margin: 10px 0;
+    }
+
+    #clockCanvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      cursor: grab;
+      touch-action: none;
+      background: #ffffff;
+      box-shadow: 0 12px 30px rgba(74, 144, 226, 0.2), inset 0 0 15px rgba(0,0,0,0.03);
+    }
+
+    #clockCanvas:active {
+      cursor: grabbing;
+    }
+
+    /* Side Panel */
+    .panel-stage {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card-section {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Difficulty Level Selector */
+    .level-pills {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .level-btn {
+      border: 2px solid #cbd5e1;
+      background: #ffffff;
+      padding: 8px 4px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: bold;
+      color: #475569;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .level-btn:hover {
+      border-color: #94a3b8;
+    }
+
+    .level-btn.active {
+      background: #e0f2fe;
+      border-color: #0284c7;
+      color: #0369a1;
+      box-shadow: 0 2px 6px rgba(2, 132, 199, 0.2);
+    }
+
+    /* Readout display */
+    .digital-clock {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      background: #1e293b;
+      color: #38bdf8;
+      border-radius: 14px;
+      padding: 10px 16px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    .chinese-readout {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 20px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .sound-btn {
+      background: #3b82f6;
+      border: none;
+      color: #ffffff;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s;
+    }
+    .sound-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Explanation tooltips */
+    .explain-tags {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .explain-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      line-height: 1.4;
+    }
+
+    .explain-hour {
+      background: var(--hour-light);
+      color: #c62828;
+      border-left: 4px solid var(--hour-color);
+    }
+
+    .explain-minute {
+      background: var(--min-light);
+      color: #1565c0;
+      border-left: 4px solid var(--min-color);
+    }
+
+    /* Step control buttons */
+    .quick-btns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: none;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:active {
+      transform: scale(0.96);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #334155;
+    }
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(59,130,246,0.3);
+    }
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    /* Quiz Panel elements */
+    .quiz-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .opt-card {
+      background: #ffffff;
+      border: 3px solid #cbd5e1;
+      padding: 14px 10px;
+      border-radius: 16px;
+      font-size: 20px;
+      font-weight: 800;
+      color: #1e293b;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .opt-card:hover {
+      transform: translateY(-2px);
+      border-color: #3b82f6;
+      background: #f0f9ff;
+    }
+
+    .opt-card.correct {
+      border-color: #22c55e !important;
+      background: #dcfce7 !important;
+      color: #15803d !important;
+      animation: pop 0.4s ease;
+    }
+
+    .opt-card.wrong {
+      border-color: #ef4444 !important;
+      background: #fee2e2 !important;
+      color: #b91c1c !important;
+      animation: shake 0.4s ease;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0.95); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+
+    /* Feedback banner */
+    .feedback-banner {
+      min-height: 48px;
+      margin-top: 10px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 8px 16px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .feedback-banner.success {
+      background: #dcfce7;
+      color: #166534;
+      border: 2px solid #86efac;
+    }
+
+    .feedback-banner.fail {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 2px solid #fca5a5;
+    }
+
+    /* Confetti Canvas */
+    #confettiCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* Mode description info */
+    .mode-tip {
+      font-size: 13px;
+      color: #64748b;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    .helper-legend {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="confettiCanvas"></canvas>
+
+  <header>
+    <h1>⏱️ 小小钟表探险家</h1>
+    <div class="badge-bar">
+      <div class="stat-pill">⭐ 星星积分: <span id="scoreText" style="color:#eab308; font-size:18px;">0</span></div>
+      <div class="stat-pill">🔥 连对纪录: <span id="streakText" style="color:#ef4444; font-size:18px;">0</span></div>
+      <div class="stat-pill">🏆 勋章称号: <span id="rankTitle" style="color:#3b82f6;">钟表学徒</span></div>
+    </div>
+  </header>
+
+  <!-- 模式切换标签页 -->
+  <div class="nav-tabs">
+    <button class="nav-btn active" id="tabLearn" onclick="switchMode('learn')">📖 认识与拨钟探索</button>
+    <button class="nav-btn" id="tabQuiz" onclick="switchMode('quiz')">🎯 随机时间测验闯关</button>
+  </div>
+
+  <main class="game-box">
+    <!-- 左侧：表盘核心区 -->
+    <div class="clock-stage">
+      <!-- 难度切换选择器 -->
+      <div style="width: 100%; max-width: 320px;">
+        <div style="font-size:13px; font-weight:bold; color:#475569; margin-bottom:6px; display:flex; justify-content:space-between;">
+          <span>表盘难度关卡：</span>
+          <span id="levelName" style="color:#0284c7;">第1关：完整数字+助记</span>
+        </div>
+        <div class="level-pills">
+          <button class="level-btn active" onclick="setLevel(1)">关卡 1</button>
+          <button class="level-btn" onclick="setLevel(2)">关卡 2</button>
+          <button class="level-btn" onclick="setLevel(3)">关卡 3</button>
+          <button class="level-btn" onclick="setLevel(4)">关卡 4</button>
+        </div>
+      </div>
+
+      <!-- 交互时钟画布 -->
+      <div class="clock-wrapper">
+        <canvas id="clockCanvas" width="640" height="640"></canvas>
+      </div>
+
+      <div class="helper-legend">
+        <div class="legend-item">
+          <div class="legend-color" style="background:var(--hour-color);"></div>
+          <span>短粗：时针（看红数）</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background:var(--min-color);"></div>
+          <span>细长：分针（走一圈60分）</span>
+        </div>
+      </div>
+      <div style="font-size: 12px; color:#94a3b8; margin-top: 4px;">
+        💡 提示：在时钟上按住并转动分针或时针，可以自由拨动时间哦！
+      </div>
+    </div>
+
+    <!-- 右侧：学习/测验交互面板 -->
+    <div class="panel-stage">
+
+      <!-- 模式一：学习探索视图 -->
+      <div id="panelLearn">
+        <div class="card-section">
+          <div class="card-title">
+            <span>🕒 当前表盘显示时间</span>
+            <button class="sound-btn" onclick="speakCurrentTime()" title="语音朗读时间">🔊</button>
+          </div>
+          <div class="digital-clock" id="digitalDisplay">10:10</div>
+          <div class="chinese-readout" id="chineseDisplay">十点十分</div>
+
+          <div class="explain-tags">
+            <div class="explain-item explain-hour">
+              <span>🔴</span>
+              <div id="hourExplanation"><b>时针</b> 指向 10，代表 <b>10 点</b>。</div>
+            </div>
+            <div class="explain-item explain-minute">
+              <span>🔵</span>
+              <div id="minExplanation"><b>分针</b> 指向 2，对应 2 × 5 = <b>10 分</b>。</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="card-title">🎛️ 快捷微调与整点体验</div>
+          <div class="mode-tip">点击下方按钮，看时针和分针如何联动跑步：</div>
+          <div class="quick-btns">
+            <button class="btn btn-secondary" onclick="adjustTime(60)">+1 小时</button>
+            <button class="btn btn-secondary" onclick="adjustTime(15)">+15 分钟</button>
+            <button class="btn btn-secondary" onclick="adjustTime(5)">+5 分钟</button>
+            <button class="btn btn-secondary" onclick="adjustTime(-60)">-1 小时</button>
+            <button class="btn btn-secondary" onclick="adjustTime(-15)">-15 分钟</button>
+            <button class="btn btn-secondary" onclick="adjustTime(-5)">-5 分钟</button>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-primary" style="flex:1;" onclick="setToPreset(3, 0)">3:00 整点</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="setToPreset(6, 30)">6:30 半点</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="setToPreset(12, 0)">12:00 正午</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模式二：测验闯关视图 -->
+      <div id="panelQuiz" style="display: none;">
+        <div class="card-section">
+          <div class="card-title">
+            <span>🎯 闯关小考场 (第 <span id="quizQuestionNum">1</span> / 10 题)</span>
+            <button class="sound-btn" onclick="speakQuizPrompt()" title="朗读题目">🔊</button>
+          </div>
+
+          <p id="quizPrompt" style="font-size:16px; font-weight:bold; color:#1e293b; margin:6px 0;">
+            小朋友，看左边表盘，现在是几点几分呢？
+          </p>
+
+          <!-- 4选1 选项区 -->
+          <div class="quiz-options" id="quizOptionsContainer">
+            <!-- 动态注入选项 -->
+          </div>
+
+          <!-- 反馈横幅 -->
+          <div class="feedback-banner" id="feedbackBanner" style="visibility:hidden;">
+            回答正确！真棒！🎉
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top: 12px;">
+            <button class="btn btn-primary" id="nextQuizBtn" style="flex:1;" onclick="generateNextQuiz()">
+              下一题 ➡️
+            </button>
+            <button class="btn btn-secondary" onclick="speakQuizExplanation()">
+              💡 听听名师解析
+            </button>
+          </div>
+        </div>
+
+        <div class="card-section" style="background:#fefce8; border-color:#fde047;">
+          <div style="font-size:14px; color:#854d0e; font-weight:bold;">
+            🌟 关卡难度递进规则：
+          </div>
+          <ul style="font-size:13px; color:#713f12; margin: 6px 0 0 18px; line-height:1.6;">
+            <li><b>关卡 1</b>：完整 1~12 数字 + 外圈分钟提示，看图最容易！</li>
+            <li><b>关卡 2</b>：外圈数字隐去，只留 1~12，需要用到 5 的乘法哦。</li>
+            <li><b>关卡 3</b>：只留 12、3、6、9 四个方位锚点，锻炼空间位置推算。</li>
+            <li><b>关卡 4</b>：数字全部消失！只有纯刻度线，成为认表小大师！</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    /* -------------------------------------------------------------
+       音频系统：采用原生 Web Audio API，无需任何外链音频文件
+       ------------------------------------------------------------- */
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playTickSound() {
+      try {
+        const ctx = getAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      } catch (e) {}
+    }
+
+    function playSuccessSound() {
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        // 吹奏轻快三和弦 C5 -> E5 -> G5 -> C6
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.09);
+          gain.gain.setValueAtTime(0.2, now + i * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.09);
+          osc.stop(now + i * 0.09 + 0.3);
+        });
+      } catch (e) {}
+    }
+
+    function playErrorSound() {
+      try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(150, now + 0.25);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.26);
+      } catch (e) {}
+    }
+
+    /* -------------------------------------------------------------
+       语音合成系统：让浏览器读出亲切的时间中文
+       ------------------------------------------------------------- */
+    function speakText(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = 0.95; // 稍微放慢一点点，便于儿童听清
+      utterance.pitch = 1.1; // 稍微活泼明朗的音调
+      window.speechSynthesis.speak(utterance);
+    }
+
+    /* -------------------------------------------------------------
+       全局状态
+       ------------------------------------------------------------- */
+    const state = {
+      mode: 'learn', // 'learn' | 'quiz'
+      level: 1,      // 1: 完整数字+外圈提示, 2: 仅1~12数字, 3: 仅12/3/6/9, 4: 无任何数字(纯刻度)
+      hour: 10,
+      minute: 10,
+      score: 0,
+      streak: 0,
+      quizCount: 1,
+      targetHour: 10,
+      targetMinute: 10,
+      quizOptions: [],
+      quizLocked: false,
+      isDraggingHand: null, // 'minute' | 'hour' | null
+    };
+
+    const levelDescriptions = {
+      1: "第1关：新手宝宝（全部数字 + 分钟提示）",
+      2: "第2关：初识规律（仅 1~12 数字）",
+      3: "第3关：关键方位（仅 12、3、6、9）",
+      4: "第4关：终极大师（数字完全消失）"
+    };
+
+    /* -------------------------------------------------------------
+       时钟绘制引擎 (Canvas)
+       ------------------------------------------------------------- */
+    const canvas = document.getElementById('clockCanvas');
+    const ctx = canvas.getContext('2d');
+    const SIZE = 640;
+    const CENTER = SIZE / 2;
+    const RADIUS = SIZE / 2 - 32;
+
+    function drawClock() {
+      ctx.clearRect(0, 0, SIZE, SIZE);
+
+      // 1. 表盘外壳与底色
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(CENTER, CENTER, RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = 'rgba(74, 144, 226, 0.15)';
+      ctx.shadowBlur = 24;
+      ctx.fill();
+
+      // 表盘圆边框
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#3b82f6';
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. 刻度线绘制 (60个小刻度，12个大刻度)
+      for (let i = 0; i < 60; i++) {
+        const angle = (i * Math.PI / 30) - Math.PI / 2;
+        const isHourTick = (i % 5 === 0);
+        const tickLength = isHourTick ? 20 : 10;
+        const tickWidth = isHourTick ? 5 : 2;
+
+        const startX = CENTER + Math.cos(angle) * (RADIUS - 16);
+        const startY = CENTER + Math.sin(angle) * (RADIUS - 16);
+        const endX = CENTER + Math.cos(angle) * (RADIUS - 16 - tickLength);
+        const endY = CENTER + Math.sin(angle) * (RADIUS - 16 - tickLength);
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.lineWidth = tickWidth;
+        ctx.strokeStyle = isHourTick ? '#1e293b' : '#94a3b8';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+
+      // 3. 数字呈现（根据当前关卡等级决定显示哪些数字）
+      // Level 1: 完整 1~12，外圈显示 00, 05, 10...
+      // Level 2: 完整 1~12，无外圈
+      // Level 3: 仅显示 12, 3, 6, 9
+      // Level 4: 完全无数字
+      const showAllNumbers = state.level <= 2;
+      const showQuarterNumbers = state.level === 3;
+      const showMinuteHints = state.level === 1;
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (let num = 1; num <= 12; num++) {
+        const angle = (num * Math.PI / 6) - Math.PI / 2;
+
+        // 判断小时数字是否显示
+        let renderThisNumber = false;
+        if (showAllNumbers) {
+          renderThisNumber = true;
+        } else if (showQuarterNumbers && (num === 12 || num === 3 || num === 6 || num === 9)) {
+          renderThisNumber = true;
+        }
+
+        if (renderThisNumber) {
+          const numRadius = RADIUS - 58;
+          const x = CENTER + Math.cos(angle) * numRadius;
+          const y = CENTER + Math.sin(angle) * numRadius;
+
+          ctx.font = 'bold 36px var(--font-family)';
+          ctx.fillStyle = (num === 12 || num === 3 || num === 6 || num === 9) ? '#ef4444' : '#1e3a8a';
+          ctx.fillText(num.toString(), x, y);
+        }
+
+        // 外圈分钟助记提示（关卡 1 专属）
+        if (showMinuteHints) {
+          const minVal = (num * 5) % 60;
+          const minStr = minVal < 10 ? '0' + minVal : '' + minVal;
+          const hintRadius = RADIUS - 16;
+          const hx = CENTER + Math.cos(angle) * (hintRadius - 26);
+          const hy = CENTER + Math.sin(angle) * (hintRadius - 26);
+
+          ctx.font = 'bold 15px var(--font-family)';
+          ctx.fillStyle = '#0284c7';
+          // 小气泡背景
+          ctx.beginPath();
+          ctx.arc(hx, hy, 14, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(224, 242, 254, 0.8)';
+          ctx.fill();
+
+          ctx.fillStyle = '#0369a1';
+          ctx.fillText(minStr, hx, hy);
+        }
+      }
+
+      // 如果关卡是 4 (无字)，在 12 点正上方绘制一个可爱醒目的黄色小皇冠/三角形引导正上方
+      if (state.level === 4) {
+        ctx.beginPath();
+        ctx.moveTo(CENTER, CENTER - RADIUS + 18);
+        ctx.lineTo(CENTER - 12, CENTER - RADIUS + 36);
+        ctx.lineTo(CENTER + 12, CENTER - RADIUS + 36);
+        ctx.closePath();
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+      }
+
+      // 4. 计算指针角度
+      const minuteAngle = (state.minute * 6 - 90) * Math.PI / 180;
+      const hourVal = (state.hour % 12) + (state.minute / 60);
+      const hourAngle = (hourVal * 30 - 90) * Math.PI / 180;
+
+      // 5. 绘制时针 (红色，短而宽)
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(CENTER - Math.cos(hourAngle) * 24, CENTER - Math.sin(hourAngle) * 24);
+      ctx.lineTo(CENTER + Math.cos(hourAngle) * (RADIUS * 0.52), CENTER + Math.sin(hourAngle) * (RADIUS * 0.52));
+      ctx.strokeStyle = '#ff5252';
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(255, 82, 82, 0.4)';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.restore();
+
+      // 6. 绘制分针 (蓝色，长而精巧)
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(CENTER - Math.cos(minuteAngle) * 32, CENTER - Math.sin(minuteAngle) * 32);
+      ctx.lineTo(CENTER + Math.cos(minuteAngle) * (RADIUS * 0.76), CENTER + Math.sin(minuteAngle) * (RADIUS * 0.76));
+      ctx.strokeStyle = '#1976d2';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(25, 118, 210, 0.4)';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.restore();
+
+      // 7. 中心轴帽装饰
+      ctx.beginPath();
+      ctx.arc(CENTER, CENTER, 15, 0, Math.PI * 2);
+      ctx.fillStyle = '#ff9800';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(CENTER, CENTER, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+
+    /* -------------------------------------------------------------
+       时间逻辑与文字解析换算
+       ------------------------------------------------------------- */
+    const chineseNumbers = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
+
+    function getFormattedTime(h, m) {
+      const hDisplay = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+      const hStr = hDisplay < 10 ? '0' + hDisplay : '' + hDisplay;
+      const mStr = m < 10 ? '0' + m : '' + m;
+      return `${hStr}:${mStr}`;
+    }
+
+    function getChineseTimeText(h, m) {
+      const hDisplay = h === 0 ? 12 : (h > 12 ? h - 12 : h);
+      let hourName = (hDisplay === 2) ? "两" : chineseNumbers[hDisplay];
+
+      if (m === 0) {
+        return `${hourName}点整`;
+      } else if (m === 30) {
+        return `${hourName}点半`;
+      } else if (m === 15) {
+        return `${hourName}点一刻 (15分)`;
+      } else if (m === 45) {
+        return `${hourName}点三刻 (45分)`;
+      } else {
+        let minText = "";
+        if (m < 10) {
+          minText = "零" + chineseNumbers[m];
+        } else if (m === 10) {
+          minText = "十";
+        } else if (m < 20) {
+          minText = "十" + chineseNumbers[m % 10];
+        } else {
+          const tens = Math.floor(m / 10);
+          const units = m % 10;
+          minText = chineseNumbers[tens] + "十" + (units > 0 ? chineseNumbers[units] : "");
+        }
+        return `${hourName}点${minText}分`;
+      }
+    }
+
+    function updateDisplay() {
+      drawClock();
+
+      const timeStr = getFormattedTime(state.hour, state.minute);
+      const chineseStr = getChineseTimeText(state.hour, state.minute);
+
+      document.getElementById('digitalDisplay').innerText = timeStr;
+      document.getElementById('chineseDisplay').innerText = chineseStr;
+
+      // 实时解释标签
+      const hDisplay = state.hour === 0 ? 12 : (state.hour > 12 ? state.hour - 12 : state.hour);
+      const nextH = (hDisplay % 12) + 1;
+      let hExp = `<b>时针</b> 指在 <b>${hDisplay}</b> 与 <b>${nextH}</b> 之间，属于 <b>${hDisplay} 点</b> 的地盘！`;
+      if (state.minute === 0) {
+        hExp = `<b>时针</b> 正好指向 <b>${hDisplay}</b>，代表 <b>${hDisplay} 点整</b>。`;
+      }
+      document.getElementById('hourExplanation').innerHTML = hExp;
+
+      const baseNum = Math.floor(state.minute / 5);
+      const rem = state.minute % 5;
+      let mExp = `<b>分针</b> 走了 <b>${state.minute}</b> 个小格，即 <b>${state.minute} 分钟</b>。`;
+      if (baseNum > 0 && rem === 0) {
+        mExp = `<b>分针</b> 指向大数字 <b>${baseNum}</b>，计算口诀：${baseNum} × 5 = <b>${state.minute} 分钟</b>！`;
+      }
+      document.getElementById('minExplanation').innerHTML = mExp;
+    }
+
+    /* -------------------------------------------------------------
+       交互：拖拽分针与时针
+       ------------------------------------------------------------- */
+    function getAngleFromEvent(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const x = clientX - (rect.left + rect.width / 2);
+      const y = clientY - (rect.top + rect.height / 2);
+      let angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
+      if (angle < 0) angle += 360;
+      return angle;
+    }
+
+    function handlePointerDown(e) {
+      // 允许在任何模式下交互，学习模式下联动，测验模式下若在拨针也可使用
+      state.isDraggingHand = 'minute'; // 优先拖动分针最符合儿童操作逻辑
+      handlePointerMove(e);
+    }
+
+    function handlePointerMove(e) {
+      if (!state.isDraggingHand) return;
+      e.preventDefault();
+      const angle = getAngleFromEvent(e);
+
+      // 分针 360 度对应 60 分钟 (1分钟 = 6度)
+      // 吸附到最近的分钟
+      let newMinute = Math.round(angle / 6) % 60;
+
+      // 检测是否跨过了 0 点边界增加/减少小时
+      if (state.minute >= 45 && newMinute <= 15) {
+        state.hour = (state.hour % 12) + 1;
+      } else if (state.minute <= 15 && newMinute >= 45) {
+        state.hour = state.hour === 1 ? 12 : state.hour - 1;
+      }
+
+      if (newMinute !== state.minute) {
+        state.minute = newMinute;
+        playTickSound();
+        updateDisplay();
+      }
+    }
+
+    function handlePointerUp() {
+      state.isDraggingHand = null;
+    }
+
+    canvas.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+
+    canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
+
+    /* -------------------------------------------------------------
+       关卡与模式切换
+       ------------------------------------------------------------- */
+    function setLevel(lvl) {
+      state.level = lvl;
+      document.querySelectorAll('.level-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === lvl);
+      });
+      document.getElementById('levelName').innerText = levelDescriptions[lvl];
+      updateDisplay();
+      playTickSound();
+    }
+
+    function switchMode(mode) {
+      state.mode = mode;
+      document.getElementById('tabLearn').classList.toggle('active', mode === 'learn');
+      document.getElementById('tabQuiz').classList.toggle('active', mode === 'quiz');
+      document.getElementById('panelLearn').style.display = (mode === 'learn') ? 'block' : 'none';
+      document.getElementById('panelQuiz').style.display = (mode === 'quiz') ? 'block' : 'none';
+
+      if (mode === 'quiz') {
+        generateNextQuiz();
+      } else {
+        updateDisplay();
+      }
+      playTickSound();
+    }
+
+    function adjustTime(deltaMinutes) {
+      let total = state.hour * 60 + state.minute + deltaMinutes;
+      if (total < 0) total += 12 * 60;
+      state.hour = Math.floor(total / 60) % 12;
+      if (state.hour === 0) state.hour = 12;
+      state.minute = total % 60;
+      playTickSound();
+      updateDisplay();
+    }
+
+    function setToPreset(h, m) {
+      state.hour = h;
+      state.minute = m;
+      playTickSound();
+      updateDisplay();
+      speakCurrentTime();
+    }
+
+    function speakCurrentTime() {
+      const text = `现在表盘上是${getChineseTimeText(state.hour, state.minute)}`;
+      speakText(text);
+    }
+
+    /* -------------------------------------------------------------
+       测验闯关系统
+       ------------------------------------------------------------- */
+    function generateNextQuiz() {
+      state.quizLocked = false;
+      const feedback = document.getElementById('feedbackBanner');
+      feedback.style.visibility = 'hidden';
+      feedback.className = 'feedback-banner';
+
+      // 根据关卡选择不同精度增加挑战度
+      // Level 1: 整点与半点 (0, 30)
+      // Level 2: 15分钟刻度 (0, 15, 30, 45)
+      // Level 3: 5分钟刻度 (0, 5, 10, ... 55)
+      // Level 4: 包含任意精细分钟 (0~59)
+      const randomHour = Math.floor(Math.random() * 12) + 1;
+      let randomMinute;
+      if (state.level === 1) {
+        randomMinute = Math.random() < 0.5 ? 0 : 30;
+      } else if (state.level === 2) {
+        const pool = [0, 15, 30, 45];
+        randomMinute = pool[Math.floor(Math.random() * pool.length)];
+      } else if (state.level === 3) {
+        randomMinute = Math.floor(Math.random() * 12) * 5;
+      } else {
+        randomMinute = Math.floor(Math.random() * 60);
+      }
+
+      state.targetHour = randomHour;
+      state.targetMinute = randomMinute;
+      state.hour = randomHour;
+      state.minute = randomMinute;
+
+      updateDisplay();
+
+      // 生成选项：1个正确答案，3个干扰项（包括经典的“时分颠倒”干扰）
+      const correctTimeStr = getFormattedTime(randomHour, randomMinute);
+      const options = new Set([correctTimeStr]);
+
+      // 干扰项 1: 时针分针看反
+      const flippedMin = (randomHour * 5) % 60;
+      const flippedHour = Math.floor(randomMinute / 5) === 0 ? 12 : Math.floor(randomMinute / 5);
+      const flippedStr = getFormattedTime(flippedHour, flippedMin);
+      if (flippedStr !== correctTimeStr) options.add(flippedStr);
+
+      // 干扰项 2 & 3: 差 1 小时或差 5~15 分钟
+      while (options.size < 4) {
+        const offsetH = (randomHour + (Math.random() < 0.5 ? 1 : 11)) % 12 || 12;
+        let offsetM = (randomMinute + (Math.random() < 0.5 ? 10 : 50)) % 60;
+        if (state.level <= 3) offsetM = Math.floor(offsetM / 5) * 5;
+        options.add(getFormattedTime(offsetH, offsetM));
+      }
+
+      const optArray = Array.from(options).sort(() => Math.random() - 0.5);
+      state.quizOptions = optArray;
+
+      // 渲染选项按钮
+      const container = document.getElementById('quizOptionsContainer');
+      container.innerHTML = '';
+      optArray.forEach(opt => {
+        const btn = document.createElement('div');
+        btn.className = 'opt-card';
+        btn.innerText = opt;
+        btn.onclick = () => checkQuizAnswer(opt, btn);
+        container.appendChild(btn);
+      });
+
+      document.getElementById('quizQuestionNum').innerText = state.quizCount;
+    }
+
+    function checkQuizAnswer(selectedTime, cardElement) {
+      if (state.quizLocked) return;
+      state.quizLocked = true;
+
+      const correctTime = getFormattedTime(state.targetHour, state.targetMinute);
+      const feedback = document.getElementById('feedbackBanner');
+      feedback.style.visibility = 'visible';
+
+      if (selectedTime === correctTime) {
+        cardElement.classList.add('correct');
+        feedback.className = 'feedback-banner success';
+        feedback.innerHTML = `🎉 太聪明了！回答完全正确（${getChineseTimeText(state.targetHour, state.targetMinute)}）！`;
+        playSuccessSound();
+        triggerConfetti();
+
+        state.score += 10;
+        state.streak += 1;
+        updateBadge();
+
+        speakText(`太棒啦！回答正确，就是${getChineseTimeText(state.targetHour, state.targetMinute)}！`);
+      } else {
+        cardElement.classList.add('wrong');
+        feedback.className = 'feedback-banner fail';
+        feedback.innerHTML = `😮 哎呀看错啦，正确答案是 <b>${correctTime}</b> (${getChineseTimeText(state.targetHour, state.targetMinute)})`;
+        playErrorSound();
+
+        state.streak = 0;
+        // 高亮正确答案
+        document.querySelectorAll('.opt-card').forEach(c => {
+          if (c.innerText === correctTime) c.classList.add('correct');
+        });
+        updateBadge();
+        speakText(`别灰心，正确时间是${getChineseTimeText(state.targetHour, state.targetMinute)}。点击下方可以听名师解析哦！`);
+      }
+
+      state.quizCount++;
+    }
+
+    function updateBadge() {
+      document.getElementById('scoreText').innerText = state.score;
+      document.getElementById('streakText').innerText = state.streak;
+
+      let rank = "钟表学徒";
+      if (state.score >= 100) rank = "👑 时间大魔法师";
+      else if (state.score >= 60) rank = "🏆 识表小神童";
+      else if (state.score >= 30) rank = "⭐ 进阶探险家";
+
+      document.getElementById('rankTitle').innerText = rank;
+    }
+
+    function speakQuizPrompt() {
+      speakText("小朋友，请看左边的钟表，时针和分针指的是几点几分呢？在右边选出你的答案吧！");
+    }
+
+    function speakQuizExplanation() {
+      const h = state.targetHour;
+      const m = state.targetMinute;
+      const text = `这道题的答案是${getChineseTimeText(h, m)}。看，红色的短粗时针指向${h}，蓝色的细长分针指向${m}分。`;
+      speakText(text);
+    }
+
+    /* -------------------------------------------------------------
+       五彩纸屑喷花动画 (Confetti Effect)
+       ------------------------------------------------------------- */
+    const confCanvas = document.getElementById('confettiCanvas');
+    const confCtx = confCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeConfetti() {
+      confCanvas.width = window.innerWidth;
+      confCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeConfetti);
+    resizeConfetti();
+
+    function triggerConfetti() {
+      particles = [];
+      const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+      for (let i = 0; i < 70; i++) {
+        particles.push({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2 - 50,
+          vx: (Math.random() - 0.5) * 14,
+          vy: (Math.random() - 0.8) * 16,
+          size: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          vRot: (Math.random() - 0.5) * 10,
+          alpha: 1
+        });
+      }
+      renderConfetti();
+    }
+
+    function renderConfetti() {
+      confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+      let alive = false;
+
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.35; // 重力
+        p.rotation += p.vRot;
+        p.alpha -= 0.012;
+
+        if (p.alpha > 0) {
+          alive = true;
+          confCtx.save();
+          confCtx.translate(p.x, p.y);
+          confCtx.rotate(p.rotation * Math.PI / 180);
+          confCtx.fillStyle = p.color;
+          confCtx.globalAlpha = Math.max(0, p.alpha);
+          confCtx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          confCtx.restore();
+        }
+      });
+
+      if (alive) {
+        requestAnimationFrame(renderConfetti);
+      } else {
+        confCtx.clearRect(0, 0, confCanvas.width, confCanvas.height);
+      }
+    }
+
+    // 初始化运行
+    updateDisplay();
+  </script>
+</body>
+</html>
