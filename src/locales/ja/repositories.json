@@ -1,7 +1,16 @@
 {
   "batchStar": {
     "title": "リンクからスター",
-    "hint": "動画の要約など、GitHub リンクを含む文章を貼り付けてください。スターを付ける前にリポジトリを確認します。他のサイトのリンクは無視されます。",
+    "hint": "GitHub リンクを含むテキストを貼り付け、リポジトリを確認してから Star を付けます。他のサイトのリンクは無視されます。",
+    "history": "貼り付け履歴",
+    "history-hint": "履歴を選んで本文を編集し、変更を保存するか再プレビューできます。生成日時が新しい順に最大10件をこの端末だけに保存します。",
+    "history-empty": "貼り付け履歴はまだありません",
+    "save-history": "履歴の変更を保存",
+    "history-error": "貼り付け履歴を読み込み、または保存できませんでした。",
+    "view-readme": "{{name}} の README を表示",
+    "open-github": "GitHub で {{name}} を開く",
+    "readme-load-error": "README を読み込めませんでした。この画面を閉じて一括インポートに戻ってください。",
+    "loading-readme": "README を読み込み中…",
     "input-label": "リポジトリのリンクを含む文章",
     "placeholder": "GitHub のリンクを含む文章や Markdown を貼り付け…",
     "close": "閉じる",

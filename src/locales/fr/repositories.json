@@ -1,7 +1,16 @@
 {
   "batchStar": {
     "title": "Ajouter des étoiles depuis des liens",
-    "hint": "Collez un résumé vidéo ou un texte contenant des liens GitHub. Vérifiez les dépôts avant d’ajouter des étoiles. Les autres sites sont ignorés.",
+    "hint": "Collez un texte contenant des liens GitHub, vérifiez les dépôts, puis ajoutez une étoile. Les liens vers les autres sites sont ignorés.",
+    "history": "Historique des textes",
+    "history-hint": "Choisissez une entrée pour la modifier, enregistrer les changements ou relancer l’aperçu. Les dix entrées générées les plus récentes sont conservées uniquement sur cet appareil.",
+    "history-empty": "Aucun historique pour le moment",
+    "save-history": "Enregistrer les modifications",
+    "history-error": "Impossible de lire ou d’enregistrer l’historique.",
+    "view-readme": "Voir le README de {{name}}",
+    "open-github": "Ouvrir {{name}} sur GitHub",
+    "readme-load-error": "Impossible de charger le README. Fermez cette vue pour revenir à l’importation.",
+    "loading-readme": "Chargement du README…",
     "input-label": "Texte contenant des liens de dépôts",
     "placeholder": "Collez du texte ou du Markdown avec des liens GitHub…",
     "close": "Fermer",

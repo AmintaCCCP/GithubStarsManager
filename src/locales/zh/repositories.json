@@ -1,7 +1,16 @@
 {
   "batchStar": {
     "title": "从链接批量 Star",
-    "hint": "粘贴视频省流或任何包含 GitHub 链接的文字，确认仓库后再 Star。其他网站的链接会被忽略。",
+    "hint": "粘贴任何包含 GitHub 链接的文字，确认仓库后再 Star。其他网站的链接会被忽略。",
+    "history": "粘贴历史",
+    "history-hint": "选择历史可编辑原文，保存修改或重新预览。按最近生成时间排序，最多保留 10 条，仅保存在本机。",
+    "history-empty": "暂无粘贴历史",
+    "save-history": "保存历史修改",
+    "history-error": "无法读取或保存粘贴历史。",
+    "view-readme": "查看 {{name}} 的 README",
+    "open-github": "在 GitHub 打开 {{name}}",
+    "readme-load-error": "无法加载 README，请关闭后返回批量导入。",
+    "loading-readme": "正在加载 README…",
     "input-label": "包含仓库链接的文字",
     "placeholder": "粘贴含 GitHub 仓库链接的文字或 Markdown…",
     "close": "关闭",

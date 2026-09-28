@@ -1,7 +1,16 @@
 {
   "batchStar": {
     "title": "從連結批次 Star",
-    "hint": "貼上影片摘要或任何包含 GitHub 連結的文字，確認儲存庫後再 Star。其他網站的連結會被忽略。",
+    "hint": "貼上任何包含 GitHub 連結的文字，確認儲存庫後再 Star。其他網站的連結會被忽略。",
+    "history": "貼上歷史",
+    "history-hint": "選取歷史可編輯原文、儲存修改或重新預覽。依最近產生時間排序，最多保留 10 筆，僅儲存在此裝置。",
+    "history-empty": "尚無貼上歷史",
+    "save-history": "儲存歷史修改",
+    "history-error": "無法讀取或儲存貼上歷史。",
+    "view-readme": "檢視 {{name}} 的 README",
+    "open-github": "在 GitHub 開啟 {{name}}",
+    "readme-load-error": "無法載入 README，請關閉後返回批次匯入。",
+    "loading-readme": "正在載入 README…",
     "input-label": "包含儲存庫連結的文字",
     "placeholder": "貼上含 GitHub 儲存庫連結的文字或 Markdown…",
     "close": "關閉",

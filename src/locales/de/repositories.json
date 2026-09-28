@@ -1,7 +1,16 @@
 {
   "batchStar": {
     "title": "Sterne aus Links hinzufügen",
-    "hint": "Füge eine Videozusammenfassung oder Text mit GitHub-Links ein. Prüfe die Repositorys vor dem Markieren. Andere Websites werden ignoriert.",
+    "hint": "Füge beliebigen Text mit GitHub-Links ein, prüfe die Repositorys und vergib Sterne. Links zu anderen Websites werden ignoriert.",
+    "history": "Einfügeverlauf",
+    "history-hint": "Wähle einen Eintrag zum Bearbeiten, Speichern oder erneuten Anzeigen der Vorschau. Die zehn zuletzt erzeugten Einträge werden nur auf diesem Gerät gespeichert.",
+    "history-empty": "Noch kein Einfügeverlauf",
+    "save-history": "Verlaufsänderungen speichern",
+    "history-error": "Der Verlauf konnte nicht gelesen oder gespeichert werden.",
+    "view-readme": "README von {{name}} anzeigen",
+    "open-github": "{{name}} auf GitHub öffnen",
+    "readme-load-error": "README konnte nicht geladen werden. Schließen Sie diese Ansicht, um zum Stapelimport zurückzukehren.",
+    "loading-readme": "README wird geladen…",
     "input-label": "Text mit Repository-Links",
     "placeholder": "Text oder Markdown mit GitHub-Links einfügen…",
     "close": "Schließen",

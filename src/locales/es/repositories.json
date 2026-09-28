@@ -1,7 +1,16 @@
 {
   "batchStar": {
     "title": "Marcar desde enlaces",
-    "hint": "Pega un resumen de vídeo o un texto con enlaces de GitHub. Revisa los repositorios antes de marcarlos. Se ignoran otros sitios.",
+    "hint": "Pega cualquier texto con enlaces de GitHub, revisa los repositorios y márcalos con Star. Se ignoran los enlaces a otros sitios.",
+    "history": "Historial de texto",
+    "history-hint": "Elige una entrada para editarla, guardar los cambios o generar otra vista previa. Las diez entradas generadas más recientemente se guardan solo en este dispositivo.",
+    "history-empty": "Aún no hay historial",
+    "save-history": "Guardar cambios del historial",
+    "history-error": "No se pudo leer o guardar el historial.",
+    "view-readme": "Ver README de {{name}}",
+    "open-github": "Abrir {{name}} en GitHub",
+    "readme-load-error": "No se pudo cargar el README. Cierre esta vista para volver a la importación.",
+    "loading-readme": "Cargando README…",
     "input-label": "Texto con enlaces a repositorios",
     "placeholder": "Pega texto o Markdown con enlaces de GitHub…",
     "close": "Cerrar",
