@@ -47,7 +47,7 @@
       "repo-picker-empty": "No matching repositories",
       "repo-picker-no-release-repos": "No repositories with Release subscriptions yet",
       "repo-picker-done": "Done",
-      "tip-body": "Include keywords match release asset file names: an asset matching any include keyword and none of the exclude keywords hits this filter. Keyword matching never trims the asset list shown on a release card.",
+      "tip-body": "Include keywords work on two levels: a release appears in the list when one of its assets matches an include keyword and no exclude keyword, and its card lists only the matching assets by default — use “Show all” to reveal the rest. Repositories on the always-include list bypass the keyword check.",
       "cancel": "Cancel",
       "save": "Save",
       "create": "Create"

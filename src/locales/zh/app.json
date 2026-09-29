@@ -47,7 +47,7 @@
       "repo-picker-empty": "没有匹配的仓库",
       "repo-picker-no-release-repos": "暂无已关注 Release 的仓库",
       "repo-picker-done": "完成",
-      "tip-body": "包含关键词匹配 Release 资产文件名：命中任一包含关键词且不含排除关键词的资产即可命中本过滤器。关键词匹配不裁剪 Release 卡片中的资产清单。",
+      "tip-body": "包含关键词同时作用于两层：Release 层面，命中任一包含关键词且不含排除关键词的资产才会出现在列表中；资产层面，卡片默认只列出命中的资产，未命中的资产可用「显示全部」展开。始终包含的仓库可绕过关键词判断。",
       "cancel": "取消",
       "save": "保存",
       "create": "创建"

@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { filterMatchesRelease, normalizeAssetFilters } from './assetFilters';
+import {
+  evaluateAssetFilter,
+  normalizeAssetFilters,
+  normalizeMatchedLinkName,
+} from './assetFilters';
+
+/** 两层共用同一个求值器：测试里拆出两个便捷断言，避免与生产实现各自演化。 */
+const releaseMatches = (
+  filter: Parameters<typeof evaluateAssetFilter>[0],
+  repoKey: string,
+  allLinkNames: string[] = [],
+  realAssetNames: string[] = allLinkNames,
+): boolean => evaluateAssetFilter(filter, repoKey, allLinkNames, realAssetNames).matchesRelease;
+
+/** 该过滤器贡献的资产索引（升序），语义见 evaluateAssetFilter 的资产级规则。 */
+const matchedIndexes = (
+  filter: Parameters<typeof evaluateAssetFilter>[0],
+  repoKey: string,
+  allLinkNames: string[] = [],
+  realAssetNames: string[] = allLinkNames,
+): number[] => [...evaluateAssetFilter(filter, repoKey, allLinkNames, realAssetNames).matchedLinkIndexes];
 
 describe('normalizeAssetFilters', () => {
   it('strips the obsolete excludeRepos field from persisted filters', () => {
@@ -174,14 +194,14 @@ describe('normalizeAssetFilters', () => {
   });
 });
 
-describe('filterMatchesRelease', () => {
+describe('evaluateAssetFilter（Release 级命中）', () => {
   // 调用方传入的列表均已小写（与 ReleaseTimeline 的 lowerLinkNames 做法一致）
   const match = (
-    filter: Parameters<typeof filterMatchesRelease>[0],
+    filter: Parameters<typeof evaluateAssetFilter>[0],
     repoKey: string,
     allLinkNames: string[] = [],
     realAssetNames: string[] = allLinkNames,
-  ) => filterMatchesRelease(filter, repoKey, allLinkNames, realAssetNames);
+  ) => releaseMatches(filter, repoKey, allLinkNames, realAssetNames);
 
   it('lets alwaysExcludeRepos win over includeRepos and keywords in the same filter', () => {
     const filter = {
@@ -266,5 +286,114 @@ describe('filterMatchesRelease', () => {
     expect(match({ keywords: [] }, 'owner/a', ['app.zip'])).toBe(false);
     // 含空字符串关键词的畸形 filter 不得变相匹配所有 Release
     expect(match({ keywords: [''] }, 'owner/a', ['app.zip'])).toBe(false);
+  });
+});
+
+describe('normalizeMatchedLinkName', () => {
+  it('strips the archive suffix GitHub appends to source-code pseudo assets', () => {
+    // 每个 Release 都存在这两条伪资产：原样参与匹配会让 zip / tar.gz 命中所有 Release
+    expect(normalizeMatchedLinkName('source code (v1.2.0.zip)', true)).toBe('source code (v1.2.0)');
+    expect(normalizeMatchedLinkName('source code (v1.2.0.tar.gz)', true)).toBe('source code (v1.2.0)');
+  });
+
+  it('leaves real uploaded assets and body-extracted links untouched', () => {
+    expect(normalizeMatchedLinkName('app-1.0.zip', false)).toBe('app-1.0.zip');
+    expect(normalizeMatchedLinkName('app-1.0.tar.gz', false)).toBe('app-1.0.tar.gz');
+    expect(normalizeMatchedLinkName('download-setup.exe', false)).toBe('download-setup.exe');
+  });
+
+  it('keeps the source keyword able to hit source archives (preset-source)', () => {
+    const sourceFilter = { keywords: ['source'] };
+    const allLinkNames = [
+      'binary.bin',
+      normalizeMatchedLinkName('source code (v1.zip)', true),
+    ];
+    expect(releaseMatches(sourceFilter, 'owner/a', allLinkNames, ['binary.bin'])).toBe(true);
+  });
+
+  it('stops a zip-only filter from matching a release that has no real zip asset', () => {
+    // 复刻线上误报：MinerU 只上传 .whl，cline / openclaw 干脆零资产，
+    // 却因为 "Source code (<tag>.zip)" 出现在 macOS（含 zip 关键词）过滤结果里
+    const zipFilter = { keywords: ['zip'] };
+    const pseudoOnlyLinks = [
+      'mineru-4.0.0-py3-none-any.whl',
+      normalizeMatchedLinkName('source code (mineru-4.0.0-released.zip)', true),
+      normalizeMatchedLinkName('source code (mineru-4.0.0-released.tar.gz)', true),
+    ];
+    expect(
+      releaseMatches(zipFilter, 'opendatalab/mineru', pseudoOnlyLinks, ['mineru-4.0.0-py3-none-any.whl']),
+    ).toBe(false);
+
+    // 真实上传的 zip 资产仍然命中
+    const realZipLinks = ['app-1.0.zip', normalizeMatchedLinkName('source code (v1.zip)', true)];
+    expect(releaseMatches(zipFilter, 'owner/a', realZipLinks, ['app-1.0.zip'])).toBe(true);
+  });
+});
+
+describe('evaluateAssetFilter（资产级裁剪）', () => {
+  // 调用方传入的链接名已小写、并已按 normalizeMatchedLinkName 归一化
+  const linkNames = ['app-macos.dmg', 'app-setup.exe', 'app-linux.appimage'];
+
+  it('keeps only the links hitting an include keyword', () => {
+    expect(matchedIndexes({ keywords: ['mac'] }, 'owner/a', linkNames)).toEqual([0]);
+    expect(matchedIndexes({ keywords: ['app'] }, 'owner/a', linkNames)).toEqual([0, 1, 2]);
+  });
+
+  it('keeps only the links hitting any of several include keywords (需求场景：macos / arm64)', () => {
+    const armNames = [
+      'koreader-macos-11.0-arm64-v1.7z',
+      'koreader-android-arm64-v1.apk',
+      'koreader-appimage-x86_64-v1.AppImage',
+      'koreader_1-1_amd64.deb',
+    ];
+    // macos 命中第 1 项、arm64 命中第 1、2 项 → 只保留 1、2
+    expect(matchedIndexes({ keywords: ['macos', 'arm64'] }, 'koreader/koreader', armNames))
+      .toEqual([0, 1]);
+  });
+
+  it('drops links hitting an exclude keyword, and treats empty include keywords as no restriction', () => {
+    expect(matchedIndexes({ keywords: [], excludeKeywords: ['setup'] }, 'owner/a', linkNames))
+      .toEqual([0, 2]);
+    expect(matchedIndexes({ keywords: ['app'], excludeKeywords: ['setup'] }, 'owner/a', linkNames))
+      .toEqual([0, 2]);
+  });
+
+  it('returns every index for always-included repos and none for always-excluded repos', () => {
+    expect(matchedIndexes({ keywords: ['mac'], includeRepos: ['owner/a'] }, 'owner/a', linkNames))
+      .toEqual([0, 1, 2]);
+    expect(matchedIndexes({ keywords: ['mac'], alwaysExcludeRepos: ['owner/a'] }, 'owner/a', linkNames))
+      .toEqual([]);
+  });
+
+  it('does not restrict assets for pure repo-rule filters and contributes nothing outside a whitelist', () => {
+    expect(matchedIndexes({ keywords: [], alwaysExcludeRepos: ['owner/other'] }, 'owner/a', linkNames))
+      .toEqual([0, 1, 2]);
+    expect(matchedIndexes({ keywords: [], includeRepos: ['owner/b'] }, 'owner/a', linkNames))
+      .toEqual([]);
+  });
+
+  it('contributes nothing for a rule-less filter (audit: it must not unlock every asset list)', () => {
+    // 空规则过滤器既不命中任何 Release，也不能贡献资产——否则被其它过滤器筛出的
+    // Release 会因为它而展示全部资产
+    expect(matchedIndexes({ keywords: [] }, 'owner/a', linkNames)).toEqual([]);
+    expect(matchedIndexes({ keywords: [''] }, 'owner/a', linkNames)).toEqual([]);
+    expect(releaseMatches({ keywords: [] }, 'owner/a', linkNames)).toBe(false);
+  });
+
+  it('contributes nothing when the filter misses the release (visible release ⇒ visible asset)', () => {
+    const evaluation = evaluateAssetFilter({ keywords: ['mac'] }, 'owner/a', ['linux.appimage'], ['linux.appimage']);
+    expect(evaluation.matchesRelease).toBe(false);
+    expect(evaluation.matchedLinkIndexes.size).toBe(0);
+  });
+
+  it('never counts the auto-generated source archive for zip-like keywords', () => {
+    const archiveNames = [
+      ...linkNames.map(name => normalizeMatchedLinkName(name, false)),
+      normalizeMatchedLinkName('source code (v1.zip)', true),
+    ];
+    expect(archiveNames[3]).toBe('source code (v1)');
+    expect(matchedIndexes({ keywords: ['zip'] }, 'owner/a', archiveNames)).toEqual([]);
+    // source 关键词依然命中源码归档条目（preset-source 行为不变）
+    expect(matchedIndexes({ keywords: ['source'] }, 'owner/a', archiveNames)).toEqual([3]);
   });
 });

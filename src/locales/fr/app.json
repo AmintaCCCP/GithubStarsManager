@@ -47,7 +47,7 @@
       "repo-picker-empty": "Aucun dépôt correspondant",
       "repo-picker-no-release-repos": "Aucun dépôt avec des releases suivies pour le moment",
       "repo-picker-done": "Terminé",
-      "tip-body": "Les mots-clés inclus s’appliquent aux noms de fichiers des releases : un fichier correspond s’il contient un mot-clé inclus et aucun mot-clé exclu. La correspondance par mots-clés ne rogne jamais la liste des fichiers affichée sur la carte d’un release.",
+      "tip-body": "Les mots-clés inclus agissent sur deux niveaux : un release apparaît dans la liste lorsqu’un de ses fichiers correspond à un mot-clé inclus et à aucun mot-clé exclu, et sa carte n’affiche par défaut que les fichiers correspondants (bouton « Afficher tous » pour le reste). Les dépôts de la liste d’inclusion contournent le test des mots-clés.",
       "cancel": "Annuler",
       "save": "Enregistrer",
       "create": "Créer"

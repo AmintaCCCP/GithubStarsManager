@@ -290,12 +290,12 @@ describe('ReleaseTimeline asset filter matching', () => {
     expect(await screen.findByText('owner/alpha')).toBeInTheDocument();
   });
 
-  it('does not trim the asset list of a matching release (filter decides visibility only)', async () => {
+  it('lists only the keyword-matching assets and reveals the rest on demand', async () => {
     const user = userEvent.setup();
     const alpha = makeRepo(7, 'alpha', 'owner/alpha');
     storeState.repositories = [alpha];
     storeState.releaseSubscriptions = new Set([alpha.id]);
-    // app-setup.exe 不命中 portable 关键词，但命中的 Release 仍要展示全部资产
+    // app-setup.exe 不命中 portable 关键词：默认不列出，但可用「显示全部」展开
     storeState.releases = [makeRepoRelease(101, alpha, ['app-portable.zip', 'app-setup.exe'])];
     activateFilter();
 
@@ -304,7 +304,84 @@ describe('ReleaseTimeline asset filter matching', () => {
     await user.click(assetToggles[0]);
 
     expect(await screen.findByText('app-portable.zip')).toBeInTheDocument();
-    expect(screen.getByText('app-setup.exe')).toBeInTheDocument();
+    expect(screen.queryByText('app-setup.exe')).not.toBeInTheDocument();
+
+    // 卡片提供展开全部资产的入口，并在展开后允许收回
+    await user.click(screen.getByRole('button', { name: '显示全部 2 个' }));
+    expect(await screen.findByText('app-setup.exe')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '仅显示命中的 1 个' }));
+    expect(screen.queryByText('app-setup.exe')).not.toBeInTheDocument();
+  });
+
+  it('keeps only assets whose names hit the include keywords (macos / arm64), source archives excluded', async () => {
+    const user = userEvent.setup();
+    const alpha = makeRepo(7, 'alpha', 'owner/alpha');
+    const release = makeRepoRelease(601, alpha, [
+      'koreader-macos-11.0-arm64-v1.7z',
+      'koreader-android-x86-v1.apk',
+      'koreader-appimage-aarch64-latest-nightly',
+    ]);
+    // GitHub 为每个 Release 自动生成的源码归档伪资产：含 zip/mac 的都不该被展示
+    release.zipball_url = 'https://github.com/owner/alpha/zipball/v601';
+    release.tarball_url = 'https://github.com/owner/alpha/tarball/v601';
+    storeState.repositories = [alpha];
+    storeState.releaseSubscriptions = new Set([alpha.id]);
+    storeState.releases = [release];
+    activateFilter({ id: 'f1', name: 'macOS', keywords: ['macos', 'arm64'] });
+
+    render(<ReleaseTimeline />);
+    const assetToggles = await screen.findAllByRole('button', { name: '显示下载资产' });
+    await user.click(assetToggles[0]);
+
+    // 只保留名称含 macos 或 arm64 的那一项
+    expect(await screen.findByText('koreader-macos-11.0-arm64-v1.7z')).toBeInTheDocument();
+    expect(screen.queryByText('koreader-android-x86-v1.apk')).not.toBeInTheDocument();
+    expect(screen.queryByText('koreader-appimage-aarch64-latest-nightly')).not.toBeInTheDocument();
+    expect(screen.queryByText('Source code (v601.zip)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Source code (v601.tar.gz)')).not.toBeInTheDocument();
+    // 3 个真实资产 + 2 个源码归档被折叠，计数跟随可见项
+    expect(screen.getByText('(1)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '显示全部 5 个' })).toBeInTheDocument();
+  });
+
+  it('shows every asset of an always-included repository even when keywords miss them', async () => {
+    const user = userEvent.setup();
+    const beta = makeRepo(8, 'beta', 'owner/beta');
+    storeState.repositories = [beta];
+    storeState.releaseSubscriptions = new Set([beta.id]);
+    storeState.releases = [makeRepoRelease(201, beta, ['beta-1.0.zip', 'beta-1.0.exe'])];
+    // includeRepos 绕过关键词判断：该仓库的 Release 不受资产级裁剪
+    activateFilter({ id: 'f1', name: 'Portable', keywords: ['portable'], includeRepos: ['owner/beta'] });
+
+    render(<ReleaseTimeline />);
+    const assetToggles = await screen.findAllByRole('button', { name: '显示下载资产' });
+    await user.click(assetToggles[0]);
+
+    expect(await screen.findByText('beta-1.0.zip')).toBeInTheDocument();
+    expect(screen.getByText('beta-1.0.exe')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /显示全部/ })).not.toBeInTheDocument();
+  });
+
+  it('ignores the auto-generated source archives when matching include keywords', async () => {
+    const alpha = makeRepo(7, 'alpha', 'owner/alpha');
+    const beta = makeRepo(8, 'beta', 'owner/beta');
+    // 复刻线上误报：GitHub 给每个 Release 都挂 "Source code (<tag>.zip)"，
+    // 于是只要关键词里有 zip，零资产或纯 .whl 的 Release 也会出现在过滤结果里。
+    const whlOnly = makeRepoRelease(101, alpha, ['mineru-4.0.0-py3-none-any.whl']);
+    whlOnly.zipball_url = 'https://github.com/owner/alpha/zipball/v101';
+    whlOnly.tarball_url = 'https://github.com/owner/alpha/tarball/v101';
+    const realZip = makeRepoRelease(201, beta, ['app-1.0.zip']);
+    realZip.zipball_url = 'https://github.com/owner/beta/zipball/v201';
+
+    storeState.repositories = [alpha, beta];
+    storeState.releaseSubscriptions = new Set([alpha.id, beta.id]);
+    storeState.releases = [whlOnly, realZip];
+    activateFilter({ id: 'f1', name: 'Zip', keywords: ['zip'] });
+
+    render(<ReleaseTimeline />);
+    expect(await screen.findByText('owner/beta')).toBeInTheDocument();
+    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
   });
 });
 

@@ -45,7 +45,10 @@ const AssetUpdatedTime = ({ updatedAt, language }: { updatedAt?: string; languag
 
 interface ReleaseCardProps {
   release: Release;
+  /** 默认展示的下载链接：已启用过滤器时只有命中过滤器的资产 */
   downloadLinks: DownloadLink[];
+  /** 该 Release 的全部下载链接（未裁剪）；省略时视为与 downloadLinks 相同 */
+  allDownloadLinks?: DownloadLink[];
   isUnread: boolean;
   isAssetsExpanded: boolean;
   isReleaseNotesExpanded: boolean;
@@ -64,6 +67,7 @@ interface ReleaseCardProps {
 const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   release,
   downloadLinks,
+  allDownloadLinks,
   isUnread,
   isAssetsExpanded,
   isReleaseNotesExpanded,
@@ -92,6 +96,25 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   // 卡片卸载时的请求取消由 hook 的 unmount 副作用承担（卡片卸载即 hook 卸载）。
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const summary = useMemo(() => summaries[release.id] ?? { status: 'idle' as const }, [summaries, release.id]);
+
+  // 资产清单裁剪：已启用过滤器命中的资产默认展示，未命中的资产由用户按需展开。
+  // 「展开全部」状态用**当前命中资产集合的签名**记录，而不是布尔值：过滤器被切换、
+  // 或关键词被编辑导致命中集合变化时自动回到「只显示命中的资产」，避免旧的展开态
+  // 让人再次误以为过滤器没生效（审计发现）。展开态留在卡片内、不持久化，与资产/日志/
+  // 总结展开态一致。
+  const everyDownloadLink = allDownloadLinks ?? downloadLinks;
+  const hiddenDownloadCount = Math.max(everyDownloadLink.length - downloadLinks.length, 0);
+  const matchedLinksSignature = downloadLinks.map(link => link.name).join('\u0000');
+  const [expandedAllSignature, setExpandedAllSignature] = useState<string | null>(null);
+  const isShowingAllAssets = hiddenDownloadCount > 0 && expandedAllSignature === matchedLinksSignature;
+  const visibleDownloadLinks = isShowingAllAssets ? everyDownloadLink : downloadLinks;
+
+  const handleToggleAllAssets = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedAllSignature(current =>
+      current === matchedLinksSignature ? null : matchedLinksSignature
+    );
+  }, [matchedLinksSignature]);
 
   // 完成或失败后自动展开（原 runSummaryAnalysis 成功/失败分支的 setIsSummaryExpanded(true)）
   useEffect(() => {
@@ -185,7 +208,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               {downloadLinks.length > 0 && (
                 <div className="flex items-center gap-1.5">
                   <Download className="w-3.5 h-3.5" />
-                  <span>{downloadLinks.length}</span>
+                  <span>{visibleDownloadLinks.length}</span>
                 </div>
               )}
             </div>
@@ -284,21 +307,36 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       >
         <div className="overflow-hidden min-h-0">
           <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-3 sm:pt-4 border-t border-border dark:border-border">
-          {isAssetsExpanded && downloadLinks.length > 0 && (
+          {isAssetsExpanded && visibleDownloadLinks.length > 0 && (
             <div className="py-2">
               <ReleasePluginRecommendations release={release} language={language} />
-              <div className="flex items-center space-x-2 mb-3">
-                <FileArchive className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground" />
-                <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
-                  {t('releaseCard.download-files')}
-                </span>
-                <span className="text-xs text-muted-foreground dark:text-muted-foreground">
-                  ({downloadLinks.length})
-                </span>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <FileArchive className="w-3.5 h-3.5 text-muted-foreground dark:text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs font-medium text-foreground dark:text-muted-foreground">
+                    {t('releaseCard.download-files')}
+                  </span>
+                  <span className="text-xs text-muted-foreground dark:text-muted-foreground">
+                    ({visibleDownloadLinks.length})
+                  </span>
+                </div>
+                {hiddenDownloadCount > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleToggleAllAssets}
+                    aria-pressed={isShowingAllAssets}
+                    className="h-auto flex-shrink-0 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 dark:text-primary dark:hover:bg-primary/20"
+                  >
+                    {isShowingAllAssets
+                      ? t('releaseCard.show-matching-assets-only', { count: downloadLinks.length })
+                      : t('releaseCard.show-all-assets', { count: everyDownloadLink.length })}
+                  </Button>
+                )}
               </div>
 
               <div className="ui-inset-surface max-h-72 overflow-hidden overflow-y-auto">
-                {downloadLinks.map((link, index) => {
+                {visibleDownloadLinks.map((link, index) => {
                   const isRpcEnabled = rpcDownloadConfig.enabled;
                   // 与 sendRpcDownload 使用相同的版本化 key
                   const rpcKey = computeRpcDownloadKey(link);

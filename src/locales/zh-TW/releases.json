@@ -61,6 +61,8 @@
     "unsubscribe-from-releases": "取消訂閱 Release",
     "view-on-github": "在GitHub上查看",
     "download-files": "下載文件",
+    "show-all-assets": "顯示全部 {{count}} 個",
+    "show-matching-assets-only": "僅顯示命中的 {{count}} 個",
     "asset-updated": "資產已更新",
     "downloads": "下載",
     "release-notes": "Release 說明",

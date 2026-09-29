@@ -47,7 +47,7 @@
       "repo-picker-empty": "Keine passenden Repositories",
       "repo-picker-no-release-repos": "Noch keine Repositories mit Release-Abos",
       "repo-picker-done": "Fertig",
-      "tip-body": "Einschluss-Schlüsselwörter beziehen sich auf Dateinamen von Release-Assets: eine Datei passt, wenn sie ein Einschluss-Schlüsselwort und kein Ausschluss-Schlüsselwort enthält. Der Keyword-Abgleich kürzt die Asset-Liste auf der Release-Karte nie.",
+      "tip-body": "Einschluss-Schlüsselwörter wirken auf zwei Ebenen: Ein Release erscheint in der Liste, wenn eine Datei zu einem Einschluss-Schlüsselwort passt und zu keinem Ausschluss-Schlüsselwort, und die Karte zeigt standardmäßig nur die passenden Dateien – der Rest lässt sich über „Alle anzeigen“ aufklappen. Repositories der Immer-einbeziehen-Liste umgehen die Schlüsselwortprüfung.",
       "cancel": "Abbrechen",
       "save": "Speichern",
       "create": "Erstellen"

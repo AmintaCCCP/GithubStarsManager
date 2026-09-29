@@ -61,6 +61,8 @@
     "unsubscribe-from-releases": "Cancelar assinatura do lançamento",
     "view-on-github": "Veja no GitHub",
     "download-files": "Baixar arquivo",
+    "show-all-assets": "Mostrar todos ({{count}})",
+    "show-matching-assets-only": "Mostrar apenas os correspondentes ({{count}})",
     "asset-updated": "Recurso atualizado",
     "downloads": "download",
     "release-notes": "Descrição da versão",

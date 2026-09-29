@@ -61,6 +61,8 @@
     "unsubscribe-from-releases": "Отписаться от выпуска",
     "view-on-github": "Посмотреть его на GitHub",
     "download-files": "Скачать файл",
+    "show-all-assets": "Показать все ({{count}})",
+    "show-matching-assets-only": "Показать только совпадающие ({{count}})",
     "asset-updated": "Объект обновлен",
     "downloads": "скачать",
     "release-notes": "Описание выпуска",
