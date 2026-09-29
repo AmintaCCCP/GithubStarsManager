@@ -61,6 +61,8 @@
     "unsubscribe-from-releases": "リリースの購読を解除する",
     "view-on-github": "GitHub で見る",
     "download-files": "ファイルをダウンロードする",
+    "show-all-assets": "すべて表示（{{count}} 件）",
+    "show-matching-assets-only": "一致した {{count}} 件のみ表示",
     "asset-updated": "アセットが更新されました",
     "downloads": "ダウンロード",
     "release-notes": "リリースの説明",

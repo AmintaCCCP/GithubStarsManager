@@ -245,4 +245,61 @@ describe('ReleaseCard asset updated indicator', () => {
     const assetRow = screen.getByRole('button', { name: /app\.dmg/ });
     expect(within(assetRow).queryByText(/前$/)).not.toBeInTheDocument();
   });
+
+describe('ReleaseCard asset list filtering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 前面的用例会把 store 语言切成 en（模块级共享状态），这里复位到 zh
+    storeState.language = 'zh';
+  });
+
+  const links = [
+    { name: 'app.dmg', url: 'https://example.com/app.dmg', size: 1000, downloadCount: 5, assetId: 101 },
+    { name: 'app.exe', url: 'https://example.com/app.exe', size: 1000, downloadCount: 0, assetId: 102 },
+    { name: 'app.AppImage', url: 'https://example.com/app.AppImage', size: 1000, downloadCount: 0, assetId: 103 },
+  ];
+
+  it('lists only the filtered assets and can reveal the rest via the show-all toggle', () => {
+    renderCard({ downloadLinks: [links[0]], allDownloadLinks: links });
+
+    expect(screen.getByText('app.dmg')).toBeInTheDocument();
+    expect(screen.queryByText('app.exe')).not.toBeInTheDocument();
+    expect(screen.queryByText('app.AppImage')).not.toBeInTheDocument();
+    // 标题计数跟随可见资产数
+    expect(screen.getByText('(1)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '显示全部 3 个' }));
+    expect(screen.getByText('app.exe')).toBeInTheDocument();
+    expect(screen.getByText('app.AppImage')).toBeInTheDocument();
+    expect(screen.getByText('(3)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '仅显示命中的 1 个' }));
+    expect(screen.queryByText('app.exe')).not.toBeInTheDocument();
+    expect(screen.getByText('(1)')).toBeInTheDocument();
+  });
+
+  it('falls back to the filtered list when the match set changes (filter switched or edited)', () => {
+    const view = renderCard({ downloadLinks: [links[0]], allDownloadLinks: links });
+
+    fireEvent.click(screen.getByRole('button', { name: '显示全部 3 个' }));
+    expect(screen.getByText('app.exe')).toBeInTheDocument();
+
+    // 过滤器被切换或关键词被编辑（命中集合变化）→ 自动回到「只显示命中的资产」，
+    // 不让旧的展开态继续展示未命中的文件
+    view.rerender(<ReleaseCard {...buildCardProps({ downloadLinks: [links[1]], allDownloadLinks: links })} />);
+    expect(screen.queryByText('app.dmg')).not.toBeInTheDocument();
+    expect(screen.getByText('app.exe')).toBeInTheDocument();
+    expect(screen.queryByText('app.AppImage')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '显示全部 3 个' })).toBeInTheDocument();
+  });
+
+  it('renders every asset without a toggle when nothing was filtered out', () => {
+    renderCard({ downloadLinks: links });
+
+    expect(screen.getByText('app.dmg')).toBeInTheDocument();
+    expect(screen.getByText('app.exe')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /显示全部/ })).not.toBeInTheDocument();
+  });
+});
+
 });

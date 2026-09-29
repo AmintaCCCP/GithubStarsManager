@@ -47,7 +47,7 @@
       "repo-picker-empty": "Nenhum repositório correspondente",
       "repo-picker-no-release-repos": "Ainda não há repositórios com releases seguidas",
       "repo-picker-done": "Concluído",
-      "tip-body": "As palavras-chave incluídas são aplicadas aos nomes de arquivo dos assets do release: um asset corresponde se contiver alguma palavra-chave incluída e nenhuma excluída. A correspondência por palavras-chave nunca corta a lista de assets exibida no cartão do release.",
+      "tip-body": "As palavras-chave incluídas atuam em dois níveis: um release aparece na lista quando possui um asset que corresponde a alguma palavra-chave incluída e a nenhuma excluída, e o cartão lista por padrão apenas os assets correspondentes; use «Mostrar todos» para ver o restante. Repositórios da lista de inclusão ignoram a verificação por palavras-chave.",
       "cancel": "Cancelar",
       "save": "Salvar",
       "create": "Criar"

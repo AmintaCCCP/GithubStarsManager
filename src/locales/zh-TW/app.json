@@ -47,7 +47,7 @@
       "repo-picker-empty": "沒有符合的儲存庫",
       "repo-picker-no-release-repos": "尚無已關注 Release 的儲存庫",
       "repo-picker-done": "確定",
-      "tip-body": "包含關鍵字比對 Release 資產檔名：命中任一包含關鍵字且不含排除關鍵字的資產即命中此篩選器。關鍵字比對不會裁剪 Release 卡片中的資產清單。",
+      "tip-body": "包含關鍵字同時作用於兩層：Release 層面，命中任一包含關鍵字且不含排除關鍵字的資產才會出現在清單中；資產層面，卡片預設只列出命中的資產，未命中的資產可用「顯示全部」展開。始終包含的倉庫可繞過關鍵字判斷。",
       "cancel": "關閉",
       "save": "儲存",
       "create": "建立"

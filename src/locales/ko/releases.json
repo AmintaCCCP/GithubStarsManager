@@ -61,6 +61,8 @@
     "unsubscribe-from-releases": "릴리스 구독 취소",
     "view-on-github": "GitHub에서 보기",
     "download-files": "파일 다운로드",
+    "show-all-assets": "전체 {{count}}개 표시",
+    "show-matching-assets-only": "일치하는 {{count}}개만 표시",
     "asset-updated": "자산이 업데이트되었습니다.",
     "downloads": "다운로드",
     "release-notes": "릴리스 설명",

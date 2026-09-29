@@ -78,55 +78,129 @@ export const normalizeAssetFilters = (filters: unknown): AssetFilter[] => {
 };
 
 /**
- * 判定单个过滤器是否命中一个 Release（对每个已启用过滤器独立求值，多过滤器间取 OR）：
+ * 归一化「参与关键词匹配的下载链接名」（调用方已小写化）。
+ *
+ * GitHub 为**每个** Release 自动生成 `Source code (<tag>.zip)` /
+ * `Source code (<tag>.tar.gz)` 伪资产，它们无条件存在、不含任何区分信息。
+ * 若原样参与包含关键词的子串匹配，`zip` / `tar.gz` 这类常见的归档后缀词会命中
+ * 全部 Release——过滤器等于失效（表现为「macOS」过滤器里冒出零资产的 Release：
+ * MinerU 的 `mineru-4.0.0-py3-none-any.whl`、cline/openclaw 的纯源码归档 Release）。
+ *
+ * 因此匹配时剥掉自动生成的归档后缀（名称形如 `source code (<tag>.zip)`，归档后缀
+ * 在右括号之前）：`source code (<tag>)` 仍可被 `source` 命中，
+ * `preset-source` 依赖的既有行为不变；而 `zip` / `tar.gz` 只再命中真实上传资产
+ * 与 Release 正文提取的下载链接。
+ */
+export const normalizeMatchedLinkName = (lowerName: string, isSourceCode: boolean): string =>
+  isSourceCode ? lowerName.replace(/\.(?:zip|tar\.gz)(?=\)$)/, '') : lowerName;
+
+/**
+ * 单个链接名是否命中关键词规则（调用方小写化；排除关键词优先，命中即出局）。
+ * 包含关键词为空时不构成正向限制，只做排除判断。
+ */
+const linkHitsKeywordRules = (
+  lowerName: string,
+  keywords: string[],
+  excludeKeywords: string[],
+): boolean =>
+  !excludeKeywords.some(keyword => lowerName.includes(keyword.toLowerCase())) &&
+  (keywords.length === 0 || keywords.some(keyword => lowerName.includes(keyword.toLowerCase())));
+
+/** 「仓库规则」求值结果：排除优先于包含（排除列表命中的仓库永不被本过滤器命中）。 */
+type RepoRuleOutcome = 'excluded' | 'included' | 'none';
+
+const resolveRepoRule = (
+  filter: Pick<AssetFilter, 'keywords'> & Partial<AssetFilter>,
+  lowerRepoKey: string,
+): RepoRuleOutcome => {
+  if ((filter.alwaysExcludeRepos ?? []).some(name => normalizeRepoKey(name) === lowerRepoKey)) {
+    return 'excluded';
+  }
+  if ((filter.includeRepos ?? []).some(name => normalizeRepoKey(name) === lowerRepoKey)) {
+    return 'included';
+  }
+  return 'none';
+};
+
+export interface AssetFilterEvaluation {
+  /** 该 Release 是否出现在 Release 列表中 */
+  matchesRelease: boolean;
+  /** 卡片默认展示的下载链接索引（下标与传入的 lowerMatchedLinkNames 一一对应） */
+  matchedLinkIndexes: Set<number>;
+}
+
+/**
+ * 单个过滤器对单个 Release 的完整求值：Release 级命中 + 该过滤器贡献的资产索引。
+ * 多过滤器之间 Release 级取 OR、资产索引取并集（由调用方合并）。
+ *
+ * 两层判定共用**同一份**规则实现，因此不存在「Release 出现了却没有任何资产可展示」
+ * 或「两层关键词范围不一致」的漂移空间；这与最初拆成两个导出函数、靠注释约定同步的
+ * 写法不同（审计发现：那种写法会让两侧规则各自演化）。
+ *
+ * Release 级（matchesRelease）：
  * 1. 仓库命中「始终排除」→ 不命中（排除优先，且早于 includeRepos 与关键词判断）；
  * 2. 仓库命中「始终包含」→ 命中（仅绕过本过滤器的关键词判断，绕不过本过滤器的排除）；
  * 3. 有资产规则时：包含关键词非空则匹配范围为全部下载链接名（含源码归档伪资产与
- *    Release 正文提取链接，`preset-source` 依赖此现状）；包含关键词为空则只匹配
+ *    Release 正文提取链接，`preset-source` 依赖此现状）——源码归档伪资产经
+ *    normalizeMatchedLinkName 剥掉自动生成的归档后缀后再匹配，避免 `zip` / `tar.gz`
+ *    命中每个 Release 上的伪资产而使过滤器失效；包含关键词为空则只匹配
  *    release.assets 的真实上传资产名——否则真实资产全被排除的 Release 仍可能被
  *    未排除的伪资产/正文链接命中，排除关键词无法隐藏该 Release；
  * 4. 无资产规则时：includeRepos 非空 → 不命中（白名单之外没有正向条件）；
  *    仅 alwaysExcludeRepos 非空 → 命中（其余仓库匹配）；两者皆空 → 不命中。
  *
- * lowerRepoKey / lowerAllLinkNames / lowerRealAssetNames 由调用方小写归一化；
+ * 资产级（matchedLinkIndexes）：
+ * 1. 只有**命中本 Release 的过滤器**才贡献资产：未命中的过滤器（含没有任何规则的
+ *    畸形/空过滤器）返回空集，否则它会变相"解锁"所有 Release 的完整资产清单；
+ * 2. 仓库命中「始终包含」→ 全部索引（该仓库的 Release 按设计展示全部资产）；
+ * 3. 有关键词规则 → 命中包含关键词且不含排除关键词的链接；包含关键词为空时不构成
+ *    正向限制，只按排除关键词剔除（负向过滤器不做正向裁剪）；
+ * 4. 无资产规则但命中（仅排除列表的负向仓库过滤器）→ 不做资产级限制，返回全部索引。
+ *
+ * lowerRepoKey / lowerMatchedLinkNames / lowerRealAssetNames 由调用方小写归一化，
+ * 且 lowerMatchedLinkNames 需先经 normalizeMatchedLinkName 归一化；
  * 过滤器自身字段为原始值（仓库与关键词匹配均不区分大小写）。
  */
-export const filterMatchesRelease = (
+export const evaluateAssetFilter = (
   filter: Pick<AssetFilter, 'keywords'> & Partial<AssetFilter>,
   lowerRepoKey: string,
-  lowerAllLinkNames: string[],
-  lowerRealAssetNames: string[],
-): boolean => {
-  if ((filter.alwaysExcludeRepos ?? []).some(name => normalizeRepoKey(name) === lowerRepoKey)) {
-    return false;
+  lowerMatchedLinkNames: readonly string[],
+  lowerRealAssetNames: readonly string[],
+): AssetFilterEvaluation => {
+  const noIndexes = (): Set<number> => new Set<number>();
+  const allIndexes = (): Set<number> =>
+    new Set(lowerMatchedLinkNames.map((_, index) => index));
+
+  const repoRule = resolveRepoRule(filter, lowerRepoKey);
+  if (repoRule === 'excluded') {
+    return { matchesRelease: false, matchedLinkIndexes: noIndexes() };
   }
-  if ((filter.includeRepos ?? []).some(name => normalizeRepoKey(name) === lowerRepoKey)) {
-    return true;
+  if (repoRule === 'included') {
+    return { matchesRelease: true, matchedLinkIndexes: allIndexes() };
   }
 
   // 防御未经过 normalizeAssetFilters 的数据：空字符串关键词经 includes("") 恒为
   // true，会让包含词击穿匹配、排除词隐藏全部 Release，这里先剔除。
   const keywords = (filter.keywords ?? []).filter(keyword => keyword.trim().length > 0);
   const excludeKeywords = (filter.excludeKeywords ?? []).filter(keyword => keyword.trim().length > 0);
-  const hasKeywords = keywords.length > 0;
-  const hasExcludeKeywords = excludeKeywords.length > 0;
 
-  if (hasKeywords || hasExcludeKeywords) {
-    const matchScope = hasKeywords ? lowerAllLinkNames : lowerRealAssetNames;
-    const assetHit = matchScope.some(lowerLinkName =>
-      (!hasKeywords || keywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))) &&
-      !excludeKeywords.some(keyword => lowerLinkName.includes(keyword.toLowerCase()))
-    );
-    if (assetHit) return true;
+  if (keywords.length === 0 && excludeKeywords.length === 0) {
+    // 纯仓库规则：白名单命中已在上方返回，这里只剩「仅排除列表」的负向过滤器
+    const matchesRelease = (filter.includeRepos ?? []).length === 0
+      && (filter.alwaysExcludeRepos ?? []).length > 0;
+    return { matchesRelease, matchedLinkIndexes: matchesRelease ? allIndexes() : noIndexes() };
   }
 
-  if (!hasKeywords && !hasExcludeKeywords) {
-    // 仓库白名单（includeRepos）存在时不命中其之外的仓库；仅排除列表是有意
-    // 支持的负向仓库过滤器：除排除仓库外的仓库均命中（第 2 节规则 7）
-    if ((filter.includeRepos ?? []).length === 0 && (filter.alwaysExcludeRepos ?? []).length > 0) {
-      return true;
-    }
+  const hitsKeywordRules = (lowerName: string): boolean =>
+    linkHitsKeywordRules(lowerName, keywords, excludeKeywords);
+  const matchScope = keywords.length > 0 ? lowerMatchedLinkNames : lowerRealAssetNames;
+  if (!matchScope.some(hitsKeywordRules)) {
+    return { matchesRelease: false, matchedLinkIndexes: noIndexes() };
   }
 
-  return false;
+  const matchedLinkIndexes = new Set<number>();
+  lowerMatchedLinkNames.forEach((lowerName, index) => {
+    if (hitsKeywordRules(lowerName)) matchedLinkIndexes.add(index);
+  });
+  return { matchesRelease: true, matchedLinkIndexes };
 };

@@ -47,7 +47,7 @@
       "repo-picker-empty": "No hay repositorios coincidentes",
       "repo-picker-no-release-repos": "Aún no hay repositorios con releases seguidas",
       "repo-picker-done": "Listo",
-      "tip-body": "Las palabras clave incluidas se aplican a los nombres de archivo de los assets del release: un asset coincide si contiene alguna palabra clave incluida y ninguna excluida. La coincidencia por palabras clave nunca recorta la lista de assets mostrada en la tarjeta del release.",
+      "tip-body": "Las palabras clave incluidas actúan en dos niveles: un release aparece en la lista cuando tiene un asset que coincide con alguna palabra clave incluida y con ninguna excluida, y su tarjeta muestra por defecto solo los assets coincidentes; usa «Mostrar todos» para ver el resto. Los repositorios de la lista de inclusión omiten la comprobación por palabras clave.",
       "cancel": "Cancelar",
       "save": "Guardar",
       "create": "Crear"
