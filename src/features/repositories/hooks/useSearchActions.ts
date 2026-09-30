@@ -34,14 +34,53 @@ export const buildSearchPatch = (
   return new Map(boostedResults.map(r => [r.id, r.score]));
 };
 
+/**
+ * 星标同步的本地记录索引：id 优先，full_name（大小写不敏感）兜底。
+ *
+ * 兜底的原因：批量 Star 早期版本会给新仓库分配合成 id，本地记录的 id 与 GitHub
+ * 真实 id 对不上，仅按 id 匹配会失配 → 整条采用裸 GitHub 数据，抹掉已完成的
+ * AI 分析与分类标签。兜底让这批存量数据在下一次同步时自动修复。
+ *
+ * 合并与「新增仓库计数」必须共用同一索引，否则被 full_name 兜底救回的存量仓库
+ * 会被误报为新增，弹出错误的「发现 N 个新仓库」提示。
+ */
+interface StarredRepositoryIndex {
+  byId: Map<number, Repository>;
+  byFullName: Map<string, Repository>;
+}
+
+const buildStarredRepositoryIndex = (storeRepos: Repository[]): StarredRepositoryIndex => ({
+  byId: new Map(storeRepos.map(repo => [repo.id, repo])),
+  byFullName: new Map(
+    storeRepos
+      .filter(repo => Boolean(repo.full_name))
+      .map(repo => [repo.full_name.toLowerCase(), repo]),
+  ),
+});
+
+const matchStarredRepository = (
+  newRepo: Repository,
+  index: StarredRepositoryIndex,
+): Repository | undefined => index.byId.get(newRepo.id)
+  ?? (newRepo.full_name ? index.byFullName.get(newRepo.full_name.toLowerCase()) : undefined);
+
+/** 统计本次同步中真正新增的仓库数（与合并口径一致）。 */
+export const countNewStarredRepositories = (
+  newRepos: Repository[],
+  storeRepos: Repository[],
+): number => {
+  const index = buildStarredRepositoryIndex(storeRepos);
+  return newRepos.filter(repo => !matchStarredRepository(repo, index)).length;
+};
+
 // SearchBar 725-750：星标同步结果与本地仓库逐字段合并（license `?? null` 回填）。
 export const mergeStarredRepositories = (
   newRepos: Repository[],
   storeRepos: Repository[],
 ): Repository[] => {
-  const existingRepoMap = new Map(storeRepos.map(repo => [repo.id, repo]));
+  const index = buildStarredRepositoryIndex(storeRepos);
   return newRepos.map(newRepo => {
-    const existing = existingRepoMap.get(newRepo.id);
+    const existing = matchStarredRepository(newRepo, index);
     if (existing) {
       return {
         ...existing,
@@ -539,8 +578,10 @@ export const useSearchActions = (): SearchActions => {
         }
       }
 
-      const existingRepoIds = new Set(storeRepos.map(repo => repo.id));
-      const newRepoCount = newRepositories.filter(repo => !existingRepoIds.has(repo.id)).length;
+      // 「新增仓库」计数必须与 mergeStarredRepositories 用同一套匹配口径
+      // （id 优先，full_name 兜底）：否则被 full_name 兜底救回的存量仓库
+      // 会被误报为新增，弹出「发现 N 个新仓库」的错误提示。
+      const newRepoCount = countNewStarredRepositories(newRepositories, storeRepos);
 
       setRepositories(finalRepositories);
       await forceSyncToBackend();

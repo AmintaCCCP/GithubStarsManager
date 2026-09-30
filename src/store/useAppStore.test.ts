@@ -662,6 +662,63 @@ describe('useAppStore repository performance guards', () => {
     expect(useAppStore.getState().searchResults).toBe(refreshed);
   });
 
+  it('keeps the real GitHub id when adding a new repository so later syncs match', () => {
+    // 回归：批量从链接 Star 的仓库自带 GitHub id。若换成合成 id，后续「同步」
+    // 按 GitHub id 匹配不到本地记录，会用裸 GitHub 数据覆盖掉 AI 分析与分类标签。
+    useAppStore.setState({ repositories: [createRepository(1)], searchResults: [] });
+    const batchStarred = createRepository(765_432_1, { full_name: 'owner/from-links' });
+
+    useAppStore.getState().addRepository(batchStarred);
+
+    const added = useAppStore.getState().repositories.find(r => r.full_name === 'owner/from-links');
+    expect(added?.id).toBe(765_432_1);
+  });
+
+  it('falls back to a synthetic id when the GitHub id collides with a different repository', () => {
+    const existing = createRepository(1);
+    useAppStore.setState({ repositories: [existing], searchResults: [] });
+
+    // 同一个 id 但 full_name 不同：不能覆盖既有记录，退回合成 id
+    useAppStore.getState().addRepository(createRepository(1, { full_name: 'owner/other' }));
+
+    const repositories = useAppStore.getState().repositories;
+    expect(repositories).toHaveLength(2);
+    const added = repositories.find(r => r.full_name === 'owner/other');
+    expect(added?.id).not.toBe(1);
+    expect(added?.id).toBeGreaterThan(0);
+  });
+
+  it('keeps AI analysis and custom category when re-adding an existing repository', () => {
+    // 入参来自 GitHub 详情 / 发现页数据，不带 AI 字段，直接展开会清空已有分析结果
+    const analyzed = createRepository(5, {
+      ai_summary: 'AI 摘要',
+      ai_tags: ['ai-tag'],
+      ai_platforms: ['cli'],
+      analyzed_at: '2026-02-01T00:00:00.000Z',
+      custom_category: '工具',
+      category_locked: true,
+    });
+    useAppStore.setState({ repositories: [analyzed], searchResults: [] });
+
+    // 同一 full_name，但 id 不同、且不带任何 AI 字段
+    useAppStore.getState().addRepository(createRepository(999, {
+      full_name: analyzed.full_name,
+      description: '来自 GitHub 的新描述',
+    }));
+
+    expect(useAppStore.getState().repositories).toHaveLength(1);
+    expect(useAppStore.getState().repositories[0]).toMatchObject({
+      id: 5,
+      description: '来自 GitHub 的新描述',
+      ai_summary: 'AI 摘要',
+      ai_tags: ['ai-tag'],
+      ai_platforms: ['cli'],
+      analyzed_at: '2026-02-01T00:00:00.000Z',
+      custom_category: '工具',
+      category_locked: true,
+    });
+  });
+
   it('preserves an active search result set when addRepository runs (Issue #304)', () => {
     const existing = createRepository(2);
     useAppStore.setState({

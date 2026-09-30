@@ -4,6 +4,7 @@ import type { Category, Repository, VectorSearchConfig } from '../../../types';
 import {
   applyListsToRepositories,
   buildSearchPatch,
+  countNewStarredRepositories,
   mergeStarredRepositories,
   planListCategories,
   useSearchActions,
@@ -777,6 +778,71 @@ describe('useSearchActions pure helpers', () => {
     expect(merged).toHaveLength(2);
     expect(merged[0]).toMatchObject({ id: 1, description: 'new', stargazers_count: 99, custom_tags: ['keep'], license: null });
     expect(merged[1]).toMatchObject({ id: 3 });
+  });
+
+  it('mergeStarredRepositories keeps AI analysis when a batch-starred repo only matches by full_name', () => {
+    // 回归：批量从链接 Star 的仓库曾被分配合成 id，与 GitHub 真实 id 对不上。
+    // 仅按 id 匹配会失配并整条采用裸 GitHub 数据，抹掉 AI 分析与分类标签。
+    const storeRepos = [
+      baseRepo({
+        id: 1_700_000_000_123,
+        full_name: 'owner/batch-starred',
+        ai_summary: 'AI 摘要',
+        ai_tags: ['ai-tag'],
+        ai_platforms: ['cli'],
+        analyzed_at: '2026-02-01T00:00:00.000Z',
+        custom_category: '工具',
+        category_locked: true,
+      }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 987_654_321, full_name: 'owner/batch-starred', description: '来自 GitHub 的新描述' }),
+    ];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({
+      // 本地 AI 分析与分类标签必须保留
+      ai_summary: 'AI 摘要',
+      ai_tags: ['ai-tag'],
+      ai_platforms: ['cli'],
+      analyzed_at: '2026-02-01T00:00:00.000Z',
+      custom_category: '工具',
+      category_locked: true,
+      // GitHub 源元数据仍然刷新
+      description: '来自 GitHub 的新描述',
+    });
+  });
+
+  it('mergeStarredRepositories matches the full_name fallback case-insensitively', () => {
+    const storeRepos = [
+      baseRepo({ id: 555, full_name: 'Owner/Mixed-Case', ai_summary: 'AI 摘要' }),
+    ];
+    const merged = mergeStarredRepositories(
+      [baseRepo({ id: 42, full_name: 'owner/mixed-case' })],
+      storeRepos,
+    );
+
+    expect(merged[0]).toMatchObject({ ai_summary: 'AI 摘要' });
+  });
+
+  it('counts a full_name-matched legacy repo as existing, not new', () => {
+    // 回归：计数若只按 id 匹配，被 full_name 兜底救回的存量仓库会被误报为
+    // 「发现 N 个新仓库」。此处锁定与合并一致的口径。
+    const storeRepos = [
+      baseRepo({ id: 1_700_000_000_123, full_name: 'owner/legacy', ai_summary: 'AI 摘要' }),
+      baseRepo({ id: 2, full_name: 'owner/unchanged' }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 987_654_321, full_name: 'owner/legacy' }),
+      baseRepo({ id: 2, full_name: 'owner/unchanged' }),
+      baseRepo({ id: 3, full_name: 'owner/brand-new' }),
+    ];
+
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
+    expect(countNewStarredRepositories([], storeRepos)).toBe(0);
+    expect(countNewStarredRepositories(newRepos, [])).toBe(3);
   });
 
   it('planListCategories skips reserved names and existing categories', () => {
