@@ -815,9 +815,10 @@ describe('useSearchActions pure helpers', () => {
     });
   });
 
-  it('mergeStarredRepositories matches the full_name fallback case-insensitively', () => {
+  it('matches the full_name fallback case-insensitively', () => {
+    // 合成 id（>=1e11）代表批量 Star 的历史记录，才有资格走名称兜底
     const storeRepos = [
-      baseRepo({ id: 555, full_name: 'Owner/Mixed-Case', ai_summary: 'AI 摘要' }),
+      baseRepo({ id: 1_700_000_000_555, full_name: 'Owner/Mixed-Case', ai_summary: 'AI 摘要' }),
     ];
     const merged = mergeStarredRepositories(
       [baseRepo({ id: 42, full_name: 'owner/mixed-case' })],
@@ -825,6 +826,75 @@ describe('useSearchActions pure helpers', () => {
     );
 
     expect(merged[0]).toMatchObject({ ai_summary: 'AI 摘要' });
+  });
+
+  it('does not let a different repo inherit analysis by reusing a real-id repo name', () => {
+    // 回归（CodeRabbit 安全评审）：本地记录带**真实 GitHub id** 时，身份是权威的。
+    // 该仓库被改名/删除后，旧名可能被另一个新仓库复用。若仍走名称兜底，
+    // 新仓库会继承旧仓库的 AI 分析、锁定分类与订阅状态（身份错误归属）。
+    const storeRepos = [
+      baseRepo({
+        id: 555,
+        full_name: 'owner/old',
+        ai_summary: '机密分析',
+        custom_category: '内部工具',
+        category_locked: true,
+        subscribed_to_releases: true,
+      }),
+    ];
+    // 另一个恰好复用旧名的新仓库，id 不同
+    const newRepos = [baseRepo({ id: 777, full_name: 'owner/old' })];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ id: 777, full_name: 'owner/old' });
+    expect(merged[0].ai_summary).toBeUndefined();
+    expect(merged[0].custom_category).toBeUndefined();
+    expect(merged[0].category_locked).toBeUndefined();
+    expect(merged[0].subscribed_to_releases).toBeUndefined();
+    // 复用旧名的仓库是真正的新增
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
+  });
+
+  it('still repairs legacy synthetic-id records by name fallback', () => {
+    // 兜底的正向场景不能被上面的加固误伤：合成 id 记录仍应被认领并恢复分析结果
+    const storeRepos = [
+      baseRepo({
+        id: 1_700_000_000_999,
+        full_name: 'owner/legacy',
+        ai_summary: 'AI 摘要',
+        custom_category: '工具',
+      }),
+    ];
+    const newRepos = [baseRepo({ id: 321, full_name: 'owner/legacy' })];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged[0]).toMatchObject({
+      ai_summary: 'AI 摘要',
+      custom_category: '工具',
+    });
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(0);
+  });
+
+  it('assigns each local record to at most one incoming repository', () => {
+    // 两条输入都只能靠名称兜底命中同一条本地记录时，必须一对一：
+    // 第二条视为新增，不得复制本地记录的 AI 数据。
+    const storeRepos = [
+      baseRepo({ id: 1_700_000_000_100, full_name: 'owner/legacy', ai_summary: 'AI 摘要' }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 201, full_name: 'owner/legacy' }),
+      baseRepo({ id: 202, full_name: 'OWNER/LEGACY' }),
+    ];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged).toHaveLength(2);
+    const matched = merged.filter(repo => repo.ai_summary === 'AI 摘要');
+    expect(matched).toHaveLength(1);
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
   });
 
   it('counts a full_name-matched legacy repo as existing, not new', () => {
@@ -904,25 +974,6 @@ describe('useSearchActions pure helpers', () => {
     expect(f.get(2)?.ai_summary).toBeUndefined();
     expect(r.get(2)?.ai_summary).toBeUndefined();
     expect(countNewStarredRepositories([reuse, renamed], storeRepos)).toBe(1);
-  });
-
-  it('assigns each local record to at most one incoming repository', () => {
-    // 两条输入都只能靠名称兜底命中同一条本地记录时，必须一对一：
-    // 第二条视为新增，不得复制本地记录的 AI 数据。
-    const storeRepos = [
-      baseRepo({ id: 100, full_name: 'owner/legacy', ai_summary: 'AI 摘要' }),
-    ];
-    const newRepos = [
-      baseRepo({ id: 201, full_name: 'owner/legacy' }),
-      baseRepo({ id: 202, full_name: 'OWNER/LEGACY' }),
-    ];
-
-    const merged = mergeStarredRepositories(newRepos, storeRepos);
-
-    expect(merged).toHaveLength(2);
-    const matched = merged.filter(repo => repo.ai_summary === 'AI 摘要');
-    expect(matched).toHaveLength(1);
-    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
   });
 
   it('planListCategories skips reserved names and existing categories', () => {

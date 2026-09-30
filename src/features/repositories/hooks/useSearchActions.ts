@@ -35,11 +35,29 @@ export const buildSearchPatch = (
 };
 
 /**
+ * 合成 id 的下界。真实 GitHub 仓库 id 远小于该值（当前量级 < 1e10），而
+ * `repositorySlice` 的合成 id 形如 `Date.now() + random`（约 1.8e12）。
+ * 因此 id >= 该阈值 ⇒ 该记录必定来自批量 Star 的历史合成 id。
+ */
+const SYNTHETIC_REPOSITORY_ID_FLOOR = 1e11;
+
+/**
+ * 该本地记录是否为「批量 Star 遗留的合成 id 记录」。
+ *
+ * 只有这类记录才允许按名称兜底认领：它们没有权威的 GitHub 身份，名称是唯一线索。
+ * 反之，带真实 GitHub id 的记录身份是权威的 —— id 对不上说明该仓库已被改名或
+ * 删除。此时若允许名称兜底，另一个**恰好复用旧名的新仓库**就会继承它的
+ * AI 分析、锁定分类与订阅状态（身份错误归属），故一律不认领。
+ */
+const isLegacySyntheticIdRecord = (repo: Repository): boolean => repo.id >= SYNTHETIC_REPOSITORY_ID_FLOOR;
+
+/**
  * 为整批同步输入分配本地记录，结果与 `newRepos` 一一对齐（`undefined` = 新增）。
  *
  * 两遍分配，且第二遍一对一：
  * 1. 先用 id 匹配**整批**输入，把命中的本地记录全部标记为「已占用」。
- * 2. 再对剩余未匹配输入做 full_name 兜底，跳过已被占用的本地记录。
+ * 2. 再对剩余未匹配输入做 full_name 兜底，跳过已被占用的本地记录，
+ *    并且只认领「合成 id 的历史记录」（见 isLegacySyntheticIdRecord）。
  *
  * 为什么必须分两遍：GitHub 允许新仓库复用刚改完名的旧仓库名。若本地是
  * `{ id: 1, full_name: 'owner/old' }`，而本批输入同时包含改名的
@@ -56,9 +74,11 @@ const assignStarredRepositories = (
   if (newRepos.length === 0 || storeRepos.length === 0) return assignments;
 
   const byId = new Map(storeRepos.map(repo => [repo.id, repo]));
-  const byFullName = new Map(
+  // 名称兜底索引只收录「合成 id 的历史记录」：带真实 GitHub id 的记录不参与，
+  // 避免旧仓库被改名/删除后，名称被新仓库复用而导致 AI 分析与分类错误归属。
+  const legacyByFullName = new Map(
     storeRepos
-      .filter(repo => Boolean(repo.full_name))
+      .filter(repo => Boolean(repo.full_name) && isLegacySyntheticIdRecord(repo))
       .map(repo => [repo.full_name.toLowerCase(), repo]),
   );
 
@@ -77,7 +97,7 @@ const assignStarredRepositories = (
   // 第二遍：仅对未匹配输入做 full_name 兜底，跳过已被第一遍占用的记录。
   newRepos.forEach((newRepo, index) => {
     if (assignments[index] || !newRepo.full_name) return;
-    const existing = byFullName.get(newRepo.full_name.toLowerCase());
+    const existing = legacyByFullName.get(newRepo.full_name.toLowerCase());
     if (!existing || claimed.has(existing.full_name)) return;
     assignments[index] = existing;
     claimed.add(existing.full_name);
