@@ -71,6 +71,25 @@ interface ElectronAPI {
   xFetchGraphQL?: (url: string, auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; body?: string; error?: string }>;
   /** Telegram 频道：主进程代抓 t.me/s/<name> 公开预览 HTML（可选 before 游标翻历史页） */
   telegramFetchChannel?: (channel: string, before?: string) => Promise<{ success: boolean; html?: string; error?: string }>;
+  /**
+   * WebDAV：主进程代发 DAV 请求（渲染进程 webSecurity 开启且 file:// 源同样受 CORS 约束，
+   * 桌面版又不带后端，只能由主进程代发）。响应体以文本原样返回，供上层还原 Response。
+   */
+  webdavRequest?: (params: {
+    url: string;
+    method: string;
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+  }) => Promise<{
+    success: boolean;
+    status?: number;
+    statusText?: string;
+    body?: string;
+    contentType?: string;
+    error?: string;
+    timedOut?: boolean;
+  }>;
   xAuth?: {
     save: (auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; error?: string }>;
     get: () => Promise<{ authToken: string; ct0: string } | null>;

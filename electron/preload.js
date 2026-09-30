@@ -12,6 +12,8 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     clear: () => ipcRenderer.invoke('x-auth:clear'),
   },
   telegramFetchChannel: (channel, before) => ipcRenderer.invoke('telegram-fetch-channel', channel, before),
+  // WebDAV：主进程代发 DAV 请求，绕开渲染进程的 CORS 限制
+  webdavRequest: (params) => ipcRenderer.invoke('webdav-request', params),
   desktop: {
     getPrefs: () => ipcRenderer.invoke('desktop:getPrefs'),
     setAutoLaunch: (enabled) => ipcRenderer.invoke('desktop:setAutoLaunch', enabled),
