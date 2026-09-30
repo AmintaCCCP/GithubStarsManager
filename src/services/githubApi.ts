@@ -496,7 +496,7 @@ export class GitHubApiService {
         }
         throw new Error(GITHUB_TOKEN_INVALID_ERROR);
       }
-      if (response.status === 403 && this.rateLimitRemaining === 0) {
+      if (response.status === 403 && remaining === '0') {
         const resetDate = this.rateLimitReset
           ? new Date(this.rateLimitReset * 1000).toLocaleString()
           : 'unknown';

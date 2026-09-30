@@ -25,6 +25,20 @@ describe('GitHubApiService.isRepositoryStarred', () => {
       .rejects.toBeInstanceOf(GitHubTokenPermissionError);
   });
 
+  it('does not reuse a previous zero rate limit for a later permission failure', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204, headers: { 'X-RateLimit-Remaining': '0' } }))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ message: 'Resource not accessible by personal access token' }),
+        { status: 403, statusText: 'Forbidden' },
+      ));
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new GitHubApiService('test-token');
+    expect(await api.isRepositoryStarred('owner', 'first')).toBe(true);
+    await expect(api.isRepositoryStarred('owner', 'second'))
+      .rejects.toBeInstanceOf(GitHubTokenPermissionError);
+  });
+
   it('uses the configured backend proxy', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);

@@ -2,7 +2,7 @@
   "loginScreen": {
     "token-permissions-title": "GitHub トークンの権限",
     "token-permissions-stars": "Star の管理には、クラシックトークンで public_repo（非公開リポジトリには repo）が必要です。Fine-grained トークンではアカウントの Starring 読み書きとリポジトリの Metadata 読み取りが必要です。",
-    "token-permissions-optional": "追加機能：Gist は gist、Star Lists は user、Fork 同期とワークフローの実行はクラシックトークンの repo が必要です。使う機能の権限だけを付与してください。",
+    "token-permissions-optional": "追加機能：クラシックトークンでは Gist に gist、Star Lists に user、Fork 同期とワークフロー実行に repo が必要です。細かい権限のトークンでは Gist に Gists（書き込み）、Fork 同期に Contents（書き込み）、ワークフロー実行に Actions（書き込み）が必要です。使う権限だけを付与してください。",
     "token-permissions-check": "ログインでは本人確認のみを行い、すべての権限は確認しません。権限不足は機能の使用時に判明する場合があります。",
     "please-enter-the-backend-url-and-api-key": "バックエンド URL と API キーを入力してください",
     "invalid-backend-url-remote-backends-must-use-htt": "無効なバックエンド アドレス: リモート バックエンドには HTTPS が必要です。HTTP を使用できるのはローカルホストのみです",

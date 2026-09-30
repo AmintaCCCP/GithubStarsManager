@@ -2,7 +2,7 @@
   "loginScreen": {
     "token-permissions-title": "GitHub Token 權限",
     "token-permissions-stars": "管理 Star：傳統 Token 需勾選 public_repo（私有儲存庫用 repo）；細緻權限 Token 需帳戶 Starring 讀寫權限，以及儲存庫 Metadata 讀取權限。",
-    "token-permissions-optional": "選用功能：Gist 需 gist，Star 清單需 user，Fork 同步與觸發工作流程需傳統 Token 的 repo。只授予實際使用的權限。",
+    "token-permissions-optional": "選用功能：傳統 Token 的 Gist 需 gist、Star 清單需 user、Fork 同步和觸發工作流程需 repo；細粒度 Token 的 Gist 需 Gists（寫入）、Fork 同步需 Contents（寫入）、觸發工作流程需 Actions（寫入）。只授予實際使用的權限。",
     "token-permissions-check": "登入只驗證身分，不會檢查所有功能權限；權限不足可能在使用功能時才出現。",
     "please-enter-the-backend-url-and-api-key": "請輸入後端 URL 和 API Key",
     "invalid-backend-url-remote-backends-must-use-htt": "後端位址無效：遠端後端需使用 HTTPS，僅 localhost 可使用 HTTP",

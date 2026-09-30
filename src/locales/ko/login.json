@@ -2,7 +2,7 @@
   "loginScreen": {
     "token-permissions-title": "GitHub 토큰 권한",
     "token-permissions-stars": "Star 관리: 클래식 토큰에는 public_repo(비공개 저장소는 repo)가 필요합니다. 세분화된 토큰에는 계정 Starring 읽기/쓰기와 저장소 Metadata 읽기 권한이 필요합니다.",
-    "token-permissions-optional": "선택 기능: Gist에는 gist, Star Lists에는 user, Fork 동기화와 워크플로 실행에는 클래식 토큰의 repo가 필요합니다. 사용하는 기능의 권한만 부여하세요.",
+    "token-permissions-optional": "선택 기능: 클래식 토큰에서는 Gist에 gist, Star Lists에 user, Fork 동기화와 워크플로 실행에 repo가 필요합니다. 세분화된 토큰에서는 Gist에 Gists(쓰기), Fork 동기화에 Contents(쓰기), 워크플로 실행에 Actions(쓰기)가 필요합니다. 사용하는 권한만 부여하세요.",
     "token-permissions-check": "로그인은 신원만 확인하며 모든 권한을 검사하지 않습니다. 권한 부족은 해당 기능을 사용할 때 나타날 수 있습니다.",
     "please-enter-the-backend-url-and-api-key": "백엔드 URL과 API 키를 입력하세요.",
     "invalid-backend-url-remote-backends-must-use-htt": "잘못된 백엔드 주소: 원격 백엔드에는 HTTPS가 필요하며 로컬 호스트만 HTTP를 사용할 수 있습니다.",
