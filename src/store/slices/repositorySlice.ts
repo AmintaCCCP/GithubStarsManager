@@ -163,19 +163,18 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
       addRepository: (repo) => set((state) => {
         // 检查是否已存在相同 full_name 的仓库
         const existingRepoIndex = state.repositories.findIndex(r => r.full_name === repo.full_name);
+        const existing = existingRepoIndex >= 0 ? state.repositories[existingRepoIndex] : undefined;
         let updatedRepositories;
 
-        if (existingRepoIndex >= 0) {
-          // 如果存在，更新现有仓库（保留ID）
+        // 判定是否「同一 GitHub 身份」：id 相同，或本地记录是合成 id 的历史记录
+        // （缺失权威身份，名称是唯一线索）。两者都不满足时，本地记录带真实 GitHub id
+        // 却与入参 id 不同 ⇒ 原仓库已被改名/删除，入参是复用旧名的**另一个**仓库。
+        const isSameIdentity = existing !== undefined
+          && (existing.id === repo.id || isLegacySyntheticIdRecord(existing));
+
+        if (existing && isSameIdentity) {
+          // 同一身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）
           updatedRepositories = [...state.repositories];
-          const existing = updatedRepositories[existingRepoIndex];
-          // 仅在「同一 GitHub 身份」下沿用已有 AI 字段：id 相同，或本地记录是
-          // 合成 id 的历史记录（缺失权威身份，名称是唯一线索）。
-          // 两者都不满足 ⇒ 本地记录带真实 GitHub id 却与入参 id 不同，说明原仓库
-          // 已被改名/删除，而入参是复用旧名的新仓库。此时沿用旧仓库的 AI 分析会
-          // 造成错误归属，故只采用入参自带的 AI 字段。
-          // custom_* 的保留属于基线既有行为，不在此收紧。
-          const reuseExistingAI = existing.id === repo.id || isLegacySyntheticIdRecord(existing);
           updatedRepositories[existingRepoIndex] = {
             ...repo,
             id: existing.id,
@@ -189,27 +188,26 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             // 保留已完成的 AI 分析：入参来自 GitHub 详情 / 发现页数据，
             // 不带这些字段，直接展开会把已有 AI 摘要与标签清空。
             // 用 `?? existing.x` 而非无条件回填：入参若显式带了新值则采用新值。
-            ai_summary: reuseExistingAI ? repo.ai_summary ?? existing.ai_summary : repo.ai_summary,
-            ai_tags: reuseExistingAI ? repo.ai_tags ?? existing.ai_tags : repo.ai_tags,
-            ai_platforms: reuseExistingAI ? repo.ai_platforms ?? existing.ai_platforms : repo.ai_platforms,
-            analyzed_at: reuseExistingAI ? repo.analyzed_at ?? existing.analyzed_at : repo.analyzed_at,
-            analysis_failed: reuseExistingAI ? repo.analysis_failed ?? existing.analysis_failed : repo.analysis_failed,
-            analysis_error: reuseExistingAI ? repo.analysis_error ?? existing.analysis_error : repo.analysis_error,
+            ai_summary: repo.ai_summary ?? existing.ai_summary,
+            ai_tags: repo.ai_tags ?? existing.ai_tags,
+            ai_platforms: repo.ai_platforms ?? existing.ai_platforms,
+            analyzed_at: repo.analyzed_at ?? existing.analyzed_at,
+            analysis_failed: repo.analysis_failed ?? existing.analysis_failed,
+            analysis_error: repo.analysis_error ?? existing.analysis_error,
           };
         } else {
-          // 如果不存在，添加新仓库。
-          // 优先沿用 GitHub 真实 id：批量从链接 Star / 发现页 Star 的仓库都自带
-          // GitHub id，后续「同步」按 id 匹配本地记录来保留 AI 分析与分类标签。
-          // 一旦换成合成 id，同步时匹配失配，会用裸 GitHub 数据整条覆盖掉本地
-          // AI 分析结果与 custom_category。仅当 id 非法或已被别的仓库占用时，
-          // 才退回合成 id（timestamp + random，确保唯一性，避免并发竞态）。
+          // 新增为独立记录：要么本地没有同名记录，要么同名但属于**另一个** GitHub
+          // 仓库。此时绝不能沿用 existing.id —— 否则新仓库会被写到旧仓库的 ID 下：
+          // 用户对新仓库做完 AI 分析后，下次同步按 GitHub ID 匹配不到本地记录
+          // （id 不同，且名称兜底只认领合成 id 记录），分析结果会再次丢失；
+          // 若旧仓库仍在星标里，新仓库的分析还会被错误归属到旧仓库。
+          // 优先沿用 GitHub 真实 id；仅当 id 非法或已被别的记录占用时，才退回
+          // 合成 id（timestamp + random，确保唯一性，避免并发竞态）。
           const githubId = resolveGitHubRepositoryId(repo, state.repositories);
 
-          if (githubId !== null) {
-            updatedRepositories = [...state.repositories, { ...repo, id: githubId }];
-          } else {
-            updatedRepositories = [...state.repositories, { ...repo, id: generateFallbackRepositoryId(state.repositories) }];
-          }
+          updatedRepositories = githubId !== null
+            ? [...state.repositories, { ...repo, id: githubId }]
+            : [...state.repositories, { ...repo, id: generateFallbackRepositoryId(state.repositories) }];
         }
 
         return {

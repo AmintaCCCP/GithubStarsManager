@@ -738,29 +738,70 @@ describe('useAppStore repository performance guards', () => {
     });
   });
 
-  it('does not copy AI analysis onto a new repo that reuses a real-id repo name', () => {
-    // 回归（CodeRabbit）：本地记录带**真实 GitHub id**（id:5），原仓库已改名/删除，
-    // 入参是复用旧名的新仓库（id:999）。此时沿用旧仓库的 AI 分析属于错误归属。
-    const analyzed = createRepository(5, {
-      ai_summary: '机密分析',
-      ai_tags: ['机密标签'],
+  it('adds a name-reusing repo as a separate record instead of overwriting the old id', () => {
+    // 回归（CodeRabbit r4145277692）：本地记录带**真实 GitHub id**（id:5），
+    // 原仓库已改名/删除，入参是复用旧名的新仓库（id:999）。
+    // 绝不能把新仓库写到旧仓库的 id 下 —— 否则用户对新仓库做完 AI 分析后，
+    // 下次同步按 GitHub id 匹配不到本地记录（名称兜底只认领合成 id 记录），
+    // 分析结果会再次丢失，即本 PR 要修的原始问题。
+    const old = createRepository(5, {
+      ai_summary: '旧仓库分析',
       custom_category: '内部工具',
       category_locked: true,
     });
-    useAppStore.setState({ repositories: [analyzed], searchResults: [] });
+    useAppStore.setState({ repositories: [old], searchResults: [] });
 
     useAppStore.getState().addRepository(createRepository(999, {
-      full_name: analyzed.full_name,
+      full_name: old.full_name,
       description: '一个完全不同的新项目',
     }));
 
-    const updated = useAppStore.getState().repositories[0];
-    expect(updated.description).toBe('一个完全不同的新项目');
-    expect(updated.ai_summary).toBeUndefined();
-    expect(updated.ai_tags).toBeUndefined();
-    // custom_* 属基线既有保留行为，本次不收紧
-    expect(updated.custom_category).toBe('内部工具');
-    expect(updated.category_locked).toBe(true);
+    const repositories = useAppStore.getState().repositories;
+    // 旧记录原样保留，新仓库作为独立记录加入
+    expect(repositories).toHaveLength(2);
+    expect(repositories[0]).toMatchObject({
+      id: 5,
+      ai_summary: '旧仓库分析',
+      custom_category: '内部工具',
+      category_locked: true,
+    });
+    const added = repositories.find(r => r.id === 999);
+    expect(added).toBeDefined();
+    expect(added).toMatchObject({
+      id: 999,
+      full_name: old.full_name,
+      description: '一个完全不同的新项目',
+    });
+    // 新仓库不得继承旧仓库的 AI 分析
+    expect(added?.ai_summary).toBeUndefined();
+    expect(added?.custom_category).toBeUndefined();
+  });
+
+  it('keeps the new repo id after AI analysis so the next sync can still match it', () => {
+    // 完整链路：复用旧名 → 独立记录 → AI 分析 → 同步仍能按 GitHub id 命中
+    const old = createRepository(5, { full_name: 'owner/old' });
+    useAppStore.setState({ repositories: [old], searchResults: [] });
+
+    useAppStore.getState().addRepository(createRepository(999, {
+      full_name: 'owner/old',
+      description: '新项目',
+    }));
+
+    // 用户对新仓库做 AI 分析
+    const analyzed = useAppStore.getState().repositories.find(r => r.id === 999)!;
+    useAppStore.getState().updateRepository({
+      ...analyzed,
+      ai_summary: '新仓库的分析结果',
+      ai_tags: ['新标签'],
+    });
+
+    // 同步时 GitHub 返回真实 id 999 ⇒ 必须按 id 命中，分析结果得以保留
+    const storeRepos = useAppStore.getState().repositories;
+    const matched = storeRepos.find(r => r.id === 999);
+    expect(matched?.ai_summary).toBe('新仓库的分析结果');
+    expect(matched?.ai_tags).toEqual(['新标签']);
+    // 旧仓库的记录未被污染
+    expect(storeRepos.find(r => r.id === 5)?.ai_summary).toBeUndefined();
   });
 
   it('preserves an active search result set when addRepository runs (Issue #304)', () => {
