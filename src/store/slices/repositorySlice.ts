@@ -161,19 +161,25 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         };
       }),
       addRepository: (repo) => set((state) => {
-        // 检查是否已存在相同 full_name 的仓库
-        const existingRepoIndex = state.repositories.findIndex(r => r.full_name === repo.full_name);
+        // 同名记录的选取必须按 GitHub 身份优先，不能只取第一条同名记录：
+        // 下方允许「同名但身份不同」的仓库并存，因此列表里可能同时存在旧真实 id
+        // 与新真实 id 的同名记录。若仍取第一条，再次添加同一仓库时会跳过更新
+        // 分支而追加一条重复记录。
+        // 1) 优先 full_name 与 id 都命中（即同一 GitHub 身份）；
+        // 2) 其次才是「同名 + 合成 id」的历史记录（缺失权威身份，名称是唯一线索）；
+        // 3) 都不命中 ⇒ 同名但属于另一个 GitHub 仓库，按新仓库处理。
+        const exactIdentityIndex = state.repositories.findIndex(
+          r => r.full_name === repo.full_name && r.id === repo.id,
+        );
+        const legacySyntheticIndex = state.repositories.findIndex(
+          r => r.full_name === repo.full_name && isLegacySyntheticIdRecord(r),
+        );
+        const existingRepoIndex = exactIdentityIndex >= 0 ? exactIdentityIndex : legacySyntheticIndex;
         const existing = existingRepoIndex >= 0 ? state.repositories[existingRepoIndex] : undefined;
         let updatedRepositories;
 
-        // 判定是否「同一 GitHub 身份」：id 相同，或本地记录是合成 id 的历史记录
-        // （缺失权威身份，名称是唯一线索）。两者都不满足时，本地记录带真实 GitHub id
-        // 却与入参 id 不同 ⇒ 原仓库已被改名/删除，入参是复用旧名的**另一个**仓库。
-        const isSameIdentity = existing !== undefined
-          && (existing.id === repo.id || isLegacySyntheticIdRecord(existing));
-
-        if (existing && isSameIdentity) {
-          // 同一身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）
+        if (existing) {
+          // 同一 GitHub 身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）
           updatedRepositories = [...state.repositories];
           updatedRepositories[existingRepoIndex] = {
             ...repo,

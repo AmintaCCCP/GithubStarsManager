@@ -777,6 +777,55 @@ describe('useAppStore repository performance guards', () => {
     expect(added?.custom_category).toBeUndefined();
   });
 
+  it('updates the identity-matching record instead of appending a duplicate', () => {
+    // 回归（CodeRabbit 5367214192）：列表里已存在「旧真实 id + 新真实 id」的同名
+    // 记录时，再次添加新仓库必须更新 id 999 那条，而不是追加重复记录。
+    const old = createRepository(5, { full_name: 'owner/old' });
+    const current = createRepository(999, {
+      full_name: 'owner/old',
+      description: '旧描述',
+      ai_summary: '新仓库的分析结果',
+      ai_tags: ['新标签'],
+    });
+    useAppStore.setState({ repositories: [old, current], searchResults: [] });
+
+    useAppStore.getState().addRepository(createRepository(999, {
+      full_name: 'owner/old',
+      description: '刷新后的描述',
+    }));
+
+    const repositories = useAppStore.getState().repositories;
+    // 不得出现重复 id
+    expect(repositories.map(r => r.id)).toEqual([5, 999]);
+    // id 999 的记录被就地更新，且保留其 AI 分析
+    const updated = repositories.find(r => r.id === 999)!;
+    expect(updated.description).toBe('刷新后的描述');
+    expect(updated.ai_summary).toBe('新仓库的分析结果');
+    expect(updated.ai_tags).toEqual(['新标签']);
+  });
+
+  it('prefers the legacy synthetic record when no exact identity match exists', () => {
+    // 同名 + 合成 id 的历史记录仍应被认领并就地更新（正向场景不被误伤）
+    const legacy = createRepository(1_700_000_000_123, {
+      full_name: 'owner/legacy',
+      ai_summary: 'AI 摘要',
+    });
+    useAppStore.setState({ repositories: [legacy], searchResults: [] });
+
+    useAppStore.getState().addRepository(createRepository(42, {
+      full_name: 'owner/legacy',
+      description: '来自 GitHub 的描述',
+    }));
+
+    const repositories = useAppStore.getState().repositories;
+    expect(repositories).toHaveLength(1);
+    expect(repositories[0]).toMatchObject({
+      id: 1_700_000_000_123,
+      description: '来自 GitHub 的描述',
+      ai_summary: 'AI 摘要',
+    });
+  });
+
   it('keeps the new repo id after AI analysis so the next sync can still match it', () => {
     // 完整链路：复用旧名 → 独立记录 → AI 分析 → 同步仍能按 GitHub id 命中
     const old = createRepository(5, { full_name: 'owner/old' });
