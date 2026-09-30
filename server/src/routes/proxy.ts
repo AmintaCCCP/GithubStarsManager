@@ -353,7 +353,7 @@ router.post('/api/proxy/webdav', async (req, res) => {
   try {
     const db = getDb();
     const { configId, method, path, body: requestBody, headers: extraHeaders,
-      inlineUrl, inlineUsername, inlinePassword } = req.body as {
+      inlineUrl, inlineUsername, inlinePassword, timeoutMs } = req.body as {
       configId?: string;
       method: string;
       path: string;
@@ -362,7 +362,15 @@ router.post('/api/proxy/webdav', async (req, res) => {
       inlineUrl?: string;
       inlineUsername?: string;
       inlinePassword?: string;
+      timeoutMs?: number;
     };
+
+    // path 必须是同源相对路径：否则 `https://dav.example.com` + `@evil.com/x`
+    // 会拼出 userinfo 形式的跨主机 URL。
+    if (typeof path !== 'string' || !path.startsWith('/')) {
+      res.status(400).json({ error: 'path must be an absolute path', code: 'WEBDAV_PATH_INVALID' });
+      return;
+    }
 
     const webdavConfig = configId
       ? (db.prepare('SELECT * FROM webdav_configs WHERE id = ?').get(configId) as Record<string, unknown> | undefined)
@@ -381,6 +389,10 @@ router.post('/api/proxy/webdav', async (req, res) => {
       baseUrl = inlineUrl;
       username = inlineUsername;
       password = inlinePassword;
+    } else if (!configId) {
+      // 既没有已保存配置也没有内联凭据：属于请求参数缺失，而非"配置不存在"
+      res.status(400).json({ error: 'configId required', code: 'CONFIG_ID_REQUIRED' });
+      return;
     } else {
       res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
       return;
@@ -405,19 +417,39 @@ router.post('/api/proxy/webdav', async (req, res) => {
     }
 
     const proxyConfig = getProxyConfig();
+    // 大文件上传的客户端超时可达 300s，服务端必须不早于客户端超时，
+    // 否则代理会先于客户端 abort，上传被服务端单方面掐断。
+    const effectiveTimeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs)
+      ? Math.min(Math.max(Math.trunc(timeoutMs), 1000), 300000)
+      : 60000;
     const result = await proxyRequest({
       url: targetUrl,
       method,
       headers,
       body: requestBody,
-      timeout: 60000,
+      timeout: effectiveTimeout,
       proxyConfig,
       // 用户自有配置来源的 WebDAV 地址：放行回环/私有网段（局域网 NAS 等）
       allowPrivate: true,
+      // PROPFIND 返回 XML、错误返回 HTML：必须原样透传，
+      // 否则 res.json() 会二次编码，listFiles() 拿到的 XML 无法解析。
+      preserveRawResponse: true,
     });
 
     relayRateLimitHeaders(res, result.headers);
-    res.status(result.status).json(result.data);
+
+    // 204/304 不允许带 body；HEAD 的响应体本身为空
+    const bodyless = result.status === 204 || result.status === 304 || method === 'HEAD';
+    const contentType = result.headers['content-type'];
+    if (contentType && !bodyless) {
+      res.setHeader('Content-Type', contentType);
+    }
+    res.status(result.status);
+    if (bodyless) {
+      res.end();
+    } else {
+      res.send(typeof result.data === 'string' ? result.data : String(result.data ?? ''));
+    }
   } catch (err) {
     logger.errorFromError('proxy.webdav', 'WebDAV proxy error', err);
     res.status(500).json({ error: 'WebDAV proxy failed', code: 'WEBDAV_PROXY_FAILED' });

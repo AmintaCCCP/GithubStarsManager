@@ -403,6 +403,77 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
   }
 });
 
+// WebDAV：主进程代发 DAV 请求。
+// 渲染进程开启了 webSecurity，且桌面版以 file:// 为源、又不携带后端，
+// 浏览器直连会被 WebDAV 服务器的 CORS 策略拦下（PROPFIND/MKCOL/PUT 等）。
+// 用 Node fetch（undici）代发可复用应用内已配置的代理，且不受渲染进程 CORS 约束。
+// 主机不设白名单：WebDAV 普遍部署在用户自有的云盘或局域网 NAS 上。
+const WEBDAV_ALLOWED_METHODS = new Set([
+  'GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'OPTIONS',
+  'PROPFIND', 'PROPPATCH', 'MKCOL', 'COPY', 'MOVE', 'LOCK', 'UNLOCK',
+]);
+ipcMain.handle('webdav-request', async (_event, params) => {
+  const { url, method, headers, body, timeoutMs } = params ?? {};
+  if (typeof url !== 'string') {
+    return { success: false, error: 'invalid url' };
+  }
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { success: false, error: 'invalid url' };
+  }
+  // 仅允许 http(s)：避免 file:/data: 等本地协议被主进程读取
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { success: false, error: 'unsupported protocol' };
+  }
+  const upperMethod = typeof method === 'string' ? method.toUpperCase() : '';
+  if (!WEBDAV_ALLOWED_METHODS.has(upperMethod)) {
+    return { success: false, error: 'invalid method' };
+  }
+  // 头值必须是非 CRLF 字符串，防止请求头注入
+  const safeHeaders = {};
+  if (headers && typeof headers === 'object') {
+    for (const [key, value] of Object.entries(headers)) {
+      if (typeof value !== 'string' || /[\r\n]/.test(key) || /[\r\n]/.test(value)) continue;
+      safeHeaders[key] = value;
+    }
+  }
+  // 与前端一致的超时上限（WebDAV 上传最长 300s）
+  const timeout = Number.isFinite(timeoutMs)
+    ? Math.min(Math.max(Math.trunc(timeoutMs), 1000), 300000)
+    : 60000;
+  try {
+    const dispatcher = getFetchDispatcher();
+    const response = await fetch(parsed.toString(), {
+      method: upperMethod,
+      headers: safeHeaders,
+      // GET/HEAD 带 body 会被 undici 拒绝
+      ...(body && upperMethod !== 'GET' && upperMethod !== 'HEAD' ? { body } : {}),
+      signal: AbortSignal.timeout(timeout),
+      ...(dispatcher ? { dispatcher } : {}),
+    });
+    const text = await response.text();
+    return {
+      success: true,
+      status: response.status,
+      statusText: response.statusText,
+      body: text,
+      contentType: response.headers.get('content-type') ?? undefined,
+    };
+  } catch (error) {
+    // 归一超时：渲染进程据此复用既有的 AbortError 提示文案
+    const isTimeout = error?.name === 'TimeoutError' ||
+      error?.name === 'AbortError' ||
+      /timeout/i.test(error instanceof Error ? error.message : String(error));
+    return {
+      success: false,
+      timedOut: isTimeout,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
 // X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
 // （带用户的 auth_token/ct0 Cookie；使用 Node fetch 保持 TLS 指纹并规避 Chromium 对自定义 Header 的限制）
 // 只允许受控操作对应的 URL（调用方不可任意指定 x.com 路径）：

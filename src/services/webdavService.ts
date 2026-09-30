@@ -91,16 +91,24 @@ export class WebDAVService {
   }
 
   /**
-   * 发起 WebDAV 请求。
-   * 后端可用时改走 POST /api/proxy/webdav，由服务端代为请求，规避浏览器 CORS 限制；
-   * 后端不可用（纯静态/本地部署）时回退为浏览器直连。
+   * 发起 WebDAV 请求，按可用性依次选择传输层：
+   * 1. Electron 桌面版：主进程代发（渲染进程没有后端，且 file:// 源同样受 CORS 约束）
+   * 2. 后端可用：POST /api/proxy/webdav，由服务端代为请求
+   * 3. 纯浏览器 / 静态部署：回退为浏览器直连
    * @param requestPath 相对配置 URL 的路径，如 "/backup/data.json"
+   * @param init.timeoutMs 业务级超时，需与调用方的 AbortController 保持一致
    */
   private async davFetch(
     method: string,
     requestPath: string,
-    init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal },
+    init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<Response> {
+    const targetUrl = `${this.config.url}${requestPath}`;
+
+    if (window.electronAPI?.webdavRequest) {
+      return this.desktopDavFetch(method, targetUrl, init);
+    }
+
     if (backend.isAvailable) {
       // Authorization 由后端依据配置生成，避免两份凭据冲突
       const forwardHeaders: Record<string, string> = { ...(init?.headers ?? {}) };
@@ -112,14 +120,49 @@ export class WebDAVService {
         init?.body,
         forwardHeaders,
         { url: this.config.url, username: this.config.username, password: this.config.password },
+        init?.signal,
+        init?.timeoutMs,
       );
     }
 
-    return fetch(`${this.config.url}${requestPath}`, {
+    return fetch(targetUrl, {
       method,
       headers: init?.headers,
       body: init?.body,
       signal: init?.signal,
+    });
+  }
+
+  /**
+   * 桌面版主进程代发 WebDAV 请求，并还原成标准 Response，
+   * 使上层调用方（依赖 response.ok / status / text()）无需区分传输层。
+   */
+  private async desktopDavFetch(
+    method: string,
+    targetUrl: string,
+    init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal; timeoutMs?: number },
+  ): Promise<Response> {
+    const result = await window.electronAPI!.webdavRequest!({
+      url: targetUrl,
+      method,
+      headers: init?.headers ?? {},
+      body: init?.body,
+      timeoutMs: init?.timeoutMs,
+    });
+
+    if (!result.success) {
+      // 归一成 AbortError，让上层沿用既有的超时提示文案
+      if (result.timedOut) {
+        throw new DOMException('WebDAV request timed out', 'AbortError');
+      }
+      throw new TypeError(result.error || 'WebDAV request failed');
+    }
+
+    const bodyless = result.status === 204 || result.status === 304 || method === 'HEAD';
+    return new Response(bodyless ? null : (result.body ?? ''), {
+      status: result.status,
+      statusText: result.statusText,
+      headers: result.contentType ? { 'Content-Type': result.contentType } : undefined,
     });
   }
 
@@ -186,6 +229,7 @@ export class WebDAVService {
             'Authorization': this.getAuthHeader(),
           },
           signal: controller.signal,
+          timeoutMs: 10000,
         });
 
         clearTimeout(timeoutId);
@@ -198,6 +242,7 @@ export class WebDAVService {
             'Authorization': this.getAuthHeader(),
             'Depth': '0',
           },
+          timeoutMs: 10000,
         });
 
         return propfindResponse.ok || propfindResponse.status === 207;
@@ -254,6 +299,7 @@ export class WebDAVService {
             },
             body: compressedContent,
             signal: controller.signal,
+            timeoutMs: dynamicTimeout,
           });
 
           clearTimeout(timeoutId);
@@ -322,6 +368,7 @@ export class WebDAVService {
         try {
           const res = await this.davFetch('MKCOL', currentPath, {
             headers: { 'Authorization': this.getAuthHeader() },
+            timeoutMs: 15000,
           });
 
           // 201 Created（新建）或 405 Method Not Allowed（已存在）都视为成功
@@ -356,6 +403,7 @@ export class WebDAVService {
             'Authorization': this.getAuthHeader(),
           },
           signal: controller.signal,
+          timeoutMs: 30000,
         });
 
         clearTimeout(timeoutId);
@@ -409,6 +457,7 @@ export class WebDAVService {
           'Authorization': this.getAuthHeader(),
         },
         signal: controller.signal,
+        timeoutMs: 10000,
       });
 
       clearTimeout(timeoutId);
@@ -444,6 +493,7 @@ export class WebDAVService {
               </D:prop>
             </D:propfind>`,
           signal: controller.signal,
+          timeoutMs: 15000,
         });
 
         clearTimeout(timeoutId);
@@ -563,6 +613,7 @@ export class WebDAVService {
         headers: {
           'Authorization': this.getAuthHeader(),
         },
+        timeoutMs: 10000,
       });
 
       if (response.ok) {
