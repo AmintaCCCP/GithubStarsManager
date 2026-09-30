@@ -35,52 +35,74 @@ export const buildSearchPatch = (
 };
 
 /**
- * 星标同步的本地记录索引：id 优先，full_name（大小写不敏感）兜底。
+ * 为整批同步输入分配本地记录，结果与 `newRepos` 一一对齐（`undefined` = 新增）。
  *
- * 兜底的原因：批量 Star 早期版本会给新仓库分配合成 id，本地记录的 id 与 GitHub
- * 真实 id 对不上，仅按 id 匹配会失配 → 整条采用裸 GitHub 数据，抹掉已完成的
- * AI 分析与分类标签。兜底让这批存量数据在下一次同步时自动修复。
+ * 两遍分配，且第二遍一对一：
+ * 1. 先用 id 匹配**整批**输入，把命中的本地记录全部标记为「已占用」。
+ * 2. 再对剩余未匹配输入做 full_name 兜底，跳过已被占用的本地记录。
  *
- * 合并与「新增仓库计数」必须共用同一索引，否则被 full_name 兜底救回的存量仓库
- * 会被误报为新增，弹出错误的「发现 N 个新仓库」提示。
+ * 为什么必须分两遍：GitHub 允许新仓库复用刚改完名的旧仓库名。若本地是
+ * `{ id: 1, full_name: 'owner/old' }`，而本批输入同时包含改名的
+ * `{ id: 1, full_name: 'owner/new' }` 与复用旧名的 `{ id: 2, full_name: 'owner/old' }`，
+ * 单遍匹配会让两条输入都命中同一条本地记录 → 产出两条 `id: 1` 的记录，
+ * 并把旧仓库的 AI 分析与分类复制到新仓库上。分两遍后，id:1 先被占用，
+ * 名称兜底只能落到真正的新增仓库上，结果也与输入顺序无关。
  */
-interface StarredRepositoryIndex {
-  byId: Map<number, Repository>;
-  byFullName: Map<string, Repository>;
-}
+const assignStarredRepositories = (
+  newRepos: Repository[],
+  storeRepos: Repository[],
+): Array<Repository | undefined> => {
+  const assignments: Array<Repository | undefined> = new Array(newRepos.length).fill(undefined);
+  if (newRepos.length === 0 || storeRepos.length === 0) return assignments;
 
-const buildStarredRepositoryIndex = (storeRepos: Repository[]): StarredRepositoryIndex => ({
-  byId: new Map(storeRepos.map(repo => [repo.id, repo])),
-  byFullName: new Map(
+  const byId = new Map(storeRepos.map(repo => [repo.id, repo]));
+  const byFullName = new Map(
     storeRepos
       .filter(repo => Boolean(repo.full_name))
       .map(repo => [repo.full_name.toLowerCase(), repo]),
-  ),
-});
+  );
 
-const matchStarredRepository = (
-  newRepo: Repository,
-  index: StarredRepositoryIndex,
-): Repository | undefined => index.byId.get(newRepo.id)
-  ?? (newRepo.full_name ? index.byFullName.get(newRepo.full_name.toLowerCase()) : undefined);
+  // 本地记录是否已被某一输入占用。用 full_name 作键：不同仓库的 id 理论上唯一，
+  // 但同一 full_name 可能在异常数据中重复，用它能保证「同一份本地记录只被用一次」。
+  const claimed = new Set<string>();
+
+  // 第一遍：整批 id 匹配，先把命中的本地记录全部占住。
+  newRepos.forEach((newRepo, index) => {
+    const existing = byId.get(newRepo.id);
+    if (!existing) return;
+    assignments[index] = existing;
+    claimed.add(existing.full_name);
+  });
+
+  // 第二遍：仅对未匹配输入做 full_name 兜底，跳过已被第一遍占用的记录。
+  newRepos.forEach((newRepo, index) => {
+    if (assignments[index] || !newRepo.full_name) return;
+    const existing = byFullName.get(newRepo.full_name.toLowerCase());
+    if (!existing || claimed.has(existing.full_name)) return;
+    assignments[index] = existing;
+    claimed.add(existing.full_name);
+  });
+
+  return assignments;
+};
 
 /** 统计本次同步中真正新增的仓库数（与合并口径一致）。 */
 export const countNewStarredRepositories = (
   newRepos: Repository[],
   storeRepos: Repository[],
-): number => {
-  const index = buildStarredRepositoryIndex(storeRepos);
-  return newRepos.filter(repo => !matchStarredRepository(repo, index)).length;
-};
+): number => assignStarredRepositories(newRepos, storeRepos)
+  .filter(assignment => assignment === undefined).length;
 
 // SearchBar 725-750：星标同步结果与本地仓库逐字段合并（license `?? null` 回填）。
 export const mergeStarredRepositories = (
   newRepos: Repository[],
   storeRepos: Repository[],
 ): Repository[] => {
-  const index = buildStarredRepositoryIndex(storeRepos);
-  return newRepos.map(newRepo => {
-    const existing = matchStarredRepository(newRepo, index);
+  // 与 countNewStarredRepositories 共用同一套分配结果，保证「合并」与
+  // 「新增计数」口径一致，且名称兜底不会把同一份本地记录重复用掉。
+  const assignments = assignStarredRepositories(newRepos, storeRepos);
+  return newRepos.map((newRepo, index) => {
+    const existing = assignments[index];
     if (existing) {
       return {
         ...existing,
