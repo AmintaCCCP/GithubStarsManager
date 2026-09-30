@@ -674,18 +674,33 @@ describe('useAppStore repository performance guards', () => {
     expect(added?.id).toBe(765_432_1);
   });
 
-  it('falls back to a synthetic id when the GitHub id collides with a different repository', () => {
-    const existing = createRepository(1);
+  it('updates a renamed repository by its real GitHub id instead of adding a duplicate', () => {
+    // 回归（CodeRabbit r4145581832）：id 是权威身份，改名只换 full_name。
+    // 同一 id 却不同名时必须就地更新，否则同一仓库会出现两条记录。
+    const existing = createRepository(1, {
+      full_name: 'owner/old',
+      ai_summary: '旧仓库分析',
+      custom_category: '工具',
+      category_locked: true,
+    });
     useAppStore.setState({ repositories: [existing], searchResults: [] });
 
-    // 同一个 id 但 full_name 不同：不能覆盖既有记录，退回合成 id
-    useAppStore.getState().addRepository(createRepository(1, { full_name: 'owner/other' }));
+    useAppStore.getState().addRepository(createRepository(1, {
+      full_name: 'owner/new',
+      description: '改名后的描述',
+    }));
 
     const repositories = useAppStore.getState().repositories;
-    expect(repositories).toHaveLength(2);
-    const added = repositories.find(r => r.full_name === 'owner/other');
-    expect(added?.id).not.toBe(1);
-    expect(added?.id).toBeGreaterThan(0);
+    expect(repositories).toHaveLength(1);
+    expect(repositories[0]).toMatchObject({
+      id: 1,
+      full_name: 'owner/new',
+      description: '改名后的描述',
+      // 本地 AI 分析与自定义字段保留
+      ai_summary: '旧仓库分析',
+      custom_category: '工具',
+      category_locked: true,
+    });
   });
 
   it('keeps AI analysis and custom category when re-adding an existing repository', () => {

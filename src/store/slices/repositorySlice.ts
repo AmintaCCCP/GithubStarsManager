@@ -28,28 +28,14 @@ export const isLegacySyntheticIdRecord = (repo: Pick<Repository, 'id'>): boolean
   repo.id >= SYNTHETIC_REPOSITORY_ID_FLOOR;
 
 /**
- * 解析一条新仓库应沿用的 GitHub 真实 id。
+ * 校验入参自带的 GitHub 仓库 id 是否可用（正整数）。
  *
- * 批量从链接 Star、发现页 Star 得到的仓库都自带 GitHub id，后续「同步」按 id
- * 匹配本地记录以保留 AI 分析（ai_summary / ai_tags / custom_category 等）。
- * 若这里改用合成 id，同步时 `mergeStarredRepositories` 按 GitHub id 查不到本地
- * 记录，会整条采用裸 GitHub 数据，从而抹掉已完成的 AI 分析与分类标签。
- *
- * 返回 null 表示该 id 不可用（非正整数、或已被另一条 full_name 不同的记录占用），
- * 调用方需退回合成 id。
+ * 不可用时（缺字段、非整数、<= 0）返回 null，调用方退回合成 id。
+ * 注意此处**不做**「已被别的记录占用」的冲突判定：id 就是权威身份，
+ * 命中同一 id 即同一仓库（改名只换 full_name），应由更新分支处理而非另建记录。
  */
-const resolveGitHubRepositoryId = (
-  repo: Repository,
-  existingRepositories: Repository[],
-): number | null => {
-  if (typeof repo.id !== 'number' || !Number.isInteger(repo.id) || repo.id <= 0) {
-    return null;
-  }
-  const conflicting = existingRepositories.find(
-    (existing) => existing.id === repo.id && existing.full_name !== repo.full_name,
-  );
-  return conflicting ? null : repo.id;
-};
+const resolveGitHubRepositoryId = (repo: Repository): number | null =>
+  typeof repo.id === 'number' && Number.isInteger(repo.id) && repo.id > 0 ? repo.id : null;
 
 /** 合成一个不与现有记录冲突的本地 id（timestamp + random，避免并发竞态）。 */
 const generateFallbackRepositoryId = (existingRepositories: Repository[]): number => {
@@ -161,16 +147,16 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         };
       }),
       addRepository: (repo) => set((state) => {
-        // 同名记录的选取必须按 GitHub 身份优先，不能只取第一条同名记录：
-        // 下方允许「同名但身份不同」的仓库并存，因此列表里可能同时存在旧真实 id
-        // 与新真实 id 的同名记录。若仍取第一条，再次添加同一仓库时会跳过更新
-        // 分支而追加一条重复记录。
-        // 1) 优先 full_name 与 id 都命中（即同一 GitHub 身份）；
-        // 2) 其次才是「同名 + 合成 id」的历史记录（缺失权威身份，名称是唯一线索）；
-        // 3) 都不命中 ⇒ 同名但属于另一个 GitHub 仓库，按新仓库处理。
-        const exactIdentityIndex = state.repositories.findIndex(
-          r => r.full_name === repo.full_name && r.id === repo.id,
-        );
+        // 待更新记录的选取顺序（身份优先，不能只取第一条同名）：
+        // 1) **真实 GitHub id 命中** ⇒ 同一仓库。id 是权威身份，改名只换 full_name，
+        //    所以这里只比对 id、不比对 full_name。必须放在最前，否则 rename 会被
+        //    当成新仓库追加，导致同一仓库出现两条记录。
+        // 2) 同名 + 合成 id 的历史记录 ⇒ 缺失权威身份，名称是唯一线索。
+        // 3) 都不命中 ⇒ 新增：要么本地没有该仓库，要么同名但属于另一个仓库。
+        const hasValidGitHubId = Number.isInteger(repo.id) && repo.id > 0;
+        const exactIdentityIndex = hasValidGitHubId
+          ? state.repositories.findIndex(r => r.id === repo.id)
+          : -1;
         const legacySyntheticIndex = state.repositories.findIndex(
           r => r.full_name === repo.full_name && isLegacySyntheticIdRecord(r),
         );
@@ -179,7 +165,8 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         let updatedRepositories;
 
         if (existing) {
-          // 同一 GitHub 身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）
+          // 同一 GitHub 身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）。
+          // 入参是完整 GitHub 数据，full_name 等源字段随之刷新（改名即在此生效）。
           updatedRepositories = [...state.repositories];
           updatedRepositories[existingRepoIndex] = {
             ...repo,
@@ -202,14 +189,14 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             analysis_error: repo.analysis_error ?? existing.analysis_error,
           };
         } else {
-          // 新增为独立记录：要么本地没有同名记录，要么同名但属于**另一个** GitHub
-          // 仓库。此时绝不能沿用 existing.id —— 否则新仓库会被写到旧仓库的 ID 下：
+          // 新增为独立记录：本地没有该仓库，或同名但属于**另一个** GitHub 仓库。
+          // 此时绝不能沿用 existing.id —— 否则新仓库会被写到旧仓库的 ID 下：
           // 用户对新仓库做完 AI 分析后，下次同步按 GitHub ID 匹配不到本地记录
           // （id 不同，且名称兜底只认领合成 id 记录），分析结果会再次丢失；
           // 若旧仓库仍在星标里，新仓库的分析还会被错误归属到旧仓库。
-          // 优先沿用 GitHub 真实 id；仅当 id 非法或已被别的记录占用时，才退回
-          // 合成 id（timestamp + random，确保唯一性，避免并发竞态）。
-          const githubId = resolveGitHubRepositoryId(repo, state.repositories);
+          // 优先沿用入参的 GitHub 真实 id；仅当 id 不可用时，才退回合成 id
+          // （timestamp + random，确保唯一性，避免并发竞态）。
+          const githubId = resolveGitHubRepositoryId(repo);
 
           updatedRepositories = githubId !== null
             ? [...state.repositories, { ...repo, id: githubId }]
