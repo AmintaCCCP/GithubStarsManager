@@ -9,33 +9,7 @@ import { buildListsPushPlan, validateListsPushPlan, GITHUB_LISTS_MAX_COUNT, GITH
 import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
 import { shouldPreserveExisting } from '../helpers/accountWorkspace';
-
-/** 合成 id 的下界。真实 GitHub 仓库 id 远小于该值（当前量级 < 1e10），而
- * `generateFallbackRepositoryId` 产出的合成 id 形如 `Date.now() + random`
- * （约 1.8e12）。因此 `id >= 该阈值` ⇒ 该记录必定来自批量 Star 的历史合成 id。
- */
-export const SYNTHETIC_REPOSITORY_ID_FLOOR = 1e11;
-
-/**
- * 判断一条本地记录是否「缺失权威 GitHub 身份」，即它是合成 id 的历史记录。
- *
- * 只有这类记录才允许在其他路径（同步的名称兜底、重复添加时保留 AI 字段）
- * 按名称认领：它们本就没有 GitHub id，名称是唯一线索。反之，带真实 GitHub id
- * 的记录身份是权威的 —— id 对不上说明该仓库已被改名或删除，此时按名称认领
- * 会让复用旧名的新仓库错误继承旧仓库的 AI 分析与分类。
- */
-export const isLegacySyntheticIdRecord = (repo: Pick<Repository, 'id'>): boolean =>
-  repo.id >= SYNTHETIC_REPOSITORY_ID_FLOOR;
-
-/**
- * 校验入参自带的 GitHub 仓库 id 是否可用（正整数）。
- *
- * 不可用时（缺字段、非整数、<= 0）返回 null，调用方退回合成 id。
- * 注意此处**不做**「已被别的记录占用」的冲突判定：id 就是权威身份，
- * 命中同一 id 即同一仓库（改名只换 full_name），应由更新分支处理而非另建记录。
- */
-const resolveGitHubRepositoryId = (repo: Repository): number | null =>
-  typeof repo.id === 'number' && Number.isInteger(repo.id) && repo.id > 0 ? repo.id : null;
+import { findIdentityMatch, isValidGitHubRepositoryId } from '../../utils/repositoryIdentity';
 
 /** 合成一个不与现有记录冲突的本地 id（timestamp + random，避免并发竞态）。 */
 const generateFallbackRepositoryId = (existingRepositories: Repository[]): number => {
@@ -147,26 +121,15 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         };
       }),
       addRepository: (repo) => set((state) => {
-        // 待更新记录的选取顺序（身份优先，不能只取第一条同名）：
-        // 1) **真实 GitHub id 命中** ⇒ 同一仓库。id 是权威身份，改名只换 full_name，
-        //    所以这里只比对 id、不比对 full_name。必须放在最前，否则 rename 会被
-        //    当成新仓库追加，导致同一仓库出现两条记录。
-        // 2) 同名 + 合成 id 的历史记录 ⇒ 缺失权威身份，名称是唯一线索。
-        // 3) 都不命中 ⇒ 新增：要么本地没有该仓库，要么同名但属于另一个仓库。
-        const hasValidGitHubId = Number.isInteger(repo.id) && repo.id > 0;
-        const exactIdentityIndex = hasValidGitHubId
-          ? state.repositories.findIndex(r => r.id === repo.id)
-          : -1;
-        const legacySyntheticIndex = state.repositories.findIndex(
-          r => r.full_name === repo.full_name && isLegacySyntheticIdRecord(r),
-        );
-        const existingRepoIndex = exactIdentityIndex >= 0 ? exactIdentityIndex : legacySyntheticIndex;
-        const existing = existingRepoIndex >= 0 ? state.repositories[existingRepoIndex] : undefined;
+        // 身份判定统一走 findIdentityMatch（id 优先，合成 id 的名称兜底其次）——
+        // 与星标同步 mergeStarredRepositories 共用同一份规则，避免两处口径漂移。
+        const existing = findIdentityMatch(repo, state.repositories);
         let updatedRepositories;
 
         if (existing) {
           // 同一 GitHub 身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）。
           // 入参是完整 GitHub 数据，full_name 等源字段随之刷新（改名即在此生效）。
+          const existingRepoIndex = state.repositories.indexOf(existing);
           updatedRepositories = [...state.repositories];
           updatedRepositories[existingRepoIndex] = {
             ...repo,
@@ -196,10 +159,8 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           // 若旧仓库仍在星标里，新仓库的分析还会被错误归属到旧仓库。
           // 优先沿用入参的 GitHub 真实 id；仅当 id 不可用时，才退回合成 id
           // （timestamp + random，确保唯一性，避免并发竞态）。
-          const githubId = resolveGitHubRepositoryId(repo);
-
-          updatedRepositories = githubId !== null
-            ? [...state.repositories, { ...repo, id: githubId }]
+          updatedRepositories = isValidGitHubRepositoryId(repo.id)
+            ? [...state.repositories, { ...repo, id: repo.id }]
             : [...state.repositories, { ...repo, id: generateFallbackRepositoryId(state.repositories) }];
         }
 

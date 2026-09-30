@@ -279,9 +279,10 @@ describe('useDiscoveryRepoActions.executeUnstar', () => {
     storeState = createStoreState();
   });
 
-  it('deletes the local repository by full_name, forces sync, and never toasts on success', async () => {
+  it('deletes the local repository sharing the GitHub id, forces sync, and never toasts on success', async () => {
     mocks.unstarRepository.mockResolvedValue(undefined);
-    storeState.repositories = [{ id: 42, full_name: repo.full_name }];
+    // 同一 GitHub 身份：本地记录与发现页条目 id 相同
+    storeState.repositories = [{ id: repo.id, full_name: repo.full_name }];
     const { result, rerender } = renderHook(() => useDiscoveryRepoActions({ repo }));
     rerender();
     expect(result.current.isStarred).toBe(true);
@@ -289,7 +290,7 @@ describe('useDiscoveryRepoActions.executeUnstar', () => {
     await act(async () => { await result.current.executeUnstar(); });
 
     expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'discovered-repo');
-    expect(storeState.deleteRepository).toHaveBeenCalledWith(42);
+    expect(storeState.deleteRepository).toHaveBeenCalledWith(repo.id);
     const unstarOrder = mocks.unstarRepository.mock.invocationCallOrder[0];
     const deleteOrder = storeState.deleteRepository.mock.invocationCallOrder[0];
     const syncOrder = mocks.forceSyncToBackend.mock.invocationCallOrder[0];
@@ -297,6 +298,37 @@ describe('useDiscoveryRepoActions.executeUnstar', () => {
     expect(deleteOrder).toBeLessThan(syncOrder);
     expect(result.current.optimisticStarred).toBeNull();
     expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('deletes a legacy synthetic-id record by name fallback', async () => {
+    mocks.unstarRepository.mockResolvedValue(undefined);
+    // 批量 Star 遗留的合成 id 记录：id 与发现有差异，但缺失权威身份，按名称认领
+    const legacyId = 1_700_000_000_042;
+    storeState.repositories = [{ id: legacyId, full_name: repo.full_name }];
+    const { result, rerender } = renderHook(() => useDiscoveryRepoActions({ repo }));
+    rerender();
+    expect(result.current.isStarred).toBe(true);
+
+    await act(async () => { await result.current.executeUnstar(); });
+
+    expect(storeState.deleteRepository).toHaveBeenCalledWith(legacyId);
+  });
+
+  it('does not delete an unrelated record that merely reuses the name', async () => {
+    // 回归：本地那条带真实 id 的记录是「已改名/删除的旧仓库」，其旧名被当前
+    // 发现页条目复用。二者不是同一仓库 —— 不得误判为已 Star，也不得删错记录。
+    mocks.unstarRepository.mockResolvedValue(undefined);
+    storeState.repositories = [{ id: 999, full_name: repo.full_name }];
+    const { result, rerender } = renderHook(() => useDiscoveryRepoActions({ repo }));
+    rerender();
+
+    // 不应被误判为已在库中
+    expect(result.current.isStarred).toBe(false);
+
+    await act(async () => { await result.current.executeUnstar(); });
+
+    // 取消 Star 的对象是 id 7，与本地 id 999 无关，不得删除该记录
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
   });
 
   it('rolls back the optimistic state and toasts on failure', async () => {

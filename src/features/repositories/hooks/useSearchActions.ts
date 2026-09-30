@@ -12,7 +12,7 @@ import type { GitHubList } from '../../../services/githubListsApi';
 import type { VectorQueryResult } from '../../../services/vectorSearchService';
 import { isReservedCategoryName } from '../../../utils/categoryUtils';
 import { performBasicTextSearch } from '../../../utils/repoSearch';
-import { isLegacySyntheticIdRecord } from '../../../store/slices/repositorySlice';
+import { assignIdentityMatches } from '../../../utils/repositoryIdentity';
 
 // ===== 提纯纯函数（来源逐字对应 SearchBar 基线行号） =====
 
@@ -36,59 +36,15 @@ export const buildSearchPatch = (
 };
 
 /**
- * 为整批同步输入分配本地记录，结果与 `newRepos` 一一对齐（`undefined` = 新增）。
+ * 星标同步的分配结果：与 `newRepos` 一一对齐（`undefined` = 新增）。
  *
- * 两遍分配，且第二遍一对一：
- * 1. 先用 id 匹配**整批**输入，把命中的本地记录全部标记为「已占用」。
- * 2. 再对剩余未匹配输入做 full_name 兜底，跳过已被占用的本地记录，
- *    并且只认领「合成 id 的历史记录」（见 isLegacySyntheticIdRecord）。
- *
- * 为什么必须分两遍：GitHub 允许新仓库复用刚改完名的旧仓库名。若本地是
- * `{ id: 1, full_name: 'owner/old' }`，而本批输入同时包含改名的
- * `{ id: 1, full_name: 'owner/new' }` 与复用旧名的 `{ id: 2, full_name: 'owner/old' }`，
- * 单遍匹配会让两条输入都命中同一条本地记录 → 产出两条 `id: 1` 的记录，
- * 并把旧仓库的 AI 分析与分类复制到新仓库上。分两遍后，id:1 先被占用，
- * 名称兜底只能落到真正的新增仓库上，结果也与输入顺序无关。
+ * 规则本体在 `utils/repositoryIdentity`（id 优先，合成 id 的名称兜底其次），
+ * 与 `addRepository` 共用同一份实现，避免两处口径漂移。
  */
 const assignStarredRepositories = (
   newRepos: Repository[],
   storeRepos: Repository[],
-): Array<Repository | undefined> => {
-  const assignments: Array<Repository | undefined> = new Array(newRepos.length).fill(undefined);
-  if (newRepos.length === 0 || storeRepos.length === 0) return assignments;
-
-  const byId = new Map(storeRepos.map(repo => [repo.id, repo]));
-  // 名称兜底索引只收录「合成 id 的历史记录」：带真实 GitHub id 的记录不参与，
-  // 避免旧仓库被改名/删除后，名称被新仓库复用而导致 AI 分析与分类错误归属。
-  const legacyByFullName = new Map(
-    storeRepos
-      .filter(repo => Boolean(repo.full_name) && isLegacySyntheticIdRecord(repo))
-      .map(repo => [repo.full_name.toLowerCase(), repo]),
-  );
-
-  // 本地记录是否已被某一输入占用。用 full_name 作键：不同仓库的 id 理论上唯一，
-  // 但同一 full_name 可能在异常数据中重复，用它能保证「同一份本地记录只被用一次」。
-  const claimed = new Set<string>();
-
-  // 第一遍：整批 id 匹配，先把命中的本地记录全部占住。
-  newRepos.forEach((newRepo, index) => {
-    const existing = byId.get(newRepo.id);
-    if (!existing) return;
-    assignments[index] = existing;
-    claimed.add(existing.full_name);
-  });
-
-  // 第二遍：仅对未匹配输入做 full_name 兜底，跳过已被第一遍占用的记录。
-  newRepos.forEach((newRepo, index) => {
-    if (assignments[index] || !newRepo.full_name) return;
-    const existing = legacyByFullName.get(newRepo.full_name.toLowerCase());
-    if (!existing || claimed.has(existing.full_name)) return;
-    assignments[index] = existing;
-    claimed.add(existing.full_name);
-  });
-
-  return assignments;
-};
+): Array<Repository | undefined> => assignIdentityMatches(newRepos, storeRepos);
 
 /** 统计本次同步中真正新增的仓库数（与合并口径一致）。 */
 export const countNewStarredRepositories = (
