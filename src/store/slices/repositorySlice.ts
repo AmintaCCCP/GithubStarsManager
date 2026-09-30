@@ -9,6 +9,17 @@ import { buildListsPushPlan, validateListsPushPlan, GITHUB_LISTS_MAX_COUNT, GITH
 import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
 import { shouldPreserveExisting } from '../helpers/accountWorkspace';
+import { findIdentityMatch, isValidGitHubRepositoryId } from '../../utils/repositoryIdentity';
+
+/** 合成一个不与现有记录冲突的本地 id（timestamp + random，避免并发竞态）。 */
+const generateFallbackRepositoryId = (existingRepositories: Repository[]): number => {
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 10000);
+  const maxExistingId = existingRepositories.length > 0
+    ? Math.max(...existingRepositories.map((r) => r.id))
+    : 0;
+  return Math.max(timestamp, maxExistingId + 1) + random;
+};
 
 export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setRepositories'
@@ -110,34 +121,47 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         };
       }),
       addRepository: (repo) => set((state) => {
-        // 检查是否已存在相同 full_name 的仓库
-        const existingRepoIndex = state.repositories.findIndex(r => r.full_name === repo.full_name);
+        // 身份判定统一走 findIdentityMatch（id 优先，合成 id 的名称兜底其次）——
+        // 与星标同步 mergeStarredRepositories 共用同一份规则，避免两处口径漂移。
+        const existing = findIdentityMatch(repo, state.repositories);
         let updatedRepositories;
 
-        if (existingRepoIndex >= 0) {
-          // 如果存在，更新现有仓库（保留ID）
+        if (existing) {
+          // 同一 GitHub 身份：更新现有仓库（沿用其 ID，保留 AI 分析与自定义字段）。
+          // 入参是完整 GitHub 数据，full_name 等源字段随之刷新（改名即在此生效）。
+          const existingRepoIndex = state.repositories.indexOf(existing);
           updatedRepositories = [...state.repositories];
           updatedRepositories[existingRepoIndex] = {
             ...repo,
-            id: updatedRepositories[existingRepoIndex].id,
+            id: existing.id,
             // 保留自定义编辑的内容
-            custom_description: updatedRepositories[existingRepoIndex].custom_description,
-            custom_tags: updatedRepositories[existingRepoIndex].custom_tags,
-            custom_category: updatedRepositories[existingRepoIndex].custom_category,
-            category_locked: updatedRepositories[existingRepoIndex].category_locked,
-            last_edited: updatedRepositories[existingRepoIndex].last_edited,
-            subscribed_to_releases: updatedRepositories[existingRepoIndex].subscribed_to_releases,
+            custom_description: existing.custom_description,
+            custom_tags: existing.custom_tags,
+            custom_category: existing.custom_category,
+            category_locked: existing.category_locked,
+            last_edited: existing.last_edited,
+            subscribed_to_releases: existing.subscribed_to_releases,
+            // 保留已完成的 AI 分析：入参来自 GitHub 详情 / 发现页数据，
+            // 不带这些字段，直接展开会把已有 AI 摘要与标签清空。
+            // 用 `?? existing.x` 而非无条件回填：入参若显式带了新值则采用新值。
+            ai_summary: repo.ai_summary ?? existing.ai_summary,
+            ai_tags: repo.ai_tags ?? existing.ai_tags,
+            ai_platforms: repo.ai_platforms ?? existing.ai_platforms,
+            analyzed_at: repo.analyzed_at ?? existing.analyzed_at,
+            analysis_failed: repo.analysis_failed ?? existing.analysis_failed,
+            analysis_error: repo.analysis_error ?? existing.analysis_error,
           };
         } else {
-          // 如果不存在，添加新仓库（生成新ID）
-          // 使用 timestamp + random 确保唯一性，避免并发时的竞态条件
-          const timestamp = Date.now();
-          const random = Math.floor(Math.random() * 10000);
-          const maxExistingId = state.repositories.length > 0
-            ? Math.max(...state.repositories.map(r => r.id))
-            : 0;
-          const newId = Math.max(timestamp, maxExistingId + 1) + random;
-          updatedRepositories = [...state.repositories, { ...repo, id: newId }];
+          // 新增为独立记录：本地没有该仓库，或同名但属于**另一个** GitHub 仓库。
+          // 此时绝不能沿用 existing.id —— 否则新仓库会被写到旧仓库的 ID 下：
+          // 用户对新仓库做完 AI 分析后，下次同步按 GitHub ID 匹配不到本地记录
+          // （id 不同，且名称兜底只认领合成 id 记录），分析结果会再次丢失；
+          // 若旧仓库仍在星标里，新仓库的分析还会被错误归属到旧仓库。
+          // 优先沿用入参的 GitHub 真实 id；仅当 id 不可用时，才退回合成 id
+          // （timestamp + random，确保唯一性，避免并发竞态）。
+          updatedRepositories = isValidGitHubRepositoryId(repo.id)
+            ? [...state.repositories, { ...repo, id: repo.id }]
+            : [...state.repositories, { ...repo, id: generateFallbackRepositoryId(state.repositories) }];
         }
 
         return {
