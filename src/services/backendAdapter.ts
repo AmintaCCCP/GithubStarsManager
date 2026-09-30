@@ -623,13 +623,28 @@ class BackendAdapter {
 
   // === WebDAV Proxy ===
 
-  async proxyWebDAV(configId: string, method: string, path: string, body?: string, headers?: Record<string, string>): Promise<Response> {
+  async proxyWebDAV(
+    configId: string,
+    method: string,
+    path: string,
+    body?: string,
+    headers?: Record<string, string>,
+    inlineConfig?: { url: string; username: string; password: string },
+  ): Promise<Response> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     return this.fetchWithTimeout(`${this._backendUrl}/proxy/webdav`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ configId, method, path, body, headers })
+      body: JSON.stringify({
+        configId, method, path, body, headers,
+        // 配置尚未同步到后端时（例如"测试连接"发生在保存之前），由前端直接带上凭据
+        ...(inlineConfig ? {
+          inlineUrl: inlineConfig.url,
+          inlineUsername: inlineConfig.username,
+          inlinePassword: inlineConfig.password,
+        } : {}),
+      })
     });
   }
 

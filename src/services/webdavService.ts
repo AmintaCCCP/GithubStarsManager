@@ -1,5 +1,6 @@
 import { WebDAVConfig } from '../types';
 import { logger } from './logger';
+import { backend } from './backendAdapter';
 
 export class WebDAVService {
   private config: WebDAVConfig;
@@ -83,6 +84,45 @@ export class WebDAVService {
     return `${this.config.url}${basePath}${filename}`;
   }
 
+  // 相对配置 URL 的路径（不含协议与主机），用于交给后端代理
+  private getRelativePath(filename: string): string {
+    const basePath = this.config.path.endsWith('/') ? this.config.path : `${this.config.path}/`;
+    return `${basePath}${filename}`;
+  }
+
+  /**
+   * 发起 WebDAV 请求。
+   * 后端可用时改走 POST /api/proxy/webdav，由服务端代为请求，规避浏览器 CORS 限制；
+   * 后端不可用（纯静态/本地部署）时回退为浏览器直连。
+   * @param requestPath 相对配置 URL 的路径，如 "/backup/data.json"
+   */
+  private async davFetch(
+    method: string,
+    requestPath: string,
+    init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal },
+  ): Promise<Response> {
+    if (backend.isAvailable) {
+      // Authorization 由后端依据配置生成，避免两份凭据冲突
+      const forwardHeaders: Record<string, string> = { ...(init?.headers ?? {}) };
+      delete forwardHeaders['Authorization'];
+      return backend.proxyWebDAV(
+        this.config.id,
+        method,
+        requestPath,
+        init?.body,
+        forwardHeaders,
+        { url: this.config.url, username: this.config.username, password: this.config.password },
+      );
+    }
+
+    return fetch(`${this.config.url}${requestPath}`, {
+      method,
+      headers: init?.headers,
+      body: init?.body,
+      signal: init?.signal,
+    });
+  }
+
   private handleNetworkError(error: unknown, operation: string): never {
     logger.error('webdav', `WebDAV ${operation} failed`, error);
     
@@ -134,16 +174,14 @@ export class WebDAVService {
         throw new Error('WebDAV URL必须以 http:// 或 https:// 开头');
       }
 
-      // 构建用于测试的目录URL（优先测试配置中的 path）
-      const dirUrl = `${this.config.url}${this.config.path}`;
+      // 测试配置中的 path（交由 davFetch 决定走后端代理还是浏览器直连）
 
       // 先尝试 HEAD 请求检测基本可达性（某些服务器对 PROPFIND/OPTIONS 支持较差）
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
       try {
-        const headResponse = await fetch(dirUrl, {
-          method: 'HEAD',
+        const headResponse = await this.davFetch('HEAD', this.config.path, {
           headers: {
             'Authorization': this.getAuthHeader(),
           },
@@ -155,8 +193,7 @@ export class WebDAVService {
         if (headResponse.ok) return true;
 
         // HEAD 不可用时，尝试 PROPFIND（不少服务器返回 207 Multi-Status 表示成功）
-        const propfindResponse = await fetch(dirUrl, {
-          method: 'PROPFIND',
+        const propfindResponse = await this.davFetch('PROPFIND', this.config.path, {
           headers: {
             'Authorization': this.getAuthHeader(),
             'Depth': '0',
@@ -210,8 +247,7 @@ export class WebDAVService {
         const startTime = Date.now();
 
         try {
-          const response = await fetch(this.getFullPath(filename), {
-            method: 'PUT',
+          const response = await this.davFetch('PUT', this.getRelativePath(filename), {
             headers: {
               'Authorization': this.getAuthHeader(),
               'Content-Type': 'application/json',
@@ -283,10 +319,8 @@ export class WebDAVService {
 
       for (const seg of segments) {
         currentPath += `/${seg}`;
-        const full = `${this.config.url}${currentPath}`;
         try {
-          const res = await fetch(full, {
-            method: 'MKCOL',
+          const res = await this.davFetch('MKCOL', currentPath, {
             headers: { 'Authorization': this.getAuthHeader() },
           });
 
@@ -317,8 +351,7 @@ export class WebDAVService {
       const startTime = Date.now();
 
       try {
-        const response = await fetch(this.getFullPath(filename), {
-          method: 'GET',
+        const response = await this.davFetch('GET', this.getRelativePath(filename), {
           headers: {
             'Authorization': this.getAuthHeader(),
           },
@@ -371,8 +404,7 @@ export class WebDAVService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
-      const response = await fetch(this.getFullPath(filename), {
-        method: 'HEAD',
+      const response = await this.davFetch('HEAD', this.getRelativePath(filename), {
         headers: {
           'Authorization': this.getAuthHeader(),
         },
@@ -397,8 +429,7 @@ export class WebDAVService {
         const basePath = this.config.path.endsWith('/') ? this.config.path : `${this.config.path}/`;
         const collectionUrl = `${this.config.url}${basePath}`;
 
-        const response = await fetch(collectionUrl, {
-          method: 'PROPFIND',
+        const response = await this.davFetch('PROPFIND', basePath, {
           headers: {
             'Authorization': this.getAuthHeader(),
             'Depth': '1',
@@ -528,8 +559,7 @@ export class WebDAVService {
   // 新增：获取服务器信息
   async getServerInfo(): Promise<{ server?: string; davLevel?: string }> {
     try {
-      const response = await fetch(this.config.url, {
-        method: 'OPTIONS',
+      const response = await this.davFetch('OPTIONS', '', {
         headers: {
           'Authorization': this.getAuthHeader(),
         },
