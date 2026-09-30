@@ -12,6 +12,7 @@ import type { GitHubList } from '../../../services/githubListsApi';
 import type { VectorQueryResult } from '../../../services/vectorSearchService';
 import { isReservedCategoryName } from '../../../utils/categoryUtils';
 import { performBasicTextSearch } from '../../../utils/repoSearch';
+import { isLegacySyntheticIdRecord } from '../../../store/slices/repositorySlice';
 
 // ===== 提纯纯函数（来源逐字对应 SearchBar 基线行号） =====
 
@@ -33,23 +34,6 @@ export const buildSearchPatch = (
   });
   return new Map(boostedResults.map(r => [r.id, r.score]));
 };
-
-/**
- * 合成 id 的下界。真实 GitHub 仓库 id 远小于该值（当前量级 < 1e10），而
- * `repositorySlice` 的合成 id 形如 `Date.now() + random`（约 1.8e12）。
- * 因此 id >= 该阈值 ⇒ 该记录必定来自批量 Star 的历史合成 id。
- */
-const SYNTHETIC_REPOSITORY_ID_FLOOR = 1e11;
-
-/**
- * 该本地记录是否为「批量 Star 遗留的合成 id 记录」。
- *
- * 只有这类记录才允许按名称兜底认领：它们没有权威的 GitHub 身份，名称是唯一线索。
- * 反之，带真实 GitHub id 的记录身份是权威的 —— id 对不上说明该仓库已被改名或
- * 删除。此时若允许名称兜底，另一个**恰好复用旧名的新仓库**就会继承它的
- * AI 分析、锁定分类与订阅状态（身份错误归属），故一律不认领。
- */
-const isLegacySyntheticIdRecord = (repo: Repository): boolean => repo.id >= SYNTHETIC_REPOSITORY_ID_FLOOR;
 
 /**
  * 为整批同步输入分配本地记录，结果与 `newRepos` 一一对齐（`undefined` = 新增）。

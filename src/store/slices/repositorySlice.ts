@@ -10,6 +10,23 @@ import { hasActiveSearchFilters } from '../../utils/repoSearch';
 import { areRepositoryRecordsEqual, replaceRepositoryInList } from '../helpers/repositoryRecords';
 import { shouldPreserveExisting } from '../helpers/accountWorkspace';
 
+/** 合成 id 的下界。真实 GitHub 仓库 id 远小于该值（当前量级 < 1e10），而
+ * `generateFallbackRepositoryId` 产出的合成 id 形如 `Date.now() + random`
+ * （约 1.8e12）。因此 `id >= 该阈值` ⇒ 该记录必定来自批量 Star 的历史合成 id。
+ */
+export const SYNTHETIC_REPOSITORY_ID_FLOOR = 1e11;
+
+/**
+ * 判断一条本地记录是否「缺失权威 GitHub 身份」，即它是合成 id 的历史记录。
+ *
+ * 只有这类记录才允许在其他路径（同步的名称兜底、重复添加时保留 AI 字段）
+ * 按名称认领：它们本就没有 GitHub id，名称是唯一线索。反之，带真实 GitHub id
+ * 的记录身份是权威的 —— id 对不上说明该仓库已被改名或删除，此时按名称认领
+ * 会让复用旧名的新仓库错误继承旧仓库的 AI 分析与分类。
+ */
+export const isLegacySyntheticIdRecord = (repo: Pick<Repository, 'id'>): boolean =>
+  repo.id >= SYNTHETIC_REPOSITORY_ID_FLOOR;
+
 /**
  * 解析一条新仓库应沿用的 GitHub 真实 id。
  *
@@ -152,6 +169,13 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           // 如果存在，更新现有仓库（保留ID）
           updatedRepositories = [...state.repositories];
           const existing = updatedRepositories[existingRepoIndex];
+          // 仅在「同一 GitHub 身份」下沿用已有 AI 字段：id 相同，或本地记录是
+          // 合成 id 的历史记录（缺失权威身份，名称是唯一线索）。
+          // 两者都不满足 ⇒ 本地记录带真实 GitHub id 却与入参 id 不同，说明原仓库
+          // 已被改名/删除，而入参是复用旧名的新仓库。此时沿用旧仓库的 AI 分析会
+          // 造成错误归属，故只采用入参自带的 AI 字段。
+          // custom_* 的保留属于基线既有行为，不在此收紧。
+          const reuseExistingAI = existing.id === repo.id || isLegacySyntheticIdRecord(existing);
           updatedRepositories[existingRepoIndex] = {
             ...repo,
             id: existing.id,
@@ -162,15 +186,15 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             category_locked: existing.category_locked,
             last_edited: existing.last_edited,
             subscribed_to_releases: existing.subscribed_to_releases,
-            // 同样保留已完成的 AI 分析：入参来自 GitHub 详情 / 发现页数据，
+            // 保留已完成的 AI 分析：入参来自 GitHub 详情 / 发现页数据，
             // 不带这些字段，直接展开会把已有 AI 摘要与标签清空。
             // 用 `?? existing.x` 而非无条件回填：入参若显式带了新值则采用新值。
-            ai_summary: repo.ai_summary ?? existing.ai_summary,
-            ai_tags: repo.ai_tags ?? existing.ai_tags,
-            ai_platforms: repo.ai_platforms ?? existing.ai_platforms,
-            analyzed_at: repo.analyzed_at ?? existing.analyzed_at,
-            analysis_failed: repo.analysis_failed ?? existing.analysis_failed,
-            analysis_error: repo.analysis_error ?? existing.analysis_error,
+            ai_summary: reuseExistingAI ? repo.ai_summary ?? existing.ai_summary : repo.ai_summary,
+            ai_tags: reuseExistingAI ? repo.ai_tags ?? existing.ai_tags : repo.ai_tags,
+            ai_platforms: reuseExistingAI ? repo.ai_platforms ?? existing.ai_platforms : repo.ai_platforms,
+            analyzed_at: reuseExistingAI ? repo.analyzed_at ?? existing.analyzed_at : repo.analyzed_at,
+            analysis_failed: reuseExistingAI ? repo.analysis_failed ?? existing.analysis_failed : repo.analysis_failed,
+            analysis_error: reuseExistingAI ? repo.analysis_error ?? existing.analysis_error : repo.analysis_error,
           };
         } else {
           // 如果不存在，添加新仓库。

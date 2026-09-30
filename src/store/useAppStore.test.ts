@@ -689,8 +689,9 @@ describe('useAppStore repository performance guards', () => {
   });
 
   it('keeps AI analysis and custom category when re-adding an existing repository', () => {
-    // 入参来自 GitHub 详情 / 发现页数据，不带 AI 字段，直接展开会清空已有分析结果
-    const analyzed = createRepository(5, {
+    // 入参来自 GitHub 详情 / 发现页数据，不带 AI 字段，直接展开会清空已有分析结果。
+    // 合成 id 的历史记录（批量 Star 遗留）缺失权威身份，应继续被认领。
+    const analyzed = createRepository(1_700_000_000_005, {
       ai_summary: 'AI 摘要',
       ai_tags: ['ai-tag'],
       ai_platforms: ['cli'],
@@ -708,7 +709,7 @@ describe('useAppStore repository performance guards', () => {
 
     expect(useAppStore.getState().repositories).toHaveLength(1);
     expect(useAppStore.getState().repositories[0]).toMatchObject({
-      id: 5,
+      id: analyzed.id,
       description: '来自 GitHub 的新描述',
       ai_summary: 'AI 摘要',
       ai_tags: ['ai-tag'],
@@ -717,6 +718,49 @@ describe('useAppStore repository performance guards', () => {
       custom_category: '工具',
       category_locked: true,
     });
+  });
+
+  it('keeps AI analysis when re-adding with the same GitHub id', () => {
+    // 同一 GitHub 身份（id 相同）⇒ 无论是否合成 id，都应保留 AI 分析
+    const analyzed = createRepository(555, { ai_summary: 'AI 摘要', ai_tags: ['ai-tag'] });
+    useAppStore.setState({ repositories: [analyzed], searchResults: [] });
+
+    useAppStore.getState().addRepository(createRepository(555, {
+      full_name: analyzed.full_name,
+      description: '来自 GitHub 的新描述',
+    }));
+
+    expect(useAppStore.getState().repositories[0]).toMatchObject({
+      id: 555,
+      description: '来自 GitHub 的新描述',
+      ai_summary: 'AI 摘要',
+      ai_tags: ['ai-tag'],
+    });
+  });
+
+  it('does not copy AI analysis onto a new repo that reuses a real-id repo name', () => {
+    // 回归（CodeRabbit）：本地记录带**真实 GitHub id**（id:5），原仓库已改名/删除，
+    // 入参是复用旧名的新仓库（id:999）。此时沿用旧仓库的 AI 分析属于错误归属。
+    const analyzed = createRepository(5, {
+      ai_summary: '机密分析',
+      ai_tags: ['机密标签'],
+      custom_category: '内部工具',
+      category_locked: true,
+    });
+    useAppStore.setState({ repositories: [analyzed], searchResults: [] });
+
+    useAppStore.getState().addRepository(createRepository(999, {
+      full_name: analyzed.full_name,
+      description: '一个完全不同的新项目',
+    }));
+
+    const updated = useAppStore.getState().repositories[0];
+    expect(updated.description).toBe('一个完全不同的新项目');
+    expect(updated.ai_summary).toBeUndefined();
+    expect(updated.ai_tags).toBeUndefined();
+    // custom_* 属基线既有保留行为，本次不收紧
+    expect(updated.custom_category).toBe('内部工具');
+    expect(updated.category_locked).toBe(true);
   });
 
   it('preserves an active search result set when addRepository runs (Issue #304)', () => {
