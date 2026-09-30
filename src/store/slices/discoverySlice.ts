@@ -137,7 +137,11 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     },
     removeExternalDiscoveryChannel: (channelId) => set(state => {
       if (!isExternalDiscoveryChannelId(channelId)) return state;
-      const discoveryChannels = state.discoveryChannels.filter(channel => channel.id !== channelId);
+      let discoveryChannels = state.discoveryChannels.filter(channel => channel.id !== channelId);
+      if (!discoveryChannels.some(channel => channel.enabled)) {
+        discoveryChannels = discoveryChannels.map(channel => channel.id === 'trending'
+          ? { ...channel, enabled: true } : channel);
+      }
       return {
         discoveryChannels,
         selectedDiscoveryChannel: state.selectedDiscoveryChannel === channelId

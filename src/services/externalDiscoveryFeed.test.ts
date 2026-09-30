@@ -10,7 +10,7 @@ describe('external discovery feed', () => {
     vi.stubGlobal('fetch', fetchMock);
     expect(await readExternalDiscoveryFeed('https://example.com/feed.json')).toEqual(['owner/repo']);
     expect(fetchMock).toHaveBeenCalledWith('https://example.com/feed.json', {
-      headers: { Accept: 'application/json' }, credentials: 'omit',
+      headers: { Accept: 'application/json' }, credentials: 'omit', signal: expect.any(AbortSignal),
     });
   });
 
@@ -35,5 +35,36 @@ describe('external discovery feed', () => {
   it('reports an unreadable browser feed without contacting GitHub', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
     await expect(readExternalDiscoveryFeed('https://example.com/feed.json')).rejects.toThrow('CORS');
+  });
+
+  it('stops reading a feed once its streamed body exceeds the size limit', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(128_001));
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
+    await expect(readExternalDiscoveryFeed('https://example.com/feed.json')).rejects.toThrow('too large');
+  });
+
+  it('times out while reading a stalled feed body', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn().mockImplementation((_url: string, options: RequestInit) => {
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            options.signal?.addEventListener('abort', () => controller.error(new DOMException('Aborted', 'AbortError')));
+          },
+        });
+        return Promise.resolve(new Response(stream, { status: 200 }));
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const result = readExternalDiscoveryFeed('https://example.com/feed.json');
+      const assertion = expect(result).rejects.toThrow('timed out');
+      await vi.advanceTimersByTimeAsync(15_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

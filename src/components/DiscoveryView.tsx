@@ -942,7 +942,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   </button>
                 )}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
+                  {!currentChannel?.sourceUrl && selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
                     <PlatformFilter
                       platform={discoveryPlatform}
                       onPlatformChange={setDiscoveryPlatform}

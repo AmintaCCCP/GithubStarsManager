@@ -256,6 +256,17 @@ describe('PR-07 Store modularization compatibility', () => {
       store.getState().removeExternalDiscoveryChannel(id!);
       expect(store.getState().discoveryChannels.some(channel => channel.id === id)).toBe(false);
       expect(store.getState().selectedDiscoveryChannel).not.toBe(id);
+      store.setState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({ ...channel, enabled: false }))
+          .concat({
+            id: 'external:only', name: 'Only feed', nameEn: 'Only feed', icon: 'search',
+            description: 'https://example.com/feed.json', sourceUrl: 'https://example.com/feed.json', enabled: true,
+          }),
+        selectedDiscoveryChannel: 'external:only',
+      });
+      store.getState().removeExternalDiscoveryChannel('external:only');
+      expect(store.getState().selectedDiscoveryChannel).toBe('trending');
+      expect(store.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
       store.getState().removeExternalDiscoveryChannel('trending');
       expect(store.getState().discoveryChannels.some(channel => channel.id === 'trending')).toBe(true);
     } finally {
