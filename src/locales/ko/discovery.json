@@ -1,4 +1,19 @@
 {
+  "externalFeeds": {
+    "manage": "외부 탐색 피드",
+    "name": "채널 이름",
+    "url": "HTTPS JSON 피드 URL",
+    "add": "피드 추가",
+    "checking": "피드 확인 중…",
+    "remove": "{{name}} 제거",
+    "format": "URL은 JSON {\"repositories\":[\"https://github.com/owner/repo\"]}을 반환해야 합니다. 피드당 공개 저장소는 최대 30개입니다.",
+    "cors-note": "사이트가 브라우저의 CORS 요청을 허용해야 합니다. GitHub 토큰은 피드로 전송되지 않습니다.",
+    "invalid": "이름과 유효한 HTTPS URL을 입력하세요.",
+    "duplicate": "이미 추가된 피드이거나 10개 제한에 도달했습니다.",
+    "invalid-format": "JSON에 유효한 저장소 목록이 없습니다.",
+    "cors": "피드를 읽을 수 없습니다. URL과 CORS 설정을 확인하세요.",
+    "unreadable": "피드를 읽을 수 없습니다. URL, 사이트 상태, JSON 형식을 확인하세요."
+  },
   "discoverySidebar": {
     "just-now": "방금 전",
     "m-ago": "몇 분 전",

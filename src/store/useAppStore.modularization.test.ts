@@ -228,6 +228,41 @@ describe('PR-07 Store modularization compatibility', () => {
     });
   });
 
+  it('retains a valid external discovery channel through migration and hydration', async () => {
+    const feed = {
+      id: 'external:example', name: 'Example feed', nameEn: 'Example feed',
+      icon: 'search', description: 'https://example.com/feed.json',
+      sourceUrl: 'https://example.com/feed.json', enabled: true,
+    } as const;
+    const snapshot = buildPersistedSnapshot({
+      discoveryChannels: [...actualStore.useAppStore.getInitialState().discoveryChannels, feed],
+      selectedDiscoveryChannel: feed.id,
+    });
+    const migrated = await persistenceOptions().migrate(structuredClone(snapshot), 0);
+    const merged = persistenceOptions().merge(migrated, actualStore.useAppStore.getInitialState());
+    expect(merged.discoveryChannels).toContainEqual(feed);
+    expect(merged.selectedDiscoveryChannel).toBe(feed.id);
+  });
+
+  it('adds, selects, and removes only user-created discovery channels', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      const id = store.getState().addExternalDiscoveryChannel('My feed', 'https://example.com/feed.json');
+      expect(id).toMatch(/^external:/);
+      expect(store.getState().selectedDiscoveryChannel).toBe(id);
+      expect(store.getState().addExternalDiscoveryChannel('Duplicate', 'https://example.com/feed.json')).toBeNull();
+      store.getState().removeExternalDiscoveryChannel(id!);
+      expect(store.getState().discoveryChannels.some(channel => channel.id === id)).toBe(false);
+      expect(store.getState().selectedDiscoveryChannel).not.toBe(id);
+      store.getState().removeExternalDiscoveryChannel('trending');
+      expect(store.getState().discoveryChannels.some(channel => channel.id === 'trending')).toBe(true);
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
   it('retains the historical normalize-only resets and release backfill behavior', () => {
     const snapshot = buildPersistedSnapshot({
       ...buildTransientDiscoverySnapshot(),

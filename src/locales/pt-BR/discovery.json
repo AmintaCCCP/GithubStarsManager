@@ -1,4 +1,19 @@
 {
+  "externalFeeds": {
+    "manage": "Feeds externos de descoberta",
+    "name": "Nome do canal",
+    "url": "URL HTTPS do feed JSON",
+    "add": "Adicionar feed",
+    "checking": "Verificando feed…",
+    "remove": "Remover {{name}}",
+    "format": "A URL deve retornar JSON: {\"repositories\":[\"https://github.com/owner/repo\"]}. No máximo 30 repositórios públicos por feed.",
+    "cors-note": "O site deve permitir requisições do navegador (CORS). O token do GitHub não é enviado ao feed.",
+    "invalid": "Informe um nome e uma URL HTTPS válida.",
+    "duplicate": "Esse feed já foi adicionado ou o limite de dez feeds foi atingido.",
+    "invalid-format": "O JSON não contém uma lista válida de repositórios.",
+    "cors": "Não foi possível ler o feed. Verifique a URL e as configurações de CORS.",
+    "unreadable": "Não foi possível ler o feed. Verifique a URL, a disponibilidade e o formato JSON."
+  },
   "discoverySidebar": {
     "just-now": "apenas",
     "m-ago": "minutos atrás",

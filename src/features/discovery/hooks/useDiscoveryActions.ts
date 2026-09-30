@@ -8,6 +8,8 @@ import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { syncWeeklyChannel } from '../../../services/weeklyIssuesService';
 import { syncXTweetChannel } from '../../../services/xTweetService';
 import { syncTelegramChannel } from '../../../services/telegramService';
+import { loadExternalDiscoveryFeed } from '../../../services/externalDiscoveryFeed';
+import { isExternalDiscoveryChannelId } from '../../../utils/discoveryFeeds';
 import { AIService } from '../../../services/aiService';
 import { AIAnalysisOptimizer } from '../../../services/aiAnalysisOptimizer';
 import { discoveryAnalysisStorage } from '../../../services/discoveryAnalysisStorage';
@@ -18,6 +20,9 @@ import { useAuthSessionGeneration } from '../../../hooks/useAuthSessionGeneratio
 
 const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryViewState>, channelId: DiscoveryChannelId) => {
   const common = [state.githubToken, state.discoveryPlatform];
+  if (isExternalDiscoveryChannelId(channelId)) {
+    return JSON.stringify([...common, state.discoveryChannels.find(channel => channel.id === channelId)?.sourceUrl]);
+  }
   switch (channelId) {
     case 'trending': return JSON.stringify([...common, state.trendingTimeRange]);
     case 'topic': return JSON.stringify([...common, state.discoverySelectedTopic]);
@@ -96,7 +101,11 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     try {
       const api = createGitHubApiService(currentState.githubToken);
       let result: PaginatedDiscoveryRepositories;
-      switch (channelId) {
+      if (isExternalDiscoveryChannelId(channelId)) {
+        const sourceUrl = currentState.discoveryChannels.find(channel => channel.id === channelId)?.sourceUrl;
+        if (!sourceUrl) throw new Error('External discovery feed is not configured');
+        result = await loadExternalDiscoveryFeed(sourceUrl, channelId, api);
+      } else switch (channelId) {
         case 'trending':
           result = await api.getTrendingRepositories(currentState.discoveryPlatform, page, 20, currentState.trendingTimeRange);
           break;

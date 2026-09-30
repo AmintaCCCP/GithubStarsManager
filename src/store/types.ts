@@ -240,6 +240,8 @@ export interface AppActions {
   setDiscoveryLastRefresh: (channel: DiscoveryChannelId, timestamp: string) => void;
   updateDiscoveryRepo: (repo: DiscoveryRepo) => void;
   toggleDiscoveryChannel: (channelId: DiscoveryChannelId) => void;
+  addExternalDiscoveryChannel: (name: string, sourceUrl: string) => DiscoveryChannelId | null;
+  removeExternalDiscoveryChannel: (channelId: DiscoveryChannelId) => void;
   setDiscoveryPlatform: (platform: DiscoveryPlatform) => void;
   setDiscoveryLanguage: (language: ProgrammingLanguage) => void;
   setDiscoverySortBy: (sortBy: SortBy) => void;

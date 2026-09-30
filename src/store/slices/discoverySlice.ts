@@ -5,6 +5,8 @@ import { normalizeTelegramChannelInput } from '../../utils/telegramFollows';
 import { saveEncryptedXAuthViaDesktop, clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
 import { logger } from '../../services/logger';
 import { recordTrendingSnapshot } from '../../utils/trendingSnapshots';
+import type { DiscoveryChannelId } from '../../types';
+import { isExternalDiscoveryChannelId, normalizeDiscoveryFeedUrl } from '../../utils/discoveryFeeds';
 
 export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setSelectedDiscoveryChannel'
@@ -15,6 +17,8 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'setDiscoveryLastRefresh'
   | 'updateDiscoveryRepo'
   | 'toggleDiscoveryChannel'
+  | 'addExternalDiscoveryChannel'
+  | 'removeExternalDiscoveryChannel'
   | 'setDiscoveryPlatform'
   | 'setDiscoveryLanguage'
   | 'setDiscoverySortBy'
@@ -38,7 +42,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'removeTelegramFollow'
   | 'appendDiscoveryRepos'
   | 'recordTrendingSnapshot'
->> = (set) => ({
+>> = (set, get) => ({
     // Discovery actions
     setSelectedDiscoveryChannel: (selectedDiscoveryChannel) => set((state) => ({
       selectedDiscoveryChannel,
@@ -112,6 +116,33 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
         selectedDiscoveryChannel: selectedChannelEnabled
           ? state.selectedDiscoveryChannel
           : discoveryChannels.find(ch => ch.enabled)?.id ?? state.selectedDiscoveryChannel,
+      };
+    }),
+    addExternalDiscoveryChannel: (name, sourceInput) => {
+      const sourceUrl = normalizeDiscoveryFeedUrl(sourceInput);
+      const trimmedName = name.trim();
+      const channels = get().discoveryChannels;
+      if (!sourceUrl || !trimmedName || trimmedName.length > 60
+        || channels.filter(channel => channel.sourceUrl).length >= 10
+        || channels.some(channel => channel.sourceUrl === sourceUrl)) return null;
+      const id: DiscoveryChannelId = `external:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      set(state => ({
+        discoveryChannels: [...state.discoveryChannels, {
+          id, name: trimmedName, nameEn: trimmedName, icon: 'search', description: sourceUrl,
+          sourceUrl, enabled: true,
+        }],
+        selectedDiscoveryChannel: id,
+      }));
+      return id;
+    },
+    removeExternalDiscoveryChannel: (channelId) => set(state => {
+      if (!isExternalDiscoveryChannelId(channelId)) return state;
+      const discoveryChannels = state.discoveryChannels.filter(channel => channel.id !== channelId);
+      return {
+        discoveryChannels,
+        selectedDiscoveryChannel: state.selectedDiscoveryChannel === channelId
+          ? discoveryChannels.find(channel => channel.enabled)?.id ?? 'trending'
+          : state.selectedDiscoveryChannel,
       };
     }),
     setDiscoveryPlatform: (discoveryPlatform) => set({ discoveryPlatform }),

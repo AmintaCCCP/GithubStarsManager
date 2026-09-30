@@ -1,4 +1,19 @@
 {
+  "externalFeeds": {
+    "manage": "Flux de découverte externes",
+    "name": "Nom du canal",
+    "url": "URL HTTPS du flux JSON",
+    "add": "Ajouter un flux",
+    "checking": "Vérification du flux…",
+    "remove": "Supprimer {{name}}",
+    "format": "L'URL doit renvoyer le JSON {\"repositories\":[\"https://github.com/owner/repo\"]}. Au plus 30 dépôts publics par flux.",
+    "cors-note": "Le site doit autoriser les requêtes du navigateur (CORS). Le jeton GitHub n'est pas envoyé au flux.",
+    "invalid": "Saisissez un nom et une URL HTTPS valide.",
+    "duplicate": "Ce flux existe déjà ou la limite de dix flux est atteinte.",
+    "invalid-format": "Le JSON ne contient pas de liste de dépôts valide.",
+    "cors": "Impossible de lire le flux. Vérifiez son URL et les réglages CORS.",
+    "unreadable": "Impossible de lire le flux. Vérifiez l'URL, la disponibilité et le format JSON."
+  },
   "discoverySidebar": {
     "just-now": "juste",
     "m-ago": "il y a quelques minutes",

@@ -583,11 +583,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
     // 取消持久化后，首次打开或切换到空频道时自动加载（代码搜索走本地实时请求，不参与自动拉取）
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
     const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (selectedDiscoveryChannel !== 'topic' && selectedDiscoveryChannel !== 'code-search' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
+    if (selectedDiscoveryChannel !== 'topic' && selectedDiscoveryChannel !== 'code-search' && selectedDiscoveryChannel !== 'search' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
       autoFetchChannelRef.current = selectedDiscoveryChannel;
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
   }, [selectedDiscoveryChannel, refreshChannel]);
+
+  useEffect(() => {
+    if (selectedDiscoveryChannel === 'search' && discoverySearchQuery.trim()) {
+      refreshChannel('search', 1, false);
+    }
+  }, [selectedDiscoveryChannel, discoverySearchQuery, refreshChannel]);
 
   // 趋势时间范围改变时刷新数据
   useEffect(() => {
@@ -692,10 +698,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const handleSearch = useCallback(() => {
     if (selectedDiscoveryChannel === 'search') {
-      setDiscoverySearchQuery(searchInput);
-      refreshChannel('search', 1, false);
+      const query = searchInput.trim();
+      if (!query) return;
+      if (query === discoverySearchQuery) refreshChannel('search', 1, false);
+      else setDiscoverySearchQuery(query);
     }
-  }, [selectedDiscoveryChannel, searchInput, setDiscoverySearchQuery, refreshChannel]);
+  }, [selectedDiscoveryChannel, discoverySearchQuery, searchInput, setDiscoverySearchQuery, refreshChannel]);
 
   const handleLoadMore = useCallback(async () => {
     if (!discoveryHasMore[selectedDiscoveryChannel]) {
@@ -812,6 +820,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                   </div>
                 </div>
+                {selectedDiscoveryChannel !== 'search' && <Button
+                  type="button"
+                  variant="outline"
+                  aria-label={t('discoveryView.search-repositories')}
+                  onClick={() => {
+                    if (!safeDiscoveryChannels.find(channel => channel.id === 'search')?.enabled) toggleDiscoveryChannel('search');
+                    setSelectedDiscoveryChannel('search');
+                  }}
+                ><Search className="h-4 w-4" /><span className="hidden sm:inline">{t('discoveryView.search-repositories')}</span></Button>}
                 {selectedDiscoveryChannel !== 'code-search' && (
                 <div className="relative group/refresh shrink-0">
                   <Button

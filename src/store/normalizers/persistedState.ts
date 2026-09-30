@@ -16,6 +16,7 @@ import { normalizeTrendingSnapshots } from '../../utils/trendingSnapshots';
 import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
+import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
 import type { AppStoreState } from '../types';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import { readAuthMirror } from '../persistence/authStorage';
@@ -38,9 +39,8 @@ export const normalizePersistedState = (
   currentState: AppStoreState
 ): Partial<AppStoreState> => {
   const safePersisted = persisted ?? {};
-  const defaultDiscoveryChannelIds = new Set(defaultDiscoveryChannels.map((channel) => channel.id));
   const persistedDiscoveryChannels = (safePersisted as Record<string, unknown>).discoveryChannels;
-  const normalizedDiscoveryChannels = defaultDiscoveryChannels.map((defaultChannel) => {
+  const normalizedDiscoveryChannels = [...defaultDiscoveryChannels.map((defaultChannel) => {
     const persistedChannel = Array.isArray(persistedDiscoveryChannels)
       ? persistedDiscoveryChannels.find((channel: unknown) =>
           (channel as Record<string, unknown>)?.id === defaultChannel.id
@@ -50,7 +50,7 @@ export const normalizePersistedState = (
       ...defaultChannel,
       enabled: persistedChannel?.enabled !== false,
     };
-  });
+  }), ...normalizeExternalDiscoveryChannels(persistedDiscoveryChannels)];
   if (!normalizedDiscoveryChannels.some(channel => channel.enabled)) {
     normalizedDiscoveryChannels[0] = { ...normalizedDiscoveryChannels[0], enabled: true };
   }
@@ -219,8 +219,7 @@ export const normalizePersistedState = (
     discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'x-tweet': [], 'telegram': [], 'weekly': [], 'search': [], 'code-search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>,
     discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'x-tweet': null, 'telegram': null, 'weekly': null, 'search': null, 'code-search': null },
     discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
-    selectedDiscoveryChannel: defaultDiscoveryChannelIds.has(safePersisted.selectedDiscoveryChannel as DiscoveryChannelId)
-      && normalizedDiscoveryChannels.some(channel => channel.id === safePersisted.selectedDiscoveryChannel && channel.enabled)
+    selectedDiscoveryChannel: normalizedDiscoveryChannels.some(channel => channel.id === safePersisted.selectedDiscoveryChannel && channel.enabled)
       ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
       : normalizedDiscoveryChannels.find(channel => channel.enabled)?.id ?? defaultDiscoveryChannels[0].id,
     // discoveryIsLoading 不持久化，始终重置为 false（防止旧数据格式异常）

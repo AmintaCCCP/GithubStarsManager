@@ -1,4 +1,5 @@
 import { Settings2 } from 'lucide-react';
+import { useState } from 'react';
 import type { AppLanguage } from '../i18n/languages';
 import { discoveryChannelName } from '../i18n/discoveryNames';
 import { useT } from '../i18n/useT';
@@ -9,8 +10,10 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { ExternalDiscoveryFeedsModal } from './ExternalDiscoveryFeedsModal';
 
 interface DiscoveryChannelMenuProps {
   channels: DiscoveryChannel[];
@@ -28,8 +31,10 @@ export function DiscoveryChannelMenu({
   const t = useT('discovery');
   const enabledCount = channels.filter(channel => channel.enabled).length;
   const label = t('discoverySidebar.manage-channels');
+  const [externalFeedsOpen, setExternalFeedsOpen] = useState(false);
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -56,7 +61,10 @@ export function DiscoveryChannelMenu({
             {discoveryChannelName(channel, language)}
           </DropdownMenuCheckboxItem>
         ))}
+        <DropdownMenuItem onSelect={() => setExternalFeedsOpen(true)}>{t('externalFeeds.manage')}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <ExternalDiscoveryFeedsModal isOpen={externalFeedsOpen} onClose={() => setExternalFeedsOpen(false)} channels={channels} />
+    </>
   );
 }

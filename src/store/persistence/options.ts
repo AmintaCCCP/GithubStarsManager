@@ -7,6 +7,7 @@ import { logger } from '../../services/logger';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
+import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
 import type { AppStoreState } from '../types';
 import {
   defaultDiscoveryChannels,
@@ -245,7 +246,7 @@ state.selectedDiscoveryChannel = 'trending';
 state.discoveryChannels = defaultDiscoveryChannels;
   } else if (state && Array.isArray(state.discoveryChannels)) {
 const persistedChannels = state.discoveryChannels as unknown[];
-state.discoveryChannels = defaultDiscoveryChannels.map((defaultChannel) => {
+state.discoveryChannels = [...defaultDiscoveryChannels.map((defaultChannel) => {
 const persistedChannel = persistedChannels.find((channel) => {
   return (channel as Record<string, unknown>)?.id === defaultChannel.id;
 }) as Record<string, unknown> | undefined;
@@ -258,7 +259,7 @@ return {
 ...defaultChannel,
 enabled: persistedChannel.enabled !== false,
 };
-});
+}), ...normalizeExternalDiscoveryChannels(persistedChannels)];
   }
   // 迁移订阅频道（版本 4→5：daily-dev → most-dev，新增 trending，补全 nameEn）
   const defaultChannelsMap = new Map(defaultSubscriptionChannels.map(ch => [ch.id, ch]));

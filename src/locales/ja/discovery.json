@@ -1,4 +1,19 @@
 {
+  "externalFeeds": {
+    "manage": "外部の発見フィード",
+    "name": "チャンネル名",
+    "url": "HTTPS JSON フィード URL",
+    "add": "フィードを追加",
+    "checking": "フィードを確認中…",
+    "remove": "{{name}} を削除",
+    "format": "URL は JSON {\"repositories\":[\"https://github.com/owner/repo\"]} を返す必要があります。フィードごとに公開リポジトリは最大 30 件です。",
+    "cors-note": "サイトはブラウザーからの CORS リクエストを許可する必要があります。GitHub トークンは送信されません。",
+    "invalid": "名前と有効な HTTPS URL を入力してください。",
+    "duplicate": "既に追加済みか、10 件の上限に達しています。",
+    "invalid-format": "JSON に有効なリポジトリ一覧がありません。",
+    "cors": "フィードを読み取れません。URL と CORS 設定を確認してください。",
+    "unreadable": "フィードを読み取れません。URL、サイトの状態、JSON 形式を確認してください。"
+  },
   "discoverySidebar": {
     "just-now": "ただ",
     "m-ago": "数分前",
