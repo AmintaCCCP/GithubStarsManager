@@ -1,5 +1,6 @@
 {
   "batchStar": {
+    "token-permission-error": "GitHub a refusé ce jeton (403). Pour consulter ou ajouter des étoiles, activez Starring en lecture/écriture et Metadata en lecture avec un jeton à granularité fine, ou public_repo avec un jeton classique (repo pour les dépôts privés).",
     "title": "Ajouter des étoiles depuis des liens",
     "hint": "Collez un texte contenant des liens GitHub, vérifiez les dépôts, puis ajoutez une étoile. Les liens vers les autres sites sont ignorés.",
     "history": "Historique des textes",

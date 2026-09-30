@@ -17,6 +17,7 @@ import { Switch } from '../ui/switch';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
 import { useDesktopActions } from '../../features/settings/hooks/useDesktopActions';
 import { useGitHubTokenActions } from '../../features/settings/hooks/useGitHubTokenActions';
+import { GitHubTokenPermissions } from '../GitHubTokenPermissions';
 
 interface GeneralPanelProps {
   t: TranslateFn;
@@ -68,6 +69,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
           <Button type="button" onClick={() => { void githubToken.updateToken(); }} disabled={githubToken.isSaving || !githubToken.tokenInput.trim()}>
             {githubToken.isSaving ? t('generalPanel.updating') : t('generalPanel.update-token')}
           </Button>
+          <GitHubTokenPermissions />
         </CardContent>
       </Card>
 

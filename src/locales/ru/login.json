@@ -1,5 +1,9 @@
 {
   "loginScreen": {
+    "token-permissions-title": "Права токена GitHub",
+    "token-permissions-stars": "Для управления звёздами классическому токену нужен public_repo (или repo для приватных репозиториев). Токену с точной настройкой нужны права Starring учётной записи на чтение и запись и Metadata репозитория на чтение.",
+    "token-permissions-optional": "Дополнительно: для Gists нужен gist, для Star Lists — user, для синхронизации форков и запуска workflow — repo у классического токена. Выдавайте только нужные права.",
+    "token-permissions-check": "Вход проверяет личность, но не все права. Нехватка прав может проявиться только при использовании функции.",
     "please-enter-the-backend-url-and-api-key": "Введите URL-адрес серверной части и ключ API.",
     "invalid-backend-url-remote-backends-must-use-htt": "Неверный адрес бэкэнда: удаленному бэкэнду требуется HTTPS, только локальный хост может использовать HTTP.",
     "unable-to-connect-to-this-backend-url": "Невозможно подключиться к внутреннему URL-адресу",

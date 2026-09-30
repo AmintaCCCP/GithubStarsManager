@@ -257,6 +257,14 @@ const GITHUB_API_BASE = 'https://api.github.com';
 // Sentinel message for the 401 thrown above; callers match on it to tell a
 // confirmed auth failure apart from network/rate-limit/5xx errors.
 export const GITHUB_TOKEN_INVALID_ERROR = 'GitHub token expired or invalid';
+
+/** GitHub accepted the token, but it lacks permission for this request. */
+export class GitHubTokenPermissionError extends Error {
+  constructor() {
+    super('Resource not accessible by personal access token');
+    this.name = 'GitHubTokenPermissionError';
+  }
+}
 // Sentinel for 401s produced by the backend proxy's own auth middleware (its
 // body carries code: 'UNAUTHORIZED'). Kept distinct from the GitHub sentinel
 // so callers can tell a stale backend API key from a dead GitHub token.
@@ -494,6 +502,13 @@ export class GitHubApiService {
           : 'unknown';
         logger.warn('githubApi', 'API request failed: rate limit exceeded', { method, endpoint, status: response.status, durationMs });
         throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
+      }
+      if (response.status === 403) {
+        const body = await response.clone().json().catch(() => null) as { message?: string } | null;
+        if (body?.message === 'Resource not accessible by personal access token') {
+          logger.warn('githubApi', 'API request failed: token permission', { method, endpoint, status: response.status, durationMs });
+          throw new GitHubTokenPermissionError();
+        }
       }
 
       // 5xx 视为可重试的瞬时故障；其余 4xx 直接抛出（重试无意义）。

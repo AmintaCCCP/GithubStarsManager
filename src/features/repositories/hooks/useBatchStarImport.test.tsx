@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBatchStarImport } from './useBatchStarImport';
+import { GitHubTokenPermissionError } from '../../../services/githubApi';
 
 const mocks = vi.hoisted(() => ({
   token: 'token',
@@ -62,6 +63,14 @@ describe('useBatchStarImport', () => {
     expect(result.current.rows.map(row => row.status)).toEqual(['unavailable', 'already-starred']);
     await act(() => result.current.starSelected());
     expect(mocks.starRepository).not.toHaveBeenCalled();
+  });
+
+  it('explains a token permission failure during preview', async () => {
+    mocks.isRepositoryStarred.mockRejectedValueOnce(new GitHubTokenPermissionError());
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+    expect(result.current.rows[0].status).toBe('unavailable');
+    expect(result.current.rows[0].error).toMatch(/Starring|starring/i);
   });
 
   it('requires selection for bare names and renamed repositories, and deduplicates canonical names', async () => {

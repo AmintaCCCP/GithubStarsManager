@@ -2,7 +2,8 @@ import { useCallback, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { translateBatch } from '../../../services/translateService';
-import type { GitHubRepoDetailRead } from '../../../services/githubApi';
+import { GitHubTokenPermissionError, type GitHubRepoDetailRead } from '../../../services/githubApi';
+import { makeT } from '../../../i18n/useT';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import type { Repository } from '../../../types';
 import type { ImportedRepositoryCandidate } from '../../../types/repositoryImport';
@@ -102,7 +103,9 @@ export function useBatchStarImport() {
               candidate,
               status: 'unavailable',
               selected: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: error instanceof GitHubTokenPermissionError
+                ? makeT(language, 'repositories')('batchStar.token-permission-error')
+                : error instanceof Error ? error.message : String(error),
             };
           }
         }));
@@ -122,7 +125,7 @@ export function useBatchStarImport() {
       busyRef.current = false;
       setIsResolving(false);
     }
-  }, [githubToken, resetTranslations]);
+  }, [githubToken, language, resetTranslations]);
 
   /** Flips the selection of a starable row; other statuses cannot be toggled. */
   const toggleRow = useCallback((index: number) => {
@@ -240,7 +243,9 @@ export function useBatchStarImport() {
           ));
         } catch (error) {
           setRows(current => current.map((item, itemIndex) => itemIndex === index
-            ? { ...item, status: 'failed', selected: false, error: error instanceof Error ? error.message : String(error) }
+            ? { ...item, status: 'failed', selected: false, error: error instanceof GitHubTokenPermissionError
+              ? makeT(language, 'repositories')('batchStar.token-permission-error')
+              : error instanceof Error ? error.message : String(error) }
             : item
           ));
         }
@@ -256,7 +261,7 @@ export function useBatchStarImport() {
       busyRef.current = false;
       setIsStarring(false);
     }
-  }, [addRepository, githubToken, rows]);
+  }, [addRepository, githubToken, language, rows]);
 
   return {
     rows, duplicateCount, inputError, isResolving, isStarring, syncError,

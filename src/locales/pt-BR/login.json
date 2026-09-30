@@ -1,5 +1,9 @@
 {
   "loginScreen": {
+    "token-permissions-title": "Permissões do token do GitHub",
+    "token-permissions-stars": "Para gerenciar estrelas: um token clássico precisa de public_repo (ou repo para repositórios privados). Um token refinado precisa de Starring da conta com leitura e escrita e Metadata do repositório com leitura.",
+    "token-permissions-optional": "Recursos opcionais: Gists precisa de gist; Star Lists, de user; sincronização de forks e execução de workflows, de repo em um token clássico. Conceda apenas as permissões que usar.",
+    "token-permissions-check": "O login verifica sua identidade, não todas as permissões. Uma permissão ausente pode aparecer só quando você usar o recurso.",
     "please-enter-the-backend-url-and-api-key": "Insira o URL de back-end e a chave de API",
     "invalid-backend-url-remote-backends-must-use-htt": "Endereço de back-end inválido: o back-end remoto requer HTTPS, apenas localhost pode usar HTTP",
     "unable-to-connect-to-this-backend-url": "Não foi possível conectar-se ao URL de back-end",

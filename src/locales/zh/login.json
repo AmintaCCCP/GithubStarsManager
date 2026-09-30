@@ -1,5 +1,9 @@
 {
   "loginScreen": {
+    "token-permissions-title": "GitHub Token 权限",
+    "token-permissions-stars": "管理 Star：传统 Token 需勾选 public_repo（私有仓库用 repo）；细粒度 Token 需账户 Starring 读写权限，以及仓库 Metadata 读取权限。",
+    "token-permissions-optional": "可选功能：Gist 需 gist，Star 列表需 user，Fork 同步与触发工作流需传统 Token 的 repo。只授予你会用到的权限。",
+    "token-permissions-check": "登录只验证身份，不会检查所有功能权限；权限不足可能在使用相应功能时才出现。",
     "please-enter-the-backend-url-and-api-key": "请输入后端 URL 和 API Key",
     "invalid-backend-url-remote-backends-must-use-htt": "后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP",
     "unable-to-connect-to-this-backend-url": "无法连接到该后端 URL",

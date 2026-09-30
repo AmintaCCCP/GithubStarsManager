@@ -69,6 +69,14 @@ const enterBackendMode = async () => {
   };
 };
 
+describe('LoginScreen token guidance', () => {
+  it('explains Star permissions before sign-in', () => {
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    expect(screen.getByText('GitHub Token 权限')).toBeVisible();
+    expect(screen.getByText(/Starring 读写权限/)).toBeVisible();
+  });
+});
+
 describe('LoginScreen 后端登录', () => {
   beforeEach(() => {
     vi.clearAllMocks();

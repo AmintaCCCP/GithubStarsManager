@@ -1,5 +1,9 @@
 {
   "loginScreen": {
+    "token-permissions-title": "Autorisations du jeton GitHub",
+    "token-permissions-stars": "Pour gérer les étoiles : un jeton classique nécessite public_repo (ou repo pour les dépôts privés). Un jeton à granularité fine nécessite Starring du compte en lecture/écriture et Metadata du dépôt en lecture.",
+    "token-permissions-optional": "Fonctions facultatives : Gists nécessite gist, Star Lists nécessite user, et la synchronisation des forks ou le lancement de workflows nécessite repo avec un jeton classique. N'accordez que les droits utiles.",
+    "token-permissions-check": "La connexion vérifie votre identité, pas toutes les autorisations. Un manque de droits peut n'apparaître qu'à l'utilisation d'une fonction.",
     "please-enter-the-backend-url-and-api-key": "Veuillez saisir l'URL du backend et la clé API",
     "invalid-backend-url-remote-backends-must-use-htt": "Adresse du backend invalide : le backend distant nécessite HTTPS, seul l'hôte local peut utiliser HTTP",
     "unable-to-connect-to-this-backend-url": "Impossible de se connecter à l'URL du backend",

@@ -1,5 +1,6 @@
 {
   "batchStar": {
+    "token-permission-error": "GitHub 拒絕了此 Token（403）。檢查或新增 Star 時，細緻權限 Token 需開啟 Starring 讀寫及儲存庫 Metadata 讀取；傳統 Token 需 public_repo（私有儲存庫用 repo）。",
     "title": "從連結批次 Star",
     "hint": "貼上任何包含 GitHub 連結的文字，確認儲存庫後再 Star。其他網站的連結會被忽略。",
     "history": "貼上歷史",
