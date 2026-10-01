@@ -680,4 +680,21 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.4</downloadUrl>
   </version>
+  <version>
+    <number>0.8.5</number>
+    <releaseDate>2026-10-01</releaseDate>
+    <changelog>
+      <item>build: Desktop installers slim down from ~180-190 MB to ~100 MB by packing only the single runtime dependency, with electron-builder.yml as the single shared build config for local and CI builds; the CI pipeline now builds the web bundle once, caches Electron binaries, and drops from ~8 minutes to ~3. (PR #412, PR #413)</item>
+      <item>feat: The &apos;Star from links&apos; dialog can preview a repository&apos;s README without leaving the dialog, and keeps the last 10 pasted texts per GitHub account as editable, reusable history. (contributed by @Khk-NL). (PR #414)</item>
+      <item>fix: Release asset filters now match and list downloads by the active keywords: include keywords no longer hit GitHub&apos;s auto-generated source archives, and matching releases list only the assets that hit the keywords, with a per-card &apos;show all&apos; toggle. (PR #415)</item>
+      <item>fix: WebDAV requests are routed through the backend proxy when a backend is available, fixing CORS &apos;Failed to fetch&apos; errors with servers that do not send CORS headers for DAV methods; connection tests accept inline credentials. (contributed by @lostiv). (PR #416)</item>
+      <item>feat: The login screen and General settings now include a GitHub token permission guide covering classic and fine-grained tokens, and batch starring shows a clear localized error when the token lacks Star permissions. (contributed by @Khk-NL). (PR #417)</item>
+      <item>fix: Batch-starred repositories keep their real GitHub IDs, so re-syncing no longer wipes AI summaries, AI tags, and category tags; previously affected data self-heals on the next sync via a full_name fallback match. (PR #418)</item>
+      <item>feat: Discovery supports adding custom external feeds from public HTTPS JSON/RSS/Atom sources of GitHub repository links, validated before saving, removable anytime, and never receiving the user&apos;s GitHub token (up to 10 feeds per user, 30 repositories per feed per load). (contributed by @Khk-NL). (PR #419)</item>
+      <item>feat: Plugin system V1.4 adds modal actions (opensPage) that open a plugin page inside a sandboxed modal with repository context, README delivery, clipboard-image, and save-file host operations, shipping the new &apos;Repo Info Card&apos; example plugin. (PR #420)</item>
+      <item>feat: Appearance, repository card display fields, and language settings move into a dedicated Appearance settings menu with checkmarks on selected card fields; the sidebar &apos;Plugins&apos; entry is renamed &apos;Plugin Management&apos;; vector search gains a dedicated index panel and an unindexed-count sidebar badge. (PR #421)</item>
+      <item>fix: The desktop app no longer probes file:///api/health on startup; README images in picture/srcset resolve correctly in dark themes with protocol-relative links forced to https; image downloads get proper MIME-based extensions; the plugin snapshot 64 MiB budget is now measured against sanitized data. (PR #422)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.5</downloadUrl>
+  </version>
 </versions>
