@@ -65,7 +65,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
     frameWindow.postMessage({
       type: 'plugin-page:init', pluginId, pageId, token: tokenRef.current,
       context: initContextRef.current,
-    }, '*');
+    }, `plugin-page://${pluginId}`);
     // initContextSignature 只用来触发重发；实际载荷取 ref，避免把对象身份放进依赖。
   }, [initContextSignature, pluginId, pageId]);
 
@@ -79,7 +79,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
           type: 'plugin-page:response', pluginId, pageId,
           requestId: request.requestId, token: tokenRef.current,
           success: false, error: { code, message },
-        }, '*');
+        }, `plugin-page://${pluginId}`);
       };
       if (pendingRef.current.has(pendingKey) || pendingRef.current.size >= 8) {
         rejectRequest('PLUGIN_PAGE_RATE_LIMITED', 'Plugin page request limit exceeded');
@@ -127,7 +127,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
         frameRef.current?.contentWindow?.postMessage({
           type: 'plugin-page:response', pluginId, pageId,
           requestId: request.requestId, token: requestToken, ...result,
-        }, '*');
+        }, `plugin-page://${pluginId}`);
       } finally {
         pendingRef.current.delete(pendingKey);
         if (aiController) aiRequestsRef.current.delete(aiController);
@@ -158,7 +158,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
           ref={frameRef}
           title={`${pluginName}: ${pageTitle}`}
           src={url}
-          sandbox="allow-scripts"
+          sandbox="allow-scripts allow-same-origin"
           referrerPolicy="no-referrer"
           className={isModal
             ? 'h-[min(72vh,860px)] min-h-[420px] w-full rounded-lg border border-border bg-white'
@@ -170,7 +170,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
             frameRef.current?.contentWindow?.postMessage({
               type: 'plugin-page:init', pluginId, pageId, token: tokenRef.current,
               ...(initContextRef.current ? { context: initContextRef.current } : {}),
-            }, '*');
+            }, `plugin-page://${pluginId}`);
           }}
         /> : <p role="status">{t('pluginPageViewer.loading-plugin-page')}</p>}
     </section>

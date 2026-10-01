@@ -12,8 +12,10 @@ V1.1 增加了 Release processor、只读语义化 `github.*` Host API，以及�
 不会把 Token、认证 Header 或任意网络请求能力交给插件。
 
 V1.2 增加页面贡献。仅含页面、没有 `main` 的插件不会启动 Node Worker；页面在
-`sandbox="allow-scripts"` iframe 中运行，不能读取宿主 DOM、Electron API、Token 或
-Zustand Store。若同时声明 `main`，该 Worker 仍是受信任本地代码，页面隔离不改变其权限。
+`sandbox="allow-scripts allow-same-origin"` iframe 中运行，不能读取宿主 DOM、Electron
+API、Token 或 Zustand Store。`allow-same-origin` 让页面保持 `plugin-page://<插件 id>`
+这个来源，宿主据此拒绝被导航替换的文档；页面与宿主仍是不同源，读不到宿主数据。
+若同时声明 `main`，该 Worker 仍是受信任本地代码，页面隔离不改变其权限。
 
 ## 最小目录
 
@@ -213,8 +215,13 @@ window.parent.postMessage({
   token,
   method: 'repositories.search',
   args: { query: 'react', limit: 20 },
+  origin: window.location.origin,
 }, '*');
 ```
+
+宿主窗口的来源不固定（开发时是 `localhost`，打包后是 `file://`），页面发往宿主只能用
+`'*'`，因此消息里必须带上 `origin`，且与 `event.origin` 一致、等于
+`plugin-page://<插件 id>`。宿主发往页面的消息使用该精确来源，不再用 `'*'`。
 
 可用方法：`repositories.search`、`repositories.get`、`releases.get`、
 `storage.get`、`storage.set`、`storage.delete`。每次请求都在宿主主进程重新检查

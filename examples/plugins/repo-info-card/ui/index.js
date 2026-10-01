@@ -24,7 +24,7 @@ function request(method, args) {
     pending.set(requestId, { resolve, reject });
     window.parent.postMessage({
       type: 'plugin-page:request', pluginId: PLUGIN_ID, pageId: PAGE_ID,
-      requestId, token, method, args,
+      requestId, token, method, args, origin: window.location.origin,
     }, '*');
   });
 }
@@ -61,6 +61,7 @@ const STR = {
     searching: '搜索中…', searchDone: '找到 {n} 个仓库，点击选择。',
     generating: '正在请求用户配置的 AI 生成卡片（需要在弹窗中确认）…',
     generated: '已生成。可预览、复制代码或导出截图（@2x）。',
+    canvasChanged: '画幅已改变，当前卡片仍是旧画幅。重新生成后才能导出截图。',
     copyOk: 'HTML 代码已复制到剪贴板。',
     imageOk: '截图已写入剪贴板。',
     savedOk: '截图已保存：{name}',
@@ -82,6 +83,7 @@ const STR = {
     searching: 'Searching…', searchDone: '{n} repositories found; click to select.',
     generating: 'Asking the configured AI to compose the card (confirmation required)…',
     generated: 'Generated. Preview it, copy the code, or export a @2x screenshot.',
+    canvasChanged: 'Canvas changed; the current card still uses the previous one. Regenerate before exporting a screenshot.',
     copyOk: 'HTML code copied to the clipboard.',
     imageOk: 'Screenshot copied to the clipboard.',
     savedOk: 'Screenshot saved: {name}',
@@ -291,6 +293,9 @@ function sanitizeFragment(raw, canvasId) {
     for (const attr of [...el.attributes]) {
       const name = attr.name.toLowerCase();
       if (name.startsWith('on')) el.removeAttribute(attr.name);
+      // style 能携带 background-image 等外链资源。复制出去的单文件 HTML 没有
+      // 预览 iframe 的 CSP，打开时浏览器会请求这些地址，所以一律去掉。
+      else if (name === 'style') el.removeAttribute(attr.name);
       else if (name === 'href' || name === 'src' || name === 'xlink:href') {
         // DOMParser 会把 &#x0A; 解码成换行，浏览器执行 URL 前又会去掉这些空白，
         // 所以 `java&#x0A;script:` 能绕过直接的 startsWith('javascript:') 检查。
@@ -551,6 +556,15 @@ $('opt-style').addEventListener('change', (event) => {
     renderPreview();
   }
 });
-$('opt-canvas').addEventListener('change', (event) => { state.canvasId = event.target.value; });
+$('opt-canvas').addEventListener('change', (event) => {
+  state.canvasId = event.target.value;
+  // 已生成的卡片尺寸固定在生成时的画幅上。导出按当前画幅取宽高，直接导出会
+  // 把旧卡片裁进新画布，所以切换后禁用截图导出，直到重新生成。
+  if (state.fragment) {
+    copyImageButton.disabled = true;
+    saveImageButton.disabled = true;
+    setStatus(str.canvasChanged);
+  }
+});
 $('opt-language').addEventListener('change', (event) => { state.languageOption = event.target.value; });
 window.addEventListener('resize', () => { if (state.fragment) renderPreview(); });
