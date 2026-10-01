@@ -85,7 +85,30 @@ describe('external discovery feed', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(xml, { status: 200 })));
     const api = { getRepositoryDetails: vi.fn().mockResolvedValue({ id: 7, name: 'rss-repo', full_name: 'owner/rss-repo' }) } as unknown as GitHubApiService;
     const result = await loadExternalDiscoveryFeed('https://example.com/feed.xml', 'external:rss-one', api, 'rss');
-    expect(api.getRepositoryDetails).toHaveBeenCalledWith('owner', 'rss-repo');
+    expect(api.getRepositoryDetails).toHaveBeenCalledWith('owner', 'rss-repo', undefined);
     expect(result.repos).toMatchObject([{ id: 7, channel: 'external:rss-one', platform: 'All' }]);
+  });
+
+  it('passes an abort signal to GitHub detail requests', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ repositories: ['owner/repo'] }), { status: 200 })));
+    const controller = new AbortController();
+    const api = { getRepositoryDetails: vi.fn().mockResolvedValue({ id: 1, name: 'repo', full_name: 'owner/repo' }) } as unknown as GitHubApiService;
+    await loadExternalDiscoveryFeed('https://example.com/feed.json', 'external:one', api, 'json', controller.signal);
+    expect(api.getRepositoryDetails).toHaveBeenCalledWith('owner', 'repo', controller.signal);
+  });
+
+  it('stops issuing GitHub detail requests once the signal aborts', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      repositories: Array.from({ length: 10 }, (_, index) => `owner/repo-${index}`),
+    }), { status: 200 })));
+    const controller = new AbortController();
+    const api = { getRepositoryDetails: vi.fn().mockImplementation(async () => {
+      controller.abort();
+      throw new DOMException('Aborted', 'AbortError');
+    }) } as unknown as GitHubApiService;
+    await expect(loadExternalDiscoveryFeed('https://example.com/feed.json', 'external:one', api, 'json', controller.signal))
+      .rejects.toThrow();
+    // 第一批 5 个并发请求已发出；中止后不再进入第二批
+    expect(api.getRepositoryDetails).toHaveBeenCalledTimes(5);
   });
 });

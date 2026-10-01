@@ -50,6 +50,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   const optimizerRef = useRef<AIAnalysisOptimizer | null>(null);
   const channelRequestVersionRef = useRef<Partial<Record<DiscoveryChannelId, number>>>({});
   const channelLoadingVersionRef = useRef<Record<string, number>>({});
+  const channelRequestControllersRef = useRef<Partial<Record<DiscoveryChannelId, AbortController>>>({});
   const latestStateRef = useRef(state);
   const authSessionIdentity = useAppStore(current => `${current.githubToken ?? ''}\u0000${current.user?.id ?? ''}\u0000${current.user?.login ?? ''}`);
   const { captureSession, isCurrentSession } = useAuthSessionGeneration(authSessionIdentity);
@@ -66,6 +67,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     return () => {
       optimizerRef.current?.abort();
       optimizerRef.current = null;
+      // 账号切换/卸载时中止外部频道仍在途的 GitHub 详情请求
+      for (const controller of Object.values(channelRequestControllersRef.current)) controller?.abort();
+      channelRequestControllersRef.current = {};
     };
   }, [authSessionIdentity, setAnalysisProgress]);
   const t = useT('discovery');
@@ -98,14 +102,19 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     } else {
       currentState.setDiscoveryLoading(channelId, true);
     }
+    let externalFeedController: AbortController | null = null;
     try {
       const api = createGitHubApiService(currentState.githubToken);
       let result: PaginatedDiscoveryRepositories;
       if (isExternalDiscoveryChannelId(channelId)) {
+        // 新请求取代旧请求时中止旧请求仍在途的 GitHub 详情请求
+        channelRequestControllersRef.current[channelId]?.abort();
+        externalFeedController = new AbortController();
+        channelRequestControllersRef.current[channelId] = externalFeedController;
         const channel = currentState.discoveryChannels.find(item => item.id === channelId);
         const sourceUrl = channel?.sourceUrl;
         if (!sourceUrl) throw new Error('External discovery feed is not configured');
-        result = await loadExternalDiscoveryFeed(sourceUrl, channelId, api, channel?.sourceKind ?? 'json');
+        result = await loadExternalDiscoveryFeed(sourceUrl, channelId, api, channel?.sourceKind ?? 'json', externalFeedController.signal);
       } else switch (channelId) {
         case 'trending':
           result = await api.getTrendingRepositories(currentState.discoveryPlatform, page, 20, currentState.trendingTimeRange);
@@ -236,6 +245,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       if (ownsLoading()) {
         if (append) currentState.setDiscoveryLoadingMore(channelId, false);
         else currentState.setDiscoveryLoading(channelId, false);
+      }
+      if (externalFeedController && channelRequestControllersRef.current[channelId] === externalFeedController) {
+        delete channelRequestControllersRef.current[channelId];
       }
     }
   }, [captureSession, isCurrentSession, scrollContainerRef, toast]);

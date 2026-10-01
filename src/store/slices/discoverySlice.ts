@@ -7,6 +7,7 @@ import { logger } from '../../services/logger';
 import { recordTrendingSnapshot } from '../../utils/trendingSnapshots';
 import type { DiscoveryChannelId } from '../../types';
 import { isExternalDiscoveryChannelId, normalizeDiscoveryFeedUrl } from '../../utils/discoveryFeeds';
+import { isChannelScrapable } from '../../services/scrapeSupport';
 
 export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setSelectedDiscoveryChannel'
@@ -101,7 +102,9 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     }),
     toggleDiscoveryChannel: (channelId) => set((state) => {
       const channel = state.discoveryChannels.find(ch => ch.id === channelId);
-      if (!channel || (channel.enabled && state.discoveryChannels.filter(ch => ch.enabled).length === 1)) {
+      // 启用判定只统计可见频道：纯浏览器模式下隐藏的 x-tweet/telegram 不算数
+      const visibleEnabledCount = state.discoveryChannels.filter(ch => ch.enabled && isChannelScrapable(ch.id)).length;
+      if (!channel || (channel.enabled && isChannelScrapable(channelId) && visibleEnabledCount === 1)) {
         return state;
       }
 
@@ -115,7 +118,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
         discoveryChannels,
         selectedDiscoveryChannel: selectedChannelEnabled
           ? state.selectedDiscoveryChannel
-          : discoveryChannels.find(ch => ch.enabled)?.id ?? state.selectedDiscoveryChannel,
+          : discoveryChannels.find(ch => ch.enabled && isChannelScrapable(ch.id))?.id ?? state.selectedDiscoveryChannel,
       };
     }),
     addExternalDiscoveryChannel: (name, sourceInput, kind = 'json') => {
@@ -138,14 +141,15 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     removeExternalDiscoveryChannel: (channelId) => set(state => {
       if (!isExternalDiscoveryChannelId(channelId)) return state;
       let discoveryChannels = state.discoveryChannels.filter(channel => channel.id !== channelId);
-      if (!discoveryChannels.some(channel => channel.enabled)) {
+      // 可见频道全部被停用（隐藏频道的 enabled 不算）时恢复「趋势」频道
+      if (!discoveryChannels.some(channel => channel.enabled && isChannelScrapable(channel.id))) {
         discoveryChannels = discoveryChannels.map(channel => channel.id === 'trending'
           ? { ...channel, enabled: true } : channel);
       }
       return {
         discoveryChannels,
         selectedDiscoveryChannel: state.selectedDiscoveryChannel === channelId
-          ? discoveryChannels.find(channel => channel.enabled)?.id ?? 'trending'
+          ? discoveryChannels.find(channel => channel.enabled && isChannelScrapable(channel.id))?.id ?? 'trending'
           : state.selectedDiscoveryChannel,
       };
     }),

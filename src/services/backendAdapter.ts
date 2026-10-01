@@ -1,6 +1,7 @@
 import { translateBackendError } from '../utils/backendErrors';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import { logger } from './logger';
+import { setBackendAvailability } from './scrapeSupport';
 
 import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -116,6 +117,7 @@ class BackendAdapter {
   private commitBackendUrl(url: string | null): void {
     if (this._backendUrl === url) return;
     this._backendUrl = url;
+    setBackendAvailability(url !== null);
     for (const listener of this._availabilityListeners) listener();
   }
 

@@ -276,6 +276,39 @@ describe('PR-07 Store modularization compatibility', () => {
     }
   });
 
+  it('falls back to trending over browser-hidden channels when removing feeds', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // 纯浏览器模式（测试环境无桌面壳、无后端）下 x-tweet/telegram 被隐藏但仍是 enabled
+      store.setState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({
+          ...channel,
+          enabled: channel.id === 'x-tweet' || channel.id === 'telegram',
+        })),
+        selectedDiscoveryChannel: 'trending',
+      });
+      const id = store.getState().addExternalDiscoveryChannel('Last feed', 'https://example.com/last.json');
+      store.getState().removeExternalDiscoveryChannel(id!);
+      // 隐藏频道的启用不能替代可见频道：删除最后一个可见启用频道后必须恢复趋势
+      expect(store.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+      expect(store.getState().selectedDiscoveryChannel).toBe('trending');
+
+      // 隐藏频道仍启用时，关闭最后一个可见启用频道应被阻止
+      store.setState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({
+          ...channel,
+          enabled: channel.id === 'trending' || channel.id === 'x-tweet',
+        })),
+      });
+      store.getState().toggleDiscoveryChannel('trending');
+      expect(store.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
   it('retains the historical normalize-only resets and release backfill behavior', () => {
     const snapshot = buildPersistedSnapshot({
       ...buildTransientDiscoverySnapshot(),

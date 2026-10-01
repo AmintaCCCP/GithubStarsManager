@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { backend } from '../services/backendAdapter';
-import { isElectron } from '../services/electronProxy';
+import { supportsWebScraping } from '../services/scrapeSupport';
 
 /**
  * X 推文/Telegram 频道抓取只能在桌面端（主进程 IPC）或配置了后端的 Web
@@ -9,10 +9,9 @@ import { isElectron } from '../services/electronProxy';
  * （init 探测是异步的，落定时通过订阅触发重渲染）。
  */
 export const useWebScrapeSupport = (): boolean => {
-  const backendAvailable = useSyncExternalStore(
+  return useSyncExternalStore(
     listener => backend.subscribeAvailability(listener),
-    () => backend.isAvailable,
+    () => supportsWebScraping(),
     () => false,
   );
-  return isElectron() || backendAvailable;
 };

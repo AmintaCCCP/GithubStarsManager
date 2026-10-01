@@ -80,17 +80,20 @@ export async function loadExternalDiscoveryFeed(
   channelId: DiscoveryChannelId,
   api: GitHubApiService,
   kind: ExternalFeedKind = 'json',
+  signal?: AbortSignal,
 ): Promise<PaginatedDiscoveryRepositories> {
   const names = kind === 'rss'
     ? await readExternalDiscoveryRssFeed(sourceUrl)
     : await readExternalDiscoveryFeed(sourceUrl);
   const repos: DiscoveryRepo[] = [];
   for (let start = 0; start < names.length; start += 5) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const batch = await Promise.all(names.slice(start, start + 5).map(async (fullName) => {
       const [owner, repo] = fullName.split('/');
       try {
-        return await api.getRepositoryDetails(owner, repo);
-      } catch {
+        return await api.getRepositoryDetails(owner, repo, signal);
+      } catch (error) {
+        if (signal?.aborted) throw error;
         return null;
       }
     }));
