@@ -934,7 +934,10 @@
     "check-if-a-new-version-is-available": "새 버전이 있는지 확인하세요.",
     "contact-information": "연락처 정보",
     "if-you-encounter-any-issues-or-have-suggestions": "사용 중 문제가 발생하거나 제안 사항이 있는 경우 다음 방법을 통해 저에게 연락해 주세요.",
-    "github": "GitHub"
+    "github": "GitHub",
+    "account-token-hint": "{{login}}(으)로 로그인했습니다. 만료된 토큰은 로그아웃하지 않고 여기서 갱신할 수 있습니다.",
+    "token-hint": "만료된 토큰은 로그아웃하지 않고 여기서 갱신할 수 있습니다.",
+    "token-permission-guide": "토큰 설정 가이드"
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "백업/내보내기 시 키 포함",

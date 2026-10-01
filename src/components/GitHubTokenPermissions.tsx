@@ -42,7 +42,7 @@ function renderWithHighlights(text: string): React.ReactNode[] {
 }
 
 /** Explains the permissions before a token is saved, without probing account-changing APIs. */
-export function GitHubTokenPermissions() {
+export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }) {
   const t = useT('login');
   const baseId = useId();
   const [mode, setMode] = useState<TokenMode>('fine-grained');
@@ -67,10 +67,12 @@ export function GitHubTokenPermissions() {
 
   return (
     <div className="text-xs leading-5 text-muted-foreground">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-        <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
-        {t('loginScreen.token-permissions-title')}
-      </h3>
+      {heading && (
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <KeyRound className="h-4 w-4 text-muted-foreground" aria-hidden />
+          {t('loginScreen.token-permissions-title')}
+        </h3>
+      )}
 
       <div role="tablist" className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
         {MODE_TABS.map(({ mode: tabMode, labelKey }) => {

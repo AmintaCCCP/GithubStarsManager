@@ -934,7 +934,10 @@
     "check-if-a-new-version-is-available": "检查是否有新版本可用",
     "contact-information": "联系方式",
     "if-you-encounter-any-issues-or-have-suggestions": "如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：",
-    "github": "GitHub"
+    "github": "GitHub",
+    "account-token-hint": "当前账号 {{login}}。过期后可在此直接更换 token，不必退出登录。",
+    "token-hint": "过期后可在此直接更换 token，不必退出登录。",
+    "token-permission-guide": "查看 Token 配置指引"
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "备份/导出时包含密钥",
