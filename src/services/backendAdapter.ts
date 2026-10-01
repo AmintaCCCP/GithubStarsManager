@@ -97,10 +97,26 @@ const readStoredBackendUrl = (): string | null => {
 
 class BackendAdapter {
   private _backendUrl: string | null = null;
+  private _availabilityListeners = new Set<() => void>();
   private _beforeInitHook: (() => Promise<void>) | null = null;
 
   registerBeforeInitHook(fn: () => Promise<void>): void {
     this._beforeInitHook = fn;
+  }
+
+  /**
+   * 订阅可用性变化（init 探测结果落定时触发）。返回取消订阅函数，
+   * 供 useSyncExternalStore 等 UI 侧响应式使用。
+   */
+  subscribeAvailability(listener: () => void): () => void {
+    this._availabilityListeners.add(listener);
+    return () => this._availabilityListeners.delete(listener);
+  }
+
+  private commitBackendUrl(url: string | null): void {
+    if (this._backendUrl === url) return;
+    this._backendUrl = url;
+    for (const listener of this._availabilityListeners) listener();
   }
 
   async init(preferredUrl?: string): Promise<void> {
@@ -138,7 +154,7 @@ class BackendAdapter {
               // In-memory commit only. Persistence is an explicit caller
               // decision (rememberActiveUrl) after its own auth checks, so a
               // candidate that later fails authentication is never remembered.
-              this._backendUrl = baseUrl;
+              this.commitBackendUrl(baseUrl);
               logger.info('backendAdapter', 'Backend connected', { url: baseUrl });
               return;
             }
@@ -150,10 +166,10 @@ class BackendAdapter {
         }
       }
 
-      this._backendUrl = null;
+      this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
     } catch {
-      this._backendUrl = null;
+      this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
     }
   }

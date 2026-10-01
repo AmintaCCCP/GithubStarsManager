@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
-import { readExternalDiscoveryFeed } from '../../../services/externalDiscoveryFeed';
+import { readExternalDiscoveryFeed, readExternalDiscoveryRssFeed } from '../../../services/externalDiscoveryFeed';
 import { normalizeDiscoveryFeedUrl } from '../../../utils/discoveryFeeds';
-import type { DiscoveryChannelId } from '../../../types';
+import type { DiscoveryChannelId, ExternalFeedKind } from '../../../types';
 import { useT } from '../../../i18n/useT';
 
 export function useExternalDiscoveryFeeds() {
@@ -12,7 +12,7 @@ export function useExternalDiscoveryFeeds() {
   const [error, setError] = useState('');
   const t = useT('discovery');
 
-  const add = async (name: string, sourceInput: string) => {
+  const add = async (name: string, sourceInput: string, kind: ExternalFeedKind = 'json') => {
     const sourceUrl = normalizeDiscoveryFeedUrl(sourceInput);
     if (!sourceUrl || !name.trim() || name.trim().length > 60) {
       setError(t('externalFeeds.invalid'));
@@ -21,8 +21,8 @@ export function useExternalDiscoveryFeeds() {
     setIsChecking(true);
     setError('');
     try {
-      await readExternalDiscoveryFeed(sourceUrl);
-      if (!addChannel(name, sourceUrl)) {
+      await (kind === 'rss' ? readExternalDiscoveryRssFeed(sourceUrl) : readExternalDiscoveryFeed(sourceUrl));
+      if (!addChannel(name, sourceUrl, kind)) {
         setError(t('externalFeeds.duplicate'));
         return false;
       }
@@ -31,7 +31,10 @@ export function useExternalDiscoveryFeeds() {
       const message = cause instanceof Error ? cause.message : '';
       setError(message.includes('CORS') ? t('externalFeeds.cors')
         : message.includes('Invalid feed format') || message.includes('invalid repository')
-          ? t('externalFeeds.invalid-format') : t('externalFeeds.unreadable'));
+          ? t('externalFeeds.invalid-format')
+          : message.includes('No GitHub repository links')
+            ? t('externalFeeds.rss-invalid')
+            : t('externalFeeds.unreadable'));
       return false;
     } finally {
       setIsChecking(false);

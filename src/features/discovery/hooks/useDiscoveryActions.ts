@@ -102,9 +102,10 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       const api = createGitHubApiService(currentState.githubToken);
       let result: PaginatedDiscoveryRepositories;
       if (isExternalDiscoveryChannelId(channelId)) {
-        const sourceUrl = currentState.discoveryChannels.find(channel => channel.id === channelId)?.sourceUrl;
+        const channel = currentState.discoveryChannels.find(item => item.id === channelId);
+        const sourceUrl = channel?.sourceUrl;
         if (!sourceUrl) throw new Error('External discovery feed is not configured');
-        result = await loadExternalDiscoveryFeed(sourceUrl, channelId, api);
+        result = await loadExternalDiscoveryFeed(sourceUrl, channelId, api, channel?.sourceKind ?? 'json');
       } else switch (channelId) {
         case 'trending':
           result = await api.getTrendingRepositories(currentState.discoveryPlatform, page, 20, currentState.trendingTimeRange);

@@ -253,6 +253,8 @@ describe('PR-07 Store modularization compatibility', () => {
       expect(id).toMatch(/^external:/);
       expect(store.getState().selectedDiscoveryChannel).toBe(id);
       expect(store.getState().addExternalDiscoveryChannel('Duplicate', 'https://example.com/feed.json')).toBeNull();
+      const rssId = store.getState().addExternalDiscoveryChannel('RSS feed', 'https://example.com/feed.xml', 'rss');
+      expect(store.getState().discoveryChannels.find(channel => channel.id === rssId)?.sourceKind).toBe('rss');
       store.getState().removeExternalDiscoveryChannel(id!);
       expect(store.getState().discoveryChannels.some(channel => channel.id === id)).toBe(false);
       expect(store.getState().selectedDiscoveryChannel).not.toBe(id);

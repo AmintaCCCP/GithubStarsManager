@@ -1,12 +1,17 @@
 {
   "externalFeeds": {
     "manage": "Flux de découverte externes",
+    "manageRss": "Flux de découverte RSS",
     "name": "Nom du canal",
-    "url": "URL HTTPS du flux JSON",
+    "url": "URL HTTPS du flux",
     "add": "Ajouter un flux",
     "checking": "Vérification du flux…",
+    "copy": "Copier",
+    "copied": "Copié",
+    "rssFormat": "Collez une URL publique de flux RSS ou Atom : l'app extrait les liens de dépôts GitHub mentionnés (30 premiers par actualisation).",
+    "rss-invalid": "Aucun lien de dépôt GitHub trouvé dans le flux.",
     "remove": "Supprimer {{name}}",
-    "format": "L'URL doit renvoyer le JSON {\"repositories\":[\"https://github.com/owner/repo\"]}. Au plus 30 dépôts publics par flux.",
+    "format": "Collez un lien HTTPS public dont la réponse JSON liste des dépôts GitHub dans son champ repositories, jusqu'à 30 dépôts publics.",
     "cors-note": "Le site doit autoriser les requêtes du navigateur (CORS). Le jeton GitHub n'est pas envoyé au flux.",
     "invalid": "Saisissez un nom et une URL HTTPS valide.",
     "duplicate": "Ce flux existe déjà ou la limite de dix flux est atteinte.",
@@ -165,5 +170,6 @@
     "stars-gained": "+{{v1}} stars depuis le premier relevé",
     "first-seen": "Premier relevé du leader {{v1}}"
   }
+
 
 }

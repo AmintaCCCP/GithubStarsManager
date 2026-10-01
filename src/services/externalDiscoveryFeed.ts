@@ -1,21 +1,19 @@
-import type { DiscoveryChannelId, DiscoveryRepo, PaginatedDiscoveryRepositories } from '../types';
+import type { DiscoveryChannelId, DiscoveryRepo, ExternalFeedKind, PaginatedDiscoveryRepositories } from '../types';
 import type { GitHubApiService } from './githubApi';
 import { normalizeDiscoveryFeedUrl, parseDiscoveryFeedRepositories } from '../utils/discoveryFeeds';
+import { parseDiscoveryRssRepositories } from '../utils/discoveryRss';
 
 const MAX_RESPONSE_BYTES = 128_000;
 const FEED_TIMEOUT_MS = 15_000;
 
-/** Validate the public feed before it can be saved as a channel. */
-export async function readExternalDiscoveryFeed(sourceUrl: string): Promise<string[]> {
-  const url = normalizeDiscoveryFeedUrl(sourceUrl);
-  if (!url) throw new Error('A feed must use a valid HTTPS URL');
-
+/** Fetch a feed body with a deadline that covers headers and full streamed reading, capped in size. */
+async function fetchFeedBytes(url: string): Promise<Uint8Array> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
     let response: Response;
     try {
-      response = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'omit', signal: controller.signal });
+      response = await fetch(url, { headers: { Accept: 'application/json, application/rss+xml, application/xml, text/xml' }, credentials: 'omit', signal: controller.signal });
     } catch {
       if (controller.signal.aborted) throw new Error('Feed request timed out');
       throw new Error('Could not read the feed. Check its URL and browser CORS permissions.');
@@ -48,16 +46,32 @@ export async function readExternalDiscoveryFeed(sourceUrl: string): Promise<stri
       bytes.set(chunk, offset);
       offset += chunk.byteLength;
     }
-    let payload: unknown;
-    try {
-      payload = JSON.parse(new TextDecoder().decode(bytes));
-    } catch {
-      throw new Error('Feed did not return valid JSON');
-    }
-    return parseDiscoveryFeedRepositories(payload);
+    return bytes;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Validate the public JSON feed before it can be saved as a channel. */
+export async function readExternalDiscoveryFeed(sourceUrl: string): Promise<string[]> {
+  const url = normalizeDiscoveryFeedUrl(sourceUrl);
+  if (!url) throw new Error('A feed must use a valid HTTPS URL');
+  const bytes = await fetchFeedBytes(url);
+  let payload: unknown;
+  try {
+    payload = JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new Error('Feed did not return valid JSON');
+  }
+  return parseDiscoveryFeedRepositories(payload);
+}
+
+/** Validate the public RSS/Atom feed before it can be saved as a channel. */
+export async function readExternalDiscoveryRssFeed(sourceUrl: string): Promise<string[]> {
+  const url = normalizeDiscoveryFeedUrl(sourceUrl);
+  if (!url) throw new Error('A feed must use a valid HTTPS URL');
+  const bytes = await fetchFeedBytes(url);
+  return parseDiscoveryRssRepositories(new TextDecoder().decode(bytes));
 }
 
 /** Resolve feed links through the existing GitHub API, keeping the feed itself read-only. */
@@ -65,8 +79,11 @@ export async function loadExternalDiscoveryFeed(
   sourceUrl: string,
   channelId: DiscoveryChannelId,
   api: GitHubApiService,
+  kind: ExternalFeedKind = 'json',
 ): Promise<PaginatedDiscoveryRepositories> {
-  const names = await readExternalDiscoveryFeed(sourceUrl);
+  const names = kind === 'rss'
+    ? await readExternalDiscoveryRssFeed(sourceUrl)
+    : await readExternalDiscoveryFeed(sourceUrl);
   const repos: DiscoveryRepo[] = [];
   for (let start = 0; start < names.length; start += 5) {
     const batch = await Promise.all(names.slice(start, start + 5).map(async (fullName) => {

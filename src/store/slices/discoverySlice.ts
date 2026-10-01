@@ -118,7 +118,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
           : discoveryChannels.find(ch => ch.enabled)?.id ?? state.selectedDiscoveryChannel,
       };
     }),
-    addExternalDiscoveryChannel: (name, sourceInput) => {
+    addExternalDiscoveryChannel: (name, sourceInput, kind = 'json') => {
       const sourceUrl = normalizeDiscoveryFeedUrl(sourceInput);
       const trimmedName = name.trim();
       const channels = get().discoveryChannels;
@@ -129,7 +129,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
       set(state => ({
         discoveryChannels: [...state.discoveryChannels, {
           id, name: trimmedName, nameEn: trimmedName, icon: 'search', description: sourceUrl,
-          sourceUrl, enabled: true,
+          sourceUrl, sourceKind: kind === 'rss' ? 'rss' : undefined, enabled: true,
         }],
         selectedDiscoveryChannel: id,
       }));

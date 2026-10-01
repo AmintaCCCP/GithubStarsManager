@@ -792,6 +792,9 @@ export interface TelegramRef {
   createdAt: string;
 }
 
+/** User-configured external discovery source formats. */
+export type ExternalFeedKind = 'json' | 'rss';
+
 export interface DiscoveryChannel {
   id: DiscoveryChannelId;
   name: string;
@@ -799,8 +802,10 @@ export interface DiscoveryChannel {
   icon: DiscoveryChannelIcon;
   description: string;
   enabled: boolean;
-  /** User-configured, public JSON feed; only present for external channels. */
+  /** User-configured, public feed; only present for external channels. */
   sourceUrl?: string;
+  /** Feed format of `sourceUrl`; omitted means the default JSON format. */
+  sourceKind?: ExternalFeedKind;
 }
 
 export interface PaginatedDiscoveryRepositories {

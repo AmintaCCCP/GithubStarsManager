@@ -52,9 +52,9 @@ describe('DiscoveryChannelMenu', () => {
       await user.click(screen.getByRole('button', { name: '管理发现频道' }));
       await user.click(screen.getByRole('menuitem', { name: '外部发现频道' }));
       await user.type(screen.getByRole('textbox', { name: '频道名称' }), '我的来源');
-      await user.type(screen.getByRole('textbox', { name: 'HTTPS JSON 地址' }), 'https://example.com/feed.json');
+      await user.type(screen.getByRole('textbox', { name: 'HTTPS 地址' }), 'https://example.com/feed.json');
       await user.click(screen.getByRole('button', { name: '添加频道' }));
-      await waitFor(() => expect(addChannel).toHaveBeenCalledWith('我的来源', 'https://example.com/feed.json'));
+      await waitFor(() => expect(addChannel).toHaveBeenCalledWith('我的来源', 'https://example.com/feed.json', 'json'));
     } finally {
       storeMock.mockImplementation(originalImplementation!);
     }

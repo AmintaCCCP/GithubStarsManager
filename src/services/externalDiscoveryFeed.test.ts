@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GitHubApiService } from './githubApi';
-import { loadExternalDiscoveryFeed, readExternalDiscoveryFeed } from './externalDiscoveryFeed';
+import { loadExternalDiscoveryFeed, readExternalDiscoveryFeed, readExternalDiscoveryRssFeed } from './externalDiscoveryFeed';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -10,7 +10,8 @@ describe('external discovery feed', () => {
     vi.stubGlobal('fetch', fetchMock);
     expect(await readExternalDiscoveryFeed('https://example.com/feed.json')).toEqual(['owner/repo']);
     expect(fetchMock).toHaveBeenCalledWith('https://example.com/feed.json', {
-      headers: { Accept: 'application/json' }, credentials: 'omit', signal: expect.any(AbortSignal),
+      headers: { Accept: 'application/json, application/rss+xml, application/xml, text/xml' },
+      credentials: 'omit', signal: expect.any(AbortSignal),
     });
   });
 
@@ -66,5 +67,25 @@ describe('external discovery feed', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('extracts GitHub repositories from a validated RSS feed', async () => {
+    const xml = '<rss><channel><item><link>https://github.com/owner/feed-repo</link></item></channel></rss>';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(xml, { status: 200 })));
+    await expect(readExternalDiscoveryRssFeed('https://example.com/feed.xml')).resolves.toEqual(['owner/feed-repo']);
+  });
+
+  it('rejects an HTML page served at the RSS feed URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html><body>not a feed</body></html>', { status: 200 })));
+    await expect(readExternalDiscoveryRssFeed('https://example.com/feed.xml')).rejects.toThrow('RSS or Atom');
+  });
+
+  it('loads RSS feed repositories through the GitHub API', async () => {
+    const xml = '<rss><channel><item><link>https://github.com/owner/rss-repo</link></item></channel></rss>';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(xml, { status: 200 })));
+    const api = { getRepositoryDetails: vi.fn().mockResolvedValue({ id: 7, name: 'rss-repo', full_name: 'owner/rss-repo' }) } as unknown as GitHubApiService;
+    const result = await loadExternalDiscoveryFeed('https://example.com/feed.xml', 'external:rss-one', api, 'rss');
+    expect(api.getRepositoryDetails).toHaveBeenCalledWith('owner', 'rss-repo');
+    expect(result.repos).toMatchObject([{ id: 7, channel: 'external:rss-one', platform: 'All' }]);
   });
 });

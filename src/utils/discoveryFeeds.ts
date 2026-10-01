@@ -1,8 +1,13 @@
-import type { DiscoveryChannel } from '../types';
+import type { DiscoveryChannel, ExternalFeedKind } from '../types';
 
 const MAX_FEEDS = 10;
 const FEED_ID = /^external:[a-z0-9-]{1,64}$/;
 const REPOSITORY_NAME = /^[A-Za-z0-9_.-]+$/;
+
+/** Only 'rss' is stored explicitly; omitted means the default JSON feed format. */
+export function normalizeExternalFeedKind(value: unknown): ExternalFeedKind | undefined {
+  return value === 'rss' ? 'rss' : undefined;
+}
 
 export function normalizeDiscoveryFeedUrl(input: string): string | null {
   try {
@@ -42,6 +47,7 @@ export function normalizeExternalDiscoveryChannels(input: unknown): DiscoveryCha
       icon: 'search',
       description: sourceUrl,
       sourceUrl,
+      sourceKind: normalizeExternalFeedKind(item.sourceKind),
       enabled: item.enabled !== false,
     });
     if (feeds.length === MAX_FEEDS) break;

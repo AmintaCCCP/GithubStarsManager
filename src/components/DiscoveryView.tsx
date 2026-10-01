@@ -28,6 +28,7 @@ import { SiAndroid, SiApple, SiLinux, SiX, SiTelegram } from '@icons-pack/react-
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
+import { useWebScrapeSupport } from '../hooks/useWebScrapeSupport';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { DiscoveryChannelMenu } from './DiscoveryChannelMenu';
 import { TrendingHistoryPanel } from '../features/discovery/components/TrendingHistoryPanel';
@@ -453,6 +454,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
 export const DiscoveryView: React.FC = React.memo(() => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toggleDiscoveryChannel = useAppStore(state => state.toggleDiscoveryChannel);
+  const scrapeSupport = useWebScrapeSupport();
   const {
     githubToken,
     language,
@@ -521,10 +523,21 @@ export const DiscoveryView: React.FC = React.memo(() => {
     if (typeof window === 'undefined') return false;
     return window.location.protocol === 'file:' || navigator.userAgent.includes('Electron');
   }, []);
-  const safeDiscoveryChannels = useMemo(
-    () => Array.isArray(discoveryChannels) ? discoveryChannels.filter(Boolean) : [],
-    [discoveryChannels]
-  );
+  const safeDiscoveryChannels = useMemo(() => {
+    if (!Array.isArray(discoveryChannels)) return [];
+    if (scrapeSupport) return discoveryChannels.filter(Boolean);
+    // 纯浏览器模式（无桌面壳、无后端）无法抓取 X 推文与 Telegram，直接隐藏
+    return discoveryChannels.filter(channel => Boolean(channel)
+      && channel.id !== 'x-tweet' && channel.id !== 'telegram');
+  }, [discoveryChannels, scrapeSupport]);
+
+  // 纯浏览器模式下持久化的选中频道若是被隐藏的抓取频道，回退到第一个可用频道
+  useEffect(() => {
+    if (scrapeSupport) return;
+    if (selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram') return;
+    const fallback = safeDiscoveryChannels.find(ch => ch.enabled && ch.id !== 'code-search')?.id ?? 'trending';
+    setSelectedDiscoveryChannel(fallback);
+  }, [scrapeSupport, selectedDiscoveryChannel, safeDiscoveryChannels, setSelectedDiscoveryChannel]);
 
   // 获取当前频道的所有仓库
   const allRepos = useMemo(
@@ -769,7 +782,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       >
         <div
           ref={sidebarRef}
-          className="hidden lg:block w-64 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
+          className="hidden lg:block w-72 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <DiscoverySidebar
@@ -820,15 +833,6 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     )}
                   </div>
                 </div>
-                {selectedDiscoveryChannel !== 'search' && <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={t('discoveryView.search-repositories')}
-                  onClick={() => {
-                    if (!safeDiscoveryChannels.find(channel => channel.id === 'search')?.enabled) toggleDiscoveryChannel('search');
-                    setSelectedDiscoveryChannel('search');
-                  }}
-                ><Search className="h-4 w-4" /><span className="hidden sm:inline">{t('discoveryView.search-repositories')}</span></Button>}
                 {selectedDiscoveryChannel !== 'code-search' && (
                 <div className="relative group/refresh shrink-0">
                   <Button
