@@ -49,11 +49,9 @@ function createPluginCatalog() {
         nextRepositories.set(sanitized.id, sanitized);
       }
       const nextReleases = new Map();
-      const publicReleases = [];
       for (const release of snapshot.releases) {
         const normalized = normalizeRelease(release);
         nextReleases.set(normalized.public.id, normalized);
-        publicReleases.push(normalized.public);
       }
       // The documented budget (docs/wiki/Plugin-Development.md) caps the
       // *retained* snapshot at 64 MiB, so measure what the Host actually keeps
@@ -62,11 +60,15 @@ function createPluginCatalog() {
       // summaries, custom overrides, vector bookkeeping…): the desktop client
       // logged 'Plugin data snapshot exceeds the size limit' on every change
       // while the sanitized snapshot was only a few megabytes.
+      // The releases are measured from `nextReleases` (deduplicated, with the
+      // validated `browser_download_url` kept in `assets`) for the same reason:
+      // `normalized.public` alone drops retained data, while duplicate release
+      // IDs would count records the Host never stores.
       let snapshotBytes;
       try {
         snapshotBytes = Buffer.byteLength(JSON.stringify({
           repositories: [...nextRepositories.values()],
-          releases: publicReleases,
+          releases: [...nextReleases.values()],
         }), 'utf8');
       } catch {
         throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin data snapshot must be JSON serializable');

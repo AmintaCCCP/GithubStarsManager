@@ -5,9 +5,9 @@
 import { useT } from '../i18n/useT';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import React, { memo, useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { memo, useState, useCallback, useContext, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import type { PluggableList } from 'unified';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -279,6 +279,69 @@ const resolveImageSrc = (imageSrc: string, baseUrl?: string): string => {
   return imageSrc;
 };
 
+const UNSAFE_SRC_SET_SCHEME = /^(?!https?:)[a-z][a-z0-9+.-]*:/i;
+
+const SRC_SET_SPACE = /[\t\n\f\r ]/;
+
+/**
+ * Split a `srcset` value into `url [descriptor]` candidates following the HTML
+ * "parse a srcset attribute" algorithm
+ * (https://html.spec.whatwg.org/multipage/images.html#parse-a-srcset-attribute).
+ *
+ * Naive `value.split(',')` is wrong because commas are legal inside URLs:
+ * `https://cdn.example.com/w_800,q_auto/hero.jpg 1x` would be cut into two
+ * candidates and the `q_auto/hero.jpg` tail rewritten as a repository-relative
+ * path, destroying the original image.
+ *
+ * Descriptors are kept verbatim rather than validated — they are only joined
+ * back onto the rewritten URL, and the browser rejects an invalid descriptor
+ * exactly as it would have without this rewrite.
+ */
+const parseSrcSet = (srcSet: string): Array<{ url: string; descriptor: string }> => {
+  const candidates: Array<{ url: string; descriptor: string }> = [];
+  let position = 0;
+
+  while (position < srcSet.length) {
+    // Splitting loop: skip the whitespace/commas separating candidates.
+    while (
+      position < srcSet.length
+      && (SRC_SET_SPACE.test(srcSet[position]) || srcSet[position] === ',')
+    ) {
+      position += 1;
+    }
+    if (position >= srcSet.length) break;
+
+    // The URL runs until the next whitespace, so commas inside it stay part of it.
+    let url = '';
+    while (position < srcSet.length && !SRC_SET_SPACE.test(srcSet[position])) {
+      url += srcSet[position];
+      position += 1;
+    }
+
+    let descriptor = '';
+    if (url.endsWith(',')) {
+      // Descriptor-less candidate: it ended on its trailing comma(s).
+      url = url.replace(/,+$/, '');
+    } else {
+      // Descriptor tokens run until the next comma outside parentheses.
+      const start = position;
+      let parens = 0;
+      while (position < srcSet.length) {
+        const char = srcSet[position];
+        if (char === '(') parens += 1;
+        else if (char === ')') parens = Math.max(parens - 1, 0);
+        else if (char === ',' && parens === 0) break;
+        position += 1;
+      }
+      descriptor = srcSet.slice(start, position).trim();
+    }
+
+    if (url) candidates.push({ url, descriptor });
+  }
+
+  return candidates;
+};
+
 /**
  * Rewrite every candidate URL of a `srcset` attribute with {@link resolveImageSrc}.
  *
@@ -289,32 +352,38 @@ const resolveImageSrc = (imageSrc: string, baseUrl?: string): string => {
  * app origin. On the desktop client that origin is `file://`, producing broken
  * images logged as `GET file:///…/dist/<asset> net::ERR_FILE_NOT_FOUND`.
  *
- * Candidates are `url [descriptor]` pairs separated by commas, e.g.
- * `hero-dark.svg 1x, hero-dark@2x.svg 2x`.
- *
  * `srcset` is not covered by react-markdown's URL transform (only `href`/`src`
  * are) and hast-util-sanitize only protocol-filters `src`, so the http(s)-only
  * policy is enforced here as well: candidates with a `data:`/`file:`/`blob:`/
- * `javascript:` scheme are dropped instead of being passed to the DOM.
+ * `javascript:` scheme are dropped instead of being passed to the DOM. That
+ * filtering (and the `//host/…` → `https://host/…` pinning) runs unconditionally;
+ * only *relative* candidate resolution depends on `baseUrl`, and without one
+ * they are kept exactly as authored — the same contract `resolveImageSrc` has
+ * for `img[src]`.
  */
-const UNSAFE_SRC_SET_SCHEME = /^(?!https?:)[a-z][a-z0-9+.-]*:/i;
-
 const resolveSrcSet = (srcSet: string | undefined, baseUrl?: string): string | undefined => {
-  if (!srcSet || !baseUrl) return srcSet;
+  if (!srcSet) return srcSet;
 
-  const rewritten = srcSet
-    .split(',')
-    .map((candidate) => {
-      const [url, ...descriptor] = candidate.trim().split(/\s+/);
-      if (!url || UNSAFE_SRC_SET_SCHEME.test(url)) return '';
+  return parseSrcSet(srcSet)
+    .map(({ url, descriptor }) => {
+      if (UNSAFE_SRC_SET_SCHEME.test(url)) return null;
       const resolved = resolveImageSrc(url, baseUrl);
-      return descriptor.length > 0 ? `${resolved} ${descriptor.join(' ')}` : resolved;
+      return descriptor ? `${resolved} ${descriptor}` : resolved;
     })
-    .filter(Boolean)
+    .filter((candidate): candidate is string => candidate !== null)
     .join(', ');
-
-  return rewritten;
 };
+
+/**
+ * `<source>` children of the enclosing `<picture>`, handed over by the
+ * `picture` component override below.
+ *
+ * Browsers only read `<source>` candidates when the `<img>` is their *direct*
+ * child, so `MarkdownImage` has to rebuild the `<picture>` around its own
+ * `<img>` — keeping every image-tool wrapper (skeleton, ring, captions) outside
+ * of it, otherwise the picture never matches and the fallback `src` always wins.
+ */
+const PictureSourcesContext = React.createContext<React.ReactNode>(null);
 
 const truncateUrl = (url: string, maxLength: number = 50): string => {
   if (url.length <= maxLength) return url;
@@ -354,6 +423,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   const zoomOverlayRef = useRef<HTMLDivElement>(null);
 
   const imageUrl = useMemo(() => resolveImageSrc(src || '', baseUrl), [src, baseUrl]);
+  const pictureSources = useContext(PictureSourcesContext);
 
   useEffect(() => {
     if (!src) return;
@@ -505,6 +575,31 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   const isSmallImage = imageSizeKnown && naturalWidth > 0 && naturalWidth < 300;
 
+  // Inside a `<picture>` the `<img>` must stay its direct child, so the
+  // `<picture>` is rebuilt around the image here while every tool wrapper
+  // (skeleton, ring, captions, error state) stays outside of it.
+  const renderMedia = (className: string, style: React.CSSProperties) => {
+    const image = (
+      <img
+        ref={imgRef}
+        src={imageUrl}
+        alt={alt || ''}
+        className={className}
+        style={style}
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+        onClick={handleImageClick}
+      />
+    );
+    if (pictureSources === null) return image;
+    return (
+      <picture>
+        {pictureSources}
+        {image}
+      </picture>
+    );
+  };
+
   if (!src) return null;
 
   if (hasError) {
@@ -536,11 +631,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             <span className="w-20 h-7 bg-muted dark:bg-muted/40 rounded animate-pulse inline-block" />
           )}
           <span className="relative inline-block">
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt={alt || ''}
-              className={`
+            {renderMedia(
+              `
                 h-auto rounded
                 ${isInsideLink
                   ? 'hover:opacity-80'
@@ -548,16 +640,13 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
                 }
                 ${isLoading ? 'opacity-0 absolute' : 'opacity-100'}
                 min-h-[16px]
-              `}
-              style={{
+              `,
+              {
                 maxWidth: `${naturalWidth}px`,
                 width: `${naturalWidth}px`,
                 objectFit: 'contain'
-              }}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-              onClick={handleImageClick}
-            />
+              }
+            )}
           </span>
         </span>
       ) : (
@@ -572,27 +661,21 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
           )}
 
           <span className={`relative inline-block rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow duration-300 ${isLoading ? 'hidden' : ''}`}>
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt={alt || ''}
-              className={`
+            {renderMedia(
+              `
                 h-auto rounded-xl
                 ${isInsideLink
                   ? 'hover:brightness-95 transition-all duration-200'
                   : 'hover:brightness-95 transition-all duration-200 cursor-pointer'
                 }
-              `}
-              style={{
+              `,
+              {
                 maxHeight: '65vh',
                 maxWidth: '100%',
                 width: 'auto',
                 objectFit: 'contain'
-              }}
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-              onClick={handleImageClick}
-            />
+              }
+            )}
             <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-foreground/5 dark:ring-foreground/10 pointer-events-none" />
           </span>
 
@@ -898,87 +981,113 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   // Element cosmetics come from .markdown-body (github-markdown-css); the
   // overrides below only carry behaviour (heading-id handshake, code blocks,
   // images, links, read-only checkboxes).
-  const markdownComponents: Components = useMemo(() => ({
-    a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} headingIds={headingIds} />,
-    img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
+  const markdownComponents: Components = useMemo(() => {
     // `<picture>` sources bypass the `img` override, so resolve their `srcset`
     // here — otherwise theme-aware README images 404 against the app origin.
-    source: ({ srcSet, ...props }) => <source {...props} srcSet={resolveSrcSet(srcSet, baseUrl)} />,
-    h1: ({ children }) => <h1 id={getHeadingId(children)}>{children}</h1>,
-    h2: ({ children }) => <h2 id={getHeadingId(children)}>{children}</h2>,
-    h3: ({ children }) => <h3 id={getHeadingId(children)}>{children}</h3>,
-    h4: ({ children }) => <h4 id={getHeadingId(children)}>{children}</h4>,
-    h5: ({ children }) => <h5 id={getHeadingId(children)}>{children}</h5>,
-    h6: ({ children }) => <h6 id={getHeadingId(children)}>{children}</h6>,
-    p: (outerProps) => {
-      const { className, children, ...domProps } = stripAstNode(outerProps);
-      const childArray = React.Children.toArray(children);
-      const hasImagesOnly = childArray.every(
-        child => {
-          if (React.isValidElement(child)) {
-            if (child.type === MarkdownImage) return true;
-            if (child.type === 'img') return true;
-          }
-          if (typeof child === 'string' && child.trim() === '') return true;
-          return false;
+    const PictureSource: React.FC<React.ComponentPropsWithoutRef<'source'> & ExtraProps> = ({
+      srcSet,
+      ...props
+    }) => <source {...stripAstNode(props)} srcSet={resolveSrcSet(srcSet, baseUrl)} />;
+    const isPictureSource = (node: React.ReactNode): boolean =>
+      React.isValidElement(node) && node.type === PictureSource;
+
+    return {
+      a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} headingIds={headingIds} />,
+      img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
+      source: PictureSource,
+      picture: ({ children, ...props }) => {
+        const nodes = React.Children.toArray(children);
+        const sources = nodes.filter(isPictureSource);
+        const rest = nodes.filter((node) => !isPictureSource(node));
+        // No `<img>` to host the sources: keep the author's markup untouched.
+        if (rest.length === 0) {
+          return <picture {...stripAstNode(props)}>{children}</picture>;
         }
-      );
+        // `MarkdownImage` rebuilds the `<picture>` around its `<img>` (see
+        // PictureSourcesContext) so every image-tool wrapper stays outside of
+        // it — browsers ignore `<source>` unless `<img>` is a direct child.
+        return (
+          <PictureSourcesContext.Provider value={sources}>
+            {rest}
+          </PictureSourcesContext.Provider>
+        );
+      },
+      h1: ({ children }) => <h1 id={getHeadingId(children)}>{children}</h1>,
+      h2: ({ children }) => <h2 id={getHeadingId(children)}>{children}</h2>,
+      h3: ({ children }) => <h3 id={getHeadingId(children)}>{children}</h3>,
+      h4: ({ children }) => <h4 id={getHeadingId(children)}>{children}</h4>,
+      h5: ({ children }) => <h5 id={getHeadingId(children)}>{children}</h5>,
+      h6: ({ children }) => <h6 id={getHeadingId(children)}>{children}</h6>,
+      p: (outerProps) => {
+        const { className, children, ...domProps } = stripAstNode(outerProps);
+        const childArray = React.Children.toArray(children);
+        const hasImagesOnly = childArray.every(
+          child => {
+            if (React.isValidElement(child)) {
+              if (child.type === MarkdownImage) return true;
+              if (child.type === 'img') return true;
+            }
+            if (typeof child === 'string' && child.trim() === '') return true;
+            return false;
+          }
+        );
 
-      return (
-        <p
-          {...domProps}
-          className={hasImagesOnly ? 'flex flex-wrap items-center justify-center gap-3' : className}
-        >
-          {children}
-        </p>
-      );
-    },
-    code: ({ className, children, ...props }) => {
-      // 检查 props 中是否有 'data-code-block' 标记（由 pre 组件添加）
-      const isCodeBlock = 'data-code-block' in props || !!className;
-      const isInline = !isCodeBlock;
-      const match = /language-(\w+)/.exec(className || '');
-      const language = match ? match[1] : '';
+        return (
+          <p
+            {...domProps}
+            className={hasImagesOnly ? 'flex flex-wrap items-center justify-center gap-3' : className}
+          >
+            {children}
+          </p>
+        );
+      },
+      code: ({ className, children, ...props }) => {
+        // 检查 props 中是否有 'data-code-block' 标记（由 pre 组件添加）
+        const isCodeBlock = 'data-code-block' in props || !!className;
+        const isInline = !isCodeBlock;
+        const match = /language-(\w+)/.exec(className || '');
+        const language = match ? match[1] : '';
 
-      if (isInline) {
-        const codeText = typeof children === 'string' ? children : extractTextFromChildren(children);
-        const rendered = renderInlineCode?.(codeText);
-        // 仅 null/undefined 回退默认 <code>，保留回调返回的合法 ReactNode（含 0、''、false）。
-        if (rendered !== null && rendered !== undefined) return rendered;
-        return <code {...stripAstNode(props)}>{children}</code>;
-      }
+        if (isInline) {
+          const codeText = typeof children === 'string' ? children : extractTextFromChildren(children);
+          const rendered = renderInlineCode?.(codeText);
+          // 仅 null/undefined 回退默认 <code>，保留回调返回的合法 ReactNode（含 0、''、false）。
+          if (rendered !== null && rendered !== undefined) return rendered;
+          return <code {...stripAstNode(props)}>{children}</code>;
+        }
 
-      const codeText = typeof children === 'string' ? children : String(children);
-      if (/^mermaid$/i.test(language)) {
-        return <MermaidBlock code={codeText.replace(/\n$/, '')} />;
-      }
-      return <CodeBlock language={language}>{children}</CodeBlock>;
-    },
-    pre: ({ children }) => {
-      // 给 code 子元素添加标记，表明它是代码块而不是行内代码
-      if (React.isValidElement(children) && children.type === 'code') {
-        type CodeBlockMarkerProps = React.ComponentPropsWithoutRef<'code'> & { 'data-code-block'?: boolean };
-        return <>{React.cloneElement(children as React.ReactElement<CodeBlockMarkerProps>, { 'data-code-block': true })}</>;
-      }
-      // 对于非 code 子元素（如 ASCII 字符画），保留 pre 标签
-      return <pre>{children}</pre>;
-    },
-    table: (outerProps) => {
-      // 宽表格（模型常输出多列对比表）在窄容器内横向滚动，而不是撑破布局或被截断。
-      const domProps = stripAstNode(outerProps);
-      return (
-        <div className="markdown-table-scroll">
-          <table {...domProps} />
-        </div>
-      );
-    },
-    input: (props) => {
-      if (props.type === 'checkbox') {
-        return <input {...stripAstNode(props)} readOnly />;
-      }
-      return <Input {...props} />;
-    },
-  }), [baseUrl, headingIds, getHeadingId, renderInlineCode]);
+        const codeText = typeof children === 'string' ? children : String(children);
+        if (/^mermaid$/i.test(language)) {
+          return <MermaidBlock code={codeText.replace(/\n$/, '')} />;
+        }
+        return <CodeBlock language={language}>{children}</CodeBlock>;
+      },
+      pre: ({ children }) => {
+        // 给 code 子元素添加标记，表明它是代码块而不是行内代码
+        if (React.isValidElement(children) && children.type === 'code') {
+          type CodeBlockMarkerProps = React.ComponentPropsWithoutRef<'code'> & { 'data-code-block'?: boolean };
+          return <>{React.cloneElement(children as React.ReactElement<CodeBlockMarkerProps>, { 'data-code-block': true })}</>;
+        }
+        // 对于非 code 子元素（如 ASCII 字符画），保留 pre 标签
+        return <pre>{children}</pre>;
+      },
+      table: (outerProps) => {
+        // 宽表格（模型常输出多列对比表）在窄容器内横向滚动，而不是撑破布局或被截断。
+        const domProps = stripAstNode(outerProps);
+        return (
+          <div className="markdown-table-scroll">
+            <table {...domProps} />
+          </div>
+        );
+      },
+      input: (props) => {
+        if (props.type === 'checkbox') {
+          return <input {...stripAstNode(props)} readOnly />;
+        }
+        return <Input {...props} />;
+      },
+    };
+  }, [baseUrl, headingIds, getHeadingId, renderInlineCode]);
 
   if (!shouldRender) {
     return <div className="h-32 flex items-center justify-center text-muted-foreground dark:text-muted-foreground/70">Loading…</div>;

@@ -272,6 +272,72 @@ describe('MarkdownRenderer', () => {
 
       expect(container.querySelector('source')).toHaveAttribute('type', 'image/avif');
     });
+
+    it('should keep <img> a direct child of <picture> with the image tools outside', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + '<source media="(prefers-color-scheme: dark)" srcset="docs/images/hero-dark.svg">'
+            + '<img src="docs/images/hero.svg" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      // Browsers only read <source> when <img> is its direct child, so no
+      // wrapper (skeleton, ring, captions…) may sit between them.
+      expect(container.querySelector('picture > source')).toBeInTheDocument();
+      expect(container.querySelector('picture > img')).toBeInTheDocument();
+      expect(container.querySelector('picture > span')).toBeNull();
+      // The image tools themselves are hoisted outside the <picture>.
+      const picture = container.querySelector('picture');
+      expect(picture?.parentElement).not.toBeNull();
+      expect(picture?.parentElement?.querySelector('span')).toBeInTheDocument();
+    });
+
+    it('should not split srcset candidates on commas inside URLs', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + '<source srcset="https://cdn.example.com/w_800,q_auto/hero.jpg 1x, docs/images/hero@2x.jpg 2x">'
+            + '<img src="docs/images/hero.jpg" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      const srcSet = container.querySelector('source')?.getAttribute('srcset') ?? '';
+      // The CDN URL keeps its own commas; only the relative candidate is rewritten.
+      expect(srcSet).toBe(
+        'https://cdn.example.com/w_800,q_auto/hero.jpg 1x, '
+        + 'https://github.com/user/repo/raw/HEAD/docs/images/hero@2x.jpg 2x'
+      );
+    });
+
+    it('should filter srcset schemes even without a baseUrl', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          content={
+            '<picture>'
+            + '<source srcset="//cdn.example.com/hero.webp 1x, data:image/png;base64,AAAA 1x, docs/images/hero.png 2x">'
+            + '<img src="hero.png" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      const srcSet = container.querySelector('source')?.getAttribute('srcset') ?? '';
+      // Protocol-relative candidates become https, unsafe schemes are dropped,
+      // and unresolvable relative candidates stay as authored (like img[src]).
+      expect(srcSet).toBe('https://cdn.example.com/hero.webp 1x, docs/images/hero.png 2x');
+    });
   });
 
   describe('Code Blocks', () => {
