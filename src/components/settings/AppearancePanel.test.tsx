@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Desktop section (#345) lives in Settings-General and must only appear in
+ * Language settings live in Settings-Appearance (moved out of Settings-General).
+ * Desktop section (#345) stays in Settings-General and must only appear in
  * the Electron client. Web builds (no bridge) hide it entirely.
  */
 const mocks = vi.hoisted(() => {
@@ -40,6 +41,7 @@ vi.mock('../../features/settings/hooks/useGitHubTokenActions', () => ({
 }));
 
 import { makeT } from '../../i18n/useT';
+import { AppearancePanel } from './AppearancePanel';
 import { GeneralPanel } from './GeneralPanel';
 
 const t = makeT('zh', 'app');
@@ -49,21 +51,29 @@ beforeEach(() => {
     Object.assign(mocks.state, { language: 'zh', setLanguage: vi.fn(), user: null });
 });
 
+describe('AppearancePanel language settings', () => {
+  it('renders the language grid inside Appearance (not General)', () => {
+    const { container } = render(<AppearancePanel t={t} />);
+    expect(screen.getByRole('radiogroup', { name: t('generalPanel.language-settings') })).toBeTruthy();
+    const languageGrid = container.querySelector('[aria-labelledby="language-settings-title"]');
+    expect(languageGrid?.className ?? '').toContain('w-full');
+    expect(languageGrid?.className ?? '').toContain('grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]');
+    expect(languageGrid?.className ?? '').not.toContain('max-w-lg');
+  });
+
+  it('no longer renders language settings inside General', () => {
+    mocks.isSupported.mockReturnValue(false);
+    render(<GeneralPanel t={t} />);
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+  });
+});
+
 describe('GeneralPanel desktop section', () => {
   it('hides the desktop section on web (no Electron bridge)', () => {
     mocks.isSupported.mockReturnValue(false);
     render(<GeneralPanel t={t} />);
     expect(screen.queryByText('桌面选项')).toBeNull();
     expect(screen.queryByLabelText('开机自动启动')).toBeNull();
-  });
-
-  it('lets language cards fill the settings row instead of wrapping early', () => {
-    mocks.isSupported.mockReturnValue(false);
-    const { container } = render(<GeneralPanel t={t} />);
-    const languageGrid = container.querySelector('[aria-labelledby="language-settings-title"]');
-    expect(languageGrid?.className).toContain('w-full');
-    expect(languageGrid?.className).toContain('grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]');
-    expect(languageGrid?.className).not.toContain('max-w-lg');
   });
 
   it('shows auto-launch and tray toggles in the Electron client', async () => {

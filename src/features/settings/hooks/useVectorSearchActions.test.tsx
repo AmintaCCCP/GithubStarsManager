@@ -6,6 +6,7 @@ import { useAppStore } from '../../../store/useAppStore';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
+  needsReindex: vi.fn(),
   indexAllRepos: vi.fn(),
   cleanup: vi.fn(),
   setVectorIndexingState: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock('../../../services/vectorSearchService', () => ({
     testConnection = vi.fn();
   },
   indexAllRepos: mocks.indexAllRepos,
-  needsReindex: () => false,
+  needsReindex: mocks.needsReindex,
 }));
 vi.mock('../../../services/githubApi', () => ({ GitHubApiService: class {} }));
 vi.mock('../../../utils/licenseFilter', () => ({ normalizeLicense: (value: string | null) => value }));
@@ -61,7 +62,7 @@ const createStoreState = () => ({
     baseUrl: 'https://example.com/v1', apiKey: 'key', model: 'text-embedding-3-small', dimensions: 1536, isActive: true,
   }],
   activeEmbeddingConfig: 'embedding',
-  vectorSearchConfig: { embeddingFormatVersion: 1 },
+  vectorSearchConfig: { embeddingFormatVersion: 1, enabled: true },
   repositories: [repository],
   githubToken: null,
   setVectorSearchStatus: mocks.setVectorSearchStatus,
@@ -82,6 +83,8 @@ describe('useVectorSearchActions', () => {
     )) as typeof useAppStore);
     Object.assign(mockUseAppStore, { getState: () => storeState });
     mocks.cleanup.mockResolvedValue(undefined);
+    mocks.needsReindex.mockReset();
+    mocks.needsReindex.mockReturnValue(false);
   });
 
   it('keeps the embedding format migration pending when indexing has failed repositories', async () => {
@@ -116,6 +119,37 @@ describe('useVectorSearchActions', () => {
       expect.objectContaining({ id: 2 }),
     ]));
     expect(mocks.setVectorSearchStatus).toHaveBeenLastCalledWith(expect.objectContaining({ vectorCount: 2 }));
+  });
+
+  it('counts unindexed repositories among eligible ones (migration forces all eligible)', () => {
+    storeState.repositories = [
+      repository,
+      { ...repository, id: 2 } as Repository,
+      { ...repository, id: 3, analyzed_at: undefined } as Repository,
+      { ...repository, id: 4, analyzed_at: '2026-08-25T00:00:00.000Z', analysis_failed: true } as Repository,
+    ];
+    // formatVersionChanged = true here (fixture embeddingFormatVersion 1 < 3):
+    // eligible repos count regardless of per-repo predicate args.
+    mocks.needsReindex.mockImplementation((repo: Repository) => repo.id !== 99);
+    const { result } = renderHook(() => useVectorSearchActions());
+    expect(result.current.unindexedRepoCount).toBe(2);
+    expect(result.current.incrementalTargetCount).toBe(2);
+  });
+
+  it('excludes up-to-date repositories when no migration is pending', () => {
+    storeState.vectorSearchConfig.embeddingFormatVersion = 3;
+    storeState.repositories = [repository, { ...repository, id: 2 } as Repository];
+    mocks.needsReindex.mockImplementation((repo: Repository) => repo.id === 2);
+    const { result } = renderHook(() => useVectorSearchActions());
+    expect(result.current.unindexedRepoCount).toBe(1);
+    expect(result.current.incrementalTargetCount).toBe(1);
+  });
+
+  it('reports zero unindexed repositories when vector search is disabled', () => {
+    storeState.vectorSearchConfig.enabled = false;
+    mocks.needsReindex.mockReturnValue(true);
+    const { result } = renderHook(() => useVectorSearchActions());
+    expect(result.current.unindexedRepoCount).toBe(0);
   });
 
   it('treats an AbortError from cleanup as a cancelled index operation', async () => {
