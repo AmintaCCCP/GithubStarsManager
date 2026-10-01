@@ -37,7 +37,7 @@
     "build:all": "npm run build && npm run build:server"
   },
   "dependencies": {
-    "undici": "^7.29.1"
+    "undici": "^8.11.2"
   },
   "devDependencies": {
     "@ai-sdk/openai-compatible": "^3.0.37",
