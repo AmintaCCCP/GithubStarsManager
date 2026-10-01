@@ -338,6 +338,78 @@ describe('MarkdownRenderer', () => {
       // and unresolvable relative candidates stay as authored (like img[src]).
       expect(srcSet).toBe('https://cdn.example.com/hero.webp 1x, docs/images/hero.png 2x');
     });
+
+    it('should zoom and download the source the browser actually selected', async () => {
+      const selectedSrc = 'https://cdn.example.com/hero-dark.svg';
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + `<source srcset="${selectedSrc}">`
+            + '<img src="docs/images/hero.svg" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      const img = container.querySelector('img') as HTMLImageElement;
+      // jsdom never runs <picture> selection: emulate the browser picking the
+      // dark <source> instead of the relative <img> fallback.
+      Object.defineProperty(img, 'currentSrc', { configurable: true, value: selectedSrc });
+      fireEvent.load(img);
+
+      fireEvent.click(img);
+      const overlay = document.querySelector('[class*="z-[99999]"]');
+      expect(overlay).not.toBeNull();
+      // The zoom preview must show what the user is looking at, not the fallback.
+      expect(overlay?.querySelector('img')).toHaveAttribute('src', selectedSrc);
+
+      const fetchMock = vi.fn().mockResolvedValue({ blob: async () => new Blob(['x']) });
+      vi.stubGlobal('fetch', fetchMock);
+      // jsdom has neither URL.createObjectURL nor hyperlink navigation: swallow
+      // the anchor click so only the fetched URL matters here.
+      const anchorClick = vi
+        .spyOn(HTMLAnchorElement.prototype, 'click')
+        .mockImplementation(() => undefined);
+      try {
+        const downloadButton = overlay?.querySelector('button[title="下载图片"]') as HTMLButtonElement;
+        expect(downloadButton).toBeInTheDocument();
+
+        fireEvent.click(downloadButton);
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(selectedSrc));
+      } finally {
+        anchorClick.mockRestore();
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('should fall back to the authored image URL when no source was selected', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + '<source srcset="https://cdn.example.com/hero-dark.svg">'
+            + '<img src="docs/images/hero.svg" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      // jsdom reports an empty currentSrc, so the load keeps the fallback URL.
+      const img = container.querySelector('img') as HTMLImageElement;
+      fireEvent.load(img);
+
+      fireEvent.click(img);
+      const overlay = document.querySelector('[class*="z-[99999]"]');
+      expect(overlay?.querySelector('img')).toHaveAttribute(
+        'src',
+        'https://github.com/user/repo/raw/HEAD/docs/images/hero.svg'
+      );
+    });
   });
 
   describe('Code Blocks', () => {

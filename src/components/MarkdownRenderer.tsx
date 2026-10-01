@@ -424,6 +424,16 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
 
   const imageUrl = useMemo(() => resolveImageSrc(src || '', baseUrl), [src, baseUrl]);
   const pictureSources = useContext(PictureSourcesContext);
+  // A `<picture>` can select a `<source>` that differs from the `<img>` fallback
+  // (dark-mode / AVIF candidates), so the resource the user actually sees is
+  // `HTMLImageElement.currentSrc`, not `imageUrl`. The zoom preview and both
+  // download paths must follow that selection. Reset on every `imageUrl` change
+  // so a stale selection is never used between the swap and the next `load`.
+  const [selectedImageUrl, setSelectedImageUrl] = useState(imageUrl);
+
+  useEffect(() => {
+    setSelectedImageUrl(imageUrl);
+  }, [imageUrl]);
 
   useEffect(() => {
     if (!src) return;
@@ -490,7 +500,9 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
     setIsDownloading(true);
     let objectUrl: string | null = null;
     try {
-      const response = await fetch(imageUrl);
+      // Download what is actually on screen: a `<picture>` may have selected a
+      // `<source>` while `imageUrl` is only the fallback.
+      const response = await fetch(selectedImageUrl);
       const blob = await response.blob();
       objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -506,7 +518,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
     } catch {
       try {
         const a = document.createElement('a');
-        a.href = imageUrl;
+        a.href = selectedImageUrl;
         a.download = alt ? alt.replace(/[/\\?%*:|"<>]/g, '_') : 'image';
         a.target = '_blank';
         a.rel = 'noopener noreferrer';
@@ -520,7 +532,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       setIsDownloading(false);
     }
-  }, [imageUrl, alt, isDownloading]);
+  }, [selectedImageUrl, alt, isDownloading]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (zoomScale > 1 && e.touches.length === 1) {
@@ -552,13 +564,16 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
   }, []);
 
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    // Fires again whenever the browser re-picks another `<source>` (e.g. the
+    // OS theme flips), so the saved selection tracks the visible resource.
+    setSelectedImageUrl(e.currentTarget.currentSrc || imageUrl);
     setIsLoading(false);
     const w = (e.target as HTMLImageElement).naturalWidth;
     const h = (e.target as HTMLImageElement).naturalHeight;
     setNaturalWidth(w);
     setNaturalHeight(h);
     setImageSizeKnown(true);
-  }, []);
+  }, [imageUrl]);
 
   const handleImageError = useCallback(() => {
     setHasError(true);
@@ -863,7 +878,7 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
             onTouchEnd={handleTouchEnd}
           >
             <img
-              src={imageUrl}
+              src={selectedImageUrl}
               alt={alt || ''}
               className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl transition-transform duration-100"
               style={{
