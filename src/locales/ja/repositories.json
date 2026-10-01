@@ -1,5 +1,6 @@
 {
   "batchStar": {
+    "token-permission-error": "GitHub がこのトークンを拒否しました（403）。Star の確認や追加には、Fine-grained トークンで Starring の読み書きと Metadata の読み取り、またはクラシックトークンで public_repo（非公開リポジトリは repo）が必要です。",
     "title": "リンクからスター",
     "hint": "GitHub リンクを含むテキストを貼り付け、リポジトリを確認してから Star を付けます。他のサイトのリンクは無視されます。",
     "history": "貼り付け履歴",

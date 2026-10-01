@@ -1,5 +1,6 @@
 {
   "batchStar": {
+    "token-permission-error": "GitHub rechazó este token (403). Para consultar o añadir estrellas, activa Starring de lectura/escritura y Metadata de lectura en un token de permisos específicos, o public_repo en uno clásico (repo para repositorios privados).",
     "title": "Marcar desde enlaces",
     "hint": "Pega cualquier texto con enlaces de GitHub, revisa los repositorios y márcalos con Star. Se ignoran los enlaces a otros sitios.",
     "history": "Historial de texto",

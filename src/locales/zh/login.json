@@ -1,5 +1,7 @@
 {
   "loginScreen": {
+    "token-permissions-title": "GitHub Token 权限",
+    "token-permissions-check": "登录只验证身份，不会检查所有功能权限；权限不足可能在使用相应功能时才出现。",
     "please-enter-the-backend-url-and-api-key": "请输入后端 URL 和 API Key",
     "invalid-backend-url-remote-backends-must-use-htt": "后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP",
     "unable-to-connect-to-this-backend-url": "无法连接到该后端 URL",
@@ -26,12 +28,6 @@
     "connect-to-github": "连接到GitHub",
     "connect-and-restore-data": "连接并恢复数据",
     "save-and-continue": "保存并继续",
-    "how-to-create-a-github-token": "如何创建GitHub token:",
-    "go-to-github-settings-developer-settings-persona": "访问GitHub Settings → Developer settings → Personal access tokens",
-    "click-generate-new-token-classic": "点击\"Generate new token (classic)\"",
-    "select-scopes": "选择权限范围：",
-    "and": "和",
-    "copy-the-generated-token-and-paste-it-above": "复制生成的token并粘贴到上方",
     "create-token-on-github": "在GitHub上创建token →",
     "already-have-backend-data": "已有后端数据",
     "sign-in-with-github-token": "使用 GitHub Token 登录",
@@ -41,6 +37,23 @@
     "keep-local": "保留本地",
     "please-enter-a-valid-github-token": "请输入有效的GitHub token",
     "signed-in-but-failed-to-save-github-token-to-bac": "已登录，但 GitHub Token 未能保存到后端，README 等后端代理功能可能不可用。",
-    "failed-to-authenticate-please-check-your-token": "认证失败，请检查您的token。"
+    "failed-to-authenticate-please-check-your-token": "认证失败，请检查您的token。",
+    "token-permissions-tab-finegrained": "细粒度 Token",
+    "token-permissions-tab-classic": "经典 Token",
+    "token-permissions-feature-star": "为仓库添加 Star",
+    "token-permissions-feature-gists": "Gist",
+    "token-permissions-feature-star-lists": "Star 清单",
+    "token-permissions-feature-fork-sync": "Fork 储存库同步",
+    "token-permissions-feature-workflows": "触发工作流",
+    "token-permissions-feature-fork-workflows": "Fork 同步 / 触发工作流",
+    "token-permissions-fine-star": "`Starring` 读写、`Metadata` 读取",
+    "token-permissions-fine-gists": "`Gists` 写入",
+    "token-permissions-fine-fork-sync": "`Contents` 写入",
+    "token-permissions-fine-workflows": "`Actions` 写入",
+    "token-permissions-classic-star": "`public_repo`（私有仓库用 `repo`）",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Token 仅保存在本机与你配置的后端，不会上传到应用方服务器。"
   }
 }

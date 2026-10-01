@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GitHubApiService } from './githubApi';
+import { GitHubApiService, GitHubTokenPermissionError } from './githubApi';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -14,6 +14,29 @@ describe('GitHubApiService.isRepositoryStarred', () => {
   it('propagates permission failures instead of treating them as unstarred', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 403, statusText: 'Forbidden' })));
     await expect(new GitHubApiService('test-token').isRepositoryStarred('owner', 'repo')).rejects.toThrow('403');
+  });
+
+  it('identifies a PAT permission failure without conflating it with rate limiting', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ message: 'Resource not accessible by personal access token' }),
+      { status: 403, statusText: 'Forbidden', headers: { 'X-RateLimit-Remaining': '4999' } },
+    )));
+    await expect(new GitHubApiService('test-token').isRepositoryStarred('owner', 'repo'))
+      .rejects.toBeInstanceOf(GitHubTokenPermissionError);
+  });
+
+  it('does not reuse a previous zero rate limit for a later permission failure', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 204, headers: { 'X-RateLimit-Remaining': '0' } }))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({ message: 'Resource not accessible by personal access token' }),
+        { status: 403, statusText: 'Forbidden' },
+      ));
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new GitHubApiService('test-token');
+    expect(await api.isRepositoryStarred('owner', 'first')).toBe(true);
+    await expect(api.isRepositoryStarred('owner', 'second'))
+      .rejects.toBeInstanceOf(GitHubTokenPermissionError);
   });
 
   it('uses the configured backend proxy', async () => {

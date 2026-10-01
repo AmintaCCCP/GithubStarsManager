@@ -1,5 +1,7 @@
 {
   "loginScreen": {
+    "token-permissions-title": "Права токена GitHub",
+    "token-permissions-check": "Вход проверяет личность, но не все права. Нехватка прав может проявиться только при использовании функции.",
     "please-enter-the-backend-url-and-api-key": "Введите URL-адрес серверной части и ключ API.",
     "invalid-backend-url-remote-backends-must-use-htt": "Неверный адрес бэкэнда: удаленному бэкэнду требуется HTTPS, только локальный хост может использовать HTTP.",
     "unable-to-connect-to-this-backend-url": "Невозможно подключиться к внутреннему URL-адресу",
@@ -26,12 +28,6 @@
     "connect-to-github": "Подключиться к GitHub",
     "connect-and-restore-data": "Подключитесь и восстановите данные",
     "save-and-continue": "Сохранить и продолжить",
-    "how-to-create-a-github-token": "Как создать токен GitHub:",
-    "go-to-github-settings-developer-settings-persona": "Посетите «Настройки GitHub» → «Настройки разработчика» → «Токены личного доступа».",
-    "click-generate-new-token-classic": "Нажмите «Создать новый токен (классический)».",
-    "select-scopes": "Выберите область разрешений:",
-    "and": "и",
-    "copy-the-generated-token-and-paste-it-above": "Скопируйте сгенерированный токен и вставьте его выше.",
     "create-token-on-github": "Создать токен на GitHub →",
     "already-have-backend-data": "У вас уже есть серверные данные",
     "sign-in-with-github-token": "Войдите в систему, используя токен GitHub.",
@@ -41,6 +37,23 @@
     "keep-local": "сохранять локальность",
     "please-enter-a-valid-github-token": "Введите действительный токен GitHub.",
     "signed-in-but-failed-to-save-github-token-to-bac": "Вы вошли в систему, но токен GitHub не удалось сохранить на серверной стороне, а функции внутреннего прокси, такие как README, могут быть недоступны.",
-    "failed-to-authenticate-please-check-your-token": "Аутентификация не удалась, проверьте свой токен."
+    "failed-to-authenticate-please-check-your-token": "Аутентификация не удалась, проверьте свой токен.",
+    "token-permissions-tab-finegrained": "Fine-grained",
+    "token-permissions-tab-classic": "Классический",
+    "token-permissions-feature-star": "Управление звёздами",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Списки звёзд",
+    "token-permissions-feature-fork-sync": "Синхронизация форков",
+    "token-permissions-feature-workflows": "Запуск workflow",
+    "token-permissions-feature-fork-workflows": "Форки / workflow",
+    "token-permissions-fine-star": "`Starring` чтение и запись, `Metadata` чтение",
+    "token-permissions-fine-gists": "`Gists` запись",
+    "token-permissions-fine-fork-sync": "`Contents` запись",
+    "token-permissions-fine-workflows": "`Actions` запись",
+    "token-permissions-classic-star": "`public_repo` (`repo` для приватных репозиториев)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения."
   }
 }

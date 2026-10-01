@@ -934,7 +934,10 @@
     "check-if-a-new-version-is-available": "Check if a new version is available",
     "contact-information": "Contact Information",
     "if-you-encounter-any-issues-or-have-suggestions": "If you encounter any issues or have suggestions while using the app, feel free to contact me through:",
-    "github": "GitHub"
+    "github": "GitHub",
+    "account-token-hint": "Signed in as {{login}}. Update an expired token here without logging out.",
+    "token-hint": "Update an expired token here without logging out.",
+    "token-permission-guide": "Token setup guide"
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Include keys in backup/export",

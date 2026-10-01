@@ -1,5 +1,6 @@
 {
   "batchStar": {
+    "token-permission-error": "GitHub hat dieses Token abgewiesen (403). Zum Prüfen oder Setzen von Stars braucht ein fein abgestuftes Token Starring mit Lese-/Schreibzugriff und Metadata mit Lesezugriff; ein klassisches Token benötigt public_repo (für private Repositorys repo).",
     "title": "Sterne aus Links hinzufügen",
     "hint": "Füge beliebigen Text mit GitHub-Links ein, prüfe die Repositorys und vergib Sterne. Links zu anderen Websites werden ignoriert.",
     "history": "Einfügeverlauf",

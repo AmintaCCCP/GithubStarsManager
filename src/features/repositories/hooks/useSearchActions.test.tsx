@@ -4,6 +4,7 @@ import type { Category, Repository, VectorSearchConfig } from '../../../types';
 import {
   applyListsToRepositories,
   buildSearchPatch,
+  countNewStarredRepositories,
   mergeStarredRepositories,
   planListCategories,
   useSearchActions,
@@ -777,6 +778,202 @@ describe('useSearchActions pure helpers', () => {
     expect(merged).toHaveLength(2);
     expect(merged[0]).toMatchObject({ id: 1, description: 'new', stargazers_count: 99, custom_tags: ['keep'], license: null });
     expect(merged[1]).toMatchObject({ id: 3 });
+  });
+
+  it('mergeStarredRepositories keeps AI analysis when a batch-starred repo only matches by full_name', () => {
+    // 回归：批量从链接 Star 的仓库曾被分配合成 id，与 GitHub 真实 id 对不上。
+    // 仅按 id 匹配会失配并整条采用裸 GitHub 数据，抹掉 AI 分析与分类标签。
+    const storeRepos = [
+      baseRepo({
+        id: 1_700_000_000_123,
+        full_name: 'owner/batch-starred',
+        ai_summary: 'AI 摘要',
+        ai_tags: ['ai-tag'],
+        ai_platforms: ['cli'],
+        analyzed_at: '2026-02-01T00:00:00.000Z',
+        custom_category: '工具',
+        category_locked: true,
+      }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 987_654_321, full_name: 'owner/batch-starred', description: '来自 GitHub 的新描述' }),
+    ];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({
+      // 本地 AI 分析与分类标签必须保留
+      ai_summary: 'AI 摘要',
+      ai_tags: ['ai-tag'],
+      ai_platforms: ['cli'],
+      analyzed_at: '2026-02-01T00:00:00.000Z',
+      custom_category: '工具',
+      category_locked: true,
+      // GitHub 源元数据仍然刷新
+      description: '来自 GitHub 的新描述',
+    });
+  });
+
+  it('matches the full_name fallback case-insensitively', () => {
+    // 合成 id（>=1e11）代表批量 Star 的历史记录，才有资格走名称兜底
+    const storeRepos = [
+      baseRepo({ id: 1_700_000_000_555, full_name: 'Owner/Mixed-Case', ai_summary: 'AI 摘要' }),
+    ];
+    const merged = mergeStarredRepositories(
+      [baseRepo({ id: 42, full_name: 'owner/mixed-case' })],
+      storeRepos,
+    );
+
+    expect(merged[0]).toMatchObject({ ai_summary: 'AI 摘要' });
+  });
+
+  it('does not let a different repo inherit analysis by reusing a real-id repo name', () => {
+    // 回归（CodeRabbit 安全评审）：本地记录带**真实 GitHub id** 时，身份是权威的。
+    // 该仓库被改名/删除后，旧名可能被另一个新仓库复用。若仍走名称兜底，
+    // 新仓库会继承旧仓库的 AI 分析、锁定分类与订阅状态（身份错误归属）。
+    const storeRepos = [
+      baseRepo({
+        id: 555,
+        full_name: 'owner/old',
+        ai_summary: '机密分析',
+        custom_category: '内部工具',
+        category_locked: true,
+        subscribed_to_releases: true,
+      }),
+    ];
+    // 另一个恰好复用旧名的新仓库，id 不同
+    const newRepos = [baseRepo({ id: 777, full_name: 'owner/old' })];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ id: 777, full_name: 'owner/old' });
+    expect(merged[0].ai_summary).toBeUndefined();
+    expect(merged[0].custom_category).toBeUndefined();
+    expect(merged[0].category_locked).toBeUndefined();
+    expect(merged[0].subscribed_to_releases).toBeUndefined();
+    // 复用旧名的仓库是真正的新增
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
+  });
+
+  it('still repairs legacy synthetic-id records by name fallback', () => {
+    // 兜底的正向场景不能被上面的加固误伤：合成 id 记录仍应被认领并恢复分析结果
+    const storeRepos = [
+      baseRepo({
+        id: 1_700_000_000_999,
+        full_name: 'owner/legacy',
+        ai_summary: 'AI 摘要',
+        custom_category: '工具',
+      }),
+    ];
+    const newRepos = [baseRepo({ id: 321, full_name: 'owner/legacy' })];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged[0]).toMatchObject({
+      ai_summary: 'AI 摘要',
+      custom_category: '工具',
+    });
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(0);
+  });
+
+  it('assigns each local record to at most one incoming repository', () => {
+    // 两条输入都只能靠名称兜底命中同一条本地记录时，必须一对一：
+    // 第二条视为新增，不得复制本地记录的 AI 数据。
+    const storeRepos = [
+      baseRepo({ id: 1_700_000_000_100, full_name: 'owner/legacy', ai_summary: 'AI 摘要' }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 201, full_name: 'owner/legacy' }),
+      baseRepo({ id: 202, full_name: 'OWNER/LEGACY' }),
+    ];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    expect(merged).toHaveLength(2);
+    const matched = merged.filter(repo => repo.ai_summary === 'AI 摘要');
+    expect(matched).toHaveLength(1);
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
+  });
+
+  it('counts a full_name-matched legacy repo as existing, not new', () => {
+    // 回归：计数若只按 id 匹配，被 full_name 兜底救回的存量仓库会被误报为
+    // 「发现 N 个新仓库」。此处锁定与合并一致的口径。
+    const storeRepos = [
+      baseRepo({ id: 1_700_000_000_123, full_name: 'owner/legacy', ai_summary: 'AI 摘要' }),
+      baseRepo({ id: 2, full_name: 'owner/unchanged' }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 987_654_321, full_name: 'owner/legacy' }),
+      baseRepo({ id: 2, full_name: 'owner/unchanged' }),
+      baseRepo({ id: 3, full_name: 'owner/brand-new' }),
+    ];
+
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
+    expect(countNewStarredRepositories([], storeRepos)).toBe(0);
+    expect(countNewStarredRepositories(newRepos, [])).toBe(3);
+  });
+
+  it('does not let a renamed repo and a name-reusing repo share one local record', () => {
+    // 回归（CodeRabbit）：GitHub 允许新仓库复用刚改完名的旧仓库名。
+    // 本地 { id: 1, owner/old }，输入含改名的 { id: 1, owner/new } 与
+    // 复用旧名的 { id: 2, owner/old }。单遍匹配会让两条输入都命中同一条本地
+    // 记录 → 产出两条 id:1，并把旧仓库的 AI 字段复制到新仓库上。
+    const storeRepos = [
+      baseRepo({
+        id: 1,
+        full_name: 'owner/old',
+        ai_summary: '旧仓库的 AI 摘要',
+        custom_category: '工具',
+      }),
+    ];
+    const newRepos = [
+      baseRepo({ id: 1, full_name: 'owner/new' }),
+      baseRepo({ id: 2, full_name: 'owner/old' }),
+    ];
+
+    const merged = mergeStarredRepositories(newRepos, storeRepos);
+
+    // id 必须唯一，不能出现两条 id:1
+    expect(merged.map(repo => repo.id)).toEqual([1, 2]);
+    // 改名的仓库沿用本地 AI 数据（id 匹配）
+    expect(merged[0]).toMatchObject({
+      full_name: 'owner/new',
+      ai_summary: '旧仓库的 AI 摘要',
+      custom_category: '工具',
+    });
+    // 复用旧名的新仓库是真正的新增，不得继承旧仓库的 AI 数据与分类
+    expect(merged[1]).toMatchObject({ id: 2, full_name: 'owner/old' });
+    expect(merged[1].ai_summary).toBeUndefined();
+    expect(merged[1].custom_category).toBeUndefined();
+    // 计数应为 1（复用旧名的新仓库）
+    expect(countNewStarredRepositories(newRepos, storeRepos)).toBe(1);
+  });
+
+  it('does not depend on input order when resolving name fallbacks', () => {
+    const storeRepos = [
+      baseRepo({ id: 1, full_name: 'owner/old', ai_summary: '旧仓库的 AI 摘要' }),
+    ];
+    const renamed = baseRepo({ id: 1, full_name: 'owner/new' });
+    const reuse = baseRepo({ id: 2, full_name: 'owner/old' });
+
+    const forward = mergeStarredRepositories([renamed, reuse], storeRepos);
+    const reversed = mergeStarredRepositories([reuse, renamed], storeRepos);
+
+    // 无论输入顺序如何，按 id 对齐后的结果必须一致
+    const byId = (list: Repository[]) => new Map(list.map(r => [r.id, r]));
+    const f = byId(forward);
+    const r = byId(reversed);
+
+    expect(f.get(1)?.full_name).toBe('owner/new');
+    expect(f.get(1)?.ai_summary).toBe('旧仓库的 AI 摘要');
+    expect(r.get(1)?.full_name).toBe('owner/new');
+    expect(r.get(1)?.ai_summary).toBe('旧仓库的 AI 摘要');
+    // 两条路径下复用旧名的仓库都不应拿到旧仓库的 AI 数据
+    expect(f.get(2)?.ai_summary).toBeUndefined();
+    expect(r.get(2)?.ai_summary).toBeUndefined();
+    expect(countNewStarredRepositories([reuse, renamed], storeRepos)).toBe(1);
   });
 
   it('planListCategories skips reserved names and existing categories', () => {

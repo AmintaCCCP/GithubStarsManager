@@ -1,6 +1,6 @@
 import { useT } from "../i18n/useT";
 import React, { useState, useCallback, useRef } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, Database, Github, Key, Link, Moon, Sun } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Database, Github, Key, Link, Loader2, Moon, Sun } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
@@ -15,6 +15,65 @@ import { Label } from './ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { APP_LANGUAGES, type AppLanguage } from '../i18n/languages';
+import { GitHubTokenPermissions } from './GitHubTokenPermissions';
+import { cn } from '../lib/utils';
+
+/** GitHub-contribution-heatmap style band across the top of the login card:
+ *  deterministic pseudo-random cells with four intensity levels, fading
+ *  towards the bottom. Sized for the widest card layout; clipped on narrow ones. */
+const HEATMAP_ROWS = 4;
+const HEATMAP_COLS = 66;
+const HEATMAP_PITCH = 13;
+const HEATMAP_CELL = 10;
+
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const HEATMAP_CELLS = (() => {
+  const random = mulberry32(20261001);
+  const levelOpacity = [0, 0.07, 0.14, 0.24];
+  const rowFade = [1, 0.7, 0.4, 0.15];
+  const cells: Array<{ x: number; y: number; opacity: number }> = [];
+  for (let row = 0; row < HEATMAP_ROWS; row += 1) {
+    for (let col = 0; col < HEATMAP_COLS; col += 1) {
+      const roll = random();
+      const level = roll < 0.32 ? 0 : roll < 0.62 ? 1 : roll < 0.86 ? 2 : 3;
+      const opacity = levelOpacity[level] * rowFade[row];
+      if (opacity <= 0) continue;
+      cells.push({ x: col * HEATMAP_PITCH, y: row * HEATMAP_PITCH, opacity });
+    }
+  }
+  return cells;
+})();
+
+function LoginCardPattern() {
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute left-6 top-7 h-[49px] w-[calc(100%-48px)]"
+    >
+      {HEATMAP_CELLS.map((cell, index) => (
+        <rect
+          key={index}
+          x={cell.x}
+          y={cell.y}
+          width={HEATMAP_CELL}
+          height={HEATMAP_CELL}
+          rx="2"
+          fill="currentColor"
+          fillOpacity={cell.opacity}
+        />
+      ))}
+    </svg>
+  );
+}
 
 export const LoginScreen: React.FC = () => {
   const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend } = useLoginActions();
@@ -271,12 +330,20 @@ export const LoginScreen: React.FC = () => {
     conflictResolveRef.current = null;
   }, []);
 
+  const showsTokenPermissions = loginMode === 'github' || backendStep === 'githubToken';
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-foreground transition-colors duration-300">
+    <div className="relative flex min-h-screen bg-background p-4 text-foreground transition-colors duration-300 sm:p-6">
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 left-1/2 h-[28rem] w-[46rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute -bottom-48 -left-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -right-32 -bottom-48 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
+      </div>
+
       <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
-        <div className="flex items-center overflow-hidden rounded-md border border-border bg-card">
+        <div className="flex items-center overflow-hidden rounded-md border border-border bg-card/80 shadow-sm backdrop-blur-sm">
           <Select value={language} onValueChange={(value) => setLanguage(value as AppLanguage)}>
-            <SelectTrigger aria-label={t('loginScreen.interface-language')} className="h-9 w-[150px] rounded-none border-0 bg-card shadow-none focus:ring-0 focus:ring-offset-0">
+            <SelectTrigger aria-label={t('loginScreen.interface-language')} className="h-9 w-[150px] rounded-none border-0 bg-transparent shadow-none focus:ring-0 focus:ring-offset-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -291,7 +358,7 @@ export const LoginScreen: React.FC = () => {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('loginScreen.toggle-theme')}>
+            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card/80 shadow-sm backdrop-blur-sm" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('loginScreen.toggle-theme')}>
               {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>
@@ -299,168 +366,168 @@ export const LoginScreen: React.FC = () => {
         </Tooltip>
       </div>
 
-      <div className="w-full max-w-md">
+      <div className={cn('relative m-auto w-full max-w-md', showsTokenPermissions && 'lg:max-w-4xl')}>
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-border bg-card shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-card shadow-md">
             <img src="./icon.png" alt="GitHub Stars Manager" className="h-full w-full object-cover" />
           </div>
           <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">GitHub Stars Manager</h1>
           <p className="text-sm text-muted-foreground">{t('loginScreen.ai-powered-repository-management')}</p>
         </div>
 
-        <Card className="border-border bg-card p-6 shadow-sm sm:p-7">
-          <div className="mb-6 text-center">
-            {loginMode === 'github'
-              ? <Github className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-              : <Database className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />}
-            <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">
-              {loginMode === 'github'
-                ? t('loginScreen.connect-with-github')
-                : backendStep === 'credentials'
-                  ? t('loginScreen.connect-to-your-backend')
-                  : t('loginScreen.set-up-github-access-token')}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {loginMode === 'github'
-                ? t('loginScreen.enter-your-github-personal-access-token-to-get-s')
-                : backendStep === 'credentials'
-                  ? t('loginScreen.enter-the-backend-url-and-api-key-to-restore-you')
-                  : tokenSetupReason === 'invalid'
-                    ? t('loginScreen.the-github-token-stored-on-the-backend-is-not-wo')
-                    : t('loginScreen.no-token-is-configured-on-this-backend-complete')}
-            </p>
-          </div>
-
-          {cachedRepoCount > 0 && (
-            <div className="mb-4 rounded-md border border-success/30 bg-success/10 p-3 text-success">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-success" />
-                <span className="text-sm font-medium">{t('loginScreen.cachedrepocount-repositories-cached', { cachedRepoCount: cachedRepoCount })}</span>
-              </div>
-              {cachedLastSync && <p className="mt-1 text-xs text-success">{t('loginScreen.last-sync')} {new Date(cachedLastSync).toLocaleString()}</p>}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {loginMode === 'backend' && backendStep === 'credentials' && (
-              <div className="space-y-2">
-                <Label htmlFor="backend-url">{t('loginScreen.backend-url')}</Label>
-                <div className="relative">
-                  <Link className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70" />
-                  <Input
-                    id="backend-url"
-                    type="url"
-                    autoComplete="url"
-                    placeholder="https://example.com"
-                    value={backendUrl}
-                    onChange={(e) => {
-                      setBackendUrl(e.target.value);
-                      setError('');
-                    }}
-                    onKeyDown={handleKeyPress}
-                    disabled={isLoading}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}>
-                {loginMode === 'github' || backendStep === 'githubToken' ? 'GitHub Personal Access Token' : 'API Key'}
-              </Label>
+        <Card className="relative overflow-hidden border-border bg-card p-0 shadow-lg shadow-black/5">
+          <div className={cn('relative grid', showsTokenPermissions && 'lg:grid-cols-2')}>
+            <div className="relative flex flex-col justify-center overflow-hidden px-6 py-12 sm:px-8">
+              <LoginCardPattern />
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70" />
-                <Input
-                  id={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder={loginMode === 'github' || backendStep === 'githubToken' ? 'ghp_xxxxxxxxxxxxxxxxxxxx' : t('loginScreen.enter-backend-api-secret')}
-                  value={loginMode === 'github' ? token : backendStep === 'credentials' ? backendApiKey : backendGithubToken}
-                  onChange={(e) => {
-                    if (loginMode === 'github') {
-                      setToken(e.target.value);
-                    } else if (backendStep === 'githubToken') {
-                      setBackendGithubToken(e.target.value);
-                    } else {
-                      setBackendApiKey(e.target.value);
-                    }
-                    setError('');
-                  }}
-                  onKeyDown={handleKeyPress}
-                  disabled={isLoading}
-                  className="pl-10"
-                />
+              <div className="mb-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-foreground text-background dark:bg-primary/10 dark:text-primary">
+                    {loginMode === 'github' ? <Github className="h-6 w-6" /> : <Database className="h-6 w-6" />}
+                  </div>
+                </div>
+                <h2 className="mb-2 text-lg font-semibold tracking-tight text-foreground">
+                  {loginMode === 'github'
+                    ? t('loginScreen.connect-with-github')
+                    : backendStep === 'credentials'
+                      ? t('loginScreen.connect-to-your-backend')
+                      : t('loginScreen.set-up-github-access-token')}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {loginMode === 'github'
+                    ? t('loginScreen.enter-your-github-personal-access-token-to-get-s')
+                    : backendStep === 'credentials'
+                      ? t('loginScreen.enter-the-backend-url-and-api-key-to-restore-you')
+                      : tokenSetupReason === 'invalid'
+                        ? t('loginScreen.the-github-token-stored-on-the-backend-is-not-wo')
+                        : t('loginScreen.no-token-is-configured-on-this-backend-complete')}
+                </p>
               </div>
-            </div>
 
-            {error && (
-              <div role="alert" className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <p className="text-sm">{error}</p>
-              </div>
-            )}
-
-            <Button
-              type="button"
-              onClick={loginMode === 'github' ? handleConnect : backendStep === 'credentials' ? handleBackendConnect : handleBackendTokenSetup}
-              disabled={isLoading || !(loginMode === 'github' ? token : backendStep === 'credentials' ? backendApiKey : backendGithubToken).trim() || (loginMode === 'backend' && backendStep === 'credentials' && !backendUrl.trim())}
-              className="w-full"
-            >
-              {isLoading ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-                  <span>{t('loginScreen.connecting')}</span>
-                </>
-              ) : (
-                <>
-                  <span>
-                    {loginMode === 'github'
-                      ? t('loginScreen.connect-to-github')
-                      : backendStep === 'credentials'
-                        ? t('loginScreen.connect-and-restore-data')
-                        : t('loginScreen.save-and-continue')}
-                  </span>
-                  <ArrowRight className="h-4 w-4" />
-                </>
+              {cachedRepoCount > 0 && (
+                <div className="mb-4 rounded-md border border-success/30 bg-success/10 p-3 text-success">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-success" />
+                    <span className="text-sm font-medium">{t('loginScreen.cachedrepocount-repositories-cached', { cachedRepoCount: cachedRepoCount })}</span>
+                  </div>
+                  {cachedLastSync && <p className="mt-1 text-xs text-success">{t('loginScreen.last-sync')} {new Date(cachedLastSync).toLocaleString()}</p>}
+                </div>
               )}
-            </Button>
-          </div>
 
-          {loginMode === 'github' && <div className="mt-6 rounded-md border border-border bg-muted/50 p-4">
-            <h3 className="mb-2 text-sm font-medium text-foreground">{t('loginScreen.how-to-create-a-github-token')}</h3>
-            <ol className="space-y-1 text-xs leading-5 text-muted-foreground">
-              <li>1. {t('loginScreen.go-to-github-settings-developer-settings-persona')}</li>
-              <li>2. {t('loginScreen.click-generate-new-token-classic')}</li>
-              <li>3. {t('loginScreen.select-scopes')} <strong>repo</strong>、<strong>user</strong> {t('loginScreen.and')} <strong>gist</strong></li>
-              <li>4. {t('loginScreen.copy-the-generated-token-and-paste-it-above')}</li>
-            </ol>
-            <div className="mt-3">
-              <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
-                {t('loginScreen.create-token-on-github')}
-              </a>
+              <div className="space-y-4">
+                {loginMode === 'backend' && backendStep === 'credentials' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="backend-url">{t('loginScreen.backend-url')}</Label>
+                    <div className="relative">
+                      <Link className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70" />
+                      <Input
+                        id="backend-url"
+                        type="url"
+                        autoComplete="url"
+                        placeholder="https://example.com"
+                        value={backendUrl}
+                        onChange={(e) => {
+                          setBackendUrl(e.target.value);
+                          setError('');
+                        }}
+                        onKeyDown={handleKeyPress}
+                        disabled={isLoading}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}>
+                    {loginMode === 'github' || backendStep === 'githubToken' ? 'GitHub Personal Access Token' : 'API Key'}
+                  </Label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70" />
+                    <Input
+                      id={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}
+                      type="password"
+                      autoComplete="current-password"
+                      placeholder={loginMode === 'github' || backendStep === 'githubToken' ? 'ghp_xxxxxxxxxxxxxxxxxxxx' : t('loginScreen.enter-backend-api-secret')}
+                      value={loginMode === 'github' ? token : backendStep === 'credentials' ? backendApiKey : backendGithubToken}
+                      onChange={(e) => {
+                        if (loginMode === 'github') {
+                          setToken(e.target.value);
+                        } else if (backendStep === 'githubToken') {
+                          setBackendGithubToken(e.target.value);
+                        } else {
+                          setBackendApiKey(e.target.value);
+                        }
+                        setError('');
+                      }}
+                      onKeyDown={handleKeyPress}
+                      disabled={isLoading}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div role="alert" className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <p className="text-sm">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  onClick={loginMode === 'github' ? handleConnect : backendStep === 'credentials' ? handleBackendConnect : handleBackendTokenSetup}
+                  disabled={isLoading || !(loginMode === 'github' ? token : backendStep === 'credentials' ? backendApiKey : backendGithubToken).trim() || (loginMode === 'backend' && backendStep === 'credentials' && !backendUrl.trim())}
+                  className="w-full"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      <span>{t('loginScreen.connecting')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {loginMode === 'github'
+                          ? t('loginScreen.connect-to-github')
+                          : backendStep === 'credentials'
+                            ? t('loginScreen.connect-and-restore-data')
+                            : t('loginScreen.save-and-continue')}
+                      </span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="mt-4 w-full text-muted-foreground hover:text-foreground"
+                onClick={() => switchLoginMode(loginMode === 'github' ? 'backend' : 'github')}
+                disabled={isLoading}
+              >
+                {loginMode === 'github' ? (
+                  <>
+                    <span>{t('loginScreen.already-have-backend-data')}</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    <ArrowLeft className="h-4 w-4" />
+                    <span>{t('loginScreen.sign-in-with-github-token')}</span>
+                  </>
+                )}
+              </Button>
+              </div>
             </div>
-          </div>}
 
-          <Button
-            type="button"
-            variant="ghost"
-            className="mt-4 w-full text-muted-foreground hover:text-foreground"
-            onClick={() => switchLoginMode(loginMode === 'github' ? 'backend' : 'github')}
-            disabled={isLoading}
-          >
-            {loginMode === 'github' ? (
-              <>
-                <span>{t('loginScreen.already-have-backend-data')}</span>
-                <ArrowRight className="h-4 w-4" />
-              </>
-            ) : (
-              <>
-                <ArrowLeft className="h-4 w-4" />
-                <span>{t('loginScreen.sign-in-with-github-token')}</span>
-              </>
+            {showsTokenPermissions && (
+              <div className="flex flex-col justify-center border-t border-border px-6 py-12 sm:px-8 lg:border-l lg:border-t-0">
+                <GitHubTokenPermissions />
+              </div>
             )}
-          </Button>
+          </div>
         </Card>
       </div>
 

@@ -1,5 +1,7 @@
 {
   "loginScreen": {
+    "token-permissions-title": "GitHub-Token-Berechtigungen",
+    "token-permissions-check": "Die Anmeldung prüft Ihre Identität, nicht alle Berechtigungen. Fehlende Rechte können erst bei der Nutzung einer Funktion auffallen.",
     "please-enter-the-backend-url-and-api-key": "Bitte geben Sie die Backend-URL und den API-Schlüssel ein",
     "invalid-backend-url-remote-backends-must-use-htt": "Ungültige Backend-Adresse: Das Remote-Backend erfordert HTTPS, nur localhost kann HTTP verwenden",
     "unable-to-connect-to-this-backend-url": "Es kann keine Verbindung zur Backend-URL hergestellt werden",
@@ -26,12 +28,6 @@
     "connect-to-github": "Stellen Sie eine Verbindung zu GitHub her",
     "connect-and-restore-data": "Daten verbinden und wiederherstellen",
     "save-and-continue": "Speichern und fortfahren",
-    "how-to-create-a-github-token": "So erstellen Sie ein GitHub-Token:",
-    "go-to-github-settings-developer-settings-persona": "Besuchen Sie GitHub-Einstellungen → Entwicklereinstellungen → Persönliche Zugriffstokens",
-    "click-generate-new-token-classic": "Klicken Sie auf „Neues Token generieren (klassisch)“",
-    "select-scopes": "Berechtigungsbereich auswählen:",
-    "and": "Und",
-    "copy-the-generated-token-and-paste-it-above": "Kopieren Sie das generierte Token und fügen Sie es oben ein",
     "create-token-on-github": "Erstellen Sie ein Token auf GitHub →",
     "already-have-backend-data": "Habe bereits Backend-Daten",
     "sign-in-with-github-token": "Melden Sie sich mit dem GitHub-Token an",
@@ -41,6 +37,23 @@
     "keep-local": "Bleiben Sie lokal",
     "please-enter-a-valid-github-token": "Bitte geben Sie ein gültiges GitHub-Token ein",
     "signed-in-but-failed-to-save-github-token-to-bac": "Sie haben sich angemeldet, aber das GitHub-Token konnte nicht im Backend gespeichert werden und Backend-Proxy-Funktionen wie README sind möglicherweise nicht verfügbar.",
-    "failed-to-authenticate-please-check-your-token": "Die Authentifizierung ist fehlgeschlagen. Bitte überprüfen Sie Ihr Token."
+    "failed-to-authenticate-please-check-your-token": "Die Authentifizierung ist fehlgeschlagen. Bitte überprüfen Sie Ihr Token.",
+    "token-permissions-tab-finegrained": "Fein abgestuft",
+    "token-permissions-tab-classic": "Klassisch",
+    "token-permissions-feature-star": "Stars verwalten",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Star-Listen",
+    "token-permissions-feature-fork-sync": "Fork-Synchronisierung",
+    "token-permissions-feature-workflows": "Workflow-Starts",
+    "token-permissions-feature-fork-workflows": "Fork-Sync / Workflows",
+    "token-permissions-fine-star": "`Starring` Lesen/Schreiben, `Metadata` Lesen",
+    "token-permissions-fine-gists": "`Gists` Schreiben",
+    "token-permissions-fine-fork-sync": "`Contents` Schreiben",
+    "token-permissions-fine-workflows": "`Actions` Schreiben",
+    "token-permissions-classic-star": "`public_repo` (`repo` für private Repositorys)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Ihr Token wird nur auf diesem Gerät und Ihrem eigenen Backend gespeichert – niemals auf den Servern der App."
   }
 }

@@ -934,7 +934,10 @@
     "check-if-a-new-version-is-available": "新しいバージョンが利用可能かどうかを確認する",
     "contact-information": "連絡先",
     "if-you-encounter-any-issues-or-have-suggestions": "使用中に問題が発生したり、提案がある場合は、次の方法でご連絡ください。",
-    "github": "GitHub"
+    "github": "GitHub",
+    "account-token-hint": "{{login}} としてサインイン中です。期限切れのトークンはログアウトせずにここで更新できます。",
+    "token-hint": "期限切れのトークンはログアウトせずにここで更新できます。",
+    "token-permission-guide": "トークン設定ガイド"
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "バックアップ/エクスポート時にキーを含める",

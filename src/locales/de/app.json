@@ -934,7 +934,10 @@
     "check-if-a-new-version-is-available": "Prüfen Sie, ob eine neue Version verfügbar ist",
     "contact-information": "Kontaktinformationen",
     "if-you-encounter-any-issues-or-have-suggestions": "Wenn Sie während der Nutzung auf Probleme stoßen oder Vorschläge haben, kontaktieren Sie mich bitte über die folgenden Methoden:",
-    "github": "GitHub"
+    "github": "GitHub",
+    "account-token-hint": "Angemeldet als {{login}}. Ein abgelaufenes Token lässt sich hier ohne Abmeldung erneuern.",
+    "token-hint": "Ein abgelaufenes Token lässt sich hier ohne Abmeldung erneuern.",
+    "token-permission-guide": "Token-Einrichtungshinweise"
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Beziehen Sie beim Sichern/Exportieren Schlüssel mit ein",
