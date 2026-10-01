@@ -19,6 +19,7 @@ import { Copy, Check, Download } from 'lucide-react';
 import hljs from 'highlight.js';
 import MermaidBlock from './MermaidBlock';
 import { githubMarkdownSchema } from '../utils/sanitizeSchema';
+import { imageExtensionForMimeType } from '../utils/imageDownload';
 import 'highlight.js/styles/github.min.css';
 import '../styles/github-markdown.scoped.css';
 import { useAppStore } from '../store/useAppStore';
@@ -174,6 +175,21 @@ const CodeBlock: React.FC<{
   );
 };
 
+/**
+ * Decode an in-page anchor fragment without throwing.
+ *
+ * Fragments come from untrusted README HTML, so `#100%-coverage` is possible;
+ * `decodeURIComponent` raises `URIError` on such input and would abort the click
+ * handler, silently breaking TOC navigation.
+ */
+const decodeAnchorFragment = (rawFragment: string): string => {
+  try {
+    return decodeURIComponent(rawFragment);
+  } catch {
+    return rawFragment;
+  }
+};
+
 /** Anchor that externalizes non-anchor links and keeps in-page TOC jumps smooth. */
 const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string; headingIds?: Map<string, string> }> = ({
   href,
@@ -187,7 +203,11 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
   const isTel = href.startsWith('tel:');
 
   const resolveHref = (link: string): string => {
-    if (link.startsWith('http://') || link.startsWith('https://') || link.startsWith('//')) {
+    // `//host/path` inherits the document scheme. The desktop client serves the
+    // UI from `file://`, where that becomes a bogus `file://host/path`, so pin
+    // protocol-relative links to HTTPS instead.
+    if (link.startsWith('//')) return `https:${link}`;
+    if (link.startsWith('http://') || link.startsWith('https://')) {
       return link;
     }
     if (link.startsWith('#')) {
@@ -214,7 +234,7 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
     e.stopPropagation();
     if (isHashLink && headingIds) {
       e.preventDefault();
-      const anchorText = decodeURIComponent(href.substring(1));
+      const anchorText = decodeAnchorFragment(href.substring(1));
       const targetId = headingIds.get(anchorText);
       if (targetId) {
         const targetElement = document.getElementById(targetId);
@@ -243,7 +263,10 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
 };
 
 const resolveImageSrc = (imageSrc: string, baseUrl?: string): string => {
-  if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://') || imageSrc.startsWith('//')) {
+  // See resolveHref: a protocol-relative src would resolve to `file://host/…`
+  // in the desktop client.
+  if (imageSrc.startsWith('//')) return `https:${imageSrc}`;
+  if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://')) {
     return imageSrc;
   }
   if (baseUrl) {
@@ -254,6 +277,43 @@ const resolveImageSrc = (imageSrc: string, baseUrl?: string): string => {
     }
   }
   return imageSrc;
+};
+
+/**
+ * Rewrite every candidate URL of a `srcset` attribute with {@link resolveImageSrc}.
+ *
+ * README HTML commonly ships theme-aware images as
+ * `<picture><source media="(prefers-color-scheme: dark)" srcset="…-dark.svg">`.
+ * Only the `<img>` fallback went through {@link resolveImageSrc}; the `<source>`
+ * candidates kept their relative paths, so the browser resolved them against the
+ * app origin. On the desktop client that origin is `file://`, producing broken
+ * images logged as `GET file:///…/dist/<asset> net::ERR_FILE_NOT_FOUND`.
+ *
+ * Candidates are `url [descriptor]` pairs separated by commas, e.g.
+ * `hero-dark.svg 1x, hero-dark@2x.svg 2x`.
+ *
+ * `srcset` is not covered by react-markdown's URL transform (only `href`/`src`
+ * are) and hast-util-sanitize only protocol-filters `src`, so the http(s)-only
+ * policy is enforced here as well: candidates with a `data:`/`file:`/`blob:`/
+ * `javascript:` scheme are dropped instead of being passed to the DOM.
+ */
+const UNSAFE_SRC_SET_SCHEME = /^(?!https?:)[a-z][a-z0-9+.-]*:/i;
+
+const resolveSrcSet = (srcSet: string | undefined, baseUrl?: string): string | undefined => {
+  if (!srcSet || !baseUrl) return srcSet;
+
+  const rewritten = srcSet
+    .split(',')
+    .map((candidate) => {
+      const [url, ...descriptor] = candidate.trim().split(/\s+/);
+      if (!url || UNSAFE_SRC_SET_SCHEME.test(url)) return '';
+      const resolved = resolveImageSrc(url, baseUrl);
+      return descriptor.length > 0 ? `${resolved} ${descriptor.join(' ')}` : resolved;
+    })
+    .filter(Boolean)
+    .join(', ');
+
+  return rewritten;
 };
 
 const truncateUrl = (url: string, maxLength: number = 50): string => {
@@ -365,9 +425,10 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
       objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;
+      const extension = imageExtensionForMimeType(blob.type);
       const fileName = alt
-        ? `${alt.replace(/[/\\?%*:|"<>]/g, '_')}.${blob.type.split('/')[1] || 'png'}`
-        : `image-${Date.now()}.${blob.type.split('/')[1] || 'png'}`;
+        ? `${alt.replace(/[/\\?%*:|"<>]/g, '_')}.${extension}`
+        : `image-${Date.now()}.${extension}`;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
@@ -840,6 +901,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = memo(({
   const markdownComponents: Components = useMemo(() => ({
     a: (props) => <MarkdownLink {...props} baseUrl={baseUrl} headingIds={headingIds} />,
     img: (props) => <MarkdownImage {...props} baseUrl={baseUrl} />,
+    // `<picture>` sources bypass the `img` override, so resolve their `srcset`
+    // here — otherwise theme-aware README images 404 against the app origin.
+    source: ({ srcSet, ...props }) => <source {...props} srcSet={resolveSrcSet(srcSet, baseUrl)} />,
     h1: ({ children }) => <h1 id={getHeadingId(children)}>{children}</h1>,
     h2: ({ children }) => <h2 id={getHeadingId(children)}>{children}</h2>,
     h3: ({ children }) => <h3 id={getHeadingId(children)}>{children}</h3>,

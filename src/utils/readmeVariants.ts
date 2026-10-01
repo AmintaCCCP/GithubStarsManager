@@ -1,3 +1,5 @@
+import type { AppLanguage } from '../i18n/languages';
+
 export interface GitHubReadmeCandidateItem {
   name?: string;
   path: string;
@@ -169,5 +171,5 @@ export const buildReadmeVariants = (
     });
 
   return [defaultVariant, ...variants];
-};import type { AppLanguage } from '../i18n/languages';
+};
 

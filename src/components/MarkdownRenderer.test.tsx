@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 
@@ -154,6 +154,32 @@ describe('MarkdownRenderer', () => {
       const link = container.querySelector('a');
       expect(link?.getAttribute('href')).toContain('github.com');
     });
+
+    it('should pin protocol-relative links to https instead of inheriting file://', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          content="[CDN Link](//cdn.example.com/docs/guide.md)"
+          baseUrl="https://github.com/user/repo"
+        />
+      );
+      const link = container.querySelector('a');
+      expect(link?.getAttribute('href')).toBe('https://cdn.example.com/docs/guide.md');
+    });
+
+    it('should not throw when the anchor fragment has malformed percent-escapes', () => {
+      const headingIds = new Map<string, string>([['100%-coverage', 'heading-0']]);
+
+      const { container } = render(
+        <MarkdownRenderer content="[Coverage](#100%-coverage)" headingIds={headingIds} />
+      );
+      const link = container.querySelector('a');
+      // The markdown pipeline %-encodes the literal `%`; what reaches the
+      // handler is `#100%25-coverage` → decoded back to `100%-coverage`.
+      expect(link).toHaveAttribute('href', '#100%25-coverage');
+      // `decodeURIComponent('100%-coverage')` raises URIError; the handler must
+      // survive it instead of aborting TOC navigation.
+      expect(() => fireEvent.click(link as Element)).not.toThrow();
+    });
   });
 
   describe('Images', () => {
@@ -175,6 +201,76 @@ describe('MarkdownRenderer', () => {
       );
       const img = container.querySelector('img');
       expect(img?.getAttribute('src')).toContain('github.com');
+    });
+
+    it('should resolve relative <picture> source srcset URLs with baseUrl', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + '<source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/hero-dark.svg 1x, docs/images/readme/hero-dark@2x.svg 2x">'
+            + '<img src="docs/images/readme/hero.svg" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      const source = container.querySelector('source');
+      const srcSet = source?.getAttribute('srcset') ?? '';
+      expect(srcSet).toContain('https://github.com/user/repo/raw/HEAD/docs/images/readme/hero-dark.svg 1x');
+      expect(srcSet).toContain('https://github.com/user/repo/raw/HEAD/docs/images/readme/hero-dark@2x.svg 2x');
+      // The dark-mode candidate must not stay relative — Electron serves the UI
+      // from file://, so a relative srcset 404s as file:///.../dist/<asset>.
+      expect(srcSet).not.toContain('srcset="docs/');
+    });
+
+    it('should pin protocol-relative image URLs to https under baseUrl', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          content="![CDN](//cdn.example.com/images/logo.png)"
+          baseUrl="https://github.com/user/repo"
+        />
+      );
+      const img = container.querySelector('img');
+      expect(img?.getAttribute('src')).toBe('https://cdn.example.com/images/logo.png');
+    });
+
+    it('should drop unsafe srcset schemes instead of forwarding them to the DOM', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + '<source srcset="javascript:alert(1) 1x, docs/images/hero.svg 1x">'
+            + '<img src="docs/images/hero.svg" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      const srcSet = container.querySelector('source')?.getAttribute('srcset') ?? '';
+      expect(srcSet).not.toContain('javascript:');
+      expect(srcSet).toContain('https://github.com/user/repo/raw/HEAD/docs/images/hero.svg 1x');
+    });
+
+    it('should preserve the theme MIME hint on sanitized picture sources', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          enableHtml
+          baseUrl="https://github.com/user/repo"
+          content={
+            '<picture>'
+            + '<source type="image/avif" srcset="docs/images/hero.avif">'
+            + '<img src="docs/images/hero.png" alt="hero">'
+            + '</picture>'
+          }
+        />
+      );
+
+      expect(container.querySelector('source')).toHaveAttribute('type', 'image/avif');
     });
   });
 

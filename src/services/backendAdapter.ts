@@ -130,9 +130,18 @@ class BackendAdapter {
     }
     try {
       const configuredUrl = preferredUrl ? normalizeBackendUrl(preferredUrl) : readStoredBackendUrl();
+      // Same-origin probing only makes sense when the UI itself is served over
+      // HTTP(S) (nginx fullstack image / vite dev server). The desktop client
+      // loads the bundle from `file://`, where `location.origin` is `file://`
+      // and `${origin}/api` becomes `file:///api` — Chromium logs every probe
+      // as `net::ERR_FILE_NOT_FOUND` before falling back to local-only mode.
+      const sameOriginApiUrl = (() => {
+        const { protocol, origin } = window.location;
+        return protocol === 'http:' || protocol === 'https:' ? `${origin}/api` : null;
+      })();
       const urls = preferredUrl
         ? (configuredUrl ? [configuredUrl] : [])
-        : (configuredUrl ? [configuredUrl] : [window.location.origin + '/api']);
+        : (configuredUrl ? [configuredUrl] : (sameOriginApiUrl ? [sameOriginApiUrl] : []));
       if (!preferredUrl && !configuredUrl && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
         urls.push('http://localhost:3000/api');
       }

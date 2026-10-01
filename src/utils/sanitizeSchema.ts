@@ -34,5 +34,9 @@ export const githubMarkdownSchema = {
     ],
     svg: [...(defaultSchema.attributes?.svg ?? []), 'className', 'viewBox', 'width', 'height', 'ariaHidden'],
     path: [...(defaultSchema.attributes?.path ?? []), 'd'],
+    // `<picture>` sources: the default schema only allows `srcSet`, which drops
+    // the MIME hint from README HTML. Without `type` the browser cannot skip a
+    // source it cannot decode, so AVIF/WebP fallbacks stop working.
+    source: [...(defaultSchema.attributes?.source ?? []), 'type'],
   },
 };

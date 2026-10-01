@@ -49,3 +49,35 @@ test('does not partially update a repository when release validation fails', () 
   assert.equal(catalog.getRepository(1), null);
   assert.equal(catalog.getRelease(2), null);
 });
+
+test('measures the size budget against the retained snapshot, not the raw payload', () => {
+  const catalog = createPluginCatalog();
+  const noisy = repository();
+  // Local-only metadata the Host never stores (AI summaries, custom overrides, …)
+  // must not count against the documented 64 MiB snapshot budget, otherwise the
+  // renderer logs 'Plugin data snapshot exceeds the size limit' on every change.
+  noisy.ai_summary = 'x'.repeat(65 * 1024 * 1024);
+
+  assert.deepEqual(
+    catalog.update({ repositories: [noisy], releases: [release()] }),
+    { repositories: 1, releases: 1 }
+  );
+  assert.equal(catalog.getRepository(1).full_name, 'owner/project');
+  assert.equal('ai_summary' in catalog.getRepository(1), false);
+});
+
+test('rejects a retained snapshot that exceeds the size budget', () => {
+  const catalog = createPluginCatalog();
+  // `body` is retained (capped at 256 KiB per release), so plenty of releases
+  // still overflow the budget once sanitized.
+  const releases = Array.from({ length: 300 }, (_, index) => ({
+    ...release(),
+    id: 1000 + index,
+    body: 'x'.repeat(300 * 1024),
+  }));
+
+  assert.throws(() => catalog.update({ repositories: [], releases }), {
+    code: 'PLUGIN_SNAPSHOT_INVALID',
+    message: 'Plugin data snapshot exceeds the size limit',
+  });
+});
