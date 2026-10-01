@@ -146,13 +146,26 @@ describe('MarkdownRenderer', () => {
 
     it('should resolve relative links with baseUrl', () => {
       const { container } = render(
-        <MarkdownRenderer 
+        <MarkdownRenderer
           content="[Relative Link](./docs/guide.md)"
           baseUrl="https://github.com/user/repo"
         />
       );
       const link = container.querySelector('a');
       expect(link?.getAttribute('href')).toContain('github.com');
+    });
+
+    it('should resolve root-relative links inside the repo, not the github.com host root', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          content="[Contributing](/docs/CONTRIBUTING.md)"
+          baseUrl="https://github.com/user/repo"
+        />
+      );
+      const link = container.querySelector('a');
+      expect(link?.getAttribute('href')).toBe(
+        'https://github.com/user/repo/blob/HEAD/docs/CONTRIBUTING.md'
+      );
     });
 
     it('should pin protocol-relative links to https instead of inheriting file://', () => {

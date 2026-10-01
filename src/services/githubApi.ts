@@ -161,13 +161,21 @@ interface GitHubRateLimitResponse {
  * 仍会立即发起 `<img>`/`<picture><source>` 的资源请求——GitHub Trending RSS
  * 的 description 正是趋势仓库 README 的渲染 HTML,其中的相对路径图片在桌面端
  * 会按 `file://…/dist/` 文档根解析,每次刷新趋势都产生一波必然
- * `ERR_FILE_NOT_FOUND` 的请求。DOMParser 生成的是惰性文档,解析不触发任何
- * 网络加载。
+ * `ERR_FILE_NOT_FOUND` 的请求。
+ *
+ * DOMParser 生成的文档没有 browsing context(base URL 是 `about:blank`),
+ * 相对资源 URL 无法解析成可请求地址;已在 Electron 44/Chromium 152 实测,
+ * 解析阶段对绝对 URL 的 img/source/iframe 同样零请求。移除资源承载元素后
+ * 再取文本作为跨引擎兜底,不依赖各引擎对惰性文档的取图时机。
  */
 function decodeRssHtmlToText(html: string): string {
   if (!html) return '';
   try {
-    return new DOMParser().parseFromString(html, 'text/html').body.textContent || '';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll(
+      'img, source, iframe, frame, video, audio, embed, object, link, script, style',
+    ).forEach((el) => el.remove());
+    return doc.body.textContent || '';
   } catch {
     return '';
   }

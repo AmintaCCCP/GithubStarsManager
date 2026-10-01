@@ -254,7 +254,11 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
     const repoBase = normalizeRepoBaseUrl(baseUrl);
     if (repoBase) {
       try {
-        return new URL(link, repoBase + '/blob/HEAD/').href;
+        // Root-relative links (`/docs/CONTRIBUTING.md`) mean a repo file, same
+        // contract as resolveImageSrc — resolving them verbatim would drop the
+        // repo path and produce `https://github.com/docs/CONTRIBUTING.md`.
+        const repoRelative = link.startsWith('/') ? link.slice(1) : link;
+        return new URL(repoRelative, repoBase + '/blob/HEAD/').href;
       } catch {
         return link;
       }
