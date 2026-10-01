@@ -194,13 +194,56 @@ describe('MarkdownRenderer', () => {
 
     it('should resolve relative image URLs with baseUrl', () => {
       const { container } = render(
-        <MarkdownRenderer 
+        <MarkdownRenderer
           content="![Image](./images/logo.png)"
           baseUrl="https://github.com/user/repo"
         />
       );
       const img = container.querySelector('img');
       expect(img?.getAttribute('src')).toContain('github.com');
+    });
+
+    it('should normalize an issue-page baseUrl to the repo root', () => {
+      // WeeklyIssueModal hands over `issue.html_url`; resolving against it
+      // produced `…/issues/123/raw/HEAD/…` 404s, so it must reduce to the
+      // repository root first.
+      const { container } = render(
+        <MarkdownRenderer
+          content="![Image](docs/images/hero.svg)"
+          baseUrl="https://github.com/user/repo/issues/123"
+        />
+      );
+      const img = container.querySelector('img');
+      expect(img?.getAttribute('src')).toBe(
+        'https://github.com/user/repo/raw/HEAD/docs/images/hero.svg'
+      );
+    });
+
+    it('should resolve root-relative image URLs inside the repo, not the github.com host root', () => {
+      const { container } = render(
+        <MarkdownRenderer
+          content="![Image](/docs/images/hero-dark.svg)"
+          baseUrl="https://github.com/user/repo"
+        />
+      );
+      const img = container.querySelector('img');
+      expect(img?.getAttribute('src')).toBe(
+        'https://github.com/user/repo/raw/HEAD/docs/images/hero-dark.svg'
+      );
+    });
+
+    it('should keep relative image URLs untouched for a non-GitHub baseUrl', () => {
+      // Tweet / Telegram page URLs have no derivable repo root; rewriting
+      // against them would only produce a different 404, so the URL is left
+      // as authored.
+      const { container } = render(
+        <MarkdownRenderer
+          content="![Image](docs/images/hero.svg)"
+          baseUrl="https://x.com/someone/status/123"
+        />
+      );
+      const img = container.querySelector('img');
+      expect(img?.getAttribute('src')).toBe('docs/images/hero.svg');
     });
 
     it('should resolve relative <picture> source srcset URLs with baseUrl', () => {

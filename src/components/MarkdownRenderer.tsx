@@ -190,6 +190,39 @@ const decodeAnchorFragment = (rawFragment: string): string => {
   }
 };
 
+/**
+ * Reduce a page URL to its repository root (`https://github.com/<owner>/<repo>`).
+ *
+ * Callers hand over whatever URL they have: a repo page (ReadmeModal), an issue
+ * page (WeeklyIssueModal), or a non-GitHub page (tweet / Telegram message).
+ * Relative image paths in rendered markdown only resolve against the repo root:
+ * with `https://github.com/o/r/issues/123` as base, `base + '/raw/HEAD/'` produced
+ * `…/issues/123/raw/HEAD/docs/x.png` (404), and with a missing or non-GitHub base
+ * the relative path fell through to the document URL — on the desktop client
+ * `file:///…/dist/docs/images/…`, logged as `net::ERR_FILE_NOT_FOUND`.
+ *
+ * Returns `undefined` when no GitHub repo root can be derived (non-GitHub host,
+ * user page without a repo, unparseable input). Relative URLs are then left as
+ * authored — they have no meaningful target in that context anyway.
+ */
+const normalizeRepoBaseUrl = (baseUrl?: string): string | undefined => {
+  if (!baseUrl) return undefined;
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined;
+  const isGithub = url.hostname === 'github.com' || url.hostname === 'www.github.com';
+  const isRaw = url.hostname === 'raw.githubusercontent.com';
+  if (!isGithub && !isRaw) return undefined;
+  const segments = url.pathname.split('/').filter(Boolean);
+  if (segments.length < 2) return undefined;
+  const [owner, repo] = segments;
+  return `https://github.com/${owner}/${repo}`;
+};
+
 /** Anchor that externalizes non-anchor links and keeps in-page TOC jumps smooth. */
 const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUrl?: string; headingIds?: Map<string, string> }> = ({
   href,
@@ -216,9 +249,12 @@ const MarkdownLink: React.FC<{ href?: string; children?: React.ReactNode; baseUr
     if (link.startsWith('mailto:') || link.startsWith('tel:')) {
       return link;
     }
-    if (baseUrl) {
+    // Normalize to the repo root so a caller passing an issue/release page URL
+    // (see normalizeRepoBaseUrl) still yields correct in-repo links.
+    const repoBase = normalizeRepoBaseUrl(baseUrl);
+    if (repoBase) {
       try {
-        return new URL(link, baseUrl + '/blob/HEAD/').href;
+        return new URL(link, repoBase + '/blob/HEAD/').href;
       } catch {
         return link;
       }
@@ -269,9 +305,14 @@ const resolveImageSrc = (imageSrc: string, baseUrl?: string): string => {
   if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://')) {
     return imageSrc;
   }
-  if (baseUrl) {
+  const repoBase = normalizeRepoBaseUrl(baseUrl);
+  if (repoBase) {
     try {
-      return new URL(imageSrc, baseUrl + '/raw/HEAD/').href;
+      // Root-relative README assets (`/docs/x.png`) mean a repo file, not the
+      // github.com host root — strip the leading slash so they resolve inside
+      // the repo instead of producing `https://github.com/docs/x.png`.
+      const repoRelative = imageSrc.startsWith('/') ? imageSrc.slice(1) : imageSrc;
+      return new URL(repoRelative, repoBase + '/raw/HEAD/').href;
     } catch {
       return imageSrc;
     }
