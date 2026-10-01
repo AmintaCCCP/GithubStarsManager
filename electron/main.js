@@ -970,9 +970,8 @@ const pluginHostOperations = {
     });
     if (result.canceled || !result.filePath) return { canceled: true };
     await fs.promises.writeFile(result.filePath, buffer);
-    const savedName = path.basename(result.filePath);
-    clipboard.writeText(savedName);
-    return { fileName: savedName };
+    // 不写剪贴板：本操作只校验 downloads:create，写剪贴板会绕过 clipboard:write。
+    return { fileName: path.basename(result.filePath) };
   },
 };
 

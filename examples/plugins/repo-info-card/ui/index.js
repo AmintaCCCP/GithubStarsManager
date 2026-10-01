@@ -291,8 +291,13 @@ function sanitizeFragment(raw, canvasId) {
     for (const attr of [...el.attributes]) {
       const name = attr.name.toLowerCase();
       if (name.startsWith('on')) el.removeAttribute(attr.name);
-      else if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
-        attr.value.trim().toLowerCase().startsWith('javascript:')) el.removeAttribute(attr.name);
+      else if (name === 'href' || name === 'src' || name === 'xlink:href') {
+        // DOMParser 会把 &#x0A; 解码成换行，浏览器执行 URL 前又会去掉这些空白，
+        // 所以 `java&#x0A;script:` 能绕过直接的 startsWith('javascript:') 检查。
+        // 复制出去的单文件 HTML 不受预览 iframe CSP 保护，必须在这里拦截。
+        const normalizedUrl = attr.value.replace(/[\t\n\r]/g, '').trim().toLowerCase();
+        if (normalizedUrl.startsWith('javascript:')) el.removeAttribute(attr.name);
+      }
     }
   });
   const card = doc.getElementById('card');
