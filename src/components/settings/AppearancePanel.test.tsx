@@ -54,6 +54,7 @@ beforeEach(() => {
 describe('AppearancePanel language settings', () => {
   it('renders the language grid inside Appearance (not General)', () => {
     const { container } = render(<AppearancePanel t={t} />);
+    expect(screen.getByRole('radiogroup', { name: t('generalPanel.language-settings') })).toBeTruthy();
     const languageGrid = container.querySelector('[aria-labelledby="language-settings-title"]');
     expect(languageGrid?.className ?? '').toContain('w-full');
     expect(languageGrid?.className ?? '').toContain('grid-cols-[repeat(auto-fit,minmax(10rem,1fr))]');
@@ -62,8 +63,8 @@ describe('AppearancePanel language settings', () => {
 
   it('no longer renders language settings inside General', () => {
     mocks.isSupported.mockReturnValue(false);
-    const { container } = render(<GeneralPanel t={t} />);
-    expect(container.querySelector('[aria-labelledby="language-settings-title"]')).toBeNull();
+    render(<GeneralPanel t={t} />);
+    expect(screen.queryByRole('radiogroup')).toBeNull();
   });
 });
 

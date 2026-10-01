@@ -198,7 +198,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
               <span
                 aria-hidden={false}
                 aria-label={`${tab.label}: ${tab.badge}`}
-                className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold tabular-nums text-destructive-foreground"
+                className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold tabular-nums text-primary-foreground"
               >
                 {tab.badge > 99 ? '99+' : tab.badge}
               </span>
@@ -511,7 +511,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       {tab.icon}
                       <span className="flex-1 font-medium">{tab.label}</span>
                       {tab.badge != null && (
-                        <Badge variant="destructive" className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
+                        <Badge className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
                           {tab.badge > 99 ? '99+' : tab.badge}
                         </Badge>
                       )}
@@ -564,7 +564,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   {tab.icon}
                   <span className="flex-1 font-medium">{tab.label}</span>
                   {tab.badge != null && (
-                    <Badge variant="destructive" className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
+                    <Badge className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
                       {tab.badge > 99 ? '99+' : tab.badge}
                     </Badge>
                   )}

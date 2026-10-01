@@ -385,7 +385,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               {t('vectorSearchSettings.auto-detect')}
             </Button>
           </div>
-          <p className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+          <p className="mt-2 rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
             {t('vectorSearchSettings.must-match-vectorize-index-dimensions')}
           </p>
         </div>
