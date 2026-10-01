@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "Die Plugin-Seite konnte nicht geladen werden",
     "this-page-comes-from-a-local-plugin-data-request": "Diese Seite wird von einem lokalen Plug-in bereitgestellt und Datenanfragen unterliegen weiterhin Host-Berechtigungsprüfungen.",
     "back-to-plugins": "Zurück zur Plugin-Liste",
-    "loading-plugin-page": "Plugin-Seite wird geladen…"
+    "loading-plugin-page": "Plugin-Seite wird geladen…",
+    "close": "Schließen"
   },
   "readmeModal": {
     "switch-readme-language": "README-Sprache wechseln",

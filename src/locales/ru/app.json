@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "Не удалось загрузить страницу плагина",
     "this-page-comes-from-a-local-plugin-data-request": "Эта страница предоставляется локальным плагином, и запросы данных по-прежнему подлежат проверке разрешений хоста.",
     "back-to-plugins": "Вернуться к списку плагинов",
-    "loading-plugin-page": "Загрузка страницы плагина…"
+    "loading-plugin-page": "Загрузка страницы плагина…",
+    "close": "Закрыть"
   },
   "readmeModal": {
     "switch-readme-language": "Переключить язык README",

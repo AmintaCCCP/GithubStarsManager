@@ -22,6 +22,7 @@ interface ModalProps {
   scrollable?: boolean;
   onPointerDownOutside?: DialogContentPointerDownOutsideHandler;
   onOverlayPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  closeLabel?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -34,6 +35,7 @@ export const Modal: React.FC<ModalProps> = ({
   scrollable = false,
   onPointerDownOutside,
   onOverlayPointerDown,
+  closeLabel,
 }) => {
   const { isScrolling, handleScroll } = useScrollbarFlash(isOpen);
 
@@ -68,11 +70,12 @@ export const Modal: React.FC<ModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         aria-describedby={undefined}
-        className={cn(maxWidth, scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0')}
+        className={cn(scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0', maxWidth)}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
         onPointerDownOutside={onPointerDownOutside}
         onOverlayPointerDown={onOverlayPointerDown}
+        closeLabel={closeLabel}
       >
         {content}
       </DialogContent>

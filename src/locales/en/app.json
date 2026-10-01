@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "Failed to load plugin page",
     "this-page-comes-from-a-local-plugin-data-request": "This page comes from a local plugin; data requests still require Host permission checks.",
     "back-to-plugins": "Back to plugins",
-    "loading-plugin-page": "Loading plugin page…"
+    "loading-plugin-page": "Loading plugin page…",
+    "close": "Close"
   },
   "readmeModal": {
     "switch-readme-language": "Switch README language",

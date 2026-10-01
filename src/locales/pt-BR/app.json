@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "Falha ao carregar a página do plug-in",
     "this-page-comes-from-a-local-plugin-data-request": "Esta página é fornecida por um plug-in local e as solicitações de dados ainda estão sujeitas a verificações de permissão do host.",
     "back-to-plugins": "Retornar à lista de plugins",
-    "loading-plugin-page": "Carregando página do plug-in…"
+    "loading-plugin-page": "Carregando página do plug-in…",
+    "close": "Fechar"
   },
   "readmeModal": {
     "switch-readme-language": "Mudar o idioma README",

@@ -146,6 +146,7 @@ function createPluginManager({
   logsRoot,
   catalog = createPluginCatalog(),
   webSearch = searchSearxng,
+  hostOperations = null,
 }) {
   if (typeof pluginsRoot !== 'string' || pluginsRoot.trim() === '') {
     throw new TypeError('pluginsRoot must be a non-empty string');
@@ -218,6 +219,8 @@ function createPluginManager({
         storage: createPluginStorage({ dataRoot: resolvedDataRoot, pluginId: validated.pluginId }),
         logger: createPluginLogger({ logsRoot: resolvedLogsRoot, pluginId: validated.pluginId }),
         catalog,
+        // 仅页面请求获得系统输出操作；Worker 侧 router 不注入，见 capabilityRouter。
+        hostOperations,
       });
       const value = await router.handle(plugin.manifest.permissions, validated);
       return { success: true, value };

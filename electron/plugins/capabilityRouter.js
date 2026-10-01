@@ -2,7 +2,17 @@
 
 const { protocolError } = require('./pluginProtocol');
 
-function createCapabilityRouter({ storage, logger, catalog }) {
+// 页面 Bridge 的系统输出操作（剪贴板、宿主下载）由宿主注入实现；路由器只做
+// 权限检查与参数解码。Worker 侧的 router 不注入 hostOperations，因此这些
+// capability 对 Worker 不可用。
+function createCapabilityRouter({ storage, logger, catalog, hostOperations = null }) {
+  function requireHostOperation(capability, operation) {
+  const handler = hostOperations?.[operation];
+  if (typeof handler !== 'function') {
+    throw protocolError('PLUGIN_CAPABILITY_UNAVAILABLE', `Capability '${capability}' is not available for this caller`);
+  }
+  return handler;
+}
   return {
     async handle(permissions, request) {
       if (!request || typeof request !== 'object' || typeof request.capability !== 'string') {
@@ -11,6 +21,32 @@ function createCapabilityRouter({ storage, logger, catalog }) {
       if (request.capability === 'log') {
         logger.log(request.operation, request.args?.message, request.args?.metadata);
         return null;
+      }
+      if (request.capability === 'clipboard') {
+        if (!permissions.includes('clipboard:write')) {
+          throw protocolError('PLUGIN_PERMISSION_DENIED', "Permission 'clipboard:write' is required");
+        }
+        if (request.operation === 'write') {
+          return requireHostOperation('clipboard', 'clipboardWrite')({ text: request.args?.text });
+        }
+        if (request.operation === 'writeImage') {
+          const buffer = Buffer.from(request.args?.dataBase64 ?? '', 'base64');
+          return requireHostOperation('clipboard', 'clipboardWriteImage')({ buffer });
+        }
+        throw protocolError('PLUGIN_CAPABILITY_UNKNOWN', `Unknown clipboard operation '${request.operation}'`);
+      }
+      if (request.capability === 'downloads') {
+        if (!permissions.includes('downloads:create')) {
+          throw protocolError('PLUGIN_PERMISSION_DENIED', "Permission 'downloads:create' is required");
+        }
+        if (request.operation === 'saveFile') {
+          const buffer = Buffer.from(request.args?.dataBase64 ?? '', 'base64');
+          return requireHostOperation('downloads', 'saveFile')({
+            fileName: request.args?.fileName,
+            buffer,
+          });
+        }
+        throw protocolError('PLUGIN_CAPABILITY_UNKNOWN', `Unknown downloads operation '${request.operation}'`);
       }
       if (request.capability === 'ai') {
         if (request.operation !== 'generate') {

@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "プラグインページの読み込みに失敗しました",
     "this-page-comes-from-a-local-plugin-data-request": "このページはローカル プラグインによって提供され、データ要求は依然としてホストの権限チェックの対象となります。",
     "back-to-plugins": "プラグイン一覧に戻る",
-    "loading-plugin-page": "プラグインページを読み込み中…"
+    "loading-plugin-page": "プラグインページを読み込み中…",
+    "close": "閉じる"
   },
   "readmeModal": {
     "switch-readme-language": "README の言語を切り替える",

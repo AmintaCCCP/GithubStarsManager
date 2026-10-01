@@ -1,0 +1,178 @@
+:root {
+  color-scheme: light;
+  --chrome-bg: #f7f7f5;
+  --chrome-ink: #1c1c1c;
+  --chrome-muted: #737373;
+  --chrome-line: #d9d9d6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  color: var(--chrome-ink);
+  background: var(--chrome-bg);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 18px;
+  min-height: 100vh;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.head h1 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.muted { color: var(--chrome-muted); }
+.hint { margin: 0; font-size: 12px; text-align: right; }
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.options label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.options select,
+.options button,
+.search-row input,
+.search-row button {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+}
+
+.options button.primary,
+.search-row button {
+  background: var(--chrome-ink);
+  color: #fff;
+  border-color: var(--chrome-ink);
+  cursor: pointer;
+}
+
+.options button:disabled,
+.actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.actions button:not(:disabled),
+.options button.primary:not(:disabled),
+.search-row button:not(:disabled) {
+  cursor: pointer;
+}
+
+#status { margin: 0; min-height: 1em; white-space: pre-wrap; }
+
+#picker .search-row { display: flex; gap: 8px; margin-top: 8px; }
+#picker .search-row input { flex: 1; }
+#picker ul { margin: 8px 0 0; padding: 0; list-style: none; }
+#picker li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+#picker li:hover { border-color: var(--chrome-ink); }
+
+#preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#preview-meta { font-size: 12px; }
+
+.zoom { display: flex; align-items: center; gap: 4px; }
+
+.zoom button {
+  font: inherit;
+  padding: 4px 9px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  line-height: 1.2;
+}
+
+.zoom button:not(:disabled) { cursor: pointer; }
+#zoom-level { min-width: 56px; text-align: center; }
+
+#preview-scroll {
+  flex: 1;
+  min-height: 220px;
+  display: flex;
+  overflow: auto;
+  border: 1px solid var(--chrome-line);
+  border-radius: 6px;
+  background: #e9e9e6;
+  padding: 12px;
+}
+
+/* margin:auto 让画布在容器内居中，同时在放大溢出时保留滚动条起始位置，
+   不会像 justify-content:center 那样把左上角裁掉。 */
+#preview-host {
+  margin: auto;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px var(--chrome-line);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 4px;
+  background: #fff;
+}

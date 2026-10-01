@@ -54,8 +54,9 @@ describe('PluginPageViewer', () => {
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
           requestId: 'ai-1', token: 'session-token', method: 'ai.generate',
-          args: { system: 'System instructions', user: 'Example repository' } },
-        origin: 'null', source: frame.contentWindow,
+          args: { system: 'System instructions', user: 'Example repository' },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
       }));
     });
     expect(confirm).toHaveBeenCalledWith('允许插件调用 AI？', expect.stringContaining('Example repository'), expect.any(Object));
@@ -84,14 +85,15 @@ describe('PluginPageViewer', () => {
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
           requestId: 'ai-2', token: 'session-token', method: 'ai.generate',
-          args: { system: '', user: 'Example repository' } },
-        origin: 'null', source: frame.contentWindow,
+          args: { system: '', user: 'Example repository' },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
       }));
     });
     expect(generateChatText).not.toHaveBeenCalled();
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
       requestId: 'ai-2', success: false, error: expect.objectContaining({ code: 'PLUGIN_AI_CANCELLED' }),
-    }), '*');
+    }), 'plugin-page://com.example.page');
   });
 
   it('asks before sending a web search to the configured service', async () => {
@@ -109,13 +111,14 @@ describe('PluginPageViewer', () => {
     await act(async () => {
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
-          requestId: 'search-1', token: 'session-token', method: 'web.search', args: { query: 'Example', limit: 2 } },
-        origin: 'null', source: frame.contentWindow,
+          requestId: 'search-1', token: 'session-token', method: 'web.search', args: { query: 'Example', limit: 2 },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
       }));
     });
     expect(confirm).toHaveBeenCalledWith('允许插件联网搜索？', expect.stringContaining('https://search.example.com'), expect.any(Object));
     expect(searchWeb).toHaveBeenCalledWith({ pluginId: 'com.example.page', pageId: 'dashboard', args: { query: 'Example', limit: 2 } });
-    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'search-1', success: true }), '*');
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'search-1', success: true }), 'plugin-page://com.example.page');
   });
 
   it('loads a sandboxed page and forwards only valid bridge messages', async () => {
@@ -127,30 +130,31 @@ describe('PluginPageViewer', () => {
       onClose={() => {}} t={t}
     />);
     const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
-    expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
+    expect(frame.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin');
     expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
     const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
-    }, '*');
+    }, 'plugin-page://com.example.page');
 
     const request = {
       type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
       requestId: '1', token: 'session-token', method: 'repositories.search', args: { query: 'react' },
+      origin: 'plugin-page://com.example.page',
     };
     expect(validatePluginPageMessage(new MessageEvent('message', {
-      data: request, origin: 'null', source: frame.contentWindow,
+      data: request, origin: 'plugin-page://com.example.page', source: frame.contentWindow,
     }), frame.contentWindow, 'com.example.page', 'dashboard', 'session-token')).toEqual(request);
     await act(async () => {
       window.dispatchEvent(new MessageEvent('message', {
-        data: { ...request, token: 'wrong' }, origin: 'null', source: frame.contentWindow,
+        data: { ...request, token: 'wrong' }, origin: 'plugin-page://com.example.page', source: frame.contentWindow,
       }));
       window.dispatchEvent(new MessageEvent('message', {
         data: request, origin: 'https://attacker.example', source: frame.contentWindow,
       }));
       window.dispatchEvent(new MessageEvent('message', {
-        data: request, origin: 'null', source: frame.contentWindow,
+        data: request, origin: 'plugin-page://com.example.page', source: frame.contentWindow,
       }));
     });
     await waitFor(() => expect(requestPageCapability).toHaveBeenCalledTimes(1));
@@ -159,7 +163,7 @@ describe('PluginPageViewer', () => {
     });
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
       type: 'plugin-page:response', requestId: '1', success: true, value: [{ id: 1 }],
-    }), '*');
+    }), 'plugin-page://com.example.page');
   });
 
   it('responds with a structured error when request arguments exceed the limit', async () => {
@@ -175,15 +179,112 @@ describe('PluginPageViewer', () => {
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
           requestId: 'large', token: 'session-token', method: 'repositories.search',
-          args: { query: 'x'.repeat(1024 * 1024) } },
-        origin: 'null', source: frame.contentWindow,
+          args: { query: 'x'.repeat(1024 * 1024) },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
       }));
     });
 
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
       requestId: 'large', success: false,
       error: expect.objectContaining({ code: 'PLUGIN_PAGE_REQUEST_TOO_LARGE' }),
-    }), '*');
+    }), 'plugin-page://com.example.page');
     expect(requestPageCapability).not.toHaveBeenCalled();
+  });
+
+  it('lets binary export payloads use the larger budget shared with the main process', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: { fileName: 'card.png' } });
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    fireEvent.load(frame);
+
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'png', token: 'session-token', method: 'downloads.saveFile',
+          args: { fileName: 'card.png', dataBase64: 'A'.repeat(2 * 1024 * 1024) },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
+      }));
+    });
+
+    await waitFor(() => expect(requestPageCapability).toHaveBeenCalledWith({
+      pluginId: 'com.example.page', pageId: 'dashboard', method: 'downloads.saveFile',
+      args: { fileName: 'card.png', dataBase64: 'A'.repeat(2 * 1024 * 1024) },
+    }));
+  });
+});
+
+describe('PluginPageViewer init context (V1.4 modal actions)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('passes the one-shot context with plugin-page:init and keeps bridge methods permission-checked', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: null });
+    const t = makeT('zh', 'app');
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t}
+      variant="modal"
+      initContext={{ repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' }} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' },
+    }, 'plugin-page://com.example.page');
+    // 普通桥方法仍然走 IPC 能力桥，不受上下文影响。
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'clip-1', token: 'session-token', method: 'clipboard.write',
+          args: { text: 'hello' },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
+      }));
+    });
+    await waitFor(() => expect(requestPageCapability).toHaveBeenCalledWith({
+      pluginId: 'com.example.page', pageId: 'dashboard', method: 'clipboard.write', args: { text: 'hello' },
+    }));
+  });
+
+  it('re-sends init with the same token when the context arrives later', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    const t = makeT('zh', 'app');
+    const { rerender } = render(<PluginPageViewer pluginId="com.example.page" pluginName="Example"
+      pageId="dashboard" pageTitle="Dashboard" onClose={() => {}} t={t} variant="modal"
+      initContext={{ repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' }} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+
+    rerender(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} variant="modal"
+      initContext={{ repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh' }} />);
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh' },
+    }, 'plugin-page://com.example.page'));
+  });
+
+  it('renders without a header row in the modal variant', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    const t = makeT('zh', 'app');
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} variant="modal" />);
+    await screen.findByTitle('Example: Dashboard');
+    expect(screen.queryByText('Example · Dashboard')).toBeNull();
+    expect(screen.queryByText(t('pluginPageViewer.back-to-plugins'))).toBeNull();
   });
 });

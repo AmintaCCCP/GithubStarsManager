@@ -29,6 +29,7 @@ import { usePluginActions } from '../plugins/hooks/usePluginActions';
 import { applyPluginActionResult } from '../plugins/applyPluginActionResult';
 import { useDialog } from '../hooks/useDialog';
 import { pluginClient } from '../plugins/pluginClient';
+import { pluginPageSession } from '../plugins/pluginPageSession';
 import type { RegisteredPluginAction } from '../plugins/types';
 
 type DialogContentPointerDownOutsideHandler = NonNullable<
@@ -174,7 +175,19 @@ const PluginRepositoryActionItems: React.FC<{
   };
 
   return actions.map((action) => (
-    <DropdownMenuItem key={`${action.pluginId}:${action.id}`} onSelect={() => void run(action)}>
+    <DropdownMenuItem
+      key={`${action.pluginId}:${action.id}`}
+      onSelect={() => (action.opensPage
+        // 弹窗由应用根上的 PluginPageHost 渲染，菜单关闭不会把它一起卸掉。
+        ? pluginPageSession.open({
+          pluginId: action.pluginId,
+          pluginName: action.pluginName,
+          pageId: action.opensPage,
+          pageTitle: action.title,
+          repository,
+        })
+        : void run(action))}
+    >
       <Plug className="mr-2 h-3.5 w-3.5" />
       {action.title}
     </DropdownMenuItem>

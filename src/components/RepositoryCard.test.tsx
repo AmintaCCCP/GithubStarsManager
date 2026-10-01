@@ -3,8 +3,12 @@ import { TooltipProvider } from './ui/tooltip';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryCard } from './RepositoryCard';
+import { PluginPageHost } from './PluginPageHost';
 import { useAppStore } from '../store/useAppStore';
 import { useRepositoryDragStore } from '../store/useRepositoryDragStore';
+import { pluginPageSession } from '../plugins/pluginPageSession';
+import { pluginRegistry } from '../plugins/pluginRegistry';
+import { DialogProvider } from '../hooks/useDialog';
 import type { Repository } from '../types';
 
 const actionMocks = vi.hoisted(() => ({
@@ -58,6 +62,23 @@ vi.mock('./RepositoryReleaseSheet', () => ({
   RepositoryReleaseSheet: ({ isOpen }: { isOpen: boolean }) => {
     if (actionMocks.releaseSheet.suspend) throw actionMocks.releaseSheet.suspend;
     return isOpen ? <div data-testid="repository-release-sheet" /> : null;
+  },
+}));
+
+vi.mock('./PluginPageModal', () => ({
+  PluginPageModal: ({ pageTitle }: { pageTitle: string }) => (
+    <div role="dialog" aria-label={pageTitle} />
+  ),
+}));
+
+const pluginClientMocks = vi.hoisted(() => ({
+  list: vi.fn(),
+}));
+
+vi.mock('../plugins/pluginClient', () => ({
+  pluginClient: {
+    isSupported: () => true,
+    list: pluginClientMocks.list,
   },
 }));
 
@@ -125,13 +146,18 @@ const renderRepositoryCard = (
   viewMode: 'list' | 'grid',
   options: { onAskRepository?: (repository: Repository) => void; selectionMode?: boolean } = {},
 ) => render(
-  <TooltipProvider>
-    <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} {...options} />
-  </TooltipProvider>
+  <DialogProvider>
+    <TooltipProvider>
+      <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} {...options} />
+    </TooltipProvider>
+  </DialogProvider>
 );
 
 beforeEach(() => {
   vi.clearAllMocks();
+  pluginClientMocks.list.mockResolvedValue({ plugins: [], invalidPlugins: [] });
+  pluginRegistry.resetForTests();
+  pluginPageSession.close();
   actionMocks.releaseSheet.suspend = null;
   useRepositoryDragStore.getState().endDrag();
   storeState.releaseSubscriptions = new Set<number>([1]);
@@ -406,6 +432,55 @@ describe('RepositoryCard view modes', () => {
 
     expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
     expect(screen.queryByTitle('取消 Star')).not.toBeInTheDocument();
+  });
+
+  it('keeps the plugin page dialog after the card menu closes', async () => {
+    const user = userEvent.setup();
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-info-card',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.githubstarsmanager.repo-info-card',
+          name: '仓库信息卡',
+          version: '0.1.0',
+          apiVersion: '1',
+          permissions: ['repositories:read'],
+          contributes: {
+            repositoryActions: [{
+              id: 'generate-info-card',
+              title: '生成仓库信息卡',
+              placement: 'repository-card',
+              opensPage: 'info-card',
+            }],
+            pages: [{ id: 'info-card', title: 'Repository Info Card', entry: 'ui/index.html' }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: ['repositories:read'],
+      }],
+      invalidPlugins: [],
+    });
+    const { unmount } = render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+          <PluginPageHost />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    await user.click(await screen.findByRole('menuitem', { name: '生成仓库信息卡' }));
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
+
+    // 弹窗挂在应用根上：卡片卸载后它仍然在。
+    unmount();
+    render(<PluginPageHost />);
+    expect(screen.getByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
   });
 });
 

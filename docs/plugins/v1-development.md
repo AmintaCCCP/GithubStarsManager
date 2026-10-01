@@ -12,8 +12,10 @@ V1.1 增加了 Release processor、只读语义化 `github.*` Host API，以及�
 不会把 Token、认证 Header 或任意网络请求能力交给插件。
 
 V1.2 增加页面贡献。仅含页面、没有 `main` 的插件不会启动 Node Worker；页面在
-`sandbox="allow-scripts"` iframe 中运行，不能读取宿主 DOM、Electron API、Token 或
-Zustand Store。若同时声明 `main`，该 Worker 仍是受信任本地代码，页面隔离不改变其权限。
+`sandbox="allow-scripts allow-same-origin"` iframe 中运行，不能读取宿主 DOM、Electron
+API、Token 或 Zustand Store。`allow-same-origin` 让页面保持 `plugin-page://<插件 id>`
+这个来源，宿主据此拒绝被导航替换的文档；页面与宿主仍是不同源，读不到宿主数据。
+若同时声明 `main`，该 Worker 仍是受信任本地代码，页面隔离不改变其权限。
 
 ## 最小目录
 
@@ -201,6 +203,14 @@ return {
 CSP 默认拒绝联网、嵌套页面、Worker、表单和内联脚本。React/Vue 等框架应预先构建成
 静态文件，使用相对资源路径，不应引入 CDN 运行时代码。
 
+CSP 的 `style-src` 只放行本插件目录下的外链样式表，同样不含 `'unsafe-inline'`：动态
+插入的 `<style>` 元素和 `style` 属性都会被静默拦截，卡片或图表会退化成浏览器默认样式。
+需要运行时生成样式时，使用外链样式表，或用 Constructable Stylesheet
+（`new CSSStyleSheet()` + `replaceSync()` 后挂到 `root.adoptedStyleSheets`）。在 shadow
+DOM 中还应注意 `:root` 匹配不到 shadow tree 里的元素，自定义属性应挂在
+`#card` 之类的实际根元素上。可运行示例见
+`examples/plugins/repo-info-card`。
+
 页面与宿主通过有版本边界的 `postMessage` 协议通信。宿主在加载时发送
 `plugin-page:init`，包含当前页面的临时 token。页面请求格式为：
 
@@ -213,8 +223,13 @@ window.parent.postMessage({
   token,
   method: 'repositories.search',
   args: { query: 'react', limit: 20 },
+  origin: window.location.origin,
 }, '*');
 ```
+
+宿主窗口的来源不固定（开发时是 `localhost`，打包后是 `file://`），页面发往宿主只能用
+`'*'`，因此消息里必须带上 `origin`，且与 `event.origin` 一致、等于
+`plugin-page://<插件 id>`。宿主发往页面的消息使用该精确来源，不再用 `'*'`。
 
 可用方法：`repositories.search`、`repositories.get`、`releases.get`、
 `storage.get`、`storage.set`、`storage.delete`。每次请求都在宿主主进程重新检查
@@ -250,9 +265,75 @@ args: { query: 'open source alternatives', limit: 5 },
 AI 请求正文不会写入调试日志；关闭页面会中止进行中的 AI 请求。未配置 Provider
 时 AI 调用失败，不会自动切换到其他服务。
 
+`ai.generate` 的参数有硬上限：`system` ≤ 2000 字符、`user` ≤ 160000 字符、
+`maxTokens` ≤ 4000。正文的 160000 字符预算（UTF-8 约 480 KB，加 JSON 转义仍
+远低于 1 MiB 的通用请求预算）用于让内容生成类页面把仓库 README 全文原样放进
+提示词，见 `examples/plugins/repo-info-card`；确认弹窗会显示完整正文，超长输入
+仍由用户逐一确认。
+
 网页搜索由用户在“设置 → 插件”填写可信的 SearXNG HTTPS 实例地址；默认关闭，
 没有预设公共实例。该实例须启用 JSON 输出。插件不能指定域名或 URL，只能提交
 最长 200 字符的搜索词及 1～10 条结果上限；宿主拒绝非 HTTPS、带凭据和本地
 地址，联网请求不跟随重定向，并限制超时与响应大小。搜索词会发送给用户所配置的
 实例及其实际使用的搜索引擎，请不要在未经同意时把私有仓库、个人备注或密钥放进
 搜索词。`network:<domain>` 仅是 Manifest 保留声明，V1.3 不提供通用网络请求 API。
+
+## V1.4 弹窗动作（opensPage）与页面输出能力
+
+页面型插件可以声明一个「弹窗动作」：用户在仓库卡片 `…` 菜单的“插件操作”里点击
+该动作时，宿主不启动 Worker，而是把动作指向的插件页面装进弹窗（sandboxed
+iframe，能力桥与 V1.2/V1.3 完全一致）。
+
+```json
+{
+  "contributes": {
+    "repositoryActions": [
+      {
+        "id": "generate-info-card",
+        "title": "生成仓库信息卡",
+        "placement": "repository-card",
+        "opensPage": "info-card"
+      }
+    ],
+    "pages": [
+      { "id": "info-card", "title": "Repository Info Card", "entry": "ui/index.html" }
+    ]
+  }
+}
+```
+
+约束与校验：
+
+- `opensPage` 必须指向本插件 `contributes.pages` 中已声明的页面 id，且 `placement`
+  必须是 `repository-card`；引用不存在的页面会被拒绝安装。
+- 声明 `opensPage` 的动作不要求 Manifest 提供 `main`；只含这类动作的插件不会启动
+  Node Worker。含普通动作（无 `opensPage`）的插件仍必须提供 `main`。
+- 仓库贡献的权限要求不变：仍需 `repositories:read`（或 `privateRepositories:read`）。
+
+仓库上下文下发：宿主打开弹窗时，在 `plugin-page:init` 消息中附带一次性
+`context` 字段：
+
+```js
+{
+  type: 'plugin-page:init', pluginId, pageId, token,
+  context: { repository: { /* 渲染端仓库对象 */ }, readme: '…或 null', language: 'zh' }
+}
+```
+
+`context` 由宿主主动下发，不经过能力桥、不受逐次确认约束；页面访问宿主能力仍
+只能走受权限约束的桥方法。README 由宿主在打开弹窗时抓取，失败则为 `null`，插件
+必须能只依赖元数据工作。
+
+页面输出能力（仅页面 Bridge，Worker 不可用）：
+
+| 方法 | 参数 | 权限 | 行为 |
+|---|---|---|---|
+| `clipboard.write` | `{ text }` | `clipboard:write` | 主进程把文本写入系统剪贴板 |
+| `clipboard.writeImage` | `{ dataBase64 }`（PNG） | `clipboard:write` | 主进程解码并写入剪贴板图像 |
+| `downloads.saveFile` | `{ fileName, dataBase64 }` | `downloads:create` | 弹出宿主原生保存对话框，用户确认后写入 |
+
+参数上限：`clipboard.writeImage` 与 `downloads.saveFile` 的 base64 载荷放宽到
+10 MiB（其余方法仍为 1 MiB）；`fileName` 不允许路径分隔符或前导点。保存位置
+始终由用户在原生对话框中确认，插件拿不到文件路径。
+
+完整可安装示例见 `examples/plugins/repo-info-card`。

@@ -12,6 +12,7 @@ function request(method, args) {
     pending.set(requestId, { resolve, reject });
     window.parent.postMessage({
       type: 'plugin-page:request', pluginId, pageId, requestId, token, method, args,
+      origin: window.location.origin,
     }, '*');
   });
 }

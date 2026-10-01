@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Repository Info Card</title>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./index.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header class="head">
+        <div>
+          <h1 id="repo-name">…</h1>
+          <p id="repo-desc" class="muted"></p>
+        </div>
+        <p id="source-hint" class="muted hint"></p>
+      </header>
+
+      <section class="options" aria-label="card options">
+        <label>
+          <span data-i18n="style">风格</span>
+          <select id="opt-style">
+            <option value="te">TE 纸面</option>
+            <option value="ink">暗色仪器</option>
+            <option value="print">极简黑白</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="canvas">画幅</span>
+          <select id="opt-canvas">
+            <option value="1x1">1:1 · 1200×1200</option>
+            <option value="5x2">5:2 · 1500×600</option>
+            <option value="3x4">3:4 · 1200×1600</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="cardLanguage">卡片语言</span>
+          <select id="opt-language">
+            <option value="auto" data-i18n="followUi">跟随界面</option>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+        <button id="generate" type="button" class="primary">生成信息卡</button>
+      </section>
+
+      <p id="status" role="status" class="muted"></p>
+
+      <section id="picker" hidden>
+        <p class="muted" data-i18n="pickerHint">此页面也可以从「设置 → 插件 → 打开页面」进入：搜索并选择一个已加载的仓库。</p>
+        <div class="search-row">
+          <input id="picker-query" type="search" maxlength="200" placeholder="search repositories…">
+          <button id="picker-search" type="button">搜索</button>
+        </div>
+        <ul id="picker-results"></ul>
+      </section>
+
+      <section id="preview-wrap" hidden>
+        <div class="preview-bar">
+          <span class="muted mono" id="preview-meta"></span>
+          <div class="zoom" role="group" data-i18n-aria-label="zoomGroup">
+            <button id="zoom-out" type="button" data-i18n-title="zoomOut" data-i18n-aria-label="zoomOut">−</button>
+            <button id="zoom-level" type="button" class="mono" data-i18n-title="zoomFit">100%</button>
+            <button id="zoom-in" type="button" data-i18n-title="zoomIn" data-i18n-aria-label="zoomIn">+</button>
+            <button id="zoom-fit" type="button" data-i18n="zoomFit">适应</button>
+            <button id="zoom-actual" type="button" data-i18n="zoomActual">1:1</button>
+          </div>
+        </div>
+        <div id="preview-scroll">
+          <div id="preview-host"></div>
+        </div>
+        <div class="actions">
+          <button id="copy-code" type="button" disabled data-i18n="copyCode">复制 HTML 代码</button>
+          <button id="copy-image" type="button" disabled data-i18n="copyImage">复制截图</button>
+          <button id="save-image" type="button" disabled data-i18n="saveImage">保存截图</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
