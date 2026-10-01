@@ -16,6 +16,8 @@ import { normalizeTrendingSnapshots } from '../../utils/trendingSnapshots';
 import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
+import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
+import { isChannelScrapable, isScrapeSupportSettled } from '../../services/scrapeSupport';
 import type { AppStoreState } from '../types';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import { readAuthMirror } from '../persistence/authStorage';
@@ -38,9 +40,8 @@ export const normalizePersistedState = (
   currentState: AppStoreState
 ): Partial<AppStoreState> => {
   const safePersisted = persisted ?? {};
-  const defaultDiscoveryChannelIds = new Set(defaultDiscoveryChannels.map((channel) => channel.id));
   const persistedDiscoveryChannels = (safePersisted as Record<string, unknown>).discoveryChannels;
-  const normalizedDiscoveryChannels = defaultDiscoveryChannels.map((defaultChannel) => {
+  const normalizedDiscoveryChannels = [...defaultDiscoveryChannels.map((defaultChannel) => {
     const persistedChannel = Array.isArray(persistedDiscoveryChannels)
       ? persistedDiscoveryChannels.find((channel: unknown) =>
           (channel as Record<string, unknown>)?.id === defaultChannel.id
@@ -50,8 +51,11 @@ export const normalizePersistedState = (
       ...defaultChannel,
       enabled: persistedChannel?.enabled !== false,
     };
-  });
-  if (!normalizedDiscoveryChannels.some(channel => channel.enabled)) {
+  }), ...normalizeExternalDiscoveryChannels(persistedDiscoveryChannels)];
+  // 抓取支持结论未落定（Web 启动探测中）时不做可见性决策，完整保留持久化的
+  // 启用标志，避免误启用「趋势」并被后续持久化写入固化（桌面端恒定已落定）
+  const scrapeSupportSettled = isScrapeSupportSettled();
+  if (scrapeSupportSettled && !normalizedDiscoveryChannels.some(channel => channel.enabled && isChannelScrapable(channel.id))) {
     normalizedDiscoveryChannels[0] = { ...normalizedDiscoveryChannels[0], enabled: true };
   }
   const authMirror = readAuthMirror();
@@ -219,10 +223,12 @@ export const normalizePersistedState = (
     discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'x-tweet': [], 'telegram': [], 'weekly': [], 'search': [], 'code-search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>,
     discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'x-tweet': null, 'telegram': null, 'weekly': null, 'search': null, 'code-search': null },
     discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
-    selectedDiscoveryChannel: defaultDiscoveryChannelIds.has(safePersisted.selectedDiscoveryChannel as DiscoveryChannelId)
-      && normalizedDiscoveryChannels.some(channel => channel.id === safePersisted.selectedDiscoveryChannel && channel.enabled)
+    // 选中频道保留持久化值（存在且启用即可；未落定时 Visibility 判定延后，
+    // 由 DiscoveryView 在抓取支持结论落定后再纠偏，避免 Web+后端用户启动探测
+    // 未完成时丢失选择）
+    selectedDiscoveryChannel: normalizedDiscoveryChannels.some(channel => channel.id === safePersisted.selectedDiscoveryChannel && channel.enabled && (!scrapeSupportSettled || isChannelScrapable(channel.id)))
       ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
-      : normalizedDiscoveryChannels.find(channel => channel.enabled)?.id ?? defaultDiscoveryChannels[0].id,
+      : normalizedDiscoveryChannels.find(channel => channel.enabled && (!scrapeSupportSettled || isChannelScrapable(channel.id)))?.id ?? defaultDiscoveryChannels[0].id,
     // discoveryIsLoading 不持久化，始终重置为 false（防止旧数据格式异常）
     discoveryIsLoading: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false },
     discoveryIsLoadingMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false },

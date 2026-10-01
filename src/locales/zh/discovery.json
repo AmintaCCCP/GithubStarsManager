@@ -1,4 +1,24 @@
 {
+  "externalFeeds": {
+    "manage": "外部发现频道",
+    "manageRss": "RSS 发现频道",
+    "name": "频道名称",
+    "url": "HTTPS 地址",
+    "add": "添加频道",
+    "checking": "正在检查来源…",
+    "copy": "复制",
+    "copied": "已复制",
+    "rssFormat": "粘贴一个公开的 RSS/Atom 订阅地址，应用会解析其中提到的 GitHub 仓库链接（每次最多取前 30 个）。",
+    "rss-invalid": "RSS 中未找到 GitHub 仓库链接。",
+    "remove": "移除 {{name}}",
+    "format": "粘贴一个公开的 HTTPS 地址，其返回的 JSON 需在 repositories 字段中列出 GitHub 仓库链接，最多 30 个公开仓库。",
+    "cors-note": "来源网站须允许浏览器跨域读取（CORS）；不会向其发送 GitHub Token。",
+    "invalid": "请输入频道名称和有效的 HTTPS 地址。",
+    "duplicate": "该来源已添加，或已达到 10 个频道上限。",
+    "invalid-format": "来源 JSON 不包含有效的仓库列表。",
+    "cors": "无法读取来源；请检查地址及网站的跨域设置。",
+    "unreadable": "无法读取来源；请检查地址、网站状态及 JSON 格式。"
+  },
   "discoverySidebar": {
     "just-now": "刚刚",
     "m-ago": "分钟前",
@@ -150,5 +170,6 @@
     "stars-gained": "自首次记录新增 {{v1}} stars",
     "first-seen": "榜首首次记录于{{v1}}"
   }
+
 
 }

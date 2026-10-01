@@ -28,6 +28,7 @@ import { SiAndroid, SiApple, SiLinux, SiX, SiTelegram } from '@icons-pack/react-
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
 import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
+import { useWebScrapeSupport } from '../hooks/useWebScrapeSupport';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { DiscoveryChannelMenu } from './DiscoveryChannelMenu';
 import { TrendingHistoryPanel } from '../features/discovery/components/TrendingHistoryPanel';
@@ -453,6 +454,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
 export const DiscoveryView: React.FC = React.memo(() => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toggleDiscoveryChannel = useAppStore(state => state.toggleDiscoveryChannel);
+  const { supported: scrapeSupport, settled: scrapeSupportSettled } = useWebScrapeSupport();
   const {
     githubToken,
     language,
@@ -521,10 +523,31 @@ export const DiscoveryView: React.FC = React.memo(() => {
     if (typeof window === 'undefined') return false;
     return window.location.protocol === 'file:' || navigator.userAgent.includes('Electron');
   }, []);
-  const safeDiscoveryChannels = useMemo(
-    () => Array.isArray(discoveryChannels) ? discoveryChannels.filter(Boolean) : [],
-    [discoveryChannels]
-  );
+  const safeDiscoveryChannels = useMemo(() => {
+    if (!Array.isArray(discoveryChannels)) return [];
+    // 可用性未确定（启动探测中）先全部显示，避免 Web+后端用户的可用频道闪烁；
+    // 纯浏览器模式（无桌面壳、无后端）无法抓取 X 推文与 Telegram，落定后直接隐藏
+    if (!scrapeSupportSettled || scrapeSupport) return discoveryChannels.filter(Boolean);
+    return discoveryChannels.filter(channel => Boolean(channel)
+      && channel.id !== 'x-tweet' && channel.id !== 'telegram');
+  }, [discoveryChannels, scrapeSupport, scrapeSupportSettled]);
+
+  // 抓取支持落定后（纯浏览器模式）：隐藏频道移出列表，确保仍有一个可见启用
+  // 频道（水合期间不做该决策，必要时在此恢复「趋势」），并把选中的被隐藏频
+  // 道回退到可见频道
+  useEffect(() => {
+    if (!scrapeSupportSettled || scrapeSupport) return;
+    const visibleEnabledExists = safeDiscoveryChannels.some(ch => ch.enabled && ch.id !== 'code-search');
+    if (!visibleEnabledExists) {
+      if (!safeDiscoveryChannels.find(ch => ch.id === 'trending')?.enabled) toggleDiscoveryChannel('trending');
+      setSelectedDiscoveryChannel('trending');
+      return;
+    }
+    if (selectedDiscoveryChannel === 'x-tweet' || selectedDiscoveryChannel === 'telegram') {
+      const fallback = safeDiscoveryChannels.find(ch => ch.enabled && ch.id !== 'code-search')?.id ?? 'trending';
+      setSelectedDiscoveryChannel(fallback);
+    }
+  }, [scrapeSupport, scrapeSupportSettled, selectedDiscoveryChannel, safeDiscoveryChannels, toggleDiscoveryChannel, setSelectedDiscoveryChannel]);
 
   // 获取当前频道的所有仓库
   const allRepos = useMemo(
@@ -583,11 +606,17 @@ export const DiscoveryView: React.FC = React.memo(() => {
     // 取消持久化后，首次打开或切换到空频道时自动加载（代码搜索走本地实时请求，不参与自动拉取）
     const hasRepos = useAppStore.getState().discoveryRepos[selectedDiscoveryChannel]?.length > 0;
     const isLoading = useAppStore.getState().discoveryIsLoading[selectedDiscoveryChannel];
-    if (selectedDiscoveryChannel !== 'topic' && selectedDiscoveryChannel !== 'code-search' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
+    if (selectedDiscoveryChannel !== 'topic' && selectedDiscoveryChannel !== 'code-search' && selectedDiscoveryChannel !== 'search' && !hasRepos && !isLoading && autoFetchChannelRef.current !== selectedDiscoveryChannel) {
       autoFetchChannelRef.current = selectedDiscoveryChannel;
       refreshChannel(selectedDiscoveryChannel, 1, false);
     }
   }, [selectedDiscoveryChannel, refreshChannel]);
+
+  useEffect(() => {
+    if (selectedDiscoveryChannel === 'search' && discoverySearchQuery.trim()) {
+      refreshChannel('search', 1, false);
+    }
+  }, [selectedDiscoveryChannel, discoverySearchQuery, refreshChannel]);
 
   // 趋势时间范围改变时刷新数据
   useEffect(() => {
@@ -692,10 +721,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
 
   const handleSearch = useCallback(() => {
     if (selectedDiscoveryChannel === 'search') {
-      setDiscoverySearchQuery(searchInput);
-      refreshChannel('search', 1, false);
+      const query = searchInput.trim();
+      if (!query) return;
+      if (query === discoverySearchQuery) refreshChannel('search', 1, false);
+      else setDiscoverySearchQuery(query);
     }
-  }, [selectedDiscoveryChannel, searchInput, setDiscoverySearchQuery, refreshChannel]);
+  }, [selectedDiscoveryChannel, discoverySearchQuery, searchInput, setDiscoverySearchQuery, refreshChannel]);
 
   const handleLoadMore = useCallback(async () => {
     if (!discoveryHasMore[selectedDiscoveryChannel]) {
@@ -761,7 +792,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
       >
         <div
           ref={sidebarRef}
-          className="hidden lg:block w-64 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
+          className="hidden lg:block w-72 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <DiscoverySidebar
@@ -925,7 +956,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   </button>
                 )}
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
+                  {!currentChannel?.sourceUrl && selectedDiscoveryChannel !== 'weekly' && selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram' && (
                     <PlatformFilter
                       platform={discoveryPlatform}
                       onPlatformChange={setDiscoveryPlatform}

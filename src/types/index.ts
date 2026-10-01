@@ -722,7 +722,7 @@ export type SortBy = 'BestMatch' | 'MostStars' | 'MostForks';
 
 export type SortOrder = 'Descending' | 'Ascending';
 
-export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'x-tweet' | 'telegram' | 'weekly' | 'search' | 'code-search';
+export type DiscoveryChannelId = 'trending' | 'hot-release' | 'most-popular' | 'topic' | 'x-tweet' | 'telegram' | 'weekly' | 'search' | 'code-search' | `external:${string}`;
 
 export type DiscoveryChannelIcon = 'trending' | 'rocket' | 'star' | 'tag' | 'tweet' | 'telegram' | 'weekly' | 'search';
 
@@ -792,6 +792,9 @@ export interface TelegramRef {
   createdAt: string;
 }
 
+/** User-configured external discovery source formats. */
+export type ExternalFeedKind = 'json' | 'rss';
+
 export interface DiscoveryChannel {
   id: DiscoveryChannelId;
   name: string;
@@ -799,6 +802,10 @@ export interface DiscoveryChannel {
   icon: DiscoveryChannelIcon;
   description: string;
   enabled: boolean;
+  /** User-configured, public feed; only present for external channels. */
+  sourceUrl?: string;
+  /** Feed format of `sourceUrl`; omitted means the default JSON format. */
+  sourceKind?: ExternalFeedKind;
 }
 
 export interface PaginatedDiscoveryRepositories {

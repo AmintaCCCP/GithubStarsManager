@@ -1,4 +1,24 @@
 {
+  "externalFeeds": {
+    "manage": "External discovery feeds",
+    "manageRss": "Add RSS discovery feed",
+    "name": "Channel name",
+    "url": "HTTPS feed URL",
+    "add": "Add feed",
+    "checking": "Checking feed…",
+    "copy": "Copy",
+    "copied": "Copied",
+    "rssFormat": "Paste a public RSS or Atom feed URL — the app extracts GitHub repository links mentioned in it (first 30 per refresh).",
+    "rss-invalid": "No GitHub repository links were found in the feed.",
+    "remove": "Remove {{name}}",
+    "format": "Paste a public HTTPS link whose JSON response lists GitHub repositories in its repositories array — up to 30 public repositories.",
+    "cors-note": "The site must allow browser requests (CORS). No GitHub token is sent to the feed.",
+    "invalid": "Enter a name and a valid HTTPS feed URL.",
+    "duplicate": "This feed is already added, or the ten-feed limit was reached.",
+    "invalid-format": "The feed JSON does not contain a valid repository list.",
+    "cors": "The feed could not be read. Check its URL and CORS settings.",
+    "unreadable": "The feed could not be read. Check its URL, availability, and JSON format."
+  },
   "discoverySidebar": {
     "just-now": "Just now",
     "m-ago": "m ago",
@@ -150,5 +170,6 @@
     "stars-gained": "+{{v1}} stars since we first recorded it",
     "first-seen": "Top entry first recorded {{v1}}"
   }
+
 
 }

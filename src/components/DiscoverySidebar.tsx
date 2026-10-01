@@ -62,13 +62,13 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
   const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
 
   return (
-    <div className="w-full lg:w-64 shrink-0">
+    <div className="w-full shrink-0">
       <div className="bg-card dark:bg-card rounded-xl border border-border dark:border-border p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-foreground dark:text-foreground whitespace-nowrap">
             {t('discoverySidebar.discovery-channels')}
           </h3>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <DiscoveryChannelMenu
               channels={channels}
               language={language}

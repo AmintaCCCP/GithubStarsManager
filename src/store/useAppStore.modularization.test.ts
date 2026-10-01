@@ -228,6 +228,148 @@ describe('PR-07 Store modularization compatibility', () => {
     });
   });
 
+  it('retains a valid external discovery channel through migration and hydration', async () => {
+    const feed = {
+      id: 'external:example', name: 'Example feed', nameEn: 'Example feed',
+      icon: 'search', description: 'https://example.com/feed.json',
+      sourceUrl: 'https://example.com/feed.json', enabled: true,
+    } as const;
+    const snapshot = buildPersistedSnapshot({
+      discoveryChannels: [...actualStore.useAppStore.getInitialState().discoveryChannels, feed],
+      selectedDiscoveryChannel: feed.id,
+    });
+    const migrated = await persistenceOptions().migrate(structuredClone(snapshot), 0);
+    const merged = persistenceOptions().merge(migrated, actualStore.useAppStore.getInitialState());
+    expect(merged.discoveryChannels).toContainEqual(feed);
+    expect(merged.selectedDiscoveryChannel).toBe(feed.id);
+  });
+
+  it('adds, selects, and removes only user-created discovery channels', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      const id = store.getState().addExternalDiscoveryChannel('My feed', 'https://example.com/feed.json');
+      expect(id).toMatch(/^external:/);
+      expect(store.getState().selectedDiscoveryChannel).toBe(id);
+      expect(store.getState().addExternalDiscoveryChannel('Duplicate', 'https://example.com/feed.json')).toBeNull();
+      const rssId = store.getState().addExternalDiscoveryChannel('RSS feed', 'https://example.com/feed.xml', 'rss');
+      expect(store.getState().discoveryChannels.find(channel => channel.id === rssId)?.sourceKind).toBe('rss');
+      store.getState().removeExternalDiscoveryChannel(id!);
+      expect(store.getState().discoveryChannels.some(channel => channel.id === id)).toBe(false);
+      expect(store.getState().selectedDiscoveryChannel).not.toBe(id);
+      store.setState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({ ...channel, enabled: false }))
+          .concat({
+            id: 'external:only', name: 'Only feed', nameEn: 'Only feed', icon: 'search',
+            description: 'https://example.com/feed.json', sourceUrl: 'https://example.com/feed.json', enabled: true,
+          }),
+        selectedDiscoveryChannel: 'external:only',
+      });
+      store.getState().removeExternalDiscoveryChannel('external:only');
+      expect(store.getState().selectedDiscoveryChannel).toBe('trending');
+      expect(store.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+      store.getState().removeExternalDiscoveryChannel('trending');
+      expect(store.getState().discoveryChannels.some(channel => channel.id === 'trending')).toBe(true);
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
+  it('falls back to trending over browser-hidden channels when removing feeds', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // 纯浏览器模式（测试环境无桌面壳、无后端）下 x-tweet/telegram 被隐藏但仍是 enabled
+      store.setState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({
+          ...channel,
+          enabled: channel.id === 'x-tweet' || channel.id === 'telegram',
+        })),
+        selectedDiscoveryChannel: 'trending',
+      });
+      const id = store.getState().addExternalDiscoveryChannel('Last feed', 'https://example.com/last.json');
+      store.getState().removeExternalDiscoveryChannel(id!);
+      // 隐藏频道的启用不能替代可见频道：删除最后一个可见启用频道后必须恢复趋势
+      expect(store.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+      expect(store.getState().selectedDiscoveryChannel).toBe('trending');
+
+      // 隐藏频道仍启用时，关闭最后一个可见启用频道应被阻止
+      store.setState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({
+          ...channel,
+          enabled: channel.id === 'trending' || channel.id === 'x-tweet',
+        })),
+      });
+      store.getState().toggleDiscoveryChannel('trending');
+      expect(store.getState().discoveryChannels.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
+  it('keeps a persisted scraping-channel selection before backend availability settles', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // Web+后端用户水合时探测尚未完成：x-tweet 选择必须保留，
+      // 由 DiscoveryView 在抓取支持结论落定后再决定是否纠偏
+      store.setState({
+        discoveryChannels: originalChannels.map(channel => ({ ...channel, enabled: true })),
+        selectedDiscoveryChannel: 'trending',
+      });
+      const hydrated = actualStore.normalizePersistedState(
+        buildPersistedSnapshot({ selectedDiscoveryChannel: 'x-tweet' }) as never,
+        store.getState(),
+      );
+      expect(hydrated.selectedDiscoveryChannel).toBe('x-tweet');
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
+  it('preserves persisted enabled flags while scrape support is unsettled', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // Web 探测未完成（测试环境无桌面壳、无探测）：只启用 x-tweet 的用户偏好
+      // 不得被强制启用的「趋势」覆盖
+      store.setState({
+        discoveryChannels: originalChannels.map(channel => ({ ...channel, enabled: channel.id === 'x-tweet' })),
+        selectedDiscoveryChannel: 'x-tweet',
+      });
+      const hydrated = actualStore.normalizePersistedState({
+        discoveryChannels: store.getState().discoveryChannels,
+        selectedDiscoveryChannel: 'x-tweet',
+      } as never, store.getState());
+      expect(hydrated.discoveryChannels?.find(channel => channel.id === 'trending')?.enabled).toBe(false);
+      expect(hydrated.selectedDiscoveryChannel).toBe('x-tweet');
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
+  it('restores trending at hydration for a settled environment without enabled channels', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // 桌面端结论恒定已落定：全部停用时仍恢复「趋势」
+      (window as unknown as { electronAPI?: unknown }).electronAPI = {};
+      const hydrated = actualStore.normalizePersistedState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({ ...channel, enabled: false })),
+        selectedDiscoveryChannel: 'x-tweet',
+      } as never, store.getState());
+      expect(hydrated.discoveryChannels?.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+    } finally {
+      delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
   it('retains the historical normalize-only resets and release backfill behavior', () => {
     const snapshot = buildPersistedSnapshot({
       ...buildTransientDiscoverySnapshot(),

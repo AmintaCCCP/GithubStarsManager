@@ -1,4 +1,24 @@
 {
+  "externalFeeds": {
+    "manage": "外部探索頻道",
+    "manageRss": "RSS 發現頻道",
+    "name": "頻道名稱",
+    "url": "HTTPS 網址",
+    "add": "新增頻道",
+    "checking": "正在檢查來源…",
+    "copy": "複製",
+    "copied": "已複製",
+    "rssFormat": "貼上一個公開的 RSS/Atom 訂閱位址，應用會解析其中提到的 GitHub 儲存庫連結（每次最多取前 30 個）。",
+    "rss-invalid": "RSS 中未找到 GitHub 儲存庫連結。",
+    "remove": "刪除 {{name}}",
+    "format": "貼上一個公開的 HTTPS 位址，其傳回的 JSON 需在 repositories 欄位列出 GitHub 儲存庫連結，最多 30 個公開儲存庫。",
+    "cors-note": "來源網站須允許瀏覽器跨來源讀取（CORS）；不會向其傳送 GitHub Token。",
+    "invalid": "請輸入頻道名稱和有效的 HTTPS 網址。",
+    "duplicate": "此來源已新增，或已達 10 個頻道上限。",
+    "invalid-format": "來源 JSON 不包含有效的儲存庫清單。",
+    "cors": "無法讀取來源；請檢查網址及網站的跨來源設定。",
+    "unreadable": "無法讀取來源；請檢查網址、網站狀態及 JSON 格式。"
+  },
   "discoverySidebar": {
     "just-now": "剛剛",
     "m-ago": "分鐘前",
@@ -150,5 +170,6 @@
     "stars-gained": "自首次記錄新增 {{v1}} stars",
     "first-seen": "榜首首次記錄於{{v1}}"
   }
+
 
 }

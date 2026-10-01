@@ -1,4 +1,24 @@
 {
+  "externalFeeds": {
+    "manage": "외부 탐색 피드",
+    "manageRss": "RSS 발견 채널",
+    "name": "채널 이름",
+    "url": "HTTPS 피드 URL",
+    "add": "피드 추가",
+    "checking": "피드 확인 중…",
+    "copy": "복사",
+    "copied": "복사됨",
+    "rssFormat": "공개 RSS 또는 Atom 피드 URL을 붙여넣으세요. 앱이 언급된 GitHub 저장소 링크를 추출합니다(갱신당 처음 30개).",
+    "rss-invalid": "피드에서 GitHub 저장소 링크를 찾지 못했습니다.",
+    "remove": "{{name}} 제거",
+    "format": "공개 HTTPS 링크를 붙여넣으세요. JSON 응답의 repositories 필드에 GitHub 저장소를 나열합니다(공개 저장소 최대 30개).",
+    "cors-note": "사이트가 브라우저의 CORS 요청을 허용해야 합니다. GitHub 토큰은 피드로 전송되지 않습니다.",
+    "invalid": "이름과 유효한 HTTPS URL을 입력하세요.",
+    "duplicate": "이미 추가된 피드이거나 10개 제한에 도달했습니다.",
+    "invalid-format": "JSON에 유효한 저장소 목록이 없습니다.",
+    "cors": "피드를 읽을 수 없습니다. URL과 CORS 설정을 확인하세요.",
+    "unreadable": "피드를 읽을 수 없습니다. URL, 사이트 상태, JSON 형식을 확인하세요."
+  },
   "discoverySidebar": {
     "just-now": "방금 전",
     "m-ago": "몇 분 전",
@@ -150,5 +170,6 @@
     "stars-gained": "처음 기록한 뒤 +{{v1}} stars",
     "first-seen": "1위는 {{v1}}에 처음 기록"
   }
+
 
 }

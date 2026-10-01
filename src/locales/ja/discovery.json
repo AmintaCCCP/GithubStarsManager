@@ -1,4 +1,24 @@
 {
+  "externalFeeds": {
+    "manage": "外部の発見フィード",
+    "manageRss": "RSS ディスカバリーチャンネル",
+    "name": "チャンネル名",
+    "url": "HTTPS フィード URL",
+    "add": "フィードを追加",
+    "checking": "フィードを確認中…",
+    "copy": "コピー",
+    "copied": "コピーしました",
+    "rssFormat": "公開 RSS/Atom フィードの URL を貼り付けてください。アプリはその中で言及されている GitHub リポジトリのリンクを抽出します（1 回につき先頭 30 件）。",
+    "rss-invalid": "フィード内に GitHub リポジトリのリンクが見つかりませんでした。",
+    "remove": "{{name}} を削除",
+    "format": "公開 HTTPS リンクを貼り付けてください。JSON レスポンスの repositories フィールドに GitHub リポジトリを列挙します（公開リポジトリ最大 30 件）。",
+    "cors-note": "サイトはブラウザーからの CORS リクエストを許可する必要があります。GitHub トークンは送信されません。",
+    "invalid": "名前と有効な HTTPS URL を入力してください。",
+    "duplicate": "既に追加済みか、10 件の上限に達しています。",
+    "invalid-format": "JSON に有効なリポジトリ一覧がありません。",
+    "cors": "フィードを読み取れません。URL と CORS 設定を確認してください。",
+    "unreadable": "フィードを読み取れません。URL、サイトの状態、JSON 形式を確認してください。"
+  },
   "discoverySidebar": {
     "just-now": "ただ",
     "m-ago": "数分前",
@@ -150,5 +170,6 @@
     "stars-gained": "初回記録から +{{v1}} stars",
     "first-seen": "首位は{{v1}}に初記録"
   }
+
 
 }
