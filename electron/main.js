@@ -958,10 +958,21 @@ const pluginHostOperations = {
     return null;
   },
   async saveFile({ fileName, buffer }) {
-    const result = await dialog.showSaveDialog(mainWindow, { defaultPath: fileName });
+    // 插件只提供建议名：去掉路径分隔与控制字符，扩展名缺失时补 .png。
+    // 最终落盘位置仍由用户在原生对话框中确认，与 Release Asset 下载一致。
+    const suggested = path.basename(typeof fileName === 'string' ? fileName : '')
+      .replace(/[\x00-\x1f<>:"/\\|?*]/g, '_');
+    const safeName = suggested && suggested !== '.' ? suggested : 'plugin-export';
+    const defaultPath = path.extname(safeName) ? safeName : `${safeName}.png`;
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath,
+      properties: ['showOverwriteConfirmation', 'createDirectory'],
+    });
     if (result.canceled || !result.filePath) return { canceled: true };
     await fs.promises.writeFile(result.filePath, buffer);
-    return { fileName: path.basename(result.filePath) };
+    const savedName = path.basename(result.filePath);
+    clipboard.writeText(savedName);
+    return { fileName: savedName };
   },
 };
 

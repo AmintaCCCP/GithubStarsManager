@@ -8,6 +8,38 @@ import { Modal } from './Modal';
 import { PluginPageViewer } from './PluginPageViewer';
 import type { Repository } from '../types';
 
+/**
+ * 弹窗动作下发的仓库上下文。字段对齐主进程 `sanitizeRepository` 的白名单，
+ * 另加卡片生成需要的两段文本摘要；不包含分析错误、索引时间戳、头像地址等
+ * 宿主内部字段。
+ */
+function repositoryContext(repository: Repository): Record<string, unknown> {
+  return {
+    id: repository.id,
+    name: repository.name,
+    full_name: repository.full_name,
+    description: repository.description,
+    html_url: repository.html_url,
+    stargazers_count: repository.stargazers_count,
+    forks_count: repository.forks_count,
+    language: repository.language,
+    created_at: repository.created_at,
+    updated_at: repository.updated_at,
+    pushed_at: repository.pushed_at,
+    owner: { login: repository.owner.login },
+    topics: repository.topics,
+    license: repository.license ?? null,
+    archived: repository.archived ?? null,
+    disabled: repository.disabled ?? null,
+    fork: repository.fork ?? null,
+    is_template: repository.is_template ?? null,
+    open_issues_count: repository.open_issues_count ?? null,
+    default_branch: repository.default_branch ?? null,
+    custom_description: repository.custom_description ?? null,
+    ai_summary: repository.ai_summary ?? null,
+  };
+}
+
 interface PluginPageModalProps {
   pluginId: string;
   pluginName: string;
@@ -39,7 +71,7 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
         pageTitle={pageTitle}
         onClose={onClose}
         t={t}
-        initContext={{ repository, readme, language }}
+        initContext={{ repository: repositoryContext(repository), readme, language }}
       />
     </Modal>
   );

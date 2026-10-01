@@ -186,6 +186,30 @@ describe('PluginPageViewer', () => {
     }), '*');
     expect(requestPageCapability).not.toHaveBeenCalled();
   });
+
+  it('lets binary export payloads use the larger budget shared with the main process', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: { fileName: 'card.png' } });
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    fireEvent.load(frame);
+
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'png', token: 'session-token', method: 'downloads.saveFile',
+          args: { fileName: 'card.png', dataBase64: 'A'.repeat(2 * 1024 * 1024) } },
+        origin: 'null', source: frame.contentWindow,
+      }));
+    });
+
+    await waitFor(() => expect(requestPageCapability).toHaveBeenCalledWith({
+      pluginId: 'com.example.page', pageId: 'dashboard', method: 'downloads.saveFile',
+      args: { fileName: 'card.png', dataBase64: 'A'.repeat(2 * 1024 * 1024) },
+    }));
+  });
 });
 
 describe('PluginPageViewer init context (V1.4 modal actions)', () => {
@@ -223,6 +247,27 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
     await waitFor(() => expect(requestPageCapability).toHaveBeenCalledWith({
       pluginId: 'com.example.page', pageId: 'dashboard', method: 'clipboard.write', args: { text: 'hello' },
     }));
+  });
+
+  it('re-sends init with the same token when the context arrives later', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    const t = makeT('zh', 'app');
+    const { rerender } = render(<PluginPageViewer pluginId="com.example.page" pluginName="Example"
+      pageId="dashboard" pageTitle="Dashboard" onClose={() => {}} t={t} variant="modal"
+      initContext={{ repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' }} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+
+    rerender(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} variant="modal"
+      initContext={{ repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh' }} />);
+
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
+      type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh' },
+    }, '*'));
   });
 
   it('renders without a header row in the modal variant', async () => {

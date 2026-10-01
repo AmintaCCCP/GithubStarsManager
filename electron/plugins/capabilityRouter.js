@@ -7,12 +7,12 @@ const { protocolError } = require('./pluginProtocol');
 // capability 对 Worker 不可用。
 function createCapabilityRouter({ storage, logger, catalog, hostOperations = null }) {
   function requireHostOperation(capability, operation) {
-    const handler = hostOperations?.[operation];
-    if (typeof handler !== 'function') {
-      throw protocolError('PLUGIN_CAPABILITY_UNAVAILABLE', `Capability '${capability}' is not available for this caller`);
-    }
-    return handler;
+  const handler = hostOperations?.[operation];
+  if (typeof handler !== 'function') {
+    throw protocolError('PLUGIN_CAPABILITY_UNAVAILABLE', `Capability '${capability}' is not available for this caller`);
   }
+  return handler;
+}
   return {
     async handle(permissions, request) {
       if (!request || typeof request !== 'object' || typeof request.capability !== 'string') {

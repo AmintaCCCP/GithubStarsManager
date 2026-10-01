@@ -298,11 +298,19 @@ function sanitizeFragment(raw, canvasId) {
   const card = doc.getElementById('card');
   if (!card) throw new Error(str.noCard);
   card.setAttribute('data-canvas', canvasId);
-  return doc.body.innerHTML;
+  // 只保留卡片根元素。模型常在 #card 前后夹带说明或额外节点，
+  // 整段 body 会把它们带进预览和导出的单文件 HTML。
+  return card.outerHTML;
 }
 
 function escapeXmlText(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+}
+
+function escapeHtmlText(text) {
+  return String(text).replace(/[&<>"]/g, (char) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+  }[char]));
 }
 
 function assembleDocument(css, fragment, title) {
@@ -311,7 +319,7 @@ function assembleDocument(css, fragment, title) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title}</title>
+<title>${escapeHtmlText(title)}</title>
 <style>body{margin:0;background:#f4f3f0;}</style>
 <style>${css}</style>
 </head>
@@ -386,6 +394,10 @@ function handleInit(context) {
   str = STR[state.language];
   document.documentElement.lang = state.language;
   applyChromeStrings();
+
+  // README 由宿主异步补发。卡片已经生成后只刷新数据，保留当前状态提示，
+  // 避免把「已生成」覆盖成「已加载」。
+  if (state.fragment) return;
 
   if (state.repository) {
     $('repo-name').textContent = state.repository.full_name;

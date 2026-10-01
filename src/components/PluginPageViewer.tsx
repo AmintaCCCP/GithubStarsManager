@@ -56,6 +56,19 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
   const initContextRef = useRef(initContext);
   initContextRef.current = initContext;
 
+  // init 只在 iframe onLoad 时发送一次，而弹窗上下文（如 README）是异步到位的。
+  // 页面已初始化后上下文发生变化时补发一次，携带同一 token，页面按新上下文刷新。
+  const initContextSignature = JSON.stringify(initContext ?? null);
+  useEffect(() => {
+    const frameWindow = frameRef.current?.contentWindow;
+    if (!frameWindow || !tokenRef.current || !initContextRef.current) return;
+    frameWindow.postMessage({
+      type: 'plugin-page:init', pluginId, pageId, token: tokenRef.current,
+      context: initContextRef.current,
+    }, '*');
+    // initContextSignature 只用来触发重发；实际载荷取 ref，避免把对象身份放进依赖。
+  }, [initContextSignature, pluginId, pageId]);
+
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
       const request = validatePluginPageMessage(event, frameRef.current?.contentWindow ?? null, pluginId, pageId, tokenRef.current);
@@ -84,7 +97,12 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
         rejectRequest('PLUGIN_PAGE_REQUEST_TOO_LARGE', 'Plugin page request arguments are not serializable');
         return;
       }
-      if (requestSize > 1024 * 1024) {
+      // 与主进程 pluginPageBridge 的预算一致：截图导出回传二进制，放宽到
+      // 10 MiB；其余方法维持 1 MiB。这里先拦一层，避免大载荷进 IPC。
+      const sizeLimit = request.method === 'clipboard.writeImage' || request.method === 'downloads.saveFile'
+        ? 10 * 1024 * 1024
+        : 1024 * 1024;
+      if (requestSize > sizeLimit) {
         rejectRequest('PLUGIN_PAGE_REQUEST_TOO_LARGE', 'Plugin page request exceeds the size limit');
         return;
       }
