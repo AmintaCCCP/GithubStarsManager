@@ -1,8 +1,6 @@
 {
   "loginScreen": {
     "token-permissions-title": "Autorisations du jeton GitHub",
-    "token-permissions-stars": "Pour gérer les étoiles : un jeton classique nécessite public_repo (ou repo pour les dépôts privés). Un jeton à granularité fine nécessite Starring du compte en lecture/écriture et Metadata du dépôt en lecture.",
-    "token-permissions-optional": "Fonctions facultatives : avec un jeton classique, Gists nécessite gist, Star Lists nécessite user, et la synchronisation des forks ou le lancement de workflows nécessite repo. Avec un jeton à granularité fine, utilisez Gists (écriture), Contents (écriture) pour les forks et Actions (écriture) pour les workflows. N'accordez que les droits utiles.",
     "token-permissions-check": "La connexion vérifie votre identité, pas toutes les autorisations. Un manque de droits peut n'apparaître qu'à l'utilisation d'une fonction.",
     "please-enter-the-backend-url-and-api-key": "Veuillez saisir l'URL du backend et la clé API",
     "invalid-backend-url-remote-backends-must-use-htt": "Adresse du backend invalide : le backend distant nécessite HTTPS, seul l'hôte local peut utiliser HTTP",
@@ -39,6 +37,23 @@
     "keep-local": "rester local",
     "please-enter-a-valid-github-token": "Veuillez saisir un jeton GitHub valide",
     "signed-in-but-failed-to-save-github-token-to-bac": "Vous êtes connecté, mais le jeton GitHub n'a pas pu être enregistré dans le backend et les fonctions de proxy backend telles que README peuvent ne pas être disponibles.",
-    "failed-to-authenticate-please-check-your-token": "L'authentification a échoué, veuillez vérifier votre jeton."
+    "failed-to-authenticate-please-check-your-token": "L'authentification a échoué, veuillez vérifier votre jeton.",
+    "token-permissions-tab-finegrained": "Granularité fine",
+    "token-permissions-tab-classic": "Classique",
+    "token-permissions-feature-star": "Gérer les étoiles",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Listes d'étoiles",
+    "token-permissions-feature-fork-sync": "Synchronisation des forks",
+    "token-permissions-feature-workflows": "Lancement de workflows",
+    "token-permissions-feature-fork-workflows": "Forks / workflows",
+    "token-permissions-fine-star": "`Starring` lecture/écriture, `Metadata` lecture",
+    "token-permissions-fine-gists": "`Gists` écriture",
+    "token-permissions-fine-fork-sync": "`Contents` écriture",
+    "token-permissions-fine-workflows": "`Actions` écriture",
+    "token-permissions-classic-star": "`public_repo` (`repo` pour les dépôts privés)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Votre jeton est stocké uniquement sur cet appareil et votre propre backend, jamais sur les serveurs de l'application."
   }
 }

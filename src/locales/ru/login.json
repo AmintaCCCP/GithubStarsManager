@@ -1,8 +1,6 @@
 {
   "loginScreen": {
     "token-permissions-title": "Права токена GitHub",
-    "token-permissions-stars": "Для управления звёздами классическому токену нужен public_repo (или repo для приватных репозиториев). Токену с точной настройкой нужны права Starring учётной записи на чтение и запись и Metadata репозитория на чтение.",
-    "token-permissions-optional": "Дополнительно: классическому токену нужны gist для Gists, user для Star Lists и repo для синхронизации форков и запуска workflow. Токену с точными правами нужны Gists (запись), Contents (запись) для форков и Actions (запись) для workflow. Выдавайте только нужные права.",
     "token-permissions-check": "Вход проверяет личность, но не все права. Нехватка прав может проявиться только при использовании функции.",
     "please-enter-the-backend-url-and-api-key": "Введите URL-адрес серверной части и ключ API.",
     "invalid-backend-url-remote-backends-must-use-htt": "Неверный адрес бэкэнда: удаленному бэкэнду требуется HTTPS, только локальный хост может использовать HTTP.",
@@ -39,6 +37,23 @@
     "keep-local": "сохранять локальность",
     "please-enter-a-valid-github-token": "Введите действительный токен GitHub.",
     "signed-in-but-failed-to-save-github-token-to-bac": "Вы вошли в систему, но токен GitHub не удалось сохранить на серверной стороне, а функции внутреннего прокси, такие как README, могут быть недоступны.",
-    "failed-to-authenticate-please-check-your-token": "Аутентификация не удалась, проверьте свой токен."
+    "failed-to-authenticate-please-check-your-token": "Аутентификация не удалась, проверьте свой токен.",
+    "token-permissions-tab-finegrained": "Fine-grained",
+    "token-permissions-tab-classic": "Классический",
+    "token-permissions-feature-star": "Управление звёздами",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Списки звёзд",
+    "token-permissions-feature-fork-sync": "Синхронизация форков",
+    "token-permissions-feature-workflows": "Запуск workflow",
+    "token-permissions-feature-fork-workflows": "Форки / workflow",
+    "token-permissions-fine-star": "`Starring` чтение и запись, `Metadata` чтение",
+    "token-permissions-fine-gists": "`Gists` запись",
+    "token-permissions-fine-fork-sync": "`Contents` запись",
+    "token-permissions-fine-workflows": "`Actions` запись",
+    "token-permissions-classic-star": "`public_repo` (`repo` для приватных репозиториев)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения."
   }
 }

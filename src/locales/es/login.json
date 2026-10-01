@@ -1,8 +1,6 @@
 {
   "loginScreen": {
     "token-permissions-title": "Permisos del token de GitHub",
-    "token-permissions-stars": "Para gestionar estrellas: un token clásico necesita public_repo (o repo para repositorios privados). Uno de permisos específicos necesita Starring de cuenta: lectura y escritura, y Metadata del repositorio: lectura.",
-    "token-permissions-optional": "Funciones opcionales: con tokens clásicos, Gists requiere gist, Star Lists user, y sincronizar forks o ejecutar flujos repo. Con tokens de acceso específico, Gists requiere Gists (escritura), sincronizar forks Contents (escritura) y ejecutar flujos Actions (escritura). Concede solo los permisos que uses.",
     "token-permissions-check": "El inicio de sesión verifica tu identidad, no todos los permisos. La falta de permisos puede aparecer al usar una función.",
     "please-enter-the-backend-url-and-api-key": "Ingrese la URL de backend y la clave API",
     "invalid-backend-url-remote-backends-must-use-htt": "Dirección de backend no válida: el backend remoto requiere HTTPS, solo el host local puede usar HTTP",
@@ -39,6 +37,23 @@
     "keep-local": "mantener local",
     "please-enter-a-valid-github-token": "Ingrese un token de GitHub válido",
     "signed-in-but-failed-to-save-github-token-to-bac": "Ha iniciado sesión, pero el token de GitHub no se pudo guardar en el backend y es posible que las funciones de proxy del backend, como README, no estén disponibles.",
-    "failed-to-authenticate-please-check-your-token": "La autenticación falló, verifique su token."
+    "failed-to-authenticate-please-check-your-token": "La autenticación falló, verifique su token.",
+    "token-permissions-tab-finegrained": "Específico",
+    "token-permissions-tab-classic": "Clásico",
+    "token-permissions-feature-star": "Gestionar estrellas",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Listas de estrellas",
+    "token-permissions-feature-fork-sync": "Sincronizar forks",
+    "token-permissions-feature-workflows": "Ejecutar flujos",
+    "token-permissions-feature-fork-workflows": "Forks / flujos",
+    "token-permissions-fine-star": "`Starring` lectura y escritura, `Metadata` lectura",
+    "token-permissions-fine-gists": "`Gists` escritura",
+    "token-permissions-fine-fork-sync": "`Contents` escritura",
+    "token-permissions-fine-workflows": "`Actions` escritura",
+    "token-permissions-classic-star": "`public_repo` (`repo` para repositorios privados)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend; nunca en los servidores de la app."
   }
 }

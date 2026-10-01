@@ -1,8 +1,6 @@
 {
   "loginScreen": {
     "token-permissions-title": "GitHub Token 权限",
-    "token-permissions-stars": "管理 Star：传统 Token 需勾选 public_repo（私有仓库用 repo）；细粒度 Token 需账户 Starring 读写权限，以及仓库 Metadata 读取权限。",
-    "token-permissions-optional": "可选功能：传统 Token 的 Gist 需 gist、Star 列表需 user、Fork 同步和触发工作流需 repo；细粒度 Token 的 Gist 需 Gists（写入）、Fork 同步需 Contents（写入）、触发工作流需 Actions（写入）。只授予会用到的权限。",
     "token-permissions-check": "登录只验证身份，不会检查所有功能权限；权限不足可能在使用相应功能时才出现。",
     "please-enter-the-backend-url-and-api-key": "请输入后端 URL 和 API Key",
     "invalid-backend-url-remote-backends-must-use-htt": "后端地址无效：远程后端需使用 HTTPS，仅 localhost 可使用 HTTP",
@@ -39,6 +37,23 @@
     "keep-local": "保留本地",
     "please-enter-a-valid-github-token": "请输入有效的GitHub token",
     "signed-in-but-failed-to-save-github-token-to-bac": "已登录，但 GitHub Token 未能保存到后端，README 等后端代理功能可能不可用。",
-    "failed-to-authenticate-please-check-your-token": "认证失败，请检查您的token。"
+    "failed-to-authenticate-please-check-your-token": "认证失败，请检查您的token。",
+    "token-permissions-tab-finegrained": "细粒度 Token",
+    "token-permissions-tab-classic": "经典 Token",
+    "token-permissions-feature-star": "为仓库添加 Star",
+    "token-permissions-feature-gists": "Gist",
+    "token-permissions-feature-star-lists": "Star 清单",
+    "token-permissions-feature-fork-sync": "Fork 储存库同步",
+    "token-permissions-feature-workflows": "触发工作流",
+    "token-permissions-feature-fork-workflows": "Fork 同步 / 触发工作流",
+    "token-permissions-fine-star": "`Starring` 读写、`Metadata` 读取",
+    "token-permissions-fine-gists": "`Gists` 写入",
+    "token-permissions-fine-fork-sync": "`Contents` 写入",
+    "token-permissions-fine-workflows": "`Actions` 写入",
+    "token-permissions-classic-star": "`public_repo`（私有仓库用 `repo`）",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Token 仅保存在本机与你配置的后端，不会上传到应用方服务器。"
   }
 }

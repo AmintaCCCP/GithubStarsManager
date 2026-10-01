@@ -73,7 +73,9 @@ describe('LoginScreen token guidance', () => {
   it('explains Star permissions before sign-in', () => {
     render(<TooltipProvider><LoginScreen /></TooltipProvider>);
     expect(screen.getByText('GitHub Token 权限')).toBeVisible();
-    expect(screen.getByText(/Starring 读写权限/)).toBeVisible();
+    expect(screen.getByText('Starring')).toBeVisible();
+    fireEvent.click(screen.getByRole('tab', { name: '经典 Token' }));
+    expect(screen.getByText('public_repo')).toBeVisible();
   });
 });
 

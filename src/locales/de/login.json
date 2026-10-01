@@ -1,8 +1,6 @@
 {
   "loginScreen": {
     "token-permissions-title": "GitHub-Token-Berechtigungen",
-    "token-permissions-stars": "Für Stars benötigt ein klassisches Token public_repo (für private Repositorys repo). Ein fein abgestuftes Token benötigt Starring für das Konto mit Lese-/Schreibzugriff und Metadata für Repositorys mit Lesezugriff.",
-    "token-permissions-optional": "Optionale Funktionen: Bei klassischen Tokens benötigen Gists gist, Star Lists user sowie Fork-Synchronisierung und Workflow-Starts repo. Bei fein abgestuften Tokens benötigen Gists Gists (Schreiben), Fork-Synchronisierung Contents (Schreiben) und Workflow-Starts Actions (Schreiben). Erteilen Sie nur benötigte Rechte.",
     "token-permissions-check": "Die Anmeldung prüft Ihre Identität, nicht alle Berechtigungen. Fehlende Rechte können erst bei der Nutzung einer Funktion auffallen.",
     "please-enter-the-backend-url-and-api-key": "Bitte geben Sie die Backend-URL und den API-Schlüssel ein",
     "invalid-backend-url-remote-backends-must-use-htt": "Ungültige Backend-Adresse: Das Remote-Backend erfordert HTTPS, nur localhost kann HTTP verwenden",
@@ -39,6 +37,23 @@
     "keep-local": "Bleiben Sie lokal",
     "please-enter-a-valid-github-token": "Bitte geben Sie ein gültiges GitHub-Token ein",
     "signed-in-but-failed-to-save-github-token-to-bac": "Sie haben sich angemeldet, aber das GitHub-Token konnte nicht im Backend gespeichert werden und Backend-Proxy-Funktionen wie README sind möglicherweise nicht verfügbar.",
-    "failed-to-authenticate-please-check-your-token": "Die Authentifizierung ist fehlgeschlagen. Bitte überprüfen Sie Ihr Token."
+    "failed-to-authenticate-please-check-your-token": "Die Authentifizierung ist fehlgeschlagen. Bitte überprüfen Sie Ihr Token.",
+    "token-permissions-tab-finegrained": "Fein abgestuft",
+    "token-permissions-tab-classic": "Klassisch",
+    "token-permissions-feature-star": "Stars verwalten",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Star-Listen",
+    "token-permissions-feature-fork-sync": "Fork-Synchronisierung",
+    "token-permissions-feature-workflows": "Workflow-Starts",
+    "token-permissions-feature-fork-workflows": "Fork-Sync / Workflows",
+    "token-permissions-fine-star": "`Starring` Lesen/Schreiben, `Metadata` Lesen",
+    "token-permissions-fine-gists": "`Gists` Schreiben",
+    "token-permissions-fine-fork-sync": "`Contents` Schreiben",
+    "token-permissions-fine-workflows": "`Actions` Schreiben",
+    "token-permissions-classic-star": "`public_repo` (`repo` für private Repositorys)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Ihr Token wird nur auf diesem Gerät und Ihrem eigenen Backend gespeichert – niemals auf den Servern der App."
   }
 }
