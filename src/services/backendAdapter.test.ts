@@ -226,3 +226,47 @@ describe('backendAdapter 后端 URL 安全策略', () => {
     expect(backend.isAvailable).toBe(true);
   });
 });
+
+describe('backendAdapter 探测源协议（file:// 桌面端不探测同源 /api）', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+  const STORAGE_KEY = 'github-stars-manager-backend-url';
+  const originalLocation = window.location;
+
+  // jsdom 的 Location 实例属性不可重定义，但 `window.location` 本身可替换。
+  const setLocation = (protocol: string, origin: string, hostname: string): void => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: { protocol, origin, hostname },
+    });
+  };
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: originalLocation });
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+    localStorage.removeItem(STORAGE_KEY);
+  });
+
+  it('桌面端 file:// 页面：不发起 file:///api/health 探测', async () => {
+    setLocation('file:', 'file://', '');
+
+    await backend.init();
+
+    expect(window.fetch).not.toHaveBeenCalled();
+    expect(backend.isAvailable).toBe(false);
+  });
+
+  it('HTTP(S) 页面：保留同源 /api 探测', async () => {
+    setLocation('https:', 'https://app.example.com', 'app.example.com');
+    vi.mocked(window.fetch).mockResolvedValue(makeHealthOkResponse());
+
+    await backend.init();
+
+    expect(window.fetch).toHaveBeenCalledWith(
+      'https://app.example.com/api/health',
+      expect.objectContaining({ redirect: 'error' })
+    );
+    expect(backend.isAvailable).toBe(true);
+  });
+});

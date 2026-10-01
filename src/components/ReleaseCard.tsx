@@ -451,6 +451,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   content={isFullContent ? (release.body || '') : truncatedBody}
                   shouldRender={true}
                   fontSize="small"
+                  baseUrl={`https://github.com/${release.repository.full_name}`}
                 />
 
                 {(release.body || '').length > truncatedBody.length && (

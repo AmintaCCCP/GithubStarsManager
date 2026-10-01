@@ -142,7 +142,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
 };
 
 /** 助手消息正文：行内引用渲染为 CitationBadge；按内容 + 证据 + 语言做 memo，避免流式期间全量重渲。 */
-const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]; evidenceById: Record<string, ToolEvidence>; language: AppLanguage }>(({ content, evidenceIds, evidenceById, language }) => {
+const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]; evidenceById: Record<string, ToolEvidence>; language: AppLanguage; baseUrl?: string }>(({ content, evidenceIds, evidenceById, language, baseUrl }) => {
   const renderInlineCode = useCallback((text: string) => {
     const evidences = evidenceIds
       .map((id) => evidenceById[id])
@@ -152,7 +152,7 @@ const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]
     if (!resolved) return null;
     return <CitationBadge target={resolved} language={language} />;
   }, [evidenceIds, evidenceById, language]);
-  return <MarkdownRenderer content={content} shouldRender breaks fontSize="small" className="repository-chat-markdown" renderInlineCode={renderInlineCode} />;
+  return <MarkdownRenderer content={content} shouldRender breaks fontSize="small" className="repository-chat-markdown" renderInlineCode={renderInlineCode} baseUrl={baseUrl} />;
 });
 
 const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
@@ -463,6 +463,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                               evidenceIds={message.evidenceIds}
                               evidenceById={evidenceById}
                               language={language}
+                              baseUrl={repository.html_url}
                             />
                           ) : (
                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label={t('repositoryChatSheet.generating')} />

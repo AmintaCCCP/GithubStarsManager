@@ -194,7 +194,7 @@ const ReleaseContent: React.FC<{
       <TabsContent value="notes" className="mt-3">
         {hasBody ? (
           <div className="rounded-md border border-border bg-muted/20 px-3 py-3">
-            <MarkdownRenderer content={release.body || ''} shouldRender fontSize="small" />
+            <MarkdownRenderer content={release.body || ''} shouldRender fontSize="small" baseUrl={repository.html_url} />
           </div>
         ) : (
           <p className="py-5 text-center text-xs text-muted-foreground">{t('repositoryReleaseSheet.this-release-has-no-release-notes')}</p>
@@ -210,7 +210,7 @@ const ReleaseContent: React.FC<{
           </div>
         ) : summary?.status === 'done' && summary.content ? (
           <div className="rounded-md border border-border bg-muted/20 px-3 py-3">
-            <MarkdownRenderer content={summary.content} shouldRender breaks fontSize="small" />
+            <MarkdownRenderer content={summary.content} shouldRender breaks fontSize="small" baseUrl={repository.html_url} />
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 py-5 text-center">

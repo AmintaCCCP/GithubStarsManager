@@ -154,6 +154,33 @@ interface GitHubRateLimitResponse {
   };
 }
 
+/**
+ * 把(通常是 RSS `content:encoded` 里的 README 渲染 HTML)文本解码为纯文本。
+ *
+ * 必须用 DOMParser 而不是给 detached 节点赋 `innerHTML`:后者在解析时浏览器
+ * 仍会立即发起 `<img>`/`<picture><source>` 的资源请求——GitHub Trending RSS
+ * 的 description 正是趋势仓库 README 的渲染 HTML,其中的相对路径图片在桌面端
+ * 会按 `file://…/dist/` 文档根解析,每次刷新趋势都产生一波必然
+ * `ERR_FILE_NOT_FOUND` 的请求。
+ *
+ * DOMParser 生成的文档没有 browsing context(base URL 是 `about:blank`),
+ * 相对资源 URL 无法解析成可请求地址;已在 Electron 44/Chromium 152 实测,
+ * 解析阶段对绝对 URL 的 img/source/iframe 同样零请求。移除资源承载元素后
+ * 再取文本作为跨引擎兜底,不依赖各引擎对惰性文档的取图时机。
+ */
+function decodeRssHtmlToText(html: string): string {
+  if (!html) return '';
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll(
+      'img, source, iframe, frame, video, audio, embed, object, link, script, style',
+    ).forEach((el) => el.remove());
+    return doc.body.textContent || '';
+  } catch {
+    return '';
+  }
+}
+
 /** 把 REST issue 条目归一化为 GitHubIssueListRead（labels 对象数组展开为 name）。 */
 function mapRestIssueListItem(item: Record<string, unknown>): GitHubIssueListRead {
   const labels = Array.isArray(item.labels)
@@ -1636,10 +1663,10 @@ export class GitHubApiService {
         // 仅用于下方提取 stars/forks 标记，绝不写入 repo.description
         const descriptionEl = item.querySelector('description');
         let readmeText = descriptionEl?.textContent || '';
-        // 解码 HTML 实体
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = readmeText;
-        readmeText = tempDiv.textContent || tempDiv.innerText || readmeText;
+        // 解码 HTML 实体（禁止走 innerHTML：detached 节点赋值仍会解析并立即
+        // 发起 <img>/<source> 资源请求，趋势仓库 README 的相对路径图片在桌面端
+        // 会按 file:// 文档根解析，每次刷新趋势都产生一波 file 404）
+        readmeText = decodeRssHtmlToText(readmeText) || readmeText;
         // 清理多余空白
         readmeText = readmeText.replace(/\s+/g, ' ').trim();
 
@@ -1845,10 +1872,8 @@ export class GitHubApiService {
         // 仅用于下方提取 stars/forks 标记，绝不写入 repo.description
         const descriptionEl = item.querySelector('description');
         let readmeText = descriptionEl?.textContent || '';
-        // Decode HTML entities and strip HTML tags
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = readmeText;
-        readmeText = tempDiv.textContent || tempDiv.innerText || '';
+        // Decode HTML entities and strip HTML tags (DOMParser, see decodeRssHtmlToText)
+        readmeText = decodeRssHtmlToText(readmeText);
         // Clean up extra whitespace
         readmeText = readmeText.replace(/\s+/g, ' ').trim();
 

@@ -37,15 +37,6 @@ function createPluginCatalog() {
       if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
         throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin data snapshot must be an object');
       }
-      let snapshotBytes;
-      try {
-        snapshotBytes = Buffer.byteLength(JSON.stringify(snapshot), 'utf8');
-      } catch {
-        throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin data snapshot must be JSON serializable');
-      }
-      if (snapshotBytes > MAX_SNAPSHOT_BYTES) {
-        throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin data snapshot exceeds the size limit');
-      }
       if (!Array.isArray(snapshot.repositories) || snapshot.repositories.length > MAX_SNAPSHOT_REPOSITORIES) {
         throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin repository snapshot is invalid');
       }
@@ -61,6 +52,29 @@ function createPluginCatalog() {
       for (const release of snapshot.releases) {
         const normalized = normalizeRelease(release);
         nextReleases.set(normalized.public.id, normalized);
+      }
+      // The documented budget (docs/wiki/Plugin-Development.md) caps the
+      // *retained* snapshot at 64 MiB, so measure what the Host actually keeps
+      // rather than the raw IPC payload. Measuring the payload rejected valid
+      // snapshots whenever the renderer carried fields the Host strips (AI
+      // summaries, custom overrides, vector bookkeeping…): the desktop client
+      // logged 'Plugin data snapshot exceeds the size limit' on every change
+      // while the sanitized snapshot was only a few megabytes.
+      // The releases are measured from `nextReleases` (deduplicated, with the
+      // validated `browser_download_url` kept in `assets`) for the same reason:
+      // `normalized.public` alone drops retained data, while duplicate release
+      // IDs would count records the Host never stores.
+      let snapshotBytes;
+      try {
+        snapshotBytes = Buffer.byteLength(JSON.stringify({
+          repositories: [...nextRepositories.values()],
+          releases: [...nextReleases.values()],
+        }), 'utf8');
+      } catch {
+        throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin data snapshot must be JSON serializable');
+      }
+      if (snapshotBytes > MAX_SNAPSHOT_BYTES) {
+        throw protocolError('PLUGIN_SNAPSHOT_INVALID', 'Plugin data snapshot exceeds the size limit');
       }
       repositories = nextRepositories;
       releases = nextReleases;
