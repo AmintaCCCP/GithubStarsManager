@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "La página del complemento no se pudo cargar",
     "this-page-comes-from-a-local-plugin-data-request": "Esta página la proporciona un complemento local y las solicitudes de datos aún están sujetas a verificaciones de permisos del host.",
     "back-to-plugins": "Volver a la lista de complementos",
-    "loading-plugin-page": "Cargando página del complemento…"
+    "loading-plugin-page": "Cargando página del complemento…",
+    "close": "Cerrar"
   },
   "readmeModal": {
     "switch-readme-language": "Cambiar idioma LÉAME",

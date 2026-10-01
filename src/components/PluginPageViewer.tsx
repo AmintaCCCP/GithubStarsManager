@@ -161,7 +161,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
           sandbox="allow-scripts allow-same-origin"
           referrerPolicy="no-referrer"
           className={isModal
-            ? 'h-[min(72vh,860px)] min-h-[420px] w-full rounded-lg border border-border bg-white'
+            ? 'h-full min-h-[70vh] w-full rounded-lg border border-border bg-white'
             : 'h-[min(70vh,800px)] min-h-[480px] w-full rounded-lg border border-border bg-white'}
           onLoad={() => {
             for (const controller of aiRequestsRef.current) controller.abort();

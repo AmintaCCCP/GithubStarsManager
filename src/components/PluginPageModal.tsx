@@ -62,7 +62,14 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
   const { readme } = usePluginPageReadme(repository);
 
   return (
-    <Modal isOpen onClose={onClose} title={`${pluginName} · ${pageTitle}`} maxWidth="max-w-5xl" scrollable>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={`${pluginName} · ${pageTitle}`}
+      maxWidth="h-[calc(100vh_-_2rem)] max-h-[calc(100vh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-none"
+      scrollable
+      closeLabel={t('pluginPageViewer.close')}
+    >
       <PluginPageViewer
         variant="modal"
         pluginId={pluginId}

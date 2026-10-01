@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "플러그인 페이지를 로드하지 못했습니다.",
     "this-page-comes-from-a-local-plugin-data-request": "이 페이지는 로컬 플러그인에서 제공되며 데이터 요청에는 여전히 호스트 권한 확인이 적용됩니다.",
     "back-to-plugins": "플러그인 목록으로 돌아가기",
-    "loading-plugin-page": "플러그인 페이지 로드 중…"
+    "loading-plugin-page": "플러그인 페이지 로드 중…",
+    "close": "닫기"
   },
   "readmeModal": {
     "switch-readme-language": "README 언어 전환",

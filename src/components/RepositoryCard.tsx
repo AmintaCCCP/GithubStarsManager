@@ -29,6 +29,7 @@ import { usePluginActions } from '../plugins/hooks/usePluginActions';
 import { applyPluginActionResult } from '../plugins/applyPluginActionResult';
 import { useDialog } from '../hooks/useDialog';
 import { pluginClient } from '../plugins/pluginClient';
+import { pluginPageSession } from '../plugins/pluginPageSession';
 import type { RegisteredPluginAction } from '../plugins/types';
 
 type DialogContentPointerDownOutsideHandler = NonNullable<
@@ -41,10 +42,6 @@ const LazyReadmeModal = React.lazy(() =>
 
 const LazyRepositoryReleaseSheet = React.lazy(() =>
   import('./RepositoryReleaseSheet').then((module) => ({ default: module.RepositoryReleaseSheet }))
-);
-
-const LazyPluginPageModal = React.lazy(() =>
-  import('./PluginPageModal').then((module) => ({ default: module.PluginPageModal }))
 );
 
 const ReadmeModalLoadingFallback: React.FC<{
@@ -159,8 +156,6 @@ const PluginRepositoryActionItems: React.FC<{
 }> = ({ actions, repository, language }) => {
   const { toast } = useDialog();
   const t = useT('repositories');
-  // V1.4：声明 opensPage 的动作不运行 Worker，点击时在弹窗中打开插件页面。
-  const [pageAction, setPageAction] = useState<RegisteredPluginAction | null>(null);
 
   const run = async (action: RegisteredPluginAction) => {
     try {
@@ -179,35 +174,24 @@ const PluginRepositoryActionItems: React.FC<{
     }
   };
 
-  return (
-    <>
-      {actions.map((action) => (
-        <DropdownMenuItem
-          key={`${action.pluginId}:${action.id}`}
-          onSelect={() => (action.opensPage ? setPageAction(action) : void run(action))}
-        >
-          <Plug className="mr-2 h-3.5 w-3.5" />
-          {action.title}
-        </DropdownMenuItem>
-      ))}
-      {pageAction && createPortal(
-        <ErrorBoundary>
-          <Suspense fallback={null}>
-            <LazyPluginPageModal
-              pluginId={pageAction.pluginId}
-              pluginName={pageAction.pluginName}
-              pageId={pageAction.opensPage!}
-              pageTitle={pageAction.title}
-              repository={repository}
-              onClose={() => setPageAction(null)}
-              t={t}
-            />
-          </Suspense>
-        </ErrorBoundary>,
-        document.body
-      )}
-    </>
-  );
+  return actions.map((action) => (
+    <DropdownMenuItem
+      key={`${action.pluginId}:${action.id}`}
+      onSelect={() => (action.opensPage
+        // 弹窗由应用根上的 PluginPageHost 渲染，菜单关闭不会把它一起卸掉。
+        ? pluginPageSession.open({
+          pluginId: action.pluginId,
+          pluginName: action.pluginName,
+          pageId: action.opensPage,
+          pageTitle: action.title,
+          repository,
+        })
+        : void run(action))}
+    >
+      <Plug className="mr-2 h-3.5 w-3.5" />
+      {action.title}
+    </DropdownMenuItem>
+  ));
 };
 
 const MAX_CACHE_SIZE = 500;

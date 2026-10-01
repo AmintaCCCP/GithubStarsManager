@@ -240,7 +240,8 @@
     "failed-to-load-plugin-page": "插件頁面載入失敗",
     "this-page-comes-from-a-local-plugin-data-request": "此頁面由本地插件提供，資料請求仍需經過宿主權限檢查。",
     "back-to-plugins": "返回插件列表",
-    "loading-plugin-page": "正在載入插件頁面…"
+    "loading-plugin-page": "正在載入插件頁面…",
+    "close": "關閉"
   },
   "readmeModal": {
     "switch-readme-language": "切換 README 語言",
