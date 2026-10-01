@@ -532,13 +532,22 @@ export const DiscoveryView: React.FC = React.memo(() => {
       && channel.id !== 'x-tweet' && channel.id !== 'telegram');
   }, [discoveryChannels, scrapeSupport, scrapeSupportSettled]);
 
-  // 纯浏览器模式下持久化的选中频道若是被隐藏的抓取频道，落定后回退到第一个可用频道
+  // 抓取支持落定后（纯浏览器模式）：隐藏频道移出列表，确保仍有一个可见启用
+  // 频道（水合期间不做该决策，必要时在此恢复「趋势」），并把选中的被隐藏频
+  // 道回退到可见频道
   useEffect(() => {
-    if (scrapeSupport || !scrapeSupportSettled) return;
-    if (selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram') return;
-    const fallback = safeDiscoveryChannels.find(ch => ch.enabled && ch.id !== 'code-search')?.id ?? 'trending';
-    setSelectedDiscoveryChannel(fallback);
-  }, [scrapeSupport, scrapeSupportSettled, selectedDiscoveryChannel, safeDiscoveryChannels, setSelectedDiscoveryChannel]);
+    if (!scrapeSupportSettled || scrapeSupport) return;
+    const visibleEnabledExists = safeDiscoveryChannels.some(ch => ch.enabled && ch.id !== 'code-search');
+    if (!visibleEnabledExists) {
+      if (!safeDiscoveryChannels.find(ch => ch.id === 'trending')?.enabled) toggleDiscoveryChannel('trending');
+      setSelectedDiscoveryChannel('trending');
+      return;
+    }
+    if (selectedDiscoveryChannel === 'x-tweet' || selectedDiscoveryChannel === 'telegram') {
+      const fallback = safeDiscoveryChannels.find(ch => ch.enabled && ch.id !== 'code-search')?.id ?? 'trending';
+      setSelectedDiscoveryChannel(fallback);
+    }
+  }, [scrapeSupport, scrapeSupportSettled, selectedDiscoveryChannel, safeDiscoveryChannels, toggleDiscoveryChannel, setSelectedDiscoveryChannel]);
 
   // 获取当前频道的所有仓库
   const allRepos = useMemo(

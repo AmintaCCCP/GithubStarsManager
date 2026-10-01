@@ -330,6 +330,46 @@ describe('PR-07 Store modularization compatibility', () => {
     }
   });
 
+  it('preserves persisted enabled flags while scrape support is unsettled', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // Web 探测未完成（测试环境无桌面壳、无探测）：只启用 x-tweet 的用户偏好
+      // 不得被强制启用的「趋势」覆盖
+      store.setState({
+        discoveryChannels: originalChannels.map(channel => ({ ...channel, enabled: channel.id === 'x-tweet' })),
+        selectedDiscoveryChannel: 'x-tweet',
+      });
+      const hydrated = actualStore.normalizePersistedState({
+        discoveryChannels: store.getState().discoveryChannels,
+        selectedDiscoveryChannel: 'x-tweet',
+      } as never, store.getState());
+      expect(hydrated.discoveryChannels?.find(channel => channel.id === 'trending')?.enabled).toBe(false);
+      expect(hydrated.selectedDiscoveryChannel).toBe('x-tweet');
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
+  it('restores trending at hydration for a settled environment without enabled channels', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // 桌面端结论恒定已落定：全部停用时仍恢复「趋势」
+      (window as unknown as { electronAPI?: unknown }).electronAPI = {};
+      const hydrated = actualStore.normalizePersistedState({
+        discoveryChannels: store.getState().discoveryChannels.map(channel => ({ ...channel, enabled: false })),
+        selectedDiscoveryChannel: 'x-tweet',
+      } as never, store.getState());
+      expect(hydrated.discoveryChannels?.find(channel => channel.id === 'trending')?.enabled).toBe(true);
+    } finally {
+      delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
   it('retains the historical normalize-only resets and release backfill behavior', () => {
     const snapshot = buildPersistedSnapshot({
       ...buildTransientDiscoverySnapshot(),
