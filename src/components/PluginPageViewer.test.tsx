@@ -187,3 +187,52 @@ describe('PluginPageViewer', () => {
     expect(requestPageCapability).not.toHaveBeenCalled();
   });
 });
+
+describe('PluginPageViewer init context (V1.4 modal actions)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('passes the one-shot context with plugin-page:init and keeps bridge methods permission-checked', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: null });
+    const t = makeT('zh', 'app');
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t}
+      variant="modal"
+      initContext={{ repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' }} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' },
+    }, '*');
+    // 普通桥方法仍然走 IPC 能力桥，不受上下文影响。
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'clip-1', token: 'session-token', method: 'clipboard.write',
+          args: { text: 'hello' } },
+        origin: 'null', source: frame.contentWindow,
+      }));
+    });
+    await waitFor(() => expect(requestPageCapability).toHaveBeenCalledWith({
+      pluginId: 'com.example.page', pageId: 'dashboard', method: 'clipboard.write', args: { text: 'hello' },
+    }));
+  });
+
+  it('renders without a header row in the modal variant', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    const t = makeT('zh', 'app');
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} variant="modal" />);
+    await screen.findByTitle('Example: Dashboard');
+    expect(screen.queryByText('Example · Dashboard')).toBeNull();
+    expect(screen.queryByText(t('pluginPageViewer.back-to-plugins'))).toBeNull();
+  });
+});

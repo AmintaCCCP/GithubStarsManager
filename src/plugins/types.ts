@@ -7,6 +7,8 @@ export interface PluginRepositoryAction {
   title: string;
   icon?: string;
   placement: PluginPlacement;
+  /** V1.4：指向本插件 contributes.pages 的页面 id。点击动作时宿主在弹窗中打开该页面，而非运行 Worker。 */
+  opensPage?: string;
 }
 
 export interface PluginManifest {

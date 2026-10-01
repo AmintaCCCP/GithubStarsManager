@@ -13,9 +13,14 @@ interface PluginPageViewerProps {
   pageTitle: string;
   onClose: () => void;
   t: TranslateFn;
+  /** modal：在弹窗内使用，隐藏自带标题栏（由外层 Modal 提供标题与关闭按钮）。 */
+  variant?: 'panel' | 'modal';
+  /** 随 plugin-page:init 一次性下发给页面的上下文（如仓库元数据），不走能力桥。 */
+  initContext?: Record<string, unknown>;
 }
 
-export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pluginName, pageId, pageTitle, onClose, t }) => {
+export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pluginName, pageId, pageTitle, onClose, t, variant = 'panel', initContext }) => {
+  const isModal = variant === 'modal';
   const generateAI = usePluginAI();
   const searchWeb = usePluginWebSearch();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -47,6 +52,9 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
     });
     return () => { disposed = true; };
   }, [pluginId, pageId, t]);
+
+  const initContextRef = useRef(initContext);
+  initContextRef.current = initContext;
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent) => {
@@ -113,15 +121,20 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
 
   return (
     <section className="space-y-3" aria-label={`${pluginName}: ${pageTitle}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h3 className="font-semibold">{pluginName} · {pageTitle}</h3>
-          <p className="text-xs text-muted-foreground">{t('pluginPageViewer.this-page-comes-from-a-local-plugin-data-request')}</p>
+      {!isModal && (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">{pluginName} · {pageTitle}</h3>
+            <p className="text-xs text-muted-foreground">{t('pluginPageViewer.this-page-comes-from-a-local-plugin-data-request')}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded border border-border px-3 py-1.5 text-sm">
+            {t('pluginPageViewer.back-to-plugins')}
+          </button>
         </div>
-        <button type="button" onClick={onClose} className="rounded border border-border px-3 py-1.5 text-sm">
-          {t('pluginPageViewer.back-to-plugins')}
-        </button>
-      </div>
+      )}
+      {isModal && (
+        <p className="text-xs text-muted-foreground">{t('pluginPageViewer.this-page-comes-from-a-local-plugin-data-request')}</p>
+      )}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> :
         url ? <iframe
           ref={frameRef}
@@ -129,13 +142,16 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
           src={url}
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
-          className="h-[min(70vh,800px)] min-h-[480px] w-full rounded-lg border border-border bg-white"
+          className={isModal
+            ? 'h-[min(72vh,860px)] min-h-[420px] w-full rounded-lg border border-border bg-white'
+            : 'h-[min(70vh,800px)] min-h-[480px] w-full rounded-lg border border-border bg-white'}
           onLoad={() => {
             for (const controller of aiRequestsRef.current) controller.abort();
             tokenRef.current = crypto.randomUUID();
             pendingRef.current.clear();
             frameRef.current?.contentWindow?.postMessage({
               type: 'plugin-page:init', pluginId, pageId, token: tokenRef.current,
+              ...(initContextRef.current ? { context: initContextRef.current } : {}),
             }, '*');
           }}
         /> : <p role="status">{t('pluginPageViewer.loading-plugin-page')}</p>}

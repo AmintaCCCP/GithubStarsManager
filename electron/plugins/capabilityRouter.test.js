@@ -76,3 +76,54 @@ test('web search authorization does not grant arbitrary network access', async (
     code: 'PLUGIN_CAPABILITY_UNKNOWN',
   });
 });
+
+test('clipboard and downloads capabilities require permissions, decode payloads, and use host operations', async () => {
+  const calls = [];
+  const router = createCapabilityRouter({
+    storage: {}, logger: { log() {} }, catalog: {},
+    hostOperations: {
+      clipboardWrite: (args) => { calls.push(['write', args]); return null; },
+      clipboardWriteImage: (args) => { calls.push(['writeImage', args.buffer.toString('utf8')]); return null; },
+      saveFile: async (args) => { calls.push(['saveFile', args.fileName, args.buffer.toString('utf8')]); return { fileName: args.fileName }; },
+    },
+  });
+
+  await router.handle(['clipboard:write'], {
+    capability: 'clipboard', operation: 'write', args: { text: 'hello' },
+  });
+  await router.handle(['clipboard:write'], {
+    capability: 'clipboard', operation: 'writeImage', args: { dataBase64: Buffer.from('png-bytes').toString('base64') },
+  });
+  assert.deepEqual(await router.handle(['downloads:create'], {
+    capability: 'downloads', operation: 'saveFile',
+    args: { fileName: 'card.png', dataBase64: Buffer.from('png-bytes-2').toString('base64') },
+  }), { fileName: 'card.png' });
+  assert.deepEqual(calls, [
+    ['write', { text: 'hello' }],
+    ['writeImage', 'png-bytes'],
+    ['saveFile', 'card.png', 'png-bytes-2'],
+  ]);
+
+  await assert.rejects(router.handle([], {
+    capability: 'clipboard', operation: 'write', args: { text: 'hello' },
+  }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  await assert.rejects(router.handle([], {
+    capability: 'downloads', operation: 'saveFile', args: { fileName: 'x', dataBase64: 'QQ==' },
+  }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  await assert.rejects(router.handle(['clipboard:write'], {
+    capability: 'clipboard', operation: 'deleteHistory', args: {},
+  }), { code: 'PLUGIN_CAPABILITY_UNKNOWN' });
+  await assert.rejects(router.handle(['downloads:create'], {
+    capability: 'downloads', operation: 'deleteFile', args: {},
+  }), { code: 'PLUGIN_CAPABILITY_UNKNOWN' });
+});
+
+test('clipboard and downloads stay unavailable when the host injects no operations', async () => {
+  const router = createCapabilityRouter({ storage: {}, logger: { log() {} }, catalog: {} });
+  await assert.rejects(router.handle(['clipboard:write'], {
+    capability: 'clipboard', operation: 'write', args: { text: 'hello' },
+  }), { code: 'PLUGIN_CAPABILITY_UNAVAILABLE' });
+  await assert.rejects(router.handle(['downloads:create'], {
+    capability: 'downloads', operation: 'saveFile', args: { fileName: 'x', dataBase64: 'QQ==' },
+  }), { code: 'PLUGIN_CAPABILITY_UNAVAILABLE' });
+});

@@ -256,3 +256,63 @@ AI 请求正文不会写入调试日志；关闭页面会中止进行中的 AI �
 地址，联网请求不跟随重定向，并限制超时与响应大小。搜索词会发送给用户所配置的
 实例及其实际使用的搜索引擎，请不要在未经同意时把私有仓库、个人备注或密钥放进
 搜索词。`network:<domain>` 仅是 Manifest 保留声明，V1.3 不提供通用网络请求 API。
+
+## V1.4 弹窗动作（opensPage）与页面输出能力
+
+页面型插件可以声明一个「弹窗动作」：用户在仓库卡片 `…` 菜单的“插件操作”里点击
+该动作时，宿主不启动 Worker，而是把动作指向的插件页面装进弹窗（sandboxed
+iframe，能力桥与 V1.2/V1.3 完全一致）。
+
+```json
+{
+  "contributes": {
+    "repositoryActions": [
+      {
+        "id": "generate-info-card",
+        "title": "生成仓库信息卡",
+        "placement": "repository-card",
+        "opensPage": "info-card"
+      }
+    ],
+    "pages": [
+      { "id": "info-card", "title": "Repository Info Card", "entry": "ui/index.html" }
+    ]
+  }
+}
+```
+
+约束与校验：
+
+- `opensPage` 必须指向本插件 `contributes.pages` 中已声明的页面 id，且 `placement`
+  必须是 `repository-card`；引用不存在的页面会被拒绝安装。
+- 声明 `opensPage` 的动作不要求 Manifest 提供 `main`；只含这类动作的插件不会启动
+  Node Worker。含普通动作（无 `opensPage`）的插件仍必须提供 `main`。
+- 仓库贡献的权限要求不变：仍需 `repositories:read`（或 `privateRepositories:read`）。
+
+仓库上下文下发：宿主打开弹窗时，在 `plugin-page:init` 消息中附带一次性
+`context` 字段：
+
+```js
+{
+  type: 'plugin-page:init', pluginId, pageId, token,
+  context: { repository: { /* 渲染端仓库对象 */ }, readme: '…或 null', language: 'zh' }
+}
+```
+
+`context` 由宿主主动下发，不经过能力桥、不受逐次确认约束；页面访问宿主能力仍
+只能走受权限约束的桥方法。README 由宿主在打开弹窗时抓取，失败则为 `null`，插件
+必须能只依赖元数据工作。
+
+页面输出能力（仅页面 Bridge，Worker 不可用）：
+
+| 方法 | 参数 | 权限 | 行为 |
+|---|---|---|---|
+| `clipboard.write` | `{ text }` | `clipboard:write` | 主进程把文本写入系统剪贴板 |
+| `clipboard.writeImage` | `{ dataBase64 }`（PNG） | `clipboard:write` | 主进程解码并写入剪贴板图像 |
+| `downloads.saveFile` | `{ fileName, dataBase64 }` | `downloads:create` | 弹出宿主原生保存对话框，用户确认后写入 |
+
+参数上限：`clipboard.writeImage` 与 `downloads.saveFile` 的 base64 载荷放宽到
+10 MiB（其余方法仍为 1 MiB）；`fileName` 不允许路径分隔符或前导点。保存位置
+始终由用户在原生对话框中确认，插件拿不到文件路径。
+
+完整可安装示例见 `examples/plugins/repo-info-card`。

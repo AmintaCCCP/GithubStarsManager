@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -941,10 +941,35 @@ ipcMain.handle('mcp:getStatus', async () => mcpServer.getStatus());
 // ── Trusted local plugin host (discovery, lifecycle, and restricted IPC) ──
 let pluginManager = null;
 
+// 页面 Bridge 的系统输出操作（V1.4）：写入剪贴板与“宿主下载”。实现只在
+// 主进程可用，经 capabilityRouter 的权限检查后调用；保存位置始终由用户在
+// 原生对话框中确认，与 Release Asset 下载一致。
+const pluginHostOperations = {
+  clipboardWrite({ text }) {
+    clipboard.writeText(text);
+    return null;
+  },
+  clipboardWriteImage({ buffer }) {
+    const image = nativeImage.createFromBuffer(buffer);
+    if (image.isEmpty()) {
+      throw Object.assign(new Error('Clipboard image payload is invalid'), { code: 'PLUGIN_CLIPBOARD_IMAGE_INVALID' });
+    }
+    clipboard.writeImage(image);
+    return null;
+  },
+  async saveFile({ fileName, buffer }) {
+    const result = await dialog.showSaveDialog(mainWindow, { defaultPath: fileName });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    await fs.promises.writeFile(result.filePath, buffer);
+    return { fileName: path.basename(result.filePath) };
+  },
+};
+
 function getPluginManager() {
   if (!pluginManager) {
     pluginManager = createPluginManager({
       pluginsRoot: path.join(app.getPath('userData'), 'plugins'),
+      hostOperations: pluginHostOperations,
     });
   }
   return pluginManager;

@@ -43,6 +43,10 @@ const LazyRepositoryReleaseSheet = React.lazy(() =>
   import('./RepositoryReleaseSheet').then((module) => ({ default: module.RepositoryReleaseSheet }))
 );
 
+const LazyPluginPageModal = React.lazy(() =>
+  import('./PluginPageModal').then((module) => ({ default: module.PluginPageModal }))
+);
+
 const ReadmeModalLoadingFallback: React.FC<{
   onClose: () => void;
   onCloseAutoFocus: () => void;
@@ -155,6 +159,8 @@ const PluginRepositoryActionItems: React.FC<{
 }> = ({ actions, repository, language }) => {
   const { toast } = useDialog();
   const t = useT('repositories');
+  // V1.4：声明 opensPage 的动作不运行 Worker，点击时在弹窗中打开插件页面。
+  const [pageAction, setPageAction] = useState<RegisteredPluginAction | null>(null);
 
   const run = async (action: RegisteredPluginAction) => {
     try {
@@ -173,12 +179,35 @@ const PluginRepositoryActionItems: React.FC<{
     }
   };
 
-  return actions.map((action) => (
-    <DropdownMenuItem key={`${action.pluginId}:${action.id}`} onSelect={() => void run(action)}>
-      <Plug className="mr-2 h-3.5 w-3.5" />
-      {action.title}
-    </DropdownMenuItem>
-  ));
+  return (
+    <>
+      {actions.map((action) => (
+        <DropdownMenuItem
+          key={`${action.pluginId}:${action.id}`}
+          onSelect={() => (action.opensPage ? setPageAction(action) : void run(action))}
+        >
+          <Plug className="mr-2 h-3.5 w-3.5" />
+          {action.title}
+        </DropdownMenuItem>
+      ))}
+      {pageAction && createPortal(
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <LazyPluginPageModal
+              pluginId={pageAction.pluginId}
+              pluginName={pageAction.pluginName}
+              pageId={pageAction.opensPage!}
+              pageTitle={pageAction.title}
+              repository={repository}
+              onClose={() => setPageAction(null)}
+              t={t}
+            />
+          </Suspense>
+        </ErrorBoundary>,
+        document.body
+      )}
+    </>
+  );
 };
 
 const MAX_CACHE_SIZE = 500;
