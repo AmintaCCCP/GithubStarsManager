@@ -401,6 +401,7 @@
   },
   "settingsPanel": {
     "general": "一般",
+    "appearance": "外觀設定",
     "star-sync": "星標同步",
     "ai-config": "AI配置",
     "webdav": "WebDAV",
@@ -411,7 +412,7 @@
     "data-management": "資料管理",
     "diagnostic-logs": "診斷日誌",
     "network": "網路設定",
-    "plugins": "外掛",
+    "plugins": "外掛管理",
     "vector-search": "向量搜尋",
     "mcp-server": "MCP服務",
     "settings-content": "設定內容",

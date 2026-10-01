@@ -401,6 +401,7 @@
   },
   "settingsPanel": {
     "general": "만능인",
+    "appearance": "외관 설정",
     "star-sync": "스타싱크",
     "ai-config": "AI 구성",
     "webdav": "WebDAV",
@@ -411,7 +412,7 @@
     "data-management": "데이터 관리",
     "diagnostic-logs": "진단 로그",
     "network": "네트워크 설정",
-    "plugins": "플러그인",
+    "plugins": "플러그인 관리",
     "vector-search": "벡터 검색",
     "mcp-server": "MCP 서비스",
     "settings-content": "콘텐츠 설정",

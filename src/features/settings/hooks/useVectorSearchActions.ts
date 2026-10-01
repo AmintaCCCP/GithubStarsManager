@@ -36,6 +36,7 @@ export interface VectorSearchActions {
   testingWorker: boolean;
   workerTestResult: { success: boolean; vectorCount: number; dimensions: number; error?: string } | null;
   incrementalTargetCount: number;
+  unindexedRepoCount: number;
   testEmbedding: (draft: EmbeddingDraft) => Promise<void>;
   testWorker: (draft: VectorWorkerDraft) => Promise<void>;
   rebuildIndex: (draft: VectorIndexDraft) => Promise<void>;
@@ -69,14 +70,28 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     [state.activeEmbeddingConfig, state.embeddingConfigs],
   );
 
-  const incrementalTargetCount = useMemo(() => {
-    const indexable = state.repositories.filter((repository) => repository.analyzed_at && !repository.analysis_failed).length;
-    const unindexed = state.repositories.filter((repository) => repository.analyzed_at && !repository.analysis_failed && needsReindex(repository, false)).length;
+  const formatVersionChanged = useMemo(() => {
     const storedVersion = isKnownEmbeddingFormatVersion(state.vectorSearchConfig.embeddingFormatVersion)
       ? state.vectorSearchConfig.embeddingFormatVersion
       : LEGACY_EMBEDDING_FORMAT_VERSION;
-    return storedVersion < EMBEDDING_FORMAT_VERSION ? indexable : unindexed;
-  }, [state.repositories, state.vectorSearchConfig.embeddingFormatVersion]);
+    return storedVersion < EMBEDDING_FORMAT_VERSION;
+  }, [state.vectorSearchConfig.embeddingFormatVersion]);
+
+  const { incrementalTargetCount, unindexedRepoCount } = useMemo(() => {
+    let indexable = 0;
+    let unindexed = 0;
+    let unindexedWithMigration = 0;
+    for (const repository of state.repositories) {
+      if (!repository.analyzed_at || repository.analysis_failed) continue;
+      indexable += 1;
+      if (needsReindex(repository, false)) unindexed += 1;
+      if (needsReindex(repository, formatVersionChanged)) unindexedWithMigration += 1;
+    }
+    return {
+      incrementalTargetCount: formatVersionChanged ? indexable : unindexed,
+      unindexedRepoCount: state.vectorSearchConfig.enabled ? unindexedWithMigration : 0,
+    };
+  }, [formatVersionChanged, state.repositories, state.vectorSearchConfig.enabled]);
 
   const testEmbedding = useCallback(async (draft: EmbeddingDraft) => {
     setTestingEmbedding(true);
@@ -207,6 +222,6 @@ export const useVectorSearchActions = (): VectorSearchActions => {
 
   return {
     testingEmbedding, embeddingTestResult, testingWorker, workerTestResult,
-    incrementalTargetCount, testEmbedding, testWorker, rebuildIndex, incrementalIndex, abortIndexing,
+    incrementalTargetCount, unindexedRepoCount, testEmbedding, testWorker, rebuildIndex, incrementalIndex, abortIndexing,
   };
 };

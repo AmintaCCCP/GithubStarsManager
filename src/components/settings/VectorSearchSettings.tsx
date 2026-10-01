@@ -165,6 +165,77 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         />
       </div>
 
+      {/* Index actions: rebuild / incremental (independent of the numbered config steps below) */}
+      <div className="border border-border rounded-lg p-4 space-y-4">
+        <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
+          <Zap className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          {t('vectorSearchSettings.index-management')}
+        </h3>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={handleRebuildIndex}
+            disabled={isIndexing || !isConfigComplete}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {t('vectorSearchSettings.rebuild-vector-index')}
+          </Button>
+          <Button
+            onClick={handleIncrementalIndex}
+            disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm text-accent-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {t('vectorSearchSettings.incremental-index')}
+            {incrementalTargetCount > 0 && (
+              <Badge className="ml-1">{incrementalTargetCount}</Badge>
+            )}
+          </Button>
+          {isIndexing && (
+            <Button
+              onClick={handleAbortIndexing}
+              variant="destructive"
+              className="h-9 gap-2 px-4 text-sm"
+            >
+              <Square className="w-4 h-4" />
+              {t('vectorSearchSettings.abort')}
+            </Button>
+          )}
+        </div>
+
+        {isIndexing && phaseTotal > 0 && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-muted-foreground dark:text-muted-foreground">
+              <span>
+                {phase === 'readme' && t('vectorSearchSettings.fetching-readme')}
+                {phase === 'embedding' && t('vectorSearchSettings.generating-embeddings')}
+                {phase === 'uploading' && t('vectorSearchSettings.uploading-vectors')}
+                {!phase && t('vectorSearchSettings.preparing')}
+              </span>
+              <span>
+                {phaseDone}/{phaseTotal} ({Math.round((phaseDone / phaseTotal) * 100)}%)
+              </span>
+            </div>
+            <div className="w-full bg-accent dark:bg-muted rounded-full h-2">
+              <div
+                className="bg-primary h-2 rounded-full transition-all"
+                style={{ width: `${(phaseDone / phaseTotal) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {indexResult && (
+          <Alert variant={indexResult.errors > 0 && indexResult.indexed === 0 ? 'destructive' : 'default'}>
+            <AlertDescription>
+              {t('vectorSearchSettings.indexing-complete')}: {indexResult.indexed} {t('vectorSearchSettings.indexed')}, {indexResult.skipped} {t('vectorSearchSettings.skipped')}, {indexResult.errors} {t('vectorSearchSettings.errors')}
+              {indexResult.error && <div className="mt-1 text-xs">{indexResult.error}</div>}
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+
       {/* Section 1: Embedding Model Config */}
       <div className="border border-border rounded-lg p-4 space-y-4">
         <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
@@ -483,11 +554,11 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </div>
       </div>
 
-      {/* Section 4: Actions */}
+      {/* Section 4: Index Content */}
       <div className="border border-border rounded-lg p-4 space-y-4">
         <h3 className="font-medium text-foreground dark:text-foreground flex items-center gap-2">
           <span className="text-xs bg-accent dark:bg-muted px-2 py-0.5 rounded">④</span>
-          {t('vectorSearchSettings.index-management')}
+          {t('vectorSearchSettings.index-content')}
         </h3>
 
         {/* 索引内容选择 */}
@@ -567,71 +638,6 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         >
           {workerSaved ? `✓ ${t('vectorSearchSettings.saved')}` : t('vectorSearchSettings.save-index-config')}
         </Button>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={handleRebuildIndex}
-            disabled={isIndexing || !isConfigComplete}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {t('vectorSearchSettings.rebuild-vector-index')}
-          </Button>
-          <Button
-            onClick={handleIncrementalIndex}
-            disabled={isIndexing || !isConfigComplete || incrementalTargetCount === 0}
-            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm text-accent-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isIndexing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {t('vectorSearchSettings.incremental-index')}
-            {incrementalTargetCount > 0 && (
-              <Badge className="ml-1">{incrementalTargetCount}</Badge>
-            )}
-          </Button>
-          {isIndexing && (
-            <Button
-              onClick={handleAbortIndexing}
-              variant="destructive"
-              className="h-9 gap-2 px-4 text-sm"
-            >
-              <Square className="w-4 h-4" />
-              {t('vectorSearchSettings.abort')}
-            </Button>
-          )}
-        </div>
-
-        {/* Progress */}
-        {isIndexing && phaseTotal > 0 && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm text-muted-foreground dark:text-muted-foreground">
-              <span>
-                {phase === 'readme' && `📖 ${t('vectorSearchSettings.fetching-readme')}`}
-                {phase === 'embedding' && `🧠 ${t('vectorSearchSettings.generating-embeddings')}`}
-                {phase === 'uploading' && `☁️ ${t('vectorSearchSettings.uploading-vectors')}`}
-                {!phase && `⏳ ${t('vectorSearchSettings.preparing')}`}
-              </span>
-              <span>
-                {phaseDone}/{phaseTotal} ({Math.round((phaseDone / phaseTotal) * 100)}%)
-              </span>
-            </div>
-            <div className="w-full bg-accent dark:bg-muted rounded-full h-2">
-              <div
-                className="bg-primary h-2 rounded-full transition-all"
-                style={{ width: `${(phaseDone / phaseTotal) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Result */}
-        {indexResult && (
-          <Alert variant={indexResult.errors > 0 && indexResult.indexed === 0 ? 'destructive' : 'default'}>
-            <AlertDescription>
-              {t('vectorSearchSettings.indexing-complete')}: {indexResult.indexed} {t('vectorSearchSettings.indexed')}, {indexResult.skipped} {t('vectorSearchSettings.skipped')}, {indexResult.errors} {t('vectorSearchSettings.errors')}
-              {indexResult.error && <div className="mt-1 text-xs">{indexResult.error}</div>}
-            </AlertDescription>
-          </Alert>
-        )}
       </div>
 
       {/* Section 5: Search Parameters */}

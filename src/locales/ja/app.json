@@ -401,6 +401,7 @@
   },
   "settingsPanel": {
     "general": "ユニバーサル",
+    "appearance": "外観設定",
     "star-sync": "スターシンク",
     "ai-config": "AIの設定",
     "webdav": "WebDAV",
@@ -411,7 +412,7 @@
     "data-management": "データ管理",
     "diagnostic-logs": "診断ログ",
     "network": "ネットワーク設定",
-    "plugins": "プラグイン",
+    "plugins": "プラグイン管理",
     "vector-search": "ベクトル検索",
     "mcp-server": "MCPサービス",
     "settings-content": "セット内容",

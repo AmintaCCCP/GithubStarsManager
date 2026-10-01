@@ -401,6 +401,7 @@
   },
   "settingsPanel": {
     "general": "Универсальный",
+    "appearance": "Оформление",
     "star-sync": "Звездная синхронизация",
     "ai-config": "Конфигурация ИИ",
     "webdav": "WebDAV",
@@ -411,7 +412,7 @@
     "data-management": "Управление данными",
     "diagnostic-logs": "Журнал диагностики",
     "network": "Настройки сети",
-    "plugins": "плагин",
+    "plugins": "Управление плагинами",
     "vector-search": "векторный поиск",
     "mcp-server": "MCP-сервис",
     "settings-content": "Установить контент",

@@ -12,6 +12,7 @@ import {
   Database,
   Server,
   Package,
+  Palette,
   X,
   Trash2,
   Wifi,
@@ -24,11 +25,14 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
+import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
 import { isElectron } from '../services/electronProxy';
 import { useBackendAvailability } from '../features/settings/hooks/useBackendAvailability';
+import { useVectorSearchActions } from '../features/settings/hooks/useVectorSearchActions';
 import {
+  AppearancePanel,
   GeneralPanel,
   AIConfigPanel,
   WebDAVPanel,
@@ -45,12 +49,13 @@ import {
   PluginSettingsPanel,
 } from './settings';
 
-type SettingsTab = 'general' | 'starSync' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp' | 'plugins';
+type SettingsTab = 'general' | 'appearance' | 'starSync' | 'ai' | 'webdav' | 'backup' | 'backend' | 'category' | 'menu' | 'data' | 'logs' | 'network' | 'vectorSearch' | 'mcp' | 'plugins';
 
 interface SettingsTabItem {
   id: SettingsTab;
   label: string;
   icon: React.ReactNode;
+  badge?: number;
 }
 
 interface SettingsPanelProps {
@@ -189,6 +194,15 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
           >
             <span className="h-4 w-4 shrink-0">{tab.icon}</span>
             <span className="whitespace-nowrap text-sm font-medium">{tab.label}</span>
+            {tab.badge != null && (
+              <span
+                aria-hidden={false}
+                aria-label={`${tab.label}: ${tab.badge}`}
+                className="ml-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold tabular-nums text-destructive-foreground"
+              >
+                {tab.badge > 99 ? '99+' : tab.badge}
+              </span>
+            )}
           </Button>
         ))}
       </div>
@@ -273,7 +287,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
-    () => new Set(['general', 'starSync', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp', 'plugins']),
+    () => new Set(['general', 'appearance', 'starSync', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp', 'plugins']),
     []
   );
 
@@ -323,11 +337,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   }, [handleTabChange, isTransitioning]);
 
+  const { unindexedRepoCount } = useVectorSearchActions();
+
   const tabs: SettingsTabItem[] = [
     {
       id: 'general',
       label: t('settingsPanel.general'),
       icon: <Globe className="w-5 h-5" />,
+    },
+    {
+      id: 'appearance',
+      label: t('settingsPanel.appearance'),
+      icon: <Palette className="w-5 h-5" />,
     },
     {
       id: 'starSync',
@@ -388,6 +409,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       id: 'vectorSearch' as SettingsTab,
       label: t('settingsPanel.vector-search'),
       icon: <Search className="w-5 h-5" />,
+      badge: unindexedRepoCount > 0 ? unindexedRepoCount : undefined,
     },
     // MCP requires a long-lived process: backend or Electron main. Hide for pure SPA.
     ...((isElectron() || backendAvailable) ? [{
@@ -402,6 +424,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       switch (displayTab) {
         case 'general':
           return <GeneralPanel t={t} />;
+        case 'appearance':
+          return <AppearancePanel t={t} />;
         case 'starSync':
           return <StarSyncPanel t={t} />;
         case 'ai':
@@ -485,7 +509,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       className="h-9 w-full justify-start gap-3 px-3 text-left"
                     >
                       {tab.icon}
-                      <span className="font-medium">{tab.label}</span>
+                      <span className="flex-1 font-medium">{tab.label}</span>
+                      {tab.badge != null && (
+                        <Badge variant="destructive" className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
+                          {tab.badge > 99 ? '99+' : tab.badge}
+                        </Badge>
+                      )}
                     </Button>
                   ))}
                 </nav>
@@ -533,7 +562,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
                 >
                   {tab.icon}
-                  <span className="font-medium">{tab.label}</span>
+                  <span className="flex-1 font-medium">{tab.label}</span>
+                  {tab.badge != null && (
+                    <Badge variant="destructive" className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
+                      {tab.badge > 99 ? '99+' : tab.badge}
+                    </Badge>
+                  )}
                 </Button>
               ))}
             </nav>

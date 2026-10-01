@@ -308,6 +308,14 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                 onClick={() => setRepositoryCardField(id, !visible)}
                 className={visible ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15' : ''}
               >
+                <span
+                  aria-hidden="true"
+                  className={visible
+                    ? 'flex h-4 w-4 items-center justify-center rounded-sm bg-primary text-primary-foreground'
+                    : 'flex h-4 w-4 items-center justify-center rounded-sm border border-border text-transparent'}
+                >
+                  <Check className="h-3 w-3" />
+                </span>
                 {t(`themeSettingsCard.card-field-${id}`)}
               </Button>
             );

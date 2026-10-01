@@ -401,6 +401,7 @@
   },
   "settingsPanel": {
     "general": "Universel",
+    "appearance": "Apparence",
     "star-sync": "Synchronisation des étoiles",
     "ai-config": "Configuration de l'IA",
     "webdav": "WebDAV",
@@ -411,7 +412,7 @@
     "data-management": "Gestion des données",
     "diagnostic-logs": "Journal de diagnostic",
     "network": "Paramètres réseau",
-    "plugins": "plug-in",
+    "plugins": "Gestion des plug-ins",
     "vector-search": "recherche de vecteur",
     "mcp-server": "Service MCP",
     "settings-content": "Définir le contenu",
