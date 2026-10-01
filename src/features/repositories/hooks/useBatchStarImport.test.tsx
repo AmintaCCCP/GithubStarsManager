@@ -73,6 +73,15 @@ describe('useBatchStarImport', () => {
     expect(result.current.rows[0].error).toMatch(/Starring|starring/i);
   });
 
+  it('explains a token permission failure during starring', async () => {
+    mocks.starRepository.mockRejectedValueOnce(new GitHubTokenPermissionError());
+    const { result } = renderHook(() => useBatchStarImport());
+    await act(() => result.current.preview('https://github.com/owner/repo'));
+    await act(() => result.current.starSelected());
+    expect(result.current.rows[0].status).toBe('failed');
+    expect(result.current.rows[0].error).toMatch(/Starring|starring/i);
+  });
+
   it('requires selection for bare names and renamed repositories, and deduplicates canonical names', async () => {
     mocks.getRepositoryDetails.mockImplementation(async (_owner, name) => detail('new-owner', name));
     const { result } = renderHook(() => useBatchStarImport());

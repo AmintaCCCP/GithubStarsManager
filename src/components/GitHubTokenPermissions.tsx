@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { FileText, GitFork, Info, KeyRound, List, ShieldCheck, Star, Workflow } from 'lucide-react';
 import { useT } from '../i18n/useT';
 import { cn } from '../lib/utils';
@@ -44,8 +44,26 @@ function renderWithHighlights(text: string): React.ReactNode[] {
 /** Explains the permissions before a token is saved, without probing account-changing APIs. */
 export function GitHubTokenPermissions() {
   const t = useT('login');
+  const baseId = useId();
   const [mode, setMode] = useState<TokenMode>('fine-grained');
-  const rows = mode === 'fine-grained' ? FINE_GRAINED_ROWS : CLASSIC_ROWS;
+  const tabRefs = useRef<Partial<Record<TokenMode, HTMLButtonElement | null>>>({});
+
+  const tabId = (tabMode: TokenMode) => `${baseId}-tab-${tabMode}`;
+  const panelId = (tabMode: TokenMode) => `${baseId}-panel-${tabMode}`;
+  const rowsFor = (tabMode: TokenMode) => (
+    tabMode === 'fine-grained' ? FINE_GRAINED_ROWS : CLASSIC_ROWS
+  );
+
+  /** WAI-ARIA tabs: Left/Right moves selection and focus (roving tabindex). */
+  const handleTabKeyDown = (event: React.KeyboardEvent, tabMode: TokenMode) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const offset = event.key === 'ArrowRight' ? 1 : -1;
+    const index = MODE_TABS.findIndex(({ mode: candidate }) => candidate === tabMode);
+    const { mode: nextMode } = MODE_TABS[(index + offset + MODE_TABS.length) % MODE_TABS.length];
+    setMode(nextMode);
+    tabRefs.current[nextMode]?.focus();
+  };
 
   return (
     <div className="text-xs leading-5 text-muted-foreground">
@@ -55,32 +73,51 @@ export function GitHubTokenPermissions() {
       </h3>
 
       <div role="tablist" className="mb-4 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
-        {MODE_TABS.map(({ mode: tabMode, labelKey }) => (
-          <button
-            key={tabMode}
-            type="button"
-            role="tab"
-            aria-selected={mode === tabMode}
-            onClick={() => setMode(tabMode)}
-            className={cn(
-              'rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-              mode === tabMode ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t(labelKey)}
-          </button>
-        ))}
+        {MODE_TABS.map(({ mode: tabMode, labelKey }) => {
+          const selected = mode === tabMode;
+          return (
+            <button
+              key={tabMode}
+              ref={(el) => { tabRefs.current[tabMode] = el; }}
+              type="button"
+              role="tab"
+              id={tabId(tabMode)}
+              aria-selected={selected}
+              aria-controls={panelId(tabMode)}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => setMode(tabMode)}
+              onKeyDown={(event) => handleTabKeyDown(event, tabMode)}
+              className={cn(
+                'rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                selected ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t(labelKey)}
+            </button>
+          );
+        })}
       </div>
 
-      <ul className="space-y-2.5">
-        {rows.map(({ icon: Icon, featureKey, valueKey }) => (
-          <li key={featureKey + valueKey} className="flex gap-2.5">
-            <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
-            <span className="w-[7.5rem] shrink-0 font-medium text-foreground">{t(featureKey)}</span>
-            <span>{renderWithHighlights(t(valueKey))}</span>
-          </li>
-        ))}
-      </ul>
+      {MODE_TABS.map(({ mode: tabMode }) => (
+        <div
+          key={tabMode}
+          role="tabpanel"
+          id={panelId(tabMode)}
+          aria-labelledby={tabId(tabMode)}
+          hidden={mode !== tabMode}
+          tabIndex={0}
+        >
+          <ul className="space-y-2.5">
+            {rowsFor(tabMode).map(({ icon: Icon, featureKey, valueKey }) => (
+              <li key={featureKey + valueKey} className="flex gap-2.5">
+                <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+                <span className="w-[7.5rem] shrink-0 font-medium text-foreground">{t(featureKey)}</span>
+                <span>{renderWithHighlights(t(valueKey))}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
 
       <div className="mt-4 space-y-2 border-t border-border pt-3">
         <p className="flex gap-2">
