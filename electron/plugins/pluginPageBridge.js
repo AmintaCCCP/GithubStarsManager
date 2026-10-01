@@ -22,6 +22,10 @@ const DEFAULT_MAX_ARGS_BYTES = 1024 * 1024;
 const BINARY_RESULT_MAX_ARGS_BYTES = 10 * 1024 * 1024;
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const MAX_CLIPBOARD_TEXT_CHARS = 200_000;
+// 内容生成页需要把仓库 README 全文原样放进 ai.generate 正文（见
+// examples/plugins/repo-info-card）。160k 字符在 UTF-8 下最多约 480 KB，
+// 加上 JSON 转义仍远低于上面的 1 MiB 通用预算，渲染端同款闸门同样放行。
+const MAX_AI_USER_CHARS = 160_000;
 
 function argsBudget(method) {
   return method === 'clipboard.writeImage' || method === 'downloads.saveFile'
@@ -62,7 +66,7 @@ function validatePageCapabilityRequest(input) {
   }
   if (method === 'ai.generate' &&
     (typeof args.system !== 'string' || args.system.length > 2000 ||
-      typeof args.user !== 'string' || !args.user.trim() || args.user.length > 8000 ||
+      typeof args.user !== 'string' || !args.user.trim() || args.user.length > MAX_AI_USER_CHARS ||
       (args.maxTokens !== undefined && (!Number.isInteger(args.maxTokens) || args.maxTokens < 1 || args.maxTokens > 4000)))) {
     throw protocolError('PLUGIN_PAGE_REQUEST_INVALID', 'AI request arguments are invalid');
   }

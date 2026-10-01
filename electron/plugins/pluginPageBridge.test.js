@@ -26,9 +26,17 @@ test('AI page requests require bounded prompts and cannot carry credentials', ()
     pluginId: 'com.example.page', pageId: 'dashboard', capability: 'ai', operation: 'generate',
     args: { system: 'Summarize', user: 'Example repository', maxTokens: 500 },
   });
+  // 内容生成页会把 README 全文放进正文：160k 字符的正文要能通过，
+  // 同时仍在 1 MiB 通用字节预算之内。
+  const readmeSizedPrompt = 'README (full text):\n' + '仓库说明 '.repeat(20_000);
+  assert.doesNotThrow(() => validatePageCapabilityRequest({
+    pluginId: 'com.example.page', pageId: 'dashboard', method: 'ai.generate',
+    args: { system: 'Summarize', user: readmeSizedPrompt.slice(0, 160_000) },
+  }));
   for (const args of [
     { system: '', user: '' },
     { system: 'x'.repeat(2001), user: 'example' },
+    { system: 'ok', user: 'x'.repeat(160_001) },
     { system: '', user: 'example', maxTokens: 4001 },
     { system: '', user: 'example', apiKey: 'secret' },
   ]) {

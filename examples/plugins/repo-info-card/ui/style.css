@@ -115,12 +115,39 @@ main {
   min-height: 0;
 }
 
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#preview-meta { font-size: 12px; }
+
+.zoom { display: flex; align-items: center; gap: 4px; }
+
+.zoom button {
+  font: inherit;
+  padding: 4px 9px;
+  border: 1px solid var(--chrome-line);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  line-height: 1.2;
+}
+
+.zoom button:not(:disabled) { cursor: pointer; }
+#zoom-level { min-width: 56px; text-align: center; }
+
 #preview-scroll {
   flex: 1;
   min-height: 220px;
   display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: auto;
   border: 1px solid var(--chrome-line);
   border-radius: 6px;
@@ -128,7 +155,13 @@ main {
   padding: 12px;
 }
 
-#preview-host { box-shadow: 0 0 0 1px var(--chrome-line); }
+/* margin:auto 让画布在容器内居中，同时在放大溢出时保留滚动条起始位置，
+   不会像 justify-content:center 那样把左上角裁掉。 */
+#preview-host {
+  margin: auto;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px var(--chrome-line);
+}
 
 .actions {
   display: flex;

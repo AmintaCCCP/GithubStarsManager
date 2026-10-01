@@ -203,6 +203,14 @@ return {
 CSP 默认拒绝联网、嵌套页面、Worker、表单和内联脚本。React/Vue 等框架应预先构建成
 静态文件，使用相对资源路径，不应引入 CDN 运行时代码。
 
+CSP 的 `style-src` 只放行本插件目录下的外链样式表，同样不含 `'unsafe-inline'`：动态
+插入的 `<style>` 元素和 `style` 属性都会被静默拦截，卡片或图表会退化成浏览器默认样式。
+需要运行时生成样式时，使用外链样式表，或用 Constructable Stylesheet
+（`new CSSStyleSheet()` + `replaceSync()` 后挂到 `root.adoptedStyleSheets`）。在 shadow
+DOM 中还应注意 `:root` 匹配不到 shadow tree 里的元素，自定义属性应挂在
+`#card` 之类的实际根元素上。可运行示例见
+`examples/plugins/repo-info-card`。
+
 页面与宿主通过有版本边界的 `postMessage` 协议通信。宿主在加载时发送
 `plugin-page:init`，包含当前页面的临时 token。页面请求格式为：
 
@@ -256,6 +264,12 @@ args: { query: 'open source alternatives', limit: 5 },
 激活的 Provider；宿主可能通过已配置的后端代理转发，插件只收到生成文本。插件
 AI 请求正文不会写入调试日志；关闭页面会中止进行中的 AI 请求。未配置 Provider
 时 AI 调用失败，不会自动切换到其他服务。
+
+`ai.generate` 的参数有硬上限：`system` ≤ 2000 字符、`user` ≤ 160000 字符、
+`maxTokens` ≤ 4000。正文的 160000 字符预算（UTF-8 约 480 KB，加 JSON 转义仍
+远低于 1 MiB 的通用请求预算）用于让内容生成类页面把仓库 README 全文原样放进
+提示词，见 `examples/plugins/repo-info-card`；确认弹窗会显示完整正文，超长输入
+仍由用户逐一确认。
 
 网页搜索由用户在“设置 → 插件”填写可信的 SearXNG HTTPS 实例地址；默认关闭，
 没有预设公共实例。该实例须启用 JSON 输出。插件不能指定域名或 URL，只能提交

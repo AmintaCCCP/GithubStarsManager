@@ -8,8 +8,11 @@
 const PLUGIN_ID = 'com.githubstarsmanager.repo-info-card';
 const PAGE_ID = 'info-card';
 
-const AI_SYSTEM_LIMIT = 2000; // bridge hard limit for ai.generate system prompt
-const AI_USER_LIMIT = 8000;   // bridge hard limit for ai.generate user prompt
+const AI_SYSTEM_LIMIT = 2000;  // bridge hard limit for ai.generate system prompt
+// bridge hard limit for ai.generate user prompt — 放宽到 160k 是为了让 README
+// 全文原样进入提示词；与 pluginPageBridge 的 user 上限必须保持一致。
+// 160k 字符在两道尺寸闸门（渲染端 1 MiB、主进程 1 MiB 字节预算）内都是安全的。
+const AI_USER_LIMIT = 160_000;
 
 /* ── bridge plumbing ─────────────────────────────────────────────── */
 
@@ -60,7 +63,6 @@ const STR = {
     pickerHint: '此入口没有携带仓库上下文（例如从「设置 → 插件 → 打开页面」进入）。搜索并选择一个已加载的仓库：',
     searching: '搜索中…', searchDone: '找到 {n} 个仓库，点击选择。',
     generating: '正在请求用户配置的 AI 生成卡片（需要在弹窗中确认）…',
-    generated: '已生成。可预览、复制代码或导出截图（@2x）。',
     canvasChanged: '画幅已改变，当前卡片仍是旧画幅。重新生成后才能导出截图。',
     copyOk: 'HTML 代码已复制到剪贴板。',
     imageOk: '截图已写入剪贴板。',
@@ -69,6 +71,13 @@ const STR = {
     aiFailed: '生成失败：{message}',
     noCard: 'AI 输出缺少 id="card" 根元素，请重试。',
     exportFailed: '导出失败：{message}',
+    zoomOut: '缩小', zoomIn: '放大', zoomFit: '适应窗口', zoomActual: '实际大小',
+    zoomGroup: '预览缩放',
+    previewMeta: '{canvas} · {w}×{h} · 导出 @2x',
+    generatedWithReadme: '已生成（基于 README）。可预览、缩放、复制代码或导出截图（@2x）。',
+    generatedMetadataOnly: '已生成（未取得 README，仅使用元信息）。可预览、缩放、复制代码或导出截图（@2x）。',
+    generatedReadmeTruncated: '已生成，但 README 超出提示词上限、已截断。可预览、缩放、复制代码或导出截图（@2x）。',
+    readmeReady: 'README 已就绪，重新生成即可把 README 内容纳入卡片。',
   },
   en: {
     bridgeNotReady: 'Host bridge is not ready',
@@ -82,7 +91,6 @@ const STR = {
     pickerHint: 'This entry carries no repository context (e.g. opened from Settings → Plugins). Pick a loaded repository:',
     searching: 'Searching…', searchDone: '{n} repositories found; click to select.',
     generating: 'Asking the configured AI to compose the card (confirmation required)…',
-    generated: 'Generated. Preview it, copy the code, or export a @2x screenshot.',
     canvasChanged: 'Canvas changed; the current card still uses the previous one. Regenerate before exporting a screenshot.',
     copyOk: 'HTML code copied to the clipboard.',
     imageOk: 'Screenshot copied to the clipboard.',
@@ -91,6 +99,13 @@ const STR = {
     aiFailed: 'Generation failed: {message}',
     noCard: 'AI output is missing the id="card" root element. Try again.',
     exportFailed: 'Export failed: {message}',
+    zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomFit: 'Fit to view', zoomActual: 'Actual size',
+    zoomGroup: 'Preview zoom',
+    previewMeta: '{canvas} · {w}×{h} · exports @2x',
+    generatedWithReadme: 'Generated from the README. Preview, zoom, copy the code, or export a @2x screenshot.',
+    generatedMetadataOnly: 'Generated without a README (metadata only). Preview, zoom, copy the code, or export a @2x screenshot.',
+    generatedReadmeTruncated: 'Generated, but the README exceeded the prompt limit and was truncated. Preview, zoom, copy the code, or export a @2x screenshot.',
+    readmeReady: 'The README is now available; regenerate to fold it into the card.',
   },
 };
 let str = STR.zh;
@@ -101,6 +116,14 @@ function applyChromeStrings() {
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     const key = el.getAttribute('data-i18n');
     if (str[key]) el.textContent = str[key];
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-title');
+    if (str[key]) el.setAttribute('title', str[key]);
+  });
+  document.querySelectorAll('[data-i18n-aria-label]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-aria-label');
+    if (str[key]) el.setAttribute('aria-label', str[key]);
   });
   generateButton.textContent = state.fragment ? str.regenerate : str.generate;
   copyCodeButton.textContent = str.copyCode;
@@ -172,7 +195,14 @@ font-family:var(--font);font-weight:400;line-height:1.5;}
 
 function cssFor(styleId) {
   const palette = PALETTES[styleId] || PALETTES.te;
-  return `:root{${palette}--font:${FONT_SANS};--mono:${FONT_MONO};}\n${CARD_CSS}`;
+  // 变量挂在 #card 而不是 :root：预览用 shadow DOM 渲染，:root 在 shadow tree 里
+  // 匹配不到任何元素，卡片会连同调色板一起退化成浏览器默认样式。
+  return `#card{${palette}--font:${FONT_SANS};--mono:${FONT_MONO};}\n${CARD_CSS}`;
+}
+
+function paletteBackground(styleId) {
+  const match = (PALETTES[styleId] || PALETTES.te).match(/--bg:([^;]+);/);
+  return match ? match[1] : '#f4f3f0';
 }
 
 /* ── prompt builders (plugin owns layout; AI writes the markup) ──── */
@@ -245,9 +275,17 @@ ${STRUCTURES[canvasId]}`;
   return system;
 }
 
+/* ── README: forward the full text; the prompt limit is now the only edge ── */
+
 function buildUserPrompt(repository, readme) {
   const repo = repository;
   const lines = [
+    'TASK',
+    'Compose ONE info card for this repository.',
+    '- Ground the card in the README text below: name the concrete capabilities, workflow, stack and limits it actually states.',
+    '- Use the one-line description, topics and ai_summary only to fill gaps the README does not cover.',
+    '- Never invent facts, numbers, versions, dates or quotes that are not written below.',
+    '',
     'REPOSITORY FACTS',
     `name: ${repo.name}`,
     `full_name: ${repo.full_name}`,
@@ -266,13 +304,25 @@ function buildUserPrompt(repository, readme) {
     `last_push: ${repo.pushed_at ?? 'unknown'}`,
   ];
   let prompt = lines.join('\n');
+  let readmeIncluded = false;
+  let truncatedReadme = false;
   if (readme) {
-    const budget = AI_USER_LIMIT - prompt.length - '\n\nREADME (verbatim excerpt, may be truncated):\n'.length;
-    if (budget > 200) {
-      prompt += `\n\nREADME (verbatim excerpt, may be truncated):\n${readme.slice(0, budget)}`;
+    // 预留 label 与换行余量，避免拼接后越过 bridge 上限被整条拒绝。
+    // 宿主 ai.generate 正文上限已放宽到 AI_USER_LIMIT，README 全文原样传递，
+    // 不清洗、不改写、不摘要。
+    const budget = AI_USER_LIMIT - prompt.length - 64;
+    // budget 为负说明元信息本身就撑满了正文上限，README 完全放不进去——
+    // 这也必须按截断上报，否则状态栏会谎称「基于 README」。
+    truncatedReadme = budget <= 0 || readme.length > budget;
+    if (budget > 0) {
+      readmeIncluded = true;
+      const label = truncatedReadme
+        ? 'README (full text, truncated at the prompt limit):'
+        : 'README (full text):';
+      prompt += `\n\n${label}\n${readme.slice(0, budget)}`;
     }
   }
-  return prompt.slice(0, AI_USER_LIMIT);
+  return { prompt: prompt.slice(0, AI_USER_LIMIT), readmeIncluded, truncatedReadme };
 }
 
 /* ── sanitizing the model output ─────────────────────────────────── */
@@ -323,14 +373,14 @@ function escapeHtmlText(text) {
   }[char]));
 }
 
-function assembleDocument(css, fragment, title) {
+function assembleDocument(css, fragment, title, background) {
   return `<!doctype html>
 <html lang="zh">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtmlText(title)}</title>
-<style>body{margin:0;background:#f4f3f0;}</style>
+<style>html,body{margin:0;background:${background};}</style>
 <style>${css}</style>
 </head>
 <body>
@@ -367,6 +417,10 @@ async function exportPngBase64() {
 
 /* ── app state + UI wiring ───────────────────────────────────────── */
 
+const ZOOM_MIN = 0.2;   // 相对「适应窗口」的最小倍率
+const ZOOM_MAX = 6;     // 相对「适应窗口」的最大倍率
+const ZOOM_STEP = 1.25;
+
 const state = {
   repository: null,
   readme: null,
@@ -377,6 +431,9 @@ const state = {
   fragment: null,
   css: null,
   docHtml: null,
+  zoom: 1,        // 相对自适应比例的倍率；1 表示「适应窗口」
+  fitScale: 1,    // 最近一次自适应算出的缩放比例
+  usedReadme: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -388,6 +445,8 @@ const saveImageButton = $('save-image');
 const previewWrap = $('preview-wrap');
 const previewScroll = $('preview-scroll');
 const previewHost = $('preview-host');
+const previewMeta = $('preview-meta');
+const zoomLevelButton = $('zoom-level');
 
 function setStatus(message) { statusEl.textContent = message; }
 
@@ -407,7 +466,15 @@ function handleInit(context) {
 
   // README 由宿主异步补发。卡片已经生成后只刷新数据，保留当前状态提示，
   // 避免把「已生成」覆盖成「已加载」。
-  if (state.fragment) return;
+  if (state.fragment) {
+    // 卡片可能在 README 到位之前就已生成，此时提示可以重新生成以纳入 README。
+    // 另外语言可能在这里变化，画幅读数与缩放按钮的朗读文本要跟着刷新。
+    const { w, h } = CANVASES[state.canvasId];
+    previewMeta.textContent = fmt(str.previewMeta, { canvas: state.canvasId, w, h });
+    updateZoomLabel();
+    if (state.readme && !state.usedReadme) setStatus(str.readmeReady);
+    return;
+  }
 
   if (state.repository) {
     $('repo-name').textContent = state.repository.full_name;
@@ -421,20 +488,67 @@ function handleInit(context) {
   }
 }
 
+// 页面 CSP 是 style-src plugin-page://<id>（不含 'unsafe-inline'），动态插入的
+// <style> 元素会被拦截，卡片因此退化成浏览器默认样式。Constructable Stylesheet
+// 不归 style-src 管，adopt 到 shadow root 后可在同样的 CSP 下正常生效。
+// sheet 复用同一实例：缩放/重绘会频繁调用本函数，避免每次 new 一份。
+let cardSheet = null;
+
+function applyCardStyles(root, css) {
+  if (typeof CSSStyleSheet === 'function' && 'adoptedStyleSheets' in root) {
+    try {
+      if (!cardSheet) cardSheet = new CSSStyleSheet();
+      cardSheet.replaceSync(css);
+      root.adoptedStyleSheets = [cardSheet];
+      for (const stale of root.querySelectorAll('style[data-card-css]')) stale.remove();
+      return;
+    } catch { /* 不可用则退回 <style>（放行内联样式的环境下仍可用） */ }
+  }
+  let style = root.querySelector('style[data-card-css]');
+  if (!style) {
+    style = document.createElement('style');
+    style.setAttribute('data-card-css', '');
+    root.append(style);
+  }
+  style.textContent = css;
+}
+
+function updateZoomLabel() {
+  const percent = Math.round(state.fitScale * state.zoom * 100);
+  zoomLevelButton.textContent = `${percent}%`;
+  // 数字对读屏只是个读数，补上它实际执行的动作。
+  zoomLevelButton.setAttribute('aria-label', `${percent}% · ${str.zoomFit}`);
+}
+
+function setZoom(value) {
+  state.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+  if (state.fragment) renderPreview();
+}
+
 function renderPreview() {
-  const root = previewHost.shadowRoot || previewHost.attachShadow({ mode: 'open' });
-  root.innerHTML = `<style>${state.css}</style>${state.fragment}`;
-  const card = root.getElementById('card');
+  // 先取消隐藏再量尺寸：preview-wrap 处于 hidden 时 clientWidth 为 0，
+  // 会让自适应比例算成最小值。
+  previewWrap.hidden = false;
   const { w, h } = CANVASES[state.canvasId];
+  // 自适应比例只依赖容器尺寸，不依赖卡片，所以在 card 判空之前就算好并刷新读数，
+  // 这样即便 AI 输出缺根元素，画幅与缩放信息也不会留旧值。
   const availableWidth = Math.max(240, previewScroll.clientWidth - 28);
   const availableHeight = Math.max(240, window.innerHeight * 0.52);
-  const scale = Math.min(availableWidth / w, availableHeight / h, 1);
+  state.fitScale = Math.min(availableWidth / w, availableHeight / h, 1);
+  previewMeta.textContent = fmt(str.previewMeta, { canvas: state.canvasId, w, h });
+  updateZoomLabel();
+  const root = previewHost.shadowRoot || previewHost.attachShadow({ mode: 'open' });
+  // 只写卡片标记；样式走 adoptedStyleSheets，不会被 CSP 拦掉。
+  root.innerHTML = state.fragment;
+  applyCardStyles(root, state.css);
+  const card = root.getElementById('card');
+  if (!card) return;
+  const scale = state.fitScale * state.zoom;
   card.style.transformOrigin = '0 0';
   card.style.transform = `scale(${scale})`;
   previewHost.style.overflow = 'hidden';
   previewHost.style.width = `${Math.round(w * scale)}px`;
   previewHost.style.height = `${Math.round(h * scale)}px`;
-  previewWrap.hidden = false;
 }
 
 async function generate() {
@@ -443,17 +557,20 @@ async function generate() {
   try {
     setStatus(str.generating);
     const system = buildSystemPrompt(state.canvasId, state.languageOption);
-    const user = buildUserPrompt(state.repository, state.readme);
+    const { prompt: user, readmeIncluded, truncatedReadme } =
+      buildUserPrompt(state.repository, state.readme);
     const text = await request('ai.generate', { system, user, maxTokens: 4000 });
+    state.usedReadme = readmeIncluded;
     state.fragment = sanitizeFragment(text, state.canvasId);
     state.css = cssFor(state.styleId);
     state.docHtml = assembleDocument(state.css, state.fragment,
-      `${state.repository.full_name} · info card`);
+      `${state.repository.full_name} · info card`, paletteBackground(state.styleId));
     renderPreview();
     copyCodeButton.disabled = false;
     copyImageButton.disabled = false;
     saveImageButton.disabled = false;
-    setStatus(str.generated);
+    setStatus(truncatedReadme ? str.generatedReadmeTruncated
+      : readmeIncluded ? str.generatedWithReadme : str.generatedMetadataOnly);
   } catch (error) {
     const message = error instanceof Error ? error.message : str.bridgeFailed;
     setStatus(fmt(message.includes('id="card"') ? str.noCard : str.aiFailed, { message }));
@@ -552,7 +669,7 @@ $('opt-style').addEventListener('change', (event) => {
     // Style only changes the plugin-owned CSS: re-skin without a new AI call.
     state.css = cssFor(state.styleId);
     state.docHtml = assembleDocument(state.css, state.fragment,
-      `${state.repository?.full_name || 'repository'} · info card`);
+      `${state.repository?.full_name || 'repository'} · info card`, paletteBackground(state.styleId));
     renderPreview();
   }
 });
@@ -568,3 +685,15 @@ $('opt-canvas').addEventListener('change', (event) => {
 });
 $('opt-language').addEventListener('change', (event) => { state.languageOption = event.target.value; });
 window.addEventListener('resize', () => { if (state.fragment) renderPreview(); });
+
+/* Preview zoom: buttons, percentage and Ctrl/⌘ + wheel. */
+$('zoom-in').addEventListener('click', () => setZoom(state.zoom * ZOOM_STEP));
+$('zoom-out').addEventListener('click', () => setZoom(state.zoom / ZOOM_STEP));
+$('zoom-fit').addEventListener('click', () => setZoom(1));
+$('zoom-level').addEventListener('click', () => setZoom(1));
+$('zoom-actual').addEventListener('click', () => setZoom(1 / (state.fitScale || 1)));
+previewScroll.addEventListener('wheel', (event) => {
+  if (!state.fragment || !(event.ctrlKey || event.metaKey)) return;
+  event.preventDefault();
+  setZoom(state.zoom * (event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP));
+}, { passive: false });
