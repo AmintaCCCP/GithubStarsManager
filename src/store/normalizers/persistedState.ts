@@ -221,7 +221,9 @@ export const normalizePersistedState = (
     discoveryRepos: { 'trending': [], 'hot-release': [], 'most-popular': [], 'topic': [], 'x-tweet': [], 'telegram': [], 'weekly': [], 'search': [], 'code-search': [] } as Record<DiscoveryChannelId, DiscoveryRepo[]>,
     discoveryLastRefresh: { 'trending': null, 'hot-release': null, 'most-popular': null, 'topic': null, 'x-tweet': null, 'telegram': null, 'weekly': null, 'search': null, 'code-search': null },
     discoveryTotalCount: { 'trending': 0, 'hot-release': 0, 'most-popular': 0, 'topic': 0, 'x-tweet': 0, 'telegram': 0, 'weekly': 0, 'search': 0, 'code-search': 0 },
-    selectedDiscoveryChannel: normalizedDiscoveryChannels.some(channel => channel.id === safePersisted.selectedDiscoveryChannel && channel.enabled && isChannelScrapable(channel.id))
+    // 选中频道保留持久化值（存在且启用即可）：被环境隐藏的频道由 DiscoveryView
+    // 在抓取支持结论落定后再纠偏，避免 Web+后端用户启动探测未完成时丢失选择
+    selectedDiscoveryChannel: normalizedDiscoveryChannels.some(channel => channel.id === safePersisted.selectedDiscoveryChannel && channel.enabled)
       ? safePersisted.selectedDiscoveryChannel as DiscoveryChannelId
       : normalizedDiscoveryChannels.find(channel => channel.enabled && isChannelScrapable(channel.id))?.id ?? defaultDiscoveryChannels[0].id,
     // discoveryIsLoading 不持久化，始终重置为 false（防止旧数据格式异常）

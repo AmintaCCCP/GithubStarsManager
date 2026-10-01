@@ -454,7 +454,7 @@ const DataStats: React.FC<DataStatsProps> = ({ currentCount, totalCount }) => {
 export const DiscoveryView: React.FC = React.memo(() => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toggleDiscoveryChannel = useAppStore(state => state.toggleDiscoveryChannel);
-  const scrapeSupport = useWebScrapeSupport();
+  const { supported: scrapeSupport, settled: scrapeSupportSettled } = useWebScrapeSupport();
   const {
     githubToken,
     language,
@@ -525,19 +525,20 @@ export const DiscoveryView: React.FC = React.memo(() => {
   }, []);
   const safeDiscoveryChannels = useMemo(() => {
     if (!Array.isArray(discoveryChannels)) return [];
-    if (scrapeSupport) return discoveryChannels.filter(Boolean);
-    // 纯浏览器模式（无桌面壳、无后端）无法抓取 X 推文与 Telegram，直接隐藏
+    // 可用性未确定（启动探测中）先全部显示，避免 Web+后端用户的可用频道闪烁；
+    // 纯浏览器模式（无桌面壳、无后端）无法抓取 X 推文与 Telegram，落定后直接隐藏
+    if (!scrapeSupportSettled || scrapeSupport) return discoveryChannels.filter(Boolean);
     return discoveryChannels.filter(channel => Boolean(channel)
       && channel.id !== 'x-tweet' && channel.id !== 'telegram');
-  }, [discoveryChannels, scrapeSupport]);
+  }, [discoveryChannels, scrapeSupport, scrapeSupportSettled]);
 
-  // 纯浏览器模式下持久化的选中频道若是被隐藏的抓取频道，回退到第一个可用频道
+  // 纯浏览器模式下持久化的选中频道若是被隐藏的抓取频道，落定后回退到第一个可用频道
   useEffect(() => {
-    if (scrapeSupport) return;
+    if (scrapeSupport || !scrapeSupportSettled) return;
     if (selectedDiscoveryChannel !== 'x-tweet' && selectedDiscoveryChannel !== 'telegram') return;
     const fallback = safeDiscoveryChannels.find(ch => ch.enabled && ch.id !== 'code-search')?.id ?? 'trending';
     setSelectedDiscoveryChannel(fallback);
-  }, [scrapeSupport, selectedDiscoveryChannel, safeDiscoveryChannels, setSelectedDiscoveryChannel]);
+  }, [scrapeSupport, scrapeSupportSettled, selectedDiscoveryChannel, safeDiscoveryChannels, setSelectedDiscoveryChannel]);
 
   // 获取当前频道的所有仓库
   const allRepos = useMemo(

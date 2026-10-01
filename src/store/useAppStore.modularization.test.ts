@@ -309,6 +309,27 @@ describe('PR-07 Store modularization compatibility', () => {
     }
   });
 
+  it('keeps a persisted scraping-channel selection before backend availability settles', () => {
+    const store = actualStore.useAppStore;
+    const originalChannels = store.getState().discoveryChannels;
+    const originalSelected = store.getState().selectedDiscoveryChannel;
+    try {
+      // Web+后端用户水合时探测尚未完成：x-tweet 选择必须保留，
+      // 由 DiscoveryView 在抓取支持结论落定后再决定是否纠偏
+      store.setState({
+        discoveryChannels: originalChannels.map(channel => ({ ...channel, enabled: true })),
+        selectedDiscoveryChannel: 'trending',
+      });
+      const hydrated = actualStore.normalizePersistedState(
+        buildPersistedSnapshot({ selectedDiscoveryChannel: 'x-tweet' }) as never,
+        store.getState(),
+      );
+      expect(hydrated.selectedDiscoveryChannel).toBe('x-tweet');
+    } finally {
+      store.setState({ discoveryChannels: originalChannels, selectedDiscoveryChannel: originalSelected });
+    }
+  });
+
   it('retains the historical normalize-only resets and release backfill behavior', () => {
     const snapshot = buildPersistedSnapshot({
       ...buildTransientDiscoverySnapshot(),

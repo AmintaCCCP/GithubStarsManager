@@ -1,7 +1,7 @@
 import { translateBackendError } from '../utils/backendErrors';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import { logger } from './logger';
-import { setBackendAvailability } from './scrapeSupport';
+import { setBackendAvailability, setBackendProbed } from './scrapeSupport';
 
 import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -106,8 +106,8 @@ class BackendAdapter {
   }
 
   /**
-   * 订阅可用性变化（init 探测结果落定时触发）。返回取消订阅函数，
-   * 供 useSyncExternalStore 等 UI 侧响应式使用。
+   * 订阅可用性结论变化（init 探测结束或可用性翻转时触发）。返回取消订阅
+   * 函数，供 useSyncExternalStore 等 UI 侧响应式使用。
    */
   subscribeAvailability(listener: () => void): () => void {
     this._availabilityListeners.add(listener);
@@ -118,7 +118,6 @@ class BackendAdapter {
     if (this._backendUrl === url) return;
     this._backendUrl = url;
     setBackendAvailability(url !== null);
-    for (const listener of this._availabilityListeners) listener();
   }
 
   async init(preferredUrl?: string): Promise<void> {
@@ -173,6 +172,11 @@ class BackendAdapter {
     } catch {
       this.commitBackendUrl(null);
       logger.info('backendAdapter', 'Backend not available, using local-only mode');
+    } finally {
+      // 探测结束：标记结论已落定并通知订阅者。即使可用性没有翻转
+      // （如纯浏览器模式保持 null），订阅方也需要重新取值。
+      setBackendProbed();
+      for (const listener of this._availabilityListeners) listener();
     }
   }
 
