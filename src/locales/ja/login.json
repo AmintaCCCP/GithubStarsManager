@@ -1,5 +1,7 @@
 {
   "loginScreen": {
+    "token-permissions-title": "GitHub トークンの権限",
+    "token-permissions-check": "ログインでは本人確認のみを行い、すべての権限は確認しません。権限不足は機能の使用時に判明する場合があります。",
     "please-enter-the-backend-url-and-api-key": "バックエンド URL と API キーを入力してください",
     "invalid-backend-url-remote-backends-must-use-htt": "無効なバックエンド アドレス: リモート バックエンドには HTTPS が必要です。HTTP を使用できるのはローカルホストのみです",
     "unable-to-connect-to-this-backend-url": "バックエンド URL に接続できません",
@@ -26,12 +28,6 @@
     "connect-to-github": "GitHub に接続する",
     "connect-and-restore-data": "データの接続と復元",
     "save-and-continue": "保存して続行",
-    "how-to-create-a-github-token": "GitHub トークンを作成する方法:",
-    "go-to-github-settings-developer-settings-persona": "GitHub 設定 → 開発者設定 → 個人アクセス トークンにアクセスします。",
-    "click-generate-new-token-classic": "「新しいトークンを生成（クラシック）」をクリックします。",
-    "select-scopes": "権限の範囲を選択します:",
-    "and": "そして",
-    "copy-the-generated-token-and-paste-it-above": "生成されたトークンをコピーして上に貼り付けます",
     "create-token-on-github": "GitHub でトークンを作成 →",
     "already-have-backend-data": "すでにバックエンドデータがある",
     "sign-in-with-github-token": "GitHub トークンを使用してログインする",
@@ -41,6 +37,23 @@
     "keep-local": "ローカルに保つ",
     "please-enter-a-valid-github-token": "有効な GitHub トークンを入力してください",
     "signed-in-but-failed-to-save-github-token-to-bac": "ログインしましたが、GitHub トークンをバックエンドに保存できず、README などのバックエンド プロキシ機能が利用できない可能性があります。",
-    "failed-to-authenticate-please-check-your-token": "認証に失敗しました。トークンを確認してください。"
+    "failed-to-authenticate-please-check-your-token": "認証に失敗しました。トークンを確認してください。",
+    "token-permissions-tab-finegrained": "Fine-grained",
+    "token-permissions-tab-classic": "クラシック",
+    "token-permissions-feature-star": "Star の管理",
+    "token-permissions-feature-gists": "Gist",
+    "token-permissions-feature-star-lists": "Star リスト",
+    "token-permissions-feature-fork-sync": "Fork 同期",
+    "token-permissions-feature-workflows": "ワークフロー実行",
+    "token-permissions-feature-fork-workflows": "Fork 同期 / ワークフロー",
+    "token-permissions-fine-star": "`Starring` 読み書き、`Metadata` 読み取り",
+    "token-permissions-fine-gists": "`Gists` 書き込み",
+    "token-permissions-fine-fork-sync": "`Contents` 書き込み",
+    "token-permissions-fine-workflows": "`Actions` 書き込み",
+    "token-permissions-classic-star": "`public_repo`（非公開リポジトリには `repo`）",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され、アプリのサーバーには送信されません。"
   }
 }

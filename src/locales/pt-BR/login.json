@@ -1,5 +1,7 @@
 {
   "loginScreen": {
+    "token-permissions-title": "Permissões do token do GitHub",
+    "token-permissions-check": "O login verifica sua identidade, não todas as permissões. Uma permissão ausente pode aparecer só quando você usar o recurso.",
     "please-enter-the-backend-url-and-api-key": "Insira o URL de back-end e a chave de API",
     "invalid-backend-url-remote-backends-must-use-htt": "Endereço de back-end inválido: o back-end remoto requer HTTPS, apenas localhost pode usar HTTP",
     "unable-to-connect-to-this-backend-url": "Não foi possível conectar-se ao URL de back-end",
@@ -26,12 +28,6 @@
     "connect-to-github": "Conecte-se ao GitHub",
     "connect-and-restore-data": "Conecte e restaure dados",
     "save-and-continue": "Salvar e continuar",
-    "how-to-create-a-github-token": "Como criar um token GitHub:",
-    "go-to-github-settings-developer-settings-persona": "Visite Configurações do GitHub → Configurações do desenvolvedor → Tokens de acesso pessoal",
-    "click-generate-new-token-classic": "Clique em \"Gerar novo token (clássico)\"",
-    "select-scopes": "Selecione o escopo da permissão:",
-    "and": "e",
-    "copy-the-generated-token-and-paste-it-above": "Copie o token gerado e cole-o acima",
     "create-token-on-github": "Crie um token no GitHub →",
     "already-have-backend-data": "Já tem dados de back-end",
     "sign-in-with-github-token": "Faça login usando o token GitHub",
@@ -41,6 +37,23 @@
     "keep-local": "manter local",
     "please-enter-a-valid-github-token": "Insira um token GitHub válido",
     "signed-in-but-failed-to-save-github-token-to-bac": "Você fez login, mas o token GitHub não foi salvo no back-end e as funções de proxy de back-end, como README, podem não estar disponíveis.",
-    "failed-to-authenticate-please-check-your-token": "Falha na autenticação. Verifique seu token."
+    "failed-to-authenticate-please-check-your-token": "Falha na autenticação. Verifique seu token.",
+    "token-permissions-tab-finegrained": "Refinado",
+    "token-permissions-tab-classic": "Clássico",
+    "token-permissions-feature-star": "Gerenciar estrelas",
+    "token-permissions-feature-gists": "Gists",
+    "token-permissions-feature-star-lists": "Listas de estrelas",
+    "token-permissions-feature-fork-sync": "Sincronização de forks",
+    "token-permissions-feature-workflows": "Executar workflows",
+    "token-permissions-feature-fork-workflows": "Forks / workflows",
+    "token-permissions-fine-star": "`Starring` leitura e escrita, `Metadata` leitura",
+    "token-permissions-fine-gists": "`Gists` gravação",
+    "token-permissions-fine-fork-sync": "`Contents` gravação",
+    "token-permissions-fine-workflows": "`Actions` gravação",
+    "token-permissions-classic-star": "`public_repo` (`repo` para repositórios privados)",
+    "token-permissions-classic-gists": "`gist`",
+    "token-permissions-classic-star-lists": "`user`",
+    "token-permissions-classic-fork-workflows": "`repo`",
+    "token-permissions-local-storage": "Seu token é armazenado apenas neste dispositivo e no seu próprio backend, nunca nos servidores do app."
   }
 }

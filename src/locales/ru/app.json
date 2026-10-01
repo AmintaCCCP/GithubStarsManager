@@ -934,7 +934,10 @@
     "check-if-a-new-version-is-available": "Проверьте, доступна ли новая версия",
     "contact-information": "Контактная информация",
     "if-you-encounter-any-issues-or-have-suggestions": "Если у вас возникнут какие-либо проблемы или у вас есть предложения во время использования, свяжитесь со мной следующими способами:",
-    "github": "GitHub"
+    "github": "GitHub",
+    "account-token-hint": "Вы вошли как {{login}}. Просроченный токен можно обновить здесь без выхода из аккаунта.",
+    "token-hint": "Просроченный токен можно обновить здесь без выхода из аккаунта.",
+    "token-permission-guide": "Руководство по настройке токена"
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Включить ключи при резервном копировании/экспорте",

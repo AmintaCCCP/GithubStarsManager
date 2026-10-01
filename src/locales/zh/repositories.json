@@ -1,5 +1,6 @@
 {
   "batchStar": {
+    "token-permission-error": "GitHub 拒绝了此 Token（403）。检查或添加 Star 时，细粒度 Token 需开启 Starring 读写及仓库 Metadata 读取；传统 Token 需 public_repo（私有仓库用 repo）。",
     "title": "从链接批量 Star",
     "hint": "粘贴任何包含 GitHub 链接的文字，确认仓库后再 Star。其他网站的链接会被忽略。",
     "history": "粘贴历史",
