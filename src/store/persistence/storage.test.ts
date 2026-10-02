@@ -317,10 +317,30 @@ describe('sharded persist storage', () => {
 });
 
 describe('indexedDbStorage batch helpers', () => {
-  it('falls back to localStorage with all-or-nothing semantics when IndexedDB is unavailable', async () => {
-    const savedIndexedDB = globalThis.indexedDB;
-    delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  // canUseIndexedDB() 读取 window.indexedDB；fake-indexeddb 的挂载位置在不同
+  // 环境（globalThis 与 window 是否同一对象）下不同，两处一并置空才可靠。
+  const withIndexedDBUnavailable = async (run: () => Promise<void>): Promise<void> => {
+    const targets: Array<Record<string, unknown>> = [window as unknown as Record<string, unknown>, globalThis as unknown as Record<string, unknown>];
+    const saved = targets.map((target) => Object.getOwnPropertyDescriptor(target, 'indexedDB'));
     try {
+      for (const target of targets) {
+        Object.defineProperty(target, 'indexedDB', { configurable: true, value: undefined });
+      }
+      await run();
+    } finally {
+      targets.forEach((target, index) => {
+        const descriptor = saved[index];
+        if (descriptor) {
+          Object.defineProperty(target, 'indexedDB', descriptor);
+        } else {
+          delete target.indexedDB;
+        }
+      });
+    }
+  };
+
+  it('falls back to localStorage with all-or-nothing semantics when IndexedDB is unavailable', async () => {
+    await withIndexedDBUnavailable(async () => {
       await setStorageEntries([['fallback-a', '1'], ['fallback-b', '2']]);
       expect(window.localStorage.getItem('fallback-a')).toBe('1');
       expect(await indexedDBStorage.getItem('fallback-a')).toBe('1');
@@ -333,11 +353,9 @@ describe('indexedDbStorage batch helpers', () => {
       await expect(setStorageEntries([['fallback-c', '3'], ['fallback-b', '4']])).rejects.toThrow();
       setItemSpy.mockRestore();
       expect(window.localStorage.getItem('fallback-c')).toBeNull();
-    } finally {
-      (globalThis as { indexedDB?: IDBFactory }).indexedDB = savedIndexedDB;
-      window.localStorage.removeItem('fallback-a');
-      window.localStorage.removeItem('fallback-b');
-    }
+    });
+    window.localStorage.removeItem('fallback-a');
+    window.localStorage.removeItem('fallback-b');
   });
 
   it('sweeps derived `${name}#` keys from localStorage on removeItem', async () => {
