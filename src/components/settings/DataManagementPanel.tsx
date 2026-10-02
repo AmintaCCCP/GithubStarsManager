@@ -55,10 +55,10 @@ import {
   Rss,
 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
+import { removePersistedSnapshot } from '../../store/persistence/storage';
 import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
-import { indexedDBStorage } from '../../services/indexedDbStorage';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
   Repository, 
@@ -367,9 +367,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     // Clear sessionStorage - only remove app-owned keys
     APP_SESSIONSTORAGE_KEYS.forEach((key) => sessionStorage.removeItem(key));
 
-    // Clear IndexedDB - only remove the specific database used by this app
+    // Clear IndexedDB - only remove the specific database used by this app.
+    // 走持久化层的串行删除：除磁盘清扫外，还会在串行写链上取消待写、完成删除并
+    // 重置分片判脏簿记——直接调底层 removeItem 会让随后的 store 重置写入以过期
+    // 基准判脏，只补写部分分片，而 meta 仍声明全部分片。
+    // 必须 await 删除真正落盘（zustand v4 的 clearStorage 不回传 Promise）：
+    // 若链上还有排队的大写入，2 秒后的 reload 可能早于删除提交，数据复活。
     try {
-      await indexedDBStorage.removeItem('github-stars-manager');
+      await removePersistedSnapshot(useAppStore.persist.getOptions().name ?? 'github-stars-manager');
     } catch (error) {
       console.error('Failed to clear IndexedDB', error);
       throw new Error('IndexedDB clear failed');

@@ -81,6 +81,18 @@ export const accountIdKey = (user: Pick<GitHubUser, 'id'> | number | null | unde
   return typeof id === 'number' && Number.isFinite(id) ? String(id) : null;
 };
 
+/**
+ * 带引用保留的类型过滤：过滤后长度不变说明所有元素都通过校验且顺序一致
+ * （filter 只会按序保留子集），此时直接返回原数组引用。
+ * 分片持久化按字段引用判脏——规整化若总是重建数组，每次启动都会把
+ * accountWorkspaces 分片误判为已变更而全量重写。
+ */
+const filterPreservingRef = <T>(value: unknown, predicate: (item: unknown) => item is T): T[] => {
+  if (!Array.isArray(value)) return [];
+  const filtered = value.filter(predicate);
+  return filtered.length === value.length ? (value as T[]) : filtered;
+};
+
 export const normalizeAccountWorkspaces = (value: unknown): Record<string, AccountWorkspace> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const empty = emptyAccountWorkspace();
@@ -98,24 +110,29 @@ export const normalizeAccountWorkspaces = (value: unknown): Record<string, Accou
           ? record.selectedGistCategory
           : 'all',
         releases: Array.isArray(record.releases) ? record.releases : [],
-        releaseSubscriptions: Array.isArray(record.releaseSubscriptions)
-          ? record.releaseSubscriptions.filter((item): item is number => typeof item === 'number')
-          : [],
+        releaseSubscriptions: filterPreservingRef(
+          record.releaseSubscriptions,
+          (item): item is number => typeof item === 'number',
+        ),
         releaseSourceSettings: normalizeReleaseSourceSettings(record.releaseSourceSettings),
-        readReleases: Array.isArray(record.readReleases)
-          ? record.readReleases.filter((item): item is number => typeof item === 'number')
-          : [],
+        readReleases: filterPreservingRef(
+          record.readReleases,
+          (item): item is number => typeof item === 'number',
+        ),
         forks: Array.isArray(record.forks) ? record.forks : [],
-        readForks: Array.isArray(record.readForks)
-          ? record.readForks.filter((item): item is number => typeof item === 'number')
-          : [],
+        readForks: filterPreservingRef(
+          record.readForks,
+          (item): item is number => typeof item === 'number',
+        ),
         customCategories: Array.isArray(record.customCategories) ? record.customCategories : [],
-        hiddenDefaultCategoryIds: Array.isArray(record.hiddenDefaultCategoryIds)
-          ? record.hiddenDefaultCategoryIds.filter((item): item is string => typeof item === 'string')
-          : [],
-        categoryOrder: Array.isArray(record.categoryOrder)
-          ? record.categoryOrder.filter((item): item is string => typeof item === 'string')
-          : [],
+        hiddenDefaultCategoryIds: filterPreservingRef(
+          record.hiddenDefaultCategoryIds,
+          (item): item is string => typeof item === 'string',
+        ),
+        categoryOrder: filterPreservingRef(
+          record.categoryOrder,
+          (item): item is string => typeof item === 'string',
+        ),
         defaultCategoryOverrides: record.defaultCategoryOverrides && typeof record.defaultCategoryOverrides === 'object'
           && !Array.isArray(record.defaultCategoryOverrides)
           ? record.defaultCategoryOverrides as AccountWorkspace['defaultCategoryOverrides']

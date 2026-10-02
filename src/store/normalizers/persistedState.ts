@@ -77,23 +77,40 @@ export const normalizePersistedState = (
   const starredGists = Array.isArray(safePersisted.starredGists) ? safePersisted.starredGists : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
-  // Migration for old users: mark repos with existing releases as already synced
-  const migratedRepositories = repositories.map(repo => {
-    const hasExistingRelease = releases.some(r => r.repository?.id === repo.id);
-    if (hasExistingRelease && !repo.has_fetched_releases) {
+  // Migration for old users: mark repos with existing releases as already synced.
+  // 引用保留：无需回填时直接返回原数组——分片持久化按引用判脏，若 hydration
+  // 总是产生新数组引用，会在每次启动后触发一次全量重写。
+  // 用 String(id) 建索引：历史快照里 id 可能被持久化为字符串，与旧实现的
+  // `===` 宽松匹配历史数据保持等价；单次遍历建 Map，回填整体 O(R+L)。
+  const latestReleaseTimeByRepoId = new Map<string, number>();
+  for (const release of releases) {
+    const repoId = release.repository?.id;
+    if (repoId === undefined || repoId === null) continue;
+    const key = String(repoId);
+    const publishedTime = new Date(release.published_at).getTime();
+    const previous = latestReleaseTimeByRepoId.get(key);
+    latestReleaseTimeByRepoId.set(key, previous === undefined ? publishedTime : Math.max(previous, publishedTime));
+  }
+  const needsReleaseBackfill = repositories.some(
+    repo => latestReleaseTimeByRepoId.has(String(repo.id)) && !repo.has_fetched_releases,
+  );
+  const migratedRepositories = needsReleaseBackfill
+    ? repositories.map(repo => {
+      if (repo.has_fetched_releases) {
+        return repo;
+      }
       // Backfill last_release_fetch_time from the latest persisted release timestamp
-      const repoReleases = releases.filter(r => r.repository?.id === repo.id);
-      const latestReleaseTime = repoReleases.length > 0
-        ? Math.max(...repoReleases.map(r => new Date(r.published_at).getTime()))
-        : null;
+      const latestReleaseTime = latestReleaseTimeByRepoId.get(String(repo.id));
+      if (latestReleaseTime === undefined) {
+        return repo;
+      }
       return {
         ...repo,
         has_fetched_releases: true,
         last_release_fetch_time: repo.last_release_fetch_time || (latestReleaseTime ? new Date(latestReleaseTime).toISOString() : new Date().toISOString())
       };
-    }
-    return repo;
-  });
+    })
+    : repositories;
 
   // Default includePreRelease to true if not set (backward compatibility)
   const includePreRelease = safePersisted.includePreRelease !== undefined

@@ -1168,6 +1168,34 @@ describe('useAppStore persisted-state historical fixtures', () => {
     });
   });
 
+  it('keeps persisted heavy-field array references when no release backfill is needed', () => {
+    // 分片持久化按引用判脏：hydration 规整化不得在无回填需求时重建重数据数组，
+    // 否则每次启动后都会触发一次全量重写。
+    const repositories = [createRepository(1, { has_fetched_releases: true }), createRepository(2)];
+    const gists = [{ id: 'gist-1' }];
+    const releases = [
+      makeRelease(11, { repository: { id: 1, full_name: 'owner/repo-1', name: 'repo-1' } }),
+    ];
+    const normalized = normalizePersistedState(
+      buildPersistedSnapshot({ repositories, gists, releases }),
+      useAppStore.getInitialState(),
+    );
+
+    expect(normalized.repositories).toBe(repositories);
+    expect(normalized.gists).toBe(gists);
+    expect(normalized.releases).toBe(releases);
+
+    // 存在需要回填的仓库时，回填行为保持不变
+    const needsBackfill = normalizePersistedState(
+      buildPersistedSnapshot({ repositories: [createRepository(1)], releases }),
+      useAppStore.getInitialState(),
+    );
+    expect(needsBackfill.repositories?.[0]).toMatchObject({
+      has_fetched_releases: true,
+      last_release_fetch_time: '2026-01-01T00:00:00.000Z',
+    });
+  });
+
   it('preserves a historical MCP token while filling host and port defaults during migration and hydration', async () => {
     const migrated = await migrateSnapshot(buildPersistedSnapshot({
       mcpConfig: { enabled: true, token: 'mcp-historical-token' },
