@@ -1,7 +1,6 @@
 import { WebDAVConfig } from '../types';
 import { logger } from './logger';
 import { backend } from './backendAdapter';
-import { isElectron } from './electronProxy';
 
 export class WebDAVService {
   private config: WebDAVConfig;
@@ -183,8 +182,10 @@ export class WebDAVService {
     const err = error as Error & { causeCode?: string };
 
     // 桌面版：请求由主进程代发，不存在 CORS 限制；失败是真实的网络/TLS 问题，
-    // 按主进程透传的底层错误码给出可操作的排查建议
-    if (isElectron()) {
+    // 按主进程透传的底层错误码给出可操作的排查建议。判断条件须与 davFetch 的
+    // 传输层选择一致（electronAPI 存在但未暴露 webdavRequest 的旧 preload 会
+    // 走后端/浏览器直连路径，不能套用主进程文案）
+    if (window.electronAPI?.webdavRequest) {
       throw new Error(this.describeDesktopFailure(err, operation));
     }
 

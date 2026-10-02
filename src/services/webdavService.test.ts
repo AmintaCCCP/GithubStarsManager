@@ -239,6 +239,14 @@ describe('WebDAVService 错误提示', () => {
     await expect(attempt).rejects.toThrow(/连接超时/);
     await expect(attempt).rejects.not.toThrow(/无法解析/);
   });
+
+  it('electronAPI 存在但未暴露 webdavRequest（旧 preload）按直连路径提示', async () => {
+    // 传输层会走后端/浏览器直连，错误提示不能套用"主进程代发"文案
+    window.electronAPI = {} as unknown as Window['electronAPI'];
+    vi.mocked(window.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(davService().testConnection()).rejects.toThrow(/CORS策略阻止/);
+  });
 });
 
 describe('WebDAVService 上传重试策略', () => {
