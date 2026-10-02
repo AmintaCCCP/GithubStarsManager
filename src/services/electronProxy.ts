@@ -68,7 +68,7 @@ interface ElectronAPI {
    * X 推文频道鉴权路径：主进程代发 x.com GraphQL / 静态资源 GET 请求
    * （带用户的 auth_token/ct0 Cookie 与 Bearer，绕开渲染进程 CORS）
    */
-  xFetchGraphQL?: (url: string, auth: { authToken: string; ct0: string }) => Promise<{ success: boolean; body?: string; error?: string }>;
+  xFetchGraphQL?: (url: string, auth: { authToken: string; ct0: string } | null) => Promise<{ success: boolean; body?: string; error?: string }>;
   /** Telegram 频道：主进程代抓 t.me/s/<name> 公开预览 HTML（可选 before 游标翻历史页） */
   telegramFetchChannel?: (channel: string, before?: string) => Promise<{ success: boolean; html?: string; error?: string }>;
   /**
@@ -152,12 +152,14 @@ export const isAllowedXGraphQLUrl = (url: string): boolean =>
 
 /**
  * X 推文频道鉴权路径：经主进程代发 x.com GraphQL / 静态资源请求。非桌面环境返回 null。
- * 限制仅允许 x.com 与 abs.twimg.com 目标，主进程 net.fetch 配置 redirect: 'error'
+ * 限制仅允许 x.com 与 abs.twimg.com 目标，主进程配置 redirect: 'error'
  * 拒绝跨域重定向，防止 Cookie 被转到允许域名之外。
+ * auth 为 null 时走主进程免登录 guest 流程（guest token + Chromium 栈），
+ * 用作鉴权请求被 x.com 边缘 WAF 403（TLS 指纹拦截）时的降级路径。
  */
 export const fetchXGraphQLViaDesktop = async (
   url: string,
-  auth: { authToken: string; ct0: string },
+  auth: { authToken: string; ct0: string } | null,
 ): Promise<string | null> => {
   if (typeof url !== 'string' || !isAllowedXGraphQLUrl(url)) {
     throw new Error('invalid url for x.com fetch');

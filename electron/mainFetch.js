@@ -67,7 +67,13 @@ function summarizeFetchError(error) {
  * ctx.remainingMs 是本次调用剩余的毫秒预算（传入 totalTimeoutMs 时才有定义），
  * 各栈用它设置自己的 AbortSignal.timeout，避免“每个栈各等一个完整超时”。
  *
- * 返回值：{ response, stack }。任何栈拿到 HTTP 响应即返回，不回退。
+ * 可选的 stack.onResponseRetryable(response)：栈对特定响应“视为未命中”，
+ * 把机会让给下一栈。用于目标站按 TLS 指纹区别对待网络栈的场景——例如
+ * x.com 边缘 WAF 对 Node 网络栈（undici）一律 403 HTML 挑战页，而
+ * Chromium 栈可以过；若把 403 当普通响应返回，回退永远轮不到 Chromium。
+ *
+ * 返回值：{ response, stack }。任何栈拿到 HTTP 响应即返回，不回退；
+ * 若所有栈的响应都被判为未命中，返回最后一个（仍是合法 HTTP 响应）。
  * 全部抛异常时抛出合并错误：err.message 含各栈失败明细；
  * err.timedOut 仅当所有栈都超时；err.failures 保留逐栈摘要。
  */
@@ -81,6 +87,7 @@ async function fetchAcrossStacks(stacks, options = {}) {
     : MIN_STACK_BUDGET_MS;
   const startedAt = Date.now();
   const failures = [];
+  let retryableMiss = null;
 
   for (const stack of stacks) {
     let remainingMs;
@@ -91,11 +98,17 @@ async function fetchAcrossStacks(stacks, options = {}) {
     }
     try {
       const response = await stack.run({ remainingMs });
+      if (typeof stack.onResponseRetryable === 'function' && stack.onResponseRetryable(response)) {
+        retryableMiss = { response, stack: stack.name };
+        continue;
+      }
       return { response, stack: stack.name };
     } catch (error) {
       failures.push({ name: stack.name, summary: summarizeFetchError(error) });
     }
   }
+
+  if (retryableMiss) return retryableMiss;
 
   const combined = failures.map((f) => `${f.name}: ${f.summary.message}`).join('; ');
   const err = new Error(combined || 'all network stacks failed');

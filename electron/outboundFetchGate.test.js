@@ -7,7 +7,9 @@
  * 内置 undici 与 npm undici@8 的 handler 协议不兼容；已实测复现）。
  *
  * 约定：main.js 顶部分别导入同版本的 { fetch: undiciFetch, ProxyAgent }，
- * 任何需要 dispatcher 的出站调用必须用 undiciFetch，禁止裸调用全局 fetch。
+ * 携带 dispatcher 的出站调用必须用 undiciFetch；无代理场景允许三选一回退到
+ * 内置 fetch（x.com 边缘按 TLS 指纹放行内置 undici、403 npm undici@8），
+ * 但禁止裸调用全局 fetch——门禁断言 main.js 中不存在 `fetch(` 直接调用。
  */
 
 const { describe, it } = require('node:test');

@@ -181,6 +181,65 @@ describe('fetchAcrossStacks: 多网络栈回退', () => {
   });
 });
 
+describe('fetchAcrossStacks: onResponseRetryable 响应级让位', () => {
+  const fakeResponse = (status) => ({ status, ok: status < 400 });
+
+  it('命中谓词的响应让位给下一栈（如 x.com 边缘按 TLS 指纹 403 undici）', async () => {
+    const calls = [];
+    const { response, stack } = await fetchAcrossStacks([
+      {
+        name: 'undici',
+        run: async () => { calls.push('undici'); return fakeResponse(403); },
+        onResponseRetryable: (r) => r.status === 403 || r.status === 429,
+      },
+      {
+        name: 'chromium',
+        run: async () => { calls.push('chromium'); return fakeResponse(200); },
+      },
+    ]);
+
+    assert.deepEqual(calls, ['undici', 'chromium']);
+    assert.equal(stack, 'chromium');
+    assert.equal(response.status, 200);
+  });
+
+  it('谓词不命中的响应照常直接返回，不触发回退', async () => {
+    let fallbackCalled = false;
+    const { response } = await fetchAcrossStacks([
+      {
+        name: 'undici',
+        run: async () => fakeResponse(200),
+        onResponseRetryable: (r) => r.status === 403,
+      },
+      {
+        name: 'chromium',
+        run: async () => { fallbackCalled = true; return fakeResponse(200); },
+      },
+    ]);
+
+    assert.equal(response.status, 200);
+    assert.equal(fallbackCalled, false);
+  });
+
+  it('所有栈的响应都被判未命中时返回最后一个响应而不抛错', async () => {
+    const { response, stack } = await fetchAcrossStacks([
+      {
+        name: 'undici',
+        run: async () => fakeResponse(403),
+        onResponseRetryable: (r) => r.status === 403,
+      },
+      {
+        name: 'chromium',
+        run: async () => fakeResponse(403),
+        onResponseRetryable: (r) => r.status === 403,
+      },
+    ]);
+
+    assert.equal(response.status, 403);
+    assert.equal(stack, 'chromium');
+  });
+});
+
 describe('timeoutSignalFromBudget', () => {
   it('用剩余预算构造信号；无预算时退回固定值；下限 1000ms', () => {
     assert.equal(timeoutSignalFromBudget(5000, 20000).aborted, false);
