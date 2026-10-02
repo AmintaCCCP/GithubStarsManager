@@ -326,20 +326,37 @@ describe('indexedDbStorage batch helpers', () => {
   });
 
   it('rolls back the whole fallback batch when any key write fails', async () => {
-    window.localStorage.setItem('fallback-c', 'previous');
-    const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation((key, value) => {
-      if (key === 'fallback-b') throw new Error('quota exceeded');
-      Storage.prototype.setItem.call(window.localStorage, key, value);
-    });
+    // Node ≥24 的原生 localStorage 经 vitest 拷入后每次访问可能返回新包装对象，
+    // vi.spyOn 拦截不可靠；整体替换为可控 fake 保证模块与测试看到同一实例。
+    const backing = new Map<string, string>([['fallback-c', 'previous']]);
+    const failingStorage: Storage = {
+      clear: () => backing.clear(),
+      getItem: (key: string) => (backing.has(key) ? (backing.get(key) as string) : null),
+      key: (index: number) => Array.from(backing.keys())[index] ?? null,
+      removeItem: (key: string) => {
+        backing.delete(key);
+      },
+      setItem: (key: string, value: string) => {
+        if (key === 'fallback-b') throw new Error('quota exceeded');
+        backing.set(key, String(value));
+      },
+      get length() {
+        return backing.size;
+      },
+    };
+    const savedDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', { configurable: true, value: failingStorage });
     try {
       await expect(writeEntriesToFallbackStorage([['fallback-a', '1'], ['fallback-b', '2']])).rejects.toThrow();
       // 已写入的键必须回滚，且不覆盖既有值
-      expect(window.localStorage.getItem('fallback-a')).toBeNull();
-      expect(window.localStorage.getItem('fallback-c')).toBe('previous');
+      expect(backing.has('fallback-a')).toBe(false);
+      expect(backing.get('fallback-c')).toBe('previous');
     } finally {
-      setItemSpy.mockRestore();
-      window.localStorage.removeItem('fallback-a');
-      window.localStorage.removeItem('fallback-c');
+      if (savedDescriptor) {
+        Object.defineProperty(window, 'localStorage', savedDescriptor);
+      } else {
+        delete (window as unknown as Record<string, unknown>).localStorage;
+      }
     }
   });
 
