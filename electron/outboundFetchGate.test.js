@@ -55,15 +55,19 @@ describe('outbound fetch gate (UND_ERR_INVALID_ARG regression)', () => {
     // 拨号阶段（ECONNREFUSED），而不是 handler 协议阶段（UND_ERR_INVALID_ARG）
     const { fetch: undiciFetch, ProxyAgent } = require('undici');
     const agent = new ProxyAgent('http://127.0.0.1:9');
-    try {
-      await undiciFetch('https://localhost.invalid/', {
-        dispatcher: agent,
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.fail('不应成功：目标不可达');
-    } catch (error) {
-      const causeCode = error && error.cause && error.cause.code;
-      assert.notEqual(causeCode, 'UND_ERR_INVALID_ARG', 'undici fetch 与 ProxyAgent 版本混用');
-    }
+    // 先结算成数据再断言：assert 失败绝不能落进处理请求错误的 catch
+    const outcome = await undiciFetch('https://localhost.invalid/', {
+      dispatcher: agent,
+      signal: AbortSignal.timeout(5000),
+    }).then(
+      (response) => ({ response }),
+      (error) => ({ error }),
+    );
+    assert.ok(
+      outcome.error,
+      `请求必须失败（目标不可达），实际返回了 HTTP ${outcome.response?.status}`,
+    );
+    const causeCode = outcome.error && outcome.error.cause && outcome.error.cause.code;
+    assert.notEqual(causeCode, 'UND_ERR_INVALID_ARG', 'undici fetch 与 ProxyAgent 版本混用');
   });
 });
