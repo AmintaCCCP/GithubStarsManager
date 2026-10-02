@@ -361,11 +361,9 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
     latestPersistValue = null;
     persistWriteVersion++;
     cancelPendingPersistTasks();
-    lastWrittenShards = null;
-    committedShards.clear();
-    legacySnapshotHydrated = false;
-    // 删除与写盘共用同一条串行链：保证排队中的写入先完成再删除，
-    // 且后续写入排在删除之后，不会出现删除事务晚于写入而误删新分片。
+    // 删除与缓存重置都入串行链：排队中的写入先完成、随后清盘、最后重置判脏
+    // 缓存（含删除失败路径）。否则 in-flight 写入完成后会重新填充缓存，删除
+    // 后的首个写入只补写脏分片，而 meta 仍列出全部分片，重启即出现分片缺失。
     writeChain = writeChain
       .catch(() => undefined)
       .then(async () => {
@@ -373,6 +371,11 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
       })
       .catch((error: unknown) => {
         logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
+      })
+      .then(() => {
+        lastWrittenShards = null;
+        committedShards.clear();
+        legacySnapshotHydrated = false;
       });
   },
 };

@@ -310,7 +310,7 @@ describe('sharded persist storage', () => {
     const stateDark = { ...state, theme: 'dark' };
     debouncedPersistStorage.setItem(KEY, { state: stateLight, version: 16 });
     const flushInFlight = flushPendingPersistSnapshot();
-    await Promise.resolve(); // 让写入 A 完成判脏并进入提交等待（版本随即过期）
+    await new Promise((resolve) => setTimeout(resolve, 0)); // 宏任务确保写入 A 完成判脏并进入提交等待（版本随即过期）
     debouncedPersistStorage.setItem(KEY, { state: stateDark, version: 16 });
     await flushPendingPersistSnapshot();
     await flushInFlight;
@@ -318,6 +318,27 @@ describe('sharded persist storage', () => {
     expect((await readShardState('core')).theme).toBe('dark');
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
     expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'zh' });
+  });
+
+  it('rebuilds the full shard set when removeItem follows a write still in flight', async () => {
+    const state = buildState();
+    debouncedPersistStorage.setItem(KEY, { state, version: 16 });
+    const inFlightWrite = flushPendingPersistSnapshot();
+    await new Promise((resolve) => setTimeout(resolve, 0)); // 宏任务确保写入 A 完成判脏并进入提交等待
+    debouncedPersistStorage.removeItem(KEY);
+    const nextState = { ...state, language: 'en' };
+    debouncedPersistStorage.setItem(KEY, { state: nextState, version: 16 });
+    await flushPendingPersistSnapshot();
+    await inFlightWrite;
+
+    // 删除后的首个写入必须全量重建：meta 与全部分片一致，不存在缺失分片
+    const rehydrated = await debouncedPersistStorage.getItem(KEY);
+    expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'en' });
+    expect(await readMeta()).not.toBeNull();
+    expect(await readShardState('gists')).toMatchObject({ gists: [{ id: 'gist-1' }] });
+    expect(await readShardState('repositories')).toMatchObject({
+      repositories: [{ id: 1, name: 'repo-one' }],
+    });
   });
 
   it('removes every derived key on removeItem', async () => {
