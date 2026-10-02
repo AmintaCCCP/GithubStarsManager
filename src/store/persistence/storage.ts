@@ -478,20 +478,22 @@ const registerPersistFlushListeners = (): void => {
  * 删除与写盘共用同一条串行链——若清盘即重置，in-flight 写入完成后会重新填充
  * 缓存，删除后的首个写入只补写脏分片，而 meta 仍列出全部分片，重启即缺失。
  *
+ * 失败语义：共享写链永不 reject（后续写入不被删除失败连坐），但返回给调用方
+ * 的 Promise 在删除失败时如实 reject——「清空所有数据」流据此跳过状态重置与
+ * reload，而不是把残留快照当作已删除导致数据在重启后复活。
+ *
  * 注意：zustand v4 的 persist.clearStorage() 不回传 removeItem 的 Promise，
- * 需要等待删除真正落盘的调用方（如「清空所有数据」后 reload）应直接调用并
- * await 本函数。
+ * 需要等待删除真正落盘的调用方应直接调用并 await 本函数。
  */
 const removePersistedSnapshot = (name: string): Promise<void> => {
   latestPersistName = null;
   latestPersistValue = null;
   persistWriteVersion++;
   cancelPendingPersistTasks();
-  writeChain = writeChain
+  const removal = writeChain
     .catch(() => undefined)
-    .then(async () => {
-      await indexedDBStorage.removeItem(name);
-    })
+    .then(() => indexedDBStorage.removeItem(name));
+  writeChain = removal
     .catch((error: unknown) => {
       logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
     })
@@ -501,7 +503,7 @@ const removePersistedSnapshot = (name: string): Promise<void> => {
       legacySnapshotHydrated = false;
       hydratedIncomplete = false;
     });
-  return writeChain;
+  return removal.then(() => writeChain);
 };
 
 // Create a debounced storage to avoid frequent JSON.stringify calls on large state objects

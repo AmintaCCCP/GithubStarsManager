@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StorageValue } from 'zustand/middleware';
 import {
+  getStorageEntriesStrict,
   getStorageItemStrict,
   indexedDBStorage,
   setStorageEntries,
@@ -10,7 +11,7 @@ import {
 import { appPersistenceOptions } from './options';
 import { createInitialState } from '../initialState';
 import { flushPendingPersistSnapshot } from './storage';
-import { debouncedPersistStorage } from './storage';
+import { debouncedPersistStorage, removePersistedSnapshot } from './storage';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import {
   PERSISTENCE_SHARD_FIELDS,
@@ -524,26 +525,36 @@ describe('sharded persist storage', () => {
     expect(hydrated?.state).toEqual({ theme: 'dark' });
   });
 
-  it('keeps reading a localStorage fallback shard after the fallback authority marker is cleared', async () => {
-    // 回归：批量严格读此前在权威标记清除后只看 IndexedDB——兜底写入期间被尽力
-    // 删除的 IDB 分片键会被误判为「分片缺失」，legacy 已退役时该分片字段回退默认
-    // 值，并在下次写入被默认值覆盖（真实数据被 LS 里的新值救不回来）。
+  it('keeps the fallback authority marker while localStorage still holds shard keys', async () => {
+    // 回归（CodeRabbit r4165367360）：IDB 批量写成功后无条件清除权威标记的做法，
+    // 在「兜底写入 + 兜底期 IDB 旧键删除失败」组合下，会让旧 IDB 分片在下次水合
+    // 遮蔽 localStorage 里的新值——用户偏好静默回退，且判脏基准已按新值更新、
+    // 永不自愈。
     const state = buildState();
     debouncedPersistStorage.setItem(KEY, { state, version: 16 });
     await flushPendingPersistSnapshot();
 
-    // 兜底插曲：仅 core 经兜底路径写入 localStorage（旧 IDB core 键被删除），权威标记置位
+    // 兜底插曲：仅 core 经兜底路径写入 localStorage；模拟兜底期间的 IDB 删除
+    // 失败（IDB 刚出过故障，这并不罕见），旧 core 留在 IndexedDB
     const fallbackCore = JSON.stringify({ format: 1, version: 16, state: { theme: 'light', language: 'en' } });
-    await writeEntriesToFallbackStorage(KEY, [[shardKeyFor(KEY, 'core'), fallbackCore]]);
+    const originalDelete = IDBObjectStore.prototype.delete;
+    IDBObjectStore.prototype.delete = function () { throw new Error('simulated delete failure'); };
+    try {
+      await writeEntriesToFallbackStorage(KEY, [[shardKeyFor(KEY, 'core'), fallbackCore]]);
+    } finally {
+      IDBObjectStore.prototype.delete = originalDelete;
+    }
     expect(window.localStorage.getItem(`${KEY}#fallback`)).not.toBeNull();
+    expect(await readRaw(shardKeyFor(KEY, 'core'))).not.toBeNull(); // 旧 IDB core 未被删掉
 
-    // 之后一批不含 core 的写入经 IndexedDB 成功：标记清除，LS 仍持有较新的 core
+    // 之后一批不含 core 的写入经 IndexedDB 成功：LS 仍持有较新的 core → 标记必须保留
     await setStorageEntries(KEY, [
       [shardKeyFor(KEY, 'releases'), JSON.stringify({ format: 1, version: 16, state: { releases: [{ id: 202 }] } })],
       [metaKeyFor(KEY), JSON.stringify({ format: 1, version: 16, shards: [...PERSISTENCE_SHARD_NAMES], savedAt: 't2' })],
     ]);
-    expect(window.localStorage.getItem(`${KEY}#fallback`)).toBeNull();
+    expect(window.localStorage.getItem(`${KEY}#fallback`)).not.toBeNull();
 
+    // 水合读到 localStorage 里的新 core，而不是 IndexedDB 里的旧 core
     const hydrated = await debouncedPersistStorage.getItem(KEY);
     expect(hydrated?.state).toMatchObject({
       theme: 'light',
@@ -551,6 +562,13 @@ describe('sharded persist storage', () => {
       releases: [{ id: 202 }],
       gists: [{ id: 'gist-1' }],
     });
+
+    // 自愈：当批写入覆盖 core 且经 IDB 成功后，LS 镜像被清、不再有派生键残留，
+    // 标记这才清除；之后的读取回到 IDB 优先
+    const healedCore = JSON.stringify({ format: 1, version: 16, state: { theme: 'dark', language: 'zh' } });
+    await setStorageEntries(KEY, [[shardKeyFor(KEY, 'core'), healedCore]]);
+    expect(window.localStorage.getItem(`${KEY}#fallback`)).toBeNull();
+    expect(await readStrict(shardKeyFor(KEY, 'core'))).toBe(healedCore);
   });
 
   it('refuses to write after a shard read failure so real data cannot be overwritten', async () => {
@@ -615,6 +633,34 @@ describe('sharded persist storage', () => {
     expect(await readRaw(KEY)).toBeNull();
     expect(await readMeta()).toBeNull();
     expect(await readRaw(shardKeyFor(KEY, 'core'))).toBeNull();
+  });
+
+  it('removePersistedSnapshot rejects when the on-disk removal fails, without poisoning the write chain', async () => {
+    // 回归（CodeRabbit r4165367349）：删除失败必须如实传给调用方（清空数据流
+    // 据此跳过状态重置与 reload，而不是把残留快照当作已删除）；同时共享写链
+    // 不 reject、簿记仍重置，后续写入全量重建、状态恢复一致。
+    debouncedPersistStorage.setItem(KEY, { state: buildState(), version: 16 });
+    await flushPendingPersistSnapshot();
+    expect(await readMeta()).not.toBeNull();
+
+    const originalDelete = IDBObjectStore.prototype.delete;
+    IDBObjectStore.prototype.delete = function () { throw new Error('simulated delete failure'); };
+    try {
+      await expect(removePersistedSnapshot(KEY)).rejects.toThrow('simulated delete failure');
+    } finally {
+      IDBObjectStore.prototype.delete = originalDelete;
+    }
+
+    // 磁盘上的旧数据未被删除（失败如实暴露，而不是被当作成功）
+    expect(await readMeta()).not.toBeNull();
+
+    // 链未被毒化、簿记已重置：后续写入全量重建，重新水合得到一致状态
+    const nextState = { ...buildState(), language: 'en' };
+    debouncedPersistStorage.setItem(KEY, { state: nextState, version: 16 });
+    await flushPendingPersistSnapshot();
+    expect((await readShardState('core')).language).toBe('en');
+    const rehydrated = await debouncedPersistStorage.getItem(KEY);
+    expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'en' });
   });
 });
 
@@ -689,6 +735,21 @@ describe('indexedDbStorage batch helpers', () => {
     // IDB 恢复后的下一次成功写入清除权威标记并回写 IDB
     await setStorageEntries(KEY, [[`${KEY}#shard:core`, 'NEWER-FROM-IDB']]);
     expect(await readStrict(`${KEY}#shard:core`)).toBe('NEWER-FROM-IDB');
+  });
+
+  it('falls back to localStorage for batch-read keys missing from IndexedDB even without the authority marker', async () => {
+    // 极端角落（如兜底标记自身写入失败）：IDB 无此键但 localStorage 有值且无标记，
+    // 批量严格读必须与单键严格读一致地回退 localStorage，而不是判成分片缺失。
+    window.localStorage.setItem(`${KEY}#shard:core`, 'LS-ONLY');
+    try {
+      expect(await getStorageEntriesStrict(KEY, [`${KEY}#shard:core`])).toEqual(['LS-ONLY']);
+      // 对照：IDB 有该键时值以 IDB 为准（LS 镜像不会被误用）
+      await setStorageEntries(KEY, [[`${KEY}#shard:core`, 'IDB-VALUE']]);
+      expect(await getStorageEntriesStrict(KEY, [`${KEY}#shard:core`])).toEqual(['IDB-VALUE']);
+    } finally {
+      window.localStorage.removeItem(`${KEY}#shard:core`);
+      await indexedDBStorage.removeItem(`${KEY}#shard:core`);
+    }
   });
 
   it('writes batch entries through the IndexedDB path and reads them back', async () => {

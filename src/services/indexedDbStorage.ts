@@ -247,13 +247,32 @@ const safeLocalStorageRemoveWithDerivedKeys = (name: string): void => {
 /**
  * localStorage 兜底权威标记：IndexedDB 批量写失败而回退写入成功时置位，
  * 表示「这些键的最新已提交值在 localStorage，读取必须优先 localStorage」。
- * 下一次 IndexedDB 写入成功时清除。若不标记，读取端会继续优先返回 IndexedDB
- * 中的旧值，localStorage 里的新值永远不会生效（状态静默回滚）。
+ * 下一次 IndexedDB 写入成功、且 localStorage 不再持有任何派生数据键时清除
+ * （仍有残留就保留，防止 IndexedDB 旧值遮蔽新值）。若不标记，读取端会继续
+ * 优先返回 IndexedDB 中的旧值，localStorage 里的新值永远不会生效（状态静默回滚）。
  */
 const fallbackMarkerKey = (name: string): string => `${name}#fallback`;
 
 const isFallbackAuthoritative = (name: string): boolean =>
   safeLocalStorageGet(fallbackMarkerKey(name)) !== null;
+
+/**
+ * localStorage 是否仍持有该 name 的派生数据键（权威标记自身除外）。
+ * 无法检查时按「仍有」处理（fail-safe）：保留标记，避免 IndexedDB 里的旧值
+ * 在下一次水合遮蔽 localStorage 里的新值。
+ */
+const hasFallbackDerivedKeys = (name: string): boolean => {
+  const marker = fallbackMarkerKey(name);
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key && key !== marker && key.startsWith(`${name}#`)) return true;
+    }
+  } catch {
+    return true;
+  }
+  return false;
+};
 
 /**
  * localStorage 兜底写入：按“全部成功才算提交”处理，任一键失败即回滚并抛错。
@@ -328,7 +347,12 @@ export const setStorageEntries = async (
       for (const [key] of entries) {
         safeLocalStorageRemove(key);
       }
-      safeLocalStorageRemove(fallbackMarkerKey(name));
+      // 仅当 localStorage 不再持有任何派生数据键时才清除权威标记：分片写入只
+      // 提交脏分片，早前兜底写入的其他分片可能仍只在 localStorage（兜底期间尽力
+      // 删除旧 IDB 键也可能失败）；此时清除标记会让 IDB 旧值在下次水合遮蔽新值。
+      if (!hasFallbackDerivedKeys(name)) {
+        safeLocalStorageRemove(fallbackMarkerKey(name));
+      }
       return;
     } catch (error) {
       console.warn('[storage] IndexedDB batch set failed, fallback to localStorage:', error);
@@ -469,10 +493,8 @@ export const indexedDBStorage: StateStorage = {
 
     if (!canUseIndexedDB()) return;
 
-    try {
-      await idbDeleteWithDerivedKeys(name);
-    } catch (error) {
-      console.warn('[storage] IndexedDB remove failed:', error);
-    }
+    // 删除失败如实抛出：残留的分片/meta 会在 reload 后复活，「清空数据」等
+    // 调用方必须感知失败，而不是把未完成的删除当作成功继续。
+    await idbDeleteWithDerivedKeys(name);
   },
 };
