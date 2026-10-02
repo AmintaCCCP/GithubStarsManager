@@ -1,6 +1,7 @@
 import { WebDAVConfig } from '../types';
 import { logger } from './logger';
 import { backend } from './backendAdapter';
+import { isElectron } from './electronProxy';
 
 export class WebDAVService {
   private config: WebDAVConfig;
@@ -36,6 +37,11 @@ export class WebDAVService {
     return { sizeKB, isLarge, suggestions };
   }
 
+  // 确定的非瞬时错误：DNS 解析失败、连接被拒、证书/TLS 校验失败、代理隧道失败。
+  // 这类失败重试只会得到同样的结果，直接抛出让用户尽快看到可操作提示
+  private static readonly NON_TRANSIENT_CAUSE =
+    /ENOTFOUND|ERR_NAME_NOT_RESOLVED|EAI_AGAIN|ECONNREFUSED|ERR_CONNECTION_REFUSED|_CERT|UNABLE_TO_|ERR_SSL|EPROTO|ERR_PROXY|ERR_TUNNEL/i;
+
   // 重试机制
   private async retryUpload<T>(
     operation: () => Promise<T>,
@@ -55,11 +61,13 @@ export class WebDAVService {
         }
 
         const errMsg = lastError.message;
+        const causeCode = (lastError as { causeCode?: string }).causeCode ?? '';
         const shouldRetry =
-          errMsg.includes('超时') ||
-          errMsg.includes('timeout') ||
-          errMsg.includes('NetworkError') ||
-          errMsg.includes('fetch');
+          !WebDAVService.NON_TRANSIENT_CAUSE.test(`${causeCode} ${errMsg}`) &&
+          (errMsg.includes('超时') ||
+            errMsg.includes('timeout') ||
+            errMsg.includes('NetworkError') ||
+            errMsg.includes('fetch'));
 
         if (!shouldRetry) {
           throw lastError;
@@ -155,7 +163,10 @@ export class WebDAVService {
       if (result.timedOut) {
         throw new DOMException('WebDAV request timed out', 'AbortError');
       }
-      throw new TypeError(result.error || 'WebDAV request failed');
+      const err = new TypeError(result.error || 'WebDAV request failed');
+      // 结构化 cause 供 handleNetworkError 映射为可操作的排查建议
+      if (result.causeCode) (err as Error & { causeCode?: string }).causeCode = result.causeCode;
+      throw err;
     }
 
     const bodyless = result.status === 204 || result.status === 304 || method === 'HEAD';
@@ -168,13 +179,22 @@ export class WebDAVService {
 
   private handleNetworkError(error: unknown, operation: string): never {
     logger.error('webdav', `WebDAV ${operation} failed`, error);
-    
-    const err = error as Error;
+
+    const err = error as Error & { causeCode?: string };
+
+    // 桌面版：请求由主进程代发，不存在 CORS 限制；失败是真实的网络/TLS 问题，
+    // 按主进程透传的底层错误码给出可操作的排查建议
+    if (isElectron()) {
+      throw new Error(this.describeDesktopFailure(err, operation));
+    }
+
     const isCorsError = (
       (err.name === 'TypeError' && err.message.includes('Failed to fetch')) ||
       (err.message && err.message.includes('NetworkError when attempting to fetch resource')) ||
       (err.name === 'NetworkError') ||
-      (err.message && err.message.includes('NetworkError'))
+      (err.message && err.message.includes('NetworkError')) ||
+      // Safari 对同类网络失败的文案
+      (err.message && err.message.includes('Load failed'))
     );
 
     if (isCorsError) {
@@ -208,6 +228,69 @@ export class WebDAVService {
     }
     
     throw new Error(`WebDAV ${operation} 失败: ${err.message || '未知错误'}`);
+  }
+
+  /**
+   * 桌面版（主进程代发）网络失败的可操作描述。主进程会回传 cause 链与
+   * causeCode（undici 的 "fetch failed" 本身不含信息），这里映射为排查建议：
+   * 先按结构化 causeCode 精确归类（它是主进程认定的最相关失败），
+   * 匹配不到再退一步对消息全文做包含匹配（覆盖另一网络栈的明细文本）。
+   */
+  private describeDesktopFailure(err: Error & { causeCode?: string }, operation: string): string {
+    const ADVICE_BY_TOKENS: Array<{ tokens: string[]; advice: string }> = [
+      {
+        tokens: ['ENOTFOUND', 'EAI_AGAIN', 'ERR_NAME_NOT_RESOLVED'],
+        advice: '无法解析 WebDAV 服务器地址。请检查 URL 中的主机名是否正确，以及当前网络的 DNS 是否可用。',
+      },
+      {
+        tokens: ['ECONNREFUSED', 'ERR_CONNECTION_REFUSED'],
+        advice: '服务器拒绝了连接。请确认 WebDAV 服务已启动且端口正确；如果是局域网地址，请确认本机与服务器在同一网络内。',
+      },
+      {
+        tokens: ['DEPTH_ZERO_SELF_SIGNED_CERT', 'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'UNABLE_TO_GET_ISSUER_CERT', 'ERR_CERT_AUTHORITY_INVALID'],
+        advice: '服务器证书未被信任（常见于自签名证书）。请为 WebDAV 服务器配置受信任的证书；局域网服务可改用 http:// 地址。',
+      },
+      {
+        tokens: ['CERT_HAS_EXPIRED', 'ERR_CERT_DATE_INVALID'],
+        advice: '服务器证书已过期。请更新 WebDAV 服务器的证书；局域网服务可改用 http:// 地址。',
+      },
+      {
+        tokens: ['ERR_PROXY_CONNECTION_FAILED', 'ERR_TUNNEL_CONNECTION_FAILED', 'ERR_PROXY_AUTH_UNSUPPORTED', 'ERR_MANDATORY_PROXY_CONFIGURATION_FAILED'],
+        advice: '经由代理连接失败。请检查“设置 → 网络设置”中的代理配置是否可用；也可以暂时关闭应用内代理、改用系统代理后重试。',
+      },
+      {
+        tokens: ['UND_ERR_CONNECT_TIMEOUT', 'ETIMEDOUT', 'ERR_TIMED_OUT'],
+        advice: '连接超时。请检查本机网络；如果需要通过代理/VPN 访问该服务器，请在“设置 → 网络设置”中配置代理后重试。',
+      },
+      {
+        tokens: ['ENETUNREACH', 'EHOSTUNREACH', 'ERR_ADDRESS_UNREACHABLE', 'ERR_NETWORK_UNREACHABLE'],
+        advice: '网络不可达。请检查本机网络连接；如果是局域网地址，请确认本机与服务器在同一网络内。',
+      },
+      {
+        tokens: ['ECONNRESET', 'ERR_CONNECTION_RESET'],
+        advice: '连接被重置。服务器或中间网络设备中断了连接，请稍后重试或检查服务器配置。',
+      },
+      {
+        tokens: ['EPROTO', 'ERR_SSL', 'SSLV3_ALERT', 'TLSV1_ALERT', 'ERR_SSL_PROTOCOL_ERROR'],
+        advice: 'TLS 握手失败。请确认 URL 的协议与服务器匹配（http/https 不要填错），并检查服务器的 TLS 配置。',
+      },
+    ];
+
+    const codeUpper = (err.causeCode ?? '').toUpperCase();
+    const text = `${codeUpper} ${err.message ?? ''}`.toUpperCase();
+    // 结构化 code 优先（避免消息里多栈明细文本抢错分类），全文匹配兜底
+    let advice: string | null = null;
+    if (codeUpper) {
+      advice = ADVICE_BY_TOKENS.find((b) => b.tokens.some((t) => codeUpper === t))?.advice ?? null;
+    }
+    if (!advice) {
+      advice = ADVICE_BY_TOKENS.find((b) => b.tokens.some((t) => text.includes(t)))?.advice ?? null;
+    }
+
+    if (advice) {
+      return `WebDAV ${operation} 失败：${advice}\n\n技术详情: ${err.message}`;
+    }
+    return `WebDAV ${operation} 失败: ${err.message || '未知错误'}\n\n提示：桌面版的 WebDAV 请求由主进程代发。若服务器需要代理/VPN 才能访问，请在“设置 → 网络设置”中配置代理；若服务器使用自签名证书，请改用受信任的证书或 http:// 地址。`;
   }
 
   async testConnection(): Promise<boolean> {

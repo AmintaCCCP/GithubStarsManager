@@ -88,6 +88,10 @@ interface ElectronAPI {
     body?: string;
     contentType?: string;
     error?: string;
+    /** 主进程网络栈失败时的最底层错误码（如 ECONNREFUSED / ENOTFOUND / DEPTH_ZERO_SELF_SIGNED_CERT） */
+    causeCode?: string;
+    /** 最底层错误的原始描述（如 "connect ECONNREFUSED 10.0.0.5:5006"） */
+    causeMessage?: string;
     timedOut?: boolean;
   }>;
   xAuth?: {

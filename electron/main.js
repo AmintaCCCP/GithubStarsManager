@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+const { summarizeFetchError, fetchAcrossStacks, timeoutSignalFromBudget, followRedirectsManually, toFailureResult } = require('./mainFetch');
 const { createPluginManager } = require('./plugins/pluginManager');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
 const { loadPluginRegistry } = require('./plugins/pluginRegistryFeed');
@@ -353,16 +354,34 @@ ipcMain.handle('x-fetch-timeline', async (_event, handle) => {
     return { success: false, error: 'invalid handle' };
   }
   try {
-    const dispatcher = getFetchDispatcher();
-    const response = await fetch(`https://x.com/${handle}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
+    const timelineUrl = `https://x.com/${handle}`;
+    const timelineHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
+    const { response } = await fetchAcrossStacks([
+      // 首选 undici：跟随应用内代理/环境变量代理（getFetchDispatcher）
+      {
+        name: 'undici',
+        run: async ({ remainingMs }) => {
+          const dispatcher = getFetchDispatcher();
+          return fetch(timelineUrl, {
+            headers: timelineHeaders,
+            signal: timeoutSignalFromBudget(remainingMs, 20_000),
+            ...(dispatcher ? { dispatcher } : {}),
+          });
+        },
       },
-      signal: AbortSignal.timeout(20_000),
-      ...(dispatcher ? { dispatcher } : {}),
-    });
+      // 回退 Chromium 栈：跟随 session 代理（含“系统代理”），并使用系统证书库
+      {
+        name: 'chromium',
+        run: ({ remainingMs }) => net.fetch(timelineUrl, {
+          headers: timelineHeaders,
+          signal: timeoutSignalFromBudget(remainingMs, 20_000),
+        }),
+      },
+    ], { totalTimeoutMs: 20_000 });
     if (!response.ok) {
       return { success: false, error: `x.com responded ${response.status}` };
     }
@@ -385,14 +404,34 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
   }
   try {
     const suffix = before ? `?before=${before}` : '';
-    const response = await net.fetch(`https://t.me/s/${channel}${suffix}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
+    const telegramUrl = `https://t.me/s/${channel}${suffix}`;
+    const telegramHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
+    const { response } = await fetchAcrossStacks([
+      // 首选 Chromium 栈：跟随 session 代理（含应用内代理与“系统代理”模式）
+      {
+        name: 'chromium',
+        run: ({ remainingMs }) => net.fetch(telegramUrl, {
+          headers: telegramHeaders,
+          signal: timeoutSignalFromBudget(remainingMs, 20_000),
+        }),
       },
-      signal: AbortSignal.timeout(20_000),
-    });
+      // 回退 undici：跟随应用内代理/环境变量代理（Chromium 栈整体不可用时兜底）
+      {
+        name: 'undici',
+        run: async ({ remainingMs }) => {
+          const dispatcher = getFetchDispatcher();
+          return fetch(telegramUrl, {
+            headers: telegramHeaders,
+            signal: timeoutSignalFromBudget(remainingMs, 20_000),
+            ...(dispatcher ? { dispatcher } : {}),
+          });
+        },
+      },
+    ], { totalTimeoutMs: 20_000 });
     if (!response.ok) {
       return { success: false, error: `t.me responded ${response.status}` };
     }
@@ -406,7 +445,10 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
 // WebDAV：主进程代发 DAV 请求。
 // 渲染进程开启了 webSecurity，且桌面版以 file:// 为源、又不携带后端，
 // 浏览器直连会被 WebDAV 服务器的 CORS 策略拦下（PROPFIND/MKCOL/PUT 等）。
-// 用 Node fetch（undici）代发可复用应用内已配置的代理，且不受渲染进程 CORS 约束。
+// 首选 Node fetch（undici，跟随应用内代理/环境变量代理）；网络层失败时回退
+// Chromium 栈（net.fetch），它跟随 session 代理（含“系统代理”）并使用系统
+// 证书库——undici 直连失败（系统代理/VPN 仅对 Chromium 生效、企业根证书装在
+// 系统钥匙串、自签名证书已被系统信任等）的大量场景可由此成功。
 // 主机不设白名单：WebDAV 普遍部署在用户自有的云盘或局域网 NAS 上。
 const WEBDAV_ALLOWED_METHODS = new Set([
   'GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'OPTIONS',
@@ -439,20 +481,39 @@ ipcMain.handle('webdav-request', async (_event, params) => {
       safeHeaders[key] = value;
     }
   }
-  // 与前端一致的超时上限（WebDAV 上传最长 300s）
+  // 与前端一致的超时上限（WebDAV 上传最长 300s）；多栈尝试共享这一预算
   const timeout = Number.isFinite(timeoutMs)
     ? Math.min(Math.max(Math.trunc(timeoutMs), 1000), 300000)
     : 60000;
+  // GET/HEAD 带 body 会被 undici 拒绝（Chromium 栈同样不允许）
+  const hasBody = !!body && upperMethod !== 'GET' && upperMethod !== 'HEAD';
   try {
-    const dispatcher = getFetchDispatcher();
-    const response = await fetch(parsed.toString(), {
-      method: upperMethod,
-      headers: safeHeaders,
-      // GET/HEAD 带 body 会被 undici 拒绝
-      ...(body && upperMethod !== 'GET' && upperMethod !== 'HEAD' ? { body } : {}),
-      signal: AbortSignal.timeout(timeout),
-      ...(dispatcher ? { dispatcher } : {}),
-    });
+    const { response } = await fetchAcrossStacks([
+      {
+        name: 'undici',
+        run: async ({ remainingMs }) => {
+          const dispatcher = getFetchDispatcher();
+          return fetch(parsed.toString(), {
+            method: upperMethod,
+            headers: safeHeaders,
+            ...(hasBody ? { body } : {}),
+            signal: timeoutSignalFromBudget(remainingMs, timeout),
+            ...(dispatcher ? { dispatcher } : {}),
+          });
+        },
+      },
+      {
+        name: 'chromium',
+        // net.fetch 的自动重定向在跨域跳转时仍会转发 Authorization（Electron 44 实测），
+        // 携带 Basic 凭据的 DAV 请求必须手动跟随跳转，跨源时剥离凭据头
+        run: ({ remainingMs }) => followRedirectsManually(net.fetch, parsed.toString(), {
+          method: upperMethod,
+          headers: safeHeaders,
+          ...(hasBody ? { body } : {}),
+          signal: timeoutSignalFromBudget(remainingMs, timeout),
+        }),
+      },
+    ], { totalTimeoutMs: timeout });
     const text = await response.text();
     return {
       success: true,
@@ -462,15 +523,8 @@ ipcMain.handle('webdav-request', async (_event, params) => {
       contentType: response.headers.get('content-type') ?? undefined,
     };
   } catch (error) {
-    // 归一超时：渲染进程据此复用既有的 AbortError 提示文案
-    const isTimeout = error?.name === 'TimeoutError' ||
-      error?.name === 'AbortError' ||
-      /timeout/i.test(error instanceof Error ? error.message : String(error));
-    return {
-      success: false,
-      timedOut: isTimeout,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    // 归一超时与结构化 cause，供渲染进程映射为可操作的修复建议
+    return toFailureResult(error);
   }
 });
 
@@ -532,7 +586,8 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
     const body = await response.text();
     return { success: true, body };
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    // undici 的网络层失败统一是 "fetch failed"，真实原因在 cause 链上
+    return { success: false, error: summarizeFetchError(error).message };
   }
 });
 
