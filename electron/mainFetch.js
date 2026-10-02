@@ -80,6 +80,15 @@ function summarizeFetchError(error) {
 /** 单栈最小预算：与 timeoutSignalFromBudget 的信号下限一致，保证不超总预算 */
 const MIN_STACK_BUDGET_MS = 1000;
 
+/** 丢弃未消费的响应体：undici 的连接需显式 cancel 才能立即归还连接池 */
+async function discardResponseBody(response) {
+  try {
+    await response?.body?.cancel?.();
+  } catch {
+    // 流已被取消/锁定/不支持 cancel：忽略
+  }
+}
+
 async function fetchAcrossStacks(stacks, options = {}) {
   const { totalTimeoutMs } = options;
   const minStackBudgetMs = Number.isFinite(options.minStackBudgetMs)
@@ -99,9 +108,12 @@ async function fetchAcrossStacks(stacks, options = {}) {
     try {
       const response = await stack.run({ remainingMs });
       if (typeof stack.onResponseRetryable === 'function' && stack.onResponseRetryable(response)) {
+        await discardResponseBody(retryableMiss?.response);
         retryableMiss = { response, stack: stack.name };
         continue;
       }
+      // 后续栈成功：先前未命中栈的响应被丢弃，取消其响应体归还连接
+      await discardResponseBody(retryableMiss?.response);
       return { response, stack: stack.name };
     } catch (error) {
       failures.push({ name: stack.name, summary: summarizeFetchError(error) });

@@ -238,6 +238,35 @@ describe('fetchAcrossStacks: onResponseRetryable 响应级让位', () => {
     assert.equal(response.status, 403);
     assert.equal(stack, 'chromium');
   });
+
+  it('被覆盖或被丢弃的未命中响应会取消其响应体（归还 undici 连接）', async () => {
+    const cancels = [];
+    const fakeWithBody = (status) => {
+      const response = fakeResponse(status);
+      response.body = { cancel: async () => { cancels.push(status); } };
+      return response;
+    };
+    const { response } = await fetchAcrossStacks([
+      {
+        name: 'undici',
+        run: async () => fakeWithBody(403),
+        onResponseRetryable: (r) => r.status === 403,
+      },
+      {
+        name: 'chromium-1',
+        run: async () => fakeWithBody(429),
+        onResponseRetryable: (r) => r.status === 429,
+      },
+      {
+        name: 'chromium-2',
+        run: async () => fakeWithBody(200),
+      },
+    ]);
+
+    assert.equal(response.status, 200);
+    // 403 被 429 覆盖时取消；429 在拿到 200 后被丢弃时取消；200 正常返回不取消
+    assert.deepEqual(cancels, [403, 429]);
+  });
 });
 
 describe('timeoutSignalFromBudget', () => {

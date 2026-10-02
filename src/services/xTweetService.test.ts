@@ -640,10 +640,14 @@ describe('defaultXGraphQLTransport（边缘 403 自动降级 guest）', () => {
     setElectronAPI({
       xFetchGraphQL: vi.fn(async (_url: string, auth: XTweetAuth | null) => {
         calls.push(auth);
-        return { success: false, error: 'x.com responded 403' };
+        // 两次请求返回不同错误，确保上抛的确实是 guest 请求的错误
+        return auth
+          ? { success: false, error: 'x.com responded 403' }
+          : { success: false, error: 'x.com guest token activate failed (429)' };
       }),
     });
-    await expect(defaultXGraphQLTransport(USER_TWEETS_URL, AUTH)).rejects.toThrow('x.com responded 403');
+    await expect(defaultXGraphQLTransport(USER_TWEETS_URL, AUTH))
+      .rejects.toThrow('x.com guest token activate failed (429)');
     expect(calls).toEqual([AUTH, null]);
   });
 
