@@ -1103,7 +1103,7 @@
     "sources-title": "Plugin-Quellen verwalten",
     "sources-description": "Eine Quelle ist ein GitHub-Repository-Verzeichnis. Nach dem Hinzufügen werden automatisch alle Plugins in diesem Verzeichnis aufgelistet; mehrere Quellen werden gemeinsam durchsucht.",
     "sources-add": "Quelle hinzufügen",
-    "sources-name": "Name (optional)",
+    "sources-name": "Bezeichnung (optional)",
     "sources-name-placeholder": "Standardmäßig Repository-/Verzeichnisname",
     "sources-url": "Quell-URL",
     "sources-url-placeholder": "https://github.com/owner/repo/tree/main/plugins",

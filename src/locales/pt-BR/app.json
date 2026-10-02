@@ -1092,7 +1092,7 @@
     "marketplace-update-success-v1": "{{v1}} atualizado. Revise as permissões antes de ativar.",
     "marketplace-unsupported-api-v1": "Versão da API de plugins não compatível ({{v1}})",
     "marketplace-permissions-more-v1": "+{{v1}}",
-    "marketplace-plugin-count-v1": "{{v1}} plugins",
+    "marketplace-plugin-count-v1": "plugins: {{v1}}",
     "marketplace-refresh-source-v1": "Atualizar a fonte {{v1}}",
     "marketplace-source-error": "Falha ao carregar a fonte: ",
     "marketplace-retry": "Tentar novamente",
