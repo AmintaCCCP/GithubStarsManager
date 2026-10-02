@@ -77,10 +77,20 @@ export const normalizePersistedState = (
   const starredGists = Array.isArray(safePersisted.starredGists) ? safePersisted.starredGists : [];
   const releases = Array.isArray(safePersisted.releases) ? safePersisted.releases : [];
 
-  // Migration for old users: mark repos with existing releases as already synced
-  const migratedRepositories = repositories.map(repo => {
-    const hasExistingRelease = releases.some(r => r.repository?.id === repo.id);
-    if (hasExistingRelease && !repo.has_fetched_releases) {
+  // Migration for old users: mark repos with existing releases as already synced.
+  // 引用保留：无需回填时直接返回原数组——分片持久化按引用判脏，若 hydration
+  // 总是产生新数组引用，会在每次启动后触发一次全量重写。
+  const releaseRepositoryIds = new Set(
+    releases.map(release => release.repository?.id).filter((id): id is number => typeof id === 'number'),
+  );
+  const needsReleaseBackfill = repositories.some(
+    repo => releaseRepositoryIds.has(repo.id) && !repo.has_fetched_releases,
+  );
+  const migratedRepositories = needsReleaseBackfill
+    ? repositories.map(repo => {
+      if (!releaseRepositoryIds.has(repo.id) || repo.has_fetched_releases) {
+        return repo;
+      }
       // Backfill last_release_fetch_time from the latest persisted release timestamp
       const repoReleases = releases.filter(r => r.repository?.id === repo.id);
       const latestReleaseTime = repoReleases.length > 0
@@ -91,9 +101,8 @@ export const normalizePersistedState = (
         has_fetched_releases: true,
         last_release_fetch_time: repo.last_release_fetch_time || (latestReleaseTime ? new Date(latestReleaseTime).toISOString() : new Date().toISOString())
       };
-    }
-    return repo;
-  });
+    })
+    : repositories;
 
   // Default includePreRelease to true if not set (backward compatibility)
   const includePreRelease = safePersisted.includePreRelease !== undefined

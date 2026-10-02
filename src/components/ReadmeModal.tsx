@@ -193,13 +193,35 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     }
   }, []);
 
+  const scrollRafRef = useRef<number | null>(null);
+
+  // 进度条读取 scrollHeight/clientHeight 会强制布局，用 rAF 合帧避免滚动时反复重排。
   const handleScroll = useCallback(() => {
-    if (!contentRef.current) return;
-    const container = contentRef.current;
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const progress = scrollHeight <= clientHeight ? 0 : (scrollTop / (scrollHeight - clientHeight)) * 100;
-    setScrollProgress(Math.min(100, Math.max(0, progress)));
-    setShowBackToTop(scrollTop > 300);
+    if (scrollRafRef.current !== null) return;
+    const run = () => {
+      scrollRafRef.current = null;
+      if (!contentRef.current) return;
+      const container = contentRef.current;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const progress = scrollHeight <= clientHeight ? 0 : (scrollTop / (scrollHeight - clientHeight)) * 100;
+      setScrollProgress(Math.min(100, Math.max(0, progress)));
+      setShowBackToTop(scrollTop > 300);
+    };
+    if (typeof window.requestAnimationFrame === 'function') {
+      scrollRafRef.current = window.requestAnimationFrame(run);
+    } else {
+      scrollRafRef.current = window.setTimeout(run, 16) as unknown as number;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (scrollRafRef.current === null) return;
+    if (typeof window.cancelAnimationFrame === 'function') {
+      window.cancelAnimationFrame(scrollRafRef.current);
+    } else {
+      window.clearTimeout(scrollRafRef.current);
+    }
+    scrollRafRef.current = null;
   }, []);
 
   useEffect(() => {

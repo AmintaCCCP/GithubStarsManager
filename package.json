@@ -98,6 +98,7 @@
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
+    "fake-indexeddb": "^6.2.5",
     "github-markdown-css": "^5.9.0",
     "globals": "^15.9.0",
     "highlight.js": "^11.11.1",
