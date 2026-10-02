@@ -15,6 +15,10 @@
  *   不回退已推进游标，60 秒水位只拦 page 1）。queryId 会随发版轮换：
  *   缓存命中优先，未命中/404 时从登录态首页引用的 main.<hash>.js bundle
  *   重新提取，失败再退回内置兜底值。
+ * - 鉴权降级（2026-10）：x.com 边缘 WAF 开始按 TLS 指纹拦截 Node 网络栈
+ *   （403 HTML 挑战页，Chromium 栈放行），鉴权请求失败时传输层自动降级
+ *   免登录 guest 流程（guest token + Chromium 栈），公开账号可继续使用，
+ *   但 guest 时间线无翻页游标（每博主仅最新一页）。
  *
  * 两条路径共用：仓库 upsert（原贴指向发布时间最新的推文）→ 详情补全
  * （GraphQL 批量优先，REST 逐仓回退）→ 独立 IndexedDB 持久化 → 按推文
@@ -181,8 +185,11 @@ const X_GRAPHQL_FEATURES = JSON.stringify({
  * 鉴权路径传输层：GET 一个 x.com GraphQL / 静态资源 URL，返回响应正文。
  * 鉴权 Cookie 只经桌面 IPC 参数或服务端 POST 体传递（URL 不带敏感信息）。
  * 非 2xx 抛错（消息含状态码，供上层映射"鉴权失效/限流"）。
+ * auth 允许 null（免登录 guest 流程）：鉴权 Cookie 请求被 x.com 边缘 WAF
+ * 403（按 TLS 指纹拦 Node 网络栈）时，自动降级 guest 重试同一 URL——公开
+ * 账号无需 Cookie 即可取时间线；其余错误（如 401 鉴权失效）不降级。
  */
-export type XGraphQLTransport = (url: string, auth: XTweetAuth) => Promise<string>;
+export type XGraphQLTransport = (url: string, auth: XTweetAuth | null) => Promise<string>;
 
 export const defaultXGraphQLTransport: XGraphQLTransport = async (url, auth) => {
   let desktopError: unknown = null;
@@ -191,7 +198,18 @@ export const defaultXGraphQLTransport: XGraphQLTransport = async (url, auth) => 
       const body = await fetchXGraphQLViaDesktop(url, auth);
       if (body !== null) return body;
     } catch (error) {
-      desktopError = error;
+      if (auth && error instanceof Error && error.message.includes('403')) {
+        // 鉴权请求被 x.com 边缘 WAF 403：降级免登录 guest 流程重试同一 URL；
+        // guest 也失败时保留其错误（比 403 更接近真因）继续走服务端回退
+        try {
+          const guestBody = await fetchXGraphQLViaDesktop(url, null);
+          if (guestBody !== null) return guestBody;
+        } catch (guestError) {
+          desktopError = guestError;
+        }
+      } else {
+        desktopError = error;
+      }
     }
   }
   const backendUrl = backend.backendUrl;

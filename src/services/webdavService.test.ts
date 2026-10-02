@@ -134,3 +134,179 @@ describe('WebDAVService 传输层选择', () => {
     await expect(davService().listFiles()).resolves.toEqual(['a.json']);
   });
 });
+
+describe('WebDAVService 错误提示', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('桌面版按 causeCode 给出可操作提示（ENOTFOUND → DNS 建议）', async () => {
+    window.electronAPI = {
+      webdavRequest: vi.fn().mockResolvedValue({
+        success: false,
+        error: 'undici: fetch failed <- ENOTFOUND: getaddrinfo ENOTFOUND dav.lan',
+        causeCode: 'ENOTFOUND',
+        causeMessage: 'getaddrinfo ENOTFOUND dav.lan',
+      }),
+    } as unknown as Window['electronAPI'];
+
+    await expect(davService().testConnection()).rejects.toThrow(/无法解析 WebDAV 服务器地址/);
+  });
+
+  it('桌面版网络层失败不再误报 CORS，并保留技术详情', async () => {
+    window.electronAPI = {
+      webdavRequest: vi.fn().mockResolvedValue({
+        success: false,
+        error: 'undici: fetch failed <- ECONNREFUSED: connect ECONNREFUSED 192.168.1.10:5006',
+        causeCode: 'ECONNREFUSED',
+        causeMessage: 'connect ECONNREFUSED 192.168.1.10:5006',
+      }),
+    } as unknown as Window['electronAPI'];
+
+    const attempt = davService().testConnection();
+    await expect(attempt).rejects.toThrow(/服务器拒绝了连接/);
+    await expect(attempt).rejects.toThrow(/ECONNREFUSED/);
+    await expect(attempt).rejects.not.toThrow(/CORS策略阻止/);
+  });
+
+  it('桌面版自签名证书给出证书建议', async () => {
+    window.electronAPI = {
+      webdavRequest: vi.fn().mockResolvedValue({
+        success: false,
+        error: 'undici: fetch failed <- DEPTH_ZERO_SELF_SIGNED_CERT: self-signed certificate',
+        causeCode: 'DEPTH_ZERO_SELF_SIGNED_CERT',
+        causeMessage: 'self-signed certificate',
+      }),
+    } as unknown as Window['electronAPI'];
+
+    await expect(davService().testConnection()).rejects.toThrow(/自签名证书/);
+  });
+
+  it('桌面版 IPC 超时仍归一为超时文案', async () => {
+    window.electronAPI = {
+      webdavRequest: vi.fn().mockResolvedValue({
+        success: false,
+        timedOut: true,
+        error: 'undici: signal timed out',
+      }),
+    } as unknown as Window['electronAPI'];
+
+    await expect(davService().testConnection()).rejects.toThrow(/连接超时/);
+  });
+
+  it('纯浏览器直连遇到 Failed to fetch 仍提示 CORS 配置', async () => {
+    vi.mocked(window.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(davService().testConnection()).rejects.toThrow(/CORS策略阻止/);
+  });
+
+  it('纯浏览器直连兼容 Safari 的 Load failed 文案', async () => {
+    vi.mocked(window.fetch).mockRejectedValue(new TypeError('Load failed'));
+
+    await expect(davService().testConnection()).rejects.toThrow(/CORS策略阻止/);
+  });
+
+  it('桌面版代理类错误码给出代理排查建议', async () => {
+    window.electronAPI = {
+      webdavRequest: vi.fn().mockResolvedValue({
+        success: false,
+        error: 'chromium: fetch failed <- ERR_PROXY_CONNECTION_FAILED',
+        causeCode: 'ERR_PROXY_CONNECTION_FAILED',
+      }),
+    } as unknown as Window['electronAPI'];
+
+    await expect(davService().testConnection()).rejects.toThrow(/经由代理连接失败/);
+  });
+
+  it('结构化 causeCode 优先于消息文本分类（ENOTFOUND 文本 + ETIMEDOUT code → 超时建议）', async () => {
+    window.electronAPI = {
+      webdavRequest: vi.fn().mockResolvedValue({
+        success: false,
+        // 主栈 undici 报 DNS、回退栈 chromium 超时；主进程认定的最相关失败在 causeCode 上
+        error: 'undici: fetch failed <- ENOTFOUND: getaddrinfo ENOTFOUND dav.lan; chromium: fetch failed <- ETIMEDOUT: connect timed out',
+        causeCode: 'ETIMEDOUT',
+      }),
+    } as unknown as Window['electronAPI'];
+
+    const attempt = davService().testConnection();
+    await expect(attempt).rejects.toThrow(/连接超时/);
+    await expect(attempt).rejects.not.toThrow(/无法解析/);
+  });
+
+  it('electronAPI 存在但未暴露 webdavRequest（旧 preload）按直连路径提示', async () => {
+    // 传输层会走后端/浏览器直连，错误提示不能套用"主进程代发"文案
+    window.electronAPI = {} as unknown as Window['electronAPI'];
+    vi.mocked(window.fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(davService().testConnection()).rejects.toThrow(/CORS策略阻止/);
+  });
+});
+
+describe('WebDAVService 上传重试策略', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('连接被拒（非瞬时错误）不做无谓重试', async () => {
+    const webdavRequest = vi.fn().mockResolvedValue({
+      success: false,
+      error: 'undici: fetch failed <- ECONNREFUSED: connect ECONNREFUSED 192.168.1.10:5006',
+      causeCode: 'ECONNREFUSED',
+    });
+    window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/服务器拒绝了连接/);
+
+    const puts = webdavRequest.mock.calls.filter((c) => c[0].method === 'PUT');
+    expect(puts.length).toBe(1);
+  });
+
+  it('自签名证书（非瞬时错误）不做无谓重试', async () => {
+    const webdavRequest = vi.fn().mockResolvedValue({
+      success: false,
+      error: 'undici: fetch failed <- DEPTH_ZERO_SELF_SIGNED_CERT: self-signed certificate',
+      causeCode: 'DEPTH_ZERO_SELF_SIGNED_CERT',
+    });
+    window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/自签名证书/);
+
+    const puts = webdavRequest.mock.calls.filter((c) => c[0].method === 'PUT');
+    expect(puts.length).toBe(1);
+  });
+
+  it('连接超时（瞬时错误）仍按既有退避策略重试', async () => {
+    vi.useFakeTimers();
+    try {
+      const webdavRequest = vi.fn().mockResolvedValue({
+        success: false,
+        error: 'undici: fetch failed <- UND_ERR_CONNECT_TIMEOUT: connect timeout',
+        causeCode: 'UND_ERR_CONNECT_TIMEOUT',
+      });
+      window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+      const attempt = davService().uploadFile('a.json', '{}');
+      const assertion = expect(attempt).rejects.toThrow(/连接超时/);
+      await vi.runAllTimersAsync();
+      await assertion;
+
+      const puts = webdavRequest.mock.calls.filter((c) => c[0].method === 'PUT');
+      expect(puts.length).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

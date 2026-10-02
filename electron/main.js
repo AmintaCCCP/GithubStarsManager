@@ -4,6 +4,14 @@ const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+// 主进程出站请求的网络栈选择：npm undici@8 的 ProxyAgent（getFetchDispatcher）
+// 与 Node 内置 fetch 的 handler 协议不兼容，混用会在拨号前抛
+// UND_ERR_INVALID_ARG: invalid onRequestStart method——携带 dispatcher 的
+// 调用必须用同版本的 undiciFetch；无代理场景多数目标用内置 fetch 即可，
+// 且 x.com 边缘 WAF 按 TLS 指纹放行内置 undici、403 npm undici@8（详见
+// X 各 handler 内注释）。
+const { fetch: undiciFetch, ProxyAgent } = require('undici');
+const { summarizeFetchError, fetchAcrossStacks, timeoutSignalFromBudget, followRedirectsManually, toFailureResult } = require('./mainFetch');
 const { createPluginManager } = require('./plugins/pluginManager');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
 const { loadPluginRegistry } = require('./plugins/pluginRegistryFeed');
@@ -329,7 +337,6 @@ function getFetchDispatcher() {
       ? 'socks5://' + auth + config.host + ':' + config.port
       : 'http://' + auth + config.host + ':' + config.port;
     try {
-      const { ProxyAgent } = require('undici');
       return new ProxyAgent(proxyUrl);
     } catch (err) {
       throw new Error(`Failed to initialize configured proxy agent: ${err instanceof Error ? err.message : String(err)}`);
@@ -338,7 +345,6 @@ function getFetchDispatcher() {
   const envProxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.ALL_PROXY || process.env.all_proxy;
   if (envProxy) {
     try {
-      const { ProxyAgent } = require('undici');
       return new ProxyAgent(envProxy);
     } catch (err) {
       throw new Error(`Failed to initialize environment proxy agent: ${err instanceof Error ? err.message : String(err)}`);
@@ -353,16 +359,40 @@ ipcMain.handle('x-fetch-timeline', async (_event, handle) => {
     return { success: false, error: 'invalid handle' };
   }
   try {
-    const dispatcher = getFetchDispatcher();
-    const response = await fetch(`https://x.com/${handle}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
+    const timelineUrl = `https://x.com/${handle}`;
+    const timelineHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
+    const { response } = await fetchAcrossStacks([
+      // 首选 Node 栈：无应用代理时用内置 fetch——x.com 边缘 WAF 按 TLS 指纹
+      // 放行内置 undici（#356 起长期可用）却 403 npm undici@8（HTML 挑战页，
+      // 实测）；配置应用代理时内置 fetch 无法接收 undici@8 的 ProxyAgent
+      // （handler 协议不兼容），只能用同版本 undici fetch
+      {
+        name: 'undici',
+        run: async ({ remainingMs }) => {
+          const dispatcher = getFetchDispatcher();
+          const fetchImpl = dispatcher ? undiciFetch : fetch;
+          return fetchImpl(timelineUrl, {
+            headers: timelineHeaders,
+            signal: timeoutSignalFromBudget(remainingMs, 20_000),
+            ...(dispatcher ? { dispatcher } : {}),
+          });
+        },
+        // 边缘按指纹 403/429 时该栈视为未命中，让位给 Chromium 栈
+        onResponseRetryable: (response) => response.status === 403 || response.status === 429,
       },
-      signal: AbortSignal.timeout(20_000),
-      ...(dispatcher ? { dispatcher } : {}),
-    });
+      // 回退 Chromium 栈：跟随 session 代理（含“系统代理”），并使用系统证书库
+      {
+        name: 'chromium',
+        run: ({ remainingMs }) => net.fetch(timelineUrl, {
+          headers: timelineHeaders,
+          signal: timeoutSignalFromBudget(remainingMs, 20_000),
+        }),
+      },
+    ], { totalTimeoutMs: 20_000 });
     if (!response.ok) {
       return { success: false, error: `x.com responded ${response.status}` };
     }
@@ -385,14 +415,34 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
   }
   try {
     const suffix = before ? `?before=${before}` : '';
-    const response = await net.fetch(`https://t.me/s/${channel}${suffix}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
+    const telegramUrl = `https://t.me/s/${channel}${suffix}`;
+    const telegramHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
+    const { response } = await fetchAcrossStacks([
+      // 首选 Chromium 栈：跟随 session 代理（含应用内代理与“系统代理”模式）
+      {
+        name: 'chromium',
+        run: ({ remainingMs }) => net.fetch(telegramUrl, {
+          headers: telegramHeaders,
+          signal: timeoutSignalFromBudget(remainingMs, 20_000),
+        }),
       },
-      signal: AbortSignal.timeout(20_000),
-    });
+      // 回退 undici：跟随应用内代理/环境变量代理（Chromium 栈整体不可用时兜底）
+      {
+        name: 'undici',
+        run: async ({ remainingMs }) => {
+          const dispatcher = getFetchDispatcher();
+          return undiciFetch(telegramUrl, {
+            headers: telegramHeaders,
+            signal: timeoutSignalFromBudget(remainingMs, 20_000),
+            ...(dispatcher ? { dispatcher } : {}),
+          });
+        },
+      },
+    ], { totalTimeoutMs: 20_000 });
     if (!response.ok) {
       return { success: false, error: `t.me responded ${response.status}` };
     }
@@ -406,7 +456,10 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
 // WebDAV：主进程代发 DAV 请求。
 // 渲染进程开启了 webSecurity，且桌面版以 file:// 为源、又不携带后端，
 // 浏览器直连会被 WebDAV 服务器的 CORS 策略拦下（PROPFIND/MKCOL/PUT 等）。
-// 用 Node fetch（undici）代发可复用应用内已配置的代理，且不受渲染进程 CORS 约束。
+// 首选 Node fetch（undici，跟随应用内代理/环境变量代理）；网络层失败时回退
+// Chromium 栈（net.fetch），它跟随 session 代理（含“系统代理”）并使用系统
+// 证书库——undici 直连失败（系统代理/VPN 仅对 Chromium 生效、企业根证书装在
+// 系统钥匙串、自签名证书已被系统信任等）的大量场景可由此成功。
 // 主机不设白名单：WebDAV 普遍部署在用户自有的云盘或局域网 NAS 上。
 const WEBDAV_ALLOWED_METHODS = new Set([
   'GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'OPTIONS',
@@ -439,20 +492,44 @@ ipcMain.handle('webdav-request', async (_event, params) => {
       safeHeaders[key] = value;
     }
   }
-  // 与前端一致的超时上限（WebDAV 上传最长 300s）
+  // 与前端一致的超时上限（WebDAV 上传最长 300s）；多栈尝试共享这一预算
   const timeout = Number.isFinite(timeoutMs)
     ? Math.min(Math.max(Math.trunc(timeoutMs), 1000), 300000)
     : 60000;
+  // GET/HEAD 带 body 会被 undici 拒绝（Chromium 栈同样不允许）
+  const hasBody = !!body && upperMethod !== 'GET' && upperMethod !== 'HEAD';
+  const stacks = [
+    {
+      name: 'undici',
+      run: async ({ remainingMs }) => {
+        const dispatcher = getFetchDispatcher();
+        return undiciFetch(parsed.toString(), {
+          method: upperMethod,
+          headers: safeHeaders,
+          ...(hasBody ? { body } : {}),
+          signal: timeoutSignalFromBudget(remainingMs, timeout),
+          ...(dispatcher ? { dispatcher } : {}),
+        });
+      },
+    },
+    // net.fetch 的自动重定向在跨域跳转时仍会转发 Authorization（Electron 44 实测），
+    // 携带 Basic 凭据的 DAV 请求必须手动跟随跳转，跨源时剥离凭据头
+    {
+      name: 'chromium',
+      run: ({ remainingMs }) => followRedirectsManually(net.fetch, parsed.toString(), {
+        method: upperMethod,
+        headers: safeHeaders,
+        ...(hasBody ? { body } : {}),
+        signal: timeoutSignalFromBudget(remainingMs, timeout),
+      }),
+    },
+  ];
+  // LOCK/POST 非幂等：网络层失败时跨栈重放可能产生重复锁/重复提交，只用单栈
+  const eligibleStacks = upperMethod === 'LOCK' || upperMethod === 'POST'
+    ? stacks.slice(0, 1)
+    : stacks;
   try {
-    const dispatcher = getFetchDispatcher();
-    const response = await fetch(parsed.toString(), {
-      method: upperMethod,
-      headers: safeHeaders,
-      // GET/HEAD 带 body 会被 undici 拒绝
-      ...(body && upperMethod !== 'GET' && upperMethod !== 'HEAD' ? { body } : {}),
-      signal: AbortSignal.timeout(timeout),
-      ...(dispatcher ? { dispatcher } : {}),
-    });
+    const { response } = await fetchAcrossStacks(eligibleStacks, { totalTimeoutMs: timeout });
     const text = await response.text();
     return {
       success: true,
@@ -462,15 +539,8 @@ ipcMain.handle('webdav-request', async (_event, params) => {
       contentType: response.headers.get('content-type') ?? undefined,
     };
   } catch (error) {
-    // 归一超时：渲染进程据此复用既有的 AbortError 提示文案
-    const isTimeout = error?.name === 'TimeoutError' ||
-      error?.name === 'AbortError' ||
-      /timeout/i.test(error instanceof Error ? error.message : String(error));
-    return {
-      success: false,
-      timedOut: isTimeout,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    // 归一超时与结构化 cause，供渲染进程映射为可操作的修复建议
+    return toFailureResult(error);
   }
 });
 
@@ -480,12 +550,69 @@ ipcMain.handle('webdav-request', async (_event, params) => {
 // - 登录态首页（queryId 提取入口）
 // - abs.twimg.com 主脚本（queryId 提取源，绝不附带 X Cookie）
 // - GraphQL UserTweets / UserByScreenName（queryId 动态，操作名固定）
+// 免登录 guest 流程（auth 为 null）：auth 缺失或鉴权请求被边缘 403 时由渲染
+// 进程降级调用——x.com 主站的边缘 WAF 对 Node 网络栈按 TLS 指纹拦 403 HTML
+// 挑战页，guest GraphQL 必须走 Chromium 栈（net.fetch，实测 200）；guest
+// token 的激活端点在 api.x.com，不做指纹拦截，undici（跟随应用代理）优先。
+// guest 拿不到登录态首页，queryId 提取入口 x.com/home 改用公开落地页。
 const X_HOME_URL = 'https://x.com/home';
 const X_MAIN_JS_PATTERN = /^https:\/\/abs\.twimg\.com\/responsive-web\/client-web\/main\.[a-zA-Z0-9_-]+\.js$/;
 const X_GRAPHQL_API_PATTERN = /^https:\/\/x\.com\/i\/api\/graphql\/[A-Za-z0-9_-]+\/(UserTweets|UserByScreenName)(\?.*)?$/;
 const isAllowedXProxyUrl = (url) =>
   url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
 const X_COOKIE_VALUE_PATTERN = /^[\w%+/=.~-]+$/;
+const X_BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+// x.com 公共 Web 客户端 Bearer（public-by-design）：随 x.com 前端 JS 分发给
+// 所有访客、浏览器请求 x.com 一律携带的公开常量，非用户凭据、无特权访问，
+// GitGuardian 的通用高熵检测对它属误报。
+const X_BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+const X_GUEST_ACTIVATE_URL = 'https://api.x.com/1.1/guest/activate.json';
+/** guest token 进程内缓存：激活端点有频控，跨请求复用；403/401 时强制刷新 */
+let xGuestToken = null;
+
+async function fetchXGuestToken() {
+  const activateHeaders = {
+    'User-Agent': X_BROWSER_UA,
+    'Authorization': `Bearer ${X_BEARER_TOKEN}`,
+  };
+  const { response } = await fetchAcrossStacks([
+    {
+      name: 'undici',
+      run: async ({ remainingMs }) => {
+        const dispatcher = getFetchDispatcher();
+        const fetchImpl = dispatcher ? undiciFetch : fetch;
+        return fetchImpl(X_GUEST_ACTIVATE_URL, {
+          method: 'POST',
+          headers: activateHeaders,
+          signal: timeoutSignalFromBudget(remainingMs, 15_000),
+          ...(dispatcher ? { dispatcher } : {}),
+        });
+      },
+    },
+    {
+      name: 'chromium',
+      run: ({ remainingMs }) => net.fetch(X_GUEST_ACTIVATE_URL, {
+        method: 'POST',
+        headers: activateHeaders,
+        signal: timeoutSignalFromBudget(remainingMs, 15_000),
+      }),
+    },
+  ], { totalTimeoutMs: 15_000 });
+  if (!response.ok) {
+    throw new Error(`x.com guest token activate failed (${response.status})`);
+  }
+  const payload = await response.json();
+  if (typeof payload?.guest_token !== 'string' || !/^\d{6,}$/.test(payload.guest_token)) {
+    throw new Error('x.com guest token activate returned invalid payload');
+  }
+  return payload.guest_token;
+}
+
+async function getXGuestToken(forceRefresh = false) {
+  if (xGuestToken && !forceRefresh) return xGuestToken;
+  xGuestToken = await fetchXGuestToken();
+  return xGuestToken;
+}
 
 ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
   if (typeof url !== 'string' || !isAllowedXProxyUrl(url)) {
@@ -493,46 +620,89 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
   }
   const authToken = typeof auth?.authToken === 'string' ? auth.authToken.trim().replace(/^["']|["']$/g, '').trim() : '';
   const ct0 = typeof auth?.ct0 === 'string' ? auth.ct0.trim().replace(/^["']|["']$/g, '').trim() : '';
-  if (!authToken || !ct0 || !X_COOKIE_VALUE_PATTERN.test(authToken) || !X_COOKIE_VALUE_PATTERN.test(ct0)) {
+  const hasCookieAuth = !!(authToken && ct0 && X_COOKIE_VALUE_PATTERN.test(authToken) && X_COOKIE_VALUE_PATTERN.test(ct0));
+  // 显式携带 Cookie 但格式非法：调用方指定了鉴权路径，直接拒绝而非静默降级 guest
+  if (auth && !hasCookieAuth) {
     return { success: false, error: 'invalid auth cookies' };
   }
   try {
-    // GraphQL API 请求带 Bearer/CSRF 等专有头；HTML 页面与静态资源带这些头
-    // 反而被 x.com 拒 401（实测），只发 UA + Cookie
-    const isApiCall = url.startsWith('https://x.com/i/api/');
-    const headers = isApiCall
-      ? {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-          'Accept': '*/*',
-          'Authorization': 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA',
-          'X-CSRF-Token': ct0,
-          'X-Twitter-Auth-Type': 'OAuth2Session',
-          'X-Twitter-Active-User': 'yes',
-          'Cookie': `auth_token=${authToken}; ct0=${ct0}`,
-        }
-      : {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
-          ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
-        };
-    // redirect: 'error' — 拒绝跨域（及一切）重定向，避免 Cookie 被转到允许域名之外
-    const dispatcher = getFetchDispatcher();
-    const response = await fetch(url, {
-      headers,
-      redirect: 'error',
-      signal: AbortSignal.timeout(20_000),
-      ...(dispatcher ? { dispatcher } : {}),
-    });
-    if (typeof response.url === 'string' && response.url && !isAllowedXProxyUrl(response.url)) {
-      return { success: false, error: 'redirect blocked' };
+    if (hasCookieAuth) {
+      // GraphQL API 请求带 Bearer/CSRF 等专有头；HTML 页面与静态资源带这些头
+      // 反而被 x.com 拒 401（实测），只发 UA + Cookie
+      const isApiCall = url.startsWith('https://x.com/i/api/');
+      const headers = isApiCall
+        ? {
+            'User-Agent': X_BROWSER_UA,
+            'Accept': '*/*',
+            'Authorization': `Bearer ${X_BEARER_TOKEN}`,
+            'X-CSRF-Token': ct0,
+            'X-Twitter-Auth-Type': 'OAuth2Session',
+            'X-Twitter-Active-User': 'yes',
+            'Cookie': `auth_token=${authToken}; ct0=${ct0}`,
+          }
+        : {
+            'User-Agent': X_BROWSER_UA,
+            'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+            ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
+          };
+      // redirect: 'error' — 拒绝跨域（及一切）重定向，避免 Cookie 被转到允许域名之外
+      const dispatcher = getFetchDispatcher();
+      // 内置 fetch 的 TLS 指纹被 x.com 边缘放行（#356 起长期可用）；npm undici@8
+      // 的指纹会被 403。仅当需要应用代理 dispatcher 时才用同版本 undici fetch
+      //（此时若仍被边缘 403，渲染进程会自动降级 guest 流程）
+      const fetchImpl = dispatcher ? undiciFetch : fetch;
+      const response = await fetchImpl(url, {
+        headers,
+        redirect: 'error',
+        signal: AbortSignal.timeout(20_000),
+        ...(dispatcher ? { dispatcher } : {}),
+      });
+      if (typeof response.url === 'string' && response.url && !isAllowedXProxyUrl(response.url)) {
+        return { success: false, error: 'redirect blocked' };
+      }
+      if (!response.ok) {
+        return { success: false, error: `x.com responded ${response.status}` };
+      }
+      const body = await response.text();
+      return { success: true, body };
     }
-    if (!response.ok) {
+
+    // 免登录 guest 流程：Chromium 栈（net.fetch；Cookie 属受禁请求头，
+    // 无法经 net.fetch 显式携带，但 guest 流程本就不需要）
+    const targetUrl = url === X_HOME_URL ? 'https://x.com/' : url;
+    const isApiCall = targetUrl.startsWith('https://x.com/i/api/');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const headers = isApiCall
+        ? {
+            'User-Agent': X_BROWSER_UA,
+            'Accept': '*/*',
+            'Authorization': `Bearer ${X_BEARER_TOKEN}`,
+            'x-guest-token': await getXGuestToken(attempt > 0),
+            'X-Twitter-Active-User': 'yes',
+          }
+        : {
+            'User-Agent': X_BROWSER_UA,
+            'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+          };
+      const response = await net.fetch(targetUrl, {
+        headers,
+        redirect: 'error',
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (response.ok) {
+        const body = await response.text();
+        return { success: true, body };
+      }
+      // guest token 可能过期/被吊销：API 请求 403/401 时强制刷新一次再试
+      if (isApiCall && (response.status === 403 || response.status === 401) && attempt === 0) {
+        continue;
+      }
       return { success: false, error: `x.com responded ${response.status}` };
     }
-    const body = await response.text();
-    return { success: true, body };
+    return { success: false, error: 'x.com responded 403' };
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
+    // undici 的网络层失败统一是 "fetch failed"，真实原因在 cause 链上
+    return { success: false, error: summarizeFetchError(error).message };
   }
 });
 

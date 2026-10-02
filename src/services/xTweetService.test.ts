@@ -12,6 +12,7 @@ import {
   buildUserByScreenNameUrl,
   parseXUserTweetsJson,
   extractXGraphQLQueryIds,
+  defaultXGraphQLTransport,
   ingestFeedTweets,
   reposNeedingDetail,
   buildXTweetDiscoveryRepos,
@@ -607,6 +608,54 @@ describe('extractXGraphQLQueryIds', () => {
   it('定位不到主脚本或 operation 时抛错', async () => {
     const { graphQL } = stubGraphQL([{ match: /^https:\/\/x\.com\/home$/, body: '<html></html>' }]);
     await expect(extractXGraphQLQueryIds(AUTH, graphQL)).rejects.toThrow('无法定位');
+  });
+});
+
+describe('defaultXGraphQLTransport（边缘 403 自动降级 guest）', () => {
+  const setElectronAPI = (impl: unknown) => {
+    (window as unknown as { electronAPI?: unknown }).electronAPI = impl;
+  };
+
+  afterEach(() => {
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+  });
+
+  const USER_TWEETS_URL = 'https://x.com/i/api/graphql/QID/UserTweets?variables=%7B%7D';
+
+  it('鉴权 Cookie 请求被边缘 403 时自动降级 guest 重试同一 URL', async () => {
+    const calls: Array<XTweetAuth | null> = [];
+    setElectronAPI({
+      xFetchGraphQL: vi.fn(async (_url: string, auth: XTweetAuth | null) => {
+        calls.push(auth);
+        if (auth) return { success: false, error: 'x.com responded 403' };
+        return { success: true, body: '{"guest":true}' };
+      }),
+    });
+    await expect(defaultXGraphQLTransport(USER_TWEETS_URL, AUTH)).resolves.toBe('{"guest":true}');
+    expect(calls).toEqual([AUTH, null]);
+  });
+
+  it('guest 也失败时保留 guest 错误上抛', async () => {
+    const calls: Array<XTweetAuth | null> = [];
+    setElectronAPI({
+      xFetchGraphQL: vi.fn(async (_url: string, auth: XTweetAuth | null) => {
+        calls.push(auth);
+        // 两次请求返回不同错误，确保上抛的确实是 guest 请求的错误
+        return auth
+          ? { success: false, error: 'x.com responded 403' }
+          : { success: false, error: 'x.com guest token activate failed (429)' };
+      }),
+    });
+    await expect(defaultXGraphQLTransport(USER_TWEETS_URL, AUTH))
+      .rejects.toThrow('x.com guest token activate failed (429)');
+    expect(calls).toEqual([AUTH, null]);
+  });
+
+  it('401（鉴权失效）不降级 guest，直接上抛原始错误', async () => {
+    const xFetchGraphQL = vi.fn(async () => ({ success: false, error: 'x.com responded 401' }));
+    setElectronAPI({ xFetchGraphQL });
+    await expect(defaultXGraphQLTransport(USER_TWEETS_URL, AUTH)).rejects.toThrow('x.com responded 401');
+    expect(xFetchGraphQL).toHaveBeenCalledTimes(1);
   });
 });
 
