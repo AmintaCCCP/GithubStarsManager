@@ -15,6 +15,50 @@ import {
   shardKeyFor,
 } from './shards';
 
+// 提交点屏障：在真实存储提交入口（setStorageEntries）拦停写入，用于让并发
+// 测试确定性地与「写入 A 仍在提交中」重叠——setTimeout 等待无法保证这一点。
+const commitGate = vi.hoisted(() => {
+  let hold = false;
+  let release: () => void = () => undefined;
+  let markReached: (() => void) | null = null;
+  let reached: Promise<void> = Promise.resolve();
+  return {
+    arm: () => {
+      hold = true;
+      reached = new Promise<void>((resolve) => {
+        markReached = resolve;
+      });
+    },
+    waitReached: (): Promise<void> => reached,
+    release: () => {
+      hold = false;
+      release();
+    },
+    reset: () => {
+      hold = false;
+      release();
+    },
+    wrap: async <T>(run: () => Promise<T>): Promise<T> => {
+      if (hold) {
+        markReached?.();
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return run();
+    },
+  };
+});
+
+vi.mock('../../services/indexedDbStorage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/indexedDbStorage')>();
+  return {
+    ...actual,
+    setStorageEntries: (entries: ReadonlyArray<readonly [string, string]>) =>
+      commitGate.wrap(() => actual.setStorageEntries(entries)),
+  };
+});
+
 const KEY = 'github-stars-manager';
 
 const tick = (ms = 20): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -50,6 +94,7 @@ const readShardState = async (shard: Parameters<typeof shardKeyFor>[1]): Promise
 
 beforeEach(async () => {
   vi.restoreAllMocks();
+  commitGate.reset();
   debouncedPersistStorage.removeItem(KEY);
   await tick();
 });
@@ -308,12 +353,15 @@ describe('sharded persist storage', () => {
 
     const stateLight = { ...state, theme: 'light' };
     const stateDark = { ...state, theme: 'dark' };
+    commitGate.arm();
     debouncedPersistStorage.setItem(KEY, { state: stateLight, version: 16 });
     const flushInFlight = flushPendingPersistSnapshot();
-    await new Promise((resolve) => setTimeout(resolve, 0)); // 宏任务确保写入 A 完成判脏并进入提交等待（版本随即过期）
+    await commitGate.waitReached(); // 写入 A 已完成判脏，在提交点被拦停
     debouncedPersistStorage.setItem(KEY, { state: stateDark, version: 16 });
-    await flushPendingPersistSnapshot();
+    const flushAfterDark = flushPendingPersistSnapshot(); // B 排队在 A 之后
+    commitGate.release();
     await flushInFlight;
+    await flushAfterDark;
 
     expect((await readShardState('core')).theme).toBe('dark');
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
@@ -322,14 +370,17 @@ describe('sharded persist storage', () => {
 
   it('rebuilds the full shard set when removeItem follows a write still in flight', async () => {
     const state = buildState();
+    commitGate.arm();
     debouncedPersistStorage.setItem(KEY, { state, version: 16 });
     const inFlightWrite = flushPendingPersistSnapshot();
-    await new Promise((resolve) => setTimeout(resolve, 0)); // 宏任务确保写入 A 完成判脏并进入提交等待
+    await commitGate.waitReached(); // 写入 A 已完成判脏，在提交点被拦停
     debouncedPersistStorage.removeItem(KEY);
     const nextState = { ...state, language: 'en' };
     debouncedPersistStorage.setItem(KEY, { state: nextState, version: 16 });
-    await flushPendingPersistSnapshot();
+    const flushAfterClear = flushPendingPersistSnapshot();
+    commitGate.release();
     await inFlightWrite;
+    await flushAfterClear;
 
     // 删除后的首个写入必须全量重建：meta 与全部分片一致，不存在缺失分片
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
