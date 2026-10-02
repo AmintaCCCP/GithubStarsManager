@@ -562,6 +562,9 @@ const isAllowedXProxyUrl = (url) =>
   url === X_HOME_URL || X_MAIN_JS_PATTERN.test(url) || X_GRAPHQL_API_PATTERN.test(url);
 const X_COOKIE_VALUE_PATTERN = /^[\w%+/=.~-]+$/;
 const X_BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+// x.com 公共 Web 客户端 Bearer（public-by-design）：随 x.com 前端 JS 分发给
+// 所有访客、浏览器请求 x.com 一律携带的公开常量，非用户凭据、无特权访问，
+// GitGuardian 的通用高熵检测对它属误报。
 const X_BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 const X_GUEST_ACTIVATE_URL = 'https://api.x.com/1.1/guest/activate.json';
 /** guest token 进程内缓存：激活端点有频控，跨请求复用；403/401 时强制刷新 */
