@@ -258,7 +258,8 @@ const writeShardedSnapshot = async (
     });
   }
 
-  if (persistWriteVersion !== writeVersion) return;
+  // 即使本写入期间已有更新的调度（版本过期），磁盘上落盘的也是本批内容，
+  // 判脏缓存必须如实反映磁盘状态；更新的写入排在本批之后，会以该基准重新判脏。
   const nextCache: ShardViews = { ...(lastWrittenShards ?? emptyShardViews()) };
   for (const shard of dirty) {
     nextCache[shard] = views[shard];
@@ -274,6 +275,25 @@ const writeShardedSnapshot = async (
   }
 };
 
+let writeChain: Promise<void> = Promise.resolve();
+
+/**
+ * 串行化分片写入：判脏必须基于上一次已完成写入的缓存（lastWrittenShards）。
+ * idle 写入与 flush 写入可能重叠，若并发执行，后写入者会以过期基准判脏而
+ * 跳过写盘，把已撤销的状态留在磁盘上且缓存不自知。
+ */
+const enqueueShardedWrite = (
+  name: string,
+  value: StorageValue<unknown>,
+  writeVersion: number,
+  source: 'idle' | 'flush',
+): Promise<void> => {
+  writeChain = writeChain
+    .catch(() => undefined)
+    .then(() => writeShardedSnapshot(name, value, writeVersion, source));
+  return writeChain;
+};
+
 const flushPendingPersistSnapshot = (): Promise<void> => {
   if (latestPersistName === null || latestPersistValue === null) return Promise.resolve();
 
@@ -281,7 +301,7 @@ const flushPendingPersistSnapshot = (): Promise<void> => {
   const name = latestPersistName;
   const value = latestPersistValue;
   const scheduledVersion = persistWriteVersion;
-  return writeShardedSnapshot(name, value, scheduledVersion, 'flush');
+  return enqueueShardedWrite(name, value, scheduledVersion, 'flush');
 };
 
 const registerPersistFlushListeners = (): void => {
@@ -332,7 +352,7 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
       persistTimeoutId = null;
       persistIdleTaskId = scheduleIdleTask(() => {
         persistIdleTaskId = null;
-        void writeShardedSnapshot(name, value, scheduledVersion, 'idle');
+        void enqueueShardedWrite(name, value, scheduledVersion, 'idle');
       });
     }, 1000);
   },

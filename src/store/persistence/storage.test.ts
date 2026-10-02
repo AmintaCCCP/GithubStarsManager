@@ -299,6 +299,27 @@ describe('sharded persist storage', () => {
     expect(hydrated?.state).toEqual({ theme: 'dark' });
   });
 
+  it('serializes overlapping idle/flush writes so the dirty baseline never trails the disk', async () => {
+    // 回归：写入 A 提交期间（版本已过期），写入 B 若以过期基准判脏会跳过写盘，
+    // 把 A 的旧值留在磁盘上且缓存不自知。
+    const state = buildState();
+    debouncedPersistStorage.setItem(KEY, { state, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    const stateLight = { ...state, theme: 'light' };
+    const stateDark = { ...state, theme: 'dark' };
+    debouncedPersistStorage.setItem(KEY, { state: stateLight, version: 16 });
+    const flushInFlight = flushPendingPersistSnapshot();
+    await Promise.resolve(); // 让写入 A 完成判脏并进入提交等待（版本随即过期）
+    debouncedPersistStorage.setItem(KEY, { state: stateDark, version: 16 });
+    await flushPendingPersistSnapshot();
+    await flushInFlight;
+
+    expect((await readShardState('core')).theme).toBe('dark');
+    const rehydrated = await debouncedPersistStorage.getItem(KEY);
+    expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'zh' });
+  });
+
   it('removes every derived key on removeItem', async () => {
     const value: StorageValue<unknown> = { state: buildState(), version: 16 };
     debouncedPersistStorage.setItem(KEY, value);
@@ -328,7 +349,12 @@ describe('indexedDbStorage batch helpers', () => {
   it('rolls back the whole fallback batch when any key write fails', async () => {
     // Node ≥24 的原生 localStorage 经 vitest 拷入后每次访问可能返回新包装对象，
     // vi.spyOn 拦截不可靠；整体替换为可控 fake 保证模块与测试看到同一实例。
-    const backing = new Map<string, string>([['fallback-c', 'previous']]);
+    // 批次内的 fallback-a 预置旧值：回滚必须恢复旧值而不是删除
+    //（meta 仍引用该分片键，删除会被水合误判为分片缺失）。
+    const backing = new Map<string, string>([
+      ['fallback-a', 'old-committed-core'],
+      ['fallback-c', 'previous'],
+    ]);
     const failingStorage: Storage = {
       clear: () => backing.clear(),
       getItem: (key: string) => (backing.has(key) ? (backing.get(key) as string) : null),
@@ -348,8 +374,9 @@ describe('indexedDbStorage batch helpers', () => {
     Object.defineProperty(window, 'localStorage', { configurable: true, value: failingStorage });
     try {
       await expect(writeEntriesToFallbackStorage([['fallback-a', '1'], ['fallback-b', '2']])).rejects.toThrow();
-      // 已写入的键必须回滚，且不覆盖既有值
-      expect(backing.has('fallback-a')).toBe(false);
+      // 已覆盖的键恢复旧值；本批新增的键回滚删除；批次外的键不受影响
+      expect(backing.get('fallback-a')).toBe('old-committed-core');
+      expect(backing.has('fallback-b')).toBe(false);
       expect(backing.get('fallback-c')).toBe('previous');
     } finally {
       if (savedDescriptor) {

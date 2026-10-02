@@ -176,23 +176,30 @@ const safeLocalStorageRemoveWithDerivedKeys = (name: string): void => {
 };
 
 /**
- * localStorage 兜底写入：按“全部成功才算提交”处理，任一键失败即回滚已写入
- * 的键并抛错，由调用方保留旧快照以便下次重试。
+ * localStorage 兜底写入：按“全部成功才算提交”处理，任一键失败即回滚并抛错。
+ * 回滚时恢复每个键写入前的旧值（而非简单删除）——批次中的分片键通常已有
+ * 上次提交的内容，删掉会让仍引用它们的 meta 在下次水合时误判为分片缺失。
  */
 export const writeEntriesToFallbackStorage = async (
   entries: ReadonlyArray<readonly [string, string]>,
 ): Promise<void> => {
-  const written: string[] = [];
+  const written: Array<readonly [string, string | null]> = [];
   try {
     for (const [key, value] of entries) {
+      const previous = safeLocalStorageGet(key);
       if (!safeLocalStorageSet(key, value)) {
         throw new Error('[storage] localStorage fallback write failed');
       }
-      written.push(key);
+      written.push([key, previous]);
     }
   } catch (error) {
-    for (const key of written) {
-      safeLocalStorageRemove(key);
+    for (let i = written.length - 1; i >= 0; i--) {
+      const [key, previous] = written[i];
+      if (previous === null) {
+        safeLocalStorageRemove(key);
+      } else {
+        safeLocalStorageSet(key, previous);
+      }
     }
     throw error;
   }
