@@ -487,33 +487,38 @@ ipcMain.handle('webdav-request', async (_event, params) => {
     : 60000;
   // GET/HEAD 带 body 会被 undici 拒绝（Chromium 栈同样不允许）
   const hasBody = !!body && upperMethod !== 'GET' && upperMethod !== 'HEAD';
-  try {
-    const { response } = await fetchAcrossStacks([
-      {
-        name: 'undici',
-        run: async ({ remainingMs }) => {
-          const dispatcher = getFetchDispatcher();
-          return fetch(parsed.toString(), {
-            method: upperMethod,
-            headers: safeHeaders,
-            ...(hasBody ? { body } : {}),
-            signal: timeoutSignalFromBudget(remainingMs, timeout),
-            ...(dispatcher ? { dispatcher } : {}),
-          });
-        },
-      },
-      {
-        name: 'chromium',
-        // net.fetch 的自动重定向在跨域跳转时仍会转发 Authorization（Electron 44 实测），
-        // 携带 Basic 凭据的 DAV 请求必须手动跟随跳转，跨源时剥离凭据头
-        run: ({ remainingMs }) => followRedirectsManually(net.fetch, parsed.toString(), {
+  const stacks = [
+    {
+      name: 'undici',
+      run: async ({ remainingMs }) => {
+        const dispatcher = getFetchDispatcher();
+        return fetch(parsed.toString(), {
           method: upperMethod,
           headers: safeHeaders,
           ...(hasBody ? { body } : {}),
           signal: timeoutSignalFromBudget(remainingMs, timeout),
-        }),
+          ...(dispatcher ? { dispatcher } : {}),
+        });
       },
-    ], { totalTimeoutMs: timeout });
+    },
+    // net.fetch 的自动重定向在跨域跳转时仍会转发 Authorization（Electron 44 实测），
+    // 携带 Basic 凭据的 DAV 请求必须手动跟随跳转，跨源时剥离凭据头
+    {
+      name: 'chromium',
+      run: ({ remainingMs }) => followRedirectsManually(net.fetch, parsed.toString(), {
+        method: upperMethod,
+        headers: safeHeaders,
+        ...(hasBody ? { body } : {}),
+        signal: timeoutSignalFromBudget(remainingMs, timeout),
+      }),
+    },
+  ];
+  // LOCK/POST 非幂等：网络层失败时跨栈重放可能产生重复锁/重复提交，只用单栈
+  const eligibleStacks = upperMethod === 'LOCK' || upperMethod === 'POST'
+    ? stacks.slice(0, 1)
+    : stacks;
+  try {
+    const { response } = await fetchAcrossStacks(eligibleStacks, { totalTimeoutMs: timeout });
     const text = await response.text();
     return {
       success: true,

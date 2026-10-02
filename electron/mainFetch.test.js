@@ -259,14 +259,19 @@ describe('followRedirectsManually: 凭据不随跨域跳转泄露', () => {
     assert.equal(calls.length, 1);
   });
 
-  it('303 把 PUT 降级为无 body 的 GET', async () => {
+  it('303 把 PUT 降级为 GET，并剥离 body 与 Content-* 请求头', async () => {
     const { calls, fetchImpl } = recorder((i) =>
       i === 0 ? respond(303, 'https://dav.example.com/done') : respond(200));
     await followRedirectsManually(fetchImpl, 'https://dav.example.com/f.json', {
-      method: 'PUT', headers: { Authorization: 'Basic abc' }, body: 'x',
+      method: 'PUT',
+      headers: { Authorization: 'Basic abc', 'Content-Type': 'application/json', 'Content-Length': '3' },
+      body: '{"a":1}',
     });
     assert.equal(calls[1].options.method, 'GET');
     assert.equal(calls[1].options.body, undefined);
+    assert.equal(calls[1].options.headers['Content-Type'], undefined);
+    assert.equal(calls[1].options.headers['Content-Length'], undefined);
+    assert.equal(calls[1].options.headers.Authorization, 'Basic abc'); // 同源保留凭据
   });
 });
 

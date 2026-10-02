@@ -164,8 +164,12 @@ async function followRedirectsManually(fetchImpl, url, options, { maxRedirects =
     if (becomeGet) {
       method = 'GET';
       body = undefined;
+      // 降级为 GET 后 body 相关的 Content-* 请求头一并移除（手动跳转不会被 fetch 自动清理）
+      for (const key of Object.keys(headers)) {
+        if (/^content-(type|length|encoding|language|location)$/i.test(key)) delete headers[key];
+      }
     }
-    options = { ...options, headers };
+    options = { ...options, headers, body };
     currentUrl = next.toString();
   }
 }
