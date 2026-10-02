@@ -1,6 +1,13 @@
 
 import type { PersistStorage, StorageValue } from 'zustand/middleware';
-import { indexedDBStorage, removeLegacySnapshot, setStorageEntries } from '../../services/indexedDbStorage';
+import {
+  getStorageEntriesStrict,
+  getStorageItemStrict,
+  hasLegacySnapshot,
+  indexedDBStorage,
+  removeLegacySnapshot,
+  setStorageEntries,
+} from '../../services/indexedDbStorage';
 import { logger } from '../../services/logger';
 import {
   PERSISTENCE_SHARD_FORMAT,
@@ -46,11 +53,18 @@ let persistFlushListenersRegistered = false;
 // - lastWrittenShards 记录每个分片上次成功写入的字段引用，作为判脏基准；
 // - committedShards 记录本会话已成功提交过的分片，用于判定 legacy 旧快照可以退役；
 // - legacySnapshotHydrated 表示本次会话从旧版单键快照（或部分分片+旧快照兜底）水合，
-//   下一次写入将强制提交全部分片，以便一次性完成迁移并退役旧键。
+//   下一次写入将强制提交全部分片，以便一次性完成迁移并退役旧键；
+// - hydratedIncomplete 表示最近一次水合存在读取失败（IDB 故障/超时）。此时水合
+//   结果不完整，绝不能写盘——否则会把磁盘上仍然完好的真实分片用默认值覆盖。
+// 已知权衡（多标签页/多窗口）：判脏基准是各标签页自己水合时的快照，互相不感知；
+// 一个标签页清盘后另一标签页的部分写入可能产生「meta 全量声明 + 部分分片缺失」，
+// 读取端会走合并/best-effort 降级路径。与旧单键方案的整快照 LWW 相比，撕裂窗口
+// 更小但存在；跨标签页仲裁（BroadcastChannel/版本号）留作后续跟进。
 type ShardViews = Record<PersistenceShardName, Record<string, unknown>>;
 let lastWrittenShards: ShardViews | null = null;
 const committedShards = new Set<PersistenceShardName>();
 let legacySnapshotHydrated = false;
+let hydratedIncomplete = false;
 
 const emptyShardViews = (): ShardViews => {
   const views = {} as ShardViews;
@@ -72,7 +86,7 @@ const cancelPendingPersistTasks = (): void => {
   }
 };
 
-const parseShardPayload = (raw: string | null): Record<string, unknown> | null => {
+const parseShardPayload = (raw: string | null): { state: Record<string, unknown>; version: number } | null => {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as ShardPayload | null;
@@ -80,20 +94,28 @@ const parseShardPayload = (raw: string | null): Record<string, unknown> | null =
       || typeof parsed.state !== 'object') {
       return null;
     }
-    return parsed.state;
+    return { state: parsed.state, version: typeof parsed.version === 'number' ? parsed.version : 0 };
   } catch {
     return null;
   }
 };
 
-const readMeta = async (name: string): Promise<ShardMeta | null> => {
-  const raw = await Promise.resolve(indexedDBStorage.getItem(metaKeyFor(name)));
+/**
+ * meta 是分片布局的目录，必须视为不可信输入：
+ * - 分片名必须是已知分片，且集合与 PERSISTENCE_SHARD_NAMES 完全一致（无缺失、
+ *   无重复、无未知项）。不完整的 meta 会让字段静默消失并被当作「分片齐全」，
+ *   进而过早退役唯一的兜底（legacy 单键快照）。
+ * - meta 本身读取失败（IDB 故障/超时）由调用方区分处理。
+ */
+const parseMeta = (raw: string | null): ShardMeta | null => {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as ShardMeta | null;
     if (!parsed || parsed.format !== PERSISTENCE_SHARD_FORMAT
-      || !Array.isArray(parsed.shards) || parsed.shards.length === 0
-      || typeof parsed.version !== 'number') {
+      || typeof parsed.version !== 'number'
+      || !Array.isArray(parsed.shards)
+      || parsed.shards.length !== PERSISTENCE_SHARD_NAMES.length
+      || !PERSISTENCE_SHARD_NAMES.every((shard) => parsed.shards.includes(shard))) {
       return null;
     }
     return parsed;
@@ -105,7 +127,7 @@ const readMeta = async (name: string): Promise<ShardMeta | null> => {
 const readLegacySnapshot = async (
   name: string,
 ): Promise<StorageValue<unknown> | null> => {
-  const raw = await Promise.resolve(indexedDBStorage.getItem(name));
+  const raw = await getStorageItemStrict(name, name);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as StorageValue<unknown>;
@@ -114,53 +136,156 @@ const readLegacySnapshot = async (
   }
 };
 
+/** meta 缺失/损坏时的打捞：按已知分片名直接读取仍可解析的分片载荷。 */
+const salvageOrphanedShards = async (name: string): Promise<{
+  parts: Record<string, unknown> | null;
+  version: number | null;
+  readFailed: boolean;
+  foundButUnreadable: boolean;
+}> => {
+  const keys = PERSISTENCE_SHARD_NAMES.map((shard) => shardKeyFor(name, shard));
+  let results: Array<string | null>;
+  try {
+    results = await getStorageEntriesStrict(name, keys);
+  } catch (error) {
+    logger.errorFromError('store.persist', 'Failed to salvage orphaned persistence shards', error);
+    return { parts: null, version: null, readFailed: true, foundButUnreadable: false };
+  }
+
+  const parts: Record<string, unknown> = {};
+  let version: number | null = null;
+  let foundButUnreadable = false;
+  PERSISTENCE_SHARD_NAMES.forEach((_shard, index) => {
+    const parsed = parseShardPayload(results[index]);
+    if (results[index] !== null && !parsed) {
+      foundButUnreadable = true;
+    }
+    if (!parsed) return;
+    Object.assign(parts, parsed.state);
+    version = version ?? parsed.version;
+  });
+  return {
+    parts: Object.keys(parts).length > 0 ? parts : null,
+    version,
+    readFailed: false,
+    foundButUnreadable,
+  };
+};
+
 /**
  * 读取持久化快照。
  *
  * 读取顺序（保证升级无感、历史数据零丢失）：
- * 1. meta + 全部分片齐全 → 拼装新格式快照；
+ * 1. meta（精确分片集）+ 全部分片齐全 → 拼装新格式快照；
  * 2. meta 存在但部分分片缺失/损坏 → 存在的分片内容与旧版单键快照合并
  *    （分片提交时间晚于旧快照，是各字段的最新已知状态）；
- * 3. meta 缺失或为新格式不识别 → 回退旧版单键快照（v16 行为，升级首启即此路径）。
+ * 3. meta 缺失/损坏/不完整 → 回退旧版单键快照（v16 行为，升级首启即此路径）；
+ * 4. legacy 也不存在 → 按已知分片名打捞孤儿分片（meta 被清/损坏但分片健在）；
+ * 5. 任何「读取失败」（区别于「确定不存在」）都会置 hydratedIncomplete，
+ *    之后拒绝写盘，防止用不完整的水合结果覆盖磁盘上的真实数据。
  */
 const readPersistedSnapshot = async (
   name: string,
 ): Promise<StorageValue<unknown> | null> => {
-  const meta = await readMeta(name);
-  if (!meta) return null;
+  let readFailed = false;
 
-  const shardStates = await Promise.all(
-    meta.shards.map(async (shard) => ({
-      shard,
-      state: parseShardPayload(await Promise.resolve(indexedDBStorage.getItem(shardKeyFor(name, shard)))),
-    })),
-  );
+  let meta: ShardMeta | null = null;
+  try {
+    meta = parseMeta(await getStorageItemStrict(name, metaKeyFor(name)));
+  } catch (error) {
+    readFailed = true;
+    logger.errorFromError('store.persist', 'Failed to read persistence meta', error);
+  }
+
+  if (!meta) {
+    const legacy = await readLegacySnapshot(name).catch(() => {
+      readFailed = true;
+      return null;
+    });
+    if (legacy && legacy.state && typeof legacy.state === 'object') {
+      // meta 不可读但 legacy 单键快照可读：以 legacy 为准（完整快照，写全量安全）。
+      legacySnapshotHydrated = true;
+      lastWrittenShards = buildShardViews(legacy.state as Record<string, unknown>);
+      hydratedIncomplete = false;
+      return legacy;
+    }
+
+    // legacy 不存在：打捞孤儿分片（meta 键丢失/损坏但分片仍可读）。
+    const salvage = await salvageOrphanedShards(name);
+    if (salvage.readFailed) readFailed = true;
+    if (salvage.parts) {
+      logger.errorFromError(
+        'store.persist',
+        'Persistence meta missing but shards are readable; recovering from orphaned shards',
+        new Error('meta missing'),
+      );
+      // 基准留空：下次写入全量重建（含 meta 自愈）；打捞内容会随全量写入写回。
+      lastWrittenShards = null;
+      hydratedIncomplete = false;
+      return { state: salvage.parts, version: salvage.version ?? 0 };
+    }
+    if (readFailed || salvage.foundButUnreadable) {
+      // 磁盘上存在持久化数据但当前不可读：拒绝以空状态水合（随后的写入会覆盖真实数据）。
+      hydratedIncomplete = true;
+      logger.errorFromError(
+        'store.persist',
+        'Persisted data exists but cannot be read; refusing to hydrate and overwrite',
+        new Error('meta and shards unreadable'),
+      );
+      return null;
+    }
+    return null;
+  }
+
+  let shardResults: Array<string | null>;
+  try {
+    shardResults = await getStorageEntriesStrict(
+      name,
+      PERSISTENCE_SHARD_NAMES.map((shard) => shardKeyFor(name, shard)),
+    );
+  } catch (error) {
+    readFailed = true;
+    logger.errorFromError('store.persist', 'Failed to read persistence shards', error);
+    shardResults = PERSISTENCE_SHARD_NAMES.map(() => null);
+  }
 
   const parts: Record<string, unknown> = {};
   const views = emptyShardViews();
   const missing: PersistenceShardName[] = [];
-  for (const { shard, state } of shardStates) {
-    if (state === null) {
+  PERSISTENCE_SHARD_NAMES.forEach((shard, index) => {
+    const parsed = parseShardPayload(shardResults[index]);
+    if (!parsed) {
       missing.push(shard);
-      continue;
+      return;
     }
-    Object.assign(parts, state);
-    views[shard] = state;
-  }
+    Object.assign(parts, parsed.state);
+    views[shard] = parsed.state;
+  });
 
-  if (missing.length === 0) {
+  if (missing.length === 0 && !readFailed) {
     lastWrittenShards = views;
-    // 分片齐全且读取成功：旧版单键快照已完成使命，异步退役（幂等）。
-    void Promise.resolve(removeLegacySnapshot(name)).catch(() => undefined);
+    // 分片齐全且读取成功：旧版单键快照已完成使命，确认仍存在时才退役（幂等、廉价）。
+    if (await hasLegacySnapshot(name)) {
+      void Promise.resolve(removeLegacySnapshot(name)).catch(() => undefined);
+    }
     return { state: parts, version: meta.version };
   }
 
-  logger.warn('store.persist', 'Some persistence shards are missing; merging with legacy snapshot', {
-    missing,
-    shards: meta.shards,
-  });
+  if (readFailed) {
+    logger.warn('store.persist', 'Some persistence shards failed to read; merge degraded', {
+      missing,
+    });
+  } else {
+    logger.warn('store.persist', 'Some persistence shards are missing; merging with legacy snapshot', {
+      missing,
+      shards: meta.shards,
+    });
+  }
 
-  const legacy = await readLegacySnapshot(name);
+  const legacy = await readLegacySnapshot(name).catch(() => {
+    readFailed = true;
+    return null;
+  });
   if (!legacy || !legacy.state || typeof legacy.state !== 'object') {
     // 无旧快照可兜底（极端：分片被外部清除），尽力返回可读分片，缺失字段按空处理。
     logger.errorFromError(
@@ -169,6 +294,7 @@ const readPersistedSnapshot = async (
       new Error(`missing shards: ${missing.join(', ')}`),
     );
     lastWrittenShards = views;
+    hydratedIncomplete = readFailed;
     return { state: parts, version: meta.version };
   }
 
@@ -176,11 +302,13 @@ const readPersistedSnapshot = async (
   const legacyState = legacy.state as Record<string, unknown>;
   const legacyViews = buildShardViews(legacyState);
   const mergedState: Record<string, unknown> = { ...legacyState, ...parts };
-  for (const { shard, state } of shardStates) {
-    views[shard] = state ?? legacyViews[shard];
-  }
+  PERSISTENCE_SHARD_NAMES.forEach((shard, index) => {
+    const parsed = parseShardPayload(shardResults[index]);
+    views[shard] = parsed?.state ?? legacyViews[shard];
+  });
   lastWrittenShards = views;
   legacySnapshotHydrated = true;
+  hydratedIncomplete = readFailed;
   return { state: mergedState, version: meta.version };
 };
 
@@ -191,6 +319,18 @@ const writeShardedSnapshot = async (
   source: 'idle' | 'flush',
 ): Promise<void> => {
   if (latestPersistValue === null || latestPersistName !== name || persistWriteVersion !== writeVersion) {
+    return;
+  }
+
+  if (hydratedIncomplete) {
+    // 最近一次水合存在读取失败：水合结果不完整，写盘会用默认值覆盖磁盘上
+    // 仍然完好的真实分片。拒绝写入直到下一次完整读取成功。
+    logger.errorFromError(
+      'store.persist',
+      'Skipping persist write: last hydration was incomplete; refusing to overwrite',
+      new Error('hydrated incomplete'),
+      { source },
+    );
     return;
   }
 
@@ -205,6 +345,7 @@ const writeShardedSnapshot = async (
     : findDirtyShards(views, lastWrittenShards);
   if (dirty.length === 0) return;
 
+  const SHARD_SIZE_WARN_BYTES = 5 * 1024 * 1024;
   const entries: Array<readonly [string, string]> = [];
   try {
     for (const shard of dirty) {
@@ -221,6 +362,12 @@ const writeShardedSnapshot = async (
           source,
           shard,
           stringifyMs,
+          bytes: serialized.length,
+        });
+      } else if (serialized.length > SHARD_SIZE_WARN_BYTES) {
+        logger.warn('store.persist', 'Large state shard serialized', {
+          source,
+          shard,
           bytes: serialized.length,
         });
       }
@@ -240,7 +387,7 @@ const writeShardedSnapshot = async (
 
   const writeStartedAt = performance.now();
   try {
-    await setStorageEntries(entries);
+    await setStorageEntries(name, entries);
   } catch (error) {
     // 提交失败（原子回滚）：旧快照原样保留，无数据丢失，等待下次变更重试。
     logger.errorFromError('store.persist', 'Sharded persist write failed; previous snapshot kept', error, {
@@ -288,9 +435,14 @@ const enqueueShardedWrite = (
   writeVersion: number,
   source: 'idle' | 'flush',
 ): Promise<void> => {
+  // 链尾兜底 catch：writeChain 永不 reject，调用方（idle 的 void 调度、
+  // pagehide 的同步事件处理器）不会产生 unhandled rejection。
   writeChain = writeChain
     .catch(() => undefined)
-    .then(() => writeShardedSnapshot(name, value, writeVersion, source));
+    .then(() => writeShardedSnapshot(name, value, writeVersion, source))
+    .catch((error: unknown) => {
+      logger.errorFromError('store.persist', 'Persist write chain failed', error, { source });
+    });
   return writeChain;
 };
 
@@ -328,17 +480,10 @@ const registerPersistFlushListeners = (): void => {
 // costs a few KB instead of re-serializing the whole ~100MB snapshot.
 const debouncedPersistStorage: PersistStorage<unknown> = {
   getItem: async (name) => {
-    const sharded = await readPersistedSnapshot(name);
-    if (sharded) return sharded;
-
-    // Migration path: v16 之前的单键快照（IndexedDB 或 localStorage 镜像）。
-    const legacy = await readLegacySnapshot(name);
-    if (legacy && legacy.state && typeof legacy.state === 'object') {
-      legacySnapshotHydrated = true;
-      lastWrittenShards = buildShardViews(legacy.state as Record<string, unknown>);
-      return legacy;
-    }
-    return null;
+    // 每次水合重新评估读取完整性；读取失败会在 readPersistedSnapshot 内置位，
+    // 使后续写入被拒绝，直到出现一次完整读取。
+    hydratedIncomplete = false;
+    return await readPersistedSnapshot(name);
   },
   setItem: (name: string, value: StorageValue<unknown>) => {
     registerPersistFlushListeners();
@@ -376,6 +521,7 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
         lastWrittenShards = null;
         committedShards.clear();
         legacySnapshotHydrated = false;
+        hydratedIncomplete = false;
       });
   },
 };

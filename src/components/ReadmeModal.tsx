@@ -194,6 +194,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   }, []);
 
   const scrollRafRef = useRef<number | null>(null);
+  const scrollFrameUsesRafRef = useRef(false);
 
   // 进度条读取 scrollHeight/clientHeight 会强制布局，用 rAF 合帧避免滚动时反复重排。
   const handleScroll = useCallback(() => {
@@ -207,16 +208,19 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       setScrollProgress(Math.min(100, Math.max(0, progress)));
       setShowBackToTop(scrollTop > 300);
     };
+    // 记录本次调度用的 API：取消时按同一 API 取消，避免环境变化后错配 id 类型。
     if (typeof window.requestAnimationFrame === 'function') {
+      scrollFrameUsesRafRef.current = true;
       scrollRafRef.current = window.requestAnimationFrame(run);
     } else {
+      scrollFrameUsesRafRef.current = false;
       scrollRafRef.current = window.setTimeout(run, 16) as unknown as number;
     }
   }, []);
 
   useEffect(() => () => {
     if (scrollRafRef.current === null) return;
-    if (typeof window.cancelAnimationFrame === 'function') {
+    if (scrollFrameUsesRafRef.current) {
       window.cancelAnimationFrame(scrollRafRef.current);
     } else {
       window.clearTimeout(scrollRafRef.current);

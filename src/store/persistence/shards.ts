@@ -12,6 +12,16 @@
  * - 体积小、变更高频的偏好与视图状态集中到 core 分片，单次重写仅几 KB；
  * - partialize 未来新增的键由 resolveShardForField 兜底归入 core，保证
  *   任何持久化字段都不会因遗漏分片映射而丢失。
+ *
+ * ── 硬性契约 ────────────────────────────────────────────────────────────
+ * 1. 不可变更新：分片按「字段引用」判脏的前提是持久化字段永远不可变更新。
+ *    对 repositories/gists/releases/forks/accountWorkspaces/trendingSnapshots
+ *    的任何原地修改（push/sort/索引赋值）都会因引用未变而静默不落盘。
+ *    新代码必须使用不可变更新（这是 zustand 生态的既有约定）。
+ * 2. 格式版本：递增 PERSISTENCE_SHARD_FORMAT 时必须同步提供
+ *    readPersistedSnapshot 的旧格式迁移分支；仅改常量会让旧分片不可读，
+ *    且 legacy 单键快照在首次迁移后已退役——结果是空启动后覆盖全部数据。
+ * ───────────────────────────────────────────────────────────────────────
  */
 
 export const PERSISTENCE_SHARD_FORMAT = 1;
@@ -68,6 +78,7 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'defaultCategoryOverrides',
     'assetFilters',
     'repositoryCardFields',
+    'lastSync',
     'theme',
     'themePreset',
     'currentView',
@@ -111,7 +122,7 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'routeMode',
   ],
   // 以下为体积大、变更低频的重数据分片：仅在对应数组引用变化时重写。
-  repositories: ['repositories', 'lastSync'],
+  repositories: ['repositories'],
   gists: ['gists', 'starredGists'],
   releases: ['releases'],
   forks: ['forks'],
@@ -171,7 +182,9 @@ export const buildShardViews = (
 
 // 账号工作区：重数组按引用比较；规整化会重建的小对象按内容比较，
 // 避免 hydration 后的新引用被误判为真实变更。
-const WORKSPACE_REFERENCE_FIELDS = [
+// 维护约定：AccountWorkspace 的每个字段必须恰好出现在其中一个列表里
+// （storage.test.ts 有覆盖断言），否则新字段的内容变化会被判脏逻辑漏掉。
+export const WORKSPACE_REFERENCE_FIELDS = [
   'repositories',
   'gists',
   'starredGists',
@@ -185,7 +198,7 @@ const WORKSPACE_REFERENCE_FIELDS = [
   'hiddenDefaultCategoryIds',
 ] as const;
 
-const WORKSPACE_VALUE_FIELDS = [
+export const WORKSPACE_VALUE_FIELDS = [
   'lastSync',
   'selectedGistCategory',
   'releaseSourceSettings',
@@ -236,7 +249,14 @@ const accountWorkspacesUnchanged = (prev: unknown, next: unknown): boolean => {
   return true;
 };
 
-/** 找出相对上次成功写入发生变化的分片（按引用判脏）。 */
+/**
+ * 找出相对上次成功写入发生变化的分片。
+ *
+ * - 重数据分片按字段引用判脏（zustand 不可变更新保证未变字段引用不变）；
+ * - core 分片按内容判脏：partialize 每次调用都会重建若干小对象/数组
+ *   （searchFilters、proxyConfig、Array.from(Set) 等），按引用会让 core
+ *   恒判脏；core 体积只有几 KB，JSON 内容比较成本可忽略。
+ */
 export const findDirtyShards = (
   views: Record<PersistenceShardName, Record<string, unknown>>,
   lastWritten: Record<PersistenceShardName, Record<string, unknown>> | null,
@@ -250,6 +270,10 @@ export const findDirtyShards = (
     for (const key of keys) {
       if (shard === 'accountWorkspaces' && key === 'accountWorkspaces') {
         if (!accountWorkspacesUnchanged(prev[key], next[key])) return true;
+        continue;
+      }
+      if (shard === 'core') {
+        if (!smallValueEqual(prev[key], next[key])) return true;
         continue;
       }
       if (!Object.is(prev[key], next[key])) return true;

@@ -98,7 +98,33 @@ export const normalizeTrendingSnapshots = (value: unknown): TrendingSnapshot[] =
   const snapshots = value
     .map(normalizeTrendingSnapshot)
     .filter((snapshot): snapshot is TrendingSnapshot => snapshot !== null);
-  return pruneTrendingSnapshots(snapshots);
+  const pruned = pruneTrendingSnapshots(snapshots);
+  // 内容等价时保留原数组引用：分片持久化按引用判脏，规整化若总是重建数组，
+  // 每次启动都会把 trendingSnapshots 分片误判为已变更而全量重写。
+  if (pruned.length === value.length
+    && pruned.every((snapshot, index) => trendingSnapshotContentEqual(snapshot, value[index]))) {
+    return value as TrendingSnapshot[];
+  }
+  return pruned;
+};
+
+/** 已知四个字段逐项相等即视为等价（原始对象来自我们自己的 JSON 往返，无额外键）。 */
+const trendingSnapshotContentEqual = (normalized: TrendingSnapshot, raw: unknown): boolean => {
+  if (!raw || typeof raw !== 'object') return false;
+  const record = raw as Record<string, unknown>;
+  if (record.period !== normalized.period) return false;
+  if (record.platform !== normalized.platform) return false;
+  if (record.capturedAt !== normalized.capturedAt) return false;
+  const rawEntries = Array.isArray(record.entries) ? record.entries : null;
+  if (!rawEntries || rawEntries.length !== normalized.entries.length) return false;
+  return normalized.entries.every((entry, index) => {
+    const rawEntry = rawEntries[index];
+    if (!rawEntry || typeof rawEntry !== 'object') return false;
+    const candidate = rawEntry as Record<string, unknown>;
+    return candidate.repositoryFullName === entry.repositoryFullName
+      && candidate.rank === entry.rank
+      && candidate.stars === entry.stars;
+  });
 };
 
 /** 去掉超期快照，并按桶裁剪到上限（每桶保留最新 N 份）。 */

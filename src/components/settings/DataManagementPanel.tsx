@@ -58,7 +58,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
-import { indexedDBStorage } from '../../services/indexedDbStorage';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import type { 
   Repository, 
@@ -367,9 +366,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     // Clear sessionStorage - only remove app-owned keys
     APP_SESSIONSTORAGE_KEYS.forEach((key) => sessionStorage.removeItem(key));
 
-    // Clear IndexedDB - only remove the specific database used by this app
+    // Clear IndexedDB - only remove the specific database used by this app.
+    // 走 persist 的 clearStorage：除磁盘清扫外，还会在串行写链上取消待写、
+    // 完成删除并重置分片判脏簿记——直接调底层 removeItem 会让随后的 store
+    // 重置写入以过期基准判脏，只补写部分分片，而 meta 仍声明全部分片。
     try {
-      await indexedDBStorage.removeItem('github-stars-manager');
+      useAppStore.persist.clearStorage();
     } catch (error) {
       console.error('Failed to clear IndexedDB', error);
       throw new Error('IndexedDB clear failed');
