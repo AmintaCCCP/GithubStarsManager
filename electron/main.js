@@ -13,6 +13,7 @@ const { createMcpLocalServer } = require('./mcpLocalServer');
 const { fetch: undiciFetch, ProxyAgent } = require('undici');
 const { summarizeFetchError, fetchAcrossStacks, timeoutSignalFromBudget, followRedirectsManually, toFailureResult } = require('./mainFetch');
 const { createPluginManager } = require('./plugins/pluginManager');
+const { createPluginMarketplace } = require('./plugins/pluginMarketplace');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
 const { loadPluginRegistry } = require('./plugins/pluginRegistryFeed');
 const { PAGE_SCHEME, pageCsp } = require('./plugins/pluginPage');
@@ -1110,6 +1111,7 @@ ipcMain.handle('mcp:getStatus', async () => mcpServer.getStatus());
 
 // ── Trusted local plugin host (discovery, lifecycle, and restricted IPC) ──
 let pluginManager = null;
+let pluginMarketplace = null;
 
 // 页面 Bridge 的系统输出操作（V1.4）：写入剪贴板与“宿主下载”。实现只在
 // 主进程可用，经 capabilityRouter 的权限检查后调用；保存位置始终由用户在
@@ -1153,6 +1155,19 @@ function getPluginManager() {
     });
   }
   return pluginManager;
+}
+
+// 插件市场（自助插件源）：源列表与目录缓存在主进程维护，安装复用 pluginManager。
+function getPluginMarketplace() {
+  if (!pluginMarketplace) {
+    pluginMarketplace = createPluginMarketplace({
+      statePath: path.join(app.getPath('userData'), 'plugins-marketplace.json'),
+      stagingRoot: path.join(app.getPath('userData'), 'plugin-staging'),
+      fetchImpl: (url, options) => net.fetch(url, options),
+      pluginManager: getPluginManager(),
+    });
+  }
+  return pluginMarketplace;
 }
 
 ipcMain.handle('plugins:list', async () => getPluginManager().list());
@@ -1215,6 +1230,24 @@ ipcMain.handle('plugins:downloadReleaseAsset', async (_event, request) => {
 ipcMain.handle('plugins:loadRegistry', async () => loadPluginRegistry({
   fetchImpl: (url, options) => net.fetch(url, options),
 }));
+// 插件市场（自助插件源）：源的增删改查与遍历、从源安装/更新插件。
+// 安装动作下载的是整个插件目录，复用 pluginManager 的校验与落位，不在渲染进程沾手文件。
+ipcMain.handle('plugins:marketplace:getState', async () => getPluginMarketplace().getState());
+ipcMain.handle('plugins:marketplace:addSource', async (_event, input) =>
+  getPluginMarketplace().addSource(input)
+);
+ipcMain.handle('plugins:marketplace:updateSource', async (_event, input) =>
+  getPluginMarketplace().updateSource(input)
+);
+ipcMain.handle('plugins:marketplace:removeSource', async (_event, input) =>
+  getPluginMarketplace().removeSource(input)
+);
+ipcMain.handle('plugins:marketplace:refresh', async (_event, options) =>
+  getPluginMarketplace().refresh(options)
+);
+ipcMain.handle('plugins:marketplace:install', async (_event, request) =>
+  getPluginMarketplace().install(request)
+);
 ipcMain.handle('plugins:runExporter', async (_event, request) =>
   getPluginManager().runExporter(request)
 );

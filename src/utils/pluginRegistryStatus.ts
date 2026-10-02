@@ -105,8 +105,14 @@ const findRemoval = (removed: PluginRemovalEntry[], pluginId: string, version: s
     ))[0] ?? null
 );
 
+/**
+ * 在撤销/拉黑表里找匹配 (pluginId, version) 的记录；多条命中时 revoke 优先、
+ * 日期新的优先。市场弹窗与已安装插件对照共用这一份实现。
+ */
+export const findPluginRemoval = findRemoval;
+
 /** 客户端支持的 Plugin API 版本；注册表里声明别的版本的条目一律不采用。 */
-const SUPPORTED_API_VERSIONS = new Set(['1']);
+export const SUPPORTED_API_VERSIONS = new Set(['1']);
 
 /** 取"客户端支持的最高版本"——不是注册表里的最新版本。 */
 export const pickInstallableEntry = (versions: PluginRegistryEntry[]): PluginRegistryEntry | null => {

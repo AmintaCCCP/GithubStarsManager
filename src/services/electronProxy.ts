@@ -101,7 +101,10 @@ interface ElectronAPI {
   };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
-  plugins?: ElectronPluginAPI & { registry?: { load: () => Promise<import('./pluginRegistryService').PluginRegistryLoadResult> } };
+  plugins?: ElectronPluginAPI & {
+    registry?: { load: () => Promise<import('./pluginRegistryService').PluginRegistryLoadResult> };
+    marketplace?: import('./pluginMarketplaceService').MarketplaceElectronAPI;
+  };
 }
 
 declare global {
