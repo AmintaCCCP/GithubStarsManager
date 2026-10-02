@@ -472,6 +472,38 @@ const registerPersistFlushListeners = (): void => {
   }
 };
 
+/**
+ * 清空持久化快照（含 `${name}#` 派生键），返回覆盖整条串行链的 Promise：
+ * 排队中的写入先完成、随后清盘、最后重置判脏簿记（含删除失败路径）。
+ * 删除与写盘共用同一条串行链——若清盘即重置，in-flight 写入完成后会重新填充
+ * 缓存，删除后的首个写入只补写脏分片，而 meta 仍列出全部分片，重启即缺失。
+ *
+ * 注意：zustand v4 的 persist.clearStorage() 不回传 removeItem 的 Promise，
+ * 需要等待删除真正落盘的调用方（如「清空所有数据」后 reload）应直接调用并
+ * await 本函数。
+ */
+const removePersistedSnapshot = (name: string): Promise<void> => {
+  latestPersistName = null;
+  latestPersistValue = null;
+  persistWriteVersion++;
+  cancelPendingPersistTasks();
+  writeChain = writeChain
+    .catch(() => undefined)
+    .then(async () => {
+      await indexedDBStorage.removeItem(name);
+    })
+    .catch((error: unknown) => {
+      logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
+    })
+    .then(() => {
+      lastWrittenShards = null;
+      committedShards.clear();
+      legacySnapshotHydrated = false;
+      hydratedIncomplete = false;
+    });
+  return writeChain;
+};
+
 // Create a debounced storage to avoid frequent JSON.stringify calls on large state objects
 // which causes V8 JIT assertion failures (EXC_BREAKPOINT) on macOS ARM64.
 //
@@ -501,29 +533,7 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
       });
     }, 1000);
   },
-  removeItem: (name) => {
-    latestPersistName = null;
-    latestPersistValue = null;
-    persistWriteVersion++;
-    cancelPendingPersistTasks();
-    // 删除与缓存重置都入串行链：排队中的写入先完成、随后清盘、最后重置判脏
-    // 缓存（含删除失败路径）。否则 in-flight 写入完成后会重新填充缓存，删除
-    // 后的首个写入只补写脏分片，而 meta 仍列出全部分片，重启即出现分片缺失。
-    writeChain = writeChain
-      .catch(() => undefined)
-      .then(async () => {
-        await indexedDBStorage.removeItem(name);
-      })
-      .catch((error: unknown) => {
-        logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
-      })
-      .then(() => {
-        lastWrittenShards = null;
-        committedShards.clear();
-        legacySnapshotHydrated = false;
-        hydratedIncomplete = false;
-      });
-  },
+  removeItem: (name) => removePersistedSnapshot(name),
 };
 
-export { debouncedPersistStorage, flushPendingPersistSnapshot };
+export { debouncedPersistStorage, flushPendingPersistSnapshot, removePersistedSnapshot };

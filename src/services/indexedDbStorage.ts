@@ -366,8 +366,13 @@ export const getStorageEntriesStrict = async (
   }
 
   const results = await idbGetMany(keys);
-  if (!isFallbackAuthoritative(name)) return results;
-  return keys.map((key, index) => safeLocalStorageGet(key) ?? results[index]);
+  if (isFallbackAuthoritative(name)) {
+    return keys.map((key, index) => safeLocalStorageGet(key) ?? results[index]);
+  }
+  // 与单键严格读一致：IDB 未命中时回退 localStorage。兜底写入期间被尽力删除的
+  // IDB 键在权威标记清除后仍可能缺失（之后的 IDB 批次只回写了当批脏分片），
+  // 不回退会把「键在 localStorage」误判为「分片缺失」。
+  return keys.map((key, index) => results[index] ?? safeLocalStorageGet(key));
 };
 
 /** 廉价探测旧版单键快照是否仍存在（不读取值本身）。 */

@@ -24,6 +24,51 @@ import {
 } from './shards';
 import { normalizeTrendingSnapshots } from '../../utils/trendingSnapshots';
 
+// 提交点屏障：在真实存储提交入口（setStorageEntries）拦停写入，用于让并发
+// 测试确定性地与「写入 A 仍在提交中」重叠——setTimeout 等待无法保证这一点。
+const commitGate = vi.hoisted(() => {
+  let hold = false;
+  let release: () => void = () => undefined;
+  let markReached: (() => void) | null = null;
+  let reached: Promise<void> = Promise.resolve();
+  return {
+    arm: () => {
+      hold = true;
+      reached = new Promise<void>((resolve) => {
+        markReached = resolve;
+      });
+    },
+    waitReached: (): Promise<void> => reached,
+    release: () => {
+      hold = false;
+      release();
+    },
+    reset: () => {
+      hold = false;
+      release();
+    },
+    wrap: async <T>(run: () => Promise<T>): Promise<T> => {
+      if (hold) {
+        markReached?.();
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return run();
+    },
+  };
+});
+
+vi.mock('../../services/indexedDbStorage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/indexedDbStorage')>();
+  return {
+    ...actual,
+    // 真实签名是 (name, entries)——转发参数必须一一对应，否则会静默改写调用语义。
+    setStorageEntries: (name: string, entries: ReadonlyArray<readonly [string, string]>) =>
+      commitGate.wrap(() => actual.setStorageEntries(name, entries)),
+  };
+});
+
 const KEY = 'github-stars-manager';
 
 const tick = (ms = 20): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -108,6 +153,7 @@ const rewrittenShards = async (): Promise<string[]> => {
 
 beforeEach(async () => {
   vi.restoreAllMocks();
+  commitGate.reset();
   debouncedPersistStorage.removeItem(KEY);
   await tick();
 });
@@ -331,12 +377,15 @@ describe('sharded persist storage', () => {
 
     const stateLight = { ...state, theme: 'light' };
     const stateDark = { ...state, theme: 'dark' };
+    commitGate.arm();
     debouncedPersistStorage.setItem(KEY, { state: stateLight, version: 16 });
     const flushInFlight = flushPendingPersistSnapshot();
-    await new Promise((resolve) => setTimeout(resolve, 0)); // 宏任务确保写入 A 完成判脏并进入提交等待（版本随即过期）
+    await commitGate.waitReached(); // 写入 A 已完成判脏，在真实提交点被确定性拦停
     debouncedPersistStorage.setItem(KEY, { state: stateDark, version: 16 });
-    await flushPendingPersistSnapshot();
+    const flushAfterDark = flushPendingPersistSnapshot(); // B 排队在 A 之后
+    commitGate.release();
     await flushInFlight;
+    await flushAfterDark;
 
     expect((await readShardState('core')).theme).toBe('dark');
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
@@ -345,14 +394,17 @@ describe('sharded persist storage', () => {
 
   it('rebuilds the full shard set when removeItem follows a write still in flight', async () => {
     const state = buildState();
+    commitGate.arm();
     debouncedPersistStorage.setItem(KEY, { state, version: 16 });
     const inFlightWrite = flushPendingPersistSnapshot();
-    await new Promise((resolve) => setTimeout(resolve, 0)); // 让写入 A 完成判脏并进入提交等待
+    await commitGate.waitReached(); // 写入 A 已完成判脏，在真实提交点被确定性拦停
     debouncedPersistStorage.removeItem(KEY);
     const nextState = { ...state, language: 'en' };
     debouncedPersistStorage.setItem(KEY, { state: nextState, version: 16 });
-    await flushPendingPersistSnapshot();
+    const flushAfterClear = flushPendingPersistSnapshot(); // 排队在删除之后
+    commitGate.release();
     await inFlightWrite;
+    await flushAfterClear;
 
     // 删除后的首个写入必须全量重建：meta 与全部分片一致，不存在缺失分片
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
@@ -472,6 +524,35 @@ describe('sharded persist storage', () => {
     expect(hydrated?.state).toEqual({ theme: 'dark' });
   });
 
+  it('keeps reading a localStorage fallback shard after the fallback authority marker is cleared', async () => {
+    // 回归：批量严格读此前在权威标记清除后只看 IndexedDB——兜底写入期间被尽力
+    // 删除的 IDB 分片键会被误判为「分片缺失」，legacy 已退役时该分片字段回退默认
+    // 值，并在下次写入被默认值覆盖（真实数据被 LS 里的新值救不回来）。
+    const state = buildState();
+    debouncedPersistStorage.setItem(KEY, { state, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    // 兜底插曲：仅 core 经兜底路径写入 localStorage（旧 IDB core 键被删除），权威标记置位
+    const fallbackCore = JSON.stringify({ format: 1, version: 16, state: { theme: 'light', language: 'en' } });
+    await writeEntriesToFallbackStorage(KEY, [[shardKeyFor(KEY, 'core'), fallbackCore]]);
+    expect(window.localStorage.getItem(`${KEY}#fallback`)).not.toBeNull();
+
+    // 之后一批不含 core 的写入经 IndexedDB 成功：标记清除，LS 仍持有较新的 core
+    await setStorageEntries(KEY, [
+      [shardKeyFor(KEY, 'releases'), JSON.stringify({ format: 1, version: 16, state: { releases: [{ id: 202 }] } })],
+      [metaKeyFor(KEY), JSON.stringify({ format: 1, version: 16, shards: [...PERSISTENCE_SHARD_NAMES], savedAt: 't2' })],
+    ]);
+    expect(window.localStorage.getItem(`${KEY}#fallback`)).toBeNull();
+
+    const hydrated = await debouncedPersistStorage.getItem(KEY);
+    expect(hydrated?.state).toMatchObject({
+      theme: 'light',
+      language: 'en',
+      releases: [{ id: 202 }],
+      gists: [{ id: 'gist-1' }],
+    });
+  });
+
   it('refuses to write after a shard read failure so real data cannot be overwritten', async () => {
     // F2r2 回归：读取失败（区别于「键不存在」）后的水合结果不完整，
     // 后续写入必须被拒绝，否则会用默认值覆盖磁盘上的真实分片。
@@ -519,6 +600,21 @@ describe('sharded persist storage', () => {
     for (const shard of PERSISTENCE_SHARD_NAMES) {
       expect(await readRaw(shardKeyFor(KEY, shard))).toBeNull();
     }
+  });
+
+  it('removeItem resolves only after the on-disk removal has completed', async () => {
+    // 「清空所有数据」后 2 秒 reload：removeItem 必须可 await（zustand v4 的
+    // clearStorage 不回传 Promise），否则 reload 可能早于删除提交，数据复活。
+    debouncedPersistStorage.setItem(KEY, { state: buildState(), version: 16 });
+    await flushPendingPersistSnapshot();
+    expect(await readMeta()).not.toBeNull();
+
+    // 不 sleep：返回的 Promise 本身应覆盖整条串行链（排队写入 → 清盘 → 簿记重置）
+    await expect(debouncedPersistStorage.removeItem(KEY)).resolves.toBeUndefined();
+
+    expect(await readRaw(KEY)).toBeNull();
+    expect(await readMeta()).toBeNull();
+    expect(await readRaw(shardKeyFor(KEY, 'core'))).toBeNull();
   });
 });
 
