@@ -4,9 +4,12 @@ const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
-// 主进程出站请求必须用 npm 包 undici 自己的 fetch：全局 fetch 来自 Node 内置
-// undici，与 npm undici@8 的 ProxyAgent（getFetchDispatcher）内部 handler 协议
-// 不兼容，混用会在拨号前就抛 UND_ERR_INVALID_ARG: invalid onRequestStart method。
+// 主进程出站请求的网络栈选择：npm undici@8 的 ProxyAgent（getFetchDispatcher）
+// 与 Node 内置 fetch 的 handler 协议不兼容，混用会在拨号前抛
+// UND_ERR_INVALID_ARG: invalid onRequestStart method——携带 dispatcher 的
+// 调用必须用同版本的 undiciFetch；无代理场景多数目标用内置 fetch 即可，
+// 且 x.com 边缘 WAF 按 TLS 指纹放行内置 undici、403 npm undici@8（详见
+// X 各 handler 内注释）。
 const { fetch: undiciFetch, ProxyAgent } = require('undici');
 const { summarizeFetchError, fetchAcrossStacks, timeoutSignalFromBudget, followRedirectsManually, toFailureResult } = require('./mainFetch');
 const { createPluginManager } = require('./plugins/pluginManager');
