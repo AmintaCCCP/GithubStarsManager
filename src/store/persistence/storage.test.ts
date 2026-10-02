@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StorageValue } from 'zustand/middleware';
-import { indexedDBStorage, setStorageEntries } from '../../services/indexedDbStorage';
+import { indexedDBStorage, setStorageEntries, writeEntriesToFallbackStorage } from '../../services/indexedDbStorage';
 import { appPersistenceOptions } from './options';
 import { createInitialState } from '../initialState';
 import { flushPendingPersistSnapshot } from './storage';
@@ -317,45 +317,50 @@ describe('sharded persist storage', () => {
 });
 
 describe('indexedDbStorage batch helpers', () => {
-  // canUseIndexedDB() 读取 window.indexedDB；fake-indexeddb 的挂载位置在不同
-  // 环境（globalThis 与 window 是否同一对象）下不同，两处一并置空才可靠。
-  const withIndexedDBUnavailable = async (run: () => Promise<void>): Promise<void> => {
-    const targets: Array<Record<string, unknown>> = [window as unknown as Record<string, unknown>, globalThis as unknown as Record<string, unknown>];
-    const saved = targets.map((target) => Object.getOwnPropertyDescriptor(target, 'indexedDB'));
-    try {
-      for (const target of targets) {
-        Object.defineProperty(target, 'indexedDB', { configurable: true, value: undefined });
-      }
-      await run();
-    } finally {
-      targets.forEach((target, index) => {
-        const descriptor = saved[index];
-        if (descriptor) {
-          Object.defineProperty(target, 'indexedDB', descriptor);
-        } else {
-          delete target.indexedDB;
-        }
-      });
-    }
-  };
-
-  it('falls back to localStorage with all-or-nothing semantics when IndexedDB is unavailable', async () => {
-    await withIndexedDBUnavailable(async () => {
-      await setStorageEntries([['fallback-a', '1'], ['fallback-b', '2']]);
-      expect(window.localStorage.getItem('fallback-a')).toBe('1');
-      expect(await indexedDBStorage.getItem('fallback-a')).toBe('1');
-
-      // 任一键写入失败：已写入的键必须回滚，整批不生效
-      const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation((key, value) => {
-        if (key === 'fallback-b') throw new Error('quota exceeded');
-        Storage.prototype.setItem.call(window.localStorage, key, value);
-      });
-      await expect(setStorageEntries([['fallback-c', '3'], ['fallback-b', '4']])).rejects.toThrow();
-      setItemSpy.mockRestore();
-      expect(window.localStorage.getItem('fallback-c')).toBeNull();
-    });
+  it('writes every entry to localStorage on the fallback path', async () => {
+    await writeEntriesToFallbackStorage([['fallback-a', '1'], ['fallback-b', '2']]);
+    expect(window.localStorage.getItem('fallback-a')).toBe('1');
+    expect(window.localStorage.getItem('fallback-b')).toBe('2');
     window.localStorage.removeItem('fallback-a');
     window.localStorage.removeItem('fallback-b');
+  });
+
+  it('rolls back the whole fallback batch when any key write fails', async () => {
+    window.localStorage.setItem('fallback-c', 'previous');
+    const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation((key, value) => {
+      if (key === 'fallback-b') throw new Error('quota exceeded');
+      Storage.prototype.setItem.call(window.localStorage, key, value);
+    });
+    try {
+      await expect(writeEntriesToFallbackStorage([['fallback-a', '1'], ['fallback-b', '2']])).rejects.toThrow();
+      // 已写入的键必须回滚，且不覆盖既有值
+      expect(window.localStorage.getItem('fallback-a')).toBeNull();
+      expect(window.localStorage.getItem('fallback-c')).toBe('previous');
+    } finally {
+      setItemSpy.mockRestore();
+      window.localStorage.removeItem('fallback-a');
+      window.localStorage.removeItem('fallback-c');
+    }
+  });
+
+  it('writes batch entries through the IndexedDB path and reads them back', async () => {
+    await setStorageEntries([['idb-a', '1'], ['idb-b', '2']]);
+    expect(await indexedDBStorage.getItem('idb-a')).toBe('1');
+    expect(await indexedDBStorage.getItem('idb-b')).toBe('2');
+    await indexedDBStorage.removeItem('idb-a');
+    await indexedDBStorage.removeItem('idb-b');
+  });
+
+  it('migrates an existing localStorage snapshot when reading a key missing from IndexedDB', async () => {
+    window.localStorage.setItem('migrate-me', '{"legacy":true}');
+    try {
+      expect(await indexedDBStorage.getItem('migrate-me')).toBe('{"legacy":true}');
+      // 读取即迁移：快照进入 IndexedDB，localStorage 镜像被清除
+      expect(window.localStorage.getItem('migrate-me')).toBeNull();
+      expect(await readRaw('migrate-me')).toBe('{"legacy":true}');
+    } finally {
+      await indexedDBStorage.removeItem('migrate-me');
+    }
   });
 
   it('sweeps derived `${name}#` keys from localStorage on removeItem', async () => {

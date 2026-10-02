@@ -176,11 +176,33 @@ const safeLocalStorageRemoveWithDerivedKeys = (name: string): void => {
 };
 
 /**
+ * localStorage 兜底写入：按“全部成功才算提交”处理，任一键失败即回滚已写入
+ * 的键并抛错，由调用方保留旧快照以便下次重试。
+ */
+export const writeEntriesToFallbackStorage = async (
+  entries: ReadonlyArray<readonly [string, string]>,
+): Promise<void> => {
+  const written: string[] = [];
+  try {
+    for (const [key, value] of entries) {
+      if (!safeLocalStorageSet(key, value)) {
+        throw new Error('[storage] localStorage fallback write failed');
+      }
+      written.push(key);
+    }
+  } catch (error) {
+    for (const key of written) {
+      safeLocalStorageRemove(key);
+    }
+    throw error;
+  }
+};
+
+/**
  * 在单个 IndexedDB 事务里批量写入多个键（分片持久化的提交点）。
  * - IndexedDB 可用时：一个 readwrite 事务承载全部分片与 meta，天然原子——
  *   任一分片写入失败则整批回滚，旧快照原样保留，不会出现半新半旧的撕裂状态。
- * - IndexedDB 不可用时：退回 localStorage，同样按“全部成功才算提交”处理，
- *   任一键失败即回滚已写入的键并抛错，由调用方保留旧快照以便下次重试。
+ * - IndexedDB 不可用时：退回 localStorage（见 writeEntriesToFallbackStorage）。
  */
 export const setStorageEntries = async (
   entries: ReadonlyArray<readonly [string, string]>,
@@ -200,20 +222,7 @@ export const setStorageEntries = async (
     }
   }
 
-  const written: string[] = [];
-  try {
-    for (const [key, value] of entries) {
-      if (!safeLocalStorageSet(key, value)) {
-        throw new Error('[storage] localStorage fallback write failed');
-      }
-      written.push(key);
-    }
-  } catch (error) {
-    for (const key of written) {
-      safeLocalStorageRemove(key);
-    }
-    throw error;
-  }
+  await writeEntriesToFallbackStorage(entries);
 };
 
 /**
