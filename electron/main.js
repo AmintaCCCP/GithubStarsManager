@@ -4,6 +4,10 @@ const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+// 主进程出站请求必须用 npm 包 undici 自己的 fetch：全局 fetch 来自 Node 内置
+// undici，与 npm undici@8 的 ProxyAgent（getFetchDispatcher）内部 handler 协议
+// 不兼容，混用会在拨号前就抛 UND_ERR_INVALID_ARG: invalid onRequestStart method。
+const { fetch: undiciFetch, ProxyAgent } = require('undici');
 const { summarizeFetchError, fetchAcrossStacks, timeoutSignalFromBudget, followRedirectsManually, toFailureResult } = require('./mainFetch');
 const { createPluginManager } = require('./plugins/pluginManager');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
@@ -330,7 +334,6 @@ function getFetchDispatcher() {
       ? 'socks5://' + auth + config.host + ':' + config.port
       : 'http://' + auth + config.host + ':' + config.port;
     try {
-      const { ProxyAgent } = require('undici');
       return new ProxyAgent(proxyUrl);
     } catch (err) {
       throw new Error(`Failed to initialize configured proxy agent: ${err instanceof Error ? err.message : String(err)}`);
@@ -339,7 +342,6 @@ function getFetchDispatcher() {
   const envProxy = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.ALL_PROXY || process.env.all_proxy;
   if (envProxy) {
     try {
-      const { ProxyAgent } = require('undici');
       return new ProxyAgent(envProxy);
     } catch (err) {
       throw new Error(`Failed to initialize environment proxy agent: ${err instanceof Error ? err.message : String(err)}`);
@@ -366,7 +368,7 @@ ipcMain.handle('x-fetch-timeline', async (_event, handle) => {
         name: 'undici',
         run: async ({ remainingMs }) => {
           const dispatcher = getFetchDispatcher();
-          return fetch(timelineUrl, {
+          return undiciFetch(timelineUrl, {
             headers: timelineHeaders,
             signal: timeoutSignalFromBudget(remainingMs, 20_000),
             ...(dispatcher ? { dispatcher } : {}),
@@ -424,7 +426,7 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
         name: 'undici',
         run: async ({ remainingMs }) => {
           const dispatcher = getFetchDispatcher();
-          return fetch(telegramUrl, {
+          return undiciFetch(telegramUrl, {
             headers: telegramHeaders,
             signal: timeoutSignalFromBudget(remainingMs, 20_000),
             ...(dispatcher ? { dispatcher } : {}),
@@ -492,7 +494,7 @@ ipcMain.handle('webdav-request', async (_event, params) => {
       name: 'undici',
       run: async ({ remainingMs }) => {
         const dispatcher = getFetchDispatcher();
-        return fetch(parsed.toString(), {
+        return undiciFetch(parsed.toString(), {
           method: upperMethod,
           headers: safeHeaders,
           ...(hasBody ? { body } : {}),
@@ -576,7 +578,7 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
         };
     // redirect: 'error' — 拒绝跨域（及一切）重定向，避免 Cookie 被转到允许域名之外
     const dispatcher = getFetchDispatcher();
-    const response = await fetch(url, {
+    const response = await undiciFetch(url, {
       headers,
       redirect: 'error',
       signal: AbortSignal.timeout(20_000),
