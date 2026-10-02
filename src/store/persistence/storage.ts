@@ -364,9 +364,16 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
     lastWrittenShards = null;
     committedShards.clear();
     legacySnapshotHydrated = false;
-    void Promise.resolve(indexedDBStorage.removeItem(name)).catch((error: unknown) => {
-      logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
-    });
+    // 删除与写盘共用同一条串行链：保证排队中的写入先完成再删除，
+    // 且后续写入排在删除之后，不会出现删除事务晚于写入而误删新分片。
+    writeChain = writeChain
+      .catch(() => undefined)
+      .then(async () => {
+        await indexedDBStorage.removeItem(name);
+      })
+      .catch((error: unknown) => {
+        logger.errorFromError('store.persist', 'Failed to remove persisted state snapshot', error);
+      });
   },
 };
 
