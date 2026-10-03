@@ -719,6 +719,59 @@ describe('plugin marketplace', () => {
     assert.equal(rolledBack.status, 'active', 'status 必须回到 active，不能报 error');
   });
 
+  it('rolls back the old directory and runtime when installFromDirectory throws synchronously', async () => {
+    const manifestJson = validManifestJson({ main: 'worker.js' });
+    const { fetchImpl } = makeFetch([
+      commitRoute(),
+      ['git/trees', () => jsonHeaders({ sha: 't', truncated: false, tree: [
+        { path: 'plugins/fixture/manifest.json', type: 'blob', size: manifestJson.length },
+        { path: 'plugins/fixture/worker.js', type: 'blob', size: 4 },
+      ] })],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('v1\n')],
+    ]);
+    const pluginManager = createPluginManager({
+      pluginsRoot,
+      statePath: path.join(tmpRoot, 'plugins-state.json'),
+      runtimeFactory: () => ({
+        activate: async () => {},
+        deactivate: async () => {},
+        terminate: () => {},
+      }),
+    });
+    const marketplace = createPluginMarketplace({
+      statePath: stateFilePath,
+      stagingRoot,
+      fetchImpl,
+      seedDefaultSource: false,
+      pluginManager,
+    });
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    const sourceId = added.state.sources[0].id;
+    const first = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
+    assert.equal(first.success, true, JSON.stringify(first));
+    const enabled = await pluginManager.enable('com.example.marketplace-fixture', ['storage']);
+    assert.equal(enabled.success, true, JSON.stringify(enabled));
+
+    // 临时弄坏 pluginsRoot 权限，让 installFromDirectory 的 mkdirSync 同步抛异常
+    const rootMode = fs.statSync(pluginsRoot).mode;
+    fs.chmodSync(pluginsRoot, 0o000);
+    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true,
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
+    fs.chmodSync(pluginsRoot, rootMode);
+
+    assert.equal(second.success, false, '同步异常必须被外层 catch 兜住');
+    const listed = await pluginManager.list();
+    const restored = listed.plugins.find((plugin) => plugin.manifest.id === 'com.example.marketplace-fixture');
+    assert.equal(restored.enabled, true, '旧版本目录必须被恢复为启用状态');
+    assert.equal(restored.status, 'active', '激活恢复后状态必须是 active');
+  });
+
   it('keeps previous grants when a disabled plugin updates to unchanged permissions', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
     const { fetchImpl } = makeFetch([

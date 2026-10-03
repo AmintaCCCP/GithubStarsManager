@@ -541,6 +541,24 @@ function createPluginManager({
             keptEnabled: false,
           };
         } catch (error) {
+          // installFromDirectory 若在 rename/commit 前同步抛错（如 mkdirSync 失败），
+          // 内部分支不会执行：这里兜底把备份目录挪回原位；原先启用中的插件还要把
+          // 运行时拉回来，否则状态位启用但实际没有 Worker。
+          try {
+            if (fs.existsSync(backupDirectory) && !fs.existsSync(previousDirectory)) {
+              fs.renameSync(backupDirectory, previousDirectory);
+              scanCache = null;
+              state.plugins[pluginId] = { ...previousState };
+              saveState();
+              if (wasEnabled) {
+                try {
+                  await activatePlugin(findPlugin(pluginId));
+                } catch (activateError) {
+                  recordError(pluginId, activateError);
+                }
+              }
+            }
+          } catch { /* 恢复失败时仍报告原始异常 */ }
           return { success: false, error: safeError(error, 'PLUGIN_REPLACE_FAILED') };
         }
       });
