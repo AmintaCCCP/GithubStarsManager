@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "이 버전은 공식 레지스트리에서 취소되어 설치하거나 업데이트할 수 없습니다.",
     "marketplace-error-blocked": "이 버전은 공식 레지스트리에서 차단되어 설치하거나 업데이트할 수 없습니다.",
     "marketplace-error-changed": "설치 중에 소스의 플러그인이 변경되었습니다. 새로 고친 후 다시 시도해 주세요.",
-    "marketplace-update-success-still-enabled-v1": "{{v1}}을(를) 업데이트했습니다. 플러그인은 계속 활성화 상태입니다."
+    "marketplace-update-success-still-enabled-v1": "{{v1}}을(를) 업데이트했습니다. 플러그인은 계속 활성화 상태입니다.",
+    "marketplace-orphaned-revoked-title": "취소된 설치된 플러그인"
   },
   "starSyncPanel": {
     "star-sync": "스타싱크",

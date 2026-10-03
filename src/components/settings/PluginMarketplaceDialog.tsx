@@ -135,6 +135,23 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
     }));
   }, [state]);
 
+  /**
+   * 已撤销的已安装插件孤儿列表：这些插件不在任何源的目录条目里（源被删或
+   * 目录里下架了），市场行不会渲染它们，但官方注册表仍判了撤销——必须独立
+   * 提示"立即停用"，不能依赖市场行才看见。
+   */
+  const orphanRevoked = useMemo(() => {
+    if (!officialRegistry) return [];
+    const inMarketplace = new Set(groups.flatMap((entry) => entry.plugins.map((plugin) => plugin.manifest.id)));
+    return snapshot.plugins
+      .filter((installed) => !inMarketplace.has(installed.manifest.id))
+      .map((installed) => ({
+        installed,
+        removal: findPluginRemoval(officialRegistry.removed, installed.manifest.id, installed.manifest.version),
+      }))
+      .filter((item) => item.removal?.action === 'revoke');
+  }, [groups, snapshot.plugins, officialRegistry]);
+
   const query = search.trim().toLowerCase();
   const filterPlugin = useCallback((plugin: MarketplacePluginEntry) => !query
     || plugin.manifest.name.toLowerCase().includes(query)
@@ -217,8 +234,9 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
         return;
       }
       await pluginRegistry.refresh();
-      // 权限一致时主进程会恢复启用状态，此时不需要"请检查权限"的提示。
-      if (replace && result.permissionsChanged === false) {
+      // 主进程明确说"替换后仍处于启用"时才展示保持启用的提示；
+      // 其他情况（含停用插件更新、权限变化）提示检查权限后再启用。
+      if (replace && result.keptEnabled === true) {
         toast(t('pluginSettingsPanel.marketplace-update-success-still-enabled-v1', { v1: plugin.manifest.name }), 'success');
       } else {
         toast(replace
@@ -502,6 +520,41 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
             </div>
           ) : (
             groups.map(renderGroup)
+          )}
+
+          {orphanRevoked.length > 0 && (
+            <section className="rounded-lg border border-destructive/40 bg-destructive/5" data-testid="marketplace-revoked-section">
+              <h4 className="border-b border-destructive/20 px-3 py-2 text-sm font-semibold text-destructive">
+                {t('pluginSettingsPanel.marketplace-orphaned-revoked-title')}
+              </h4>
+              <ul className="divide-y divide-destructive/10">
+                {orphanRevoked.map(({ installed, removal }) => (
+                  <li key={installed.manifest.id} className="flex items-start justify-between gap-3 px-3 py-3" data-testid={`marketplace-revoked-${installed.manifest.id}`}>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-medium">{installed.manifest.name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">v{installed.manifest.version}</span>
+                        <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
+                          {t('pluginSettingsPanel.revoked')}
+                        </span>
+                      </div>
+                      {removal?.reason && <p className="mt-1 text-xs text-destructive">{removal.reason}</p>}
+                    </div>
+                    {installed.enabled && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={busyPluginId === installed.manifest.id}
+                        onClick={() => void disable(installed.manifest.id)}
+                      >
+                        {t('pluginSettingsPanel.disable-now')}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
         </div>
       </Modal>

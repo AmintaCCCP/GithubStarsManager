@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "Cette version a été révoquée par le registre officiel ; installation et mise à jour impossibles.",
     "marketplace-error-blocked": "Cette version a été bloquée par le registre officiel ; installation et mise à jour impossibles.",
     "marketplace-error-changed": "Le plugin a changé sur la source pendant l’installation ; actualisez puis réessayez.",
-    "marketplace-update-success-still-enabled-v1": "{{v1}} mis à jour ; le plugin reste activé."
+    "marketplace-update-success-still-enabled-v1": "{{v1}} mis à jour ; le plugin reste activé.",
+    "marketplace-orphaned-revoked-title": "Plugins installés révoqués"
   },
   "starSyncPanel": {
     "star-sync": "Synchronisation des étoiles",

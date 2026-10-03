@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "該版本已被官方註冊表撤銷，無法安裝或更新。",
     "marketplace-error-blocked": "該版本已被官方註冊表封鎖，無法安裝或更新。",
     "marketplace-error-changed": "安裝過程中來源上的插件發生了變化，請重新整理後再試。",
-    "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持啟用狀態。"
+    "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持啟用狀態。",
+    "marketplace-orphaned-revoked-title": "已撤銷的已安裝插件"
   },
   "starSyncPanel": {
     "star-sync": "星標同步",

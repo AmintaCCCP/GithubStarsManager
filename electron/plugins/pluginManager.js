@@ -491,12 +491,22 @@ function createPluginManager({
           const installed = this.installFromDirectory(sourceDirectory);
 
           if (!installed.success) {
-            // 回滚：清掉可能存在的半成品目录，把旧版本原样挪回去并恢复状态。
+            // 回滚：清掉可能存在的半成品目录，把旧版本原样挪回来并恢复状态。
             try { fs.rmSync(path.join(resolvedRoot, pluginId), { recursive: true, force: true }); } catch {}
             fs.renameSync(backupDirectory, previousDirectory);
             scanCache = null;
             state.plugins[pluginId] = { ...previousState };
             saveState();
+            // 原来处于启用状态：恢复启用不只是恢复状态位，还要把 Worker 拉起来，
+            // 否则状态显示已启用而 runtimes 里没有运行时，插件全程不可用。
+            if (wasEnabled) {
+              try {
+                await activatePlugin(findPlugin(pluginId));
+              } catch (error) {
+                // 旧版本原地激活也失败：按既有语义记录错误并保持停用。
+                recordError(pluginId, error);
+              }
+            }
             return installed;
           }
           try { fs.rmSync(backupDirectory, { recursive: true, force: true }); } catch {}
@@ -507,7 +517,7 @@ function createPluginManager({
               await activatePlugin(findPlugin(pluginId));
               state.plugins[pluginId] = { enabled: true, grantedPermissions: [...previousState.grantedPermissions] };
               saveState();
-              return { success: true, pluginId, permissionsChanged: false };
+              return { success: true, pluginId, permissionsChanged: false, keptEnabled: true };
             } catch (error) {
               // 新版本已就位但激活失败：按既有语义记录错误并保持停用，并向调用方
               // 如实报告失败——绝不能报"成功且保持启用"。插件数据不动，plugins
@@ -516,10 +526,20 @@ function createPluginManager({
               return { success: false, error: safeError(error) };
             }
           }
-          state.plugins[pluginId] = { enabled: false, grantedPermissions: [] };
+          // 停用场景保留与新权限一致的旧授权（enable 要求授权与当前 manifest 完全一致）；
+          // 权限变化才清空。permissionsChanged 只对原来启用的插件有意义。
+          // keptEnabled=false 让界面不会把停在"停用"的插件说成"保持启用"。
+          state.plugins[pluginId] = {
+            enabled: false,
+            grantedPermissions: permissionsUnchanged ? [...previousState.grantedPermissions] : [],
+          };
           saveState();
-          // 只有新版权限与原授权不同时才需要重新走权限确认。
-          return { success: true, pluginId, permissionsChanged: !permissionsUnchanged };
+          return {
+            success: true,
+            pluginId,
+            permissionsChanged: wasEnabled && !permissionsUnchanged,
+            keptEnabled: false,
+          };
         } catch (error) {
           return { success: false, error: safeError(error, 'PLUGIN_REPLACE_FAILED') };
         }

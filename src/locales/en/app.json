@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "This version has been revoked by the official registry and cannot be installed or updated.",
     "marketplace-error-blocked": "This version has been blocked by the official registry and cannot be installed or updated.",
     "marketplace-error-changed": "The plugin changed on the source during installation; refresh and try again.",
-    "marketplace-update-success-still-enabled-v1": "Updated {{v1}}; the plugin stays enabled."
+    "marketplace-update-success-still-enabled-v1": "Updated {{v1}}; the plugin stays enabled.",
+    "marketplace-orphaned-revoked-title": "Revoked installed plugins"
   },
   "starSyncPanel": {
     "star-sync": "Star Sync",

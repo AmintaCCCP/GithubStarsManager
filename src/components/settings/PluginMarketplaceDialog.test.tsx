@@ -292,6 +292,32 @@ describe('PluginMarketplaceDialog', () => {
     await vi.waitFor(() => expect(mocks.disable).toHaveBeenCalledWith('com.example.fixture'));
   });
 
+  it('surfaces a disable-now prompt for a revoked installed plugin even if no source lists it', async () => {
+    // 插件唯一来源已被删除：市场行不会渲染该插件，但官方撤销提示必须独立出现。
+    mocks.setStoreSnapshot({ plugins: [installedPlugin({ enabled: true, status: 'active' })], invalidPlugins: [] });
+    mocks.getState.mockResolvedValue({ sources: [], entries: [] });
+    mocks.loadOfficialRegistry.mockResolvedValue({
+      success: true,
+      registry: {
+        fetchedAt: '',
+        plugins: [],
+        removed: [{ id: 'com.example.fixture', versions: ['1.0.0'], reason: '向第三方发送了仓库列表', date: '2026-10-01', action: 'revoke' }],
+        rejected: [],
+        error: null,
+      },
+    });
+    mocks.disable.mockResolvedValue({ success: true });
+    const user = userEvent.setup();
+    renderDialog();
+    await waitFor(() => expect(screen.getByTestId('marketplace-revoked-com.example.fixture')).toBeInTheDocument());
+
+    expect(screen.getByTestId('marketplace-revoked-section')).toHaveTextContent('已撤销的已安装插件');
+    expect(screen.getByTestId('marketplace-revoked-com.example.fixture')).toHaveTextContent('向第三方发送了仓库列表');
+
+    await user.click(within(screen.getByTestId('marketplace-revoked-com.example.fixture')).getByRole('button', { name: '立即停用' }));
+    await vi.waitFor(() => expect(mocks.disable).toHaveBeenCalledWith('com.example.fixture'));
+  });
+
   it('shows the empty state with an add-source action when no sources exist', async () => {
     mocks.getState.mockResolvedValue({ sources: [], entries: [] });
     renderDialog();

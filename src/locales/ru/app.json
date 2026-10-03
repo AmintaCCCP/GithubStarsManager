@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "Эта версия отозвана официальным реестром; установка и обновление невозможны.",
     "marketplace-error-blocked": "Эта версия заблокирована официальным реестром; установка и обновление невозможны.",
     "marketplace-error-changed": "Плагин изменился в источнике во время установки; обновите список и повторите попытку.",
-    "marketplace-update-success-still-enabled-v1": "«{{v1}}» обновлён; плагин остаётся включённым."
+    "marketplace-update-success-still-enabled-v1": "«{{v1}}» обновлён; плагин остаётся включённым.",
+    "marketplace-orphaned-revoked-title": "Отозванные установленные плагины"
   },
   "starSyncPanel": {
     "star-sync": "Звездная синхронизация",

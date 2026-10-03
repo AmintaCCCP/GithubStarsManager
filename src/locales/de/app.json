@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "Diese Version wurde von der offiziellen Registry widerrufen und kann nicht installiert oder aktualisiert werden.",
     "marketplace-error-blocked": "Diese Version wurde von der offiziellen Registry gesperrt und kann nicht installiert oder aktualisiert werden.",
     "marketplace-error-changed": "Das Plugin hat sich während der Installation auf der Quelle geändert; aktualisiere und versuche es erneut.",
-    "marketplace-update-success-still-enabled-v1": "{{v1}} aktualisiert; das Plugin bleibt aktiviert."
+    "marketplace-update-success-still-enabled-v1": "{{v1}} aktualisiert; das Plugin bleibt aktiviert.",
+    "marketplace-orphaned-revoked-title": "Widerrufene installierte Plugins"
   },
   "starSyncPanel": {
     "star-sync": "Star-Synchronisierung",

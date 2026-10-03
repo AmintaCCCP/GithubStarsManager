@@ -19,7 +19,7 @@ export interface MarketplaceElectronAPI {
   removeSource: (input: { id: string }) => Promise<MarketplaceMutationResult>;
   refresh: (options?: { sourceId?: string }) => Promise<MarketplaceMutationResult>;
   install: (request: MarketplaceInstallRequest) => Promise<
-    { success: true; pluginId: string; permissionsChanged?: boolean } | { success: false; error: PluginError }
+    { success: true; pluginId: string; permissionsChanged?: boolean; keptEnabled?: boolean } | { success: false; error: PluginError }
   >;
 }
 

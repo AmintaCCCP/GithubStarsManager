@@ -1130,7 +1130,8 @@
     "marketplace-error-revoked": "このバージョンは公式レジストリで取り消されているため、インストール・更新できません。",
     "marketplace-error-blocked": "このバージョンは公式レジストリでブロックされているため、インストール・更新できません。",
     "marketplace-error-changed": "インストール中にソース上のプラグインが変わりました。更新してから再試行してください。",
-    "marketplace-update-success-still-enabled-v1": "{{v1}} を更新しました。プラグインは有効のままです。"
+    "marketplace-update-success-still-enabled-v1": "{{v1}} を更新しました。プラグインは有効のままです。",
+    "marketplace-orphaned-revoked-title": "取り消し済みのインストール済みプラグイン"
   },
   "starSyncPanel": {
     "star-sync": "スターシンク",
