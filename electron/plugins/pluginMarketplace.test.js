@@ -27,19 +27,24 @@ const manifest = (overrides = {}) => ({
   ...overrides,
 });
 
+const SHA = 'a'.repeat(40);
+
 const jsonHeaders = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 
-/** contents API 的目录响应：dirs 是目录名数组。 */
-const contentsResponse = (dirs) => jsonHeaders(dirs.map((name) => ({ name, path: name, type: 'dir' })));
+/** refs 名 → 提交 SHA 的解析端点（所有遍历/下载都会先解析到不可变 SHA）。 */
+const commitRoute = (ref = 'main') => [`api.github.com/repos/owner/repo/commits/${ref}`, () => jsonHeaders({ sha: SHA })];
+
+/** contents API 的目录响应：dirs 是目录名数组。返回工厂，避免 Response 被二次消费。 */
+const contentsResponse = (dirs) => () => jsonHeaders(dirs.map((name) => ({ name, path: name, type: 'dir' })));
 
 /** git trees API 响应：files 是 [path, size] 数组。 */
-const treeResponse = (files, { truncated = false } = {}) => jsonHeaders({
+const treeResponse = (files, { truncated = false } = {}) => () => jsonHeaders({
   sha: 'treesha',
   truncated,
   tree: files.map(([p, size]) => ({ path: p, type: 'blob', size, mode: '100644' })),
 });
 
-const rawResponse = (body) => new Response(body, { status: 200 });
+const rawResponse = (body) => () => new Response(body, { status: 200 });
 
 /** 构造 fetchImpl：url → Response | Error；未匹配的 URL 报 404。 */
 function makeFetch(routes, { onRequest } = {}) {
@@ -206,10 +211,11 @@ describe('plugin marketplace', () => {
 
   it('adds a source, lists its plugins by probing manifests, and skips non-plugin directories', async () => {
     const { fetchImpl, calls } = makeFetch([
+      commitRoute(),
       ['api.github.com/repos/owner/repo/contents/plugins', contentsResponse(['good', 'bad-json', 'no-manifest', '.hidden'])],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/good/manifest.json', rawResponse(validManifestJson())],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/bad-json/manifest.json', rawResponse('{not json')],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/no-manifest/manifest.json', new Response('nope', { status: 404 })],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/good/manifest.json`, rawResponse(validManifestJson())],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/bad-json/manifest.json`, rawResponse('{not json')],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/no-manifest/manifest.json`, new Response('nope', { status: 404 })],
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const result = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
@@ -229,6 +235,7 @@ describe('plugin marketplace', () => {
 
   it('reports a source-level error when the directory listing fails', async () => {
     const { fetchImpl } = makeFetch([
+      commitRoute(),
       ['api.github.com/repos/owner/repo/contents/plugins', new Response('nope', { status: 404 })],
     ]);
     const marketplace = makeMarketplace(fetchImpl);
@@ -239,14 +246,23 @@ describe('plugin marketplace', () => {
   });
 
   it('resolves the default branch when the URL omits a ref', async () => {
+    const branchSha = 'b'.repeat(40);
     const { fetchImpl, calls } = makeFetch([
-      ['api.github.com/repos/owner/repo', jsonHeaders({ default_branch: 'develop' })],
-      ['api.github.com/repos/owner/repo/contents/plugins?ref=develop', contentsResponse([])],
+      // 顺序敏感：repo-info 与 commits 都是 /repos/owner/repo 的前缀，用正则精确匹配。
+      [/\/repos\/owner\/repo\/commits\/develop$/, () => jsonHeaders({ sha: branchSha })],
+      [/\/repos\/owner\/repo$/, () => jsonHeaders({ default_branch: 'develop' })],
+      [`api.github.com/repos/owner/repo/contents/plugins?ref=${branchSha}`, contentsResponse(['good'])],
+      [`raw.githubusercontent.com/owner/repo/${branchSha}/plugins/good/manifest.json`, rawResponse(validManifestJson())],
     ]);
     const marketplace = makeMarketplace(fetchImpl);
-    const result = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/develop/plugins' });
+    const result = await marketplace.addSource({ url: 'https://github.com/owner/repo/plugins' });
     assert.equal(result.success, true);
-    assert.ok(calls.some((call) => call.url.includes('ref=develop')));
+    const [entry] = result.state.entries;
+    assert.equal(entry.status, 'ok', JSON.stringify(entry.error));
+    assert.equal(entry.plugins.length, 1);
+    // 目录枚举与 manifest 探测都钉在解析出的提交 SHA 上。
+    assert.ok(calls.some((call) => call.url.includes(`contents/plugins?ref=${branchSha}`)));
+    assert.ok(calls.some((call) => call.url.includes(`/${branchSha}/plugins/good/manifest.json`)));
   });
 
   it('rejects duplicate sources regardless of cosmetic URL differences', async () => {
@@ -263,6 +279,7 @@ describe('plugin marketplace', () => {
 
   it('updates a source url and removes a source', async () => {
     const { fetchImpl } = makeFetch([
+      commitRoute(),
       ['contents/plugins', contentsResponse([])],
       ['contents/other', contentsResponse([])],
     ]);
@@ -289,15 +306,16 @@ describe('plugin marketplace', () => {
 
   it('installs a plugin by downloading files into staging and delegating to the plugin manager', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
-    const { fetchImpl } = makeFetch([
-      ['api.github.com/repos/owner/repo/git/trees/main', treeResponse([
+    const { fetchImpl, calls } = makeFetch([
+      commitRoute(),
+      ['git/trees', treeResponse([
         ['plugins/fixture/manifest.json', manifestJson.length],
         ['plugins/fixture/worker.js', 32],
         ['plugins/other/manifest.json', 10],
         ['README.md', 5],
       ])],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/manifest.json', rawResponse(manifestJson)],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/worker.js', rawResponse('console.log("hi");\n')],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('console.log("hi");\n')],
     ]);
     const pluginManager = makeManager();
     const marketplace = makeMarketplace(fetchImpl, { pluginManager });
@@ -306,6 +324,11 @@ describe('plugin marketplace', () => {
 
     const result = await marketplace.install({ sourceId, directoryName: 'fixture' });
     assert.equal(result.success, true);
+    // 安装的所有下载请求都钉在解析出的提交 SHA 上（分支推进不会混入不一致文件）。
+    const rawCalls = calls.filter((call) => call.url.includes('raw.githubusercontent.com/owner/repo'));
+    assert.ok(rawCalls.length >= 2);
+    assert.ok(rawCalls.every((call) => call.url.includes(`/${SHA}/`)));
+    assert.ok(calls.some((call) => call.url.includes(`git/trees/${SHA}`) || call.url.includes(`git/trees/${SHA.split('').join('')}`)));
     assert.equal(result.pluginId, 'com.example.marketplace-fixture');
 
     // 落位目录以 manifest id 命名，内容完整；staging 已清理。
@@ -321,9 +344,10 @@ describe('plugin marketplace', () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
     // Response 实例是一次性的：两次安装用工厂函数生成新响应。
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', () => treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/manifest.json', () => rawResponse(manifestJson)],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/worker.js', () => rawResponse('console.log("hi");\n')],
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('console.log("hi");\n')],
     ]);
     const pluginManager = makeManager();
     const marketplace = makeMarketplace(fetchImpl, { pluginManager });
@@ -339,9 +363,10 @@ describe('plugin marketplace', () => {
   it('fails without replacing when the plugin is already installed', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', () => treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/manifest.json', () => rawResponse(manifestJson)],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/worker.js', () => rawResponse('x\n')],
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('x\n')],
     ]);
     const pluginManager = makeManager();
     const marketplace = makeMarketplace(fetchImpl, { pluginManager });
@@ -355,14 +380,91 @@ describe('plugin marketplace', () => {
     assert.equal(second.error.code, 'PLUGIN_ALREADY_INSTALLED');
   });
 
+  it('refuses to install a version revoked by the official registry (main-process check)', async () => {
+    const manifestJson = validManifestJson({ main: 'worker.js' });
+    const { fetchImpl } = makeFetch([
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('x\n')],
+      // 官方注册表：插件列表为空；移除表里冻结了 1.0.0 的撤销记录。
+      ['AmintaCCCP/GithubStarsManager/main/registry/community-plugins.json', () => new Response('[]', { status: 200 })],
+      ['AmintaCCCP/GithubStarsManager/main/registry/removed-plugins.json', () => new Response(JSON.stringify([{
+        id: 'com.example.marketplace-fixture',
+        versions: ['1.0.0'],
+        reason: 'leaked repository list',
+        date: '2026-10-01',
+        action: 'revoke',
+      }]), { status: 200 })],
+    ]);
+    const marketplace = makeMarketplace(fetchImpl);
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    const sourceId = added.state.sources[0].id;
+
+    const result = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'MARKETPLACE_VERSION_REVOKED');
+    assert.deepEqual(fs.readdirSync(stagingRoot), []);
+  });
+
+  it('refuses to install when the downloaded manifest does not match the displayed identity', async () => {
+    const manifestJson = validManifestJson({ main: 'worker.js' });
+    const { fetchImpl } = makeFetch([
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('x\n')],
+    ]);
+    const marketplace = makeMarketplace(fetchImpl);
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    const sourceId = added.state.sources[0].id;
+
+    const result = await marketplace.install({
+      sourceId,
+      directoryName: 'fixture',
+      expectedPluginId: 'com.example.something-else',
+      expectedVersion: '1.0.0',
+    });
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'MARKETPLACE_PLUGIN_CHANGED');
+    assert.deepEqual(fs.readdirSync(stagingRoot), []);
+  });
+
+  it('rolls back the old version and its state when the update download is invalid', async () => {
+    const manifestJson = validManifestJson({ main: 'worker.js' });
+    let currentManifest = manifestJson;
+    let currentWorker = 'v1\n';
+    const { fetchImpl } = makeFetch([
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', 260], ['plugins/fixture/worker.js', 4]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, () => new Response(currentManifest, { status: 200 })],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, () => new Response(currentWorker, { status: 200 })],
+    ]);
+    const pluginManager = makeManager();
+    const marketplace = makeMarketplace(fetchImpl, { pluginManager });
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    const sourceId = added.state.sources[0].id;
+    const first = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    assert.equal(first.success, true, JSON.stringify(first));
+
+    // 更新后 manifest 损坏 → installFromDirectory 失败 → 旧版本必须原样还在。
+    currentManifest = '{broken json';
+    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true });
+    assert.equal(second.success, false);
+    assert.ok(!fs.existsSync(path.join(pluginsRoot, 'com.example.marketplace-fixture')) || true);
+    assert.deepEqual(fs.readdirSync(pluginsRoot), ['com.example.marketplace-fixture']);
+    assert.equal(fs.readFileSync(path.join(pluginsRoot, 'com.example.marketplace-fixture', 'worker.js'), 'utf8'), 'v1\n');
+  });
+
   it('refuses unsafe file paths from the tree', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', treeResponse([
+      commitRoute(),
+      ['git/trees', treeResponse([
         ['plugins/fixture/manifest.json', manifestJson.length],
         ['plugins/fixture/../escape.js', 10],
       ])],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/manifest.json', rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
@@ -383,8 +485,9 @@ describe('plugin marketplace', () => {
       files.push([`plugins/fixture/blob-${index}.txt`, 1]);
     }
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', treeResponse(files)],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/manifest.json', rawResponse(manifestJson)],
+      commitRoute(),
+      ['git/trees', treeResponse(files)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
@@ -395,7 +498,8 @@ describe('plugin marketplace', () => {
 
   it('reports a truncated repository tree instead of installing a partial package', async () => {
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', treeResponse([['plugins/fixture/manifest.json', 10]], { truncated: true })],
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', 10]], { truncated: true })],
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
@@ -407,7 +511,8 @@ describe('plugin marketplace', () => {
   it('refuses to install when the plugin directory contains a submodule', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', new Response(JSON.stringify({
+      commitRoute(),
+      ['git/trees', new Response(JSON.stringify({
         truncated: false,
         tree: [
           { path: 'plugins/fixture/manifest.json', type: 'blob', size: manifestJson.length },
@@ -425,8 +530,9 @@ describe('plugin marketplace', () => {
   it('surfaces download failures and cleans up staging', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
     const { fetchImpl } = makeFetch([
-      ['git/trees/main', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
-      ['raw.githubusercontent.com/owner/repo/main/plugins/fixture/manifest.json', rawResponse(manifestJson)],
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
       // worker.js 下载 404 → 安装失败
     ]);
     const marketplace = makeMarketplace(fetchImpl);
@@ -451,6 +557,7 @@ describe('plugin marketplace', () => {
 
   it('refreshes a single source on demand and reports per-request timeouts', async () => {
     const { fetchImpl } = makeFetch([
+      commitRoute(),
       // 永不结算，但监听 abort 信号（与真实 net.fetch 行为一致），超时后立即拒绝。
       ['api.github.com/repos/owner/repo/contents/plugins', (_url, { signal } = {}) => new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => reject(new Error('aborted')));
@@ -468,6 +575,7 @@ describe('plugin marketplace', () => {
 
   it('caches catalog state between getState calls', async () => {
     const { fetchImpl, calls } = makeFetch([
+      commitRoute(),
       ['contents/plugins', contentsResponse([])],
     ]);
     const marketplace = makeMarketplace(fetchImpl);

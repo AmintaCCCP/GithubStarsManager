@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "Esta fuente de plugins ya se ha añadido.",
     "marketplace-error-already-installed": "Este plugin ya está instalado. Usa «Actualizar» para actualizarlo.",
     "marketplace-error-package-too-large": "El paquete del plugin supera el límite de tamaño de instalación.",
-    "marketplace-updatable-count-v1": "{{v1}} actualizables"
+    "marketplace-updatable-count-v1": "{{v1}} actualizables",
+    "marketplace-error-revoked": "Esta versión fue revocada por el registro oficial; no se puede instalar ni actualizar.",
+    "marketplace-error-blocked": "Esta versión fue bloqueada por el registro oficial; no se puede instalar ni actualizar.",
+    "marketplace-error-changed": "El plugin cambió en la fuente durante la instalación; actualiza e inténtalo de nuevo.",
+    "marketplace-update-success-still-enabled-v1": "{{v1}} actualizado; el plugin permanece activado."
   },
   "starSyncPanel": {
     "star-sync": "Sincronización de estrellas",

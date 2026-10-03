@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "이 플러그인 소스는 이미 추가되어 있습니다.",
     "marketplace-error-already-installed": "이 플러그인은 이미 설치되어 있습니다. 업데이트하려면 \"업데이트\"를 사용하세요.",
     "marketplace-error-package-too-large": "플러그인 패키지가 설치 크기 제한을 초과했습니다.",
-    "marketplace-updatable-count-v1": "업데이트 가능 {{v1}}개"
+    "marketplace-updatable-count-v1": "업데이트 가능 {{v1}}개",
+    "marketplace-error-revoked": "이 버전은 공식 레지스트리에서 취소되어 설치하거나 업데이트할 수 없습니다.",
+    "marketplace-error-blocked": "이 버전은 공식 레지스트리에서 차단되어 설치하거나 업데이트할 수 없습니다.",
+    "marketplace-error-changed": "설치 중에 소스의 플러그인이 변경되었습니다. 새로 고친 후 다시 시도해 주세요.",
+    "marketplace-update-success-still-enabled-v1": "{{v1}}을(를) 업데이트했습니다. 플러그인은 계속 활성화 상태입니다."
   },
   "starSyncPanel": {
     "star-sync": "스타싱크",

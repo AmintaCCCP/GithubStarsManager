@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "该插件源已经添加过了。",
     "marketplace-error-already-installed": "该插件已安装。如需更新请使用“更新”。",
     "marketplace-error-package-too-large": "插件包超出安装大小限制。",
-    "marketplace-updatable-count-v1": "{{v1}} 个可更新"
+    "marketplace-updatable-count-v1": "{{v1}} 个可更新",
+    "marketplace-error-revoked": "该版本已被官方注册表撤销，无法安装或更新。",
+    "marketplace-error-blocked": "该版本已被官方注册表拉黑，无法安装或更新。",
+    "marketplace-error-changed": "安装过程中源上的插件发生了变化，请刷新后重试。",
+    "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持启用状态。"
   },
   "starSyncPanel": {
     "star-sync": "星标同步",

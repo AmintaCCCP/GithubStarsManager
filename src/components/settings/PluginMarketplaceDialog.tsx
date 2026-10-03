@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AlertTriangle, Loader2, Package, RefreshCw, Search, Settings2, Store, Trash2 } from 'lucide-react';
 import { TranslateFn } from '../../i18n/useT';
 import { useDialog } from '../../hooks/useDialog';
@@ -39,6 +39,9 @@ const describeMarketplaceError = (t: TranslateFn, error: PluginError): string =>
   if (error.code === 'SOURCE_ALREADY_EXISTS') return t('pluginSettingsPanel.marketplace-error-duplicate-source');
   if (error.code === 'PLUGIN_ALREADY_INSTALLED') return t('pluginSettingsPanel.marketplace-error-already-installed');
   if (error.code === 'MARKETPLACE_PACKAGE_TOO_LARGE') return t('pluginSettingsPanel.marketplace-error-package-too-large');
+  if (error.code === 'MARKETPLACE_VERSION_REVOKED') return t('pluginSettingsPanel.marketplace-error-revoked');
+  if (error.code === 'MARKETPLACE_VERSION_BLOCKED') return t('pluginSettingsPanel.marketplace-error-blocked');
+  if (error.code === 'MARKETPLACE_PLUGIN_CHANGED') return t('pluginSettingsPanel.marketplace-error-changed');
   return error.message;
 };
 
@@ -63,8 +66,12 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
   const [busyInstallKey, setBusyInstallKey] = useState<string | null>(null);
   const [busyPluginId, setBusyPluginId] = useState<string | null>(null);
   const [officialRegistry, setOfficialRegistry] = useState<PluginRegistry | null>(null);
+  /** 并发刷新计数：归零才清除 loading/initializing。 */
+  const pendingRefreshCount = useRef(0);
 
   const refresh = useCallback(async (sourceId?: string) => {
+    // 多个源并发刷新：按未完成计数管理加载态，先完成的源不能提前关掉 loading。
+    pendingRefreshCount.current += 1;
     setLoading(true);
     try {
       const result = await pluginMarketplaceService.refresh(sourceId ? { sourceId } : undefined);
@@ -73,8 +80,11 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
     } catch (error) {
       toast(error instanceof Error ? error.message : t('pluginSettingsPanel.marketplace-refresh-failed'), 'error');
     } finally {
-      setLoading(false);
-      setInitializing(false);
+      pendingRefreshCount.current = Math.max(0, pendingRefreshCount.current - 1);
+      if (pendingRefreshCount.current === 0) {
+        setLoading(false);
+        setInitializing(false);
+      }
     }
   }, [t, toast]);
 
@@ -195,6 +205,9 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
       const result = await pluginMarketplaceService.install({
         sourceId,
         directoryName: plugin.directoryName,
+        // 绑定用户在界面上看到的插件身份：主进程校验下载到的 manifest 与之一致。
+        expectedPluginId: plugin.manifest.id,
+        expectedVersion: plugin.manifest.version,
         replace,
       });
       if (!result.success) {
@@ -202,9 +215,14 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
         return;
       }
       await pluginRegistry.refresh();
-      toast(replace
-        ? t('pluginSettingsPanel.marketplace-update-success-v1', { v1: plugin.manifest.name })
-        : t('pluginSettingsPanel.marketplace-install-success-v1', { v1: plugin.manifest.name }), 'success');
+      // 权限一致时主进程会恢复启用状态，此时不需要"请检查权限"的提示。
+      if (replace && result.permissionsChanged === false) {
+        toast(t('pluginSettingsPanel.marketplace-update-success-still-enabled-v1', { v1: plugin.manifest.name }), 'success');
+      } else {
+        toast(replace
+          ? t('pluginSettingsPanel.marketplace-update-success-v1', { v1: plugin.manifest.name })
+          : t('pluginSettingsPanel.marketplace-install-success-v1', { v1: plugin.manifest.name }), 'success');
+      }
     } catch (error) {
       toast(error instanceof Error ? error.message : t('pluginSettingsPanel.plugin-installation-failed'), 'error');
     } finally {

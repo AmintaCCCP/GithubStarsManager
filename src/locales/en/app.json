@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "This plugin source has already been added.",
     "marketplace-error-already-installed": "This plugin is already installed. Use Update to upgrade it.",
     "marketplace-error-package-too-large": "The plugin package exceeds the installation size limit.",
-    "marketplace-updatable-count-v1": "{{v1}} updatable"
+    "marketplace-updatable-count-v1": "{{v1}} updatable",
+    "marketplace-error-revoked": "This version has been revoked by the official registry and cannot be installed or updated.",
+    "marketplace-error-blocked": "This version has been blocked by the official registry and cannot be installed or updated.",
+    "marketplace-error-changed": "The plugin changed on the source during installation; refresh and try again.",
+    "marketplace-update-success-still-enabled-v1": "Updated {{v1}}; the plugin stays enabled."
   },
   "starSyncPanel": {
     "star-sync": "Star Sync",

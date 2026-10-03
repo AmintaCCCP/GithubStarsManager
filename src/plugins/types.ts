@@ -95,7 +95,10 @@ export type MarketplaceMutationResult =
 export interface MarketplaceInstallRequest {
   sourceId: string;
   directoryName: string;
-  /** 更新场景：先保留数据卸载旧版本再安装。 */
+  /** 用户在界面上看到的插件身份：主进程校验下载到的 manifest 与之一致。 */
+  expectedPluginId: string;
+  expectedVersion: string;
+  /** 更新场景：由主进程原子替换（失败自动回滚），并恢复/停用启用状态。 */
   replace?: boolean;
 }
 
@@ -161,7 +164,7 @@ export interface ElectronPluginAPI {
     removeSource: (input: { id: string }) => Promise<MarketplaceMutationResult>;
     refresh: (options?: { sourceId?: string }) => Promise<MarketplaceMutationResult>;
     install: (request: MarketplaceInstallRequest) => Promise<
-      { success: true; pluginId: string } | { success: false; error: PluginError }
+      { success: true; pluginId: string; permissionsChanged?: boolean } | { success: false; error: PluginError }
     >;
   };
 }

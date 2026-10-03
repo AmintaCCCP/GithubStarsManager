@@ -156,6 +156,8 @@ describe('PluginMarketplaceDialog', () => {
     await vi.waitFor(() => expect(mocks.install).toHaveBeenCalledWith({
       sourceId: 'src-1',
       directoryName: 'fixture',
+      expectedPluginId: 'com.example.fixture',
+      expectedVersion: '1.0.0',
       replace: false,
     }));
     await vi.waitFor(() => expect(mocks.refreshInstalled).toHaveBeenCalled());
@@ -210,6 +212,8 @@ describe('PluginMarketplaceDialog', () => {
     await vi.waitFor(() => expect(mocks.install).toHaveBeenCalledWith({
       sourceId: 'src-1',
       directoryName: 'next-version',
+      expectedPluginId: 'com.example.updatable',
+      expectedVersion: '2.0.0',
       replace: true,
     }));
   });

@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "このプラグインソースはすでに追加されています。",
     "marketplace-error-already-installed": "このプラグインはすでにインストール済みです。更新するには「更新」を使ってください。",
     "marketplace-error-package-too-large": "プラグインパッケージがインストールサイズの上限を超えています。",
-    "marketplace-updatable-count-v1": "更新可能 {{v1}} 件"
+    "marketplace-updatable-count-v1": "更新可能 {{v1}} 件",
+    "marketplace-error-revoked": "このバージョンは公式レジストリで取り消されているため、インストール・更新できません。",
+    "marketplace-error-blocked": "このバージョンは公式レジストリでブロックされているため、インストール・更新できません。",
+    "marketplace-error-changed": "インストール中にソース上のプラグインが変わりました。更新してから再試行してください。",
+    "marketplace-update-success-still-enabled-v1": "{{v1}} を更新しました。プラグインは有効のままです。"
   },
   "starSyncPanel": {
     "star-sync": "スターシンク",

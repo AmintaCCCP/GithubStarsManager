@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "此插件源已經新增過了。",
     "marketplace-error-already-installed": "此插件已安裝。如需更新請使用「更新」。",
     "marketplace-error-package-too-large": "插件套件超出安裝大小限制。",
-    "marketplace-updatable-count-v1": "{{v1}} 個可更新"
+    "marketplace-updatable-count-v1": "{{v1}} 個可更新",
+    "marketplace-error-revoked": "該版本已被官方註冊表撤銷，無法安裝或更新。",
+    "marketplace-error-blocked": "該版本已被官方註冊表封鎖，無法安裝或更新。",
+    "marketplace-error-changed": "安裝過程中來源上的插件發生了變化，請重新整理後再試。",
+    "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持啟用狀態。"
   },
   "starSyncPanel": {
     "star-sync": "星標同步",

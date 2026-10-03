@@ -1126,7 +1126,11 @@
     "marketplace-error-duplicate-source": "Этот источник плагинов уже добавлен.",
     "marketplace-error-already-installed": "Этот плагин уже установлен. Для обновления используйте «Обновить».",
     "marketplace-error-package-too-large": "Пакет плагина превышает допустимый размер установки.",
-    "marketplace-updatable-count-v1": "Доступно обновлений: {{v1}}"
+    "marketplace-updatable-count-v1": "Доступно обновлений: {{v1}}",
+    "marketplace-error-revoked": "Эта версия отозвана официальным реестром; установка и обновление невозможны.",
+    "marketplace-error-blocked": "Эта версия заблокирована официальным реестром; установка и обновление невозможны.",
+    "marketplace-error-changed": "Плагин изменился в источнике во время установки; обновите список и повторите попытку.",
+    "marketplace-update-success-still-enabled-v1": "«{{v1}}» обновлён; плагин остаётся включённым."
   },
   "starSyncPanel": {
     "star-sync": "Звездная синхронизация",

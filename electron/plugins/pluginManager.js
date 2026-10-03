@@ -448,6 +448,81 @@ function createPluginManager({
         return { success: false, error: safeError(error, 'PLUGIN_INSTALL_FAILED') };
       }
     },
+    /**
+     * 用新版本原子替换已安装插件（更新场景，插件市场使用）。
+     *
+     * 先把旧目录整体挪进备份，装好新版后再删备份；安装失败则把旧目录原样
+     * 挪回来并恢复启用状态，不会出现"更新失败插件也没了"的中间态。新版权限
+     * 与原授权一致且原来处于启用状态时，替换后直接恢复启用；权限有变化时
+     * 保持停用，等用户走既有的权限确认流程重新启用。插件数据（存储/日志）
+     * 全程不动。
+     */
+    async replaceFromDirectory(sourceDirectory) {
+      if (typeof sourceDirectory !== 'string' || sourceDirectory.trim() === '') {
+        return { success: false, error: { code: 'PLUGIN_INSTALL_SOURCE_INVALID', message: 'Plugin source directory is invalid' } };
+      }
+      let inspected;
+      try {
+        inspected = inspectPluginSource(sourceDirectory);
+      } catch (error) {
+        return { success: false, error: safeError(error, 'PLUGIN_INSTALL_SOURCE_INVALID') };
+      }
+      const pluginId = inspected.manifest.id;
+      return runLifecycle(pluginId, async () => {
+        const existing = (scanCache || scan()).plugins.find((plugin) => plugin.manifest.id === pluginId);
+        if (!existing) return this.installFromDirectory(sourceDirectory);
+
+        const previousState = stateFor(pluginId);
+        const wasEnabled = previousState.enabled === true;
+        const previousDirectory = path.join(resolvedRoot, existing.directoryName);
+        const backupDirectory = path.join(resolvedRoot, `.replacing-${pluginId}-${process.pid}-${Date.now()}`);
+        try {
+          // 已在 runLifecycle 队列内：直接停掉 Worker，不能再走 disable（会重入同一队列死锁）。
+          const runtime = runtimes.get(pluginId);
+          try {
+            if (runtime) await runtime.deactivate();
+          } catch (error) {
+            runtime?.terminate();
+          } finally {
+            runtimes.delete(pluginId);
+          }
+          fs.renameSync(previousDirectory, backupDirectory);
+          scanCache = null;
+          const installed = this.installFromDirectory(sourceDirectory);
+
+          if (!installed.success) {
+            // 回滚：清掉可能存在的半成品目录，把旧版本原样挪回去并恢复状态。
+            try { fs.rmSync(path.join(resolvedRoot, pluginId), { recursive: true, force: true }); } catch {}
+            fs.renameSync(backupDirectory, previousDirectory);
+            scanCache = null;
+            state.plugins[pluginId] = { ...previousState };
+            saveState();
+            return installed;
+          }
+          try { fs.rmSync(backupDirectory, { recursive: true, force: true }); } catch {}
+          scanCache = null;
+          const permissionsUnchanged = samePermissions(inspected.manifest.permissions, previousState.grantedPermissions);
+          if (wasEnabled && permissionsUnchanged) {
+            try {
+              await activatePlugin(findPlugin(pluginId));
+              state.plugins[pluginId] = { enabled: true, grantedPermissions: [...previousState.grantedPermissions] };
+              saveState();
+              return { success: true, pluginId, permissionsChanged: false };
+            } catch (error) {
+              // 新版本已就位但激活失败：按既有语义记录错误并保持停用。
+              recordError(pluginId, error);
+              return { success: true, pluginId, permissionsChanged: false };
+            }
+          }
+          state.plugins[pluginId] = { enabled: false, grantedPermissions: [] };
+          saveState();
+          // 只有新版权限与原授权不同时才需要重新走权限确认。
+          return { success: true, pluginId, permissionsChanged: !permissionsUnchanged };
+        } catch (error) {
+          return { success: false, error: safeError(error, 'PLUGIN_REPLACE_FAILED') };
+        }
+      });
+    },
     async enable(pluginId, grantedPermissions) {
       return runLifecycle(pluginId, async () => {
         const plugin = findPlugin(pluginId);

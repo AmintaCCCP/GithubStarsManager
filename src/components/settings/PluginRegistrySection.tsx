@@ -45,13 +45,22 @@ export const PluginRegistrySection: React.FC<PluginRegistrySectionProps> = ({ t,
 
   const sourceCount = state?.sources.length ?? 0;
   const pluginCount = state?.entries.reduce((total, entry) => total + entry.plugins.length, 0) ?? 0;
-  // 已安装插件里有更高目录版本的个数——提醒用户市场里有可更新的插件。
-  const catalogPlugins = state?.entries.flatMap((entry) => entry.plugins) ?? [];
+  // 与市场列表一致的跨源去重规则（同一插件 id 只认先遇到的源），
+  // 否则统计里的"可更新"可能是市场里根本不会展示的后续源条目。
+  const firstEntryById = new Map<string, { version: string }>();
+  for (const entry of state?.entries ?? []) {
+    for (const plugin of entry.plugins) {
+      if (!firstEntryById.has(plugin.manifest.id)) {
+        firstEntryById.set(plugin.manifest.id, { version: plugin.manifest.version });
+      }
+    }
+  }
   const updatableCount = new Set(
     installedSnapshot.plugins
-      .filter((installed) => catalogPlugins.some((plugin) =>
-        plugin.manifest.id === installed.manifest.id
-        && comparePluginVersions(plugin.manifest.version, installed.manifest.version) > 0))
+      .filter((installed) => {
+        const catalogEntry = firstEntryById.get(installed.manifest.id);
+        return !!catalogEntry && comparePluginVersions(catalogEntry.version, installed.manifest.version) > 0;
+      })
       .map((installed) => installed.manifest.id),
   ).size;
 

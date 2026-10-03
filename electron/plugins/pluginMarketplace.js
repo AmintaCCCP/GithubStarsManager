@@ -6,6 +6,7 @@ const { randomUUID } = require('node:crypto');
 
 const { MAX_MANIFEST_BYTES, validateManifest } = require('./manifestSchema');
 const { createMarketplaceStateStore, normalizeState } = require('./pluginMarketplaceState');
+const { loadPluginRegistry } = require('./pluginRegistryFeed');
 const { sanitizeText } = require('./pluginLogger');
 
 /**
@@ -295,6 +296,7 @@ function createPluginMarketplace({
   /** sourceId → { status: 'ok'|'error', plugins, warnings, error, fetchedAt } */
   const catalog = new Map();
   const defaultBranches = new Map();
+  const commitShas = new Map();
   const refreshInFlight = new Map();
   let installChain = Promise.resolve();
 
@@ -333,7 +335,7 @@ function createPluginMarketplace({
   }
 
   /** 源 URL 没写 ref 时，取仓库的默认分支并缓存。 */
-  async function resolveRef(parsed) {
+  async function resolveDefaultBranch(parsed) {
     if (parsed.ref) return { ok: true, ref: parsed.ref };
     const repoKey = `${parsed.owner}/${parsed.repo}`;
     const cached = defaultBranches.get(repoKey);
@@ -360,19 +362,53 @@ function createPluginMarketplace({
     return { ok: true, ref: branch };
   }
 
+  /**
+   * 把 ref 名解析成不可变的提交 SHA（缓存）。分支可能随时推进，若直接用 ref 名
+   * 发请求，同一次安装里的目录枚举与文件下载可能来自不同提交；绑定 SHA 后
+   * tree API、contents API 与所有 raw 下载都钉在同一个提交上。
+   */
+  async function resolveSourceCommit(parsed) {
+    const ref = await resolveDefaultBranch(parsed);
+    if (!ref.ok) return ref;
+    const cacheKey = `${parsed.owner}/${parsed.repo}@${ref.ref}`;
+    const cached = commitShas.get(cacheKey);
+    if (cached) return { ok: true, sha: cached };
+    const result = await fetchCapped(
+      fetchImpl,
+      `https://${API_HOST}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
+      + `/commits/${encodeURIComponent(ref.ref)}`,
+      { headers: githubApiHeaders(), maxBytes: MAX_LISTING_BYTES, requestTimeoutMs },
+    );
+    if (!result.ok) {
+      return { ok: false, error: prefixedError('SOURCE_COMMIT', result.error) };
+    }
+    let sha = null;
+    try {
+      const payload = JSON.parse(result.bytes.toString('utf8'));
+      if (typeof payload.sha === 'string' && /^[0-9a-f]{40}$/.test(payload.sha)) sha = payload.sha;
+    } catch {
+      sha = null;
+    }
+    if (!sha) {
+      return { ok: false, error: { code: 'SOURCE_COMMIT_JSON_INVALID', message: 'Repository commit metadata is not valid JSON or lacks a commit SHA' } };
+    }
+    commitShas.set(cacheKey, sha);
+    return { ok: true, sha };
+  }
+
   /** 遍历一个源：列出目录，逐个子目录探测 manifest.json。 */
   async function listSourcePlugins(source) {
     const parsed = parseSourceUrl(source.url);
     if (!parsed) {
       return { status: 'error', plugins: [], warnings: [], error: { code: 'SOURCE_URL_INVALID', message: 'The source URL is not a GitHub repository directory' } };
     }
-    const ref = await resolveRef(parsed);
-    if (!ref.ok) {
-      return { status: 'error', plugins: [], warnings: [], error: ref.error };
+    const commit = await resolveSourceCommit(parsed);
+    if (!commit.ok) {
+      return { status: 'error', plugins: [], warnings: [], error: commit.error };
     }
 
     const contentsUrl = `https://${API_HOST}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
-      + `/contents/${encodePath(parsed.dirPath)}?ref=${encodeURIComponent(ref.ref)}`;
+      + `/contents/${encodePath(parsed.dirPath)}?ref=${encodeURIComponent(commit.sha)}`;
     const listing = await fetchCapped(fetchImpl, contentsUrl, {
       headers: githubApiHeaders(),
       maxBytes: MAX_LISTING_BYTES,
@@ -410,7 +446,7 @@ function createPluginMarketplace({
 
     const probed = await mapLimit(directories, PROBE_CONCURRENCY, async (directory) => {
       const manifestUrl = `https://${RAW_HOST}/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
-        + `/${encodeURIComponent(ref.ref)}/${encodePath(parsed.dirPath, directory, 'manifest.json')}`;
+        + `/${encodeURIComponent(commit.sha)}/${encodePath(parsed.dirPath, directory, 'manifest.json')}`;
       const response = await fetchCapped(fetchImpl, manifestUrl, {
         headers: { Accept: 'application/json' },
         maxBytes: MAX_MANIFEST_BYTES,
@@ -589,8 +625,10 @@ function createPluginMarketplace({
       const sourceId = typeof request?.sourceId === 'string' ? request.sourceId : '';
       const directoryName = typeof request?.directoryName === 'string' ? request.directoryName : '';
       const replace = request?.replace === true;
+      const expectedPluginId = typeof request?.expectedPluginId === 'string' ? request.expectedPluginId : '';
+      const expectedVersion = typeof request?.expectedVersion === 'string' ? request.expectedVersion : '';
       // 安装与更新会卸载/重装插件，串行化避免并发安装互相踩踏。
-      const run = () => installInner(sourceId, directoryName, replace);
+      const run = () => installInner(sourceId, directoryName, replace, expectedPluginId, expectedVersion);
       const result = installChain.then(run, run);
       installChain = result.then(() => undefined, () => undefined);
       return result;
@@ -611,9 +649,9 @@ function createPluginMarketplace({
     return isInside(path.resolve(stagingDirectory), path.resolve(stagingDirectory, relative));
   }
 
-  async function downloadPackageFiles(parsed, ref, directoryName, dirPath, stagingDirectory) {
+  async function downloadPackageFiles(parsed, sha, directoryName, dirPath, stagingDirectory) {
     const treeUrl = `https://${API_HOST}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
-      + `/git/trees/${encodeURIComponent(ref)}?recursive=1`;
+      + `/git/trees/${encodeURIComponent(sha)}?recursive=1`;
     const tree = await fetchCapped(fetchImpl, treeUrl, {
       headers: githubApiHeaders(),
       maxBytes: MAX_LISTING_BYTES,
@@ -661,7 +699,7 @@ function createPluginMarketplace({
       const response = await fetchCapped(
         fetchImpl,
         `https://${RAW_HOST}/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
-        + `/${encodeURIComponent(ref)}/${encodePath(entry.path)}`,
+        + `/${encodeURIComponent(sha)}/${encodePath(entry.path)}`,
         { headers: { Accept: 'application/octet-stream' }, maxBytes: MAX_PLUGIN_PACKAGE_BYTES, requestTimeoutMs },
       );
       if (!response.ok) {
@@ -692,10 +730,42 @@ function createPluginMarketplace({
     if (!validation.success) {
       return { ok: false, error: { code: 'MARKETPLACE_MANIFEST_INVALID', message: validation.message } };
     }
-    return { ok: true, pluginId: validation.data.id };
+    return { ok: true, pluginId: validation.data.id, manifestVersion: validation.data.version };
   }
 
-  async function installInner(sourceId, directoryName, replace) {
+  /**
+   * 撤销/拉黑表的匹配：versions 为空表示全部版本；多条命中时 revoke 优先、
+   * 日期新的优先（与渲染层 pluginRegistryStatus 的判定保持一致）。
+   */
+  function findRemovalRecord(removed, pluginId, version) {
+    const matches = (removed || []).filter((record) =>
+      record && record.id === pluginId
+      && Array.isArray(record.versions)
+      && (record.versions.length === 0 || record.versions.includes(version)));
+    if (matches.length === 0) return null;
+    matches.sort((left, right) => (
+      (left.action === 'revoke' ? 0 : 1) - (right.action === 'revoke' ? 0 : 1)
+      || String(right.date || '').localeCompare(String(left.date || ''))
+    ));
+    return matches[0];
+  }
+
+  /**
+   * 官方静态注册表的撤销/拉黑终审：在主进程执行，不依赖渲染层的提示。
+   * 注册表暂时取不到时放行（与"对照提示"的定位一致；本地安装的信任模型不变）。
+   */
+  async function checkOfficialRemoval({ id, version }) {
+    const registry = await loadPluginRegistry({ fetchImpl });
+    if (!registry.success) return null;
+    const record = findRemovalRecord(registry.registry.removed, id, version);
+    if (!record) return null;
+    return {
+      code: record.action === 'revoke' ? 'MARKETPLACE_VERSION_REVOKED' : 'MARKETPLACE_VERSION_BLOCKED',
+      message: `Version ${version} of '${id}' is ${record.action} by the official registry`,
+    };
+  }
+
+  async function installInner(sourceId, directoryName, replace, expectedPluginId, expectedVersion) {
     if (!directoryName || directoryName.includes('/') || directoryName.includes('\\') || directoryName === '.' || directoryName === '..') {
       return { success: false, error: { code: 'MARKETPLACE_PLUGIN_NOT_FOUND', message: 'No plugin files were found under this source directory' } };
     }
@@ -707,29 +777,39 @@ function createPluginMarketplace({
     if (!parsed) {
       return { success: false, error: { code: 'SOURCE_URL_INVALID', message: 'The source URL is not a GitHub repository directory' } };
     }
-    const ref = await resolveRef(parsed);
-    if (!ref.ok) {
-      return { success: false, error: ref.error };
+    const commit = await resolveSourceCommit(parsed);
+    if (!commit.ok) {
+      return { success: false, error: commit.error };
     }
 
     clearStagingRoot();
     fs.mkdirSync(stagingRoot, { recursive: true });
     const stagingDirectory = path.join(stagingRoot, randomUUID());
     try {
-      const downloaded = await downloadPackageFiles(parsed, ref.ref, directoryName, parsed.dirPath, stagingDirectory);
+      const downloaded = await downloadPackageFiles(parsed, commit.sha, directoryName, parsed.dirPath, stagingDirectory);
       if (!downloaded.ok) return { success: false, error: downloaded.error };
       // 下载耗时期间源可能已被删除：落盘前再确认一次，避免"幽灵源"的插件进入本地列表。
       if (!findSource(sourceId)) {
         return { success: false, error: { code: 'SOURCE_NOT_FOUND', message: 'The plugin source was not found' } };
       }
-      let result = pluginManager.installFromDirectory(stagingDirectory);
-      if (!result.success && result.error?.code === 'PLUGIN_ALREADY_INSTALLED' && replace) {
-        // 更新：保留插件数据（存储/日志）卸载旧版本后重装。
-        const uninstalled = await pluginManager.uninstall(downloaded.pluginId, false);
-        if (!uninstalled.success) return uninstalled;
-        result = pluginManager.installFromDirectory(stagingDirectory);
+      // 请求里带了用户在界面上看到的插件身份：下载到的 manifest 必须与之一致，
+      // 防止"点击安装 A、装上 B"或"点击更新到 v2、装上 v3"。
+      if ((typeof expectedPluginId === 'string' && expectedPluginId !== '' && expectedPluginId !== downloaded.pluginId)
+        || (typeof expectedVersion === 'string' && expectedVersion !== '' && downloaded.manifestVersion !== expectedVersion)) {
+        return { success: false, error: { code: 'MARKETPLACE_PLUGIN_CHANGED', message: 'The plugin changed on the source while installing; refresh and try again' } };
       }
-      return result.success ? result : { success: false, error: result.error };
+      // 官方撤销/拉黑记录在主进程终审（渲染层的检查只是提示）。
+      const removal = await checkOfficialRemoval({ id: downloaded.pluginId, version: downloaded.manifestVersion });
+      if (removal) {
+        return { success: false, error: removal };
+      }
+      if (replace) {
+        // 更新：pluginManager 原子换目录，失败自动回滚旧版本与启用状态。
+        // 注意必须 await：try/finally 里的 return <promise> 不会等它 settlement，
+        // 不 await 会导致 finally 提前清掉 staging，把异步替换流程踩塌。
+        return await pluginManager.replaceFromDirectory(stagingDirectory);
+      }
+      return pluginManager.installFromDirectory(stagingDirectory);
     } catch (error) {
       return {
         success: false,
