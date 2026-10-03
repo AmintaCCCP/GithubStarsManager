@@ -632,9 +632,12 @@ describe('plugin marketplace', () => {
 
   it('re-resolves the commit SHA on every refresh so branch movement becomes visible', async () => {
     const shas = ['a'.repeat(40), 'b'.repeat(40)];
+    // makeFetch 在调用处理器前就记录请求，处理器里自己计数，别用 calls 反推。
+    let commitCallCount = 0;
     const { fetchImpl, calls } = makeFetch([
       ['api.github.com/repos/owner/repo/commits/main', () => {
-        const sha = shas[Math.min(calls.filter((call) => call.url.includes('/commits/')).length, shas.length - 1)];
+        const sha = shas[Math.min(commitCallCount, shas.length - 1)];
+        commitCallCount += 1;
         return jsonHeaders({ sha });
       }],
       ['contents/plugins', contentsResponse([])],
@@ -644,8 +647,11 @@ describe('plugin marketplace', () => {
     assert.equal(added.success, true);
     await marketplace.refresh({ sourceId: added.state.sources[0].id });
 
-    const commitCalls = calls.filter((call) => call.url.includes('/commits/'));
-    assert.equal(commitCalls.length, 2, '每一次遍历都必须重新解析提交 SHA');
+    // 两次遍历各自解析一次提交，且 contents 请求分别钉在两个不同的 SHA 上。
+    const contentsCalls = calls.filter((call) => call.url.includes('/contents/'));
+    assert.equal(contentsCalls.length, 2);
+    assert.ok(contentsCalls[0].url.includes(`ref=${shas[0]}`));
+    assert.ok(contentsCalls[1].url.includes(`ref=${shas[1]}`));
   });
 
   it('propagates non-ENOENT state-file read errors instead of silently wiping the list', () => {
