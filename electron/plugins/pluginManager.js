@@ -509,9 +509,11 @@ function createPluginManager({
               saveState();
               return { success: true, pluginId, permissionsChanged: false };
             } catch (error) {
-              // 新版本已就位但激活失败：按既有语义记录错误并保持停用。
+              // 新版本已就位但激活失败：按既有语义记录错误并保持停用，并向调用方
+              // 如实报告失败——绝不能报"成功且保持启用"。插件数据不动，plugins
+              // 列表里的 error 状态来自 recordError。
               recordError(pluginId, error);
-              return { success: true, pluginId, permissionsChanged: false };
+              return { success: false, error: safeError(error) };
             }
           }
           state.plugins[pluginId] = { enabled: false, grantedPermissions: [] };

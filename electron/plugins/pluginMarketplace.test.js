@@ -322,7 +322,10 @@ describe('plugin marketplace', () => {
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
     const sourceId = added.state.sources[0].id;
 
-    const result = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, true);
     // 安装的所有下载请求都钉在解析出的提交 SHA 上（分支推进不会混入不一致文件）。
     const rawCalls = calls.filter((call) => call.url.includes('raw.githubusercontent.com/owner/repo'));
@@ -353,10 +356,16 @@ describe('plugin marketplace', () => {
     const marketplace = makeMarketplace(fetchImpl, { pluginManager });
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
     const sourceId = added.state.sources[0].id;
-    const first = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const first = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(first.success, true, JSON.stringify(first));
 
-    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true });
+    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true,
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(second.success, true, JSON.stringify(second));
   });
 
@@ -372,10 +381,16 @@ describe('plugin marketplace', () => {
     const marketplace = makeMarketplace(fetchImpl, { pluginManager });
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
     const sourceId = added.state.sources[0].id;
-    const first = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const first = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(first.success, true, JSON.stringify(first));
 
-    const second = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const second = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(second.success, false);
     assert.equal(second.error.code, 'PLUGIN_ALREADY_INSTALLED');
   });
@@ -401,7 +416,10 @@ describe('plugin marketplace', () => {
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
     const sourceId = added.state.sources[0].id;
 
-    const result = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'MARKETPLACE_VERSION_REVOKED');
     assert.deepEqual(fs.readdirSync(stagingRoot), []);
@@ -430,30 +448,42 @@ describe('plugin marketplace', () => {
     assert.deepEqual(fs.readdirSync(stagingRoot), []);
   });
 
-  it('rolls back the old version and its state when the update download is invalid', async () => {
+  it('rolls back the old version and its state when the updated package is missing entries', async () => {
     const manifestJson = validManifestJson({ main: 'worker.js' });
-    let currentManifest = manifestJson;
-    let currentWorker = 'v1\n';
+    let treeFiles = [
+      { path: 'plugins/fixture/manifest.json', type: 'blob', size: manifestJson.length },
+      { path: 'plugins/fixture/worker.js', type: 'blob', size: 4 },
+    ];
     const { fetchImpl } = makeFetch([
       commitRoute(),
-      ['git/trees', treeResponse([['plugins/fixture/manifest.json', 260], ['plugins/fixture/worker.js', 4]])],
-      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, () => new Response(currentManifest, { status: 200 })],
-      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, () => new Response(currentWorker, { status: 200 })],
+      ['git/trees', () => jsonHeaders({ sha: 't', truncated: false, tree: treeFiles })],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('v1\n')],
     ]);
     const pluginManager = makeManager();
     const marketplace = makeMarketplace(fetchImpl, { pluginManager });
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
     const sourceId = added.state.sources[0].id;
-    const first = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const first = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(first.success, true, JSON.stringify(first));
 
-    // 更新后 manifest 损坏 → installFromDirectory 失败 → 旧版本必须原样还在。
-    currentManifest = '{broken json';
-    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true });
+    // 更新时的文件清单缺了 manifest 声明的入口：installFromDirectory 校验失败
+    // → 回滚：旧目录原样回来，状态仍是"未启用"。
+    treeFiles = [{ path: 'plugins/fixture/manifest.json', type: 'blob', size: manifestJson.length }];
+    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true,
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(second.success, false);
-    assert.ok(!fs.existsSync(path.join(pluginsRoot, 'com.example.marketplace-fixture')) || true);
+    assert.equal(second.error.code, 'PLUGIN_ENTRY_NOT_FOUND');
     assert.deepEqual(fs.readdirSync(pluginsRoot), ['com.example.marketplace-fixture']);
     assert.equal(fs.readFileSync(path.join(pluginsRoot, 'com.example.marketplace-fixture', 'worker.js'), 'utf8'), 'v1\n');
+    const listed = await pluginManager.list();
+    const rollbackPlugin = listed.plugins.find((plugin) => plugin.manifest.id === 'com.example.marketplace-fixture');
+    assert.equal(rollbackPlugin.enabled, false);
   });
 
   it('refuses unsafe file paths from the tree', async () => {
@@ -469,7 +499,10 @@ describe('plugin marketplace', () => {
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
     const sourceId = added.state.sources[0].id;
-    const result = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'MARKETPLACE_ENTRY_UNSAFE');
     // 逃逸路径在写入前就被拒绝：staging 清空，目标文件不存在于任何位置。
@@ -491,7 +524,10 @@ describe('plugin marketplace', () => {
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
-    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'MARKETPLACE_PACKAGE_TOO_LARGE');
   });
@@ -503,7 +539,10 @@ describe('plugin marketplace', () => {
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
-    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'SOURCE_TREE_TRUNCATED');
   });
@@ -522,7 +561,10 @@ describe('plugin marketplace', () => {
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
-    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'MARKETPLACE_SUBMODULE_UNSUPPORTED');
   });
@@ -537,7 +579,10 @@ describe('plugin marketplace', () => {
     ]);
     const marketplace = makeMarketplace(fetchImpl);
     const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
-    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'MARKETPLACE_DOWNLOAD_HTTP_ERROR');
     assert.deepEqual(fs.readdirSync(stagingRoot), []);
@@ -550,7 +595,10 @@ describe('plugin marketplace', () => {
     const sourceId = added.state.sources[0].id;
     await marketplace.removeSource({ id: sourceId });
 
-    const result = await marketplace.install({ sourceId, directoryName: 'fixture' });
+    const result = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'SOURCE_NOT_FOUND');
   });
@@ -571,6 +619,98 @@ describe('plugin marketplace', () => {
     const refreshed = await marketplace.refresh({ sourceId: added.state.sources[0].id });
     assert.equal(refreshed.success, true);
     assert.equal(refreshed.state.entries[0].error.code, 'SOURCE_LIST_TIMEOUT');
+  });
+
+  it('requires the displayed plugin identity in the install request', async () => {
+    const { fetchImpl } = makeFetch([commitRoute(), ['contents/plugins', contentsResponse(['fixture'])]]);
+    const marketplace = makeMarketplace(fetchImpl);
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    const result = await marketplace.install({ sourceId: added.state.sources[0].id, directoryName: 'fixture' });
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'MARKETPLACE_IDENTITY_REQUIRED');
+  });
+
+  it('re-resolves the commit SHA on every refresh so branch movement becomes visible', async () => {
+    const shas = ['a'.repeat(40), 'b'.repeat(40)];
+    const { fetchImpl, calls } = makeFetch([
+      ['api.github.com/repos/owner/repo/commits/main', () => {
+        const sha = shas[Math.min(calls.filter((call) => call.url.includes('/commits/')).length, shas.length - 1)];
+        return jsonHeaders({ sha });
+      }],
+      ['contents/plugins', contentsResponse([])],
+    ]);
+    const marketplace = makeMarketplace(fetchImpl);
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    assert.equal(added.success, true);
+    await marketplace.refresh({ sourceId: added.state.sources[0].id });
+
+    const commitCalls = calls.filter((call) => call.url.includes('/commits/'));
+    assert.equal(commitCalls.length, 2, '每一次遍历都必须重新解析提交 SHA');
+  });
+
+  it('propagates non-ENOENT state-file read errors instead of silently wiping the list', () => {
+    fs.mkdirSync(stateFilePath, { recursive: true });
+    const { fetchImpl } = makeFetch([]);
+    assert.throws(
+      () => createPluginMarketplace({
+        statePath: stateFilePath,
+        stagingRoot,
+        fetchImpl,
+        pluginManager: makeManager(),
+      }),
+      /EISDIR/,
+    );
+  });
+
+  it('keeps reporting activation failure without pretending the update succeeded', async () => {
+    const manifestJson = validManifestJson({ main: 'worker.js' });
+    const { fetchImpl } = makeFetch([
+      commitRoute(),
+      ['git/trees', treeResponse([['plugins/fixture/manifest.json', manifestJson.length], ['plugins/fixture/worker.js', 32]])],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/manifest.json`, rawResponse(manifestJson)],
+      [`raw.githubusercontent.com/owner/repo/${SHA}/plugins/fixture/worker.js`, rawResponse('v2\n')],
+    ]);
+    let activationShouldFail = false;
+    const pluginManager = createPluginManager({
+      pluginsRoot,
+      statePath: path.join(tmpRoot, 'plugins-state.json'),
+      runtimeFactory: () => ({
+        activate: async () => {
+          if (activationShouldFail) throw Object.assign(new Error('spawn failed'), { code: 'WORKER_SPAWN_FAILED' });
+        },
+        deactivate: async () => {},
+        terminate: () => {},
+      }),
+    });
+    const marketplace = createPluginMarketplace({
+      statePath: stateFilePath,
+      stagingRoot,
+      fetchImpl,
+      seedDefaultSource: false,
+      pluginManager,
+    });
+    const added = await marketplace.addSource({ url: 'https://github.com/owner/repo/tree/main/plugins' });
+    const sourceId = added.state.sources[0].id;
+    const first = await marketplace.install({ sourceId, directoryName: 'fixture',
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
+    assert.equal(first.success, true, JSON.stringify(first));
+    const enabled = await pluginManager.enable('com.example.marketplace-fixture', ['storage']);
+    assert.equal(enabled.success, true, JSON.stringify(enabled));
+
+    activationShouldFail = true;
+    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true,
+      expectedPluginId: 'com.example.marketplace-fixture',
+      expectedVersion: '1.0.0',
+    });
+    assert.equal(second.success, false);
+    assert.equal(second.error.code, 'WORKER_SPAWN_FAILED');
+    // 新版本文件已就位但激活失败：插件保持停用，错误状态由 recordError 记录。
+    const listed = await pluginManager.list();
+    const replaced = listed.plugins.find((plugin) => plugin.manifest.id === 'com.example.marketplace-fixture');
+    assert.equal(replaced.enabled, false);
+    assert.ok(replaced.lastError);
   });
 
   it('caches catalog state between getState calls', async () => {

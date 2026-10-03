@@ -80,7 +80,9 @@ function createMarketplaceStateStore(statePath) {
         text = fs.readFileSync(resolvedPath, 'utf8');
       } catch (error) {
         if (error && error.code === 'ENOENT') return null;
-        return emptyState();
+        // 其他读取错误（权限、I/O）直接上抛：把"读不到"当成"空列表"会让下一次
+        // addSource 的保存覆盖掉用户原有的源列表。
+        throw error;
       }
       try {
         return normalizeState(JSON.parse(text));

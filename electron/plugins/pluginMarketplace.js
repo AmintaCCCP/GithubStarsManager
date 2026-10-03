@@ -296,7 +296,6 @@ function createPluginMarketplace({
   /** sourceId → { status: 'ok'|'error', plugins, warnings, error, fetchedAt } */
   const catalog = new Map();
   const defaultBranches = new Map();
-  const commitShas = new Map();
   const refreshInFlight = new Map();
   let installChain = Promise.resolve();
 
@@ -363,16 +362,15 @@ function createPluginMarketplace({
   }
 
   /**
-   * 把 ref 名解析成不可变的提交 SHA（缓存）。分支可能随时推进，若直接用 ref 名
-   * 发请求，同一次安装里的目录枚举与文件下载可能来自不同提交；绑定 SHA 后
-   * tree API、contents API 与所有 raw 下载都钉在同一个提交上。
+   * 把 ref 名解析成不可变的提交 SHA。分支可能随时推进：若直接用 ref 名发请求，
+   * 同一次遍历/安装里的目录枚举与文件下载可能来自不同提交；绑定 SHA 后该次
+   * 操作内的 tree API、contents API 与所有 raw 下载都钉在同一个提交上。
+   * 注意 SHA 不持久缓存——每次刷新/安装都重新解析，否则分支推进后用户永远
+   * 看不到新版本。
    */
   async function resolveSourceCommit(parsed) {
     const ref = await resolveDefaultBranch(parsed);
     if (!ref.ok) return ref;
-    const cacheKey = `${parsed.owner}/${parsed.repo}@${ref.ref}`;
-    const cached = commitShas.get(cacheKey);
-    if (cached) return { ok: true, sha: cached };
     const result = await fetchCapped(
       fetchImpl,
       `https://${API_HOST}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`
@@ -392,7 +390,6 @@ function createPluginMarketplace({
     if (!sha) {
       return { ok: false, error: { code: 'SOURCE_COMMIT_JSON_INVALID', message: 'Repository commit metadata is not valid JSON or lacks a commit SHA' } };
     }
-    commitShas.set(cacheKey, sha);
     return { ok: true, sha };
   }
 
@@ -625,8 +622,8 @@ function createPluginMarketplace({
       const sourceId = typeof request?.sourceId === 'string' ? request.sourceId : '';
       const directoryName = typeof request?.directoryName === 'string' ? request.directoryName : '';
       const replace = request?.replace === true;
-      const expectedPluginId = typeof request?.expectedPluginId === 'string' ? request.expectedPluginId : '';
-      const expectedVersion = typeof request?.expectedVersion === 'string' ? request.expectedVersion : '';
+      const expectedPluginId = typeof request?.expectedPluginId === 'string' ? request.expectedPluginId.trim() : '';
+      const expectedVersion = typeof request?.expectedVersion === 'string' ? request.expectedVersion.trim() : '';
       // 安装与更新会卸载/重装插件，串行化避免并发安装互相踩踏。
       const run = () => installInner(sourceId, directoryName, replace, expectedPluginId, expectedVersion);
       const result = installChain.then(run, run);
@@ -766,6 +763,11 @@ function createPluginMarketplace({
   }
 
   async function installInner(sourceId, directoryName, replace, expectedPluginId, expectedVersion) {
+    // 请求必须带上用户在界面看到的插件身份——否则无法把下载内容与点击的条目
+    // 对应起来，install 可能装上、甚至覆盖替换掉别的插件。
+    if (!expectedPluginId || !expectedVersion) {
+      return { success: false, error: { code: 'MARKETPLACE_IDENTITY_REQUIRED', message: 'The install request must carry the plugin identity shown to the user' } };
+    }
     if (!directoryName || directoryName.includes('/') || directoryName.includes('\\') || directoryName === '.' || directoryName === '..') {
       return { success: false, error: { code: 'MARKETPLACE_PLUGIN_NOT_FOUND', message: 'No plugin files were found under this source directory' } };
     }
@@ -792,10 +794,8 @@ function createPluginMarketplace({
       if (!findSource(sourceId)) {
         return { success: false, error: { code: 'SOURCE_NOT_FOUND', message: 'The plugin source was not found' } };
       }
-      // 请求里带了用户在界面上看到的插件身份：下载到的 manifest 必须与之一致，
-      // 防止"点击安装 A、装上 B"或"点击更新到 v2、装上 v3"。
-      if ((typeof expectedPluginId === 'string' && expectedPluginId !== '' && expectedPluginId !== downloaded.pluginId)
-        || (typeof expectedVersion === 'string' && expectedVersion !== '' && downloaded.manifestVersion !== expectedVersion)) {
+      // 下载到的 manifest 必须与界面上的身份一致，防止"点 A 装 B"或"点 v2 装 v3"。
+      if (expectedPluginId !== downloaded.pluginId || expectedVersion !== downloaded.manifestVersion) {
         return { success: false, error: { code: 'MARKETPLACE_PLUGIN_CHANGED', message: 'The plugin changed on the source while installing; refresh and try again' } };
       }
       // 官方撤销/拉黑记录在主进程终审（渲染层的检查只是提示）。

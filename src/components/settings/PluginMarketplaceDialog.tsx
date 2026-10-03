@@ -211,6 +211,8 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
         replace,
       });
       if (!result.success) {
+        // 某些失败路径（如更新后激活失败）会修改本地插件状态，列表也要跟上。
+        await pluginRegistry.refresh();
         toast(describeMarketplaceError(t, result.error), 'error');
         return;
       }
