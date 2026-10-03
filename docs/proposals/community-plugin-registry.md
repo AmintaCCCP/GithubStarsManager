@@ -3,6 +3,17 @@
 状态：提案，等待维护者决定托管位置与签名密钥归属
 对应开发守则：§17 Plugin Store / Community Registry、§18 签名 / 撤销 / 更新
 
+## 2026-10 修订：自助插件源（已实现）与静态注册表的关系
+
+在静态注册表之外，客户端现在支持**用户自行维护的插件源**（插件市场）：源是一个 GitHub 仓库目录（如 `https://github.com/owner/repo/tree/main/plugins`），客户端用 contents API 列出目录、逐个子目录探测 `manifest.json` 形成插件列表；安装时用 git trees API 拿到文件清单，逐文件下载到 staging 目录，再复用与本地安装完全相同的校验、拷贝与原子落位流程（`pluginManager.installFromDirectory`）。更新等于先保留数据卸载旧版本再重装；启用始终需要权限确认。
+
+两者的分工：
+
+- **自助插件源**解决"发现与分发"：任何仓库目录都可以成为源，无需经过本仓库的注册表 PR。信任模型与本地安装一致——安装不等于运行，Worker 插件拥有 Node.js 权限，启用前由用户自行判断。
+- **静态注册表**继续作为官方审核通道：`community-plugins.json` / `removed-plugins.json` 的撤销与拉黑记录仍会在插件市场里叠加显示——命中撤销/拉黑版本的市场条目会禁止安装与更新，已安装且被撤销的插件会提示立即停用。
+
+实现入口：`electron/plugins/pluginMarketplace.js`（主进程）、`src/components/settings/PluginMarketplaceDialog.tsx`（市场弹窗）、`src/components/settings/PluginSourcesDialog.tsx`（源管理弹窗）。
+
 ## 为什么是"静态注册表 + 固定版本"
 
 插件系统已有 manifest 校验、权限确认、sandboxed Plugin Pages、capability router 与 CSP，但这不等于所有插件都有运行时隔离：`manifest.main` 会在 Node.js Worker 中执行，可直接访问文件系统、环境变量、网络与进程能力，Host capability router 无法约束这些直接调用。社区分发还缺少**分发、信任与本机代码隔离**这一层。可选路线有三条：

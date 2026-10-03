@@ -60,6 +60,48 @@ export type PluginOperationResult =
   | { success: true; dataRemoved?: boolean }
   | { success: false; error: PluginError };
 
+/** 插件市场的一个自助插件源：GitHub 仓库目录。 */
+export interface PluginSource {
+  id: string;
+  url: string;
+  name?: string;
+  addedAt: string;
+}
+
+/** 源目录里探测到的一个插件（manifest 已在主进程通过完整校验）。 */
+export interface MarketplacePluginEntry {
+  directoryName: string;
+  manifest: PluginManifest;
+}
+
+export interface MarketplaceSourceEntry {
+  source: PluginSource;
+  status: 'ok' | 'error' | 'pending';
+  plugins: MarketplacePluginEntry[];
+  warnings: string[];
+  error: PluginError | null;
+  fetchedAt: string | null;
+}
+
+export interface MarketplaceState {
+  sources: PluginSource[];
+  entries: MarketplaceSourceEntry[];
+}
+
+export type MarketplaceMutationResult =
+  | { success: true; state: MarketplaceState }
+  | { success: false; error: PluginError };
+
+export interface MarketplaceInstallRequest {
+  sourceId: string;
+  directoryName: string;
+  /** 用户在界面上看到的插件身份：主进程校验下载到的 manifest 与之一致。 */
+  expectedPluginId: string;
+  expectedVersion: string;
+  /** 更新场景：由主进程原子替换（失败自动回滚），并恢复/停用启用状态。 */
+  replace?: boolean;
+}
+
 export type PluginActionResult =
   | { type: 'text'; content: string; suggestedAction?: 'copy' | 'save' }
   | { type: 'open-external'; url: string }
@@ -115,6 +157,16 @@ export interface ElectronPluginAPI {
   configureWebSearch: (endpoint: string | null) => Promise<PluginOperationResult>;
   searchWeb: (request: { pluginId: string; pageId: string; args: { query: string; limit?: number } }) =>
     Promise<{ success: true; value: Array<{ title: string; url: string; snippet: string }> } | { success: false; error: PluginError }>;
+  marketplace: {
+    getState: () => Promise<MarketplaceState>;
+    addSource: (input: { url: string; name?: string }) => Promise<MarketplaceMutationResult>;
+    updateSource: (input: { id: string; url?: string; name?: string }) => Promise<MarketplaceMutationResult>;
+    removeSource: (input: { id: string }) => Promise<MarketplaceMutationResult>;
+    refresh: (options?: { sourceId?: string }) => Promise<MarketplaceMutationResult>;
+    install: (request: MarketplaceInstallRequest) => Promise<
+      { success: true; pluginId: string; permissionsChanged?: boolean; keptEnabled?: boolean } | { success: false; error: PluginError }
+    >;
+  };
 }
 
 export interface RegisteredPluginAction extends PluginRepositoryAction {

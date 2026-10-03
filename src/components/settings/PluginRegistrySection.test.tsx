@@ -1,157 +1,87 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PluginRegistrySection } from './PluginRegistrySection';
 import { makeT } from '../../i18n/useT';
-import type { InstalledPlugin } from '../../plugins/types';
-import type { PluginRegistryLoadResult, PluginRemovalEntry } from '../../services/pluginRegistryService';
+import type { MarketplaceState } from '../../plugins/types';
 
 const mocks = vi.hoisted(() => ({
   isAvailable: vi.fn(() => true),
-  load: vi.fn(),
-  onDisable: vi.fn(),
+  getState: vi.fn(),
+  onOpenMarketplace: vi.fn(),
 }));
 
-vi.mock('../../services/pluginRegistryService', () => ({
-  pluginRegistryService: {
+vi.mock('../../services/pluginMarketplaceService', () => ({
+  pluginMarketplaceService: {
     isAvailable: mocks.isAvailable,
-    load: mocks.load,
+    getState: mocks.getState,
   },
 }));
 
 const t = makeT('zh', 'app');
 
-const plugin = (overrides: Partial<InstalledPlugin> = {}): InstalledPlugin => ({
-  directoryName: 'health',
-  enabled: true,
-  status: 'active',
-  grantedPermissions: ['storage'],
-  manifest: {
-    manifestVersion: 1,
-    id: 'com.example.health',
-    name: 'Health',
-    version: '1.0.0',
-    apiVersion: '1',
-    permissions: ['storage'],
-    contributes: {},
-  },
-  ...overrides,
-} as InstalledPlugin);
-
-const loadedRegistry = (removed: PluginRemovalEntry[] = []): PluginRegistryLoadResult => ({
-  success: true,
-  registry: {
-    fetchedAt: '2026-09-21T04:00:00.000Z',
+const marketplaceState = (overrides: Partial<MarketplaceState> = {}): MarketplaceState => ({
+  sources: [{ id: 'src-1', url: 'https://github.com/owner/repo/tree/main/plugins', addedAt: '2026-10-01T00:00:00.000Z' }],
+  entries: [{
+    source: { id: 'src-1', url: 'https://github.com/owner/repo/tree/main/plugins', addedAt: '2026-10-01T00:00:00.000Z' },
+    status: 'ok',
     plugins: [{
-      id: 'com.example.health',
-      versions: [{
-        id: 'com.example.health',
-        version: '1.3.0',
+      directoryName: 'fixture',
+      manifest: {
+        manifestVersion: 1,
+        id: 'com.example.fixture',
+        name: 'Fixture',
+        version: '1.0.0',
         apiVersion: '1',
-        source: 'https://github.com/example/health',
-        releaseUrl: 'https://github.com/example/health/releases/download/v1.3.0/health.zip',
-        sha256: 'a'.repeat(64),
-        permissions: ['storage', 'repositories:read'],
-        networkTargets: [],
-        dataUsage: '只读本地仓库元数据，不外发。',
-        review: { status: 'approved', date: '2026-09-21', commit: 'b'.repeat(40) },
-      }],
+        permissions: ['storage'],
+        contributes: {},
+      },
     }],
-    removed,
-    rejected: [{ code: 'REGISTRY_ID_INVALID', message: 'bad id' }],
+    warnings: [],
     error: null,
-  },
+    fetchedAt: '2026-10-01T00:00:00.000Z',
+  }],
+  ...overrides,
 });
 
-describe('PluginRegistrySection', () => {
+describe('PluginRegistrySection（入口卡片）', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isAvailable.mockReturnValue(true);
   });
 
-  it('renders nothing when the desktop bridge is unavailable', () => {
+  it('renders nothing when the marketplace bridge is unavailable', () => {
     mocks.isAvailable.mockReturnValue(false);
-    const { container } = render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
+    const { container } = render(<PluginRegistrySection t={t} onOpenMarketplace={mocks.onOpenMarketplace} />);
     expect(container).toBeEmptyDOMElement();
-    expect(mocks.load).not.toHaveBeenCalled();
+    expect(mocks.getState).not.toHaveBeenCalled();
   });
 
-  it('shows the update with the permissions the new version would need', async () => {
-    mocks.load.mockResolvedValue(loadedRegistry());
-    render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
-
-    await waitFor(() => expect(screen.getByTestId('plugin-registry-com.example.health')).toBeInTheDocument());
-    const row = screen.getByTestId('plugin-registry-com.example.health');
-    expect(row).toHaveTextContent('有新版本 1.3.0');
-    expect(row).toHaveTextContent('新增权限：repositories:read');
-    expect(screen.getByTestId('plugin-registry-rejected')).toHaveTextContent('1 条记录没通过校验');
-    // 有更新只提示，不提供"停用"按钮
-    expect(screen.queryByRole('button', { name: '立即停用' })).not.toBeInTheDocument();
-  });
-
-  it('asks for confirmation-free manual action only for revoked plugins', async () => {
+  it('shows the source and plugin counts and opens the marketplace', async () => {
+    mocks.getState.mockResolvedValue(marketplaceState());
     const user = userEvent.setup();
-    mocks.load.mockResolvedValue({
-      success: true,
-      registry: {
-        fetchedAt: '2026-09-21T04:00:00.000Z',
-        plugins: [],
-        removed: [{ id: 'com.example.health', versions: ['1.0.0'], reason: '向第三方发送了仓库列表', date: '2026-09-21', action: 'revoke' }],
-        rejected: [],
-        error: null,
-      },
-    });
-    render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
+    render(<PluginRegistrySection t={t} onOpenMarketplace={mocks.onOpenMarketplace} />);
 
-    await waitFor(() => expect(screen.getByTestId('plugin-registry-com.example.health')).toHaveTextContent('已被撤销'));
-    expect(screen.getByTestId('plugin-registry-com.example.health')).toHaveTextContent('向第三方发送了仓库列表');
+    await vi.waitFor(() => expect(screen.getByTestId('plugin-registry-stats')).toHaveTextContent('1 个插件源'));
+    expect(screen.getByTestId('plugin-registry-stats')).toHaveTextContent('1 个可用插件');
 
-    await user.click(screen.getByRole('button', { name: '立即停用' }));
-    expect(mocks.onDisable).toHaveBeenCalledWith(expect.objectContaining({ manifest: expect.objectContaining({ id: 'com.example.health' }) }));
+    await user.click(screen.getByTestId('plugin-registry-open'));
+    expect(mocks.onOpenMarketplace).toHaveBeenCalledOnce();
   });
 
-  it('hides the disable action for a plugin that is already disabled', async () => {
-    mocks.load.mockResolvedValue({
-      success: true,
-      registry: {
-        fetchedAt: '2026-09-21T04:00:00.000Z',
-        plugins: [],
-        removed: [{ id: 'com.example.health', versions: ['1.0.0'], reason: '向第三方发送了仓库列表', date: '2026-09-21', action: 'revoke' }],
-        rejected: [],
-        error: null,
-      },
-    });
-    render(<PluginRegistrySection plugins={[plugin({ enabled: false, status: 'disabled' })]} t={t} onDisable={mocks.onDisable} />);
+  it('hides the stats line when no sources have been added', async () => {
+    mocks.getState.mockResolvedValue(marketplaceState({ sources: [], entries: [] }));
+    render(<PluginRegistrySection t={t} onOpenMarketplace={mocks.onOpenMarketplace} />);
 
-    await waitFor(() => expect(screen.getByTestId('plugin-registry-com.example.health')).toHaveTextContent('已被撤销'));
-    expect(screen.queryByRole('button', { name: '立即停用' })).not.toBeInTheDocument();
-    expect(mocks.onDisable).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(screen.getByTestId('plugin-registry-open')).toBeInTheDocument());
+    expect(screen.queryByTestId('plugin-registry-stats')).not.toBeInTheDocument();
   });
 
-  it('surfaces a registry load failure instead of staying silent', async () => {
-    mocks.load.mockResolvedValue({ success: false, error: { code: 'REGISTRY_UNREACHABLE', message: 'offline' } });
-    render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
+  it('keeps rendering the entry card when the state read fails', async () => {
+    mocks.getState.mockRejectedValue(new Error('IPC unavailable'));
+    render(<PluginRegistrySection t={t} onOpenMarketplace={mocks.onOpenMarketplace} />);
 
-    await waitFor(() => expect(screen.getByTestId('plugin-registry-error')).toHaveTextContent('offline'));
-  });
-
-  it('surfaces a partial registry failure while keeping the valid half', async () => {
-    const partial = loadedRegistry();
-    if (!partial.success) throw new Error('expected a successful fixture');
-    partial.registry.error = { code: 'REGISTRY_HTTP_ERROR', message: 'Removal list unavailable' };
-    mocks.load.mockResolvedValue(partial);
-
-    render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
-
-    await waitFor(() => expect(screen.getByTestId('plugin-registry-com.example.health')).toBeInTheDocument());
-    expect(screen.getByTestId('plugin-registry-error')).toHaveTextContent('Removal list unavailable');
-  });
-
-  it('surfaces an unexpected bridge rejection and clears stale data', async () => {
-    mocks.load.mockRejectedValue(new Error('IPC unavailable'));
-    render(<PluginRegistrySection plugins={[plugin()]} t={t} onDisable={mocks.onDisable} />);
-
-    await waitFor(() => expect(screen.getByTestId('plugin-registry-error')).toHaveTextContent('IPC unavailable'));
-    expect(screen.queryByTestId('plugin-registry-com.example.health')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByTestId('plugin-registry-open')).toBeInTheDocument());
+    expect(screen.queryByTestId('plugin-registry-stats')).not.toBeInTheDocument();
   });
 });

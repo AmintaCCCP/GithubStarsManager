@@ -5,21 +5,14 @@ import { AlertTriangle, FolderPlus, Loader2, Plug, RefreshCw, ShieldAlert, Trash
 import { useDialog } from '../../hooks/useDialog';
 import { pluginClient } from '../../plugins/pluginClient';
 import { pluginRegistry } from '../../plugins/pluginRegistry';
+import { buildPluginEnablePrompt } from '../../plugins/pluginEnablePrompt';
 import { PluginPageViewer } from '../PluginPageViewer';
+import { PluginMarketplaceDialog } from './PluginMarketplaceDialog';
 import { PluginRegistrySection } from './PluginRegistrySection';
+import { PluginUninstallDialog } from './PluginUninstallDialog';
 import type { InstalledPlugin } from '../../plugins/types';
 import { Button } from '../ui/button';
 import { Switch } from '../ui/switch';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../ui/alert-dialog';
 
 interface PluginSettingsPanelProps {
   t: TranslateFn;
@@ -36,6 +29,8 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   const [busyPluginId, setBusyPluginId] = useState<string | null>(null);
   const [selectedPage, setSelectedPage] = useState<{ pluginId: string; pageId: string } | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<InstalledPlugin | null>(null);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
+  const [marketplaceReloadSignal, setMarketplaceReloadSignal] = useState(0);
   const [searchEndpoint, setSearchEndpoint] = useState('');
 
   const refresh = async () => {
@@ -73,24 +68,13 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   };
 
   const enable = async (plugin: InstalledPlugin) => {
-    const permissions = plugin.manifest.permissions;
-    const permissionText = permissions.length > 0
-      ? permissions.map((permission) => `• ${permission}`).join('\n')
-      : t('pluginSettingsPanel.no-additional-host-permissions');
-    const repositoryDataNotice = permissions.some((permission) =>
-      permission === 'repositories:read' || permission === 'privateRepositories:read')
-      ? t('pluginSettingsPanel.note-repository-read-access-includes-metadata-of')
-      : '';
-    const approved = await confirm(
-      t('pluginSettingsPanel.enable-v1', { v1: plugin.manifest.name }),
-      `${t('pluginSettingsPanel.local-plugins-with-worker-js-have-node-js-access')}\n\n${t('pluginSettingsPanel.requested-permissions')}\n${permissionText}${repositoryDataNotice}`,
-      { confirmText: t('pluginSettingsPanel.confirm-and-enable'), type: 'warning' }
-    );
+    const prompt = buildPluginEnablePrompt(t, plugin.manifest);
+    const approved = await confirm(prompt.title, prompt.message, { confirmText: prompt.confirmText, type: 'warning' });
     if (!approved) return;
 
     setBusyPluginId(plugin.manifest.id);
     try {
-      const result = await pluginRegistry.enable(plugin.manifest.id, permissions);
+      const result = await pluginRegistry.enable(plugin.manifest.id, plugin.manifest.permissions);
       if (!result.success) toast(result.error.message, 'error');
       else toast(t('pluginSettingsPanel.plugin-enabled'), 'success');
     } catch (error) {
@@ -195,8 +179,12 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
           </Button>
         </div>
       </div>
-      {/* 社区插件注册表（开发守则 §17）：只读对照，不下载也不安装 */}
-      <PluginRegistrySection plugins={snapshot.plugins} t={t} onDisable={disable} />
+      {/* 社区插件注册表：入口卡片，插件的浏览/安装与源的管理在市场弹窗里完成 */}
+      <PluginRegistrySection
+        t={t}
+        onOpenMarketplace={() => setMarketplaceOpen(true)}
+        reloadSignal={marketplaceReloadSignal}
+      />
 
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -321,33 +309,24 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
         </div>
       )}
 
-      <AlertDialog open={uninstallTarget !== null} onOpenChange={(open) => { if (!open) setUninstallTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t('pluginSettingsPanel.uninstall-v1', { v1: uninstallTarget?.manifest.name ?? '' })}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="whitespace-pre-wrap break-all">
-              {t('pluginSettingsPanel.the-installed-plugin-directory-is-deleted-choose')}
-              {uninstallTarget ? `\n\n${uninstallTarget.manifest.id}` : ''}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('pluginSettingsPanel.cancel')}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => { if (uninstallTarget) void removePlugin(uninstallTarget, false); }}
-            >
-              {t('pluginSettingsPanel.uninstall-keep-data')}
-            </AlertDialogAction>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => { if (uninstallTarget) void removePlugin(uninstallTarget, true); }}
-            >
-              {t('pluginSettingsPanel.uninstall-and-delete-data')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PluginUninstallDialog
+        target={uninstallTarget}
+        t={t}
+        onClose={() => setUninstallTarget(null)}
+        onUninstall={(removePluginData) => {
+          if (uninstallTarget) void removePlugin(uninstallTarget, removePluginData);
+        }}
+      />
+
+      <PluginMarketplaceDialog
+        isOpen={marketplaceOpen}
+        onClose={() => {
+          setMarketplaceOpen(false);
+          // 源数量/插件统计可能在弹窗里被改动，关闭时让入口卡片重读本地状态。
+          setMarketplaceReloadSignal((signal) => signal + 1);
+        }}
+        t={t}
+      />
     </div>
   );
 };

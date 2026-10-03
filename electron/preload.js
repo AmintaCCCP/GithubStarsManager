@@ -50,5 +50,14 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     registry: {
       load: () => ipcRenderer.invoke('plugins:loadRegistry'),
     },
+    // 插件市场（自助插件源）：源管理 + 目录遍历 + 从源安装/更新
+    marketplace: {
+      getState: () => ipcRenderer.invoke('plugins:marketplace:getState'),
+      addSource: (input) => ipcRenderer.invoke('plugins:marketplace:addSource', input),
+      updateSource: (input) => ipcRenderer.invoke('plugins:marketplace:updateSource', input),
+      removeSource: (input) => ipcRenderer.invoke('plugins:marketplace:removeSource', input),
+      refresh: (options) => ipcRenderer.invoke('plugins:marketplace:refresh', options),
+      install: (request) => ipcRenderer.invoke('plugins:marketplace:install', request),
+    },
   },
 });
