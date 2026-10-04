@@ -390,7 +390,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
               />
             </div>
           ) : (
-            <div className="relative min-h-0 flex-1">
+            <div className="relative min-h-0 min-w-0 flex-1">
               <div ref={messageRegionRef} onScroll={handleRegionScroll} className="h-full overflow-y-auto pr-1">
                 {error ? (
                   <div className="flex min-h-40 flex-col items-center justify-center gap-2 rounded-md border border-destructive/40 bg-muted/20 px-5 text-center">
