@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -12,6 +12,34 @@ const { createMcpLocalServer } = require('./mcpLocalServer');
 // X 各 handler 内注释）。
 const { fetch: undiciFetch, ProxyAgent } = require('undici');
 const { summarizeFetchError, fetchAcrossStacks, timeoutSignalFromBudget, followRedirectsManually, toFailureResult } = require('./mainFetch');
+// 诊断抓包装饰器：纯旁路记录（参数/响应/异常原样透传，见 netTap.js）。
+// Chromium 栈（net.fetch）由 session.webRequest 观察者零调用点覆盖
+// （官方文档：net.fetch 默认触发 webRequest handlers），不做双重包装。
+// 新标识符均含大写 Fetch，且 `fetch.bind(` 不匹配 outboundFetchGate 的
+// 裸调用正则（该门禁同时要求本解构行字节级原样保留）。
+const diagTap = require('./netTap');
+const { createDiagLogger } = require('./diagLogger');
+const { buildSystemInfo } = require('./systemInfo');
+const redact = require('./redact');
+const { setNetworkRecorder } = require('./plugins/webSearch');
+let diagDebug = false;
+const diagLog = createDiagLogger({
+  logsDir: path.join(app.getPath('userData'), 'logs', 'diagnostics'),
+  // 调试模式放宽磁盘预算：20MB/日、总量 40MB（普通模式 5MB/日、20MB）
+  maxFileBytes: () => (diagDebug ? 20 * 1024 * 1024 : 5 * 1024 * 1024),
+  maxTotalBytes: () => (diagDebug ? 40 * 1024 * 1024 : 20 * 1024 * 1024),
+  maxFiles: 7,
+});
+const undiciFetchTapped = diagTap.wrapFetch(undiciFetch, {
+  source: 'main:undici',
+  record: (entry) => diagLog.record(entry),
+  isDebugMode: () => diagDebug,
+});
+const builtinFetchTapped = diagTap.wrapFetch(fetch.bind(globalThis), {
+  source: 'main:node-fetch',
+  record: (entry) => diagLog.record(entry),
+  isDebugMode: () => diagDebug,
+});
 const { createPluginManager } = require('./plugins/pluginManager');
 const { createPluginMarketplace } = require('./plugins/pluginMarketplace');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
@@ -39,6 +67,50 @@ let isQuitting = false;
 // In-memory desktop prefs (#345). Source of truth on disk:
 // `<userData>/desktop-prefs.json`. Defaults: autoLaunch OFF, tray ON.
 let desktopPrefs = { ...DEFAULT_DESKTOP_PREFS };
+
+// ── Process-level diagnostics (previously invisible crash evidence) ──
+// Recording must never itself throw: every handler is guarded, and a failure
+// inside diagLog degrades to its in-memory ring.
+process.on('uncaughtException', (error) => {
+  try {
+    diagLog.record({
+      level: 'error',
+      module: 'electron.process',
+      message: 'uncaughtException',
+      data: redact.sanitizeError(error),
+    });
+  } catch { /* swallow — diagnostics must not crash the crash handler */ }
+});
+process.on('unhandledRejection', (reason) => {
+  try {
+    diagLog.record({
+      level: 'error',
+      module: 'electron.process',
+      message: 'unhandledRejection',
+      data: redact.sanitizeError(reason),
+    });
+  } catch { /* swallow */ }
+});
+app.on('render-process-gone', (_event, details) => {
+  try {
+    diagLog.record({
+      level: 'error',
+      module: 'electron.app',
+      message: `Render process gone: ${details?.reason ?? 'unknown'}`,
+      data: { reason: details?.reason, exitCode: details?.exitCode, details: redact.sanitizeForLog(details) },
+    });
+  } catch { /* swallow */ }
+});
+app.on('child-process-gone', (_event, details) => {
+  try {
+    diagLog.record({
+      level: 'error',
+      module: 'electron.app',
+      message: `Child process gone: ${details?.type ?? 'unknown'} ${details?.reason ?? ''}`,
+      data: { type: details?.type, reason: details?.reason, exitCode: details?.exitCode },
+    });
+  } catch { /* swallow */ }
+});
 
 // `--hidden` is appended to our own Linux autostart entry so login starts in tray.
 const startHidden = process.argv.includes('--hidden');
@@ -108,6 +180,37 @@ function createWindow() {
     if (!startHidden && !mainWindow.isVisible()) {
       mainWindow.show();
     }
+  });
+
+  // Renderer console errors that escaped every try/catch: record a capped
+  // sample (unique-error storms bypass repeat aggregation, so a token bucket
+  // here is the hard bound). Handles both the legacy (event, level, message)
+  // and the details-object event shapes across Electron versions.
+  let rendererConsoleErrorBudget = { windowStart: 0, used: 0 };
+  mainWindow.webContents.on('console-message', (...args) => {
+    try {
+      const first = args[1];
+      const level = first && typeof first === 'object' ? first.level : args[1];
+      const message = first && typeof first === 'object' ? first.message : args[2];
+      const isError = level === 3 || level === 'error';
+      if (!isError) return;
+      const nowMs = Date.now();
+      if (nowMs - rendererConsoleErrorBudget.windowStart >= 60_000) {
+        rendererConsoleErrorBudget.windowStart = nowMs;
+        rendererConsoleErrorBudget.used = 0;
+      }
+      if (rendererConsoleErrorBudget.used >= 30) return;
+      rendererConsoleErrorBudget.used += 1;
+      const details = first && typeof first === 'object' ? first : {};
+      diagLog.record({
+        level: 'error',
+        module: 'electron.renderer-console',
+        message: String(message ?? '').slice(0, 2000),
+        ...(details.sourceId || details.lineNumber
+          ? { data: { sourceId: details.sourceId, lineNumber: details.lineNumber } }
+          : {}),
+      });
+    } catch { /* never break the window */ }
   });
 
   if (isDev) {
@@ -375,7 +478,7 @@ ipcMain.handle('x-fetch-timeline', async (_event, handle) => {
         name: 'undici',
         run: async ({ remainingMs }) => {
           const dispatcher = getFetchDispatcher();
-          const fetchImpl = dispatcher ? undiciFetch : fetch;
+          const fetchImpl = dispatcher ? undiciFetchTapped : builtinFetchTapped;
           return fetchImpl(timelineUrl, {
             headers: timelineHeaders,
             signal: timeoutSignalFromBudget(remainingMs, 20_000),
@@ -436,7 +539,7 @@ ipcMain.handle('telegram-fetch-channel', async (_event, channel, before) => {
         name: 'undici',
         run: async ({ remainingMs }) => {
           const dispatcher = getFetchDispatcher();
-          return undiciFetch(telegramUrl, {
+          return undiciFetchTapped(telegramUrl, {
             headers: telegramHeaders,
             signal: timeoutSignalFromBudget(remainingMs, 20_000),
             ...(dispatcher ? { dispatcher } : {}),
@@ -504,7 +607,7 @@ ipcMain.handle('webdav-request', async (_event, params) => {
       name: 'undici',
       run: async ({ remainingMs }) => {
         const dispatcher = getFetchDispatcher();
-        return undiciFetch(parsed.toString(), {
+        return undiciFetchTapped(parsed.toString(), {
           method: upperMethod,
           headers: safeHeaders,
           ...(hasBody ? { body } : {}),
@@ -581,7 +684,7 @@ async function fetchXGuestToken() {
       name: 'undici',
       run: async ({ remainingMs }) => {
         const dispatcher = getFetchDispatcher();
-        const fetchImpl = dispatcher ? undiciFetch : fetch;
+        const fetchImpl = dispatcher ? undiciFetchTapped : builtinFetchTapped;
         return fetchImpl(X_GUEST_ACTIVATE_URL, {
           method: 'POST',
           headers: activateHeaders,
@@ -651,7 +754,7 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
       // 内置 fetch 的 TLS 指纹被 x.com 边缘放行（#356 起长期可用）；npm undici@8
       // 的指纹会被 403。仅当需要应用代理 dispatcher 时才用同版本 undici fetch
       //（此时若仍被边缘 403，渲染进程会自动降级 guest 流程）
-      const fetchImpl = dispatcher ? undiciFetch : fetch;
+      const fetchImpl = dispatcher ? undiciFetchTapped : builtinFetchTapped;
       const response = await fetchImpl(url, {
         headers,
         redirect: 'error',
@@ -1152,6 +1255,8 @@ function getPluginManager() {
     pluginManager = createPluginManager({
       pluginsRoot: path.join(app.getPath('userData'), 'plugins'),
       hostOperations: pluginHostOperations,
+      // 插件 capability log 镜像：写入插件自身日志文件的同时进诊断日志
+      logMirror: (entry) => diagLog.record(entry),
     });
   }
   return pluginManager;
@@ -1276,6 +1381,361 @@ ipcMain.handle('plugins:searchWeb', async (event, request) => {
   return getPluginManager().searchWeb(request);
 });
 
+// ── Diagnostics IPC (append/flush/read/exportBundle) ──
+// The renderer bridge batches entries (2s / 32 items) and piggybacks its
+// current debug-mode flag so main-process capture level follows the same
+// switch with zero extra IPC round-trips.
+
+function applyDiagnosticsPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  if (typeof payload.debugMode === 'boolean') diagDebug = payload.debugMode;
+  return payload.entries;
+}
+
+ipcMain.handle('diagnostics:append', (_event, payload) => {
+  try {
+    const entries = applyDiagnosticsPayload(payload);
+    if (entries === null) return { success: false, error: 'invalid payload' };
+    return diagLog.ingestRenderer(entries);
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
+// One-way shutdown path: pagehide/beforeunload flush before the page dies.
+ipcMain.on('diagnostics:flush', (_event, payload) => {
+  try {
+    const entries = applyDiagnosticsPayload(payload);
+    if (entries !== null) diagLog.ingestRenderer(entries);
+  } catch { /* shutdown must never throw */ }
+});
+
+ipcMain.handle('diagnostics:read', async (_event, options) => {
+  try {
+    const since = typeof options?.since === 'string' ? options.since : undefined;
+    const limit = Number.isFinite(options?.limit)
+      ? Math.min(Math.max(Math.trunc(options.limit), 1), 5000)
+      : 2000;
+    const main = await diagLog.readTail({ since, sources: ['main'], limit });
+    return { success: true, main, plugins: readPluginLogTails({ limit }) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error), main: [], plugins: [] };
+  }
+});
+
+ipcMain.handle('diagnostics:exportBundle', async (_event, payload) => exportDiagnosticsBundle(payload));
+
+/** Read the tail of every plugin's own JSONL log (<userData>/plugin-logs). */
+function readPluginLogTails({ limit = 1000 } = {}) {
+  const logsRoot = path.join(app.getPath('userData'), 'plugin-logs');
+  const result = [];
+  try {
+    const names = fs.readdirSync(logsRoot)
+      .filter((name) => name.endsWith('.log'))
+      .sort()
+      .slice(0, 100);
+    for (const name of names) {
+      const pluginId = name.slice(0, -4);
+      let content = '';
+      try { content = fs.readFileSync(path.join(logsRoot, name), 'utf8'); } catch { continue; }
+      const lines = content.split('\n').filter(Boolean).slice(-200);
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line);
+          result.push({
+            id: `${name}-${result.length}`,
+            timestamp: typeof parsed.at === 'string' ? parsed.at : new Date(0).toISOString(),
+            level: parsed.level === 'warning' ? 'warn' : (['debug', 'info', 'warn', 'error'].includes(parsed.level) ? parsed.level : 'info'),
+            module: pluginId,
+            message: typeof parsed.message === 'string' ? parsed.message : '',
+            ...(parsed.metadata === undefined ? {} : { data: parsed.metadata }),
+            source: 'plugins',
+          });
+        } catch { /* torn line after rotation — skip */ }
+      }
+    }
+  } catch { /* no plugin logs yet */ }
+  return result.slice(-limit);
+}
+
+/**
+ * Halve-then-drop the oldest records (by timestamp, across every source)
+ * until the SERIALIZED (indent=2, same as the writeFile) bundle fits the
+ * budget. Returns null when even a metadata-only bundle would exceed the
+ * cap — the caller must then fail the export instead of writing a file.
+ */
+function fitBundleSize(bundle, maxBytes) {
+  const serializedLength = (obj) => Buffer.byteLength(JSON.stringify(obj, null, 2), 'utf8');
+  if (serializedLength(bundle) <= maxBytes) return bundle;
+  const out = { ...bundle, truncated: true, sources: { ...bundle.sources } };
+  const lists = [
+    { host: out, key: 'frontendLogs' },
+    { host: out, key: 'backendLogs' },
+    { host: out.sources, key: 'main' },
+    { host: out.sources, key: 'network' },
+    { host: out.sources, key: 'plugins' },
+  ];
+  for (;;) {
+    if (serializedLength(out) <= maxBytes) return out;
+    // Find the source holding the globally oldest record and drop its
+    // oldest eighth (at least one entry). Each array is chronological, so
+    // prefix drops mirror "drop oldest first" while keeping this O(log n)
+    // re-serializations instead of one per record.
+    let target = -1;
+    let targetTs = null;
+    lists.forEach(({ host, key }, li) => {
+      const arr = Array.isArray(host[key]) ? host[key] : [];
+      if (arr.length === 0) return;
+      const ts = typeof arr[0]?.timestamp === 'string' ? arr[0].timestamp : '';
+      if (targetTs === null || ts < targetTs) {
+        targetTs = ts;
+        target = li;
+      }
+    });
+    if (target < 0) return null;
+    const { host, key } = lists[target];
+    const arr = host[key];
+    host[key] = arr.slice(Math.max(1, Math.floor(arr.length / 8)));
+  }
+}
+
+/**
+ * Export-side trust boundary: the renderer may submit networkEntries or
+ * frontendLogs directly, so string values that look like embedded JSON
+ * (e.g. a captured request body containing X auth cookies) are parsed and
+ * re-sanitized as objects before they can land in the exported file.
+ */
+function deepRedactEmbeddedJson(value, depth = 0) {
+  if (depth > 6) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.length <= 256 * 1024 ? value.trim() : '';
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed && typeof parsed === 'object') {
+          const sanitized = redact.sanitizeForLog(parsed);
+          return JSON.stringify(sanitized);
+        }
+      } catch {
+        // Not JSON — leave the string as-is (already sanitized upstream).
+      }
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map((v) => deepRedactEmbeddedJson(v, depth + 1));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = deepRedactEmbeddedJson(v, depth + 1);
+    return out;
+  }
+  return value;
+}
+
+function redactExportedEntries(entries) {
+  return entries.map((entry) => {
+    if (!entry || typeof entry !== 'object') return entry;
+    if (entry.data === undefined) return entry;
+    return { ...entry, data: deepRedactEmbeddedJson(entry.data) };
+  });
+}
+
+async function exportDiagnosticsBundle(payload = {}) {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return { success: false, error: 'main window unavailable' };
+    const windowHours = payload.windowHours === null || payload.windowHours === undefined
+      ? null
+      : Math.min(Math.max(Math.trunc(Number(payload.windowHours) || 24), 1), 168);
+    const since = windowHours ? new Date(Date.now() - windowHours * 3_600_000).toISOString() : undefined;
+    const capEntries = (value, max) => (Array.isArray(value) ? value.filter((e) => (
+      e
+      && typeof e === 'object'
+      && (!since || (typeof e.timestamp === 'string' && e.timestamp >= since))
+    )) : []).slice(-max);
+    const mainLogs = await diagLog.readTail({ since, limit: 2000 });
+    const bundle = fitBundleSize({
+      format: 'github-stars-manager-logs-v2',
+      exportDate: new Date().toISOString(),
+      appVersion: app.getVersion(),
+      sessionId: diagLog.sessionId,
+      environment: buildSystemInfo({
+        os,
+        versions: process.versions,
+        appVersion: app.getVersion(),
+        sessionId: diagLog.sessionId,
+        proxyConfig: loadProxyConfig(),
+        plugins: await listPluginsForSnapshot(),
+        renderer: payload.environment && typeof payload.environment === 'object' ? payload.environment : {},
+      }),
+      sanitizationNote: typeof payload.sanitizationNote === 'string'
+        ? payload.sanitizationNote
+        : 'Tokens, API keys, passwords and emails are masked before writing.',
+      frontendLogs: redactExportedEntries(capEntries(payload.frontendLogs, 2000)),
+      backendLogs: redactExportedEntries(capEntries(payload.backendLogs, 2000)),
+      sources: {
+        main: mainLogs,
+        network: redactExportedEntries(capEntries(payload.networkEntries, 1000)),
+        plugins: capEntries(readPluginLogTails({ limit: 1500 }), 1500),
+      },
+    }, 5 * 1024 * 1024);
+    if (!bundle) {
+      return { success: false, error: 'diagnostics bundle exceeds size budget even after truncation' };
+    }
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: `github-stars-manager-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
+      properties: ['showOverwriteConfirmation', 'createDirectory'],
+    });
+    if (result.canceled || !result.filePath) return { success: false, canceled: true };
+    await fs.promises.writeFile(result.filePath, JSON.stringify(bundle, null, 2), 'utf8');
+    diagLog.record({
+      level: 'info',
+      module: 'electron.diagnostics',
+      message: 'Diagnostics bundle exported',
+      data: { windowHours },
+    });
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Best-effort plugin manifest summary for snapshots; never throws. */
+async function listPluginsForSnapshot() {
+  try {
+    const result = await getPluginManager().list();
+    return (result?.plugins ?? []).map((plugin) => ({
+      id: plugin?.manifest?.id,
+      version: plugin?.manifest?.version,
+      enabled: !!plugin?.enabled,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ── Chromium-stack request observer (zero call-site coverage for net.fetch,
+// and every renderer/Chromium request through the default session) ──
+const DIAGNOSTICS_WEBREQUEST_FILTER = { urls: ['http://*/*', 'https://*/*'] };
+
+function isLoopbackHost(hostname) {
+  const host = String(hostname).toLowerCase().replace(/^\[|\]$/g, '');
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1';
+}
+
+function shouldSkipDiagnosticsUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return true;
+    if (!isLoopbackHost(url.hostname)) return false;
+    // MCP 本地服务是入站只读接口，不属于对外请求
+    if (mcpConfig.enabled && url.port === String(mcpConfig.port)) return true;
+    // Dev 模式跳过 Vite 开发服务器自身流量
+    if (isDev && url.port === '5173') return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function flattenHeaderRecord(headers) {
+  const flat = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    flat[key] = Array.isArray(value) ? value.join(', ') : String(value);
+  }
+  return flat;
+}
+
+function attachDiagnosticsWebRequestObserver(targetSession) {
+  const inflight = new Map();
+  const rememberRequest = (details) => {
+    if (shouldSkipDiagnosticsUrl(details.url)) return;
+    if (inflight.size >= 1000) {
+      const oldest = inflight.keys().next().value;
+      inflight.delete(oldest);
+    }
+    inflight.set(details.id, {
+      url: details.url,
+      method: details.method,
+      startedAt: Date.now(),
+      redirects: 0,
+      via: details.webContentsId ? 'renderer' : 'main',
+      resourceType: details.resourceType,
+    });
+  };
+  // ⚠️ onBeforeRequest is a BLOCKING listener: on Electron 44 a listener that
+  // never calls its callback hangs EVERY matching request until the caller's
+  // own timeout aborts it (net::ERR_ABORTED) — empirically verified. The
+  // callback form with an immediate callback({}) is required, even though the
+  // bookkeeping itself is synchronous.
+  targetSession.webRequest.onBeforeRequest(DIAGNOSTICS_WEBREQUEST_FILTER, (details, callback) => {
+    try {
+      rememberRequest(details);
+    } finally {
+      callback({});
+    }
+  });
+  targetSession.webRequest.onBeforeRedirect(DIAGNOSTICS_WEBREQUEST_FILTER, (details) => {
+    const pending = inflight.get(details.id);
+    if (pending) pending.redirects += 1;
+  });
+  targetSession.webRequest.onCompleted(DIAGNOSTICS_WEBREQUEST_FILTER, (details) => {
+    const pending = inflight.get(details.id) ?? {
+      url: details.url,
+      method: details.method,
+      startedAt: Date.now(),
+      redirects: 0,
+      via: details.webContentsId ? 'renderer' : 'main',
+      resourceType: details.resourceType,
+    };
+    inflight.delete(details.id);
+    if (shouldSkipDiagnosticsUrl(details.url)) return;
+    const failed = details.statusCode >= 400;
+    if (!diagDebug && !failed) return;
+    try {
+      diagLog.record({
+        level: failed ? 'warn' : 'debug',
+        module: 'electron.webRequest',
+        message: `${pending.method} ${redact.redactUrl(pending.url)} → ${details.statusCode}`,
+        data: {
+          url: redact.redactUrl(pending.url),
+          method: pending.method,
+          status: details.statusCode,
+          durationMs: Date.now() - pending.startedAt,
+          redirects: pending.redirects,
+          via: pending.via,
+          resourceType: pending.resourceType,
+          fromCache: !!details.fromCache,
+          ...(diagDebug && details.responseHeaders
+            ? { responseHeaders: redact.sanitizeForLog({ headers: flattenHeaderRecord(details.responseHeaders) }).headers }
+            : {}),
+        },
+      });
+    } catch { /* observer must never break the request path */ }
+  });
+  targetSession.webRequest.onErrorOccurred(DIAGNOSTICS_WEBREQUEST_FILTER, (details) => {
+    const pending = inflight.get(details.id);
+    inflight.delete(details.id);
+    if (shouldSkipDiagnosticsUrl(details.url)) return;
+    try {
+      diagLog.record({
+        level: 'error',
+        module: 'electron.webRequest',
+        message: `${details.method} ${redact.redactUrl(details.url)} failed`,
+        data: {
+          url: redact.redactUrl(details.url),
+          method: details.method,
+          error: details.error,
+          // details.timestamp is the event clock, not an epoch offset — only
+          // the remembered start time yields a meaningful duration.
+          ...(pending ? { durationMs: Date.now() - pending.startedAt } : {}),
+          via: details.webContentsId ? 'renderer' : 'main',
+          resourceType: details.resourceType,
+        },
+      });
+    } catch { /* observer must never break the request path */ }
+  });
+}
+
+
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
@@ -1285,6 +1745,11 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+  // Chromium 栈观察者：覆盖全部 net.fetch（插件市场/注册表/资源下载/X/Telegram/
+  // WebDAV 回退栈）与渲染进程经 session 发出的请求；webSearch.js 的 node:https
+  // 既不经 undici 也不经 Chromium，由该文件内手动补记（setNetworkRecorder）。
+  attachDiagnosticsWebRequestObserver(session.defaultSession);
+  setNetworkRecorder((entry) => diagLog.record(entry));
   protocol.handle(PAGE_SCHEME, (request) => {
     const resource = getPluginManager().readPageResource(request.url);
     if (!resource) return new Response('Not Found', { status: 404 });
@@ -1325,6 +1790,28 @@ app.whenReady().then(() => {
       }
     });
   }
+  // Startup environment snapshot (previously absent from the journal).
+  // The snapshot's own sessionId field is dropped: the journal entry carries
+  // sessionId at the top level, and a UUID value inside `data` would trip the
+  // sanitizer's generic-secret pattern.
+  void listPluginsForSnapshot().then((plugins) => {
+    const snapshot = buildSystemInfo({
+      os,
+      versions: process.versions,
+      appVersion: app.getVersion(),
+      sessionId: diagLog.sessionId,
+      proxyConfig: savedProxy,
+      plugins,
+      routeMode: null,
+    });
+    delete snapshot.sessionId;
+    diagLog.record({
+      level: 'info',
+      module: 'electron.system',
+      message: 'Session started',
+      data: snapshot,
+    });
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -1346,6 +1833,12 @@ app.on('will-quit', () => {
   destroyTray();
   void mcpServer.stop();
   pluginManager?.shutdown();
+  // Synchronous final drain: journal writes are appendFileSync, so this
+  // completes instantly with nothing left in flight — the quit path stays
+  // free of async waiting (and of the hang risks that come with it).
+  try {
+    diagLog.flushSync();
+  } catch { /* quit must never be blocked by diagnostics */ }
 });
 
 app.on('activate', () => {

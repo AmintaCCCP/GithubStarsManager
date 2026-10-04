@@ -9,6 +9,9 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { DialogProvider } from './hooks/useDialog';
 import { TooltipProvider } from './components/ui/tooltip';
 import { logger } from './services/logger';
+import { installFetchCapture } from './services/fetchCapture';
+import { installDiagnosticsBridge } from './services/diagnosticsBridge';
+import { installGlobalErrorHandlers } from './services/globalErrorHandlers';
 import { ensureThemeStyleTag } from './lib/themePresets';
 import { useAppStore } from './store/useAppStore';
 import { ensureLanguageLoaded, FALLBACK_LANGUAGE } from './i18n';
@@ -31,6 +34,18 @@ import '@fontsource/lora';
 import '@fontsource/playfair-display';
 
 logger.info('app', 'Main.tsx loading');
+
+// Diagnostics pipeline must be live before React renders so the fetch ledger,
+// the journal bridge, and the global error handlers see every early request
+// and error. All three are idempotent, no-ops in web mode where applicable,
+// and never throw into the bootstrap path.
+try {
+  installFetchCapture();
+  installDiagnosticsBridge();
+  installGlobalErrorHandlers();
+} catch (error) {
+  logger.errorFromError('app', 'Failed to install diagnostics pipeline', error);
+}
 
 const bootstrap = async (): Promise<void> => {
   try {

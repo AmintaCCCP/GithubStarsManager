@@ -1,0 +1,207 @@
+{
+  "$comment": "Shared sanitization test vectors. Driven by src/utils/logSanitizer.vectors.test.ts (vitest), electron/redact.test.js (node:test), and server/tests/services/logSanitizer.vectors.test.ts (server vitest) to lock the renderer/backend/main-process sanitizer copies to identical observable behavior. Do not add vectors whose behavior legitimately differs between copies (e.g. the auth_token vs auth_token_encrypted key-name difference).",
+  "strings": [
+    {
+      "name": "plain text passes through",
+      "input": "hello world",
+      "expected": "hello world"
+    },
+    {
+      "name": "github token masked to last four",
+      "input": "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected": "***aaaa"
+    },
+    {
+      "name": "gsm mcp token masked to last four",
+      "input": "gsm_mcp_a1b2c3d4e5f6",
+      "expected": "***e5f6"
+    },
+    {
+      "name": "openai-style key masked",
+      "input": "sk-proj-abcdef1234567890ABCDEF",
+      "expected": "***CDEF"
+    },
+    {
+      "name": "long base64-like string masked",
+      "input": "YWJjZGVmZ2hpamtsbW5vcHFyc3R1",
+      "expected": "***c3R1"
+    },
+    {
+      "name": "email masked but domain kept",
+      "input": "john.doe@example.com",
+      "expected": "j***@example.com"
+    },
+    {
+      "name": "short local part fully masked",
+      "input": "ab@ex.com",
+      "expected": "**@ex.com"
+    },
+    {
+      "name": "bearer token masked",
+      "input": "Bearer sk-abcdef123456789012345678",
+      "expected": "Bearer ***5678"
+    },
+    {
+      "name": "basic auth header masked",
+      "input": "Basic dXNlcjpwYXNzd29yZA==",
+      "expected": "Basic ***"
+    },
+    {
+      "name": "url token param redacted",
+      "input": "https://api.example.com/v1/items?token=supersecretvalue&limit=10",
+      "expected": "https://api.example.com/v1/items?token=***&limit=10"
+    },
+    {
+      "name": "clean url passes through",
+      "input": "https://api.github.com/repos/x/y",
+      "expected": "https://api.github.com/repos/x/y"
+    },
+    {
+      "name": "short numeric string untouched",
+      "input": "12345",
+      "expected": "12345"
+    },
+    {
+      "name": "lowercase bearer masked",
+      "input": "bearer abcdefghijklmnopqrstuvwxyz",
+      "expected": "bearer ***wxyz"
+    }
+  ],
+  "objects": [
+    {
+      "name": "password field masked",
+      "input": {
+        "password": "hunter2password"
+      },
+      "expected": {
+        "password": "***word"
+      }
+    },
+    {
+      "name": "nested token field masked",
+      "input": {
+        "nested": {
+          "token": "abcdefghijklmnopqrst"
+        }
+      },
+      "expected": {
+        "nested": {
+          "token": "***qrst"
+        }
+      }
+    },
+    {
+      "name": "header credentials masked",
+      "input": {
+        "headers": {
+          "Authorization": "Bearer sk-abcdef123456789012345678",
+          "X-Api-Key": "sk-xyz987654321098765432",
+          "Accept": "application/json"
+        }
+      },
+      "expected": {
+        "headers": {
+          "Authorization": "Bearer ***5678",
+          "X-Api-Key": "***5432",
+          "Accept": "application/json"
+        }
+      }
+    },
+    {
+      "name": "apiKey field masked",
+      "input": {
+        "apiKey": "sk-abcdef123456789012345678"
+      },
+      "expected": {
+        "apiKey": "***5678"
+      }
+    },
+    {
+      "name": "token-like key masked",
+      "input": {
+        "sessionToken": "value123"
+      },
+      "expected": {
+        "sessionToken": "***e123"
+      }
+    },
+    {
+      "name": "mixed array sanitized item-wise",
+      "input": [
+        "ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "safe",
+        42,
+        null
+      ],
+      "expected": [
+        "***aaaa",
+        "safe",
+        42,
+        null
+      ]
+    },
+    {
+      "name": "innocuous object passes through",
+      "input": {
+        "count": 3,
+        "ok": true,
+        "name": "plain"
+      },
+      "expected": {
+        "count": 3,
+        "ok": true,
+        "name": "plain"
+      }
+    },
+    {
+      "name": "email inside field masked",
+      "input": {
+        "contact": "john.doe@example.com"
+      },
+      "expected": {
+        "contact": "j***@example.com"
+      }
+    },
+    {
+      "name": "x.com ct0 csrf cookie value masked",
+      "input": {
+        "ct0": "111111111111111111111111"
+      },
+      "expected": {
+        "ct0": "***1111"
+      }
+    }
+  ],
+  "errorMessages": [
+    {
+      "name": "embedded url token redacted",
+      "input": "request to https://api.example.com/v1/data?token=supersecretvalue failed",
+      "expected": "request to https://api.example.com/v1/data?token=*** failed"
+    },
+    {
+      "name": "embedded bearer credential redacted",
+      "input": "Authorization: Bearer sk-abcdefghij1234567890 rejected",
+      "expected": "Authorization: Bearer *** rejected"
+    },
+    {
+      "name": "embedded github token masked",
+      "input": "token ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa in message",
+      "expected": "token ***aaaa in message"
+    },
+    {
+      "name": "embedded openai-style key masked",
+      "input": "key sk-proj-abcdef1234567890 expired",
+      "expected": "key ***7890 expired"
+    },
+    {
+      "name": "embedded mcp token masked",
+      "input": "mcp gsm_mcp_a1b2c3d4e5f6 rejected",
+      "expected": "mcp ***e5f6 rejected"
+    },
+    {
+      "name": "embedded email masked",
+      "input": "contact john.doe@example.com about it",
+      "expected": "contact j***@example.com about it"
+    }
+  ]
+}

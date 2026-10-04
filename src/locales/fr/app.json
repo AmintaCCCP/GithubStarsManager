@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "Afficher les détails HTTP : {{v1}} {{v2}}",
     "fe": "l'extrémité avant",
     "be": "extrémité arrière",
-    "load-more-v1-remaining": "Charger plus ({{v1}} plus)"
+    "load-more-v1-remaining": "Charger plus ({{v1}} plus)",
+    "source-main": "Processus principal",
+    "source-plugins": "Extensions",
+    "export-bundle": "Générer le paquet de diagnostic",
+    "export-window-hour": "Dernière heure",
+    "export-window-day": "Dernières 24 heures",
+    "export-window-all": "Tout l'historique",
+    "network-ledger": "Journal réseau"
   },
   "generalPanel": {
     "general-settings": "Paramètres généraux",

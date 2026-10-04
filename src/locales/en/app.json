@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "View HTTP details: {{v1}} {{v2}}",
     "fe": "FE",
     "be": "BE",
-    "load-more-v1-remaining": "Load more ({{v1}} remaining)"
+    "load-more-v1-remaining": "Load more ({{v1}} remaining)",
+    "source-main": "Main process",
+    "source-plugins": "Plugins",
+    "export-bundle": "Export bundle",
+    "export-window-hour": "Last hour",
+    "export-window-day": "Last 24 hours",
+    "export-window-all": "All time",
+    "network-ledger": "Network ledger"
   },
   "generalPanel": {
     "general-settings": "General Settings",

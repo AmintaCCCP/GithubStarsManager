@@ -916,7 +916,14 @@
     "frontend": "Frontend",
     "export": "Export",
     "frontend-v1": "Frontend {{v1}}",
-    "backend-backendlogcount": "Backend {{backendLogCount}}"
+    "backend-backendlogcount": "Backend {{backendLogCount}}",
+    "source-main": "Hauptprozess",
+    "source-plugins": "Plugins",
+    "export-bundle": "Diagnosepaket erstellen",
+    "export-window-hour": "Letzte Stunde",
+    "export-window-day": "Letzte 24 Stunden",
+    "export-window-all": "Gesamter Zeitraum",
+    "network-ledger": "Netzwerkprotokoll"
   },
   "generalPanel": {
     "general-settings": "Allgemeine Einstellungen",

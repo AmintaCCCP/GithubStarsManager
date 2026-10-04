@@ -13,6 +13,20 @@ for (const [network, prefix] of [
   ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
 ]) blocked.addSubnet(network, prefix, 'ipv4');
 
+// node:https 既不经 undici 也不经 Chromium session，netTap/webRequest 均无法
+// 覆盖；这里提供模块级记录钩子，由 main.js 注入 diagLog.record（纯旁路，
+// 钩子自身的异常必须被吞掉，绝不影响搜索请求）。
+let networkRecorder = null;
+
+function setNetworkRecorder(recorder) {
+  networkRecorder = typeof recorder === 'function' ? recorder : null;
+}
+
+function recordNetwork(entry) {
+  if (!networkRecorder) return;
+  try { networkRecorder(entry); } catch { /* diagnostics must not break search */ }
+}
+
 function publicLookup(hostname, options, callback) {
   dns.lookup(hostname, { all: true, family: 4 }, (error, addresses) => {
     if (error) return callback(error);
@@ -52,6 +66,17 @@ function validateSearchArgs(args) {
 }
 
 function readSearchResponse(url) {
+  const startedAt = Date.now();
+  // Log only origin+pathname: the `q` query parameter carries the user's
+  // search text, which must never reach the diagnostics journal.
+  const requestUrl = `${url.origin}${url.pathname}`;
+  const finish = (level, message, extra) => {
+    if (extra === undefined) {
+      recordNetwork({ level, module: 'plugins.webSearch', message: `GET ${requestUrl} → ${message}`, data: { url: requestUrl, durationMs: Date.now() - startedAt } });
+    } else {
+      recordNetwork({ level, module: 'plugins.webSearch', message: `GET ${requestUrl} failed`, data: { url: requestUrl, durationMs: Date.now() - startedAt, detail: message } });
+    }
+  };
   return new Promise((resolve, reject) => {
     const request = https.request(url, {
       method: 'GET', agent: false, timeout: 8000, family: 4, lookup: publicLookup,
@@ -60,6 +85,7 @@ function readSearchResponse(url) {
       if (response.statusCode !== 200) {
         clearTimeout(deadline);
         response.resume();
+        finish('error', response.statusCode);
         reject(protocolError('PLUGIN_SEARCH_FAILED', response.statusCode === 403
           ? 'Search service must enable JSON output' : 'Search service returned an error'));
         return;
@@ -76,10 +102,12 @@ function readSearchResponse(url) {
       });
       response.on('end', () => {
         clearTimeout(deadline);
+        finish('debug', response.statusCode);
         resolve(Buffer.concat(chunks).toString('utf8'));
       });
       response.on('error', (error) => {
         clearTimeout(deadline);
+        finish('error', error?.code ?? 'response error');
         reject(error);
       });
     });
@@ -87,6 +115,7 @@ function readSearchResponse(url) {
     request.on('timeout', () => request.destroy(protocolError('PLUGIN_SEARCH_TIMEOUT', 'Search service timed out')));
     request.on('error', (error) => {
       clearTimeout(deadline);
+      finish('error', error?.code ?? 'request error');
       reject(error);
     });
     request.end();
@@ -121,4 +150,4 @@ async function searchSearxng(endpoint, args) {
   }).slice(0, limit);
 }
 
-module.exports = { searchUrl, validateSearchArgs, searchSearxng, publicLookup };
+module.exports = { searchUrl, validateSearchArgs, searchSearxng, publicLookup, setNetworkRecorder };

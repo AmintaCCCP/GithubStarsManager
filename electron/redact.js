@@ -1,35 +1,42 @@
+'use strict';
+
 /**
- * Backend log sanitization utility — masks all sensitive data at write time.
- * Logic mirrors the frontend sanitizer but lives in the server bundle.
+ * Main-process log sanitization — mirrors src/utils/logSanitizer.ts /
+ * server/src/services/logSanitizer.ts behavior for diagnostics written by
+ * electron/diagLogger. The renderer copies cannot be imported from plain-CJS
+ * electron code, so this is the fourth copy of the rules; shared test vectors
+ * in tests/fixtures/sanitization-vectors.json lock the four copies to the
+ * same observable behavior (see redact.test.js / logSanitizer.vectors.test.ts
+ * and server/tests/services/logSanitizer.vectors.test.ts).
  */
 
-// Sensitive field names that trigger masking
+// Union of the sensitive field names from the renderer and backend copies.
 const SENSITIVE_FIELD_NAMES = new Set([
   'apiKey', 'api_key', 'api_key_encrypted', 'password', 'password_encrypted',
   'secret', 'token', 'githubToken', 'accessToken', 'authorization',
   'x-api-key', 'credentials', 'passwd', 'pwd', 'backendApiSecret',
-  'mcp_token', 'mcpToken', 'authToken', 'auth_token_encrypted', 'ct0',
+  'mcp_token', 'mcpToken', 'authToken', 'auth_token', 'auth_token_encrypted', 'ct0',
 ]);
 
-// URL query param keys to redact
+// Header names whose values are always dropped entirely (cookie values are
+// full credentials; the sanitizer keeps key names but never cookie payloads).
+const DROPPED_HEADER_VALUES = new Set(['cookie', 'set-cookie']);
+
 const SENSITIVE_URL_PARAMS = ['key', 'api_key', 'apikey', 'token', 'access_token', 'secret', 'client_secret', 'password', 'auth'];
 
-// Patterns for token/key detection
 const GITHUB_TOKEN_RE = /^ghp_[a-zA-Z0-9]{36}$/;
 const GENERIC_SECRET_RE = /^[a-zA-Z0-9+/=_-]{20,}$/;
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-/**
- * Mask a secret string: show only last 4 chars.
- */
-export function maskSecret(value: string): string {
+/** Maximum length of any sanitized string (matches renderer preview budgets). */
+const MAX_STRING_LENGTH = 16 * 1024;
+
+function maskSecret(value) {
   if (!value || value.length <= 4) return '****';
   return '***' + value.slice(-4);
 }
 
-/**
- * Mask an email: keep domain, mask local part.
- */
-export function maskEmail(email: string): string {
+function maskEmail(email) {
   const atIndex = email.indexOf('@');
   if (atIndex <= 0) return '***@***';
   const local = email.slice(0, atIndex);
@@ -38,10 +45,7 @@ export function maskEmail(email: string): string {
   return maskedLocal + '@' + domain;
 }
 
-/**
- * Redact sensitive query params from a URL string.
- */
-export function redactUrl(url: string): string {
+function redactUrl(url) {
   try {
     const parsed = new URL(url);
     for (const [key] of parsed.searchParams) {
@@ -55,36 +59,15 @@ export function redactUrl(url: string): string {
   }
 }
 
-function isGitHubToken(value: string): boolean {
+function isGitHubToken(value) {
   return GITHUB_TOKEN_RE.test(value);
 }
 
-function looksLikeSecret(value: string): boolean {
+function looksLikeSecret(value) {
   return value.length >= 20 && GENERIC_SECRET_RE.test(value);
 }
 
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-/**
- * Recursively sanitize an object for logging.
- */
-export function sanitizeForLog(input: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
-  if (input === null || input === undefined) return input;
-  if (typeof input === 'string') return sanitizeString(input);
-  if (typeof input === 'number' || typeof input === 'boolean') return input;
-  if (typeof input === 'object') {
-    if (seen.has(input as object)) return '[Circular]';
-    seen.add(input as object);
-    const result = Array.isArray(input)
-      ? input.map((v) => sanitizeForLog(v, seen))
-      : sanitizeObject(input as Record<string, unknown>, seen);
-    seen.delete(input as object);
-    return result;
-  }
-  return sanitizeString(String(input));
-}
-
-function sanitizeString(value: string): string {
+function sanitizeString(value) {
   if (isGitHubToken(value)) return maskSecret(value);
   if (value.startsWith('gsm_mcp_')) return maskSecret(value);
   if (looksLikeSecret(value)) return maskSecret(value);
@@ -95,10 +78,28 @@ function sanitizeString(value: string): string {
   return value;
 }
 
-function sanitizeObject(obj: Record<string, unknown>, seen: WeakSet<object>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
+function sanitizeHeaders(headers, seen) {
+  const result = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lowerKey = key.toLowerCase();
+    if (DROPPED_HEADER_VALUES.has(lowerKey)) {
+      result[key] = '***';
+      continue;
+    }
+    if (lowerKey === 'authorization' || lowerKey === 'x-api-key') {
+      result[key] = typeof value === 'string' ? sanitizeString(value) : '****';
+    } else {
+      result[key] = sanitizeForLog(value, seen);
+    }
+  }
+  return result;
+}
+
+function sanitizeObject(obj, seen) {
+  const result = {};
   for (const [key, value] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
+
     if (SENSITIVE_FIELD_NAMES.has(key) || SENSITIVE_FIELD_NAMES.has(lowerKey)) {
       result[key] = typeof value === 'string' ? maskSecret(value) : '****';
       continue;
@@ -112,7 +113,7 @@ function sanitizeObject(obj: Record<string, unknown>, seen: WeakSet<object>): Re
       continue;
     }
     if (typeof value === 'object' && value !== null && (lowerKey === 'headers' || lowerKey === 'header')) {
-      result[key] = sanitizeHeaders(value as Record<string, unknown>, seen);
+      result[key] = sanitizeHeaders(value, seen);
       continue;
     }
     result[key] = sanitizeForLog(value, seen);
@@ -120,17 +121,28 @@ function sanitizeObject(obj: Record<string, unknown>, seen: WeakSet<object>): Re
   return result;
 }
 
-function sanitizeHeaders(headers: Record<string, unknown>, seen: WeakSet<object>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(headers)) {
-    const lowerKey = key.toLowerCase();
-    if (lowerKey === 'authorization' || lowerKey === 'x-api-key') {
-      result[key] = typeof value === 'string' ? sanitizeString(value) : '****';
-    } else {
-      result[key] = sanitizeForLog(value, seen);
-    }
+/**
+ * Recursively sanitize arbitrary input for logging. Objects/arrays are walked
+ * (cycle-safe), strings are pattern-masked, and any string exceeding
+ * MAX_STRING_LENGTH is truncated so a huge payload cannot bloat the journal.
+ */
+function sanitizeForLog(input, seen = new Set()) {
+  if (input === null || input === undefined) return input;
+  if (typeof input === 'string') {
+    const sanitized = sanitizeString(input);
+    return sanitized.length > MAX_STRING_LENGTH ? sanitized.slice(0, MAX_STRING_LENGTH) + '…[truncated]' : sanitized;
   }
-  return result;
+  if (typeof input === 'number' || typeof input === 'boolean') return input;
+  if (typeof input === 'object') {
+    if (seen.has(input)) return '[Circular]';
+    seen.add(input);
+    const result = Array.isArray(input)
+      ? input.map((v) => sanitizeForLog(v, seen))
+      : sanitizeObject(input, seen);
+    seen.delete(input);
+    return result;
+  }
+  return sanitizeString(String(input));
 }
 
 /**
@@ -142,7 +154,7 @@ function sanitizeHeaders(headers: Record<string, unknown>, seen: WeakSet<object>
  * (redact.js, renderer, backend) keeps this list byte-identical and is pinned
  * by the shared errorMessages vectors.
  */
-function redactInline(text: string): string {
+function redactInline(text) {
   return String(text)
     .replace(/https?:\/\/[^\s"'<>]+/g, (url) => redactUrl(url))
     .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 ***')
@@ -156,9 +168,11 @@ function redactInline(text: string): string {
 const MAX_STACK_LENGTH = 8000;
 
 /**
- * Sanitize an Error object for logging.
+ * Sanitize an Error-like value into a plain { name, message, stack } record.
+ * Whole-value redaction (sanitizeString) plus substring redaction for
+ * credentials embedded in messages/stacks.
  */
-export function sanitizeError(err: unknown): { message: string; stack?: string; name?: string } {
+function sanitizeError(err) {
   if (!(err instanceof Error)) {
     return { message: redactInline(sanitizeString(String(err))) };
   }
@@ -168,3 +182,14 @@ export function sanitizeError(err: unknown): { message: string; stack?: string; 
     stack: err.stack ? redactInline(sanitizeString(err.stack)).slice(0, MAX_STACK_LENGTH) : undefined,
   };
 }
+
+module.exports = {
+  MAX_STRING_LENGTH,
+  SENSITIVE_URL_PARAMS,
+  maskEmail,
+  maskSecret,
+  redactUrl,
+  sanitizeError,
+  sanitizeForLog,
+  sanitizeString,
+};
