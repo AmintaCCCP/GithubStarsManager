@@ -22,6 +22,18 @@ vi.mock('mermaid', () => ({
   },
 }));
 
+// 统计数学插件加载器被动态 import 的次数（passthrough mock，不改变真实行为）：
+// 普通文档用例断言计数保持为 0，覆盖「effect 绕过 MATH_PATTERN 门控直接发起加载」的回归。
+const mathLoaderCalls = vi.hoisted(() => ({ remark: 0, rehype: 0 }));
+vi.mock('remark-math', async (importOriginal) => {
+  mathLoaderCalls.remark += 1;
+  return importOriginal();
+});
+vi.mock('rehype-katex', async (importOriginal) => {
+  mathLoaderCalls.rehype += 1;
+  return importOriginal();
+});
+
 describe('MarkdownRenderer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -702,17 +714,26 @@ describe('MarkdownRenderer', () => {
       expect(MATH_PATTERN.test('$x^2$')).toBe(true);
     });
 
+    it('should not load math support for plain documents', async () => {
+      // 本用例必须在下方 display-math 用例之前运行：vitest 会缓存已解析的 mock
+      // 模块，display 用例触发过动态 import 后计数器不再增长。
+      mathLoaderCalls.remark = 0;
+      mathLoaderCalls.rehype = 0;
+      const { container } = render(<MarkdownRenderer content="Just $5 and text" />);
+      // 与 effect 相同的门控判断：普通文档不满足数学语法
+      expect(MATH_PATTERN.test('Just $5 and text')).toBe(false);
+      // 排空动态导入的微任务：若 effect 绕过门控发起 import，计数器会在这里增长
+      for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(mathLoaderCalls.remark).toBe(0);
+      expect(mathLoaderCalls.rehype).toBe(0);
+      expect(container.querySelector('.katex')).toBeNull();
+    });
+
     it('should lazily load KaTeX and render display math', async () => {
       const { container } = render(<MarkdownRenderer content="$$E=mc^2$$" />);
       await waitFor(() => {
         expect(container.querySelector('.katex')).toBeInTheDocument();
       }, { timeout: 5000 });
     }, 10000);
-
-    it('should not load math support for plain documents', () => {
-      // KaTeX 是否加载完全由 MATH_PATTERN.test(content) 门控（与 effect 一致），
-      // 直接断言门控为 false，不依赖真实定时器长度的竞态。
-      expect(MATH_PATTERN.test('Just $5 and text')).toBe(false);
-    });
   });
 });
