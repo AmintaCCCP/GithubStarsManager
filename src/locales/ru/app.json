@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "Просмотр сведений о HTTP: {{v1}} {{v2}}",
     "fe": "внешний интерфейс",
     "be": "задняя часть",
-    "load-more-v1-remaining": "Загружается еще (еще {{v1}})"
+    "load-more-v1-remaining": "Загружается еще (еще {{v1}})",
+    "source-main": "Главный процесс",
+    "source-plugins": "Плагины",
+    "export-bundle": "Создать пакет диагностики",
+    "export-window-hour": "Последний час",
+    "export-window-day": "Последние 24 часа",
+    "export-window-all": "Всё время",
+    "network-ledger": "Журнал сети"
   },
   "generalPanel": {
     "general-settings": "Общие настройки",

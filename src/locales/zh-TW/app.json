@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "請參閱 HTTP 詳情：{{v1}} {{v2}}",
     "fe": "前端",
     "be": "後端",
-    "load-more-v1-remaining": "載更多（還有 {{v1}} 條）"
+    "load-more-v1-remaining": "載更多（還有 {{v1}} 條）",
+    "source-main": "主程式",
+    "source-plugins": "外掛",
+    "export-bundle": "產生診斷套件",
+    "export-window-hour": "近 1 小時",
+    "export-window-day": "近 24 小時",
+    "export-window-all": "全部時間",
+    "network-ledger": "網路日誌"
   },
   "generalPanel": {
     "general-settings": "通用設定",

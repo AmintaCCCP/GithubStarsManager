@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "Ver detalles de HTTP: {{v1}} {{v2}}",
     "fe": "Interfaz",
     "be": "extremo posterior",
-    "load-more-v1-remaining": "Cargando más ({{v1}} más)"
+    "load-more-v1-remaining": "Cargando más ({{v1}} más)",
+    "source-main": "Proceso principal",
+    "source-plugins": "Plugins",
+    "export-bundle": "Generar paquete de diagnóstico",
+    "export-window-hour": "Última hora",
+    "export-window-day": "Últimas 24 horas",
+    "export-window-all": "Todo el histórico",
+    "network-ledger": "Registro de red"
   },
   "generalPanel": {
     "general-settings": "Configuraciones generales",

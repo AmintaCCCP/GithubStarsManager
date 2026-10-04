@@ -147,6 +147,7 @@ function createPluginManager({
   catalog = createPluginCatalog(),
   webSearch = searchSearxng,
   hostOperations = null,
+  logMirror = null,
 }) {
   if (typeof pluginsRoot !== 'string' || pluginsRoot.trim() === '') {
     throw new TypeError('pluginsRoot must be a non-empty string');
@@ -203,6 +204,32 @@ function createPluginManager({
     return scanResult.plugins.find((plugin) => plugin.manifest.id === pluginId) || null;
   }
 
+  /**
+   * Plugin file logger with an optional diagnostics mirror: every capability
+   * `log` call keeps going to the plugin's own JSONL file and is additionally
+   * mirrored into the main diagnostics journal so the export bundle and the
+   * panel see plugin activity without reading plugin files. Mirror failures
+   * are swallowed — the file log is the source of truth.
+   */
+  function createMirroredPluginLogger(pluginId) {
+    const fileLogger = createPluginLogger({ logsRoot: resolvedLogsRoot, pluginId });
+    if (typeof logMirror !== 'function') return fileLogger;
+    return {
+      ...fileLogger,
+      log(level, message, metadata) {
+        fileLogger.log(level, message, metadata);
+        try {
+          logMirror({
+            level: level === 'warning' ? 'warn' : (['debug', 'info', 'warn', 'error'].includes(level) ? level : 'info'),
+            module: `plugins.${pluginId}`,
+            message,
+            data: metadata,
+          });
+        } catch { /* mirror is best-effort */ }
+      },
+    };
+  }
+
   async function authorizePageRequest(request) {
     let validated;
     try { validated = validatePageCapabilityRequest(request); }
@@ -217,7 +244,7 @@ function createPluginManager({
     try {
       const router = createCapabilityRouter({
         storage: createPluginStorage({ dataRoot: resolvedDataRoot, pluginId: validated.pluginId }),
-        logger: createPluginLogger({ logsRoot: resolvedLogsRoot, pluginId: validated.pluginId }),
+        logger: createMirroredPluginLogger(validated.pluginId),
         catalog,
         // 仅页面请求获得系统输出操作；Worker 侧 router 不注入，见 capabilityRouter。
         hostOperations,
@@ -241,7 +268,7 @@ function createPluginManager({
       const permissions = plugin.manifest.permissions;
       const capabilityRouter = createCapabilityRouter({
         storage: createPluginStorage({ dataRoot: resolvedDataRoot, pluginId }),
-        logger: createPluginLogger({ logsRoot: resolvedLogsRoot, pluginId }),
+        logger: createMirroredPluginLogger(pluginId),
         catalog,
       });
       const runtime = runtimeFactory({

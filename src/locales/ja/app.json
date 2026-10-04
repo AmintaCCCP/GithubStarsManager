@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "HTTP の詳細を表示: {{v1}} {{v2}}",
     "fe": "フロントエンド",
     "be": "後部",
-    "load-more-v1-remaining": "さらに読み込み中（さらに {{v1}} 件）"
+    "load-more-v1-remaining": "さらに読み込み中（さらに {{v1}} 件）",
+    "source-main": "メインプロセス",
+    "source-plugins": "プラグイン",
+    "export-bundle": "診断パッケージを生成",
+    "export-window-hour": "直近1時間",
+    "export-window-day": "直近24時間",
+    "export-window-all": "全期間",
+    "network-ledger": "ネットワークログ"
   },
   "generalPanel": {
     "general-settings": "一般設定",

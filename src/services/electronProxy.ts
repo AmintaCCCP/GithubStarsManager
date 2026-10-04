@@ -7,9 +7,55 @@ import type {
   Release,
 } from '../types';
 import type { ElectronPluginAPI } from '../plugins/types';
+import type { LogEntry } from './logger';
 
 /** Alias of persisted MCP prefs — keep identical to McpServiceConfig to avoid drift. */
 export type McpLocalConfig = McpServiceConfig;
+
+/** Renderer → main diagnostics payload; entries are already sanitized. */
+export interface DiagnosticsIpcPayload {
+  /** Renderer debug flag piggybacked so main-process capture level follows the same switch. */
+  debugMode: boolean;
+  entries: LogEntry[];
+}
+
+/** Network/time window options for reading the main-process journal. */
+export interface DiagnosticsReadOptions {
+  since?: string;
+  limit?: number;
+}
+
+export interface DiagnosticsReadResult {
+  success: boolean;
+  main: LogEntry[];
+  plugins: LogEntry[];
+  error?: string;
+}
+
+export interface DiagnosticsExportPayload {
+  /** null = all history; otherwise hours back (1..168). */
+  windowHours: number | null;
+  frontendLogs: LogEntry[];
+  backendLogs: LogEntry[];
+  networkEntries: LogEntry[];
+  environment?: Record<string, unknown>;
+  sanitizationNote?: string;
+}
+
+export interface DiagnosticsExportResult {
+  success: boolean;
+  canceled?: boolean;
+  filePath?: string;
+  error?: string;
+}
+
+export interface DiagnosticsElectronAPI {
+  append: (payload: DiagnosticsIpcPayload) => Promise<{ success: boolean; accepted?: number; error?: string }>;
+  /** One-way send (ipcRenderer.send) used on pagehide/beforeunload. */
+  flush: (payload: DiagnosticsIpcPayload) => void;
+  read: (options?: DiagnosticsReadOptions) => Promise<DiagnosticsReadResult>;
+  exportBundle: (payload: DiagnosticsExportPayload) => Promise<DiagnosticsExportResult>;
+}
 
 /** Secrets stay in main-process memory only (IPC snapshot); not written to disk by MCP server. */
 export interface McpVectorRuntimeConfig {
@@ -101,6 +147,8 @@ interface ElectronAPI {
   };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
+  /** Diagnostics bridge (desktop only; absent in web builds). */
+  diagnostics?: DiagnosticsElectronAPI;
   plugins?: ElectronPluginAPI & {
     registry?: { load: () => Promise<import('./pluginRegistryService').PluginRegistryLoadResult> };
     marketplace?: import('./pluginMarketplaceService').MarketplaceElectronAPI;

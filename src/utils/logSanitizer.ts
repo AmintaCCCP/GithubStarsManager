@@ -8,7 +8,7 @@ const SENSITIVE_FIELD_NAMES = new Set([
   'apiKey', 'api_key', 'api_key_encrypted', 'password', 'password_encrypted',
   'secret', 'token', 'githubToken', 'accessToken', 'authorization',
   'x-api-key', 'credentials', 'passwd', 'pwd', 'backendApiSecret',
-  'mcp_token', 'mcpToken', 'authToken', 'auth_token',
+  'mcp_token', 'mcpToken', 'authToken', 'auth_token', 'ct0',
 ]);
 
 // URL query param keys to redact
@@ -198,16 +198,38 @@ function sanitizeHeaders(headers: Record<string, unknown>, seen: WeakSet<object>
 }
 
 /**
+ * Substring-level redaction for free-form error text (messages, stacks).
+ * sanitizeString only recognizes values that match a pattern in full, so a
+ * credential embedded inside prose would otherwise survive into the journal.
+ * Order matters: URL first (it may contain tokens), then scheme-prefixed
+ * credentials, then bare token shapes, then emails. Every sanitizer copy
+ * (redact.js, renderer, backend) keeps this list byte-identical and is pinned
+ * by the shared errorMessages vectors.
+ */
+function redactInline(text: string): string {
+  return String(text)
+    .replace(/https?:\/\/[^\s"'<>]+/g, (url) => redactUrl(url))
+    .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 ***')
+    .replace(/\bghp_[A-Za-z0-9]{36}\b/g, (value) => maskSecret(value))
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, (value) => maskSecret(value))
+    .replace(/\bgsm_mcp_\S+/g, (value) => maskSecret(value))
+    .replace(/[^@\s"'<>]+@[^@\s"'<>]+\.[A-Za-z]{2,}/g, (value) => maskEmail(value));
+}
+
+/** Maximum sanitized stack length kept per error. */
+const MAX_STACK_LENGTH = 8000;
+
+/**
  * Sanitize an Error object for logging.
  * Extracts message and stack, sanitizes any embedded secrets.
  */
 export function sanitizeError(err: unknown): { message: string; stack?: string; name?: string } {
   if (!(err instanceof Error)) {
-    return { message: sanitizeString(String(err)) };
+    return { message: redactInline(sanitizeString(String(err))) };
   }
   return {
     name: err.name,
-    message: sanitizeString(err.message),
-    stack: err.stack ? sanitizeString(err.stack) : undefined,
+    message: redactInline(sanitizeString(err.message)),
+    stack: err.stack ? redactInline(sanitizeString(err.stack)).slice(0, MAX_STACK_LENGTH) : undefined,
   };
 }

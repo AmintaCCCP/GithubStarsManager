@@ -21,6 +21,13 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     setMinimizeToTray: (enabled) => ipcRenderer.invoke('desktop:setMinimizeToTray', enabled),
     show: () => ipcRenderer.invoke('desktop:show'),
   },
+  // 诊断日志桥：批量追加（invoke）与卸载前冲刷（send 单向，不 await）
+  diagnostics: {
+    append: (payload) => ipcRenderer.invoke('diagnostics:append', payload),
+    flush: (payload) => ipcRenderer.send('diagnostics:flush', payload),
+    read: (options) => ipcRenderer.invoke('diagnostics:read', options),
+    exportBundle: (payload) => ipcRenderer.invoke('diagnostics:exportBundle', payload),
+  },
   mcp: {
     setConfig: (config) => ipcRenderer.invoke('mcp:setConfig', config),
     getConfig: () => ipcRenderer.invoke('mcp:getConfig'),

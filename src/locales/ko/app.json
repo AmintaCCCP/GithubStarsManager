@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "HTTP 세부정보 보기: {{v1}} {{v2}}",
     "fe": "프런트 엔드",
     "be": "후방",
-    "load-more-v1-remaining": "더 로드 중({{v1}}개 더)"
+    "load-more-v1-remaining": "더 로드 중({{v1}}개 더)",
+    "source-main": "메인 프로세스",
+    "source-plugins": "플러그인",
+    "export-bundle": "진단 패키지 생성",
+    "export-window-hour": "최근 1시간",
+    "export-window-day": "최근 24시간",
+    "export-window-all": "전체 기간",
+    "network-ledger": "네트워크 로그"
   },
   "generalPanel": {
     "general-settings": "일반 설정",

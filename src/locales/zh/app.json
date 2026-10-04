@@ -916,7 +916,14 @@
     "view-http-details-v1-v2": "查看 HTTP 详情：{{v1}} {{v2}}",
     "fe": "前端",
     "be": "后端",
-    "load-more-v1-remaining": "加载更多（还有 {{v1}} 条）"
+    "load-more-v1-remaining": "加载更多（还有 {{v1}} 条）",
+    "source-main": "主进程",
+    "source-plugins": "插件",
+    "export-bundle": "生成诊断包",
+    "export-window-hour": "近 1 小时",
+    "export-window-day": "近 24 小时",
+    "export-window-all": "全部时间",
+    "network-ledger": "网络台账"
   },
   "generalPanel": {
     "general-settings": "通用设置",

@@ -14,6 +14,11 @@ export interface LogEntry {
   message: string;
   data?: unknown;
   source: 'frontend';
+  /**
+   * Flood-aggregation count (set by diagnosticsBridge for repeated
+   * module+level+message entries; additive field, never required).
+   */
+  repeatCount?: number;
 }
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
