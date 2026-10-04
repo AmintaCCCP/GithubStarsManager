@@ -2514,8 +2514,18 @@ html.dark .markdown-body {
 }
 
 /* 代码块与 ASCII 文本绘图不换行（会破坏图形），改为在块内横向滚动，
-   不把消息卡片或侧栏撑出横向溢出。 */
-.repository-chat-markdown pre {
+   不把消息卡片或侧栏撑出横向溢出。字号对齐 GitHub 的实际渲染值
+   （16px 正文 × 85% = 13.6px）：侧栏正文是 14px，沿用上游 85% 只得到
+   11.9px，明显小于 GitHub 的代码字号。深色主题的上游规则带 html.dark
+   前缀、特异性更高，这里需要同等特异性的变体才能在两种主题下都生效。 */
+.repository-chat-markdown pre,
+html.dark .repository-chat-markdown pre {
   max-width: 100%;
   overflow-x: auto;
+  font-size: 13.6px;
+}
+
+/* 长单词/URL 在窄侧栏内断行，避免把消息区撑宽后整段文字被右缘裁掉。 */
+.repository-chat-markdown {
+  overflow-wrap: break-word;
 }
