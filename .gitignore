@@ -58,3 +58,8 @@ package-lock.json.*.tmp
 
 # GitHub wiki clone (published to *.wiki.git, not this repo)
 docs/wiki/
+# Locally generated reports (never commit)
+docs/reports/
+# BI collector (local scripts and runtime data)
+scripts/bi/
+bi-site/
