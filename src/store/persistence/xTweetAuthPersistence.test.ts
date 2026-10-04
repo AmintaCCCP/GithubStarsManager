@@ -58,9 +58,11 @@ describe('xTweetAuth persistence & security', () => {
       },
     };
 
-    if (typeof appPersistenceOptions.migrate === 'function') {
-      const migrated = appPersistenceOptions.migrate(rawState as unknown, 14) as Record<string, unknown>;
-      expect('xTweetAuth' in migrated).toBe(false);
+    // 显式断言前置条件：migrate 缺失时测试必须失败，而不是静默跳过校验
+    if (typeof appPersistenceOptions.migrate !== 'function') {
+      throw new Error('appPersistenceOptions.migrate 必须存在，否则遗留明文 xTweetAuth 快照无法被迁移清理');
     }
+    const migrated = appPersistenceOptions.migrate(rawState as unknown, 14) as Record<string, unknown>;
+    expect('xTweetAuth' in migrated).toBe(false);
   });
 });

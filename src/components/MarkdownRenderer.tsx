@@ -49,8 +49,9 @@ const BASE_REMARK_PLUGINS = [remarkGfm, remarkAlert, remarkGemoji];
 const REHYPE_PLUGINS_NO_HTML: never[] = [];
 
 // Matches $$display$$, \(inline\), \[display\] and $inline$ math so KaTeX is
-// only loaded for documents that actually use it.
-const MATH_PATTERN =
+// only loaded for documents that actually use it. Exported so tests can assert
+// the lazy-load gate directly (and keep the regex lookbehind-free for Safari).
+export const MATH_PATTERN =
   /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)(?:\\.|[^$\\\n])*?[^\s$\\\n]\$/;
 
 interface MathPlugins {

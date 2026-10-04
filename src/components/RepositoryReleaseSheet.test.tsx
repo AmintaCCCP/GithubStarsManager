@@ -89,8 +89,8 @@ const renderSheet = () => render(
   />
 );
 
-// 侧栏现在还会渲染 Repository Health 事实面板，面板里的「最新稳定版本」同样是 tag 名�?
-// 因此针对 Release 条目的查询必须限定在 Release 列表容器内，避免与事实面板串台�?
+// 侧栏现在还会渲染 Repository Health 事实面板，面板里的「最新稳定版本」同样是 tag 名，
+// 因此针对 Release 条目的查询必须限定在 Release 列表容器内，避免与事实面板串台。
 const releaseList = () => within(screen.getByTestId('release-list'));
 
 describe('RepositoryReleaseSheet', () => {
@@ -159,15 +159,15 @@ describe('RepositoryReleaseSheet', () => {
 
     await user.click(releaseList().getByText('v1').closest('button')!);
 
-    // 可识别平台的资产渲染品牌徽章（与 ReleaseCard �?AssetLeadingIcon 一致）�?
-    // getAllByTitle：simple-icons �?svg 内部也带 <title>，需按徽�?class 过滤出外�?span�?
+    // 可识别平台的资产渲染品牌徽章（与 ReleaseCard 的 AssetLeadingIcon 一致）。
+    // getAllByTitle：simple-icons 的 svg 内部也带 <title>，需按徽章 class 过滤出外层 span。
     const getBadge = (title: string) =>
       screen.getAllByTitle(title).find((el) => el.classList.contains('asset-platform-badge'));
     expect(getBadge('macOS')).toBeDefined();
     expect(getBadge('Windows')).toBeDefined();
     expect(getBadge('Linux')).toBeDefined();
 
-    // 平台不可识别的资产回退到通用下载图标，不猜平�?
+    // 平台不可识别的资产回退到通用下载图标，不猜平台。
     const zipRow = screen.getByText('myapp-1.0.zip').closest('tr');
     expect(zipRow).not.toBeNull();
     expect(zipRow!.querySelector('.asset-platform-badge')).toBeNull();

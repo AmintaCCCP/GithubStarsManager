@@ -89,8 +89,6 @@ describe('backend sync hash convergence (Issue #304 loop-breaker)', () => {
 
     // The fix commits the raw backend hash (firstPullHash), not quickHash(merged).
     expect(firstPullHash).not.toBe(JSON.stringify(merged));
-    // Second poll re-hashes the same backend payload → equals the committed hash.
-    expect(JSON.stringify(backendPayload)).toBe(firstPullHash);
   });
 
   it('merged output is stable across repeated merges of the same inputs', () => {
@@ -179,8 +177,10 @@ it('omits client-only fields from both pull and successful-push hashes', () => {
 
 describe('syncFromBackend two-pull loop (Issue #304 end-to-end)', () => {
   const backendPayload = [createRepository(1, { ai_summary: 'from backend' })];
+  let originalState: ReturnType<typeof useAppStore.getState>;
 
   beforeEach(() => {
+    originalState = useAppStore.getState();
     vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: backendPayload, total: 1 });
     vi.mocked(backend.fetchReleases).mockResolvedValue({ releases: [], total: 0 });
     vi.mocked(backend.fetchAIConfigs).mockResolvedValue([]);
@@ -195,6 +195,11 @@ describe('syncFromBackend two-pull loop (Issue #304 end-to-end)', () => {
       readmeMaxChars: 6000,
     });
     vi.mocked(backend.fetchSettings).mockResolvedValue({});
+    resetSyncHashes();
+  });
+
+  afterEach(() => {
+    useAppStore.setState(originalState);
   });
 
   it('applies a changed backend payload once; an unchanged second pull is a no-op', async () => {

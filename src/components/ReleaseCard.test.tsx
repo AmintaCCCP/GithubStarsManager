@@ -84,6 +84,8 @@ const renderCard = (props: Partial<Parameters<typeof ReleaseCard>[0]> = {}) => {
 describe('ReleaseCard asset updated indicator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 模块级 store 状态被所有用例共享：英文用例设置的 en 不得泄漏到后续用例
+    storeState.language = 'zh';
   });
 
   it('shows container-level and per-asset indicators from the same source (updated_asset_ids)', () => {

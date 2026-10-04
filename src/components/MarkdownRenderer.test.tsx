@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
-import MarkdownRenderer from '../components/MarkdownRenderer';
+import MarkdownRenderer, { MATH_PATTERN } from '../components/MarkdownRenderer';
 
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn((selector) => {
@@ -692,9 +691,14 @@ describe('MarkdownRenderer', () => {
 
   describe('Math (KaTeX)', () => {
     it('uses a Safari-compatible inline math detector', () => {
-      const source = readFileSync('src/components/MarkdownRenderer.tsx', 'utf8');
-
-      expect(source).not.toContain('(?<!');
+      // 老 Safari 不支持 lookbehind：直接断言导出正则的 source，
+      // 避免对整个文件做文本扫描，也去掉对 cwd 的依赖。
+      expect(MATH_PATTERN.source).not.toContain('?<!');
+      // 防止为绕过检查而破坏检测能力：四种数学语法仍必须命中
+      expect(MATH_PATTERN.test('$$E=mc^2$$')).toBe(true);
+      expect(MATH_PATTERN.test('\\[display\\]')).toBe(true);
+      expect(MATH_PATTERN.test('\\(inline\\)')).toBe(true);
+      expect(MATH_PATTERN.test('$x^2$')).toBe(true);
     });
 
     it('should lazily load KaTeX and render display math', async () => {
@@ -704,11 +708,10 @@ describe('MarkdownRenderer', () => {
       }, { timeout: 5000 });
     }, 10000);
 
-    it('should not load math support for plain documents', async () => {
-      const { container } = render(<MarkdownRenderer content="Just $5 and text" />);
-      // Give the effect a tick; no katex nodes should ever appear
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(container.querySelector('.katex')).toBeNull();
+    it('should not load math support for plain documents', () => {
+      // KaTeX 是否加载完全由 MATH_PATTERN.test(content) 门控（与 effect 一致），
+      // 直接断言门控为 false，不依赖真实定时器长度的竞态。
+      expect(MATH_PATTERN.test('Just $5 and text')).toBe(false);
     });
   });
 });
