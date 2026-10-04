@@ -650,6 +650,8 @@ test('installs a validated local directory as disabled without copying symlinks'
     fs.symlinkSync(path.join(source, 'worker.js'), path.join(linked, 'extra-link.js'), 'file');
   } catch (error) {
     t.skip(`Symlink creation unavailable: ${error.message}`);
+    // node:test 的 t.skip 只标记跳过、不会终止回调，必须显式 return
+    return;
   }
   assert.equal(manager.installFromDirectory(linked).error.code, 'PLUGIN_PACKAGE_SYMLINK');
   assert.equal(fs.existsSync(path.join(root, 'com.example.linked-install')), false);

@@ -693,7 +693,8 @@ describe('MarkdownRenderer', () => {
     it('uses a Safari-compatible inline math detector', () => {
       // 老 Safari 不支持 lookbehind：直接断言导出正则的 source，
       // 避免对整个文件做文本扫描，也去掉对 cwd 的依赖。
-      expect(MATH_PATTERN.source).not.toContain('?<!');
+      // 正向 (?<= 与负向 (?<! 两种 lookbehind 一并拒绝。
+      expect(MATH_PATTERN.source).not.toMatch(/\(\?<([=!])/);
       // 防止为绕过检查而破坏检测能力：四种数学语法仍必须命中
       expect(MATH_PATTERN.test('$$E=mc^2$$')).toBe(true);
       expect(MATH_PATTERN.test('\\[display\\]')).toBe(true);
