@@ -62,7 +62,9 @@ describe('AIRateLimiter', () => {
     });
 
     it('requestsPerMinute 下并发 acquire 不超发', async () => {
-      const limiter = new AIRateLimiter({ requestsPerMinute: 2, rpmWindowMs: 500 });
+      // 窗口取 2s、探测取 200ms：真实计时器下若 CI 事件循环短暂卡顿，
+      // 探测窗仍远小于限流窗口，避免过期定时器晚触发导致的偶发超发。
+      const limiter = new AIRateLimiter({ requestsPerMinute: 2, rpmWindowMs: 2000 });
       let acquired = 0;
       const pending = Array.from({ length: 4 }, async () => {
         const release = await limiter.acquire();

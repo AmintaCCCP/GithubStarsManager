@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, beforeEach } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -159,6 +159,10 @@ describe('plugin marketplace', () => {
     stagingRoot = path.join(tmpRoot, 'staging');
     pluginsRoot = path.join(tmpRoot, 'plugins');
     stateFilePath = path.join(statePath, 'plugins-marketplace.json');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
   function makeManager() {
@@ -759,11 +763,15 @@ describe('plugin marketplace', () => {
     // 临时弄坏 pluginsRoot 权限，让 installFromDirectory 的 mkdirSync 同步抛异常
     const rootMode = fs.statSync(pluginsRoot).mode;
     fs.chmodSync(pluginsRoot, 0o000);
-    const second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true,
-      expectedPluginId: 'com.example.marketplace-fixture',
-      expectedVersion: '1.0.0',
-    });
-    fs.chmodSync(pluginsRoot, rootMode);
+    let second;
+    try {
+      second = await marketplace.install({ sourceId, directoryName: 'fixture', replace: true,
+        expectedPluginId: 'com.example.marketplace-fixture',
+        expectedVersion: '1.0.0',
+      });
+    } finally {
+      fs.chmodSync(pluginsRoot, rootMode);
+    }
 
     assert.equal(second.success, false, '同步异常必须被外层 catch 兜住');
     const listed = await pluginManager.list();

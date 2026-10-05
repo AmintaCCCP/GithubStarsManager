@@ -102,7 +102,6 @@ describe('内置分类语言行为 fixture（zh/en 基线）', () => {
     const snapshot = buildSnapshot();
     if (shouldUpdateFixtures()) {
       writeFixture(FIXTURE_FILE, snapshot);
-      expect(snapshot).not.toBeNull();
       return;
     }
     expect(snapshot).toEqual(readFixture(FIXTURE_FILE));

@@ -21,6 +21,9 @@ async function canOpenSqlite(): Promise<boolean> {
 }
 
 const dbAvailable = await canOpenSqlite();
+// DB-backed suites skip instead of failing when the native sqlite binding cannot
+// be opened (e.g. Node 26 without a rebuildable better-sqlite3); the pure-unit
+// suites below always run.
 const describeIfDb = dbAvailable ? describe : describe.skip;
 
 describeIfDb('MCP admin + transport auth', () => {
@@ -162,10 +165,5 @@ describe('MCP pure units always run', () => {
     expect(t.startsWith('gsm_mcp_')).toBe(true);
     expect(timingSafeEqualString(t, t)).toBe(true);
     expect(timingSafeEqualString(t, t + 'x')).toBe(false);
-  });
-
-  it('notes when sqlite native binding unavailable', () => {
-    // Environment limitation (e.g. Node 26 without rebuildable better-sqlite3)
-    expect(typeof dbAvailable).toBe('boolean');
   });
 });

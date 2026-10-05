@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const providerMocks = vi.hoisted(() => ({
   getRepository: vi.fn(),
@@ -44,6 +44,12 @@ function contract(tool: { name: string; inputSchema?: Record<string, unknown> })
 }
 
 describe('backend/Electron MCP parity', () => {
+  // registerMcpTools 在注册时读取 getVectorAvailability()，
+  // 必须在每个用例前复位，避免上一个用例的覆写泄漏到后续注册。
+  beforeEach(() => {
+    providerMocks.getVectorAvailability.mockReturnValue({ available: true });
+  });
+
   it('keeps the same names and input property sets for vector-enabled MCP', () => {
     const backend = getBackendTools().map(contract);
     const electron = getElectronTools(true).map((tool: { name: string; inputSchema?: { properties?: Record<string, unknown> } }) => ({

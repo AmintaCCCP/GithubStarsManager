@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { readFileSync } from 'node:fs';
-import MarkdownRenderer from '../components/MarkdownRenderer';
+import MarkdownRenderer, { MATH_PATTERN } from '../components/MarkdownRenderer';
 
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn((selector) => {
@@ -22,6 +21,18 @@ vi.mock('mermaid', () => ({
     render: vi.fn().mockResolvedValue({ svg: '<svg>diagram</svg>' }),
   },
 }));
+
+// 统计数学插件加载器被动态 import 的次数（passthrough mock，不改变真实行为）：
+// 普通文档用例断言计数保持为 0，覆盖「effect 绕过 MATH_PATTERN 门控直接发起加载」的回归。
+const mathLoaderCalls = vi.hoisted(() => ({ remark: 0, rehype: 0 }));
+vi.mock('remark-math', async (importOriginal) => {
+  mathLoaderCalls.remark += 1;
+  return importOriginal();
+});
+vi.mock('rehype-katex', async (importOriginal) => {
+  mathLoaderCalls.rehype += 1;
+  return importOriginal();
+});
 
 describe('MarkdownRenderer', () => {
   beforeEach(() => {
@@ -692,9 +703,30 @@ describe('MarkdownRenderer', () => {
 
   describe('Math (KaTeX)', () => {
     it('uses a Safari-compatible inline math detector', () => {
-      const source = readFileSync('src/components/MarkdownRenderer.tsx', 'utf8');
+      // 老 Safari 不支持 lookbehind：直接断言导出正则的 source，
+      // 避免对整个文件做文本扫描，也去掉对 cwd 的依赖。
+      // 正向 (?<= 与负向 (?<! 两种 lookbehind 一并拒绝。
+      expect(MATH_PATTERN.source).not.toMatch(/\(\?<([=!])/);
+      // 防止为绕过检查而破坏检测能力：四种数学语法仍必须命中
+      expect(MATH_PATTERN.test('$$E=mc^2$$')).toBe(true);
+      expect(MATH_PATTERN.test('\\[display\\]')).toBe(true);
+      expect(MATH_PATTERN.test('\\(inline\\)')).toBe(true);
+      expect(MATH_PATTERN.test('$x^2$')).toBe(true);
+    });
 
-      expect(source).not.toContain('(?<!');
+    it('should not load math support for plain documents', async () => {
+      // 本用例必须在下方 display-math 用例之前运行：vitest 会缓存已解析的 mock
+      // 模块，display 用例触发过动态 import 后计数器不再增长。
+      mathLoaderCalls.remark = 0;
+      mathLoaderCalls.rehype = 0;
+      const { container } = render(<MarkdownRenderer content="Just $5 and text" />);
+      // 与 effect 相同的门控判断：普通文档不满足数学语法
+      expect(MATH_PATTERN.test('Just $5 and text')).toBe(false);
+      // 排空动态导入的微任务：若 effect 绕过门控发起 import，计数器会在这里增长
+      for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(mathLoaderCalls.remark).toBe(0);
+      expect(mathLoaderCalls.rehype).toBe(0);
+      expect(container.querySelector('.katex')).toBeNull();
     });
 
     it('should lazily load KaTeX and render display math', async () => {
@@ -703,12 +735,5 @@ describe('MarkdownRenderer', () => {
         expect(container.querySelector('.katex')).toBeInTheDocument();
       }, { timeout: 5000 });
     }, 10000);
-
-    it('should not load math support for plain documents', async () => {
-      const { container } = render(<MarkdownRenderer content="Just $5 and text" />);
-      // Give the effect a tick; no katex nodes should ever appear
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(container.querySelector('.katex')).toBeNull();
-    });
   });
 });

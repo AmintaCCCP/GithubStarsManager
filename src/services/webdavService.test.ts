@@ -63,18 +63,16 @@ describe('WebDAVService 传输层选择', () => {
     expect(headers?.Authorization).toBeUndefined();
   });
 
-  it('把调用方的 AbortSignal 与 timeoutMs 透传给后端代理', async () => {
+  it('把内部 AbortSignal 与 timeoutMs 透传给后端代理', async () => {
     vi.mocked(backend).isAvailable = true;
     proxyWebDAV.mockResolvedValue(new Response('{}', { status: 200 }));
 
-    const controller = new AbortController();
     await davService().fileExists('data.json');
 
-    // fileExists 内部自建 controller；这里只断言 timeoutMs 被显式传递
+    // fileExists 内部自建 controller；这里断言 signal 与 timeoutMs 被显式传递
     const call = proxyWebDAV.mock.calls[0];
     expect(call[6]).toBeInstanceOf(AbortSignal);
     expect(call[7]).toBe(10000);
-    expect(controller.signal.aborted).toBe(false);
   });
 
   it('上传时透传按体积计算出的动态超时', async () => {
