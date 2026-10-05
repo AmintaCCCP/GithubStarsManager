@@ -500,9 +500,12 @@ function highlightHtml(source) {
   return out;
 }
 
-function assembleDocument(css, fragment, title, background, lang) {
+function assembleDocument(css, fragment, title, background) {
+  // <html lang> 描述的是「已生成卡片」的语言：用生成时快照，切换语言选项
+  // 不影响已导出文档（与 fragmentCanvas 同一原则）；未生成时退回当前选项。
+  const lang = state.fragmentLanguage ?? resolvedCardLanguage();
   return `<!doctype html>
-<html lang="${escapeHtmlText(lang || 'zh')}">
+<html lang="${escapeHtmlText(lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -582,7 +585,8 @@ const state = {
   languageOption: 'auto',
   notes: '',
   fragment: null,
-  fragmentCanvas: null,  // 生成时的画幅快照 { id, w, h }；切画幅后旧卡片仍按它渲染
+  fragmentCanvas: null,       // 生成时的画幅快照 { id, w, h }；切画幅后旧卡片仍按它渲染
+  fragmentLanguage: null,     // 生成时的卡片语言快照；导出文档的 <html lang> 跟随它
   css: null,
   docHtml: null,
   zoom: 1,        // 相对自适应比例的倍率；1 表示「适应窗口」
@@ -847,7 +851,7 @@ function selectStyle(id) {
     state.css = cssFor(state.styleId, state.fragmentCanvas);
     state.docHtml = assembleDocument(state.css, state.fragment,
       `${state.repository?.full_name || 'repository'} · info card`,
-      paletteBackground(state.styleId), resolvedCardLanguage());
+      paletteBackground(state.styleId));
     if (previewMode === 'preview') renderPreview();
   }
 }
@@ -1037,7 +1041,7 @@ function applyCodeEdits() {
   state.css = cssFor(state.styleId, state.fragmentCanvas);
   state.docHtml = assembleDocument(state.css, state.fragment,
     `${state.repository?.full_name || 'repository'} · info card`,
-    paletteBackground(state.styleId), resolvedCardLanguage());
+    paletteBackground(state.styleId));
   syncCodeEditor();
   return true;
 }
@@ -1079,11 +1083,12 @@ async function generate() {
     const text = await request('ai.generate', { system, user, maxTokens: 4000 });
     state.usedReadme = readmeIncluded;
     state.fragmentCanvas = canvas;
+    state.fragmentLanguage = resolvedCardLanguage();
     state.fragment = sanitizeFragment(text, canvas);
     state.css = cssFor(state.styleId, canvas);
     state.docHtml = assembleDocument(state.css, state.fragment,
       `${state.repository.full_name} · info card`,
-      paletteBackground(state.styleId), resolvedCardLanguage());
+      paletteBackground(state.styleId));
     previewWrap.hidden = false;
     previewEmpty.hidden = true;
     if (previewMode === 'code') {
