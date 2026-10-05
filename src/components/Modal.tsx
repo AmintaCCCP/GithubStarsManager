@@ -20,6 +20,7 @@ interface ModalProps {
   maxWidth?: string;
   footer?: React.ReactNode;
   scrollable?: boolean;
+  contentClassName?: string;
   onPointerDownOutside?: DialogContentPointerDownOutsideHandler;
   onOverlayPointerDown?: React.PointerEventHandler<HTMLDivElement>;
   closeLabel?: string;
@@ -33,6 +34,7 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'max-w-md',
   footer,
   scrollable = false,
+  contentClassName,
   onPointerDownOutside,
   onOverlayPointerDown,
   closeLabel,
@@ -46,7 +48,7 @@ export const Modal: React.FC<ModalProps> = ({
       </DialogHeader>
       <div
         data-testid="modal-scroll-area"
-        className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-on-scroll', isScrolling && 'scrolling')}
+        className={cn('min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-on-scroll', isScrolling && 'scrolling', contentClassName)}
         onScroll={handleScroll}
       >
         {children}

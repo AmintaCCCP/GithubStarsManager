@@ -322,7 +322,8 @@ iframe，能力桥与 V1.2/V1.3 完全一致）。
 
 `context` 由宿主主动下发，不经过能力桥、不受逐次确认约束；页面访问宿主能力仍
 只能走受权限约束的桥方法。README 由宿主在打开弹窗时抓取，失败则为 `null`，插件
-必须能只依赖元数据工作。
+必须能只依赖元数据工作。页面型插件的 `context` 还会带上 `accountTag`（当前
+GitHub 身份标签），供页面在绘制任何本地缓存之前完成账号校验。
 
 页面输出能力（仅页面 Bridge，Worker 不可用）：
 
@@ -355,8 +356,11 @@ args: {
   query: { per_page: 12 },           // 可选；仅允许 per_page / page（1–100）
                                      // 与 state（open/closed/all 枚举）
 },
-// 成功时返回 value: { status, body }；202/204 时 body 为 null，
+// 成功时返回 value: { status, body, acct }；acct 是当前 GitHub 身份的标签
+// （Token 的 SHA-256 截断，匿名请求为 'anon'，页面拿不到 Token），用于给本地
+// 缓存按账号做命名空间；202/204 时 body 为 null，
 // HTTP 非 2xx 归一为 success:false（code: 'PLUGIN_NETWORK_HTTP_ERROR'）。
+// 重定向一律拒绝（redirect: 'error'），避免跳转绕过路径白名单。
 ```
 
 约束与校验（主进程 `pluginPageBridge` 与渲染端执行器双侧同闸门）：

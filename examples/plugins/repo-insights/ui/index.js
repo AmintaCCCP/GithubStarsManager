@@ -35,6 +35,7 @@
       httpError: 'GitHub API 返回 {status}',
       rateLimited: '请求过于频繁，请稍后重试。',
       statsPending: 'GitHub 正在生成该仓库的统计数据（通常几分钟内可用），已展示缓存或稍后重试。',
+      statsWaiting: 'GitHub 正在生成统计数据… 已等待 {n} 秒，自动重试中',
       statsTooLarge: '该仓库提交数超过 GitHub 统计接口的上限（10,000 次），此区块不可用。',
       fromCache: '缓存数据',
       cached: '缓存 · {age}前更新',
@@ -59,6 +60,7 @@
       churnHint: '每周新增 / 删除行数（绿=新增，红=删除）',
       churnAdditions: '新增行',
       churnDeletions: '删除行',
+      churnNone: '该仓库暂无代码变更统计。',
       // 语言
       languagesTitle: '语言分布',
       languagesHint: '按代码字节数',
@@ -164,6 +166,7 @@
       httpError: 'GitHub API returned {status}',
       rateLimited: 'Too many requests; please retry later.',
       statsPending: 'GitHub is still computing statistics for this repository (usually ready within minutes). Showing cache if available.',
+      statsWaiting: 'GitHub is computing statistics… waited {n}s, retrying automatically',
       statsTooLarge: 'This repository exceeds the GitHub statistics limit (10,000 commits); this section is unavailable.',
       fromCache: 'cached data',
       cached: 'cached · updated {age} ago',
@@ -185,6 +188,7 @@
       churnHint: 'Weekly additions / deletions (green = added, red = removed)',
       churnAdditions: 'Additions',
       churnDeletions: 'Deletions',
+      churnNone: 'No code churn statistics available for this repository.',
       languagesTitle: 'Languages',
       languagesHint: 'By bytes of code',
       languagesOther: 'Other',
@@ -404,7 +408,7 @@
     Chart.defaults.borderColor = theme.grid;
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
     charts.get(canvasId)?.destroy();
-    charts.set(canvasId, new Chart($(canvasId), {
+    const chart = new Chart($(canvasId), {
       ...config,
       options: {
         maintainAspectRatio: false,
@@ -417,7 +421,11 @@
           ...(config.options?.plugins ?? {}),
         },
       },
-    }));
+    });
+    charts.set(canvasId, chart);
+    requestAnimationFrame(() => {
+      chart.resize();
+    });
   }
 
   /* ── 指标缓存与并发队列 ───────────────────────────────────────────── */
@@ -441,8 +449,10 @@
     try {
       const entry = await request('storage.get', { key: cacheKey(repoKey, metricId) });
       if (!entry || typeof entry !== 'object' || !Number.isFinite(entry.fetchedAt)) return null;
-      // 账号已知且不匹配：脏缓存（可能来自另一个 GitHub 账号），删除并忽略。
-      if (state.acct && entry.acct && entry.acct !== state.acct) {
+      // 账号尚未确认（init 未到）：不绘制任何缓存，避免先展示其他账号的数据。
+      if (!state.acct) return null;
+      // 账号不匹配（条目无标签或标签不同）：脏缓存，删除并忽略。
+      if (entry.acct !== state.acct) {
         void request('storage.delete', { key: cacheKey(repoKey, metricId) }).catch(() => {});
         return null;
       }
@@ -453,7 +463,8 @@
 
   /** 写缓存；私有仓库与账号未知时绝不落盘，超限/配额失败静默放弃。 */
   function writeCache(repoKey, metricId, payload, ttl) {
-    if (state.privateRepo || !state.acct) return;
+    // 只有仓库详情明确确认公开（private === false）后才允许写缓存。
+    if (state.privateRepo !== false || !state.acct) return;
     const entry = { fetchedAt: Date.now(), ttl, acct: state.acct, payload };
     // 单值上限 64 KiB，写入失败（超限/配额）静默放弃缓存。
     request('storage.set', { key: cacheKey(repoKey, metricId), value: entry }).catch(() => {});
@@ -496,10 +507,15 @@
       path: absolute ? pathSuffix : `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${pathSuffix}`,
       query: query ?? {},
     });
-    // 记录宿主下发的账号标签（Token 的 SHA-256 截断），供缓存按账号隔离。
+    // 响应里的账号标签只用于校验：与 init 下发的身份不一致说明账号已切换，
+    // 清掉缓存并以新标签继续（正常路径下两者一致）。
     if (value && typeof value === 'object' && typeof value.acct === 'string') {
-      if (state.acct && state.acct !== value.acct) purgeRepoCache(state.repoKey);
-      state.acct = value.acct;
+      if (state.acct && state.acct !== value.acct) {
+        purgeRepoCache(state.repoKey);
+        state.acct = value.acct;
+      } else if (!state.acct) {
+        state.acct = value.acct;
+      }
     }
     // 宿主把 403/404 等归一为 success:false；202/204 是 success:true + body:null。
     return value;
@@ -516,11 +532,11 @@
     meta: new Map(),      // metricId → { stale: boolean }
     runSeq: 0,
     queue: createQueue(6),
-    // GitHub 身份标签（宿主随响应下发，页面拿不到 Token）；缓存按账号隔离。
+    // GitHub 身份标签（宿主随 init 与响应下发，页面拿不到 Token）；缓存按账号隔离。
     acct: null,
-    // 私有仓库（或身份未知时）不写缓存：避免本地缓存跨 GitHub 账号留存
-    // 非公开数据。宿主能力桥按账号隔离由渲染端 acct 保证，这里是第二道闸。
-    privateRepo: false,
+    // 仓库可见性三态：null=未确认 / true=私有 / false=已确认公开。
+    // 未确认或私有时不写缓存：避免本地缓存跨 GitHub 账号留存非公开数据。
+    privateRepo: null,
   };
 
   /* ── 渲染：头部与 KPI ─────────────────────────────────────────────── */
@@ -638,6 +654,11 @@
     stateEl.className = `state${kind ? ` ${kind}` : ''}`;
   }
 
+  /** 加载中状态：文案 + 旋转指示（纯 CSS，见 style.css 的 .state.loading）。 */
+  function setLoading(cardId, message) {
+    setState(cardId, message, 'loading');
+  }
+
   /** 显示/隐藏卡片内的图表画布区。 */
   function showChart(cardId, visible) {
     $(cardId).querySelector('.ch').hidden = !visible;
@@ -671,6 +692,7 @@
       <span class="chip">${esc(str.commitsLast4)}<b>${int(last4)}</b></span>
       <span class="chip">${esc(str.commitsDelta)}<b class="${delta >= 0 ? 'up' : 'down'}">${delta >= 0 ? '+' : ''}${delta}%</b></span>
       <span class="chip">${esc(str.commitsActiveWeeks)}<b>${fmt(str.commitsOf8, { n: activeWeeks })}</b></span>`);
+    showChart('card-commits', true);
     drawChart('card-commits-canvas', {
       type: 'bar',
       data: {
@@ -683,7 +705,6 @@
       },
       options: { scales: { x: { ticks: { maxTicksLimit: 12, maxRotation: 0 } }, y: { beginAtZero: true } } },
     });
-    showChart('card-commits', true);
     setState('card-commits', meta?.stale ? `${str.fromCache} · ${esc(ageText(meta.fetchedAt))}` : '');
     renderHealth();
     renderFacts();
@@ -692,9 +713,15 @@
 
   /** 渲染每周新增/删除行数的双向柱状图（GitHub 的 deletions 为负数，直接画在零线下方）。 */
   function renderChurn(payload) {
-    if (!Array.isArray(payload) || payload.length === 0) return false;
+    if (!Array.isArray(payload)) return false;
+    if (payload.length === 0) {
+      showChart('card-churn', false);
+      setState('card-churn', str.churnNone);
+      return true;
+    }
     state.data.set('codeFrequency', payload);
     const weeks = payload.slice(-52);
+    showChart('card-churn', true);
     drawChart('card-churn-canvas', {
       type: 'bar',
       data: {
@@ -713,7 +740,6 @@
         plugins: { legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10 } } },
       },
     });
-    showChart('card-churn', true);
     setState('card-churn', '');
     return true;
   }
@@ -730,6 +756,7 @@
     const restBytes = entries.slice(8).reduce((sum, [, bytes]) => sum + bytes, 0);
     if (restBytes > 0) top.push([str.languagesOther, restBytes]);
     const total = entries.reduce((sum, [, bytes]) => sum + bytes, 0);
+    showChart('card-languages', true);
     drawChart('card-languages-canvas', {
       type: 'doughnut',
       data: {
@@ -749,7 +776,6 @@
         },
       },
     });
-    showChart('card-languages', true);
     setState('card-languages', fmt(str.languagesCount, { n: entries.length }));
     return true;
   }
@@ -841,6 +867,7 @@
       const key = release.published_at.slice(0, 7);
       if (perMonth.has(key)) perMonth.set(key, perMonth.get(key) + 1);
     }
+    showChart('card-releases', true);
     drawChart('card-releases-canvas', {
       type: 'bar',
       data: {
@@ -849,7 +876,6 @@
       },
       options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { ticks: { maxTicksLimit: 12, maxRotation: 0 } } } },
     });
-    showChart('card-releases', true);
     $('card-releases').querySelector('.rows').innerHTML = published.slice(0, 5).map((r) => `
       <li>
         <span class="tag-name">${esc(r.tag_name)}</span>
@@ -960,6 +986,7 @@
   function renderRadar() {
     const axes = deriveRadarAxes();
     const theme = chartTheme();
+    showChart('card-radar', true);
     drawChart('card-radar-canvas', {
       type: 'radar',
       data: {
@@ -985,7 +1012,6 @@
         },
       },
     });
-    showChart('card-radar', true);
     setState('card-radar', '');
     $('card-radar').hidden = false;
   }
@@ -1087,12 +1113,109 @@
       </li>`;
     }).join('');
     $('contrib-note').textContent = contribs ? str.contribFootnote : '';
-    if (!contribs) setState('card-maintainers', str.loading);
+    if (!contribs) setLoading('card-maintainers', str.loading);
     else setState('card-maintainers', '');
     card.hidden = false;
   }
 
   /* ── AI 近期动态分析 ── */
+
+  /** 行内语法：**粗体**、__粗体__、*斜体*、_斜体_、~~删除线~~、`代码`、[文本](https://链接)。输入必须已转义。 */
+  function renderInlineMarkdown(escaped) {
+    return escaped
+      .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+      .replace(/__([^_\n]+)__/g, '<b>$1</b>')
+      .replace(/\*([^*\n]+)\*/g, '<i>$1</i>')
+      .replace(/(?<=^|[\s(])_([^_\n]+)_(?=$|[\s),.!?，。！？])/g, '<i>$1</i>')
+      .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+      .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+      .replace(/\[([^\]\n]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+  }
+
+  /**
+   * 受限 Markdown → HTML：支持标题（#..######）、代码块（```）、引用块（>）、
+   * 无序/有序列表、粗体、斜体、删除线、行内代码与 https 链接。
+   * 先转义再解析，杜绝 XSS 注入。
+   */
+  function renderMarkdown(text) {
+    const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
+    const html = [];
+    let list = null; // 'ul' | 'ol' | null
+    let inCodeBlock = false;
+    let codeLines = [];
+
+    const closeList = () => {
+      if (list) { html.push(`</${list}>`); list = null; }
+    };
+
+    for (const raw of lines) {
+      if (/^\s*```/.test(raw)) {
+        closeList();
+        if (inCodeBlock) {
+          html.push(`<pre class="md-pre"><code>${esc(codeLines.join('\n'))}</code></pre>`);
+          codeLines = [];
+          inCodeBlock = false;
+        } else {
+          inCodeBlock = true;
+          codeLines = [];
+        }
+        continue;
+      }
+      if (inCodeBlock) {
+        codeLines.push(raw);
+        continue;
+      }
+
+      const line = raw.trimEnd();
+      if (!line.trim()) { closeList(); continue; }
+
+      // 标题（支持 # 到 ######），内联样式同步格式化
+      const heading = line.match(/^(#{1,6})\s+(.*)$/);
+      if (heading) {
+        closeList();
+        html.push(`<h4 class="md-h">${renderInlineMarkdown(esc(heading[2].trim()))}</h4>`);
+        continue;
+      }
+
+      // 分割线
+      if (/^(?:---+|\*\*\*+|___+)\s*$/.test(line)) {
+        closeList();
+        html.push('<hr class="md-hr">');
+        continue;
+      }
+
+      // 引用块 >
+      const quote = line.match(/^>\s*(.*)$/);
+      if (quote) {
+        closeList();
+        html.push(`<blockquote class="md-quote">${renderInlineMarkdown(esc(quote[1].trim()))}</blockquote>`);
+        continue;
+      }
+
+      // 列表项：无序（-*•）或有序（1. 1)）
+      const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
+      if (bullet) {
+        const ordered = /^\s*\d+[.)]/.test(line);
+        if (list !== (ordered ? 'ol' : 'ul')) {
+          closeList();
+          list = ordered ? 'ol' : 'ul';
+          html.push(`<${list}>`);
+        }
+        html.push(`<li>${renderInlineMarkdown(esc(bullet[1].trim()))}</li>`);
+        continue;
+      }
+
+      closeList();
+      html.push(`<p>${renderInlineMarkdown(esc(line))}</p>`);
+    }
+
+    closeList();
+    if (inCodeBlock && codeLines.length > 0) {
+      html.push(`<pre class="md-pre"><code>${esc(codeLines.join('\n'))}</code></pre>`);
+    }
+    return html.join('');
+  }
+
 
   function buildAiPrompt() {
     const r = { ...state.repository, ...(state.data.get('repo') || {}) };
@@ -1148,7 +1271,7 @@ ${release.body}`);
         ? '你是开源仓库分析助手。基于用户提供的仓库元数据、合并 PR、Release 更新日志与提交统计，用简体中文分四节输出：\n1) 新增功能——从 feat PR 与 changelog 的 Features 条目归纳近期交付了哪些新能力；\n2) 修复的问题——从 fix PR 与 changelog 的 Bug Fixes 条目归纳修了哪些问题、影响哪些模块；\n3) 发布与风险——发布节奏、破坏性变更、安全公告与升级建议；\n4) 总评——一句话。\n每节 1-3 条要点，总长度不超过 400 字，直接输出，不要客套。'
         : 'You are an open-source repository analyst. Based on the repository metadata, merged PRs, release notes and commit stats provided, output four sections in English:\n1) New features — summarize recently shipped capabilities from feat PRs and changelog Features entries;\n2) Fixed issues — summarize what was fixed and which modules were affected, from fix PRs and changelog Bug Fixes entries;\n3) Releases & risks — release cadence, breaking changes, security advisories, upgrade advice;\n4) Verdict — one sentence.\n1-3 bullets per section, under 300 words total, no pleasantries.';
       const text = await request('ai.generate', { system, user: buildAiPrompt(), maxTokens: 1200 });
-      $('ai-result').textContent = text;
+      $('ai-result').innerHTML = renderMarkdown(text);
       $('ai-result').hidden = false;
       setState('card-ai', str.aiDone);
       button.textContent = str.aiRegenerate;
@@ -1175,6 +1298,7 @@ ${release.body}`);
       <span class="chip">${esc(str.starsLast4)}<b class="up">+${int(last4)}</b></span>
       <span class="chip">${esc(str.starsLast12)}<b class="up">+${int(last12)}</b></span>
       <span class="chip">${fmt(str.starsRange, { n: sorted.length })}</span>`);
+    showChart('card-stars', true);
     drawChart('card-stars-canvas', {
       data: {
         labels: sorted.map((b) => weekLabel(b.week)),
@@ -1192,7 +1316,6 @@ ${release.body}`);
         plugins: { legend: { display: true, position: 'top', align: 'end', labels: { boxWidth: 10, font: { size: 11 } } } },
       },
     });
-    showChart('card-stars', true);
     setState('card-stars', meta?.stale ? `${str.fromCache} · ${esc(ageText(meta.fetchedAt))}` : '');
     return true;
   }
@@ -1376,7 +1499,35 @@ ${release.body}`);
    * paint(payload, meta) 返回 false 表示数据不可用（区块保留空态）。
    * 返回 null（成功）或 error（供必需指标上抛为全局错误）。
    */
-  async function loadMetric({ id, cardId, pathSuffix, query, optional, stats, ttl = 24 * HOUR, absolute = false, paint }) {
+  const STATS_RETRY_INTERVAL_MS = 2500;
+  const STATS_MAX_RETRIES = 24;
+  const statsTimers = new Map();
+
+  function clearStatsTimer(cardId) {
+    if (statsTimers.has(cardId)) {
+      clearInterval(statsTimers.get(cardId));
+      statsTimers.delete(cardId);
+    }
+    if (statsTimers.size === 0 && $('status')?.classList.contains('loading')) {
+      $('status').classList.remove('loading');
+      $('status').textContent = '';
+    }
+  }
+
+  function startStatsTicker(cardId, initialStartTime) {
+    if (statsTimers.has(cardId)) return initialStartTime || Date.now();
+    const start = initialStartTime || Date.now();
+    const update = () => {
+      const elapsed = Math.max(1, Math.round((Date.now() - start) / 1000));
+      setLoading(cardId, fmt(str.statsWaiting, { n: elapsed }));
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    statsTimers.set(cardId, timer);
+    return start;
+  }
+
+  async function loadMetric({ id, cardId, pathSuffix, query, optional, stats, ttl = 24 * HOUR, absolute = false, paint, attempt = 0, statsStartTime = 0 }) {
     const { owner, repo, repoKey, queue } = state;
     const runSeq = state.runSeq;
     const stale = () => runSeq !== state.runSeq; // 仓库已切换，本 Metric 的后续动作全部作废
@@ -1391,27 +1542,55 @@ ${release.body}`);
         if (painted && cardId) $(cardId).hidden = false;
       } catch { // 缓存载荷形状异常：降级为无缓存，不让异常逃逸成未处理 rejection
         cacheEntry = null;
-        if (cardId) setState(cardId, str.loading);
+        if (cardId) setLoading(cardId, str.loading);
       }
     }
-    if (stale()) return null;
-    if (cardId && !optional && !cacheEntry) setState(cardId, str.loading);
+    if (stale()) {
+      if (cardId) clearStatsTimer(cardId);
+      return null;
+    }
+    // 无缓存时一律显示加载状态，给用户明确反馈
+    if (cardId && !cacheEntry && !statsTimers.has(cardId)) setLoading(cardId, str.loading);
     try {
       const result = await queue(() => (stale()
         ? Promise.resolve({ status: 0, body: null })
         : fetchMetric(owner, repo, pathSuffix, query, absolute)));
-      if (stale()) return null;
-      const pendingStats = stats && result.status === 202 && result.body == null;
-      if (pendingStats) {
-        if (cardId && !cacheEntry) setState(cardId, str.statsPending);
+      if (stale()) {
+        if (cardId) clearStatsTimer(cardId);
         return null;
       }
+      const pendingStats = stats && result.status === 202 && result.body == null;
+      if (pendingStats) {
+        // GitHub 统计数据在后台生成中：2.5s 轮询一次，界面以 1s 步长实时累加已等待秒数，
+        // 保证用户清晰感知当前进度，生成完毕后自动刷新。
+        if (cardId && attempt < STATS_MAX_RETRIES) {
+          const statsStart = startStatsTicker(cardId, statsStartTime);
+          setTimeout(() => {
+            if (!stale()) void loadMetric({ id, cardId, pathSuffix, query, optional, stats, ttl, absolute, paint, attempt: attempt + 1, statsStartTime: statsStart });
+            else if (cardId) clearStatsTimer(cardId);
+          }, STATS_RETRY_INTERVAL_MS);
+          return null;
+        }
+        if (cardId) {
+          clearStatsTimer(cardId);
+          if (!cacheEntry) setState(cardId, str.statsPending);
+        }
+        return null;
+      }
+      if (cardId) clearStatsTimer(cardId);
       const painted = paint(result.body, { stale: false });
       if (stale()) return null;
-      if (painted && cardId) $(cardId).hidden = false;
-      if (result.body != null) writeCache(repoKey, id, result.body, ttl);
+      if (painted) {
+        if (cardId) $(cardId).hidden = false;
+        if (result.body != null) writeCache(repoKey, id, result.body, ttl);
+      } else {
+        if (cardId && !cacheEntry) {
+          setState(cardId, id === 'codeFrequency' ? str.churnNone : '');
+        }
+      }
       return null;
     } catch (error) {
+      if (cardId) clearStatsTimer(cardId);
       if (!stale() && cardId && !cacheEntry) markSectionError(cardId, error);
       return error;
     }
@@ -1435,11 +1614,11 @@ ${release.body}`);
         }
       } catch { // 形状异常的缓存按无缓存处理
         cacheEntry = null;
-        setState(cardId, str.loading);
+        setLoading(cardId, str.loading);
       }
     }
     if (stale()) return;
-    if (!cacheEntry) setState(cardId, str.loading);
+    if (!cacheEntry) setLoading(cardId, str.loading);
     try {
       const buckets = [];
       const seenWeeks = new Set();
@@ -1509,10 +1688,11 @@ ${release.body}`);
       card.querySelector('h3').textContent = str[titleKey];
       card.querySelector('.hint').textContent = str[hintKey];
     }
+    for (const cardId of statsTimers.keys()) clearStatsTimer(cardId);
     for (const cardId of ['card-commits', 'card-radar', 'card-churn', 'card-languages', 'card-releases', 'card-stars']) {
       showChart(cardId, false);
       showChips(cardId, '');
-      setState(cardId, '');
+      setLoading(cardId, str.loading);
     }
     $('card-maintainers').hidden = true;
     $('owner-facts').innerHTML = '';
@@ -1526,16 +1706,16 @@ ${release.body}`);
     $('ai-generate').textContent = str.aiGenerate;
     $('ai-note').textContent = str.aiNote;
     setState('card-ai', '');
-    setState('card-facts', str.loading);
+    setLoading('card-facts', str.loading);
     $('facts-signals').innerHTML = '';
     $('facts-hero').innerHTML = '';
     $('facts-grid').innerHTML = '';
-    setState('card-community', str.loading);
+    setLoading('card-community', str.loading);
     $('community-signals').innerHTML = '';
     $('community-pct').textContent = '–';
     $('advisory-rows').innerHTML = '';
     showChips('card-advisories', '');
-    setState('card-advisories', str.loading);
+    setLoading('card-advisories', str.loading);
     $('card-stars').querySelector('.rows')?.replaceChildren();
     $('health-box').hidden = true;
     $('cards').hidden = false;
@@ -1550,9 +1730,11 @@ ${release.body}`);
   /** 拉取全部指标并渲染：并行 10 个数据集 + 星标历史翻页，全局错误只在必需指标失败时提示。 */
   async function loadAll() {
     const runSeq = ++state.runSeq;
+    state.privateRepo = null; // 新一轮加载：可见性回到“未确认”
     resetSections();
     paintAllFromCache();
     $('status').textContent = str.loading;
+    $('status').classList.add('loading');
 
     const metrics = [
       {
@@ -1563,8 +1745,8 @@ ${release.body}`);
           // /repos/{o}/{r} 携带 Token 时会返回私有仓库详情：私有数据绝不进缓存，
           // 并清掉此前可能已落盘的同仓库条目。
           const isPrivate = payload?.private === true;
-          if (isPrivate && !state.privateRepo) purgeRepoCache(state.repoKey);
-          state.privateRepo = isPrivate;
+          if (isPrivate && state.privateRepo !== true) purgeRepoCache(state.repoKey);
+          state.privateRepo = typeof payload?.private === 'boolean' ? payload.private : null;
           renderKpis();
           renderHealth();
           renderFacts();
@@ -1616,9 +1798,11 @@ ${release.body}`);
     // repo 详情失败时给出全局错误（头部/KPI 仍用快照元数据展示）。
     if (results[0]) {
       $('status').textContent = fmt(str.loadFailed, { message: results[0]?.message || str.bridgeFailed });
+      $('status').classList.remove('loading');
       // repo 详情失败时，事实卡退化为纯快照元数据（多数事实仍可给出）。
       renderFacts();
-    } else {
+    } else if (statsTimers.size === 0) {
+      $('status').classList.remove('loading');
       $('status').textContent = '';
     }
 
@@ -1650,6 +1834,14 @@ ${release.body}`);
   async function handleInit(context) {
     if (context.theme) applyTheme(context.theme);
     if (context.language) applyLanguage(context.language);
+    // 宿主在 init 中下发当前 GitHub 身份标签：缓存绘制前先确立身份，
+    // 标签变化（切换账号）时清空既有缓存再重载。
+    if (typeof context.accountTag === 'string' && context.accountTag) {
+      if (state.acct && state.acct !== context.accountTag) {
+        purgeRepoCache(state.repoKey);
+      }
+      state.acct = context.accountTag;
+    }
     if (!context.repository) {
       $('status').textContent = str.noRepository;
       $('picker').hidden = false;

@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import { pluginClient } from '../../../plugins/pluginClient';
+import { resolvePluginAccountTag } from '../../../plugins/pluginAccountTag';
 import { buildNetworkRequestUrl, isAllowedNetworkTarget } from '../../../plugins/networkTargets';
 
 export interface PluginNetworkValue {
@@ -25,28 +26,6 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 // 错误响应只需从中提取一条 message，给更小的封顶。
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
-
-/** Token → 稳定账号标签（SHA-256 前 16 位 hex），按 Token 记忆避免重复计算。 */
-const accountTagCache = new Map<string, string>();
-
-async function accountTagFor(token: string | null): Promise<string> {
-  const cached = accountTagCache.get(token ?? '');
-  if (cached) return cached;
-  const tag = await (async () => {
-    if (!token) return 'anon';
-    try {
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-      return Array.from(new Uint8Array(digest)).slice(0, 8)
-        .map((byte) => byte.toString(16).padStart(2, '0'))
-        .join('');
-    } catch {
-      // subtle 不可用（极旧环境）时退化为长度摘要——仍优于账号无关的缓存。
-      return `len:${token.length}`;
-    }
-  })();
-  accountTagCache.set(token ?? '', tag);
-  return tag;
-}
 
 function argsToRequest(args: unknown): { host: string; path: string; query?: Record<string, unknown> } | null {
   if (!args || typeof args !== 'object' || Array.isArray(args)) return null;
@@ -131,9 +110,18 @@ export function usePluginNetwork() {
         },
         signal: controller.signal,
         referrerPolicy: 'no-referrer',
+        // 白名单只校验初始路径；重定向会绕过它（如 /repos/twitter/bootstrap
+        // 跳转到白名单外的 /repositories/{id}），因此拒绝任何重定向。
+        redirect: 'error',
       });
       if (response.status === 202 || response.status === 204) {
-        return { success: true, value: { status: response.status, body: null, acct: await accountTagFor(githubToken) } };
+        // 与成功分支同契约：回传前二次授权，插件停用后结果不交给页面。
+        const reauth202 = await authorize();
+        if (!reauth202.success) return reauth202;
+        if (!isCurrentPage() || externalSignal?.aborted) {
+          return { success: false, error: { code: 'PLUGIN_PAGE_CLOSED', message: 'Plugin page closed' } };
+        }
+        return { success: true, value: { status: response.status, body: null, acct: await resolvePluginAccountTag(githubToken) } };
       }
       if (!response.ok) {
         let detail = '';
@@ -162,7 +150,7 @@ export function usePluginNetwork() {
       try {
         return {
           success: true,
-          value: { status: response.status, body: text ? JSON.parse(text) : null, acct: await accountTagFor(githubToken) },
+          value: { status: response.status, body: text ? JSON.parse(text) : null, acct: await resolvePluginAccountTag(githubToken) },
         };
       } catch {
         return { success: false, error: { code: 'PLUGIN_NETWORK_RESPONSE_INVALID', message: 'Network response is not valid JSON' } };
@@ -176,7 +164,9 @@ export function usePluginNetwork() {
         success: false,
         error: {
           code: aborted ? 'PLUGIN_NETWORK_TIMEOUT' : 'PLUGIN_NETWORK_FAILED',
-          message: aborted ? 'Network request timed out' : 'Network request failed',
+          message: aborted
+            ? 'Network request timed out'
+            : 'Network request failed (redirects are not followed)',
         },
       };
     } finally {

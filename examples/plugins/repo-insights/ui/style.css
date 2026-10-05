@@ -43,11 +43,21 @@ body[data-theme="light"] {
 /* .head/.kpis/.grid 等有显式 display，会盖掉 hidden 属性的 UA 样式，
    必须显式压制，否则初始化前会闪现空骨架。 */
 [hidden] { display: none !important; }
+html, body {
+  min-height: 100%;
+}
 body {
   background: var(--bg);
   color: var(--tx);
   font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
   padding: 18px 22px 28px;
+  display: flex;
+  flex-direction: column;
+}
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 .muted { color: var(--tx2); }
 .small { font-size: 12px; }
@@ -262,11 +272,96 @@ a:hover { text-decoration: underline; }
 .ai-result {
   font-size: 13px;
   line-height: 1.8;
-  white-space: pre-wrap;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px 14px;
+}
+.ai-result p { margin: 6px 0; }
+.ai-result ul, .ai-result ol { margin: 6px 0; padding-left: 20px; }
+.ai-result li { margin: 4px 0; }
+.ai-result .md-h {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 12px 0 6px;
+  color: var(--tx);
+}
+.ai-result .md-h:first-child { margin-top: 0; }
+.ai-result code {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+.ai-result pre.md-pre {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+}
+.ai-result pre.md-pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.ai-result blockquote.md-quote {
+  border-left: 3px solid var(--acc);
+  padding-left: 10px;
+  margin: 6px 0;
+  color: var(--tx2);
+}
+.ai-result hr.md-hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 10px 0;
+}
+.ai-result b, .ai-result strong {
+  font-weight: 600;
+  color: var(--tx);
+}
+.ai-result a {
+  color: var(--badge-tx);
+  text-decoration: underline;
+}
+/* 加载中状态：文案后跟旋转指示（纯 CSS，无需内联样式）。 */
+.state.loading::after {
+  content: '';
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-left: 8px;
+  vertical-align: -1px;
+  border: 2px solid var(--track);
+  border-top-color: var(--acc);
+  border-radius: 50%;
+  animation: insights-spin 1s linear infinite;
+}
+@keyframes insights-spin { to { transform: rotate(360deg); } }
+
+.stats-wait-bar {
+  display: block;
+  height: 4px;
+  background: var(--track);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 8px auto 0;
+  max-width: 240px;
+}
+.stats-wait-fill {
+  display: block;
+  height: 100%;
+  width: 35%;
+  background: var(--acc);
+  border-radius: 2px;
+  animation: stats-pulse 1.5s ease-in-out infinite alternate;
+}
+@keyframes stats-pulse {
+  from { width: 15%; transform: translateX(0); }
+  to { width: 50%; transform: translateX(120px); }
 }
 
 .facts-hero { font-size: 15px; font-weight: 600; margin: 2px 0 12px; }
@@ -392,5 +487,17 @@ a:hover { text-decoration: underline; }
 #picker-results li:hover { background: var(--panel2); }
 #picker-results li .muted { margin-left: 8px; }
 
-#status { min-height: 18px; margin-top: 4px; }
-#foot { margin-top: 10px; }
+#status { min-height: 18px; margin-top: 8px; }
+#status.loading::after {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 6px;
+  vertical-align: -1px;
+  border: 2px solid var(--track);
+  border-top-color: var(--acc);
+  border-radius: 50%;
+  animation: insights-spin 1s linear infinite;
+}
+#foot { margin-top: auto; padding-top: 14px; }

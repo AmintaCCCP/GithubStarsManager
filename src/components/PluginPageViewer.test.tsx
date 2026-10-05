@@ -239,7 +239,7 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
-      context: { repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' },
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh', accountTag: 'anon' },
     }, 'plugin-page://com.example.page');
     // 普通桥方法仍然走 IPC 能力桥，不受上下文影响。
     await act(async () => {
@@ -273,7 +273,7 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
 
     await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
       type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
-      context: { repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh' },
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh', accountTag: 'anon' },
     }, 'plugin-page://com.example.page'));
   });
 
