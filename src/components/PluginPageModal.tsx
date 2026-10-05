@@ -59,6 +59,7 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
   pluginId, pluginName, pageId, pageTitle, repository, onClose, t,
 }) => {
   const language = useAppStore(useShallow((state) => state.language));
+  const theme = useAppStore(useShallow((state) => state.theme));
   const { readme } = usePluginPageReadme(repository);
 
   return (
@@ -78,7 +79,7 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
         pageTitle={pageTitle}
         onClose={onClose}
         t={t}
-        initContext={{ repository: repositoryContext(repository), readme, language }}
+        initContext={{ repository: repositoryContext(repository), readme, language, theme }}
       />
     </Modal>
   );

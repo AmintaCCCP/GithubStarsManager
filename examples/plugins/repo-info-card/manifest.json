@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "com.githubstarsmanager.repo-info-card",
   "name": "Repo Info Card",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generates a shareable single-file HTML info card for one repository with the host's configured AI provider, then previews, copies and exports it as a PNG.",
   "author": "GithubStarsManager",
   "apiVersion": "1",
