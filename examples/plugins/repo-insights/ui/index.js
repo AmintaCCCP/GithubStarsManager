@@ -627,6 +627,7 @@
     gradeEl.className = `health-grade grade-${grade.toLowerCase()}`;
     $('health-label').textContent = str.healthLabel;
     $('health-box').hidden = false;
+    renderRadar();
   }
 
   /* ── 区块渲染 ─────────────────────────────────────────────────────── */
@@ -801,8 +802,10 @@
     const published = payload
       .filter((r) => !r.draft && r.published_at)
       .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
-    state.data.set('releases', published.map((r) => ({
+    state.data.set('releases', published.map((r, index) => ({
       tag_name: r.tag_name, name: r.name, published_at: r.published_at, prerelease: Boolean(r.prerelease),
+      // 最近 15 条保留截断后的更新日志，供 AI 动态分析使用（缓存单值 64 KiB 上限内）。
+      ...(index < 15 ? { body: String(r.body ?? '').slice(0, 1200) } : {}),
     })));
     if (published.length === 0) {
       showChart('card-releases', false);
