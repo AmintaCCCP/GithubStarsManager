@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "搜尋服務設定儲存失敗",
     "no-additional-host-permissions": "無額外 Host 權限",
     "note-repository-read-access-includes-metadata-of": "注意：倉庫讀取權限會包含你已收藏的私有倉庫元資料。",
+    "note-network-access-uses-your-github-token": "\n\n注意：網路權限允許外掛頁面經宿主代理、使用你的 GitHub Token 存取列出的站點（僅限宿主白名單內的唯讀 GET 請求，不會傳送倉庫備註等本地資料）。",
     "enable-v1": "啟用 {{v1}}",
     "local-plugins-with-worker-js-have-node-js-access": "帶有 worker.js 的本機插件擁有 Node.js 權限，Worker 不是安全沙箱。僅啟用你信任的程式碼。",
     "requested-permissions": "請求權限：",

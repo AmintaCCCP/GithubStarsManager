@@ -127,3 +127,23 @@ test('clipboard and downloads stay unavailable when the host injects no operatio
     capability: 'downloads', operation: 'saveFile', args: { fileName: 'x', dataBase64: 'QQ==' },
   }), { code: 'PLUGIN_CAPABILITY_UNAVAILABLE' });
 });
+
+test('network requests authorize per host and only through the page bridge shape', async () => {
+  const router = createCapabilityRouter({ storage: {}, logger: { log() {} }, catalog: {} });
+  await assert.rejects(router.handle([], {
+    capability: 'network', operation: 'request', args: { host: 'api.github.com', path: '/repos/o/r' },
+  }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  await assert.rejects(router.handle(['network:evil.example'], {
+    capability: 'network', operation: 'request', args: { host: 'api.github.com', path: '/repos/o/r' },
+  }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  await assert.rejects(router.handle(['network:api.github.com'], {
+    capability: 'network', operation: 'request', args: { host: 42, path: '/repos/o/r' },
+  }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  await assert.rejects(router.handle(['network:api.github.com'], {
+    capability: 'network', operation: 'fetch', args: { host: 'api.github.com' },
+  }), { code: 'PLUGIN_CAPABILITY_UNKNOWN' });
+  // 授权型返回：实际请求由渲染端用用户自己的 Token 执行。
+  assert.equal(await router.handle(['network:api.github.com'], {
+    capability: 'network', operation: 'request', args: { host: 'api.github.com', path: '/repos/o/r' },
+  }), null);
+});

@@ -104,3 +104,67 @@ test('binary export payloads get a larger budget than ordinary requests', () => 
     ...base, method: 'downloads.saveFile', args: { fileName: 'big.png', dataBase64: bigBase64 },
   }).args.fileName, 'big.png');
 });
+
+test('network requests map to the network capability with normalized args', () => {
+  const base = { pluginId: 'com.example.page', pageId: 'dashboard' };
+  assert.deepEqual(validatePageCapabilityRequest({
+    ...base, method: 'network.request', args: { host: 'api.github.com', path: '/repos/facebook/react' },
+  }), {
+    ...base, capability: 'network', operation: 'request',
+    args: { host: 'api.github.com', path: '/repos/facebook/react' },
+  });
+  assert.deepEqual(validatePageCapabilityRequest({
+    ...base, method: 'network.request',
+    args: { host: 'api.github.com', path: '/repos/a-b-c-d/e_f.g/contributors', query: { per_page: 12, page: 2 } },
+  }).args.query, { per_page: 12, page: 2 });
+});
+
+test('network requests accept only allowlisted hosts, metric paths and pagination params', () => {
+  const base = { pluginId: 'com.example.page', pageId: 'dashboard', method: 'network.request' };
+  const allowed = [
+    { host: 'api.github.com', path: '/repos/facebook/react' },
+    { host: 'api.github.com', path: '/repos/facebook/react/stats/commit_activity' },
+    { host: 'api.github.com', path: '/repos/facebook/react/stats/participation' },
+    { host: 'api.github.com', path: '/repos/facebook/react/stats/code_frequency' },
+    { host: 'api.github.com', path: '/repos/facebook/react/contributors', query: { per_page: 12 } },
+    { host: 'api.github.com', path: '/repos/facebook/react/languages' },
+    { host: 'api.github.com', path: '/repos/facebook/react/releases' },
+    { host: 'api.github.com', path: '/repos/facebook/react/tags' },
+    { host: 'api.github.com', path: '/repos/facebook/react/stargazers' },
+    { host: 'api.github.com', path: '/repos/facebook/react/stargazers/history', query: { per_page: 30, page: 3 } },
+    { host: 'api.github.com', path: '/repos/facebook/react/community/profile' },
+    { host: 'api.github.com', path: '/repos/facebook/react/security-advisories' },
+    { host: 'api.github.com', path: '/repos/facebook/react/pulls', query: { state: 'closed', per_page: 30 } },
+    { host: 'api.github.com', path: '/users/facebook' },
+    { host: 'api.github.com', path: '/repos/o/r', query: {} },
+  ];
+  for (const args of allowed) {
+    assert.doesNotThrow(() => validatePageCapabilityRequest({ ...base, args }),
+      `should accept ${JSON.stringify(args)}`);
+  }
+  const rejected = [
+    [{ host: 'evil.example', path: '/repos/facebook/react' }, 'unknown host'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react/settings' }, 'unknown suffix'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react/stats/unknown' }, 'unknown stats suffix'],
+    [{ host: 'api.github.com', path: '/repos/facebook' }, 'missing repo segment'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react?per_page=1' }, 'query string in path'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react#frag' }, 'fragment in path'],
+    [{ host: 'api.github.com', path: '/repos/facebook/../evil' }, 'path traversal'],
+    [{ host: 'api.github.com', path: '/repos/%2e%2e/evil' }, 'percent-encoded traversal'],
+    [{ host: 'api.github.com', path: `/repos/o/${'r'.repeat(101)}` }, 'repo too long'],
+    [{ host: 'api.github.com', path: '/repos/-bad/react' }, 'owner with leading dash'],
+    [{ host: 'api.github.com', path: `/repos/${'a'.repeat(40)}/react` }, 'owner too long'],
+    [{ host: 'api.github.com', path: '//repos/facebook/react' }, 'double slash'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react', query: { url: 'https://evil.example' } }, 'unknown query key'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react', query: { per_page: 101 } }, 'per_page over range'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react', query: { page: 0 } }, 'page under range'],
+    [{ host: 'api.github.com', path: '/repos/facebook/react', query: 'per_page=12' }, 'query not an object'],
+    [{ host: 'api.github.com', path: '' }, 'empty path'],
+    [{ host: 'api.github.com' }, 'missing path'],
+    [{ path: '/repos/facebook/react' }, 'missing host'],
+  ];
+  for (const [args, label] of rejected) {
+    assert.throws(() => validatePageCapabilityRequest({ ...base, args }),
+      { code: 'PLUGIN_PAGE_REQUEST_INVALID' }, `should reject ${label}`);
+  }
+});

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { pluginClient } from '../plugins/pluginClient';
 import { validatePluginPageMessage } from '../plugins/pluginPageMessages';
 import { usePluginAI } from '../features/plugins/hooks/usePluginAI';
+import { usePluginNetwork } from '../features/plugins/hooks/usePluginNetwork';
 import { usePluginWebSearch } from '../features/plugins/hooks/usePluginWebSearch';
 
 interface PluginPageViewerProps {
@@ -22,6 +23,7 @@ interface PluginPageViewerProps {
 export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pluginName, pageId, pageTitle, onClose, t, variant = 'panel', initContext }) => {
   const isModal = variant === 'modal';
   const generateAI = usePluginAI();
+  const requestNetwork = usePluginNetwork();
   const searchWeb = usePluginWebSearch();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const tokenRef = useRef(crypto.randomUUID());
@@ -29,6 +31,9 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
   const requestTimesRef = useRef<number[]>([]);
   const mountedRef = useRef(true);
   const aiRequestsRef = useRef(new Set<AbortController>());
+  // network.request 的在途请求：页面卸载/重载时中止，避免带着 Token 的请求
+  // 在结果无人消费后继续跑完（ai.generate 已有同款机制）。
+  const networkSignalRef = useRef<AbortController>(new AbortController());
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +43,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
     return () => {
       mountedRef.current = false;
       for (const controller of aiRequests) controller.abort();
+      networkSignalRef.current.abort();
     };
   }, []);
 
@@ -119,7 +125,11 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
             : request.method === 'web.search'
               ? await searchWeb(pluginId, pluginName, pageId, request.args,
                 () => mountedRef.current && tokenRef.current === requestToken)
-            : await pluginClient.requestPageCapability({ pluginId, pageId, method: request.method, args: request.args });
+            : request.method === 'network.request'
+              ? await requestNetwork(pluginId, pageId, request.args,
+                () => mountedRef.current && tokenRef.current === requestToken,
+                networkSignalRef.current.signal)
+              : await pluginClient.requestPageCapability({ pluginId, pageId, method: request.method, args: request.args });
         } catch {
           result = { success: false as const, error: { code: 'PLUGIN_PAGE_REQUEST_FAILED', message: 'Host request failed' } };
         }
@@ -135,7 +145,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [pluginId, pageId, pluginName, generateAI, searchWeb, t]);
+  }, [pluginId, pageId, pluginName, generateAI, requestNetwork, searchWeb, t]);
 
   return (
     <section className="space-y-3" aria-label={`${pluginName}: ${pageTitle}`}>
@@ -165,6 +175,7 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
             : 'h-[min(70vh,800px)] min-h-[480px] w-full rounded-lg border border-border bg-white'}
           onLoad={() => {
             for (const controller of aiRequestsRef.current) controller.abort();
+            networkSignalRef.current = new AbortController();
             tokenRef.current = crypto.randomUUID();
             pendingRef.current.clear();
             frameRef.current?.contentWindow?.postMessage({

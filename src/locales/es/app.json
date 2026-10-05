@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "No se pudo guardar la configuración del servicio de búsqueda",
     "no-additional-host-permissions": "Sin permisos de anfitrión adicionales",
     "note-repository-read-access-includes-metadata-of": "Nota: El permiso de lectura del almacén incluirá los metadatos del almacén privado que haya recopilado.",
+    "note-network-access-uses-your-github-token": "\n\nNota: los permisos de red permiten que la página del complemento acceda a los hosts listados a través del proxy del host usando tu token de GitHub (solo solicitudes GET de solo lectura a endpoints de la lista blanca; no se envían datos locales como notas de repositorios).",
     "enable-v1": "Habilitar {{v1}}",
     "local-plugins-with-worker-js-have-node-js-access": "Los complementos locales con trabajador.js tienen permisos de Node.js y Worker no es un entorno limitado seguro. Habilite solo el código en el que confíe.",
     "requested-permissions": "Solicitar permiso:",

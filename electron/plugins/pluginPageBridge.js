@@ -11,10 +11,38 @@ const METHODS = {
   'storage.delete': { capability: 'storage', operation: 'delete', fields: ['key'] },
   'ai.generate': { capability: 'ai', operation: 'generate', fields: ['system', 'user', 'maxTokens'] },
   'web.search': { capability: 'web', operation: 'search', fields: ['query', 'limit'] },
+  'network.request': { capability: 'network', operation: 'request', fields: ['host', 'path', 'query'] },
   'clipboard.write': { capability: 'clipboard', operation: 'write', fields: ['text'] },
   'clipboard.writeImage': { capability: 'clipboard', operation: 'writeImage', fields: ['dataBase64'] },
   'downloads.saveFile': { capability: 'downloads', operation: 'saveFile', fields: ['fileName', 'dataBase64'] },
 };
+
+// V1.5 页面网络能力：宿主按 `network:<host>` 权限代理只读 GET 请求。目标主机
+// 与路径模式在这里白名单化；渲染端执行前用同一份清单复核（见
+// src/plugins/networkTargets.ts，两侧一致性由 pluginPageBridge parity 测试保证）。
+const NETWORK_ALLOWED_HOSTS = new Set(['api.github.com']);
+// 只读公开指标端点。{owner}/{repo} 段在下方单独校验；不允许查询串——
+// 分页参数走单独的 `query` 字段（仅 per_page/page），避免任意 URL 拼接。
+const NETWORK_ALLOWED_REPO_PATHS = [
+  '/repos/{owner}/{repo}',
+  '/repos/{owner}/{repo}/stats/commit_activity',
+  '/repos/{owner}/{repo}/stats/participation',
+  '/repos/{owner}/{repo}/stats/code_frequency',
+  '/repos/{owner}/{repo}/contributors',
+  '/repos/{owner}/{repo}/languages',
+  '/repos/{owner}/{repo}/releases',
+  '/repos/{owner}/{repo}/pulls',
+  '/repos/{owner}/{repo}/tags',
+  '/repos/{owner}/{repo}/stargazers',
+  '/repos/{owner}/{repo}/stargazers/history',
+  '/repos/{owner}/{repo}/community/profile',
+  '/repos/{owner}/{repo}/security-advisories',
+];
+// 仓库所有者（用户或组织）资料，供维护者容器展示。
+const NETWORK_ALLOWED_USER_PATHS = ['/users/{login}'];
+const GITHUB_OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+const GITHUB_REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
+const MAX_NETWORK_PATH_BYTES = 500;
 
 // 生成型页面（如截图导出）需要回传二进制结果，单独放宽；base64 编码后
 // 10 MiB 约对应 7.5 MiB 原始字节。其余方法维持 1 MiB 的通用上限。
@@ -31,6 +59,39 @@ function argsBudget(method) {
   return method === 'clipboard.writeImage' || method === 'downloads.saveFile'
     ? BINARY_RESULT_MAX_ARGS_BYTES
     : DEFAULT_MAX_ARGS_BYTES;
+}
+
+function validateNetworkRequestArgs(args) {
+  if (typeof args.host !== 'string' || !NETWORK_ALLOWED_HOSTS.has(args.host)) return false;
+  if (typeof args.path !== 'string' || !args.path ||
+    Buffer.byteLength(args.path, 'utf8') > MAX_NETWORK_PATH_BYTES) return false;
+  // 只允许纯路径：不带查询串、片段、凭据、反斜杠或空白，避免任何拼接歧义。
+  if (!args.path.startsWith('/') || /[?#\\\s]/.test(args.path) || !/^[\x21-\x7e]+$/.test(args.path)) return false;
+  if (args.path.includes('//') || args.path.endsWith('/')) return false;
+  const segments = args.path.split('/').filter(Boolean);
+  // '.' / '..' 段会被 URL 规范化解析掉，造成路径越界，直接拒绝。
+  if (segments.some((segment) => segment === '.' || segment === '..')) return false;
+  if (segments[0] === 'users') {
+    // 所有者资料：/users/{login}。
+    return segments.length === 2 && NETWORK_ALLOWED_USER_PATHS.length > 0 && GITHUB_OWNER_RE.test(segments[1]);
+  }
+  if (segments[0] !== 'repos' || segments.length < 3) return false;
+  const [repos, owner, repo, ...tail] = segments;
+  if (repos !== 'repos' || !GITHUB_OWNER_RE.test(owner) || !GITHUB_REPO_RE.test(repo)) return false;
+  // 模板尾段逐段比较：{owner}/{repo} 已单独校验，其余段必须与白名单完全一致。
+  const tailMatches = NETWORK_ALLOWED_REPO_PATHS.some((template) => {
+    const templateTail = template.split('/').filter(Boolean).slice(3);
+    return templateTail.length === tail.length && templateTail.every((part, index) => part === tail[index]);
+  });
+  if (!tailMatches) return false;
+  if (args.query === undefined) return true;
+  if (!args.query || typeof args.query !== 'object' || Array.isArray(args.query)) return false;
+  const keys = Object.keys(args.query);
+  if (keys.some((key) => key !== 'per_page' && key !== 'page' && key !== 'state')) return false;
+  if ('per_page' in args.query && (!Number.isInteger(args.query.per_page) || args.query.per_page < 1 || args.query.per_page > 100)) return false;
+  if ('page' in args.query && (!Number.isInteger(args.query.page) || args.query.page < 1 || args.query.page > 100)) return false;
+  if ('state' in args.query && !['open', 'closed', 'all'].includes(args.query.state)) return false;
+  return true;
 }
 
 function validatePageCapabilityRequest(input) {
@@ -75,6 +136,9 @@ function validatePageCapabilityRequest(input) {
       (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 10)))) {
     throw protocolError('PLUGIN_PAGE_REQUEST_INVALID', 'Web search arguments are invalid');
   }
+  if (method === 'network.request' && !validateNetworkRequestArgs(args)) {
+    throw protocolError('PLUGIN_PAGE_REQUEST_INVALID', 'Network request arguments are invalid');
+  }
   if (method === 'clipboard.write' &&
     (typeof args.text !== 'string' || args.text.length === 0 || args.text.length > MAX_CLIPBOARD_TEXT_CHARS)) {
     throw protocolError('PLUGIN_PAGE_REQUEST_INVALID', 'Clipboard text arguments are invalid');
@@ -93,4 +157,9 @@ function validatePageCapabilityRequest(input) {
   return { pluginId, pageId, capability: definition.capability, operation: definition.operation, args };
 }
 
-module.exports = { validatePageCapabilityRequest };
+module.exports = {
+  validatePageCapabilityRequest,
+  NETWORK_ALLOWED_HOSTS,
+  NETWORK_ALLOWED_REPO_PATHS,
+  NETWORK_ALLOWED_USER_PATHS,
+};
