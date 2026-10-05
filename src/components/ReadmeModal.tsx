@@ -528,14 +528,14 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       <DialogContent
         showClose={false}
         aria-describedby={undefined}
-        className="w-[calc(100%_-_2rem)] max-w-[1130px] min-w-0 overflow-hidden p-0"
+        className="flex h-[calc(100vh_-_2rem)] max-h-[calc(100vh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-none min-w-0 flex-col overflow-hidden p-0"
         onCloseAutoFocus={(event) => {
           if (!onCloseAutoFocus) return;
           event.preventDefault();
           onCloseAutoFocus();
         }}
       >
-        <div className="relative flex max-h-[90vh] min-w-0 max-w-full w-full flex-col overflow-hidden bg-card dark:bg-card">
+        <div className="relative flex min-h-0 min-w-0 max-w-full w-full flex-1 flex-col overflow-hidden bg-card dark:bg-card">
           {readmeContent && !loading && (
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-accent dark:bg-muted z-20 rounded-t-xl overflow-hidden">
               <div

@@ -51,14 +51,14 @@ const ReadmeModalLoadingFallback: React.FC<{
   <Dialog open onOpenChange={(open) => !open && onClose()}>
     <DialogContent
       aria-describedby={undefined}
-      className="w-[calc(100%_-_2rem)] max-w-[1130px] p-6"
+      className="flex h-[calc(100vh_-_2rem)] max-h-[calc(100vh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-none flex-col overflow-hidden p-6"
       onCloseAutoFocus={(event) => {
         event.preventDefault();
         onCloseAutoFocus();
       }}
     >
       <DialogTitle className="sr-only">Loading README</DialogTitle>
-      <div className="flex min-h-40 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
+      <div className="flex flex-1 flex-col items-center justify-center gap-4" role="status" aria-live="polite">
         <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
         <p className="text-muted-foreground">Loading README…</p>
       </div>
