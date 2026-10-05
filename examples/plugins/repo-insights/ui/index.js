@@ -318,9 +318,11 @@
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
+  /** 整数千分位格式化；非有限值显示为占位符。 */
   const int = (value) => (typeof value === 'number' && Number.isFinite(value) ? Math.round(value).toLocaleString() : '–');
   const $ = (id) => document.getElementById(id);
 
+  /** 把缓存时间戳格式化为“N 分钟/小时/天前”的人类可读文案。 */
   function ageText(fetchedAt) {
     const minutes = Math.max(0, Math.round((Date.now() - fetchedAt) / 60000));
     if (minutes < 1) return str.justNow;
@@ -329,6 +331,7 @@
     return fmt(str.days, { n: Math.round(minutes / (60 * 24)) });
   }
 
+  /** 相对时间文案：天/周/月/年自动进位。 */
   function relativeDays(days) {
     if (days <= 0) return str.relToday;
     if (days === 1) return str.relYesterday;
@@ -344,6 +347,7 @@
     return fmt(str.durYears, { n: Math.round((days / 365.25) * 10) / 10 });
   }
 
+  /** ISO 时间字符串 → YYYY-MM-DD；不可解析时显示占位符。 */
   function shortDate(iso) {
     const time = Date.parse(iso);
     return Number.isFinite(time)
@@ -366,10 +370,12 @@
     return tag.split(/[^a-z0-9]+/).filter(Boolean).some((token) => PRERELEASE_TOKENS.has(token.replace(/\d+$/, '')));
   }
 
+  /** 把可能缺失/非数的计数收敛为非负整数（缺省 0）。 */
   const toCountValue = (value) => {
     const count = Number(value);
     return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
   };
+  /** 把时间字符串解析为 epoch 毫秒；缺失或不可解析返回 null。 */
   const toTimestampValue = (value) => {
     const timestamp = Date.parse(value ?? '');
     return Number.isFinite(timestamp) ? timestamp : null;
@@ -380,6 +386,7 @@
   const charts = new Map();
   let chartSeq = 0;
 
+  /** 从当前 CSS 变量读取 Chart.js 主题色（跟随深浅主题）。 */
   function chartTheme() {
     const style = getComputedStyle(document.body);
     return {
@@ -389,6 +396,7 @@
     };
   }
 
+  /** 按 canvasId 重建 Chart.js 实例（先销毁旧实例，避免泄漏），并注入统一主题。 */
   function drawChart(canvasId, config) {
     if (typeof Chart === 'undefined') return;
     const theme = chartTheme();
@@ -416,6 +424,7 @@
 
   // pluginStorage 单键上限 128 字符；owner/repo 全长可达 ~140，故对 repoKey 取
   // FNV-1a 32 位哈希（base36）作键。仅作缓存命名空间，不承载安全语义。
+  /** FNV-1a 32 位哈希的 base36 形式，用作缓存键的仓库命名空间。 */
   const hash36 = (value) => {
     let hash = 0x811c9dc5;
     for (let i = 0; i < value.length; i += 1) {
@@ -424,22 +433,43 @@
     }
     return hash.toString(36);
   };
+  /** 缓存键：账号隔离由条目内 acct 字段承担，键内含仓库哈希与数据集 id。 */
   const cacheKey = (repoKey, metricId) => `ins:${CACHE_SCHEMA}:${hash36(repoKey)}:${metricId}`;
 
+  /** 读缓存；账号标签不一致的条目视为脏数据并删除（切账号不留存旧数据）。 */
   async function readCache(repoKey, metricId) {
     try {
       const entry = await request('storage.get', { key: cacheKey(repoKey, metricId) });
-      if (entry && typeof entry === 'object' && Number.isFinite(entry.fetchedAt)) return entry;
+      if (!entry || typeof entry !== 'object' || !Number.isFinite(entry.fetchedAt)) return null;
+      // 账号已知且不匹配：脏缓存（可能来自另一个 GitHub 账号），删除并忽略。
+      if (state.acct && entry.acct && entry.acct !== state.acct) {
+        void request('storage.delete', { key: cacheKey(repoKey, metricId) }).catch(() => {});
+        return null;
+      }
+      return entry;
     } catch { /* 缓存读取失败按无缓存处理 */ }
     return null;
   }
 
+  /** 写缓存；私有仓库与账号未知时绝不落盘，超限/配额失败静默放弃。 */
   function writeCache(repoKey, metricId, payload, ttl) {
-    const entry = { fetchedAt: Date.now(), ttl, payload };
+    if (state.privateRepo || !state.acct) return;
+    const entry = { fetchedAt: Date.now(), ttl, acct: state.acct, payload };
     // 单值上限 64 KiB，写入失败（超限/配额）静默放弃缓存。
     request('storage.set', { key: cacheKey(repoKey, metricId), value: entry }).catch(() => {});
   }
 
+  const CACHED_METRIC_IDS = ['repo', 'commitActivity', 'codeFrequency', 'contributors', 'languages',
+    'releases', 'pulls', 'ownerProfile', 'community', 'advisories', 'starHistory'];
+
+  /** 清空该仓库的全部缓存条目（私有仓库标记或账号切换时用）。 */
+  function purgeRepoCache(repoKey) {
+    for (const metricId of CACHED_METRIC_IDS) {
+      void request('storage.delete', { key: cacheKey(repoKey, metricId) }).catch(() => {});
+    }
+  }
+
+  /** 创建定并发任务队列：FIFO、上限内立即执行、异常不阻塞后续任务。 */
   function createQueue(limit) {
     const waiting = [];
     let active = 0;
@@ -466,6 +496,11 @@
       path: absolute ? pathSuffix : `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${pathSuffix}`,
       query: query ?? {},
     });
+    // 记录宿主下发的账号标签（Token 的 SHA-256 截断），供缓存按账号隔离。
+    if (value && typeof value === 'object' && typeof value.acct === 'string') {
+      if (state.acct && state.acct !== value.acct) purgeRepoCache(state.repoKey);
+      state.acct = value.acct;
+    }
     // 宿主把 403/404 等归一为 success:false；202/204 是 success:true + body:null。
     return value;
   }
@@ -481,6 +516,11 @@
     meta: new Map(),      // metricId → { stale: boolean }
     runSeq: 0,
     queue: createQueue(6),
+    // GitHub 身份标签（宿主随响应下发，页面拿不到 Token）；缓存按账号隔离。
+    acct: null,
+    // 私有仓库（或身份未知时）不写缓存：避免本地缓存跨 GitHub 账号留存
+    // 非公开数据。宿主能力桥按账号隔离由渲染端 acct 保证，这里是第二道闸。
+    privateRepo: false,
   };
 
   /* ── 渲染：头部与 KPI ─────────────────────────────────────────────── */
@@ -496,6 +536,7 @@
     $('head').hidden = false;
   }
 
+  /** 渲染 KPI 行：星标/复刻/开放 Issue/关注者/许可证/创建时间（快照与实时详情合并）。 */
   function renderKpis() {
     const r = state.repository;
     const live = state.data.get('repo') || {};
@@ -521,6 +562,7 @@
 
   const RING_CIRCUMFERENCE = 2 * Math.PI * 34;
 
+  /** 仓库健康度 0–100 评分：维护活跃 40% + 热度 30% + 质量 30%，附各子分数供雷达使用。 */
   function computeHealthScore() {
     const r = { ...state.repository, ...(state.data.get('repo') || {}) };
     const releases = state.data.get('releases');
@@ -574,6 +616,7 @@
     return { overall, grade, parts };
   }
 
+  /** 渲染健康分圆环与等级，并联动健康度雷达。 */
   function renderHealth() {
     const { overall, grade } = computeHealthScore();
     $('ring-value').setAttribute('stroke-dasharray', `${(overall / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`);
@@ -594,10 +637,12 @@
     stateEl.className = `state${kind ? ` ${kind}` : ''}`;
   }
 
+  /** 显示/隐藏卡片内的图表画布区。 */
   function showChart(cardId, visible) {
     $(cardId).querySelector('.ch').hidden = !visible;
   }
 
+  /** 填充或清空卡片的 chips 行。 */
   function showChips(cardId, chipsHtml) {
     const chips = $(cardId).querySelector('.chips');
     if (!chips) return;
@@ -605,11 +650,13 @@
     chips.hidden = !chipsHtml;
   }
 
+  /** 把 commit_activity 的周时间戳格式化为图表横轴标签。 */
   function weekLabel(tsSeconds) {
     const date = new Date(tsSeconds * 1000);
     return fmt(str.week, { m: date.getUTCMonth() + 1, d: date.getUTCDate() });
   }
 
+  /** 渲染 52 周提交柱状图与近 4 周/活跃周摘要 chips。 */
   function renderCommits(payload, meta) {
     if (!Array.isArray(payload) || payload.length === 0) return false;
     state.data.set('commitActivity', payload);
@@ -642,6 +689,7 @@
     return true;
   }
 
+  /** 渲染每周新增/删除行数的双向柱状图（GitHub 的 deletions 为负数，直接画在零线下方）。 */
   function renderChurn(payload) {
     if (!Array.isArray(payload) || payload.length === 0) return false;
     state.data.set('codeFrequency', payload);
@@ -671,6 +719,7 @@
 
   const LANGUAGE_PALETTE = ['#4f8ff7', '#9a6bff', '#2fbf7f', '#ffb454', '#ff5d73', '#5ec8ff', '#c084fc', '#86efac', '#8a93a8'];
 
+  /** 渲染语言分布环形图（Top 8 + 其他），并标注语言种数。 */
   function renderLanguages(payload) {
     if (!payload || typeof payload !== 'object') return false;
     const entries = Object.entries(payload).sort((a, b) => b[1] - a[1]);
@@ -704,6 +753,7 @@
     return true;
   }
 
+  /** 仅存储贡献者样本并触发维护者容器渲染（贡献者不再有独立图表卡）。 */
   function renderContributors(payload) {
     if (!Array.isArray(payload) || payload.length === 0) return false;
     const top = payload.slice(0, 12).filter((c) => c.login);
@@ -713,6 +763,7 @@
     return true;
   }
 
+  /** 裁剪并存储所有者资料，触发维护者容器渲染。 */
   function paintOwnerProfile(payload) {
     if (!payload || typeof payload !== 'object' || !payload.login) return false;
     state.data.set('ownerProfile', {
@@ -731,6 +782,7 @@
     return true;
   }
 
+  /** 裁剪已合并 PR（按合并时间降序取前 15）供 AI 提示词使用。 */
   function paintPulls(payload) {
     if (!Array.isArray(payload)) return false;
     const merged = payload
@@ -743,6 +795,7 @@
   }
 
 
+  /** 渲染发布节奏：摘要 chips、月度发布柱状图与最近 5 条列表；保留最近 15 条截断日志供 AI 使用。 */
   function renderReleases(payload) {
     if (!Array.isArray(payload)) return false;
     const published = payload
@@ -812,6 +865,7 @@
     ['code_of_conduct', 'sigConduct'], ['issue_template', 'sigIssue'], ['pull_request_template', 'sigPr'],
   ];
 
+  /** 渲染社区健康百分比与六项标准文件信号徽章。 */
   function renderCommunity(payload) {
     if (!payload || typeof payload !== 'object' || typeof payload.health_percentage !== 'number') return false;
     state.data.set('community', payload);
@@ -828,25 +882,39 @@
     return true;
   }
 
+  /** 渲染已发布安全公告：仅保留有 published_at 的条目，按严重程度计数并列出最近 8 条。 */
   function renderAdvisories(payload) {
     if (!Array.isArray(payload)) return false;
-    const count = (severity) => payload.filter((a) => a.severity === severity).length;
+    // 只展示已发布的公告：非发布态（草稿/triage）条目没有 published_at。
+    const publishedAdvisories = payload
+      .filter((a) => typeof a.published_at === 'string')
+      .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+    state.data.set('advisories', publishedAdvisories.slice(0, 10).map((a) => ({
+      ghsa_id: a.ghsa_id ?? null,
+      cve_id: a.cve_id ?? null,
+      severity: a.severity ?? null,
+      summary: a.summary ?? null,
+      published_at: a.published_at,
+    })));
+    const count = (severity) => publishedAdvisories.filter((a) => a.severity === severity).length;
     const chips = [];
     if (count('critical')) chips.push(`<span class="chip">Critical<b class="down">${count('critical')}</b></span>`);
     if (count('high')) chips.push(`<span class="chip">High<b class="down">${count('high')}</b></span>`);
-    chips.push(`<span class="chip">${esc(str.advisoriesTotal)}<b>${payload.length}</b></span>`);
+    chips.push(`<span class="chip">${esc(str.advisoriesTotal)}<b>${publishedAdvisories.length}</b></span>`);
     showChips('card-advisories', chips.join(''));
-    renderRadar();
-    $('advisory-rows').innerHTML = payload.slice(0, 8).map((a) => `
+    $('advisory-rows').innerHTML = publishedAdvisories.slice(0, 8).map((a) => `
       <li>
         <span class="badge sev-${esc(a.severity || 'low')}">${esc((a.severity || 'low').toUpperCase())}</span>
         <span class="tag-name">${esc(a.ghsa_id || a.cve_id || '')}</span>
         <span class="muted">${esc(a.summary || '')}</span>
         <span class="row-date">${esc(shortDate(a.published_at))}</span>
       </li>`).join('');
-    setState('card-advisories', payload.length === 0 ? str.advisoriesNone : '');
+    setState('card-advisories', publishedAdvisories.length === 0 ? str.advisoriesNone : '');
+    renderRadar();
+    renderFacts();
     return true;
   }
+
 
   /* ── 健康度雷达：总分之外的维度分解（未知维度自动省略） ── */
 
@@ -885,6 +953,7 @@
     return axes;
   }
 
+  /** 渲染健康度雷达图（维度随可用数据动态增减）。 */
   function renderRadar() {
     const axes = deriveRadarAxes();
     const theme = chartTheme();
@@ -939,10 +1008,12 @@
     };
   }
 
+  /** 把占比量化到 5% 步长，映射到静态宽度类（CSP 禁内联样式）。 */
   function quantizeShare(percent) {
     return Math.max(5, Math.round(percent / 5) * 5);
   }
 
+  /** 渲染维护者容器：左栏所有者资料与巴士因子，右栏贡献者概要列表。 */
   function renderMaintainers() {
     const card = $('card-maintainers');
     const r = { ...state.repository, ...(state.data.get('repo') || {}) };
@@ -1022,9 +1093,9 @@
 
   function buildAiPrompt() {
     const r = { ...state.repository, ...(state.data.get('repo') || {}) };
-    const releases = (state.data.get('releases') ?? []).slice(0, 10);
-    const pulls = (state.data.get('pulls') ?? []).slice(0, 15);
-    const advisories = (state.data.get('advisories') ?? []).slice(0, 5);
+    const releases = (state.data.get('releases') ?? []).slice(0, 12);
+    const pulls = (state.data.get('pulls') ?? []).slice(0, 20);
+    const advisories = (state.data.get('advisories') ?? []).slice(0, 8);
     const contribs = state.data.get('contributors');
     const bus = computeBusFactor(contribs);
     const commits = state.data.get('commitActivity');
@@ -1035,11 +1106,17 @@
     lines.push(`# Repository: ${r.full_name}`);
     lines.push(`language=${r.language ?? 'unknown'} license=${r.license?.spdx_id ?? 'none'} stars=${r.stargazers_count ?? '?'}`);
     if (weeks.length >= 8) lines.push(`commits: last4weeks=${last4} prior4weeks=${prev4}`);
-    if (releases.length > 0) lines.push(`latest release: ${releases[0].tag_name} (${releases[0].published_at?.slice(0, 10) ?? 'n/a'})`);
+    if (releases.length > 0) {
+      lines.push(`latest release: ${releases[0].tag_name} (${releases[0].published_at?.slice(0, 10) ?? 'n/a'})`);
+      const withBody = releases.filter((x) => x.body).length;
+      lines.push(`recent releases fetched: ${releases.length} (release notes included for ${withBody})`);
+    }
     if (bus) lines.push(`bus factor: ${bus.k} (top contributors: ${contribs.slice(0, 3).map((c) => c.login).join(', ')})`);
     if (advisories.length > 0) {
-      lines.push('security advisories (recent):');
-      for (const a of advisories) lines.push(`- [${a.severity}] ${a.ghsa_id}: ${String(a.summary ?? '').slice(0, 120)}`);
+      lines.push('published security advisories (most recent first):');
+      for (const a of advisories) {
+        lines.push(`- [${a.severity}] ${a.ghsa_id} (${a.published_at?.slice(0, 10) ?? ''}): ${String(a.summary ?? '').slice(0, 140)}`);
+      }
     }
     if (pulls.length > 0) {
       lines.push('recently merged PRs:');
@@ -1055,6 +1132,7 @@ ${release.body}`);
     return lines.join('\n').slice(0, 100_000);
   }
 
+  /** 请求 AI 生成分节要点分析；经宿主逐次确认，未配置 Provider/用户取消均有对应文案。 */
   async function generateAiBriefing() {
     if (!token) return;
     const button = $('ai-generate');
@@ -1150,6 +1228,7 @@ ${release.body}`);
     return null; // 数据已知：52 周窗口内没有提交
   }
 
+  /** 推导“仓库体检”事实快照：三态事实 + 保守信号 + 摘要所需的时间量。 */
   function deriveHealthFacts() {
     const r = { ...state.repository, ...(state.data.get('repo') || {}) };
     const releases = state.data.get('releases'); // 已过滤 draft、按发布时间降序
@@ -1210,6 +1289,7 @@ ${release.body}`);
     return { facts, signals, ageDays, daysSincePush, daysSinceCommit, contributors };
   }
 
+  /** 事实值的三态格式化：未知/无/是/否/计数/时长/日期。 */
   function formatFactValue(fact) {
     if (fact.value === undefined) return { text: str.valUnknown, unknown: true };
     if (fact.value === null) return { text: str.valNone, unknown: true };
@@ -1229,6 +1309,7 @@ ${release.body}`);
     }
   }
 
+  /** 渲染仓库体检卡：一句话摘要、事实分组（未知沉底）与保守信号徽章。 */
   function renderFacts() {
     const { facts, signals, daysSinceCommit } = deriveHealthFacts();
     $('facts-signals').innerHTML = signals.map((key) => `<span class="badge signal">${esc(str[key])}</span>`).join('');
@@ -1395,6 +1476,7 @@ ${release.body}`);
     document.body.dataset.theme = theme === 'light' ? 'light' : 'dark';
   }
 
+  /** 应用宿主下发的语言并刷新静态文案。 */
   function applyLanguage(language) {
     str = String(language).toLowerCase().startsWith('zh') ? STR.zh : STR.en;
     document.documentElement.lang = String(language).toLowerCase().startsWith('zh') ? 'zh' : 'en';
@@ -1415,6 +1497,7 @@ ${release.body}`);
     ['card-advisories', 'advisoriesTitle', 'advisoriesHint'],
   ];
 
+  /** 清空并重置全部卡片的标题、图表与状态，进入新一轮加载。 */
   function resetSections() {
     state.data.clear();
     state.meta.clear();
@@ -1461,6 +1544,7 @@ ${release.body}`);
     renderKpis();
   }
 
+  /** 拉取全部指标并渲染：并行 10 个数据集 + 星标历史翻页，全局错误只在必需指标失败时提示。 */
   async function loadAll() {
     const runSeq = ++state.runSeq;
     resetSections();
@@ -1471,7 +1555,18 @@ ${release.body}`);
       {
         // repo 详情：只进 KPI 与健康分，不驱动卡片状态（cardId 为空）。
         id: 'repo', cardId: null, pathSuffix: '', ttl: 6 * HOUR, optional: false,
-        paint: (payload) => { state.data.set('repo', payload); renderKpis(); renderHealth(); renderFacts(); return true; },
+        paint: (payload) => {
+          state.data.set('repo', payload);
+          // /repos/{o}/{r} 携带 Token 时会返回私有仓库详情：私有数据绝不进缓存，
+          // 并清掉此前可能已落盘的同仓库条目。
+          const isPrivate = payload?.private === true;
+          if (isPrivate && !state.privateRepo) purgeRepoCache(state.repoKey);
+          state.privateRepo = isPrivate;
+          renderKpis();
+          renderHealth();
+          renderFacts();
+          return true;
+        },
       },
       {
         id: 'commitActivity', cardId: 'card-commits', pathSuffix: '/stats/commit_activity',
@@ -1532,6 +1627,7 @@ ${release.body}`);
 
   let lastRepoKey = null;
 
+  /** 设定当前仓库并启动数据加载。 */
   function start(repository) {
     const [owner, name] = String(repository.full_name ?? '').split('/');
     if (!owner || !name) {
@@ -1547,6 +1643,7 @@ ${release.body}`);
     void loadAll();
   }
 
+  /** 处理宿主 init：主题/语言跟随；同仓库重复 init 幂等，换仓库重新加载。 */
   async function handleInit(context) {
     if (context.theme) applyTheme(context.theme);
     if (context.language) applyLanguage(context.language);
@@ -1568,6 +1665,7 @@ ${release.body}`);
     start(repository);
   }
 
+  /** 经桥搜索宿主已加载的仓库（设置页入口的仓库选择器用）。 */
   async function searchRepositories(query) {
     const value = await request('repositories.search', { query, limit: 10 });
     return Array.isArray(value) ? value : value?.repositories ?? [];

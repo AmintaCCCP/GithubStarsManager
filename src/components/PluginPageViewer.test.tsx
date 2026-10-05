@@ -322,7 +322,7 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
     expect((init.headers as Record<string, string>)['X-GitHub-Api-Version']).toBe('2022-11-28');
     expect(init.method).toBe('GET');
     const response = postMessage.mock.calls.find(([message]) => (message as { requestId?: string }).requestId === 'net-1')?.[0];
-    expect(response).toEqual(expect.objectContaining({ success: true, value: { status: 200, body: { total: 42 } } }));
+    expect(response).toEqual(expect.objectContaining({ success: true, value: expect.objectContaining({ status: 200, body: { total: 42 } }) }));
     expect(JSON.stringify(response)).not.toContain('gh-token-sample');
   });
 
@@ -374,7 +374,7 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
       }));
     });
     const response = postMessage.mock.calls.find(([message]) => (message as { requestId?: string }).requestId === 'net-202')?.[0];
-    expect(response).toEqual(expect.objectContaining({ success: true, value: { status: 202, body: null } }));
+    expect(response).toEqual(expect.objectContaining({ success: true, value: expect.objectContaining({ status: 202, body: null }) }));
   });
 
   it('blocks non-allowlisted network targets before any request leaves the host', async () => {

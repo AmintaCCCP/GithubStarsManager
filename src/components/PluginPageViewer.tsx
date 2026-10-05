@@ -175,6 +175,8 @@ export const PluginPageViewer: React.FC<PluginPageViewerProps> = ({ pluginId, pl
             : 'h-[min(70vh,800px)] min-h-[480px] w-full rounded-lg border border-border bg-white'}
           onLoad={() => {
             for (const controller of aiRequestsRef.current) controller.abort();
+            // 先中止旧 epoch 的在途请求再轮换，避免它们带着 Token 继续跑完。
+            networkSignalRef.current.abort();
             networkSignalRef.current = new AbortController();
             tokenRef.current = crypto.randomUUID();
             pendingRef.current.clear();
