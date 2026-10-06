@@ -92,6 +92,27 @@ describe('netTap.wrapFetch', () => {
     assert.ok(entries[0].data.detail.includes('net::ERR_ABORTED'));
   });
 
+  it('records aborts by exception name (no net:: code in chain) as info', async () => {
+    const { entries, record } = collect();
+    // AbortController.abort() 抛出的异常只有 name，cause 链里没有 net::ERR_*
+    const boom = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    const tapped = wrapFetch(async () => { throw boom; }, { source: 'test', record });
+    await assert.rejects(() => tapped('https://api.example.com/x'), (err) => err === boom);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].level, 'info');
+    assert.match(entries[0].message, / aborted$/);
+  });
+
+  it('records TimeoutError DOMException aborts as info', async () => {
+    const { entries, record } = collect();
+    const boom = new DOMException('The operation timed out', 'TimeoutError');
+    const tapped = wrapFetch(async () => { throw boom; }, { source: 'test', record });
+    await assert.rejects(() => tapped('https://api.example.com/x'), (err) => err === boom);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].level, 'info');
+    assert.match(entries[0].message, / aborted$/);
+  });
+
   it('records transient network conditions (net::ERR_NETWORK_CHANGED) as warn', async () => {
     const { entries, record } = collect();
     const boom = Object.assign(new Error('Failed to fetch'), { cause: new Error('net::ERR_NETWORK_CHANGED') });

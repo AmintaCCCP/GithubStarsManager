@@ -98,6 +98,17 @@ describe('logger', () => {
       expect((data.name as string).length).toBeLessThanOrEqual(120);
     });
 
+    it('preserves own enumerable diagnostic fields (e.g. code) on Errors', () => {
+      const error = Object.assign(new Error('failed'), { code: 'ETIMEDOUT', token: 'value-token-123456' });
+      logger.warn('githubApi', 'API request network error', error);
+      const data = lastEntry().data as { code?: string; token?: string; name?: string; message?: string };
+      expect(data.code).toBe('ETIMEDOUT');
+      // 附加字段仍走字段名脱敏
+      expect(data.token).toBe('***3456');
+      expect(data.name).toBe('Error');
+      expect(data.message).toBe('failed');
+    });
+
     it('keeps object data without Error values structurally unchanged', () => {
       logger.info('app', 'plain data', { a: 1, nested: { b: 'x' } });
       expect(lastEntry().data).toEqual({ a: 1, nested: { b: 'x' } });

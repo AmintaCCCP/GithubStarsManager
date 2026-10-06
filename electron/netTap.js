@@ -59,6 +59,20 @@ function classifyNetFailure(summary) {
   return classifyNetErrorCode(text);
 }
 
+/**
+ * Abort exceptions by NAME, mirroring the renderer-side capture policy
+ * (src/services/fetchCapture.ts): AbortError (AbortController.abort() —
+ * "signal is aborted without reason" in Chromium) and TimeoutError
+ * (AbortSignal.timeout()) are normal control flow. summarizeFetchError only
+ * keeps message/cause text, so a bare DOMException abort leaves no net error
+ * code behind — the original exception must be classified separately.
+ */
+function isAbortException(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (error.name === 'AbortError') return true;
+  return typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'TimeoutError';
+}
+
 function resetBodyBudgetForTest() {
   bodyBudget.windowStart = 0;
   bodyBudget.used = 0;
@@ -250,7 +264,7 @@ function wrapFetch(fetchImpl, { source, record, isDebugMode } = {}) {
       return response;
     } catch (error) {
       const summary = summarizeFetchError(error);
-      const level = classifyNetFailure(summary);
+      const level = isAbortException(error) ? 'info' : classifyNetFailure(summary);
       const aborted = level === 'info';
       try {
         record({
@@ -277,6 +291,7 @@ module.exports = {
   BODY_CAPTURE_BUDGET_PER_MINUTE,
   classifyNetErrorCode,
   classifyNetFailure,
+  isAbortException,
   resetBodyBudgetForTest,
   wrapFetch,
 };

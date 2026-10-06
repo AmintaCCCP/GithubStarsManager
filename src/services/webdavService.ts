@@ -416,7 +416,10 @@ export class WebDAVService {
           href = decodeURIComponent(href);
         } catch { /* 非法百分号编码按原文匹配 */ }
         const path = href.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').replace(/\/+$/, '').toLowerCase();
-        return path === normalizedTarget || path.endsWith(normalizedTarget) || normalizedTarget.endsWith(path);
+        // 精确匹配：宽松的 endsWith 会让 /old/backup 误配 /backup，或让空路径
+        // 选中任意条目——多状态体里先出现失败条目时会读错资源级状态。
+        if (path === '' && normalizedTarget === '/') return true;
+        return path === normalizedTarget;
       });
       if (!match) return true;
 

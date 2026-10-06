@@ -766,6 +766,55 @@ describe('idle 大分片写入节流', () => {
     expect((await readShardState('releases')).releases).toEqual(bigReleases);
   });
 
+  it('大分片冷却不阻塞同时变化的其他脏分片：core 立即落盘，releases 到期后落盘', async () => {
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot(); // 基准 = v1
+
+    // releases（大分片，冷却中）与 core 同时变化：core 立即写，releases 推迟
+    const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
+    debouncedPersistStorage.setItem(KEY, {
+      state: { ...baseState, releases: releasesV2, theme: 'light' },
+      version: 16,
+    });
+    await settleUntil(async () => (await readShardState('core')).theme === 'light', 'core 变更不应被大分片冷却拖住');
+    expect(await diskReleasesEquals(bigReleases)).toBe(true); // 冷却期内 releases 未落盘
+
+    await settleUntil(() => diskReleasesEquals(releasesV2), '冷却到期后 releases 应落盘 v2');
+  });
+
+  it('在途大分片提交后，已入队的下一笔大分片写入按冷却推迟执行', async () => {
+    // 派发 v3 时冷却相对旧基准（v1）已过期，但派发与执行之间 v2 才提交——
+    // 写入执行时须按最新提交时间复查冷却，否则两次大分片写入间隔不足冷却期。
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot(); // 基准 = v1（提交于 T0）
+    await realWait(INTERVAL_MS + 150); // 冷却相对 T0 已过期
+
+    try {
+      commitGate.arm();
+      const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
+      debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
+      const flushing = flushPendingPersistSnapshot(); // v2 写入开始并在提交点挂停（在途）
+      await commitGate.waitReached();
+
+      // 派发 v3：按旧基准（v1）看冷却已过期 → 立即入队，排在在途 v2 之后
+      const releasesV3 = [{ id: 3, blob: bigBlob('z') }];
+      debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV3 }, version: 16 });
+      await realWait(60);
+
+      commitGate.release(); // v2 提交（lastShardWriteAt 更新为此刻）
+      await flushing;
+      // v3 写入执行时复查冷却：距 v2 提交不足冷却期 → 推迟而非立即写
+      await realWait(60);
+      expect(await diskReleasesEquals(releasesV2)).toBe(true);
+
+      await settleUntil(() => diskReleasesEquals(releasesV3), '冷却到期后 v3 应落盘');
+    } finally {
+      commitGate.reset();
+    }
+  });
+
   it('在途写入未提交时把状态改回旧值，恢复更新不能被丢弃', async () => {
     // commitGate 挂停提交入口制造确定性的在途窗口：v2 写入已到达
     // setStorageEntries 但未提交，lastWrittenShards 仍是 v1 旧基准——此时

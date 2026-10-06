@@ -369,6 +369,20 @@ describe('WebDAVService 连接测试探测顺序', () => {
     await expect(davService().testConnection()).resolves.toBe(true);
   });
 
+  it('PROPFIND 207 目标 href 精确匹配：无关条目的失败不影响判定', async () => {
+    // /old/backup 的 404 不能匹配目标 /backup（宽松 endsWith 会读错条目）
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/old/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '<D:response><D:href>/backup</D:href><D:status>HTTP/1.1 200 OK</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch).mockResolvedValue(new Response(xml, {
+      status: 207,
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+  });
+
   it('PROPFIND 不可用（405）时降级 HEAD，HEAD 200 即成功', async () => {
     vi.mocked(window.fetch)
       .mockResolvedValueOnce(new Response(null, { status: 405 }))

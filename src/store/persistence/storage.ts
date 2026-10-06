@@ -356,6 +356,7 @@ const writeShardedSnapshot = async (
   value: StorageValue<unknown>,
   writeVersion: number,
   source: 'idle' | 'flush',
+  shardFilter?: ReadonlyArray<PersistenceShardName>,
 ): Promise<void> => {
   if (latestPersistValue === null || latestPersistName !== name || persistWriteVersion !== writeVersion) {
     return;
@@ -379,9 +380,25 @@ const writeShardedSnapshot = async (
   const state = (value.state ?? {}) as Record<string, unknown>;
   const views = buildShardViews(state);
   // 从旧版快照水合的会话：首次写入强制提交全部分片，完成迁移后即可退役旧键。
-  const dirty = legacySnapshotHydrated
+  let dirty = legacySnapshotHydrated
     ? [...PERSISTENCE_SHARD_NAMES]
     : findDirtyShards(views, lastWrittenShards);
+  if (shardFilter) {
+    const allowed = new Set(shardFilter);
+    dirty = dirty.filter((shard) => allowed.has(shard));
+  }
+  if (source === 'idle') {
+    // 写入真正执行时按最新提交时间复查冷却：派发与执行之间可能有在途写入
+    // 提交（大分片冷却因此尚未结束）。被跳过的分片交还冷却到期后的派发
+    // （届时读取模块级最新值），数据不会丢。
+    let stillCoolingMs = 0;
+    dirty = dirty.filter((shard) => {
+      const remaining = cooldownRemainingMsFor(shard);
+      if (remaining > stillCoolingMs) stillCoolingMs = remaining;
+      return remaining === 0;
+    });
+    if (stillCoolingMs > 0) armDeferredLargeShardWrite(stillCoolingMs);
+  }
   if (dirty.length === 0) return;
 
   const entries: Array<readonly [string, string]> = [];
@@ -489,16 +506,39 @@ const enqueueShardedWrite = (
   value: StorageValue<unknown>,
   writeVersion: number,
   source: 'idle' | 'flush',
+  shardFilter?: ReadonlyArray<PersistenceShardName>,
 ): Promise<void> => {
   // 链尾兜底 catch：writeChain 永不 reject，调用方（idle 的 void 调度、
   // pagehide 的同步事件处理器）不会产生 unhandled rejection。
   writeChain = writeChain
     .catch(() => undefined)
-    .then(() => writeShardedSnapshot(name, value, writeVersion, source))
+    .then(() => writeShardedSnapshot(name, value, writeVersion, source, shardFilter))
     .catch((error: unknown) => {
       logger.errorFromError('store.persist', 'Persist write chain failed', error, { source });
     });
   return writeChain;
+};
+
+/**
+ * 分片的大分片冷却剩余时间；非大分片或从未写入过返回 0（不冷却）。
+ */
+const cooldownRemainingMsFor = (shard: PersistenceShardName): number => {
+  if ((lastWrittenShardBytes.get(shard) ?? 0) <= SHARD_SIZE_WARN_BYTES) return 0;
+  const lastWriteAt = lastShardWriteAt.get(shard);
+  if (lastWriteAt === undefined) return 0;
+  return Math.max(0, largeShardIdleWriteMinIntervalMs - (Date.now() - lastWriteAt));
+};
+
+/** 冷却到期后重新派发（读取模块级最新值，合并为一次最终写入）。 */
+const armDeferredLargeShardWrite = (remainingMs: number): void => {
+  if (remainingMs <= 0) return;
+  if (deferredLargeShardWriteTimerId !== null) {
+    clearTimeout(deferredLargeShardWriteTimerId);
+  }
+  deferredLargeShardWriteTimerId = setTimeout(() => {
+    deferredLargeShardWriteTimerId = null;
+    dispatchIdleShardedWrite();
+  }, remainingMs);
 };
 
 /**
@@ -511,12 +551,11 @@ const enqueueShardedWrite = (
  *   lastWrittenShards 仍是旧基准——此时若最新值恰好等于旧基准（把状态改回
  *   旧值），按空脏早退会让该"恢复旧值"的更新被在途提交的新值覆盖丢失。
  *   照常入队，由写入链在提交时以最新基准重新判脏（确实无变化时自然跳过）。
- * - 若脏分片中存在大分片（上次序列化体积超过 SHARD_SIZE_WARN_BYTES）且距其
- *   上次成功写入不足 LARGE_SHARD_IDLE_WRITE_MIN_INTERVAL_MS，则不立即写入：
- *   最新值保留在 latestPersistValue/persistWriteVersion，安排定时器在冷却到期后
- *   重新走本函数。冷却期内新来的写请求经 1s 防抖汇入同一派发口、重新对齐到
- *   冷却期末，最终合并为一次写入——磁盘上落盘的一定是最新 scheduledVersion。
- * - 否则立即入队 idle 写入（读取模块级最新值，保证被节流合并后的写入不丢数据）。
+ * - 冷却只推迟冷却中的大分片本身：脏分片按冷却分区，未冷却的（含 core 等
+ *   小分片）立即入队写入，冷却中的大分片由定时器在冷却到期后重新派发。
+ *   若整批推迟，小分片的变更也会被拖住最长一个冷却期，期间异常退出会丢数据。
+ * - 冷却到期后重新走本函数，按最新状态重新判脏再写入——磁盘上落盘的
+ *   一定是最新 scheduledVersion。
  */
 const dispatchIdleShardedWrite = (): void => {
   if (latestPersistName === null || latestPersistValue === null) return;
@@ -530,27 +569,21 @@ const dispatchIdleShardedWrite = (): void => {
     return;
   }
 
-  let cooldownRemainingMs = 0;
-  for (const shard of dirty) {
-    if ((lastWrittenShardBytes.get(shard) ?? 0) <= SHARD_SIZE_WARN_BYTES) continue;
-    const lastWriteAt = lastShardWriteAt.get(shard);
-    if (lastWriteAt === undefined) continue;
-    const remaining = largeShardIdleWriteMinIntervalMs - (Date.now() - lastWriteAt);
-    if (remaining > cooldownRemainingMs) cooldownRemainingMs = remaining;
+  // 冷却只推迟冷却中的大分片本身：脏分片按冷却分区，未冷却的（含 core 等
+  // 小分片）立即入队写入，冷却中的大分片由定时器在冷却到期后重新派发。
+  // 若整批推迟，小分片的变更也会被拖住最长一个冷却期，期间异常退出会丢数据。
+  let maxCoolingRemainingMs = 0;
+  const eligible = dirty.filter((shard) => {
+    const remaining = cooldownRemainingMsFor(shard);
+    if (remaining > maxCoolingRemainingMs) maxCoolingRemainingMs = remaining;
+    return remaining === 0;
+  });
+  if (eligible.length > 0) {
+    void enqueueShardedWrite(latestPersistName, latestPersistValue, persistWriteVersion, 'idle', eligible);
   }
-
-  if (cooldownRemainingMs > 0) {
-    if (deferredLargeShardWriteTimerId !== null) {
-      clearTimeout(deferredLargeShardWriteTimerId);
-    }
-    deferredLargeShardWriteTimerId = setTimeout(() => {
-      deferredLargeShardWriteTimerId = null;
-      dispatchIdleShardedWrite();
-    }, cooldownRemainingMs);
-    return;
+  if (maxCoolingRemainingMs > 0) {
+    armDeferredLargeShardWrite(maxCoolingRemainingMs);
   }
-
-  void enqueueShardedWrite(latestPersistName, latestPersistValue, persistWriteVersion, 'idle');
 };
 
 const flushPendingPersistSnapshot = (): Promise<void> => {
