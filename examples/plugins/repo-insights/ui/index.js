@@ -1177,6 +1177,15 @@
         continue;
       }
 
+      // 整行粗体分节标题（如 **1. 新增功能** 或 **1. 新增功能：** 或 1. **新增功能**）
+      const boldHeading = line.match(/^\s*\*\*(.+?)\*\*(?:[:：]?)\s*$/) ||
+                          line.match(/^\s*(?:\d+[.)]|\b[一二三四五][、.）\)]\s*)\s*\*\*(.+?)\*\*(?:[:：]?)\s*$/);
+      if (boldHeading) {
+        closeList();
+        html.push(`<h4 class="md-h">${renderInlineMarkdown(esc(boldHeading[1].trim()))}</h4>`);
+        continue;
+      }
+
       // 分割线
       if (/^(?:---+|\*\*\*+|___+)\s*$/.test(line)) {
         closeList();
