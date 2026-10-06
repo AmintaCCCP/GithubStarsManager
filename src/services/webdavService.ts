@@ -307,8 +307,23 @@ export class WebDAVService {
       // 成功返回 200 或 207 Multi-Status。HEAD 并非 WebDAV 规范的必备方法，部分
       // 服务器（如坚果云 dav.jianguoyun.com）对集合路径的 HEAD 直接返回 403，
       // 若以 HEAD 首发会让每次测试连接都多付一次 403 往返与一条警告日志。
+      //
+      // 10 秒预算覆盖整个探测过程（首发 + 降级回退），从首发前起算：
+      // - 浏览器直连/后端代理：请求共用 AbortController，定时器到点中止整个探测，
+      //   因此在探测结束前不得提前清除定时器；
+      // - 桌面端 IPC 无法跨进程传 AbortSignal，每次请求自带独立超时预算，
+      //   故传剩余时间作为 timeoutMs；剩余不足 1s 时不再发起新的 IPC 请求
+      //   （避免最坏 2×10s 的总耗时），直接按连接超时处理。
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+      const deadline = Date.now() + 10000;
+      const remainingTimeoutMs = (): number => {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0 || (window.electronAPI?.webdavRequest && remaining <= 1000)) {
+          throw new DOMException('WebDAV request timed out', 'AbortError');
+        }
+        return remaining;
+      };
 
       try {
         let propfindResponse: Response;
@@ -319,7 +334,7 @@ export class WebDAVService {
               'Depth': '0',
             },
             signal: controller.signal,
-            timeoutMs: 10000,
+            timeoutMs: remainingTimeoutMs(),
           });
         } catch (propfindError: unknown) {
           // 浏览器直连时，PROPFIND 可能被 CORS 预检直接拒绝而抛网络错误
@@ -331,24 +346,25 @@ export class WebDAVService {
               'Authorization': this.getAuthHeader(),
             },
             signal: controller.signal,
-            timeoutMs: 10000,
+            timeoutMs: remainingTimeoutMs(),
           });
           clearTimeout(timeoutId);
           return headAfterError.ok;
         }
 
-        clearTimeout(timeoutId);
-
-        if (propfindResponse.ok || propfindResponse.status === 207) return true;
+        if (propfindResponse.ok || propfindResponse.status === 207) {
+          clearTimeout(timeoutId);
+          return true;
+        }
 
         // PROPFIND 不可用时，降级尝试 HEAD（兼容仅放行普通 HTTP 方法的网关/服务器）。
-        // 回退请求共用同一 AbortController，让 10 秒超时覆盖整个探测过程。
+        // 回退请求共用同一 AbortController，10 秒预算覆盖到回退完成才清除定时器。
         const headResponse = await this.davFetch('HEAD', this.config.path, {
           headers: {
             'Authorization': this.getAuthHeader(),
           },
           signal: controller.signal,
-          timeoutMs: 10000,
+          timeoutMs: remainingTimeoutMs(),
         });
 
         clearTimeout(timeoutId);
@@ -555,21 +571,31 @@ export class WebDAVService {
   }
 
   async fileExists(filename: string): Promise<boolean> {
+    // 10 秒预算覆盖整个检查过程（首发 HEAD + 403 时的 PROPFIND 回退），
+    // 与 testConnection 相同的 deadline 语义（见彼处注释）。
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+    const deadline = Date.now() + 10000;
+    const remainingTimeoutMs = (): number => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0 || (window.electronAPI?.webdavRequest && remaining <= 1000)) {
+        throw new DOMException('WebDAV request timed out', 'AbortError');
+      }
+      return remaining;
+    };
     try {
       const response = await this.davFetch('HEAD', this.getRelativePath(filename), {
         headers: {
           'Authorization': this.getAuthHeader(),
         },
         signal: controller.signal,
-        timeoutMs: 10000,
+        timeoutMs: remainingTimeoutMs(),
       });
 
       // HEAD 并非 WebDAV 规范必备方法：部分服务器（如坚果云）对 HEAD 返回 403，
       // 不能据此断定文件不存在。降级用 PROPFIND（Depth: 0）确认；若 403 出于真实
       // 权限原因，PROPFIND 同样会被拒并如实返回 false。回退请求共用同一
-      // AbortController，让 10 秒超时覆盖整个检查过程。
+      // AbortController，10 秒预算覆盖到回退完成才清除定时器。
       if (response.status === 403) {
         const propfindResponse = await this.davFetch('PROPFIND', this.getRelativePath(filename), {
           headers: {
@@ -577,7 +603,7 @@ export class WebDAVService {
             'Depth': '0',
           },
           signal: controller.signal,
-          timeoutMs: 10000,
+          timeoutMs: remainingTimeoutMs(),
         });
         clearTimeout(timeoutId);
         return propfindResponse.ok || propfindResponse.status === 207;

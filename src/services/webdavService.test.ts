@@ -383,6 +383,45 @@ describe('WebDAVService 连接测试探测顺序', () => {
     await expect(davService().testConnection()).resolves.toBe(false);
   });
 
+  it('浏览器直连时 10 秒预算覆盖 HEAD 回退（回退停滞会被中止而不是挂死）', async () => {
+    vi.useFakeTimers();
+    try {
+      // PROPFIND 405 正常返回；HEAD 回退停滞不返回（模拟 fetch 只认 signal）
+      vi.mocked(window.fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 405 }))
+        .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+        }));
+
+      const promise = davService().testConnection();
+      const expectation = expect(promise).rejects.toThrow('连接超时');
+      await vi.runAllTimersAsync();
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('桌面端 PROPFIND 失败后剩余预算不足 1s 时跳过 HEAD 回退，总耗时不超预算', async () => {
+    vi.useFakeTimers();
+    try {
+      const webdavRequest = vi.fn(() => new Promise((resolve) => {
+        setTimeout(() => resolve({ success: true, status: 405, statusText: '', body: '' }), 9500);
+      }));
+      window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+      const promise = davService().testConnection();
+      const expectation = expect(promise).rejects.toThrow('连接超时');
+      await vi.advanceTimersByTimeAsync(9600);
+      await expectation;
+      // 回退因剩余预算不足被跳过：只有首发这一次 IPC 请求
+      expect(webdavRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      delete window.electronAPI;
+    }
+  });
+
   it('fileExists 遇 HEAD 403 降级 PROPFIND 确认存在（不支持 HEAD 的服务器）', async () => {
     vi.mocked(window.fetch)
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
