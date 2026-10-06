@@ -202,13 +202,28 @@ function createWindow() {
       if (rendererConsoleErrorBudget.used >= 30) return;
       rendererConsoleErrorBudget.used += 1;
       const details = first && typeof first === 'object' ? first : {};
+      const data = {};
+      if (details.sourceId || details.lineNumber) {
+        data.sourceId = details.sourceId;
+        data.lineNumber = details.lineNumber;
+      }
+      // New-style (details-object) events carry stackTrace: an array of stack
+      // lines for uncaught errors. The legacy (event, level, message, line,
+      // sourceId) shape has no such field and keeps the location-only data.
+      // Sample is capped like the message above (20 lines x 500 chars);
+      // diagLog re-runs redact.sanitizeForLog over data on write, and the
+      // per-line redactInline pass covers credentials embedded mid-line that
+      // whole-value string rules cannot see.
+      if (Array.isArray(details.stackTrace) && details.stackTrace.length > 0) {
+        data.stackTrace = details.stackTrace
+          .slice(0, 20)
+          .map((line) => redact.redactInline(String(line).slice(0, 500)));
+      }
       diagLog.record({
         level: 'error',
         module: 'electron.renderer-console',
         message: String(message ?? '').slice(0, 2000),
-        ...(details.sourceId || details.lineNumber
-          ? { data: { sourceId: details.sourceId, lineNumber: details.lineNumber } }
-          : {}),
+        ...(Object.keys(data).length > 0 ? { data } : {}),
       });
     } catch { /* never break the window */ }
   });
@@ -1716,10 +1731,13 @@ function attachDiagnosticsWebRequestObserver(targetSession) {
     inflight.delete(details.id);
     if (shouldSkipDiagnosticsUrl(details.url)) return;
     try {
+      // Same level policy as netTap: user aborts (net::ERR_ABORTED) are
+      // normal control flow → info; transient network conditions → warn.
+      const netLevel = diagTap.classifyNetErrorCode(details.error);
       diagLog.record({
-        level: 'error',
+        level: netLevel,
         module: 'electron.webRequest',
-        message: `${details.method} ${redact.redactUrl(details.url)} failed`,
+        message: `${details.method} ${redact.redactUrl(details.url)} ${netLevel === 'info' ? 'aborted' : 'failed'}`,
         data: {
           url: redact.redactUrl(details.url),
           method: details.method,

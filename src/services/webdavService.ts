@@ -303,14 +303,18 @@ export class WebDAVService {
 
       // 测试配置中的 path（交由 davFetch 决定走后端代理还是浏览器直连）
 
-      // 先尝试 HEAD 请求检测基本可达性（某些服务器对 PROPFIND/OPTIONS 支持较差）
+      // 先用 PROPFIND（Depth: 0）探测：这是 WebDAV 规范（RFC 4918）定义的标准方法，
+      // 成功返回 200 或 207 Multi-Status。HEAD 并非 WebDAV 规范的必备方法，部分
+      // 服务器（如坚果云 dav.jianguoyun.com）对集合路径的 HEAD 直接返回 403，
+      // 若以 HEAD 首发会让每次测试连接都多付一次 403 往返与一条警告日志。
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
       try {
-        const headResponse = await this.davFetch('HEAD', this.config.path, {
+        const propfindResponse = await this.davFetch('PROPFIND', this.config.path, {
           headers: {
             'Authorization': this.getAuthHeader(),
+            'Depth': '0',
           },
           signal: controller.signal,
           timeoutMs: 10000,
@@ -318,18 +322,17 @@ export class WebDAVService {
 
         clearTimeout(timeoutId);
 
-        if (headResponse.ok) return true;
+        if (propfindResponse.ok || propfindResponse.status === 207) return true;
 
-        // HEAD 不可用时，尝试 PROPFIND（不少服务器返回 207 Multi-Status 表示成功）
-        const propfindResponse = await this.davFetch('PROPFIND', this.config.path, {
+        // PROPFIND 不可用时，降级尝试 HEAD（兼容仅放行普通 HTTP 方法的网关/服务器）
+        const headResponse = await this.davFetch('HEAD', this.config.path, {
           headers: {
             'Authorization': this.getAuthHeader(),
-            'Depth': '0',
           },
           timeoutMs: 10000,
         });
 
-        return propfindResponse.ok || propfindResponse.status === 207;
+        return headResponse.ok;
       } catch (fetchError: unknown) {
         clearTimeout(timeoutId);
         
@@ -545,7 +548,23 @@ export class WebDAVService {
       });
 
       clearTimeout(timeoutId);
-      return response.ok;
+      if (response.ok) return true;
+
+      // HEAD 并非 WebDAV 规范必备方法：部分服务器（如坚果云）对 HEAD 返回 403，
+      // 不能据此断定文件不存在。降级用 PROPFIND（Depth: 0）确认；若 403 出于真实
+      // 权限原因，PROPFIND 同样会被拒并如实返回 false。
+      if (response.status === 403) {
+        const propfindResponse = await this.davFetch('PROPFIND', this.getRelativePath(filename), {
+          headers: {
+            'Authorization': this.getAuthHeader(),
+            'Depth': '0',
+          },
+          timeoutMs: 10000,
+        });
+        return propfindResponse.ok || propfindResponse.status === 207;
+      }
+
+      return false;
     } catch (error) {
       logger.error('webdav', 'WebDAV文件检查失败', error);
       return false;

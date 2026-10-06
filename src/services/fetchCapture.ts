@@ -5,7 +5,8 @@
  * app consumes.
  *
  * Level policy: normal mode records failures only (fetch rejection → error,
- * HTTP 4xx/5xx → warn); debug mode records every request with request headers
+ * user/timeout aborts → info, HTTP 4xx/5xx → warn); debug mode records every
+ * request with request headers
  * (values masked, key names kept), a request-body preview (string bodies,
  * 8KB), and a response preview (16KB) behind three guards:
  *   1. size/type guard — content-length > 256KB or a binary content-type is
@@ -234,6 +235,24 @@ async function readResponsePreview(response: Response): Promise<{ preview: strin
   }
 }
 
+/**
+ * Aborts are normal control flow, not failures: AbortController.abort()
+ * surfaces as a DOMException named AbortError ("signal is aborted without
+ * reason" in Chromium), AbortSignal.timeout() as a DOMException named
+ * TimeoutError. Both record at info level; everything else stays at error.
+ */
+function errorNameOf(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const name = (error as { name?: unknown }).name;
+  return typeof name === 'string' && name ? name : undefined;
+}
+
+function isAbortError(error: unknown): boolean {
+  const name = errorNameOf(error);
+  return name === 'AbortError'
+    || (typeof DOMException !== 'undefined' && error instanceof DOMException && name === 'TimeoutError');
+}
+
 function recordEntry(level: LogLevel, message: string, data: Record<string, unknown>): void {
   const entry: LogEntry = {
     id: `net-${Date.now()}-${++ledgerIdSeq}`,
@@ -337,10 +356,13 @@ export function installFetchCapture(options?: { isDebugMode?: () => boolean }): 
       dispatchCompletion(response, meta, debug);
       return response;
     } catch (error) {
-      recordEntry('error', `${method} ${sanitizeForLog(url)} failed`, {
+      const aborted = isAbortError(error);
+      const errorName = errorNameOf(error);
+      recordEntry(aborted ? 'info' : 'error', `${method} ${sanitizeForLog(url)} ${aborted ? 'aborted' : 'failed'}`, {
         url: sanitizeForLog(url),
         method,
         durationMs: Date.now() - startedAt,
+        ...(errorName ? { errorName } : {}),
         detail: error instanceof Error ? sanitizeForLog(error.message) : String(error),
       });
       throw error;

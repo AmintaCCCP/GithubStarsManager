@@ -1,0 +1,78 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { logger } from './logger';
+import type { LogEntry } from './logger';
+
+function lastEntry(): LogEntry {
+  const entries = logger.getEntries();
+  expect(entries.length).toBeGreaterThan(0);
+  return entries[entries.length - 1];
+}
+
+describe('logger', () => {
+  beforeEach(() => {
+    logger.clear();
+    logger.setLevel('info');
+  });
+
+  describe('Error data serialization (Error.message/.stack are non-enumerable)', () => {
+    it('records a bare Error as { name, message, stack } instead of {}', () => {
+      const token = `ghp_${'a'.repeat(36)}`;
+      const error = new Error(`boom with ${token}`);
+      logger.warn('githubApi', 'Failed to fetch releases for owner/repo', error);
+
+      const entry = lastEntry();
+      expect(entry.level).toBe('warn');
+      const data = entry.data as { name?: string; message?: string; stack?: string };
+      expect(data.name).toBe('Error');
+      expect(data.message).toContain('boom');
+      expect(typeof data.stack).toBe('string');
+      // Message and stack are inline-redacted: the raw token never survives.
+      expect(data.message).not.toContain(token);
+      expect(data.message).toContain('***');
+      expect(data.stack).not.toContain(token);
+      expect(data.stack).toContain('***');
+    });
+
+    it('replaces Error values inside plain objects with sanitized records', () => {
+      const fetchError = new TypeError('Failed to fetch');
+      logger.warn('xTweet', 'GraphQL batch enrichment failed, falling back to REST', {
+        endpoint: '/graphql',
+        attempt: 2,
+        error: fetchError,
+      });
+
+      const data = lastEntry().data as Record<string, unknown>;
+      expect(data.endpoint).toBe('/graphql');
+      expect(data.attempt).toBe(2);
+      const serialized = data.error as { name?: string; message?: string; stack?: string };
+      expect(serialized.name).toBe('TypeError');
+      expect(serialized.message).toBe('Failed to fetch');
+      expect(typeof serialized.stack).toBe('string');
+    });
+
+    it('keeps object data without Error values structurally unchanged', () => {
+      logger.info('app', 'plain data', { a: 1, nested: { b: 'x' } });
+      expect(lastEntry().data).toEqual({ a: 1, nested: { b: 'x' } });
+    });
+
+    it('keeps the existing field-name masking for non-Error data', () => {
+      logger.info('app', 'sensitive', { token: 'value-token-123456', nested: { apiKey: 'key-abcdef123456' } });
+      const data = lastEntry().data as { token?: string; nested?: { apiKey?: string } };
+      expect(data.token).toBe('***3456');
+      expect(data.nested?.apiKey).toBe('***3456');
+    });
+
+    it('records non-Error data (string) through the plain sanitizer', () => {
+      logger.error('app', 'thrown string', 'plain failure text');
+      expect(lastEntry().data).toBe('plain failure text');
+    });
+
+    it('records an Error whose message itself looks like a URL with secrets redacted', () => {
+      const error = new Error('request to https://api.example.com/v1/data?token=supersecret99 failed');
+      logger.warn('net', 'request failed', error);
+      const data = lastEntry().data as { message?: string };
+      expect(data.message).toContain('token=***');
+      expect(data.message).not.toContain('supersecret99');
+    });
+  });
+});

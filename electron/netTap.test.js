@@ -79,6 +79,44 @@ describe('netTap.wrapFetch', () => {
     assert.ok(entries[0].data.detail.includes('ECONNREFUSED'));
   });
 
+  it('records user aborts (net::ERR_ABORTED) as info', async () => {
+    const { entries, record } = collect();
+    const boom = Object.assign(new Error('Failed to fetch'), { cause: new Error('net::ERR_ABORTED') });
+    const tapped = wrapFetch(async () => { throw boom; }, { source: 'test', record });
+    await assert.rejects(() => tapped('https://api.example.com/x'), (err) => err === boom);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].level, 'info');
+    assert.match(entries[0].message, / aborted$/);
+    // Chromium net errors carry no .code, so the marker survives in the
+    // joined cause chain (detail), not in causeCode/causeMessage.
+    assert.ok(entries[0].data.detail.includes('net::ERR_ABORTED'));
+  });
+
+  it('records transient network conditions (net::ERR_NETWORK_CHANGED) as warn', async () => {
+    const { entries, record } = collect();
+    const boom = Object.assign(new Error('Failed to fetch'), { cause: new Error('net::ERR_NETWORK_CHANGED') });
+    const tapped = wrapFetch(async () => { throw boom; }, { source: 'test', record });
+    await assert.rejects(() => tapped('https://api.example.com/x'), (err) => err === boom);
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].level, 'warn');
+    assert.match(entries[0].message, / failed$/);
+  });
+
+  it('classifies Chromium net error codes: abort → info, transient → warn, rest → error', () => {
+    const { classifyNetErrorCode, classifyNetFailure } = require('./netTap');
+    assert.equal(classifyNetErrorCode('net::ERR_ABORTED'), 'info');
+    assert.equal(classifyNetErrorCode('net::ERR_NETWORK_CHANGED'), 'warn');
+    assert.equal(classifyNetErrorCode('net::ERR_INTERNET_DISCONNECTED'), 'warn');
+    assert.equal(classifyNetErrorCode('net::ERR_CONNECTION_RESET'), 'warn');
+    assert.equal(classifyNetErrorCode('net::ERR_NAME_NOT_RESOLVED'), 'error');
+    assert.equal(classifyNetErrorCode('net::ERR_CONNECTION_REFUSED'), 'error');
+    assert.equal(classifyNetErrorCode(undefined), 'error');
+    // causeCode (a .code property) and causeMessage (Chromium text) both work
+    assert.equal(classifyNetFailure({ causeCode: 'net::ERR_ABORTED' }), 'info');
+    assert.equal(classifyNetFailure({ causeMessage: 'net::ERR_NETWORK_CHANGED' }), 'warn');
+    assert.equal(classifyNetFailure({}), 'error');
+  });
+
   it('debug mode records success requests with sanitized headers', async () => {
     const { entries, record } = collect();
     const tapped = wrapFetch(

@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StorageValue } from 'zustand/middleware';
 import {
   getStorageEntriesStrict,
@@ -661,6 +661,99 @@ describe('sharded persist storage', () => {
     expect((await readShardState('core')).language).toBe('en');
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
     expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'en' });
+  });
+});
+
+describe('idle 大分片写入节流', () => {
+  // 大分片按上次成功写入的序列化体积判定（阈值 SHARD_SIZE_WARN_BYTES = 5MB），
+  // 用 5MB+ 的字符串构造 releases 分片。
+  const bigBlob = (ch: string): string => ch.repeat(5 * 1024 * 1024 + 1024);
+  const bigReleases = [{ id: 1, blob: bigBlob('x') }];
+
+  // fake-indexeddb 的事务推进依赖真实 setImmediate；因此只 fake Date/setTimeout，
+  // 既能用 advanceTimersByTimeAsync 推进防抖与冷却时钟，又保留可自然 await 的 IDB。
+  const settle = async (): Promise<void> => {
+    for (let i = 0; i < 10; i++) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+  };
+  const advanceThroughDebounce = async (): Promise<void> => {
+    await vi.advanceTimersByTimeAsync(1100); // 1s 防抖 + idle 回调
+    await settle();
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('冷却期内的多次 idle 写入合并为一次最终写，落盘为最新值', async () => {
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot(); // 首次写入建立基准（releases 序列化体积 > 5MB）
+    const savedAtAfterFirst = (await readMeta())?.savedAt;
+
+    // 冷却期内第 1 次写入：releases 引用变化 → 被推迟，磁盘保持基准内容
+    const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
+    debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
+    await advanceThroughDebounce();
+    expect((await readShardState('releases')).releases).toEqual(bigReleases);
+
+    // 冷却期内第 2 次写入：与第 1 次合并，定时器重新对齐到冷却期末
+    const releasesV3 = [{ id: 3, blob: bigBlob('z') }];
+    debouncedPersistStorage.setItem(KEY, {
+      state: { ...baseState, releases: releasesV3, theme: 'light' },
+      version: 16,
+    });
+    await advanceThroughDebounce();
+    expect((await readShardState('releases')).releases).toEqual(bigReleases);
+
+    // 冷却到期（距上次成功写入 60s）：定时器触发一次最终写，内容为最新值
+    await vi.advanceTimersByTimeAsync(60_000);
+    await settle();
+    expect((await readShardState('releases')).releases).toEqual(releasesV3);
+    expect((await readShardState('core')).theme).toBe('light');
+    expect((await readMeta())?.savedAt).not.toBe(savedAtAfterFirst);
+  });
+
+  it('冷却期外的 idle 写入不再等待，到点立即落盘', async () => {
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    // 距上次写入 61s（冷却已过）：防抖+idle 到点后直接写入，无额外推迟
+    await vi.advanceTimersByTimeAsync(61_000);
+    const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
+    debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
+    await advanceThroughDebounce();
+    expect((await readShardState('releases')).releases).toEqual(releasesV2);
+  });
+
+  it('flush 等非 idle 来源绕过节流，冷却期内也立即写入', async () => {
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    // 刚写完大分片（冷却期内）、不推进时钟：flush（pagehide/visibilitychange 路径）必须立即落盘
+    const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
+    debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
+    await flushPendingPersistSnapshot();
+    expect((await readShardState('releases')).releases).toEqual(releasesV2);
+  });
+
+  it('大分片冷却期内，仅小分片变化仍立即写入', async () => {
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot();
+
+    // releases 引用未变（仅 core 的 theme 变化）：不落入大分片冷却，防抖后立即写入
+    debouncedPersistStorage.setItem(KEY, { state: { ...baseState, theme: 'light' }, version: 16 });
+    await advanceThroughDebounce();
+    expect((await readShardState('core')).theme).toBe('light');
+    expect((await readShardState('releases')).releases).toEqual(bigReleases);
   });
 });
 

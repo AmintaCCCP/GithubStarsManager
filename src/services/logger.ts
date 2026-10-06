@@ -28,6 +28,36 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
+function isErrorValue(value: unknown): boolean {
+  return value instanceof Error
+    || (typeof DOMException !== 'undefined' && value instanceof DOMException);
+}
+
+/**
+ * Error values need a pre-pass before sanitizeForLog: `message` / `stack` are
+ * non-enumerable, so the object walk cannot see them and a bare Error would
+ * be logged as `{}`. A bare Error is replaced with sanitizeError's
+ * { name, message, stack } record (inline-redacted, stack capped); inside a
+ * plain object, own enumerable properties holding an Error are replaced with
+ * the same record. Everything else passes through untouched, so the existing
+ * field-name masking behavior is unchanged.
+ */
+function prepareErrorValues(data: unknown): unknown {
+  if (isErrorValue(data)) return sanitizeError(data);
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return data;
+  let hasError = false;
+  const shallow: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (isErrorValue(value)) {
+      shallow[key] = sanitizeError(value);
+      hasError = true;
+    } else {
+      shallow[key] = value;
+    }
+  }
+  return hasError ? shallow : data;
+}
+
 class Logger {
   private buffer: LogEntry[] = [];
   private maxEntries = 2000;
@@ -38,7 +68,7 @@ class Logger {
 
     // Sanitize at write time — buffer never contains secrets
     const sanitizedMessage = typeof message === 'string' ? sanitizeForLog(message) as string : String(message);
-    const sanitizedData = data !== undefined ? sanitizeForLog(data) : undefined;
+    const sanitizedData = data !== undefined ? sanitizeForLog(prepareErrorValues(data)) : undefined;
 
     const entry: LogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

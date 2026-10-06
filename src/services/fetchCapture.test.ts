@@ -57,6 +57,59 @@ describe('fetchCapture', () => {
     expect(sinkEntries.length).toBe(2);
   });
 
+  it('records user aborts (AbortError) as info with errorName, not error', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      throw new DOMException('signal is aborted without reason', 'AbortError');
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/aborted').catch(() => {});
+
+    const entries = getNetworkEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0].level).toBe('info');
+    expect(entries[0].message).toContain('aborted');
+    const data = entries[0].data as Record<string, unknown>;
+    expect(data.errorName).toBe('AbortError');
+    // jsdom's DOMException is not an Error subclass, so detail falls back to
+    // String(error) ("AbortError: <message>"); assert on the message itself.
+    expect(String(data.detail)).toContain('signal is aborted without reason');
+  });
+
+  it('records timeout aborts (DOMException TimeoutError) as info with errorName', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      throw new DOMException('The operation timed out', 'TimeoutError');
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/timeout').catch(() => {});
+
+    const entries = getNetworkEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0].level).toBe('info');
+    expect((entries[0].data as Record<string, unknown>).errorName).toBe('TimeoutError');
+  });
+
+  it('keeps non-abort rejections at error level and attaches errorName', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/reject').catch(() => {});
+
+    const entries = getNetworkEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0].level).toBe('error');
+    expect(entries[0].message).toContain('failed');
+    const data = entries[0].data as Record<string, unknown>;
+    expect(data.errorName).toBe('TypeError');
+    expect(data.detail).toBe('fetch failed');
+  });
+
   it('keeps request/response forwarding transparent', async () => {
     const impl: FetchStub = vi.fn(async () => jsonResponse('payload'));
     (window as unknown as { fetch: FetchStub }).fetch = impl;

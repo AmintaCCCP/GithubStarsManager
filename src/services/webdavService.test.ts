@@ -308,3 +308,74 @@ describe('WebDAVService 上传重试策略', () => {
     }
   });
 });
+
+describe('WebDAVService 连接测试探测顺序', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('先发 PROPFIND（Depth: 0），207 即成功且不再探测 HEAD', async () => {
+    // 坚果云等服务器对集合 HEAD 返回 403：PROPFIND 成功时不应多付一次 403
+    vi.mocked(window.fetch).mockResolvedValue(new Response(null, { status: 207 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect(url).toBe('https://dav.example.com/backup');
+    expect(init?.method).toBe('PROPFIND');
+    expect(init?.headers).toMatchObject({ Depth: '0', Authorization: /^Basic / });
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('PROPFIND 200 同样视为成功', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('PROPFIND 不可用（405）时降级 HEAD，HEAD 200 即成功', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'HEAD']);
+  });
+
+  it('PROPFIND 与 HEAD 都失败时返回 false（不抛错）', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+
+    await expect(davService().testConnection()).resolves.toBe(false);
+  });
+
+  it('fileExists 遇 HEAD 403 降级 PROPFIND 确认存在（不支持 HEAD 的服务器）', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(
+        '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"><D:response><D:href>/backup/data.json</D:href></D:response></D:multistatus>',
+        { status: 207 },
+      ));
+
+    await expect(davService().fileExists('data.json')).resolves.toBe(true);
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['HEAD', 'PROPFIND']);
+  });
+
+  it('fileExists 的 HEAD 404 仍直接判定不存在，不追加探测', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response(null, { status: 404 }));
+
+    await expect(davService().fileExists('missing.json')).resolves.toBe(false);
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+  });
+});

@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "com.githubstarsmanager.repo-insights",
   "name": "Repo Insights",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Per-repository insights dashboard: commit activity, code churn, contributors, languages, release cadence, community health, security advisories and a computed repository health score, fetched live from the GitHub API through the host bridge.",
   "author": "GithubStarsManager",
   "apiVersion": "1",
