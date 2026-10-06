@@ -342,6 +342,33 @@ describe('WebDAVService 连接测试探测顺序', () => {
     expect(window.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('PROPFIND 207 响应体报告目标资源 404 时判定失败（不误报连接可用）', async () => {
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch).mockResolvedValue(new Response(xml, {
+      status: 207,
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    }));
+
+    await expect(davService().testConnection()).resolves.toBe(false);
+  });
+
+  it('PROPFIND 207 仅属性级 propstat 404（无资源级 status）仍视为成功', async () => {
+    // 个别属性（如 getcontentlength）缺失是正常现象，不代表资源不存在
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup</D:href>' +
+      '<D:propstat><D:prop><D:getcontentlength/></D:prop>' +
+      '<D:status>HTTP/1.1 404 Property Not Found</D:status></D:propstat>' +
+      '</D:response></D:multistatus>';
+    vi.mocked(window.fetch).mockResolvedValue(new Response(xml, {
+      status: 207,
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+  });
+
   it('PROPFIND 不可用（405）时降级 HEAD，HEAD 200 即成功', async () => {
     vi.mocked(window.fetch)
       .mockResolvedValueOnce(new Response(null, { status: 405 }))
@@ -437,6 +464,20 @@ describe('WebDAVService 连接测试探测顺序', () => {
     // 回退 PROPFIND 与首发 HEAD 共用同一 AbortController，超时覆盖整个检查
     const [headInit, propfindInit] = vi.mocked(window.fetch).mock.calls.map(([, init]) => init);
     expect(propfindInit?.signal).toBe(headInit?.signal);
+  });
+
+  it('fileExists 的 PROPFIND 207 响应体报告目标文件 404 时返回 false', async () => {
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup/data.json</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(xml, {
+        status: 207,
+        headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+      }));
+
+    await expect(davService().fileExists('data.json')).resolves.toBe(false);
   });
 
   it('fileExists 的 HEAD 404 仍直接判定不存在，不追加探测', async () => {

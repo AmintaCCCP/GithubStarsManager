@@ -358,9 +358,11 @@ export function installFetchCapture(options?: { isDebugMode?: () => boolean }): 
     } catch (error) {
       const aborted = isAbortError(error);
       const errorName = errorNameOf(error);
-      // 错误名也是自由文本（自定义 Error 子类可携带任意 name）：写日志前
-      // 与 message 同样做行内脱敏并限长。
-      const sanitizedErrorName = errorName ? redactInline(errorName).slice(0, 120) : undefined;
+      // 错误名也是自由文本（自定义 Error 子类可携带任意 name）：写日志前先做
+      // 整值脱敏（长令牌形态的 name 只有整值规则能识别），再行内脱敏并限长。
+      const sanitizedErrorName = errorName
+        ? redactInline(sanitizeForLog(errorName) as string).slice(0, 120)
+        : undefined;
       recordEntry(aborted ? 'info' : 'error', `${method} ${sanitizeForLog(url)} ${aborted ? 'aborted' : 'failed'}`, {
         url: sanitizeForLog(url),
         method,

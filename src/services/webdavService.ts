@@ -352,7 +352,16 @@ export class WebDAVService {
           return headAfterError.ok;
         }
 
-        if (propfindResponse.ok || propfindResponse.status === 207) {
+        // 注意顺序：207 ∈ [200,299]，Response.ok 对 207 也为 true，
+        // 必须先判 207 再判 ok，否则多状态体检查永远不可达。
+        if (propfindResponse.status === 207) {
+          // RFC 4918：207 外层成功不代表目标资源本身成功，响应体可为目标
+          // href 携带资源级失败状态；须检查目标路径的探测结果再判定。
+          const targetOk = await this.multistatusTargetSucceeded(propfindResponse, this.config.path);
+          clearTimeout(timeoutId);
+          return targetOk;
+        }
+        if (propfindResponse.ok) {
           clearTimeout(timeoutId);
           return true;
         }
@@ -380,6 +389,45 @@ export class WebDAVService {
       }
     } catch (error: unknown) {
       return this.handleNetworkError(error, '连接测试');
+    }
+  }
+
+  /**
+   * RFC 4918：207 Multi-Status 的外层成功不代表目标资源本身成功——响应体可为
+   * 目标 href 携带资源级失败状态（如 404）。解析多状态体并检查目标路径对应的
+   * response 条目：无资源级 status（仅属性级 propstat 状态，个别属性 404 属
+   * 正常现象）或资源级状态为 2xx 视为成功。找不到目标条目或解析失败时按外层
+   * 207 放行——href 形态因服务器而异（绝对 URI、百分号编码、尾斜杠），
+   * 过度严格会把可用连接误判为失败。
+   */
+  private async multistatusTargetSucceeded(response: Response, targetPath: string): Promise<boolean> {
+    try {
+      const body = await response.text();
+      const doc = new DOMParser().parseFromString(body, 'application/xml');
+      const responses = Array.from(doc.getElementsByTagName('*')).filter((el) => el.localName === 'response');
+      if (responses.length === 0) return true;
+
+      const normalizedTarget = `/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
+      const match = responses.find((el) => {
+        const hrefEl = Array.from(el.children).find((child) => child.localName === 'href');
+        if (!hrefEl) return false;
+        let href = hrefEl.textContent ?? '';
+        try {
+          href = decodeURIComponent(href);
+        } catch { /* 非法百分号编码按原文匹配 */ }
+        const path = href.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').replace(/\/+$/, '').toLowerCase();
+        return path === normalizedTarget || path.endsWith(normalizedTarget) || normalizedTarget.endsWith(path);
+      });
+      if (!match) return true;
+
+      // 只认 response 的直接子级 status（资源级）；propstat 内的 status 属于
+      // 个别属性，404 不代表资源不存在。
+      const statusEl = Array.from(match.children).find((child) => child.localName === 'status');
+      if (!statusEl) return true;
+      const code = Number((statusEl.textContent ?? '').match(/\b(\d{3})\b/)?.[1] ?? 0);
+      return code === 0 ? true : code >= 200 && code < 300;
+    } catch {
+      return true; // 解析失败按外层 207 放行，不误伤可用连接
     }
   }
 
@@ -606,7 +654,10 @@ export class WebDAVService {
           timeoutMs: remainingTimeoutMs(),
         });
         clearTimeout(timeoutId);
-        return propfindResponse.ok || propfindResponse.status === 207;
+        // 207 ∈ [200,299] 时 Response.ok 为 true，须先判 207 检查多状态体
+        return propfindResponse.status === 207
+          ? await this.multistatusTargetSucceeded(propfindResponse, this.getRelativePath(filename))
+          : propfindResponse.ok;
       }
 
       clearTimeout(timeoutId);
