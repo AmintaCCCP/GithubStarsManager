@@ -202,22 +202,16 @@ function createWindow() {
       if (rendererConsoleErrorBudget.used >= 30) return;
       rendererConsoleErrorBudget.used += 1;
       const details = first && typeof first === 'object' ? first : {};
+      // Stacks are NOT available here: Electron 44's console-message details
+      // only carry message/level/lineNumber/sourceId/frame. Uncaught renderer
+      // errors get their (sanitized) stacks from the renderer-side
+      // ui.global entries (globalErrorHandlers, installed before any app
+      // code) forwarded over diagnosticsBridge IPC; this handler is only the
+      // last-resort backstop for errors that escape that path.
       const data = {};
       if (details.sourceId || details.lineNumber) {
         data.sourceId = details.sourceId;
         data.lineNumber = details.lineNumber;
-      }
-      // New-style (details-object) events carry stackTrace: an array of stack
-      // lines for uncaught errors. The legacy (event, level, message, line,
-      // sourceId) shape has no such field and keeps the location-only data.
-      // Sample is capped like the message above (20 lines x 500 chars);
-      // diagLog re-runs redact.sanitizeForLog over data on write, and the
-      // per-line redactInline pass covers credentials embedded mid-line that
-      // whole-value string rules cannot see.
-      if (Array.isArray(details.stackTrace) && details.stackTrace.length > 0) {
-        data.stackTrace = details.stackTrace
-          .slice(0, 20)
-          .map((line) => redact.redactInline(String(line).slice(0, 500)));
       }
       diagLog.record({
         level: 'error',

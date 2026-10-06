@@ -311,35 +311,55 @@ export class WebDAVService {
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
       try {
-        const propfindResponse = await this.davFetch('PROPFIND', this.config.path, {
+        let propfindResponse: Response;
+        try {
+          propfindResponse = await this.davFetch('PROPFIND', this.config.path, {
+            headers: {
+              'Authorization': this.getAuthHeader(),
+              'Depth': '0',
+            },
+            signal: controller.signal,
+            timeoutMs: 10000,
+          });
+        } catch (propfindError: unknown) {
+          // 浏览器直连时，PROPFIND 可能被 CORS 预检直接拒绝而抛网络错误
+          //（HEAD 是 CORS 安全方法、无预检问题）：非超时错误时降级 HEAD 再试，
+          // 不能把可用的连接误报为失败。超时错误仍按连接超时处理。
+          if ((propfindError as Error).name === 'AbortError') throw propfindError;
+          const headAfterError = await this.davFetch('HEAD', this.config.path, {
+            headers: {
+              'Authorization': this.getAuthHeader(),
+            },
+            signal: controller.signal,
+            timeoutMs: 10000,
+          });
+          clearTimeout(timeoutId);
+          return headAfterError.ok;
+        }
+
+        clearTimeout(timeoutId);
+
+        if (propfindResponse.ok || propfindResponse.status === 207) return true;
+
+        // PROPFIND 不可用时，降级尝试 HEAD（兼容仅放行普通 HTTP 方法的网关/服务器）。
+        // 回退请求共用同一 AbortController，让 10 秒超时覆盖整个探测过程。
+        const headResponse = await this.davFetch('HEAD', this.config.path, {
           headers: {
             'Authorization': this.getAuthHeader(),
-            'Depth': '0',
           },
           signal: controller.signal,
           timeoutMs: 10000,
         });
 
         clearTimeout(timeoutId);
-
-        if (propfindResponse.ok || propfindResponse.status === 207) return true;
-
-        // PROPFIND 不可用时，降级尝试 HEAD（兼容仅放行普通 HTTP 方法的网关/服务器）
-        const headResponse = await this.davFetch('HEAD', this.config.path, {
-          headers: {
-            'Authorization': this.getAuthHeader(),
-          },
-          timeoutMs: 10000,
-        });
-
         return headResponse.ok;
       } catch (fetchError: unknown) {
         clearTimeout(timeoutId);
-        
+
         if ((fetchError as Error).name === 'AbortError') {
           throw new Error('连接超时。请检查WebDAV服务器是否可访问。');
         }
-        
+
         throw fetchError;
       }
     } catch (error: unknown) {
@@ -535,10 +555,9 @@ export class WebDAVService {
   }
 
   async fileExists(filename: string): Promise<boolean> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
-
       const response = await this.davFetch('HEAD', this.getRelativePath(filename), {
         headers: {
           'Authorization': this.getAuthHeader(),
@@ -547,25 +566,27 @@ export class WebDAVService {
         timeoutMs: 10000,
       });
 
-      clearTimeout(timeoutId);
-      if (response.ok) return true;
-
       // HEAD 并非 WebDAV 规范必备方法：部分服务器（如坚果云）对 HEAD 返回 403，
       // 不能据此断定文件不存在。降级用 PROPFIND（Depth: 0）确认；若 403 出于真实
-      // 权限原因，PROPFIND 同样会被拒并如实返回 false。
+      // 权限原因，PROPFIND 同样会被拒并如实返回 false。回退请求共用同一
+      // AbortController，让 10 秒超时覆盖整个检查过程。
       if (response.status === 403) {
         const propfindResponse = await this.davFetch('PROPFIND', this.getRelativePath(filename), {
           headers: {
             'Authorization': this.getAuthHeader(),
             'Depth': '0',
           },
+          signal: controller.signal,
           timeoutMs: 10000,
         });
+        clearTimeout(timeoutId);
         return propfindResponse.ok || propfindResponse.status === 207;
       }
 
-      return false;
+      clearTimeout(timeoutId);
+      return response.ok;
     } catch (error) {
+      clearTimeout(timeoutId);
       logger.error('webdav', 'WebDAV文件检查失败', error);
       return false;
     }

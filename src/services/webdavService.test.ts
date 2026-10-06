@@ -350,6 +350,29 @@ describe('WebDAVService 连接测试探测顺序', () => {
     await expect(davService().testConnection()).resolves.toBe(true);
 
     expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'HEAD']);
+    // 回退 HEAD 与首发 PROPFIND 共用同一 AbortController：10s 超时覆盖整个探测
+    const [propfindInit, headInit] = vi.mocked(window.fetch).mock.calls.map(([, init]) => init);
+    expect(headInit?.signal).toBeInstanceOf(AbortSignal);
+    expect(headInit?.signal).toBe(propfindInit?.signal);
+  });
+
+  it('PROPFIND 抛网络错误（如 CORS 预检拒绝）时仍降级 HEAD', async () => {
+    // 浏览器直连：PROPFIND 预检不被放行会直接抛 TypeError，而非返回 405
+    vi.mocked(window.fetch)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'HEAD']);
+  });
+
+  it('PROPFIND 超时（AbortError）不降级 HEAD，直接按连接超时抛出', async () => {
+    vi.mocked(window.fetch).mockRejectedValueOnce(
+      Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
+    );
+
+    await expect(davService().testConnection()).rejects.toThrow('连接超时');
+    expect(window.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('PROPFIND 与 HEAD 都失败时返回 false（不抛错）', async () => {
@@ -370,6 +393,9 @@ describe('WebDAVService 连接测试探测顺序', () => {
 
     await expect(davService().fileExists('data.json')).resolves.toBe(true);
     expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['HEAD', 'PROPFIND']);
+    // 回退 PROPFIND 与首发 HEAD 共用同一 AbortController，超时覆盖整个检查
+    const [headInit, propfindInit] = vi.mocked(window.fetch).mock.calls.map(([, init]) => init);
+    expect(propfindInit?.signal).toBe(headInit?.signal);
   });
 
   it('fileExists 的 HEAD 404 仍直接判定不存在，不追加探测', async () => {

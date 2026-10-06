@@ -50,6 +50,36 @@ describe('logger', () => {
       expect(typeof serialized.stack).toBe('string');
     });
 
+    it('replaces Errors nested at any depth inside objects and arrays', () => {
+      const timeoutError = new Error('timeout');
+      logger.warn('webdav', 'probe failed', {
+        request: { path: '/dav', error: timeoutError },
+        attempts: [new TypeError('Failed to fetch'), 'aborted'],
+      });
+
+      const data = lastEntry().data as {
+        request?: { path?: string; error?: { name?: string; message?: string } };
+        attempts?: Array<{ name?: string; message?: string } | string>;
+      };
+      expect(data.request?.path).toBe('/dav');
+      expect(data.request?.error?.name).toBe('Error');
+      expect(data.request?.error?.message).toBe('timeout');
+      expect(typeof (data.request?.error as { stack?: string }).stack).toBe('string');
+      const firstAttempt = data.attempts?.[0] as { name?: string; message?: string };
+      expect(firstAttempt.name).toBe('TypeError');
+      expect(firstAttempt.message).toBe('Failed to fetch');
+      expect(data.attempts?.[1]).toBe('aborted');
+    });
+
+    it('does not loop forever on circular references containing no Errors', () => {
+      const circular: Record<string, unknown> = { name: 'root' };
+      circular.self = circular;
+      logger.info('app', 'circular data', circular);
+      const data = lastEntry().data as Record<string, unknown>;
+      expect(data.name).toBe('root');
+      // The circular walk is handled by sanitizeForLog; the entry still records.
+    });
+
     it('keeps object data without Error values structurally unchanged', () => {
       logger.info('app', 'plain data', { a: 1, nested: { b: 'x' } });
       expect(lastEntry().data).toEqual({ a: 1, nested: { b: 'x' } });

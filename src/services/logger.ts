@@ -36,26 +36,30 @@ function isErrorValue(value: unknown): boolean {
 /**
  * Error values need a pre-pass before sanitizeForLog: `message` / `stack` are
  * non-enumerable, so the object walk cannot see them and a bare Error would
- * be logged as `{}`. A bare Error is replaced with sanitizeError's
- * { name, message, stack } record (inline-redacted, stack capped); inside a
- * plain object, own enumerable properties holding an Error are replaced with
- * the same record. Everything else passes through untouched, so the existing
- * field-name masking behavior is unchanged.
+ * be logged as `{}`. Errors are replaced — at the top level, inside plain
+ * objects at any depth, and inside arrays — with sanitizeError's
+ * { name, message, stack } record (inline-redacted, stack capped). Structures
+ * without any Error are returned by reference, so the existing field-name
+ * masking behavior is unchanged; the `seen` WeakSet guards cycles the same
+ * way sanitizeForLog does (a revisited node is left as-is for that walk to
+ * redact).
  */
-function prepareErrorValues(data: unknown): unknown {
+function prepareErrorValues(data: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (isErrorValue(data)) return sanitizeError(data);
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return data;
-  let hasError = false;
-  const shallow: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(data)) {
-    if (isErrorValue(value)) {
-      shallow[key] = sanitizeError(value);
-      hasError = true;
-    } else {
-      shallow[key] = value;
-    }
-  }
-  return hasError ? shallow : data;
+  if (typeof data !== 'object' || data === null) return data;
+  if (seen.has(data)) return data;
+  seen.add(data);
+  let changed = false;
+  const convert = (value: unknown): unknown => {
+    const next = prepareErrorValues(value, seen);
+    if (next !== value) changed = true;
+    return next;
+  };
+  const converted: unknown = Array.isArray(data)
+    ? data.map(convert)
+    : Object.fromEntries(Object.entries(data as Record<string, unknown>).map(([key, value]) => [key, convert(value)]));
+  seen.delete(data);
+  return changed ? converted : data;
 }
 
 class Logger {
