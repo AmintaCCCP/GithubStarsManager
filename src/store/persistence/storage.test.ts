@@ -682,13 +682,14 @@ describe('idle 大分片写入节流', () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
   };
-  /** 轮询磁盘直到 check 成立（fake-indexeddb 的提交是真实 macrotask，轮数有界）；超限抛错并带上实际读值。 */
-  const settleUntil = async (check: () => Promise<boolean>, message: string): Promise<void> => {
-    for (let i = 0; i < 500; i++) {
+  /** 轮询磁盘直到 check 成立；按实际经过时间截止（默认 5s），两次检查之间短暂真实等待——迭代数上限在极慢环境下可能先于防抖耗尽。 */
+  const settleUntil = async (check: () => Promise<boolean>, message: string, deadlineMs = 5000): Promise<void> => {
+    const deadline = Date.now() + deadlineMs;
+    for (;;) {
       if (await check()) return;
-      await new Promise<void>((resolve) => setImmediate(resolve));
+      if (Date.now() >= deadline) throw new Error(`${message}（等待超时，实际状态未满足）`);
+      await realWait(5);
     }
-    throw new Error(`${message}（等待超时，实际状态未满足）`);
   };
   const diskReleasesEquals = async (expected: unknown): Promise<boolean> => {
     const current = (await readShardState('releases')).releases;
