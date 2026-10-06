@@ -144,13 +144,16 @@ test('installs and serves the V1.2 page-only example without starting a Worker',
     pluginsRoot: path.join(workspace, 'plugins'),
     statePath: path.join(workspace, 'plugins-state.json'),
   });
-  const source = path.resolve(__dirname, '../../examples/plugins/repo-health-page');
-  const pluginId = 'com.example.repo-health-page';
+  const source = path.resolve(__dirname, '../../examples/plugins/repo-insights');
+  const pluginId = 'com.githubstarsmanager.repo-insights';
   assert.deepEqual(manager.installFromDirectory(source), { success: true, pluginId });
-  assert.deepEqual(await manager.enable(pluginId, ['repositories:read']), { success: true });
-  const page = manager.getPage(pluginId, 'dashboard');
+  assert.deepEqual(
+    await manager.enable(pluginId, ['repositories:read', 'network:api.github.com', 'storage', 'ai:invoke']),
+    { success: true }
+  );
+  const page = manager.getPage(pluginId, 'insights');
   assert.equal(page.success, true);
-  assert.match(manager.readPageResource(page.url).body.toString(), /Repository Health/);
+  assert.match(manager.readPageResource(page.url).body.toString(), /Repository Insights/);
   assert.match(manager.readPageResource(page.url.replace('index.html', 'index.js')).body.toString(), /repositories\.search/);
   await manager.disable(pluginId);
   assert.equal(manager.readPageResource(page.url), null);

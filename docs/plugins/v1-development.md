@@ -47,7 +47,7 @@ V1 接受以下权限。未实现的项可以出现在 Manifest 中，但不会�
 | `web:search` | 仅页面 Bridge：逐次确认后查询用户配置的 SearXNG。Worker 不获得该方法。 |
 | `repositories:write` | 预留，V1 不提供写入仓库的 Host API。 |
 | `gists:read` | 预留，V1 不提供 Gist 查询。 |
-| `network:<domain>` | 预留，V1.3 不提供通用网络请求。 |
+| `network:<domain>` | 仅页面 Bridge（V1.5）：按主机授权的只读 GET 代理，当前仅支持 `api.github.com` 且端点受白名单限制，见「V1.5 页面网络能力」。Worker 不获得该方法；通用网络请求仍不提供。 |
 
 ## Manifest
 
@@ -187,13 +187,13 @@ return {
 ```json
 {
   "manifestVersion": 1,
-  "id": "com.example.repo-health-page",
-  "name": "Repo Health Page",
+  "id": "com.githubstarsmanager.repo-insights",
+  "name": "Repo Insights",
   "version": "0.1.0",
   "apiVersion": "1",
   "permissions": ["repositories:read"],
   "contributes": {
-    "pages": [{ "id": "dashboard", "title": "Repository Health", "entry": "ui/index.html" }]
+    "pages": [{ "id": "insights", "title": "Repository Insights", "entry": "ui/index.html" }]
   }
 }
 ```
@@ -217,7 +217,7 @@ DOM 中还应注意 `:root` 匹配不到 shadow tree 里的元素，自定义属
 ```js
 window.parent.postMessage({
   type: 'plugin-page:request',
-  pluginId: 'com.example.repo-health-page',
+  pluginId: 'com.githubstarsmanager.repo-insights',
   pageId: 'dashboard',
   requestId: 'request_1',
   token,
@@ -237,7 +237,7 @@ window.parent.postMessage({
 并非实时 GitHub API；没有 `repositories:read`、`releases:read` 或 `storage` 权限时，
 对应方法会被拒绝。页面消息还受来源、临时 token、大小、并发数和频率限制。
 
-完整可安装示例见 `examples/plugins/repo-health-page`。页面关闭、插件停用或卸载后，
+完整可安装示例见 `examples/plugins/repo-insights`。页面关闭、插件停用或卸载后，
 宿主不再提供该页面资源和能力调用。V1.2 仍是本地插件开发功能，不代表插件商店审核
 或对所有恶意本地代码提供完整安全沙箱。
 
@@ -322,7 +322,8 @@ iframe，能力桥与 V1.2/V1.3 完全一致）。
 
 `context` 由宿主主动下发，不经过能力桥、不受逐次确认约束；页面访问宿主能力仍
 只能走受权限约束的桥方法。README 由宿主在打开弹窗时抓取，失败则为 `null`，插件
-必须能只依赖元数据工作。
+必须能只依赖元数据工作。页面型插件的 `context` 还会带上 `accountTag`（当前
+GitHub 身份标签），供页面在绘制任何本地缓存之前完成账号校验。
 
 页面输出能力（仅页面 Bridge，Worker 不可用）：
 
@@ -337,3 +338,48 @@ iframe，能力桥与 V1.2/V1.3 完全一致）。
 始终由用户在原生对话框中确认，插件拿不到文件路径。
 
 完整可安装示例见 `examples/plugins/repo-info-card`。
+
+## V1.5 页面网络能力（network.request）
+
+页面型插件可声明 `network:<domain>` 权限（如 `network:api.github.com`），通过
+页面 Bridge 的 `network.request` 方法让宿主代理只读 GET 请求。V1.5 的授权在启用
+确认时一次完成（权限列表会附加说明），不逐次弹窗；执行流程与 `ai.generate` /
+`web.search` 同构：主进程校验参数白名单与 `network:<host>` 权限（授权型返回），
+渲染端用用户自己的 GitHub Token 发起请求，Token 不进 IPC 参数、页面拿不到。
+
+```js
+// 每次请求均按 V1.2 的消息格式发送，method / args 换为：
+method: 'network.request',
+args: {
+  host: 'api.github.com',
+  path: '/repos/facebook/react/stats/commit_activity',
+  query: { per_page: 12 },           // 可选；仅允许 per_page / page（1–100）
+                                     // 与 state（open/closed/all 枚举）
+},
+// 成功时返回 value: { status, body, acct }；acct 是当前 GitHub 身份的标签
+// （Token 的 SHA-256 截断，匿名请求为 'anon'，页面拿不到 Token），用于给本地
+// 缓存按账号做命名空间；202/204 时 body 为 null，
+// HTTP 非 2xx 归一为 success:false（code: 'PLUGIN_NETWORK_HTTP_ERROR'）。
+// 重定向一律拒绝（redirect: 'error'），避免跳转绕过路径白名单。
+```
+
+约束与校验（主进程 `pluginPageBridge` 与渲染端执行器双侧同闸门）：
+
+- `host` 当前仅接受 `api.github.com`；`path` 必须是纯路径（无查询串、片段、
+  凭据、空白），且匹配只读指标端点白名单：
+  `/repos/{owner}/{repo}`、`/stats/commit_activity`、`/stats/participation`、
+  `/stats/code_frequency`、`/contributors`、`/languages`、`/releases`、`/pulls`、
+  `/tags`、`/stargazers`、`/stargazers/history`、`/community/profile`、
+  `/security-advisories` 与所有者资料 `/users/{login}`。
+- 仅 GET；请求头由宿主固定（`Accept: application/vnd.github+json`、
+  `X-GitHub-Api-Version`、有 Token 时附 `Authorization: Bearer`）。
+- 未配置 Token 时以匿名身份请求（受 GitHub 60 次/小时限额约束）。
+- 响应超时 15 秒、正文上限 4 MiB；页面 Bridge 的并发与频率限制同样适用。
+- Worker 侧不提供该方法（`network` 能力在 Worker 路由中只做授权检查）。
+
+`stats/*` 类端点在 GitHub 首次生成缓存时会返回 202（`body: null`），页面应按
+「统计生成中」处理并可稍后重试。
+
+完整可安装示例见 `examples/plugins/repo-insights`（仓库洞察看板：仓库体检——摘要、
+作者与贡献者及客观事实，提交活动、代码变更、贡献者、语言、发布节奏、社区健康、
+安全公告、星标趋势与健康度评分，图表使用随插件打包的本地 Chart.js）。

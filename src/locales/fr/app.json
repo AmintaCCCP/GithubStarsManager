@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "Échec de l'enregistrement des paramètres du service de recherche",
     "no-additional-host-permissions": "Aucune autorisation d'hôte supplémentaire",
     "note-repository-read-access-includes-metadata-of": "Remarque : L'autorisation de lecture de l'entrepôt inclura les métadonnées de l'entrepôt privé que vous avez collectées.",
+    "note-network-access-uses-your-github-token": "\n\nRemarque : les autorisations réseau permettent à la page du plugin d'accéder aux hôtes listés via le proxy de l'hôte avec votre jeton GitHub (requêtes GET en lecture seule vers les points de terminaison autorisés uniquement ; aucune donnée locale telle que les notes de dépôt n'est jointe).",
     "enable-v1": "Activer {{v1}}",
     "local-plugins-with-worker-js-have-node-js-access": "Les plugins locaux avec worker.js disposent des autorisations Node.js et Worker n'est pas un bac à sable sécurisé. Activez uniquement le code auquel vous faites confiance.",
     "requested-permissions": "Demander l'autorisation :",

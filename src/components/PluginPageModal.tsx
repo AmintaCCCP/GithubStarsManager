@@ -69,6 +69,7 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
       title={`${pluginName} · ${pageTitle}`}
       maxWidth="h-[calc(100vh_-_2rem)] max-h-[calc(100vh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-none"
       scrollable
+      contentClassName="flex flex-col"
       closeLabel={t('pluginPageViewer.close')}
     >
       <PluginPageViewer

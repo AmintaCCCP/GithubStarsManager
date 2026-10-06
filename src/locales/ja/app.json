@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "検索サービス設定の保存に失敗しました",
     "no-additional-host-permissions": "追加のホスト権限はありません",
     "note-repository-read-access-includes-metadata-of": "注: ウェアハウスの読み取り権限には、収集したプライベート ウェアハウスのメタデータが含まれます。",
+    "note-network-access-uses-your-github-token": "\n\n注意：ネットワーク権限があると、プラグインページはホストのプロキシ経由であなたの GitHub Token を使ってリストされたホストにアクセスできます（ホストの許可リスト内の読み取り専用 GET のみ。リポジトリのメモなどのローカルデータは送信されません）。",
     "enable-v1": "{{v1}}を有効にする",
     "local-plugins-with-worker-js-have-node-js-access": "worker.js を使用するローカル プラグインには Node.js 権限があり、Worker は安全なサンドボックスではありません。信頼できるコードのみを有効にしてください。",
     "requested-permissions": "許可を要求します:",

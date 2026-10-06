@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Repository Insights</title>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./chart.umd.js" defer></script>
+    <script src="./index.js" defer></script>
+  </head>
+  <body data-theme="dark">
+    <main id="app">
+      <!-- 仓库头 -->
+      <header class="head" id="head" hidden>
+        <div class="head-main">
+          <h1><a id="repo-link" target="_blank" rel="noreferrer noopener"></a></h1>
+          <p id="repo-desc" class="muted"></p>
+        </div>
+        <div class="health" id="health-box" hidden>
+          <svg viewBox="0 0 84 84" class="ring" role="img" aria-label="health score">
+            <circle class="ring-track" cx="42" cy="42" r="34"></circle>
+            <circle class="ring-value" id="ring-value" cx="42" cy="42" r="34"></circle>
+          </svg>
+          <div class="health-meta">
+            <span class="health-score" id="health-score">–</span>
+            <span class="health-grade" id="health-grade"></span>
+            <span class="muted small" id="health-label"></span>
+          </div>
+        </div>
+      </header>
+
+      <!-- KPI -->
+      <section class="kpis" id="kpis" hidden></section>
+
+      <!-- 图表卡片栅格 -->
+      <section class="grid" id="cards" hidden>
+        <div class="card w12" id="card-facts">
+          <h3></h3><p class="hint"></p>
+          <div class="chips" id="facts-signals"></div>
+          <p class="facts-hero" id="facts-hero"></p>
+          <div class="facts-grid" id="facts-grid"></div>
+          <p class="disclaimer muted small"></p>
+          <p class="state"></p>
+        </div>
+        <div class="card w7" id="card-commits">
+          <h3></h3><p class="hint"></p>
+          <div class="chips"></div>
+          <div class="ch"><canvas id="card-commits-canvas"></canvas></div>
+          <p class="state"></p>
+        </div>
+        <div class="card w5" id="card-radar">
+          <h3></h3><p class="hint"></p>
+          <div class="ch"><canvas id="card-radar-canvas"></canvas></div>
+          <p class="state"></p>
+        </div>
+        <div class="card w6" id="card-churn">
+          <h3></h3><p class="hint"></p>
+          <div class="ch"><canvas id="card-churn-canvas"></canvas></div>
+          <p class="state"></p>
+        </div>
+        <div class="card w6" id="card-languages">
+          <h3></h3><p class="hint"></p>
+          <div class="ch"><canvas id="card-languages-canvas"></canvas></div>
+          <p class="state"></p>
+        </div>
+        <div class="card w6" id="card-releases">
+          <h3></h3><p class="hint"></p>
+          <div class="chips"></div>
+          <div class="ch"><canvas id="card-releases-canvas"></canvas></div>
+          <ul class="rows"></ul>
+          <p class="state"></p>
+        </div>
+        <div class="card w6" id="card-community">
+          <h3></h3><p class="hint"></p>
+          <div class="community-row">
+            <div class="health-pct"><span id="community-pct">–</span><span class="muted small" id="community-pct-label"></span></div>
+            <ul class="signals" id="community-signals"></ul>
+          </div>
+          <p class="state"></p>
+        </div>
+        <div class="card w12" id="card-maintainers">
+          <h3></h3><p class="hint"></p>
+          <div class="maint-grid">
+            <section class="subpanel">
+              <h4 class="subpanel-title" id="maint-owner-title"></h4>
+              <div class="who">
+                <span class="avatar avatar-lg" id="owner-avatar" aria-hidden="true"></span>
+                <div class="who-main">
+                  <b id="owner-login"></b>
+                  <span class="muted small" id="owner-tagline"></span>
+                </div>
+              </div>
+              <p class="owner-bio" id="owner-bio"></p>
+              <dl class="owner-facts" id="owner-facts"></dl>
+              <div class="busfactor" id="busfactor-box"></div>
+            </section>
+            <section class="subpanel">
+              <h4 class="subpanel-title" id="maint-contrib-title"></h4>
+              <ul class="contrib-list" id="contrib-list"></ul>
+              <p class="contrib-note muted" id="contrib-note"></p>
+              <p class="state"></p>
+            </section>
+          </div>
+        </div>
+        <div class="card w12" id="card-ai">
+          <h3></h3><p class="hint"></p>
+          <div class="ai-bar">
+            <button id="ai-generate" type="button" class="btn btn-ai"></button>
+            <span class="muted small" id="ai-note"></span>
+          </div>
+          <div class="ai-result" id="ai-result" hidden></div>
+          <p class="state"></p>
+        </div>
+        <div class="card w7" id="card-stars">
+          <h3></h3><p class="hint"></p>
+          <div class="chips"></div>
+          <div class="ch"><canvas id="card-stars-canvas"></canvas></div>
+          <p class="state"></p>
+        </div>
+        <div class="card w5" id="card-advisories">
+          <h3></h3><p class="hint"></p>
+          <div class="chips" id="advisory-chips"></div>
+          <ul class="rows" id="advisory-rows"></ul>
+          <p class="state"></p>
+        </div>
+      </section>
+      <!-- 无仓库上下文时的选择器 -->
+      <section id="picker" hidden>
+        <p class="muted" data-i18n="pickerHint">此入口没有携带仓库上下文（例如从「设置 → 插件 → 打开页面」进入）。搜索并选择一个已加载的仓库：</p>
+        <div class="search-row">
+          <input id="picker-query" type="search" maxlength="200" placeholder="search repositories…">
+          <button id="picker-search" type="button" class="btn" data-i18n="search">搜索</button>
+        </div>
+        <ul id="picker-results"></ul>
+      </section>
+
+      <p id="status" role="status" class="muted small"></p>
+      <footer class="muted small" id="foot"></footer>
+    </main>
+  </body>
+</html>

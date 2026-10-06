@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "검색 서비스 설정을 저장하지 못했습니다.",
     "no-additional-host-permissions": "추가 호스트 권한 없음",
     "note-repository-read-access-includes-metadata-of": "참고: 창고 읽기 권한에는 수집한 개인 창고의 메타데이터가 포함됩니다.",
+    "note-network-access-uses-your-github-token": "\n\n참고: 네트워크 권한이 있으면 플러그인 페이지가 호스트 프록시를 통해 나열된 호스트에 사용자의 GitHub Token으로 접근할 수 있습니다(호스트 허용 목록의 읽기 전용 GET 요청만 가능하며, 저장소 메모 같은 로컬 데이터는 전송되지 않습니다).",
     "enable-v1": "{{v1}} 활성화",
     "local-plugins-with-worker-js-have-node-js-access": "Worker.js가 포함된 로컬 플러그인에는 Node.js 권한이 있으며 Worker는 보안 샌드박스가 아닙니다. 신뢰할 수 있는 코드만 활성화하세요.",
     "requested-permissions": "권한 요청:",

@@ -68,6 +68,20 @@ function createCapabilityRouter({ storage, logger, catalog, hostOperations = nul
         // The user-configured search endpoint is contacted only after confirmation.
         return null;
       }
+      if (request.capability === 'network') {
+        if (request.operation !== 'request') {
+          throw protocolError('PLUGIN_CAPABILITY_UNKNOWN', `Unknown network operation '${request.operation}'`);
+        }
+        // 按 `network:<host>` 逐主机授权；host/path 白名单在 page bridge 已校验，
+        // Worker 调用没有这道前置校验，因此这里仍要求 host 是非空字符串。
+        const host = request.args?.host;
+        if (typeof host !== 'string' || !host || !permissions.includes(`network:${host}`)) {
+          throw protocolError('PLUGIN_PERMISSION_DENIED', `Permission 'network:<host>' is required`);
+        }
+        // Authorization only: the renderer executes the request with the user's
+        // own GitHub token after this check, mirroring ai/web capabilities.
+        return null;
+      }
       if (request.capability === 'github') {
         if (request.operation === 'getRelease') {
           if (!permissions.includes('releases:read')) {

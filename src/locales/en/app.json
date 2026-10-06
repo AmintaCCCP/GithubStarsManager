@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "Failed to save search service settings",
     "no-additional-host-permissions": "No additional Host permissions",
     "note-repository-read-access-includes-metadata-of": "\n\nNote: repository read access includes metadata of your private starred repositories.",
+    "note-network-access-uses-your-github-token": "\n\nNote: network permissions let the plugin page reach the listed hosts through the host proxy using your GitHub Token (read-only GET requests to host-allowlisted endpoints only; no local data such as repository notes is attached).",
     "enable-v1": "Enable {{v1}}",
     "local-plugins-with-worker-js-have-node-js-access": "Local plugins with worker.js have Node.js access; a Worker is not a security sandbox. Enable only code you trust.",
     "requested-permissions": "Requested permissions:",

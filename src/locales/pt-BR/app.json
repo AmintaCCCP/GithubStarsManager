@@ -1042,6 +1042,7 @@
     "failed-to-save-search-service-settings": "Falha ao salvar as configurações do serviço de pesquisa",
     "no-additional-host-permissions": "Nenhuma permissão adicional de host",
     "note-repository-read-access-includes-metadata-of": "Nota: A permissão de leitura do warehouse incluirá os metadados do warehouse privado que você coletou.",
+    "note-network-access-uses-your-github-token": "\n\nNota: as permissões de rede permitem que a página do plugin acesse os hosts listados por meio do proxy do host usando seu token do GitHub (apenas solicitações GET somente leitura aos endpoints da lista de permissões do host; nenhum dado local, como notas de repositórios, é anexado).",
     "enable-v1": "Ativar {{v1}}",
     "local-plugins-with-worker-js-have-node-js-access": "Plug-ins locais com worker.js têm permissões Node.js e Worker não é uma sandbox segura. Ative apenas códigos em que você confia.",
     "requested-permissions": "Solicitar permissão:",

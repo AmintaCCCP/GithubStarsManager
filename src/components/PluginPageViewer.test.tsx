@@ -239,7 +239,7 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
     fireEvent.load(frame);
     expect(postMessage).toHaveBeenCalledWith({
       type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
-      context: { repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh' },
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: null, language: 'zh', accountTag: 'anon' },
     }, 'plugin-page://com.example.page');
     // 普通桥方法仍然走 IPC 能力桥，不受上下文影响。
     await act(async () => {
@@ -273,7 +273,7 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
 
     await waitFor(() => expect(postMessage).toHaveBeenCalledWith({
       type: 'plugin-page:init', pluginId: 'com.example.page', pageId: 'dashboard', token: 'session-token',
-      context: { repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh' },
+      context: { repository: { id: 7, full_name: 'a/b' }, readme: '# readme', language: 'zh', accountTag: 'anon' },
     }, 'plugin-page://com.example.page'));
   });
 
@@ -287,4 +287,124 @@ describe('PluginPageViewer init context (V1.4 modal actions)', () => {
     expect(screen.queryByText('Example · Dashboard')).toBeNull();
     expect(screen.queryByText(t('pluginPageViewer.back-to-plugins'))).toBeNull();
   });
+
+  it('proxies network.request through the host with the user token attached', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: null });
+    // 渲染端 hook 通过被 mock 的 useAppStore selector 读取 token，必须挂在模块级 storeState 上。
+    storeState.githubToken = 'gh-token-sample';
+    getState.mockReturnValue({ language: 'zh', githubToken: 'gh-token-sample' });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ total: 42 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'net-1', token: 'session-token', method: 'network.request',
+          args: { host: 'api.github.com', path: '/repos/o/r/contributors', query: { per_page: 12 } },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
+      }));
+    });
+    expect(requestPageCapability).toHaveBeenCalledWith({
+      pluginId: 'com.example.page', pageId: 'dashboard', method: 'network.request',
+      args: { host: 'api.github.com', path: '/repos/o/r/contributors', query: { per_page: 12 } },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.github.com/repos/o/r/contributors?per_page=12');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer gh-token-sample');
+    expect((init.headers as Record<string, string>)['X-GitHub-Api-Version']).toBe('2022-11-28');
+    expect(init.method).toBe('GET');
+    const response = postMessage.mock.calls.find(([message]) => (message as { requestId?: string }).requestId === 'net-1')?.[0];
+    expect(response).toEqual(expect.objectContaining({ success: true, value: expect.objectContaining({ status: 200, body: { total: 42 } }) }));
+    expect(JSON.stringify(response)).not.toContain('gh-token-sample');
+  });
+
+  it('maps GitHub HTTP failures to a structured network error', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: null });
+    getState.mockReturnValue({ language: 'zh', githubToken: null });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'Not Found' }), { status: 404 })));
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'net-2', token: 'session-token', method: 'network.request',
+          args: { host: 'api.github.com', path: '/repos/o/r/stats/commit_activity' },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
+      }));
+    });
+    const response = postMessage.mock.calls.find(([message]) => (message as { requestId?: string }).requestId === 'net-2')?.[0];
+    expect(response).toEqual(expect.objectContaining({
+      success: false,
+      error: expect.objectContaining({ code: 'PLUGIN_NETWORK_HTTP_ERROR', message: expect.stringContaining('404') }),
+    }));
+  });
+
+  it('surfaces 202 statistics-pending responses as body-null success', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: null });
+    storeState.githubToken = null;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 202 })));
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'net-202', token: 'session-token', method: 'network.request',
+          args: { host: 'api.github.com', path: '/repos/o/r/stats/commit_activity' },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
+      }));
+    });
+    const response = postMessage.mock.calls.find(([message]) => (message as { requestId?: string }).requestId === 'net-202')?.[0];
+    expect(response).toEqual(expect.objectContaining({ success: true, value: expect.objectContaining({ status: 202, body: null }) }));
+  });
+
+  it('blocks non-allowlisted network targets before any request leaves the host', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'session-token' });
+    getPage.mockResolvedValue({ success: true, url: 'plugin-page://com.example.page/dashboard/index.html' });
+    requestPageCapability.mockResolvedValue({ success: true, value: null });
+    getState.mockReturnValue({ language: 'zh', githubToken: null });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    render(<PluginPageViewer pluginId="com.example.page" pluginName="Example" pageId="dashboard"
+      pageTitle="Dashboard" onClose={() => {}} t={t} />);
+    const frame = await screen.findByTitle('Example: Dashboard') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    fireEvent.load(frame);
+    await act(async () => {
+      window.dispatchEvent(new MessageEvent('message', {
+        data: { type: 'plugin-page:request', pluginId: 'com.example.page', pageId: 'dashboard',
+          requestId: 'net-3', token: 'session-token', method: 'network.request',
+          args: { host: 'evil.example', path: '/repos/o/r' },
+          origin: 'plugin-page://com.example.page' },
+        origin: 'plugin-page://com.example.page', source: frame.contentWindow,
+      }));
+    });
+    expect(requestPageCapability).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    const response = postMessage.mock.calls.find(([message]) => (message as { requestId?: string }).requestId === 'net-3')?.[0];
+    expect(response).toEqual(expect.objectContaining({
+      success: false,
+      error: expect.objectContaining({ code: 'PLUGIN_PAGE_REQUEST_INVALID' }),
+    }));
+  });
 });
+

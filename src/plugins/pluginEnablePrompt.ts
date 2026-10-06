@@ -20,9 +20,12 @@ export function buildPluginEnablePrompt(t: TranslateFn, manifest: PluginManifest
     permission === 'repositories:read' || permission === 'privateRepositories:read')
     ? t('pluginSettingsPanel.note-repository-read-access-includes-metadata-of')
     : '';
+  const networkNotice = permissions.some((permission) => permission.startsWith('network:'))
+    ? t('pluginSettingsPanel.note-network-access-uses-your-github-token')
+    : '';
   return {
     title: t('pluginSettingsPanel.enable-v1', { v1: manifest.name }),
-    message: `${t('pluginSettingsPanel.local-plugins-with-worker-js-have-node-js-access')}\n\n${t('pluginSettingsPanel.requested-permissions')}\n${permissionText}${repositoryDataNotice}`,
+    message: `${t('pluginSettingsPanel.local-plugins-with-worker-js-have-node-js-access')}\n\n${t('pluginSettingsPanel.requested-permissions')}\n${permissionText}${repositoryDataNotice}${networkNotice}`,
     confirmText: t('pluginSettingsPanel.confirm-and-enable'),
   };
 }
