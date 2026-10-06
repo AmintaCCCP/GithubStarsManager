@@ -10,7 +10,7 @@ import {
 } from '../../services/indexedDbStorage';
 import { appPersistenceOptions } from './options';
 import { createInitialState } from '../initialState';
-import { flushPendingPersistSnapshot } from './storage';
+import { flushPendingPersistSnapshot, __setPersistTimingsForTest } from './storage';
 import { debouncedPersistStorage, removePersistedSnapshot } from './storage';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import {
@@ -670,24 +670,40 @@ describe('idle 大分片写入节流', () => {
   const bigBlob = (ch: string): string => ch.repeat(5 * 1024 * 1024 + 1024);
   const bigReleases = [{ id: 1, blob: bigBlob('x') }];
 
-  // fake-indexeddb 的事务推进依赖真实 setImmediate；因此只 fake Date/setTimeout，
-  // 既能用 advanceTimersByTimeAsync 推进防抖与冷却时钟，又保留可自然 await 的 IDB。
-  const settle = async (): Promise<void> => {
-    for (let i = 0; i < 10; i++) {
+  // 用真实计时器验证节流时序：经 __setPersistTimingsForTest 注入更小的
+  // 防抖/冷却时长。此前用 fake timers 跳 60s，fake-indexeddb 的事务推进依赖
+  // 真实 macrotask，两者交错在慢速 CI 上出现「冷却到期写入尚未提交就读盘」
+  // 的不稳定（本地快环境难以复现）；真实计时器下不存在两套时钟互踩。
+  // 注入值需满足 冷却间隔 > 防抖 + 单次等待窗口，冷却才有约束意义。
+  const DEBOUNCE_MS = 5;
+  const INTERVAL_MS = 300;
+  const settle = async (turns = 30): Promise<void> => {
+    for (let i = 0; i < turns; i++) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
   };
-  const advanceThroughDebounce = async (): Promise<void> => {
-    await vi.advanceTimersByTimeAsync(1100); // 1s 防抖 + idle 回调
-    await settle();
+  /** 轮询磁盘直到 check 成立（fake-indexeddb 的提交是真实 macrotask，轮数有界）；超限抛错并带上实际读值。 */
+  const settleUntil = async (check: () => Promise<boolean>, message: string): Promise<void> => {
+    for (let i = 0; i < 500; i++) {
+      if (await check()) return;
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    throw new Error(`${message}（等待超时，实际状态未满足）`);
+  };
+  const diskReleasesEquals = async (expected: unknown): Promise<boolean> => {
+    const current = (await readShardState('releases')).releases;
+    return JSON.stringify(current) === JSON.stringify(expected);
+  };
+  const realWait = async (ms: number): Promise<void> => {
+    await new Promise<void>((resolve) => setTimeout(resolve, ms));
   };
 
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+    __setPersistTimingsForTest({ debounceMs: DEBOUNCE_MS, idleTimeoutMs: 10, largeShardIdleMinIntervalMs: INTERVAL_MS });
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    __setPersistTimingsForTest({ debounceMs: 1000, idleTimeoutMs: 3000, largeShardIdleMinIntervalMs: 60_000 });
   });
 
   it('冷却期内的多次 idle 写入合并为一次最终写，落盘为最新值', async () => {
@@ -697,10 +713,11 @@ describe('idle 大分片写入节流', () => {
     const savedAtAfterFirst = (await readMeta())?.savedAt;
 
     // 冷却期内第 1 次写入：releases 引用变化 → 被推迟，磁盘保持基准内容
+    //（真实计时器下，冷却期内磁盘不可能推进，短等待后断言即安全）
     const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
     debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
-    await advanceThroughDebounce();
-    expect((await readShardState('releases')).releases).toEqual(bigReleases);
+    await settle();
+    expect(await diskReleasesEquals(bigReleases)).toBe(true);
 
     // 冷却期内第 2 次写入：与第 1 次合并，定时器重新对齐到冷却期末
     const releasesV3 = [{ id: 3, blob: bigBlob('z') }];
@@ -708,13 +725,11 @@ describe('idle 大分片写入节流', () => {
       state: { ...baseState, releases: releasesV3, theme: 'light' },
       version: 16,
     });
-    await advanceThroughDebounce();
-    expect((await readShardState('releases')).releases).toEqual(bigReleases);
-
-    // 冷却到期（距上次成功写入 60s）：定时器触发一次最终写，内容为最新值
-    await vi.advanceTimersByTimeAsync(60_000);
     await settle();
-    expect((await readShardState('releases')).releases).toEqual(releasesV3);
+    expect(await diskReleasesEquals(bigReleases)).toBe(true);
+
+    // 冷却到期（距上次成功写入 300ms）：定时器触发一次最终写，内容为最新值
+    await settleUntil(() => diskReleasesEquals(releasesV3), '冷却到期后应落盘最新值 v3');
     expect((await readShardState('core')).theme).toBe('light');
     expect((await readMeta())?.savedAt).not.toBe(savedAtAfterFirst);
   });
@@ -724,12 +739,11 @@ describe('idle 大分片写入节流', () => {
     debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
     await flushPendingPersistSnapshot();
 
-    // 距上次写入 61s（冷却已过）：防抖+idle 到点后直接写入，无额外推迟
-    await vi.advanceTimersByTimeAsync(61_000);
+    // 距上次写入超过冷却间隔：防抖+idle 到点后直接写入，无额外推迟
+    await realWait(INTERVAL_MS + 150);
     const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
     debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
-    await advanceThroughDebounce();
-    expect((await readShardState('releases')).releases).toEqual(releasesV2);
+    await settleUntil(() => diskReleasesEquals(releasesV2), '冷却期外写入应立即落盘 v2');
   });
 
   it('flush 等非 idle 来源绕过节流，冷却期内也立即写入', async () => {
@@ -737,11 +751,11 @@ describe('idle 大分片写入节流', () => {
     debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
     await flushPendingPersistSnapshot();
 
-    // 刚写完大分片（冷却期内）、不推进时钟：flush（pagehide/visibilitychange 路径）必须立即落盘
+    // 刚写完大分片（冷却期内）：flush（pagehide/visibilitychange 路径）必须立即落盘
     const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
     debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
     await flushPendingPersistSnapshot();
-    expect((await readShardState('releases')).releases).toEqual(releasesV2);
+    await settleUntil(() => diskReleasesEquals(releasesV2), 'flush 应绕过冷却立即落盘 v2');
   });
 
   it('大分片冷却期内，仅小分片变化仍立即写入', async () => {
@@ -751,8 +765,7 @@ describe('idle 大分片写入节流', () => {
 
     // releases 引用未变（仅 core 的 theme 变化）：不落入大分片冷却，防抖后立即写入
     debouncedPersistStorage.setItem(KEY, { state: { ...baseState, theme: 'light' }, version: 16 });
-    await advanceThroughDebounce();
-    expect((await readShardState('core')).theme).toBe('light');
+    await settleUntil(async () => (await readShardState('core')).theme === 'light', '仅小分片变化应立即落盘');
     expect((await readShardState('releases')).releases).toEqual(bigReleases);
   });
 });

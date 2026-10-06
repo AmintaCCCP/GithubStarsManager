@@ -384,7 +384,9 @@ describe('WebDAVService 连接测试探测顺序', () => {
   });
 
   it('浏览器直连时 10 秒预算覆盖 HEAD 回退（回退停滞会被中止而不是挂死）', async () => {
-    vi.useFakeTimers();
+    // 只 fake setTimeout/Date（预算与中止定时器）；不 fake setImmediate，
+    // 避免与 mock fetch 的 promise 链交错产生环境差异。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       // PROPFIND 405 正常返回；HEAD 回退停滞不返回（模拟 fetch 只认 signal）
       vi.mocked(window.fetch)
@@ -395,7 +397,7 @@ describe('WebDAVService 连接测试探测顺序', () => {
 
       const promise = davService().testConnection();
       const expectation = expect(promise).rejects.toThrow('连接超时');
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(10001);
       await expectation;
     } finally {
       vi.useRealTimers();
@@ -403,7 +405,7 @@ describe('WebDAVService 连接测试探测顺序', () => {
   });
 
   it('桌面端 PROPFIND 失败后剩余预算不足 1s 时跳过 HEAD 回退，总耗时不超预算', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     try {
       const webdavRequest = vi.fn(() => new Promise((resolve) => {
         setTimeout(() => resolve({ success: true, status: 405, statusText: '', body: '' }), 9500);

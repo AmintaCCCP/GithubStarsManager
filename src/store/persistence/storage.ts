@@ -27,7 +27,7 @@ const scheduleIdleTask = (callback: () => void): number => {
   }
 
   if ('requestIdleCallback' in window) {
-    return window.requestIdleCallback(callback, { timeout: 3000 });
+    return window.requestIdleCallback(callback, { timeout: idleCallbackTimeoutMs });
   }
 
   return globalThis.setTimeout(callback, 0) as unknown as number;
@@ -76,10 +76,29 @@ let hydratedIncomplete = false;
 // latestPersistValue/persistWriteVersion，冷却到期后合并为一次最终写入；
 // flush（pagehide/visibilitychange）等非 idle 来源绕过节流立即写入。
 const SHARD_SIZE_WARN_BYTES = 5 * 1024 * 1024;
-const LARGE_SHARD_IDLE_WRITE_MIN_INTERVAL_MS = 60_000;
+// 时序参数为 let：默认值即生产行为；测试经 __setPersistTimingsForTest 注入
+// 更小的值，用真实计时器确定性地验证节流时序（fake timers 与 fake-indexeddb
+// 的 macrotask 交错在慢环境 CI 上不稳定）。
+let largeShardIdleWriteMinIntervalMs = 60_000;
+let persistDebounceMs = 1000;
+let idleCallbackTimeoutMs = 3000;
 const lastWrittenShardBytes = new Map<PersistenceShardName, number>();
 const lastShardWriteAt = new Map<PersistenceShardName, number>();
 let deferredLargeShardWriteTimerId: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * 仅供测试注入更小的时序参数（写入防抖 / 空闲回调上限 / 大分片 idle 写入最小
+ * 间隔）。不改变任何语义，只缩短等待；用例结束后应恢复默认值。
+ */
+export function __setPersistTimingsForTest(timings: {
+  debounceMs?: number;
+  idleTimeoutMs?: number;
+  largeShardIdleMinIntervalMs?: number;
+}): void {
+  if (timings.debounceMs !== undefined) persistDebounceMs = timings.debounceMs;
+  if (timings.idleTimeoutMs !== undefined) idleCallbackTimeoutMs = timings.idleTimeoutMs;
+  if (timings.largeShardIdleMinIntervalMs !== undefined) largeShardIdleWriteMinIntervalMs = timings.largeShardIdleMinIntervalMs;
+}
 
 const emptyShardViews = (): ShardViews => {
   const views = {} as ShardViews;
@@ -500,7 +519,7 @@ const dispatchIdleShardedWrite = (): void => {
     if ((lastWrittenShardBytes.get(shard) ?? 0) <= SHARD_SIZE_WARN_BYTES) continue;
     const lastWriteAt = lastShardWriteAt.get(shard);
     if (lastWriteAt === undefined) continue;
-    const remaining = LARGE_SHARD_IDLE_WRITE_MIN_INTERVAL_MS - (Date.now() - lastWriteAt);
+    const remaining = largeShardIdleWriteMinIntervalMs - (Date.now() - lastWriteAt);
     if (remaining > cooldownRemainingMs) cooldownRemainingMs = remaining;
   }
 
@@ -614,7 +633,7 @@ const debouncedPersistStorage: PersistStorage<unknown> = {
         // 由大分片节流决定立即写入或推迟到冷却期末（见 dispatchIdleShardedWrite）。
         dispatchIdleShardedWrite();
       });
-    }, 1000);
+    }, persistDebounceMs);
   },
   removeItem: (name) => removePersistedSnapshot(name),
 };
