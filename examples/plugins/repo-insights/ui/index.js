@@ -1521,9 +1521,13 @@ ${release.body}`);
     // GitHub 对超大仓库（如 RSSHub）的 /stats/* 端点永远返回 422（统计不可计算），
     // 跨会话稳定复现，不属于临时失败。commit_activity 的报错文案自带
     // “10000 commits”，可按文案识别；code_frequency 的 422 文案不含 commit 字样，
-    // 需按 metricId 识别。两者均归入“仓库过大/统计不可用”文案。
+    // 需按 metricId 识别。422 一律要求来自能力桥的 HTTP 错误（code 为
+    // PLUGIN_NETWORK_HTTP_ERROR 且消息带 “GitHub API returned 422” 前缀），
+    // 避免其他路径的错误文案里偶然出现 “422” 字样被误判。两者均归入
+    // “仓库过大/统计不可用”文案。
     const isStatsTooLarge = /10000 commits/.test(error?.message || '')
-      || (/\b422\b/.test(error?.message || '')
+      || (error?.code === 'PLUGIN_NETWORK_HTTP_ERROR'
+        && /^GitHub API returned 422\b/.test(error.message || '')
         && (/commit/i.test(error?.message || '')
           || metricId === 'commitActivity' || metricId === 'codeFrequency'));
     const message = error?.code === 'PLUGIN_PAGE_RATE_LIMITED'

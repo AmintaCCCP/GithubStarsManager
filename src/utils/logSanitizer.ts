@@ -206,7 +206,7 @@ function sanitizeHeaders(headers: Record<string, unknown>, seen: WeakSet<object>
  * (redact.js, renderer, backend) keeps this list byte-identical and is pinned
  * by the shared errorMessages vectors.
  */
-function redactInline(text: string): string {
+export function redactInline(text: string): string {
   return String(text)
     .replace(/https?:\/\/[^\s"'<>]+/g, (url) => redactUrl(url))
     .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi, '$1 ***')
@@ -219,17 +219,28 @@ function redactInline(text: string): string {
 /** Maximum sanitized stack length kept per error. */
 const MAX_STACK_LENGTH = 8000;
 
+/** Maximum sanitized name length kept per error. */
+const MAX_NAME_LENGTH = 120;
+
 /**
  * Sanitize an Error object for logging.
  * Extracts message and stack, sanitizes any embedded secrets.
+ * DOMException is handled explicitly: in some runtimes it does not inherit
+ * from Error, and the previous `instanceof Error` guard would degrade it to
+ * a message-only string, losing the independent name/stack fields.
+ * The name is inline-redacted and capped too — custom error names are free-form
+ * strings and can carry embedded credentials just like messages.
  */
 export function sanitizeError(err: unknown): { message: string; stack?: string; name?: string } {
-  if (!(err instanceof Error)) {
+  const isErrorLike = err instanceof Error
+    || (typeof DOMException !== 'undefined' && err instanceof DOMException);
+  if (!isErrorLike) {
     return { message: redactInline(sanitizeString(String(err))) };
   }
+  const { name, message, stack } = err as Error;
   return {
-    name: err.name,
-    message: redactInline(sanitizeString(err.message)),
-    stack: err.stack ? redactInline(sanitizeString(err.stack)).slice(0, MAX_STACK_LENGTH) : undefined,
+    name: redactInline(sanitizeString(String(name ?? ''))).slice(0, MAX_NAME_LENGTH),
+    message: redactInline(sanitizeString(message)),
+    stack: stack ? redactInline(sanitizeString(stack)).slice(0, MAX_STACK_LENGTH) : undefined,
   };
 }

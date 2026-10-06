@@ -80,6 +80,24 @@ describe('logger', () => {
       // The circular walk is handled by sanitizeForLog; the entry still records.
     });
 
+    it('serializes a DOMException with independent name and message fields', () => {
+      // DOMException 在部分运行时不继承 Error，序列化仍须保留 name
+      logger.warn('net', 'request aborted', new DOMException('signal is aborted without reason', 'AbortError'));
+      const data = lastEntry().data as { name?: string; message?: string };
+      expect(data.name).toBe('AbortError');
+      expect(data.message).toBe('signal is aborted without reason');
+    });
+
+    it('inline-redacts and caps custom error names', () => {
+      const error = new Error('boom');
+      error.name = `TokenLeak ghp_${'a'.repeat(36)}`;
+      logger.warn('app', 'custom name error', error);
+      const data = lastEntry().data as { name?: string; message?: string };
+      expect(data.name).not.toContain('a'.repeat(36));
+      expect(data.name).toContain('***');
+      expect((data.name as string).length).toBeLessThanOrEqual(120);
+    });
+
     it('keeps object data without Error values structurally unchanged', () => {
       logger.info('app', 'plain data', { a: 1, nested: { b: 'x' } });
       expect(lastEntry().data).toEqual({ a: 1, nested: { b: 'x' } });

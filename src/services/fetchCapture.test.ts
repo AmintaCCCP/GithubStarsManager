@@ -77,6 +77,23 @@ describe('fetchCapture', () => {
     expect(String(data.detail)).toContain('signal is aborted without reason');
   });
 
+  it('redacts and caps errorName before writing the entry', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      const boom = new TypeError('fetch failed');
+      // 自定义 name 是自由文本，可能夹带凭据形态的字符串
+      boom.name = `TokenLeak ghp_${'a'.repeat(36)}`;
+      throw boom;
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/leak').catch(() => {});
+
+    const data = getNetworkEntries()[0].data as Record<string, unknown>;
+    expect(String(data.errorName)).not.toContain('a'.repeat(36));
+    expect(String(data.errorName)).toContain('***');
+  });
+
   it('records timeout aborts (DOMException TimeoutError) as info with errorName', async () => {
     const impl: FetchStub = vi.fn(async () => {
       throw new DOMException('The operation timed out', 'TimeoutError');

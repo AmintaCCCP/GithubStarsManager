@@ -29,7 +29,7 @@
  */
 
 import type { LogEntry, LogLevel } from './logger';
-import { sanitizeForLog } from '../utils/logSanitizer';
+import { sanitizeForLog, redactInline } from '../utils/logSanitizer';
 
 const MAX_NETWORK_ENTRIES = 1000;
 const REQUEST_BODY_PREVIEW_LENGTH = 8 * 1024;
@@ -358,11 +358,14 @@ export function installFetchCapture(options?: { isDebugMode?: () => boolean }): 
     } catch (error) {
       const aborted = isAbortError(error);
       const errorName = errorNameOf(error);
+      // 错误名也是自由文本（自定义 Error 子类可携带任意 name）：写日志前
+      // 与 message 同样做行内脱敏并限长。
+      const sanitizedErrorName = errorName ? redactInline(errorName).slice(0, 120) : undefined;
       recordEntry(aborted ? 'info' : 'error', `${method} ${sanitizeForLog(url)} ${aborted ? 'aborted' : 'failed'}`, {
         url: sanitizeForLog(url),
         method,
         durationMs: Date.now() - startedAt,
-        ...(errorName ? { errorName } : {}),
+        ...(sanitizedErrorName ? { errorName: sanitizedErrorName } : {}),
         detail: error instanceof Error ? sanitizeForLog(error.message) : String(error),
       });
       throw error;
