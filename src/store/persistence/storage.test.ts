@@ -677,11 +677,6 @@ describe('idle 大分片写入节流', () => {
   // 注入值需满足 冷却间隔 > 防抖 + 单次等待窗口，冷却才有约束意义。
   const DEBOUNCE_MS = 5;
   const INTERVAL_MS = 300;
-  const settle = async (turns = 30): Promise<void> => {
-    for (let i = 0; i < turns; i++) {
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    }
-  };
   /** 轮询磁盘直到 check 成立；按实际经过时间截止（默认 5s），两次检查之间短暂真实等待——迭代数上限在极慢环境下可能先于防抖耗尽。 */
   const settleUntil = async (check: () => Promise<boolean>, message: string, deadlineMs = 5000): Promise<void> => {
     const deadline = Date.now() + deadlineMs;
@@ -713,11 +708,12 @@ describe('idle 大分片写入节流', () => {
     await flushPendingPersistSnapshot(); // 首次写入建立基准（releases 序列化体积 > 5MB）
     const savedAtAfterFirst = (await readMeta())?.savedAt;
 
-    // 冷却期内第 1 次写入：releases 引用变化 → 被推迟，磁盘保持基准内容
-    //（真实计时器下，冷却期内磁盘不可能推进，短等待后断言即安全）
+    // 冷却期内第 1 次写入：releases 引用变化 → 被推迟，磁盘保持基准内容。
+    // 负向断言必须等防抖派发确实发生（防抖 5ms + 空闲回调上限 10ms + 余量），
+    // 否则断言可能在派发前通过、即使节流被移除也检测不到。
     const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
     debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
-    await settle();
+    await realWait(60);
     expect(await diskReleasesEquals(bigReleases)).toBe(true);
 
     // 冷却期内第 2 次写入：与第 1 次合并，定时器重新对齐到冷却期末
@@ -726,7 +722,7 @@ describe('idle 大分片写入节流', () => {
       state: { ...baseState, releases: releasesV3, theme: 'light' },
       version: 16,
     });
-    await settle();
+    await realWait(60);
     expect(await diskReleasesEquals(bigReleases)).toBe(true);
 
     // 冷却到期（距上次成功写入 300ms）：定时器触发一次最终写，内容为最新值
@@ -768,6 +764,32 @@ describe('idle 大分片写入节流', () => {
     debouncedPersistStorage.setItem(KEY, { state: { ...baseState, theme: 'light' }, version: 16 });
     await settleUntil(async () => (await readShardState('core')).theme === 'light', '仅小分片变化应立即落盘');
     expect((await readShardState('releases')).releases).toEqual(bigReleases);
+  });
+
+  it('在途写入未提交时把状态改回旧值，恢复更新不能被丢弃', async () => {
+    // commitGate 挂停提交入口制造确定性的在途窗口：v2 写入已到达
+    // setStorageEntries 但未提交，lastWrittenShards 仍是 v1 旧基准——此时
+    // 把状态改回旧基准，派发口按旧基准判脏为空，不能据此丢弃该更新。
+    const baseState = { ...buildState(), releases: bigReleases };
+    debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
+    await flushPendingPersistSnapshot(); // 基准 = v1
+
+    try {
+      commitGate.arm();
+      const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
+      debouncedPersistStorage.setItem(KEY, { state: { ...baseState, releases: releasesV2 }, version: 16 });
+      const flushing = flushPendingPersistSnapshot(); // v2 写入开始并在提交点挂停
+      await commitGate.waitReached(); // v2 已在途、未提交
+      debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 }); // 改回旧基准
+      // 在闸门仍挂停时等防抖(5ms)+空闲回调(10ms)派发确实发生：此时按旧基准
+      // 判脏为空。提前 release 会让 v2 先提交、判脏变非空，测试失去判别力。
+      await realWait(60);
+      commitGate.release(); // 放行 v2 提交
+      await flushing;
+      await settleUntil(() => diskReleasesEquals(bigReleases), '恢复旧值的更新不应被在途写入丢弃');
+    } finally {
+      commitGate.reset(); // 失败路径也不让挂停状态泄漏到后续用例
+    }
   });
 });
 

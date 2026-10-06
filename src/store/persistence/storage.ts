@@ -386,6 +386,14 @@ const writeShardedSnapshot = async (
 
   const entries: Array<readonly [string, string]> = [];
   const serializedBytes = new Map<PersistenceShardName, number>();
+  // serialized.length 是 UTF-16 码元数；含 CJK/emoji 等多字节字符时 UTF-8 字节数
+  // 更大（至多 3 倍），而 UTF-8 字节数恒 ≥ 码元数。故码元数已达阈值可直接判定；
+  // 低于阈值才用 TextEncoder 精确计字节数（此时上界为 3×阈值，开销有界）——
+  // 避免为 140MB 级分片整串转码一份字节副本。
+  const byteLengthOf = (serialized: string): number => {
+    if (serialized.length >= SHARD_SIZE_WARN_BYTES) return serialized.length;
+    return new TextEncoder().encode(serialized).length;
+  };
   try {
     for (const shard of dirty) {
       const stringifyStartedAt = performance.now();
@@ -395,20 +403,21 @@ const writeShardedSnapshot = async (
         state: views[shard],
       };
       const serialized = JSON.stringify(payload);
-      serializedBytes.set(shard, serialized.length);
+      const byteLength = byteLengthOf(serialized);
+      serializedBytes.set(shard, byteLength);
       const stringifyMs = Math.round(performance.now() - stringifyStartedAt);
       if (stringifyMs > 50) {
         logger.warn('store.persist', 'Large state stringify completed', {
           source,
           shard,
           stringifyMs,
-          bytes: serialized.length,
+          bytes: byteLength,
         });
-      } else if (serialized.length > SHARD_SIZE_WARN_BYTES) {
+      } else if (byteLength > SHARD_SIZE_WARN_BYTES) {
         logger.warn('store.persist', 'Large state shard serialized', {
           source,
           shard,
-          bytes: serialized.length,
+          bytes: byteLength,
         });
       }
       entries.push([shardKeyFor(name, shard), serialized]);
@@ -498,6 +507,10 @@ const enqueueShardedWrite = (
  * - 先基于最新待写值计算脏分片。这只用于节流决策，权威判脏仍在
  *   writeShardedSnapshot 写入时进行；此处误判最多造成多等/少等一个冷却期，
  *   不影响落盘内容的正确性。
+ * - 脏分片为空时也不能直接丢弃：写入链中可能仍有未提交的在途写入，
+ *   lastWrittenShards 仍是旧基准——此时若最新值恰好等于旧基准（把状态改回
+ *   旧值），按空脏早退会让该"恢复旧值"的更新被在途提交的新值覆盖丢失。
+ *   照常入队，由写入链在提交时以最新基准重新判脏（确实无变化时自然跳过）。
  * - 若脏分片中存在大分片（上次序列化体积超过 SHARD_SIZE_WARN_BYTES）且距其
  *   上次成功写入不足 LARGE_SHARD_IDLE_WRITE_MIN_INTERVAL_MS，则不立即写入：
  *   最新值保留在 latestPersistValue/persistWriteVersion，安排定时器在冷却到期后
@@ -512,7 +525,10 @@ const dispatchIdleShardedWrite = (): void => {
   const dirty = legacySnapshotHydrated
     ? [...PERSISTENCE_SHARD_NAMES]
     : findDirtyShards(views, lastWrittenShards);
-  if (dirty.length === 0) return;
+  if (dirty.length === 0) {
+    void enqueueShardedWrite(latestPersistName, latestPersistValue, persistWriteVersion, 'idle');
+    return;
+  }
 
   let cooldownRemainingMs = 0;
   for (const shard of dirty) {
