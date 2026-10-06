@@ -1177,12 +1177,15 @@
         continue;
       }
 
-      // 整行粗体分节标题（如 **1. 新增功能** 或 **1. 新增功能：** 或 1. **新增功能**）
-      const boldHeading = line.match(/^\s*\*\*(.+?)\*\*(?:[:：]?)\s*$/) ||
-                          line.match(/^\s*(?:\d+[.)]|\b[一二三四五][、.）\)]\s*)\s*\*\*(.+?)\*\*(?:[:：]?)\s*$/);
-      if (boldHeading) {
+      // 整行粗体分节标题（如 **1. 新增功能** 或 **1. 新增功能：** 或 1. **新增功能** 或 一、 **新增功能**）
+      const pureBold = line.match(/^\s*\*\*(.+?)\*\*(?:[:：]?)\s*$/);
+      const numberedBold = line.match(/^\s*((?:\d+[.)]|[（(]?[一二三四五六七八九十]+[、.）)]?)\s*)\*\*(.+?)\*\*(?:[:：]?)\s*$/);
+      if (pureBold || numberedBold) {
         closeList();
-        html.push(`<h4 class="md-h">${renderInlineMarkdown(esc(boldHeading[1].trim()))}</h4>`);
+        const titleText = pureBold
+          ? pureBold[1].trim()
+          : `${numberedBold[1].trim()} ${numberedBold[2].trim()}`.trim();
+        html.push(`<h4 class="md-h">${renderInlineMarkdown(esc(titleText))}</h4>`);
         continue;
       }
 
