@@ -132,9 +132,21 @@ const STR = {
   },
 };
 let str = STR.zh;
+
+/**
+ * 格式化包含 `{key}` 占位符的国际化文案模板。
+ *
+ * @param {string} template 包含占位符的文案模板
+ * @param {Record<string, any>} [params] 占位符键值对映射
+ * @returns {string} 替换参数后的格式化文本
+ */
 function fmt(template, params) {
   return template.replace(/\{(\w+)\}/g, (_, key) => String(params?.[key] ?? `{${key}}`));
 }
+
+/**
+ * 将当前界面语言（中/英）的静态文本与辅助属性同步至页面所有 DOM 节点。
+ */
 function applyChromeStrings() {
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     const key = el.getAttribute('data-i18n');
@@ -355,19 +367,37 @@ const STRUCTURES = {
 </div>`,
 };
 
-function cardLanguageLabel(option) {
+/**
+ * 根据语言选项获取注入 AI 提示词的目标英文语言名称。
+ *
+ * @param {string} [option=state.languageOption] 语言选项代码（'auto' 或语言代码）
+ * @returns {string} 对应的英文语言名称（未命中时默认为 'English'）
+ */
+function cardLanguageLabel(option = state.languageOption) {
   const code = option === 'auto' ? state.language : option;
   return CARD_LANGUAGES.find((item) => item.code === code)?.englishName ?? 'English';
 }
 
-// 卡片固定文案（统计标签/规格键/页脚）随所选语言注入结构模板，
-// 未命中时退回英文（与 cardLanguageLabel 的回退一致）。
-function cardLanguageLabels(option) {
+/**
+ * 获取注入卡片结构模板的固定文案（统计标签、规格键、页脚）。
+ * 未命中时退回英文（与 cardLanguageLabel 的回退行为一致）。
+ *
+ * @param {string} [option=state.languageOption] 语言选项代码（'auto' 或语言代码）
+ * @returns {{ stars: string, forks: string, language: string, license: string, key: string, footer: string }} 对应语言的标签文案集
+ */
+function cardLanguageLabels(option = state.languageOption) {
   const code = option === 'auto' ? state.language : option;
   const match = CARD_LANGUAGES.find((item) => item.code === code);
-  return match?.labels ?? CARD_LANGUAGES.find((item) => item.code === 'en').labels;
+  return match?.labels ?? CARD_LANGUAGES.find((item) => item.code === 'en')?.labels ?? CARD_LANGUAGES[0].labels;
 }
 
+/**
+ * 将指定版式结构模板中的 `{K_*}` 占位符替换为对应语言的固定标签。
+ *
+ * @param {'square' | 'banner' | 'portrait'} layout 画布对应的版式类型
+ * @param {{ stars: string, forks: string, language: string, license: string, key: string, footer: string }} labels 本地化标签字典
+ * @returns {string} 注入本地化文案后的卡片 HTML 结构骨架
+ */
 function localizedStructure(layout, labels) {
   return STRUCTURES[layout]
     .replaceAll('{K_STARS}', labels.stars)
@@ -378,12 +408,25 @@ function localizedStructure(layout, labels) {
     .replaceAll('{K_FOOTER}', labels.footer);
 }
 
-// 卡片实际生效的语言码（跟随界面时即宿主界面语言），用于提示词与导出文档。
-function resolvedCardLanguage() {
-  return state.languageOption === 'auto' ? state.language : state.languageOption;
+/**
+ * 计算卡片实际生效的语言码（跟随界面时取宿主界面语言），用于提示词与导出文档。
+ *
+ * @param {string} [option=state.languageOption] 语言选项代码（'auto' 或语言代码）
+ * @returns {string} 实际生效的目标语言代码
+ */
+function resolvedCardLanguage(option = state.languageOption) {
+  return option === 'auto' ? state.language : option;
 }
 
-function buildSystemPrompt(canvas, languageOption) {
+/**
+ * 构建发送给模型的系统提示词，包含画幅约束、输出格式和本地化结构骨架。
+ *
+ * @param {{ id: string, w: number, h: number }} canvas 目标画幅快照
+ * @param {string} [languageOption=state.languageOption] 目标语言选项代码
+ * @returns {string} 格式化且在 bridge 长度限制内的系统提示词
+ * @throws {Error} 若提示词总长度超出 AI_SYSTEM_LIMIT 时抛出异常
+ */
+function buildSystemPrompt(canvas, languageOption = state.languageOption) {
   const layout = layoutForCanvas(canvas.id, canvas.w, canvas.h);
   const system = `You are an information designer. Return ONE info card for the repository facts in the user message.
 
@@ -406,7 +449,16 @@ ${localizedStructure(layout, cardLanguageLabels(languageOption))}`;
 
 /* ── README: forward the full text; the prompt limit is now the only edge ── */
 
-function buildUserPrompt(repository, readme, notes, languageOption) {
+/**
+ * 构建发送给模型的高阶用户提示词，整合任务要求、目标语言强调、用户备注、仓库事实与截断 README。
+ *
+ * @param {Record<string, any>} repository 仓库信息对象
+ * @param {string | null} readme 仓库 README 正文全文
+ * @param {string} notes 用户在附加说明中输入的定制要求
+ * @param {string} [languageOption=state.languageOption] 目标语言选项代码
+ * @returns {{ prompt: string, readmeIncluded: boolean, truncatedReadme: boolean }} 拼接后的提示词与 README 处理状态
+ */
+function buildUserPrompt(repository, readme, notes, languageOption = state.languageOption) {
   const repo = repository;
   const lines = [
     'TASK',
@@ -680,20 +732,48 @@ const customWInput = $('custom-w');
 const customHInput = $('custom-h');
 const notesInput = $('opt-notes');
 
+/**
+ * 更新界面底部的状态栏提示信息。
+ *
+ * @param {string} message 状态文本
+ */
 function setStatus(message) { statusEl.textContent = message; }
 
-// 生成进行中的统一反馈：按钮换 loading 文案 + 旋转指示，状态栏离开灰色弱化态
-// 并呼吸闪烁。AI 请求要经过宿主确认弹窗与较长的网络等待，没有这些信号用户会
-// 以为页面卡死。
+/**
+ * 设置或恢复生成流程中的忙碌状态。
+ *
+ * 生成进行中：禁用生成按钮并增加 loading 样式与文案，状态栏离开灰色弱化态并呼吸闪烁；
+ * 期间禁用导出按钮，避免并发导出与重复提交产生竞态；结束后按卡片快照恢复按钮状态。
+ *
+ * @param {boolean} busy 是否处于生成忙碌状态
+ */
 function setBusy(busy) {
   state.busy = busy;
   generateButton.disabled = busy;
   generateButton.classList.toggle('is-busy', busy);
+  generateButton.setAttribute('aria-busy', String(busy));
   statusEl.classList.toggle('is-busy', busy);
+  statusEl.setAttribute('aria-busy', String(busy));
   generateButton.textContent = busy ? str.generatingShort
     : (state.fragment ? str.regenerate : str.generate);
+
+  if (busy) {
+    copyCodeButton.disabled = true;
+    copyImageButton.disabled = true;
+    saveImageButton.disabled = true;
+  } else if (state.fragment) {
+    copyCodeButton.disabled = false;
+    const canvasMatches = state.canvasId === state.fragmentCanvas?.id;
+    copyImageButton.disabled = !canvasMatches;
+    saveImageButton.disabled = !canvasMatches;
+  }
 }
 
+/**
+ * 根据宿主传入的主题或系统偏好设置根节点的明暗主题属性。
+ *
+ * @param {'dark' | 'light' | null} theme 主题名称
+ */
 function applyChromeTheme(theme) {
   // 弹窗入口随 init context 带宿主主题；面板入口没有 theme 时退回系统偏好。
   const dark = theme === 'dark'
@@ -701,6 +781,11 @@ function applyChromeTheme(theme) {
   document.documentElement.dataset.chrome = dark ? 'dark' : 'light';
 }
 
+/**
+ * 响应宿主下发的页面初始化消息（包含仓库元数据、README、界面语言及主题）。
+ *
+ * @param {Record<string, any>} context 宿主传入的初始上下文对象
+ */
 function handleInit(context) {
   state.repository = context.repository || null;
   state.readme = typeof context.readme === 'string' && context.readme ? context.readme : null;
@@ -727,6 +812,9 @@ function handleInit(context) {
     if (state.readme && !state.usedReadme) setStatus(str.readmeReady);
     return;
   }
+
+  // 生成进行中不打断 loading 状态提示，避免将「正在生成」冲掉为「已加载」。
+  if (state.busy) return;
 
   if (state.repository) {
     $('repo-name').textContent = state.repository.full_name;
@@ -1143,6 +1231,14 @@ codeEditor.addEventListener('scroll', () => {
   codeHighlight.scrollLeft = codeEditor.scrollLeft;
 });
 
+/**
+ * 发起 AI 请求生成仓库信息卡。
+ *
+ * 校验仓库上下文与忙碌锁，收集画幅与语言参数构建提示词；
+ * 请求成功后按快照保存画幅与语言状态，并刷新预览与导出文档；失败时展示友好错误提示。
+ *
+ * @returns {Promise<void>}
+ */
 async function generate() {
   if (!state.repository) { setStatus(str.noRepository); return; }
   if (state.busy) return;
@@ -1150,13 +1246,15 @@ async function generate() {
   try {
     setStatus(str.generating);
     const canvas = selectedCanvas();
-    const system = buildSystemPrompt(canvas, state.languageOption);
+    const targetLanguageOption = state.languageOption;
+    const targetLanguage = resolvedCardLanguage(targetLanguageOption);
+    const system = buildSystemPrompt(canvas, targetLanguageOption);
     const { prompt: user, readmeIncluded, truncatedReadme } =
-      buildUserPrompt(state.repository, state.readme, state.notes, state.languageOption);
+      buildUserPrompt(state.repository, state.readme, state.notes, targetLanguageOption);
     const text = await request('ai.generate', { system, user, maxTokens: 4000 });
     state.usedReadme = readmeIncluded;
     state.fragmentCanvas = canvas;
-    state.fragmentLanguage = resolvedCardLanguage();
+    state.fragmentLanguage = targetLanguage;
     state.fragment = sanitizeFragment(text, canvas);
     state.css = cssFor(state.styleId, canvas);
     state.docHtml = assembleDocument(state.css, state.fragment,
@@ -1185,7 +1283,13 @@ async function generate() {
   }
 }
 
+/**
+ * 将已组装的单文件 HTML 代码写入系统剪贴板。
+ *
+ * @returns {Promise<void>}
+ */
 async function copyCode() {
+  if (state.busy || !state.fragment) return;
   try {
     await request('clipboard.write', { text: state.docHtml });
     setStatus(str.copyOk);
@@ -1194,7 +1298,13 @@ async function copyCode() {
   }
 }
 
+/**
+ * 将当前卡片以 2x 分辨率光栅化为 PNG 并写入系统剪贴板。
+ *
+ * @returns {Promise<void>}
+ */
 async function copyImage() {
+  if (state.busy || !state.fragment) return;
   try {
     setStatus('…');
     const { dataBase64 } = await exportPngBase64();
@@ -1205,7 +1315,13 @@ async function copyImage() {
   }
 }
 
+/**
+ * 将当前卡片以 2x 分辨率光栅化为 PNG 并保存到用户下载路径。
+ *
+ * @returns {Promise<void>}
+ */
 async function saveImage() {
+  if (state.busy || !state.fragment) return;
   try {
     setStatus('…');
     const { dataBase64 } = await exportPngBase64();

@@ -14,8 +14,15 @@ const CANVASES = [
   { id: 'custom', w: 640, h: 2400 },
 ];
 
+/**
+ * 构造测试沙箱所需的轻量级虚拟 DOM 元素桩对象。
+ *
+ * @param {string} id 元素 ID
+ * @returns {Record<string, any>} 具有基础 DOM 操作接口的虚拟节点
+ */
 function makeElement(id) {
   const classes = new Set();
+  const attributes = new Map();
   return {
     id,
     textContent: '',
@@ -39,9 +46,9 @@ function makeElement(id) {
         return on;
       },
     },
-    setAttribute() {},
-    getAttribute() { return null; },
-    removeAttribute() {},
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    getAttribute(name) { return attributes.get(name) ?? null; },
+    removeAttribute(name) { attributes.delete(name); },
     append() {},
     replaceChildren() {},
     querySelector() { return null; },
@@ -55,6 +62,11 @@ function makeElement(id) {
   };
 }
 
+/**
+ * 在隔离的 vm 沙箱环境中加载并执行仓库信息卡 UI 脚本，并暴露内部对象。
+ *
+ * @returns {{ plugin: Record<string, any>, byId: (id: string) => Record<string, any> }} 沙箱中运行的插件上下文与元素检索器
+ */
 function loadPlugin() {
   const elements = new Map();
   const byId = (id) => {
@@ -76,7 +88,7 @@ function loadPlugin() {
     clearTimeout,
   };
   // 追加的这行把脚本作用域里的常量与函数挂到沙箱全局，供断言取用。
-  const expose = '\n;globalThis.__plugin = { state, STR, CARD_LANGUAGES, STRUCTURES, layoutForCanvas, buildSystemPrompt, buildUserPrompt, setBusy, AI_SYSTEM_LIMIT, AI_USER_LIMIT };\n';
+  const expose = '\n;globalThis.__plugin = { state, STR, CARD_LANGUAGES, STRUCTURES, layoutForCanvas, buildSystemPrompt, buildUserPrompt, setBusy, setStatus, handleInit, AI_SYSTEM_LIMIT, AI_USER_LIMIT };\n';
   vm.runInNewContext(
     fs.readFileSync(PLUGIN_SCRIPT, 'utf8') + expose,
     sandbox,
@@ -85,6 +97,11 @@ function loadPlugin() {
   return { plugin: sandbox.__plugin, byId };
 }
 
+/**
+ * 生成单元测试使用的标准样例仓库元数据。
+ *
+ * @returns {Record<string, any>} 包含基本属性的仓库数据桩
+ */
 function repository() {
   return {
     name: 'project',
@@ -157,6 +174,16 @@ test('repo info card: an explicit language option overrides the UI language in b
   assert.ok(prompt.length <= plugin.AI_USER_LIMIT);
 });
 
+test('repo info card: prompt builders default to state.languageOption when omitted', () => {
+  const { plugin } = loadPlugin();
+  plugin.state.language = 'zh';
+  plugin.state.languageOption = 'auto';
+  const system = plugin.buildSystemPrompt({ id: '1x1', w: 1200, h: 1200 });
+  assert.ok(system.includes('Language: Simplified Chinese'));
+  const { prompt } = plugin.buildUserPrompt(repository(), 'readme body', '');
+  assert.ok(prompt.includes('Write EVERY visible string in Simplified Chinese'));
+});
+
 test('repo info card: an oversized README is truncated instead of being silently dropped', () => {
   const { plugin } = loadPlugin();
   const huge = 'x'.repeat(plugin.AI_USER_LIMIT + 1000);
@@ -176,12 +203,60 @@ test('repo info card: generating toggles a visible busy state on the button and 
   plugin.setBusy(true);
   assert.equal(generate.disabled, true, 'generate button must be disabled while waiting');
   assert.ok(generate.classList.contains('is-busy'), 'button needs the spinner hook');
+  assert.equal(generate.getAttribute('aria-busy'), 'true');
   assert.ok(status.classList.contains('is-busy'), 'status line needs the pulse hook');
+  assert.equal(status.getAttribute('aria-busy'), 'true');
   assert.equal(generate.textContent, plugin.STR.zh.generatingShort);
 
   plugin.setBusy(false);
   assert.equal(generate.disabled, false);
   assert.ok(!generate.classList.contains('is-busy'));
+  assert.equal(generate.getAttribute('aria-busy'), 'false');
   assert.ok(!status.classList.contains('is-busy'));
+  assert.equal(status.getAttribute('aria-busy'), 'false');
   assert.equal(generate.textContent, plugin.STR.zh.generate);
+});
+
+test('repo info card: async init while busy does not overwrite the generating status line', () => {
+  const { plugin, byId } = loadPlugin();
+  const status = byId('status');
+  plugin.handleInit({ repository: repository(), readme: null, language: 'zh' });
+  assert.equal(status.textContent, plugin.STR.zh.loadedWithoutReadme);
+
+  // 用户点击生成，进入 busy 状态
+  plugin.setBusy(true);
+  plugin.setStatus(plugin.STR.zh.generating);
+  assert.equal(status.textContent, plugin.STR.zh.generating);
+
+  // 宿主异步补发带 README 的 init
+  plugin.handleInit({ repository: repository(), readme: '# Project README', language: 'zh' });
+  assert.equal(plugin.state.readme, '# Project README');
+  assert.equal(status.textContent, plugin.STR.zh.generating,
+    'status line must remain on generating while busy');
+
+  plugin.setBusy(false);
+});
+
+test('repo info card: busy state disables export buttons and restores them on finish', () => {
+  const { plugin, byId } = loadPlugin();
+  const copyCode = byId('copy-code');
+  const copyImage = byId('copy-image');
+  const saveImage = byId('save-image');
+
+  plugin.state.fragment = '<div id="card">ok</div>';
+  plugin.state.fragmentCanvas = { id: '1x1', w: 1200, h: 1200 };
+  plugin.state.canvasId = '1x1';
+  copyCode.disabled = false;
+  copyImage.disabled = false;
+  saveImage.disabled = false;
+
+  plugin.setBusy(true);
+  assert.equal(copyCode.disabled, true);
+  assert.equal(copyImage.disabled, true);
+  assert.equal(saveImage.disabled, true);
+
+  plugin.setBusy(false);
+  assert.equal(copyCode.disabled, false);
+  assert.equal(copyImage.disabled, false);
+  assert.equal(saveImage.disabled, false);
 });
