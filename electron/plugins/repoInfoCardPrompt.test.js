@@ -84,11 +84,24 @@ function loadPlugin() {
       removeEventListener() {},
     },
     window: { addEventListener() {}, matchMedia: () => ({ matches: false }) },
+    DOMParser: class {
+      parseFromString(html) {
+        const root = makeElement('parsed-doc');
+        if (html.includes('id="card"')) {
+          const card = makeElement('card');
+          card.outerHTML = '<div id="card"></div>';
+          root.getElementById = (id) => (id === 'card' ? card : null);
+        } else {
+          root.getElementById = () => null;
+        }
+        return root;
+      }
+    },
     setTimeout,
     clearTimeout,
   };
   // 追加的这行把脚本作用域里的常量与函数挂到沙箱全局，供断言取用。
-  const expose = '\n;globalThis.__plugin = { state, STR, CARD_LANGUAGES, STRUCTURES, layoutForCanvas, buildSystemPrompt, buildUserPrompt, setBusy, setStatus, handleInit, AI_SYSTEM_LIMIT, AI_USER_LIMIT };\n';
+  const expose = '\n;globalThis.__plugin = { state, STR, CARD_LANGUAGES, STRUCTURES, layoutForCanvas, buildSystemPrompt, buildUserPrompt, setBusy, setStatus, handleInit, canvasMatchesSnapshot, sanitizeFragment, AI_SYSTEM_LIMIT, AI_USER_LIMIT };\n';
   vm.runInNewContext(
     fs.readFileSync(PLUGIN_SCRIPT, 'utf8') + expose,
     sandbox,
@@ -223,7 +236,7 @@ test('repo info card: async init while busy does not overwrite the generating st
   plugin.handleInit({ repository: repository(), readme: null, language: 'zh' });
   assert.equal(status.textContent, plugin.STR.zh.loadedWithoutReadme);
 
-  // 用户点击生成，进入 busy 状态
+  // 用户点击生成，进入 busy 状态（首次生成，无已有卡片）
   plugin.setBusy(true);
   plugin.setStatus(plugin.STR.zh.generating);
   assert.equal(status.textContent, plugin.STR.zh.generating);
@@ -232,9 +245,28 @@ test('repo info card: async init while busy does not overwrite the generating st
   plugin.handleInit({ repository: repository(), readme: '# Project README', language: 'zh' });
   assert.equal(plugin.state.readme, '# Project README');
   assert.equal(status.textContent, plugin.STR.zh.generating,
-    'status line must remain on generating while busy');
+    'status line must remain on generating while busy (first generation)');
 
   plugin.setBusy(false);
+
+  // 重新生成场景（已有卡片状态）：正在 busy 生成时收到 README 更新也不冲掉 generating 提示
+  plugin.state.fragment = '<div id="card">existing card</div>';
+  plugin.state.fragmentCanvas = { id: '1x1', w: 1200, h: 1200 };
+  plugin.state.usedReadme = false;
+  plugin.setBusy(true);
+  plugin.setStatus(plugin.STR.zh.generating);
+
+  plugin.handleInit({ repository: repository(), readme: '# New README', language: 'zh' });
+  assert.equal(plugin.state.readme, '# New README');
+  assert.equal(status.textContent, plugin.STR.zh.generating,
+    'status line must remain on generating while regenerating existing card');
+
+  plugin.setBusy(false);
+
+  // 非 busy 状态下已有卡片收到新 README 时，应正常提示 readmeReady
+  plugin.handleInit({ repository: repository(), readme: '# Updated README', language: 'zh' });
+  assert.equal(status.textContent, plugin.STR.zh.readmeReady,
+    'status line should prompt readmeReady when not busy');
 });
 
 test('repo info card: busy state disables export buttons and restores them on finish', () => {
@@ -259,4 +291,43 @@ test('repo info card: busy state disables export buttons and restores them on fi
   assert.equal(copyCode.disabled, false);
   assert.equal(copyImage.disabled, false);
   assert.equal(saveImage.disabled, false);
+
+  // 自定义画幅尺寸不匹配时，恢复忙碌状态后截图按钮仍应保持禁用
+  plugin.state.canvasId = 'custom';
+  plugin.state.fragmentCanvas = { id: 'custom', w: 800, h: 1000 };
+  plugin.state.customWidth = 900; // 尺寸已改动
+  plugin.state.customHeight = 1000;
+
+  plugin.setBusy(true);
+  plugin.setBusy(false);
+  assert.equal(copyCode.disabled, false);
+  assert.equal(copyImage.disabled, true, 'screenshot button must stay disabled when custom width differs');
+  assert.equal(saveImage.disabled, true, 'save image button must stay disabled when custom width differs');
+
+  // 自定义画幅尺寸调回一致时，截图按钮恢复可用
+  plugin.state.customWidth = 800;
+  plugin.setBusy(true);
+  plugin.setBusy(false);
+  assert.equal(copyImage.disabled, false, 'screenshot button should be enabled when custom dimensions match');
+  assert.equal(saveImage.disabled, false, 'save image button should be enabled when custom dimensions match');
+});
+
+test('repo info card: sanitization failure preserves existing fragment and snapshot state', () => {
+  const { plugin } = loadPlugin();
+  const initialCanvas = { id: '1x1', w: 1200, h: 1200 };
+  plugin.state.fragment = '<div id="card">original</div>';
+  plugin.state.fragmentCanvas = initialCanvas;
+  plugin.state.fragmentLanguage = 'zh';
+  plugin.state.usedReadme = true;
+
+  // 模拟非法响应（缺少 id="card" 根元素）
+  assert.throws(() => {
+    plugin.sanitizeFragment('<div>no card root</div>', { id: '5x2', w: 1500, h: 600 });
+  }, /card/i);
+
+  // 原有卡片状态与快照保持原样
+  assert.equal(plugin.state.fragment, '<div id="card">original</div>');
+  assert.equal(plugin.state.fragmentCanvas, initialCanvas);
+  assert.equal(plugin.state.fragmentLanguage, 'zh');
+  assert.equal(plugin.state.usedReadme, true);
 });

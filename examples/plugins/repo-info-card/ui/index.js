@@ -678,6 +678,20 @@ function clampCanvasDimension(value) {
   return Math.min(CANVAS_MAX, Math.max(CANVAS_MIN, parsed));
 }
 
+/**
+ * 比较当前画幅设置与已生成卡片的画幅快照是否完全一致（含自定义画幅的长宽）。
+ *
+ * @param {{ id: string, w: number, h: number } | null} snapshot 已生成卡片的画幅快照
+ * @returns {boolean} 当前选项是否与快照一致
+ */
+function canvasMatchesSnapshot(snapshot) {
+  if (!snapshot || state.canvasId !== snapshot.id) return false;
+  if (snapshot.id === CUSTOM_CANVAS_ID) {
+    return state.customWidth === snapshot.w && state.customHeight === snapshot.h;
+  }
+  return true;
+}
+
 /* ── app state + UI wiring ───────────────────────────────────────── */
 
 const ZOOM_MIN = 0.2;   // 相对「适应窗口」的最小倍率
@@ -763,7 +777,7 @@ function setBusy(busy) {
     saveImageButton.disabled = true;
   } else if (state.fragment) {
     copyCodeButton.disabled = false;
-    const canvasMatches = state.canvasId === state.fragmentCanvas?.id;
+    const canvasMatches = canvasMatchesSnapshot(state.fragmentCanvas);
     copyImageButton.disabled = !canvasMatches;
     saveImageButton.disabled = !canvasMatches;
   }
@@ -809,7 +823,7 @@ function handleInit(context) {
     const { w, h } = canvasMetrics(state.fragmentCanvas);
     previewMeta.textContent = fmt(str.previewMeta, { canvas: canvasLabel(state.fragmentCanvas.id), w, h });
     updateZoomLabel();
-    if (state.readme && !state.usedReadme) setStatus(str.readmeReady);
+    if (!state.busy && state.readme && !state.usedReadme) setStatus(str.readmeReady);
     return;
   }
 
@@ -1024,9 +1038,10 @@ function selectCanvas(id) {
   // 已生成的卡片尺寸固定在生成时的画幅上。导出按快照取宽高，直接导出会
   // 把旧卡片裁进新画布，所以切换后禁用截图导出，直到重新生成。
   if (state.fragment) {
-    copyImageButton.disabled = true;
-    saveImageButton.disabled = true;
-    setStatus(str.canvasChanged);
+    const canvasMatches = canvasMatchesSnapshot(state.fragmentCanvas);
+    copyImageButton.disabled = !canvasMatches;
+    saveImageButton.disabled = !canvasMatches;
+    if (!canvasMatches) setStatus(str.canvasChanged);
   }
 }
 
@@ -1046,9 +1061,10 @@ function handleCustomDimensionInput(input, dimension) {
   if (customSubLabel) customSubLabel.textContent = `${state.customWidth}×${state.customHeight}`;
   // 已按旧自定义尺寸生成的卡片同样不能直接导出。
   if (state.canvasId === CUSTOM_CANVAS_ID && state.fragment) {
-    copyImageButton.disabled = true;
-    saveImageButton.disabled = true;
-    setStatus(str.canvasChanged);
+    const canvasMatches = canvasMatchesSnapshot(state.fragmentCanvas);
+    copyImageButton.disabled = !canvasMatches;
+    saveImageButton.disabled = !canvasMatches;
+    if (!canvasMatches) setStatus(str.canvasChanged);
   }
 }
 
@@ -1252,10 +1268,11 @@ async function generate() {
     const { prompt: user, readmeIncluded, truncatedReadme } =
       buildUserPrompt(state.repository, state.readme, state.notes, targetLanguageOption);
     const text = await request('ai.generate', { system, user, maxTokens: 4000 });
+    const fragment = sanitizeFragment(text, canvas);
     state.usedReadme = readmeIncluded;
     state.fragmentCanvas = canvas;
     state.fragmentLanguage = targetLanguage;
-    state.fragment = sanitizeFragment(text, canvas);
+    state.fragment = fragment;
     state.css = cssFor(state.styleId, canvas);
     state.docHtml = assembleDocument(state.css, state.fragment,
       `${state.repository.full_name} · info card`,
