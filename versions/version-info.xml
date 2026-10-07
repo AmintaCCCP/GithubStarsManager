@@ -697,4 +697,23 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.5</downloadUrl>
   </version>
+  <version>
+    <number>0.8.6</number>
+    <releaseDate>2026-10-07</releaseDate>
+    <changelog>
+      <item>build: 升级各工作区 npm 构建工具链与依赖库至最新安全版本。(PR #423)</item>
+      <item>perf: IndexedDB 改用分片持久化与脏检查原子提交，开关弹窗等操作仅写轻量分片，消除 140MB 级序列化告警与卡顿。(PR #424)</item>
+      <item>fix: 优化桌面端 WebDAV 错误提示，在特定受限网络环境下平滑回退至 Chromium 网络栈。(PR #426)</item>
+      <item>feat: 社区插件注册表升级为插件市场，支持按源浏览、搜索、一键安装、更新及卸载，支持自定义添加维护外部 GitHub 插件源。(PR #427)</item>
+      <item>feat: 建立贯穿主进程、渲染端、后端与插件的全量诊断日志体系，敏感信息自动脱敏，支持导出诊断包与捕获出站请求台账。(PR #428)</item>
+      <item>fix: 对齐仓库问答面板中的代码块样式与 GitHub 设计语言，消除窄侧栏右缘截断。(PR #429)</item>
+      <item>fix: 升级 http-cache-semantics 至 4.3.0 修复 CVE-2026-93748 安全漏洞，加固测试隔离。(PR #430)</item>
+      <item>feat: README 阅读弹窗扩大至近全屏尺寸（四周各留 1rem 舒适边距），大幅提升长篇文档阅读体验。(PR #431)</item>
+      <item>feat: 全面重构仓库信息卡示例插件 UI，支持 Linear 设计风格、左右分栏、实时代码编辑/高亮预览、自由缩放平移与自定义画幅。(PR #432)</item>
+      <item>feat: 新增 V1.5 页面只读网络桥接能力，发布「仓库洞察」官方示例插件，提供提交动态、健康度雷达、贡献者与巴士因子分析看板。(PR #433)</item>
+      <item>fix: 修复仓库洞察插件图表竞态崩溃，完善 WebDAV PROPFIND 连接探测兼容性，并对超大持久化分片增加空闲写入节流。(PR #434)</item>
+      <item>fix: 修复仓库信息卡选择跟随界面语言时的本地化提示词覆盖问题，补充生成 Loading 动效与导出画幅校验。(PR #435)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.6</downloadUrl>
+  </version>
 </versions>
