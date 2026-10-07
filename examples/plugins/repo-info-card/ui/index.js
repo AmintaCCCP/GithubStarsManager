@@ -75,6 +75,7 @@ const STR = {
     pickerHint: '此入口没有携带仓库上下文（例如从「设置 → 插件 → 打开页面」进入）。搜索并选择一个已加载的仓库：',
     searching: '搜索中…', searchDone: '找到 {n} 个仓库，点击选择。',
     generating: '正在请求用户配置的 AI 生成卡片（需要在弹窗中确认）…',
+    generatingShort: '生成中…',
     canvasChanged: '画幅已改变，当前卡片仍是旧画幅。重新生成后才能导出截图。',
     copyOk: 'HTML 代码已复制到剪贴板。',
     imageOk: '截图已写入剪贴板。',
@@ -112,6 +113,7 @@ const STR = {
     pickerHint: 'This entry carries no repository context (e.g. opened from Settings → Plugins). Pick a loaded repository:',
     searching: 'Searching…', searchDone: '{n} repositories found; click to select.',
     generating: 'Asking the configured AI to compose the card (confirmation required)…',
+    generatingShort: 'Generating…',
     canvasChanged: 'Canvas changed; the current card still uses the previous one. Regenerate before exporting a screenshot.',
     copyOk: 'HTML code copied to the clipboard.',
     imageOk: 'Screenshot copied to the clipboard.',
@@ -150,7 +152,9 @@ function applyChromeStrings() {
     const key = el.getAttribute('data-i18n-aria-label');
     if (str[key]) el.setAttribute('aria-label', str[key]);
   });
-  generateButton.textContent = state.fragment ? str.regenerate : str.generate;
+  // 生成进行中按钮固定显示 loading 文案，避免语言/片段状态刷新覆盖它。
+  generateButton.textContent = state.busy ? str.generatingShort
+    : (state.fragment ? str.regenerate : str.generate);
   copyCodeButton.textContent = str.copyCode;
   copyImageButton.textContent = str.copyImage;
   saveImageButton.textContent = str.saveImage;
@@ -178,17 +182,49 @@ const CANVAS_MAX = 3000;
 
 // 与主程序 src/i18n/languages.ts 的 APP_LANGUAGES 保持一致：卡片语言选项
 // 覆盖 i18n 包含的全部语言，englishName 直接进入 AI 提示词的语言指令。
+// labels 是卡片上的固定文案（统计标签、规格键、页脚），随语言一起注入结构
+// 模板——否则模型面对全英文模板与英文 README 时会忽略语言指令，整卡输出英文。
 const CARD_LANGUAGES = [
-  { code: 'zh', nativeName: '中文', englishName: 'Simplified Chinese' },
-  { code: 'en', nativeName: 'English', englishName: 'English' },
-  { code: 'ja', nativeName: '日本語', englishName: 'Japanese' },
-  { code: 'es', nativeName: 'Español', englishName: 'Spanish' },
-  { code: 'pt-BR', nativeName: 'Português (Brasil)', englishName: 'Brazilian Portuguese' },
-  { code: 'ru', nativeName: 'Русский', englishName: 'Russian' },
-  { code: 'zh-TW', nativeName: '繁體中文', englishName: 'Traditional Chinese' },
-  { code: 'fr', nativeName: 'Français', englishName: 'French' },
-  { code: 'de', nativeName: 'Deutsch', englishName: 'German' },
-  { code: 'ko', nativeName: '한국어', englishName: 'Korean' },
+  {
+    code: 'zh', nativeName: '中文', englishName: 'Simplified Chinese',
+    labels: { stars: '星标', forks: '复刻', language: '语言', license: '许可证', key: '条目', footer: '仓库信息卡' },
+  },
+  {
+    code: 'en', nativeName: 'English', englishName: 'English',
+    labels: { stars: 'STARS', forks: 'FORKS', language: 'LANGUAGE', license: 'LICENSE', key: 'KEY', footer: 'REPO INFO CARD' },
+  },
+  {
+    code: 'ja', nativeName: '日本語', englishName: 'Japanese',
+    labels: { stars: 'スター', forks: 'フォーク', language: '言語', license: 'ライセンス', key: '項目', footer: 'リポジトリ情報カード' },
+  },
+  {
+    code: 'es', nativeName: 'Español', englishName: 'Spanish',
+    labels: { stars: 'ESTRELLAS', forks: 'FORKS', language: 'IDIOMA', license: 'LICENCIA', key: 'DATO', footer: 'FICHA DEL REPOSITORIO' },
+  },
+  {
+    code: 'pt-BR', nativeName: 'Português (Brasil)', englishName: 'Brazilian Portuguese',
+    labels: { stars: 'ESTRELAS', forks: 'FORKS', language: 'LINGUAGEM', license: 'LICENÇA', key: 'ITEM', footer: 'CARTÃO DO REPOSITÓRIO' },
+  },
+  {
+    code: 'ru', nativeName: 'Русский', englishName: 'Russian',
+    labels: { stars: 'ЗВЁЗДЫ', forks: 'ФОРКИ', language: 'ЯЗЫК', license: 'ЛИЦЕНЗИЯ', key: 'ПУНКТ', footer: 'КАРТОЧКА РЕПОЗИТОРИЯ' },
+  },
+  {
+    code: 'zh-TW', nativeName: '繁體中文', englishName: 'Traditional Chinese',
+    labels: { stars: '星標', forks: '複刻', language: '語言', license: '授權', key: '項目', footer: '儲存庫資訊卡' },
+  },
+  {
+    code: 'fr', nativeName: 'Français', englishName: 'French',
+    labels: { stars: 'ÉTOILES', forks: 'FORKS', language: 'LANGAGE', license: 'LICENCE', key: 'DONNÉE', footer: 'FICHE DU DÉPÔT' },
+  },
+  {
+    code: 'de', nativeName: 'Deutsch', englishName: 'German',
+    labels: { stars: 'STERNE', forks: 'FORKS', language: 'SPRACHE', license: 'LIZENZ', key: 'EINTRAG', footer: 'REPO-INFOKARTE' },
+  },
+  {
+    code: 'ko', nativeName: '한국어', englishName: 'Korean',
+    labels: { stars: '스타', forks: '포크', language: '언어', license: '라이선스', key: '항목', footer: '저장소 정보 카드' },
+  },
 ];
 
 // 版式与画幅解耦：data-canvas 只管尺寸（--w/--h/字号/留白），data-layout
@@ -274,6 +310,8 @@ function layoutForCanvas(canvasId, w, h) {
 }
 
 /* ── prompt builders (plugin owns layout; AI writes the markup) ──── */
+/* {K_*} 占位符在 buildSystemPrompt 里按所选卡片语言替换成 labels 的固定文案；
+ * 模板本身的说明文字仍是英文（给模型看），卡面上的标签则始终是目标语言。 */
 
 const STRUCTURES = {
   square: `<div id="card">
@@ -285,10 +323,10 @@ const STRUCTURES = {
 <div class="col">same shape, 02</div>
 <div class="col">same shape, 03</div>
 </div>
-<div class="reads">4 x <div class="read"><div class="k mono">STARS|FORKS|LANGUAGE|LICENSE</div><div class="v">{value}</div></div></div>
-<div class="spec">4 x <div class="row"><span class="k mono">KEY</span><span>{value}</span></div> for TOPICS, CREATED, LAST PUSH, HOMEPAGE</div>
+<div class="reads">4 x <div class="read"><div class="k mono">{K_STARS}|{K_FORKS}|{K_LANGUAGE}|{K_LICENSE}</div><div class="v">{value}</div></div></div>
+<div class="spec">4 x <div class="row"><span class="k mono">{K_KEY}</span><span>{value}</span></div> for TOPICS, CREATED, LAST PUSH, HOMEPAGE</div>
 <p class="closer">{one-sentence takeaway with 1 .accent}</p>
-<div class="footer"><span class="mono">{repo url}</span><span>REPO INFO CARD</span></div>
+<div class="footer"><span class="mono">{repo url}</span><span>{K_FOOTER}</span></div>
 </div>`,
   banner: `<div id="card">
 <div class="card-top"><span>{TYPE - DOMAIN}</span><span class="mono">{owner}</span></div>
@@ -300,26 +338,44 @@ const STRUCTURES = {
 </div>
 <div class="hero-right">
 <div class="pipe mono"><span>{word}</span><span>{word}</span><span>{word}</span></div>
-<div class="reads">3 x <div class="read"><div class="k mono">KEY</div><div class="v">{value}</div></div></div>
+<div class="reads">3 x <div class="read"><div class="k mono">{K_STARS}|{K_FORKS}|{K_LANGUAGE}</div><div class="v">{value}</div></div></div>
 </div>
 </div>
-<div class="footer"><span class="mono">{repo url}</span><span>REPO INFO CARD</span></div>
+<div class="footer"><span class="mono">{repo url}</span><span>{K_FOOTER}</span></div>
 </div>`,
   portrait: `<div id="card">
 <div class="card-top"><span>{TYPE - DOMAIN}</span><span class="mono">{owner}</span></div>
 <div class="kicker mono">{DOMAIN TAG}</div>
 <h1 class="title">{title with 1 <span class="accent">keyword</span>}</h1>
 <p class="intro">{2 sentences}</p>
-<div class="reads">4 x <div class="read"><div class="k mono">KEY</div><div class="v">{value}</div></div></div>
-<div class="spec">6 x <div class="row"><span class="k mono">KEY</span><span>{value}</span></div></div>
+<div class="reads">4 x <div class="read"><div class="k mono">{K_STARS}|{K_FORKS}|{K_LANGUAGE}|{K_LICENSE}</div><div class="v">{value}</div></div></div>
+<div class="spec">6 x <div class="row"><span class="k mono">{K_KEY}</span><span>{value}</span></div></div>
 <p class="closer">{takeaway with 1 .accent}</p>
-<div class="footer"><span class="mono">{repo url}</span><span>REPO INFO CARD</span></div>
+<div class="footer"><span class="mono">{repo url}</span><span>{K_FOOTER}</span></div>
 </div>`,
 };
 
 function cardLanguageLabel(option) {
   const code = option === 'auto' ? state.language : option;
   return CARD_LANGUAGES.find((item) => item.code === code)?.englishName ?? 'English';
+}
+
+// 卡片固定文案（统计标签/规格键/页脚）随所选语言注入结构模板，
+// 未命中时退回英文（与 cardLanguageLabel 的回退一致）。
+function cardLanguageLabels(option) {
+  const code = option === 'auto' ? state.language : option;
+  const match = CARD_LANGUAGES.find((item) => item.code === code);
+  return match?.labels ?? CARD_LANGUAGES.find((item) => item.code === 'en').labels;
+}
+
+function localizedStructure(layout, labels) {
+  return STRUCTURES[layout]
+    .replaceAll('{K_STARS}', labels.stars)
+    .replaceAll('{K_FORKS}', labels.forks)
+    .replaceAll('{K_LANGUAGE}', labels.language)
+    .replaceAll('{K_LICENSE}', labels.license)
+    .replaceAll('{K_KEY}', labels.key)
+    .replaceAll('{K_FOOTER}', labels.footer);
 }
 
 // 卡片实际生效的语言码（跟随界面时即宿主界面语言），用于提示词与导出文档。
@@ -337,11 +393,11 @@ OUTPUT
 - Root element exactly <div id="card" data-canvas="${canvas.id}" data-layout="${layout}"> with the element sequence and class names below; nothing outside it.
 - .accent wraps exactly ONE keyword inside .title and ONE inside .closer. No other color.
 - Facts: only from the user message. Never invent numbers, quotes, versions or claims; omit an element when its value is unknown. Format big numbers like 43.7K or 1.2M.
-- Language: ${cardLanguageLabel(languageOption)}. Keep English proper nouns verbatim; one space between CJK and Latin. No hype words.
+- Language: ${cardLanguageLabel(languageOption)}. Translate every visible text; the notes and facts below are English source data only. Keep proper nouns verbatim; one space between CJK and Latin. No hype words.
 - Column headings are judgements, not topic labels. Do not repeat one fact in two sections.
 
 STRUCTURE
-${STRUCTURES[layout]}`;
+${localizedStructure(layout, cardLanguageLabels(languageOption))}`;
   if (system.length > AI_SYSTEM_LIMIT) {
     throw new Error(`System prompt exceeds the bridge limit (${system.length} > ${AI_SYSTEM_LIMIT})`);
   }
@@ -350,11 +406,14 @@ ${STRUCTURES[layout]}`;
 
 /* ── README: forward the full text; the prompt limit is now the only edge ── */
 
-function buildUserPrompt(repository, readme, notes) {
+function buildUserPrompt(repository, readme, notes, languageOption) {
   const repo = repository;
   const lines = [
     'TASK',
     'Compose ONE info card for this repository.',
+    // 语言要求在这里再强调一次：system prompt 只剩一行、且后面全是英文的
+    // README 与英文元数据，实测模型容易整体跟着英文走。
+    `- Write EVERY visible string in ${cardLanguageLabel(languageOption)} (title, intro, column headings, tags, metric labels, spec keys, closer, footer). The English text below is source data to translate, not output to copy.`,
     '- Ground the card in the README text below: name the concrete capabilities, workflow, stack and limits it actually states.',
     '- Use the one-line description, topics and ai_summary only to fill gaps the README does not cover.',
     '- Never invent facts, numbers, versions, dates or quotes that are not written below.',
@@ -592,6 +651,7 @@ const state = {
   zoom: 1,        // 相对自适应比例的倍率；1 表示「适应窗口」
   fitScale: 1,    // 最近一次自适应算出的缩放比例
   usedReadme: false,
+  busy: false,    // AI 请求进行中：按钮 loading + 状态栏呼吸动画
 };
 
 const $ = (id) => document.getElementById(id);
@@ -621,6 +681,18 @@ const customHInput = $('custom-h');
 const notesInput = $('opt-notes');
 
 function setStatus(message) { statusEl.textContent = message; }
+
+// 生成进行中的统一反馈：按钮换 loading 文案 + 旋转指示，状态栏离开灰色弱化态
+// 并呼吸闪烁。AI 请求要经过宿主确认弹窗与较长的网络等待，没有这些信号用户会
+// 以为页面卡死。
+function setBusy(busy) {
+  state.busy = busy;
+  generateButton.disabled = busy;
+  generateButton.classList.toggle('is-busy', busy);
+  statusEl.classList.toggle('is-busy', busy);
+  generateButton.textContent = busy ? str.generatingShort
+    : (state.fragment ? str.regenerate : str.generate);
+}
 
 function applyChromeTheme(theme) {
   // 弹窗入口随 init context 带宿主主题；面板入口没有 theme 时退回系统偏好。
@@ -1073,13 +1145,14 @@ codeEditor.addEventListener('scroll', () => {
 
 async function generate() {
   if (!state.repository) { setStatus(str.noRepository); return; }
-  generateButton.disabled = true;
+  if (state.busy) return;
+  setBusy(true);
   try {
     setStatus(str.generating);
     const canvas = selectedCanvas();
     const system = buildSystemPrompt(canvas, state.languageOption);
     const { prompt: user, readmeIncluded, truncatedReadme } =
-      buildUserPrompt(state.repository, state.readme, state.notes);
+      buildUserPrompt(state.repository, state.readme, state.notes, state.languageOption);
     const text = await request('ai.generate', { system, user, maxTokens: 4000 });
     state.usedReadme = readmeIncluded;
     state.fragmentCanvas = canvas;
@@ -1108,7 +1181,7 @@ async function generate() {
     const message = error instanceof Error ? error.message : str.bridgeFailed;
     setStatus(fmt(message.includes('id="card"') ? str.noCard : str.aiFailed, { message }));
   } finally {
-    generateButton.disabled = false;
+    setBusy(false);
   }
 }
 
