@@ -105,7 +105,7 @@
     "highlight.js": "^11.11.1",
     "i18next": "^26.4.2",
     "jsdom": "^24.0.0",
-    "katex": "^0.16.0",
+    "katex": "^0.18.2",
     "lucide-react": "^0.344.0",
     "mermaid": "^11.17.0",
     "postcss": "^8.4.35",
