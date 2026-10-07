@@ -1,6 +1,6 @@
 {
   "name": "github-stars-manager-server",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "private": true,
   "type": "module",
   "scripts": {
