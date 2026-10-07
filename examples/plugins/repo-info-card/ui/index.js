@@ -75,6 +75,7 @@ const STR = {
     pickerHint: '此入口没有携带仓库上下文（例如从「设置 → 插件 → 打开页面」进入）。搜索并选择一个已加载的仓库：',
     searching: '搜索中…', searchDone: '找到 {n} 个仓库，点击选择。',
     generating: '正在请求用户配置的 AI 生成卡片（需要在弹窗中确认）…',
+    generatingShort: '生成中…',
     canvasChanged: '画幅已改变，当前卡片仍是旧画幅。重新生成后才能导出截图。',
     copyOk: 'HTML 代码已复制到剪贴板。',
     imageOk: '截图已写入剪贴板。',
@@ -112,6 +113,7 @@ const STR = {
     pickerHint: 'This entry carries no repository context (e.g. opened from Settings → Plugins). Pick a loaded repository:',
     searching: 'Searching…', searchDone: '{n} repositories found; click to select.',
     generating: 'Asking the configured AI to compose the card (confirmation required)…',
+    generatingShort: 'Generating…',
     canvasChanged: 'Canvas changed; the current card still uses the previous one. Regenerate before exporting a screenshot.',
     copyOk: 'HTML code copied to the clipboard.',
     imageOk: 'Screenshot copied to the clipboard.',
@@ -130,9 +132,21 @@ const STR = {
   },
 };
 let str = STR.zh;
+
+/**
+ * 格式化包含 `{key}` 占位符的国际化文案模板。
+ *
+ * @param {string} template 包含占位符的文案模板
+ * @param {Record<string, any>} [params] 占位符键值对映射
+ * @returns {string} 替换参数后的格式化文本
+ */
 function fmt(template, params) {
   return template.replace(/\{(\w+)\}/g, (_, key) => String(params?.[key] ?? `{${key}}`));
 }
+
+/**
+ * 将当前界面语言（中/英）的静态文本与辅助属性同步至页面所有 DOM 节点。
+ */
 function applyChromeStrings() {
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     const key = el.getAttribute('data-i18n');
@@ -150,7 +164,9 @@ function applyChromeStrings() {
     const key = el.getAttribute('data-i18n-aria-label');
     if (str[key]) el.setAttribute('aria-label', str[key]);
   });
-  generateButton.textContent = state.fragment ? str.regenerate : str.generate;
+  // 生成进行中按钮固定显示 loading 文案，避免语言/片段状态刷新覆盖它。
+  generateButton.textContent = state.busy ? str.generatingShort
+    : (state.fragment ? str.regenerate : str.generate);
   copyCodeButton.textContent = str.copyCode;
   copyImageButton.textContent = str.copyImage;
   saveImageButton.textContent = str.saveImage;
@@ -178,17 +194,49 @@ const CANVAS_MAX = 3000;
 
 // 与主程序 src/i18n/languages.ts 的 APP_LANGUAGES 保持一致：卡片语言选项
 // 覆盖 i18n 包含的全部语言，englishName 直接进入 AI 提示词的语言指令。
+// labels 是卡片上的固定文案（统计标签、规格键、页脚），随语言一起注入结构
+// 模板——否则模型面对全英文模板与英文 README 时会忽略语言指令，整卡输出英文。
 const CARD_LANGUAGES = [
-  { code: 'zh', nativeName: '中文', englishName: 'Simplified Chinese' },
-  { code: 'en', nativeName: 'English', englishName: 'English' },
-  { code: 'ja', nativeName: '日本語', englishName: 'Japanese' },
-  { code: 'es', nativeName: 'Español', englishName: 'Spanish' },
-  { code: 'pt-BR', nativeName: 'Português (Brasil)', englishName: 'Brazilian Portuguese' },
-  { code: 'ru', nativeName: 'Русский', englishName: 'Russian' },
-  { code: 'zh-TW', nativeName: '繁體中文', englishName: 'Traditional Chinese' },
-  { code: 'fr', nativeName: 'Français', englishName: 'French' },
-  { code: 'de', nativeName: 'Deutsch', englishName: 'German' },
-  { code: 'ko', nativeName: '한국어', englishName: 'Korean' },
+  {
+    code: 'zh', nativeName: '中文', englishName: 'Simplified Chinese',
+    labels: { stars: '星标', forks: '复刻', language: '语言', license: '许可证', key: '条目', footer: '仓库信息卡' },
+  },
+  {
+    code: 'en', nativeName: 'English', englishName: 'English',
+    labels: { stars: 'STARS', forks: 'FORKS', language: 'LANGUAGE', license: 'LICENSE', key: 'KEY', footer: 'REPO INFO CARD' },
+  },
+  {
+    code: 'ja', nativeName: '日本語', englishName: 'Japanese',
+    labels: { stars: 'スター', forks: 'フォーク', language: '言語', license: 'ライセンス', key: '項目', footer: 'リポジトリ情報カード' },
+  },
+  {
+    code: 'es', nativeName: 'Español', englishName: 'Spanish',
+    labels: { stars: 'ESTRELLAS', forks: 'FORKS', language: 'IDIOMA', license: 'LICENCIA', key: 'DATO', footer: 'FICHA DEL REPOSITORIO' },
+  },
+  {
+    code: 'pt-BR', nativeName: 'Português (Brasil)', englishName: 'Brazilian Portuguese',
+    labels: { stars: 'ESTRELAS', forks: 'FORKS', language: 'LINGUAGEM', license: 'LICENÇA', key: 'ITEM', footer: 'CARTÃO DO REPOSITÓRIO' },
+  },
+  {
+    code: 'ru', nativeName: 'Русский', englishName: 'Russian',
+    labels: { stars: 'ЗВЁЗДЫ', forks: 'ФОРКИ', language: 'ЯЗЫК', license: 'ЛИЦЕНЗИЯ', key: 'ПУНКТ', footer: 'КАРТОЧКА РЕПОЗИТОРИЯ' },
+  },
+  {
+    code: 'zh-TW', nativeName: '繁體中文', englishName: 'Traditional Chinese',
+    labels: { stars: '星標', forks: '複刻', language: '語言', license: '授權', key: '項目', footer: '儲存庫資訊卡' },
+  },
+  {
+    code: 'fr', nativeName: 'Français', englishName: 'French',
+    labels: { stars: 'ÉTOILES', forks: 'FORKS', language: 'LANGAGE', license: 'LICENCE', key: 'DONNÉE', footer: 'FICHE DU DÉPÔT' },
+  },
+  {
+    code: 'de', nativeName: 'Deutsch', englishName: 'German',
+    labels: { stars: 'STERNE', forks: 'FORKS', language: 'SPRACHE', license: 'LIZENZ', key: 'EINTRAG', footer: 'REPO-INFOKARTE' },
+  },
+  {
+    code: 'ko', nativeName: '한국어', englishName: 'Korean',
+    labels: { stars: '스타', forks: '포크', language: '언어', license: '라이선스', key: '항목', footer: '저장소 정보 카드' },
+  },
 ];
 
 // 版式与画幅解耦：data-canvas 只管尺寸（--w/--h/字号/留白），data-layout
@@ -274,6 +322,8 @@ function layoutForCanvas(canvasId, w, h) {
 }
 
 /* ── prompt builders (plugin owns layout; AI writes the markup) ──── */
+/* {K_*} 占位符在 buildSystemPrompt 里按所选卡片语言替换成 labels 的固定文案；
+ * 模板本身的说明文字仍是英文（给模型看），卡面上的标签则始终是目标语言。 */
 
 const STRUCTURES = {
   square: `<div id="card">
@@ -285,10 +335,10 @@ const STRUCTURES = {
 <div class="col">same shape, 02</div>
 <div class="col">same shape, 03</div>
 </div>
-<div class="reads">4 x <div class="read"><div class="k mono">STARS|FORKS|LANGUAGE|LICENSE</div><div class="v">{value}</div></div></div>
-<div class="spec">4 x <div class="row"><span class="k mono">KEY</span><span>{value}</span></div> for TOPICS, CREATED, LAST PUSH, HOMEPAGE</div>
+<div class="reads">4 x <div class="read"><div class="k mono">{K_STARS}|{K_FORKS}|{K_LANGUAGE}|{K_LICENSE}</div><div class="v">{value}</div></div></div>
+<div class="spec">4 x <div class="row"><span class="k mono">{K_KEY}</span><span>{value}</span></div> for TOPICS, CREATED, LAST PUSH, HOMEPAGE</div>
 <p class="closer">{one-sentence takeaway with 1 .accent}</p>
-<div class="footer"><span class="mono">{repo url}</span><span>REPO INFO CARD</span></div>
+<div class="footer"><span class="mono">{repo url}</span><span>{K_FOOTER}</span></div>
 </div>`,
   banner: `<div id="card">
 <div class="card-top"><span>{TYPE - DOMAIN}</span><span class="mono">{owner}</span></div>
@@ -300,34 +350,83 @@ const STRUCTURES = {
 </div>
 <div class="hero-right">
 <div class="pipe mono"><span>{word}</span><span>{word}</span><span>{word}</span></div>
-<div class="reads">3 x <div class="read"><div class="k mono">KEY</div><div class="v">{value}</div></div></div>
+<div class="reads">3 x <div class="read"><div class="k mono">{K_STARS}|{K_FORKS}|{K_LANGUAGE}</div><div class="v">{value}</div></div></div>
 </div>
 </div>
-<div class="footer"><span class="mono">{repo url}</span><span>REPO INFO CARD</span></div>
+<div class="footer"><span class="mono">{repo url}</span><span>{K_FOOTER}</span></div>
 </div>`,
   portrait: `<div id="card">
 <div class="card-top"><span>{TYPE - DOMAIN}</span><span class="mono">{owner}</span></div>
 <div class="kicker mono">{DOMAIN TAG}</div>
 <h1 class="title">{title with 1 <span class="accent">keyword</span>}</h1>
 <p class="intro">{2 sentences}</p>
-<div class="reads">4 x <div class="read"><div class="k mono">KEY</div><div class="v">{value}</div></div></div>
-<div class="spec">6 x <div class="row"><span class="k mono">KEY</span><span>{value}</span></div></div>
+<div class="reads">4 x <div class="read"><div class="k mono">{K_STARS}|{K_FORKS}|{K_LANGUAGE}|{K_LICENSE}</div><div class="v">{value}</div></div></div>
+<div class="spec">6 x <div class="row"><span class="k mono">{K_KEY}</span><span>{value}</span></div></div>
 <p class="closer">{takeaway with 1 .accent}</p>
-<div class="footer"><span class="mono">{repo url}</span><span>REPO INFO CARD</span></div>
+<div class="footer"><span class="mono">{repo url}</span><span>{K_FOOTER}</span></div>
 </div>`,
 };
 
-function cardLanguageLabel(option) {
+/**
+ * 根据语言选项获取注入 AI 提示词的目标英文语言名称。
+ *
+ * @param {string} [option=state.languageOption] 语言选项代码（'auto' 或语言代码）
+ * @returns {string} 对应的英文语言名称（未命中时默认为 'English'）
+ */
+function cardLanguageLabel(option = state.languageOption) {
   const code = option === 'auto' ? state.language : option;
   return CARD_LANGUAGES.find((item) => item.code === code)?.englishName ?? 'English';
 }
 
-// 卡片实际生效的语言码（跟随界面时即宿主界面语言），用于提示词与导出文档。
-function resolvedCardLanguage() {
-  return state.languageOption === 'auto' ? state.language : state.languageOption;
+/**
+ * 获取注入卡片结构模板的固定文案（统计标签、规格键、页脚）。
+ * 未命中时退回英文（与 cardLanguageLabel 的回退行为一致）。
+ *
+ * @param {string} [option=state.languageOption] 语言选项代码（'auto' 或语言代码）
+ * @returns {{ stars: string, forks: string, language: string, license: string, key: string, footer: string }} 对应语言的标签文案集
+ */
+function cardLanguageLabels(option = state.languageOption) {
+  const code = option === 'auto' ? state.language : option;
+  const match = CARD_LANGUAGES.find((item) => item.code === code);
+  return match?.labels ?? CARD_LANGUAGES.find((item) => item.code === 'en')?.labels ?? CARD_LANGUAGES[0].labels;
 }
 
-function buildSystemPrompt(canvas, languageOption) {
+/**
+ * 将指定版式结构模板中的 `{K_*}` 占位符替换为对应语言的固定标签。
+ *
+ * @param {'square' | 'banner' | 'portrait'} layout 画布对应的版式类型
+ * @param {{ stars: string, forks: string, language: string, license: string, key: string, footer: string }} labels 本地化标签字典
+ * @returns {string} 注入本地化文案后的卡片 HTML 结构骨架
+ */
+function localizedStructure(layout, labels) {
+  return STRUCTURES[layout]
+    .replaceAll('{K_STARS}', labels.stars)
+    .replaceAll('{K_FORKS}', labels.forks)
+    .replaceAll('{K_LANGUAGE}', labels.language)
+    .replaceAll('{K_LICENSE}', labels.license)
+    .replaceAll('{K_KEY}', labels.key)
+    .replaceAll('{K_FOOTER}', labels.footer);
+}
+
+/**
+ * 计算卡片实际生效的语言码（跟随界面时取宿主界面语言），用于提示词与导出文档。
+ *
+ * @param {string} [option=state.languageOption] 语言选项代码（'auto' 或语言代码）
+ * @returns {string} 实际生效的目标语言代码
+ */
+function resolvedCardLanguage(option = state.languageOption) {
+  return option === 'auto' ? state.language : option;
+}
+
+/**
+ * 构建发送给模型的系统提示词，包含画幅约束、输出格式和本地化结构骨架。
+ *
+ * @param {{ id: string, w: number, h: number }} canvas 目标画幅快照
+ * @param {string} [languageOption=state.languageOption] 目标语言选项代码
+ * @returns {string} 格式化且在 bridge 长度限制内的系统提示词
+ * @throws {Error} 若提示词总长度超出 AI_SYSTEM_LIMIT 时抛出异常
+ */
+function buildSystemPrompt(canvas, languageOption = state.languageOption) {
   const layout = layoutForCanvas(canvas.id, canvas.w, canvas.h);
   const system = `You are an information designer. Return ONE info card for the repository facts in the user message.
 
@@ -337,11 +436,11 @@ OUTPUT
 - Root element exactly <div id="card" data-canvas="${canvas.id}" data-layout="${layout}"> with the element sequence and class names below; nothing outside it.
 - .accent wraps exactly ONE keyword inside .title and ONE inside .closer. No other color.
 - Facts: only from the user message. Never invent numbers, quotes, versions or claims; omit an element when its value is unknown. Format big numbers like 43.7K or 1.2M.
-- Language: ${cardLanguageLabel(languageOption)}. Keep English proper nouns verbatim; one space between CJK and Latin. No hype words.
+- Language: ${cardLanguageLabel(languageOption)}. Translate every visible text; the notes and facts below are English source data only. Keep proper nouns verbatim; one space between CJK and Latin. No hype words.
 - Column headings are judgements, not topic labels. Do not repeat one fact in two sections.
 
 STRUCTURE
-${STRUCTURES[layout]}`;
+${localizedStructure(layout, cardLanguageLabels(languageOption))}`;
   if (system.length > AI_SYSTEM_LIMIT) {
     throw new Error(`System prompt exceeds the bridge limit (${system.length} > ${AI_SYSTEM_LIMIT})`);
   }
@@ -350,11 +449,23 @@ ${STRUCTURES[layout]}`;
 
 /* ── README: forward the full text; the prompt limit is now the only edge ── */
 
-function buildUserPrompt(repository, readme, notes) {
+/**
+ * 构建发送给模型的高阶用户提示词，整合任务要求、目标语言强调、用户备注、仓库事实与截断 README。
+ *
+ * @param {Record<string, any>} repository 仓库信息对象
+ * @param {string | null} readme 仓库 README 正文全文
+ * @param {string} notes 用户在附加说明中输入的定制要求
+ * @param {string} [languageOption=state.languageOption] 目标语言选项代码
+ * @returns {{ prompt: string, readmeIncluded: boolean, truncatedReadme: boolean }} 拼接后的提示词与 README 处理状态
+ */
+function buildUserPrompt(repository, readme, notes, languageOption = state.languageOption) {
   const repo = repository;
   const lines = [
     'TASK',
     'Compose ONE info card for this repository.',
+    // 语言要求在这里再强调一次：system prompt 只剩一行、且后面全是英文的
+    // README 与英文元数据，实测模型容易整体跟着英文走。
+    `- Write EVERY visible string in ${cardLanguageLabel(languageOption)} (title, intro, column headings, tags, metric labels, spec keys, closer, footer). The English text below is source data to translate, not output to copy.`,
     '- Ground the card in the README text below: name the concrete capabilities, workflow, stack and limits it actually states.',
     '- Use the one-line description, topics and ai_summary only to fill gaps the README does not cover.',
     '- Never invent facts, numbers, versions, dates or quotes that are not written below.',
@@ -567,6 +678,20 @@ function clampCanvasDimension(value) {
   return Math.min(CANVAS_MAX, Math.max(CANVAS_MIN, parsed));
 }
 
+/**
+ * 比较当前画幅设置与已生成卡片的画幅快照是否完全一致（含自定义画幅的长宽）。
+ *
+ * @param {{ id: string, w: number, h: number } | null} snapshot 已生成卡片的画幅快照
+ * @returns {boolean} 当前选项是否与快照一致
+ */
+function canvasMatchesSnapshot(snapshot) {
+  if (!snapshot || state.canvasId !== snapshot.id) return false;
+  if (snapshot.id === CUSTOM_CANVAS_ID) {
+    return state.customWidth === snapshot.w && state.customHeight === snapshot.h;
+  }
+  return true;
+}
+
 /* ── app state + UI wiring ───────────────────────────────────────── */
 
 const ZOOM_MIN = 0.2;   // 相对「适应窗口」的最小倍率
@@ -592,6 +717,7 @@ const state = {
   zoom: 1,        // 相对自适应比例的倍率；1 表示「适应窗口」
   fitScale: 1,    // 最近一次自适应算出的缩放比例
   usedReadme: false,
+  busy: false,    // AI 请求进行中：按钮 loading + 状态栏呼吸动画
 };
 
 const $ = (id) => document.getElementById(id);
@@ -620,8 +746,48 @@ const customWInput = $('custom-w');
 const customHInput = $('custom-h');
 const notesInput = $('opt-notes');
 
+/**
+ * 更新界面底部的状态栏提示信息。
+ *
+ * @param {string} message 状态文本
+ */
 function setStatus(message) { statusEl.textContent = message; }
 
+/**
+ * 设置或恢复生成流程中的忙碌状态。
+ *
+ * 生成进行中：禁用生成按钮并增加 loading 样式与文案，状态栏离开灰色弱化态并呼吸闪烁；
+ * 期间禁用导出按钮，避免并发导出与重复提交产生竞态；结束后按卡片快照恢复按钮状态。
+ *
+ * @param {boolean} busy 是否处于生成忙碌状态
+ */
+function setBusy(busy) {
+  state.busy = busy;
+  generateButton.disabled = busy;
+  generateButton.classList.toggle('is-busy', busy);
+  generateButton.setAttribute('aria-busy', String(busy));
+  statusEl.classList.toggle('is-busy', busy);
+  statusEl.setAttribute('aria-busy', String(busy));
+  generateButton.textContent = busy ? str.generatingShort
+    : (state.fragment ? str.regenerate : str.generate);
+
+  if (busy) {
+    copyCodeButton.disabled = true;
+    copyImageButton.disabled = true;
+    saveImageButton.disabled = true;
+  } else if (state.fragment) {
+    copyCodeButton.disabled = false;
+    const canvasMatches = canvasMatchesSnapshot(state.fragmentCanvas);
+    copyImageButton.disabled = !canvasMatches;
+    saveImageButton.disabled = !canvasMatches;
+  }
+}
+
+/**
+ * 根据宿主传入的主题或系统偏好设置根节点的明暗主题属性。
+ *
+ * @param {'dark' | 'light' | null} theme 主题名称
+ */
 function applyChromeTheme(theme) {
   // 弹窗入口随 init context 带宿主主题；面板入口没有 theme 时退回系统偏好。
   const dark = theme === 'dark'
@@ -629,6 +795,11 @@ function applyChromeTheme(theme) {
   document.documentElement.dataset.chrome = dark ? 'dark' : 'light';
 }
 
+/**
+ * 响应宿主下发的页面初始化消息（包含仓库元数据、README、界面语言及主题）。
+ *
+ * @param {Record<string, any>} context 宿主传入的初始上下文对象
+ */
 function handleInit(context) {
   state.repository = context.repository || null;
   state.readme = typeof context.readme === 'string' && context.readme ? context.readme : null;
@@ -652,9 +823,12 @@ function handleInit(context) {
     const { w, h } = canvasMetrics(state.fragmentCanvas);
     previewMeta.textContent = fmt(str.previewMeta, { canvas: canvasLabel(state.fragmentCanvas.id), w, h });
     updateZoomLabel();
-    if (state.readme && !state.usedReadme) setStatus(str.readmeReady);
+    if (!state.busy && state.readme && !state.usedReadme) setStatus(str.readmeReady);
     return;
   }
+
+  // 生成进行中不打断 loading 状态提示，避免将「正在生成」冲掉为「已加载」。
+  if (state.busy) return;
 
   if (state.repository) {
     $('repo-name').textContent = state.repository.full_name;
@@ -864,9 +1038,10 @@ function selectCanvas(id) {
   // 已生成的卡片尺寸固定在生成时的画幅上。导出按快照取宽高，直接导出会
   // 把旧卡片裁进新画布，所以切换后禁用截图导出，直到重新生成。
   if (state.fragment) {
-    copyImageButton.disabled = true;
-    saveImageButton.disabled = true;
-    setStatus(str.canvasChanged);
+    const canvasMatches = canvasMatchesSnapshot(state.fragmentCanvas);
+    copyImageButton.disabled = !canvasMatches;
+    saveImageButton.disabled = !canvasMatches;
+    if (!canvasMatches) setStatus(str.canvasChanged);
   }
 }
 
@@ -886,9 +1061,10 @@ function handleCustomDimensionInput(input, dimension) {
   if (customSubLabel) customSubLabel.textContent = `${state.customWidth}×${state.customHeight}`;
   // 已按旧自定义尺寸生成的卡片同样不能直接导出。
   if (state.canvasId === CUSTOM_CANVAS_ID && state.fragment) {
-    copyImageButton.disabled = true;
-    saveImageButton.disabled = true;
-    setStatus(str.canvasChanged);
+    const canvasMatches = canvasMatchesSnapshot(state.fragmentCanvas);
+    copyImageButton.disabled = !canvasMatches;
+    saveImageButton.disabled = !canvasMatches;
+    if (!canvasMatches) setStatus(str.canvasChanged);
   }
 }
 
@@ -1071,20 +1247,32 @@ codeEditor.addEventListener('scroll', () => {
   codeHighlight.scrollLeft = codeEditor.scrollLeft;
 });
 
+/**
+ * 发起 AI 请求生成仓库信息卡。
+ *
+ * 校验仓库上下文与忙碌锁，收集画幅与语言参数构建提示词；
+ * 请求成功后按快照保存画幅与语言状态，并刷新预览与导出文档；失败时展示友好错误提示。
+ *
+ * @returns {Promise<void>}
+ */
 async function generate() {
   if (!state.repository) { setStatus(str.noRepository); return; }
-  generateButton.disabled = true;
+  if (state.busy) return;
+  setBusy(true);
   try {
     setStatus(str.generating);
     const canvas = selectedCanvas();
-    const system = buildSystemPrompt(canvas, state.languageOption);
+    const targetLanguageOption = state.languageOption;
+    const targetLanguage = resolvedCardLanguage(targetLanguageOption);
+    const system = buildSystemPrompt(canvas, targetLanguageOption);
     const { prompt: user, readmeIncluded, truncatedReadme } =
-      buildUserPrompt(state.repository, state.readme, state.notes);
+      buildUserPrompt(state.repository, state.readme, state.notes, targetLanguageOption);
     const text = await request('ai.generate', { system, user, maxTokens: 4000 });
+    const fragment = sanitizeFragment(text, canvas);
     state.usedReadme = readmeIncluded;
     state.fragmentCanvas = canvas;
-    state.fragmentLanguage = resolvedCardLanguage();
-    state.fragment = sanitizeFragment(text, canvas);
+    state.fragmentLanguage = targetLanguage;
+    state.fragment = fragment;
     state.css = cssFor(state.styleId, canvas);
     state.docHtml = assembleDocument(state.css, state.fragment,
       `${state.repository.full_name} · info card`,
@@ -1108,11 +1296,17 @@ async function generate() {
     const message = error instanceof Error ? error.message : str.bridgeFailed;
     setStatus(fmt(message.includes('id="card"') ? str.noCard : str.aiFailed, { message }));
   } finally {
-    generateButton.disabled = false;
+    setBusy(false);
   }
 }
 
+/**
+ * 将已组装的单文件 HTML 代码写入系统剪贴板。
+ *
+ * @returns {Promise<void>}
+ */
 async function copyCode() {
+  if (state.busy || !state.fragment) return;
   try {
     await request('clipboard.write', { text: state.docHtml });
     setStatus(str.copyOk);
@@ -1121,7 +1315,13 @@ async function copyCode() {
   }
 }
 
+/**
+ * 将当前卡片以 2x 分辨率光栅化为 PNG 并写入系统剪贴板。
+ *
+ * @returns {Promise<void>}
+ */
 async function copyImage() {
+  if (state.busy || !state.fragment) return;
   try {
     setStatus('…');
     const { dataBase64 } = await exportPngBase64();
@@ -1132,7 +1332,13 @@ async function copyImage() {
   }
 }
 
+/**
+ * 将当前卡片以 2x 分辨率光栅化为 PNG 并保存到用户下载路径。
+ *
+ * @returns {Promise<void>}
+ */
 async function saveImage() {
+  if (state.busy || !state.fragment) return;
   try {
     setStatus('…');
     const { dataBase64 } = await exportPngBase64();

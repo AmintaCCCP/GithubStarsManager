@@ -421,12 +421,43 @@ main {
   cursor: not-allowed;
 }
 
+/* 生成进行中：按钮内旋转指示 + 文案切换（文字由 JS 置为「生成中…」）。 */
+.btn-primary.is-busy {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+.btn-primary.is-busy::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: card-spin 0.8s linear infinite;
+}
+
+@keyframes card-spin {
+  to { transform: rotate(360deg); }
+}
+
 #status {
   margin: 0;
   min-height: 1em;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+/* AI 请求可能等待数十秒：状态栏离开灰色弱化态并呼吸闪烁，明确"正在工作"。 */
+#status.is-busy {
+  color: hsl(var(--foreground));
+  animation: status-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  50% { opacity: 0.45; }
 }
 
 /* 无仓库上下文时的选择器（设置 → 插件 → 打开页面）。 */
@@ -742,5 +773,7 @@ main {
   *::before,
   *::after {
     transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
