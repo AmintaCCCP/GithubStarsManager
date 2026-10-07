@@ -28,6 +28,53 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
+function isErrorValue(value: unknown): boolean {
+  return value instanceof Error
+    || (typeof DOMException !== 'undefined' && value instanceof DOMException);
+}
+
+/**
+ * Error → 日志记录：{ name, message, stack } 之外保留错误上的自有可枚举
+ * 属性（如 Object.assign 挂上去的 code 等诊断字段）——在引入 Error 预处理
+ * 之前这些字段经 sanitizeForLog 的对象遍历可见，不能因改走 sanitizeError
+ * 而丢失。附加字段同样走脱敏与循环引用守卫；标准字段放在后面以附加字段
+ * 同名时为准（已脱敏）。
+ */
+function errorToLogRecord(error: unknown): Record<string, unknown> {
+  const extras = sanitizeForLog({ ...(error as object) }) as Record<string, unknown>;
+  return { ...extras, ...sanitizeError(error) };
+}
+
+/**
+ * Error values need a pre-pass before sanitizeForLog: `message` / `stack` are
+ * non-enumerable, so the object walk cannot see them and a bare Error would
+ * be logged as `{}`. Errors are replaced — at the top level, inside plain
+ * objects at any depth, and inside arrays — with errorToLogRecord's
+ * { name, message, stack } record plus the error's own enumerable diagnostic
+ * fields (all inline-redacted, stack capped). Structures
+ * without any Error are returned by reference, so the existing field-name
+ * masking behavior is unchanged; the `seen` WeakSet guards cycles the same
+ * way sanitizeForLog does (a revisited node is left as-is for that walk to
+ * redact).
+ */
+function prepareErrorValues(data: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
+  if (isErrorValue(data)) return errorToLogRecord(data);
+  if (typeof data !== 'object' || data === null) return data;
+  if (seen.has(data)) return data;
+  seen.add(data);
+  let changed = false;
+  const convert = (value: unknown): unknown => {
+    const next = prepareErrorValues(value, seen);
+    if (next !== value) changed = true;
+    return next;
+  };
+  const converted: unknown = Array.isArray(data)
+    ? data.map(convert)
+    : Object.fromEntries(Object.entries(data as Record<string, unknown>).map(([key, value]) => [key, convert(value)]));
+  seen.delete(data);
+  return changed ? converted : data;
+}
+
 class Logger {
   private buffer: LogEntry[] = [];
   private maxEntries = 2000;
@@ -38,7 +85,7 @@ class Logger {
 
     // Sanitize at write time — buffer never contains secrets
     const sanitizedMessage = typeof message === 'string' ? sanitizeForLog(message) as string : String(message);
-    const sanitizedData = data !== undefined ? sanitizeForLog(data) : undefined;
+    const sanitizedData = data !== undefined ? sanitizeForLog(prepareErrorValues(data)) : undefined;
 
     const entry: LogEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,

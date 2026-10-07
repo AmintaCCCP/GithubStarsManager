@@ -57,6 +57,94 @@ describe('fetchCapture', () => {
     expect(sinkEntries.length).toBe(2);
   });
 
+  it('records user aborts (AbortError) as info with errorName, not error', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      throw new DOMException('signal is aborted without reason', 'AbortError');
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/aborted').catch(() => {});
+
+    const entries = getNetworkEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0].level).toBe('info');
+    expect(entries[0].message).toContain('aborted');
+    const data = entries[0].data as Record<string, unknown>;
+    expect(data.errorName).toBe('AbortError');
+    // jsdom's DOMException is not an Error subclass, so detail falls back to
+    // String(error) ("AbortError: <message>"); assert on the message itself.
+    expect(String(data.detail)).toContain('signal is aborted without reason');
+  });
+
+  it('redacts and caps errorName before writing the entry', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      const boom = new TypeError('fetch failed');
+      // 自定义 name 是自由文本，可能夹带凭据形态的字符串
+      boom.name = `TokenLeak ghp_${'a'.repeat(36)}`;
+      throw boom;
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/leak').catch(() => {});
+
+    const data = getNetworkEntries()[0].data as Record<string, unknown>;
+    expect(String(data.errorName)).not.toContain('a'.repeat(36));
+    expect(String(data.errorName)).toContain('***');
+  });
+
+  it('masks an errorName that is itself a whole-value secret token', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      const boom = new TypeError('fetch failed');
+      // 整值长令牌：只有整值规则（sanitizeForLog/sanitizeString）能识别，
+      // 行内脱敏 redactInline 对它无能为力
+      boom.name = 'A1b2C3d4E5f6G7h8I9j0K1l2';
+      throw boom;
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/whole-token').catch(() => {});
+
+    const data = getNetworkEntries()[0].data as Record<string, unknown>;
+    expect(String(data.errorName)).not.toBe('A1b2C3d4E5f6G7h8I9j0K1l2');
+    expect(String(data.errorName)).toContain('***');
+  });
+
+  it('records timeout aborts (DOMException TimeoutError) as info with errorName', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      throw new DOMException('The operation timed out', 'TimeoutError');
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/timeout').catch(() => {});
+
+    const entries = getNetworkEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0].level).toBe('info');
+    expect((entries[0].data as Record<string, unknown>).errorName).toBe('TimeoutError');
+  });
+
+  it('keeps non-abort rejections at error level and attaches errorName', async () => {
+    const impl: FetchStub = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    (window as unknown as { fetch: FetchStub }).fetch = impl;
+    installFetchCapture();
+
+    await window.fetch('https://api.example.com/reject').catch(() => {});
+
+    const entries = getNetworkEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0].level).toBe('error');
+    expect(entries[0].message).toContain('failed');
+    const data = entries[0].data as Record<string, unknown>;
+    expect(data.errorName).toBe('TypeError');
+    expect(data.detail).toBe('fetch failed');
+  });
+
   it('keeps request/response forwarding transparent', async () => {
     const impl: FetchStub = vi.fn(async () => jsonResponse('payload'));
     (window as unknown as { fetch: FetchStub }).fetch = impl;

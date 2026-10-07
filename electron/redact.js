@@ -188,6 +188,7 @@ module.exports = {
   SENSITIVE_URL_PARAMS,
   maskEmail,
   maskSecret,
+  redactInline,
   redactUrl,
   sanitizeError,
   sanitizeForLog,

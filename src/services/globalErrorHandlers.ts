@@ -9,6 +9,7 @@
  */
 
 import { logger } from './logger';
+import { sanitizeError } from '../utils/logSanitizer';
 
 let installed = false;
 
@@ -27,12 +28,16 @@ export function installGlobalErrorHandlers(): void {
       const errEvent = event as ErrorEvent;
       const target = (event as Event).target as { tagName?: string; src?: string; href?: string } | null;
       if (typeof errEvent.message === 'string' && errEvent.message && !target?.tagName) {
+        // sanitizeError keeps the full stack AND inline-redacts it (Bearer /
+        // token / email shapes embedded mid-line that the generic sanitizer's
+        // whole-value string rules cannot see), capping it like other errors.
+        const { stack } = sanitizeError(errEvent.error);
         logger.error('ui.global', 'Uncaught script error', {
           message: errEvent.message,
           source: errEvent.filename || undefined,
           line: errEvent.lineno || undefined,
           column: errEvent.colno || undefined,
-          stack: errEvent.error instanceof Error ? errEvent.error.stack?.slice(0, 4000) : undefined,
+          ...(stack ? { stack } : {}),
         });
         return;
       }

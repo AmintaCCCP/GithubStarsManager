@@ -8,6 +8,9 @@
  * Level policy mirrors the renderer capture: normal mode records failures
  * only (fetch rejection → error, HTTP 4xx/5xx → warn); debug mode records
  * everything plus request/response previews behind the size/type/rate guards.
+ * Rejection levels are refined by Chromium net error code: user/caller aborts
+ * (net::ERR_ABORTED) are normal control flow → info, transient network
+ * conditions (network changed / offline / connection reset) → warn.
  * Error chains are expanded with mainFetch.summarizeFetchError so undici's
  * opaque "fetch failed" becomes a usable cause chain.
  */
@@ -23,6 +26,52 @@ const STREAMING_CONTENT_TYPE = 'text/event-stream';
 const BODY_CAPTURE_BUDGET_PER_MINUTE = 60;
 
 const bodyBudget = { windowStart: 0, used: 0 };
+
+/** Chromium net error of a user/caller abort (AbortController, own timeout). */
+const ABORT_NET_ERRORS = ['net::ERR_ABORTED'];
+/** Chromium net errors of transient network conditions, not app failures. */
+const TRANSIENT_NET_ERRORS = [
+  'net::ERR_NETWORK_CHANGED',
+  'net::ERR_INTERNET_DISCONNECTED',
+  'net::ERR_CONNECTION_RESET',
+];
+
+/**
+ * Failure level for a Chromium net error string. Chromium's net.fetch reports
+ * "net::ERR_*" as the cause TEXT (not a .code property), so the match is
+ * substring-based and covers both causeCode and causeMessage forms.
+ */
+function classifyNetErrorCode(text) {
+  const value = typeof text === 'string' ? text : '';
+  if (ABORT_NET_ERRORS.some((code) => value.includes(code))) return 'info';
+  if (TRANSIENT_NET_ERRORS.some((code) => value.includes(code))) return 'warn';
+  return 'error';
+}
+
+/** Failure level for a mainFetch.summarizeFetchError result. */
+function classifyNetFailure(summary) {
+  // summary only keeps the deepest cause WITH a .code — Chromium net errors
+  // carry no .code, so "net::ERR_*" typically survives only inside
+  // summary.message (the joined cause chain).
+  const text = [summary?.causeCode, summary?.causeMessage, summary?.message]
+    .filter((t) => typeof t === 'string')
+    .join(' ');
+  return classifyNetErrorCode(text);
+}
+
+/**
+ * Abort exceptions by NAME, mirroring the renderer-side capture policy
+ * (src/services/fetchCapture.ts): AbortError (AbortController.abort() —
+ * "signal is aborted without reason" in Chromium) and TimeoutError
+ * (AbortSignal.timeout()) are normal control flow. summarizeFetchError only
+ * keeps message/cause text, so a bare DOMException abort leaves no net error
+ * code behind — the original exception must be classified separately.
+ */
+function isAbortException(error) {
+  if (!error || typeof error !== 'object') return false;
+  if (error.name === 'AbortError') return true;
+  return typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'TimeoutError';
+}
 
 function resetBodyBudgetForTest() {
   bodyBudget.windowStart = 0;
@@ -215,11 +264,13 @@ function wrapFetch(fetchImpl, { source, record, isDebugMode } = {}) {
       return response;
     } catch (error) {
       const summary = summarizeFetchError(error);
+      const level = isAbortException(error) ? 'info' : classifyNetFailure(summary);
+      const aborted = level === 'info';
       try {
         record({
-          level: 'error',
+          level,
           module: 'electron.netTap',
-          message: `${method} ${redact.redactUrl(rawUrl)} failed`,
+          message: `${method} ${redact.redactUrl(rawUrl)} ${aborted ? 'aborted' : 'failed'}`,
           data: {
             url: redact.redactUrl(rawUrl),
             method,
@@ -238,6 +289,9 @@ function wrapFetch(fetchImpl, { source, record, isDebugMode } = {}) {
 
 module.exports = {
   BODY_CAPTURE_BUDGET_PER_MINUTE,
+  classifyNetErrorCode,
+  classifyNetFailure,
+  isAbortException,
   resetBodyBudgetForTest,
   wrapFetch,
 };

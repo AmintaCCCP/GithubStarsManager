@@ -388,6 +388,8 @@
   /* ── Chart.js 主题 ────────────────────────────────────────────────── */
 
   const charts = new Map();
+  // 每个画布当前挂起的 resize RAF id：同一画布连续重绘时用于取消旧回调。
+  const chartRafs = new Map();
   let chartSeq = 0;
 
   /** 从当前 CSS 变量读取 Chart.js 主题色（跟随深浅主题）。 */
@@ -407,8 +409,25 @@
     Chart.defaults.color = theme.tx2;
     Chart.defaults.borderColor = theme.grid;
     Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    // 竞态：同一画布被连续重绘两次（缓存先画 + 网络刷新再画；或窗口最小化/
+    // 被遮挡时 RAF 冻结、恢复后积压回调同帧触发）时，第一次排下的 resize RAF
+    // 尚未执行，第二次已经 destroy 了第一个实例（destroy 会置 chart.canvas = null）。
+    // 旧 RAF 随后执行 chart.resize()，Chart.js 内部会读
+    // canvas.ownerDocument.defaultView，从而抛出
+    // “Cannot read properties of null (reading 'ownerDocument')”，
+    // 且同帧多个过期回调会在同一毫秒连续报错。故每画布只保留最新的一个
+    // RAF，重绘前先取消旧回调。
+    const previousRaf = chartRafs.get(canvasId);
+    if (previousRaf !== undefined) cancelAnimationFrame(previousRaf);
     charts.get(canvasId)?.destroy();
-    const chart = new Chart($(canvasId), {
+    const canvas = $(canvasId);
+    if (!canvas) {
+      // 画布已不存在（例如面板关闭后 paint 仍被调用）：只销毁旧实例并返回，
+      // 不能 new Chart(null) 创建坏实例（其 RAF resize 同样会崩溃）。
+      charts.delete(canvasId);
+      return;
+    }
+    const chart = new Chart(canvas, {
       ...config,
       options: {
         maintainAspectRatio: false,
@@ -423,9 +442,13 @@
       },
     });
     charts.set(canvasId, chart);
-    requestAnimationFrame(() => {
-      chart.resize();
+    const rafId = requestAnimationFrame(() => {
+      chartRafs.delete(canvasId);
+      // 回调执行时再次校验：本实例仍是该画布的当前实例、且画布尚在
+      //（destroy 后 chart.canvas === null），防御任何残余竞态。
+      if (charts.get(canvasId) === chart && chart.canvas) chart.resize();
     });
+    chartRafs.set(canvasId, rafId);
   }
 
   /* ── 指标缓存与并发队列 ───────────────────────────────────────────── */
@@ -1494,11 +1517,22 @@ ${release.body}`);
 
   /* ── 区块加载 ─────────────────────────────────────────────────────── */
 
-  function markSectionError(cardId, error, unavailableMessage) {
+  function markSectionError(cardId, error, unavailableMessage, metricId) {
+    // GitHub 对超大仓库（如 RSSHub）的 /stats/* 端点永远返回 422（统计不可计算），
+    // 跨会话稳定复现，不属于临时失败。commit_activity 的报错文案自带
+    // “10000 commits”，可按文案识别；code_frequency 的 422 文案不含 commit 字样，
+    // 需按 metricId 识别。422 一律要求来自能力桥的 HTTP 错误（code 为
+    // PLUGIN_NETWORK_HTTP_ERROR 且消息带 “GitHub API returned 422” 前缀），
+    // 避免其他路径的错误文案里偶然出现 “422” 字样被误判。两者均归入
+    // “仓库过大/统计不可用”文案。
+    const isStatsTooLarge = /10000 commits/.test(error?.message || '')
+      || (error?.code === 'PLUGIN_NETWORK_HTTP_ERROR'
+        && /^GitHub API returned 422\b/.test(error.message || '')
+        && (/commit/i.test(error?.message || '')
+          || metricId === 'commitActivity' || metricId === 'codeFrequency'));
     const message = error?.code === 'PLUGIN_PAGE_RATE_LIMITED'
       ? str.rateLimited
-      : /10000 commits/.test(error?.message || '') ||
-          (/\b422\b/.test(error?.message || '') && /commit/i.test(error?.message || ''))
+      : isStatsTooLarge
         ? str.statsTooLarge
         : unavailableMessage && error?.code === 'PLUGIN_NETWORK_HTTP_ERROR' && / 40[34]/.test(error.message || '')
           ? unavailableMessage
@@ -1603,7 +1637,9 @@ ${release.body}`);
       return null;
     } catch (error) {
       if (cardId) clearStatsTimer(cardId);
-      if (!stale() && cardId && !cacheEntry) markSectionError(cardId, error);
+      // 传入 metricId：markSectionError 需要据此识别 code_frequency 等
+      // stats 端点的 422（仓库过大），避免落成通用失败文案。
+      if (!stale() && cardId && !cacheEntry) markSectionError(cardId, error, undefined, id);
       return error;
     }
   }

@@ -308,3 +308,196 @@ describe('WebDAVService 上传重试策略', () => {
     }
   });
 });
+
+describe('WebDAVService 连接测试探测顺序', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('先发 PROPFIND（Depth: 0），207 即成功且不再探测 HEAD', async () => {
+    // 坚果云等服务器对集合 HEAD 返回 403：PROPFIND 成功时不应多付一次 403
+    vi.mocked(window.fetch).mockResolvedValue(new Response(null, { status: 207 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect(url).toBe('https://dav.example.com/backup');
+    expect(init?.method).toBe('PROPFIND');
+    expect(init?.headers).toMatchObject({ Depth: '0', Authorization: /^Basic / });
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('PROPFIND 200 同样视为成功', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response(null, { status: 200 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('PROPFIND 207 响应体报告目标资源 404 时判定失败（不误报连接可用）', async () => {
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch).mockResolvedValue(new Response(xml, {
+      status: 207,
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    }));
+
+    await expect(davService().testConnection()).resolves.toBe(false);
+  });
+
+  it('PROPFIND 207 仅属性级 propstat 404（无资源级 status）仍视为成功', async () => {
+    // 个别属性（如 getcontentlength）缺失是正常现象，不代表资源不存在
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup</D:href>' +
+      '<D:propstat><D:prop><D:getcontentlength/></D:prop>' +
+      '<D:status>HTTP/1.1 404 Property Not Found</D:status></D:propstat>' +
+      '</D:response></D:multistatus>';
+    vi.mocked(window.fetch).mockResolvedValue(new Response(xml, {
+      status: 207,
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+  });
+
+  it('PROPFIND 207 目标 href 精确匹配：无关条目的失败不影响判定', async () => {
+    // /old/backup 的 404 不能匹配目标 /backup（宽松 endsWith 会读错条目）
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/old/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '<D:response><D:href>/backup</D:href><D:status>HTTP/1.1 200 OK</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch).mockResolvedValue(new Response(xml, {
+      status: 207,
+      headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+    }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+  });
+
+  it('PROPFIND 不可用（405）时降级 HEAD，HEAD 200 即成功', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'HEAD']);
+    // 回退 HEAD 与首发 PROPFIND 共用同一 AbortController：10s 超时覆盖整个探测
+    const [propfindInit, headInit] = vi.mocked(window.fetch).mock.calls.map(([, init]) => init);
+    expect(headInit?.signal).toBeInstanceOf(AbortSignal);
+    expect(headInit?.signal).toBe(propfindInit?.signal);
+  });
+
+  it('PROPFIND 抛网络错误（如 CORS 预检拒绝）时仍降级 HEAD', async () => {
+    // 浏览器直连：PROPFIND 预检不被放行会直接抛 TypeError，而非返回 405
+    vi.mocked(window.fetch)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    await expect(davService().testConnection()).resolves.toBe(true);
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['PROPFIND', 'HEAD']);
+  });
+
+  it('PROPFIND 超时（AbortError）不降级 HEAD，直接按连接超时抛出', async () => {
+    vi.mocked(window.fetch).mockRejectedValueOnce(
+      Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
+    );
+
+    await expect(davService().testConnection()).rejects.toThrow('连接超时');
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('PROPFIND 与 HEAD 都失败时返回 false（不抛错）', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+
+    await expect(davService().testConnection()).resolves.toBe(false);
+  });
+
+  it('浏览器直连时 10 秒预算覆盖 HEAD 回退（回退停滞会被中止而不是挂死）', async () => {
+    // 只 fake setTimeout/Date（预算与中止定时器）；不 fake setImmediate，
+    // 避免与 mock fetch 的 promise 链交错产生环境差异。
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      // PROPFIND 405 正常返回；HEAD 回退停滞不返回（模拟 fetch 只认 signal）
+      vi.mocked(window.fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 405 }))
+        .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+        }));
+
+      const promise = davService().testConnection();
+      const expectation = expect(promise).rejects.toThrow('连接超时');
+      await vi.advanceTimersByTimeAsync(10001);
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('桌面端 PROPFIND 失败后剩余预算不足 1s 时跳过 HEAD 回退，总耗时不超预算', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const webdavRequest = vi.fn(() => new Promise((resolve) => {
+        setTimeout(() => resolve({ success: true, status: 405, statusText: '', body: '' }), 9500);
+      }));
+      window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+      const promise = davService().testConnection();
+      const expectation = expect(promise).rejects.toThrow('连接超时');
+      await vi.advanceTimersByTimeAsync(9600);
+      await expectation;
+      // 回退因剩余预算不足被跳过：只有首发这一次 IPC 请求
+      expect(webdavRequest).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      delete window.electronAPI;
+    }
+  });
+
+  it('fileExists 遇 HEAD 403 降级 PROPFIND 确认存在（不支持 HEAD 的服务器）', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(
+        '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"><D:response><D:href>/backup/data.json</D:href></D:response></D:multistatus>',
+        { status: 207 },
+      ));
+
+    await expect(davService().fileExists('data.json')).resolves.toBe(true);
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['HEAD', 'PROPFIND']);
+    // 回退 PROPFIND 与首发 HEAD 共用同一 AbortController，超时覆盖整个检查
+    const [headInit, propfindInit] = vi.mocked(window.fetch).mock.calls.map(([, init]) => init);
+    expect(propfindInit?.signal).toBe(headInit?.signal);
+  });
+
+  it('fileExists 的 PROPFIND 207 响应体报告目标文件 404 时返回 false', async () => {
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup/data.json</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(xml, {
+        status: 207,
+        headers: { 'Content-Type': 'application/xml; charset=utf-8' },
+      }));
+
+    await expect(davService().fileExists('data.json')).resolves.toBe(false);
+  });
+
+  it('fileExists 的 HEAD 404 仍直接判定不存在，不追加探测', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response(null, { status: 404 }));
+
+    await expect(davService().fileExists('missing.json')).resolves.toBe(false);
+    expect(window.fetch).toHaveBeenCalledTimes(1);
+  });
+});

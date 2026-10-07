@@ -5,7 +5,8 @@
  * app consumes.
  *
  * Level policy: normal mode records failures only (fetch rejection → error,
- * HTTP 4xx/5xx → warn); debug mode records every request with request headers
+ * user/timeout aborts → info, HTTP 4xx/5xx → warn); debug mode records every
+ * request with request headers
  * (values masked, key names kept), a request-body preview (string bodies,
  * 8KB), and a response preview (16KB) behind three guards:
  *   1. size/type guard — content-length > 256KB or a binary content-type is
@@ -28,7 +29,7 @@
  */
 
 import type { LogEntry, LogLevel } from './logger';
-import { sanitizeForLog } from '../utils/logSanitizer';
+import { sanitizeForLog, redactInline } from '../utils/logSanitizer';
 
 const MAX_NETWORK_ENTRIES = 1000;
 const REQUEST_BODY_PREVIEW_LENGTH = 8 * 1024;
@@ -234,6 +235,24 @@ async function readResponsePreview(response: Response): Promise<{ preview: strin
   }
 }
 
+/**
+ * Aborts are normal control flow, not failures: AbortController.abort()
+ * surfaces as a DOMException named AbortError ("signal is aborted without
+ * reason" in Chromium), AbortSignal.timeout() as a DOMException named
+ * TimeoutError. Both record at info level; everything else stays at error.
+ */
+function errorNameOf(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const name = (error as { name?: unknown }).name;
+  return typeof name === 'string' && name ? name : undefined;
+}
+
+function isAbortError(error: unknown): boolean {
+  const name = errorNameOf(error);
+  return name === 'AbortError'
+    || (typeof DOMException !== 'undefined' && error instanceof DOMException && name === 'TimeoutError');
+}
+
 function recordEntry(level: LogLevel, message: string, data: Record<string, unknown>): void {
   const entry: LogEntry = {
     id: `net-${Date.now()}-${++ledgerIdSeq}`,
@@ -337,10 +356,18 @@ export function installFetchCapture(options?: { isDebugMode?: () => boolean }): 
       dispatchCompletion(response, meta, debug);
       return response;
     } catch (error) {
-      recordEntry('error', `${method} ${sanitizeForLog(url)} failed`, {
+      const aborted = isAbortError(error);
+      const errorName = errorNameOf(error);
+      // 错误名也是自由文本（自定义 Error 子类可携带任意 name）：写日志前先做
+      // 整值脱敏（长令牌形态的 name 只有整值规则能识别），再行内脱敏并限长。
+      const sanitizedErrorName = errorName
+        ? redactInline(sanitizeForLog(errorName) as string).slice(0, 120)
+        : undefined;
+      recordEntry(aborted ? 'info' : 'error', `${method} ${sanitizeForLog(url)} ${aborted ? 'aborted' : 'failed'}`, {
         url: sanitizeForLog(url),
         method,
         durationMs: Date.now() - startedAt,
+        ...(sanitizedErrorName ? { errorName: sanitizedErrorName } : {}),
         detail: error instanceof Error ? sanitizeForLog(error.message) : String(error),
       });
       throw error;
