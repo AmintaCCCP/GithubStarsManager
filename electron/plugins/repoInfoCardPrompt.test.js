@@ -33,6 +33,10 @@ function makeElement(id) {
     disabled: false,
     hidden: false,
     tabIndex: 0,
+    clientWidth: 800,
+    clientHeight: 600,
+    scrollWidth: 800,
+    scrollHeight: 600,
     dataset: {},
     style: {},
     classList: {
@@ -101,7 +105,7 @@ function loadPlugin() {
     clearTimeout,
   };
   // 追加的这行把脚本作用域里的常量与函数挂到沙箱全局，供断言取用。
-  const expose = '\n;globalThis.__plugin = { state, STR, CARD_LANGUAGES, STRUCTURES, layoutForCanvas, buildSystemPrompt, buildUserPrompt, setBusy, setStatus, handleInit, canvasMatchesSnapshot, sanitizeFragment, AI_SYSTEM_LIMIT, AI_USER_LIMIT };\n';
+  const expose = '\n;let __mockRequest = null; const __origReq = request; request = (method, args) => __mockRequest ? __mockRequest(method, args) : __origReq(method, args); globalThis.__plugin = { state, STR, CARD_LANGUAGES, STRUCTURES, layoutForCanvas, buildSystemPrompt, buildUserPrompt, setBusy, setStatus, handleInit, canvasMatchesSnapshot, sanitizeFragment, generate, setRequestMock: (fn) => { __mockRequest = fn; }, AI_SYSTEM_LIMIT, AI_USER_LIMIT };\n';
   vm.runInNewContext(
     fs.readFileSync(PLUGIN_SCRIPT, 'utf8') + expose,
     sandbox,
@@ -312,22 +316,42 @@ test('repo info card: busy state disables export buttons and restores them on fi
   assert.equal(saveImage.disabled, false, 'save image button should be enabled when custom dimensions match');
 });
 
-test('repo info card: sanitization failure preserves existing fragment and snapshot state', () => {
-  const { plugin } = loadPlugin();
+test('repo info card: sanitization failure preserves existing fragment and snapshot state', async () => {
+  const { plugin, byId } = loadPlugin();
+  const status = byId('status');
   const initialCanvas = { id: '1x1', w: 1200, h: 1200 };
+  plugin.state.repository = repository();
   plugin.state.fragment = '<div id="card">original</div>';
   plugin.state.fragmentCanvas = initialCanvas;
   plugin.state.fragmentLanguage = 'zh';
   plugin.state.usedReadme = true;
 
-  // 模拟非法响应（缺少 id="card" 根元素）
-  assert.throws(() => {
-    plugin.sanitizeFragment('<div>no card root</div>', { id: '5x2', w: 1500, h: 600 });
-  }, /card/i);
+  // 用户试图按新的画幅和语言重新生成
+  plugin.state.canvasId = '5x2';
+  plugin.state.languageOption = 'ja';
 
-  // 原有卡片状态与快照保持原样
+  // 模拟 AI 请求返回非法响应（缺少 id="card" 根元素）
+  plugin.setRequestMock(async (method) => {
+    if (method === 'ai.generate') {
+      return '<div>invalid response without card root</div>';
+    }
+    throw new Error(`Unexpected method: ${method}`);
+  });
+
+  await plugin.generate();
+
+  // 状态行提示缺少 card 根元素错误，且忙碌状态已安全解除
+  assert.ok(status.textContent.includes(plugin.STR.zh.noCard));
+  assert.equal(plugin.state.busy, false);
+
+  // 原有卡片状态与快照保持原样，未被失败的新请求污染
   assert.equal(plugin.state.fragment, '<div id="card">original</div>');
   assert.equal(plugin.state.fragmentCanvas, initialCanvas);
   assert.equal(plugin.state.fragmentLanguage, 'zh');
   assert.equal(plugin.state.usedReadme, true);
+
+  // 直接调用 sanitizeFragment 也依然正确抛错
+  assert.throws(() => {
+    plugin.sanitizeFragment('<div>no card root</div>', { id: '5x2', w: 1500, h: 600 });
+  }, /card/i);
 });
