@@ -71,10 +71,22 @@ function isPrivateOrLocalIpv6(h: string): boolean {
   );
 }
 
+function isLocalOrLanHostname(h: string): boolean {
+  return (
+    h.endsWith('.local') ||
+    h.endsWith('.lan') ||
+    h.endsWith('.home') ||
+    h.endsWith('.internal') ||
+    h.endsWith('.corp') ||
+    h.endsWith('.home.arpa')
+  );
+}
+
 /** 判断 hostname 是否为回环地址或私有网段（含 IPv6 私有/本地网段）。 */
 export function isPrivateOrLoopback(hostname: string): boolean {
   const h = normalizeHostname(hostname);
   if (BLOCKED_HOSTS.has(h)) return true;
+  if (isLocalOrLanHostname(h)) return true;
   if (PRIVATE_IP_PATTERNS.some(p => p.test(h))) return true;
   if (isPrivateOrLocalIpv6(h)) return true;
   return false;

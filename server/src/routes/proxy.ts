@@ -325,9 +325,8 @@ router.post('/api/proxy/ai', async (req, res) => {
 
     const timeout = apiType === 'openai-responses' || !!reasoningEffort ? 600000 : 60000;
 
-    // 宽松档（放行回环/私有网段）只用于「用户已保存的 AI 配置」(configId)。
-    // 内联 config 路径（任意客户端均可携带目标地址）保持严格档，避免 SSRF 放宽被滥用。
-    const allowPrivate = Boolean(configId);
+    // 放行回环/局域网私有网段：AI 接入点是由用户手动输入的，放行局域网与回环请求。
+    const allowPrivate = true;
 
     const proxyConfig = getProxyConfig();
     const result = await proxyRequest({

@@ -108,6 +108,13 @@ describe('validateUrl', () => {
       expect(isPrivateOrLoopback('ff02::1')).toBe(true);
     });
 
+    it('detects LAN hostnames', () => {
+      expect(isPrivateOrLoopback('ollama.local')).toBe(true);
+      expect(isPrivateOrLoopback('my-pc.lan')).toBe(true);
+      expect(isPrivateOrLoopback('nas.home')).toBe(true);
+      expect(isPrivateOrLoopback('server.internal')).toBe(true);
+    });
+
     it('returns false for public hosts', () => {
       expect(isPrivateOrLoopback('api.openai.com')).toBe(false);
       expect(isPrivateOrLoopback('8.8.8.8')).toBe(false);
