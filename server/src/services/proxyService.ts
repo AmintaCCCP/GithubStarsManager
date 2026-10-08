@@ -114,9 +114,12 @@ export function validateUrl(rawUrl: string, opts: ValidateUrlOptions = {}): void
     return;
   }
 
-  // 严格模式（默认）：拦截回环地址与私有网段（含 IPv6 私有/本地网段）。
+  // 严格模式（默认）：拦截回环地址与私有网段（含 IPv6 私有/本地网段及局域网主机名）。
   if (BLOCKED_HOSTS.has(hostname)) {
     throw new Error(`Blocked proxy request: hostname '${hostname}' is not allowed`);
+  }
+  if (isLocalOrLanHostname(hostname)) {
+    throw new Error(`Blocked proxy request: LAN hostname '${hostname}' is not allowed`);
   }
   if (PRIVATE_IP_PATTERNS.some(p => p.test(hostname))) {
     throw new Error(`Blocked proxy request: private IP '${hostname}' is not allowed`);

@@ -101,9 +101,11 @@ describe('isLocalOrLanHost', () => {
       expect(isLocalOrLanHost('::ffff:7f00:0001')).toBe(true); // 127.0.0.1
     });
 
-    it('rejects public IPv6', () => {
+    it('rejects public IPv6 including dotted-decimal forms', () => {
       expect(isLocalOrLanHost('2001:db8::1')).toBe(false);
       expect(isLocalOrLanHost('2606:4700:4700::1111')).toBe(false);
+      expect(isLocalOrLanHost('2001:4860:4860::8.8.8.8')).toBe(false);
+      expect(isLocalOrLanHost('[2001:4860:4860::8.8.8.8]:8080')).toBe(false);
     });
   });
 

@@ -38,13 +38,9 @@ export function isLocalOrLanHost(input: string): boolean {
     if (closeIdx !== -1) {
       h = h.slice(1, closeIdx);
     }
-  } else if (h.includes(':') && h.includes('.')) {
-    // IPv4 with port (192.168.1.1:8080) vs ::ffff:192.168.1.1
-    if (!h.startsWith('::ffff:')) {
-      h = h.split(':')[0] || '';
-    }
-  } else if (h.includes(':') && !h.startsWith('::')) {
-    // Single-colon hostname:port (e.g. ollama:11434)
+  } else {
+    // Strip port only when there is exactly one colon (hostname:port or IPv4:port).
+    // IPv6 addresses have at least two colons and must not have their colons split.
     const colonCount = (h.match(/:/g) || []).length;
     if (colonCount === 1) {
       h = h.split(':')[0] || '';
