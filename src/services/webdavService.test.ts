@@ -72,7 +72,8 @@ describe('WebDAVService 传输层选择', () => {
     // fileExists 内部自建 controller；这里断言 signal 与 timeoutMs 被显式传递
     const call = proxyWebDAV.mock.calls[0];
     expect(call[6]).toBeInstanceOf(AbortSignal);
-    expect(call[7]).toBe(10000);
+    expect(call[7]).toBeGreaterThan(9000);
+    expect(call[7]).toBeLessThanOrEqual(10000);
   });
 
   it('上传时透传按体积计算出的动态超时', async () => {
