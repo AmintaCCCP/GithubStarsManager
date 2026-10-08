@@ -58,6 +58,11 @@ describe('validateUrl', () => {
       expect(() => validateUrl('http://[ff02::1]/x')).toThrow(/private IPv6 address/);
     });
 
+    it('blocks LAN hostnames in strict mode', () => {
+      expect(() => validateUrl('http://nas.home/x')).toThrow(/LAN hostname 'nas.home' is not allowed/);
+      expect(() => validateUrl('http://ollama.local/x')).toThrow(/LAN hostname 'ollama.local' is not allowed/);
+    });
+
     it('still allows public IPv6 addresses in strict mode', () => {
       expect(() => validateUrl('http://[2001:db8::1]/x')).not.toThrow();
     });
@@ -69,10 +74,11 @@ describe('validateUrl', () => {
       expect(() => validateUrl('http://127.0.0.1:11434/v1/chat/completions', { allowPrivate: true })).not.toThrow();
     });
 
-    it('allows private network ranges (fixes #244 local AI / NAS)', () => {
+    it('allows private network ranges and LAN hostnames (fixes #244 local AI / NAS)', () => {
       expect(() => validateUrl('http://10.10.16.13/v1/chat/completions', { allowPrivate: true })).not.toThrow();
       expect(() => validateUrl('http://192.168.1.10:11434/v1/chat/completions', { allowPrivate: true })).not.toThrow();
       expect(() => validateUrl('http://172.16.0.5/x', { allowPrivate: true })).not.toThrow();
+      expect(() => validateUrl('http://nas.home/x', { allowPrivate: true })).not.toThrow();
     });
 
     it('STILL blocks the cloud metadata IMDS address even when lenient', () => {
@@ -106,6 +112,13 @@ describe('validateUrl', () => {
       expect(isPrivateOrLoopback('fe80::1')).toBe(true);
       expect(isPrivateOrLoopback('fc00::1')).toBe(true);
       expect(isPrivateOrLoopback('ff02::1')).toBe(true);
+    });
+
+    it('detects LAN hostnames', () => {
+      expect(isPrivateOrLoopback('ollama.local')).toBe(true);
+      expect(isPrivateOrLoopback('my-pc.lan')).toBe(true);
+      expect(isPrivateOrLoopback('nas.home')).toBe(true);
+      expect(isPrivateOrLoopback('server.internal')).toBe(true);
     });
 
     it('returns false for public hosts', () => {

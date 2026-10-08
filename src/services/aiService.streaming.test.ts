@@ -103,6 +103,23 @@ describe('insecure endpoint guard', () => {
     // 守卫放行后请求会继续（测试环境 fetch 未实现），但绝不抛 HTTPS 守卫错误。
     await expect(service.generateChatText({ system: 's', user: 'u' })).rejects.not.toThrow(/HTTPS/);
   });
+
+  it('allows plain http for local area network (LAN) addresses and local hostnames', async () => {
+    const lanEndpoints = [
+      'http://192.168.1.100:11434/v1',
+      'http://10.0.0.5:11434/v1',
+      'http://172.16.0.2:11434/v1',
+      'http://100.64.0.1:11434/v1',
+      'http://ollama.local:11434/v1',
+      'http://ollama:11434/v1',
+      'http://[fe80::1]:11434/v1',
+    ];
+
+    for (const endpoint of lanEndpoints) {
+      const service = new AIService(baseConfig(endpoint), 'zh');
+      await expect(service.generateChatText({ system: 's', user: 'u' })).rejects.not.toThrow(/HTTPS/);
+    }
+  });
 });
 
 describe('redirect and sniff safety', () => {
