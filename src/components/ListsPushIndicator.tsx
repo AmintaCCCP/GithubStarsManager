@@ -35,8 +35,8 @@ export const ListsPushIndicator: React.FC = () => {
     const prevListsPush = prevListsPushRef.current;
     prevRunningRef.current = listsPush.isRunning;
     prevListsPushRef.current = listsPush;
-    // 新一轮推送开始时取消上一轮待执行的 reset，避免其在运行中清空状态
-    if (listsPush.isRunning) clearTimeout(resetTimerRef.current);
+    // 任何新的推送状态都会取代上一轮待执行的 reset，避免其清空新一轮运行状态或新错误
+    if (listsPush !== prevListsPush) clearTimeout(resetTimerRef.current);
 
     if (wasRunning && !listsPush.isRunning) {
       if (listsPush.error) {

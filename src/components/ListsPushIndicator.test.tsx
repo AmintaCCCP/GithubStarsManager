@@ -97,4 +97,23 @@ describe('ListsPushIndicator 错误提示', () => {
       vi.useRealTimers();
     }
   });
+
+  it('上一轮的 reset 定时器不会清空 4 秒内出现的启动前错误', () => {
+    vi.useFakeTimers();
+    try {
+      setPush({ isRunning: true, total: 1, done: 0 });
+      const { rerender } = render(<ListsPushIndicator />);
+      setPush({ isRunning: false, message: '完成' });
+      rerender(<ListsPushIndicator />);
+      setPush({ error: '未配置 token' });
+      rerender(<ListsPushIndicator />);
+
+      vi.advanceTimersByTime(5000);
+
+      expect(mocks.state.resetListsPush).not.toHaveBeenCalled();
+      expect(mocks.toast).toHaveBeenLastCalledWith('未配置 token', 'error');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
