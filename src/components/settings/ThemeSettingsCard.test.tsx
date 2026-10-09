@@ -26,6 +26,7 @@ import { makeT } from '../../i18n/useT';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
 import { THEME_PRESETS } from '../../constants/themePresets';
 import { DEFAULT_REPOSITORY_CARD_FIELDS } from '../../types/repositoryCardFields';
+import { DEFAULT_REPOSITORY_CARD_ACTIONS } from '../../types/repositoryCardActions';
 
 const t = makeT('zh', 'app');
 
@@ -46,6 +47,10 @@ beforeEach(() => {
     repositoryCardFields: { ...DEFAULT_REPOSITORY_CARD_FIELDS },
     setRepositoryCardField: vi.fn((id: string, visible: boolean) => {
       mocks.state.repositoryCardFields = { ...(mocks.state.repositoryCardFields as Record<string, boolean>), [id]: visible };
+    }),
+    repositoryCardActions: DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item })),
+    setRepositoryCardActions: vi.fn((actions: unknown) => {
+      mocks.state.repositoryCardActions = actions;
     }),
   });
 });
@@ -71,6 +76,22 @@ describe('ThemeSettingsCard', () => {
 
     await user.click(screen.getByRole('button', { name: '描述' }));
     expect(mocks.state.setRepositoryCardField).toHaveBeenCalledWith('description', false);
+  });
+
+  it('reorders and hides quick actions without removing them from the configuration', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+
+    await user.click(screen.getByRole('button', { name: '问答此仓库上移' }));
+    expect(mocks.state.setRepositoryCardActions).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 'ask', visible: true }),
+    ]));
+    expect((mocks.state.repositoryCardActions as typeof DEFAULT_REPOSITORY_CARD_ACTIONS).map((item) => item.id).slice(0, 2)).toEqual(['ask', 'analyze']);
+
+    await user.click(screen.getByRole('switch', { name: '在卡片上显示问答此仓库' }));
+    expect(mocks.state.setRepositoryCardActions).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ id: 'ask', visible: false }),
+    ]));
   });
 
   it('renders every registered preset as a radio option', () => {

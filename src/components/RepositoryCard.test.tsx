@@ -10,6 +10,7 @@ import { pluginPageSession } from '../plugins/pluginPageSession';
 import { pluginRegistry } from '../plugins/pluginRegistry';
 import { DialogProvider } from '../hooks/useDialog';
 import type { Repository } from '../types';
+import { DEFAULT_REPOSITORY_CARD_ACTIONS } from '../types/repositoryCardActions';
 
 const actionMocks = vi.hoisted(() => ({
   releaseSheet: {
@@ -113,6 +114,7 @@ const storeState = {
   language: 'zh' as const,
   // 卡片可见字段（开发守则 §14）：默认全开，单个用例里按需改
   repositoryCardFields: { description: true, tags: true, language: true, stars: true, license: true, lastUpdated: true },
+  repositoryCardActions: DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item })),
   updateRepository: vi.fn(),
   deleteRepository: vi.fn(),
   vectorSearchConfig: {
@@ -169,6 +171,7 @@ beforeEach(() => {
     license: true,
     lastUpdated: true,
   };
+  storeState.repositoryCardActions = DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item }));
   storeState.vectorSearchConfig.enabled = true;
   Object.assign(actionMocks.actions, {
     isSubscribed: true,
@@ -183,6 +186,22 @@ beforeEach(() => {
 });
 
 describe('RepositoryCard view modes', () => {
+  it('follows the saved quick-action order and keeps hidden actions in the menu', async () => {
+    const user = userEvent.setup();
+    storeState.repositoryCardActions = [
+      { id: 'github', visible: true },
+      { id: 'ask', visible: false },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS.filter((item) => item.id !== 'github' && item.id !== 'ask'),
+    ];
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
+
+    const actionRow = screen.getByTestId('grid-action-row');
+    expect(actionRow.firstElementChild).toHaveAttribute('title', '在GitHub上查看');
+    expect(screen.queryByRole('button', { name: '问答此仓库' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
+  });
+
   it('keeps list actions on the same row as edit and only folds overflow into a more-actions menu', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('list', { onAskRepository: vi.fn() });
