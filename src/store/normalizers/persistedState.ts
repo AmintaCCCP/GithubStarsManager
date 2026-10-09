@@ -14,6 +14,7 @@ import { normalizeAssetFilters } from '../../utils/assetFilters';
 import { normalizeThemeTokens } from '../../utils/themeTokens';
 import { normalizeTrendingSnapshots } from '../../utils/trendingSnapshots';
 import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
+import { normalizeRepositoryCardActions } from '../../utils/repositoryCardActions';
 import { normalizeXTweetAuth, normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
@@ -221,6 +222,7 @@ export const normalizePersistedState = (
     trendingSnapshots: normalizeTrendingSnapshots((safePersisted as Record<string, unknown>).trendingSnapshots),
     // 卡片可见字段（开发守则 §14）：逐项校验，非法值按默认（显示）处理
     repositoryCardFields: normalizeRepositoryCardFields((safePersisted as Record<string, unknown>).repositoryCardFields),
+    repositoryCardActions: normalizeRepositoryCardActions((safePersisted as Record<string, unknown>).repositoryCardActions),
     language: isAppLanguage(safePersisted.language) ? safePersisted.language : currentState.language,
     translationEngine: safePersisted.translationEngine === 'google' || safePersisted.translationEngine === 'ai'
       ? safePersisted.translationEngine

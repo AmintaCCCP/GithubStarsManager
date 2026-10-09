@@ -23,6 +23,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { REPOSITORY_CARD_FIELD_IDS } from '../../types/repositoryCardFields';
 import { isRepositoryCardFieldVisible } from '../../utils/repositoryCardFields';
+import { RepositoryCardActionsSettings } from './RepositoryCardActionsSettings';
 
 interface ThemeSettingsCardProps {
   t: TranslateFn;
@@ -323,6 +324,14 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
         </div>
       </CardContent>
     </Card>
+    <RepositoryCardActionsSettings
+      title={t('themeSettingsCard.card-actions')}
+      hint={t('themeSettingsCard.card-actions-hint')}
+      resetLabel={t('themeSettingsCard.reset-card-actions')}
+      moveUpLabel={(action) => t('menuManagementPanel.move-v1-up', { v1: action })}
+      moveDownLabel={(action) => t('menuManagementPanel.move-v1-down', { v1: action })}
+      visibilityLabel={(action) => t('themeSettingsCard.quick-action-visibility', { action })}
+    />
     </>
   );
 };
