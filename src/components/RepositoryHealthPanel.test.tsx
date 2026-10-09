@@ -37,7 +37,7 @@ const release: Release = {
 };
 
 async function expandPanel() {
-  const trigger = screen.getByRole('button', { name: /仓库健康事实/ });
+  const trigger = screen.getByRole('button', { name: /仓库概况/ });
   if (trigger.getAttribute('aria-expanded') !== 'true') {
     await userEvent.click(trigger);
   }
@@ -48,7 +48,7 @@ describe('RepositoryHealthPanel', () => {
   it('默认折叠，点击标题后展开事实', async () => {
     render(<RepositoryHealthPanel repository={makeRepo()} releases={[release]} language="zh" />);
 
-    const trigger = screen.getByRole('button', { name: /仓库健康事实/ });
+    const trigger = screen.getByRole('button', { name: /仓库概况/ });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('活跃度')).not.toBeInTheDocument();
 

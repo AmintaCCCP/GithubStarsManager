@@ -41,6 +41,7 @@ describe('GlobalChatHistorySheet', () => {
     render(<GlobalChatHistorySheet isOpen repositories={repositories} onClose={() => {}} onSelectSession={() => {}} />);
 
     const items = await screen.findAllByTitle(/进入 owner\//);
+    expect(screen.getByRole('heading', { name: '问答历史 (2)' })).toBeInTheDocument();
     expect(items.map((item) => item.textContent)).toEqual([
       expect.stringContaining('title-newer'),
       expect.stringContaining('title-older'),

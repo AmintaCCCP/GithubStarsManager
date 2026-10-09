@@ -305,7 +305,7 @@
     "no": "No",
     "v1-year": "{{v1}} / year",
     "v1-days-years-years": "{{v1}} days (~{{years}} years)",
-    "repository-health-facts": "Repository health facts",
+    "repository-health-facts": "Repository overview",
     "these-are-objective-facts-with-no-overall-score": "These are objective facts with no overall score. “Unknown” means the fact has not been obtained yet."
   }
 }

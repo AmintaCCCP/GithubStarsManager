@@ -305,7 +305,7 @@
     "no": "Non",
     "v1-year": "{{v1}} / an",
     "v1-days-years-years": "{{v1}} jours (~{{years}} ans)",
-    "repository-health-facts": "Faits de santé du dépôt",
+    "repository-health-facts": "Aperçu du dépôt",
     "these-are-objective-facts-with-no-overall-score": "Ce sont des faits objectifs, sans score global. « Inconnu » signifie que le fait n’a pas encore été obtenu."
   }
 }

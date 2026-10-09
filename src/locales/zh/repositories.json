@@ -305,7 +305,7 @@
     "no": "否",
     "v1-year": "{{v1}} 次/年",
     "v1-days-years-years": "{{v1}} 天（约 {{years}} 年）",
-    "repository-health-facts": "仓库健康事实",
+    "repository-health-facts": "仓库概况",
     "these-are-objective-facts-with-no-overall-score": "以上为客观事实，不含健康总分。「未知」表示尚未获得该事实。"
   }
 }

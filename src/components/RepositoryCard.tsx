@@ -198,21 +198,17 @@ const MAX_CACHE_SIZE = 500;
 const ACTION_SLOT_WIDTH = 32;
 const ACTION_SLOT_GAP = 6;
 const ACTION_SLOT_STRIDE = ACTION_SLOT_WIDTH + ACTION_SLOT_GAP;
-const BASE_OVERFLOW_ACTION_COUNT = 7;
+const BASE_OVERFLOW_ACTION_COUNT = 6;
 
 const highlightCache = new Map<string, React.ReactNode>();
 
 const countVisibleOverflowActions = (
   width: number,
   primaryActionCount: number,
-  hasPersistentMenu: boolean,
 ): number => {
   if (width === 0) return primaryActionCount;
   const capacity = Math.max(1, Math.floor((width + ACTION_SLOT_GAP) / ACTION_SLOT_STRIDE));
-  if (hasPersistentMenu) {
-    return Math.max(0, Math.min(primaryActionCount, capacity - 1));
-  }
-  return capacity >= primaryActionCount ? primaryActionCount : Math.max(0, capacity - 1);
+  return Math.max(0, Math.min(primaryActionCount, capacity - 1));
 };
 
 const mutedIconButtonClass =
@@ -295,9 +291,7 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
   const showReleases = visibleActionCount >= 4 + askSlot;
   const showDocs = visibleActionCount >= 5 + askSlot;
   const showGithub = visibleActionCount >= 6 + askSlot;
-  const showUnstar = visibleActionCount >= 7 + askSlot;
   const showFindSimilarInMenu = Boolean(vectorSearchAvailable && onFindSimilar && (persistFindSimilarInMenu || visibleActionCount < primaryActionCount));
-  const showOverflowMenu = visibleActionCount < primaryActionCount || pluginActions.length > 0 || showFindSimilarInMenu;
   const menuOpenProps = onActionsMenuOpenChange
     ? { open: isActionsMenuOpen, onOpenChange: onActionsMenuOpenChange }
     : {};
@@ -387,19 +381,7 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
           <ExternalLink className="w-4 h-4" />
         </a>
       ) : null}
-      {showUnstar ? (
-        <SelectionAwareButton
-          onClick={onUnstar}
-          disabled={unstarring}
-          selectionMode={selectionMode}
-          variant="unstar"
-          title={t('repositoryCard.unstar')}
-        >
-          <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
-        </SelectionAwareButton>
-      ) : null}
-      {showOverflowMenu ? (
-        <DropdownMenu {...menuOpenProps}>
+      <DropdownMenu {...menuOpenProps}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -470,12 +452,6 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
                 </a>
               </DropdownMenuItem>
             )}
-            {showUnstar ? null : (
-              <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void onUnstar()}>
-                <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
-                {t('repositoryCard.unstar')}
-              </DropdownMenuItem>
-            )}
             {showFindSimilarInMenu ? (
               <DropdownMenuItem disabled={isFindingSimilar} onSelect={() => onFindSimilar?.()}>
                 {isFindingSimilar ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-2 h-3.5 w-3.5" />}
@@ -489,9 +465,13 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
                 <PluginRepositoryActionItems actions={pluginActions} repository={repository} language={language} />
               </>
             ) : null}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void onUnstar()}>
+              <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
+              {t('repositoryCard.unstar')}
+            </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+      </DropdownMenu>
     </div>
   );
 };
@@ -573,11 +553,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         setVisibleOverflowActionCount(primaryOverflowActionCount);
         return;
       }
-      const hasPersistentMenu =
-        pluginActions.actions.length > 0 ||
-        (viewMode === 'list' && vectorSearchAvailable);
       setVisibleOverflowActionCount(
-        countVisibleOverflowActions(width, primaryOverflowActionCount, hasPersistentMenu),
+        countVisibleOverflowActions(width, primaryOverflowActionCount),
       );
     };
 
