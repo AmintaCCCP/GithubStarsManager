@@ -55,6 +55,7 @@ function makeSliceHarness(options: {
   repositories?: Repository[];
   customCategories?: Category[];
   nodeIdMap?: Map<string, string>;
+  hiddenDefaultCategoryIds?: string[];
 }) {
   const state: HarnessState = {
     listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null },
@@ -63,7 +64,7 @@ function makeSliceHarness(options: {
     repositories: options.repositories ?? [makeRepo()],
     customCategories: options.customCategories ?? [],
     language: 'en',
-    hiddenDefaultCategoryIds: defaultCategories.filter(c => c.id !== 'devtools').map(c => c.id),
+    hiddenDefaultCategoryIds: options.hiddenDefaultCategoryIds ?? defaultCategories.filter(c => c.id !== 'devtools').map(c => c.id),
     defaultCategoryOverrides: {},
     categoryListIdMap: options.categoryListIdMap ?? {},
   };
@@ -82,7 +83,7 @@ function makeSliceHarness(options: {
     resolveRepositoryNodeIds: vi.fn().mockResolvedValue(options.nodeIdMap ?? new Map()),
   };
   const slice = createRepositorySlice(set as never, get as never);
-  const push = () => slice.pushCategoriesToLists(api as never);
+  const push = (categoryIds?: string[]) => slice.pushCategoriesToLists(api as never, categoryIds);
   return { push, api, state };
 }
 
@@ -249,5 +250,65 @@ describe('pushCategoriesToLists 隐藏分类不参与回写', () => {
 
     // 仓库加入 devtools list 的同时，保留其在隐藏分类 list（L_web）中的成员关系
     expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_web', 'L_new']);
+  });
+});
+
+describe('pushCategoriesToLists 仅推送选中分类', () => {
+  const alpha: Category = { id: 'custom-alpha', name: 'Alpha', icon: '📁', keywords: ['alpha'], isCustom: true };
+
+  const thingRepo = (topics: string[]) => makeRepo({ name: 'thing', full_name: 'owner/thing', html_url: 'https://github.com/owner/thing', topics });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('只为选中分类新建 list，并保留仓库在未选中托管 list 中的成员关系', async () => {
+    const { push, api, state } = makeSliceHarness({
+      currentLists: [{ id: 'L_dev', name: 'Development Tools', items: ['owner/thing'] }],
+      categoryListIdMap: { devtools: 'L_dev' },
+      customCategories: [alpha],
+      repositories: [thingRepo(['alpha'])],
+      nodeIdMap: new Map([['owner/thing', 'node_1']]),
+    });
+
+    await push(['custom-alpha']);
+
+    expect(api.createUserList).toHaveBeenCalledTimes(1);
+    expect(api.createUserList).toHaveBeenCalledWith('Alpha', true);
+    expect(api.updateUserList).not.toHaveBeenCalled();
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev', 'L_new']);
+    expect(state.categoryListIdMap).toEqual({ devtools: 'L_dev', 'custom-alpha': 'L_new' });
+    expect(state.listsPush.error).toBeNull();
+  });
+
+  it('过期成员清理仅作用于选中分类的 list', async () => {
+    const { push, api } = makeSliceHarness({
+      currentLists: [
+        { id: 'L_dev', name: 'Development Tools', items: ['owner/thing'] },
+        { id: 'L_alpha', name: 'Alpha', items: ['owner/thing'] },
+      ],
+      categoryListIdMap: { devtools: 'L_dev', 'custom-alpha': 'L_alpha' },
+      customCategories: [alpha],
+      repositories: [thingRepo([])],
+      nodeIdMap: new Map([['owner/thing', 'node_1']]),
+    });
+
+    await push(['custom-alpha']);
+
+    expect(api.updateUserListsForItem).toHaveBeenCalledTimes(1);
+    expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev']);
+  });
+
+  it.each([
+    ['空数组', [] as string[]],
+    ['未知/隐藏分类 id', ['missing', 'web']],
+  ])('选中集合为%s时报错且不发起任何请求', async (_label, ids) => {
+    const { push, api, state } = makeSliceHarness({ currentLists: [] });
+
+    await push(ids);
+
+    expect(api.getUserLists).not.toHaveBeenCalled();
+    expect(state.listsPush.isRunning).toBe(false);
+    expect(state.listsPush.error).toBe('No categories selected to push');
   });
 });

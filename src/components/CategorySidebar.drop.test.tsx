@@ -58,6 +58,7 @@ const storeState = {
   categoryOrder: [],
   collapsedSidebarCategoryCount: 6,
   categoryMatchMode: 'effective' as const,
+  listsPush: { isRunning: false },
   deleteCustomCategory: vi.fn(),
   hideDefaultCategory: vi.fn(),
   showDefaultCategory: vi.fn(),

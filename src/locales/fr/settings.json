@@ -57,6 +57,7 @@
   "useStarSyncActions": {
     "not-connected-to-github-yet": "Vous n'êtes pas connecté à GitHub, veuillez d'abord vous connecter",
     "push-categories-to-github-lists": "Synchroniser la classification des entrepôts avec la liste GitHub",
+    "push-confirm-body-selected": "Catégories sélectionnées : {{count}}. Elles seront écrites dans des listes GitHub du même nom :\n\n· Les listes existantes du même nom seront écrasées (les dépôts qui ne correspondent plus sont retirés)\n· Les listes manquantes seront créées (privées par défaut)\n· Les autres listes ne sont pas modifiées\n\nContinuer ?",
     "push-confirm-body": "Écrivez chaque catégorie locale (y compris les catégories par défaut et personnalisées) dans la liste GitHub avec le même nom :\n\n· Une liste portant le même nom écrasera ses membres (les référentiels qui ne correspondent pas à la catégorie seront supprimés de la liste)\n· S'il n'y a pas de liste du même nom, créez-en une nouvelle (privée par défaut)\n· L'entrepôt sera ajouté à la liste correspondante selon sa classification correspondante\n· Les autres adhésions à la liste n'appartenant pas à la catégorie locale seront conservées\n\nÊtes-vous sûr de vouloir continuer ?"
   },
   "useWebDAVActions": {

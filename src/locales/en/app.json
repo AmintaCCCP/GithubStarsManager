@@ -129,6 +129,9 @@
     "ok": "OK",
     "cancel": "Cancel",
     "tip-you-can-enter-any-emoji-like-etc": "Tip: You can enter any emoji, like 🎯 🎨 🎪 etc.",
+    "push-to-github-list": "Push to GitHub list",
+    "save-changes-before-push": "Save changes before pushing",
+    "name-too-long-for-github-list": "Longer than {{max}} characters — GitHub Lists will reject this name when pushing",
     "selected": "Selected:",
     "custom-emoji": "Custom emoji",
     "includes-all-common-emoji-categories-smileys-peo": "Includes all common emoji categories: smileys, people, gestures, animals, food, transport, symbols, etc.",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "Updated {{v1}}; the plugin stays enabled.",
     "marketplace-orphaned-revoked-title": "Revoked installed plugins"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "Push selected categories",
+    "select-categories": "Select categories",
+    "select-all": "Select all",
+    "select-none": "Select none",
+    "cancel": "Cancel",
+    "push-count-selected": "Push {{count}} selected"
+  },
   "starSyncPanel": {
     "star-sync": "Star Sync",
     "sync-scope": "Sync Scope",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "Write each local category to a GitHub List of the same name. Same-name lists are overwritten, missing lists are created.",
     "pushing": "Pushing…",
     "push-categories-to-lists": "Push categories to lists",
+    "push-selected-categories": "Push selected…",
     "preparing": "Preparing…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "Not connected to GitHub yet",
     "missing-user-info-reconnect": "Missing user info, reconnect",
+    "no-categories-selected": "No categories selected to push",
     "no-repositories-to-push": "No repositories to push",
     "no-repos-matched-any-category": "No repos matched any category",
     "pushed-v1-lists-updated-updatedcount-repos": "Pushed {{v1}} lists, updated {{updatedCount}} repos",

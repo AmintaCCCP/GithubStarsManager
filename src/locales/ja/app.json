@@ -129,6 +129,9 @@
     "ok": "もちろん",
     "cancel": "キャンセル",
     "tip-you-can-enter-any-emoji-like-etc": "ヒント: 🎯 🎨 🎪 などの任意の絵文字表現を入力できます。",
+    "push-to-github-list": "GitHub リストに書き戻す",
+    "save-changes-before-push": "書き戻す前に変更を保存してください",
+    "name-too-long-for-github-list": "{{max}} 文字を超えています。書き戻し時に GitHub Lists がこの名前を拒否します",
     "selected": "現在の選択:",
     "custom-emoji": "カスタム絵文字",
     "includes-all-common-emoji-categories-smileys-peo": "スマイリーフェイス、人物、ジェスチャー、動物、食べ物、交通機関、シンボルなど、一般的に使用される絵文字カテゴリがすべて含まれています。",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "{{v1}} を更新しました。プラグインは有効のままです。",
     "marketplace-orphaned-revoked-title": "取り消し済みのインストール済みプラグイン"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "選択したカテゴリを書き戻す",
+    "select-categories": "カテゴリを選択",
+    "select-all": "すべて選択",
+    "select-none": "選択解除",
+    "cancel": "キャンセル",
+    "push-count-selected": "選択した {{count}} 件を書き戻す"
+  },
   "starSyncPanel": {
     "star-sync": "スターシンク",
     "sync-scope": "同期スコープ",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "各ローカル カテゴリを同じ名前で GitHub リストに書き込みます。同じ名前のリストは上書きされ、同じ名前のないリストが作成されます。",
     "pushing": "同期中...",
     "push-categories-to-lists": "倉庫分類を GitHub リストに同期する",
+    "push-selected-categories": "選択して書き戻し…",
     "preparing": "準備中…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "GitHub にログインしていません。最初に接続してください",
     "missing-user-info-reconnect": "ユーザー情報が不足しています。再接続してください",
+    "no-categories-selected": "プッシュするカテゴリが選択されていません",
     "no-repositories-to-push": "現在、書き戻すウェアハウスがありません",
     "no-repos-matched-any-category": "どのカテゴリにも該当する倉庫はありません",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} 個のリストが同期され、{{updatedCount}} 個のウェアハウスが更新されました。",

@@ -57,6 +57,7 @@
   "useStarSyncActions": {
     "not-connected-to-github-yet": "Não conectado ao GitHub, conecte-se primeiro",
     "push-categories-to-github-lists": "Sincronize a classificação do warehouse com a lista do GitHub",
+    "push-confirm-body-selected": "Categorias selecionadas: {{count}}. Serão gravadas em Listas do GitHub com o mesmo nome:\n\n· Listas existentes com o mesmo nome serão sobrescritas (repositórios que não correspondem mais são removidos)\n· Listas ausentes serão criadas (privadas por padrão)\n· As outras listas não são alteradas\n\nContinuar?",
     "push-confirm-body": "Escreva cada categoria local (incluindo categorias padrão e personalizadas) de volta na lista do GitHub com o mesmo nome:\n\n· Uma lista com o mesmo nome substituirá seus membros (repositórios que não correspondam à categoria serão removidos da lista)\n· Se não houver lista com o mesmo nome, crie uma nova (privada por padrão)\n· O armazém será adicionado à lista correspondente de acordo com a classificação correspondente\n· Outras associações à lista que não pertençam à categoria local serão mantidas\n\nTem certeza de que deseja continuar?"
   },
   "useWebDAVActions": {

@@ -57,6 +57,7 @@
   "useStarSyncActions": {
     "not-connected-to-github-yet": "No has iniciado sesión en GitHub, conéctate primero",
     "push-categories-to-github-lists": "Sincronizar la clasificación del almacén con la lista de GitHub",
+    "push-confirm-body-selected": "Categorías seleccionadas: {{count}}. Se escribirán en listas de GitHub con el mismo nombre:\n\n· Las listas existentes con el mismo nombre se sobrescribirán (se quitan los repositorios que ya no coinciden)\n· Las listas que falten se crearán (privadas por defecto)\n· Las demás listas no se modifican\n\n¿Continuar?",
     "push-confirm-body": "Escriba cada categoría local (incluidas las categorías predeterminadas y personalizadas) en la Lista de GitHub con el mismo nombre:\n\n· Una lista con el mismo nombre sobrescribirá a sus miembros (los repositorios que no coincidan con la categoría serán eliminados de la lista)\n· Si no hay una lista con el mismo nombre, crea una nueva (privada por defecto)\n· El almacén se añadirá al listado correspondiente según su clasificación coincidente\n· Se conservarán otras membresías de la lista que no pertenecen a la categoría local.\n\n¿Estás seguro de que quieres continuar?"
   },
   "useWebDAVActions": {

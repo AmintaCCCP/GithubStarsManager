@@ -183,7 +183,7 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
       resetListsPush: () => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: null } }),
       setListsPushError: (error) => set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error } }),
       setCategoryListIdMap: (categoryId, listId) => set((state) => ({ categoryListIdMap: { ...state.categoryListIdMap, [categoryId]: listId } })),
-      pushCategoriesToLists: async (api) => {
+      pushCategoriesToLists: async (api, categoryIds) => {
         const state = get();
         const t = i18n.getFixedT(state.language, 'app');
         // 重入保护：已有回写进行中时直接返回，避免并发创建重复 list 并互相覆盖成员
@@ -211,7 +211,14 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             language,
             hiddenDefaultCategoryIds,
             defaultCategoryOverrides
-          ).filter(cat => cat.id !== 'all');
+          ).filter(cat => cat.id !== 'all')
+            .filter(cat => !categoryIds || categoryIds.includes(cat.id));
+
+          // 仅推送选中分类时，选中集合为空（含未知/已隐藏 id）则直接报错，不发起请求
+          if (categoryIds && allCategories.length === 0) {
+            set({ listsPush: { isRunning: false, total: 0, done: 0, currentLabel: null, message: null, error: t('repositorySlice.no-categories-selected') } });
+            return;
+          }
 
           // 1. 获取当前全部 list（含成员）
           const currentLists = await api.getUserLists(user!.login);

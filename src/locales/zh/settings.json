@@ -57,6 +57,7 @@
   "useStarSyncActions": {
     "not-connected-to-github-yet": "未登录 GitHub，请先连接",
     "push-categories-to-github-lists": "同步仓库分类到 GitHub list",
+    "push-confirm-body-selected": "将选中的 {{count}} 个分类写回为同名 GitHub List：\n\n· 已有同名 list 将覆盖其成员（不再匹配的仓库会被移除）\n· 不存在的 list 会新建（默认私有）\n· 其他 list 不受影响\n\n确定继续吗？",
     "push-confirm-body": "将每个本地分类（含默认与自定义分类）写回为同名 GitHub List：\n\n· 同名 list 将覆盖其成员（未匹配分类的仓库会从该 list 移除）\n· 无同名 list 则新建（默认私有）\n· 仓库将按其匹配的分类加入对应 list\n· 不属于本地分类的其他 list 成员关系会被保留\n\n确定继续吗？"
   },
   "useWebDAVActions": {

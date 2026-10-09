@@ -129,6 +129,9 @@
     "ok": "Конечно",
     "cancel": "Отмена",
     "tip-you-can-enter-any-emoji-like-etc": "Совет: вы можете ввести любое выражение смайлика, например 🎯 🎨 🎪 и т. д.",
+    "push-to-github-list": "Отправить в список GitHub",
+    "save-changes-before-push": "Сохраните изменения перед отправкой",
+    "name-too-long-for-github-list": "Длиннее {{max}} символов — GitHub Lists отклонит это имя при отправке",
     "selected": "Текущий выбор:",
     "custom-emoji": "Пользовательские смайлы",
     "includes-all-common-emoji-categories-smileys-peo": "Содержит все часто используемые категории смайлов: смайлики, люди, жесты, животные, еда, транспорт, символы и т. д.",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "«{{v1}}» обновлён; плагин остаётся включённым.",
     "marketplace-orphaned-revoked-title": "Отозванные установленные плагины"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "Отправить выбранные категории",
+    "select-categories": "Выберите категории",
+    "select-all": "Выбрать все",
+    "select-none": "Снять выбор",
+    "cancel": "Отмена",
+    "push-count-selected": "Отправить выбранные: {{count}}"
+  },
   "starSyncPanel": {
     "star-sync": "Звездная синхронизация",
     "sync-scope": "Область синхронизации",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "Запишите каждую локальную категорию обратно в список GitHub с тем же именем. Списки с одинаковыми именами будут перезаписаны, а также будут созданы списки без одного и того же имени.",
     "pushing": "Синхронизация...",
     "push-categories-to-lists": "Синхронизировать классификацию склада со списком GitHub.",
+    "push-selected-categories": "Отправить выбранные…",
     "preparing": "В подготовке…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "Вы не вошли в GitHub, сначала подключитесь",
     "missing-user-info-reconnect": "Информация о пользователе отсутствует, пожалуйста, переподключитесь",
+    "no-categories-selected": "Не выбраны категории для отправки",
     "no-repositories-to-push": "В настоящее время нет склада, на который можно было бы написать ответ.",
     "no-repos-matched-any-category": "Ни один склад не попадает ни в одну категорию",
     "pushed-v1-lists-updated-updatedcount-repos": "Списки {{v1}} синхронизированы, а склады {{updatedCount}} обновлены.",

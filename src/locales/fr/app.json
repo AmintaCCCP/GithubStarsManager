@@ -129,6 +129,9 @@
     "ok": "Bien sûr",
     "cancel": "Annuler",
     "tip-you-can-enter-any-emoji-like-etc": "Astuce : Vous pouvez saisir n'importe quelle expression emoji, telle que 🎯 🎨 🎪, etc.",
+    "push-to-github-list": "Envoyer vers une liste GitHub",
+    "save-changes-before-push": "Enregistrez les modifications avant l'envoi",
+    "name-too-long-for-github-list": "Plus de {{max}} caractères : GitHub Lists rejettera ce nom lors de l'envoi",
     "selected": "Sélection actuelle :",
     "custom-emoji": "Émoji personnalisé",
     "includes-all-common-emoji-categories-smileys-peo": "Contient toutes les catégories d'emojis couramment utilisées : visages souriants, personnes, gestes, animaux, nourriture, transports, symboles, etc.",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "{{v1}} mis à jour ; le plugin reste activé.",
     "marketplace-orphaned-revoked-title": "Plugins installés révoqués"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "Envoyer les catégories sélectionnées",
+    "select-categories": "Sélectionner les catégories",
+    "select-all": "Tout sélectionner",
+    "select-none": "Tout désélectionner",
+    "cancel": "Annuler",
+    "push-count-selected": "Envoyer {{count}} sélectionnée(s)"
+  },
   "starSyncPanel": {
     "star-sync": "Synchronisation des étoiles",
     "sync-scope": "Portée de synchronisation",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "Réécrivez chaque catégorie locale dans une liste GitHub portant le même nom. Les listes portant le même nom seront écrasées et des listes sans le même nom seront créées.",
     "pushing": "Synchronisation...",
     "push-categories-to-lists": "Synchroniser la classification des entrepôts avec la liste GitHub",
+    "push-selected-categories": "Envoyer la sélection…",
     "preparing": "En préparation…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "Vous n'êtes pas connecté à GitHub, veuillez d'abord vous connecter",
     "missing-user-info-reconnect": "Les informations utilisateur sont manquantes, veuillez vous reconnecter",
+    "no-categories-selected": "Aucune catégorie sélectionnée à envoyer",
     "no-repositories-to-push": "Il n'y a actuellement aucun entrepôt vers lequel répondre",
     "no-repos-matched-any-category": "Aucun entrepôt n'appartient à aucune catégorie",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} listes ont été synchronisées et {{updatedCount}} entrepôts ont été mis à jour.",

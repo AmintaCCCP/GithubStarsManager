@@ -48,6 +48,27 @@ describe('useStarSyncActions 命名空间绑定回归', () => {
     expect(mocks.pushCategoriesToLists).toHaveBeenCalledTimes(1);
   });
 
+  it('传入分类 id 时转发给 store，并使用「选中分类」确认文案', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    const { result } = renderHook(() => useStarSyncActions());
+
+    await act(async () => { await result.current.pushCategoriesToLists(['a', 'b']); });
+
+    const [, body] = mocks.confirm.mock.calls[0];
+    expect(body).toContain('选中的 2 个分类');
+    expect(body).not.toContain('useStarSyncActions.');
+    expect(mocks.pushCategoriesToLists).toHaveBeenCalledWith({ __factory: true, token: 'token' }, ['a', 'b']);
+  });
+
+  it('用户取消确认时不调用 store', async () => {
+    mocks.confirm.mockResolvedValue(false);
+    const { result } = renderHook(() => useStarSyncActions());
+
+    await act(async () => { await result.current.pushCategoriesToLists(['a']); });
+
+    expect(mocks.pushCategoriesToLists).not.toHaveBeenCalled();
+  });
+
   it('未连接 GitHub 时通过 setListsPushError 提示 settings 命名空间文案', async () => {
     mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
       selector ? selector({ ...storeState, githubToken: null }) : storeState

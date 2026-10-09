@@ -7,7 +7,7 @@ import { useDialog } from '../../../hooks/useDialog';
 import { createGitHubListsApiService } from '../../../services/githubApiFactory';
 
 export interface StarSyncActions {
-  pushCategoriesToLists: () => Promise<void>;
+  pushCategoriesToLists: (categoryIds?: string[]) => Promise<void>;
 }
 
 /** Encapsulates the confirmed GitHub Lists synchronization workflow. */
@@ -22,7 +22,7 @@ export const useStarSyncActions = (): StarSyncActions => {
   })));
   const { confirm } = useDialog();
 
-  const push = useCallback(async () => {
+  const push = useCallback(async (categoryIds?: string[]) => {
 
     if (!githubToken) {
       setListsPushError(t('useStarSyncActions.not-connected-to-github-yet'));
@@ -30,11 +30,13 @@ export const useStarSyncActions = (): StarSyncActions => {
     }
     const confirmed = await confirm(
       t('useStarSyncActions.push-categories-to-github-lists'),
-      t('useStarSyncActions.push-confirm-body'),
+      categoryIds
+        ? t('useStarSyncActions.push-confirm-body-selected', { count: categoryIds.length })
+        : t('useStarSyncActions.push-confirm-body'),
       { type: 'warning' },
     );
     if (!confirmed) return;
-    await pushCategoriesToLists(createGitHubListsApiService(githubToken));
+    await pushCategoriesToLists(createGitHubListsApiService(githubToken), categoryIds);
   }, [confirm, githubToken, pushCategoriesToLists, setListsPushError, t]);
 
   return { pushCategoriesToLists: push };
