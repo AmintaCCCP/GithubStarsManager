@@ -294,6 +294,43 @@ describe('RepositoryCard view modes', () => {
     expect(actionMocks.actions.unstar).toHaveBeenCalledOnce();
   });
 
+  it('does not show a separator above Unstar when it is the only grid menu item', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('grid');
+
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('closes the grid action menu without opening README when card whitespace is clicked', async () => {
+    const user = userEvent.setup();
+    const { container } = renderRepositoryCard('grid');
+    const card = container.firstElementChild as HTMLElement;
+
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.pointerDown(card);
+      fireEvent.click(card);
+    });
+
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消 Star' })).not.toBeInTheDocument());
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+  });
+
+  it('shows the customized edit tooltip in grid mode', () => {
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={{ ...repository, custom_description: 'My summary' }} allCategories={[]} viewMode="grid" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByTitle('已自定义，编辑仓库信息')).toBeInTheDocument();
+  });
+
   it('emits a repository-chat intent from both grid and list controls without invoking a service', async () => {
     const user = userEvent.setup();
     const onAskRepository = vi.fn();
