@@ -78,6 +78,7 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'defaultCategoryOverrides',
     'assetFilters',
     'repositoryCardFields',
+    'repositoryCardActions',
     'lastSync',
     'theme',
     'themePreset',

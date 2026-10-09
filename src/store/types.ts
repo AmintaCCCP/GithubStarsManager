@@ -41,6 +41,7 @@ import type {
   SyncMode,
   TranslationEngine,
   RepositoryCardFieldId,
+  RepositoryCardActionPreference,
   RepositoryChatSettings,
   ThemeTokens,
   TrendingSnapshot,
@@ -277,6 +278,7 @@ export interface AppActions {
   // 仓库卡片可见字段（开发守则 §14）
   /** 切换某个字段的显示；未提供的字段沿用当前值。 */
   setRepositoryCardField: (id: RepositoryCardFieldId, visible: boolean) => void;
+  setRepositoryCardActions: (actions: RepositoryCardActionPreference[]) => void;
 }
 
 export type AppStoreState = AppState & AppActions;
