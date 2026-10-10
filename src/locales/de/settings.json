@@ -57,6 +57,7 @@
   "useStarSyncActions": {
     "not-connected-to-github-yet": "Nicht bei GitHub angemeldet, bitte verbinden Sie sich zuerst",
     "push-categories-to-github-lists": "Synchronisieren Sie die Lagerklassifizierung mit der GitHub-Liste",
+    "push-confirm-body-selected": "Ausgewählte Kategorien: {{count}}. Sie werden in gleichnamige GitHub-Listen geschrieben:\n\n· Vorhandene gleichnamige Listen werden überschrieben (nicht mehr passende Repositories werden entfernt)\n· Fehlende Listen werden erstellt (standardmäßig privat)\n· Andere Listen bleiben unverändert\n\nFortfahren?",
     "push-confirm-body": "Schreiben Sie jede lokale Kategorie (einschließlich Standard- und benutzerdefinierter Kategorien) mit demselben Namen zurück in die GitHub-Liste:\n\n· Eine Liste mit demselben Namen überschreibt ihre Mitglieder (Repositorys, die nicht mit der Kategorie übereinstimmen, werden aus der Liste entfernt).\n· Wenn es keine Liste mit demselben Namen gibt, erstellen Sie eine neue (standardmäßig privat).\n· Das Lager wird entsprechend seiner passenden Klassifizierung zur entsprechenden Liste hinzugefügt\n· Andere Listenmitgliedschaften, die nicht zur lokalen Kategorie gehören, bleiben erhalten\n\nSind Sie sicher, dass Sie fortfahren möchten?"
   },
   "useWebDAVActions": {

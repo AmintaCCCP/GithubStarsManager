@@ -65,7 +65,7 @@ export interface AppActions {
   setLastSync: (timestamp: string) => void;
   setSyncMode: (mode: SyncMode) => void;
   setSyncModeConfigured: (configured: boolean) => void;
-  pushCategoriesToLists: (api: GitHubListsApiService) => Promise<void>;
+  pushCategoriesToLists: (api: GitHubListsApiService, categoryIds?: string[]) => Promise<void>;
   resetListsPush: () => void;
   setListsPushError: (error: string | null) => void;
   setCategoryListIdMap: (categoryId: string, listId: string) => void;

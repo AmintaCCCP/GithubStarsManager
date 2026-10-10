@@ -129,6 +129,9 @@
     "ok": "確定",
     "cancel": "取消",
     "tip-you-can-enter-any-emoji-like-etc": "提示：可以輸入任何emoji表情，如 🎯 🎨 🎪 等",
+    "push-to-github-list": "推送至 GitHub list",
+    "save-changes-before-push": "請先儲存修改再推送",
+    "name-too-long-for-github-list": "超過 {{max}} 個字元——推送時 GitHub Lists 會拒絕此名稱",
     "selected": "當前選擇:",
     "custom-emoji": "自訂emoji",
     "includes-all-common-emoji-categories-smileys-peo": "包含所有常用emoji分類：笑臉、人物、手勢、動物、食物、交通、符號等",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持啟用狀態。",
     "marketplace-orphaned-revoked-title": "已撤銷的已安裝插件"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "推送所選分類",
+    "select-categories": "選擇分類",
+    "select-all": "全選",
+    "select-none": "全不選",
+    "cancel": "關閉",
+    "push-count-selected": "推送選中的 {{count}} 個分類"
+  },
   "starSyncPanel": {
     "star-sync": "星標同步",
     "sync-scope": "同步範圍",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "將每個本地分類寫回為同名 GitHub List。同名 list 將被覆蓋，無同名 list 則新建。",
     "pushing": "同步中…",
     "push-categories-to-lists": "同步倉庫分類到 GitHub list",
+    "push-selected-categories": "推送所選分類…",
     "preparing": "準備中…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "未登入 GitHub，請先連接",
     "missing-user-info-reconnect": "缺少用戶訊息，請重新連接",
+    "no-categories-selected": "未選擇要推送的分類",
     "no-repositories-to-push": "暫無倉庫可回寫",
     "no-repos-matched-any-category": "沒有倉庫命中任何分類",
     "pushed-v1-lists-updated-updatedcount-repos": "已同步 {{v1}} 個 list、更新 {{updatedCount}} 個倉庫",

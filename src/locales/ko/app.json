@@ -129,6 +129,9 @@
     "ok": "확신하는",
     "cancel": "취소",
     "tip-you-can-enter-any-emoji-like-etc": "팁: 🎯 🎨 🎪 등 어떤 이모티콘이든 입력할 수 있습니다.",
+    "push-to-github-list": "GitHub 리스트로 푸시",
+    "save-changes-before-push": "푸시하기 전에 변경 사항을 저장하세요",
+    "name-too-long-for-github-list": "{{max}}자를 초과합니다. 푸시 시 GitHub Lists가 이 이름을 거부합니다",
     "selected": "현재 선택:",
     "custom-emoji": "맞춤 이모티콘",
     "includes-all-common-emoji-categories-smileys-peo": "웃는 얼굴, 사람, 몸짓, 동물, 음식, 교통수단, 기호 등 일반적으로 사용되는 모든 이모티콘 카테고리가 포함되어 있습니다.",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "{{v1}}을(를) 업데이트했습니다. 플러그인은 계속 활성화 상태입니다.",
     "marketplace-orphaned-revoked-title": "취소된 설치된 플러그인"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "선택한 카테고리 푸시",
+    "select-categories": "카테고리 선택",
+    "select-all": "모두 선택",
+    "select-none": "선택 해제",
+    "cancel": "취소",
+    "push-count-selected": "선택한 {{count}}개 푸시"
+  },
   "starSyncPanel": {
     "star-sync": "스타싱크",
     "sync-scope": "동기화 범위",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "각 로컬 카테고리를 동일한 이름으로 GitHub 목록에 다시 작성합니다. 이름이 같은 목록은 덮어쓰여지고, 이름이 같은 목록이 생성됩니다.",
     "pushing": "동기화 중...",
     "push-categories-to-lists": "창고 분류를 GitHub 목록에 동기화",
+    "push-selected-categories": "선택 항목 푸시…",
     "preparing": "준비중…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "GitHub에 로그인되어 있지 않습니다. 먼저 연결하세요.",
     "missing-user-info-reconnect": "사용자 정보가 누락되었습니다. 다시 연결해 주세요.",
+    "no-categories-selected": "푸시할 카테고리가 선택되지 않았습니다",
     "no-repositories-to-push": "현재 다시 쓸 창고가 없습니다.",
     "no-repos-matched-any-category": "카테고리에 해당하는 창고가 없습니다.",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} 목록이 동기화되었으며 {{updatedCount}} 창고가 업데이트되었습니다.",

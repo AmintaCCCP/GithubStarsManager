@@ -57,6 +57,7 @@
   "useStarSyncActions": {
     "not-connected-to-github-yet": "Not connected to GitHub yet",
     "push-categories-to-github-lists": "Push categories to GitHub lists",
+    "push-confirm-body-selected": "Selected categories: {{count}}. They will be written to GitHub Lists of the same name:\n\n· Existing same-name lists will be overwritten (repos no longer matching are removed)\n· Missing lists will be created (private by default)\n· Other lists are not touched\n\nContinue?",
     "push-confirm-body": "Each local category (default & custom) will be written to a GitHub List of the same name:\n\n· Existing same-name lists will be overwritten (repos no longer matching are removed)\n· Missing lists will be created (private by default)\n· Repos are added to the lists matching their category\n· Memberships in lists not managed locally are preserved\n\nContinue?"
   },
   "useWebDAVActions": {

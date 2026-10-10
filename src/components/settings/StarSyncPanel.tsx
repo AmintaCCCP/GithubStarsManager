@@ -1,27 +1,34 @@
 
 import { TranslateFn } from '../../i18n/useT';
-import { GitBranch, ListChecks, Loader2, Star } from 'lucide-react';
-import React from 'react';
-import { useAppStore } from '../../store/useAppStore';
+import { GitBranch, ListChecks, ListPlus, Loader2, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { useAppStore, getAllCategories } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useStarSyncActions } from '../../features/settings/hooks/useStarSyncActions';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { PushCategoriesModal } from './PushCategoriesModal';
 
 interface StarSyncPanelProps {
   t: TranslateFn;
 }
 
 export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
-  const { syncMode, setSyncMode, setSyncModeConfigured, listsPush } = useAppStore(useShallow((state) => ({
+  const { syncMode, setSyncMode, setSyncModeConfigured, listsPush, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides, language } = useAppStore(useShallow((state) => ({
     syncMode: state.syncMode,
     setSyncMode: state.setSyncMode,
     setSyncModeConfigured: state.setSyncModeConfigured,
     listsPush: state.listsPush,
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    language: state.language,
   })));
   const { pushCategoriesToLists: handlePushCategoriesToLists } = useStarSyncActions();
+  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
+  const categories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides).filter(c => c.id !== 'all');
 
   const progressPercent = listsPush.total > 0 ? Math.min(100, Math.round((listsPush.done / listsPush.total) * 100)) : 0;
 
@@ -62,9 +69,20 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
           </div>
         </CardHeader>
         <CardContent>
-          <Button type="button" onClick={handlePushCategoriesToLists} disabled={listsPush.isRunning} className="gap-2">
-            {listsPush.isRunning ? <><Loader2 className="h-4 w-4 animate-spin" /><span>{t('starSyncPanel.pushing')}</span></> : <><ListChecks className="h-4 w-4" /><span>{t('starSyncPanel.push-categories-to-lists')}</span></>}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={() => void handlePushCategoriesToLists()} disabled={listsPush.isRunning} className="gap-2">
+              {listsPush.isRunning ? <><Loader2 className="h-4 w-4 animate-spin" /><span>{t('starSyncPanel.pushing')}</span></> : <><ListChecks className="h-4 w-4" /><span>{t('starSyncPanel.push-categories-to-lists')}</span></>}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setIsPushModalOpen(true)} disabled={listsPush.isRunning} className="gap-2">
+              <ListPlus className="h-4 w-4" /><span>{t('starSyncPanel.push-selected-categories')}</span>
+            </Button>
+          </div>
+          <PushCategoriesModal
+            isOpen={isPushModalOpen}
+            onClose={() => setIsPushModalOpen(false)}
+            categories={categories}
+            onConfirm={(ids) => { setIsPushModalOpen(false); void handlePushCategoriesToLists(ids); }}
+          />
           {listsPush.isRunning && <div className="mt-4 space-y-2"><div className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground dark:text-muted-foreground">{listsPush.currentLabel || t('starSyncPanel.preparing')}</span><span className="ml-2 shrink-0 text-muted-foreground dark:text-muted-foreground">{listsPush.done}/{listsPush.total}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-muted/40"><div className="h-full bg-primary transition-all duration-200" style={{ width: `${progressPercent}%` }} /></div></div>}
           {!listsPush.isRunning && listsPush.error && <p role="alert" className="mt-4 whitespace-pre-line text-sm text-destructive">{listsPush.error}</p>}
           {!listsPush.isRunning && listsPush.message && !listsPush.error && <p className="mt-4 text-sm text-success">{listsPush.message}</p>}

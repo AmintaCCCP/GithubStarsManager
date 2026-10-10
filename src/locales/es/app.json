@@ -129,6 +129,9 @@
     "ok": "Seguro",
     "cancel": "Cancelar",
     "tip-you-can-enter-any-emoji-like-etc": "Consejo: Puedes ingresar cualquier expresión emoji, como 🎯 🎨 🎪, etc.",
+    "push-to-github-list": "Enviar a lista de GitHub",
+    "save-changes-before-push": "Guarda los cambios antes de enviar",
+    "name-too-long-for-github-list": "Más de {{max}} caracteres: GitHub Lists rechazará este nombre al enviar",
     "selected": "Selección actual:",
     "custom-emoji": "emojis personalizados",
     "includes-all-common-emoji-categories-smileys-peo": "Contiene todas las categorías de emoji de uso común: caras sonrientes, personas, gestos, animales, comida, transporte, símbolos, etc.",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "{{v1}} actualizado; el plugin permanece activado.",
     "marketplace-orphaned-revoked-title": "Plugins instalados revocados"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "Enviar categorías seleccionadas",
+    "select-categories": "Seleccionar categorías",
+    "select-all": "Seleccionar todo",
+    "select-none": "Deseleccionar todo",
+    "cancel": "Cancelar",
+    "push-count-selected": "Enviar {{count}} seleccionadas"
+  },
   "starSyncPanel": {
     "star-sync": "Sincronización de estrellas",
     "sync-scope": "Alcance de sincronización",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "Escribe cada categoría local en una lista de GitHub con el mismo nombre. Las listas con el mismo nombre se sobrescribirán y se crearán listas sin el mismo nombre.",
     "pushing": "Sincronizando...",
     "push-categories-to-lists": "Sincronizar la clasificación del almacén con la lista de GitHub",
+    "push-selected-categories": "Enviar seleccionadas…",
     "preparing": "En preparación…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "No has iniciado sesión en GitHub, conéctate primero",
     "missing-user-info-reconnect": "Falta información del usuario, vuelva a conectarse",
+    "no-categories-selected": "No hay categorías seleccionadas para enviar",
     "no-repositories-to-push": "Actualmente no hay ningún almacén al que escribir",
     "no-repos-matched-any-category": "Ningún almacén afecta a ninguna categoría.",
     "pushed-v1-lists-updated-updatedcount-repos": "Se han sincronizado {{v1}} listas y se han actualizado {{updatedCount}} almacenes.",

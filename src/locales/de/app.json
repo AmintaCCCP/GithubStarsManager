@@ -129,6 +129,9 @@
     "ok": "Sicher",
     "cancel": "Stornieren",
     "tip-you-can-enter-any-emoji-like-etc": "Tipp: Sie können einen beliebigen Emoji-Ausdruck eingeben, z. B. 🎯 🎨 🎪 usw.",
+    "push-to-github-list": "In GitHub-Liste übertragen",
+    "save-changes-before-push": "Änderungen vor dem Übertragen speichern",
+    "name-too-long-for-github-list": "Länger als {{max}} Zeichen – GitHub Lists lehnt diesen Namen beim Übertragen ab",
     "selected": "Aktuelle Auswahl:",
     "custom-emoji": "Benutzerdefiniertes Emoji",
     "includes-all-common-emoji-categories-smileys-peo": "Enthält alle häufig verwendeten Emoji-Kategorien: Smileys, Menschen, Gesten, Tiere, Essen, Transport, Symbole usw.",
@@ -1141,6 +1144,14 @@
     "marketplace-update-success-still-enabled-v1": "{{v1}} aktualisiert; das Plugin bleibt aktiviert.",
     "marketplace-orphaned-revoked-title": "Widerrufene installierte Plugins"
   },
+  "pushCategoriesModal": {
+    "push-selected-categories": "Ausgewählte Kategorien übertragen",
+    "select-categories": "Kategorien auswählen",
+    "select-all": "Alle auswählen",
+    "select-none": "Auswahl aufheben",
+    "cancel": "Abbrechen",
+    "push-count-selected": "{{count}} ausgewählte übertragen"
+  },
   "starSyncPanel": {
     "star-sync": "Star-Synchronisierung",
     "sync-scope": "Bereich synchronisieren",
@@ -1153,6 +1164,7 @@
     "write-each-local-category-to-a-github-list-of-th": "Schreiben Sie jede lokale Kategorie zurück in eine GitHub-Liste mit demselben Namen. Listen mit demselben Namen werden überschrieben und Listen ohne denselben Namen werden erstellt.",
     "pushing": "Synchronisierung...",
     "push-categories-to-lists": "Synchronisieren Sie die Lagerklassifizierung mit der GitHub-Liste",
+    "push-selected-categories": "Auswahl übertragen…",
     "preparing": "In Vorbereitung…"
   },
   "themeSettingsCard": {
@@ -1317,6 +1329,7 @@
   "repositorySlice": {
     "not-connected-to-github-yet": "Nicht bei GitHub angemeldet, bitte verbinden Sie sich zuerst",
     "missing-user-info-reconnect": "Es fehlen Benutzerinformationen. Bitte stellen Sie die Verbindung wieder her",
+    "no-categories-selected": "Keine Kategorien zum Übertragen ausgewählt",
     "no-repositories-to-push": "Derzeit gibt es kein Lager, in das zurückgeschrieben werden kann",
     "no-repos-matched-any-category": "Kein Lager trifft auf irgendeine Kategorie",
     "pushed-v1-lists-updated-updatedcount-repos": "{{v1}} Listen wurden synchronisiert und {{updatedCount}} Lager wurden aktualisiert.",
