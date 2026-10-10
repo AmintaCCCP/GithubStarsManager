@@ -45,6 +45,7 @@ const pushLabel = 'categoryEditModal.push-to-github-list';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  storeState.listsPush.isRunning = false;
   vi.mocked(useAppStore).mockImplementation(((
     selector?: (state: typeof storeState) => unknown,
   ) => (selector ? selector(storeState) : storeState)) as typeof useAppStore);
@@ -74,6 +75,18 @@ describe('CategoryEditModal push to GitHub list', () => {
     fireEvent.change(screen.getByLabelText(/categoryEditModal.category-name/), { target: { value: '分类A2' } });
     expect(button.disabled).toBe(true);
     expect(button.title).toBe('categoryEditModal.save-changes-before-push');
+  });
+
+  it('disables the push button while a lists push is running', () => {
+    storeState.listsPush.isRunning = true;
+    const onClose = vi.fn();
+    render(<CategoryEditModal isOpen onClose={onClose} category={category} />);
+    const button = screen.getByText(pushLabel).closest('button') as HTMLButtonElement;
+
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(mocks.pushCategoriesToLists).not.toHaveBeenCalled();
   });
 
   it('shows a hint when the name is longer than 32 characters', () => {
