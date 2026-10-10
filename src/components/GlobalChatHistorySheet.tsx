@@ -115,6 +115,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
           <SheetTitle className="flex items-center gap-2 text-base">
             <History className="h-4 w-4 shrink-0" aria-hidden="true" />
             {t('globalChatHistorySheet.chat-history')}
+            {!isLoading && !loadError && <span className="text-sm font-normal text-muted-foreground">({sessions.length})</span>}
           </SheetTitle>
           <SheetDescription>
             {t('globalChatHistorySheet.conversations-across-repositories-select-one-to')}

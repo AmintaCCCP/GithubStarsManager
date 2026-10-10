@@ -15,7 +15,6 @@ import { useSearchShortcuts } from '../hooks/useSearchShortcuts';
 import { useSearchActions } from '../features/repositories/hooks/useSearchActions';
 import { useDialog } from '../hooks/useDialog';
 import { isRepoCustomized } from '../utils/repoUtils';
-import { repositoryChatStorage } from '../services/repositoryChatStorage';
 import { applyRepoFilters, performBasicTextSearch as basicTextSearch, sortRepositories } from '../utils/repoSearch';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 import { NumberInput } from './ui/NumberInput';
@@ -119,36 +118,6 @@ export const SearchBar: React.FC = () => {
   const [availableLicenses, setAvailableLicenses] = useState<string[]>([]);
   const [isRealTimeSearch, setIsRealTimeSearch] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
-  // S4 全局问答历史入口：徽标显示已保存会话数。
-  const [globalHistoryCount, setGlobalHistoryCount] = useState(0);
-  // 重叠刷新只允许最新请求提交，避免旧数量覆盖新状态。
-  const globalHistoryRequestRef = useRef(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const refreshGlobalHistoryCount = async () => {
-      const requestId = ++globalHistoryRequestRef.current;
-      try {
-        const sessions = await repositoryChatStorage.listRecentSessions(100);
-        if (!cancelled && requestId === globalHistoryRequestRef.current) setGlobalHistoryCount(sessions.length);
-      } catch {
-        if (!cancelled && requestId === globalHistoryRequestRef.current) setGlobalHistoryCount(0);
-      }
-    };
-    void refreshGlobalHistoryCount();
-    // 删除会话时由历史抽屉广播；打开抽屉与窗口重获焦点时也刷新，
-    // 覆盖单仓问答内新建会话导致的计数过期。
-    window.addEventListener('gsm:global-chat-history-changed', refreshGlobalHistoryCount);
-    window.addEventListener('gsm:open-global-chat-history', refreshGlobalHistoryCount);
-    window.addEventListener('focus', refreshGlobalHistoryCount);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('gsm:global-chat-history-changed', refreshGlobalHistoryCount);
-      window.removeEventListener('gsm:open-global-chat-history', refreshGlobalHistoryCount);
-      window.removeEventListener('focus', refreshGlobalHistoryCount);
-    };
-  }, []);
-
   const openGlobalChatHistory = () => {
     window.dispatchEvent(new CustomEvent('gsm:open-global-chat-history'));
   };
@@ -873,11 +842,6 @@ export const SearchBar: React.FC = () => {
           >
             <History className="w-4 h-4" aria-hidden="true" />
             <span>{t('searchBar.chat-history')}</span>
-            {globalHistoryCount > 0 && (
-              <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs">
-                {globalHistoryCount > 99 ? '99+' : globalHistoryCount}
-              </span>
-            )}
           </Button>
 
           <Button

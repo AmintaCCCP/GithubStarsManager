@@ -210,7 +210,7 @@ describe('RepositoryCard view modes', () => {
       actionMocks.actions.vectorSearchAvailable = false;
       renderRepositoryCard('list');
 
-      expect(screen.queryByRole('button', { name: '更多仓库操作' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: '查找同类仓库' })).not.toBeInTheDocument();
       expect(screen.queryByText('查找同类')).not.toBeInTheDocument();
     } finally {
@@ -280,15 +280,55 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByTestId('repository-edit-modal')).toBeInTheDocument();
   });
 
-  it('delegates grid quick actions to the domain Hook without changing their presentation', async () => {
+  it('keeps Unstar at the bottom of the grid menu and delegates it to the domain Hook', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('grid');
 
     await user.click(screen.getByTitle('AI分析此仓库'));
-    await user.click(screen.getByTitle('取消 Star'));
+    expect(screen.queryByTitle('取消 Star')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    expect(screen.getAllByRole('menuitem').at(-1)).toHaveTextContent('取消 Star');
+    await user.click(screen.getByRole('menuitem', { name: '取消 Star' }));
 
     expect(actionMocks.actions.analyze).toHaveBeenCalledOnce();
     expect(actionMocks.actions.unstar).toHaveBeenCalledOnce();
+  });
+
+  it('does not show a separator above Unstar when it is the only grid menu item', async () => {
+    const user = userEvent.setup();
+    renderRepositoryCard('grid');
+
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+  });
+
+  it('closes the grid action menu without opening README when card whitespace is clicked', async () => {
+    const user = userEvent.setup();
+    const { container } = renderRepositoryCard('grid');
+    const card = container.firstElementChild as HTMLElement;
+
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    expect(screen.getByRole('menuitem', { name: '取消 Star' })).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.pointerDown(card);
+      fireEvent.click(card);
+    });
+
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: '取消 Star' })).not.toBeInTheDocument());
+    expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+  });
+
+  it('shows the customized edit tooltip in grid mode', () => {
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={{ ...repository, custom_description: 'My summary' }} allCategories={[]} viewMode="grid" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByTitle('已自定义，编辑仓库信息')).toBeInTheDocument();
   });
 
   it('emits a repository-chat intent from both grid and list controls without invoking a service', async () => {
@@ -360,10 +400,10 @@ describe('RepositoryCard view modes', () => {
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
   });
 
-  it('retains the existing quick action row in grid mode', () => {
+  it('retains the other quick actions in grid mode', () => {
     renderRepositoryCard('grid', { onAskRepository: vi.fn() });
 
-    expect(screen.queryByRole('button', { name: '更多仓库操作' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
     expect(screen.getByTitle('AI分析此仓库')).toBeInTheDocument();
     expect(screen.getByTitle('问答此仓库')).toBeInTheDocument();
     expect(screen.getByTitle('取消订阅发布')).toBeInTheDocument();

@@ -198,21 +198,26 @@ const MAX_CACHE_SIZE = 500;
 const ACTION_SLOT_WIDTH = 32;
 const ACTION_SLOT_GAP = 6;
 const ACTION_SLOT_STRIDE = ACTION_SLOT_WIDTH + ACTION_SLOT_GAP;
-const BASE_OVERFLOW_ACTION_COUNT = 7;
+const BASE_OVERFLOW_ACTION_COUNT = 6;
 
 const highlightCache = new Map<string, React.ReactNode>();
 
+/**
+ * Counts quick actions that fit beside the persistent More actions button.
+ * A zero width means the row has not been measured yet, so all primary actions
+ * remain visible until layout supplies a usable width.
+ *
+ * @param width - Available action-row width in pixels.
+ * @param primaryActionCount - Number of primary quick actions.
+ * @returns Number of primary actions to render outside the menu.
+ */
 const countVisibleOverflowActions = (
   width: number,
   primaryActionCount: number,
-  hasPersistentMenu: boolean,
 ): number => {
   if (width === 0) return primaryActionCount;
   const capacity = Math.max(1, Math.floor((width + ACTION_SLOT_GAP) / ACTION_SLOT_STRIDE));
-  if (hasPersistentMenu) {
-    return Math.max(0, Math.min(primaryActionCount, capacity - 1));
-  }
-  return capacity >= primaryActionCount ? primaryActionCount : Math.max(0, capacity - 1);
+  return Math.max(0, Math.min(primaryActionCount, capacity - 1));
 };
 
 const mutedIconButtonClass =
@@ -295,9 +300,9 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
   const showReleases = visibleActionCount >= 4 + askSlot;
   const showDocs = visibleActionCount >= 5 + askSlot;
   const showGithub = visibleActionCount >= 6 + askSlot;
-  const showUnstar = visibleActionCount >= 7 + askSlot;
   const showFindSimilarInMenu = Boolean(vectorSearchAvailable && onFindSimilar && (persistFindSimilarInMenu || visibleActionCount < primaryActionCount));
-  const showOverflowMenu = visibleActionCount < primaryActionCount || pluginActions.length > 0 || showFindSimilarInMenu;
+  const hasActionsAbovePlugins = !showAnalyze || (Boolean(onAskRepository) && !showAsk) || !showSubscribe || !showEdit || !showReleases || !showDocs || !showGithub || showFindSimilarInMenu;
+  const hasActionsAboveUnstar = hasActionsAbovePlugins || pluginActions.length > 0;
   const menuOpenProps = onActionsMenuOpenChange
     ? { open: isActionsMenuOpen, onOpenChange: onActionsMenuOpenChange }
     : {};
@@ -387,19 +392,7 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
           <ExternalLink className="w-4 h-4" />
         </a>
       ) : null}
-      {showUnstar ? (
-        <SelectionAwareButton
-          onClick={onUnstar}
-          disabled={unstarring}
-          selectionMode={selectionMode}
-          variant="unstar"
-          title={t('repositoryCard.unstar')}
-        >
-          <StarOff className={`w-4 h-4 ${unstarring ? 'animate-pulse' : ''}`} />
-        </SelectionAwareButton>
-      ) : null}
-      {showOverflowMenu ? (
-        <DropdownMenu {...menuOpenProps}>
+      <DropdownMenu {...menuOpenProps}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -470,12 +463,6 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
                 </a>
               </DropdownMenuItem>
             )}
-            {showUnstar ? null : (
-              <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void onUnstar()}>
-                <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
-                {t('repositoryCard.unstar')}
-              </DropdownMenuItem>
-            )}
             {showFindSimilarInMenu ? (
               <DropdownMenuItem disabled={isFindingSimilar} onSelect={() => onFindSimilar?.()}>
                 {isFindingSimilar ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Search className="mr-2 h-3.5 w-3.5" />}
@@ -484,14 +471,18 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
             ) : null}
             {pluginActions.length > 0 ? (
               <>
-                <DropdownMenuSeparator />
+                {hasActionsAbovePlugins ? <DropdownMenuSeparator /> : null}
                 <DropdownMenuLabel>{t('repositoryCard.plugin-actions')}</DropdownMenuLabel>
                 <PluginRepositoryActionItems actions={pluginActions} repository={repository} language={language} />
               </>
             ) : null}
+            {hasActionsAboveUnstar ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuItem className="text-destructive focus:text-destructive" disabled={unstarring} onSelect={() => void onUnstar()}>
+              <StarOff className={`mr-2 h-3.5 w-3.5 ${unstarring ? 'animate-pulse' : ''}`} />
+              {t('repositoryCard.unstar')}
+            </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
-      ) : null}
+      </DropdownMenu>
     </div>
   );
 };
@@ -559,9 +550,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   }, []);
 
   useEffect(() => {
-    if (viewMode !== 'list' || selectionMode) {
-      setIsActionsMenuOpen(false);
-    }
+    setIsActionsMenuOpen(false);
   }, [viewMode, selectionMode]);
 
   useEffect(() => {
@@ -573,11 +562,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         setVisibleOverflowActionCount(primaryOverflowActionCount);
         return;
       }
-      const hasPersistentMenu =
-        pluginActions.actions.length > 0 ||
-        (viewMode === 'list' && vectorSearchAvailable);
       setVisibleOverflowActionCount(
-        countVisibleOverflowActions(width, primaryOverflowActionCount, hasPersistentMenu),
+        countVisibleOverflowActions(width, primaryOverflowActionCount),
       );
     };
 
@@ -589,7 +575,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       observer.disconnect();
       window.removeEventListener('resize', updateVisibleActionCount);
     };
-  }, [viewMode, primaryOverflowActionCount, pluginActions.actions.length, selectionMode, vectorSearchAvailable]);
+  }, [viewMode, primaryOverflowActionCount, selectionMode]);
 
   // 高亮搜索关键词的工具函数 - 使用缓存优化
   const highlightSearchTerm = useCallback((text: string, searchTerm: string): React.ReactNode => {
@@ -1233,13 +1219,21 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           isSubscribed={isSubscribed}
           unstarring={unstarring}
           pluginActions={pluginActions.actions}
+          isActionsMenuOpen={isActionsMenuOpen}
+          onActionsMenuOpenChange={setIsActionsMenuOpen}
           onAnalyze={handleAIAnalyze}
           onAsk={onAskRepository ? () => onAskRepository(repository) : undefined}
           onToggleReleaseSubscription={toggleReleaseSubscription}
           onEdit={() => setEditModalOpen(true)}
-          editButtonTitle={t('repositoryCard.edit-repository-info')}
+          editButtonTitle={displayContent.isCustomized ? t('repositoryCard.customized-edit-repository-info') : t('repositoryCard.edit-repository-info')}
           onViewReleases={() => setReleaseSheetOpen(true)}
           onUnstar={handleUnstar}
+          menuAlign="start"
+          onMenuPointerDownOutside={(target) => {
+            if (cardRef.current?.contains(target)) {
+              menuDismissedByPointerDownRef.current = true;
+            }
+          }}
           t={t}
         />
       ) : null}

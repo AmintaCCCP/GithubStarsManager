@@ -305,7 +305,7 @@
     "no": "Não",
     "v1-year": "{{v1}} / ano",
     "v1-days-years-years": "{{v1}} dias (~{{years}} anos)",
-    "repository-health-facts": "Fatos de saúde do repositório",
+    "repository-health-facts": "Visão geral do repositório",
     "these-are-objective-facts-with-no-overall-score": "São fatos objetivos, sem pontuação geral. “Desconhecido” significa que o fato ainda não foi obtido."
   }
 }
