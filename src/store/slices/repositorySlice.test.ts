@@ -299,6 +299,26 @@ describe('pushCategoriesToLists 仅推送选中分类', () => {
     expect(api.updateUserListsForItem).toHaveBeenCalledWith('node_1', ['L_dev']);
   });
 
+  it('选中分类与未选分类共享同一 list 时，共享 list 的成员关系不被清理', async () => {
+    // 历史映射重叠：devtools（未选）与 custom-alpha（选中）指向同一个 list。
+    // thing 仅因 devtools 而在 L_shared 中，不命中选中的 alpha，
+    // 若共享 list 被当作选中分类的托管 list 清空，thing 的成员关系会被误删。
+    const { push, api, state } = makeSliceHarness({
+      currentLists: [{ id: 'L_shared', name: 'Alpha', items: ['owner/thing'] }],
+      categoryListIdMap: { devtools: 'L_shared', 'custom-alpha': 'L_shared' },
+      customCategories: [alpha],
+      repositories: [thingRepo([])],
+      nodeIdMap: new Map([['owner/thing', 'node_1']]),
+    });
+
+    await push(['custom-alpha']);
+
+    expect(api.updateUserListsForItem).not.toHaveBeenCalled();
+    expect(api.updateUserList).not.toHaveBeenCalled();
+    expect(api.createUserList).not.toHaveBeenCalled();
+    expect(state.listsPush.error).toBeNull();
+  });
+
   it.each([
     ['空数组', [] as string[]],
     ['未知/隐藏分类 id', ['missing', 'web']],

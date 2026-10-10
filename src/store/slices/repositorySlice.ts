@@ -206,12 +206,13 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
         try {
           const { user, repositories, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, categoryListIdMap } = get();
 
-          const allCategories = getAllCategories(
+          const allCategoriesForPush = getAllCategories(
             customCategories,
             language,
             hiddenDefaultCategoryIds,
             defaultCategoryOverrides
-          ).filter(cat => cat.id !== 'all')
+          ).filter(cat => cat.id !== 'all');
+          const allCategories = allCategoriesForPush
             .filter(cat => !categoryIds || categoryIds.includes(cat.id));
 
           // 仅推送选中分类时，选中集合为空（含未知/已隐藏 id）则直接报错，不发起请求
@@ -231,6 +232,24 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           //    - 仍找不到才新建，并用规范名命名，随后记录到映射
           //    计划构建为纯本地计算，便于在写入前整体校验 GitHub Lists 硬限制。
           const plan = buildListsPushPlan(allCategories, currentLists, categoryListIdMap, defaultCategoryOverrides);
+
+          // 仅推送部分分类时，未选分类可能与选中分类解析到同一个既有 list
+          //（同名分类经名称变体命中同一 list，或历史映射重叠）。这类 list 同时
+          // 承载未选分类的成员关系，第 9 步清理过期成员时不能把它们整体视为
+          // "托管"清空，否则会误删未选分类的仓库成员。按完整分类集解析出未选
+          // 分类占用的既有 list，在第 9 步原样保留。
+          const unselectedListIds = categoryIds
+            ? new Set(
+                buildListsPushPlan(
+                  allCategoriesForPush.filter(cat => !categoryIds.includes(cat.id)),
+                  currentLists,
+                  categoryListIdMap,
+                  defaultCategoryOverrides
+                )
+                  .filter(entry => entry.kind !== 'create')
+                  .map(entry => entry.listId)
+              )
+            : new Set<string>();
 
           // 3. 预校验硬限制（list 总数上限 32、list 名称上限 32 字符）：
           //    任一触发即整体中止、零写入，并在错误中列出明细，引导用户到
@@ -356,7 +375,10 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
             const itemId = nodeIdMap.get(key);
             if (!itemId) continue;
             const currentIds = repoCurrentListIds.get(key) || new Set<string>();
-            const preservedIds = [...currentIds].filter(id => !managedListIds.has(id));
+            // 与未选分类共享的 list 即使同时被选中分类托管，其成员关系也按"未选"保留
+            const preservedIds = [...currentIds].filter(
+              id => !managedListIds.has(id) || unselectedListIds.has(id)
+            );
             const finalListIds = [...new Set([...preservedIds, ...targetIds])];
             if (finalListIds.length === currentIds.size && finalListIds.every(id => currentIds.has(id))) {
               continue;
