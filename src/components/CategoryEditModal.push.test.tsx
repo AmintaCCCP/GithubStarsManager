@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CategoryEditModal } from './CategoryEditModal';
 import { useAppStore } from '../store/useAppStore';
@@ -77,14 +78,15 @@ describe('CategoryEditModal push to GitHub list', () => {
     expect(button.title).toBe('categoryEditModal.save-changes-before-push');
   });
 
-  it('disables the push button while a lists push is running', () => {
+  it('disables the push button while a lists push is running', async () => {
     storeState.listsPush.isRunning = true;
     const onClose = vi.fn();
     render(<CategoryEditModal isOpen onClose={onClose} category={category} />);
     const button = screen.getByText(pushLabel).closest('button') as HTMLButtonElement;
 
     expect(button.disabled).toBe(true);
-    fireEvent.click(button);
+    // user-event 模拟真实用户点击：对禁用按钮不会派发 click，比 fireEvent 更接近浏览器行为
+    await userEvent.click(button);
     expect(onClose).not.toHaveBeenCalled();
     expect(mocks.pushCategoriesToLists).not.toHaveBeenCalled();
   });
