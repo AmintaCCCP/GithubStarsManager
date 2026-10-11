@@ -5,6 +5,7 @@
   "packages": {
     ".": {
       "draft": true,
+      "force-tag-creation": true,
       "extra-files": [
         { "type": "json", "path": "server/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "server/package-lock.json", "jsonpath": "$.version" },
