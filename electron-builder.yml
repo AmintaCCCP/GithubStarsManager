@@ -26,7 +26,11 @@ extraMetadata:
   main: electron/main.js
 
 compression: normal
-asar: false
+# asar 开启后源码以归档分发。已核实 electron/main.js 对 __dirname 的引用全部为
+# 只读资源（preload.js、build/icon.png、dist/index.html、assets/*.png），Electron
+# 的 fs shim / loadFile / nativeImage 均可直接读取 asar 内路径；所有写入都落在
+# userData（proxy-config、数据库、日志、插件目录），不依赖 asar 外的可写路径。
+asar: true
 
 # 发布统一由 release job（softprops/action-gh-release）完成；构建命令同时带
 # --publish=never，双重保证 electron-builder 不会尝试自行发布。
