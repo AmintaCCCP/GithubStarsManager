@@ -135,7 +135,8 @@
   },
   "overrides": {
     "decode-uri-component": "^0.5.0",
-    "katex": "$katex"
+    "katex": "$katex",
+    "postcss-selector-parser": "^7.1.6"
   }
 }
 
