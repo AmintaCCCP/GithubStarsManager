@@ -1,0 +1,51 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LandingPage/**'
+      - 'bi-site/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'LandingPage/**'
+      - 'bi-site/**'
+  schedule:
+    # Weekly full sweep on Monday ~03:37 UTC, off the top of the hour to
+    # avoid GitHub's scheduled-run congestion.
+    - cron: '37 3 * * 1'
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: '/language:javascript-typescript'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

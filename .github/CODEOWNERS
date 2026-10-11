@@ -1,0 +1,7 @@
+# Default owner for everything in the repository.
+* @AmintaCCCP
+
+# CI/CD workflows additionally require the owner's review, matching the
+# repository-wide default above but stated explicitly so workflow changes
+# remain owned if the default line is ever relaxed.
+.github/workflows/ @AmintaCCCP

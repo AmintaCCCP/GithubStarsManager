@@ -25,9 +25,13 @@ jobs:
     # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
     # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
+    # A checkout plus a single node script; generous headroom over any
+    # realistic slowdown, and the job fails long before GitHub's 6-hour
+    # default if the runner hangs.
+    timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
@@ -39,6 +43,12 @@ jobs:
     needs: verify-release-version
     runs-on: ${{ matrix.os }}
     continue-on-error: false
+    # Desktop packaging legs have historically landed well under 30 minutes,
+    # but macOS/Windows packaging plus the 3-attempt electron-builder retry
+    # loop can spike far beyond that; 120 minutes keeps roughly 2x margin over
+    # the worst spikes while a hung runner still fails instead of blocking the
+    # run until GitHub's 6-hour default.
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -52,12 +62,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         persist-credentials: false
 
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
       with:
         node-version: '24'
         cache: 'npm'
@@ -272,7 +282,7 @@ jobs:
 
     - name: Upload artifacts (Windows)
       if: matrix.os == 'windows-latest' && success()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: windows-app
         path: |
@@ -282,7 +292,7 @@ jobs:
 
     - name: Upload artifacts (macOS)
       if: matrix.os == 'macos-latest' && success()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: macos-app
         path: release/*.dmg
@@ -290,7 +300,7 @@ jobs:
 
     - name: Upload artifacts (Linux)
       if: startsWith(matrix.os, 'ubuntu') && success()
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: linux-app
         path: release/*.AppImage
@@ -301,16 +311,24 @@ jobs:
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
+    # Artifact download plus one release publish; several multiples of
+    # headroom over the couple of minutes this job needs in practice.
+    timeout-minutes: 20
     # Keep partial platform releases possible, but never publish when the tag
-    # does not match the root package.json client version.
+    # does not match the root package.json client version. NOTE: there is
+    # deliberately no `needs.build.result == 'success'` gate — a matrix job's
+    # needs result aggregates to 'failure' when ANY leg fails (fail-fast is
+    # disabled above), so gating on it would also drop the release when a
+    # single platform fails, killing the documented partial-release design.
+    # The empty-release hole (all platforms failing) is closed by the explicit
+    # zero-artifact guard and `fail_on_unmatched_files: true` below instead.
     if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
     permissions:
       contents: write
 
     steps:
     - name: Download all artifacts
-      uses: actions/download-artifact@v8
-      continue-on-error: true
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
 
     - name: List downloaded files
       shell: bash
@@ -332,14 +350,26 @@ jobs:
         echo "Files prepared for release:"
         ls -la release-files/ || echo "No files found"
 
+    - name: Fail when no build artifacts exist
+      shell: bash
+      run: |
+        # Every desktop build failed (or produced nothing matching the upload
+        # globs). Publishing a tag with zero installers would strand users of
+        # the in-app update feed, so fail loudly instead of creating an empty
+        # release.
+        if [ -z "$(find release-files -type f -print -quit 2>/dev/null)" ]; then
+          echo "::error::No desktop artifacts (.exe/.msi/.dmg/.AppImage) were produced by any platform build; refusing to publish an empty release."
+          exit 1
+        fi
+
     - name: Create Release
-      uses: softprops/action-gh-release@v3
+      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
       with:
         files: release-files/*
         draft: false
         prerelease: false
         generate_release_notes: true
-        fail_on_unmatched_files: false
+        fail_on_unmatched_files: true
         body: |
           ## Desktop Application Release
 

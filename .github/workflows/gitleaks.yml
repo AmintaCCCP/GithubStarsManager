@@ -1,0 +1,38 @@
+name: Gitleaks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly full-history sweep on Monday ~04:41 UTC, off the top of the hour
+    # to avoid GitHub's scheduled-run congestion.
+    - cron: '41 4 * * 1'
+
+concurrency:
+  group: gitleaks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Secret scan
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          # Full history so push and scheduled scans cover every commit, not
+          # only the shallow tip.
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

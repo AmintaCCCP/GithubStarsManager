@@ -91,6 +91,31 @@ test('skips when no pull-request range is provided', () => {
   assert.match(result.stdout, /skip/);
 });
 
+test('allows version bumps only for the release-please bot author', () =>
+  withRepo((root) => {
+    writeJson(path.join(root, 'package.json'), { name: 'app', version: '0.8.2' });
+    git(root, ['add', 'package.json']);
+    git(root, ['commit', '-m', 'chore(main): release 0.8.2']);
+
+    const bot = runScript(root, [], { PR_AUTHOR: 'github-actions[bot]' });
+    assert.equal(bot.code, 0, bot.stderr);
+    assert.match(bot.stdout, /release bot PR author: github-actions\[bot\]/);
+
+    // Any other author — humans, other automation — stays blocked even with
+    // the exact same diff, so the gate is weakened only for release-please.
+    for (const author of ['dependabot[bot]', 'some-contributor', 'AmintaCCCP']) {
+      const blocked = runScript(root, [], { PR_AUTHOR: author });
+      assert.equal(blocked.code, 1, `${author}: ${blocked.stderr}`);
+      assert.match(blocked.stderr, /package\.json: version changed/);
+    }
+
+    // Missing PR_AUTHOR (local runs, older CI configs) must not be treated as
+    // a bot pass.
+    const noAuthor = runScript(root);
+    assert.equal(noAuthor.code, 1, noAuthor.stderr);
+    assert.match(noAuthor.stderr, /package\.json: version changed/);
+  }));
+
 test('blocks package.json version bumps', () =>
   withRepo((root) => {
     writeJson(path.join(root, 'package.json'), { name: 'app', version: '0.8.2' });

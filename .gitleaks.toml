@@ -1,0 +1,21 @@
+# Gitleaks configuration: default rules plus a narrow allowlist.
+#
+# The files below intentionally contain synthetic credentials: they are the
+# test corpus for the app's own log-redaction and sanitizer layers
+# (src/services/redact.ts and the server log sanitizer). Every string gitleaks
+# flags in them is a fake token produced for assertions, never a real
+# credential. The allowlist is scoped to these exact paths so a real secret
+# committed anywhere else — including any other test file — still fails CI.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic tokens used by redaction/sanitizer test suites"
+paths = [
+  '''^src/services/logger\.test\.ts$''',
+  '''^src/services/githubApi\.test\.ts$''',
+  '''^tests/fixtures/sanitization-vectors\.json$''',
+  '''^server/tests/middleware/csp\.test\.ts$''',
+  '''^server/tests/mcp/routes\.test\.ts$''',
+  '''^server/tests/services/config\.test\.ts$''',
+]

@@ -15,6 +15,13 @@
  * Not blocked: dependency bumps inside lockfiles, README, workflows, or
  * scripts/update-version.cjs itself.
  *
+ * Allowed: PRs authored by a release bot (RELEASE_BOT_AUTHORS, currently
+ * `github-actions[bot]`, the identity release-please uses with the default
+ * GITHUB_TOKEN) — its automated version-release PRs are the only writer of
+ * version files besides the owner. The bot identity comes from the
+ * `PR_AUTHOR` env var, which CI populates from
+ * `github.event.pull_request.user.login` and is not user-controllable.
+ *
  * Exit 0 = clean / skipped, 1 = blocked, 2 = usage / git error.
  */
 'use strict';
@@ -27,6 +34,8 @@ const DEFAULT_ROOT = path.resolve(__dirname, '..');
 const PACKAGE_VERSION_FILES = ['package.json', 'server/package.json'];
 const LOCKFILE_VERSION_FILES = ['package-lock.json', 'server/package-lock.json'];
 const UPDATE_FEED = 'versions/version-info.xml';
+
+const RELEASE_BOT_AUTHORS = new Set(['github-actions[bot]']);
 
 function parseArgs(argv) {
   const args = { base: null, head: 'HEAD', root: DEFAULT_ROOT };
@@ -177,6 +186,12 @@ function run(argv = process.argv.slice(2), env = process.env, io = console) {
     return 0;
   }
 
+  const author = env.PR_AUTHOR || '';
+  if (RELEASE_BOT_AUTHORS.has(author)) {
+    io.log(`check-pr-release-files: skip (release bot PR author: ${author})`);
+    return 0;
+  }
+
   let violations;
   try {
     violations = collectViolations(args.root, range.base, range.head);
@@ -203,6 +218,7 @@ module.exports = {
   PACKAGE_VERSION_FILES,
   LOCKFILE_VERSION_FILES,
   UPDATE_FEED,
+  RELEASE_BOT_AUTHORS,
   parseArgs,
   resolveRange,
   collectViolations,

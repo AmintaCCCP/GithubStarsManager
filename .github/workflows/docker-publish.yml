@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+  pull_request:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/docker-publish.yml'
   workflow_dispatch:
 
 # Keep only the newest run for each branch or tag, while allowing release tags
@@ -19,7 +24,50 @@ env:
   LEGACY_IMAGE_NAME: ${{ github.repository_owner }}/github-stars-manager-server
 
 jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
+    # 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    # Fork PRs can only read default-branch GHA caches, and the arm64 leg
+    # compiles the better-sqlite3 native module under QEMU; keep the timeout
+    # above a cold multi-arch build.
+    timeout-minutes: 60
+    # PR validation does not authenticate to GHCR and cannot publish packages.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Validate backend multi-architecture image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./server
+          platforms: linux/amd64,linux/arm64
+          push: false
+          # Fork PRs may fall back to the default branch's publish cache, so a
+          # cold fork PR reuses the latest main build layers instead of timing
+          # out on a from-scratch multi-arch build.
+          cache-from: |
+            type=gha,scope=github-stars-manager-backend-pr,timeout=5m
+            type=gha,scope=github-stars-manager-backend-branch,timeout=5m
+          cache-to: type=gha,scope=github-stars-manager-backend-pr,mode=max,timeout=5m,ignore-error=true
+
   build-and-push:
+    # Only main and release tags may publish: pull_request runs validate only,
+    # and workflow_dispatch can target any branch, where a manual run must
+    # neither publish images nor overwrite the default branch's cache scope.
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04

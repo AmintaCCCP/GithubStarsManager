@@ -1,0 +1,32 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+# release-please maintains its release branch, opens/updates the version PR,
+# and after the PR merge cuts the vX.Y.Z tag and GitHub release — all with the
+# default GITHUB_TOKEN identity (github-actions[bot]).
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  # Do not cancel an in-flight run: two overlapping runs could both try to
+  # update the open release PR. release-please is idempotent, so queueing is
+  # safe and a cancelled mid-write run is not.
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json

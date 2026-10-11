@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
           # Always full history. Do not write `&& 0 || 1`: GitHub treats 0 as
@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -55,6 +55,10 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # The gate skips release-file checks only for the release-please bot
+          # (github-actions[bot]) whose automated PRs bump versions; every
+          # human or other bot author is still blocked.
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: node scripts/check-pr-release-files.cjs --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
 
       - name: Validate community plugin registry semantics
@@ -82,3 +86,81 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Dependency audit (report-only baseline)
+        # Advisory-only until the dependency backlog is cleared: currently
+        # known-accepted high advisories (the braces and electron-builder
+        # transitive chains, both needing major toolchain upgrades) would fail
+        # this step, so the gate is report-only. Once the backlog is cleared,
+        # drop `|| true` to make the audit blocking.
+        run: npm audit --audit-level=high || true
+
+  server:
+    name: Server quality gates
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: server
+
+      - name: Run tests
+        run: npm test
+        working-directory: server
+
+      - name: Build
+        run: npm run build
+        working-directory: server
+
+  worker:
+    name: Worker typecheck
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: cloudflare-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: cloudflare-worker
+
+      - name: Typecheck
+        # The worker ships no test suite yet (tracked separately); keep the
+        # TypeScript build honest until tests land and join this job.
+        run: npx tsc --noEmit
+        working-directory: cloudflare-worker
