@@ -39,6 +39,9 @@ jobs:
         if: steps.release.outputs.releases_created == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No checkout in this job, so gh cannot infer the repository from a
+          # git remote — set it explicitly.
+          GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ steps.release.outputs.tag_name }}
         run: |
           # Tags pushed with GITHUB_TOKEN do not emit push events (GitHub

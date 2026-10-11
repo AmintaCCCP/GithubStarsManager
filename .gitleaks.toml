@@ -24,11 +24,14 @@ paths = [
   '''^server/tests/services/config\.test\.ts$''',
 ]
 regexes = [
-  '''(?i)sk-[a-z0-9]{8,}''',                       # fake OpenAI-style keys: sk-abcdef123456789012345678
-  '''(?i)(value-token-|key-)[a-z0-9-]{4,}''',      # value-token-123456, key-abcdef123456
-  '''0123456789abcdef0123456789abcdef''',          # repeated sequential hex (ENCRYPTION_KEY fixtures)
+  # Each entry is an exact synthetic constant from the fixtures — not a
+  # pattern — so a real credential that merely looks like these shapes is
+  # still reported. Extend this list only when a fixture gains a new constant.
+  '''sk-abcdef123456789012345678|sk-xyz987654321098765432''',
+  '''value-token-123456|key-abcdef123456''',
+  '''0123456789abcdef0123456789abcdef''',         # repeated sequential hex (ENCRYPTION_KEY fixtures)
   '''abcdef1234567890''',                          # sequential hex sha fixtures
   '''dGhpcyBpcyBhIGJhc2U2NCBrZXkgMTIzNA==''',      # base64("this is a base64 key 1234")
-  '''(?i)hunter2|abcdefghijklmnopqrst''',          # classic dummy passwords
-  '''(?i)test-api-secret''',                       # literal API secret fixture
+  '''hunter2password|abcdefghijklmnopqrst''',      # classic dummy passwords
+  '''test-api-secret''',                           # literal API secret fixture
 ]
