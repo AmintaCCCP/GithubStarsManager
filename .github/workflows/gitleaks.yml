@@ -28,11 +28,57 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-          # Full history so push and scheduled scans cover every commit, not
-          # only the shallow tip.
+          # Full history so every commit range and the scheduled sweep are
+          # complete, not a shallow tip.
           fetch-depth: 0
 
-      - name: Scan for secrets
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+      - name: Install gitleaks
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Bump deliberately: the version is pinned and checksum-verified.
+          GITLEAKS_VERSION: '8.30.1'
+        run: |
+          workdir="$(mktemp -d)"
+          cd "$workdir"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/checksums.txt"
+          grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" checksums.txt | sha256sum --check --status
+          tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan for secrets
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # The official gitleaks-action selects commits with
+          # `--no-merges --first-parent`, so commits introduced by a branch
+          # merged into this PR (the merge's second parent) are never scanned
+          # and a secret carried in through a merge would pass silently. Scan
+          # plain two-dot `git log` ranges instead — those include every
+          # parent commit — scoped per trigger event.
+          log_opts=""
+          case "$EVENT_NAME" in
+            pull_request)
+              log_opts="${BASE_SHA}..HEAD"
+              ;;
+            push)
+              # `before` is empty or all-zeros on the first push of a branch,
+              # and can point at a rewritten (force-pushed) commit; fall back
+              # to a full-history scan in those cases.
+              if [ -n "$BEFORE_SHA" ] \
+                && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] \
+                && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+                log_opts="${BEFORE_SHA}..HEAD"
+              fi
+              ;;
+            schedule)
+              ;; # weekly full-history sweep
+          esac
+          echo "Scanning range: ${log_opts:-<full history>}"
+          if [ -n "$log_opts" ]; then
+            gitleaks detect --no-banner --redact --log-opts="$log_opts"
+          else
+            gitleaks detect --no-banner --redact
+          fi

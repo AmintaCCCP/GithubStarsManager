@@ -10,6 +10,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Needed by the dispatch step below to start the tag-triggered release
+  # workflows (workflow_dispatch) for the freshly cut tag.
+  actions: write
 
 concurrency:
   group: release-please-${{ github.ref }}
@@ -26,7 +29,29 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Run release-please
+        id: release
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         with:
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
+
+      - name: Dispatch release workflows for the new tag
+        if: steps.release.outputs.releases_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+        run: |
+          # Tags pushed with GITHUB_TOKEN do not emit push events (GitHub
+          # suppresses workflow triggers for events created by the default
+          # token), so a freshly cut vX.Y.Z tag would never start
+          # build-desktop or the docker publish workflows and the release
+          # would ship without installers or images. workflow_dispatch is the
+          # documented exception that does start runs.
+          if [ -z "$TAG_NAME" ]; then
+            echo "release-please reported a release without tag_name; nothing to dispatch"
+            exit 0
+          fi
+          for workflow in build-desktop.yml docker-publish-frontend.yml docker-publish.yml docker-publish-fullstack.yml; do
+            gh workflow run "$workflow" --ref "$TAG_NAME"
+            echo "Dispatched ${workflow} for ${TAG_NAME}"
+          done

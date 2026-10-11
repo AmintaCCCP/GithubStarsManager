@@ -29,10 +29,9 @@ jobs:
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
-    # Fork PRs can only read default-branch GHA caches, and the arm64 leg
-    # compiles the better-sqlite3 native module under QEMU; keep the timeout
-    # above a cold multi-arch build.
-    timeout-minutes: 60
+    # A cold amd64 build (lockfile change) recompiles better-sqlite3 natively,
+    # which fits comfortably in this budget.
+    timeout-minutes: 20
     # PR validation does not authenticate to GHCR and cannot publish packages.
     permissions:
       contents: read
@@ -53,11 +52,16 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./server
-          platforms: linux/amd64,linux/arm64
+          # amd64 only on purpose: the arm64 leg compiles the better-sqlite3
+          # native module under QEMU, which turns a cold build (any lockfile
+          # change) into 20+ minutes of emulated node-gyp. The arm64 server
+          # build is still exercised by the fullstack validate job on every
+          # server/** PR and by the publish job on main and tags.
+          platforms: linux/amd64
           push: false
           # Fork PRs may fall back to the default branch's publish cache, so a
           # cold fork PR reuses the latest main build layers instead of timing
-          # out on a from-scratch multi-arch build.
+          # out on a from-scratch build.
           cache-from: |
             type=gha,scope=github-stars-manager-backend-pr,timeout=5m
             type=gha,scope=github-stars-manager-backend-branch,timeout=5m
