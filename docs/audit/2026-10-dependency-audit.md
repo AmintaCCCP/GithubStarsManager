@@ -60,7 +60,7 @@ PR-02 计划依据的审计快照中，npm audit 对 8 个 moderate 给出的修
 
 降级后新增命中（均不影响 26.15.3 树）：
 
-- `app-builder-lib <=26.14.0` **high** — GHSA-7g7r-gx96-252g（electron-updater：app-builder-lib 构建的 AppImage 搜索路径可注入）；
+- `app-builder-lib <=26.14.0` **high** — GHSA-7g7r-gx96-252g（app-builder-lib：构建的 AppImage 运行时以空路径组件设置 LD_LIBRARY_PATH，库搜索路径可注入，26.15.0 修复）；
 - `builder-util-runtime <9.7.0` **high** — GHSA-p2f4-r6v6-j797（electron-updater：跨源重定向泄露 PRIVATE-TOKEN / Authorization 凭据）；
 - `tar <=7.5.20` **critical** — 经 `@electron/rebuild` 引入的 12 条 tar advisory（GHSA-34x7-hfp2-rc4v 等）。
 
