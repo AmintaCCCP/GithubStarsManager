@@ -1,0 +1,37 @@
+# Gitleaks configuration: default rules plus a narrow allowlist.
+#
+# The files below intentionally contain synthetic credentials: they are the
+# test corpus for the app's own log-redaction and sanitizer layers
+# (src/services/redact.ts and the server log sanitizer).
+#
+# `condition = "and"` (gitleaks >= 8.21) means a finding is exempted only when
+# BOTH the file is one of these fixtures AND the matched secret matches one of
+# the obviously-fake constants listed in `regexes`. A real-looking credential
+# committed to these files still fails the scan, and secrets anywhere else —
+# including any other test file — are never exempted.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic tokens used by redaction/sanitizer test suites"
+condition = "and"
+paths = [
+  '''^src/services/logger\.test\.ts$''',
+  '''^src/services/githubApi\.test\.ts$''',
+  '''^tests/fixtures/sanitization-vectors\.json$''',
+  '''^server/tests/middleware/csp\.test\.ts$''',
+  '''^server/tests/mcp/routes\.test\.ts$''',
+  '''^server/tests/services/config\.test\.ts$''',
+]
+regexes = [
+  # Each entry is an exact synthetic constant from the fixtures — not a
+  # pattern — so a real credential that merely looks like these shapes is
+  # still reported. Extend this list only when a fixture gains a new constant.
+  '''sk-abcdef123456789012345678|sk-xyz987654321098765432''',
+  '''value-token-123456|key-abcdef123456''',
+  '''0123456789abcdef0123456789abcdef''',         # repeated sequential hex (ENCRYPTION_KEY fixtures)
+  '''abcdef1234567890''',                          # sequential hex sha fixtures
+  '''dGhpcyBpcyBhIGJhc2U2NCBrZXkgMTIzNA==''',      # base64("this is a base64 key 1234")
+  '''hunter2password|abcdefghijklmnopqrst''',      # classic dummy passwords
+  '''test-api-secret''',                           # literal API secret fixture
+]

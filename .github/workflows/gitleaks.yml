@@ -1,0 +1,84 @@
+name: Gitleaks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly full-history sweep on Monday ~04:41 UTC, off the top of the hour
+    # to avoid GitHub's scheduled-run congestion.
+    - cron: '41 4 * * 1'
+
+concurrency:
+  group: gitleaks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Secret scan
+    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
+    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          # Full history so every commit range and the scheduled sweep are
+          # complete, not a shallow tip.
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          # Bump deliberately: the version is pinned and checksum-verified.
+          GITLEAKS_VERSION: '8.30.1'
+        run: |
+          workdir="$(mktemp -d)"
+          cd "$workdir"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum --check --status
+          tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan for secrets
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Two scanning rules here:
+          # 1. Plain two-dot `git log` ranges (no --first-parent) so every
+          #    parent commit of a merge is traversed and scanned — the
+          #    official gitleaks-action's `--no-merges --first-parent`
+          #    selection skips commits introduced by branches merged into a
+          #    PR, and a secret carried in through a merge passes silently.
+          # 2. `--diff-merges=first-parent` so the merge commit ITSELF also
+          #    produces a patch (against its first parent): `git log -p`
+          #    prints no patch for merges by default, hiding credentials
+          #    written during conflict resolution.
+          log_opts="--diff-merges=first-parent"
+          case "$EVENT_NAME" in
+            pull_request)
+              log_opts="$log_opts ${BASE_SHA}..HEAD"
+              ;;
+            push)
+              # `before` is empty or all-zeros on the first push of a branch,
+              # and can point at a rewritten (force-pushed) commit; fall back
+              # to a full-history scan in those cases.
+              if [ -n "$BEFORE_SHA" ] \
+                && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] \
+                && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+                log_opts="$log_opts ${BEFORE_SHA}..HEAD"
+              fi
+              ;;
+            schedule)
+              ;; # no range: full history of HEAD
+          esac
+          echo "Scanning with log opts: $log_opts"
+          gitleaks detect --no-banner --redact --log-opts="$log_opts"
