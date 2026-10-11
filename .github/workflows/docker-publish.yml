@@ -29,9 +29,12 @@ jobs:
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
-    # A cold amd64 build (lockfile change) recompiles better-sqlite3 natively,
-    # which fits comfortably in this budget.
-    timeout-minutes: 20
+    # Warm-cache runs land around a minute; a lockfile change re-runs npm ci
+    # for both platforms (~3-4 minutes based on the sibling fullstack job).
+    # The arm64 npm ci under QEMU emulation stalls occasionally; the timeout
+    # turns a hung run into a visible failure worth a re-run instead of an
+    # all-day zombie job.
+    timeout-minutes: 60
     # PR validation does not authenticate to GHCR and cannot publish packages.
     permissions:
       contents: read
@@ -52,12 +55,11 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: ./server
-          # amd64 only on purpose: the arm64 leg compiles the better-sqlite3
-          # native module under QEMU, which turns a cold build (any lockfile
-          # change) into 20+ minutes of emulated node-gyp. The arm64 server
-          # build is still exercised by the fullstack validate job on every
-          # server/** PR and by the publish job on main and tags.
-          platforms: linux/amd64
+          # Both platforms must be validated: arm64 (soft-router deployments)
+          # ships from this same Dockerfile on publish, and a broken arm64
+          # npm ci would otherwise only surface after the merge, failing the
+          # main-branch publish entirely.
+          platforms: linux/amd64,linux/arm64
           push: false
           # Fork PRs may fall back to the default branch's publish cache, so a
           # cold fork PR reuses the latest main build layers instead of timing
