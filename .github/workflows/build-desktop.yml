@@ -320,8 +320,12 @@ jobs:
     # needs result aggregates to 'failure' when ANY leg fails (fail-fast is
     # disabled above), so gating on it would also drop the release when a
     # single platform fails, killing the documented partial-release design.
-    # The empty-release hole (all platforms failing) is closed by the explicit
-    # zero-artifact guard and `fail_on_unmatched_files: true` below instead.
+    # The empty-release hole is closed by three layers instead: release-please
+    # creates the vX.Y.Z release as a DRAFT before dispatching this workflow,
+    # the explicit zero-artifact guard below fails before anything is
+    # published (leaving the draft invisible), and `fail_on_unmatched_files:
+    # true` rejects a mismatched upload set. On success the release action
+    # uploads the assets and flips the draft public via `draft: false`.
     if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
     permissions:
       contents: write
@@ -354,15 +358,21 @@ jobs:
       shell: bash
       run: |
         # Every desktop build failed (or produced nothing matching the upload
-        # globs). Publishing a tag with zero installers would strand users of
-        # the in-app update feed, so fail loudly instead of creating an empty
-        # release.
+        # globs). release-please has already created the vX.Y.Z release as a
+        # draft before dispatching this workflow, so failing here leaves that
+        # draft unpublished and invisible — no public release can end up
+        # without installers. On success the release step below uploads the
+        # assets and flips the draft public.
         if [ -z "$(find release-files -type f -print -quit 2>/dev/null)" ]; then
           echo "::error::No desktop artifacts (.exe/.msi/.dmg/.AppImage) were produced by any platform build; refusing to publish an empty release."
           exit 1
         fi
 
     - name: Create Release
+      # For release-please tags this UPDATES the pre-created draft release:
+      # upload the assets, then publish it (input draft: false unmarks the
+      # draft in softprops' finalize step). For manual tag pushes without a
+      # pre-existing release it creates the release directly.
       uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
       with:
         files: release-files/*

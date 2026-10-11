@@ -4,6 +4,7 @@
   "include-component-in-tag": false,
   "packages": {
     ".": {
+      "draft": true,
       "extra-files": [
         { "type": "json", "path": "server/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "server/package-lock.json", "jsonpath": "$.version" },
