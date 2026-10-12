@@ -372,8 +372,42 @@ jobs:
           exit 1
         fi
 
+    - name: Verify a hand-authored draft release exists for this tag
+      # Guard against the empty-notes hole: if the operator pushes the tag but
+      # forgets to pre-create the draft, softprops would silently CREATE a new
+      # release for the tag with no body (we deliberately pass neither `body`
+      # nor `generate_release_notes`), publishing a public release with no
+      # human-written notes. Fail here instead, before anything is created.
+      #
+      # The GitHub "get release by tag" endpoint 404s for drafts, so we list
+      # releases and match on tag_name to find a draft the operator created.
+      shell: bash
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+        RELEASE_TAG: ${{ github.ref_name }}
+      run: |
+        set -euo pipefail
+        json="$(gh api --paginate "repos/{owner}/{repo}/releases?per_page=100" \
+          --jq "[.[] | select(.tag_name == \"$RELEASE_TAG\")][0]")"
+        if [ -z "$json" ] || [ "$json" = "null" ]; then
+          echo "::error::No release exists for tag $RELEASE_TAG. Create a DRAFT first: gh release create $RELEASE_TAG --draft --notes \"<hand-written notes>\""
+          exit 1
+        fi
+        draft="$(jq -r '.draft' <<<"$json")"
+        body="$(jq -r '.body // ""' <<<"$json")"
+        if [ "$draft" != "true" ]; then
+          echo "::error::Release for tag $RELEASE_TAG already exists but is NOT a draft. Refusing to touch a published release from CI."
+          exit 1
+        fi
+        if [ -z "${body//[[:space:]]/}" ]; then
+          echo "::error::Draft release for tag $RELEASE_TAG has an EMPTY body. Refusing to publish a release with no hand-written notes. Re-create it with: gh release create $RELEASE_TAG --draft --notes \"<hand-written notes>\""
+          exit 1
+        fi
+        echo "✓ Draft release for $RELEASE_TAG found with a non-empty body ($(wc -c <<<"$body") bytes)"
+
     - name: Create Release
-      # Reuses the pre-created draft release for this tag: uploads the
+      # Reuses the pre-authored draft release verified above: uploads the
       # installers, then publishes it (input draft: false unmarks the draft in
       # softprops' finalize step). The notes body is intentionally NOT set here
       # — it was authored ahead of time with `gh release create <tag> --draft
