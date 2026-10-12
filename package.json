@@ -106,7 +106,7 @@
     "i18next": "^26.4.2",
     "jsdom": "^24.0.0",
     "katex": "^0.19.0",
-    "lucide-react": "^0.344.0",
+    "lucide-react": "^1.54.0",
     "mermaid": "^11.17.0",
     "postcss": "^8.4.35",
     "query-string": "^9.3.1",
