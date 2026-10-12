@@ -1,7 +1,8 @@
 
 import { TranslateFn } from '../../i18n/useT';
 import React, { useState } from 'react';
-import { ArrowRight, ExternalLink, Github, Key, Mail, Monitor, Package, Twitter } from 'lucide-react';
+import { ArrowRight, ExternalLink, Key, Mail, Monitor, Package } from 'lucide-react';
+import { Github, Twitter } from '../ui/brand-icons';
 import { UpdateChecker } from '../UpdateChecker';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
