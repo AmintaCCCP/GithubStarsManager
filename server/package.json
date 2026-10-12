@@ -18,7 +18,7 @@
     "express": "^4.21.0",
     "helmet": "^7.1.0",
     "morgan": "^1.12.1",
-    "socks-proxy-agent": "^9.0.0",
+    "socks-proxy-agent": "^10.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
