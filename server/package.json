@@ -26,8 +26,8 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/morgan": "^1.9.9",
-    "@types/supertest": "^6.0.2",
-    "supertest": "^6.3.4",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.1",
     "tsx": "^4.23.13",
     "typescript": "^5.5.3",
     "vitest": "^5.0.1"
