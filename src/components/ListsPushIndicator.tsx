@@ -26,7 +26,7 @@ export const ListsPushIndicator: React.FC = () => {
   // 按对象引用比较：每次 store 写入都会生成新的 listsPush 对象，即使错误文案相同也能再次提示
   const prevListsPushRef = useRef(listsPush);
   // 结束后延迟重置的定时器放在 ref 中，避免后续 store 写入触发 effect 重跑时被提前清除
-  const resetTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(resetTimerRef.current), []);
 

@@ -354,7 +354,7 @@ describe('RepositoryCard view modes', () => {
     expect(releaseButton.compareDocumentPosition(zreadLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await user.click(releaseButton);
-    expect(screen.getByTestId('repository-release-sheet')).toBeInTheDocument();
+    expect(await screen.findByTestId('repository-release-sheet')).toBeInTheDocument();
   });
 
   it('opens the release sheet from the list action menu without opening README', async () => {
@@ -515,7 +515,7 @@ describe('RepositoryCard view modes', () => {
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
-    expect(screen.getByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
 
     // 弹窗挂在应用根上：卡片卸载后它仍然在。
     unmount();
