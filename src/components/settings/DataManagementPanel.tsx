@@ -35,7 +35,6 @@ import {
   Trash2,
   AlertTriangle,
   Database,
-  Github,
   Tag,
   Bot,
   Cloud,
@@ -54,6 +53,7 @@ import {
   RefreshCw,
   Rss,
 } from 'lucide-react';
+import { Github } from '../ui/brand-icons';
 import { useAppStore } from '../../store/useAppStore';
 import { removePersistedSnapshot } from '../../store/persistence/storage';
 import { useShallow } from 'zustand/react/shallow';

@@ -1,6 +1,7 @@
 import { useT } from "../i18n/useT";
 import React, { useState, useCallback, useRef } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, Database, Github, Key, Link, Loader2, Moon, Sun } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, Database, Key, Link, Loader2, Moon, Sun } from 'lucide-react';
+import { Github } from './ui/brand-icons';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
