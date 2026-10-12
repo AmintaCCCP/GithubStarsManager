@@ -29,7 +29,7 @@ compression: normal
 # asar 开启后源码以归档分发。已核实 electron/main.js 对 __dirname 的引用全部为
 # 只读读取：preload.js、dist/index.html、electron/assets/*.png 均在归档内，Electron
 # 的 fs shim / loadFile / nativeImage 可直接读取 asar 路径；../build/* 为遗留回退
-# 路径（electron-builder 不打包 buildResources 目录，asar 前后行为一致）。所有
+# 路径（files 配置包含 build/**/*，匹配文件会进入归档，asar 前后行为一致）。所有
 # 写入都落在 userData（proxy-config、数据库、日志、插件目录），不依赖 asar 外
 # 的可写路径。
 asar: true
