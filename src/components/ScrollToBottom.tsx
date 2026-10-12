@@ -9,7 +9,7 @@ import { useAppStore } from '../store/useAppStore';
 import { Button } from './ui/button';
 
 interface ScrollToBottomProps {
-  scrollContainerRef: React.RefObject<HTMLElement>;
+  scrollContainerRef: React.RefObject<HTMLElement | null>;
 }
 
 export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({ 
