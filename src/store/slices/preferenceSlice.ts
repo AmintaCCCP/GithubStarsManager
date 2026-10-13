@@ -3,6 +3,7 @@ import type { AppStoreSlice } from '../types';
 import { REQUIRED_HEADER_MENU_IDS } from '../schema';
 import { normalizeThemeTokens } from '../../utils/themeTokens';
 import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields';
+import { normalizeRepositoryCardActions } from '../../utils/repositoryCardActions';
 
 export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setTheme'
@@ -25,6 +26,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setRpcDownloadConfig'
   | 'setRepositoryViewMode'
   | 'setRepositoryCardField'
+  | 'setRepositoryCardActions'
   | 'setReleaseViewMode'
   | 'setReleaseShowMode'
   | 'setReleaseLatestMode'
@@ -79,6 +81,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       setRepositoryCardField: (id, visible) => set((state) => ({
         repositoryCardFields: normalizeRepositoryCardFields({ ...state.repositoryCardFields, [id]: visible }),
       })),
+      setRepositoryCardActions: (actions) => set({ repositoryCardActions: normalizeRepositoryCardActions(actions) }),
       setRepositoryViewMode: (repositoryViewMode) => set({ repositoryViewMode }),
 
       // Release Timeline View actions
