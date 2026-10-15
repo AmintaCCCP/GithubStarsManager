@@ -19,7 +19,7 @@
     "helmet": "^7.1.0",
     "morgan": "^1.12.1",
     "socks-proxy-agent": "^10.1.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
