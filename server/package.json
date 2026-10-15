@@ -16,7 +16,7 @@
     "better-sqlite3": "^12.11.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "helmet": "^7.1.0",
+    "helmet": "^8.3.0",
     "morgan": "^1.12.1",
     "socks-proxy-agent": "^10.1.0",
     "zod": "^4.6.6"
