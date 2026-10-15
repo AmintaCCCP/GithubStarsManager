@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@ai-sdk/openai-compatible": "^3.0.37",
-    "@eslint/js": "^9.9.1",
+    "@eslint/js": "^10.0.1",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource-variable/fira-code": "^5.3.0",
     "@fontsource-variable/geist": "^5.3.0",
