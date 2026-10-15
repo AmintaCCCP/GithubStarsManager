@@ -4,6 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const Ajv = require('ajv');
+const addFormats = require('ajv-formats');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 
@@ -28,10 +29,12 @@ function readSchema(root, relativePath) {
 }
 
 function collectSchemaViolations(value, schema, relativePath) {
-  const validate = new Ajv({ allErrors: true, jsonPointers: true }).compile(schema);
+  const ajv = new Ajv({ allErrors: true });
+  addFormats(ajv);
+  const validate = ajv.compile(schema);
   if (validate(value)) return [];
   return validate.errors.map((error) => (
-    `${relativePath}${error.dataPath || ''}: ${error.message}`
+    `${relativePath}${error.instancePath || error.dataPath || ''}: ${error.message}`
   ));
 }
 
