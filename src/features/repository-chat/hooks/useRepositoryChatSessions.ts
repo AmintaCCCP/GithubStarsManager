@@ -7,11 +7,14 @@ import { useAppStore } from '../../../store/useAppStore';
 import { resolveRepositoryChatHeadSha } from '../../../services/repositoryChatService';
 import type { RepositoryChatMessage, RepositoryChatSession } from '../../../types/repositoryChat';
 import { repositoryChatStorage } from '../../../services/repositoryChatStorage';
+import { createSecureId } from '../../../utils/cryptoRandom';
 
-const createId = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return `repository-chat-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
+/**
+ * Generates a unique repository chat session ID.
+ *
+ * @returns A cryptographically secure session ID prefixed with 'repository-chat'.
+ */
+const createId = (): string => createSecureId('repository-chat');
 
 /** 会话默认标题集合：历史会话可能以任意语言创建，判断是否默认标题用集合比较 */
 export const DEFAULT_CHAT_TITLES = new Set([

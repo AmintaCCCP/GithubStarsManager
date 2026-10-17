@@ -86,8 +86,7 @@ function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
     }
 
     if (versionPrefix) {
-      const versionRe = new RegExp(`/${versionPrefix}$`);
-      if (versionRe.test(basePath) && pathWithVersion.startsWith(`${versionPrefix}/`)) {
+      if (basePath.endsWith(`/${versionPrefix}`) && pathWithVersion.startsWith(`${versionPrefix}/`)) {
         const rest = pathWithVersion.slice(versionPrefix.length + 1);
         return new URL(rest, baseUrlWithSlash).toString();
       }

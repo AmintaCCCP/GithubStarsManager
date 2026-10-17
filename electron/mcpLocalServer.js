@@ -779,7 +779,7 @@ function createMcpLocalServer(getState) {
           } catch (err) {
             lastError = err instanceof Error ? err.message : String(err);
             res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Invalid JSON-RPC', detail: lastError }));
+            res.end(JSON.stringify({ error: 'Invalid JSON-RPC' }));
           }
         });
         return;
@@ -834,7 +834,7 @@ function createMcpLocalServer(getState) {
         } catch (err) {
           lastError = err instanceof Error ? err.message : String(err);
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid JSON-RPC', detail: lastError }));
+          res.end(JSON.stringify({ error: 'Invalid JSON-RPC' }));
         }
       });
     });

@@ -1,6 +1,7 @@
 import type { Release, ReleaseAsset, Repository } from '../types';
 import type { ToolEvidence } from '../types/repositoryChat';
 import { detectAssetPlatform } from '../utils/releaseAssets';
+import { createSecureId } from '../utils/cryptoRandom';
 
 /**
  * 仓库问答的"元信息来源"工具层：Release 资产与 Issue 搜索。
@@ -29,10 +30,13 @@ const MAX_ISSUE_BODY_CHARS = 2_500;
 const MAX_ISSUE_COMMENT_CHARS = 1_200;
 const MAX_ISSUE_COMMENT_LINES = 8;
 
-const createId = (prefix: string): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`;
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
+/**
+ * Generates a unique identifier for meta source evidence records.
+ *
+ * @param prefix - The prefix string for the evidence ID.
+ * @returns A cryptographically secure unique identifier string.
+ */
+const createId = (prefix: string): string => createSecureId(prefix);
 
 // eslint-disable-next-line no-control-regex -- 控制字符清理与 aiService.sanitizeForPrompt 同规则
 const sanitize = (value: string): string => value.replace(/\r\n?/g, '\n').replace(/[\0-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');

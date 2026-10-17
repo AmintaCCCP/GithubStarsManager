@@ -546,7 +546,7 @@ function sanitizeFragment(raw, canvas) {
         // 所以 `java&#x0A;script:` 能绕过直接的 startsWith('javascript:') 检查。
         // 复制出去的单文件 HTML 不受预览 iframe CSP 保护，必须在这里拦截。
         const normalizedUrl = attr.value.replace(/[\t\n\r]/g, '').trim().toLowerCase();
-        if (normalizedUrl.startsWith('javascript:')) el.removeAttribute(attr.name);
+        if (/^(?:javascript|data|vbscript):/i.test(normalizedUrl)) el.removeAttribute(attr.name);
       }
     }
   });

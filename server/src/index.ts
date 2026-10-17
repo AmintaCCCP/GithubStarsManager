@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -46,6 +47,12 @@ function buildConnectSrc(): string[] {
   return ["'self'", ...BROWSER_CONNECT_ORIGINS, ...extra];
 }
 
+/**
+ * Creates and configures the Express application instance with security headers,
+ * proxy trust settings, rate limiting, and all backend API and static routes.
+ *
+ * @returns Configured Express application.
+ */
 export function createApp(): express.Express {
   const app = express();
 
@@ -85,6 +92,35 @@ export function createApp(): express.Express {
     })
   );
   app.use(morgan('combined', { stream: morganLoggerStream }));
+
+  // In separated deployments behind a trusted reverse proxy (e.g. Nginx),
+  // trust the immediate proxy hop so req.ip reflects the actual client IP.
+  // Full-stack single-process deployments (with STATIC_DIR) do not trust proxies
+  // by default unless explicitly configured via TRUST_PROXY.
+  if (process.env.TRUST_PROXY) {
+    const rawTrustProxy = process.env.TRUST_PROXY.trim();
+    if (rawTrustProxy === 'true') {
+      app.set('trust proxy', true);
+    } else if (rawTrustProxy === 'false') {
+      app.set('trust proxy', false);
+    } else if (/^\d+$/.test(rawTrustProxy)) {
+      app.set('trust proxy', parseInt(rawTrustProxy, 10));
+    } else {
+      app.set('trust proxy', rawTrustProxy);
+    }
+  } else {
+    app.set('trust proxy', false);
+  }
+
+  // Global rate limiter to protect database and endpoints from DoS before body parsing
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV === 'test',
+  });
+  app.use(limiter);
   app.use(express.json({ limit: '50mb' }));
 
   // Auth middleware for all /api/* except /api/health

@@ -17,11 +17,15 @@ import type {
 import { runRepositoryChatTurn } from '../../../services/repositoryChatRunner';
 import { repositoryChatStorage } from '../../../services/repositoryChatStorage';
 import { DEFAULT_CHAT_TITLES } from './useRepositoryChatSessions';
+import { createSecureId } from '../../../utils/cryptoRandom';
 
-const createId = (prefix: string): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `${prefix}-${crypto.randomUUID()}`;
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
+/**
+ * Generates a unique repository chat entity ID with the specified prefix.
+ *
+ * @param prefix - The prefix indicating the entity type (e.g. 'message', 'tool-event').
+ * @returns A cryptographically secure unique identifier string.
+ */
+const createId = (prefix: string): string => createSecureId(prefix);
 
 export const repositoryChatErrorMessage = (unknownError: unknown, language: AppLanguage): string => {
   const t = makeT(language, 'chat');
