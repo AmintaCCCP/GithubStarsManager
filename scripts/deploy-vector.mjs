@@ -14,6 +14,7 @@ import crypto from 'node:crypto';
 import readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -582,12 +583,29 @@ function saveLocalConfig(config) {
 
 // ======================== Wrangler 执行引擎自适应 ========================
 function getLocalWranglerBin() {
-  const wranglerJs = path.resolve(WORKER_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
-  if (fs.existsSync(wranglerJs)) {
-    return { cmd: process.execPath, argsPrefix: [wranglerJs], needsShell: false };
+  const candidatePaths = [
+    path.resolve(WORKER_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js'),
+    path.resolve(ROOT_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js'),
+  ];
+
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      return { cmd: process.execPath, argsPrefix: [p], needsShell: false };
+    }
   }
-  const isWindows = process.platform === 'win32';
-  return { cmd: isWindows ? 'npx.cmd' : 'npx', argsPrefix: ['--yes', 'wrangler'], needsShell: isWindows };
+
+  try {
+    const workerRequire = createRequire(path.resolve(WORKER_DIR, 'package.json'));
+    const resolved = workerRequire.resolve('wrangler/bin/wrangler.js');
+    if (fs.existsSync(resolved)) {
+      return { cmd: process.execPath, argsPrefix: [resolved], needsShell: false };
+    }
+  } catch {}
+
+  console.error(c.red(currentLocale === 'zh'
+    ? '❌ 未找到本地 Wrangler 依赖。请先在 cloudflare-worker 目录下运行 npm install。'
+    : '❌ Local Wrangler binary not found. Please run "npm install" inside cloudflare-worker directory.'));
+  throw new Error('Local wrangler binary not found');
 }
 
 function runWrangler(args, options = {}) {
@@ -909,8 +927,21 @@ async function handleVectorizeConfig(savedConfig) {
   printStep(2, 4, t('step_2_title'));
   printCard(t('vec_card_title'), t('vec_card_lines'));
 
-  const defaultIndexName = savedConfig?.indexName || 'github-stars';
-  const indexName = await askQuestion(t('vec_index_prompt'), defaultIndexName);
+  const defaultIndexName = (savedConfig?.indexName && /^[a-zA-Z0-9_-]+$/.test(savedConfig.indexName))
+    ? savedConfig.indexName
+    : 'github-stars';
+  let indexName = defaultIndexName;
+  while (true) {
+    const raw = await askQuestion(t('vec_index_prompt'), defaultIndexName);
+    const trimmed = (raw || defaultIndexName).trim();
+    if (/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      indexName = trimmed;
+      break;
+    }
+    console.log(c.red(currentLocale === 'zh'
+      ? '❌ 索引名称仅允许包含字母、数字、下划线和连字符。'
+      : '❌ Index name may only contain letters, numbers, underscores, and hyphens.'));
+  }
 
   console.log(c.cyan(t('vec_checking_remote', { name: indexName })));
   const existing = checkExistingVectorizeIndex(indexName);

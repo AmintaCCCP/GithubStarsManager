@@ -99,6 +99,8 @@ describe('deploy-vector entrypoints and scripts verification', () => {
           ...process.env,
           DEPLOY_CONFIG_FILE: tempConfig,
           LANG: 'zh_CN.UTF-8',
+          LC_ALL: 'zh_CN.UTF-8',
+          LC_MESSAGES: 'zh_CN.UTF-8',
         },
       });
       assert.ok(res.stdout.includes('Usage:') || res.stdout.includes('Options:'));
