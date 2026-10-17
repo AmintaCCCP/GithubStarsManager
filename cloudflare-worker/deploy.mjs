@@ -561,19 +561,22 @@ function loadLocalConfig() {
 
 function saveLocalConfig(config) {
   try {
-    if (!fs.existsSync(WORKER_DIR)) {
-      fs.mkdirSync(WORKER_DIR, { recursive: true });
+    const configDir = path.dirname(CONFIG_FILE);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
     }
     const toSave = { ...config, locale: currentLocale };
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(toSave, null, 2), {
+    const tmpFile = `${CONFIG_FILE}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tmpFile, JSON.stringify(toSave, null, 2), {
       encoding: 'utf-8',
       mode: 0o600,
     });
     try {
       if (process.platform !== 'win32') {
-        fs.chmodSync(CONFIG_FILE, 0o600);
+        fs.chmodSync(tmpFile, 0o600);
       }
     } catch {}
+    fs.renameSync(tmpFile, CONFIG_FILE);
     return true;
   } catch (err) {
     console.error(c.red(`❌ Save config failed: ${err.message}`));
@@ -1205,8 +1208,8 @@ async function main() {
       console.error(c.red(currentLocale === 'zh' ? '❌ 未找到本地配置记录，请先运行部署向导。' : '❌ No local config found, please run deployment wizard first.'));
       process.exit(1);
     }
-    await testWorkerConnectivity(savedConfig.workerUrl, savedConfig.authToken);
-    process.exit(0);
+    const ok = await testWorkerConnectivity(savedConfig.workerUrl, savedConfig.authToken);
+    process.exit(ok ? 0 : 1);
   }
 
   await ensureDependencies();
@@ -1287,8 +1290,8 @@ async function main() {
     }
 
     if (mode.value === 'test') {
-      await testWorkerConnectivity(savedConfig.workerUrl, savedConfig.authToken);
-      process.exit(0);
+      const ok = await testWorkerConnectivity(savedConfig.workerUrl, savedConfig.authToken);
+      process.exit(ok ? 0 : 1);
     }
 
     if (mode.value === 'quick') {
