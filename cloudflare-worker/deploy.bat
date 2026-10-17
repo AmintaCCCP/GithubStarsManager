@@ -34,6 +34,7 @@ goto parse_args
 :run_node
 node deploy.mjs %SAFE_ARGS%
 set "EXIT_CODE=%ERRORLEVEL%"
+echo %CMDCMDLINE% | find /i "/c" >nul && pause
 endlocal & set "FINAL_EXIT_CODE=%EXIT_CODE%"
 popd
 exit /b %FINAL_EXIT_CODE%

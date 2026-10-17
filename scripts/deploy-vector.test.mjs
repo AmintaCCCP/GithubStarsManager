@@ -50,6 +50,13 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     assert.ok(fs.existsSync(ps1), 'cloudflare-worker/deploy.ps1 must exist');
     const batContent = fs.readFileSync(bat, 'utf-8');
     assert.ok(batContent.includes('deploy.mjs'), 'bat must run deploy.mjs');
+    assert.ok(batContent.includes('%CMDCMDLINE%'), 'bat must handle double-click pause');
+  });
+
+  it('.gitattributes enforces CRLF line endings for batch files', () => {
+    const gitattributes = fs.readFileSync(path.resolve(ROOT_DIR, '.gitattributes'), 'utf-8');
+    assert.ok(gitattributes.includes('*.bat text eol=crlf'), 'must enforce CRLF for .bat');
+    assert.ok(gitattributes.includes('*.cmd text eol=crlf'), 'must enforce CRLF for .cmd');
   });
 
   it('package.json has deploy:vector script pointing to cloudflare-worker/deploy.mjs', () => {
@@ -63,9 +70,10 @@ describe('cloudflare-worker deployment entrypoints and scripts verification', ()
     assert.equal(pkg.scripts['deploy:vector'], 'node deploy.mjs');
   });
 
-  it('.gitignore ignores cloudflare-worker/.deploy-config.json', () => {
+  it('.gitignore ignores cloudflare-worker/.deploy-config.json and temp files', () => {
     const gitignore = fs.readFileSync(path.resolve(ROOT_DIR, '.gitignore'), 'utf-8');
     assert.ok(gitignore.includes('cloudflare-worker/.deploy-config.json'), 'must ignore .deploy-config.json');
+    assert.ok(gitignore.includes('cloudflare-worker/.deploy-config.json.*.tmp'), 'must ignore temp config files');
   });
 
   it('cloudflare-worker/deploy.mjs handles --status error gracefully with i18n when not configured', () => {

@@ -1373,13 +1373,16 @@ async function main() {
     if (claimAction.value === 'claim_deploy' || claimAction.value === 'claim_only') {
       console.log('');
       console.log(c.cyan('📌 ' + t('remote_token_claim_prompt')));
-      const tokenInput = await askQuestion(t('step_3_title'), '');
+      const tokenInput = await askQuestion(t('step_3_title'), savedConfig?.authToken || '');
       
-      let finalAuthToken = tokenInput.trim();
+      let finalAuthToken = (tokenInput || '').trim() || savedConfig?.authToken || '';
       let workerUrl = '';
 
       if (claimAction.value === 'claim_deploy') {
         syncWranglerToml(remoteProbe.defaultIndexName);
+        if (!finalAuthToken && !remoteProbe.secrets?.hasAuthToken) {
+          finalAuthToken = generateRandomToken();
+        }
         if (finalAuthToken) {
           putWranglerSecret(finalAuthToken);
         }
