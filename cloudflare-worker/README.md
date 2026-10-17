@@ -6,9 +6,11 @@
 
 无需繁琐敲击多条命令，也**无需打开 Cloudflare 网页后台**！交互式 TUI 会自动引导输入所有参数，并有详尽说明：
 
-- **macOS / Linux**: 在项目根目录下运行 `./deploy-vector.sh` 或 `npm run deploy:vector`
-- **Windows**: 双击项目根目录下的 `deploy-vector.bat`，或在 PowerShell 中运行 `.\deploy-vector.ps1`
-- **直接在当前目录**: 运行 `node deploy.mjs`
+- **项目根目录**: 运行 `npm run deploy:vector`
+- **当前 cloudflare-worker 目录**:
+  - **macOS / Linux**: 运行 `./deploy.sh` 或 `node deploy.mjs`
+  - **Windows**: 双击 `deploy.bat`，或在 PowerShell 中运行 `.\deploy.ps1`
+  - **NPM 脚本**: 运行 `npm run deploy:interactive` 或 `npm run deploy:vector`
 
 ### 一键部署向导亮点：
 1. **交互式 TUI 引导**：全流程可视化步骤与中文帮助卡片，详细说明每个参数（模型维度、AUTH_TOKEN、索引配置等）的用途与获取方式。

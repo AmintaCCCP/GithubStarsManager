@@ -1310,8 +1310,8 @@
     "deploy-tab-one-click": "ワンクリックデプロイ（推奨）",
     "deploy-tab-manual": "手動ステップ（高度）",
     "one-click-platforms-tip": "プラットフォーム固有のクイックランチャー：",
-    "platform-mac-linux": "macOS / Linux: ターミナルで ./deploy-vector.sh を実行",
-    "platform-windows": "Windows: deploy-vector.bat をダブルクリックまたは .\\deploy-vector.ps1 を実行"
+    "platform-mac-linux": "macOS / Linux: cloudflare-worker で ./deploy.sh を実行",
+    "platform-windows": "Windows: cloudflare-worker で deploy.bat をダブルクリックまたは .\\deploy.ps1 を実行"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV設定",

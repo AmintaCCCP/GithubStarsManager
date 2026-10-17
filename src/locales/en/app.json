@@ -1310,8 +1310,8 @@
     "deploy-tab-one-click": "One-Click Deploy (Recommended)",
     "deploy-tab-manual": "Manual Steps (Advanced)",
     "one-click-platforms-tip": "Platform-specific quick launchers:",
-    "platform-mac-linux": "macOS / Linux: Run ./deploy-vector.sh in terminal",
-    "platform-windows": "Windows: Double-click deploy-vector.bat or run .\\deploy-vector.ps1"
+    "platform-mac-linux": "macOS / Linux: In cloudflare-worker, run ./deploy.sh",
+    "platform-windows": "Windows: In cloudflare-worker, double-click deploy.bat or run .\\deploy.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV Configuration",

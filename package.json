@@ -37,7 +37,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build:server": "cd server && npm run build",
     "build:all": "npm run build && npm run build:server",
-    "deploy:vector": "node scripts/deploy-vector.mjs"
+    "deploy:vector": "node cloudflare-worker/deploy.mjs"
   },
   "dependencies": {
     "undici": "^8.11.2"

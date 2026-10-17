@@ -1310,8 +1310,8 @@
     "deploy-tab-one-click": "一鍵部署（推薦）",
     "deploy-tab-manual": "手動分步部署（高級）",
     "one-click-platforms-tip": "各平台專用快捷啟動方式：",
-    "platform-mac-linux": "macOS / Linux: 終端運行 ./deploy-vector.sh",
-    "platform-windows": "Windows: 雙擊運行 deploy-vector.bat 或執行 .\\deploy-vector.ps1"
+    "platform-mac-linux": "macOS / Linux: 進入 cloudflare-worker 運行 ./deploy.sh",
+    "platform-windows": "Windows: 進入 cloudflare-worker 雙擊 deploy.bat 或執行 .\\deploy.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",

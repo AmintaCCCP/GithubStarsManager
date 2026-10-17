@@ -1310,8 +1310,8 @@
     "deploy-tab-one-click": "원클릭 배포 (권장)",
     "deploy-tab-manual": "수동 단계 (고급)",
     "one-click-platforms-tip": "플랫폼별 빠른 실행기:",
-    "platform-mac-linux": "macOS / Linux: 터미널에서 ./deploy-vector.sh 실행",
-    "platform-windows": "Windows: deploy-vector.bat를 두 번 클릭하거나 .\\deploy-vector.ps1 실행"
+    "platform-mac-linux": "macOS / Linux: cloudflare-worker에서 ./deploy.sh 실행",
+    "platform-windows": "Windows: cloudflare-worker에서 deploy.bat를 두 번 클릭하거나 .\\deploy.ps1 실행"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV 구성",
