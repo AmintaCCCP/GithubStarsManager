@@ -80,6 +80,10 @@ export function createApp(): express.Express {
         'X-RateLimit-Remaining',
         'X-RateLimit-Reset',
         'x-ratelimit-remaining',
+        'RateLimit-Limit',
+        'RateLimit-Remaining',
+        'RateLimit-Reset',
+        'RateLimit-Policy',
       ],
       allowedHeaders: [
         'Content-Type',

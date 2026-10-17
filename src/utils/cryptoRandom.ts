@@ -8,6 +8,7 @@
  *
  * @param bytesCount - The number of random bytes to generate (default: 8).
  * @returns A lowercase hexadecimal string representation of the random bytes.
+ * @throws {Error} If no secure random generator is available in the environment.
  */
 export const secureRandomString = (bytesCount = 8): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
@@ -15,7 +16,7 @@ export const secureRandomString = (bytesCount = 8): string => {
     crypto.getRandomValues(bytes);
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   }
-  return Date.now().toString(36);
+  throw new Error('Secure random generator is unavailable');
 };
 
 /**
