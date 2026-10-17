@@ -13,7 +13,27 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-node deploy.mjs %*
+setlocal EnableDelayedExpansion
+set "SAFE_ARGS="
+
+:parse_args
+if "%~1"=="" goto run_node
+
+if /I "%~1"=="-h" set "SAFE_ARGS=!SAFE_ARGS! -h"
+if /I "%~1"=="--help" set "SAFE_ARGS=!SAFE_ARGS! --help"
+if /I "%~1"=="-q" set "SAFE_ARGS=!SAFE_ARGS! -q"
+if /I "%~1"=="--quick" set "SAFE_ARGS=!SAFE_ARGS! --quick"
+if /I "%~1"=="-s" set "SAFE_ARGS=!SAFE_ARGS! -s"
+if /I "%~1"=="--status" set "SAFE_ARGS=!SAFE_ARGS! --status"
+if /I "%~1"=="--lang=zh" set "SAFE_ARGS=!SAFE_ARGS! --lang=zh"
+if /I "%~1"=="--lang=en" set "SAFE_ARGS=!SAFE_ARGS! --lang=en"
+
+shift
+goto parse_args
+
+:run_node
+node deploy.mjs %SAFE_ARGS%
 set "EXIT_CODE=%ERRORLEVEL%"
+endlocal & set "FINAL_EXIT_CODE=%EXIT_CODE%"
 popd
-exit /b %EXIT_CODE%
+exit /b %FINAL_EXIT_CODE%
