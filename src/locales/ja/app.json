@@ -1302,7 +1302,16 @@
     "for-detailed-instructions-see": "詳細な導入ガイドを参照してください。",
     "connection-successful-dimensions": "接続成功 - ディメンション: {{dimensions}}",
     "connection-failed-detail": "接続に失敗しました: {{error}}",
-    "connection-successful-vectors": "接続成功 — ベクトル: {{vectorCount}}、次元: {{dimensions}}"
+    "connection-successful-vectors": "接続成功 — ベクトル: {{vectorCount}}、次元: {{dimensions}}",
+    "one-click-deployment-recommended": "🌟 ワンクリック対話型デプロイウィザード (推奨)",
+    "one-click-deploy-desc": "全プラットフォーム (Windows / macOS / Linux) に対応。Cloudflare ダッシュボードを開く必要がなく、TUI でパラメータを設定し、ローカルに自動保存し、既存のベクトルインデックスを保護します。",
+    "copy-one-click-deploy-cmd": "ワンクリックデプロイコマンドをコピー",
+    "copied": "コピーされました",
+    "deploy-tab-one-click": "ワンクリックデプロイ（推奨）",
+    "deploy-tab-manual": "手動ステップ（高度）",
+    "one-click-platforms-tip": "プラットフォーム固有のクイックランチャー：",
+    "platform-mac-linux": "macOS / Linux: ターミナルで ./deploy-vector.sh を実行",
+    "platform-windows": "Windows: deploy-vector.bat をダブルクリックまたは deploy-vector.ps1 を実行"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV設定",

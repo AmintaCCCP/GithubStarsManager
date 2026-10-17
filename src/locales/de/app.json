@@ -1302,7 +1302,16 @@
     "connection-successful-dimensions": "Verbindung erfolgreich – Dimension: {{dimensions}}",
     "connection-failed-detail": "Verbindung fehlgeschlagen: {{error}}",
     "connection-successful-vectors": "Verbindung erfolgreich – Vektor: {{vectorCount}}, Abmessungen: {{dimensions}}",
-    "text": ")"
+    "text": ")",
+    "one-click-deployment-recommended": "🌟 Interaktiver Ein-Klick-Bereitstellungsassistent (Empfohlen)",
+    "one-click-deploy-desc": "Unterstützt alle Plattformen (Windows / macOS / Linux). Kein Öffnen des Cloudflare-Dashboards erforderlich; interaktive TUI führt durch alle Eingaben, speichert Parameter lokal und schützt bestehende Vektorindizes.",
+    "copy-one-click-deploy-cmd": "Ein-Klick-Bereitstellungsbefehl kopieren",
+    "copied": "Kopiert",
+    "deploy-tab-one-click": "Ein-Klick-Bereitstellung (Empfohlen)",
+    "deploy-tab-manual": "Manuelle Schritte (Erweitert)",
+    "one-click-platforms-tip": "Plattformspezifische Schnellstarter:",
+    "platform-mac-linux": "macOS / Linux: ./deploy-vector.sh im Terminal ausführen",
+    "platform-windows": "Windows: Doppelklicken Sie auf deploy-vector.bat oder führen Sie deploy-vector.ps1 aus"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV-Konfiguration",

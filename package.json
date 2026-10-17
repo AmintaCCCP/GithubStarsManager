@@ -17,11 +17,12 @@
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run && npm run test:electron:mcp && npm run test:electron:diagnostics && npm run test:electron:plugins && npm run test:update-version && npm run test:ci-gates",
+    "test:run": "vitest run && npm run test:electron:mcp && npm run test:electron:diagnostics && npm run test:electron:plugins && npm run test:update-version && npm run test:ci-gates && npm run test:deploy-vector",
     "test:electron:mcp": "node --test electron/mcpLocalServer.test.js electron/repoHealth.test.js electron/desktopPrefs.test.js electron/xAuthStorage.test.js electron/mainFetch.test.js electron/outboundFetchGate.test.js",
     "test:electron:diagnostics": "node --test electron/diagLogger.test.js electron/redact.test.js electron/netTap.test.js electron/systemInfo.test.js",
     "test:electron:plugins": "node --test electron/plugins/*.test.js",
     "test:update-version": "node --test scripts/update-version.test.cjs",
+    "test:deploy-vector": "node --test scripts/deploy-vector.test.mjs",
     "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs scripts/check-plugin-registry.test.cjs",
     "test:coverage": "vitest run --coverage",
     "build:desktop": "node scripts/build-desktop.js",
@@ -35,7 +36,8 @@
     "dev:server": "cd server && npm run dev",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build:server": "cd server && npm run build",
-    "build:all": "npm run build && npm run build:server"
+    "build:all": "npm run build && npm run build:server",
+    "deploy:vector": "node scripts/deploy-vector.mjs"
   },
   "dependencies": {
     "undici": "^8.11.2"

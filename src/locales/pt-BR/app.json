@@ -1302,7 +1302,16 @@
     "connection-successful-dimensions": "Conexão bem-sucedida - Dimensão: {{dimensions}}",
     "connection-failed-detail": "Falha na conexão: {{error}}",
     "connection-successful-vectors": "Conexão bem-sucedida — vetor: {{vectorCount}}, dimensões: {{dimensions}}",
-    "text": ")"
+    "text": ")",
+    "one-click-deployment-recommended": "🌟 Assistente de implantação interativo com um clique (Recomendado)",
+    "one-click-deploy-desc": "Compatível com todas as plataformas (Windows / macOS / Linux). Sem necessidade de abrir o painel da Cloudflare; a TUI interativa orienta a configuração, salva parâmetros localmente e preserva os índices vetoriais existentes.",
+    "copy-one-click-deploy-cmd": "Copiar comando de implantação em um clique",
+    "copied": "Copiado",
+    "deploy-tab-one-click": "Implantação em um clique (Recomendado)",
+    "deploy-tab-manual": "Etapas manuais (Avançado)",
+    "one-click-platforms-tip": "Iniciadores rápidos específicos da plataforma:",
+    "platform-mac-linux": "macOS / Linux: Execute ./deploy-vector.sh no terminal",
+    "platform-windows": "Windows: Clique duas vezes em deploy-vector.bat ou execute deploy-vector.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuração WebDAV",

@@ -63,3 +63,7 @@ docs/reports/
 # BI collector (local scripts and runtime data)
 scripts/bi/
 bi-site/
+
+# Cloudflare Worker deployment local state & secrets
+cloudflare-worker/.deploy-config.json
+cloudflare-worker/.deploy-config.*.json

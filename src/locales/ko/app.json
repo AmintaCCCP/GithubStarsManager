@@ -1302,7 +1302,16 @@
     "for-detailed-instructions-see": "자세한 배포 가이드를 참조하세요.",
     "connection-successful-dimensions": "연결 성공 - 측정기준: {{dimensions}}",
     "connection-failed-detail": "연결 실패: {{error}}",
-    "connection-successful-vectors": "연결 성공 — 벡터: {{vectorCount}}, 크기: {{dimensions}}"
+    "connection-successful-vectors": "연결 성공 — 벡터: {{vectorCount}}, 크기: {{dimensions}}",
+    "one-click-deployment-recommended": "🌟 원클릭 대화형 배포 마법사 (강력 추천)",
+    "one-click-deploy-desc": "모든 플랫폼(Windows / macOS / Linux)을 지원합니다. Cloudflare 대시보드를 열 필요 없이 TUI를 통해 모든 매개변수를 입력하고 로컬에 자동 저장하며 기존 벡터 인덱스를 보존합니다.",
+    "copy-one-click-deploy-cmd": "원클릭 배포 명령 복사",
+    "copied": "복사됨",
+    "deploy-tab-one-click": "원클릭 배포 (권장)",
+    "deploy-tab-manual": "수동 단계 (고급)",
+    "one-click-platforms-tip": "플랫폼별 빠른 실행기:",
+    "platform-mac-linux": "macOS / Linux: 터미널에서 ./deploy-vector.sh 실행",
+    "platform-windows": "Windows: deploy-vector.bat를 두 번 클릭하거나 deploy-vector.ps1 실행"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV 구성",
