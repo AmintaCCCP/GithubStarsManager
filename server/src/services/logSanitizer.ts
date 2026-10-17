@@ -63,7 +63,7 @@ function looksLikeSecret(value: string): boolean {
   return value.length >= 20 && GENERIC_SECRET_RE.test(value);
 }
 
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const EMAIL_RE = /^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$/;
 
 /**
  * Recursively sanitize an object for logging.

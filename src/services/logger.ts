@@ -3,6 +3,7 @@
  */
 
 import { sanitizeForLog, sanitizeError } from '../utils/logSanitizer';
+import { createSecureId } from '../utils/cryptoRandom';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -88,7 +89,7 @@ class Logger {
     const sanitizedData = data !== undefined ? sanitizeForLog(prepareErrorValues(data)) : undefined;
 
     const entry: LogEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: createSecureId('log'),
       timestamp: new Date().toISOString(),
       level,
       module,

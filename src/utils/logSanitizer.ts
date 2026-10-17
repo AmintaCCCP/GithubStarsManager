@@ -95,7 +95,7 @@ function looksLikeSecret(value: string): boolean {
 /**
  * Detect if a string looks like an email address.
  */
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const EMAIL_RE = /^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$/;
 
 /**
  * Recursively sanitize an object for logging.

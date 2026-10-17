@@ -26,7 +26,7 @@ const SENSITIVE_URL_PARAMS = ['key', 'api_key', 'apikey', 'token', 'access_token
 
 const GITHUB_TOKEN_RE = /^ghp_[a-zA-Z0-9]{36}$/;
 const GENERIC_SECRET_RE = /^[a-zA-Z0-9+/=_-]{20,}$/;
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const EMAIL_RE = /^[^@\s]+@[^@\s.]+(?:\.[^@\s.]+)+$/;
 
 /** Maximum length of any sanitized string (matches renderer preview budgets). */
 const MAX_STRING_LENGTH = 16 * 1024;

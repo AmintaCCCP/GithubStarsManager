@@ -23,9 +23,23 @@ const apiRepoDetail = (description: string | null) => ({
   pushed_at: '2026-01-02T00:00:00Z',
 });
 
+/**
+ * Tests whether the given URL targets the mshibanami GitHub trending RSS feed.
+ *
+ * @param url - The URL string to test.
+ * @returns True if the URL hostname matches mshibanami.github.io.
+ */
+const isRssFeedUrl = (url: string): boolean => {
+  try {
+    return new URL(url).hostname === 'mshibanami.github.io';
+  } catch {
+    return false;
+  }
+};
+
 const stubFetch = (apiDescription: string | null) => {
   const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-    if (url.includes('mshibanami.github.io')) {
+    if (isRssFeedUrl(url)) {
       return { ok: true, status: 200, text: async () => RSS_XML };
     }
     return {
@@ -55,7 +69,7 @@ describe('GitHubApiService.searchTrending description source', () => {
 
   it('enriches the description via the GitHub API even when RSS provides non-zero stars and forks', async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
-      if (url.includes('mshibanami.github.io')) {
+      if (isRssFeedUrl(url)) {
         return { ok: true, status: 200, text: async () => RSS_WITH_COUNTS_XML };
       }
       return {

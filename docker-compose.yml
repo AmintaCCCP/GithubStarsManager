@@ -22,6 +22,7 @@ services:
     environment:
       - API_SECRET=${API_SECRET:-}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - TRUST_PROXY=1
     volumes:
       - backend-data:/app/data
     restart: unless-stopped

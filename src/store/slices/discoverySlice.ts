@@ -8,6 +8,7 @@ import { recordTrendingSnapshot } from '../../utils/trendingSnapshots';
 import type { DiscoveryChannelId } from '../../types';
 import { isExternalDiscoveryChannelId, normalizeDiscoveryFeedUrl } from '../../utils/discoveryFeeds';
 import { isChannelScrapable } from '../../services/scrapeSupport';
+import { createSecureId } from '../../utils/cryptoRandom';
 
 export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActions,
   | 'setSelectedDiscoveryChannel'
@@ -128,7 +129,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
       if (!sourceUrl || !trimmedName || trimmedName.length > 60
         || channels.filter(channel => channel.sourceUrl).length >= 10
         || channels.some(channel => channel.sourceUrl === sourceUrl)) return null;
-      const id: DiscoveryChannelId = `external:${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      const id: DiscoveryChannelId = `external:${createSecureId()}`;
       set(state => ({
         discoveryChannels: [...state.discoveryChannels, {
           id, name: trimmedName, nameEn: trimmedName, icon: 'search', description: sourceUrl,
