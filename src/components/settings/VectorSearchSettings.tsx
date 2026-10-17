@@ -839,7 +839,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                   {t('vectorSearchSettings.one-click-deploy-desc')}
                 </p>
                 <div className="bg-background/80 dark:bg-background/60 p-2.5 rounded border border-border text-xs font-mono select-all">
-                  npm run deploy:vector
+                  npm run deploy:vector {/* i18n-allow-literal */}
                 </div>
                 <div className="pt-2 border-t border-border/40 text-xs text-muted-foreground space-y-1">
                   <p className="font-medium text-foreground">{t('vectorSearchSettings.one-click-platforms-tip')}</p>
@@ -864,17 +864,17 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                   </li>
                   <li>
                     <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">
-                      npx wrangler vectorize create github-stars --dimensions={formDimensions} --metric=cosine
+                      {`npx wrangler vectorize create github-stars --dimensions=${formDimensions} --metric=cosine`} {/* i18n-allow-literal */}
                     </code>
                   </li>
                   <li>
                     <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker && npm install</code>
                   </li>
                   <li>
-                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler secret put AUTH_TOKEN</code>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler secret put AUTH_TOKEN</code> {/* i18n-allow-literal */}
                   </li>
                   <li>
-                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code> {/* i18n-allow-literal */}
                   </li>
                 </ol>
               </div>
@@ -889,7 +889,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                     <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker</code>
                   </li>
                   <li>
-                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code> {/* i18n-allow-literal */}
                     {t('vectorSearchSettings.if-dependencies-changed-run')}
                     <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install</code>
                     {t('vectorSearchSettings.text')}

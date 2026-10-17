@@ -1311,7 +1311,7 @@
     "deploy-tab-manual": "手動分步部署（高級）",
     "one-click-platforms-tip": "各平台專用快捷啟動方式：",
     "platform-mac-linux": "macOS / Linux: 終端運行 ./deploy-vector.sh",
-    "platform-windows": "Windows: 雙擊運行 deploy-vector.bat 或執行 deploy-vector.ps1"
+    "platform-windows": "Windows: 雙擊運行 deploy-vector.bat 或執行 .\\deploy-vector.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",

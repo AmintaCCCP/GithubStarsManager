@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename);
 // 根目录与 worker 目录路径
 const ROOT_DIR = path.resolve(__dirname, '..');
 const WORKER_DIR = path.resolve(ROOT_DIR, 'cloudflare-worker');
-const CONFIG_FILE = path.resolve(WORKER_DIR, '.deploy-config.json');
+const CONFIG_FILE = process.env.DEPLOY_CONFIG_FILE || path.resolve(WORKER_DIR, '.deploy-config.json');
 const WRANGLER_TOML = path.resolve(WORKER_DIR, 'wrangler.toml');
 
 // ======================== 多语言 i18n 系统 ========================
@@ -35,19 +35,20 @@ function detectInitialLocale() {
       if (l.startsWith('en')) return 'en';
     }
   }
+
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      if (saved.locale === 'zh' || saved.locale === 'en') return saved.locale;
+    }
+  } catch {}
+
   const envLang = (process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || process.env.LANGUAGE || '').toLowerCase();
   if (envLang.startsWith('zh')) return 'zh';
 
   try {
     const sysLocale = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase();
     if (sysLocale.startsWith('zh')) return 'zh';
-  } catch {}
-
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const saved = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
-      if (saved.locale) return saved.locale;
-    }
   } catch {}
 
   return 'en';
@@ -583,22 +584,21 @@ function saveLocalConfig(config) {
 function getLocalWranglerBin() {
   const wranglerJs = path.resolve(WORKER_DIR, 'node_modules', 'wrangler', 'bin', 'wrangler.js');
   if (fs.existsSync(wranglerJs)) {
-    return { cmd: process.execPath, argsPrefix: [wranglerJs] };
+    return { cmd: process.execPath, argsPrefix: [wranglerJs], needsShell: false };
   }
   const isWindows = process.platform === 'win32';
-  return { cmd: isWindows ? 'npx.cmd' : 'npx', argsPrefix: ['--yes', 'wrangler'] };
+  return { cmd: isWindows ? 'npx.cmd' : 'npx', argsPrefix: ['--yes', 'wrangler'], needsShell: isWindows };
 }
 
 function runWrangler(args, options = {}) {
-  const { cmd, argsPrefix } = getLocalWranglerBin();
+  const { cmd, argsPrefix, needsShell } = getLocalWranglerBin();
   const fullArgs = [...argsPrefix, ...args];
-  const isWindows = process.platform === 'win32';
 
   return spawnSync(cmd, fullArgs, {
     cwd: options.cwd || WORKER_DIR,
     stdio: options.stdio || 'pipe',
     encoding: 'utf-8',
-    shell: options.shell !== undefined ? options.shell : isWindows,
+    shell: options.shell !== undefined ? options.shell : needsShell,
     env: {
       ...process.env,
       WRANGLER_SEND_METRICS: 'false',
@@ -609,16 +609,15 @@ function runWrangler(args, options = {}) {
 }
 
 function runWranglerWithInput(args, inputStr, options = {}) {
-  const { cmd, argsPrefix } = getLocalWranglerBin();
+  const { cmd, argsPrefix, needsShell } = getLocalWranglerBin();
   const fullArgs = [...argsPrefix, ...args];
-  const isWindows = process.platform === 'win32';
 
   return spawnSync(cmd, fullArgs, {
     cwd: options.cwd || WORKER_DIR,
     input: inputStr,
     stdio: ['pipe', 'pipe', 'pipe'],
     encoding: 'utf-8',
-    shell: options.shell !== undefined ? options.shell : isWindows,
+    shell: options.shell !== undefined ? options.shell : needsShell,
     env: {
       ...process.env,
       WRANGLER_SEND_METRICS: 'false',
@@ -629,14 +628,13 @@ function runWranglerWithInput(args, inputStr, options = {}) {
 }
 
 function runWranglerInteractive(args, options = {}) {
-  const { cmd, argsPrefix } = getLocalWranglerBin();
+  const { cmd, argsPrefix, needsShell } = getLocalWranglerBin();
   const fullArgs = [...argsPrefix, ...args];
-  const isWindows = process.platform === 'win32';
 
   return spawnSync(cmd, fullArgs, {
     cwd: options.cwd || WORKER_DIR,
     stdio: 'inherit',
-    shell: options.shell !== undefined ? options.shell : isWindows,
+    shell: options.shell !== undefined ? options.shell : needsShell,
     env: {
       ...process.env,
       WRANGLER_SEND_METRICS: 'false',
@@ -780,8 +778,9 @@ async function handleCloudflareAuth() {
         console.log(c.green('\n' + t('cf_token_success', { account: verify.accountName })));
         return true;
       } else {
-        console.warn(c.yellow('\n' + t('cf_token_warn')));
-        return true;
+        delete process.env.CLOUDFLARE_API_TOKEN;
+        console.warn(c.yellow('\n' + t('cf_login_failed')));
+        continue;
       }
     }
   }
@@ -1068,10 +1067,10 @@ function putWranglerSecret(authToken) {
   const res = runWranglerWithInput(['secret', 'put', 'AUTH_TOKEN'], authToken + '\n');
 
   if (res.status !== 0) {
-    console.warn(c.yellow(`⚠️ Wrangler secret notice: ${res.stderr || res.stdout}`));
-  } else {
-    console.log(c.green(t('secret_set_success')));
+    console.error(c.red(`❌ Wrangler secret put failed: ${res.stderr || res.stdout}`));
+    throw new Error('AUTH_TOKEN secret configuration failed');
   }
+  console.log(c.green(t('secret_set_success')));
 }
 
 function deployWorker() {
@@ -1166,7 +1165,6 @@ async function main() {
 
   checkNodeEnvironment();
   banner();
-  await ensureDependencies();
 
   const savedConfig = loadLocalConfig();
 
@@ -1179,6 +1177,8 @@ async function main() {
     await testWorkerConnectivity(savedConfig.workerUrl, savedConfig.authToken);
     process.exit(0);
   }
+
+  await ensureDependencies();
 
   // 命令行参数: --quick
   if (args.includes('-q') || args.includes('--quick')) {
@@ -1281,7 +1281,14 @@ async function main() {
     }
   }
 
-  // 2. 本地无 config：自动执行老用户远端历史部署探测，避免覆盖老部署！
+  // 2. Cloudflare 认证检查 / 登录
+  const authOk = await handleCloudflareAuth();
+  if (!authOk) {
+    console.error(c.red('\n❌ Cloudflare auth incomplete.'));
+    process.exit(1);
+  }
+
+  // 3. 自动执行老用户远端历史部署探测，避免覆盖老部署！
   console.log(c.cyan('🔍 ' + (currentLocale === 'zh' ? '正在探测 Cloudflare 账号中是否已存在历史部署...' : 'Probing Cloudflare for existing deployments...')));
   const remoteProbe = probeRemoteDeployment();
 
@@ -1372,15 +1379,9 @@ async function main() {
     }
   }
 
-  // 3. 全新部署向导流程
-  const authOk = await handleCloudflareAuth();
-  if (!authOk) {
-    console.error(c.red('\n❌ Cloudflare auth incomplete.'));
-    process.exit(1);
-  }
-
+  // 4. 全新部署向导流程
   const vecConfig = await handleVectorizeConfig(savedConfig);
-  const tokenConfig = await handleAuthTokenConfig(savedConfig, false);
+  const tokenConfig = await handleAuthTokenConfig(savedConfig, Boolean(remoteProbe.secrets?.hasAuthToken));
 
   printStep(4, 4, t('step_4_title'));
   syncWranglerToml(vecConfig.indexName);

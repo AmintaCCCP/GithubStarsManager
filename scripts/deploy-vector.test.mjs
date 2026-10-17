@@ -69,12 +69,41 @@ describe('deploy-vector entrypoints and scripts verification', () => {
 
   it('scripts/deploy-vector.mjs handles --status error gracefully with i18n when not configured', () => {
     const file = path.resolve(ROOT_DIR, 'scripts/deploy-vector.mjs');
-    const res = spawnSync('node', [file, '--status', '--lang=en'], { encoding: 'utf-8' });
+    const isolatedEnv = {
+      ...process.env,
+      DEPLOY_CONFIG_FILE: path.resolve(ROOT_DIR, 'cloudflare-worker', '.non-existent-deploy-config.json'),
+    };
+    const res = spawnSync('node', [file, '--status', '--lang=en'], {
+      encoding: 'utf-8',
+      env: isolatedEnv,
+    });
     assert.ok(res.status !== 0);
     assert.ok(res.stderr.includes('No local config found') || res.stdout.includes('No local config found'));
 
-    const resZh = spawnSync('node', [file, '--status', '--lang=zh'], { encoding: 'utf-8' });
+    const resZh = spawnSync('node', [file, '--status', '--lang=zh'], {
+      encoding: 'utf-8',
+      env: isolatedEnv,
+    });
     assert.ok(resZh.status !== 0);
     assert.ok(resZh.stderr.includes('未找到本地配置') || resZh.stdout.includes('未找到本地配置'));
+  });
+
+  it('scripts/deploy-vector.mjs respects saved.locale from isolated config when valid', () => {
+    const file = path.resolve(ROOT_DIR, 'scripts/deploy-vector.mjs');
+    const tempConfig = path.resolve(ROOT_DIR, 'cloudflare-worker', '.test-locale-config.json');
+    try {
+      fs.writeFileSync(tempConfig, JSON.stringify({ locale: 'en' }), 'utf-8');
+      const res = spawnSync('node', [file, '--help'], {
+        encoding: 'utf-8',
+        env: {
+          ...process.env,
+          DEPLOY_CONFIG_FILE: tempConfig,
+          LANG: 'zh_CN.UTF-8',
+        },
+      });
+      assert.ok(res.stdout.includes('Usage:') || res.stdout.includes('Options:'));
+    } finally {
+      if (fs.existsSync(tempConfig)) fs.unlinkSync(tempConfig);
+    }
   });
 });

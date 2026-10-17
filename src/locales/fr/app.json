@@ -1311,7 +1311,7 @@
     "deploy-tab-manual": "Étapes manuelles (Avancé)",
     "one-click-platforms-tip": "Lanceurs rapides spécifiques à la plateforme :",
     "platform-mac-linux": "macOS / Linux : Exécutez ./deploy-vector.sh dans le terminal",
-    "platform-windows": "Windows : Double-cliquez sur deploy-vector.bat ou exécutez deploy-vector.ps1"
+    "platform-windows": "Windows : Double-cliquez sur deploy-vector.bat ou exécutez .\\deploy-vector.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuration WebDAV",
