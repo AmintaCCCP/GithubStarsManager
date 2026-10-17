@@ -1302,7 +1302,16 @@
     "for-detailed-instructions-see": "Consulte la guía de implementación detallada.",
     "connection-successful-dimensions": "Conexión exitosa - Dimensión: {{dimensions}}",
     "connection-failed-detail": "Error de conexión: {{error}}",
-    "connection-successful-vectors": "Conexión exitosa: vector: {{vectorCount}}, dimensiones: {{dimensions}}"
+    "connection-successful-vectors": "Conexión exitosa: vector: {{vectorCount}}, dimensiones: {{dimensions}}",
+    "one-click-deployment-recommended": "🌟 Asistente de implementación interactivo de un clic (Recomendado)",
+    "one-click-deploy-desc": "Compatible con todas las plataformas (Windows / macOS / Linux). Sin necesidad de abrir el panel de Cloudflare; la TUI interactiva guía la configuración, guarda los parámetros localmente y preserva los índices vectoriales existentes.",
+    "copy-one-click-deploy-cmd": "Copiar comando de despliegue en un clic",
+    "copied": "Copiado",
+    "deploy-tab-one-click": "Despliegue en un clic (Recomendado)",
+    "deploy-tab-manual": "Pasos manuales (Avanzado)",
+    "one-click-platforms-tip": "Iniciadores rápidos específicos de la plataforma:",
+    "platform-mac-linux": "macOS / Linux: En cloudflare-worker, ejecutar ./deploy.sh",
+    "platform-windows": "Windows: En cloudflare-worker, haga doble clic en deploy.bat o ejecute .\\deploy.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "Configuración WebDAV",

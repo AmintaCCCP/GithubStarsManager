@@ -1302,7 +1302,16 @@
     "for-detailed-instructions-see": "Пожалуйста, обратитесь к подробному руководству по развертыванию.",
     "connection-successful-dimensions": "Соединение успешно выполнено – Размер: {{dimensions}}",
     "connection-failed-detail": "Не удалось подключиться: {{error}}",
-    "connection-successful-vectors": "Соединение успешно — вектор: {{vectorCount}}, размеры: {{dimensions}}"
+    "connection-successful-vectors": "Соединение успешно — вектор: {{vectorCount}}, размеры: {{dimensions}}",
+    "one-click-deployment-recommended": "🌟 Интерактивный мастер развертывания в один клик (Рекомендуется)",
+    "one-click-deploy-desc": "Поддерживает все платформы (Windows / macOS / Linux). Не требует открытия панели Cloudflare; интерактивный TUI проведет через настройку, сохранит параметры локально и сохранит существующие векторные индексы.",
+    "copy-one-click-deploy-cmd": "Скопировать команду развертывания в один клик",
+    "copied": "Скопировано",
+    "deploy-tab-one-click": "Развертывание в один клик (Рекомендуется)",
+    "deploy-tab-manual": "Ручные шаги (Расширенный)",
+    "one-click-platforms-tip": "Специальные средства быстрого запуска платформы:",
+    "platform-mac-linux": "macOS / Linux: в cloudflare-worker запустите ./deploy.sh",
+    "platform-windows": "Windows: в cloudflare-worker дважды щелкните deploy.bat или запустите .\\deploy.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "Конфигурация WebDAV",

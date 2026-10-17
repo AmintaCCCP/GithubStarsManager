@@ -2,16 +2,33 @@
 
 极简 Cloudflare Worker，作为 Cloudflare Vectorize 的代理。前端负责 Embedding 生成，Worker 只负责向量的存/查/删。
 
-## 前置条件
+## 🌟 方式一：一键交互式部署向导（强烈推荐）
 
+无需繁琐敲击多条命令，也**无需打开 Cloudflare 网页后台**！交互式 TUI 会自动引导输入所有参数，并有详尽说明：
+
+- **项目根目录**: 运行 `npm run deploy:vector`
+- **当前 cloudflare-worker 目录**:
+  - **macOS / Linux**: 运行 `./deploy.sh` 或 `node deploy.mjs`
+  - **Windows**: 双击 `deploy.bat`，或在 PowerShell 中运行 `.\deploy.ps1`
+  - **NPM 脚本**: 运行 `npm run deploy:interactive` 或 `npm run deploy:vector`
+
+### 一键部署向导亮点：
+1. **交互式 TUI 引导**：全流程可视化步骤与中文帮助卡片，详细说明每个参数（模型维度、AUTH_TOKEN、索引配置等）的用途与获取方式。
+2. **无需打开 Cloudflare**：全流程基于 Wrangler CLI 自动完成索引探测、安全密钥注入与 Worker 部署。
+3. **数据安全无虞**：**严格保留现有向量索引与历史数据**，不会升级或重置现有索引版本，无需重新索引。
+4. **本地参数记忆**：参数自动安全保存在本地（`.deploy-config.json`），后续代码更新只需选择“快速重新部署”，一键完成更新，无需重复输入。
+5. **部署即验**：部署完成后自动发起连通性测试，并打印清晰的结果卡片，直接复制 URL 和 Token 即可使用。
+
+---
+
+## 方式二：手动分步部署（开发者备用）
+
+### 1. 前置条件
 - [Cloudflare 账号](https://dash.cloudflare.com/)
 - [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
 - 已登录 Wrangler (`wrangler login`)
 
-## 首次部署
-
-### 1. 创建 Vectorize 索引
-
+### 2. 创建 Vectorize 索引
 索引维度必须与你选择的 Embedding 模型一致：
 
 ```bash

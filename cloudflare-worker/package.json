@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "deploy:interactive": "node deploy.mjs",
+    "deploy:vector": "node deploy.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261011.1",

@@ -1302,7 +1302,16 @@
     "for-detailed-instructions-see": "詳細部署指南請參考",
     "connection-successful-dimensions": "連結成功 — 維度: {{dimensions}}",
     "connection-failed-detail": "連結失敗：{{error}}",
-    "connection-successful-vectors": "連結成功 — 向量: {{vectorCount}}，維度: {{dimensions}}"
+    "connection-successful-vectors": "連結成功 — 向量: {{vectorCount}}，維度: {{dimensions}}",
+    "one-click-deployment-recommended": "🌟 一鍵互動式部署向導（強烈推薦）",
+    "one-click-deploy-desc": "適配各平台（Windows / macOS / Linux），無需打開 Cloudflare 網頁後台，TUI 引導輸入所有參數，已配置參數自動保存至本地，絕不重置已有向量索引。",
+    "copy-one-click-deploy-cmd": "複製一鍵部署命令",
+    "copied": "已複製",
+    "deploy-tab-one-click": "一鍵部署（推薦）",
+    "deploy-tab-manual": "手動分步部署（高級）",
+    "one-click-platforms-tip": "各平台專用快捷啟動方式：",
+    "platform-mac-linux": "macOS / Linux: 進入 cloudflare-worker 運行 ./deploy.sh",
+    "platform-windows": "Windows: 進入 cloudflare-worker 雙擊 deploy.bat 或執行 .\\deploy.ps1"
   },
   "webDAVPanel": {
     "webdav-configuration": "WebDAV配置",

@@ -6,6 +6,7 @@ import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Switch } from '../ui/switch';
 import { NumberInput } from '../ui/NumberInput';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import React, { useState } from 'react';
 import {
   Search,
@@ -800,54 +801,106 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
         </div>
 
         <div id="vector-deploy-guide" hidden={!showDeployGuide} className="px-4 pb-4 text-sm text-muted-foreground dark:text-muted-foreground space-y-4">
-            {/* 首次部署 */}
-            <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
-              <p className="font-medium text-foreground dark:text-foreground mb-2">
-                {t('vectorSearchSettings.initial-deployment')}
-              </p>
-              <ol className="list-decimal list-inside space-y-1.5">
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install -g wrangler</code>
-                  {t('vectorSearchSettings.then')}
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler login</code>
-                </li>
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">
-                    npx wrangler vectorize create github-stars --dimensions={formDimensions} --metric=cosine
-                  </code>
-                </li>
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker && npm install</code>
-                </li>
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler secret put AUTH_TOKEN</code>
-                </li>
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
-                </li>
-              </ol>
-            </div>
+          <Tabs defaultValue="one-click" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-3">
+              <TabsTrigger value="one-click" className="text-xs sm:text-sm">
+                {t('vectorSearchSettings.deploy-tab-one-click')}
+              </TabsTrigger>
+              <TabsTrigger value="manual" className="text-xs sm:text-sm">
+                {t('vectorSearchSettings.deploy-tab-manual')}
+              </TabsTrigger>
+            </TabsList>
 
-            {/* 更新部署 */}
-            <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
-              <p className="font-medium text-foreground dark:text-foreground mb-2">
-                {t('vectorSearchSettings.redeploy-after-code-changes')}
-              </p>
-              <ol className="list-decimal list-inside space-y-1.5">
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker</code>
-                </li>
-                <li>
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code>
-                  {t('vectorSearchSettings.if-dependencies-changed-run')}
-                  <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install</code>
-                  {t('vectorSearchSettings.text')}
-                </li>
-              </ol>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {t('vectorSearchSettings.note-redeployment-does-not-require-recreating-th')}
-              </p>
-            </div>
+            {/* Tab 1: 一键部署 */}
+            <TabsContent value="one-click" className="space-y-3">
+              <div className="p-4 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-foreground">
+                    {t('vectorSearchSettings.one-click-deployment-recommended')}
+                  </span>
+                  <Button
+                    onClick={async () => {
+                      const cmd = 'npm run deploy:vector';
+                      try {
+                        await navigator.clipboard.writeText(cmd);
+                        toast(t('vectorSearchSettings.copied'), 'info');
+                      } catch (error) {
+                        console.warn('Failed to copy deploy command:', error);
+                      }
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                  >
+                    {t('vectorSearchSettings.copy-one-click-deploy-cmd')}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {t('vectorSearchSettings.one-click-deploy-desc')}
+                </p>
+                <div className="bg-background/80 dark:bg-background/60 p-2.5 rounded border border-border text-xs font-mono select-all">
+                  npm run deploy:vector {/* i18n-allow-literal */}
+                </div>
+                <div className="pt-2 border-t border-border/40 text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">{t('vectorSearchSettings.one-click-platforms-tip')}</p>
+                  <p>• {t('vectorSearchSettings.platform-mac-linux')}</p>
+                  <p>• {t('vectorSearchSettings.platform-windows')}</p>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Tab 2: 手动部署 */}
+            <TabsContent value="manual" className="space-y-3">
+              {/* 首次部署 */}
+              <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
+                <p className="font-medium text-foreground dark:text-foreground mb-2">
+                  {t('vectorSearchSettings.initial-deployment')}
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5">
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install -g wrangler</code>
+                    {t('vectorSearchSettings.then')}
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler login</code>
+                  </li>
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">
+                      {`npx wrangler vectorize create github-stars --dimensions=${formDimensions} --metric=cosine`} {/* i18n-allow-literal */}
+                    </code>
+                  </li>
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker && npm install</code>
+                  </li>
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">wrangler secret put AUTH_TOKEN</code> {/* i18n-allow-literal */}
+                  </li>
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code> {/* i18n-allow-literal */}
+                  </li>
+                </ol>
+              </div>
+
+              {/* 更新部署 */}
+              <div className="p-3 bg-accent/50 dark:bg-card/50 rounded-md">
+                <p className="font-medium text-foreground dark:text-foreground mb-2">
+                  {t('vectorSearchSettings.redeploy-after-code-changes')}
+                </p>
+                <ol className="list-decimal list-inside space-y-1.5">
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">cd cloudflare-worker</code>
+                  </li>
+                  <li>
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm run deploy</code> {/* i18n-allow-literal */}
+                    {t('vectorSearchSettings.if-dependencies-changed-run')}
+                    <code className="bg-accent dark:bg-muted px-1.5 py-0.5 rounded text-xs">npm install</code>
+                    {t('vectorSearchSettings.text')}
+                  </li>
+                </ol>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {t('vectorSearchSettings.note-redeployment-does-not-require-recreating-th')}
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
 
             {/* 模型变更警告 */}
             <div className="rounded-lg border border-border bg-muted/40 p-4 text-muted-foreground">
