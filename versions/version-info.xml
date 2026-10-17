@@ -716,4 +716,23 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.6</downloadUrl>
   </version>
+  <version>
+    <number>0.8.7</number>
+    <releaseDate>2026-10-17</releaseDate>
+    <changelog>
+      <item>feat: 推出 Cloudflare Vectorize 向量搜索跨平台一键终端交互式部署向导及双语配置指引。(PR #479)</item>
+      <item>fix: 全面修复 CodeQL 安全告警，增加接口限流、安全随机数生成、防 ReDoS 与危险协议拦截。(PR #478)</item>
+      <item>feat: 在外观设置中支持自定义仓库卡片快捷操作按钮的排序与显隐状态。(感谢 @Khk-NL 的贡献) (PR #467)</item>
+      <item>ci: 恢复手动控制版本号与手写更新日志，CI 打包前增加 draft release 守卫。(PR #466)</item>
+      <item>build: 桌面端打包安全加固，开启 asar 归档保护源码分发，全面治理构建工具链漏洞。(PR #464)</item>
+      <item>feat: 支持勾选单个或多个指定分类增量推送到 GitHub Lists。(感谢 @SlickShady96 的贡献) (PR #445)</item>
+      <item>UX: 仓库卡片取消 Star 操作移入更多菜单底部防误触，简化概况及问答计数提示。(感谢 @Khk-NL 的贡献) (PR #443)</item>
+      <item>fix: 修复 KaTeX 原型污染及 sharp 上游已知安全漏洞。(PR #442)</item>
+      <item>feat: 支持将局域网及本机地址设为自定义 AI 接入点并放行明文 HTTP 协议。(PR #441)</item>
+      <item>build: 强制升级 postcss-selector-parser 修复 CPU 耗尽 DoS 漏洞。(PR #447)</item>
+      <item>ci: CI 流水线加固治理，增加超时控制、零产物防漏拦截与服务端自动化测试。(PR #448)</item>
+      <item>build: 升级 Vite 8、React、Vitest 5、TailwindCSS 4、MCP SDK 1.32.1 等依赖至最新版本。(PR #436, #460, #462, #463, #468, #473, #476)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.7</downloadUrl>
+  </version>
 </versions>
