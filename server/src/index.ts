@@ -58,7 +58,6 @@ function buildConnectSrc(): string[] {
  * exactly what the browser will execute.
  */
 type HtmlNode = {
-  nodeName?: string;
   tagName?: string;
   value?: string;
   childNodes?: HtmlNode[];
