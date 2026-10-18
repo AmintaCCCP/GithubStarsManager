@@ -86,6 +86,8 @@ curl http://localhost:8080/api/health
 IMAGE_TAG=0.8.4
 API_SECRET=your-api-secret
 ENCRYPTION_KEY=your-encryption-key
+# 仅当从其他机器通过纯 HTTP 访问、且前面没有 TLS 反代时取消注释
+# CSP_UPGRADE_INSECURE_REQUESTS=false
 ```
 
 不使用 Compose 时，可直接运行镜像。直接执行 `docker run` 不会读取 Compose 的 `.env`，请导出 `IMAGE_TAG`（或在命令中直接替换）以固定镜像版本：

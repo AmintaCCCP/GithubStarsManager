@@ -81,6 +81,8 @@ For Compose deployments, add `IMAGE_TAG` to the same `.env` file to pin a full-s
 ```bash
 API_SECRET=replace-with-a-long-random-secret
 IMAGE_TAG=0.8.4
+# Only for plain-HTTP access from another machine (no TLS proxy in front).
+# CSP_UPGRADE_INSECURE_REQUESTS=false
 # Set this only when preserving an existing environment-provided key.
 # ENCRYPTION_KEY=the-exact-existing-key
 ```
