@@ -3,11 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import { parse } from 'parse5';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger, morganLoggerStream } from './services/logger.js';
-import { mountStaticFrontend } from './services/staticFrontend.js';
+import { mountStaticFrontend, resolveSpaIndexFile } from './services/staticFrontend.js';
 import { getDb, closeDb } from './db/connection.js';
 import { runMigrations } from './db/migrations.js';
 import healthRouter from './routes/health.js';
@@ -48,6 +51,69 @@ function buildConnectSrc(): string[] {
 }
 
 /**
+ * @vitejs/plugin-legacy injects inline bootstrap scripts and a `data:` module
+ * into the SPA shell. Hash the served copy so `script-src` stays free of
+ * 'unsafe-inline' and follows every rebuild, where hardcoded hashes would drift.
+ * The shell is parsed as HTML rather than pattern-matched so the hashes cover
+ * exactly what the browser will execute.
+ */
+type HtmlNode = {
+  tagName?: string;
+  value?: string;
+  childNodes?: HtmlNode[];
+  attrs?: Array<{ name: string; value: string }>;
+};
+
+function collectInlineScripts(node: HtmlNode, scripts: string[]): void {
+  if (node.tagName === 'script' && !node.attrs?.some((attr) => attr.name === 'src')) {
+    const body = (node.childNodes ?? []).map((child) => child.value ?? '').join('');
+    if (body.trim().length > 0) {
+      scripts.push(body);
+    }
+  }
+  for (const child of node.childNodes ?? []) {
+    collectInlineScripts(child, scripts);
+  }
+}
+
+function buildScriptSrc(): string[] {
+  const indexFile = resolveSpaIndexFile();
+  if (!indexFile) {
+    return ["'self'"];
+  }
+
+  let html: string;
+  try {
+    html = fs.readFileSync(indexFile, 'utf8');
+  } catch (error) {
+    logger.warn('csp', `Could not read ${indexFile}; serving a strict script-src`, error);
+    return ["'self'"];
+  }
+
+  const scripts: string[] = [];
+  collectInlineScripts(parse(html) as HtmlNode, scripts);
+
+  const hashes = scripts.map(
+    (body) => `'sha256-${crypto.createHash('sha256').update(body, 'utf8').digest('base64')}'`
+  );
+  const directives = ["'self'", ...new Set(hashes)];
+  if (html.toLowerCase().includes('data:text/javascript')) {
+    directives.push('data:');
+  }
+  return directives;
+}
+
+/**
+ * Helmet's default `upgrade-insecure-requests` rewrites the SPA's own http://
+ * assets to https://, so plain HTTP deployments (e.g. `http://<lan-ip>:3000`)
+ * fail every script with ERR_SSL_PROTOCOL_ERROR and stay blank. Browsers ignore
+ * HSTS received over HTTP, so only this directive needs an opt-out.
+ */
+function shouldUpgradeInsecureRequests(): boolean {
+  return !/^(0|false|no)$/i.test(process.env.CSP_UPGRADE_INSECURE_REQUESTS?.trim() ?? '');
+}
+
+/**
  * Creates and configures the Express application instance with security headers,
  * proxy trust settings, rate limiting, and all backend API and static routes.
  *
@@ -55,6 +121,7 @@ function buildConnectSrc(): string[] {
  */
 export function createApp(): express.Express {
   const app = express();
+  const upgradeInsecureRequests = shouldUpgradeInsecureRequests();
 
   // Helmet's default CSP blocks every browser-direct call (api.github.com,
   // avatar images, AI providers), which breaks the supported "browser direct"
@@ -65,6 +132,8 @@ export function createApp(): express.Express {
         directives: {
           'connect-src': buildConnectSrc(),
           'img-src': ["'self'", 'data:', 'https:'],
+          'script-src': buildScriptSrc(),
+          ...(upgradeInsecureRequests ? {} : { 'upgrade-insecure-requests': null }),
         },
       },
     }),

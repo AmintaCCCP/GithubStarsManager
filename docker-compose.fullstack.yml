@@ -6,6 +6,7 @@ services:
     environment:
       API_SECRET: ${API_SECRET:?Set API_SECRET in .env before starting the full-stack deployment}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      CSP_UPGRADE_INSECURE_REQUESTS: ${CSP_UPGRADE_INSECURE_REQUESTS:-true}
     volumes:
       - backend-data:/app/data
     restart: unless-stopped

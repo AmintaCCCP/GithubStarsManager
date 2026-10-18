@@ -11,6 +11,15 @@ function isBackendPath(requestPath: string): boolean {
   );
 }
 
+export function resolveSpaIndexFile(staticDir = process.env.STATIC_DIR): string | null {
+  if (!staticDir) {
+    return null;
+  }
+
+  const indexFile = path.join(path.resolve(staticDir), 'index.html');
+  return fs.existsSync(indexFile) ? indexFile : null;
+}
+
 /**
  * Optionally serves a compiled frontend from the directory configured by STATIC_DIR.
  *
@@ -18,16 +27,12 @@ function isBackendPath(requestPath: string): boolean {
  * and 404 behavior remain unchanged. The full-stack image sets STATIC_DIR=/app/public.
  */
 export function mountStaticFrontend(app: Express, staticDir = process.env.STATIC_DIR): boolean {
-  if (!staticDir) {
+  const indexFile = resolveSpaIndexFile(staticDir);
+  if (!indexFile) {
     return false;
   }
 
-  const resolvedStaticDir = path.resolve(staticDir);
-  const indexFile = path.join(resolvedStaticDir, 'index.html');
-  if (!fs.existsSync(indexFile)) {
-    return false;
-  }
-
+  const resolvedStaticDir = path.dirname(indexFile);
   const serveStatic = express.static(resolvedStaticDir, { index: false });
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (isBackendPath(req.path)) {

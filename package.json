@@ -23,7 +23,7 @@
     "test:electron:plugins": "node --test electron/plugins/*.test.js",
     "test:update-version": "node --test scripts/update-version.test.cjs",
     "test:deploy-vector": "node --test scripts/deploy-vector.test.mjs",
-    "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs scripts/check-plugin-registry.test.cjs",
+    "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs scripts/check-plugin-registry.test.cjs scripts/fullstack-compose-env.test.cjs",
     "test:coverage": "vitest run --coverage",
     "build:desktop": "node scripts/build-desktop.js",
     "electron": "electron electron/main.js",

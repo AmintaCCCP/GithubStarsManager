@@ -19,6 +19,7 @@
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.3.0",
     "morgan": "^1.12.1",
+    "parse5": "^7.3.0",
     "socks-proxy-agent": "^10.1.0",
     "zod": "^4.6.6"
   },

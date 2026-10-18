@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -59,6 +60,88 @@ describeIfDb('helmet CSP for browser-direct route mode', () => {
     expect(csp).toContain("object-src 'none'");
   });
 
+  it('keeps script-src strict when no SPA shell is served', async () => {
+    delete process.env.STATIC_DIR;
+    const csp = await cspOf(createApp());
+    const scriptSrc = csp.split(';').find((directive) => directive.trim().startsWith('script-src')) ?? '';
+    expect(scriptSrc.trim()).toBe("script-src 'self'");
+    expect(scriptSrc).not.toContain('unsafe-inline');
+  });
+
+  it('allows the served SPA inline bootstrap scripts by hash without unsafe-inline', async () => {
+    const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-spa-'));
+    const inlineScript = 'window.__vite_is_modern_browser=true';
+    fs.writeFileSync(
+      path.join(staticDir, 'index.html'),
+      [
+        '<!doctype html><html><head>',
+        `<script type="module">${inlineScript}</script>`,
+        '<script type="module">import\'data:text/javascript,if(!import.meta.resolve)throw Error("x")\'</script>',
+        '</head><body><div id="root"></div></body></html>',
+      ].join('')
+    );
+
+    process.env.STATIC_DIR = staticDir;
+    try {
+      const app = createApp();
+      const shellResponse = await request(app).get('/').expect(200);
+      const deepLinkResponse = await request(app).get('/onboarding').expect(200);
+      const csp = shellResponse.headers['content-security-policy'] ?? '';
+      expect(deepLinkResponse.headers['content-security-policy']).toBe(csp);
+      expect(deepLinkResponse.text).toBe(shellResponse.text);
+      expect(shellResponse.text).toContain(inlineScript);
+      expect(shellResponse.text).toContain('data:text/javascript');
+
+      const scriptSrc = csp.split(';').find((directive) => directive.trim().startsWith('script-src')) ?? '';
+      const hash = crypto.createHash('sha256').update(inlineScript, 'utf8').digest('base64');
+      expect(scriptSrc).toContain("'self'");
+      expect(scriptSrc).toContain(`'sha256-${hash}'`);
+      expect(scriptSrc).toContain('data:');
+      expect(scriptSrc).not.toContain('unsafe-inline');
+    } finally {
+      delete process.env.STATIC_DIR;
+      fs.rmSync(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it('hashes inline scripts regardless of tag casing', async () => {
+    const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-spa-case-'));
+    const inlineScript = 'window.__vite_is_modern_browser=true';
+    fs.writeFileSync(
+      path.join(staticDir, 'index.html'),
+      `<!doctype html><HTML><BODY><SCRIPT type="module">${inlineScript}</SCRIPT></BODY></HTML>`
+    );
+
+    process.env.STATIC_DIR = staticDir;
+    try {
+      const csp = await cspOf(createApp());
+      const hash = crypto.createHash('sha256').update(inlineScript, 'utf8').digest('base64');
+      expect(csp).toContain(`'sha256-${hash}'`);
+    } finally {
+      delete process.env.STATIC_DIR;
+      fs.rmSync(staticDir, { recursive: true, force: true });
+    }
+  });
+
+  it('hashes CRLF inline scripts the way the browser normalizes them', async () => {
+    const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-spa-crlf-'));
+    const inlineScript = 'window.__vite_is_modern_browser=true;\nwindow.__vite_crlf_probe=1;';
+    fs.writeFileSync(
+      path.join(staticDir, 'index.html'),
+      `<!doctype html><html><head><script type="module">${inlineScript.replace(/\n/g, '\r\n')}</script></head></html>`
+    );
+
+    process.env.STATIC_DIR = staticDir;
+    try {
+      const csp = await cspOf(createApp());
+      const hash = crypto.createHash('sha256').update(inlineScript, 'utf8').digest('base64');
+      expect(csp).toContain(`'sha256-${hash}'`);
+    } finally {
+      delete process.env.STATIC_DIR;
+      fs.rmSync(staticDir, { recursive: true, force: true });
+    }
+  });
+
   it('allows browser-direct GitHub API and AI provider origins in connect-src', async () => {
     const csp = await cspOf(createApp());
     const connectSrc = csp.split(';').find((directive) => directive.trim().startsWith('connect-src')) ?? '';
@@ -88,6 +171,23 @@ describeIfDb('helmet CSP for browser-direct route mode', () => {
       expect(connectSrc).toContain('https://worker.example.org');
     } finally {
       delete process.env.CSP_CONNECT_SRC;
+    }
+  });
+
+  it('upgrades insecure requests by default', async () => {
+    delete process.env.CSP_UPGRADE_INSECURE_REQUESTS;
+    const csp = await cspOf(createApp());
+    expect(csp).toContain('upgrade-insecure-requests');
+  });
+
+  it('keeps http:// deployments working when CSP_UPGRADE_INSECURE_REQUESTS is off', async () => {
+    process.env.CSP_UPGRADE_INSECURE_REQUESTS = 'false';
+    try {
+      const app = createApp();
+      const response = await request(app).get('/api/health');
+      expect(response.headers['content-security-policy'] ?? '').not.toContain('upgrade-insecure-requests');
+    } finally {
+      delete process.env.CSP_UPGRADE_INSECURE_REQUESTS;
     }
   });
 });
