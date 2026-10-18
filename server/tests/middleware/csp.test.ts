@@ -83,7 +83,15 @@ describeIfDb('helmet CSP for browser-direct route mode', () => {
 
     process.env.STATIC_DIR = staticDir;
     try {
-      const csp = await cspOf(createApp());
+      const app = createApp();
+      const shellResponse = await request(app).get('/').expect(200);
+      const deepLinkResponse = await request(app).get('/onboarding').expect(200);
+      const csp = shellResponse.headers['content-security-policy'] ?? '';
+      expect(deepLinkResponse.headers['content-security-policy']).toBe(csp);
+      expect(deepLinkResponse.text).toBe(shellResponse.text);
+      expect(shellResponse.text).toContain(inlineScript);
+      expect(shellResponse.text).toContain('data:text/javascript');
+
       const scriptSrc = csp.split(';').find((directive) => directive.trim().startsWith('script-src')) ?? '';
       const hash = crypto.createHash('sha256').update(inlineScript, 'utf8').digest('base64');
       expect(scriptSrc).toContain("'self'");

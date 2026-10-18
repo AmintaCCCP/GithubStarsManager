@@ -9,7 +9,7 @@ const compose = fs.readFileSync(composeFile, 'utf8');
 test('fullstack compose forwards CSP_UPGRADE_INSECURE_REQUESTS with a safe default', () => {
   assert.match(
     compose,
-    /CSP_UPGRADE_INSECURE_REQUESTS:\s*\$\{CSP_UPGRADE_INSECURE_REQUESTS:-true\}/,
+    /^  app:\r?\n(?:(?!^  \S)[\s\S])*?^    environment:\r?\n(?:(?!^    \S)[\s\S])*?^      CSP_UPGRADE_INSECURE_REQUESTS:\s*\$\{CSP_UPGRADE_INSECURE_REQUESTS:-true\}\r?$/m,
     'the fullstack service must pass the variable through and default it to true'
   );
 });
