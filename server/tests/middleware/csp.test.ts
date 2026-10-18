@@ -96,6 +96,25 @@ describeIfDb('helmet CSP for browser-direct route mode', () => {
     }
   });
 
+  it('hashes inline scripts regardless of tag casing', async () => {
+    const staticDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-spa-case-'));
+    const inlineScript = 'window.__vite_is_modern_browser=true';
+    fs.writeFileSync(
+      path.join(staticDir, 'index.html'),
+      `<!doctype html><HTML><BODY><SCRIPT type="module">${inlineScript}</SCRIPT></BODY></HTML>`
+    );
+
+    process.env.STATIC_DIR = staticDir;
+    try {
+      const csp = await cspOf(createApp());
+      const hash = crypto.createHash('sha256').update(inlineScript, 'utf8').digest('base64');
+      expect(csp).toContain(`'sha256-${hash}'`);
+    } finally {
+      delete process.env.STATIC_DIR;
+      fs.rmSync(staticDir, { recursive: true, force: true });
+    }
+  });
+
   it('allows browser-direct GitHub API and AI provider origins in connect-src', async () => {
     const csp = await cspOf(createApp());
     const connectSrc = csp.split(';').find((directive) => directive.trim().startsWith('connect-src')) ?? '';

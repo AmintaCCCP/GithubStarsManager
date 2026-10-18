@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { parse } from 'parse5';
 import { config } from './config.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -52,8 +53,30 @@ function buildConnectSrc(): string[] {
 /**
  * @vitejs/plugin-legacy injects inline bootstrap scripts and a `data:` module
  * into the SPA shell. Hash the served copy so `script-src` stays free of
- * 'unsafe-inline' and survives rebuilds, where hardcoded hashes would drift.
+ * 'unsafe-inline' and follows every rebuild, where hardcoded hashes would drift.
+ * The shell is parsed as HTML rather than pattern-matched so the hashes cover
+ * exactly what the browser will execute.
  */
+type HtmlNode = {
+  nodeName?: string;
+  tagName?: string;
+  value?: string;
+  childNodes?: HtmlNode[];
+  attrs?: Array<{ name: string; value: string }>;
+};
+
+function collectInlineScripts(node: HtmlNode, scripts: string[]): void {
+  if (node.tagName === 'script' && !node.attrs?.some((attr) => attr.name === 'src')) {
+    const body = (node.childNodes ?? []).map((child) => child.value ?? '').join('');
+    if (body.trim().length > 0) {
+      scripts.push(body);
+    }
+  }
+  for (const child of node.childNodes ?? []) {
+    collectInlineScripts(child, scripts);
+  }
+}
+
 function buildScriptSrc(): string[] {
   const indexFile = resolveSpaIndexFile();
   if (!indexFile) {
@@ -67,13 +90,15 @@ function buildScriptSrc(): string[] {
     logger.warn('csp', `Could not read ${indexFile}; serving a strict script-src`, error);
     return ["'self'"];
   }
-  const hashes = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
-    .map((match) => match[1])
-    .filter((body) => body.trim().length > 0)
-    .map((body) => `'sha256-${crypto.createHash('sha256').update(body, 'utf8').digest('base64')}'`);
 
+  const scripts: string[] = [];
+  collectInlineScripts(parse(html) as HtmlNode, scripts);
+
+  const hashes = scripts.map(
+    (body) => `'sha256-${crypto.createHash('sha256').update(body, 'utf8').digest('base64')}'`
+  );
   const directives = ["'self'", ...new Set(hashes)];
-  if (html.includes('data:text/javascript')) {
+  if (html.toLowerCase().includes('data:text/javascript')) {
     directives.push('data:');
   }
   return directives;
