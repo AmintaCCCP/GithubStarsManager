@@ -74,6 +74,8 @@ docker run -d \
 
 For a new deployment, omit `ENCRYPTION_KEY` and the service generates a key in the persisted data volume. If an existing deployment already uses `ENCRYPTION_KEY`, always pass the **exact same value** on every recreation and during migration; an environment-provided key overrides the file key, and changing it makes already encrypted credentials unreadable.
 
+The full-stack image serves plain HTTP unless you put it behind TLS. Because it sends `upgrade-insecure-requests` by default, add `-e CSP_UPGRADE_INSECURE_REQUESTS=false` when you open it directly over `http://<host>:8080` from another machine. Without it the browser rewrites the app's own assets to `https://` and the page stays blank. Keep the default when a reverse proxy terminates TLS.
+
 For Compose deployments, add `IMAGE_TAG` to the same `.env` file to pin a full-stack version:
 
 ```bash

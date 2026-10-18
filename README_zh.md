@@ -582,6 +582,7 @@ npm run dev
 | `ENCRYPTION_KEY` | 否 | 用于加密存储密钥的 AES-256 密钥。未设置时自动生成。 |
 | `PORT` | 否 | 服务器端口（默认：3000） |
 | `CSP_CONNECT_SRC` | 否 | 追加到 `connect-src` CSP 指令的额外来源（逗号分隔），用于浏览器直接访问的自定义 AI 服务商 / 向量搜索 worker 端点（如 `https://ai.example.com,https://worker.example.org`）。 |
+| `CSP_UPGRADE_INSECURE_REQUESTS` | 否 | 默认开启，会发送 `upgrade-insecure-requests`。当 fullstack 镜像通过纯 HTTP 提供服务（如 `http://<内网 IP>:3000`）时设为 `false`；否则浏览器会把 SPA 自身资源改写为 `https://`，页面保持空白。仅对不打算接入 TLS 的 HTTP 部署关闭。 |
 
 #### 前端连接后端
 1. 打开应用中的设置面板

@@ -104,6 +104,8 @@ docker run -d \
 
 新部署可以不传 `ENCRYPTION_KEY`，服务会在持久化数据卷中生成并保存密钥。如果已有部署显式设置了 `ENCRYPTION_KEY`，每次重建和迁移时都必须传入**完全相同的值**；环境变量密钥优先于数据卷内的文件密钥，变更它会导致原先加密的凭据无法读取。
 
+全栈镜像默认以纯 HTTP 提供服务（除非放在终止 TLS 的反代之后），并默认发送 `upgrade-insecure-requests`。如果要从其他机器直接通过 `http://<主机>:8080` 访问，请加上 `-e CSP_UPGRADE_INSECURE_REQUESTS=false`；否则浏览器会把应用自身资源改写为 `https://`，页面保持空白。由反代终止 TLS 时请保留默认值。
+
 本地构建全栈镜像时，请明确指定新的 Dockerfile：
 
 ```bash
