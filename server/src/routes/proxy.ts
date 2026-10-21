@@ -98,11 +98,11 @@ function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
   }
 }
 
-// POST /api/proxy/github/{*path}
-router.post('/api/proxy/github/{*path}', async (req, res) => {
+// POST /api/proxy/github/*
+router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
   try {
     const db = getDb();
-    const rawPath = req.params.path;
+    const rawPath = (req.params as Record<string, string>)[0];
     const githubPath = Array.isArray(rawPath) ? rawPath.join('/') : (rawPath ?? '');
 
     // Prevent path traversal
