@@ -424,11 +424,12 @@ describe('RepositoryCard view modes', () => {
     expect(await screen.findByText('Loading releases…')).toBeInTheDocument();
 
     await act(async () => {
-      fireEvent.pointerDown(document.body);
+      fireEvent.pointerDown(card);
       fireEvent.click(card);
     });
 
     expect(screen.queryByTestId('readme-modal')).not.toBeInTheDocument();
+    actionMocks.releaseSheet.suspend = null;
   });
 
   it('does not open README when an outside click closes the edit modal', async () => {
