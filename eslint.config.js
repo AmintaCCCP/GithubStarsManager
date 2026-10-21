@@ -60,6 +60,8 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true, allowExportNames: ['useDialog'] },
       ],
+      'preserve-caught-error': 'off',
+      'no-useless-assignment': 'off',
     },
   },
   {
