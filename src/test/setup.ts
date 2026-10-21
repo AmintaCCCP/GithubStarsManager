@@ -137,3 +137,11 @@ for (const language of readdirSync(localesDir)) {
     );
   }
 }
+
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
+
+afterEach(() => {
+  cleanup();
+  document.body.innerHTML = '';
+});

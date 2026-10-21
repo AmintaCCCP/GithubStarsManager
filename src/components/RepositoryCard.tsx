@@ -78,6 +78,7 @@ const ReleaseSheetLoadingFallback: React.FC<{
       aria-describedby={undefined}
       className="w-[calc(100%_-_2rem)] max-w-sm p-6"
       onPointerDownOutside={onPointerDownOutside}
+      onOverlayPointerDown={onPointerDownOutside as unknown as React.PointerEventHandler<HTMLDivElement>}
       onCloseAutoFocus={(event) => {
         event.preventDefault();
         onCloseAutoFocus();
