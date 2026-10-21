@@ -127,22 +127,29 @@ router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
     }
 
     const cleanPath = githubPath.replace(/^\/+/, '');
-    let targetUrlObj: URL;
+    const safeSegments = cleanPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
+
+    const searchParams = new URL(req.url, 'http://localhost').searchParams;
+    const safeSearchParams = new URLSearchParams();
+    for (const [key, value] of searchParams.entries()) {
+      safeSearchParams.set(encodeURIComponent(key), encodeURIComponent(value));
+    }
+    const safeQuery = safeSearchParams.toString() ? `?${safeSearchParams.toString()}` : '';
+
+    const targetUrl = `https://api.github.com/${safeSegments}${safeQuery}`;
+
+    let parsedUrl: URL;
     try {
-      targetUrlObj = new URL(`https://api.github.com/${cleanPath}`);
+      parsedUrl = new URL(targetUrl);
     } catch {
       res.status(400).json({ error: 'Invalid target path', code: 'INVALID_TARGET_PATH' });
       return;
     }
 
-    if (targetUrlObj.protocol !== 'https:' || targetUrlObj.hostname !== 'api.github.com') {
+    if (parsedUrl.protocol !== 'https:' || parsedUrl.hostname !== 'api.github.com') {
       res.status(400).json({ error: 'Host not allowed', code: 'HOST_NOT_ALLOWED' });
       return;
     }
-
-    const queryString = new URL(req.url, 'http://localhost').search;
-    targetUrlObj.search = queryString;
-    const targetUrl = targetUrlObj.toString();
     validateUrl(targetUrl);
 
     const body = req.body as { method?: string; headers?: Record<string, string>; body?: string | object };
