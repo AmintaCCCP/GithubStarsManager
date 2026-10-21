@@ -98,11 +98,12 @@ function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
   }
 }
 
-// POST /api/proxy/github/*
-router.post('/api/proxy/github/*', async (req, res) => {
+// POST /api/proxy/github/{*path}
+router.post('/api/proxy/github/{*path}', async (req, res) => {
   try {
     const db = getDb();
-    const githubPath = (req.params as Record<string, string>)[0]; // wildcard capture
+    const rawPath = req.params.path;
+    const githubPath = Array.isArray(rawPath) ? rawPath.join('/') : (rawPath ?? '');
     
     // Read and decrypt GitHub token from settings
     const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
