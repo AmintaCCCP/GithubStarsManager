@@ -124,6 +124,20 @@ router.post('/api/proxy/github/{*path}', async (req, res) => {
     const queryString = new URL(req.url, 'http://localhost').search;
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
 
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(targetUrl);
+    } catch {
+      res.status(400).json({ error: 'Invalid target path', code: 'INVALID_TARGET_PATH' });
+      return;
+    }
+
+    if (parsedUrl.origin !== 'https://api.github.com') {
+      res.status(400).json({ error: 'Host not allowed', code: 'HOST_NOT_ALLOWED' });
+      return;
+    }
+    validateUrl(targetUrl);
+
     const body = req.body as { method?: string; headers?: Record<string, string>; body?: string | object };
     const method = body.method || 'GET';
     
