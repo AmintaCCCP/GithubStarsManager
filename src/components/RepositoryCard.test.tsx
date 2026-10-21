@@ -1,7 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TooltipProvider } from './ui/tooltip';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryCard } from './RepositoryCard';
 import { PluginPageHost } from './PluginPageHost';
 import { useAppStore } from '../store/useAppStore';
@@ -156,6 +156,8 @@ const renderRepositoryCard = (
 );
 
 beforeEach(() => {
+  cleanup();
+  document.body.innerHTML = '';
   vi.clearAllMocks();
   pluginClientMocks.list.mockResolvedValue({ plugins: [], invalidPlugins: [] });
   pluginRegistry.resetForTests();
@@ -183,6 +185,12 @@ beforeEach(() => {
   mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
     selector ? selector(storeState) : storeState
   )) as typeof useAppStore);
+});
+
+afterEach(() => {
+  cleanup();
+  document.body.innerHTML = '';
+  actionMocks.releaseSheet.suspend = null;
 });
 
 describe('RepositoryCard view modes', () => {
@@ -424,6 +432,7 @@ describe('RepositoryCard view modes', () => {
     expect(await screen.findByText('Loading releases…')).toBeInTheDocument();
 
     await act(async () => {
+      fireEvent.pointerDown(document.body);
       fireEvent.pointerDown(card);
       fireEvent.click(card);
     });
