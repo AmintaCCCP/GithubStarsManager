@@ -111,7 +111,7 @@
     "jsdom": "^24.0.0",
     "katex": "^0.19.0",
     "lucide-react": "^1.59.0",
-    "mermaid": "^11.17.0",
+    "mermaid": "^12.2.0",
     "postcss": "^8.5.30",
     "query-string": "^9.3.1",
     "react": "^19.3.1",
