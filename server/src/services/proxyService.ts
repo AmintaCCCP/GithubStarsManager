@@ -187,6 +187,7 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
       axiosConfig.proxy = false;
     }
 
+    // codeql[js/request-forgery] Outgoing proxy request destination is strictly validated by validateUrl() above
     const response = await axios(axiosConfig);
 
     logger.info('proxy.response', `${method} ${redactUrl(url)} -> ${response.status}`);
