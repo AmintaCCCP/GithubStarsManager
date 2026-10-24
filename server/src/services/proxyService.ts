@@ -1,6 +1,9 @@
 import axios, { AxiosRequestConfig } from 'axios';
 import { isIP } from 'node:net';
 import { lookup } from 'node:dns/promises';
+import type { LookupAddress, LookupOptions } from 'node:dns';
+import { Agent as HttpAgent, type AgentOptions as HttpAgentOptions } from 'node:http';
+import { Agent as HttpsAgent, type AgentOptions as HttpsAgentOptions } from 'node:https';
 import { logger } from './logger.js';
 import { redactUrl } from './logSanitizer.js';
 
@@ -46,8 +49,8 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const CREDENTIAL_HEADERS = new Set(['authorization', 'cookie', 'proxy-authorization']);
 
 /** 解析 hostname 并校验全部解析结果（IMDS 封禁 + 严格档私网段）。
- *  解析失败时放行——后续连接会以同样的 DNS 错误自然失败；
- *  配置了代理时跳过：目标由远程代理解析，本地结果不代表实际连接地址。 */
+ *  解析失败时放行——后续连接会以同样的 DNS 错误自然失败。
+ *  仅用于代理模式：直连请求由 createSafeLookup 的连接级固定负责。 */
 async function assertResolvedHostsSafe(rawUrl: string, allowPrivate: boolean): Promise<void> {
   let hostname: string;
   try {
@@ -72,16 +75,77 @@ async function assertResolvedHostsSafe(rawUrl: string, allowPrivate: boolean): P
   } catch {
     return;
   }
-  for (const { address } of addresses) {
-    // 归一化覆盖 ::ffff:169.254.169.254 等 IPv4 映射型写法
+  // 归一化覆盖 ::ffff:169.254.169.254 等 IPv4 映射型写法
+  const violating = addresses.find(({ address }) => {
     const normalized = normalizeHostname(address);
-    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(normalized)) {
-      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to protected address '${normalized}'`);
-    }
-    if (!allowPrivate && isPrivateOrLoopback(normalized)) {
-      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to private address '${normalized}'`);
-    }
+    return ALWAYS_BLOCKED_RESOLVED_IPS.has(normalized) || (!allowPrivate && isPrivateOrLoopback(normalized));
+  });
+  if (violating) {
+    const normalized = normalizeHostname(violating.address);
+    const kind = ALWAYS_BLOCKED_RESOLVED_IPS.has(normalized) ? 'protected' : 'private';
+    throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to ${kind} address '${normalized}'`);
   }
+}
+
+/** 过滤出策略允许的解析结果：IMDS/未指定地址任何档位拒绝，严格档额外拒绝私网/回环段。 */
+function filterAllowedAddresses(allowPrivate: boolean, addresses: LookupAddress[]): LookupAddress[] {
+  return addresses.filter(({ address }) => {
+    const normalized = normalizeHostname(address);
+    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(normalized)) return false;
+    if (!allowPrivate && isPrivateOrLoopback(normalized)) return false;
+    return true;
+  });
+}
+
+type SafeLookupCallback = (err: Error | null, address?: string | LookupAddress[], family?: number) => void;
+type SafeLookup = (hostname: string, options: LookupOptions, callback: SafeLookupCallback) => void;
+
+/** 连接级固定：自定义 lookup 在解析时即执行策略校验，Node 直接连接校验通过的
+ *  IP，消除「校验通过后、实际连接前被 DNS 重绑定」的窗口。校验失败的候选被
+ *  剔除；若全部候选都被拒绝则整个解析失败（连接不发起）。 */
+export function createSafeLookup(allowPrivate: boolean): SafeLookup {
+  return (hostname, options, callback) => {
+    lookup(hostname, { all: true, verbatim: true })
+      .then((all) => {
+        const valid = filterAllowedAddresses(allowPrivate, all);
+        if (!valid.length) {
+          callback(new Error(`Blocked proxy request: hostname '${hostname}' has no allowed resolved address`));
+          return;
+        }
+        if (options.all) {
+          callback(null, valid);
+          return;
+        }
+        if (options.family === 4 || options.family === 6) {
+          const match = valid.find((a) => a.family === options.family);
+          if (!match) {
+            const err = new Error(`No IPv${options.family} record for '${hostname}' passed policy`) as NodeJS.ErrnoException;
+            err.code = 'ENOTFOUND';
+            callback(err);
+            return;
+          }
+          callback(null, match.address, match.family);
+          return;
+        }
+        callback(null, valid[0].address, valid[0].family);
+      })
+      .catch((err: Error) => callback(err));
+  };
+}
+
+// 直连 Agent 按 allowPrivate 两档缓存（默认无 keepAlive，socket 用完即断，无泄漏）
+const directAgentCache = new Map<boolean, { httpAgent: HttpAgent; httpsAgent: HttpsAgent }>();
+function getDirectAgents(allowPrivate: boolean): { httpAgent: HttpAgent; httpsAgent: HttpsAgent } {
+  let cached = directAgentCache.get(allowPrivate);
+  if (!cached) {
+    const safeLookup = createSafeLookup(allowPrivate) as unknown as HttpAgentOptions['lookup'];
+    cached = {
+      httpAgent: new HttpAgent({ lookup: safeLookup } as HttpAgentOptions),
+      httpsAgent: new HttpsAgent({ lookup: safeLookup } as unknown as HttpsAgentOptions),
+    };
+    directAgentCache.set(allowPrivate, cached);
+  }
+  return cached;
 }
 
 export interface ValidateUrlOptions {
@@ -187,13 +251,16 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
   try {
     validateUrl(url, { allowPrivate: options.allowPrivate });
-    if (!proxyConfig?.enabled) {
-      // 代理关闭时本地负责 DNS 解析，校验解析结果（IMDS/私网段策略）
+    if (proxyConfig?.enabled) {
+      // 代理模式下目标由远程代理解析，无法本地固定连接地址：以本地解析结果做
+      // 预检（覆盖同宿主/共享解析器的常见部署），远程代理自身的出口策略是用户
+      // 显式选择的委派边界。直连请求由下方注入的 safe lookup 在连接级强制执行。
       await assertResolvedHostsSafe(url, Boolean(options.allowPrivate));
     }
     logger.info('proxy.request', `${method} ${redactUrl(url)}`);
 
-    // 代理配置只依赖 proxyConfig，循环外构建一次，每一跳复用
+    // 代理配置只依赖 proxyConfig，循环外构建一次，每一跳复用。
+    // 直连时注入带策略校验的 lookup（连接级固定，杜绝校验后重绑定）。
     let httpAgent: AxiosRequestConfig['httpAgent'];
     let httpsAgent: AxiosRequestConfig['httpsAgent'];
     let proxySetting: AxiosRequestConfig['proxy'];
@@ -223,6 +290,9 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
     } else {
       // 显式禁用代理，防止 axios 回退到环境变量 HTTP_PROXY/HTTPS_PROXY
       proxySetting = false;
+      const direct = getDirectAgents(Boolean(options.allowPrivate));
+      httpAgent = direct.httpAgent;
+      httpsAgent = direct.httpsAgent;
     }
 
     // 关闭 axios 自动重定向，手动逐跳跟随：每一跳都重跑 validateUrl 与
@@ -287,7 +357,7 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
           }
           currentUrl = nextUrl;
           validateUrl(currentUrl, { allowPrivate: options.allowPrivate });
-          if (!proxyConfig?.enabled) {
+          if (proxyConfig?.enabled) {
             await assertResolvedHostsSafe(currentUrl, Boolean(options.allowPrivate));
           }
           logger.info('proxy.redirect', `${response.status} -> ${redactUrl(currentUrl)}`);
