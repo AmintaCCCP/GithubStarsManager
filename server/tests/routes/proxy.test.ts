@@ -1,6 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import axios from 'axios';
-import { proxyRequest } from '../../src/services/proxyService.js';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import type { LookupOptions } from 'node:dns';
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
+import { createSafeLookup, proxyRequest } from '../../src/services/proxyService.js';
 
 // 确定性测试：mock axios，避免对真实外网的依赖（原测试依赖网络连通性，环境不通时随机失败）。
 vi.mock('axios', () => {
@@ -12,6 +16,17 @@ vi.mock('axios', () => {
           (e as { name?: string }).name === 'AbortError')
     );
   return { default: fn };
+});
+
+// DNS 解析结果同样 mock，保证测试确定性（默认解析到公网地址）
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}));
+const dnsLookupMock = dnsLookup as unknown as Mock;
+const axiosMock = axios as unknown as Mock;
+
+beforeEach(() => {
+  dnsLookupMock.mockReset().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
 });
 
 describe('proxyRequest', () => {
@@ -305,5 +320,268 @@ describe('proxyRequest', () => {
 
     expect(result.status).toBe(502);
     expect(mockAxios).not.toHaveBeenCalled();
+  });
+});
+
+describe('proxyRequest redirect & DNS hardening', () => {
+  beforeEach(() => {
+    axiosMock.mockReset();
+    dnsLookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('follows a redirect hop-by-hop with maxRedirects disabled per hop', async () => {
+    axiosMock
+      .mockResolvedValueOnce({ status: 302, headers: { location: 'https://api.github.com/other' }, data: '' })
+      .mockResolvedValueOnce({ status: 200, headers: { 'content-type': 'application/json' }, data: { ok: 1 } });
+
+    const result = await proxyRequest({ url: 'https://api.github.com/first', method: 'GET' });
+
+    expect(result.status).toBe(200);
+    expect(result.data).toEqual({ ok: 1 });
+    expect(axiosMock).toHaveBeenCalledTimes(2);
+    expect(axiosMock.mock.calls[0][0].url).toBe('https://api.github.com/first');
+    expect(axiosMock.mock.calls[0][0].maxRedirects).toBe(0);
+    expect(axiosMock.mock.calls[1][0].url).toBe('https://api.github.com/other');
+    expect(axiosMock.mock.calls[1][0].maxRedirects).toBe(0);
+  });
+
+  it('blocks a redirect hop to a private address in strict mode', async () => {
+    axiosMock.mockResolvedValueOnce({
+      status: 302,
+      headers: { location: 'http://127.0.0.1/evil' },
+      data: '',
+    });
+
+    const result = await proxyRequest({ url: 'https://api.github.com/first', method: 'GET' });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).toHaveBeenCalledTimes(1); // 第二跳未发出
+    expect((result.data as { details: string }).details).toContain('127.0.0.1');
+  });
+
+  it('allows a redirect hop to a private address in allowPrivate mode', async () => {
+    axiosMock
+      .mockResolvedValueOnce({ status: 302, headers: { location: 'http://192.168.1.10:11434/v1' }, data: '' })
+      .mockResolvedValueOnce({ status: 200, headers: { 'content-type': 'application/json' }, data: { ok: 1 } });
+
+    const result = await proxyRequest({
+      url: 'https://api.github.com/first',
+      method: 'GET',
+      allowPrivate: true,
+    });
+
+    expect(result.status).toBe(200);
+    expect(axiosMock.mock.calls[1][0].url).toBe('http://192.168.1.10:11434/v1');
+  });
+
+  it('attaches policy-checking lookup agents for direct requests', async () => {
+    axiosMock.mockResolvedValueOnce({
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      data: { ok: 1 },
+    });
+
+    const result = await proxyRequest({ url: 'https://api.github.com/x', method: 'GET' });
+
+    expect(result.status).toBe(200);
+    const cfg = axiosMock.mock.calls[0][0];
+    expect(cfg.httpAgent).toBeInstanceOf(HttpAgent);
+    expect(cfg.httpsAgent).toBeInstanceOf(HttpsAgent);
+    expect(cfg.proxy).toBe(false);
+  });
+
+  it('enforces the local DNS pre-check in proxy mode (remote proxy owns resolution)', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
+
+    const result = await proxyRequest({
+      url: 'https://example.com/api',
+      method: 'GET',
+      allowPrivate: true,
+      proxyConfig: { enabled: true, type: 'http', host: 'proxy.local', port: 7890 },
+    });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).not.toHaveBeenCalled();
+    expect((result.data as { details: string }).details).toContain('169.254.169.254');
+  });
+
+  it('strips credential headers on same-host HTTPS-to-HTTP downgrade redirect', async () => {
+    axiosMock
+      .mockResolvedValueOnce({ status: 302, headers: { location: 'http://api.github.com/final' }, data: '' })
+      .mockResolvedValueOnce({ status: 200, headers: { 'content-type': 'application/json' }, data: { ok: 1 } });
+
+    const result = await proxyRequest({
+      url: 'https://api.github.com/first',
+      method: 'GET',
+      headers: { Authorization: 'Bearer secret', Cookie: 'session=1' },
+    });
+
+    expect(result.status).toBe(200);
+    const second = axiosMock.mock.calls[1][0];
+    expect(second.url).toBe('http://api.github.com/final');
+    expect(second.headers.Authorization).toBeUndefined();
+    expect(second.headers.Cookie).toBeUndefined();
+  });
+
+  it('re-runs the DNS pre-check per redirect hop in proxy mode', async () => {
+    dnsLookupMock
+      .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+      .mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
+    axiosMock.mockResolvedValueOnce({
+      status: 302,
+      headers: { location: 'https://metadata.example.com/x' },
+      data: '',
+    });
+
+    const result = await proxyRequest({
+      url: 'https://api.github.com/first',
+      method: 'GET',
+      allowPrivate: true,
+      proxyConfig: { enabled: true, type: 'http', host: 'proxy.local', port: 7890 },
+    });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).toHaveBeenCalledTimes(1);
+    expect(dnsLookupMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('strips credential headers on cross-host redirect and converts 303 to GET', async () => {
+    axiosMock
+      .mockResolvedValueOnce({ status: 303, headers: { location: 'https://other.example.com/final' }, data: '' })
+      .mockResolvedValueOnce({ status: 200, headers: { 'content-type': 'application/json' }, data: { done: true } });
+
+    const result = await proxyRequest({
+      url: 'https://api.github.com/first',
+      method: 'POST',
+      headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' },
+      body: { a: 1 },
+    });
+
+    expect(result.status).toBe(200);
+    const second = axiosMock.mock.calls[1][0];
+    expect(second.url).toBe('https://other.example.com/final');
+    expect(second.method).toBe('get');
+    expect(second.data).toBeUndefined();
+    expect(second.headers.Authorization).toBeUndefined();
+  });
+
+
+});
+
+describe('IMDS protection in allowPrivate mode', () => {
+  beforeEach(() => {
+    axiosMock.mockReset();
+    dnsLookupMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('blocks the IMDS IPv6 literal URL even in allowPrivate mode', async () => {
+    const result = await proxyRequest({
+      url: 'http://[fd00:ec2::254]/latest/meta-data',
+      method: 'GET',
+      allowPrivate: true,
+    });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).not.toHaveBeenCalled();
+    expect((result.data as { details: string }).details).toContain('fd00:ec2::254');
+  });
+
+  it('blocks DNS AAAA records returning IPv4-mapped IMDS in proxy mode', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '::ffff:169.254.169.254', family: 6 }]);
+
+    const result = await proxyRequest({
+      url: 'https://metadata.example.com/secret',
+      method: 'GET',
+      allowPrivate: true,
+      proxyConfig: { enabled: true, type: 'http', host: 'proxy.local', port: 7890 },
+    });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).not.toHaveBeenCalled();
+    expect((result.data as { details: string }).details).toContain('169.254.169.254');
+  });
+});
+
+describe('createSafeLookup (connection-level pinning)', () => {
+  type LookupResult = {
+    err: Error | null;
+    address?: string | Array<{ address: string; family: number }>;
+    family?: number;
+  };
+  const run = (allowPrivate: boolean, hostname: string, options: LookupOptions = {}) =>
+    new Promise<LookupResult>((resolve) => {
+      createSafeLookup(allowPrivate)(hostname, options, (err, address, family) => {
+        resolve({ err, address: address as LookupResult['address'], family });
+      });
+    });
+
+  beforeEach(() => {
+    dnsLookupMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects when every resolved address is IMDS', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
+    const res = await run(true, 'metadata.example.com');
+    expect(res.err?.message).toContain('no allowed resolved address');
+  });
+
+  it('rejects private addresses in strict mode but connects in allowPrivate mode', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+    const strict = await run(false, 'gateway.example.com');
+    expect(strict.err?.message).toContain('no allowed resolved address');
+
+    const relaxed = await run(true, 'gateway.example.com');
+    expect(relaxed.err).toBeNull();
+    expect(relaxed.address).toBe('10.0.0.5');
+  });
+
+  it('skips violating candidates and connects to the allowed one in strict mode', async () => {
+    dnsLookupMock.mockResolvedValue([
+      { address: '10.0.0.5', family: 4 },
+      { address: '93.184.216.34', family: 4 },
+    ]);
+    const res = await run(false, 'mixed.example.com');
+    expect(res.err).toBeNull();
+    expect(res.address).toBe('93.184.216.34');
+  });
+
+  it('normalizes IPv4-mapped IPv6 before policy checks', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '::ffff:169.254.169.254', family: 6 }]);
+    const res = await run(true, 'metadata.example.com');
+    expect(res.err?.message).toContain('no allowed resolved address');
+  });
+
+  it('honours requested family and reports ENOTFOUND when no record passes', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '2001:db8::1', family: 6 }]);
+    const res = await run(true, 'v6only.example.com', { family: 4 });
+    expect((res.err as NodeJS.ErrnoException).code).toBe('ENOTFOUND');
+  });
+
+  it('passes the full address list through when options.all is set', async () => {
+    dnsLookupMock.mockResolvedValue([
+      { address: '93.184.216.34', family: 4 },
+      { address: '2606:2800::1', family: 6 },
+    ]);
+    const res = await run(true, 'dual.example.com', { all: true });
+    expect(res.err).toBeNull();
+    expect(Array.isArray(res.address)).toBe(true);
+  });
+
+  it('propagates DNS resolution failures', async () => {
+    dnsLookupMock.mockRejectedValue(Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }));
+    const res = await run(true, 'missing.example.com');
+    expect(res.err?.message).toContain('ENOTFOUND');
   });
 });

@@ -644,6 +644,7 @@ router.post('/api/settings/proxy/test', async (req, res) => {
         socket.on('connect', () => resolve(socket));
         socket.on('timeout', () => { socket.destroy(); reject(new Error('Connection timeout')); });
         socket.on('error', (err: Error) => reject(err));
+        // codeql[js/request-forgery] 目标是用户在设置中自填的自有代理服务器，按业务必须支持内网/回环地址。
         socket.connect(port, host);
       });
 
@@ -755,6 +756,35 @@ router.post('/api/settings/proxy/test', async (req, res) => {
 
 // --- RPC Download endpoints ---
 
+// aria2 RPC 的 host/port 直接拼进 `http://${host}:${port}/jsonrpc`。host 中出现
+// 路径分隔、查询、锚点、userinfo、百分号编码或空白字符都会改变 URL 的解析结构
+// （如 `1.2.3.4/#x`、`a%2fb@`），一律拒绝；其余字符（含 IDN 主机名、IPv6）保持
+// 放行（裸 IPv6 在构造 URL 时自动补方括号），端口必须是 1-65535 的整数。
+function isSafeRpcHost(host: unknown): boolean {
+  return typeof host === 'string' && host.length > 0 && !/[/\\?#@%\s]/.test(host);
+}
+
+function isSafeRpcPort(port: unknown): boolean {
+  if (typeof port === 'number') return Number.isInteger(port) && port >= 1 && port <= 65535;
+  if (typeof port === 'string') {
+    if (!/^\d+$/.test(port)) return false;
+    const n = Number(port);
+    return n >= 1 && n <= 65535;
+  }
+  return false;
+}
+
+// URL 标准要求 IPv6 主机使用方括号：把裸 IPv6（如 `::1`）规范化为 `[::1]`，
+// 已带方括号或普通主机名/IPv4 原样返回。测试连接与下载两条路径共用。
+function buildRpcUrl(host: string, port: number | string): string {
+  const hostPart = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
+  return `http://${hostPart}:${port}/jsonrpc`;
+}
+
+function invalidRpcTarget(res: import('express').Response): void {
+  res.status(400).json({ error: 'Invalid RPC host or port', code: 'INVALID_RPC_TARGET' });
+}
+
 function getRpcDownloadConfig(): { host: string; port: number; secret: string } | null {
   try {
     const db = getDb();
@@ -762,6 +792,11 @@ function getRpcDownloadConfig(): { host: string; port: number; secret: string } 
     if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
     if (parsed && parsed.enabled && parsed.host && parsed.port) {
+      // 存量配置可能写入于入库校验之前：读取时同样校验（fail-closed，非法即视为未配置）
+      if (!isSafeRpcHost(parsed.host) || !isSafeRpcPort(parsed.port)) {
+        logger.warn('rpc.config', 'Stored rpc_download_config has invalid host/port; treating as unconfigured');
+        return null;
+      }
       let secret = '';
       if (parsed.secret_encrypted) {
         secret = decrypt(parsed.secret_encrypted, config.encryptionKey);
@@ -802,6 +837,17 @@ router.put('/api/settings/rpc-download', (req, res) => {
     const { enabled, host, port, secret } = req.body;
     const secretProvided = 'secret' in req.body;
 
+    // 空字符串沿用原有行为（未配置时允许空串）；其余任何值都要求先通过字符串
+    // 类型与 URL 结构字符校验，防止数字 0 等非字符串值绕过（`host &&` 的假值陷阱）。
+    if (host !== undefined && host !== '' && !isSafeRpcHost(host)) {
+      invalidRpcTarget(res);
+      return;
+    }
+    if (port !== undefined && port !== '' && !isSafeRpcPort(port)) {
+      invalidRpcTarget(res);
+      return;
+    }
+
     const configToStore: Record<string, unknown> = { enabled, host, port };
     if (secretProvided && secret) {
       configToStore.secret_encrypted = encrypt(secret, config.encryptionKey);
@@ -836,6 +882,7 @@ async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: n
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // codeql[js/request-forgery] 目标是用户配置的自有 aria2 RPC（典型为内网 NAS），按业务必须支持 http 内网地址；host/port 已做 URL 结构字符校验。
     return await fetch(url, { ...fetchInit, signal: controller.signal });
   } finally {
     clearTimeout(timer);
@@ -847,6 +894,11 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
   const { host, port, secret: requestSecret } = req.body;
   if (!host || !port) {
     res.json({ success: false, error: 'Host and port are required' });
+    return;
+  }
+  // host/port 直接拼进 jsonrpc URL，先挡掉能改变 URL 解析结构的字符
+  if (!isSafeRpcHost(host) || !isSafeRpcPort(port)) {
+    invalidRpcTarget(res);
     return;
   }
 
@@ -861,7 +913,7 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
   }
 
   try {
-    const rpcUrl = `http://${host}:${port}/jsonrpc`;
+    const rpcUrl = buildRpcUrl(host, port);
     const params = secret ? [`token:${secret}`] : [];
 
     logger.info('rpc.test', `Testing connection to ${host}:${port}`);
@@ -934,7 +986,7 @@ router.post('/api/download/rpc', async (req, res) => {
       return;
     }
 
-    const rpcUrl = `http://${rpcConfig.host}:${rpcConfig.port}/jsonrpc`;
+    const rpcUrl = buildRpcUrl(rpcConfig.host, rpcConfig.port);
     const params: unknown[] = rpcConfig.secret
       ? [`token:${rpcConfig.secret}`, [url]]
       : [[url]];

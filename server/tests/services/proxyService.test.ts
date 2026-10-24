@@ -82,11 +82,11 @@ describe('validateUrl', () => {
     });
 
     it('STILL blocks the cloud metadata IMDS address even when lenient', () => {
-      expect(() => validateUrl('http://169.254.169.254/latest/meta-data/', { allowPrivate: true })).toThrow(/IMDS address/);
+      expect(() => validateUrl('http://169.254.169.254/latest/meta-data/', { allowPrivate: true })).toThrow(/protected address/);
     });
 
     it('STILL blocks IPv4-mapped IPv6 IMDS even when lenient', () => {
-      expect(() => validateUrl('http://[::ffff:169.254.169.254]/x', { allowPrivate: true })).toThrow(/IMDS address/);
+      expect(() => validateUrl('http://[::ffff:169.254.169.254]/x', { allowPrivate: true })).toThrow(/protected address/);
     });
   });
 
