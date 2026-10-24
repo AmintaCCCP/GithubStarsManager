@@ -12,7 +12,10 @@
  *    泛词的仓库。失败/零命中时逐词 fuzzy 回退（≤3 次，不带语言过滤仍查全库）。
  *    召回池 = repoFacets ∪ hits 分页聚合（≤3 页，唯一仓库 <60 且仍有余量才翻页）→ ≤60 仓库。
  * ③ GitHub 元数据补全（GraphQL 批量，整批失败回退 REST 逐仓并发 8）→ 语言后过滤
- *    （过滤后 <10 个放弃过滤）→ LLM 精选排序（selectRelevantRepositories + 召回证据行）。
+ *    （过滤后 <10 个放弃过滤）→ LLM 精选排序（宽松排序提示词：全网召回池必然
+ *    混杂词法噪声，"没有真正满足意图就返回 []"的过滤式措辞会让模型塌缩判空——
+ *    实测 flash 模型 3/3 真实查询返回空数组而候选里有直接对口仓库）。判空不再
+ *    清空结果：按池序词法兜底，ai_empty 仅作信号上报。
  *
  * 竞态/取消语义：AbortSignal 全链路传播，abort 一律重抛、绝不产出兜底结果
  * （对齐 aiService 现有语义）；结果写入 'search' 频道，不分页（≤20 个）。
@@ -458,7 +461,8 @@ function fallbackOrderByCount(pool: Array<{ repo: DiscoveryRepo; count: number }
 /**
  * 全网仓库 AI 语义搜索主入口。结果写入 'search' 频道渲染（不分页）。
  * - 召回为空 → onFallback('recall_empty') + 空结果；
- * - LLM 精选返回 []（明确判空）→ onFallback('ai_empty') + 空结果；
+ * - LLM 精选返回 []（明确判空）→ onFallback('ai_empty') + 按池序词法兜底
+ *   （全网搜索语境下判空几乎必是模型塌缩而非真实空态，不清空结果）；
  * - LLM 精选不可解析/失败（非 abort）→ onFallback('unparseable'/'ai_failed') + 按命中数兜底；
  * - abort 一律重抛，绝不产出兜底结果。
  */
@@ -575,9 +579,12 @@ export async function searchRepositoriesSemantically(
       onFallback?.('unparseable');
       ordered = fallbackOrderByCount(pool);
     } else if (ranked.length === 0) {
-      // 模型明确判定无相关仓库：尊重该判断返回空态
+      // 全网搜索语境下召回池按扩展词构造，"所有候选都与查询无关"几乎不可能是真命题：
+      // 模型判空基本是塌缩失败而非真实空态（实测提示词过严时 flash 模型 3/3 判空，
+      // 候选里明明有直接对口仓库）。尊重判空信号（ai_empty 照常上报）但不清空结果，
+      // 按池序（辅路命中优先、并集计数降序）词法兜底；结果非空时 UI 不会展示空态。
       onFallback?.('ai_empty');
-      return emptyResult();
+      ordered = pool.slice(0, MAX_RESULT_COUNT).map(candidate => candidate.repo);
     } else {
       // selectRelevantRepositories 返回的 Repository 即带 rank/channel/platform 的 DiscoveryRepo
       ordered = ranked as DiscoveryRepo[];

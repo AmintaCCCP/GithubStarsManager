@@ -566,7 +566,7 @@ describe('AIService.selectRelevantRepositories — evidence 证据行', () => {
   };
   const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as Record<string, unknown>;
 
-  it('不传 evidence 时精选提示词与 searchRepositoriesWithSelection 逐字节一致；传 evidence 时在对应仓库块末尾追加证据行', async () => {
+  it('不传 evidence 时精选提示词与 searchRepositoriesWithSelection 逐字节一致；传 evidence（全网发现）切换宽松排序提示词并追加证据行', async () => {
     const repoA = makeRepo({ id: 910000001, name: 'md-tool', full_name: 'acme/md-tool', description: 'a markdown tool' });
     const repoB = makeRepo({ id: 910000002, name: 'other', full_name: 'acme/other', description: 'unrelated' });
     const query = 'markdown 编辑器';
@@ -596,10 +596,12 @@ describe('AIService.selectRelevantRepositories — evidence 证据行', () => {
     expect(baselinePrompt).not.toBe('');
     expect(baselinePrompt).not.toContain('matches=');
 
-    // 传 evidence：对应仓库块末尾追加证据行（键为 full_name 小写匹配）
+    // 传 evidence（全网发现路径）：提示词切换为宽松排序模式 + 证据行追加
+    let evidenceSystem = '';
     let evidencePrompt = '';
     fetchMock.mockImplementationOnce(async (_url, init) => {
       const body = await captureBody(init);
+      evidenceSystem = String((body.messages as Array<{ content: string }>)[0].content);
       evidencePrompt = String((body.messages as Array<{ content: string }>)[1].content);
       return chatResponse('[]');
     });
@@ -616,8 +618,35 @@ describe('AIService.selectRelevantRepositories — evidence 证据行', () => {
     expect(mdBlockEnd).toBeGreaterThan(metaLine);
     // 无证据的仓库不受影响
     expect(evidencePrompt).toContain('acme/other');
-    // 其余内容与基线一致：去掉证据行后逐字节相同
-    expect(evidencePrompt.replace(`${evidenceLine}\n`, '')).toBe(baselinePrompt);
+    // 全网发现提示词不再含过滤式"凑数即判空"措辞（实测会让 flash 模型在噪声
+    // 候选池上塌缩到空数组），改为"选最相关、忽略无关、仅当全部候选无关才判空"
+    expect(evidencePrompt).not.toContain('凑数');
+    expect(evidencePrompt).toContain('不要因为候选池中多数仓库无关就返回空数组');
+    expect(evidenceSystem).not.toContain('返回空数组');
+  });
+
+  it('en 语言下 evidence 路径同样切换为宽松排序提示词', async () => {
+    const repoA = makeRepo({ id: 910000001, name: 'md-tool', full_name: 'acme/md-tool', description: 'a markdown tool' });
+    const fetchMock = mockFetch();
+    let enSystem = '';
+    let enPrompt = '';
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      enSystem = String((body.messages as Array<{ content: string }>)[0].content);
+      enPrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      return chatResponse('[]');
+    });
+    const enService = new AIService(makeConfig() as never, 'en');
+    await enService.selectRelevantRepositories(
+      [repoA],
+      'markdown editor',
+      '',
+      undefined,
+      new Map([['acme/md-tool', 'matches=1; paths=README.md; langs=']]),
+    );
+    expect(enPrompt).not.toContain('loosely related');
+    expect(enPrompt).toContain('never return [] just because most candidates are irrelevant');
+    expect(enSystem).not.toContain('return an empty array');
   });
 });
 

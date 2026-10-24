@@ -2298,11 +2298,15 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   /**
-   * 把候选仓库摘要交给 LLM，选出与查询真正相关的仓库并按相关性排序。
+   * 把候选仓库摘要交给 LLM，选出与查询相关的仓库并按相关性排序。
    * 返回 null 表示响应缺失/无法解析（调用方走词法兜底）；空数组是合法结果
    * （模型判断没有仓库能满足查询意图）。
    * evidence（可选，全网仓库语义搜索使用）：键为 full_name 小写、值为召回
-   * 证据行的映射，附加到对应仓库摘要块末尾，让重排模型看到"为什么被召回"。
+   * 证据行的映射，附加到对应仓库摘要块末尾，让重排模型看到"为什么被召回"；
+   * 传 evidence 即切换为"全网发现"宽松排序提示词——全网召回池必然混杂大量
+   * 词法噪声，过滤式措辞（"没有真正满足意图就返回 []"）会让模型在噪声池上
+   * 塌缩到空数组（实测 flash 级模型 3/3 真实查询判空，候选里明明有直接对口
+   * 仓库），因此该路径改为"选出最相关、忽略无关、仅当全部候选无关才返回 []"。
    * 不传时提示词与历史格式逐字节一致（fixtures 快照守护）。
    */
   async selectRelevantRepositories(
@@ -2318,14 +2322,24 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
         ? `\n\n用户意图说明：${this.sanitizeForPrompt(intent)}`
         : `\n\nQuery intent: ${this.sanitizeForPrompt(intent)}`)
       : '';
+    // evidence 是"全网发现"路径的唯一标记（本地库精选从不传 evidence）
+    const discovery = evidence !== undefined;
 
     const system = this.language === 'zh'
-      ? '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出真正相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。若没有仓库能满足查询意图，返回空数组 []。'
-      : 'You are a GitHub repository search reranking assistant. Select the repositories that truly match the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text. If no repository satisfies the query intent, return an empty array [].';
+      ? (discovery
+        ? '你是 GitHub 仓库搜索排序助手。候选仓库来自全网词法召回，往往混杂大量无关仓库，请从中找出与用户查询相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。'
+        : '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出真正相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。若没有仓库能满足查询意图，返回空数组 []。')
+      : (discovery
+        ? 'You are a GitHub repository search reranking assistant. The candidates come from web-wide lexical recall and often include many irrelevant repositories; pick the ones related to the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text.'
+        : 'You are a GitHub repository search reranking assistant. Select the repositories that truly match the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text. If no repository satisfies the query intent, return an empty array [].');
 
     const user = this.language === 'zh'
-      ? `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 只保留能满足查询意图的仓库；若没有仓库能真正满足意图，返回 []，不要用仅部分沾边的仓库凑数。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`
-      : `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Keep only repositories that satisfy the query intent; if none truly do, return [] instead of padding with loosely related ones.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`;
+      ? (discovery
+        ? `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 选出与查询相关的仓库，按相关性从高到低排序；部分相关（同一主题的不同实现或周边工具）也应纳入。\n- 与查询无关的候选直接忽略；不要因为候选池中多数仓库无关就返回空数组。\n- 只有当所有候选都与查询意图无关时，才返回 []。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`
+        : `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 只保留能满足查询意图的仓库；若没有仓库能真正满足意图，返回 []，不要用仅部分沾边的仓库凑数。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`)
+      : (discovery
+        ? `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Pick the repositories relevant to the query, ordered from most to least relevant; partially relevant ones (different implementations of, or adjacent tools for, the same topic) should also be included.\n- Skip irrelevant candidates; never return [] just because most candidates are irrelevant.\n- Return [] only when every candidate is unrelated to the query intent.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`
+        : `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Keep only repositories that satisfy the query intent; if none truly do, return [] instead of padding with loosely related ones.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`);
 
     const content = await this.requestText({
       system,

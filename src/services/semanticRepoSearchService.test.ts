@@ -500,17 +500,18 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     expect(result.repos[0].full_name).toBe('o/r24');
   });
 
-  it('重排分支：AI 返回 [] → ai_empty 空结果', async () => {
+  it('重排分支：AI 返回 [] → ai_empty 上报 + 按池序词法兜底（不清空结果）', async () => {
     const select = vi.fn(async () => []);
     const ai = makeAi({ select });
     const onFallback = vi.fn();
     const { fetchImpl } = installGrepFetch([
-      grepResponse(grepResult({ total: 1, repoFacets: [{ val: 'a/b', count: 1 }] })),
+      grepResponse(grepResult({ total: 2, repoFacets: [{ val: 'a/small', count: 1 }, { val: 'b/big', count: 9 }] })),
     ]);
     const result = await searchRepositoriesSemantically(makeApi(), ai, 'kw', { fetchImpl, onFallback });
     expect(onFallback).toHaveBeenCalledWith('ai_empty');
-    expect(result.repos).toEqual([]);
-    expect(result.totalCount).toBe(0);
+    expect(result.repos.map(repo => repo.full_name)).toEqual(['b/big', 'a/small']);
+    expect(result.repos.map(repo => repo.rank)).toEqual([1, 2]);
+    expect(result.totalCount).toBe(2);
   });
 
   it('重排分支：AI 返回 null → unparseable + 按命中数降序兜底', async () => {
@@ -550,6 +551,39 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     await expect(searchRepositoriesSemantically(makeApi(), ai, 'kw', { fetchImpl, onFallback }))
       .rejects.toMatchObject({ name: 'AbortError' });
     expect(onFallback).not.toHaveBeenCalled();
+  });
+
+  it('#494 实测回归：噪声候选池 + 模型判空 → 仍返回词法兜底结果（辅路命中优先）而非空数组', async () => {
+    // 复刻真实抓包 case（openai账号注册机）：召回池 22 个里 4 个直接对口
+    // （GPT-Register-Tool 等），旧过滤式提示词下模型全部返回 []、最终展示为空。
+    // 服务层修复：判空不清空结果，按池序（辅路命中优先、并集计数降序）兜底。
+    const noise = Array.from({ length: 20 }, (_, i) => ({ val: `noise/repo-${i}`, count: 100 - i }));
+    const fetchImpl = vi.fn(async (input: string | URL | RequestInfo) => {
+      const q = decodeURIComponent(String(input).replace(/\+/g, ' '));
+      if (q.includes('openai')) {
+        // 主路并集正则（query + 术语）：大量噪声 + 直接对口仓库
+        return grepResponse(grepResult({
+          total: 21,
+          repoFacets: [...noise, { val: 'acme/gpt-register-tool', count: 6 }],
+          hits: [hit('noise/repo-0', 'docs/a.md')],
+        })) as unknown as Response;
+      }
+      // 辅路高具体性正则（仅 CJK 术语）：只有对口仓库命中
+      return grepResponse(grepResult({
+        total: 1,
+        repoFacets: [{ val: 'acme/gpt-register-tool', count: 1 }],
+        hits: [hit('acme/gpt-register-tool', 'README.md')],
+      })) as unknown as Response;
+    });
+    const select = vi.fn(async () => []);
+    const ai = makeAi({ expand: async () => ({ terms: ['注册机'], intent: '批量注册 OpenAI 账号的工具' }), select });
+    const onFallback = vi.fn();
+    const result = await searchRepositoriesSemantically(makeApi(), ai, 'openai账号注册机', { fetchImpl, onFallback });
+    expect(onFallback).toHaveBeenCalledWith('ai_empty');
+    expect(result.repos.length).toBe(20);
+    expect(result.repos[0].full_name).toBe('acme/gpt-register-tool');
+    expect(result.repos[1].full_name).toBe('noise/repo-0');
+    expect(result.totalCount).toBe(20);
   });
 });
 
