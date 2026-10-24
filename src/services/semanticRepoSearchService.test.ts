@@ -30,12 +30,20 @@ const hit = (repo: string, path: string, language = 'TypeScript') => ({
 });
 
 /** 以 grep.app 原始 API 形状返回可被 searchGrepApp 消费的伪 Response。 */
-const grepResponse = (result: GrepSearchResult) => ({
+const grepResponse = (result: GrepSearchResult) => grepRawResponse(result, true);
+
+/**
+ * Markdown 域（带 f.lang）实测响应形状：服务端缺 facets.count 字段，
+ * normalizeGrepSearchResponse 回落 hits.total。
+ */
+const markdownGrepResponse = (result: GrepSearchResult) => grepRawResponse(result, false);
+
+const grepRawResponse = (result: GrepSearchResult, withFacetCount: boolean) => ({
   ok: true,
   status: 200,
   json: async () => ({
     facets: {
-      count: result.total,
+      ...(withFacetCount ? { count: result.total } : {}),
       repo: { buckets: result.repoFacets.map(bucket => ({ val: bucket.val, count: bucket.count })) },
       path: { buckets: [] },
       lang: { buckets: [] },
@@ -140,15 +148,15 @@ describe('semanticRepoSearchService — buildRecallRegex', () => {
     expect(buildRecallRegex('React', ['react', 'Vue'])).toBe('(?:React|Vue)');
   });
 
-  it('长度窗口：空白与超长（>60）成员被剔除', () => {
+  it('长度窗口：空白与超长（>60）成员被剔除（2 字符术语另受具体性门槛约束，见下）', () => {
     expect(buildRecallRegex('   ', [])).toBeNull();
-    expect(buildRecallRegex('a'.repeat(61), ['ok'])).toBe('(?:ok)');
+    expect(buildRecallRegex('a'.repeat(61), ['okm'])).toBe('(?:okm)');
     expect(buildRecallRegex('ok', ['b'.repeat(61)])).toBe('(?:ok)');
   });
 
-  it('成员上限 6 个', () => {
-    const regex = buildRecallRegex('q0', ['t1', 't2', 't3', 't4', 't5', 't6', 't7']);
-    expect(regex).toBe('(?:q0|t1|t2|t3|t4|t5)');
+  it('成员上限 6 个（术语需 ≥3 字符拉丁词以通过具体性门槛）', () => {
+    const regex = buildRecallRegex('q0', ['t01', 't02', 't03', 't04', 't05', 't06', 't07']);
+    expect(regex).toBe('(?:q0|t01|t02|t03|t04|t05)');
   });
 
   it('成员逐个转义后拼接', () => {
@@ -157,6 +165,30 @@ describe('semanticRepoSearchService — buildRecallRegex', () => {
 
   it('无有效成员返回 null', () => {
     expect(buildRecallRegex('', [])).toBeNull();
+  });
+
+  it('总长预算 64：长 query + 多术语贪心纳入，超预算成员被跳过后继续尝试更短成员', () => {
+    const regex = buildRecallRegex('terminal file manager', ['file manager', 'filemanager', 'explorer', 'alternative', 'tui']);
+    // alternative（加入后 71>64）被跳过，更短的 tui（加入后恰好 64≤64）仍被纳入
+    expect(regex).toBe('(?:terminal file manager|file manager|filemanager|explorer|tui)');
+    expect(regex?.length ?? 0).toBeLessThanOrEqual(64);
+  });
+
+  it('总长预算按转义后长度计算：30 个点号恰好 64 字符保留，31 个点号单独超限剔除', () => {
+    // '.'.repeat(30) 转义后 60 字符，(?:…) 共 64 字符，恰好卡线保留
+    expect(buildRecallRegex('.'.repeat(30), [])).toBe(`(?:${'\\.'.repeat(30)})`);
+    // '.'.repeat(31) 转义后 62 字符，(?:…) 共 66 > 64 → 剔除；后续具体成员正常纳入
+    expect(buildRecallRegex('.'.repeat(31), ['yazi'])).toBe('(?:yazi)');
+  });
+
+  it('总长预算：单个超长成员被剔除后其余成员正常', () => {
+    expect(buildRecallRegex('.'.repeat(40), ['yazi', 'okm'])).toBe('(?:yazi|okm)');
+  });
+
+  it('术语具体性：<3 字符拉丁术语剔除、2 字符 CJK 术语保留、query 不受约束', () => {
+    expect(buildRecallRegex('main query', ['mc', 'go', '翻译', 'tokyo'])).toBe('(?:main query|翻译|tokyo)');
+    // query 成员（即使 <3 字符拉丁词）不受具体性规则影响，不破坏单词搜索
+    expect(buildRecallRegex('go', ['golang', 'mc'])).toBe('(?:go|golang)');
   });
 });
 
@@ -225,9 +257,10 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     ]);
     const result = await searchRepositoriesSemantically(makeApi(), ai, 'markdown editor', { fetchImpl });
 
-    // grep 恰好 1 次请求，且确为正则模式
+    // grep 恰好 1 次请求，且确为 Markdown 域优先的正则模式
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(calls[0]).toContain('regexp=true');
+    expect(calls[0]).toContain('f.lang=Markdown');
     expect(decodeUrl(calls[0])).toContain('(?:markdown editor|editor)');
 
     // AI 返回倒序 → 按序赋 rank
@@ -258,12 +291,47 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     expect(decodeUrl(calls[1])).toContain('q=markdown notes');
   });
 
-  it('首个请求 429 → 立即重抛且不做任何回退', async () => {
+  it('Markdown 优先：md 正则 total===0（缺 facets.count 回落 hits.total）→ 回退 fuzzy 且不带 f.lang=Markdown', async () => {
+    const ai = makeAi({ expand: async () => ({ terms: ['cli', 'note'], intent: '' }) });
+    const { fetchImpl, calls } = installGrepFetch([
+      markdownGrepResponse(grepResult({ total: 0 })),
+      grepResponse(grepResult({ total: 0 })),
+      grepResponse(grepResult({ total: 0 })),
+      grepResponse(grepResult({ total: 0 })),
+    ]);
+    await searchRepositoriesSemantically(makeApi(), ai, 'markdown notes', { fetchImpl });
+
+    // 首个正则请求带 f.lang=Markdown（实测带 f.lang 的响应缺 facets.count，total 回落 hits.total）
+    expect(calls[0]).toContain('f.lang=Markdown');
+    expect(decodeUrl(calls[0])).toContain('(?:markdown notes|cli|note)');
+    // md 正则零命中 → 1 次正则 + 3 次 fuzzy；fuzzy 回退不带语言过滤仍查全库
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(calls.slice(1).every(url => !url.includes('f.lang=Markdown') && !url.includes('regexp=true'))).toBe(true);
+    expect(decodeUrl(calls[1])).toContain('q=markdown notes');
+  });
+
+  it('术语具体性同步应用于 fuzzy 回退：<3 字符拉丁术语不发起回退请求', async () => {
+    const ai = makeAi({ expand: async () => ({ terms: ['mc', 'go', 'note'], intent: '' }) });
+    const emptyGrep = grepResponse(grepResult({ total: 0 }));
+    const { fetchImpl, calls } = installGrepFetch([emptyGrep, emptyGrep, emptyGrep]);
+    await searchRepositoriesSemantically(makeApi(), ai, 'markdown notes', { fetchImpl });
+
+    // 正则成员剔除 mc/go；fuzzy 回退仅 markdown notes / note 两个词（共 3 次请求）
+    expect(decodeUrl(calls[0])).toContain('(?:markdown notes|note)');
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(decodeUrl(calls[1])).toContain('q=markdown notes');
+    expect(decodeUrl(calls[2])).toContain('q=note');
+    expect(calls.slice(1).every(url => !decodeUrl(url).includes('q=mc') && !decodeUrl(url).includes('q=go'))).toBe(true);
+  });
+
+  it('Markdown 正则首个请求 429 → 立即重抛且不做任何回退', async () => {
     const ai = makeAi();
     const { fetchImpl, calls } = installGrepFetch([rateLimitedResponse(), rateLimitedResponse()]);
     await expect(searchRepositoriesSemantically(makeApi(), ai, 'markdown', { fetchImpl })).rejects.toMatchObject({ status: 429 });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(calls).toHaveLength(1);
+    // Markdown 优先召回：首个（正则）请求即带 f.lang=Markdown
+    expect(calls[0]).toContain('f.lang=Markdown');
   });
 
   it('翻页停止条件：无余量（hits>=total）只查 1 页', async () => {

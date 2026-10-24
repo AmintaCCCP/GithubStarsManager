@@ -4,7 +4,9 @@
  * 三段式管道（参考仓库页"无向量 AI 搜索"，但候选池来自全网而非本地 star 列表）：
  * ① LLM 查询扩展（AIService.expandSearchQuery）→ {intent, terms}
  * ② grep.app 词法召回全网仓库：多个词的并集等价于一次 `(?:q|t1|t2…)` 正则交替
- *    查询（请求数 4→1，降低 429 风险与延迟）；失败/零命中时逐词 fuzzy 回退（≤3 次）。
+ *    查询（请求数 4→1，降低 429 风险与延迟），并在 Markdown 文档域优先召回
+ *    （f.lang=Markdown：README/文档命中更能代表项目主题，避开全库代码搜索的
+ *    变量名/泛词污染）；失败/零命中时逐词 fuzzy 回退（≤3 次，不带语言过滤仍查全库）。
  *    召回池 = repoFacets ∪ hits 分页聚合（≤3 页，唯一仓库 <60 且仍有余量才翻页）→ ≤60 仓库。
  * ③ GitHub 元数据补全（GraphQL 批量，整批失败回退 REST 逐仓并发 8）→ 语言后过滤
  *    （过滤后 <10 个放弃过滤）→ LLM 精选排序（selectRelevantRepositories + 召回证据行）。
@@ -30,6 +32,15 @@ const RECALL_MAX_ALTERNATIONS = 6;
 /** 正则成员与 fuzzy 回退词的长度窗口。 */
 const RECALL_TERM_MIN_LENGTH = 1;
 const RECALL_TERM_MAX_LENGTH = 60;
+/**
+ * 正则交替模式总长上限（按转义后字符计，含 `(?:`/`)` 包裹）。实测 grep.app 服务端
+ * 会把正则 q 参数截断到 64 字符后再编译：≤64 返回 200，>64 直接 400
+ * （`{"error":"missing closing ): ..."}`，右括号被截掉）→ 整次召回失效，
+ * 必须在前端守住预算。
+ */
+const MAX_RECALL_PATTERN_LENGTH = 64;
+/** Markdown 文档域优先召回的语言过滤（README/文档命中更能代表项目主题）。 */
+const RECALL_MARKDOWN_LANGS = ['Markdown'];
 /** 逐词 fuzzy 回退的请求上限（含原始 query，总请求数 ≤ 1 次正则 + 3 次回退）。 */
 const FALLBACK_QUERY_LIMIT = 3;
 /** 回退请求之间的固定间隔，降低 grep.app 429 风险。 */
@@ -106,19 +117,40 @@ export function escapeRe2Literal(term: string): string {
 }
 
 /**
- * 构造单次正则交替查询：成员 = [query, ...terms] 去重（大小写不敏感）、
- * 长度 1..60、上限 6 个，逐个转义后用 `|` 连接包成 `(?:...)`。
- * 没有有效成员时返回 null（调用方直接走逐词回退）。
+ * 术语具体性门槛（仅约束扩展术语，不约束用户原始 query）：实测 `mc` 这类
+ * 2 字符拉丁泛词作正则成员会在全库代码匹配中产生海量命中，repoFacets 头部桶
+ * 全被泛词仓库占据，真正相关的仓库被挤出 top-60。纯拉丁字母/数字词要求 ≥3 字符；
+ * CJK 字符信息密度高，含 CJK 的词 ≥2 字符即可。
+ */
+function isSpecificRecallTerm(term: string): boolean {
+  if (/[\u4e00-\u9fff]/.test(term)) return term.length >= 2;
+  return term.length >= 3;
+}
+
+/**
+ * 构造单次正则交替查询：成员 = [query, ...terms]（大小写不敏感去重、原始长度
+ * 1..60、上限 6 个），逐个转义后用 `|` 连接包成 `(?:...)`。术语成员还需通过
+ * 具体性门槛（query 成员不受限，不破坏单词搜索）。在总长预算内贪心构造：
+ * 长度按转义后字符计（转义会加长，如 `a.b` → 5 字符），当前成员使
+ * `(?:` + 已选成员 + `)` 总长超过 64 时跳过、继续尝试后续更短成员；首个成员
+ * 单独即超预算时同样按长度窗剔除逻辑丢弃。没有有效成员时返回 null
+ * （调用方直接走逐词回退）。
  */
 export function buildRecallRegex(query: string, terms: string[]): string | null {
   const seen = new Set<string>();
   const members: string[] = [];
+  let isQueryTurn = true;
   for (const raw of [query, ...terms]) {
+    const isQueryMember = isQueryTurn;
+    isQueryTurn = false;
     const term = raw.trim();
     if (term.length < RECALL_TERM_MIN_LENGTH || term.length > RECALL_TERM_MAX_LENGTH) continue;
+    if (!isQueryMember && !isSpecificRecallTerm(term)) continue;
     const key = term.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
+    const candidate = `(?:${members.map(escapeRe2Literal).concat(escapeRe2Literal(term)).join('|')})`;
+    if (candidate.length > MAX_RECALL_PATTERN_LENGTH) continue;
     members.push(term);
     if (members.length >= RECALL_MAX_ALTERNATIONS) break;
   }
@@ -174,22 +206,23 @@ export function aggregateRecall(results: GrepSearchResult[]): Map<string, Recall
   return map;
 }
 
-/** 执行单个 grep 查询；paginate 时按需翻页（≤3 页，唯一仓库 <60 且仍有余量）。 */
+/** 执行单个 grep 查询（langs 为可选语言过滤，翻页请求同样携带）；paginate 时按需翻页（≤3 页，唯一仓库 <60 且仍有余量）。 */
 async function runGrepQuery(
   q: string,
   mode: GrepMatchMode,
   collected: GrepSearchResult[],
   options: { signal?: AbortSignal; fetchImpl?: typeof fetch },
   paginate: boolean,
+  langs?: string[],
 ): Promise<GrepSearchResult> {
-  const first = await searchGrepApp({ q, mode }, { signal: options.signal, timeoutMs: GREP_TIMEOUT_MS, fetchImpl: options.fetchImpl });
+  const first = await searchGrepApp({ q, mode, langs }, { signal: options.signal, timeoutMs: GREP_TIMEOUT_MS, fetchImpl: options.fetchImpl });
   collected.push(first);
   if (!paginate) return first;
   let fetchedHits = first.hits.length;
   let page = 1;
   while (page < MAX_RECALL_PAGES && fetchedHits < first.total && aggregateRecall(collected).size < RECALL_POOL_LIMIT) {
     page += 1;
-    const next = await searchGrepApp({ q, mode, page }, { signal: options.signal, timeoutMs: GREP_TIMEOUT_MS, fetchImpl: options.fetchImpl });
+    const next = await searchGrepApp({ q, mode, langs, page }, { signal: options.signal, timeoutMs: GREP_TIMEOUT_MS, fetchImpl: options.fetchImpl });
     collected.push(next);
     if (next.hits.length === 0) break;
     fetchedHits += next.hits.length;
@@ -198,9 +231,11 @@ async function runGrepQuery(
 }
 
 /**
- * 词法召回：先尝试一次正则交替查询（并按需翻页）；非 429 失败或 total===0 时
- * 逐词 fuzzy 回退（query 优先、≤3 词、间隔 250ms）。429 立即重抛（专用限流
- * 提示），abort 一律重抛；单个回退查询失败记日志后继续。
+ * 词法召回：先尝试一次 Markdown 文档域（f.lang=Markdown）正则交替查询（并按需
+ * 翻页）；非 429 失败或 total===0 时逐词 fuzzy 回退（query 优先、≤3 词、间隔
+ * 250ms，不带语言过滤仍查全库）。grep 请求预算保持 ≤1 次正则（含翻页）+3 次
+ * 回退不变。429 立即重抛（专用限流提示），abort 一律重抛；单个回退查询失败
+ * 记日志后继续。
  */
 async function recallRepositories(
   query: string,
@@ -212,26 +247,33 @@ async function recallRepositories(
   let needFallback = !regex;
   if (regex) {
     try {
-      const first = await runGrepQuery(regex, 'regexp', collected, options, true);
+      // Markdown 文档域优先：实测 f.lang=Markdown 过滤可用且效果显著（yazi 的
+      // README.md 直接出现在 "terminal file manager" 查询命中里）；全库代码搜索
+      // 则易被变量名/泛词污染刷屏
+      const first = await runGrepQuery(regex, 'regexp', collected, options, true, RECALL_MARKDOWN_LANGS);
       if (first.total === 0) needFallback = true;
     } catch (error) {
       if (options.signal?.aborted || isAbortError(error)) throw error;
       if (isGrepRateLimitError(error)) throw error;
-      logger.warn('semanticSearch', '正则召回查询失败，回退逐词 fuzzy 查询', { error: errorMessage(error) });
+      logger.warn('semanticSearch', 'Markdown 正则召回查询失败，回退逐词 fuzzy 查询', { error: errorMessage(error) });
       needFallback = true;
     }
   }
   if (needFallback) {
+    // fuzzy 回退不带语言过滤（Markdown 域零命中不代表全库零命中）
     const seen = new Set<string>();
     const fallbackWords = [query, ...terms]
-      .map(word => word.trim())
-      .filter(word => {
+      .map((word, index) => ({ word: word.trim(), isQuery: index === 0 }))
+      .filter(({ word, isQuery }) => {
         if (word.length < RECALL_TERM_MIN_LENGTH || word.length > RECALL_TERM_MAX_LENGTH) return false;
+        // 术语与正则成员同门槛：泛词不发起回退请求；query 成员不受限
+        if (!isQuery && !isSpecificRecallTerm(word)) return false;
         const key = word.toLowerCase();
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       })
+      .map(entry => entry.word)
       .slice(0, FALLBACK_QUERY_LIMIT);
     for (let i = 0; i < fallbackWords.length; i++) {
       if (i > 0) await sleep(FALLBACK_INTERVAL_MS, options.signal);

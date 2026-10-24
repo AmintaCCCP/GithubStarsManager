@@ -136,11 +136,20 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         case 'search': {
           const searchQuery = currentState.discoverySearchQuery.trim();
           const activeConfig = currentState.aiConfigs.find(config => config.id === currentState.activeAIConfig);
+          // 语义模式要求 AI 配置完整可用（判定镜像 handleAnalyzePage）：配置存在但解密失败/
+          // 密钥为空/缺端点/缺密钥/缺模型时与"无配置"同等处理，回退关键词搜索
+          const isSemanticConfigReady = (config: typeof activeConfig): config is NonNullable<typeof activeConfig> =>
+            !!config
+            && config.apiKeyStatus !== 'decrypt_failed'
+            && config.apiKeyStatus !== 'empty'
+            && !!config.baseUrl
+            && !!config.apiKey
+            && !!config.model;
           // 新搜索开始时清空上一轮语义搜索的进度与空态（含切回关键词模式后的残留清理）
           const semanticStore = useAppStore.getState();
           semanticStore.setDiscoverySearchPhase(null);
           semanticStore.setDiscoverySearchEmptyReason(null);
-          if (currentState.discoverySearchMode === 'semantic' && searchQuery && activeConfig) {
+          if (currentState.discoverySearchMode === 'semantic' && searchQuery && isSemanticConfigReady(activeConfig)) {
             // AI 语义分支：LLM 查询扩展 → grep.app 全网词法召回 → GitHub 元数据补全 → LLM 精选排序
             // 新请求取代旧请求时中止旧的语义搜索（LLM / grep / GitHub 全链路）
             channelRequestControllersRef.current['search']?.abort();
@@ -175,7 +184,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
                 result = { repos: [], hasMore: false, nextPageIndex: 1, totalCount: 0 };
               } else if (isGrepRateLimitError(error)) {
                 // grep.app 限流（429）：专用提示，不再向上抛
-                toast(tRef.current('discoveryView.semantic-rate-limited'), 'error');
+                // 请求已被新请求取代时旧请求无权汇报状态，429 提示静默丢弃（守卫风格同 onPhase/onFallback）
+                if (isCurrentRequest()) toast(tRef.current('discoveryView.semantic-rate-limited'), 'error');
                 result = { repos: [], hasMore: false, nextPageIndex: 1, totalCount: 0 };
               } else {
                 throw error;
@@ -189,8 +199,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
               }
             }
           } else {
-            if (currentState.discoverySearchMode === 'semantic' && searchQuery && !activeConfig) {
-              // 语义模式但未配置 AI 服务：提示后回退关键词搜索执行
+            if (currentState.discoverySearchMode === 'semantic' && searchQuery && !isSemanticConfigReady(activeConfig)) {
+              // 语义模式但未配置/配置不完整 AI 服务：提示后回退关键词搜索执行
               toast(tRef.current('discoveryView.semantic-no-ai-config'), 'warning');
             }
             // 关键词分支（默认）：行为与历史版本完全一致
