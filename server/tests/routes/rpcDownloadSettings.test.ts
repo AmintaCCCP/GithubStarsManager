@@ -165,14 +165,26 @@ describe('RPC download host/port hardening', () => {
   it('POST /api/settings/rpc-download/test accepts bare IPv6 and brackets it into a valid URL', async () => {
     createSettingsDb();
     const app = createTestApp();
+    // mock fetch 并断言完整 URL：裸 IPv6 必须被补上方括号才是合法 URL
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ result: { version: 'test' } }),
+    } as Response);
 
-    // `::1` 通过校验（合法自有目标），URL 构造时自动补方括号后发起请求：
-    // 端口 9 无服务 → success:false（若 URL 非法则 fetch 会抛异常走不到这里）
-    const res = await request(app).post('/api/settings/rpc-download/test').send({
-      host: '::1',
-      port: 9,
-    });
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(false);
+    try {
+      const res = await request(app).post('/api/settings/rpc-download/test').send({
+        host: '::1',
+        port: 9,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://[::1]:9/jsonrpc',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 });
