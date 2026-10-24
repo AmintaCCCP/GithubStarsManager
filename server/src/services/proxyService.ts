@@ -33,8 +33,9 @@ const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.
 const PRIVATE_IP_PATTERNS = [/^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./];
 
 export interface ValidateUrlOptions {
-  /** 宽松模式：放行回环地址与私有网段。仅用于「用户主动保存的自行配置」所来源的 URL
-   *  （如 AI / WebDAV / 下载目标），不应作用于任意或半可信的输入。 */
+  /** 宽松模式：放行回环地址与私有网段。仅用于「用户主动提供的自有配置」所来源的 URL
+   *  （已保存的 AI / WebDAV 配置、WebDAV 测试连接的内联地址、下载目标），
+   *  不应作用于任意或半可信的输入（如 AI 内联 config）。 */
   allowPrivate?: boolean;
 }
 
@@ -188,7 +189,8 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
     }
 
     // codeql[js/request-forgery] 目标 URL 均先过 validateUrl（协议白名单、IMDS 硬封禁、私网段策略）；
-    // 用户自有配置（AI / WebDAV / 下载目标）按业务必须支持无证书 http 内网地址，allowPrivate 仅对已保存的配置放开。
+    // 用户主动提供的自有配置来源（已保存的 AI/WebDAV 配置、WebDAV 测试连接的内联地址、下载目标）
+    // 按业务必须支持无证书 http 内网地址，allowPrivate 仅对这些来源放开；AI 内联 config 等任意输入保持严格档。
     const response = await axios(axiosConfig);
 
     logger.info('proxy.response', `${method} ${redactUrl(url)} -> ${response.status}`);

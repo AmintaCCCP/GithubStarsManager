@@ -118,6 +118,37 @@ describe('RPC download host/port hardening', () => {
     expect(res.body.code).toBe('INVALID_RPC_TARGET');
   });
 
+  it('PUT /api/settings/rpc-download rejects non-string host values that would bypass validation', async () => {
+    createSettingsDb();
+    const app = createTestApp();
+
+    // 数字 0 等假值曾因 `host &&` 短路绕过校验
+    const res = await request(app).put('/api/settings/rpc-download').send({
+      enabled: true,
+      host: 0,
+      port: 6800,
+      secret: 'token',
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('INVALID_RPC_TARGET');
+  });
+
+  it('GET /api/download/rpc fail-closes on stored configs saved before the validation existed', async () => {
+    const values = createSettingsDb();
+    values.set(
+      'rpc_download_config',
+      JSON.stringify({ enabled: true, host: '127.0.0.1/#x', port: 6800 }),
+    );
+    const app = createTestApp();
+
+    const res = await request(app).post('/api/download/rpc').send({
+      url: 'https://example.com/file.zip',
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error).toContain('not configured');
+  });
+
   it('POST /api/settings/rpc-download/test accepts a legitimate intranet host shape', async () => {
     createSettingsDb();
     const app = createTestApp();
@@ -129,5 +160,19 @@ describe('RPC download host/port hardening', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(false); // 9 端口无服务，连接失败
+  });
+
+  it('POST /api/settings/rpc-download/test accepts bare IPv6 and brackets it into a valid URL', async () => {
+    createSettingsDb();
+    const app = createTestApp();
+
+    // `::1` 通过校验（合法自有目标），URL 构造时自动补方括号后发起请求：
+    // 端口 9 无服务 → success:false（若 URL 非法则 fetch 会抛异常走不到这里）
+    const res = await request(app).post('/api/settings/rpc-download/test').send({
+      host: '::1',
+      port: 9,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(false);
   });
 });
