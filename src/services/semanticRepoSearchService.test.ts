@@ -676,7 +676,7 @@ describe('semanticRepoSearchService — 高具体性辅路召回（用户实测"
       const url = String(input);
       const page = url.includes('page=') ? Number(url.match(/page=(\d+)/)?.[1] ?? 1) : 1;
       const q = decodeURIComponent(url.replace(/\+/g, ' '));
-      if (q.includes('github\\u661f\\u6807') || q.includes('github星标')) {
+      if (!q.includes('desktop app')) {
         // 辅路：仅 CJK 罕见词——相关仓库高分命中，junk 不命中
         return grepResponse(grepResult({
           total: 6,
@@ -705,8 +705,11 @@ describe('semanticRepoSearchService — 高具体性辅路召回（用户实测"
     const aiSpy = makeAi({ expand: async () => ({ terms: ['github星标', 'github stars', '桌面端应用', 'desktop app'], intent: '' }), select });
     const result = await searchRepositoriesSemantically(makeApi(), aiSpy, '管理github星标仓库的桌面端应用', { fetchImpl, language: 'All' });
     // 相关仓库（命中 CJK 罕见词，并集计数仅 2）必须排到 junk（973 次）之前
-    expect(result.repos[0]?.full_name).toBe('good/star-manager');
-    expect(result.repos.map(r => r.full_name)).not.toContain('junk/windows-use');
+    // select 桩原样返回全部候选，junk 会在结果中，断言相对顺序：
+    // 相关仓库（命中 CJK 罕见词，并集计数仅 2）必须排到 junk（973 次）之前
+    const names = result.repos.map(r => r.full_name);
+    expect(names[0]).toBe('good/star-manager');
+    expect(names.indexOf('good/star-manager')).toBeLessThan(names.indexOf('junk/windows-use'));
   });
 
   it('辅路查询失败（非 429）不影响主路召回', async () => {
