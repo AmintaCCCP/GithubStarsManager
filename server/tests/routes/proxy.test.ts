@@ -409,6 +409,24 @@ describe('proxyRequest redirect & DNS hardening', () => {
     expect((result.data as { details: string }).details).toContain('169.254.169.254');
   });
 
+  it('strips credential headers on same-host HTTPS-to-HTTP downgrade redirect', async () => {
+    axiosMock
+      .mockResolvedValueOnce({ status: 302, headers: { location: 'http://api.github.com/final' }, data: '' })
+      .mockResolvedValueOnce({ status: 200, headers: { 'content-type': 'application/json' }, data: { ok: 1 } });
+
+    const result = await proxyRequest({
+      url: 'https://api.github.com/first',
+      method: 'GET',
+      headers: { Authorization: 'Bearer secret', Cookie: 'session=1' },
+    });
+
+    expect(result.status).toBe(200);
+    const second = axiosMock.mock.calls[1][0];
+    expect(second.url).toBe('http://api.github.com/final');
+    expect(second.headers.Authorization).toBeUndefined();
+    expect(second.headers.Cookie).toBeUndefined();
+  });
+
   it('re-runs the DNS pre-check per redirect hop in proxy mode', async () => {
     dnsLookupMock
       .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])

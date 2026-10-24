@@ -341,8 +341,9 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
         const location = response.headers?.location;
         if (typeof location === 'string' && location) {
           const nextUrl = new URL(location, currentUrl).toString();
-          // 跨主机跳转不携带凭证头
-          if (new URL(nextUrl).host !== new URL(currentUrl).host) {
+          // 跨 origin（跨主机，或同主机 HTTPS→HTTP 降级）跳转不携带凭证头，
+          // 防止 Authorization/Cookie 泄露到其他主机或明文通道
+          if (new URL(nextUrl).origin !== new URL(currentUrl).origin) {
             currentHeaders = Object.fromEntries(
               Object.entries(currentHeaders).filter(([k]) => !CREDENTIAL_HEADERS.has(k.toLowerCase())),
             );
