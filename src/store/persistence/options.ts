@@ -159,6 +159,9 @@ discoveryPlatform: state.discoveryPlatform,
 discoveryLanguage: state.discoveryLanguage,
 discoverySortBy: state.discoverySortBy,
 discoverySortOrder: state.discoverySortOrder,
+// 仓库搜索模式（关键词/AI 语义）持久化；语义搜索的 phase 进度与空态原因是
+// 会话级运行时数据（同 discoveryRepos 理由），不入白名单。
+discoverySearchMode: state.discoverySearchMode,
 discoverySelectedTopic: state.discoverySelectedTopic,
   weeklyOnlyCollected: state.weeklyOnlyCollected,
   xTweetFollows: state.xTweetFollows,

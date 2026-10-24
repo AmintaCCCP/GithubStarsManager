@@ -630,6 +630,12 @@ export interface AppState {
   discoverySortBy: SortBy;
   discoverySortOrder: SortOrder;
   discoverySearchQuery: string;
+  /** 仓库搜索模式：keyword=关键词（默认，行为不变）；semantic=AI 语义（全网仓库） */
+  discoverySearchMode: 'keyword' | 'semantic';
+  /** 语义搜索阶段进度文案（会话级，不持久化；null=不在语义搜索中） */
+  discoverySearchPhase: string | null;
+  /** 语义搜索空态原因（会话级，不持久化；recall_empty=召回为空，ai_empty=AI 判定空） */
+  discoverySearchEmptyReason: 'recall_empty' | 'ai_empty' | null;
   discoverySelectedTopic: TopicCategory | null;
   discoveryHasMore: Record<DiscoveryChannelId, boolean>;
   discoveryNextPage: Record<DiscoveryChannelId, number>;

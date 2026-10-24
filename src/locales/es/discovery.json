@@ -100,7 +100,21 @@
     "platform-filter-v1": "Filtro de plataforma: {{v1}}",
     "items-count": "{{currentCount}} artículos",
     "items-count-with-total": "{{currentCount}} artículos ({{totalCount}} artículos en total)",
-    "total-2": "(total"
+    "total-2": "(total",
+    "search-mode": "Modo de búsqueda",
+    "search-mode-keyword": "Palabras clave",
+    "search-mode-semantic": "IA semántica",
+    "search-mode-semantic-placeholder": "Describe con lenguaje natural el repositorio que buscas, p. ej.: una herramienta de línea de comandos para gestionar notas en Markdown",
+    "search-mode-hint": "La búsqueda semántica con IA se basa en la coincidencia de código de toda la web vía grep.app (solo repositorios de GitHub) y requiere un servicio de IA configurado",
+    "search-phase-expanding": "La IA analiza la consulta…",
+    "search-phase-recalling": "Recuperación léxica en toda la web…",
+    "search-phase-enriching": "Completando detalles de los repositorios…",
+    "search-phase-reranking": "La IA selecciona y ordena…",
+    "semantic-rate-limited": "Límite de búsquedas de código alcanzado (429), inténtalo de nuevo más tarde",
+    "semantic-no-ai-config": "No hay servicio de IA configurado, se volvió a la búsqueda por palabras clave",
+    "semantic-fallback-toast": "La selección de IA falló, resultados ordenados por coincidencias léxicas",
+    "semantic-empty-recall": "No se encontraron repositorios relacionados en el código público, prueba palabras clave técnicas más específicas",
+    "semantic-empty-ai": "La IA no encontró repositorios relevantes, prueba otra formulación o añade palabras clave técnicas"
   },
   "weeklyIssueModal": {
     "submission-v1": "Contribución #{{v1}}",

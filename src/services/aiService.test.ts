@@ -517,3 +517,106 @@ describe('AIService.analyzeRepository language following', () => {
     expect(joined).toContain('Write ALL user-facing output in Japanese (日本語)');
   });
 });
+
+describe('AIService.expandSearchQuery — 查询扩展公开方法', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as Record<string, unknown>;
+
+  it('解析模型返回的意图与关键词（keywords/categories/synonyms 合并去重）', async () => {
+    const fetchMock = mockFetch();
+    const requests: Array<Record<string, unknown>> = [];
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      requests.push(await captureBody(init));
+      return chatResponse('{"intent":"找 markdown 编辑器","keywords":["markdown","editor"],"categories":["cli"],"synonyms":["md","markdown"]}');
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const result = await service.expandSearchQuery('markdown 编辑器');
+
+    expect(result.intent).toBe('找 markdown 编辑器');
+    expect(result.terms).toEqual(['markdown', 'editor', 'cli', 'md']);
+    // 请求形态与既有扩展阶段一致：思考预算 2000、低温
+    expect(requests[0].max_tokens).toBe(2000);
+    expect(requests[0].temperature).toBe(0.1);
+  });
+
+  it('模型返回空内容时 requestText 抛错（与既有扩展阶段行为一致）', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockImplementationOnce(async () => chatResponse(''));
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    // requestText 对空 content 统一抛错，扩展阶段（重构前后）同样不会拿到空结果
+    await expect(service.expandSearchQuery('anything')).rejects.toThrow('No content received from AI service');
+  });
+});
+
+describe('AIService.selectRelevantRepositories — evidence 证据行', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as Record<string, unknown>;
+
+  it('不传 evidence 时精选提示词与 searchRepositoriesWithSelection 逐字节一致；传 evidence 时在对应仓库块末尾追加证据行', async () => {
+    const repoA = makeRepo({ id: 910000001, name: 'md-tool', full_name: 'acme/md-tool', description: 'a markdown tool' });
+    const repoB = makeRepo({ id: 910000002, name: 'other', full_name: 'acme/other', description: 'unrelated' });
+    const query = 'markdown 编辑器';
+    const intent = '找 markdown 编辑器';
+
+    // 基线：完整三段式搜索的第二次请求（精选）提示词
+    const fetchMock = mockFetch();
+    let baselinePrompt = '';
+    fetchMock.mockImplementationOnce(async () => chatResponse(`{"intent":"${intent}","keywords":[],"synonyms":[]}`));
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      baselinePrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      return chatResponse('[]');
+    });
+    const pipelineService = new AIService(makeConfig() as never, 'zh');
+    await pipelineService.searchRepositoriesWithSelection([repoA, repoB], query);
+
+    // 直调（无 evidence）：与基线逐字节一致
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      const directPrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      expect(directPrompt).toBe(baselinePrompt);
+      return chatResponse('[]');
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    await service.selectRelevantRepositories([repoA, repoB], query, intent);
+    expect(baselinePrompt).not.toBe('');
+    expect(baselinePrompt).not.toContain('matches=');
+
+    // 传 evidence：对应仓库块末尾追加证据行（键为 full_name 小写匹配）
+    let evidencePrompt = '';
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      evidencePrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      return chatResponse('[]');
+    });
+    const evidence = new Map<string, string>([
+      ['acme/md-tool', 'matches=5; paths=README.md,package.json; langs=TypeScript'],
+    ]);
+    await service.selectRelevantRepositories([repoA, repoB], query, intent, undefined, evidence);
+    // 证据行出现在 md-tool 摘要块的末尾（meta 行之后、块间距之前）
+    expect(evidencePrompt).toContain('   matches=5; paths=README.md,package.json; langs=TypeScript');
+    const evidenceLine = '   matches=5; paths=README.md,package.json; langs=TypeScript';
+    const mdBlockEnd = evidencePrompt.indexOf(evidenceLine);
+    const metaLine = evidencePrompt.indexOf('acme/md-tool');
+    expect(metaLine).toBeGreaterThan(-1);
+    expect(mdBlockEnd).toBeGreaterThan(metaLine);
+    // 无证据的仓库不受影响
+    expect(evidencePrompt).toContain('acme/other');
+    // 其余内容与基线一致：去掉证据行后逐字节相同
+    expect(evidencePrompt.replace(`${evidenceLine}\n`, '')).toBe(baselinePrompt);
+  });
+});

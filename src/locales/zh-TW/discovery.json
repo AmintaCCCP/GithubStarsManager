@@ -100,7 +100,21 @@
     "retry": "重試",
     "platform-filter-v1": "平台篩選：{{v1}}",
     "items-count": "{{currentCount}} 項",
-    "items-count-with-total": "{{currentCount}} 項（共 {{totalCount}} 項）"
+    "items-count-with-total": "{{currentCount}} 項（共 {{totalCount}} 項）",
+    "search-mode": "搜尋模式",
+    "search-mode-keyword": "關鍵字",
+    "search-mode-semantic": "AI 語意",
+    "search-mode-semantic-placeholder": "用自然語言描述想找的儲存庫，如：管理 Markdown 筆記的命令列工具",
+    "search-mode-hint": "AI 語意搜尋基於 grep.app 全網程式碼比對（僅 GitHub 儲存庫），需設定 AI 服務",
+    "search-phase-expanding": "AI 分析查詢…",
+    "search-phase-recalling": "全網詞彙召回…",
+    "search-phase-enriching": "補全儲存庫資訊…",
+    "search-phase-reranking": "AI 精選排序…",
+    "semantic-rate-limited": "觸發程式碼搜尋限流（429），請稍後再試",
+    "semantic-no-ai-config": "未設定 AI 服務，已回退關鍵字搜尋",
+    "semantic-fallback-toast": "AI 精選失敗，已按詞彙命中排序",
+    "semantic-empty-recall": "全網程式碼中未比對到相關儲存庫，試試更具體的技術關鍵字",
+    "semantic-empty-ai": "AI 未找到相關儲存庫，可換個說法或補充技術關鍵字"
   },
   "weeklyIssueModal": {
     "submission-v1": "投稿 #{{v1}}",

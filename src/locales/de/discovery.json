@@ -100,7 +100,21 @@
     "retry": "Versuchen Sie es erneut",
     "platform-filter-v1": "Plattformfilter: {{v1}}",
     "items-count": "{{currentCount}} Artikel",
-    "items-count-with-total": "{{currentCount}} Artikel ({{totalCount}} Artikel insgesamt)"
+    "items-count-with-total": "{{currentCount}} Artikel ({{totalCount}} Artikel insgesamt)",
+    "search-mode": "Suchmodus",
+    "search-mode-keyword": "Schlüsselwörter",
+    "search-mode-semantic": "KI-Semantik",
+    "search-mode-semantic-placeholder": "Beschreibe das gesuchte Repository in natürlicher Sprache, z. B.: ein Kommandozeilen-Tool zur Verwaltung von Markdown-Notizen",
+    "search-mode-hint": "Die KI-Semantiksuche basiert auf Code-Abgleich im gesamten Web über grep.app (nur GitHub-Repositories) und erfordert einen konfigurierten KI-Dienst",
+    "search-phase-expanding": "KI analysiert die Anfrage…",
+    "search-phase-recalling": "Lexikalischer Abruf im gesamten Web…",
+    "search-phase-enriching": "Repository-Details werden ergänzt…",
+    "search-phase-reranking": "KI wählt aus und sortiert…",
+    "semantic-rate-limited": "Rate-Limit der Codesuche erreicht (429), bitte später erneut versuchen",
+    "semantic-no-ai-config": "Kein KI-Dienst konfiguriert, Rückfall auf die Schlüsselwortsuche",
+    "semantic-fallback-toast": "KI-Auswahl fehlgeschlagen, Ergebnisse nach lexikalischen Treffern sortiert",
+    "semantic-empty-recall": "Keine passenden Repositories im öffentlichen Code gefunden, versuche spezifischere technische Schlüsselwörter",
+    "semantic-empty-ai": "Die KI hat keine relevanten Repositories gefunden, formuliere um oder ergänze technische Schlüsselwörter"
   },
   "weeklyIssueModal": {
     "submission-v1": "Beitrag #{{v1}}",

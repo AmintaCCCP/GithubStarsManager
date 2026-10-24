@@ -331,6 +331,8 @@ interface CustomSelectProps {
   className?: string;
   dropdownClassName?: string;
   ariaLabel?: string;
+  /** 禁用整个下拉（语义搜索模式下排序无意义时使用） */
+  disabled?: boolean;
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -340,6 +342,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
   className = '',
   dropdownClassName = '',
   ariaLabel,
+  disabled = false,
 }) => {
   const selectedOption = options.find(o => o.value === value);
 
@@ -349,8 +352,9 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
         <Button
           type="button"
           variant="outline"
+          disabled={disabled}
           aria-label={ariaLabel ?? selectedOption?.label}
-          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors ${className}`}
+          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium bg-card dark:bg-muted/40 border border-border dark:border-border text-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
         >
           {selectedOption?.icon && <span className="h-4 w-4">{selectedOption.icon}</span>}
           <span>{selectedOption?.label}</span>
@@ -478,6 +482,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
     setDiscoverySortOrder,
     discoverySearchQuery,
     setDiscoverySearchQuery,
+    discoverySearchMode,
+    setDiscoverySearchMode,
+    discoverySearchPhase,
+    discoverySearchEmptyReason,
     discoverySelectedTopic,
     setDiscoverySelectedTopic,
     discoveryHasMore,
@@ -727,6 +735,15 @@ export const DiscoveryView: React.FC = React.memo(() => {
       else setDiscoverySearchQuery(query);
     }
   }, [selectedDiscoveryChannel, discoverySearchQuery, searchInput, setDiscoverySearchQuery, refreshChannel]);
+
+  // 搜索模式切换：关键词 ↔ AI 语义。store 更新是异步的，读取最新查询用 getState()；
+  // 已有查询时立即重搜（请求签名包含模式，在途旧请求会自动作废）
+  const handleSearchModeChange = useCallback((value: string) => {
+    setDiscoverySearchMode(value as 'keyword' | 'semantic');
+    if (useAppStore.getState().discoverySearchQuery.trim()) {
+      refreshChannel('search', 1, false);
+    }
+  }, [setDiscoverySearchMode, refreshChannel]);
 
   const handleLoadMore = useCallback(async () => {
     if (!discoveryHasMore[selectedDiscoveryChannel]) {
@@ -1036,15 +1053,29 @@ export const DiscoveryView: React.FC = React.memo(() => {
                 ? 'ui-toolbar p-4 space-y-4'
                 : 'ui-toolbar p-5 space-y-4'}>
                 <div className="flex flex-col sm:flex-row gap-3">
+                  {/* 搜索模式下拉：关键词（默认，行为不变）/ AI 语义（全网仓库） */}
+                  <CustomSelect
+                    value={discoverySearchMode}
+                    onChange={handleSearchModeChange}
+                    ariaLabel={t('discoveryView.search-mode')}
+                    options={[
+                      { value: 'keyword', label: t('discoveryView.search-mode-keyword'), icon: <Search className="w-4 h-4" /> },
+                      { value: 'semantic', label: t('discoveryView.search-mode-semantic'), icon: <Bot className="w-4 h-4" /> },
+                    ]}
+                  />
                   <div className="flex-1 relative">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                     <Input
                       type="text"
-                      aria-label={t('discoveryView.search-repositories')}
+                      aria-label={discoverySearchMode === 'semantic'
+                        ? t('discoveryView.search-mode-semantic-placeholder')
+                        : t('discoveryView.search-repositories')}
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                      placeholder={t('discoveryView.search-repositories-2')}
+                      placeholder={discoverySearchMode === 'semantic'
+                        ? t('discoveryView.search-mode-semantic-placeholder')
+                        : t('discoveryView.search-repositories-2')}
                       className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
                   </div>
                   <Button
@@ -1057,6 +1088,16 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     <span className="hidden sm:inline">{t('discoveryView.search')}</span>
                   </Button>
                 </div>
+                {discoverySearchMode === 'semantic' && (
+                  <p className="text-xs text-muted-foreground dark:text-muted-foreground">
+                    {t('discoveryView.search-mode-hint')}
+                  </p>
+                )}
+                {discoverySearchPhase && (
+                  <p className="animate-pulse text-xs text-muted-foreground dark:text-muted-foreground">
+                    {discoverySearchPhase}
+                  </p>
+                )}
                 
                 <div className="flex flex-wrap gap-2.5">
                   <Select value={discoveryLanguage} onValueChange={(value) => setDiscoveryLanguage(value as ProgrammingLanguage)}>
@@ -1080,10 +1121,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     </SelectContent>
                   </Select>
                   
+                  {/* 语义模式由 AI 按相关性排序，排序选项无意义，禁用 */}
                   <CustomSelect
                     value={discoverySortBy}
                     onChange={(value) => setDiscoverySortBy(value as SortBy)}
                     ariaLabel={t('discoveryView.discovery-sort-field')}
+                    disabled={discoverySearchMode === 'semantic'}
                     options={[
                       { value: 'BestMatch', label: t('discoveryView.best-match') },
                       { value: 'MostStars', label: t('discoveryView.most-stars') },
@@ -1095,6 +1138,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                     value={discoverySortOrder}
                     onChange={(value) => setDiscoverySortOrder(value as SortOrder)}
                     ariaLabel={t('discoveryView.discovery-sort-order')}
+                    disabled={discoverySearchMode === 'semantic'}
                     options={[
                       { value: 'Descending', label: t('discoveryView.descending') },
                       { value: 'Ascending', label: t('discoveryView.ascending') },
@@ -1147,7 +1191,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         {t('discoveryView.repo-search')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {t('discoveryView.enter-keywords-to-search-github-repositories')}
+                        {/* 语义模式且已有查询：按空态原因区分文案（缺省用召回为空兜底） */}
+                        {discoverySearchMode === 'semantic' && discoverySearchQuery.trim()
+                          ? (discoverySearchEmptyReason === 'ai_empty'
+                              ? t('discoveryView.semantic-empty-ai')
+                              : t('discoveryView.semantic-empty-recall'))
+                          : t('discoveryView.enter-keywords-to-search-github-repositories')}
                       </p>
                     </div>
                   </>

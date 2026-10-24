@@ -1584,8 +1584,12 @@ AI Summary: ${gist.ai_summary || 'None'}`;
   /**
    * 构造候选仓库的紧凑摘要（序号. ID | 全名 / 简介 / 语言 | ★ | License | Tags）。
    * 语义重排序与无向量精选共用同一格式。
+   * evidence（可选，全网仓库语义搜索使用）：键为 full_name 小写，值为追加到该
+   * 仓库摘要块末尾的召回证据行（命中次数 / 样本文件 / 语言）。证据来自外部代码
+   * 索引（grep.app），属于不可信输入，追加前统一过 sanitizeForPrompt 防提示注入。
+   * 不传 evidence 时输出与历史格式逐字节一致（fixtures 快照守护）。
    */
-  private buildCandidateSummaries(candidates: Repository[]): string {
+  private buildCandidateSummaries(candidates: Repository[], evidence?: Map<string, string>): string {
     return candidates.map((repo, index) => {
       const stars = repo.stargazers_count >= 1000
         ? `${(repo.stargazers_count / 1000).toFixed(0)}k`
@@ -1600,6 +1604,8 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       if (lic !== NO_LICENSE_SENTINEL) meta.push(`License: ${lic}`);
       if (tags) meta.push(`Tags: ${tags}`);
       parts.push(`   ${meta.join(' | ')}`);
+      const evidenceLine = evidence?.get(repo.full_name.toLowerCase());
+      if (evidenceLine) parts.push(`   ${this.sanitizeForPrompt(evidenceLine)}`);
       return parts.join('\n');
     }).join('\n\n');
   }
@@ -2156,6 +2162,32 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   /**
+   * 查询扩展 + 意图复述（一次 chat 调用）：无向量语义搜索
+   * （searchRepositoriesWithSelection）与全网仓库语义搜索
+   * （semanticRepoSearchService）共用的第一阶段。
+   * 思考类模型的思考 token 与输出共享预算，预算太小会把 JSON 截断在半截
+   * （实测 glm 思考模型 300 token 不够），给足余量；非思考模型只按实际用量
+   * 计费，无额外成本。响应为空或无法解析时返回 {terms: [], intent: ''}，
+   * 由调用方决定是否继续后续阶段。
+   */
+  async expandSearchQuery(query: string, signal?: AbortSignal): Promise<{ terms: string[]; intent: string }> {
+    const system = this.language === 'zh'
+      ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
+      : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
+    const content = await this.requestText({
+      system,
+      user: this.createSearchPrompt(query),
+      temperature: 0.1,
+      maxTokens: 2000,
+      signal,
+    });
+    if (content) {
+      return this.parseSearchResponse(content);
+    }
+    return { terms: [], intent: '' };
+  }
+
+  /**
    * 无向量路径的 AI 语义搜索（向量搜索不可用时的降级链）。
    * 三段式：
    * ① 查询扩展 + 意图复述（一次 chat 调用）；
@@ -2186,25 +2218,11 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
     try {
       logger.info('ai', 'Starting AI selection search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, query });
 
-      // ① 查询扩展 + 意图复述。思考类模型的思考 token 与输出共享预算，
-      //    预算太小会把 JSON 截断在半截（实测 glm 思考模型 300 token 不够），
-      //    给足余量；非思考模型只按实际用量计费，无额外成本。
+      // ① 查询扩展 + 意图复述
       onPhase?.('expanding');
-      const system = this.language === 'zh'
-        ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
-        : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
-      const content = await this.requestText({
-        system,
-        user: this.createSearchPrompt(query),
-        temperature: 0.1,
-        maxTokens: 2000,
-        signal,
-      });
-      if (content) {
-        const parsed = this.parseSearchResponse(content);
-        aiTerms = parsed.terms;
-        intent = parsed.intent;
-      }
+      const expanded = await this.expandSearchQuery(query, signal);
+      aiTerms = expanded.terms;
+      intent = expanded.intent;
 
       // ② 候选召回
       let candidates: Repository[];
@@ -2270,14 +2288,18 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
    * 把候选仓库摘要交给 LLM，选出与查询真正相关的仓库并按相关性排序。
    * 返回 null 表示响应缺失/无法解析（调用方走词法兜底）；空数组是合法结果
    * （模型判断没有仓库能满足查询意图）。
+   * evidence（可选，全网仓库语义搜索使用）：键为 full_name 小写、值为召回
+   * 证据行的映射，附加到对应仓库摘要块末尾，让重排模型看到"为什么被召回"。
+   * 不传时提示词与历史格式逐字节一致（fixtures 快照守护）。
    */
-  private async selectRelevantRepositories(
+  async selectRelevantRepositories(
     candidates: Repository[],
     query: string,
     intent: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    evidence?: Map<string, string>
   ): Promise<Repository[] | null> {
-    const summaries = this.sanitizeForPrompt(this.buildCandidateSummaries(candidates));
+    const summaries = this.sanitizeForPrompt(this.buildCandidateSummaries(candidates, evidence));
     const intentLine = intent
       ? (this.language === 'zh'
         ? `\n\n用户意图说明：${this.sanitizeForPrompt(intent)}`

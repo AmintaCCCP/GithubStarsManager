@@ -100,7 +100,21 @@
     "platform-filter-v1": "プラットフォームフィルター: {{v1}}",
     "items-count": "{{currentCount}} 個のアイテム",
     "items-count-with-total": "{{currentCount}} 個のアイテム (合計 {{totalCount}} 個のアイテム)",
-    "ai": "AI"
+    "ai": "AI",
+    "search-mode": "検索モード",
+    "search-mode-keyword": "キーワード",
+    "search-mode-semantic": "AI セマンティック",
+    "search-mode-semantic-placeholder": "自然言語で探したいリポジトリを説明してください。例：Markdown ノートを管理するコマンドラインツール",
+    "search-mode-hint": "AI セマンティック検索は grep.app による全ウェブのコードマッチングに基づきます（GitHub リポジトリのみ）。AI サービスの設定が必要です",
+    "search-phase-expanding": "AI がクエリを分析中…",
+    "search-phase-recalling": "全ウェブから語彙的にリコール中…",
+    "search-phase-enriching": "リポジトリ情報を補完中…",
+    "search-phase-reranking": "AI が選別・並べ替え中…",
+    "semantic-rate-limited": "コード検索のレート制限（429）が発生しました。しばらくしてから再試行してください",
+    "semantic-no-ai-config": "AI サービスが未設定のため、キーワード検索にフォールバックしました",
+    "semantic-fallback-toast": "AI 選別に失敗したため、語彙マッチ順で並べ替えました",
+    "semantic-empty-recall": "全ウェブのコードから関連リポジトリが見つかりませんでした。より具体的な技術キーワードを試してください",
+    "semantic-empty-ai": "AI は関連リポジトリを見つけられませんでした。言い換えや技術キーワードの追加を試してください"
   },
   "weeklyIssueModal": {
     "submission-v1": "貢献番号{{v1}}",

@@ -100,7 +100,21 @@
     "platform-filter-v1": "Filtre de plate-forme : {{v1}}",
     "items-count": "{{currentCount}} éléments",
     "items-count-with-total": "{{currentCount}} éléments ({{totalCount}} éléments au total)",
-    "total-2": "(total"
+    "total-2": "(total",
+    "search-mode": "Mode de recherche",
+    "search-mode-keyword": "Mots-clés",
+    "search-mode-semantic": "IA sémantique",
+    "search-mode-semantic-placeholder": "Décrivez en langage naturel le dépôt recherché, ex. : un outil en ligne de commande pour gérer ses notes Markdown",
+    "search-mode-hint": "La recherche sémantique IA s'appuie sur la correspondance de code de tout le web via grep.app (dépôts GitHub uniquement) et requiert un service IA configuré",
+    "search-phase-expanding": "L'IA analyse la requête…",
+    "search-phase-recalling": "Rappel lexical sur tout le web…",
+    "search-phase-enriching": "Enrichissement des dépôts…",
+    "search-phase-reranking": "L'IA sélectionne et trie…",
+    "semantic-rate-limited": "Limite de requêtes atteinte sur la recherche de code (429), réessayez plus tard",
+    "semantic-no-ai-config": "Aucun service IA configuré, retour à la recherche par mots-clés",
+    "semantic-fallback-toast": "La sélection IA a échoué, résultats triés par correspondances lexicales",
+    "semantic-empty-recall": "Aucun dépôt correspondant trouvé dans le code public, essayez des mots-clés techniques plus précis",
+    "semantic-empty-ai": "L'IA n'a trouvé aucun dépôt pertinent, reformulez ou ajoutez des mots-clés techniques"
   },
   "weeklyIssueModal": {
     "submission-v1": "N° de contribution {{v1}}",
