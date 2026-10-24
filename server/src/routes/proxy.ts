@@ -644,6 +644,7 @@ router.post('/api/settings/proxy/test', async (req, res) => {
         socket.on('connect', () => resolve(socket));
         socket.on('timeout', () => { socket.destroy(); reject(new Error('Connection timeout')); });
         socket.on('error', (err: Error) => reject(err));
+        // codeql[js/request-forgery] 目标是用户在设置中自填的自有代理服务器，按业务必须支持内网/回环地址。
         socket.connect(port, host);
       });
 
@@ -755,6 +756,28 @@ router.post('/api/settings/proxy/test', async (req, res) => {
 
 // --- RPC Download endpoints ---
 
+// aria2 RPC 的 host/port 直接拼进 `http://${host}:${port}/jsonrpc`。host 中出现
+// 路径分隔、查询、锚点、userinfo、百分号编码或空白字符都会改变 URL 的解析结构
+// （如 `1.2.3.4/#x`、`a%2fb@`），一律拒绝；其余字符（含 IDN 主机名、裸 IPv6）
+// 保持原有行为，端口必须是 1-65535 的整数。
+function isSafeRpcHost(host: unknown): boolean {
+  return typeof host === 'string' && host.length > 0 && !/[/\\?#@%\s]/.test(host);
+}
+
+function isSafeRpcPort(port: unknown): boolean {
+  if (typeof port === 'number') return Number.isInteger(port) && port >= 1 && port <= 65535;
+  if (typeof port === 'string') {
+    if (!/^\d+$/.test(port)) return false;
+    const n = Number(port);
+    return n >= 1 && n <= 65535;
+  }
+  return false;
+}
+
+function invalidRpcTarget(res: import('express').Response): void {
+  res.status(400).json({ error: 'Invalid RPC host or port', code: 'INVALID_RPC_TARGET' });
+}
+
 function getRpcDownloadConfig(): { host: string; port: number; secret: string } | null {
   try {
     const db = getDb();
@@ -802,6 +825,17 @@ router.put('/api/settings/rpc-download', (req, res) => {
     const { enabled, host, port, secret } = req.body;
     const secretProvided = 'secret' in req.body;
 
+    // 空值沿用原有行为（未配置时允许空串）；非空值做 URL 结构字符校验，
+    // 防止拼进 `http://${host}:${port}/jsonrpc` 时改变解析目标。
+    if (host && !isSafeRpcHost(host)) {
+      invalidRpcTarget(res);
+      return;
+    }
+    if (port !== undefined && port !== '' && !isSafeRpcPort(port)) {
+      invalidRpcTarget(res);
+      return;
+    }
+
     const configToStore: Record<string, unknown> = { enabled, host, port };
     if (secretProvided && secret) {
       configToStore.secret_encrypted = encrypt(secret, config.encryptionKey);
@@ -836,6 +870,7 @@ async function fetchWithTimeout(url: string, init: RequestInit & { timeoutMs?: n
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    // codeql[js/request-forgery] 目标是用户配置的自有 aria2 RPC（典型为内网 NAS），按业务必须支持 http 内网地址；host/port 已做 URL 结构字符校验。
     return await fetch(url, { ...fetchInit, signal: controller.signal });
   } finally {
     clearTimeout(timer);
@@ -847,6 +882,11 @@ router.post('/api/settings/rpc-download/test', async (req, res) => {
   const { host, port, secret: requestSecret } = req.body;
   if (!host || !port) {
     res.json({ success: false, error: 'Host and port are required' });
+    return;
+  }
+  // host/port 直接拼进 jsonrpc URL，先挡掉能改变 URL 解析结构的字符
+  if (!isSafeRpcHost(host) || !isSafeRpcPort(port)) {
+    invalidRpcTarget(res);
     return;
   }
 
