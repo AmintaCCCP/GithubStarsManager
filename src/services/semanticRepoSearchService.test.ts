@@ -654,3 +654,15 @@ describe('semanticRepoSearchService — 召回故障语义（CodeRabbit 三轮�
     expect(decodeUrl(calls[3])).toContain('q=machine learning');
   });
 });
+
+describe('semanticRepoSearchService — 未发起请求的边界（CodeRabbit 四轮意见回归）', () => {
+  it('查询超长且扩展无可用词 → 一次请求都不发起，按 recall_empty 处理而非抛服务故障', async () => {
+    const ai = makeAi({ expand: async () => ({ terms: [], intent: '' }) });
+    const onFallback = vi.fn();
+    const { fetchImpl } = installGrepFetch([]);
+    const result = await searchRepositoriesSemantically(makeApi(), ai, 'a'.repeat(61), { fetchImpl, onFallback });
+    expect(result.repos).toEqual([]);
+    expect(onFallback).toHaveBeenCalledWith('recall_empty');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});

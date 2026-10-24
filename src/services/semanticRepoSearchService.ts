@@ -248,11 +248,16 @@ async function recallRepositories(
   const collected: GrepSearchResult[] = [];
   const regex = buildRecallRegex(query, terms);
   let needFallback = !regex;
+  // 实际发起的主请求次数（正则 1 次 + fuzzy 回退各 1 次，翻页不计）：
+  // 仅当"发过请求且一次都没成功"才判定检索服务不可用；一次都没发起
+  // （如查询超长且扩展无可用词）返回空聚合，由上层按 recall_empty 处理
+  let attemptedRequests = 0;
   if (regex) {
     try {
       // Markdown 文档域优先：实测 f.lang=Markdown 过滤可用且效果显著（yazi 的
       // README.md 直接出现在 "terminal file manager" 查询命中里）；全库代码搜索
       // 则易被变量名/泛词污染刷屏
+      attemptedRequests += 1;
       const first = await runGrepQuery(regex, 'regexp', collected, options, true, RECALL_MARKDOWN_LANGS);
       if (first.total === 0) needFallback = true;
     } catch (error) {
@@ -302,6 +307,7 @@ async function recallRepositories(
     const fallbackWords = [...(hasQuery ? [queryWord] : []), ...interleaved].slice(0, FALLBACK_QUERY_LIMIT);
     for (let i = 0; i < fallbackWords.length; i++) {
       if (i > 0) await sleep(FALLBACK_INTERVAL_MS, options.signal);
+      attemptedRequests += 1;
       try {
         await runGrepQuery(fallbackWords[i], 'fuzzy', collected, options, false);
       } catch (error) {
@@ -312,9 +318,10 @@ async function recallRepositories(
     }
   }
   // collected 只在请求成功时 push（含"首页成功、翻页失败"的部分成功场景）：
-  // 一次都没成功说明检索服务整体不可用（超时/网络错误等），应向上抛错，
-  // 而不是把服务故障谎报成"零命中"（recall_empty）
-  if (collected.length === 0) {
+  // 发过请求但一次都没成功说明检索服务整体不可用（超时/网络错误等），应向上抛错，
+  // 而不是把服务故障谎报成"零命中"（recall_empty）；一次都没发起则交由上层按
+  // recall_empty 处理
+  if (collected.length === 0 && attemptedRequests > 0) {
     throw new Error('Code search unavailable: all recall requests failed');
   }
   return aggregateRecall(collected);
