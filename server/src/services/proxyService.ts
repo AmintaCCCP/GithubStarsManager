@@ -1,4 +1,6 @@
 import axios, { AxiosRequestConfig } from 'axios';
+import { isIP } from 'node:net';
+import { lookup } from 'node:dns/promises';
 import { logger } from './logger.js';
 import { redactUrl } from './logSanitizer.js';
 
@@ -31,6 +33,44 @@ export interface ProxyResponse {
 
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254']);
 const PRIVATE_IP_PATTERNS = [/^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./];
+
+// 无论严格/宽松档，DNS 解析结果命中一律拒绝：云元数据（IMDS 的 v4/v6 端点）
+// 与未指定地址不可能是合法业务目标。宽松档（allowPrivate）仅豁免私网/回环段。
+const ALWAYS_BLOCKED_RESOLVED_IPS = new Set(['169.254.169.254', 'fd00:ec2::254', '0.0.0.0', '::']);
+
+// axios 自动跟随重定向时不会重跑目标校验，改为手动逐跳处理（见 proxyRequest）。
+const MAX_REDIRECT_HOPS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+// 跨主机重定向不携带的凭证头，防止 Authorization/Cookie 泄露到跳转目标。
+const CREDENTIAL_HEADERS = new Set(['authorization', 'cookie', 'proxy-authorization']);
+
+/** 解析 hostname 并校验全部解析结果（IMDS 封禁 + 严格档私网段）。
+ *  解析失败时放行——后续连接会以同样的 DNS 错误自然失败；
+ *  配置了代理时跳过：目标由远程代理解析，本地结果不代表实际连接地址。 */
+async function assertResolvedHostsSafe(rawUrl: string, allowPrivate: boolean): Promise<void> {
+  let hostname: string;
+  try {
+    hostname = new URL(rawUrl).hostname;
+  } catch {
+    return; // URL 本身非法，validateUrl 会给出明确错误
+  }
+  if (isIP(hostname)) return; // IP 字面量已在 validateUrl 按字面量校验
+
+  let addresses: Array<{ address: string }>;
+  try {
+    addresses = await lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    return;
+  }
+  for (const { address } of addresses) {
+    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(address)) {
+      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to protected address '${address}'`);
+    }
+    if (!allowPrivate && isPrivateOrLoopback(address)) {
+      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to private address '${address}'`);
+    }
+  }
+}
 
 export interface ValidateUrlOptions {
   /** 宽松模式：放行回环地址与私有网段。仅用于「用户主动提供的自有配置」所来源的 URL
@@ -135,49 +175,34 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
 
   try {
     validateUrl(url, { allowPrivate: options.allowPrivate });
+    if (!proxyConfig?.enabled) {
+      // 代理关闭时本地负责 DNS 解析，校验解析结果（IMDS/私网段策略）
+      await assertResolvedHostsSafe(url, Boolean(options.allowPrivate));
+    }
     logger.info('proxy.request', `${method} ${redactUrl(url)}`);
 
-    const axiosConfig: AxiosRequestConfig = {
-      url,
-      method: method.toLowerCase() as AxiosRequestConfig['method'],
-      headers,
-      timeout,
-      validateStatus: () => true, // 不抛出 HTTP 错误状态码
-    };
-    if (preserveRawResponse) {
-      axiosConfig.responseType = 'text';
-      axiosConfig.transformResponse = [(data) => data];
-    }
-
-    if (body && method !== 'GET' && method !== 'HEAD') {
-      axiosConfig.data = body;
-      const hasContentType = Object.keys(headers).some(
-        k => k.toLowerCase() === 'content-type'
-      );
-      if (!hasContentType && typeof body === 'object') {
-        axiosConfig.headers = { ...axiosConfig.headers, 'Content-Type': 'application/json' };
-      }
-    }
-
-    // 配置代理
+    // 代理配置只依赖 proxyConfig，循环外构建一次，每一跳复用
+    let httpAgent: AxiosRequestConfig['httpAgent'];
+    let httpsAgent: AxiosRequestConfig['httpsAgent'];
+    let proxySetting: AxiosRequestConfig['proxy'];
     if (proxyConfig?.enabled && proxyConfig.host && proxyConfig.port) {
       if (proxyConfig.type === 'socks5') {
         // SOCKS5: axios 不原生支持，使用 socks-proxy-agent
         const { SocksProxyAgent } = await import('socks-proxy-agent');
         const socksUrl = `socks5://${proxyConfig.host}:${proxyConfig.port}`;
         const agent = new SocksProxyAgent(socksUrl);
-        axiosConfig.httpAgent = agent;
-        axiosConfig.httpsAgent = agent;
-        axiosConfig.proxy = false; // 禁用 axios 内置代理，使用自定义 agent
+        httpAgent = agent;
+        httpsAgent = agent;
+        proxySetting = false; // 禁用 axios 内置代理，使用自定义 agent
       } else {
         // HTTP/HTTPS 代理
-        axiosConfig.proxy = {
+        proxySetting = {
           protocol: 'http',
           host: proxyConfig.host,
           port: proxyConfig.port,
         };
         if (proxyConfig.username && proxyConfig.password) {
-          axiosConfig.proxy.auth = {
+          proxySetting.auth = {
             username: proxyConfig.username,
             password: proxyConfig.password,
           };
@@ -185,42 +210,108 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
       }
     } else {
       // 显式禁用代理，防止 axios 回退到环境变量 HTTP_PROXY/HTTPS_PROXY
-      axiosConfig.proxy = false;
+      proxySetting = false;
     }
 
-    // codeql[js/request-forgery] 目标 URL 均先过 validateUrl（协议白名单、IMDS 硬封禁、私网段策略）；
-    // 用户主动提供的自有配置来源（已保存的 AI/WebDAV 配置、WebDAV 测试连接的内联地址、下载目标）
-    // 按业务必须支持无证书 http 内网地址，allowPrivate 仅对这些来源放开；AI 内联 config 等任意输入保持严格档。
-    const response = await axios(axiosConfig);
+    // 关闭 axios 自动重定向，手动逐跳跟随：每一跳都重跑 validateUrl 与
+    // DNS 解析校验，防止初始 URL 合法、重定向到内网/IMDS 绕过策略。
+    let currentUrl = url;
+    let currentMethod = method;
+    let currentBody = body;
+    let currentHeaders = headers;
 
-    logger.info('proxy.response', `${method} ${redactUrl(url)} -> ${response.status}`);
-
-    const responseHeaders: Record<string, string> = {};
-    if (response.headers) {
-      for (const [key, value] of Object.entries(response.headers)) {
-        responseHeaders[key] = String(value);
+    for (let hop = 0; ; hop++) {
+      const axiosConfig: AxiosRequestConfig = {
+        url: currentUrl,
+        method: currentMethod.toLowerCase() as AxiosRequestConfig['method'],
+        headers: currentHeaders,
+        timeout,
+        maxRedirects: 0, // 重定向由本循环处理，axios 只发单跳
+        proxy: proxySetting,
+        validateStatus: () => true, // 不抛出 HTTP 错误状态码
+      };
+      if (httpAgent) {
+        axiosConfig.httpAgent = httpAgent;
+        axiosConfig.httpsAgent = httpsAgent;
       }
-    }
+      if (preserveRawResponse) {
+        axiosConfig.responseType = 'text';
+        axiosConfig.transformResponse = [(data) => data];
+      }
 
-    let data: unknown;
-    if (preserveRawResponse) {
-      data = typeof response.data === 'string' ? response.data : String(response.data ?? '');
-    } else {
-      const contentType = String(response.headers['content-type'] || '');
-      if (contentType.includes('application/json') && typeof response.data === 'object') {
-        data = response.data;
-      } else if (typeof response.data === 'string') {
-        try {
-          data = JSON.parse(response.data);
-        } catch {
+      if (currentBody && currentMethod !== 'GET' && currentMethod !== 'HEAD') {
+        axiosConfig.data = currentBody;
+        const hasContentType = Object.keys(currentHeaders).some(
+          k => k.toLowerCase() === 'content-type'
+        );
+        if (!hasContentType && typeof currentBody === 'object') {
+          axiosConfig.headers = { ...axiosConfig.headers, 'Content-Type': 'application/json' };
+        }
+      }
+
+      // codeql[js/request-forgery] 目标 URL 均先过 validateUrl（协议白名单、IMDS 硬封禁、私网段策略，
+      // 含逐跳重定向校验与 DNS 解析结果校验）；用户主动提供的自有配置来源（已保存的 AI/WebDAV 配置、
+      // WebDAV 测试连接的内联地址、下载目标）按业务必须支持无证书 http 内网地址，allowPrivate 仅对这些
+      // 来源放开；AI 内联 config 等任意输入保持严格档。
+      const response = await axios(axiosConfig);
+
+      if (REDIRECT_STATUSES.has(response.status) && hop < MAX_REDIRECT_HOPS) {
+        const location = response.headers?.location;
+        if (typeof location === 'string' && location) {
+          const nextUrl = new URL(location, currentUrl).toString();
+          // 跨主机跳转不携带凭证头
+          if (new URL(nextUrl).host !== new URL(currentUrl).host) {
+            currentHeaders = Object.fromEntries(
+              Object.entries(currentHeaders).filter(([k]) => !CREDENTIAL_HEADERS.has(k.toLowerCase())),
+            );
+          }
+          // 与 follow-redirects 既有语义保持一致：303 固定转 GET；
+          // 301/302 对 POST 转 GET；307/308 及其余方法（WebDAV PROPFIND 等）
+          // 保留原方法与请求体
+          if (response.status === 303
+            || ((response.status === 301 || response.status === 302) && currentMethod.toUpperCase() === 'POST')) {
+            currentMethod = 'GET';
+            currentBody = undefined;
+          }
+          currentUrl = nextUrl;
+          validateUrl(currentUrl, { allowPrivate: options.allowPrivate });
+          if (!proxyConfig?.enabled) {
+            await assertResolvedHostsSafe(currentUrl, Boolean(options.allowPrivate));
+          }
+          logger.info('proxy.redirect', `${response.status} -> ${redactUrl(currentUrl)}`);
+          continue;
+        }
+      }
+
+      logger.info('proxy.response', `${currentMethod} ${redactUrl(currentUrl)} -> ${response.status}`);
+
+      const responseHeaders: Record<string, string> = {};
+      if (response.headers) {
+        for (const [key, value] of Object.entries(response.headers)) {
+          responseHeaders[key] = String(value);
+        }
+      }
+
+      let data: unknown;
+      if (preserveRawResponse) {
+        data = typeof response.data === 'string' ? response.data : String(response.data ?? '');
+      } else {
+        const contentType = String(response.headers['content-type'] || '');
+        if (contentType.includes('application/json') && typeof response.data === 'object') {
+          data = response.data;
+        } else if (typeof response.data === 'string') {
+          try {
+            data = JSON.parse(response.data);
+          } catch {
+            data = response.data;
+          }
+        } else {
           data = response.data;
         }
-      } else {
-        data = response.data;
       }
-    }
 
-    return { status: response.status, headers: responseHeaders, data };
+      return { status: response.status, headers: responseHeaders, data };
+    }
   } catch (error) {
     if (axios.isAxiosError(error)) {
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
