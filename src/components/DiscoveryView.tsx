@@ -11,6 +11,7 @@ import {
   RefreshCw,
   TrendingUp,
   Bot,
+  Check,
   Loader2,
   Rocket,
   Tag,
@@ -367,9 +368,9 @@ const CustomSelect: React.FC<CustomSelectProps> = ({
             <DropdownMenuRadioItem
               key={option.value}
               value={option.value}
-              className={value === option.value ? 'bg-accent text-accent-foreground' : ''}
+              className={`gap-2 ${value === option.value ? 'bg-accent text-accent-foreground' : ''}`}
             >
-              {option.icon && <span className="h-4 w-4">{option.icon}</span>}
+              {option.icon && <span className="h-4 w-4 shrink-0">{option.icon}</span>}
               <span>{option.label}</span>
             </DropdownMenuRadioItem>
           ))}
@@ -386,6 +387,37 @@ interface LoadMoreButtonProps {
   totalCount: number;
   language: AppLanguage;
 }
+
+/** 语义搜索四阶段（顺序即管道顺序），UI 据此渲染进度指示。 */
+const SEMANTIC_PHASE_ORDER = ['expanding', 'recalling', 'enriching', 'reranking'] as const;
+
+/** 语义搜索过程状态：已完成打勾、当前阶段旋转 + 脉冲 + 明细（如补全计数）、未到阶段弱化。 */
+const SemanticSearchProgress: React.FC<{ phase: string; detail: string | null }> = ({ phase, detail }) => {
+  const t = useT('discovery');
+  const currentIndex = SEMANTIC_PHASE_ORDER.indexOf(phase as typeof SEMANTIC_PHASE_ORDER[number]);
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground dark:text-muted-foreground">
+      {SEMANTIC_PHASE_ORDER.map((step, index) => {
+        const done = currentIndex > index;
+        const active = currentIndex === index;
+        return (
+          <span
+            key={step}
+            className={`flex items-center gap-1.5 ${active ? 'text-foreground dark:text-foreground' : ''} ${!done && !active ? 'opacity-50' : ''}`}
+          >
+            {done
+              ? <Check className="h-3 w-3" />
+              : active
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+            <span className={active ? 'animate-pulse' : ''}>{t(`discoveryView.search-phase-${step}`)}</span>
+            {active && detail && <span className="tabular-nums">({detail})</span>}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
 
 const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
   onLoadMore,
@@ -485,6 +517,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     discoverySearchMode,
     setDiscoverySearchMode,
     discoverySearchPhase,
+    discoverySearchPhaseDetail,
     discoverySearchEmptyReason,
     discoverySelectedTopic,
     setDiscoverySelectedTopic,
@@ -1092,9 +1125,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   </p>
                 )}
                 {discoverySearchPhase && (
-                  <p className="animate-pulse text-xs text-muted-foreground dark:text-muted-foreground">
-                    {discoverySearchPhase}
-                  </p>
+                  <SemanticSearchProgress phase={discoverySearchPhase} detail={discoverySearchPhaseDetail} />
                 )}
                 
                 <div className="flex flex-wrap gap-2.5">

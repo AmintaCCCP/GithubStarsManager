@@ -2169,14 +2169,27 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
    * （实测 glm 思考模型 300 token 不够），给足余量；非思考模型只按实际用量
    * 计费，无额外成本。响应为空或无法解析时返回 {terms: [], intent: ''}，
    * 由调用方决定是否继续后续阶段。
+   * multilingual（全网仓库语义搜索使用）：GitHub 上仓库的 README/文档既有英文
+   * 也有本地语言，只用查询原语言的关键词会漏掉大量仓库——追加硬性约束要求
+   * 同时给出查询原语言与英文（查询本身是英文时补充中文）两套关键词。默认关闭，
+   * 保证仓库页既有扩展提示词逐字节不变（fixtures 快照守护）。
    */
-  async expandSearchQuery(query: string, signal?: AbortSignal): Promise<{ terms: string[]; intent: string }> {
+  async expandSearchQuery(
+    query: string,
+    signal?: AbortSignal,
+    options?: { multilingual?: boolean },
+  ): Promise<{ terms: string[]; intent: string }> {
     const system = this.language === 'zh'
       ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
       : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
+    const multilingualDirective = this.language === 'zh'
+      ? '\n\n补充约束：keywords 必须同时包含查询原语言与英文两套关键词（查询本身已是英文时补充中文），每种至少 2 个，覆盖相同概念的不同语言表达，以便匹配不同语言撰写的仓库。'
+      : '\n\nAdditional constraint: keywords must include two sets of terms — the query\'s original language AND English (if the query is already English, add Chinese) — at least 2 of each, covering the same concepts across languages so that repositories written in different languages can be matched.';
     const content = await this.requestText({
       system,
-      user: this.createSearchPrompt(query),
+      user: options?.multilingual
+        ? `${this.createSearchPrompt(query)}${multilingualDirective}`
+        : this.createSearchPrompt(query),
       temperature: 0.1,
       maxTokens: 2000,
       signal,

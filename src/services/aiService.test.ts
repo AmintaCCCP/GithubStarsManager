@@ -620,3 +620,36 @@ describe('AIService.selectRelevantRepositories — evidence 证据行', () => {
     expect(evidencePrompt.replace(`${evidenceLine}\n`, '')).toBe(baselinePrompt);
   });
 });
+
+describe('AIService.expandSearchQuery — 多语言关键词约束（multilingual）', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> };
+
+  it('multilingual: true 时用户提示词追加双语约束；默认调用不追加（仓库页提示词逐字节不变）', async () => {
+    const fetchMock = mockFetch();
+    const requests: Array<string> = [];
+    fetchMock.mockImplementation(async (_url, init) => {
+      requests.push(String((await captureBody(init)).messages[1].content));
+      return chatResponse('{"intent":"i","keywords":["k"],"synonyms":[]}');
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    await service.expandSearchQuery('markdown 编辑器', undefined);
+    await service.expandSearchQuery('markdown 编辑器', undefined, { multilingual: true });
+
+    // 默认路径：无追加段（与 createSearchPrompt 原文一致）
+    expect(requests[0]).not.toContain('补充约束');
+    // 多语言路径：追加双语约束（原语言 + 英文，英文查询补中文）
+    expect(requests[1]).toContain('补充约束');
+    expect(requests[1]).toContain('查询原语言与英文');
+    // 追加段在原提示词之后，且原文完整保留
+    expect(requests[1].startsWith(requests[0])).toBe(true);
+    expect(requests[1].length).toBeGreaterThan(requests[0].length);
+  });
+});

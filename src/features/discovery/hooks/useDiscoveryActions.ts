@@ -148,6 +148,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
           // 新搜索开始时清空上一轮语义搜索的进度与空态（含切回关键词模式后的残留清理）
           const semanticStore = useAppStore.getState();
           semanticStore.setDiscoverySearchPhase(null);
+          semanticStore.setDiscoverySearchPhaseDetail(null);
           semanticStore.setDiscoverySearchEmptyReason(null);
           // 任何新的搜索请求（关键词或语义）启动前都中止在途语义搜索的
           // LLM / grep / GitHub 全链路请求——切回关键词模式时同样要停，不能
@@ -166,8 +167,9 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
                 onPhase: (phase, detail) => {
                   // 只有当前请求有权写进度，避免被取代的旧请求覆盖新搜索的状态
                   if (!isCurrentRequest()) return;
-                  const phaseText = tRef.current(`discoveryView.search-phase-${phase}`);
-                  useAppStore.getState().setDiscoverySearchPhase(detail ? `${phaseText} (${detail})` : phaseText);
+                  // 存原始阶段 id（UI 据此渲染四步进度指示），补充明细（如补全计数）单独存
+                  useAppStore.getState().setDiscoverySearchPhase(phase);
+                  useAppStore.getState().setDiscoverySearchPhaseDetail(detail ?? null);
                 },
                 onFallback: (reason) => {
                   if (reason === 'ai_failed' || reason === 'unparseable') {
@@ -195,6 +197,7 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
             } finally {
               if (channelRequestVersionRef.current['search'] === requestVersion) {
                 useAppStore.getState().setDiscoverySearchPhase(null);
+                useAppStore.getState().setDiscoverySearchPhaseDetail(null);
               }
               if (channelRequestControllersRef.current['search'] === semanticController) {
                 delete channelRequestControllersRef.current['search'];

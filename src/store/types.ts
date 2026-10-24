@@ -251,6 +251,7 @@ export interface AppActions {
   setDiscoverySearchQuery: (query: string) => void;
   setDiscoverySearchMode: (mode: 'keyword' | 'semantic') => void;
   setDiscoverySearchPhase: (phase: string | null) => void;
+  setDiscoverySearchPhaseDetail: (detail: string | null) => void;
   setDiscoverySearchEmptyReason: (reason: 'recall_empty' | 'ai_empty' | null) => void;
   setDiscoverySelectedTopic: (topic: TopicCategory | null) => void;
   setDiscoveryHasMore: (channel: DiscoveryChannelId, hasMore: boolean) => void;

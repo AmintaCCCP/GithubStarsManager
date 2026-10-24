@@ -105,7 +105,7 @@
     "search-mode-keyword": "키워드",
     "search-mode-semantic": "AI 시맨틱",
     "search-mode-semantic-placeholder": "자연어로 찾고 싶은 저장소를 설명하세요. 예: Markdown 노트를 관리하는 커맨드라인 도구",
-    "search-mode-hint": "AI 시맨틱 검색은 grep.app 기반 전체 웹 코드 매칭을 사용합니다(GitHub 저장소만 해당). AI 서비스 구성이 필요합니다",
+    "search-mode-hint": "AI 시맨틱 검색은 공개된 코드를 전체 웹에서 매칭하여 저장소를 찾습니다(GitHub 저장소만 해당). AI 서비스 구성이 필요합니다",
     "search-phase-expanding": "AI가 쿼리 분석 중…",
     "search-phase-recalling": "전체 웹에서 어휘적 리콜 중…",
     "search-phase-enriching": "저장소 정보 보완 중…",

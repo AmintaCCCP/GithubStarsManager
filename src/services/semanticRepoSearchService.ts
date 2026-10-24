@@ -376,7 +376,7 @@ export async function searchRepositoriesSemantically(
   let terms: string[] = [];
   let intent = '';
   try {
-    const expanded = await aiService.expandSearchQuery(trimmed, signal);
+    const expanded = await aiService.expandSearchQuery(trimmed, signal, { multilingual: true });
     terms = expanded.terms;
     intent = expanded.intent;
   } catch (error) {

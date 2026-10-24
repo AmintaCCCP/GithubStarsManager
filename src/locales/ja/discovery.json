@@ -105,7 +105,7 @@
     "search-mode-keyword": "キーワード",
     "search-mode-semantic": "AI セマンティック",
     "search-mode-semantic-placeholder": "自然言語で探したいリポジトリを説明してください。例：Markdown ノートを管理するコマンドラインツール",
-    "search-mode-hint": "AI セマンティック検索は grep.app による全ウェブのコードマッチングに基づきます（GitHub リポジトリのみ）。AI サービスの設定が必要です",
+    "search-mode-hint": "AI セマンティック検索は、公開されているコードをウェブ全体から照合してリポジトリを検索します（GitHub リポジトリのみ）。AI サービスの設定が必要です",
     "search-phase-expanding": "AI がクエリを分析中…",
     "search-phase-recalling": "全ウェブから語彙的にリコール中…",
     "search-phase-enriching": "リポジトリ情報を補完中…",

@@ -121,9 +121,10 @@ export const createInitialState = (): AppState => ({
       discoverySortBy: 'BestMatch',
       discoverySortOrder: 'Descending',
       discoverySearchQuery: '',
-      // 仓库搜索模式：默认关键词（行为与历史版本一致）；phase/emptyReason 为会话级状态
+      // 仓库搜索模式：默认关键词（行为与历史版本一致）；phase/detail/emptyReason 为会话级状态
       discoverySearchMode: 'keyword',
       discoverySearchPhase: null,
+      discoverySearchPhaseDetail: null,
       discoverySearchEmptyReason: null,
       discoverySelectedTopic: null,
       discoveryHasMore: { 'trending': false, 'hot-release': false, 'most-popular': false, 'topic': false, 'x-tweet': false, 'telegram': false, 'weekly': false, 'search': false, 'code-search': false },

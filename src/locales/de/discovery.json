@@ -105,7 +105,7 @@
     "search-mode-keyword": "Schlüsselwörter",
     "search-mode-semantic": "KI-Semantik",
     "search-mode-semantic-placeholder": "Beschreibe das gesuchte Repository in natürlicher Sprache, z. B.: ein Kommandozeilen-Tool zur Verwaltung von Markdown-Notizen",
-    "search-mode-hint": "Die KI-Semantiksuche basiert auf Code-Abgleich im gesamten Web über grep.app (nur GitHub-Repositories) und erfordert einen konfigurierten KI-Dienst",
+    "search-mode-hint": "Die KI-Semantiksuche findet Repositories durch Abgleich öffentlichen Codes im gesamten Web (nur GitHub-Repositories) und erfordert einen konfigurierten KI-Dienst",
     "search-phase-expanding": "KI analysiert die Anfrage…",
     "search-phase-recalling": "Lexikalischer Abruf im gesamten Web…",
     "search-phase-enriching": "Repository-Details werden ergänzt…",

@@ -105,7 +105,7 @@
     "search-mode-keyword": "Mots-clés",
     "search-mode-semantic": "IA sémantique",
     "search-mode-semantic-placeholder": "Décrivez en langage naturel le dépôt recherché, ex. : un outil en ligne de commande pour gérer ses notes Markdown",
-    "search-mode-hint": "La recherche sémantique IA s'appuie sur la correspondance de code de tout le web via grep.app (dépôts GitHub uniquement) et requiert un service IA configuré",
+    "search-mode-hint": "La recherche sémantique IA trouve des dépôts en comparant le code public de tout le web (dépôts GitHub uniquement) et requiert un service IA configuré",
     "search-phase-expanding": "L'IA analyse la requête…",
     "search-phase-recalling": "Rappel lexical sur tout le web…",
     "search-phase-enriching": "Enrichissement des dépôts…",

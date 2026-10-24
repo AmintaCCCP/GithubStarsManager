@@ -105,7 +105,7 @@
     "search-mode-keyword": "Keywords",
     "search-mode-semantic": "AI Semantic",
     "search-mode-semantic-placeholder": "Describe the repository you want in natural language, e.g.: a CLI tool for managing Markdown notes",
-    "search-mode-hint": "AI semantic search matches code across the web via grep.app (GitHub repositories only) and requires a configured AI service",
+    "search-mode-hint": "AI semantic search finds repositories by matching public code across the web (GitHub repositories only) and requires a configured AI service",
     "search-phase-expanding": "AI is analyzing your query…",
     "search-phase-recalling": "Recalling repositories from the web…",
     "search-phase-enriching": "Enriching repository details…",

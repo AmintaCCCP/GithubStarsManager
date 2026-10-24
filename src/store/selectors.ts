@@ -152,6 +152,8 @@ export const selectDiscoveryViewState = (state: AppStoreState) => ({
   setDiscoverySearchMode: state.setDiscoverySearchMode,
   discoverySearchPhase: state.discoverySearchPhase,
   setDiscoverySearchPhase: state.setDiscoverySearchPhase,
+  discoverySearchPhaseDetail: state.discoverySearchPhaseDetail,
+  setDiscoverySearchPhaseDetail: state.setDiscoverySearchPhaseDetail,
   discoverySearchEmptyReason: state.discoverySearchEmptyReason,
   setDiscoverySearchEmptyReason: state.setDiscoverySearchEmptyReason,
   discoverySelectedTopic: state.discoverySelectedTopic,

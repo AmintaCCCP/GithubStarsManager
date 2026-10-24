@@ -28,6 +28,7 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'setDiscoverySearchQuery'
   | 'setDiscoverySearchMode'
   | 'setDiscoverySearchPhase'
+  | 'setDiscoverySearchPhaseDetail'
   | 'setDiscoverySearchEmptyReason'
   | 'setDiscoverySelectedTopic'
   | 'setDiscoveryHasMore'
@@ -163,8 +164,9 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     setDiscoverySortOrder: (discoverySortOrder) => set({ discoverySortOrder }),
     setDiscoverySearchQuery: (discoverySearchQuery) => set({ discoverySearchQuery }),
     setDiscoverySearchMode: (discoverySearchMode) => set({ discoverySearchMode }),
-    // phase 与 emptyReason 是会话级状态（不持久化），语义搜索开始/结束由 hook 负责清空
+    // phase/detail 与 emptyReason 是会话级状态（不持久化），语义搜索开始/结束由 hook 负责清空
     setDiscoverySearchPhase: (discoverySearchPhase) => set({ discoverySearchPhase }),
+    setDiscoverySearchPhaseDetail: (discoverySearchPhaseDetail) => set({ discoverySearchPhaseDetail }),
     setDiscoverySearchEmptyReason: (discoverySearchEmptyReason) => set({ discoverySearchEmptyReason }),
     setDiscoverySelectedTopic: (discoverySelectedTopic) => set({ discoverySelectedTopic }),
     setDiscoveryHasMore: (channel, hasMore) => set((state) => ({

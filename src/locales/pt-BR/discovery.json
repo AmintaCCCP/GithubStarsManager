@@ -105,7 +105,7 @@
     "search-mode-keyword": "Palavras-chave",
     "search-mode-semantic": "IA semântica",
     "search-mode-semantic-placeholder": "Descreva em linguagem natural o repositório que procura, ex.: uma ferramenta de linha de comando para gerenciar notas em Markdown",
-    "search-mode-hint": "A busca semântica com IA baseia-se na correspondência de código de toda a web via grep.app (apenas repositórios GitHub) e requer um serviço de IA configurado",
+    "search-mode-hint": "A busca semântica com IA encontra repositórios comparando código público de toda a web (apenas repositórios GitHub) e requer um serviço de IA configurado",
     "search-phase-expanding": "A IA está analisando a consulta…",
     "search-phase-recalling": "Recuperando repositórios na web…",
     "search-phase-enriching": "Complementando informações dos repositórios…",

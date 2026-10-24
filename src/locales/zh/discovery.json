@@ -105,7 +105,7 @@
     "search-mode-keyword": "关键词",
     "search-mode-semantic": "AI 语义",
     "search-mode-semantic-placeholder": "用自然语言描述想找的仓库，如：管理 Markdown 笔记的命令行工具",
-    "search-mode-hint": "AI 语义搜索基于 grep.app 全网代码匹配（仅 GitHub 仓库），需配置 AI 服务",
+    "search-mode-hint": "AI 语义搜索通过全网公开代码匹配寻找仓库（仅 GitHub 仓库），需配置 AI 服务",
     "search-phase-expanding": "AI 分析查询…",
     "search-phase-recalling": "全网词法召回…",
     "search-phase-enriching": "补全仓库信息…",
