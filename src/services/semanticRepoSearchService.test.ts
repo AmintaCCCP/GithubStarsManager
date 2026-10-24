@@ -672,12 +672,10 @@ describe('semanticRepoSearchService — 高具体性辅路召回（用户实测"
   it('泛词并集命中 5 万+ 时，命中罕见词的相关仓库排进池顶（真实 case：junk 973 次 vs 相关 2 次+辅路命中）', async () => {
     // 真实 HAR 场景：并集（含 desktop app/github stars 等泛词）在 Markdown 域 53934 命中，
     // junk 仓库 973 次刷进池顶，相关仓库只命中 2 次；辅路只查 CJK 罕见词，相关仓库命中
-    let callIndex = 0;
     const fetchImpl = vi.fn(async (input: string | URL | RequestInfo) => {
       const url = String(input);
       const page = url.includes('page=') ? Number(url.match(/page=(\d+)/)?.[1] ?? 1) : 1;
       const q = decodeURIComponent(url.replace(/\+/g, ' '));
-      callIndex += 1;
       if (q.includes('github\\u661f\\u6807') || q.includes('github星标')) {
         // 辅路：仅 CJK 罕见词——相关仓库高分命中，junk 不命中
         return grepResponse(grepResult({
