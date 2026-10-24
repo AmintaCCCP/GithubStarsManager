@@ -568,3 +568,41 @@ describe('semanticRepoSearchService — REST 回退限流处理', () => {
     expect(rest).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('semanticRepoSearchService — 翻页 facets 与 REST 限流停机（CodeRabbit 二轮意见回归）', () => {
+  it('同一查询翻页时 repoFacets 不被重复累加（facets 是全局分布，仅首页有效）', async () => {
+    const selectEvidence = new Map<string, string>();
+    const aiWithCapture = makeAi({
+      select: async (candidates, _query, _intent, _signal, evidence) => {
+        for (const [key, value] of evidence ?? []) selectEvidence.set(key, value);
+        return candidates;
+      },
+    });
+    const page = () => grepResponse(grepResult({
+      total: 10,
+      repoFacets: [{ val: 'a/b', count: 5 }],
+      hits: [hit('a/b', 'x')],
+    }));
+    const { fetchImpl } = installGrepFetch([page(), page(), page(), page()]);
+    await searchRepositoriesSemantically(makeApi(), aiWithCapture, 'kw', { fetchImpl });
+    // 翻到第 3 页，若每页 facets 都累加会得到 15；正确行为是只认首页的 5
+    expect(selectEvidence.get('a/b')).toBe('matches=5; paths=x; langs=TypeScript');
+  });
+
+  it('REST 限流触发停止标志：其余 worker 不再从队列取仓库烧配额', async () => {
+    const names = Array.from({ length: 30 }, (_, i) => `o/r${i}`);
+    const graphql = vi.fn(async () => { throw new Error('GraphQL batch failed: empty data'); });
+    const rest = vi.fn(async (owner: string, repo: string) => {
+      if (repo === 'r0') throw new Error('GitHub API error: 403 rate limit exceeded');
+      await new Promise(resolve => setTimeout(resolve, 20));
+      return makeDetail(`${owner}/${repo}`, 9000);
+    });
+    const { fetchImpl } = installGrepFetch([
+      grepResponse(grepResult({ total: 1, repoFacets: names.map(name => ({ val: name, count: 1 })), hits: [hit('o/r0', 'x')] })),
+    ]);
+    await expect(searchRepositoriesSemantically(makeApi({ graphql, rest }), makeAi(), 'kw', { fetchImpl }))
+      .rejects.toThrow(/rate limit exceeded/);
+    // 并发 8：首个 worker 命中限流即停机，最多 8 个在途请求；未修复时会打满 30 个
+    expect(rest.mock.calls.length).toBeLessThanOrEqual(8);
+  });
+});

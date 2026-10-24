@@ -223,7 +223,10 @@ async function runGrepQuery(
   while (page < MAX_RECALL_PAGES && fetchedHits < first.total && aggregateRecall(collected).size < RECALL_POOL_LIMIT) {
     page += 1;
     const next = await searchGrepApp({ q, mode, langs, page }, { signal: options.signal, timeoutMs: GREP_TIMEOUT_MS, fetchImpl: options.fetchImpl });
-    collected.push(next);
+    // facets 是整个查询的全局分布，同一查询的每一页返回相同 repoFacets：
+    // 翻页结果清空 facets，只保留首页的，避免同仓库计数被页数成倍放大
+    // （污染证据行 matches=N 与词法兜底排序）；跨查询求和语义不受影响
+    collected.push({ ...next, repoFacets: [] });
     if (next.hits.length === 0) break;
     fetchedHits += next.hits.length;
   }
@@ -297,9 +300,12 @@ async function enrichViaRest(
 ): Promise<Map<string, GitHubRepoDetailRead | null>> {
   const details = new Map<string, GitHubRepoDetailRead | null>();
   const queue = [...fullNames];
+  // 限流后停止取新任务：搜索已注定失败（限流错误向上抛），其余 worker 不应
+  // 继续从队列取仓库烧 GitHub 请求额度
+  let stopped = false;
   const workerCount = Math.min(REST_ENRICH_CONCURRENCY, queue.length);
   const workers = Array.from({ length: workerCount }, async () => {
-    while (queue.length > 0) {
+    while (!stopped && queue.length > 0) {
       const fullName = queue.shift();
       if (!fullName) break;
       const [owner, repo] = fullName.split('/');
@@ -310,7 +316,10 @@ async function enrichViaRest(
         // GitHub 限流（主限流/次级限流均报 403 "rate limit exceeded"）不能吞成
         // "仓库不可用"，否则管道会拿着不完整的候选集继续跑并把残缺结果交给 LLM：
         // 直接向上抛，由 hook 的错误路径提示用户
-        if (error instanceof Error && /rate limit exceeded/i.test(error.message)) throw error;
+        if (error instanceof Error && /rate limit exceeded/i.test(error.message)) {
+          stopped = true;
+          throw error;
+        }
         if (!isRestRepoUnavailable(error)) {
           logger.warn('semanticSearch', 'REST 单仓补全失败，跳过该仓库', { fullName, error: errorMessage(error) });
         }

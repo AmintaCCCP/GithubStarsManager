@@ -149,10 +149,12 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
           const semanticStore = useAppStore.getState();
           semanticStore.setDiscoverySearchPhase(null);
           semanticStore.setDiscoverySearchEmptyReason(null);
+          // 任何新的搜索请求（关键词或语义）启动前都中止在途语义搜索的
+          // LLM / grep / GitHub 全链路请求——切回关键词模式时同样要停，不能
+          // 只靠结果丢弃（版本守卫）而让旧请求继续烧配额
+          channelRequestControllersRef.current['search']?.abort();
           if (currentState.discoverySearchMode === 'semantic' && searchQuery && isSemanticConfigReady(activeConfig)) {
             // AI 语义分支：LLM 查询扩展 → grep.app 全网词法召回 → GitHub 元数据补全 → LLM 精选排序
-            // 新请求取代旧请求时中止旧的语义搜索（LLM / grep / GitHub 全链路）
-            channelRequestControllersRef.current['search']?.abort();
             const semanticController = new AbortController();
             channelRequestControllersRef.current['search'] = semanticController;
             const aiService = new AIService(activeConfig, currentState.language);
