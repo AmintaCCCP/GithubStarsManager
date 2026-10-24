@@ -606,3 +606,51 @@ describe('semanticRepoSearchService — 翻页 facets 与 REST 限流停机（Co
     expect(rest.mock.calls.length).toBeLessThanOrEqual(8);
   });
 });
+
+describe('semanticRepoSearchService — 召回故障语义（CodeRabbit 三轮意见回归）', () => {
+  it('GraphQL 批量限流 → 直接上抛，不回退 REST（避免共用限流退避长时间阻塞）', async () => {
+    const graphql = vi.fn(async () => { throw new Error('GitHub API error: 403 rate limit exceeded'); });
+    const rest = vi.fn(async () => makeDetail('a/b', 1));
+    const { fetchImpl } = installGrepFetch([
+      grepResponse(grepResult({ total: 1, repoFacets: [{ val: 'a/b', count: 1 }] })),
+    ]);
+    await expect(searchRepositoriesSemantically(makeApi({ graphql, rest }), makeAi(), 'kw', { fetchImpl }))
+      .rejects.toThrow(/rate limit exceeded/);
+    expect(rest).not.toHaveBeenCalled();
+  });
+
+  it('正则与全部 fuzzy 回退都失败 → 上抛错误而非谎报零命中（不产出 recall_empty）', async () => {
+    const ai = makeAi({ expand: async () => ({ terms: ['cli', 'note'], intent: '' }) });
+    const networkError = new Error('Code search request failed: 503');
+    const { fetchImpl } = installGrepFetch([networkError, networkError, networkError, networkError]);
+    const onFallback = vi.fn();
+    await expect(searchRepositoriesSemantically(makeApi(), ai, 'kw', { fetchImpl, onFallback }))
+      .rejects.toThrow(/all recall requests failed/);
+    expect(onFallback).not.toHaveBeenCalled();
+  });
+
+  it('部分成功（正则失败、任一 fuzzy 成功）→ 正常召回，不受全失败上抛影响', async () => {
+    const ai = makeAi({ expand: async () => ({ terms: ['cli'], intent: '' }) });
+    const { fetchImpl } = installGrepFetch([
+      new Error('Code search request failed: 503'),
+      grepResponse(grepResult({ total: 1, repoFacets: [{ val: 'a/b', count: 2 }] })),
+    ]);
+    const result = await searchRepositoriesSemantically(makeApi(), ai, 'kw', { fetchImpl });
+    expect(result.repos.map(repo => repo.full_name)).toEqual(['a/b']);
+  });
+
+  it('fuzzy 回退按语言类别轮流选词：跨语言代表词不被同语言词挤出名额', async () => {
+    const ai = makeAi({ expand: async () => ({
+      terms: ['深度学习', '模型训练', 'machine learning', 'llm framework'],
+      intent: '',
+    }) });
+    const emptyGrep = grepResponse(grepResult({ total: 0 }));
+    const { fetchImpl, calls } = installGrepFetch([emptyGrep, emptyGrep, emptyGrep, emptyGrep]);
+    await searchRepositoriesSemantically(makeApi(), ai, '机器学习框架', { fetchImpl });
+
+    // 名额 3：query + 每个语言类别各一个代表词（而非前两个中文词占满）
+    expect(decodeUrl(calls[1])).toContain('q=机器学习框架');
+    expect(decodeUrl(calls[2])).toContain('q=深度学习');
+    expect(decodeUrl(calls[3])).toContain('q=machine learning');
+  });
+});

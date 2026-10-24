@@ -1220,8 +1220,10 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         {t('discoveryView.repo-search')}
                       </p>
                       <p className="text-sm text-muted-foreground dark:text-muted-foreground leading-relaxed">
-                        {/* 语义模式且已有查询：按空态原因区分文案（缺省用召回为空兜底） */}
-                        {discoverySearchMode === 'semantic' && discoverySearchQuery.trim()
+                        {/* 仅当语义搜索真的给出了空态原因（召回为空/AI 判空）才显示语义空态文案：
+                            语义模式但回退到关键词搜索（如 AI 配置不完整）时 reason 为 null，
+                            此时显示通用关键词文案，不能宣称"语义召回为空" */}
+                        {discoverySearchMode === 'semantic' && discoverySearchQuery.trim() && discoverySearchEmptyReason
                           ? (discoverySearchEmptyReason === 'ai_empty'
                               ? t('discoveryView.semantic-empty-ai')
                               : t('discoveryView.semantic-empty-recall'))

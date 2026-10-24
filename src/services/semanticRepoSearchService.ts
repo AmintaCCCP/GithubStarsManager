@@ -265,19 +265,41 @@ async function recallRepositories(
   if (needFallback) {
     // fuzzy 回退不带语言过滤（Markdown 域零命中不代表全库零命中）
     const seen = new Set<string>();
-    const fallbackWords = [query, ...terms]
-      .map((word, index) => ({ word: word.trim(), isQuery: index === 0 }))
-      .filter(({ word, isQuery }) => {
-        if (word.length < RECALL_TERM_MIN_LENGTH || word.length > RECALL_TERM_MAX_LENGTH) return false;
-        // 术语与正则成员同门槛：泛词不发起回退请求；query 成员不受限
-        if (!isQuery && !isSpecificRecallTerm(word)) return false;
-        const key = word.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      })
-      .map(entry => entry.word)
-      .slice(0, FALLBACK_QUERY_LIMIT);
+    const isValidFallbackWord = (word: string, isQuery: boolean): boolean => {
+      if (word.length < RECALL_TERM_MIN_LENGTH || word.length > RECALL_TERM_MAX_LENGTH) return false;
+      // 术语与正则成员同门槛：泛词不发起回退请求；query 成员不受限
+      if (!isQuery && !isSpecificRecallTerm(word)) return false;
+      const key = word.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    };
+    const queryWord = query.trim();
+    const hasQuery = isValidFallbackWord(queryWord, true);
+    // 术语按语言类别（CJK / 非 CJK）轮流选取：模型常先返回一串同语言词，
+    // 直接按原顺序截断会把跨语言代表词挤出名额（≤3 个），多语言仓库漏召回
+    const termsByLang = new Map<boolean, string[]>();
+    for (const raw of terms) {
+      const word = raw.trim();
+      if (!isValidFallbackWord(word, false)) continue;
+      const isCjk = /[\u4e00-\u9fff]/.test(word);
+      const bucket = termsByLang.get(isCjk) ?? [];
+      bucket.push(word);
+      termsByLang.set(isCjk, bucket);
+    }
+    const interleaved: string[] = [];
+    let picked = true;
+    while (picked) {
+      picked = false;
+      for (const bucket of termsByLang.values()) {
+        const word = bucket.shift();
+        if (word) {
+          interleaved.push(word);
+          picked = true;
+        }
+      }
+    }
+    const fallbackWords = [...(hasQuery ? [queryWord] : []), ...interleaved].slice(0, FALLBACK_QUERY_LIMIT);
     for (let i = 0; i < fallbackWords.length; i++) {
       if (i > 0) await sleep(FALLBACK_INTERVAL_MS, options.signal);
       try {
@@ -288,6 +310,12 @@ async function recallRepositories(
         logger.warn('semanticSearch', 'fuzzy 回退查询失败，跳过该词继续', { error: errorMessage(error) });
       }
     }
+  }
+  // collected 只在请求成功时 push（含"首页成功、翻页失败"的部分成功场景）：
+  // 一次都没成功说明检索服务整体不可用（超时/网络错误等），应向上抛错，
+  // 而不是把服务故障谎报成"零命中"（recall_empty）
+  if (collected.length === 0) {
+    throw new Error('Code search unavailable: all recall requests failed');
   }
   return aggregateRecall(collected);
 }
@@ -408,6 +436,10 @@ export async function searchRepositoriesSemantically(
     });
   } catch (error) {
     if (signal?.aborted || isAbortError(error)) throw error;
+    // GraphQL 限流时直接向上抛：REST 回退与 GraphQL 共用限流退避
+    // （rateLimitRemaining/rateLimitReset），会静默等待限流窗口重置（最长约 1 小时）
+    // 且不向用户报错，与 enrichViaRest 的"限流即上抛"约定保持一致
+    if (error instanceof Error && /rate limit exceeded/i.test(error.message)) throw error;
     logger.warn('semanticSearch', 'GraphQL 批量补全失败，回退 REST 逐仓补全', { error: errorMessage(error) });
     details = await enrichViaRest(api, fullNames, signal);
   }
