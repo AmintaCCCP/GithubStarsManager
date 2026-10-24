@@ -26,6 +26,10 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
   | 'setDiscoverySortBy'
   | 'setDiscoverySortOrder'
   | 'setDiscoverySearchQuery'
+  | 'setDiscoverySearchMode'
+  | 'setDiscoverySearchPhase'
+  | 'setDiscoverySearchPhaseDetail'
+  | 'setDiscoverySearchEmptyReason'
   | 'setDiscoverySelectedTopic'
   | 'setDiscoveryHasMore'
   | 'setDiscoveryNextPage'
@@ -159,6 +163,11 @@ export const createDiscoverySlice: AppStoreSlice<Pick<import('../types').AppActi
     setDiscoverySortBy: (discoverySortBy) => set({ discoverySortBy }),
     setDiscoverySortOrder: (discoverySortOrder) => set({ discoverySortOrder }),
     setDiscoverySearchQuery: (discoverySearchQuery) => set({ discoverySearchQuery }),
+    setDiscoverySearchMode: (discoverySearchMode) => set({ discoverySearchMode }),
+    // phase/detail 与 emptyReason 是会话级状态（不持久化），语义搜索开始/结束由 hook 负责清空
+    setDiscoverySearchPhase: (discoverySearchPhase) => set({ discoverySearchPhase }),
+    setDiscoverySearchPhaseDetail: (discoverySearchPhaseDetail) => set({ discoverySearchPhaseDetail }),
+    setDiscoverySearchEmptyReason: (discoverySearchEmptyReason) => set({ discoverySearchEmptyReason }),
     setDiscoverySelectedTopic: (discoverySelectedTopic) => set({ discoverySelectedTopic }),
     setDiscoveryHasMore: (channel, hasMore) => set((state) => ({
       discoveryHasMore: { ...state.discoveryHasMore, [channel]: hasMore },

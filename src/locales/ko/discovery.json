@@ -100,7 +100,21 @@
     "retry": "다시 시도해 보세요",
     "platform-filter-v1": "플랫폼 필터: {{v1}}",
     "items-count": "{{currentCount}}개 항목",
-    "items-count-with-total": "{{currentCount}}개 항목(총 {{totalCount}}개 항목)"
+    "items-count-with-total": "{{currentCount}}개 항목(총 {{totalCount}}개 항목)",
+    "search-mode": "검색 모드",
+    "search-mode-keyword": "키워드",
+    "search-mode-semantic": "AI 시맨틱",
+    "search-mode-semantic-placeholder": "자연어로 찾고 싶은 저장소를 설명하세요. 예: Markdown 노트를 관리하는 커맨드라인 도구",
+    "search-mode-hint": "AI 시맨틱 검색은 공개된 코드를 전체 웹에서 매칭하여 저장소를 찾습니다(GitHub 저장소만 해당). AI 서비스 구성이 필요합니다",
+    "search-phase-expanding": "AI가 쿼리 분석 중…",
+    "search-phase-recalling": "전체 웹에서 어휘적 리콜 중…",
+    "search-phase-enriching": "저장소 정보 보완 중…",
+    "search-phase-reranking": "AI 선별 정렬 중…",
+    "semantic-rate-limited": "코드 검색 요청 제한(429)이 발생했습니다. 잠시 후 다시 시도하세요",
+    "semantic-no-ai-config": "AI 서비스가 구성되지 않아 키워드 검색으로 대체했습니다",
+    "semantic-fallback-toast": "AI 선별에 실패하여 어휘 매칭 순으로 정렬했습니다",
+    "semantic-empty-recall": "전체 웹 코드에서 관련 저장소를 찾지 못했습니다. 더 구체적인 기술 키워드를 시도해 보세요",
+    "semantic-empty-ai": "AI가 관련 저장소를 찾지 못했습니다. 다른 표현이나 기술 키워드를 추가해 보세요"
   },
   "weeklyIssueModal": {
     "submission-v1": "기여 #{{v1}}",

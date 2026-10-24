@@ -517,3 +517,168 @@ describe('AIService.analyzeRepository language following', () => {
     expect(joined).toContain('Write ALL user-facing output in Japanese (日本語)');
   });
 });
+
+describe('AIService.expandSearchQuery — 查询扩展公开方法', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as Record<string, unknown>;
+
+  it('解析模型返回的意图与关键词（keywords/categories/synonyms 合并去重）', async () => {
+    const fetchMock = mockFetch();
+    const requests: Array<Record<string, unknown>> = [];
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      requests.push(await captureBody(init));
+      return chatResponse('{"intent":"找 markdown 编辑器","keywords":["markdown","editor"],"categories":["cli"],"synonyms":["md","markdown"]}');
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    const result = await service.expandSearchQuery('markdown 编辑器');
+
+    expect(result.intent).toBe('找 markdown 编辑器');
+    expect(result.terms).toEqual(['markdown', 'editor', 'cli', 'md']);
+    // 请求形态与既有扩展阶段一致：思考预算 2000、低温
+    expect(requests[0].max_tokens).toBe(2000);
+    expect(requests[0].temperature).toBe(0.1);
+  });
+
+  it('模型返回空内容时 requestText 抛错（与既有扩展阶段行为一致）', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockImplementationOnce(async () => chatResponse(''));
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    // requestText 对空 content 统一抛错，扩展阶段（重构前后）同样不会拿到空结果
+    await expect(service.expandSearchQuery('anything')).rejects.toThrow('No content received from AI service');
+  });
+});
+
+describe('AIService.selectRelevantRepositories — evidence 证据行', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as Record<string, unknown>;
+
+  it('不传 evidence 时精选提示词与 searchRepositoriesWithSelection 逐字节一致；传 evidence（全网发现）切换宽松排序提示词并追加证据行', async () => {
+    const repoA = makeRepo({ id: 910000001, name: 'md-tool', full_name: 'acme/md-tool', description: 'a markdown tool' });
+    const repoB = makeRepo({ id: 910000002, name: 'other', full_name: 'acme/other', description: 'unrelated' });
+    const query = 'markdown 编辑器';
+    const intent = '找 markdown 编辑器';
+
+    // 基线：完整三段式搜索的第二次请求（精选）提示词
+    const fetchMock = mockFetch();
+    let baselinePrompt = '';
+    fetchMock.mockImplementationOnce(async () => chatResponse(`{"intent":"${intent}","keywords":[],"synonyms":[]}`));
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      baselinePrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      return chatResponse('[]');
+    });
+    const pipelineService = new AIService(makeConfig() as never, 'zh');
+    await pipelineService.searchRepositoriesWithSelection([repoA, repoB], query);
+
+    // 直调（无 evidence）：与基线逐字节一致
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      const directPrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      expect(directPrompt).toBe(baselinePrompt);
+      return chatResponse('[]');
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    await service.selectRelevantRepositories([repoA, repoB], query, intent);
+    expect(baselinePrompt).not.toBe('');
+    expect(baselinePrompt).not.toContain('matches=');
+
+    // 传 evidence（全网发现路径）：提示词切换为宽松排序模式 + 证据行追加
+    let evidenceSystem = '';
+    let evidencePrompt = '';
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      evidenceSystem = String((body.messages as Array<{ content: string }>)[0].content);
+      evidencePrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      return chatResponse('[]');
+    });
+    const evidence = new Map<string, string>([
+      ['acme/md-tool', 'matches=5; paths=README.md,package.json; langs=TypeScript'],
+    ]);
+    await service.selectRelevantRepositories([repoA, repoB], query, intent, undefined, evidence);
+    // 证据行出现在 md-tool 摘要块的末尾（meta 行之后、块间距之前）
+    expect(evidencePrompt).toContain('   matches=5; paths=README.md,package.json; langs=TypeScript');
+    const evidenceLine = '   matches=5; paths=README.md,package.json; langs=TypeScript';
+    const mdBlockEnd = evidencePrompt.indexOf(evidenceLine);
+    const metaLine = evidencePrompt.indexOf('acme/md-tool');
+    expect(metaLine).toBeGreaterThan(-1);
+    expect(mdBlockEnd).toBeGreaterThan(metaLine);
+    // 无证据的仓库不受影响
+    expect(evidencePrompt).toContain('acme/other');
+    // 全网发现提示词不再含过滤式"凑数即判空"措辞（实测会让 flash 模型在噪声
+    // 候选池上塌缩到空数组），改为"选最相关、忽略无关、仅当全部候选无关才判空"
+    expect(evidencePrompt).not.toContain('凑数');
+    expect(evidencePrompt).toContain('不要因为候选池中多数仓库无关就返回空数组');
+    expect(evidenceSystem).not.toContain('返回空数组');
+  });
+
+  it('en 语言下 evidence 路径同样切换为宽松排序提示词', async () => {
+    const repoA = makeRepo({ id: 910000001, name: 'md-tool', full_name: 'acme/md-tool', description: 'a markdown tool' });
+    const fetchMock = mockFetch();
+    let enSystem = '';
+    let enPrompt = '';
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      enSystem = String((body.messages as Array<{ content: string }>)[0].content);
+      enPrompt = String((body.messages as Array<{ content: string }>)[1].content);
+      return chatResponse('[]');
+    });
+    const enService = new AIService(makeConfig() as never, 'en');
+    await enService.selectRelevantRepositories(
+      [repoA],
+      'markdown editor',
+      '',
+      undefined,
+      new Map([['acme/md-tool', 'matches=1; paths=README.md; langs=']]),
+    );
+    expect(enPrompt).not.toContain('loosely related');
+    expect(enPrompt).toContain('never return [] just because most candidates are irrelevant');
+    expect(enSystem).not.toContain('return an empty array');
+  });
+});
+
+describe('AIService.expandSearchQuery — 多语言关键词约束（multilingual）', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as { messages: Array<{ content: string }> };
+
+  it('multilingual: true 时用户提示词追加双语约束；默认调用不追加（仓库页提示词逐字节不变）', async () => {
+    const fetchMock = mockFetch();
+    const requests: Array<string> = [];
+    fetchMock.mockImplementation(async (_url, init) => {
+      requests.push(String((await captureBody(init)).messages[1].content));
+      return chatResponse('{"intent":"i","keywords":["k"],"synonyms":[]}');
+    });
+
+    const service = new AIService(makeConfig() as never, 'zh');
+    await service.expandSearchQuery('markdown 编辑器', undefined);
+    await service.expandSearchQuery('markdown 编辑器', undefined, { multilingual: true });
+
+    // 默认路径：无追加段（与 createSearchPrompt 原文一致）
+    expect(requests[0]).not.toContain('补充约束');
+    // 多语言路径：追加双语约束（原语言 + 英文，英文查询补中文）
+    expect(requests[1]).toContain('补充约束');
+    expect(requests[1]).toContain('查询原语言与英文');
+    // 追加段在原提示词之后，且原文完整保留
+    expect(requests[1].startsWith(requests[0])).toBe(true);
+    expect(requests[1].length).toBeGreaterThan(requests[0].length);
+  });
+});

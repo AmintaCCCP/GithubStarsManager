@@ -270,9 +270,11 @@ function mapGraphqlRepoDetail(node: Record<string, unknown>): GitHubRepoDetailRe
     disabled: node.isDisabled === true,
     fork: node.isFork === true,
     is_template: node.isTemplate === true,
+    // GraphQL schema 已移除 openIssues 字段，fragment 改请求 issues(states: OPEN) { totalCount }，
+    // 语义等价（均只统计 open issue）；字段缺省时兜底为 0，与 REST 路径 mapRestRepoDetail 一致
     open_issues_count:
-      typeof (node.openIssues as { totalCount?: unknown } | undefined)?.totalCount === 'number'
-        ? (node.openIssues as { totalCount: number }).totalCount
+      typeof (node.issues as { totalCount?: unknown } | undefined)?.totalCount === 'number'
+        ? (node.issues as { totalCount: number }).totalCount
         : 0,
     default_branch:
       typeof (node.defaultBranchRef as { name?: unknown } | null | undefined)?.name === 'string'
@@ -1368,7 +1370,9 @@ export class GitHubApiService {
         const [owner, name] = fullName.split('/');
         return `a${idx}: repository(owner: "${escapeGraphQlString(owner)}", name: "${escapeGraphQlString(name)}") { ...WeeklyRepoDetailFragment }`;
       });
-      const query = `query WeeklyRepoBatch {\n${aliases.join('\n')}\n}\nfragment WeeklyRepoDetailFragment on Repository {\n  databaseId\n  name\n  nameWithOwner\n  description\n  url\n  stargazerCount\n  forkCount\n  primaryLanguage { name }\n  createdAt\n  updatedAt\n  pushedAt\n  repositoryTopics(first: 20) { nodes { topic { name } } }\n  owner { login avatarUrl }\n  licenseInfo { spdxId }\n  isArchived\n  isDisabled\n  isFork\n  isTemplate\n  openIssues { totalCount }\n  defaultBranchRef { name }\n}`;
+      // 注意：GitHub schema 已移除 openIssues 字段（实测报 undefinedField），改用语义等价的
+      // issues(states: OPEN) { totalCount }，mapGraphqlRepoDetail 消费端同步改为读 node.issues
+      const query = `query WeeklyRepoBatch {\n${aliases.join('\n')}\n}\nfragment WeeklyRepoDetailFragment on Repository {\n  databaseId\n  name\n  nameWithOwner\n  description\n  url\n  stargazerCount\n  forkCount\n  primaryLanguage { name }\n  createdAt\n  updatedAt\n  pushedAt\n  repositoryTopics(first: 20) { nodes { topic { name } } }\n  owner { login avatarUrl }\n  licenseInfo { spdxId }\n  isArchived\n  isDisabled\n  isFork\n  isTemplate\n  issues(states: OPEN) { totalCount }\n  defaultBranchRef { name }\n}`;
       const response = await this.makeRequest<{ data?: Record<string, unknown> | null; errors?: Array<{ message?: string }> }>(
         '/graphql',
         {

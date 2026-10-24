@@ -10,7 +10,9 @@ import { syncXTweetChannel } from '../../../services/xTweetService';
 import { syncTelegramChannel } from '../../../services/telegramService';
 import { loadExternalDiscoveryFeed } from '../../../services/externalDiscoveryFeed';
 import { isExternalDiscoveryChannelId } from '../../../utils/discoveryFeeds';
-import { AIService } from '../../../services/aiService';
+import { AIService, isAbortError } from '../../../services/aiService';
+import { isGrepRateLimitError } from '../../../services/grepAppService';
+import { searchRepositoriesSemantically } from '../../../services/semanticRepoSearchService';
 import { AIAnalysisOptimizer } from '../../../services/aiAnalysisOptimizer';
 import { discoveryAnalysisStorage } from '../../../services/discoveryAnalysisStorage';
 import { buildCategoryHints, resolveCategoryAssignment } from '../../../utils/categoryUtils';
@@ -26,7 +28,8 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
   switch (channelId) {
     case 'trending': return JSON.stringify([...common, state.trendingTimeRange]);
     case 'topic': return JSON.stringify([...common, state.discoverySelectedTopic]);
-    case 'search': return JSON.stringify([...common, state.discoverySearchQuery, state.discoveryLanguage, state.discoverySortBy, state.discoverySortOrder]);
+    // 搜索模式纳入签名：关键词 ↔ AI 语义切换时作废在途请求并触发重搜
+    case 'search': return JSON.stringify([...common, state.discoverySearchQuery, state.discoverySearchMode, state.discoveryLanguage, state.discoverySortBy, state.discoverySortOrder]);
     // 周刊过滤为客户端行为，但签名纳入 weeklyOnlyCollected 以便切换过滤器时重跑入口重建切片
     case 'weekly': return JSON.stringify([...common, state.weeklyOnlyCollected]);
     // 关注列表/鉴权变化会改变抓取范围，纳入签名作废旧请求
@@ -130,11 +133,88 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
             ? await api.getTopicRepositories(currentState.discoverySelectedTopic, currentState.discoveryPlatform, page)
             : await api.getTrendingRepositories(currentState.discoveryPlatform, page);
           break;
-        case 'search':
-          result = currentState.discoverySearchQuery.trim()
-            ? await api.searchRepositories(currentState.discoverySearchQuery, currentState.discoveryPlatform, currentState.discoveryLanguage, currentState.discoverySortBy, currentState.discoverySortOrder, page)
-            : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+        case 'search': {
+          const searchQuery = currentState.discoverySearchQuery.trim();
+          const activeConfig = currentState.aiConfigs.find(config => config.id === currentState.activeAIConfig);
+          // 语义模式要求 AI 配置完整可用（判定镜像 handleAnalyzePage）：配置存在但解密失败/
+          // 密钥为空/缺端点/缺密钥/缺模型时与"无配置"同等处理，回退关键词搜索
+          const isSemanticConfigReady = (config: typeof activeConfig): config is NonNullable<typeof activeConfig> =>
+            !!config
+            && config.apiKeyStatus !== 'decrypt_failed'
+            && config.apiKeyStatus !== 'empty'
+            && !!config.baseUrl
+            && !!config.apiKey
+            && !!config.model;
+          // 新搜索开始时清空上一轮语义搜索的进度与空态（含切回关键词模式后的残留清理）
+          const semanticStore = useAppStore.getState();
+          semanticStore.setDiscoverySearchPhase(null);
+          semanticStore.setDiscoverySearchPhaseDetail(null);
+          semanticStore.setDiscoverySearchEmptyReason(null);
+          // 任何新的搜索请求（关键词或语义）启动前都中止在途语义搜索的
+          // LLM / grep / GitHub 全链路请求——切回关键词模式时同样要停，不能
+          // 只靠结果丢弃（版本守卫）而让旧请求继续烧配额
+          channelRequestControllersRef.current['search']?.abort();
+          if (currentState.discoverySearchMode === 'semantic' && searchQuery && isSemanticConfigReady(activeConfig)) {
+            // AI 语义分支：LLM 查询扩展 → grep.app 全网词法召回 → GitHub 元数据补全 → LLM 精选排序
+            const semanticController = new AbortController();
+            channelRequestControllersRef.current['search'] = semanticController;
+            const aiService = new AIService(activeConfig, currentState.language);
+            let emptyReason: 'recall_empty' | 'ai_empty' | null = null;
+            try {
+              result = await searchRepositoriesSemantically(api, aiService, searchQuery, {
+                language: currentState.discoveryLanguage,
+                signal: semanticController.signal,
+                onPhase: (phase, detail) => {
+                  // 只有当前请求有权写进度，避免被取代的旧请求覆盖新搜索的状态
+                  if (!isCurrentRequest()) return;
+                  // 存原始阶段 id（UI 据此渲染四步进度指示），补充明细（如补全计数）单独存
+                  useAppStore.getState().setDiscoverySearchPhase(phase);
+                  useAppStore.getState().setDiscoverySearchPhaseDetail(detail ?? null);
+                },
+                onFallback: (reason) => {
+                  if (reason === 'ai_failed' || reason === 'unparseable') {
+                    if (isCurrentRequest()) toast(tRef.current('discoveryView.semantic-fallback-toast'), 'warning');
+                    return;
+                  }
+                  emptyReason = reason;
+                },
+              });
+              if (emptyReason && result.repos.length === 0 && isCurrentRequest()) {
+                useAppStore.getState().setDiscoverySearchEmptyReason(emptyReason);
+              }
+            } catch (error) {
+              if (semanticController.signal.aborted || isAbortError(error)) {
+                // 用户取消/被新请求取代：静默返回空结果（后续 isCurrentRequest 守卫会丢弃写入）
+                result = { repos: [], hasMore: false, nextPageIndex: 1, totalCount: 0 };
+              } else if (isGrepRateLimitError(error)) {
+                // grep.app 限流（429）：专用提示，不再向上抛
+                // 请求已被新请求取代时旧请求无权汇报状态，429 提示静默丢弃（守卫风格同 onPhase/onFallback）
+                if (isCurrentRequest()) toast(tRef.current('discoveryView.semantic-rate-limited'), 'error');
+                result = { repos: [], hasMore: false, nextPageIndex: 1, totalCount: 0 };
+              } else {
+                throw error;
+              }
+            } finally {
+              if (channelRequestVersionRef.current['search'] === requestVersion) {
+                useAppStore.getState().setDiscoverySearchPhase(null);
+                useAppStore.getState().setDiscoverySearchPhaseDetail(null);
+              }
+              if (channelRequestControllersRef.current['search'] === semanticController) {
+                delete channelRequestControllersRef.current['search'];
+              }
+            }
+          } else {
+            if (currentState.discoverySearchMode === 'semantic' && searchQuery && !isSemanticConfigReady(activeConfig)) {
+              // 语义模式但未配置/配置不完整 AI 服务：提示后回退关键词搜索执行
+              toast(tRef.current('discoveryView.semantic-no-ai-config'), 'warning');
+            }
+            // 关键词分支（默认）：行为与历史版本完全一致
+            result = currentState.discoverySearchQuery.trim()
+              ? await api.searchRepositories(currentState.discoverySearchQuery, currentState.discoveryPlatform, currentState.discoveryLanguage, currentState.discoverySortBy, currentState.discoverySortOrder, page)
+              : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+          }
           break;
+        }
         case 'weekly':
           // 新请求开始即清掉旧状态：缓存命中时 syncWeeklyChannel 不会回调 onStatus，
           // 不清会残留上一轮的进度文案
@@ -251,6 +331,19 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       }
     }
   }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
+
+  // 搜索模式切换后自动重搜。不能在 onChange 里同步调 refreshChannel：它读
+  // latestStateRef.current（渲染提交后才同步），会以旧模式发请求、随即被签名
+  // 守卫（isCurrentRequest 用 getState 重算签名）丢弃，列表不刷新。本 effect
+  // 注册在 latestStateRef 同步 effect 之后，触发时读到的已是新模式
+  const prevSearchModeRef = useRef(state.discoverySearchMode);
+  useEffect(() => {
+    if (prevSearchModeRef.current === state.discoverySearchMode) return;
+    prevSearchModeRef.current = state.discoverySearchMode;
+    if (state.selectedDiscoveryChannel === 'search' && state.discoverySearchQuery.trim()) {
+      void refreshChannel('search', 1, false);
+    }
+  }, [state.discoverySearchMode, state.selectedDiscoveryChannel, state.discoverySearchQuery, refreshChannel]);
 
   const handleAnalyzePage = useCallback(async () => {
     const analysisState = latestStateRef.current;

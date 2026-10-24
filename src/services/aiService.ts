@@ -1584,8 +1584,12 @@ AI Summary: ${gist.ai_summary || 'None'}`;
   /**
    * 构造候选仓库的紧凑摘要（序号. ID | 全名 / 简介 / 语言 | ★ | License | Tags）。
    * 语义重排序与无向量精选共用同一格式。
+   * evidence（可选，全网仓库语义搜索使用）：键为 full_name 小写，值为追加到该
+   * 仓库摘要块末尾的召回证据行（命中次数 / 样本文件 / 语言）。证据来自外部代码
+   * 索引（grep.app），属于不可信输入，追加前统一过 sanitizeForPrompt 防提示注入。
+   * 不传 evidence 时输出与历史格式逐字节一致（fixtures 快照守护）。
    */
-  private buildCandidateSummaries(candidates: Repository[]): string {
+  private buildCandidateSummaries(candidates: Repository[], evidence?: Map<string, string>): string {
     return candidates.map((repo, index) => {
       const stars = repo.stargazers_count >= 1000
         ? `${(repo.stargazers_count / 1000).toFixed(0)}k`
@@ -1600,6 +1604,8 @@ AI Summary: ${gist.ai_summary || 'None'}`;
       if (lic !== NO_LICENSE_SENTINEL) meta.push(`License: ${lic}`);
       if (tags) meta.push(`Tags: ${tags}`);
       parts.push(`   ${meta.join(' | ')}`);
+      const evidenceLine = evidence?.get(repo.full_name.toLowerCase());
+      if (evidenceLine) parts.push(`   ${this.sanitizeForPrompt(evidenceLine)}`);
       return parts.join('\n');
     }).join('\n\n');
   }
@@ -2156,6 +2162,45 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   /**
+   * 查询扩展 + 意图复述（一次 chat 调用）：无向量语义搜索
+   * （searchRepositoriesWithSelection）与全网仓库语义搜索
+   * （semanticRepoSearchService）共用的第一阶段。
+   * 思考类模型的思考 token 与输出共享预算，预算太小会把 JSON 截断在半截
+   * （实测 glm 思考模型 300 token 不够），给足余量；非思考模型只按实际用量
+   * 计费，无额外成本。响应为空或无法解析时返回 {terms: [], intent: ''}，
+   * 由调用方决定是否继续后续阶段。
+   * multilingual（全网仓库语义搜索使用）：GitHub 上仓库的 README/文档既有英文
+   * 也有本地语言，只用查询原语言的关键词会漏掉大量仓库——追加硬性约束要求
+   * 同时给出查询原语言与英文（查询本身是英文时补充中文）两套关键词。默认关闭，
+   * 保证仓库页既有扩展提示词逐字节不变（fixtures 快照守护）。
+   */
+  async expandSearchQuery(
+    query: string,
+    signal?: AbortSignal,
+    options?: { multilingual?: boolean },
+  ): Promise<{ terms: string[]; intent: string }> {
+    const system = this.language === 'zh'
+      ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
+      : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
+    const multilingualDirective = this.language === 'zh'
+      ? '\n\n补充约束：keywords 必须同时包含查询原语言与英文两套关键词（查询本身已是英文时补充中文），每种至少 2 个，覆盖相同概念的不同语言表达，以便匹配不同语言撰写的仓库。'
+      : '\n\nAdditional constraint: keywords must include two sets of terms — the query\'s original language AND English (if the query is already English, add Chinese) — at least 2 of each, covering the same concepts across languages so that repositories written in different languages can be matched.';
+    const content = await this.requestText({
+      system,
+      user: options?.multilingual
+        ? `${this.createSearchPrompt(query)}${multilingualDirective}`
+        : this.createSearchPrompt(query),
+      temperature: 0.1,
+      maxTokens: 2000,
+      signal,
+    });
+    if (content) {
+      return this.parseSearchResponse(content);
+    }
+    return { terms: [], intent: '' };
+  }
+
+  /**
    * 无向量路径的 AI 语义搜索（向量搜索不可用时的降级链）。
    * 三段式：
    * ① 查询扩展 + 意图复述（一次 chat 调用）；
@@ -2186,25 +2231,11 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
     try {
       logger.info('ai', 'Starting AI selection search', { apiType: this.getApiType(), model: this.config.model, configId: this.config.id, query });
 
-      // ① 查询扩展 + 意图复述。思考类模型的思考 token 与输出共享预算，
-      //    预算太小会把 JSON 截断在半截（实测 glm 思考模型 300 token 不够），
-      //    给足余量；非思考模型只按实际用量计费，无额外成本。
+      // ① 查询扩展 + 意图复述
       onPhase?.('expanding');
-      const system = this.language === 'zh'
-        ? '你是一个智能搜索助手。请分析用户的搜索意图，提取关键词并提供多语言翻译。'
-        : 'You are an intelligent search assistant. Please analyze user search intent, extract keywords and provide multilingual translations.';
-      const content = await this.requestText({
-        system,
-        user: this.createSearchPrompt(query),
-        temperature: 0.1,
-        maxTokens: 2000,
-        signal,
-      });
-      if (content) {
-        const parsed = this.parseSearchResponse(content);
-        aiTerms = parsed.terms;
-        intent = parsed.intent;
-      }
+      const expanded = await this.expandSearchQuery(query, signal);
+      aiTerms = expanded.terms;
+      intent = expanded.intent;
 
       // ② 候选召回
       let candidates: Repository[];
@@ -2267,30 +2298,48 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   /**
-   * 把候选仓库摘要交给 LLM，选出与查询真正相关的仓库并按相关性排序。
+   * 把候选仓库摘要交给 LLM，选出与查询相关的仓库并按相关性排序。
    * 返回 null 表示响应缺失/无法解析（调用方走词法兜底）；空数组是合法结果
    * （模型判断没有仓库能满足查询意图）。
+   * evidence（可选，全网仓库语义搜索使用）：键为 full_name 小写、值为召回
+   * 证据行的映射，附加到对应仓库摘要块末尾，让重排模型看到"为什么被召回"；
+   * 传 evidence 即切换为"全网发现"宽松排序提示词——全网召回池必然混杂大量
+   * 词法噪声，过滤式措辞（"没有真正满足意图就返回 []"）会让模型在噪声池上
+   * 塌缩到空数组（实测 flash 级模型 3/3 真实查询判空，候选里明明有直接对口
+   * 仓库），因此该路径改为"选出最相关、忽略无关、仅当全部候选无关才返回 []"。
+   * 不传时提示词与历史格式逐字节一致（fixtures 快照守护）。
    */
-  private async selectRelevantRepositories(
+  async selectRelevantRepositories(
     candidates: Repository[],
     query: string,
     intent: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    evidence?: Map<string, string>
   ): Promise<Repository[] | null> {
-    const summaries = this.sanitizeForPrompt(this.buildCandidateSummaries(candidates));
+    const summaries = this.sanitizeForPrompt(this.buildCandidateSummaries(candidates, evidence));
     const intentLine = intent
       ? (this.language === 'zh'
         ? `\n\n用户意图说明：${this.sanitizeForPrompt(intent)}`
         : `\n\nQuery intent: ${this.sanitizeForPrompt(intent)}`)
       : '';
+    // evidence 是"全网发现"路径的唯一标记（本地库精选从不传 evidence）
+    const discovery = evidence !== undefined;
 
     const system = this.language === 'zh'
-      ? '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出真正相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。若没有仓库能满足查询意图，返回空数组 []。'
-      : 'You are a GitHub repository search reranking assistant. Select the repositories that truly match the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text. If no repository satisfies the query intent, return an empty array [].';
+      ? (discovery
+        ? '你是 GitHub 仓库搜索排序助手。候选仓库来自全网词法召回，往往混杂大量无关仓库，请从中找出与用户查询相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。'
+        : '你是 GitHub 仓库搜索排序助手。根据用户查询，从候选仓库中选出真正相关的仓库，按相关性从高到低返回其 ID 的 JSON 数组。注意：ID 是候选列表中给出的真实仓库 ID（一长串数字），严禁使用序号、行号或自行编号。只输出 JSON 数组，不要输出任何额外文字。若没有仓库能满足查询意图，返回空数组 []。')
+      : (discovery
+        ? 'You are a GitHub repository search reranking assistant. The candidates come from web-wide lexical recall and often include many irrelevant repositories; pick the ones related to the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text.'
+        : 'You are a GitHub repository search reranking assistant. Select the repositories that truly match the user query and return their IDs as a JSON array ordered from most to least relevant. The ID is the real repository ID (a long number) from the candidate list; never use ordinals or line numbers. Output only the JSON array, no extra text. If no repository satisfies the query intent, return an empty array [].');
 
     const user = this.language === 'zh'
-      ? `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 只保留能满足查询意图的仓库；若没有仓库能真正满足意图，返回 []，不要用仅部分沾边的仓库凑数。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`
-      : `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Keep only repositories that satisfy the query intent; if none truly do, return [] instead of padding with loosely related ones.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`;
+      ? (discovery
+        ? `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 选出与查询相关的仓库，按相关性从高到低排序；部分相关（同一主题的不同实现或周边工具）也应纳入。\n- 与查询无关的候选直接忽略；不要因为候选池中多数仓库无关就返回空数组。\n- 只有当所有候选都与查询意图无关时，才返回 []。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`
+        : `用户查询：「${this.sanitizeForPrompt(query)}」${intentLine}\n\n候选仓库（共 ${candidates.length} 个）：\n${summaries}\n\n要求：\n- 只保留能满足查询意图的仓库；若没有仓库能真正满足意图，返回 []，不要用仅部分沾边的仓库凑数。\n- 相关性相近时，star 数更高、更活跃的优先。\n- 最多返回 ${AIService.SELECTION_MAX_RESULTS} 个 ID。`)
+      : (discovery
+        ? `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Pick the repositories relevant to the query, ordered from most to least relevant; partially relevant ones (different implementations of, or adjacent tools for, the same topic) should also be included.\n- Skip irrelevant candidates; never return [] just because most candidates are irrelevant.\n- Return [] only when every candidate is unrelated to the query intent.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`
+        : `User query: "${this.sanitizeForPrompt(query)}"${intentLine}\n\nCandidate repositories (${candidates.length} total):\n${summaries}\n\nRequirements:\n- Keep only repositories that satisfy the query intent; if none truly do, return [] instead of padding with loosely related ones.\n- When relevance is similar, prefer higher stars and more active projects.\n- Return at most ${AIService.SELECTION_MAX_RESULTS} IDs.`);
 
     const content = await this.requestText({
       system,

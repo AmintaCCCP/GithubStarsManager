@@ -117,6 +117,7 @@ const currentPersistedKeys = [
   'discoveryLanguage',
   'discoverySortBy',
   'discoverySortOrder',
+  'discoverySearchMode',
   'discoverySelectedTopic',
   'weeklyOnlyCollected',
   'xTweetFollows',

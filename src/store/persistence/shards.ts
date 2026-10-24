@@ -113,6 +113,7 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'discoveryLanguage',
     'discoverySortBy',
     'discoverySortOrder',
+    'discoverySearchMode',
     'discoverySelectedTopic',
     'weeklyOnlyCollected',
     'xTweetFollows',
