@@ -307,6 +307,10 @@ async function enrichViaRest(
         details.set(fullName.toLowerCase(), await api.getRepositoryDetails(owner, repo, signal));
       } catch (error) {
         if (signal?.aborted || isAbortError(error)) throw error;
+        // GitHub 限流（主限流/次级限流均报 403 "rate limit exceeded"）不能吞成
+        // "仓库不可用"，否则管道会拿着不完整的候选集继续跑并把残缺结果交给 LLM：
+        // 直接向上抛，由 hook 的错误路径提示用户
+        if (error instanceof Error && /rate limit exceeded/i.test(error.message)) throw error;
         if (!isRestRepoUnavailable(error)) {
           logger.warn('semanticSearch', 'REST 单仓补全失败，跳过该仓库', { fullName, error: errorMessage(error) });
         }

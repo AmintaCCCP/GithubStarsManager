@@ -327,6 +327,19 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     }
   }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
 
+  // 搜索模式切换后自动重搜。不能在 onChange 里同步调 refreshChannel：它读
+  // latestStateRef.current（渲染提交后才同步），会以旧模式发请求、随即被签名
+  // 守卫（isCurrentRequest 用 getState 重算签名）丢弃，列表不刷新。本 effect
+  // 注册在 latestStateRef 同步 effect 之后，触发时读到的已是新模式
+  const prevSearchModeRef = useRef(state.discoverySearchMode);
+  useEffect(() => {
+    if (prevSearchModeRef.current === state.discoverySearchMode) return;
+    prevSearchModeRef.current = state.discoverySearchMode;
+    if (state.selectedDiscoveryChannel === 'search' && state.discoverySearchQuery.trim()) {
+      void refreshChannel('search', 1, false);
+    }
+  }, [state.discoverySearchMode, state.selectedDiscoveryChannel, state.discoverySearchQuery, refreshChannel]);
+
   const handleAnalyzePage = useCallback(async () => {
     const analysisState = latestStateRef.current;
     if (!analysisState.githubToken) return;

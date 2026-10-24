@@ -551,3 +551,20 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     expect(onFallback).not.toHaveBeenCalled();
   });
 });
+
+describe('semanticRepoSearchService — REST 回退限流处理', () => {
+  it('REST 回退遇 GitHub 限流（rate limit exceeded）→ 重抛，不产出残缺候选结果', async () => {
+    const graphql = vi.fn(async () => { throw new Error('GraphQL batch failed: empty data'); });
+    const rest = vi.fn(async () => { throw new Error('GitHub API error: 403 rate limit exceeded'); });
+    const ai = makeAi();
+    const onFallback = vi.fn();
+    const { fetchImpl } = installGrepFetch([
+      grepResponse(grepResult({ total: 2, repoFacets: [{ val: 'a/b', count: 2 }, { val: 'c/d', count: 1 }] })),
+    ]);
+    await expect(searchRepositoriesSemantically(makeApi({ graphql, rest }), ai, 'kw', { fetchImpl, onFallback }))
+      .rejects.toThrow(/rate limit exceeded/);
+    // 限流不能被吞成"仓库不可用"：不允许拿着残缺候选集继续走重排兜底
+    expect(onFallback).not.toHaveBeenCalled();
+    expect(rest).toHaveBeenCalledTimes(2);
+  });
+});

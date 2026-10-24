@@ -736,14 +736,12 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [selectedDiscoveryChannel, discoverySearchQuery, searchInput, setDiscoverySearchQuery, refreshChannel]);
 
-  // 搜索模式切换：关键词 ↔ AI 语义。store 更新是异步的，读取最新查询用 getState()；
-  // 已有查询时立即重搜（请求签名包含模式，在途旧请求会自动作废）
+  // 搜索模式切换：关键词 ↔ AI 语义。这里只写 store；已有查询时的自动重搜由
+  // useDiscoveryActions 的模式变化 effect 触发（该 effect 在 latestStateRef 同步
+  // 之后执行，refreshChannel 读到的已是新模式，请求签名校验才能通过）
   const handleSearchModeChange = useCallback((value: string) => {
     setDiscoverySearchMode(value as 'keyword' | 'semantic');
-    if (useAppStore.getState().discoverySearchQuery.trim()) {
-      refreshChannel('search', 1, false);
-    }
-  }, [setDiscoverySearchMode, refreshChannel]);
+  }, [setDiscoverySearchMode]);
 
   const handleLoadMore = useCallback(async () => {
     if (!discoveryHasMore[selectedDiscoveryChannel]) {
