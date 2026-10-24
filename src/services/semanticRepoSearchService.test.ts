@@ -5,6 +5,7 @@ import type { AIService } from './aiService';
 import {
   aggregateRecall,
   buildRecallRegex,
+  buildSpecificRecallRegex,
   escapeRe2Literal,
   searchRepositoriesSemantically,
 } from './semanticRepoSearchService';
@@ -664,5 +665,71 @@ describe('semanticRepoSearchService — 未发起请求的边界（CodeRabbit �
     expect(result.repos).toEqual([]);
     expect(onFallback).toHaveBeenCalledWith('recall_empty');
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+describe('semanticRepoSearchService — 高具体性辅路召回（用户实测"经常没有结果"回归）', () => {
+  it('泛词并集命中 5 万+ 时，命中罕见词的相关仓库排进池顶（真实 case：junk 973 次 vs 相关 2 次+辅路命中）', async () => {
+    // 真实 HAR 场景：并集（含 desktop app/github stars 等泛词）在 Markdown 域 53934 命中，
+    // junk 仓库 973 次刷进池顶，相关仓库只命中 2 次；辅路只查 CJK 罕见词，相关仓库命中
+    let callIndex = 0;
+    const fetchImpl = vi.fn(async (input: string | URL | RequestInfo) => {
+      const url = String(input);
+      const page = url.includes('page=') ? Number(url.match(/page=(\d+)/)?.[1] ?? 1) : 1;
+      const q = decodeURIComponent(url.replace(/\+/g, ' '));
+      callIndex += 1;
+      if (q.includes('github\\u661f\\u6807') || q.includes('github星标')) {
+        // 辅路：仅 CJK 罕见词——相关仓库高分命中，junk 不命中
+        return grepResponse(grepResult({
+          total: 6,
+          repoFacets: [{ val: 'good/star-manager', count: 6 }],
+          hits: [hit('good/star-manager', 'README.md')],
+        })) as unknown as Response;
+      }
+      if (page === 1) {
+        return grepResponse(grepResult({
+          total: 53934,
+          repoFacets: [
+            { val: 'junk/windows-use', count: 973 },
+            { val: 'good/star-manager', count: 2 },
+          ],
+          hits: [hit('junk/windows-use', 'docs/app.md')],
+        })) as unknown as Response;
+      }
+      // 翻页页：同样 junk
+      return grepResponse(grepResult({
+        total: 53934,
+        repoFacets: [{ val: 'junk/more', count: 500 }],
+        hits: [hit('junk/more', 'docs/x.md')],
+      })) as unknown as Response;
+    });
+    const select = vi.fn(async (candidates: Repository[]) => candidates);
+    const aiSpy = makeAi({ expand: async () => ({ terms: ['github星标', 'github stars', '桌面端应用', 'desktop app'], intent: '' }), select });
+    const result = await searchRepositoriesSemantically(makeApi(), aiSpy, '管理github星标仓库的桌面端应用', { fetchImpl, language: 'All' });
+    // 相关仓库（命中 CJK 罕见词，并集计数仅 2）必须排到 junk（973 次）之前
+    expect(result.repos[0]?.full_name).toBe('good/star-manager');
+    expect(result.repos.map(r => r.full_name)).not.toContain('junk/windows-use');
+  });
+
+  it('辅路查询失败（非 429）不影响主路召回', async () => {
+    const ai = makeAi({ expand: async () => ({ terms: ['划词翻译', 'translate'], intent: '' }) });
+    const { fetchImpl } = installGrepFetch([
+      grepResponse(grepResult({ total: 2, repoFacets: [{ val: 'a/b', count: 2 }] })),
+      new Error('Code search request failed: 500'),
+    ]);
+    const result = await searchRepositoriesSemantically(makeApi(), ai, '划词翻译', { fetchImpl });
+    expect(result.repos.map(repo => repo.full_name)).toEqual(['a/b']);
+  });
+});
+
+describe('semanticRepoSearchService — buildSpecificRecallRegex', () => {
+  it('优先取 CJK 成员；无 CJK 时取最长多词短语；均无则返回 null', () => {
+    expect(buildSpecificRecallRegex(['github stars', '桌面端应用', 'desktop app', '仓库管理'])).toBe('(?:桌面端应用|仓库管理)');
+    expect(buildSpecificRecallRegex(['ranger', 'terminal file manager', 'yazi'])).toBe('(?:terminal file manager)');
+    expect(buildSpecificRecallRegex(['ranger', 'yazi'])).toBeNull();
+    // 预算内贪心：CJK 成员过多时按 64 字符截断不报错
+    const long = buildSpecificRecallRegex(Array.from({ length: 8 }, (_, i) => `中文词表第${i}项`));
+    expect(long?.startsWith('(?:')).toBe(true);
+    expect(long!.length).toBeLessThanOrEqual(64);
   });
 });

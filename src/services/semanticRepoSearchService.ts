@@ -6,7 +6,10 @@
  * ② grep.app 词法召回全网仓库：多个词的并集等价于一次 `(?:q|t1|t2…)` 正则交替
  *    查询（请求数 4→1，降低 429 风险与延迟），并在 Markdown 文档域优先召回
  *    （f.lang=Markdown：README/文档命中更能代表项目主题，避开全库代码搜索的
- *    变量名/泛词污染）；失败/零命中时逐词 fuzzy 回退（≤3 次，不带语言过滤仍查全库）。
+ *    变量名/泛词污染）。并集 facets 计数 ∝ 仓库文档量 × 词的泛化度，泛词会把
+ *    无关大仓库刷进池顶、把真正相关的仓库挤出池子——因此追加一路"高具体性"
+ *    正则（CJK 词 / 长多词短语单独成查），其命中仓库在池内排序优先于仅命中
+ *    泛词的仓库。失败/零命中时逐词 fuzzy 回退（≤3 次，不带语言过滤仍查全库）。
  *    召回池 = repoFacets ∪ hits 分页聚合（≤3 页，唯一仓库 <60 且仍有余量才翻页）→ ≤60 仓库。
  * ③ GitHub 元数据补全（GraphQL 批量，整批失败回退 REST 逐仓并发 8）→ 语言后过滤
  *    （过滤后 <10 个放弃过滤）→ LLM 精选排序（selectRelevantRepositories + 召回证据行）。
@@ -159,6 +162,46 @@ export function buildRecallRegex(query: string, terms: string[]): string | null 
 }
 
 /**
+ * 构造"高具体性"正则（第二路召回，用于把命中罕见词的仓库在池内排前）。
+ * 背景（真实 case）：全并集正则的 facets 计数 ∝ 仓库文档量 × 词的泛化度，
+ * `github stars`/`desktop app` 这类英文高频词会带来数万命中，把海量无关
+ * 大仓库刷进 top-60，而真正相关的仓库（往往只命中罕见词一两次）被挤出
+ * 池子，精选模型只能判空——用户看到"经常没有结果"。单次并集查询无法
+ * 区分"哪个成员命中"（RE2 不支持环视、无逐成员归因），因此把最可能罕见
+ * 的成员单独成查：CJK 词在以英文为主的代码语料里天然罕见；无 CJK 成员时
+ * 退化为最长的多词短语（短语比单词具体）。其命中仓库在池内排序时优先于
+ * 仅命中泛词的仓库（主键 = 是否命中罕见词，次键 = 并集计数）。
+ * 没有可挑成员（或与并集等价）时返回 null，跳过第二路。
+ */
+export function buildSpecificRecallRegex(terms: string[]): string | null {
+  const seen = new Set<string>();
+  const valid: string[] = [];
+  for (const raw of terms) {
+    const term = raw.trim();
+    if (term.length < RECALL_TERM_MIN_LENGTH || term.length > RECALL_TERM_MAX_LENGTH) continue;
+    if (!isSpecificRecallTerm(term)) continue;
+    const key = term.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    valid.push(term);
+  }
+  let members = valid.filter(term => /[\u4e00-\u9fff]/.test(term));
+  if (members.length === 0) {
+    members = valid.filter(term => term.includes(' ')).sort((a, b) => b.length - a.length).slice(0, 2);
+  }
+  // 与 buildRecallRegex 相同的 64 字符预算机制（按转义后长度贪心纳入）
+  const picked: string[] = [];
+  for (const term of members) {
+    const candidate = `(?:${picked.map(escapeRe2Literal).concat(escapeRe2Literal(term)).join('|')})`;
+    if (candidate.length > MAX_RECALL_PATTERN_LENGTH) continue;
+    picked.push(term);
+  }
+  if (picked.length === 0) return null;
+  const specific = `(?:${picked.map(escapeRe2Literal).join('|')})`;
+  return specific;
+}
+
+/**
  * 聚合多次 grep 查询/多页结果：Map 以 full_name 小写为键。
  * count 以 repoFacets 求和为准（facets 反映查询的全局分布，跨查询求和代表
  * 综合召回强度）；仅出现在 hits 的仓库按出现次数计；paths/langs 取自 hits
@@ -234,18 +277,24 @@ async function runGrepQuery(
 }
 
 /**
- * 词法召回：先尝试一次 Markdown 文档域（f.lang=Markdown）正则交替查询（并按需
- * 翻页）；非 429 失败或 total===0 时逐词 fuzzy 回退（query 优先、≤3 词、间隔
- * 250ms，不带语言过滤仍查全库）。grep 请求预算保持 ≤1 次正则（含翻页）+3 次
- * 回退不变。429 立即重抛（专用限流提示），abort 一律重抛；单个回退查询失败
- * 记日志后继续。
+ * 词法召回（两路正则 + fuzzy 回退）：
+ * ① 主路：Markdown 文档域（f.lang=Markdown）全并集正则交替查询（并按需翻页）；
+ * ② 辅路：高具体性成员（CJK 词 / 长多词短语）单独成查——并集 facets 计数
+ *    ∝ 仓库文档量 × 词的泛化度，泛词会淹没真正相关的仓库（详见
+ *    buildSpecificRecallRegex 注释）；辅路命中的仓库在池内排序时优先。
+ * 主路非 429 失败或 total===0 时逐词 fuzzy 回退（query 优先、跨语言轮流、
+ * ≤3 词、间隔 250ms，不带语言过滤仍查全库）；辅路失败仅记日志（主路仍在）。
+ * 请求预算：成功路径 ≤1+2 页+1 = 4，失败路径 ≤1+3 = 4。429 立即重抛，
+ * abort 一律重抛；单个回退查询失败记日志后继续。
+ * 返回聚合池 + 辅路命中仓库集合（供上层排序：具体优先，次按并集计数）。
  */
 async function recallRepositories(
   query: string,
   terms: string[],
   options: { signal?: AbortSignal; fetchImpl?: typeof fetch },
-): Promise<Map<string, RecallAggregatedEntry>> {
+): Promise<{ aggregation: Map<string, RecallAggregatedEntry>; specificRepoKeys: Set<string> }> {
   const collected: GrepSearchResult[] = [];
+  const specificCollected: GrepSearchResult[] = [];
   const regex = buildRecallRegex(query, terms);
   let needFallback = !regex;
   // 实际发起的主请求次数（正则 1 次 + fuzzy 回退各 1 次，翻页不计）：
@@ -260,6 +309,21 @@ async function recallRepositories(
       attemptedRequests += 1;
       const first = await runGrepQuery(regex, 'regexp', collected, options, true, RECALL_MARKDOWN_LANGS);
       if (first.total === 0) needFallback = true;
+      else {
+        // 辅路：高具体性成员单独成查，把被泛词计数淹没的相关仓库标记出来。
+        // 与主路同域同超时；失败仅记日志（主路结果仍在），限流/abort 照常上抛
+        const specificRegex = buildSpecificRecallRegex(terms);
+        if (specificRegex && specificRegex !== regex) {
+          attemptedRequests += 1;
+          try {
+            await runGrepQuery(specificRegex, 'regexp', specificCollected, options, false, RECALL_MARKDOWN_LANGS);
+          } catch (error) {
+            if (options.signal?.aborted || isAbortError(error)) throw error;
+            if (isGrepRateLimitError(error)) throw error;
+            logger.warn('semanticSearch', '高具体性召回查询失败，忽略辅路加权', { error: errorMessage(error) });
+          }
+        }
+      }
     } catch (error) {
       if (options.signal?.aborted || isAbortError(error)) throw error;
       if (isGrepRateLimitError(error)) throw error;
@@ -324,7 +388,9 @@ async function recallRepositories(
   if (collected.length === 0 && attemptedRequests > 0) {
     throw new Error('Code search unavailable: all recall requests failed');
   }
-  return aggregateRecall(collected);
+  const aggregation = aggregateRecall(collected);
+  const specificRepoKeys = new Set(aggregateRecall(specificCollected).keys());
+  return { aggregation, specificRepoKeys };
 }
 
 /** GraphQL 整批失败后的 REST 逐仓补全：并发 8，404/403（不可用仓库）与其他错误均跳过该仓库。 */
@@ -419,16 +485,24 @@ export async function searchRepositoriesSemantically(
     logger.warn('semanticSearch', '查询扩展失败，使用原始查询词法召回', { error: errorMessage(error) });
   }
 
-  // ② grep.app 词法召回（单次正则交替 + 按需逐词回退）
+  // ② grep.app 词法召回（主路并集正则 + 辅路高具体性正则 + 按需逐词回退）
   onPhase?.('recalling');
-  const aggregation = await recallRepositories(trimmed, terms, { signal, fetchImpl });
+  const { aggregation, specificRepoKeys } = await recallRepositories(trimmed, terms, { signal, fetchImpl });
   if (aggregation.size === 0) {
     onFallback?.('recall_empty');
     return emptyResult();
   }
 
-  // ③ GitHub 元数据补全：top-60（count 降序，稳定排序）
-  const topEntries = [...aggregation.values()].sort((a, b) => b.count - a.count).slice(0, RECALL_POOL_LIMIT);
+  // ③ GitHub 元数据补全：top-60。排序主键 = 是否命中辅路罕见词（命中泛词
+  //     海量次的无关大仓库排在命中罕见词的相关仓库之后），次键 = 并集计数；
+  //     Array.sort 稳定，同分保持召回顺序
+  const topEntries = [...aggregation.values()]
+    .sort((a, b) => {
+      const aSpecific = specificRepoKeys.has(a.repo.toLowerCase()) ? 1 : 0;
+      const bSpecific = specificRepoKeys.has(b.repo.toLowerCase()) ? 1 : 0;
+      return bSpecific - aSpecific || b.count - a.count;
+    })
+    .slice(0, RECALL_POOL_LIMIT);
   const fullNames = topEntries.map(entry => entry.repo);
   onPhase?.('enriching');
   let details: Map<string, GitHubRepoDetailRead | null>;
