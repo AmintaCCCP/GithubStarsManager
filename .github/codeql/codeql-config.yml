@@ -1,7 +1,0 @@
-# CodeQL 分析范围配置（advanced setup，经 codeql-action/init 的 config-file 接入）。
-#
-# examples/ 是插件示例目录，不是产品代码：示例插件渲染 AI 模型生成的 HTML
-# （js/xss-through-dom）属有意行为，且运行在宿主提供的沙箱预览中，排除出扫描
-# 范围以止住该目录的重复告警。产品代码（src/、electron/、server/）不受影响。
-paths-ignore:
-  - examples

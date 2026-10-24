@@ -187,8 +187,6 @@ export async function proxyRequest(options: ProxyRequestOptions): Promise<ProxyR
       axiosConfig.proxy = false;
     }
 
-    // codeql[js/request-forgery] 目标 URL 均先过 validateUrl（协议白名单、IMDS 硬封禁、私网段策略）；
-    // 用户自有配置（AI / WebDAV / 下载目标）按业务必须支持无证书 http 内网地址，allowPrivate 仅对已保存的配置放开。
     const response = await axios(axiosConfig);
 
     logger.info('proxy.response', `${method} ${redactUrl(url)} -> ${response.status}`);

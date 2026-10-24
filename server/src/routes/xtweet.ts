@@ -92,7 +92,6 @@ router.post('/api/xtweet/graphql', async (req, res) => {
           ...(url.startsWith('https://x.com/') ? { 'Cookie': `auth_token=${authToken}; ct0=${ct0}` } : {}),
         };
     // redirect: 'error' — 拒绝跨域重定向，避免 Cookie 被转到允许域名之外
-    // codeql[js/request-forgery] 目标 URL 由 isAllowedXProxyUrl 白名单（x.com / abs.twimg.com 固定模式）锁定，且 redirect:'error' 拒绝跨域重定向，不透传任意地址。
     const response = await fetch(url, {
       headers,
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
