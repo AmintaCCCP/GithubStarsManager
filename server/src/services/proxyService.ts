@@ -34,8 +34,9 @@ export interface ProxyResponse {
 const BLOCKED_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0', '169.254.169.254']);
 const PRIVATE_IP_PATTERNS = [/^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./];
 
-// 无论严格/宽松档，DNS 解析结果命中一律拒绝：云元数据（IMDS 的 v4/v6 端点）
-// 与未指定地址不可能是合法业务目标。宽松档（allowPrivate）仅豁免私网/回环段。
+// 无论严格/宽松档，DNS 解析结果或 IP 字面量命中一律拒绝：云元数据（IMDS 的
+// v4/v6 端点）与未指定地址不可能是合法业务目标。宽松档（allowPrivate）仅
+// 豁免私网/回环段。
 const ALWAYS_BLOCKED_RESOLVED_IPS = new Set(['169.254.169.254', 'fd00:ec2::254', '0.0.0.0', '::']);
 
 // axios 自动跟随重定向时不会重跑目标校验，改为手动逐跳处理（见 proxyRequest）。
@@ -54,7 +55,16 @@ async function assertResolvedHostsSafe(rawUrl: string, allowPrivate: boolean): P
   } catch {
     return; // URL 本身非法，validateUrl 会给出明确错误
   }
-  if (isIP(hostname)) return; // IP 字面量已在 validateUrl 按字面量校验
+  // URL.hostname 不含方括号，这里防御性剥离后判断 IP 字面量
+  const bareHostname = hostname.replace(/^\[|\]$/g, '');
+  if (isIP(bareHostname)) {
+    // IP 字面量已在 validateUrl 按字面量校验；宽松档的 validateUrl 只封 v4
+    // IMDS，这里对全部字面量再兜底一道 IMDS/未指定地址死守
+    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(bareHostname)) {
+      throw new Error(`Blocked proxy request: protected address '${bareHostname}' is not allowed`);
+    }
+    return;
+  }
 
   let addresses: Array<{ address: string }>;
   try {
@@ -63,11 +73,13 @@ async function assertResolvedHostsSafe(rawUrl: string, allowPrivate: boolean): P
     return;
   }
   for (const { address } of addresses) {
-    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(address)) {
-      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to protected address '${address}'`);
+    // 归一化覆盖 ::ffff:169.254.169.254 等 IPv4 映射型写法
+    const normalized = normalizeHostname(address);
+    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(normalized)) {
+      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to protected address '${normalized}'`);
     }
-    if (!allowPrivate && isPrivateOrLoopback(address)) {
-      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to private address '${address}'`);
+    if (!allowPrivate && isPrivateOrLoopback(normalized)) {
+      throw new Error(`Blocked proxy request: hostname '${hostname}' resolves to private address '${normalized}'`);
     }
   }
 }
@@ -148,9 +160,9 @@ export function validateUrl(rawUrl: string, opts: ValidateUrlOptions = {}): void
   const hostname = normalizeHostname(parsed.hostname);
 
   if (opts.allowPrivate) {
-    // 宽松模式：仍死守云元数据 IMDS 地址——最高危的 SSRF 目标（云厂商密钥）。
-    if (hostname === '169.254.169.254') {
-      throw new Error(`Blocked proxy request: IMDS address '169.254.169.254' is not allowed`);
+    // 宽松模式：仍死守云元数据 IMDS 地址（v4/v6 端点）与未指定地址——最高危的 SSRF 目标（云厂商密钥）。
+    if (ALWAYS_BLOCKED_RESOLVED_IPS.has(hostname)) {
+      throw new Error(`Blocked proxy request: protected address '${hostname}' is not allowed`);
     }
     return;
   }

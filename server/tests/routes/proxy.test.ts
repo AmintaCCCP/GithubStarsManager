@@ -444,3 +444,40 @@ describe('proxyRequest redirect & DNS hardening', () => {
     expect(dnsLookupMock).not.toHaveBeenCalled();
   });
 });
+
+describe('IMDS protection in allowPrivate mode', () => {
+  beforeEach(() => {
+    axiosMock.mockReset();
+    dnsLookupMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('blocks the IMDS IPv6 literal URL even in allowPrivate mode', async () => {
+    const result = await proxyRequest({
+      url: 'http://[fd00:ec2::254]/latest/meta-data',
+      method: 'GET',
+      allowPrivate: true,
+    });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).not.toHaveBeenCalled();
+    expect((result.data as { details: string }).details).toContain('fd00:ec2::254');
+  });
+
+  it('blocks DNS AAAA records returning IPv4-mapped IMDS in allowPrivate mode', async () => {
+    dnsLookupMock.mockResolvedValue([{ address: '::ffff:169.254.169.254', family: 6 }]);
+
+    const result = await proxyRequest({
+      url: 'https://metadata.example.com/secret',
+      method: 'GET',
+      allowPrivate: true,
+    });
+
+    expect(result.status).toBe(502);
+    expect(axiosMock).not.toHaveBeenCalled();
+    expect((result.data as { details: string }).details).toContain('169.254.169.254');
+  });
+});
