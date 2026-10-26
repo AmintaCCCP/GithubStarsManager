@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EmbeddingConfig, Repository } from '../types';
-import { buildCrossEncoderDocument, CrossEncoderReranker } from './crossEncoderReranker';
+import { buildCrossEncoderDocument, CrossEncoderReranker, deriveRepoKind } from './crossEncoderReranker';
 
 const config = (overrides: Partial<EmbeddingConfig> = {}): EmbeddingConfig => ({
   id: 'emb',
@@ -112,6 +112,13 @@ describe('CrossEncoderReranker', () => {
     await expect(new CrossEncoderReranker(config({ apiType: 'openai' })).rerank('q', document)).resolves.toBeNull();
     await expect(new CrossEncoderReranker(config({ apiKey: '' })).rerank('q', document)).resolves.toBeNull();
     expect(window.fetch).not.toHaveBeenCalled();
+  });
+
+  it('derives library only from compound Chinese terms, not 仓库/数据库', () => {
+    const neutral = { ...makeRepo(), name: 'toolkit', full_name: 'acme/toolkit', ai_tags: [], topics: [] };
+    expect(deriveRepoKind({ ...neutral, ai_summary: '这是一个GitHub仓库管理工具', description: '' })).not.toBe('library');
+    expect(deriveRepoKind({ ...neutral, ai_summary: '一个常用的函数库', description: '' })).toBe('library');
+    expect(deriveRepoKind({ ...neutral, description: 'A database toolkit', ai_summary: '' })).not.toBe('library');
   });
 
   it('builds bounded documents from local metadata without stars or README', () => {

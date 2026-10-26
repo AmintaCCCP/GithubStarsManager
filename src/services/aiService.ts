@@ -1972,18 +1972,23 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   private extractAndParseAIJson(content: string): Record<string, unknown> | null {
-    const direct = this.tryParseJsonObject(content);
+    // Reasoning models may inline <think> chains in content; a stray "{" in the
+    // chain would otherwise hijack the JSON extraction.
+    const cleaned = content
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<think>[\s\S]*$/gi, '');
+    const direct = this.tryParseJsonObject(cleaned);
     if (direct) return direct;
 
-    const start = content.indexOf('{');
+    const start = cleaned.indexOf('{');
     if (start === -1) return null;
 
     let inString = false;
     let escaped = false;
     let depth = 0;
 
-    for (let i = start; i < content.length; i++) {
-      const char = content[i];
+    for (let i = start; i < cleaned.length; i++) {
+      const char = cleaned[i];
 
       if (escaped) {
         escaped = false;
@@ -2006,7 +2011,7 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
       if (char === '}') {
         depth--;
         if (depth === 0) {
-          return this.tryParseJsonObject(content.slice(start, i + 1));
+          return this.tryParseJsonObject(cleaned.slice(start, i + 1));
         }
       }
     }

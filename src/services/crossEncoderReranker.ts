@@ -36,7 +36,8 @@ export function deriveRepoKind(repo: Repository): string {
   if (/\bplugins?\b|插件/.test(text)) return 'plugin';
   if (/\bcli\b|command[\s-]?line|命令行/.test(text)) return 'cli';
   if (/\bdesktop\b|桌面/.test(text)) return 'desktop';
-  if (/\blibrar(?:y|ies)\b|sdk\b|库/.test(text)) return 'library';
+  // "库" alone matches 仓库/数据库; only compound kinds mean a code library.
+  if (/\blibrar(?:y|ies)\b|\bsdk\b|(?:函数|类|组件|工具|依赖)库/.test(text)) return 'library';
   if (/\bweb\b|browser|frontend|网页/.test(text)) return 'web';
   return '';
 }

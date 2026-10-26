@@ -796,6 +796,19 @@ describe('AIService vector query analysis and graded reranking', () => {
     expect(window.fetch).not.toHaveBeenCalled();
   });
 
+  it('parses JSON that follows an inline <think> chain', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(chatResponse(
+      '<think>Let me reason about { this query } carefully... but never output JSON</think>{"grades":[{"id":101,"grade":2}]}',
+    ));
+    const repos = [
+      makeRepo({ id: 101, name: 'a', full_name: 'acme/a' }),
+      makeRepo({ id: 202, name: 'b', full_name: 'acme/b' }),
+    ];
+    const result = await new AIService(makeConfig() as never, 'zh').rerankRepositoriesGraded(repos, 'query', null);
+    expect(result?.status).toBe('invalid');
+    expect(result?.grades.get(101)).toBe(2);
+  });
+
   it('keeps the private lexical delegate identical to the public static implementation', () => {
     const repo = makeRepo({ id: 4, name: 'skill-pack', full_name: 'acme/skill-pack', custom_tags: ['技能'] });
     const service = new AIService(makeConfig() as never, 'zh');
