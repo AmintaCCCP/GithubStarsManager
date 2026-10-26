@@ -119,6 +119,8 @@ describe('CrossEncoderReranker', () => {
     expect(deriveRepoKind({ ...neutral, ai_summary: '这是一个GitHub仓库管理工具', description: '' })).not.toBe('library');
     expect(deriveRepoKind({ ...neutral, ai_summary: '一个常用的函数库', description: '' })).toBe('library');
     expect(deriveRepoKind({ ...neutral, description: 'A database toolkit', ai_summary: '' })).not.toBe('library');
+    expect(deriveRepoKind({ ...neutral, ai_summary: '这是一个分类库整理项目', description: '' })).not.toBe('library');
+    expect(deriveRepoKind({ ...neutral, ai_summary: '一个类库集合', description: '' })).toBe('library');
   });
 
   it('builds bounded documents from local metadata without stars or README', () => {
