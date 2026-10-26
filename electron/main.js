@@ -4,6 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const isDev = process.env.NODE_ENV === 'development';
 const { createMcpLocalServer } = require('./mcpLocalServer');
+const { startDeviceFlow, deviceClientIdFromEnv } = require('./oauthDeviceFlow');
+const oauthDeviceClientId = deviceClientIdFromEnv();
 // 主进程出站请求的网络栈选择：npm undici@8 的 ProxyAgent（getFetchDispatcher）
 // 与 Node 内置 fetch 的 handler 协议不兼容，混用会在拨号前抛
 // UND_ERR_INVALID_ARG: invalid onRequestStart method——携带 dispatcher 的
@@ -819,6 +821,22 @@ ipcMain.handle('x-fetch-graphql', async (_event, url, auth) => {
   }
 });
 
+ipcMain.handle('oauth-device-flow-config', () => ({ clientId: oauthDeviceClientId }));
+ipcMain.handle('oauth-open-external', (_event, url) => {
+  if (typeof url !== 'string' || !/^https:\/\/(github\.com|www\.github\.com)\//.test(url)) {
+    return { success: false, error: 'untrusted url' };
+  }
+  return shell.openExternal(url).then(() => ({ success: true }));
+});
+ipcMain.handle('oauth-device-flow', async () => {
+  if (!oauthDeviceClientId) return { success: false, error: 'GITHUB_OAUTH_DEVICE_CLIENT_ID is not configured' };
+  try {
+    const token = await startDeviceFlow();
+    return { success: true, token };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
 ipcMain.handle('x-auth:save', async (_event, auth) => {
   if (auth === null || auth === undefined) {
     console.log('[x-auth:save] clearing (null payload)');

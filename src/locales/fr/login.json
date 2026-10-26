@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Votre jeton est stocké uniquement sur cet appareil et votre propre backend, jamais sur les serveurs de l'application."
+    "token-permissions-local-storage": "Votre jeton est stocké uniquement sur cet appareil et votre propre backend, jamais sur les serveurs de l'application.",
+    "oauth-web-button": "Continuer avec GitHub",
+    "oauth-device-button": "Continuer avec GitHub (flux d’appareil)",
+    "oauth-completing": "Finalisation de la connexion GitHub…",
+    "oauth.failed": "Échec de la connexion GitHub. Veuillez réessayer.",
+    "oauth.expired": "Le lien de connexion GitHub a expiré. Veuillez réessayer."
   }
 }

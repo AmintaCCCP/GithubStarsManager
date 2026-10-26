@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Ihr Token wird nur auf diesem Gerät und Ihrem eigenen Backend gespeichert – niemals auf den Servern der App."
+    "token-permissions-local-storage": "Ihr Token wird nur auf diesem Gerät und Ihrem eigenen Backend gespeichert – niemals auf den Servern der App.",
+    "oauth-web-button": "Mit GitHub fortfahren",
+    "oauth-device-button": "Mit GitHub fortfahren (Geräte-Flow)",
+    "oauth-completing": "GitHub-Anmeldung wird abgeschlossen…",
+    "oauth.failed": "GitHub-Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
+    "oauth.expired": "Der GitHub-Anmeldelink ist abgelaufen. Bitte erneut versuchen."
   }
 }

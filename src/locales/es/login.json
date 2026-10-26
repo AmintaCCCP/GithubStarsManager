@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend; nunca en los servidores de la app."
+    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend; nunca en los servidores de la app.",
+    "oauth-web-button": "Continuar con GitHub",
+    "oauth-device-button": "Continuar con GitHub (flujo de dispositivo)",
+    "oauth-completing": "Completando el inicio de sesión de GitHub…",
+    "oauth.failed": "Error al iniciar sesión con GitHub. Inténtalo de nuevo.",
+    "oauth.expired": "El enlace de inicio de sesión de GitHub ha caducado. Inténtalo de nuevo."
   }
 }

@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され、アプリのサーバーには送信されません。"
+    "token-permissions-local-storage": "トークンはこのデバイスと自分のバックエンドにのみ保存され、アプリのサーバーには送信されません。",
+    "oauth-web-button": "GitHub で続行",
+    "oauth-device-button": "GitHub で続行（デバイスフロー）",
+    "oauth-completing": "GitHub ログインを完了しています…",
+    "oauth.failed": "GitHub ログインに失敗しました。もう一度お試しください。",
+    "oauth.expired": "GitHub ログインのリンクの有効期限が切れました。もう一度お試しください。"
   }
 }

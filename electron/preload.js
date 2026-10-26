@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
+  oauthDeviceFlow: () => ipcRenderer.invoke('oauth-device-flow'),
+  oauthDeviceFlowConfig: () => ipcRenderer.invoke('oauth-device-flow-config'),
+  oauthOpenExternal: (url) => ipcRenderer.invoke('oauth-open-external', url),
   setProxy: (config) => ipcRenderer.invoke('set-proxy', config),
   getProxy: () => ipcRenderer.invoke('get-proxy'),
   testProxy: (config) => ipcRenderer.invoke('test-proxy', config),

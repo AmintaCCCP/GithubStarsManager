@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения."
+    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения.",
+    "oauth-web-button": "Продолжить с GitHub",
+    "oauth-device-button": "Продолжить с GitHub (поток устройств)",
+    "oauth-completing": "Завершаем вход через GitHub…",
+    "oauth.failed": "Не удалось войти через GitHub. Попробуйте ещё раз.",
+    "oauth.expired": "Срок действия ссылки для входа через GitHub истёк. Попробуйте ещё раз."
   }
 }

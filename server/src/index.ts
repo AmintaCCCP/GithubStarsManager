@@ -25,6 +25,7 @@ import xtweetRouter from './routes/xtweet.js';
 import telegramRouter from './routes/telegram.js';
 import logsRouter from './routes/logs.js';
 import mcpAdminRouter from './routes/mcp.js';
+import oauthRouter from './routes/oauth.js';
 import { mountMcpRoutes } from './mcp/http.js';
 
 // Origins the SPA is allowed to call directly from the browser. 'self' covers
@@ -195,6 +196,10 @@ export function createApp(): express.Express {
   });
   app.use(limiter);
   app.use(express.json({ limit: '50mb' }));
+
+  // OAuth login routes: mounted before the auth middleware so the login page
+  // and GitHub's callback can reach them without an API_SECRET bearer token.
+  app.use(oauthRouter);
 
   // Auth middleware for all /api/* except /api/health
   app.use('/api', authMiddleware);

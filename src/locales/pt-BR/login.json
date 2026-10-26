@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Seu token é armazenado apenas neste dispositivo e no seu próprio backend, nunca nos servidores do app."
+    "token-permissions-local-storage": "Seu token é armazenado apenas neste dispositivo e no seu próprio backend, nunca nos servidores do app.",
+    "oauth-web-button": "Continuar com GitHub",
+    "oauth-device-button": "Continuar com GitHub (fluxo de dispositivo)",
+    "oauth-completing": "Concluindo login do GitHub…",
+    "oauth.failed": "Falha ao entrar com GitHub. Tente novamente.",
+    "oauth.expired": "O link de login do GitHub expirou. Tente novamente."
   }
 }

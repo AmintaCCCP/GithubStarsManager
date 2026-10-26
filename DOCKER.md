@@ -178,6 +178,11 @@ docker run -d \
 | `ENCRYPTION_KEY` | No | Auto-generated (saved to `data/.encryption-key`) | AES-256 key for encrypting stored secrets. Accepts any format — 64-char hex, shorter hex, base64, or plain text (all normalized via SHA-256) |
 | `PORT` | No | `3000` | Server listening port |
 | `DB_PATH` | No | `data/data.db` | Path to SQLite database file |
+| `GITHUB_OAUTH_CLIENT_ID` | No | `null` (OAuth disabled) | Public client ID of the GitHub OAuth App used for web sign-in. |
+| `GITHUB_OAUTH_CLIENT_SECRET` | No | `null` | GitHub OAuth client secret. Server-side only; never sent to browsers or desktop clients. |
+| `GITHUB_OAUTH_CALLBACK_URL` | No | `null` | Full callback URL registered on the OAuth App (e.g. `https://your-host/api/oauth/github/callback`). Required for web OAuth. |
+| `GITHUB_OAUTH_FRONTEND_URL` | No | `null` | Frontend base URL that receives `#oauth?ticket=...` after the callback (e.g. `https://your-host/`). Required for web OAuth. |
+| `GITHUB_OAUTH_DEVICE_CLIENT_ID` | No | `null` | Desktop-only: public client ID injected into the Electron main process for the Device Flow. When unset the desktop Device Flow entry stays hidden (PAT login remains). |
 
 > **Note:** The data volume (`/app/data`) stores both the database and the auto-generated encryption key. Always mount it to persist data across container restarts.
 

@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Your token is stored only on this device and your own backend — never on the app's servers."
+    "token-permissions-local-storage": "Your token is stored only on this device and your own backend — never on the app's servers.",
+    "oauth-web-button": "Continue with GitHub",
+    "oauth-device-button": "Continue with GitHub (Device Flow)",
+    "oauth-completing": "Completing GitHub sign-in…",
+    "oauth.failed": "GitHub sign-in failed. Please try again.",
+    "oauth.expired": "The GitHub sign-in link has expired. Please try again."
   }
 }

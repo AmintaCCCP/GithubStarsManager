@@ -1,10 +1,11 @@
 import { useT } from "../i18n/useT";
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Database, Key, Link, Loader2, Moon, Sun } from 'lucide-react';
 import { Github } from './ui/brand-icons';
 import { useAppStore } from '../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
+import { useOAuthLogin } from '../features/lifecycle/hooks/useOAuthLogin';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import { accountIdKey, workspaceHasData } from '../store/helpers/accountWorkspace';
@@ -125,6 +126,18 @@ export const LoginScreen: React.FC = () => {
     setTheme: state.setTheme,
   })));
   const t = useT('login');
+  const oauth = useOAuthLogin(async () => {
+    // Store writes already happened in useOAuthLogin.finishLogin; landing here
+    // just hands the screen over to the app shell.
+  });
+  useEffect(() => {
+    void oauth.completeFromUrl();
+    // Run once on mount; the hook itself retries once the backend
+    // availability probe settles, in case the callback hash landed before a
+    // backend URL was resolved.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const parkedWorkspaces = Object.values(accountWorkspaces ?? {});
   const cachedRepoCount = repositories.length > 0
     ? repositories.length
@@ -500,6 +513,44 @@ export const LoginScreen: React.FC = () => {
                   )}
                 </Button>
               </div>
+
+              {oauth.mode && (
+                <div className="mt-4 border-t border-border pt-4">
+                  {oauth.isCompleting ? (
+                    <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{t('loginScreen.oauth-completing')}</span>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={oauth.mode === 'web' ? oauth.startWebLogin : () => void oauth.startDeviceFlow()}
+                      disabled={isLoading}
+                    >
+                      <Github className="h-4 w-4" />
+                      <span>
+                        {oauth.mode === 'web'
+                          ? t('loginScreen.oauth-web-button')
+                          : t('loginScreen.oauth-device-button')}
+                      </span>
+                    </Button>
+                  )}
+                  {oauth.error && (
+                    <div role="alert" className="mt-2 flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-destructive">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <p className="text-sm">
+                        {oauth.error === 'oauth.expired'
+                          ? t('loginScreen.oauth.expired')
+                          : oauth.error === 'oauth.failed'
+                            ? t('loginScreen.oauth.failed')
+                            : oauth.error}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <Button
                 type="button"

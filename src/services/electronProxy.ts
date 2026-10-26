@@ -105,6 +105,9 @@ export interface DesktopElectronAPI {
 }
 
 interface ElectronAPI {
+  /** GitHub Device Flow (desktop only): null clientId means the entry stays hidden. */
+  oauthDeviceFlowConfig?: () => Promise<{ clientId: string | null }>;
+  oauthDeviceFlow?: () => Promise<{ success: boolean; token?: string; error?: string }>;
   setProxy: (config: ProxyConfig) => Promise<{ success: boolean }>;
   getProxy: () => Promise<ProxyConfig>;
   testProxy: (config: ProxyConfig) => Promise<{ success: boolean; error?: string }>;

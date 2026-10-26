@@ -2,12 +2,20 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-interface Config {
+import { setOauthConfigSourceForTests } from './routes/oauth.js';
+
+export interface Config {
   port: number;
   apiSecret: string | null;
   encryptionKey: string;
   dbPath: string;
   nodeEnv: string;
+  githubOauth: {
+    clientId: string | null;
+    clientSecret: string | null;
+    callbackUrl: string | null;
+    frontendUrl: string | null;
+  };
 }
 
 /** Resolve the data directory path, creating it if it doesn't exist. */
@@ -74,6 +82,15 @@ function resolveEncryptionKey(dataDir: string): string {
   return newKey;
 }
 
+function loadOauthConfig(): Config['githubOauth'] {
+  return {
+    clientId: process.env.GITHUB_OAUTH_CLIENT_ID || null,
+    clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET || null,
+    callbackUrl: process.env.GITHUB_OAUTH_CALLBACK_URL || null,
+    frontendUrl: process.env.GITHUB_OAUTH_FRONTEND_URL || null,
+  };
+}
+
 /** Load all server configuration from environment variables and defaults. */
 function loadConfig(): Config {
   const dataDir = resolveDataDir();
@@ -84,7 +101,11 @@ function loadConfig(): Config {
     encryptionKey: resolveEncryptionKey(dataDir),
     dbPath: process.env.DB_PATH || path.join(dataDir, 'data.db'),
     nodeEnv: process.env.NODE_ENV || 'development',
+    githubOauth: loadOauthConfig(),
   };
 }
 
 export const config = loadConfig();
+
+// Keep routes/oauth.ts reading the same typed config object (test seam swaps it).
+setOauthConfigSourceForTests(() => config.githubOauth);

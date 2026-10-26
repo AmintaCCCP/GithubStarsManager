@@ -4,6 +4,13 @@ import { TooltipProvider } from './ui/tooltip';
 
 const mocks = vi.hoisted(() => ({
   safeReadText: vi.fn(),
+  oauth: {
+    mode: null as 'web' | 'device' | null,
+    error: null as string | null,
+    startWebLogin: vi.fn(),
+    startDeviceFlow: vi.fn(),
+    completeFromUrl: vi.fn().mockResolvedValue(false),
+  },
   restoreBackendSession: vi.fn(),
   setupBackendGitHubToken: vi.fn(),
   syncBackendData: vi.fn(),
@@ -17,6 +24,17 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('../features/lifecycle/hooks/useOAuthLogin', () => ({
+  useOAuthLogin: () => ({
+    mode: mocks.oauth.mode,
+    isCompleting: false,
+    startWebLogin: mocks.oauth.startWebLogin,
+    startDeviceFlow: mocks.oauth.startDeviceFlow,
+    completeFromUrl: mocks.oauth.completeFromUrl,
+    resetError: vi.fn(),
+    error: mocks.oauth.error,
+  }),
+}));
 vi.mock('../utils/clipboardUtils', () => ({ safeReadText: mocks.safeReadText }));
 vi.mock('../features/lifecycle/hooks/useLoginActions', () => ({
   useLoginActions: () => ({
@@ -236,5 +254,46 @@ describe('LoginScreen 后端 URL 预填', () => {
     const { urlInput } = await enterBackendMode();
 
     expect(urlInput).toHaveValue('https://stored.example');
+  });
+});
+
+
+describe('LoginScreen OAuth entries', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.oauth.mode = null;
+    mocks.oauth.error = null;
+    mocks.oauth.completeFromUrl.mockReset().mockResolvedValue(false);
+    mocks.oauth.startWebLogin.mockReset();
+    mocks.oauth.startDeviceFlow.mockReset();
+    window.location.hash = '';
+  });
+
+  it('shows no OAuth entry when OAuth is unavailable', () => {
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    expect(screen.queryByRole('button', { name: /GitHub 登录/ })).not.toBeInTheDocument();
+    expect(mocks.oauth.startWebLogin).not.toHaveBeenCalled();
+  });
+
+  it('shows the web OAuth button when enabled and triggers start', async () => {
+    mocks.oauth.mode = 'web';
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    const button = await screen.findByRole('button', { name: '使用 GitHub 登录' });
+    fireEvent.click(button);
+    expect(mocks.oauth.startWebLogin).toHaveBeenCalledOnce();
+  });
+
+  it('shows the device flow button in Electron local mode', async () => {
+    mocks.oauth.mode = 'device';
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    const button = await screen.findByRole('button', { name: '使用 GitHub 登录（设备授权）' });
+    fireEvent.click(button);
+    expect(mocks.oauth.startDeviceFlow).toHaveBeenCalledOnce();
+  });
+
+  it('completes a ticket callback from the URL hash on mount', async () => {
+    window.location.hash = '#oauth?ticket=tic';
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    await waitFor(() => expect(mocks.oauth.completeFromUrl).toHaveBeenCalledOnce());
   });
 });

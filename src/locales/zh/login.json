@@ -54,6 +54,11 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Token 仅保存在本机与你配置的后端，不会上传到应用方服务器。"
+    "token-permissions-local-storage": "Token 仅保存在本机与你配置的后端，不会上传到应用方服务器。",
+    "oauth-web-button": "使用 GitHub 登录",
+    "oauth-device-button": "使用 GitHub 登录（设备授权）",
+    "oauth-completing": "正在完成 GitHub 登录…",
+    "oauth.failed": "GitHub 登录失败，请重试。",
+    "oauth.expired": "GitHub 登录链接已过期，请重试。"
   }
 }
