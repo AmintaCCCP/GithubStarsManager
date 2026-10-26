@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
-import type { AIService } from './aiService';
+import { AIService } from './aiService';
+import type { GradedRerankResult } from './vectorSearchPipeline';
 import type { EmbeddingClient, VectorSearchService } from './vectorSearchService';
 import {
   applyRelativeCutoff,
@@ -361,12 +362,63 @@ describe('vectorSearchPipeline', () => {
     ]).map(item => item.repo.id)).toEqual([3, 1, 2]);
   });
 
-  it('keeps the acceptance fixtures wired to the expected top IDs', () => {
-    const fixture = readFixture(fixturePath(import.meta.url, '__fixtures__/vector-search-cases.json')) as {
-      cases: Array<{ denseMatches: Array<{ id: string }>; expectedTopIds: string[] }>;
-    };
-    for (const item of fixture.cases) {
-      expect(item.expectedTopIds[0]).toBe(item.denseMatches[0].id);
-    }
+  interface AcceptanceCase {
+    name: string;
+    query: string;
+    analysis: VectorQueryAnalysis;
+    denseMatches: Array<{ id: string; score: number; full_name: string; description: string; tags: string[] }>;
+    llmResponse: string;
+    expectedTopIds: string[];
+  }
+  const acceptanceCases = (readFixture(fixturePath(import.meta.url, '__fixtures__/vector-search-cases.json')) as { cases: AcceptanceCase[] }).cases;
+
+  it.each(acceptanceCases)('runs acceptance case $name end to end through the pipeline', async (item) => {
+    const repos = item.denseMatches.map(match => makeRepo({
+      id: Number(match.id),
+      full_name: match.full_name,
+      description: match.description,
+      topics: match.tags,
+      ai_tags: match.tags,
+      stargazers_count: 10,
+    }));
+    const aiService = {
+      analyzeVectorSearchQuery: vi.fn().mockResolvedValue(item.analysis),
+      rerankRepositoriesGraded: vi.fn().mockImplementation(
+        (candidates: Repository[]): GradedRerankResult | null =>
+          new AIService({} as never, 'en').parseGradedRerankResult(item.llmResponse, candidates),
+      ),
+    } as unknown as AIService;
+
+    const result = await runVectorSearchPipeline({
+      query: item.query,
+      repositories: repos,
+      vectorConfig: {
+        enabled: true,
+        workerUrl: 'https://worker',
+        authToken: 'token',
+        embeddingConfigId: 'emb',
+        indexMode: 'description',
+        readmeMaxChars: 6000,
+      },
+      embeddingConfig: {
+        id: 'emb',
+        name: 'emb',
+        apiType: 'openai-compatible',
+        baseUrl: 'https://emb',
+        apiKey: 'key',
+        model: 'model',
+        dimensions: 2,
+        isActive: true,
+      },
+      aiService,
+      embeddingClient: { embed: vi.fn().mockResolvedValue([[0.1]]) } as unknown as EmbeddingClient,
+      vectorService: {
+        query: vi.fn().mockResolvedValue(item.denseMatches.map(match => ({ id: match.id, score: match.score, metadata: {} }))),
+      } as unknown as VectorSearchService,
+      crossEncoder: null,
+      signal: new AbortController().signal,
+    });
+
+    expect(result?.repositories.map(repo => String(repo.id))).toEqual(item.expectedTopIds);
   });
 });
