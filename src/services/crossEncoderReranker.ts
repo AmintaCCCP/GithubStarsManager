@@ -1,4 +1,5 @@
 import type { EmbeddingConfig, Repository } from '../types';
+import { logger } from './logger';
 import { NO_LICENSE_SENTINEL, normalizeLicense } from '../utils/licenseFilter';
 
 export interface CrossEncoderResult {
@@ -37,8 +38,9 @@ export function deriveRepoKind(repo: Repository): string {
   if (/\bcli\b|command[\s-]?line|命令行/.test(text)) return 'cli';
   if (/\bdesktop\b|桌面/.test(text)) return 'desktop';
   // "库" alone matches 仓库/数据库 and "类库" matches 分类库; only compound
-  // kinds mean a code library.
-  if (/\blibrar(?:y|ies)\b|\bsdk\b|(?:函数|组件|工具|依赖)库|(?<!分)类库/.test(text)) return 'library';
+  // kinds mean a code library. No lookbehind: Safari < 16.4 cannot parse it.
+  if (/\blibrar(?:y|ies)\b|\bsdk\b|(?:函数|组件|工具|依赖)库/.test(text)) return 'library';
+  if (text.replace(/分类库/g, '').includes('类库')) return 'library';
   if (/\bweb\b|browser|frontend|网页/.test(text)) return 'web';
   return '';
 }
@@ -103,17 +105,32 @@ export class CrossEncoderReranker {
         }),
         signal,
       });
-      if (!response.ok) return null;
+      if (!response.ok) {
+        logger.warn('vector-search', 'Cross-encoder request returned a non-OK status', { status: response.status });
+        return null;
+      }
 
       const data = await response.json() as { results?: unknown };
-      if (!Array.isArray(data.results) || data.results.length === 0) return null;
+      if (!Array.isArray(data.results) || data.results.length === 0) {
+        logger.warn('vector-search', 'Cross-encoder response has no usable results');
+        return null;
+      }
 
       const bestByIndex = new Map<number, number>();
       for (const result of data.results) {
-        if (!result || typeof result !== 'object') return null;
+        if (!result || typeof result !== 'object') {
+          logger.warn('vector-search', 'Cross-encoder response has a malformed entry');
+          return null;
+        }
         const { index, relevance_score: score } = result as { index?: unknown; relevance_score?: unknown };
-        if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= documents.length) return null;
-        if (typeof score !== 'number' || !Number.isFinite(score)) return null;
+        if (!Number.isInteger(index) || (index as number) < 0 || (index as number) >= documents.length) {
+          logger.warn('vector-search', 'Cross-encoder response has an out-of-range index');
+          return null;
+        }
+        if (typeof score !== 'number' || !Number.isFinite(score)) {
+          logger.warn('vector-search', 'Cross-encoder response has a non-numeric score');
+          return null;
+        }
         const previous = bestByIndex.get(index as number);
         if (previous === undefined || score > previous) bestByIndex.set(index as number, score);
       }
@@ -131,6 +148,7 @@ export class CrossEncoderReranker {
       return returned;
     } catch (error) {
       if (isAbortError(error)) throw error;
+      logger.warn('vector-search', 'Cross-encoder request failed', { error });
       return null;
     }
   }

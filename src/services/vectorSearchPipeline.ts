@@ -483,6 +483,7 @@ export async function runVectorSearchPipeline(
         null,
       ).catch(error => {
         if (isAbortError(error)) throw error;
+        logger.warn('vector-search', 'Query analysis failed, continuing without analysis', { error });
         return null;
       })
     : Promise.resolve(null);
@@ -602,6 +603,7 @@ export async function runVectorSearchPipeline(
         null,
       ).catch(error => {
         if (isAbortError(error)) throw error;
+        logger.warn('vector-search', 'Cross-encoder rerank failed, continuing with fusion order', { error });
         return null;
       })
     : null;
@@ -634,6 +636,7 @@ export async function runVectorSearchPipeline(
       null,
     ).catch(error => {
       if (isAbortError(error)) throw error;
+      logger.warn('vector-search', 'Graded LLM rerank failed, continuing with CE/fusion order', { error });
       return null;
     });
     llmStatus = graded?.status ?? 'invalid';
