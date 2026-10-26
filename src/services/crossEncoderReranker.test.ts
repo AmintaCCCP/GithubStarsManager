@@ -42,6 +42,7 @@ describe('CrossEncoderReranker', () => {
   it.each([
     'https://api.siliconflow.cn',
     'https://api.siliconflow.cn/',
+    'https://api.siliconflow.cn/ ',
   ])('posts to /v1/rerank with the ordinary model for base URL %s', async (baseUrl) => {
     (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(JSON.stringify({
       results: [
@@ -58,7 +59,12 @@ describe('CrossEncoderReranker', () => {
     const [url, init] = (window.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(String(init.body)) as Record<string, unknown>;
     expect(url).toBe('https://api.siliconflow.cn/v1/rerank');
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer secret');
     expect(body.model).toBe('BAAI/bge-reranker-v2-m3');
+    expect(body.query).toBe('readme skill');
+    expect(body.documents).toEqual(['first', 'second']);
+    expect(body.top_n).toBe(50);
     expect(body.return_documents).toBe(false);
     expect(result?.map(item => item.id)).toEqual(['1', '2']);
   });
