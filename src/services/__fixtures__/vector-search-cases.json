@@ -1,0 +1,60 @@
+{
+  "cases": [
+    {
+      "name": "readme-skill",
+      "query": "优化github readme的技能",
+      "analysis": {
+        "intent": "寻找优化 GitHub README 的 agent skill",
+        "keywords": ["github", "readme", "skill", "agent"],
+        "idealDescription": "An agent skill for improving GitHub README files.",
+        "facets": {
+          "artifact": ["skill"],
+          "action": ["optimize"],
+          "domain": ["github readme"],
+          "platform": ["claude code", "codex"]
+        },
+        "highPrecisionTerms": ["readme", "skill"],
+        "lowConfidenceFacets": []
+      },
+      "denseMatches": [
+        {
+          "id": "1298998324",
+          "score": 0.69177395,
+          "full_name": "oil-oil/beautify-github-readme",
+          "description": "Design clear, theme-specific GitHub README homepages.",
+          "tags": ["开发工具", "设计工具", "插件扩展"]
+        }
+      ],
+      "llmResponse": "{\"grades\":[]}",
+      "expectedTopIds": ["1298998324"]
+    },
+    {
+      "name": "architecture-diagram-agent-skill",
+      "query": "绘制架构图的agent skills",
+      "analysis": {
+        "intent": "寻找能绘制架构图的 agent skill",
+        "keywords": ["architecture", "diagram", "agent", "skill"],
+        "idealDescription": "An AI agent skill that turns architecture descriptions into diagrams.",
+        "facets": {
+          "artifact": ["skill"],
+          "action": ["draw", "generate"],
+          "domain": ["architecture diagram"],
+          "platform": ["claude code", "codex"]
+        },
+        "highPrecisionTerms": ["architecture", "diagram", "skill"],
+        "lowConfidenceFacets": []
+      },
+      "denseMatches": [
+        {
+          "id": "1318031275",
+          "score": 0.68777084,
+          "full_name": "Andy1314Chen/architecture-drawer",
+          "description": "Skill for Claude Code and Codex: describe your system architecture in text.",
+          "tags": ["Skills", "开发工具", "AI/机器学习"]
+        }
+      ],
+      "llmResponse": "{\"grades\":[{\"id\":1318031275,\"grade\":2},{\"id\":1262011420,\"grade\":1}]}",
+      "expectedTopIds": ["1318031275", "1262011420"]
+    }
+  ]
+}

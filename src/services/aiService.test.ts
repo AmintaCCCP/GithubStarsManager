@@ -682,3 +682,125 @@ describe('AIService.expandSearchQuery — 多语言关键词约束（multilingua
     expect(requests[1].length).toBeGreaterThan(requests[0].length);
   });
 });
+
+describe('AIService vector query analysis and graded reranking', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+
+  beforeEach(() => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockReset();
+  });
+
+  it('parses strict JSON query analysis and truncates overlong fields', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(chatResponse(`\`\`\`json
+{
+  "intent": "${'i'.repeat(250)}",
+  "keywords": [" Skill ", "skill", "README", "", "readme"],
+  "idealDescription": "${'d'.repeat(650)}",
+  "facets": {
+    "artifact": ["skill"],
+    "action": ["optimize"],
+    "domain": ["github readme"],
+    "platform": ["codex"]
+  },
+  "highPrecisionTerms": ["README", "skill"],
+  "lowConfidenceFacets": []
+}
+\`\`\``));
+    const result = await new AIService(makeConfig() as never, 'zh').analyzeVectorSearchQuery('优化 readme');
+
+    expect(result?.intent).toHaveLength(200);
+    expect(result?.idealDescription).toHaveLength(600);
+    expect(result?.keywords).toEqual(['skill', 'readme']);
+    expect(result?.facets.artifact).toEqual(['skill']);
+  });
+
+  it('returns null for malformed analysis or wrong field types', async () => {
+    const fetch = window.fetch as ReturnType<typeof vi.fn>;
+    fetch.mockResolvedValueOnce(chatResponse('not json'));
+    const service = new AIService(makeConfig() as never, 'zh');
+    await expect(service.analyzeVectorSearchQuery('x')).resolves.toBeNull();
+
+    fetch.mockResolvedValueOnce(chatResponse(JSON.stringify({
+      intent: 'intent',
+      keywords: ['x'],
+      idealDescription: 'ideal',
+      facets: { artifact: 'skill', action: [], domain: [], platform: [] },
+      highPrecisionTerms: [],
+      lowConfidenceFacets: [],
+    })));
+    await expect(service.analyzeVectorSearchQuery('x')).resolves.toBeNull();
+  });
+
+  it('accepts complete grades by real ID or ordinal and distinguishes empty', () => {
+    const repos = [
+      makeRepo({ id: 101, name: 'a', full_name: 'acme/a' }),
+      makeRepo({ id: 202, name: 'b', full_name: 'acme/b' }),
+    ];
+    const service = new AIService(makeConfig() as never, 'zh');
+
+    expect(service.parseGradedRerankResult('{"grades":[{"id":202,"grade":2},{"id":1,"grade":1}]}', repos))
+      .toEqual({ status: 'complete', grades: new Map([[202, 2], [101, 1]]) });
+    expect(service.parseGradedRerankResult('{"grades":[]}', repos))
+      .toEqual({ status: 'empty', grades: new Map() });
+  });
+
+  it.each([
+    ['missing candidate', '{"grades":[{"id":101,"grade":2}]}'],
+    ['unknown ID', '{"grades":[{"id":101,"grade":2},{"id":202,"grade":1},{"id":999,"grade":0}]}'],
+    ['duplicate ID', '{"grades":[{"id":101,"grade":2},{"id":101,"grade":1},{"id":202,"grade":0}]}'],
+    ['invalid grade', '{"grades":[{"id":101,"grade":3},{"id":202,"grade":0}]}'],
+  ])('returns invalid for %s', (_label, content) => {
+    const repos = [
+      makeRepo({ id: 101, name: 'a', full_name: 'acme/a' }),
+      makeRepo({ id: 202, name: 'b', full_name: 'acme/b' }),
+    ];
+    const result = new AIService(makeConfig() as never, 'zh').parseGradedRerankResult(content, repos);
+    expect(result.status).toBe('invalid');
+  });
+
+  it('sends one grade per candidate and never includes ranking scores or stars', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      chatResponse('{"grades":[{"id":101,"grade":2},{"id":202,"grade":0}]}'),
+    );
+    const repos = [
+      makeRepo({ id: 101, name: 'a', full_name: 'acme/a', stargazers_count: 99999 }),
+      makeRepo({ id: 202, name: 'b', full_name: 'acme/b' }),
+    ];
+    const result = await new AIService(makeConfig() as never, 'zh').rerankRepositoriesGraded(
+      repos,
+      'query',
+      null,
+    );
+    const [, init] = (window.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const messages = JSON.parse(String(init.body)).messages as Array<{ content: string }>;
+    const prompt = messages.map(message => message.content).join('\n');
+
+    expect(result?.status).toBe('complete');
+    expect(prompt).toContain('Return one grade for every candidate, exactly once.');
+    expect(prompt).not.toContain('99999');
+    expect(prompt).not.toContain('RRF');
+  });
+
+  it('returns empty for no candidates without calling the LLM', async () => {
+    const result = await new AIService(makeConfig() as never, 'zh').rerankRepositoriesGraded(
+      [],
+      'query',
+      null,
+    );
+
+    expect(result).toEqual({ status: 'empty', grades: new Map() });
+    expect(window.fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the private lexical delegate identical to the public static implementation', () => {
+    const repo = makeRepo({ id: 4, name: 'skill-pack', full_name: 'acme/skill-pack', custom_tags: ['技能'] });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const publicResult = AIService.rankLexicalCandidates([repo], '技能', ['skill']);
+    const privateResult = service['scoreRepositoriesByKeywords']([repo], '技能', ['skill']);
+    expect(privateResult).toEqual(publicResult);
+  });
+});

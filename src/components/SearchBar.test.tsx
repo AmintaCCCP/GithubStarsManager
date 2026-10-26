@@ -4,6 +4,12 @@ import { SearchBar } from './SearchBar';
 import { useAppStore } from '../store/useAppStore';
 import type { Repository, SearchFilters } from '../types';
 
+const runVectorSearchPipeline = vi.hoisted(() => vi.fn());
+
+vi.mock('../services/vectorSearchPipeline', () => ({
+  runVectorSearchPipeline,
+}));
+
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn(),
   getAllCategories: vi.fn(() => []),
@@ -107,6 +113,7 @@ describe('SearchBar', () => {
     vi.clearAllMocks();
     localStorage.clear();
     currentState = baseStoreState();
+    runVectorSearchPipeline.mockReset();
   });
 
   it('clears the committed query when the search input is manually emptied', () => {
@@ -341,5 +348,67 @@ describe('SearchBar', () => {
     } finally {
       window.removeEventListener('gsm:open-global-chat-history', dispatchSpy);
     }
+  });
+
+  it('keeps synthetic vector order when sort/filter effects re-run for the same query', async () => {
+    const lowStarFirst = createRepository({
+      id: 1,
+      name: 'first-by-relevance',
+      full_name: 'owner/first-by-relevance',
+      stargazers_count: 1,
+    });
+    const highStarSecond = createRepository({
+      id: 2,
+      name: 'second-by-relevance',
+      full_name: 'owner/second-by-relevance',
+      stargazers_count: 999,
+    });
+    const setSearchResults = vi.fn();
+    const storeState = createStoreState({
+      repositories: [lowStarFirst, highStarSecond],
+      setSearchResults,
+      vectorSearchConfig: {
+        enabled: true,
+        workerUrl: 'https://worker.example',
+        authToken: 'token',
+        embeddingConfigId: 'emb',
+        indexMode: 'readme',
+        readmeMaxChars: 6000,
+      },
+      embeddingConfigs: [{
+        id: 'emb',
+        name: 'emb',
+        apiType: 'openai-compatible',
+        baseUrl: 'https://embedding.example',
+        apiKey: 'key',
+        model: 'model',
+        dimensions: 2,
+        isActive: true,
+      } as never],
+    });
+    const setSearchFilters = vi.fn((filters: Partial<SearchFilters>) => {
+      storeState.searchFilters = { ...storeState.searchFilters, ...filters };
+    });
+    storeState.setSearchFilters = setSearchFilters;
+    currentState = storeState;
+    mockUseAppStore.mockImplementation(((selector?: (state: unknown) => unknown) => (selector ? selector(storeState) : storeState)) as unknown as typeof useAppStore);
+    runVectorSearchPipeline.mockResolvedValue({
+      repositories: [lowStarFirst, highStarSecond],
+      scoreMap: new Map([['1', 1], ['2', 0.5]]),
+      diagnostics: {},
+    });
+
+    const { rerender } = render(<SearchBar />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'relevance' } });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'AI搜索' }));
+    });
+
+    expect(setSearchResults).toHaveBeenLastCalledWith([lowStarFirst, highStarSecond]);
+    rerender(<SearchBar />);
+    fireEvent.click(screen.getByRole('button', { name: '按降序排列' }));
+    rerender(<SearchBar />);
+
+    expect(setSearchResults).toHaveBeenLastCalledWith([lowStarFirst, highStarSecond]);
   });
 });

@@ -105,6 +105,20 @@ describe('RepositoryList view mode controls', () => {
     ]);
   });
 
+  it('preserves the incoming order while a relevance query is active', () => {
+    const lowerStarRepository = { ...repository, id: 2, name: 'first-by-relevance', full_name: 'owner/first-by-relevance', stargazers_count: 1 };
+    const higherStarRepository = { ...repository, id: 3, name: 'second-by-relevance', full_name: 'owner/second-by-relevance', stargazers_count: 999 };
+    searchFilters.query = 'relevance';
+
+    render(<RepositoryList repositories={[lowerStarRepository, higherStarRepository, repository]} selectedCategory="all" />);
+
+    expect(screen.getAllByTestId(/repository-card-/).map((card) => card.textContent)).toEqual([
+      'first-by-relevance',
+      'second-by-relevance',
+      'repository-one',
+    ]);
+  });
+
   it('preserves the card vector-result order in similar view instead of applying the normal star sort', () => {
     const lowScoreLowStarRepository = { ...repository, id: 2, name: 'first-by-vector-score', full_name: 'owner/first-by-vector-score', stargazers_count: 1 };
     const highScoreHighStarRepository = { ...repository, id: 3, name: 'second-by-vector-score', full_name: 'owner/second-by-vector-score', stargazers_count: 999 };
