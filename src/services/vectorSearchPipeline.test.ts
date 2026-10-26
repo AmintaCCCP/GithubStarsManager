@@ -383,10 +383,18 @@ describe('vectorSearchPipeline', () => {
     }));
     const aiService = {
       analyzeVectorSearchQuery: vi.fn().mockResolvedValue(item.analysis),
-      rerankRepositoriesGraded: vi.fn().mockImplementation(
-        (candidates: Repository[]): GradedRerankResult | null =>
-          new AIService({} as never, 'en').parseGradedRerankResult(item.llmResponse, candidates),
-      ),
+      rerankRepositoriesGraded: vi.fn().mockImplementation(async (candidates: Repository[]): Promise<GradedRerankResult | null> => {
+        const parser = new AIService({
+          id: 'parser',
+          name: 'parser',
+          apiType: 'openai',
+          baseUrl: 'http://localhost:0',
+          apiKey: '',
+          model: 'gpt-test',
+          isActive: true,
+        } as never, 'en');
+        return parser.parseGradedRerankResult(item.llmResponse, candidates);
+      }),
     } as unknown as AIService;
 
     const result = await runVectorSearchPipeline({
@@ -419,6 +427,9 @@ describe('vectorSearchPipeline', () => {
       signal: new AbortController().signal,
     });
 
+    const rerankMock = aiService.rerankRepositoriesGraded as ReturnType<typeof vi.fn>;
+    if (item.denseMatches.length >= 3) expect(rerankMock).toHaveBeenCalledTimes(1);
+    else expect(rerankMock).not.toHaveBeenCalled();
     expect(result?.repositories.map(repo => String(repo.id))).toEqual(item.expectedTopIds);
   });
 });
