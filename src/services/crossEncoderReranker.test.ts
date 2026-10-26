@@ -43,6 +43,7 @@ describe('CrossEncoderReranker', () => {
     'https://api.siliconflow.cn',
     'https://api.siliconflow.cn/',
     'https://api.siliconflow.cn/ ',
+    'https://api.siliconflow.cn/v1',
   ])('posts to /v1/rerank with the ordinary model for base URL %s', async (baseUrl) => {
     (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(JSON.stringify({
       results: [

@@ -89,7 +89,7 @@ export class CrossEncoderReranker {
     if (signal?.aborted) throw new DOMException('Cross-encoder request aborted', 'AbortError');
 
     try {
-      const baseUrl = this.config.baseUrl.trim().replace(/\/+$/, '');
+      const baseUrl = this.config.baseUrl.trim().replace(/\/+$/, '').replace(/\/v1$/, '');
       const response = await fetch(`${baseUrl}/v1/rerank`, {
         method: 'POST',
         headers: {
