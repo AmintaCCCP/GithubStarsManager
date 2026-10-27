@@ -520,6 +520,7 @@ export async function runVectorSearchPipeline(
     })
     .catch(error => {
       if (isAbortError(error)) throw error;
+      logger.warn('vector-search', 'Raw embedding or dense recall failed, continuing without it', { error });
       return [];
     });
   // Analysis may reject first on cancellation; keep the in-flight dense promise handled.
@@ -563,6 +564,7 @@ export async function runVectorSearchPipeline(
         })
         .catch(error => {
           if (isAbortError(error)) throw error;
+          logger.warn('vector-search', 'Ideal embedding or dense recall failed, continuing without it', { error });
           return [];
         })
     : Promise.resolve([]);

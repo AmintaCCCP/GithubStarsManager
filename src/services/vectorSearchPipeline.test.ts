@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import { AIService } from './aiService';
+import { logger } from './logger';
 import type { GradedRerankResult } from './vectorSearchPipeline';
 import type { EmbeddingClient, VectorSearchService } from './vectorSearchService';
 import {
@@ -168,6 +169,48 @@ describe('vectorSearchPipeline', () => {
     expect(result?.diagnostics.analysisUsed).toBe(true);
     expect(result?.diagnostics.rawDenseCount).toBe(1);
     expect(result?.diagnostics.idealDenseCount).toBe(1);
+  });
+
+  it('warns and keeps local recall when raw and ideal embedding fail', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const result = await runVectorSearchPipeline({
+        query: 'readme skill',
+        repositories: [makeRepo({ id: 1, full_name: 'acme/readme-skill', ai_tags: ['skill'] })],
+        vectorConfig: {
+          enabled: true,
+          workerUrl: 'https://worker',
+          authToken: 'token',
+          embeddingConfigId: 'emb',
+          indexMode: 'description',
+          readmeMaxChars: 6000,
+        },
+        embeddingConfig: {} as never,
+        aiService: {
+          analyzeVectorSearchQuery: vi.fn().mockResolvedValue(analysis),
+          rerankRepositoriesGraded: vi.fn(),
+        } as unknown as AIService,
+        embeddingClient: { embed: vi.fn().mockRejectedValue(new Error('embed down')) } as unknown as EmbeddingClient,
+        vectorService: { query: vi.fn() } as unknown as VectorSearchService,
+        crossEncoder: null,
+        signal: new AbortController().signal,
+      });
+
+      expect(warn).toHaveBeenCalledWith(
+        'vector-search',
+        expect.stringContaining('Raw embedding'),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        'vector-search',
+        expect.stringContaining('Ideal embedding'),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
+      expect(result?.repositories.map(repo => repo.id)).toEqual([1]);
+      expect(result?.diagnostics.rawDenseCount).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('does not call the LLM when both optional switches are off', async () => {
