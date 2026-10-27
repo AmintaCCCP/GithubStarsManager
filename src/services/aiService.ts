@@ -2401,9 +2401,8 @@ Return:
     const hasProfile = Boolean(
       analysis
       && (
-        analysis.intent
-        || analysis.idealDescription
-        || analysis.keywords.length > 0
+        analysis.keywords.length > 0
+        || analysis.highPrecisionTerms.length > 0
         || Object.values(analysis.facets).some(values => values.length > 0)
       ),
     );

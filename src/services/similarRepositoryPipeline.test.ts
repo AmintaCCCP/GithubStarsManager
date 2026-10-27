@@ -218,6 +218,63 @@ describe('similarRepositoryPipeline', () => {
     expect(result.repositories.map(repo => repo.id)).toEqual([3, 2]);
   });
 
+  it('does not trust a generic AI profile without structured domain evidence', async () => {
+    const source = makeRepo({ id: 1, full_name: 'owner/empty', description: '' });
+    const rerank = vi.fn();
+    const aiService = {
+      analyzeSimilarRepositorySource: vi.fn().mockResolvedValue({
+        intent: 'A generic software project',
+        idealDescription: 'A peer software repository.',
+        keywords: [],
+        facets: { artifact: [], action: [], domain: [], platform: [] },
+        highPrecisionTerms: [],
+        lowConfidenceFacets: [],
+      }),
+      rerankSimilarRepositoriesGraded: rerank,
+    } as unknown as AIService;
+    const crossEncoder = {
+      isAvailable: vi.fn(() => true),
+      rerank: vi.fn(async () => [
+        { id: '3', score: 1, rank: 1 },
+        { id: '2', score: 0.5, rank: 2 },
+        { id: '4', score: 0.25, rank: 3 },
+      ]),
+    } as unknown as CrossEncoderReranker;
+
+    const result = await runSimilarRepositoryPipeline({
+      source,
+      repositories: [
+        makeRepo({ id: 2, full_name: 'peer/first' }),
+        makeRepo({ id: 3, full_name: 'peer/second' }),
+        makeRepo({ id: 4, full_name: 'peer/third' }),
+      ],
+      vectorConfig,
+      embeddingConfig,
+      aiService,
+      embeddingClient: { embed: vi.fn().mockResolvedValue([[0.1]]) } as unknown as EmbeddingClient,
+      vectorService: {
+        query: vi.fn().mockResolvedValue([
+          { id: '2', score: 0.9, metadata: {} },
+          { id: '3', score: 0.8, metadata: {} },
+          { id: '4', score: 0.7, metadata: {} },
+        ]),
+      } as unknown as VectorSearchService,
+      crossEncoder,
+      readmeFetcher: vi.fn().mockResolvedValue('# Terminal file browser'),
+      signal: new AbortController().signal,
+    });
+
+    expect(result.diagnostics.profileSource).toBe('ai');
+    expect(result.diagnostics.ceQueryFallback).toBe(true);
+    expect(result.diagnostics.profileDenseCount).toBe(0);
+    expect(rerank).not.toHaveBeenCalled();
+    expect(crossEncoder.rerank).toHaveBeenCalledWith(
+      expect.stringContaining('Terminal file browser'),
+      expect.any(Array),
+      expect.any(AbortSignal),
+    );
+  });
+
   it('normalizes brand and language leakage from AI and local profiles', () => {
     const source = makeRepo(cases[4].source);
     expect(normalizeSimilarityAnalysis(cases[4].analysis, source)).toBeNull();

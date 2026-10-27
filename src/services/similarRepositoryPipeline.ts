@@ -231,9 +231,7 @@ export function buildLocalSimilarityProfile(source: Repository): VectorQueryAnal
 
 function hasUsableProfile(analysis: VectorQueryAnalysis): boolean {
   return Boolean(
-    (analysis.intent && analysis.intent !== GENERIC_PROFILE_INTENT)
-    || analysis.idealDescription
-    || analysis.keywords.length > 0
+    analysis.keywords.length > 0
     || analysis.highPrecisionTerms.length > 0
     || Object.values(analysis.facets).some(values => values.length > 0),
   );
@@ -425,7 +423,9 @@ export async function runSimilarRepositoryPipeline(
   const profile = aiProfile || localProfile;
   const profileSource = aiProfile ? 'ai' : 'local';
 
-  const profilePromise = profile.idealDescription && vectorConfig.enableHyDE !== false
+  const profilePromise = hasUsableProfile(profile)
+    && profile.idealDescription
+    && vectorConfig.enableHyDE !== false
     ? recallDense(profile.idealDescription, 'profile')
     : Promise.resolve<DenseOutcome>({ matches: [], success: false });
   const [exactOutcome, profileOutcome] = await Promise.all([exactPromise, profilePromise]);
