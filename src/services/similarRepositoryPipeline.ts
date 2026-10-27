@@ -28,6 +28,12 @@ import {
 const README_TIMEOUT_MS = 5000;
 const FACET_NAMES = ['artifact', 'action', 'domain', 'platform'] as const;
 const GENERIC_PROFILE_INTENT = 'software repository';
+const GENERIC_PROFILE_TERMS = new Set([
+  'app', 'application', 'backend', 'browser', 'client', 'cross-platform', 'cross platform',
+  'desktop', 'frontend', 'github', 'linux', 'macos', 'mobile', 'repo', 'repository', 'server',
+  'software', 'tool', 'tools', 'utility', 'web', 'windows', 'android', 'ios',
+  '前端', '后端', '客户端', '应用', '桌面', '服务器', '浏览器', '移动端', '网页',
+]);
 
 interface DenseOutcome {
   matches: VectorQueryResult[];
@@ -230,11 +236,19 @@ export function buildLocalSimilarityProfile(source: Repository): VectorQueryAnal
 }
 
 function hasUsableProfile(analysis: VectorQueryAnalysis): boolean {
-  return Boolean(
-    analysis.keywords.length > 0
-    || analysis.highPrecisionTerms.length > 0
-    || Object.values(analysis.facets).some(values => values.length > 0),
+  const platformTerms = new Set(
+    analysis.facets.platform.map(value => value.trim().toLowerCase()),
   );
+  const isSpecific = (value: string): boolean => {
+    const normalized = value.trim().toLowerCase();
+    return Boolean(normalized)
+      && !platformTerms.has(normalized)
+      && !GENERIC_PROFILE_TERMS.has(normalized);
+  };
+  return analysis.facets.artifact.length > 0
+    || analysis.facets.domain.some(isSpecific)
+    || analysis.keywords.some(isSpecific)
+    || analysis.highPrecisionTerms.some(isSpecific);
 }
 
 export function buildSimilarityRerankQuery(

@@ -173,7 +173,12 @@ describe('similarRepositoryPipeline', () => {
   });
 
   it('uses README context for cross-encoder when the local profile has no domain evidence', async () => {
-    const source = makeRepo({ id: 1, full_name: 'owner/empty', description: '' });
+    const source = makeRepo({
+      id: 1,
+      full_name: 'owner/empty',
+      description: '',
+      ai_platforms: ['web'],
+    });
     const repositories = [
       makeRepo({ id: 2, full_name: 'peer/first' }),
       makeRepo({ id: 3, full_name: 'peer/second' }),
@@ -215,6 +220,7 @@ describe('similarRepositoryPipeline', () => {
       expect.any(AbortSignal),
     );
     expect(result.diagnostics.ceQueryFallback).toBe(true);
+    expect(result.diagnostics.profileDenseCount).toBe(0);
     expect(result.repositories.map(repo => repo.id)).toEqual([3, 2]);
   });
 
