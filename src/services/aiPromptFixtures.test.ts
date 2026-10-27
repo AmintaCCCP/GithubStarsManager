@@ -158,6 +158,10 @@ const buildAIServiceFixtures = async (language: 'zh' | 'en') => {
       releaseName: 'Summer release',
     }));
   result.generateHyDEQuery = await captureRequests(() => makeService().generateHyDEQuery('react state management library'));
+  result.analyzeVectorSearchQuery = await captureRequests(() =>
+    makeService().analyzeVectorSearchQuery('优化 GitHub README 的技能'));
+  result.rerankRepositoriesGraded = await captureRequests(() =>
+    makeService().rerankRepositoriesGraded([repo, repoB], 'state management', null));
   result.searchRepositoriesWithSemanticReranking = await captureRequests(() =>
     makeService().searchRepositoriesWithSemanticReranking([repo, repoB], 'state management'));
   result.searchGistsWithReranking = await captureRequests(() =>

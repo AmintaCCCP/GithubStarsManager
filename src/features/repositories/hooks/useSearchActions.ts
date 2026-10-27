@@ -5,6 +5,8 @@ import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
+import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
+import { runVectorSearchPipeline } from '../../../services/vectorSearchPipeline';
 import { createGitHubApiService, createGitHubListsApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { useDialog } from '../../../hooks/useDialog';
@@ -308,7 +310,9 @@ export const useSearchActions = (): SearchActions => {
         aiOrdered = true;
       } catch (error) {
         // 取消不是失败：向上传播交给 aiSearch 静默结束，不产出兜底结果
-        if (isAbortError(error)) throw error;
+        if (options?.signal?.aborted || isAbortError(error)) {
+          throw new DOMException('Search cancelled', 'AbortError');
+        }
         console.warn('❌ AI search failed, falling back to basic search:', error);
         toast(t('useSearchActions.ai-request-failed-fell-back-to-local-lexical-sea'), 'warning');
         filtered = performBasicTextSearch(repositories, query);
@@ -317,6 +321,10 @@ export const useSearchActions = (): SearchActions => {
       console.log('⚠️ No AI config found, using basic text search');
       // Basic text search if no AI config
       filtered = performBasicTextSearch(repositories, query);
+    }
+
+    if (options?.signal?.aborted) {
+      throw new DOMException('Search cancelled', 'AbortError');
     }
 
     // Apply other filters and update results
@@ -355,7 +363,6 @@ export const useSearchActions = (): SearchActions => {
     setIsSearching(true);
     setSearchPhase(null);
     vectorScoreMapRef.current = null;
-    console.log('🔍 Starting AI search for query:', query);
 
     try {
       // ====== 向量搜索分支 ======
@@ -368,104 +375,61 @@ export const useSearchActions = (): SearchActions => {
         try {
           const embeddingClient = new EmbeddingClient(activeEmbConfig);
           const vectorService = new VectorSearchService(vsConfig);
+          const aiConfig = aiConfigs.find(config => config.id === activeAIConfig);
+          const aiService = aiConfig
+            && (vsConfig.enableHyDE !== false || vsConfig.enableReranking !== false)
+            ? new AIService(aiConfig, language)
+            : null;
+          const crossEncoder = activeEmbConfig.apiType === 'siliconflow'
+            ? new CrossEncoderReranker(activeEmbConfig)
+            : null;
+          const result = await runVectorSearchPipeline({
+            query,
+            repositories,
+            vectorConfig: vsConfig,
+            embeddingConfig: activeEmbConfig,
+            aiService,
+            embeddingClient,
+            vectorService,
+            crossEncoder,
+            signal: controller.signal,
+            onPhase: (phase) => {
+              setSearchPhase(
+                phase === 'analyzing'
+                  ? t('useSearchActions.ai-analyzing-query')
+                  : phase === 'embedding'
+                    ? t('useSearchActions.generating-query-vector')
+                    : phase === 'recalling'
+                      ? t('useSearchActions.searching-vector-index')
+                      : t('useSearchActions.ai-semantic-reranking'),
+              );
+            },
+          });
 
-          // 1. HyDE 查询预处理：用 LLM 生成理想仓库描述再嵌入（可选，5 秒超时降级）
-          let embeddingQuery = query;
-          const hydeConfig = aiConfigs.find(config => config.id === activeAIConfig);
-          if (vsConfig.enableHyDE !== false && hydeConfig) {
-            const hydeAbort = new AbortController();
-            let hydeTimer: ReturnType<typeof setTimeout> | null = null;
-            try {
-              setSearchPhase(t('useSearchActions.ai-analyzing-query'));
-              const hydeService = new AIService(hydeConfig, language);
-              embeddingQuery = await Promise.race([
-                hydeService.generateHyDEQuery(query, hydeAbort.signal).catch(() => query),
-                new Promise<string>((resolve) => {
-                  hydeTimer = setTimeout(() => {
-                    hydeAbort.abort();
-                    resolve(query);
-                  }, 5000);
-                }),
-              ]);
-              if (embeddingQuery !== query) {
-                console.log('🔮 HyDE generated:', embeddingQuery.slice(0, 100));
-              }
-            } catch (hydeError) {
-              console.warn('HyDE failed, using raw query:', hydeError);
-              embeddingQuery = query;
-            } finally {
-              if (hydeTimer) clearTimeout(hydeTimer);
-            }
+          if (controller.signal.aborted || aiSearchAbortRef.current !== controller) {
+            throw new DOMException('Search superseded', 'AbortError');
+          }
+          if (result === null) {
+            await keywordSearch(query, applyFilters, { signal: controller.signal });
+            return;
           }
 
-          // 2. 前端调用 Embedding API 生成查询向量
-          setSearchPhase(t('useSearchActions.generating-query-vector'));
-          const queryVectors = await embeddingClient.embed([embeddingQuery], 'query');
-          if (queryVectors && queryVectors.length > 0) {
-            // 2. 前端将查询向量发送到 Worker
-            setSearchPhase(t('useSearchActions.searching-vector-index'));
-            const vectorResults = await vectorService.query(queryVectors[0], {
-              topK: vsConfig.searchTopK ?? 30,
-              threshold: vsConfig.searchThreshold ?? 0.35,
-            });
-
-            if (vectorResults.length > 0) {
-              // 3. 轻量关键词加分：精确匹配的字段给予分数微调
-              const scoreMap = buildSearchPatch(query, vectorResults);
-
-              // 4. 从本地仓库数据中取出匹配结果，按相似度排序
-              const scoredRepos = repositories
-                .filter(repo => scoreMap.has(String(repo.id)))
-                .map(repo => ({
-                  repo,
-                  score: scoreMap.get(String(repo.id)) || 0,
-                }))
-                .sort((a, b) => b.score - a.score)
-                .map(item => item.repo);
-
-              if (scoredRepos.length > 0) {
-                // 4. AI 语义重排序：用 LLM 对向量搜索结果做真正的语义排序
-                let reranked = scoredRepos;
-                let rerankSucceeded = false;
-                const rerankConfig = aiConfigs.find(config => config.id === activeAIConfig);
-                if (rerankConfig && vsConfig.enableReranking !== false) {
-                  try {
-                    setSearchPhase(t('useSearchActions.ai-semantic-reranking'));
-                    const rerankService = new AIService(rerankConfig, language);
-                    reranked = await rerankService.searchRepositoriesWithSemanticReranking(scoredRepos, query);
-                    rerankSucceeded = true;
-                    console.log('🤖 AI semantically reranked results:', reranked.length);
-                  } catch (rerankError) {
-                    console.warn('AI semantic reranking failed, using vector order:', rerankError);
-                  }
-                }
-
-                // 保存 LLM 重排序顺序，applyFilters 可能按 UI 排序覆盖它
-                const rerankOrder = rerankSucceeded
-                  ? new Map(reranked.map((repo, index) => [String(repo.id), index]))
-                  : null;
-                const finalFiltered = applyFilters([...reranked]);
-                if (rerankOrder) {
-                  // 恢复 LLM 语义排序顺序
-                  finalFiltered.sort((a, b) =>
-                    (rerankOrder.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
-                    - (rerankOrder.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER)
-                  );
-                } else {
-                  finalFiltered.sort((a, b) => (scoreMap.get(String(b.id)) ?? 0) - (scoreMap.get(String(a.id)) ?? 0));
-                }
-                console.log('🎯 Vector search results:', finalFiltered.length);
-                vectorScoreMapRef.current = { query, scores: scoreMap };
-                skipNextTextSearchRef.current = true;
-                setSearchResults(finalFiltered);
-                setSearchFilters({ query });
-                return;
-              }
-            }
-          }
-          // 向量搜索无结果 → 继续走关键词搜索
-          console.log('⚠️ Vector search returned no results, falling back to keyword search');
+          const finalFiltered = applyFilters([...result.repositories]);
+          const order = new Map(
+            result.repositories.map((repo, index) => [String(repo.id), index]),
+          );
+          finalFiltered.sort((a, b) =>
+            (order.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER)
+            - (order.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER));
+          vectorScoreMapRef.current = { query, scores: result.scoreMap };
+          skipNextTextSearchRef.current = true;
+          setSearchResults(finalFiltered);
+          setSearchFilters({ query });
+          return;
         } catch (vectorError) {
+          if (controller.signal.aborted || isAbortError(vectorError)) {
+            throw new DOMException('Search superseded', 'AbortError');
+          }
           console.warn('❌ Vector search failed, falling back to keyword search:', vectorError);
         }
       }

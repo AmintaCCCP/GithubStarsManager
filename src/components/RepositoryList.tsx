@@ -151,8 +151,9 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     // Do not let the normal list preference (stars/updated/name) overwrite that
     // relevance ordering after the card action has entered similar-view mode.
     if (similarView?.active) return categoryRepositories;
+    if (searchFilters.query) return categoryRepositories;
     return sortRepositories(categoryRepositories, searchFilters.sortBy, searchFilters.sortOrder);
-  }, [repositories, selectedCategory, allCategories, categoryMatchMode, searchFilters.sortBy, searchFilters.sortOrder, similarView?.active]);
+  }, [repositories, selectedCategory, allCategories, categoryMatchMode, searchFilters.query, searchFilters.sortBy, searchFilters.sortOrder, similarView?.active]);
 
   // 根据当前筛选的仓库中是否有AI分析内容来动态设置默认显示模式
   const hasAnalyzedRepos = useMemo(() => 

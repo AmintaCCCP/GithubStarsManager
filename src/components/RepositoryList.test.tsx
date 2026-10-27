@@ -84,7 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   storeState.repositoryViewMode = 'grid';
   storeState.similarView = null;
-  Object.assign(searchFilters, { sortBy: 'stars', sortOrder: 'desc' });
+  Object.assign(searchFilters, { query: '', sortBy: 'stars', sortOrder: 'desc' });
   mockUseAppStore.mockImplementation(((selector?: (state: unknown) => unknown) => (selector ? selector(storeState) : storeState)) as unknown as typeof useAppStore);
   Object.assign(mockUseAppStore, {
     getState: () => storeState,
@@ -102,6 +102,20 @@ describe('RepositoryList view mode controls', () => {
       'higher-star',
       'repository-one',
       'lower-star',
+    ]);
+  });
+
+  it('preserves the incoming order while a relevance query is active', () => {
+    const lowerStarRepository = { ...repository, id: 2, name: 'first-by-relevance', full_name: 'owner/first-by-relevance', stargazers_count: 1 };
+    const higherStarRepository = { ...repository, id: 3, name: 'second-by-relevance', full_name: 'owner/second-by-relevance', stargazers_count: 999 };
+    searchFilters.query = 'relevance';
+
+    render(<RepositoryList repositories={[lowerStarRepository, higherStarRepository, repository]} selectedCategory="all" />);
+
+    expect(screen.getAllByTestId(/repository-card-/).map((card) => card.textContent)).toEqual([
+      'first-by-relevance',
+      'second-by-relevance',
+      'repository-one',
     ]);
   });
 
