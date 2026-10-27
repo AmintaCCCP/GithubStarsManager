@@ -422,6 +422,7 @@ export async function runSimilarRepositoryPipeline(
         ANALYSIS_TIMEOUT_MS,
         signal,
         null,
+        () => logger.warn('vector-search', 'Similar source analysis timed out; using local profile'),
       ).catch(error => {
         if (isAbortError(error) || signal.aborted) throw abortError();
         logger.warn('vector-search', 'Similar source analysis failed; using local profile', { error });
