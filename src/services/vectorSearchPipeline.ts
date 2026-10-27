@@ -73,11 +73,11 @@ export const LLM_CANDIDATE_LIMIT = 15;
 export const RRF_K = 60;
 export const RELATIVE_FUSION_CUTOFF = 0.65;
 
-const ANALYSIS_TIMEOUT_MS = 3500;
-const EMBEDDING_TIMEOUT_MS = 5000;
-const WORKER_TIMEOUT_MS = 4000;
-const CROSS_ENCODER_TIMEOUT_MS = 3000;
-const LLM_TIMEOUT_MS = 8000;
+export const ANALYSIS_TIMEOUT_MS = 3500;
+export const EMBEDDING_TIMEOUT_MS = 5000;
+export const WORKER_TIMEOUT_MS = 4000;
+export const CROSS_ENCODER_TIMEOUT_MS = 3000;
+export const LLM_TIMEOUT_MS = 8000;
 
 const ARTIFACT_ALIASES: Record<string, string> = {
   '技能': 'skill',
@@ -106,6 +106,7 @@ export function withBudget<T>(
   timeoutMs: number,
   outerSignal: AbortSignal,
   timeoutValue: T,
+  onTimeout?: () => void,
 ): Promise<T> {
   if (outerSignal.aborted) return Promise.reject(abortError());
 
@@ -128,6 +129,7 @@ export function withBudget<T>(
     };
     const timer = setTimeout(() => {
       controller.abort();
+      onTimeout?.();
       settle(() => resolve(timeoutValue));
     }, timeoutMs);
 
@@ -161,15 +163,28 @@ function buildRepoIndex(repositories: Repository[]): Map<string, Repository> {
   return repoById;
 }
 
-function hydrateMatches(
+export function hydrateMatches(
   matches: VectorQueryResult[],
   repoById: Map<string, Repository>,
+  options: {
+    excludeSource?: Repository;
+    excludeForks?: boolean;
+  } = {},
 ): RankedChannel[] {
   const best = new Map<string, { repo: Repository; score: number }>();
+  const sourceId = options.excludeSource ? String(options.excludeSource.id) : '';
+  const sourceFullName = options.excludeSource?.full_name.trim().toLowerCase() || '';
   matches.forEach((match) => {
     const repo = repoById.get(String(match.id));
     if (!repo || !Number.isFinite(match.score) || match.score <= 0) return;
     const id = String(repo.id);
+    if (
+      id === sourceId
+      || (sourceFullName && repo.full_name.trim().toLowerCase() === sourceFullName)
+      || (options.excludeForks && repo.fork === true)
+    ) {
+      return;
+    }
     const previous = best.get(id);
     if (!previous || match.score > previous.score) {
       best.set(id, { repo, score: match.score });
@@ -280,6 +295,7 @@ export function fuseCandidates(input: {
   idealMatches: RankedChannel[];
   lexical: Array<{ repo: Repository; score: number }>;
   structured: RankedChannel[];
+  tieBreak?: 'default' | 'similarity';
 }): FusedCandidate[] {
   const byId = new Map<string, FusedCandidate>();
   const dedupeRanked = (items: RankedChannel[]): RankedChannel[] => {
@@ -355,12 +371,18 @@ export function fuseCandidates(input: {
     );
   }
 
-  return [...byId.values()].sort((a, b) =>
-    b.fusedScore - a.fusedScore
-    || b.lexicalScore - a.lexicalScore
-    || b.structuredScore - a.structuredScore
-    || (b.repo.stargazers_count || 0) - (a.repo.stargazers_count || 0)
-    || a.repo.id - b.repo.id);
+  return [...byId.values()].sort((a, b) => {
+    const similarityTieBreak = input.tieBreak === 'similarity'
+      ? a.repo.full_name.localeCompare(b.repo.full_name)
+      : 0;
+    return b.fusedScore - a.fusedScore
+      || b.lexicalScore - a.lexicalScore
+      || b.structuredScore - a.structuredScore
+      || (input.tieBreak === 'similarity'
+        ? similarityTieBreak
+        : (b.repo.stargazers_count || 0) - (a.repo.stargazers_count || 0))
+      || a.repo.id - b.repo.id;
+  });
 }
 
 export function applyRelativeCutoff(fused: FusedCandidate[], topK: number): FusedCandidate[] {
@@ -399,13 +421,16 @@ export function chooseFinalOrder(options: {
   topK: number;
   analysis: VectorQueryAnalysis | null;
   crossEncoderUsed: boolean;
+  noPositiveGradesPolicy?: 'fallback' | 'empty';
 }): FusedCandidate[] {
   const { ceOrdered, fused, graded, analysis, crossEncoderUsed } = options;
   const baseOrder = crossEncoderUsed ? ceOrdered : fused;
+  const noPositiveGradesPolicy = options.noPositiveGradesPolicy ?? 'fallback';
 
   if (graded?.status === 'complete') {
     const ordered = orderByGrades(baseOrder, graded.grades);
     if (ordered.length > 0) return ordered.slice(0, options.topK);
+    if (noPositiveGradesPolicy === 'empty') return [];
     if (crossEncoderUsed) return ceOrdered.slice(0, Math.min(options.topK, 10));
     return fused.some(item => hasStrongEvidence(item, analysis))
       ? fused.slice(0, Math.min(5, options.topK))
@@ -413,6 +438,7 @@ export function chooseFinalOrder(options: {
   }
 
   if (graded?.status === 'empty') {
+    if (noPositiveGradesPolicy === 'empty') return [];
     if (crossEncoderUsed) return ceOrdered.slice(0, Math.min(options.topK, 10));
     return fused.some(item => hasStrongEvidence(item, analysis))
       ? fused.slice(0, Math.min(5, options.topK))
@@ -421,6 +447,133 @@ export function chooseFinalOrder(options: {
 
   if (crossEncoderUsed) return ceOrdered.slice(0, options.topK);
   return applyRelativeCutoff(fused, options.topK);
+}
+
+export interface FinishRankedCandidatesOptions {
+  fused: FusedCandidate[];
+  vectorConfig: VectorSearchConfig;
+  signal: AbortSignal;
+  analysis: VectorQueryAnalysis | null;
+  ceQuery: string;
+  crossEncoder: CrossEncoderReranker | null;
+  rerankCandidates: ((
+    candidates: Repository[],
+    query: string,
+    analysis: VectorQueryAnalysis | null,
+    signal: AbortSignal,
+  ) => Promise<GradedRerankResult | null>) | null;
+  noPositiveGradesPolicy?: 'fallback' | 'empty';
+  onPhase?: (phase: 'reranking') => void;
+}
+
+export interface FinishRankedCandidatesResult {
+  candidates: FusedCandidate[];
+  diagnostics: Pick<
+    VectorSearchPipelineResult['diagnostics'],
+    'crossEncoderUsed' | 'crossEncoderPartial' | 'llmStatus' | 'fallback'
+  > & {
+    timingsMs: Pick<
+      VectorSearchPipelineResult['diagnostics']['timingsMs'],
+      'crossEncoder' | 'llm'
+    >;
+  };
+}
+
+export async function finishRankedCandidates(
+  options: FinishRankedCandidatesOptions,
+): Promise<FinishRankedCandidatesResult> {
+  const { fused, vectorConfig, signal, analysis } = options;
+  let crossEncoderUsed = false;
+  let crossEncoderPartial = false;
+  let ceOrdered = fused;
+  const timingsMs: FinishRankedCandidatesResult['diagnostics']['timingsMs'] = {};
+
+  const ceStarted = Date.now();
+  const ce = options.crossEncoder?.isAvailable() && vectorConfig.enableReranking !== false
+    ? await withBudget(
+        stageSignal => options.crossEncoder!.rerank(
+          options.ceQuery,
+          fused.map(item => ({
+            id: String(item.repo.id),
+            text: buildCrossEncoderDocument(item.repo),
+          })),
+          stageSignal,
+        ),
+        CROSS_ENCODER_TIMEOUT_MS,
+        signal,
+        null,
+      ).catch(error => {
+        if (isAbortError(error)) throw error;
+        logger.warn('vector-search', 'Cross-encoder rerank failed, continuing with fusion order', { error });
+        return null;
+      })
+    : null;
+  timingsMs.crossEncoder = Date.now() - ceStarted;
+  if (ce && ce.length > 0) {
+    crossEncoderUsed = true;
+    crossEncoderPartial = ce.length < fused.length;
+    ceOrdered = orderByCrossEncoder(fused, ce);
+  }
+
+  const llmCandidates = ceOrdered.slice(0, LLM_CANDIDATE_LIMIT);
+  let graded: GradedRerankResult | null = null;
+  let llmStatus: VectorSearchPipelineResult['diagnostics']['llmStatus'] = 'skipped';
+  const llmStarted = Date.now();
+  if (
+    options.rerankCandidates
+    && vectorConfig.enableReranking !== false
+    && llmCandidates.length >= 3
+  ) {
+    options.onPhase?.('reranking');
+    graded = await withBudget(
+      stageSignal => options.rerankCandidates!(
+        llmCandidates.map(item => item.repo),
+        options.ceQuery,
+        analysis,
+        stageSignal,
+      ),
+      LLM_TIMEOUT_MS,
+      signal,
+      null,
+    ).catch(error => {
+      if (isAbortError(error)) throw error;
+      logger.warn('vector-search', 'Graded LLM rerank failed, continuing with CE/fusion order', { error });
+      return null;
+    });
+    llmStatus = graded?.status ?? 'invalid';
+  }
+  timingsMs.llm = Date.now() - llmStarted;
+  if (signal.aborted) throw abortError();
+
+  const candidates = chooseFinalOrder({
+    ceOrdered,
+    fused,
+    graded,
+    topK: vectorConfig.searchTopK ?? 30,
+    analysis,
+    crossEncoderUsed,
+    noPositiveGradesPolicy: options.noPositiveGradesPolicy,
+  });
+  const llmSelected = graded?.status === 'complete'
+    && candidates.some(item => (graded.grades.get(item.repo.id) || 0) > 0);
+  const fallback: VectorSearchPipelineResult['diagnostics']['fallback'] = candidates.length === 0
+    ? 'empty-guard'
+    : llmSelected
+      ? 'none'
+      : crossEncoderUsed
+        ? 'cross-encoder'
+        : 'fusion';
+
+  return {
+    candidates,
+    diagnostics: {
+      crossEncoderUsed,
+      crossEncoderPartial,
+      llmStatus,
+      fallback,
+      timingsMs,
+    },
+  };
 }
 
 export function toSyntheticScoreMap(repositories: Repository[]): Map<string, number> {
@@ -586,84 +739,29 @@ export async function runVectorSearchPipeline(
     .slice(0, RECALL_TOP_K);
   if (fused.length === 0) return null;
 
-  let crossEncoderUsed = false;
-  let crossEncoderPartial = false;
-  let ceOrdered = fused;
-  const ceStarted = Date.now();
-  const ce = options.crossEncoder?.isAvailable() && vectorConfig.enableReranking !== false
-    ? await withBudget(
-        stageSignal => options.crossEncoder!.rerank(
-          query,
-          fused.map(item => ({
-            id: String(item.repo.id),
-            text: buildCrossEncoderDocument(item.repo),
-          })),
-          stageSignal,
-        ),
-        CROSS_ENCODER_TIMEOUT_MS,
-        signal,
-        null,
-      ).catch(error => {
-        if (isAbortError(error)) throw error;
-        logger.warn('vector-search', 'Cross-encoder rerank failed, continuing with fusion order', { error });
-        return null;
-      })
-    : null;
-  timingsMs.crossEncoder = Date.now() - ceStarted;
-  if (ce && ce.length > 0) {
-    crossEncoderUsed = true;
-    crossEncoderPartial = ce.length < fused.length;
-    ceOrdered = orderByCrossEncoder(fused, ce);
-  }
-
-  const llmCandidates = ceOrdered.slice(0, LLM_CANDIDATE_LIMIT);
-  let graded: GradedRerankResult | null = null;
-  let llmStatus: VectorSearchPipelineResult['diagnostics']['llmStatus'] = 'skipped';
-  const llmStarted = Date.now();
-  if (
-    options.aiService
-    && vectorConfig.enableReranking !== false
-    && llmCandidates.length >= 3
-  ) {
-    options.onPhase?.('reranking');
-    graded = await withBudget(
-      stageSignal => options.aiService!.rerankRepositoriesGraded(
-        llmCandidates.map(item => item.repo),
-        query,
-        analysis,
-        stageSignal,
-      ),
-      LLM_TIMEOUT_MS,
-      signal,
-      null,
-    ).catch(error => {
-      if (isAbortError(error)) throw error;
-      logger.warn('vector-search', 'Graded LLM rerank failed, continuing with CE/fusion order', { error });
-      return null;
-    });
-    llmStatus = graded?.status ?? 'invalid';
-  }
-  timingsMs.llm = Date.now() - llmStarted;
-  if (signal.aborted) throw abortError();
-
-  const finalCandidates = chooseFinalOrder({
-    ceOrdered,
+  const finished = await finishRankedCandidates({
     fused,
-    graded,
-    topK: vectorConfig.searchTopK ?? 30,
+    vectorConfig,
+    signal,
     analysis,
-    crossEncoderUsed,
+    ceQuery: query,
+    crossEncoder: options.crossEncoder,
+    rerankCandidates: options.aiService
+      ? (candidates, ignoredQuery, rerankAnalysis, stageSignal) => (
+          options.aiService!.rerankRepositoriesGraded(
+            candidates,
+            ignoredQuery,
+            rerankAnalysis,
+            stageSignal,
+          )
+        )
+      : null,
+    onPhase: options.onPhase,
   });
+  timingsMs.crossEncoder = finished.diagnostics.timingsMs.crossEncoder;
+  timingsMs.llm = finished.diagnostics.timingsMs.llm;
+  const finalCandidates = finished.candidates;
   const finalRepos = finalCandidates.map(item => item.repo);
-  const llmSelected = graded?.status === 'complete'
-    && finalCandidates.some(item => (graded.grades.get(item.repo.id) || 0) > 0);
-  const fallback: VectorSearchPipelineResult['diagnostics']['fallback'] = finalRepos.length === 0
-    ? 'empty-guard'
-    : llmSelected
-      ? 'none'
-      : crossEncoderUsed
-        ? 'cross-encoder'
-        : 'fusion';
 
   return {
     repositories: finalRepos,
@@ -675,10 +773,7 @@ export async function runVectorSearchPipeline(
       lexicalCount: lexical.length,
       structuredCount: structured.length,
       fusedCount: fused.length,
-      crossEncoderUsed,
-      crossEncoderPartial,
-      llmStatus,
-      fallback,
+      ...finished.diagnostics,
       timingsMs,
     },
   };

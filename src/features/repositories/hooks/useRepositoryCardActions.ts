@@ -5,7 +5,10 @@ import { shallow } from 'zustand/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
-import { EmbeddingClient, VectorSearchService, findSimilarRepositories } from '../../../services/vectorSearchService';
+import { AIService, isAbortError } from '../../../services/aiService';
+import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
+import { runSimilarRepositoryPipeline } from '../../../services/similarRepositoryPipeline';
+import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { analyzeRepository, createFailedAnalysisResult } from '../../../services/aiAnalysisHelper';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
@@ -84,12 +87,16 @@ export const useRepositoryCardActions = ({
   );
   const { toast, confirm } = useDialog();
   const abortControllerRef = useRef<AbortController | null>(null);
+  const similarityAbortRef = useRef<AbortController | null>(null);
   const [isLocallyAnalyzing, setIsLocallyAnalyzing] = useState(false);
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [isUnstarring, setIsUnstarring] = useState(false);
 
   useEffect(() => () => {
     abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    similarityAbortRef.current?.abort();
+    similarityAbortRef.current = null;
     setAnalyzingRepository(repoId, false);
   }, [repoId, setAnalyzingRepository]);
 
@@ -248,7 +255,10 @@ export const useRepositoryCardActions = ({
         );
       }
     } finally {
-      setIsLocallyAnalyzing(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+        setIsLocallyAnalyzing(false);
+      }
       if (!controller.signal.aborted) {
         setAnalyzingRepository(repoId, false);
       }
@@ -279,6 +289,9 @@ export const useRepositoryCardActions = ({
     const activeConfig = embeddingConfigs.find((config) => config.id === activeEmbeddingConfig);
     if (!activeConfig) return;
 
+    similarityAbortRef.current?.abort();
+    const controller = new AbortController();
+    similarityAbortRef.current = controller;
     setIsFindingSimilar(true);
     try {
       const embeddingClient = new EmbeddingClient({
@@ -299,37 +312,61 @@ export const useRepositoryCardActions = ({
       const readmeFetcher = githubApi
         ? (owner: string, repo: string, signal?: AbortSignal) => githubApi.getRepositoryReadme(owner, repo, signal)
         : undefined;
-      const similar = await findSimilarRepositories(repository, {
+      const aiConfig = aiConfigs.find((config) => config.id === activeAIConfig);
+      const aiService = aiConfig
+        && aiConfig.apiKeyStatus !== 'decrypt_failed'
+        && aiConfig.apiKeyStatus !== 'empty'
+        && aiConfig.baseUrl
+        && aiConfig.apiKey
+        && aiConfig.model
+        ? new AIService(aiConfig, language)
+        : null;
+      const result = await runSimilarRepositoryPipeline({
+        source: repository,
+        repositories,
+        vectorConfig: vectorSearchConfig,
         embeddingClient,
+        embeddingConfig: activeConfig,
         vectorService,
-        allRepos: repositories,
-        topK: vectorSearchConfig.searchTopK ?? 30,
-        threshold: vectorSearchConfig.searchThreshold ?? 0.35,
+        aiService,
+        crossEncoder: new CrossEncoderReranker(activeConfig),
         readmeFetcher,
-        indexMode: vectorSearchConfig.indexMode,
-        readmeMaxChars: vectorSearchConfig.readmeMaxChars,
+        signal: controller.signal,
       });
+      if (
+        controller.signal.aborted
+        || similarityAbortRef.current !== controller
+      ) {
+        throw new DOMException('Similar search superseded', 'AbortError');
+      }
 
-      enterSimilarView(similar, repository);
+      enterSimilarView(result.repositories, repository);
 
-      if (similar.length === 0) {
+      if (result.repositories.length === 0) {
         toast(t('useRepositoryCardActions.no-similar-repositories-found'), 'info');
       }
     } catch (error) {
+      if (isAbortError(error) || controller.signal.aborted) return;
       console.error('Find similar repositories failed:', error);
       const errorMessage = error instanceof Error && error.message
         ? error.message
         : (t('useRepositoryCardActions.failed-to-find-similar-repositories-please-check'));
       toast(errorMessage, 'error');
     } finally {
-      setIsFindingSimilar(false);
+      if (similarityAbortRef.current === controller) {
+        similarityAbortRef.current = null;
+        setIsFindingSimilar(false);
+      }
     }
   }, [
+    activeAIConfig,
     activeEmbeddingConfig,
+    aiConfigs,
     embeddingConfigs,
     enterSimilarView,
     githubToken,
     isFindingSimilar,
+    language,
     repositories,
     repository,
     toast,

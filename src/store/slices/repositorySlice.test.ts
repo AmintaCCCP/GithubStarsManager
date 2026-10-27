@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { beforeEach } from 'vitest';
 import type { Category, Repository } from '../../types';
-import { defaultCategories } from '../schema';
+import { defaultCategories, initialSearchFilters } from '../schema';
 import { createRepositorySlice } from './repositorySlice';
 import { logger } from '../../services/logger';
 import { GITHUB_LISTS_MAX_COUNT, GITHUB_LISTS_NAME_MAX_LENGTH } from '../helpers/listsPushPlan';
@@ -161,6 +161,45 @@ describe('pushCategoriesToLists 语言切换自动重命名', () => {
 
     expect(api.createUserList).toHaveBeenCalledWith('Development Tools', true);
     expect(state.categoryListIdMap.devtools).toBe('L_new');
+  });
+});
+
+describe('similar repository view sorting', () => {
+  it('preserves the user sort while clearing filters when entering and exiting similar view', () => {
+    const state: Record<string, unknown> = {
+      searchFilters: {
+        ...initialSearchFilters,
+        query: 'react',
+        languages: ['TypeScript'],
+        sortBy: 'updated',
+        sortOrder: 'asc',
+      },
+      searchResults: [makeRepo({ id: 2 })],
+      similarView: null,
+    };
+    const set = (partial: unknown) => {
+      const next = typeof partial === 'function'
+        ? (partial as (current: Record<string, unknown>) => Record<string, unknown>)(state)
+        : partial as Record<string, unknown>;
+      Object.assign(state, next);
+    };
+    const slice = createRepositorySlice(set as never, (() => state) as never);
+
+    slice.enterSimilarView([makeRepo()], makeRepo());
+
+    expect(state.searchFilters).toMatchObject({
+      query: '',
+      languages: [],
+      sortBy: 'updated',
+      sortOrder: 'asc',
+    });
+
+    slice.exitSimilarView();
+
+    expect(state.searchFilters).toMatchObject({
+      sortBy: 'updated',
+      sortOrder: 'asc',
+    });
   });
 });
 

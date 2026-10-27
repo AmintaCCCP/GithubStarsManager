@@ -74,13 +74,20 @@ const RepositoriesView = React.memo(({
   const isActive = hasActiveSearchFilters(searchFilters);
   const similarView = useAppStore((state) => state.similarView);
   const exitSimilarView = useAppStore((state) => state.exitSimilarView);
+  // Similar view preserves the user's sort preference, which is not a search
+  // filter and must not trigger the "search takes precedence" exit.
+  const hasActiveQueryOrFilter = hasActiveSearchFilters({
+    ...searchFilters,
+    sortBy: 'stars',
+    sortOrder: 'desc',
+  });
 
   // 相似视图下用户发起搜索时，自动退出相似视图（搜索优先于相似浏览，避免界面歧义）
   useEffect(() => {
-    if (similarView?.active && isActive) {
+    if (similarView?.active && hasActiveQueryOrFilter) {
       exitSimilarView();
     }
-  }, [similarView?.active, isActive, exitSimilarView]);
+  }, [similarView?.active, hasActiveQueryOrFilter, exitSimilarView]);
 
   // 相似仓库视图激活时，列表数据源切换为相似结果，且忽略分类过滤
   const listRepositories = similarView?.active

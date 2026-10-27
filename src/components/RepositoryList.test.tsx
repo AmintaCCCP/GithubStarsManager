@@ -19,7 +19,11 @@ vi.mock('./RepositoryCard', () => ({
   ),
 }));
 
-vi.mock('./SimilarViewBanner', () => ({ SimilarViewBanner: () => null }));
+vi.mock('./SimilarViewBanner', () => ({
+  SimilarViewBanner: ({ onReset }: { onReset: () => void }) => (
+    <button type="button" onClick={onReset}>重置相似仓库</button>
+  ),
+}));
 vi.mock('./BulkActionToolbar', () => ({ BulkActionToolbar: () => null }));
 vi.mock('./BulkCategorizeModal', () => ({ BulkCategorizeModal: () => null }));
 vi.mock('./BulkRestoreModal', () => ({ BulkRestoreModal: () => null }));
@@ -138,6 +142,23 @@ describe('RepositoryList view mode controls', () => {
       'second-by-vector-score',
       'repository-one',
     ]);
+  });
+
+  it('keeps the similar-view reset control visible when no similar repositories are found', () => {
+    storeState.similarView = {
+      active: true,
+      anchorRepoFullName: repository.full_name,
+      anchorRepoName: repository.name,
+      similarResults: [],
+      originalSearchResults: [],
+      originalSearchFilters: searchFilters,
+    } as never;
+
+    render(<RepositoryList repositories={[]} selectedCategory="all" />);
+
+    expect(screen.getByText('未找到相似的仓库。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重置相似仓库' }));
+    expect(storeState.resetSimilarView).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the established grid as default and switches cards to the compact list mode', () => {

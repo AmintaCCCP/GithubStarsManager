@@ -70,6 +70,7 @@ describe('vectorSearchPipeline', () => {
     vi.useFakeTimers();
     try {
       let stageSignal: AbortSignal | undefined;
+      const onTimeout = vi.fn();
       const result = withBudget(
         signal => {
           stageSignal = signal;
@@ -78,11 +79,13 @@ describe('vectorSearchPipeline', () => {
         100,
         new AbortController().signal,
         'timeout',
+        onTimeout,
       );
       await vi.advanceTimersByTimeAsync(100);
 
       await expect(result).resolves.toBe('timeout');
       expect(stageSignal?.aborted).toBe(true);
+      expect(onTimeout).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();
     }

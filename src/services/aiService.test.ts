@@ -733,6 +733,60 @@ describe('AIService vector query analysis and graded reranking', () => {
       lowConfidenceFacets: [],
     })));
     await expect(service.analyzeVectorSearchQuery('x')).resolves.toBeNull();
+
+    fetch.mockResolvedValueOnce(chatResponse(JSON.stringify({
+      intent: 'intent',
+      keywords: [],
+      idealDescription: '   ',
+      facets: { artifact: [], action: [], domain: [], platform: [] },
+      highPrecisionTerms: [],
+      lowConfidenceFacets: [],
+    })));
+    await expect(service.analyzeVectorSearchQuery('x')).resolves.toMatchObject({
+      intent: 'intent',
+      idealDescription: '',
+    });
+
+    fetch.mockResolvedValueOnce(chatResponse(JSON.stringify({
+      intent: 'intent',
+      keywords: [],
+      idealDescription: '   ',
+      facets: { artifact: [], action: [], domain: [], platform: [] },
+      highPrecisionTerms: [],
+      lowConfidenceFacets: [],
+    })));
+    await expect(service.analyzeSimilarRepositorySource(
+      makeRepo({ id: 1, name: 'source', full_name: 'owner/source' }),
+      '',
+    )).resolves.toBeNull();
+  });
+
+  it('builds a bounded source profile prompt without popularity or repository identity', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(chatResponse(JSON.stringify({
+      intent: 'optimize GitHub README files',
+      keywords: ['github', 'readme', 'skill'],
+      idealDescription: 'A peer agent skill for README quality.',
+      facets: { artifact: ['skill'], action: ['optimize'], domain: ['readme'], platform: ['codex'] },
+      highPrecisionTerms: ['readme', 'skill'],
+      lowConfidenceFacets: [],
+    })));
+    const repo = makeRepo({
+      id: 101,
+      name: 'readme-brand',
+      full_name: 'acme/readme-brand',
+      description: 'Agent skill for README quality',
+      ai_tags: ['skill'],
+      stargazers_count: 99999,
+    });
+    const result = await new AIService(makeConfig() as never, 'zh')
+      .analyzeSimilarRepositorySource(repo, '# README mention', undefined);
+    const [, init] = (window.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const messages = JSON.parse(String(init.body)).messages as Array<{ content: string }>;
+    const prompt = messages.map(message => message.content).join('\n');
+
+    expect(result?.idealDescription).toContain('peer agent skill');
+    expect(prompt).not.toContain('acme/readme-brand');
+    expect(prompt).not.toContain('99999');
   });
 
   it('accepts complete grades by real ID or ordinal and distinguishes empty', () => {
@@ -794,6 +848,43 @@ describe('AIService vector query analysis and graded reranking', () => {
 
     expect(result).toEqual({ status: 'empty', grades: new Map() });
     expect(window.fetch).not.toHaveBeenCalled();
+  });
+
+  it('reranks similar repositories from the cleaned peer profile only', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      chatResponse('{"grades":[{"id":101,"grade":2},{"id":202,"grade":0}]}'),
+    );
+    const repos = [
+      makeRepo({ id: 101, name: 'a', full_name: 'acme/a', stargazers_count: 99999 }),
+      makeRepo({ id: 202, name: 'b', full_name: 'acme/b' }),
+    ];
+    const result = await new AIService(makeConfig() as never, 'zh').rerankSimilarRepositoriesGraded(
+      makeRepo({ id: 999, name: 'private-brand', full_name: 'source-owner/private-brand' }),
+      repos,
+      {
+        intent: 'maintain README documentation',
+        keywords: ['readme', 'documentation'],
+        idealDescription: 'A peer documentation maintenance skill.',
+        facets: {
+          artifact: ['skill'],
+          action: ['maintain'],
+          domain: ['readme'],
+          platform: ['codex'],
+        },
+        highPrecisionTerms: ['readme', 'skill'],
+        lowConfidenceFacets: [],
+      },
+      undefined,
+    );
+    const [, init] = (window.fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    const messages = JSON.parse(String(init.body)).messages as Array<{ content: string }>;
+    const prompt = messages.map(message => message.content).join('\n');
+
+    expect(result?.status).toBe('complete');
+    expect(prompt).toContain('Source intent: maintain README documentation');
+    expect(prompt).not.toContain('source-owner/private-brand');
+    expect(prompt).not.toContain('99999');
+    expect(prompt).not.toContain('RRF');
   });
 
   it('parses JSON that follows an inline <think> chain', async () => {

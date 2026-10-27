@@ -21,6 +21,15 @@ const mocks = vi.hoisted(() => {
     repositories: [],
     githubToken: 'ghp-local-token',
     setSelectedCategory: vi.fn(),
+    similarView: null as null | {
+      active: boolean;
+      anchorRepoFullName: string;
+      anchorRepoName: string;
+      similarResults: unknown[];
+      originalSearchResults: unknown[];
+      originalSearchFilters: Record<string, unknown>;
+    },
+    exitSimilarView: vi.fn(),
   };
 
   return {
@@ -175,5 +184,29 @@ describe('App backend initialization', () => {
       expect(screen.getByTestId(testId)).toBeInTheDocument();
       expect(mocks.loadedViews).toContain(currentView);
     }
+  });
+
+  it('keeps similar view active when only its preserved sort differs from defaults', async () => {
+    vi.useRealTimers();
+    mocks.storeState.searchFilters = {
+      ...mocks.storeState.searchFilters,
+      sortBy: 'updated',
+      sortOrder: 'asc',
+    };
+    mocks.storeState.similarView = {
+      active: true,
+      anchorRepoFullName: 'owner/anchor',
+      anchorRepoName: 'anchor',
+      similarResults: [],
+      originalSearchResults: [],
+      originalSearchFilters: { sortBy: 'updated', sortOrder: 'asc' },
+    };
+
+    render(<App />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mocks.storeState.exitSimilarView).not.toHaveBeenCalled();
   });
 });
