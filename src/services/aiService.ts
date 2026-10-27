@@ -2222,7 +2222,10 @@ each facet <= 6 values, highPrecisionTerms <= 8.`;
   }
 
   /** Parse the shared query/source-profile JSON contract without partial recovery. */
-  private parseVectorQueryAnalysis(content: string): VectorQueryAnalysis | null {
+  private parseVectorQueryAnalysis(
+    content: string,
+    options: { requireNonEmptyText?: boolean } = {},
+  ): VectorQueryAnalysis | null {
     const parsed = this.extractAndParseAIJson(content);
     if (!parsed || typeof parsed.intent !== 'string' || typeof parsed.idealDescription !== 'string') {
       return null;
@@ -2252,7 +2255,7 @@ each facet <= 6 values, highPrecisionTerms <= 8.`;
 
     const intent = parsed.intent.trim();
     const idealDescription = parsed.idealDescription.trim();
-    if (!intent || !idealDescription) return null;
+    if (options.requireNonEmptyText && (!intent || !idealDescription)) return null;
 
     const strings = (values: unknown[], limit: number, lowercase = false): string[] => {
       const normalized = values
@@ -2336,7 +2339,7 @@ each facet <= 6 values, highPrecisionTerms <= 8, lowConfidenceFacets <= 4.`;
         : 1200,
       signal,
     });
-    return this.parseVectorQueryAnalysis(content);
+    return this.parseVectorQueryAnalysis(content, { requireNonEmptyText: true });
   }
 
   /**

@@ -27,6 +27,7 @@ import {
 
 const README_TIMEOUT_MS = 5000;
 const FACET_NAMES = ['artifact', 'action', 'domain', 'platform'] as const;
+const GENERIC_PROFILE_INTENT = 'software repository';
 
 interface DenseOutcome {
   matches: VectorQueryResult[];
@@ -219,7 +220,7 @@ export function buildLocalSimilarityProfile(source: Repository): VectorQueryAnal
     lowConfidenceFacets: [],
   };
   return normalizeSimilarityAnalysis(generic, source, { allowEmptyIdeal: true }) || {
-    intent: 'software repository',
+    intent: GENERIC_PROFILE_INTENT,
     keywords: [],
     idealDescription: '',
     facets: { artifact: [], action: [], domain: [], platform: [] },
@@ -230,9 +231,10 @@ export function buildLocalSimilarityProfile(source: Repository): VectorQueryAnal
 
 function hasUsableProfile(analysis: VectorQueryAnalysis): boolean {
   return Boolean(
-    analysis.intent
+    (analysis.intent && analysis.intent !== GENERIC_PROFILE_INTENT)
     || analysis.idealDescription
     || analysis.keywords.length > 0
+    || analysis.highPrecisionTerms.length > 0
     || Object.values(analysis.facets).some(values => values.length > 0),
   );
 }
@@ -240,8 +242,13 @@ function hasUsableProfile(analysis: VectorQueryAnalysis): boolean {
 export function buildSimilarityRerankQuery(
   source: Repository,
   analysis: VectorQueryAnalysis | null,
+  readmeExcerpt = '',
 ): string {
-  if (!analysis || !hasUsableProfile(analysis)) return buildCrossEncoderDocument(source);
+  if (!analysis || !hasUsableProfile(analysis)) {
+    const metadata = buildCrossEncoderDocument(source).slice(0, 700);
+    const readme = readmeExcerpt.trim().replace(/\s+/g, ' ').slice(0, 900);
+    return [metadata, readme && `README: ${readme}`].filter(Boolean).join('\n');
+  }
   return [
     analysis.intent,
     analysis.idealDescription,
@@ -253,6 +260,19 @@ export function buildSimilarityRerankQuery(
 function buildSimilarityLexicalQuery(analysis: VectorQueryAnalysis): string {
   if (analysis.keywords.length > 0) return analysis.keywords.join(' ');
   return [...analysis.facets.artifact, ...analysis.facets.domain, ...analysis.facets.platform].join(' ');
+}
+
+function compactRepoName(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+function isSameOwnerBrandVariant(source: Repository, candidate: Repository): boolean {
+  if (source.owner.login.toLowerCase() !== candidate.owner.login.toLowerCase()) return false;
+  const sourceName = compactRepoName(source.name);
+  const candidateName = compactRepoName(candidate.name);
+  return sourceName.length >= 5
+    && candidateName.length > sourceName.length
+    && candidateName.startsWith(sourceName);
 }
 
 function buildEligibleRepositories(
@@ -267,6 +287,7 @@ function buildEligibleRepositories(
       id === String(source.id)
       || repo.full_name.trim().toLowerCase() === sourceFullName
       || repo.fork === true
+      || isSameOwnerBrandVariant(source, repo)
       || seen.has(id)
     ) {
       return false;
@@ -454,18 +475,23 @@ export async function runSimilarRepositoryPipeline(
     );
   }
 
-  const ceQueryFallback = !hasUsableProfile(profile);
-  const ceQuery = ceQueryFallback
-    ? buildCrossEncoderDocument(source)
-    : buildSimilarityRerankQuery(source, profile);
+  const profileUsable = hasUsableProfile(profile);
+  const ceQueryFallback = !profileUsable;
+  const ceQuery = buildSimilarityRerankQuery(
+    source,
+    profileUsable ? profile : null,
+    readme,
+  );
   const finished = await finishRankedCandidates({
     fused,
     vectorConfig,
     signal,
-    analysis: profile,
+    analysis: profileUsable ? profile : null,
     ceQuery,
     crossEncoder: options.crossEncoder,
-    rerankCandidates: options.aiService && vectorConfig.enableReranking !== false
+    rerankCandidates: profileUsable
+      && options.aiService
+      && vectorConfig.enableReranking !== false
       ? (candidates, _query, rerankAnalysis, stageSignal) => (
           options.aiService!.rerankSimilarRepositoriesGraded(
             source,

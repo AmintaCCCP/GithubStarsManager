@@ -8,6 +8,7 @@ import {
   normalizeSimilarityAnalysis,
   runSimilarRepositoryPipeline,
 } from './similarRepositoryPipeline';
+import type { CrossEncoderReranker } from './crossEncoderReranker';
 import type { EmbeddingClient, VectorSearchService } from './vectorSearchService';
 import {
   chooseFinalOrder,
@@ -141,6 +142,7 @@ describe('similarRepositoryPipeline', () => {
     const duplicate = makeRepo({ id: 3, full_name: 'peer/duplicate' });
     const fork = makeRepo({ id: 4, full_name: 'peer/fork', fork: true });
     const sameName = makeRepo({ id: 5, full_name: 'ACME/SOURCE' });
+    const brandVariant = makeRepo({ id: 6, full_name: 'acme/source-pro' });
     const valid = makeRepo({ id: 2, full_name: 'peer/valid' });
     const query = vi.fn().mockResolvedValue([
       { id: '1', score: 1, metadata: {} },
@@ -148,13 +150,14 @@ describe('similarRepositoryPipeline', () => {
       { id: '3', score: 0.8, metadata: {} },
       { id: '4', score: 0.95, metadata: {} },
       { id: '5', score: 0.94, metadata: {} },
+      { id: '6', score: 0.93, metadata: {} },
       { id: '999', score: 0.99, metadata: {} },
       { id: '2', score: 0.7, metadata: {} },
     ]);
 
     const result = await runSimilarRepositoryPipeline({
       source,
-      repositories: [source, duplicate, fork, sameName, valid],
+      repositories: [source, duplicate, fork, sameName, brandVariant, valid],
       vectorConfig: { ...vectorConfig, enableHyDE: false },
       embeddingConfig,
       aiService: null,
@@ -166,6 +169,53 @@ describe('similarRepositoryPipeline', () => {
 
     expect(result.repositories.map(repo => repo.id)).toEqual([3, 2]);
     expect(result.repositories.filter(repo => repo.id === 3)).toHaveLength(1);
+    expect(result.repositories.some(repo => repo.id === brandVariant.id)).toBe(false);
+  });
+
+  it('uses README context for cross-encoder when the local profile has no domain evidence', async () => {
+    const source = makeRepo({ id: 1, full_name: 'owner/empty', description: '' });
+    const repositories = [
+      makeRepo({ id: 2, full_name: 'peer/first' }),
+      makeRepo({ id: 3, full_name: 'peer/second' }),
+    ];
+    const crossEncoder = {
+      isAvailable: vi.fn(() => true),
+      rerank: vi.fn(async () => [
+        { id: '3', score: 1, rank: 1 },
+        { id: '2', score: 0.5, rank: 2 },
+      ]),
+    } as unknown as CrossEncoderReranker;
+
+    const result = await runSimilarRepositoryPipeline({
+      source,
+      repositories,
+      vectorConfig: { ...vectorConfig, enableHyDE: false },
+      embeddingConfig,
+      aiService: null,
+      embeddingClient: { embed: vi.fn().mockResolvedValue([[0.1]]) } as unknown as EmbeddingClient,
+      vectorService: {
+        query: vi.fn().mockResolvedValue([
+          { id: '2', score: 0.9, metadata: {} },
+          { id: '3', score: 0.8, metadata: {} },
+        ]),
+      } as unknown as VectorSearchService,
+      crossEncoder,
+      readmeFetcher: vi.fn().mockResolvedValue('# Terminal file browser\nManage files from a TUI.'),
+      signal: new AbortController().signal,
+    });
+
+    expect(crossEncoder.rerank).toHaveBeenCalledWith(
+      expect.stringContaining('Terminal file browser'),
+      expect.any(Array),
+      expect.any(AbortSignal),
+    );
+    expect(crossEncoder.rerank).not.toHaveBeenCalledWith(
+      expect.stringContaining('software repository'),
+      expect.any(Array),
+      expect.any(AbortSignal),
+    );
+    expect(result.diagnostics.ceQueryFallback).toBe(true);
+    expect(result.repositories.map(repo => repo.id)).toEqual([3, 2]);
   });
 
   it('normalizes brand and language leakage from AI and local profiles', () => {

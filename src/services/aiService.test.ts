@@ -742,7 +742,23 @@ describe('AIService vector query analysis and graded reranking', () => {
       highPrecisionTerms: [],
       lowConfidenceFacets: [],
     })));
-    await expect(service.analyzeVectorSearchQuery('x')).resolves.toBeNull();
+    await expect(service.analyzeVectorSearchQuery('x')).resolves.toMatchObject({
+      intent: 'intent',
+      idealDescription: '',
+    });
+
+    fetch.mockResolvedValueOnce(chatResponse(JSON.stringify({
+      intent: 'intent',
+      keywords: [],
+      idealDescription: '   ',
+      facets: { artifact: [], action: [], domain: [], platform: [] },
+      highPrecisionTerms: [],
+      lowConfidenceFacets: [],
+    })));
+    await expect(service.analyzeSimilarRepositorySource(
+      makeRepo({ id: 1, name: 'source', full_name: 'owner/source' }),
+      '',
+    )).resolves.toBeNull();
   });
 
   it('builds a bounded source profile prompt without popularity or repository identity', async () => {
