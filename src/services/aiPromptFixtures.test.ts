@@ -160,8 +160,24 @@ const buildAIServiceFixtures = async (language: 'zh' | 'en') => {
   result.generateHyDEQuery = await captureRequests(() => makeService().generateHyDEQuery('react state management library'));
   result.analyzeVectorSearchQuery = await captureRequests(() =>
     makeService().analyzeVectorSearchQuery('优化 GitHub README 的技能'));
+  result.analyzeSimilarRepositorySource = await captureRequests(() =>
+    makeService().analyzeSimilarRepositorySource(repo, README));
   result.rerankRepositoriesGraded = await captureRequests(() =>
     makeService().rerankRepositoriesGraded([repo, repoB], 'state management', null));
+  result.rerankSimilarRepositoriesGraded = await captureRequests(() =>
+    makeService().rerankSimilarRepositoriesGraded(repo, [repoB, repo], {
+      intent: 'manage react state',
+      keywords: ['react', 'state'],
+      idealDescription: 'A peer library for managing React state.',
+      facets: {
+        artifact: ['library'],
+        action: ['manage'],
+        domain: ['react state'],
+        platform: [],
+      },
+      highPrecisionTerms: ['react', 'state'],
+      lowConfidenceFacets: [],
+    }));
   result.searchRepositoriesWithSemanticReranking = await captureRequests(() =>
     makeService().searchRepositoriesWithSemanticReranking([repo, repoB], 'state management'));
   result.searchGistsWithReranking = await captureRequests(() =>

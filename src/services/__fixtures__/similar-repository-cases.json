@@ -1,0 +1,302 @@
+{
+  "cases": [
+    {
+      "name": "README skill peer beats generic markdown tools",
+      "source": {
+        "id": 1001,
+        "full_name": "acme/readme-craft",
+        "description": "Agent skill that improves GitHub README files",
+        "topics": ["github", "readme"],
+        "ai_tags": ["skill", "documentation"],
+        "ai_platforms": ["codex", "claude code"],
+        "language": "TypeScript"
+      },
+      "analysis": {
+        "intent": "optimize GitHub README files with an agent skill",
+        "keywords": ["github", "readme", "skill", "documentation", "agent"],
+        "idealDescription": "A peer agent skill that audits and rewrites GitHub README files.",
+        "facets": {
+          "artifact": ["skill"],
+          "action": ["optimize", "audit"],
+          "domain": ["github readme", "documentation"],
+          "platform": ["codex", "claude code"]
+        },
+        "highPrecisionTerms": ["readme", "skill"],
+        "lowConfidenceFacets": []
+      },
+      "candidates": [
+        {
+          "id": 2001,
+          "full_name": "peer/readme-skill",
+          "description": "Agent skill for auditing and improving GitHub README documentation.",
+          "topics": ["github", "readme"],
+          "ai_tags": ["skill", "documentation"],
+          "ai_platforms": ["codex"],
+          "stargazers_count": 20
+        },
+        {
+          "id": 2002,
+          "full_name": "big/markdown-editor",
+          "description": "A polished markdown editor for technical writers.",
+          "topics": ["markdown", "editor"],
+          "stargazers_count": 90000
+        },
+        {
+          "id": 2003,
+          "full_name": "big/writing-assistant",
+          "description": "Popular writing assistant for README and blog content.",
+          "topics": ["writing", "readme"],
+          "stargazers_count": 120000
+        }
+      ],
+      "exactMatches": [
+        { "id": "2002", "score": 0.91 },
+        { "id": "2003", "score": 0.88 },
+        { "id": "2001", "score": 0.72 }
+      ],
+      "profileMatches": [
+        { "id": "2001", "score": 0.9 },
+        { "id": "2002", "score": 0.68 }
+      ],
+      "llmResponse": "{\"grades\":[{\"id\":2001,\"grade\":2},{\"id\":2002,\"grade\":1},{\"id\":2003,\"grade\":0}]}",
+      "expectedTopIds": ["2001", "2002"]
+    },
+    {
+      "name": "awesome-list artifact outranks popular React library",
+      "source": {
+        "id": 1010,
+        "full_name": "acme/awesome-react",
+        "description": "A curated awesome-list of React resources",
+        "topics": ["awesome-list", "react"],
+        "ai_tags": ["awesome-list", "react"],
+        "language": "Markdown"
+      },
+      "analysis": {
+        "intent": "find a curated React awesome-list",
+        "keywords": ["awesome-list", "react", "curated", "resources"],
+        "idealDescription": "A curated awesome-list collecting useful React resources.",
+        "facets": {
+          "artifact": ["awesome-list"],
+          "action": ["curate"],
+          "domain": ["react"],
+          "platform": []
+        },
+        "highPrecisionTerms": ["awesome-list"],
+        "lowConfidenceFacets": []
+      },
+      "candidates": [
+        {
+          "id": 2010,
+          "full_name": "peer/awesome-react-next",
+          "description": "Curated list of React and Next.js resources.",
+          "topics": ["awesome-list", "react"],
+          "ai_tags": ["awesome-list"],
+          "stargazers_count": 40
+        },
+        {
+          "id": 2011,
+          "full_name": "big/react-ui",
+          "description": "A popular React component library.",
+          "topics": ["react", "component-library"],
+          "stargazers_count": 150000
+        },
+        {
+          "id": 2012,
+          "full_name": "big/react-toolkit",
+          "description": "React hooks and state toolkit.",
+          "topics": ["react", "state"],
+          "stargazers_count": 80000
+        }
+      ],
+      "exactMatches": [
+        { "id": "2011", "score": 0.93 },
+        { "id": "2012", "score": 0.87 },
+        { "id": "2010", "score": 0.7 }
+      ],
+      "profileMatches": [
+        { "id": "2010", "score": 0.92 }
+      ],
+      "llmResponse": "{\"grades\":[{\"id\":2010,\"grade\":2},{\"id\":2011,\"grade\":0},{\"id\":2012,\"grade\":0}]}",
+      "expectedTopIds": ["2010"]
+    },
+    {
+      "name": "bilingual terminal file manager",
+      "source": {
+        "id": 1020,
+        "full_name": "acme/terminal-files",
+        "description": "终端文件管理器",
+        "topics": ["终端", "文件管理"],
+        "ai_tags": ["cli", "file-manager"],
+        "language": "Rust"
+      },
+      "analysis": {
+        "intent": "find a terminal file manager",
+        "keywords": ["terminal", "终端", "file manager", "文件管理器", "tui"],
+        "idealDescription": "A keyboard-driven file manager that runs in the terminal.",
+        "facets": {
+          "artifact": ["cli"],
+          "action": ["browse", "manage"],
+          "domain": ["file manager", "终端文件"],
+          "platform": ["terminal"]
+        },
+        "highPrecisionTerms": ["terminal", "file manager"],
+        "lowConfidenceFacets": []
+      },
+      "candidates": [
+        {
+          "id": 2020,
+          "full_name": "peer/tui-files",
+          "description": "TUI file browser and terminal file manager.",
+          "topics": ["tui", "file-manager", "terminal"],
+          "ai_tags": ["cli"],
+          "stargazers_count": 30
+        },
+        {
+          "id": 2021,
+          "full_name": "big/file-upload",
+          "description": "A web service for uploading and sharing files.",
+          "topics": ["upload", "files"],
+          "stargazers_count": 70000
+        },
+        {
+          "id": 2022,
+          "full_name": "big/cloud-drive",
+          "description": "Cloud storage and file sharing application.",
+          "topics": ["cloud", "files"],
+          "stargazers_count": 90000
+        }
+      ],
+      "exactMatches": [
+        { "id": "2021", "score": 0.89 },
+        { "id": "2022", "score": 0.85 },
+        { "id": "2020", "score": 0.74 }
+      ],
+      "profileMatches": [
+        { "id": "2020", "score": 0.91 }
+      ],
+      "llmResponse": "{\"grades\":[{\"id\":2020,\"grade\":2},{\"id\":2021,\"grade\":0},{\"id\":2022,\"grade\":0}]}",
+      "expectedTopIds": ["2020"]
+    },
+    {
+      "name": "MCP server peer stays ahead of ORM and database UI",
+      "source": {
+        "id": 1030,
+        "full_name": "acme/postgres-mcp",
+        "description": "MCP server for querying PostgreSQL",
+        "topics": ["mcp", "postgresql", "database"],
+        "ai_tags": ["mcp", "database"],
+        "ai_platforms": ["codex", "claude code"],
+        "language": "TypeScript"
+      },
+      "analysis": {
+        "intent": "find an MCP server that exposes database access",
+        "keywords": ["mcp", "server", "database", "sql", "postgresql"],
+        "idealDescription": "A peer MCP server that exposes database tools to coding agents.",
+        "facets": {
+          "artifact": ["mcp"],
+          "action": ["query"],
+          "domain": ["database", "sql"],
+          "platform": ["codex", "claude code"]
+        },
+        "highPrecisionTerms": ["mcp", "database"],
+        "lowConfidenceFacets": []
+      },
+      "candidates": [
+        {
+          "id": 2030,
+          "full_name": "peer/mysql-mcp",
+          "description": "MCP server exposing MySQL query tools.",
+          "topics": ["mcp", "mysql", "database"],
+          "ai_tags": ["mcp", "database"],
+          "ai_platforms": ["codex"],
+          "stargazers_count": 50
+        },
+        {
+          "id": 2031,
+          "full_name": "big/sql-orm",
+          "description": "ORM for SQL databases.",
+          "topics": ["orm", "database", "sql"],
+          "stargazers_count": 100000
+        },
+        {
+          "id": 2032,
+          "full_name": "big/db-gui",
+          "description": "Database management GUI.",
+          "topics": ["database", "gui"],
+          "stargazers_count": 60000
+        }
+      ],
+      "exactMatches": [
+        { "id": "2031", "score": 0.9 },
+        { "id": "2032", "score": 0.84 },
+        { "id": "2030", "score": 0.77 }
+      ],
+      "profileMatches": [
+        { "id": "2030", "score": 0.93 }
+      ],
+      "llmResponse": "{\"grades\":[{\"id\":2030,\"grade\":2},{\"id\":2031,\"grade\":1},{\"id\":2032,\"grade\":1}]}",
+      "expectedTopIds": ["2030", "2031", "2032"]
+    },
+    {
+      "name": "identity hygiene",
+      "source": {
+        "id": 1040,
+        "full_name": "acme/readme-skill",
+        "description": "AI agent skill for GitHub README documentation",
+        "topics": ["github", "readme"],
+        "ai_tags": ["skill", "documentation"],
+        "language": "TypeScript",
+        "license": "MIT"
+      },
+      "analysis": {
+        "intent": "acme/readme-skill",
+        "keywords": ["acme", "readme-skill", "typescript", "skill", "readme"],
+        "idealDescription": "acme/readme-skill is a peer repository.",
+        "facets": {
+          "artifact": ["skill"],
+          "action": [],
+          "domain": ["readme"],
+          "platform": []
+        },
+        "highPrecisionTerms": ["acme", "readme-skill", "typescript", "skill"],
+        "lowConfidenceFacets": []
+      },
+      "candidates": [
+        {
+          "id": 2040,
+          "full_name": "peer/docs-skill",
+          "description": "Agent skill for maintaining documentation.",
+          "topics": ["documentation", "skill"],
+          "ai_tags": ["skill"],
+          "stargazers_count": 20
+        },
+        {
+          "id": 2041,
+          "full_name": "peer/readme-helper",
+          "description": "Agent tool for README checks.",
+          "topics": ["readme", "agent"],
+          "ai_tags": ["tool"],
+          "stargazers_count": 15
+        },
+        {
+          "id": 2042,
+          "full_name": "peer/docs-helper",
+          "description": "Documentation assistant.",
+          "topics": ["documentation"],
+          "stargazers_count": 10
+        }
+      ],
+      "exactMatches": [
+        { "id": "1040", "score": 1 },
+        { "id": "2040", "score": 0.88 },
+        { "id": "2040", "score": 0.86 },
+        { "id": "2041", "score": 0.82 },
+        { "id": "9999", "score": 0.99 },
+        { "id": "2042", "score": 0.75 }
+      ],
+      "profileMatches": [],
+      "llmResponse": "{\"grades\":[{\"id\":2040,\"grade\":2},{\"id\":2041,\"grade\":1},{\"id\":2042,\"grade\":1}]}",
+      "expectedTopIds": ["2040", "2041", "2042"]
+    }
+  ]
+}
