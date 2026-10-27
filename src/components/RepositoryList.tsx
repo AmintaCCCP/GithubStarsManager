@@ -534,12 +534,23 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
     return (
       <>
+        {similarView?.active && (
+          <div className="mb-5">
+            <SimilarViewBanner
+              anchorRepoName={similarView.anchorRepoName}
+              onReset={resetSimilarView}
+              language={language}
+            />
+          </div>
+        )}
         <div className="ui-empty-state flex flex-col items-center px-6 py-14 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <SearchX className="h-5 w-5" aria-hidden="true" />
           </div>
           <p className="font-medium text-foreground">
-          {searchFilters?.query ? (
+          {similarView?.active ? (
+            t('useRepositoryCardActions.no-similar-repositories-found')
+          ) : searchFilters?.query ? (
             t('repositoryList.no-repositories-found-for-v1', { v1: searchFilters.query })
           ) : selectedCategory === 'all'
             ? (t('repositoryList.no-repositories-found'))
@@ -547,15 +558,17 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
               )
           }
         </p>
-        <p className="mt-1.5 max-w-md text-sm text-muted-foreground dark:text-muted-foreground">
-          {searchFilters?.query ? (
-            t('repositoryList.try-different-keywords-use-ai-search-for-semanti')
-          ) : selectedCategory === 'all'
-            ? (t('repositoryList.click-sync-to-load-your-starred-repositories'))
-            : (t('repositoryList.switch-to-another-category-or-sync-to-load-more')
-              )
-          }
-        </p>
+        {!similarView?.active && (
+          <p className="mt-1.5 max-w-md text-sm text-muted-foreground dark:text-muted-foreground">
+            {searchFilters?.query ? (
+              t('repositoryList.try-different-keywords-use-ai-search-for-semanti')
+            ) : selectedCategory === 'all'
+              ? (t('repositoryList.click-sync-to-load-your-starred-repositories'))
+              : (t('repositoryList.switch-to-another-category-or-sync-to-load-more')
+                )
+            }
+          </p>
+        )}
         {hasActiveNonQueryFilters && (
           <Button
             type="button"

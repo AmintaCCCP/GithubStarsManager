@@ -445,8 +445,12 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
           originalSearchResults: state.similarView?.originalSearchResults ?? state.searchResults,
           originalSearchFilters: state.similarView?.originalSearchFilters ?? state.searchFilters,
         },
-        // 进入相似视图时清空搜索条件，避免与搜索结果混淆（相似视图是列表的"替代"视图）
-        searchFilters: { ...initialSearchFilters },
+        // 进入相似视图时清空搜索条件，但保留用户选择的排序。
+        searchFilters: {
+          ...initialSearchFilters,
+          sortBy: state.searchFilters.sortBy,
+          sortOrder: state.searchFilters.sortOrder,
+        },
       })),
       /**
        * 重置相似视图：恢复进入前的搜索结果与条件（回到"查找相似之前"的状态）。

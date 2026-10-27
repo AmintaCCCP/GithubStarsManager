@@ -475,6 +475,14 @@ describe('RepositoryCard view modes', () => {
     expect(footer?.parentElement).toHaveClass('mt-4');
   });
 
+  it('hides the last-pushed text while the similar-repository status is active', () => {
+    actionMocks.actions.isFindingSimilar = true;
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
+
+    expect(screen.getByTitle('查找相似仓库')).toHaveClass('opacity-100', 'pointer-events-auto');
+    expect(screen.getByText(/最近提交/)).toHaveClass('invisible');
+  });
+
   it('collapses trailing grid actions into a more-actions menu when the card is narrow', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('grid', { onAskRepository: vi.fn() });

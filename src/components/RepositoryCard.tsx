@@ -1362,11 +1362,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
         <div className={viewMode === 'list' ? 'basis-full flex-none' : 'mt-4'}>
         <div className={`flex items-center justify-between text-muted-foreground dark:text-muted-foreground border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
-          <div className="relative flex min-w-0 items-center gap-1.5 leading-none">
+          <div className="group/footer relative flex min-w-0 items-center gap-1.5 leading-none">
             {isRepositoryCardFieldVisible(cardFields, 'lastUpdated') && (
             <>
-            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`} />
-            <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? 'group-hover:opacity-0' : ''}`}>
+            <Calendar className={`w-4 h-4 flex-shrink-0 transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? `group-hover:opacity-0 group-hover:invisible group-focus-within/footer:opacity-0 group-focus-within/footer:invisible ${isFindingSimilar ? 'invisible' : ''}` : ''}`} />
+            <span className={`truncate transition-opacity duration-150 ${viewMode === 'grid' && vectorSearchAvailable && !selectionMode ? `group-hover:opacity-0 group-hover:invisible group-focus-within/footer:opacity-0 group-focus-within/footer:invisible ${isFindingSimilar ? 'invisible' : ''}` : ''}`}>
               {t('repositoryCard.last-pushed-time', { time: formatDistanceToNow(new Date(repository.pushed_at || repository.updated_at), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
             </span>
             </>
@@ -1380,7 +1380,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                   handleFindSimilar();
                 }}
                 disabled={isFindingSimilar}
-                className="absolute -inset-y-1 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline"
+                className={`absolute -inset-y-1 left-0 flex h-auto items-center space-x-1 text-primary dark:text-primary font-medium transition-opacity duration-150 hover:underline disabled:cursor-not-allowed disabled:hover:no-underline ${isFindingSimilar ? 'opacity-100 pointer-events-auto' : 'opacity-0 group-hover:opacity-100 group-focus-within/footer:opacity-100 focus-visible:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within/footer:pointer-events-auto focus-visible:pointer-events-auto'}`}
                 title={t('repositoryCard.find-similar-repositories-2')}
               >
                 {isFindingSimilar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
