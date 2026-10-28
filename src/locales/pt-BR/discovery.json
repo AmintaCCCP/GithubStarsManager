@@ -23,9 +23,13 @@
     "just-now": "apenas",
     "m-ago": "minutos atrás",
     "h-ago": "horas atrás",
+    "discovery-label": "Descoberta",
     "discovery-channels": "canal de descoberta",
     "manage-channels": "Gerenciar canais de descoberta",
-    "refresh-all": "Atualizar tudo"
+    "refresh-all": "Atualizar tudo",
+    "channels-section": "Canais",
+    "sources-section": "Fontes",
+    "channel-count": "{{count}} itens"
   },
   "discoveryView": {
     "all-loaded": "Tudo carregado",
@@ -184,6 +188,4 @@
     "stars-gained": "+{{v1}} stars desde o primeiro registro",
     "first-seen": "O primeiro foi registrado {{v1}}"
   }
-
-
 }

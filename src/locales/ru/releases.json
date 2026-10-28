@@ -43,7 +43,20 @@
     "target-branch": "Целевой филиал",
     "loading-branches": "Загрузка списка филиалов…",
     "cancel": "Отмена",
-    "sync-branch": "Подтвердить синхронизацию"
+    "sync-branch": "Подтвердить синхронизацию",
+    "filters": "Фильтры форков",
+    "fork-control-label": "Управление форками",
+    "fork-status": "Состояние форков",
+    "status": "Состояние",
+    "all-forks": "Все форки",
+    "update-available": "Доступно обновление",
+    "up-to-date": "Актуально",
+    "check-pending": "Ожидает проверки",
+    "forked-repositories": "Исходные репозитории",
+    "show-all-upstreams": "Показать все ({{count}})",
+    "show-fewer-upstreams": "Свернуть исходные репозитории",
+    "fork-count": "Форков: {{count}}",
+    "update-count": "Обновлений: {{count}}"
   },
   "releaseCard": {
     "assets-updated": "Объект обновлен",
@@ -133,6 +146,7 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "Вы также можете использовать синхронизацию склада Watch или настроить список складов в качестве источника релизов.",
     "configure-release-sources": "Настроить источник выпуска",
     "release-timeline": "График выпуска",
+    "release": "Релизы",
     "latest-releases-from-your-activereleaserepocount": "Последний выпуск из репозиториев вашей подписки {{activeReleaseRepoCount}}.",
     "pre": "Pre",
     "refresh": "обновить",
@@ -173,7 +187,12 @@
     "previous-page": "Предыдущая страница",
     "next-page": "Следующая страница",
     "last-page": "последняя страница",
-    "last-refresh-time": "Последнее обновление {{time}}"
+    "last-refresh-time": "Последнее обновление {{time}}",
+    "filters": "Фильтры релизов",
+    "inbox-label": "Входящие Release",
+    "inbox-section": "Входящие",
+    "all-releases": "Все Release",
+    "release-count": "Release: {{count}}"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "Для этого выпуска нет загружаемых ресурсов.",

@@ -43,7 +43,20 @@
     "target-branch": "Rama objetivo",
     "loading-branches": "Cargando lista de sucursales…",
     "cancel": "Cancelar",
-    "sync-branch": "Confirmar sincronización"
+    "sync-branch": "Confirmar sincronización",
+    "filters": "Filtros de forks",
+    "fork-control-label": "Control de forks",
+    "fork-status": "Estado de forks",
+    "status": "Estado",
+    "all-forks": "Todos los forks",
+    "update-available": "Actualización disponible",
+    "up-to-date": "Al día",
+    "check-pending": "Comprobación pendiente",
+    "forked-repositories": "Repositorios de origen",
+    "show-all-upstreams": "Mostrar los {{count}}",
+    "show-fewer-upstreams": "Mostrar menos repositorios",
+    "fork-count": "{{count}} bifurcaciones",
+    "update-count": "{{count}} actualizaciones"
   },
   "releaseCard": {
     "assets-updated": "Activo actualizado",
@@ -133,6 +146,7 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "También puede utilizar la sincronización del almacén de Watch o personalizar la lista del almacén como fuente de lanzamiento.",
     "configure-release-sources": "Configurar fuente de lanzamiento",
     "release-timeline": "Cronograma de lanzamiento",
+    "release": "Lanzamientos",
     "latest-releases-from-your-activereleaserepocount": "Última versión de sus {{activeReleaseRepoCount}} repositorios de suscripción",
     "pre": "Pre",
     "refresh": "refrescar",
@@ -173,7 +187,12 @@
     "previous-page": "Pagina anterior",
     "next-page": "Página siguiente",
     "last-page": "última página",
-    "last-refresh-time": "Última actualización {{time}}"
+    "last-refresh-time": "Última actualización {{time}}",
+    "filters": "Filtros de releases",
+    "inbox-label": "Bandeja de Release",
+    "inbox-section": "Bandeja",
+    "all-releases": "Todas las versiones",
+    "release-count": "{{count}} versiones"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "No hay recursos descargables para esta versión.",

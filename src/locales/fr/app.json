@@ -153,7 +153,7 @@
     "hide-category-confirmation": "Masquer la confirmation de la catégorie",
     "hide-default-category-v1-this-will-not-delete-an": "Masquer la catégorie par défaut « {{v1}} » ?\n\nCela ne supprimera aucun référentiel, cela masquera simplement la catégorie par défaut sur la gauche.",
     "failed-to-hide-category-please-check-backend-con": "Échec du masquage des catégories, veuillez vérifier la connexion backend.",
-    "categories": "Classement des applications",
+    "categories": "Catégories de dépôts",
     "add-category": "Ajouter une catégorie",
     "drag-repository-cards-here-to-quickly-change-cat": "Vous pouvez faire glisser les fiches d'entrepôt ici pour changer rapidement de catégorie",
     "drop-here-to-remove-category": "Faites glisser ici pour annuler la classification",
@@ -167,7 +167,14 @@
     "delete-category": "Supprimer la catégorie",
     "hide-default-category": "Masquer les catégories par défaut",
     "drag-hint": "{{name}} – Faites glisser la fiche d'entrepôt ici pour modifier rapidement la classification",
-    "sync-failed-reverted": "Échec de la synchronisation avec le backend. La modification de catégorie a été annulée."
+    "sync-failed-reverted": "Échec de la synchronisation avec le backend. La modification de catégorie a été annulée.",
+    "category-group": "Catégories",
+    "workspace-label": "Espace de travail",
+    "quick-access": "Accès rapide",
+    "all-repositories": "Tous les dépôts",
+    "needs-review": "À trier",
+    "synced": "Synchronisé",
+    "repository-count": "{{count}} dépôts"
   },
   "codeSearchView": {
     "show-less": "fermer",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "Recherche IA"
   },
   "settingsPanel": {
+    "section-app": "Appli",
+    "section-ai-data": "IA et données",
+    "section-connection": "Connexion et diagnostic",
     "general": "Universel",
     "appearance": "Apparence",
     "star-sync": "Synchronisation des étoiles",
@@ -421,7 +431,8 @@
     "settings-content": "Définir le contenu",
     "settings": "installation",
     "close-settings": "Fermer les paramètres",
-    "settings-tabs": "Configurer les onglets"
+    "settings-tabs": "Configurer les onglets",
+    "preferences-label": "Préférences"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "Affichage",

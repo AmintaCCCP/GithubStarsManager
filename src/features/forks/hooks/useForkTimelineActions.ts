@@ -231,7 +231,11 @@ export const useForkTimelineActions = () => {
           }
         } catch {
           if (isCurrentSession(requestSession)) {
-            setNeedsSyncMap(previous => ({ ...previous, [fork.id]: false }));
+            setNeedsSyncMap(previous => {
+              const next = { ...previous };
+              delete next[fork.id];
+              return next;
+            });
           }
         }
       }));

@@ -71,7 +71,17 @@
     "sort-files": "ファイル数別",
     "category-all": "すべての要点",
     "category-starred": "要点",
-    "category-mine": "私の要点"
+    "category-mine": "私の要点",
+    "context-sidebar": "Gist コンテキストサイドバー",
+    "library-label": "Gist ライブラリ",
+    "sidebar-title": "Gist ライブラリ",
+    "scope": "範囲",
+    "analysis-status": "分析状態",
+    "analysis-all": "すべての Gist",
+    "analyzed": "分析済み",
+    "needs-analysis": "未分析",
+    "gist-count": "{{count}} 件の Gist",
+    "analyzed-count": "{{count}} 件分析済み"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub トークンが見つかりません。再度ログインしてください。",

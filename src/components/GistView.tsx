@@ -7,7 +7,21 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, FileCode2, HelpCircle, Loader2, Plus, RefreshCw, Search, Star, User, X } from 'lucide-react';
+import {
+  Bot,
+  FileCode2,
+  HelpCircle,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Search,
+  Star,
+  User,
+  X,
+  ListFilter,
+  CheckCircle2,
+  CircleDashed,
+} from 'lucide-react';
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
@@ -15,6 +29,7 @@ import { useGistActions, type GistCreateInput, type GistUpdateInput } from '../f
 import { useAppStore } from '../store/useAppStore';
 import type { Gist, GistCategoryId } from '../types';
 import { filterAndSortGists, getGistCategoryItems } from '../utils/gistUtils';
+import { WorkspacePageHeader } from './WorkspacePageHeader';
 
 const categoryIcons = {
   all: FileCode2,
@@ -62,6 +77,10 @@ export const GistView: React.FC = () => {
   }), [gists, starredGists, user?.login]);
 
   const currentCategoryItems = categoryItems[selectedGistCategory];
+  const analyzedGistCount = currentCategoryItems.filter(
+    (gist) => !!gist.analyzed_at && !gist.analysis_failed,
+  ).length;
+  const needsAnalysisGistCount = currentCategoryItems.length - analyzedGistCount;
   // 标记最近一次是 AI 重排序结果，避免随后的 query 同步触发 effect 把它覆盖掉。
   const aiRerankedRef = useRef(false);
 
@@ -98,15 +117,20 @@ export const GistView: React.FC = () => {
   };
 
   return (
-    <div className="flex w-full flex-col items-start gap-4 lg:flex-row lg:gap-6">
-      <aside className="w-full lg:w-64 lg:flex-shrink-0 lg:self-start">
-        <div className="linear-sidebar sticky top-24 z-10 p-3">
-          <div className="mb-3 flex items-center justify-between px-2">
+    <div className="route-workspace w-full">
+      <aside
+        data-context-sidebar="gists"
+        aria-label={t('gistView.context-sidebar')}
+        className="context-sidebar w-full lg:w-(--app-sidebar-width) lg:flex-shrink-0 lg:self-start lg:overflow-visible! lg:max-h-none!"
+      >
+        <div className="context-sidebar-head">
+          <div>
+            <p className="app-side-eyebrow">{t('gistView.library-label')}</p>
             <div className="flex items-center gap-1">
-              <h2 className="text-lg font-semibold text-foreground dark:text-foreground">Gist</h2>
+              <h2 className="app-side-title">{t('gistView.sidebar-title')}</h2>
               <div className="group relative">
                 <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground dark:text-muted-foreground/70" />
-                <div className="absolute left-0 top-full z-[9999] mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-border dark:bg-card dark:text-muted-foreground">
+                <div className="gist-access-help-popover absolute left-0 top-full mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-border dark:bg-card dark:text-muted-foreground">
                   <p className="mb-1 font-medium text-foreground dark:text-foreground">
                     {t('gistView.gist-access-requires-the-gist-scope')}
                   </p>
@@ -118,36 +142,103 @@ export const GistView: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="space-y-1">
-            {gistCategories.map(categoryId => {
-              const Icon = categoryIcons[categoryId];
-              const active = selectedGistCategory === categoryId;
-              return (
-                <Button
-                  key={categoryId}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setSelectedGistCategory(categoryId)}
-                  variant="ghost"
-                  className={`linear-settings-nav-item group flex w-full items-center justify-between px-3 py-2 text-sm text-muted-foreground hover:text-accent-foreground ${
-                    active ? 'is-active' : ''
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    {t(`gistView.category-${categoryId}`)}
-                  </span>
-                  <span className={`font-medium ${active ? 'text-accent-foreground' : 'text-muted-foreground group-hover:text-accent-foreground'}`}>
-                    {categoryItems[categoryId].length}
-                  </span>
-                </Button>
-              );
-            })}
+        </div>
+        <div className="context-sidebar-body">
+          <section className="app-side-section" aria-label={t('gistView.scope')}>
+            <p className="app-section-label app-side-group-label">{t('gistView.scope')}</p>
+            <div className="app-side-list">
+              {gistCategories.map(categoryId => {
+                const Icon = categoryIcons[categoryId];
+                const active = selectedGistCategory === categoryId;
+                return (
+                  <Button
+                    key={categoryId}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setSelectedGistCategory(categoryId)}
+                    variant="ghost"
+                    className="app-side-item justify-between"
+                  >
+                    <span className="app-side-item-label">
+                      <Icon className="h-4 w-4" />
+                      <span>{t(`gistView.category-${categoryId}`)}</span>
+                    </span>
+                    <span className="app-side-count">
+                      {categoryItems[categoryId].length}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="app-side-section" aria-label={t('gistView.analysis-status')}>
+            <p className="app-section-label app-side-group-label">{t('gistView.analysis-status')}</p>
+            <div className="app-side-list">
+              <Button
+                type="button"
+                aria-pressed={gistSearchFilters.isAnalyzed === undefined}
+                onClick={() => setGistSearchFilters({ isAnalyzed: undefined })}
+                variant="ghost"
+                className="app-side-item justify-between"
+              >
+                <span className="app-side-item-label">
+                  <ListFilter className="h-4 w-4" />
+                  <span>{t('gistView.analysis-all')}</span>
+                </span>
+                <span className="app-side-count">{currentCategoryItems.length}</span>
+              </Button>
+              <Button
+                type="button"
+                aria-pressed={gistSearchFilters.isAnalyzed === true}
+                onClick={() => setGistSearchFilters({ isAnalyzed: true })}
+                variant="ghost"
+                className="app-side-item justify-between"
+              >
+                <span className="app-side-item-label">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>{t('gistView.analyzed')}</span>
+                </span>
+                <span className="app-side-count">{analyzedGistCount}</span>
+              </Button>
+              <Button
+                type="button"
+                aria-pressed={gistSearchFilters.isAnalyzed === false}
+                onClick={() => setGistSearchFilters({ isAnalyzed: false })}
+                variant="ghost"
+                className="app-side-item justify-between"
+              >
+                <span className="app-side-item-label">
+                  <CircleDashed className="h-4 w-4" />
+                  <span>{t('gistView.needs-analysis')}</span>
+                </span>
+                <span className="app-side-count">{needsAnalysisGistCount}</span>
+              </Button>
+            </div>
+          </section>
+        </div>
+        <div className="context-sidebar-foot">
+          <div className="app-side-foot-status">
+            <span className="app-status-dot" aria-hidden="true" />
+            <span>{t(`gistView.category-${selectedGistCategory}`)}</span>
+          </div>
+          <div className="app-side-foot-meta">
+            <span>{t('gistView.gist-count', { count: currentCategoryItems.length })}</span>
+            <span>{t('gistView.analyzed-count', { count: analyzedGistCount })}</span>
           </div>
         </div>
       </aside>
 
-      <section className="w-full min-w-0 flex-1 space-y-5 lg:self-start">
+      <section className="workspace-content app-workspace-content w-full min-w-0 flex-1 space-y-5 lg:self-start">
+        <WorkspacePageHeader
+          eyebrow={t('gistView.library-label')}
+          title={t('app:header.menu-gists')}
+          meta={(
+            <span className="app-workspace-meta-pill">
+              {t('gistView.v1-gists', { v1: gistSearchResults.length })}
+            </span>
+          )}
+        />
         <div className="ui-toolbar p-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 flex-1 items-center gap-2">

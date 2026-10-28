@@ -153,7 +153,9 @@
     "hide-category-confirmation": "Hide Category Confirmation",
     "hide-default-category-v1-this-will-not-delete-an": "Hide default category \"{{v1}}\"?\n\nThis will not delete any repositories. It only hides this built-in category from the sidebar.",
     "failed-to-hide-category-please-check-backend-con": "Failed to hide category. Please check backend connection.",
-    "categories": "Categories",
+    "categories": "Repository categories",
+    "category-group": "Categories",
+    "workspace-label": "Workspace",
     "add-category": "Add Category",
     "drag-repository-cards-here-to-quickly-change-cat": "Drag repository cards here to quickly change category",
     "drop-here-to-remove-category": "Drop here to remove category",
@@ -167,7 +169,12 @@
     "delete-category": "Delete category",
     "hide-default-category": "Hide default category",
     "drag-hint": "{{name}} — Drag repository cards here to quickly change category",
-    "sync-failed-reverted": "Failed to sync to backend. Category change has been reverted."
+    "sync-failed-reverted": "Failed to sync to backend. Category change has been reverted.",
+    "quick-access": "Quick access",
+    "all-repositories": "All repositories",
+    "needs-review": "Needs review",
+    "synced": "Stars synced",
+    "repository-count": "{{count}} repositories"
   },
   "codeSearchView": {
     "show-less": "Show less",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "AI search"
   },
   "settingsPanel": {
+    "section-app": "Application",
+    "section-ai-data": "AI & data",
+    "section-connection": "Connection & diagnostics",
     "general": "General",
     "appearance": "Appearance",
     "star-sync": "Star Sync",
@@ -420,6 +430,7 @@
     "mcp-server": "MCP Server",
     "settings-content": "Settings content",
     "settings": "Settings",
+    "preferences-label": "Preferences",
     "close-settings": "Close settings",
     "settings-tabs": "Settings tabs"
   },

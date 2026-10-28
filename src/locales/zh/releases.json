@@ -16,6 +16,7 @@
   "forkTimeline": {
     "personal-account": "个人账号",
     "fork": "复刻",
+    "filters": "复刻筛选",
     "manage-v2-forked-repositories-for-v2": "管理 {{currentOwnerLabel}} 的 {{v2}} 个Fork仓库",
     "owner": "拥有者:",
     "v1-personal": "{{v1}}（个人）",
@@ -43,7 +44,19 @@
     "target-branch": "目标分支 (Target Branch)",
     "loading-branches": "加载分支列表中…",
     "cancel": "取消",
-    "sync-branch": "确认同步"
+    "sync-branch": "确认同步",
+    "fork-control-label": "复刻控制",
+    "fork-status": "复刻状态",
+    "status": "状态",
+    "all-forks": "全部复刻",
+    "update-available": "有更新",
+    "up-to-date": "已同步",
+    "check-pending": "待检查",
+    "forked-repositories": "上游仓库",
+    "show-all-upstreams": "显示全部 {{count}} 个",
+    "show-fewer-upstreams": "收起上游仓库",
+    "fork-count": "{{count}} 个复刻",
+    "update-count": "{{count}} 个待更新"
   },
   "releaseCard": {
     "assets-updated": "资产已更新",
@@ -133,6 +146,8 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "也可以通过 Watch 仓库同步或自定义仓库列表作为 Release 来源。",
     "configure-release-sources": "配置 Release 来源",
     "release-timeline": "Release时间线",
+    "release": "发布",
+    "filters": "发布筛选",
     "latest-releases-from-your-activereleaserepocount": "来自您的 {{activeReleaseRepoCount}} 个订阅仓库的最新Release",
     "pre": "Pre",
     "refresh": "刷新",
@@ -173,7 +188,11 @@
     "previous-page": "上一页",
     "next-page": "下一页",
     "last-page": "最后一页",
-    "last-refresh-time": "最后刷新 {{time}}"
+    "last-refresh-time": "最后刷新 {{time}}",
+    "inbox-label": "发布收件箱",
+    "inbox-section": "收件箱",
+    "all-releases": "全部 Release",
+    "release-count": "{{count}} 条 Release"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "该 Release 没有可下载的资产。",

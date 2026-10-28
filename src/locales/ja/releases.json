@@ -43,7 +43,20 @@
     "target-branch": "対象支店",
     "loading-branches": "ブランチリストをロード中…",
     "cancel": "キャンセル",
-    "sync-branch": "同期の確認"
+    "sync-branch": "同期の確認",
+    "filters": "フォークフィルター",
+    "fork-control-label": "Fork 管理",
+    "fork-status": "Fork 状態",
+    "status": "状態",
+    "all-forks": "すべてのフォーク",
+    "update-available": "更新あり",
+    "up-to-date": "最新",
+    "check-pending": "確認待ち",
+    "forked-repositories": "上流リポジトリ",
+    "show-all-upstreams": "すべて表示（{{count}}）",
+    "show-fewer-upstreams": "上流リポジトリを折りたたむ",
+    "fork-count": "{{count}} 件のフォーク",
+    "update-count": "{{count}} 件の更新"
   },
   "releaseCard": {
     "assets-updated": "アセットが更新されました",
@@ -133,6 +146,7 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "また、ウォッチ ウェアハウス同期を使用したり、リリース ソースとしてウェアハウス リストをカスタマイズしたりすることもできます。",
     "configure-release-sources": "リリースソースの構成",
     "release-timeline": "リリースタイムライン",
+    "release": "リリース",
     "latest-releases-from-your-activereleaserepocount": "{{activeReleaseRepoCount}} サブスクリプション リポジトリからの最新リリース",
     "pre": "Pre",
     "refresh": "リフレッシュする",
@@ -173,7 +187,12 @@
     "previous-page": "前のページへ",
     "next-page": "次のページ",
     "last-page": "最後のページ",
-    "last-refresh-time": "最終更新 {{time}}"
+    "last-refresh-time": "最終更新 {{time}}",
+    "filters": "リリースフィルター",
+    "inbox-label": "Release 受信トレイ",
+    "inbox-section": "受信トレイ",
+    "all-releases": "すべての Release",
+    "release-count": "{{count}} 件の Release"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "このリリースにはダウンロード可能なアセットはありません。",

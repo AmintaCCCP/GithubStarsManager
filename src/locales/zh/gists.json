@@ -50,6 +50,7 @@
     "save": "保存"
   },
   "gistView": {
+    "library-label": "Gist 库",
     "gist-access-requires-the-gist-scope": "访问 Gist 需要 gist 权限",
     "if-your-private-gists-are-missing-or-you-cannot": "若私有 gist 未拉取到，或无法新建/编辑/删除 gist，请到 GitHub → Settings → Developer settings → Personal access tokens 中确认当前 token 已勾选 gist 权限。修改权限后请重新输入 token 登录。",
     "search-gists-filenames-or-summaries": "搜索 gist、文件名或摘要",
@@ -71,7 +72,16 @@
     "sort-files": "按文件数",
     "category-all": "全部 gist",
     "category-starred": "星标 gist",
-    "category-mine": "我的 gist"
+    "category-mine": "我的 gist",
+    "context-sidebar": "Gist 上下文侧栏",
+    "sidebar-title": "Gist 分类",
+    "scope": "范围",
+    "analysis-status": "分析状态",
+    "analysis-all": "全部 Gist",
+    "analyzed": "已分析",
+    "needs-analysis": "待分析",
+    "gist-count": "{{count}} 个 Gist",
+    "analyzed-count": "{{count}} 个已分析"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub token 未找到，请重新登录。",

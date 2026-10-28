@@ -153,7 +153,7 @@
     "hide-category-confirmation": "카테고리 확인 숨기기",
     "hide-default-category-v1-this-will-not-delete-an": "기본 카테고리 \"{{v1}}\"을 숨기시겠습니까?\n\n이렇게 하면 저장소가 삭제되지 않고 왼쪽의 기본 카테고리만 숨겨집니다.",
     "failed-to-hide-category-please-check-backend-con": "카테고리를 숨길 수 없습니다. 백엔드 연결을 확인하세요.",
-    "categories": "애플리케이션 분류",
+    "categories": "리포지토리 분류",
     "add-category": "카테고리 추가",
     "drag-repository-cards-here-to-quickly-change-cat": "여기로 창고 카드를 드래그하여 카테고리를 빠르게 변경할 수 있습니다.",
     "drop-here-to-remove-category": "분류를 취소하려면 여기로 드래그하세요.",
@@ -167,7 +167,14 @@
     "delete-category": "카테고리 삭제",
     "hide-default-category": "기본 카테고리 숨기기",
     "drag-hint": "{{name}} - 분류를 빠르게 수정하려면 창고 카드를 여기로 드래그하세요.",
-    "sync-failed-reverted": "백엔드 동기화에 실패하여 카테고리 변경을 되돌렸습니다."
+    "sync-failed-reverted": "백엔드 동기화에 실패하여 카테고리 변경을 되돌렸습니다.",
+    "category-group": "카테고리",
+    "workspace-label": "워크스페이스",
+    "quick-access": "빠른 액세스",
+    "all-repositories": "모든 저장소",
+    "needs-review": "정리 필요",
+    "synced": "동기화됨",
+    "repository-count": "저장소 {{count}}개"
   },
   "codeSearchView": {
     "show-less": "닫다",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "AI 검색"
   },
   "settingsPanel": {
+    "section-app": "애플리케이션",
+    "section-ai-data": "AI 및 데이터",
+    "section-connection": "연결 및 진단",
     "general": "만능인",
     "appearance": "외관 설정",
     "star-sync": "스타싱크",
@@ -421,7 +431,8 @@
     "settings-content": "콘텐츠 설정",
     "settings": "설정",
     "close-settings": "설정 닫기",
-    "settings-tabs": "탭 설정"
+    "settings-tabs": "탭 설정",
+    "preferences-label": "환경설정"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "보기",

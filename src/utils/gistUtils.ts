@@ -117,7 +117,9 @@ export const filterAndSortGists = (gists: Gist[], filters: GistSearchFilters): G
 
   if (filters.isAnalyzed !== undefined) {
     filtered = filtered.filter(gist =>
-      filters.isAnalyzed ? (!!gist.analyzed_at && !gist.analysis_failed) : !gist.analyzed_at
+      filters.isAnalyzed
+        ? (!!gist.analyzed_at && !gist.analysis_failed)
+        : !(!!gist.analyzed_at && !gist.analysis_failed)
     );
   }
 

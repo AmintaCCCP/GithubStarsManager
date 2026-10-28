@@ -28,6 +28,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogTitle } from './ui/dialog';
+import { WorkspacePageHeader } from './WorkspacePageHeader';
 import { isElectron } from '../services/electronProxy';
 import { useBackendAvailability } from '../features/settings/hooks/useBackendAvailability';
 import { useVectorSearchActions } from '../features/settings/hooks/useVectorSearchActions';
@@ -53,6 +54,7 @@ type SettingsTab = 'general' | 'appearance' | 'starSync' | 'ai' | 'webdav' | 'ba
 
 interface SettingsTabItem {
   id: SettingsTab;
+  section: 'app' | 'ai-data' | 'connection';
   label: string;
   icon: React.ReactNode;
   badge?: number;
@@ -266,12 +268,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     tabChangeTimeoutRef.current = setTimeout(() => {
       setActiveTab(tabId);
       setDisplayTab(tabId);
+      if (!isModal) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
 
       tabResetTimeoutRef.current = setTimeout(() => {
         setIsTransitioning(false);
       }, 120);
     }, 100);
-  }, [activeTab, isTransitioning]);
+  }, [activeTab, isModal, isTransitioning]);
 
   // 清理定时器
   useEffect(() => {
@@ -342,71 +347,85 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const tabs: SettingsTabItem[] = [
     {
       id: 'general',
+      section: 'app',
       label: t('settingsPanel.general'),
       icon: <Globe className="w-5 h-5" />,
     },
     {
       id: 'appearance',
+      section: 'app',
       label: t('settingsPanel.appearance'),
       icon: <Palette className="w-5 h-5" />,
     },
     {
       id: 'starSync',
+      section: 'app',
       label: t('settingsPanel.star-sync'),
       icon: <Star className="w-5 h-5" />,
     },
     {
       id: 'ai',
+      section: 'ai-data',
       label: t('settingsPanel.ai-config'),
       icon: <Bot className="w-5 h-5" />,
     },
     {
       id: 'webdav',
+      section: 'ai-data',
       label: t('settingsPanel.webdav'),
       icon: <Cloud className="w-5 h-5" />,
     },
     {
       id: 'backup',
+      section: 'ai-data',
       label: t('settingsPanel.backup'),
       icon: <Database className="w-5 h-5" />,
     },
     {
       id: 'backend',
+      section: 'ai-data',
       label: t('settingsPanel.backend'),
       icon: <Server className="w-5 h-5" />,
     },
     {
       id: 'category',
+      section: 'ai-data',
       label: t('settingsPanel.categories'),
       icon: <Package className="w-5 h-5" />,
     },
     {
       id: 'menu',
+      section: 'ai-data',
       label: t('settingsPanel.menu'),
       icon: <Layout className="w-5 h-5" />,
     },
     {
       id: 'data',
+      section: 'ai-data',
       label: t('settingsPanel.data-management'),
       icon: <Trash2 className="w-5 h-5" />,
     },
     {
       id: 'logs',
+      section: 'connection',
       label: t('settingsPanel.diagnostic-logs'),
       icon: <ScrollText className="w-5 h-5" />,
     },
     ...((isElectron() || backendAvailable) ? [{
       id: 'network' as SettingsTab,
+      section: 'connection' as const,
       label: t('settingsPanel.network'),
       icon: <Wifi className="w-5 h-5" />,
     }] : []),
     ...(isElectron() ? [{
       id: 'plugins' as SettingsTab,
+      section: 'connection' as const,
       label: t('settingsPanel.plugins'),
       icon: <Plug className="w-5 h-5" />,
     }] : []),
     {
       id: 'vectorSearch' as SettingsTab,
+      section: 'connection' as const,
       label: t('settingsPanel.vector-search'),
       icon: <Search className="w-5 h-5" />,
       badge: unindexedRepoCount > 0 ? unindexedRepoCount : undefined,
@@ -414,6 +433,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     // MCP requires a long-lived process: backend or Electron main. Hide for pure SPA.
     ...((isElectron() || backendAvailable) ? [{
       id: 'mcp' as SettingsTab,
+      section: 'connection' as const,
       label: t('settingsPanel.mcp-server'),
       icon: <Cable className="w-5 h-5" />,
     }] : []),
@@ -509,7 +529,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       className="h-9 w-full justify-start gap-3 px-3 text-left"
                     >
                       {tab.icon}
-                      <span className="flex-1 font-medium">{tab.label}</span>
+                      <span className="flex-1">{tab.label}</span>
                       {tab.badge != null && (
                         <Badge className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
                           {tab.badge > 99 ? '99+' : tab.badge}
@@ -536,46 +556,66 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   // 独立页面模式（兼容原有代码）
   return (
-    <div className="mx-auto max-w-6xl">
-      <div className="flex items-center space-x-3 mb-6">
-        <Settings className="h-5 w-5 text-muted-foreground" />
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          {t('settingsPanel.settings')}
-        </h2>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-6">
+    <div className="w-full">
+      <div className="route-workspace">
         {/* 桌面端侧边栏 */}
-        <div className="hidden lg:block w-64 flex-shrink-0 lg:sticky lg:top-4 lg:self-start">
-          <div className="ui-panel overflow-hidden rounded-md">
-            <nav className="p-2 space-y-1" role="tablist" aria-label={t('settingsPanel.settings-tabs')}>
-              {tabs.map((tab) => (
-                <Button
-                  key={tab.id}
-                  type="button"
-                  variant={activeTab === tab.id ? 'secondary' : 'ghost'}
-                  onClick={() => handleTabChange(tab.id)}
-                  role="tab"
-                  id={`settings-tab-${tab.id}`}
-                  aria-selected={activeTab === tab.id}
-                  aria-controls={`settings-tabpanel-${tab.id}`}
-                  className="h-auto w-full justify-start gap-3 px-4 py-3 text-left"
-                >
-                  {tab.icon}
-                  <span className="flex-1 font-medium">{tab.label}</span>
-                  {tab.badge != null && (
-                    <Badge className="ml-auto h-5 min-w-[1.25rem] justify-center px-1.5 text-[11px] tabular-nums">
-                      {tab.badge > 99 ? '99+' : tab.badge}
-                    </Badge>
-                  )}
-                </Button>
-              ))}
-            </nav>
+        <aside
+          data-context-sidebar="settings"
+          aria-label={t('settingsPanel.settings')}
+          className="context-sidebar hidden w-(--app-sidebar-width) flex-shrink-0 lg:flex"
+        >
+          <div className="context-sidebar-head">
+            <div>
+              <p className="app-side-eyebrow">{t('settingsPanel.preferences-label')}</p>
+              <h2 className="app-side-title">{t('settingsPanel.settings')}</h2>
+            </div>
           </div>
-        </div>
+          <nav
+            className="context-sidebar-body app-side-list"
+            role="tablist"
+            aria-label={t('settingsPanel.settings-tabs')}
+          >
+              {tabs.map((tab, index) => {
+                const showSectionLabel = index === 0 || tabs[index - 1].section !== tab.section;
+                const sectionLabel =
+                  tab.section === 'app'
+                    ? t('settingsPanel.section-app')
+                    : tab.section === 'ai-data'
+                      ? t('settingsPanel.section-ai-data')
+                      : t('settingsPanel.section-connection');
+                return (
+                  <React.Fragment key={tab.id}>
+                    {showSectionLabel && (
+                      <p className="app-section-label app-side-group-label" aria-hidden="true">
+                        {sectionLabel}
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => handleTabChange(tab.id)}
+                      role="tab"
+                      id={`settings-tab-${tab.id}`}
+                      aria-selected={activeTab === tab.id}
+                      aria-controls={`settings-tabpanel-${tab.id}`}
+                      className="app-side-item justify-start text-left"
+                    >
+                      {tab.icon}
+                      <span className="flex-1">{tab.label}</span>
+                      {tab.badge != null && (
+                        <Badge className="app-side-count ml-auto">
+                          {tab.badge > 99 ? '99+' : tab.badge}
+                        </Badge>
+                      )}
+                    </Button>
+                  </React.Fragment>
+                );
+              })}
+          </nav>
+        </aside>
 
         {/* 移动端标签导航 */}
-        <div className="lg:hidden -mx-4 sm:-mx-6">
+        <div className="lg:hidden settings-mobile-tabs">
           <MobileTabNav
             tabs={tabs}
             activeTab={activeTab}
@@ -584,8 +624,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         {/* 内容区域 */}
-        <div className="flex-1 min-w-0">
-          <div className="ui-panel rounded-md p-4 sm:p-6">
+        <div className="workspace-content app-workspace-content">
+          <WorkspacePageHeader
+            eyebrow={t('settingsPanel.preferences-label')}
+            section={t('settingsPanel.settings')}
+            title={t('settingsPanel.settings')}
+            meta={(
+              <span className="app-workspace-meta-pill">
+                {tabs.find((tab) => tab.id === activeTab)?.label}
+              </span>
+            )}
+          />
+          <div className="ui-panel app-settings-content-panel p-4 sm:p-6">
             {renderTabContent()}
           </div>
         </div>

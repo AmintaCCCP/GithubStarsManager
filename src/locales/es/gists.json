@@ -71,7 +71,17 @@
     "sort-files": "Por número de archivos",
     "category-all": "todas las esencias",
     "category-starred": "esencia estelar",
-    "category-mine": "mi esencia"
+    "category-mine": "mi esencia",
+    "context-sidebar": "Barra lateral de contexto de Gist",
+    "library-label": "Biblioteca de Gists",
+    "sidebar-title": "Biblioteca de Gists",
+    "scope": "Alcance",
+    "analysis-status": "Estado del análisis",
+    "analysis-all": "Todos los Gists",
+    "analyzed": "Analizados",
+    "needs-analysis": "Análisis pendiente",
+    "gist-count": "{{count}} Gists",
+    "analyzed-count": "{{count}} analizados"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "No se encontró el token de GitHub. Inicie sesión nuevamente.",

@@ -153,7 +153,7 @@
     "hide-category-confirmation": "Kategoriebestätigung ausblenden",
     "hide-default-category-v1-this-will-not-delete-an": "Standardkategorie „{{v1}}“ ausblenden?\n\nDadurch werden keine Repositorys gelöscht, sondern lediglich die Standardkategorie auf der linken Seite ausgeblendet.",
     "failed-to-hide-category-please-check-backend-con": "Kategorien konnten nicht ausgeblendet werden. Bitte überprüfen Sie die Backend-Verbindung.",
-    "categories": "Anwendungsklassifizierung",
+    "categories": "Repository-Kategorien",
     "add-category": "Kategorie hinzufügen",
     "drag-repository-cards-here-to-quickly-change-cat": "Sie können Lagerkarten hierher ziehen, um schnell zwischen Kategorien zu wechseln",
     "drop-here-to-remove-category": "Ziehen Sie hierher, um die Klassifizierung abzubrechen",
@@ -167,7 +167,14 @@
     "delete-category": "Kategorie löschen",
     "hide-default-category": "Standardkategorien ausblenden",
     "drag-hint": "{{name}} – Ziehen Sie die Lagerkarte hierher, um die Klassifizierung schnell zu ändern",
-    "sync-failed-reverted": "Synchronisierung mit dem Backend fehlgeschlagen. Die Kategorieänderung wurde rückgängig gemacht."
+    "sync-failed-reverted": "Synchronisierung mit dem Backend fehlgeschlagen. Die Kategorieänderung wurde rückgängig gemacht.",
+    "category-group": "Kategorien",
+    "workspace-label": "Arbeitsbereich",
+    "quick-access": "Schnellzugriff",
+    "all-repositories": "Alle Repositories",
+    "needs-review": "Zu prüfen",
+    "synced": "Synchronisiert",
+    "repository-count": "{{count}} Repositories"
   },
   "codeSearchView": {
     "show-less": "schließen",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "KI-Suche"
   },
   "settingsPanel": {
+    "section-app": "Anwendung",
+    "section-ai-data": "KI & Daten",
+    "section-connection": "Verbindung & Diagnose",
     "general": "Universal",
     "appearance": "Darstellung",
     "star-sync": "Star-Synchronisierung",
@@ -421,7 +431,8 @@
     "settings-content": "Inhalte festlegen",
     "settings": "aufstellen",
     "close-settings": "Einstellungen schließen",
-    "settings-tabs": "Tabs einrichten"
+    "settings-tabs": "Tabs einrichten",
+    "preferences-label": "Einstellungen"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "Anzeigen",

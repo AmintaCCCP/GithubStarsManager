@@ -3,13 +3,32 @@ import { getDateFnsLocale } from '../i18n/format';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import React, { useState, useMemo, useEffect } from 'react';
-import { Package, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
+import {
+  Package,
+  Search,
+  X,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Loader2,
+  GitFork,
+  ArrowDownUp,
+  CheckCheck,
+  CircleHelp,
+  GitBranch,
+  UserRound,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import ForkCard from './ForkCard';
 import { useForkTimelineActions } from '../features/forks/hooks/useForkTimelineActions';
 import { useT } from '../i18n/useT';
 import { Modal } from './Modal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { WorkspacePageHeader } from './WorkspacePageHeader';
+
+const UPSTREAM_PREVIEW_LIMIT = 6;
 
 export const ForkTimeline: React.FC = () => {
   const t = useT('releases');
@@ -46,8 +65,9 @@ export const ForkTimeline: React.FC = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [forkSyncFilter, setForkSyncFilter] = useState<'all' | 'update' | 'current' | 'unchecked'>('all');
+  const [showAllUpstreamRepositories, setShowAllUpstreamRepositories] = useState(false);
   const searchQuery = forkSearchQuery;
-  const currentOwnerLabel = activeForkOwner || t('forkTimeline.personal-account');
   const isForkUnread = (forkId: number) => !readForks.has(forkId);
   const handleForkOwnerSelection = (ownerLogin: string) => {
     handleForkOwnerChange(ownerLogin);
@@ -65,6 +85,14 @@ export const ForkTimeline: React.FC = () => {
       return bTime - aTime;
     });
 
+    if (forkSyncFilter === 'update') {
+      filtered = filtered.filter((fork) => needsSyncMap[fork.id] === true);
+    } else if (forkSyncFilter === 'current') {
+      filtered = filtered.filter((fork) => needsSyncMap[fork.id] === false);
+    } else if (forkSyncFilter === 'unchecked') {
+      filtered = filtered.filter((fork) => needsSyncMap[fork.id] === undefined);
+    }
+
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -72,13 +100,47 @@ export const ForkTimeline: React.FC = () => {
         fork.name.toLowerCase().includes(query) ||
         fork.full_name.toLowerCase().includes(query) ||
         (fork.source?.full_name || '').toLowerCase().includes(query) ||
+        (fork.parent?.full_name || '').toLowerCase().includes(query) ||
         (fork.description || '').toLowerCase().includes(query) ||
         (fork.source?.description || '').toLowerCase().includes(query)
       );
     }
 
     return filtered;
-  }, [ownerForks, searchQuery]);
+  }, [ownerForks, needsSyncMap, forkSyncFilter, searchQuery]);
+
+  const forkSyncCounts = useMemo(() => ({
+    update: ownerForks.filter((fork) => needsSyncMap[fork.id] === true).length,
+    current: ownerForks.filter((fork) => needsSyncMap[fork.id] === false).length,
+    unchecked: ownerForks.filter((fork) => needsSyncMap[fork.id] === undefined).length,
+  }), [ownerForks, needsSyncMap]);
+
+  const upstreamRepositories = useMemo(() => {
+    const counts = new Map<string, number>();
+    ownerForks.forEach((fork) => {
+      const name = fork.source?.full_name || fork.parent?.full_name;
+      if (name) counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return [...counts.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [ownerForks]);
+
+  const visibleUpstreamRepositories = useMemo(() => {
+    if (
+      showAllUpstreamRepositories ||
+      upstreamRepositories.length <= UPSTREAM_PREVIEW_LIMIT
+    ) {
+      return upstreamRepositories;
+    }
+
+    const preview = upstreamRepositories.slice(0, UPSTREAM_PREVIEW_LIMIT);
+    const selectedIndex = upstreamRepositories.findIndex(([name]) => name === searchQuery);
+    if (selectedIndex < UPSTREAM_PREVIEW_LIMIT) {
+      return preview;
+    }
+
+    // Keep an active repository visible even when it falls outside the preview.
+    return [...preview.slice(0, UPSTREAM_PREVIEW_LIMIT - 1), upstreamRepositories[selectedIndex]];
+  }, [searchQuery, showAllUpstreamRepositories, upstreamRepositories]);
 
   // Pagination
   const totalPages = Math.ceil(filteredForks.length / itemsPerPage);
@@ -87,6 +149,12 @@ export const ForkTimeline: React.FC = () => {
   const paginatedForks = filteredForks.slice(startIndex, startIndex + itemsPerPage);
   const displayStart = filteredForks.length === 0 ? 0 : startIndex + 1;
   const displayEnd = Math.min(startIndex + itemsPerPage, filteredForks.length);
+  const hasActiveFilter = Boolean(searchQuery.trim()) || forkSyncFilter !== 'all';
+  const clearForkFilters = () => {
+    setForkSearchQuery('');
+    setForkSyncFilter('all');
+    setCurrentPage(1);
+  };
 
   // Sync currentPage when data changes
   useEffect(() => {
@@ -127,54 +195,191 @@ export const ForkTimeline: React.FC = () => {
     return rangeWithDots;
   };
 
-  return (
-    <div className="max-w-full mx-auto px-2 sm:px-4">
-      {/* Header */}
-      <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
-              {t('forkTimeline.fork')}
-            </h2>
-            <p className="text-muted-foreground dark:text-muted-foreground">
-              {t('forkTimeline.manage-v2-forked-repositories-for-v2', { currentOwnerLabel: currentOwnerLabel, v2: ownerForks.length })}
-            </p>
+  const forkContextSidebar = (
+    <aside
+      data-context-sidebar="forks"
+      aria-label={t('forkTimeline.fork')}
+      className="context-sidebar w-full shrink-0 lg:w-(--app-sidebar-width) lg:self-start"
+    >
+      <div className="context-sidebar-head">
+        <div>
+          <p className="app-side-eyebrow">{t('forkTimeline.fork-control-label')}</p>
+          <h3 className="app-side-title">
+            {t('forkTimeline.fork-status')}
+          </h3>
+        </div>
+        <Button
+          onClick={handleRefresh}
+          disabled={forkIsRefreshing}
+          variant="ghost"
+          size="icon"
+          className="linear-icon-button"
+          title={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
+          aria-label={forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}
+        >
+          <RefreshCw className={`h-4 w-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+      <div className="context-sidebar-body">
+        <section className="app-side-section" aria-label={t('forkTimeline.status')}>
+          <p className="app-section-label app-side-group-label">{t('forkTimeline.status')}</p>
+          <div className="app-side-list">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setForkSyncFilter('all');
+                setCurrentPage(1);
+              }}
+              aria-pressed={forkSyncFilter === 'all'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <GitFork className="h-4 w-4" />
+                <span>{t('forkTimeline.all-forks')}</span>
+              </span>
+              <span className="app-side-count">{ownerForks.length}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setForkSyncFilter('update');
+                setCurrentPage(1);
+              }}
+              aria-pressed={forkSyncFilter === 'update'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <ArrowDownUp className="h-4 w-4" />
+                <span>{t('forkTimeline.update-available')}</span>
+              </span>
+              <span className="app-side-count">{forkSyncCounts.update}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setForkSyncFilter('current');
+                setCurrentPage(1);
+              }}
+              aria-pressed={forkSyncFilter === 'current'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <CheckCheck className="h-4 w-4" />
+                <span>{t('forkTimeline.up-to-date')}</span>
+              </span>
+              <span className="app-side-count">{forkSyncCounts.current}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setForkSyncFilter('unchecked');
+                setCurrentPage(1);
+              }}
+              aria-pressed={forkSyncFilter === 'unchecked'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <CircleHelp className="h-4 w-4" />
+                <span>{t('forkTimeline.check-pending')}</span>
+              </span>
+              <span className="app-side-count">{forkSyncCounts.unchecked}</span>
+            </Button>
           </div>
-          <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:max-w-full lg:justify-end">
-            {/* Fork owner selector */}
-            <div className="flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap">
-              <span id="fork-owner-label" className="shrink-0 whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('forkTimeline.owner')}</span>
-              <Select value={activeForkOwner} onValueChange={handleForkOwnerSelection} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
-                <SelectTrigger className="ui-field h-9 w-48 max-w-[calc(100vw-8rem)] shrink px-3 py-2 text-sm" aria-labelledby="fork-owner-label"><SelectValue /></SelectTrigger>
-                <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t('forkTimeline.v1-personal', { v1: owner.login }) : owner.login}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+        </section>
 
+        <section className="app-side-section" aria-label={t('forkTimeline.forked-repositories')}>
+          <p className="app-section-label app-side-group-label">
+            {t('forkTimeline.forked-repositories')}
+          </p>
+          <div className="app-side-list">
+            {upstreamRepositories.length === 0 ? (
+              <p className="app-side-empty">{t('forkTimeline.no-forked-repositories')}</p>
+            ) : visibleUpstreamRepositories.map(([name, count]) => (
+              <Button
+                key={name}
+                variant="ghost"
+                onClick={() => {
+                  setForkSearchQuery(name);
+                  setCurrentPage(1);
+                }}
+                aria-pressed={searchQuery === name}
+                className="app-side-item justify-between"
+                title={name}
+              >
+                <span className="app-side-item-label">
+                  <GitBranch className="h-4 w-4" />
+                  <span className="truncate">{name}</span>
+                </span>
+                {count > 1 && <span className="app-side-count">{count}</span>}
+              </Button>
+            ))}
+            {upstreamRepositories.length > UPSTREAM_PREVIEW_LIMIT && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="app-side-more"
+                onClick={() => setShowAllUpstreamRepositories((expanded) => !expanded)}
+                aria-expanded={showAllUpstreamRepositories}
+              >
+                {showAllUpstreamRepositories
+                  ? t('forkTimeline.show-fewer-upstreams')
+                  : t('forkTimeline.show-all-upstreams', { count: upstreamRepositories.length })}
+              </Button>
+            )}
+          </div>
+        </section>
+      </div>
+      <div className="context-sidebar-foot">
+        <div className="app-side-foot-status">
+          <span className="app-status-dot" aria-hidden="true" />
+          <span>
+            {lastRefreshTime
+              ? `${t('forkTimeline.last-refresh')} ${formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}`
+              : t('forkTimeline.status')}
+          </span>
+        </div>
+        <div className="app-side-foot-meta">
+          <span>{t('forkTimeline.fork-count', { count: ownerForks.length })}</span>
+          <span>{t('forkTimeline.update-count', { count: forkSyncCounts.update })}</span>
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <>
+      <div className="route-workspace">
+        {forkContextSidebar}
+        <div className="workspace-content app-workspace-content">
+          <div className="w-full">
+      <WorkspacePageHeader
+        eyebrow={t('forkTimeline.fork-control-label')}
+        section={t('forkTimeline.fork')}
+        title={t('forkTimeline.fork')}
+        meta={(
+          <span className="app-workspace-meta-pill">
+            {t('forkTimeline.fork-count', { count: ownerForks.length })}
+          </span>
+        )}
+        actions={(
+          <div className="app-route-scope">
+            <span className="app-route-scope-label">{t('forkTimeline.owner')}</span>
+            <Select value={activeForkOwner} onValueChange={handleForkOwnerSelection} disabled={!personalOwnerLogin || isLoadingOrganizations || forkIsRefreshing}>
+              <SelectTrigger className="app-route-scope-trigger" aria-label={t('forkTimeline.owner')}>
+                <UserRound className="shrink-0" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>{forkOwnerOptions.map(owner => <SelectItem key={owner.id} value={owner.login}>{owner.isPersonal ? t('forkTimeline.v1-personal', { v1: owner.login }) : owner.login}</SelectItem>)}</SelectContent>
+            </Select>
             {isLoadingOrganizations && (
-              <span className="flex items-center space-x-1 text-sm text-muted-foreground dark:text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="app-side-inline-status">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 <span>{t('forkTimeline.loading-organizations')}</span>
               </span>
             )}
-
-            {/* Last Refresh Time */}
-            {lastRefreshTime && (
-              <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('forkTimeline.last-refresh')} {formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) })}
-              </span>
-            )}
-
-            {/* Refresh Button */}
-            <Button
-              onClick={handleRefresh}
-              disabled={forkIsRefreshing}
-              className="ui-button-primary flex h-auto shrink-0 items-center space-x-2 px-4 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${forkIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{forkIsRefreshing ? t('forkTimeline.refreshing') : t('forkTimeline.refresh')}</span>
-            </Button>
           </div>
-        </div>
+        )}
+      />
 
         {/* Search Bar */}
         <div className="ui-toolbar p-3 sm:p-4 mb-4">
@@ -215,7 +420,7 @@ export const ForkTimeline: React.FC = () => {
             <span className="text-sm text-muted-foreground dark:text-muted-foreground">
               {t('forkTimeline.showing-displaystart-displayend-of-v3-forks', { displayStart: displayStart, displayEnd: displayEnd, v3: filteredForks.length })}
             </span>
-            {searchQuery && (
+            {hasActiveFilter && (
               <span className="text-sm text-primary dark:text-primary">
                 ({t('forkTimeline.filtered')})
               </span>
@@ -303,24 +508,25 @@ export const ForkTimeline: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
 
       {/* Fork List */}
-      <div className="space-y-2">
+      <div className="app-fork-list">
         {paginatedForks.length === 0 ? (
           <div className="ui-empty-state text-center py-12">
             <Package className="w-12 h-12 text-muted-foreground dark:text-muted-foreground mx-auto mb-3" />
             <h3 className="text-lg font-medium text-foreground dark:text-muted-foreground mb-1">
-              {searchQuery ? t('forkTimeline.no-matching-results') : t('forkTimeline.no-forked-repositories')}
+              {hasActiveFilter ? t('forkTimeline.no-matching-results') : t('forkTimeline.no-forked-repositories')}
             </h3>
             <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {searchQuery
+              {hasActiveFilter
                 ? t('forkTimeline.no-matching-forks-found')
-                : t('forkTimeline.no-forked-repositories-found-for-currentownerlab', { currentOwnerLabel: currentOwnerLabel })}
+                : t('forkTimeline.no-forked-repositories-found-for-currentownerlab', {
+                    currentOwnerLabel: activeForkOwner || t('forkTimeline.personal-account'),
+                  })}
             </p>
-            {searchQuery && (
+            {hasActiveFilter && (
               <Button
-                onClick={() => setForkSearchQuery('')}
+                onClick={clearForkFilters}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
               >
                 {t('forkTimeline.clear-search-2')}
@@ -430,6 +636,9 @@ export const ForkTimeline: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
+    </div>
+  </div>
 
       {/* Sync Branch Modal */}
       <Modal
@@ -477,6 +686,6 @@ export const ForkTimeline: React.FC = () => {
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 };

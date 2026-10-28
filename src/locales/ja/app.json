@@ -153,7 +153,7 @@
     "hide-category-confirmation": "カテゴリの確認を非表示にする",
     "hide-default-category-v1-this-will-not-delete-an": "デフォルトのカテゴリ「{{v1}}」を非表示にしますか?\n\nこれによりリポジトリは削除されず、左側のデフォルト カテゴリが非表示になるだけです。",
     "failed-to-hide-category-please-check-backend-con": "カテゴリを非表示にできませんでした。バックエンド接続を確認してください。",
-    "categories": "アプリケーションの分類",
+    "categories": "リポジトリ分類",
     "add-category": "カテゴリを追加",
     "drag-repository-cards-here-to-quickly-change-cat": "ここに倉庫カードをドラッグすると、カテゴリをすばやく変更できます",
     "drop-here-to-remove-category": "分類をキャンセルするにはここにドラッグします",
@@ -167,7 +167,14 @@
     "delete-category": "カテゴリの削除",
     "hide-default-category": "デフォルトのカテゴリを非表示にする",
     "drag-hint": "{{name}} - 倉庫カードをここにドラッグすると、分類をすばやく変更できます",
-    "sync-failed-reverted": "バックエンドへの同期に失敗したため、カテゴリの変更を元に戻しました。"
+    "sync-failed-reverted": "バックエンドへの同期に失敗したため、カテゴリの変更を元に戻しました。",
+    "category-group": "カテゴリ",
+    "workspace-label": "ワークスペース",
+    "quick-access": "クイックアクセス",
+    "all-repositories": "すべてのリポジトリ",
+    "needs-review": "整理待ち",
+    "synced": "同期済み",
+    "repository-count": "{{count}} 件のリポジトリ"
   },
   "codeSearchView": {
     "show-less": "近い",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "AI検索"
   },
   "settingsPanel": {
+    "section-app": "アプリケーション",
+    "section-ai-data": "AI とデータ",
+    "section-connection": "接続と診断",
     "general": "ユニバーサル",
     "appearance": "外観設定",
     "star-sync": "スターシンク",
@@ -421,7 +431,8 @@
     "settings-content": "セット内容",
     "settings": "設定",
     "close-settings": "設定を閉じる",
-    "settings-tabs": "タブを設定する"
+    "settings-tabs": "タブを設定する",
+    "preferences-label": "環境設定"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "見る",

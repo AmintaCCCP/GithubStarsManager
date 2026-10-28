@@ -97,10 +97,10 @@ beforeEach(() => {
 });
 
 describe('CategorySidebar drop-to-uncategorize (issue #353 suggestion)', () => {
-  it('将已分类仓库拖到「全部分类」时显式清空分类并同步后端', async () => {
+  it('将已分类仓库拖到「全部仓库」时显式清空分类并同步后端', async () => {
     renderSidebar([categorizedRepo]);
 
-    await dropOnCategory('全部分类', String(categorizedRepo.id));
+    await dropOnCategory('全部仓库', String(categorizedRepo.id));
 
     expect(storeState.updateRepository).toHaveBeenCalledOnce();
     const updated = storeState.updateRepository.mock.calls[0][0] as Repository;
@@ -110,16 +110,16 @@ describe('CategorySidebar drop-to-uncategorize (issue #353 suggestion)', () => {
     expect(useRepositoryDragStore.getState().isDragging).toBe(false);
   });
 
-  it('本就无分类的仓库拖到「全部分类」时不写入不同步', async () => {
+  it('本就无分类的仓库拖到「全部仓库」时不写入不同步', async () => {
     renderSidebar([{ ...categorizedRepo, custom_category: '', category_locked: false }]);
 
-    await dropOnCategory('全部分类', String(categorizedRepo.id));
+    await dropOnCategory('全部仓库', String(categorizedRepo.id));
 
     expect(storeState.updateRepository).not.toHaveBeenCalled();
     expect(syncMocks.forceSyncToBackend).not.toHaveBeenCalled();
   });
 
-  it('无锁定分类且 AI/默认分类均未命中的仓库拖到「全部分类」时保持 no-op（保留 undefined 以便后续 AI 归类）', async () => {
+  it('无锁定分类且 AI/默认分类均未命中的仓库拖到「全部仓库」时保持 no-op（保留 undefined 以便后续 AI 归类）', async () => {
     const neverMatchedRepo: Repository = {
       ...categorizedRepo,
       id: 2,
@@ -135,7 +135,7 @@ describe('CategorySidebar drop-to-uncategorize (issue #353 suggestion)', () => {
     };
     renderSidebar([neverMatchedRepo]);
 
-    await dropOnCategory('全部分类', '2');
+    await dropOnCategory('全部仓库', '2');
 
     expect(storeState.updateRepository).not.toHaveBeenCalled();
     expect(syncMocks.forceSyncToBackend).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe('CategorySidebar drop-to-uncategorize (issue #353 suggestion)', () => {
     syncMocks.forceSyncToBackend.mockRejectedValue(new Error('sync failed'));
     renderSidebar([categorizedRepo]);
 
-    await dropOnCategory('全部分类', String(categorizedRepo.id));
+    await dropOnCategory('全部仓库', String(categorizedRepo.id));
 
     // 回滚：以原始仓库对象调用 updateRepository
     expect(storeState.updateRepository).toHaveBeenCalledTimes(2);

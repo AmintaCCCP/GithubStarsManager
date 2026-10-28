@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryList } from './RepositoryList';
-import { useAppStore } from '../store/useAppStore';
-import type { Repository } from '../types';
+import { useAppStore, getAllCategories } from '../store/useAppStore';
+import type { Category, Repository, SearchFilters, SimilarViewState } from '../types';
 
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn(),
@@ -14,8 +14,8 @@ vi.mock('../hooks/useDialog', () => ({
 }));
 
 vi.mock('./RepositoryCard', () => ({
-  RepositoryCard: ({ repository, viewMode }: { repository: Repository; viewMode: string }) => (
-    <div data-testid={`repository-card-${repository.id}`} data-view-mode={viewMode}>{repository.name}</div>
+  RepositoryCard: ({ repository, viewMode, showAISummary }: { repository: Repository; viewMode: string; showAISummary: boolean }) => (
+    <div data-testid={`repository-card-${repository.id}`} data-view-mode={viewMode} data-show-ai={String(showAISummary)}>{repository.name}</div>
   ),
 }));
 
@@ -45,7 +45,7 @@ const repository: Repository = {
   topics: [],
 };
 
-const searchFilters = {
+const searchFilters: SearchFilters = {
   query: '',
   tags: [],
   languages: [],
@@ -74,7 +74,7 @@ const storeState = {
   toggleReleaseSubscription: vi.fn(),
   batchUnsubscribeReleases: vi.fn(),
   releaseSubscriptions: new Set<number>(),
-  similarView: null,
+  similarView: null as SimilarViewState | null,
   resetSimilarView: vi.fn(),
   repositoryViewMode: 'grid' as 'grid' | 'list',
   setRepositoryViewMode: vi.fn((mode: 'grid' | 'list') => {
@@ -133,7 +133,7 @@ describe('RepositoryList view mode controls', () => {
       similarResults: [lowScoreLowStarRepository, highScoreHighStarRepository, repository],
       originalSearchResults: [],
       originalSearchFilters: searchFilters,
-    } as never;
+    };
 
     render(<RepositoryList repositories={[lowScoreLowStarRepository, highScoreHighStarRepository, repository]} selectedCategory="all" />);
 
@@ -152,7 +152,7 @@ describe('RepositoryList view mode controls', () => {
       similarResults: [],
       originalSearchResults: [],
       originalSearchFilters: searchFilters,
-    } as never;
+    };
 
     render(<RepositoryList repositories={[]} selectedCategory="all" />);
 
@@ -178,5 +178,74 @@ describe('RepositoryList view mode controls', () => {
     rerender(<RepositoryList repositories={[repository]} selectedCategory="all" />);
     expect(screen.getByTestId('repository-card-1')).toHaveAttribute('data-view-mode', 'list');
     expect(screen.getByTitle('单列列表')).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('RepositoryList AI summary display toggle', () => {
+  const analyzedRepository: Repository = {
+    ...repository,
+    id: 10,
+    name: 'analyzed-repo',
+    full_name: 'owner/analyzed-repo',
+    analyzed_at: '2026-01-05T00:00:00.000Z',
+  };
+  const plainRepository: Repository = {
+    ...repository,
+    id: 11,
+    name: 'plain-repo',
+    full_name: 'owner/plain-repo',
+  };
+
+  it('renders cards with AI summary content enabled by default', () => {
+    render(<RepositoryList repositories={[analyzedRepository, plainRepository]} selectedCategory="all" />);
+
+    expect(screen.getByTestId('repository-card-10')).toHaveAttribute('data-show-ai', 'true');
+  });
+
+  it('switches to original descriptions and back to AI content when analyzed repositories exist', () => {
+    render(<RepositoryList repositories={[analyzedRepository, plainRepository]} selectedCategory="all" />);
+
+    fireEvent.click(screen.getByText('原始描述'));
+    expect(screen.getByTestId('repository-card-10')).toHaveAttribute('data-show-ai', 'false');
+
+    fireEvent.click(screen.getByText('AI分析内容'));
+    expect(screen.getByTestId('repository-card-10')).toHaveAttribute('data-show-ai', 'true');
+  });
+
+  it('keeps original descriptions when the AI option has no analyzed repositories to show', () => {
+    render(<RepositoryList repositories={[plainRepository]} selectedCategory="all" />);
+
+    fireEvent.click(screen.getByText('原始描述'));
+    expect(screen.getByTestId('repository-card-11')).toHaveAttribute('data-show-ai', 'false');
+
+    fireEvent.click(screen.getByText('AI分析内容'));
+    expect(screen.getByTestId('repository-card-11')).toHaveAttribute('data-show-ai', 'false');
+  });
+
+  it('automatically falls back to original descriptions when switching to a category without analyzed repositories', () => {
+    vi.mocked(getAllCategories).mockReturnValue([
+      { id: 'cat-x', name: '未分析分类', isCustom: true, keywords: [], icon: '' } satisfies Category,
+    ]);
+    const lockedPlainRepository: Repository = {
+      ...plainRepository,
+      category_locked: true,
+      custom_category: '未分析分类',
+    };
+
+    const { rerender } = render(<RepositoryList repositories={[analyzedRepository]} selectedCategory="all" />);
+    expect(screen.getByTestId('repository-card-10')).toHaveAttribute('data-show-ai', 'true');
+
+    rerender(<RepositoryList repositories={[lockedPlainRepository]} selectedCategory="cat-x" />);
+    expect(screen.getByTestId('repository-card-11')).toHaveAttribute('data-show-ai', 'false');
+  });
+
+  it('restores the AI summary default on a fresh mount', () => {
+    const first = render(<RepositoryList repositories={[analyzedRepository]} selectedCategory="all" />);
+    fireEvent.click(screen.getByText('原始描述'));
+    expect(first.getByTestId('repository-card-10')).toHaveAttribute('data-show-ai', 'false');
+
+    first.unmount();
+    render(<RepositoryList repositories={[analyzedRepository]} selectedCategory="all" />);
+    expect(screen.getByTestId('repository-card-10')).toHaveAttribute('data-show-ai', 'true');
   });
 });

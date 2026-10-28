@@ -43,7 +43,20 @@
     "target-branch": "目標分支 (Target Branch)",
     "loading-branches": "載入分支列表中…",
     "cancel": "取消",
-    "sync-branch": "確認同步"
+    "sync-branch": "確認同步",
+    "filters": "復刻篩選",
+    "fork-control-label": "Fork 控制",
+    "fork-status": "Fork 狀態",
+    "status": "狀態",
+    "all-forks": "全部 Fork",
+    "update-available": "有可用更新",
+    "up-to-date": "已是最新",
+    "check-pending": "待檢查",
+    "forked-repositories": "上游倉庫",
+    "show-all-upstreams": "顯示全部 {{count}} 個",
+    "show-fewer-upstreams": "收起上游倉庫",
+    "fork-count": "{{count}} 個 Fork",
+    "update-count": "{{count}} 個待更新"
   },
   "releaseCard": {
     "assets-updated": "資產已更新",
@@ -133,6 +146,7 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "也可以透過 Watch 倉庫同步或自訂倉庫清單作為 Release 來源。",
     "configure-release-sources": "配置 Release 來源",
     "release-timeline": "Release時間線",
+    "release": "發布",
     "latest-releases-from-your-activereleaserepocount": "來自您的 {{activeReleaseRepoCount}} 個訂閱倉庫的最新Release",
     "pre": "Pre",
     "refresh": "重新整理",
@@ -173,7 +187,12 @@
     "previous-page": "上一頁",
     "next-page": "下一頁",
     "last-page": "最後一頁",
-    "last-refresh-time": "最後重新整理 {{time}}"
+    "last-refresh-time": "最後重新整理 {{time}}",
+    "filters": "發布篩選",
+    "inbox-label": "Release 收件匣",
+    "inbox-section": "收件匣",
+    "all-releases": "全部發布版本",
+    "release-count": "{{count}} 則 Release"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "該 Release 沒有可下載的資產。",

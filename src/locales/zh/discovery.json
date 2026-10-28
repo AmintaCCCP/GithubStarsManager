@@ -23,9 +23,13 @@
     "just-now": "刚刚",
     "m-ago": "分钟前",
     "h-ago": "小时前",
+    "discovery-label": "发现",
     "discovery-channels": "发现频道",
     "manage-channels": "管理发现频道",
-    "refresh-all": "刷新全部"
+    "refresh-all": "刷新全部",
+    "channels-section": "频道",
+    "sources-section": "发现来源",
+    "channel-count": "{{count}} 条内容"
   },
   "discoveryView": {
     "all-loaded": "已加载全部",
@@ -184,6 +188,4 @@
     "stars-gained": "自首次记录新增 {{v1}} stars",
     "first-seen": "榜首首次记录于{{v1}}"
   }
-
-
 }

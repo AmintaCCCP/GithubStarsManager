@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ForkTimeline } from './ForkTimeline';
@@ -251,6 +251,125 @@ describe('ForkTimeline owner filtering', () => {
       expect(toastMock).toHaveBeenCalledWith('组织列表加载失败，请检查 GitHub token 权限。', 'error');
     });
   });
+
+  it('keeps route-scoped owner control and refresh control in their correct regions', async () => {
+    render(<ForkTimeline />);
+
+    await screen.findByRole('combobox', { name: '拥有者:' });
+
+    const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    expect(sidebar.querySelectorAll('[role="combobox"]')).toHaveLength(0);
+    expect(within(sidebar).getByRole('button', { name: '全部复刻1' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: '有更新0' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: '已同步0' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: '待检查1' })).toBeInTheDocument();
+    expect(screen.getAllByRole('combobox', { name: '拥有者:' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '刷新' })).toHaveLength(1);
+    expect(screen.queryAllByText('仓库分类')).toHaveLength(0);
+  });
+
+  it('shows the last refresh time in the sidebar after a refresh completes', async () => {
+    render(<ForkTimeline />);
+
+    await screen.findByRole('combobox', { name: '拥有者:' });
+
+    expect(screen.queryByText(/上次刷新:/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+
+    await waitFor(() => {
+      expect(storeState.forks).toHaveLength(2);
+    });
+    expect(await screen.findByText(/上次刷新:/)).toBeInTheDocument();
+  });
+
+  it('keeps a fork unchecked when the sync-status request fails', async () => {
+    storeState.forks = [personalFork];
+    let rejectCheck: (error: Error) => void = () => undefined;
+    const checkForkSyncNeeded = vi.fn().mockReturnValue(new Promise((_, reject) => {
+      rejectCheck = reject;
+    }));
+    MockGitHubApiService.mockImplementation(function () { return {
+      getUserOrganizations: vi.fn().mockResolvedValue([]),
+      getUserForks: vi.fn().mockResolvedValue([personalFork]),
+      getOrganizationForks: vi.fn().mockResolvedValue([]),
+      getCurrentUser: vi.fn().mockResolvedValue(storeState.user),
+      checkForkSyncNeeded,
+    } as unknown as GitHubApiService; });
+
+    render(<ForkTimeline />);
+    fireEvent.click(screen.getByRole('button', { name: '刷新' }));
+    await waitFor(() => expect(checkForkSyncNeeded).toHaveBeenCalledOnce());
+
+    rejectCheck(new Error('rate limited'));
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith('刷新完成！', 'info');
+    });
+    const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    expect(within(sidebar).getByRole('button', { name: '待检查1' })).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: '已同步0' })).toBeInTheDocument();
+  });
+
+  it('previews upstream repositories and expands the full list on demand', async () => {
+    storeState.forks = Array.from({ length: 8 }, (_, index) =>
+      createFork(index + 1, 'tamina', `fork-${index + 1}`),
+    );
+
+    render(<ForkTimeline />);
+
+    const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    expect(within(sidebar).getByText('upstream/fork-6')).toBeInTheDocument();
+    expect(within(sidebar).queryByText('upstream/fork-8')).not.toBeInTheDocument();
+
+    fireEvent.click(within(sidebar).getByRole('button', { name: '显示全部 8 个' }));
+
+    expect(within(sidebar).getByText('upstream/fork-8')).toBeInTheDocument();
+    expect(within(sidebar).getByRole('button', { name: '收起上游仓库' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('filters parent-only forks from the upstream repository shortcut', async () => {
+    const parentOnlyFork = {
+      ...createFork(3, 'tamina', 'parent-only'),
+      source: undefined,
+      parent: {
+        ...createFork(103, 'upstream', 'parent-only').source!,
+      },
+    } as unknown as ForkRepo;
+    storeState.forks = [parentOnlyFork];
+
+    render(<ForkTimeline />);
+
+    const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    fireEvent.click(within(sidebar).getByRole('button', { name: /upstream\/parent-only/ }));
+
+    expect(await screen.findByText('parent-only')).toBeInTheDocument();
+  });
+
+  it('uses the filtered empty state and clears sync filters', async () => {
+    storeState.forks = [personalFork];
+
+    render(<ForkTimeline />);
+
+    fireEvent.click(screen.getByRole('button', { name: '有更新0' }));
+
+    expect(await screen.findByRole('heading', { name: '无符合条件的结果' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '清除搜索' }));
+    expect(await screen.findByText('personal-fork')).toBeInTheDocument();
+  });
+
+  it('keeps the forks sidebar mounted when no forks are cached', async () => {
+    storeState.forks = [];
+
+    render(<ForkTimeline />);
+
+    await screen.findByRole('combobox', { name: '拥有者:' });
+
+    expect(document.querySelectorAll('[data-context-sidebar="forks"]')).toHaveLength(1);
+    const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    expect(within(sidebar).getByText('没有Fork仓库')).toBeInTheDocument();
+    expect(screen.queryAllByText('仓库分类')).toHaveLength(0);
+  });
 });
 
 
@@ -399,10 +518,11 @@ describe('ForkTimeline branch request ordering', () => {
     fireEvent.click(screen.getByText('tamina（个人）'));
     fireEvent.click(await screen.findByRole('option', { name: 'team-org' }));
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
-    await screen.findByText('管理 team-org 的 1 个Fork仓库');
-    const refreshButton = screen.getByText('刷新').closest('button');
+    const sidebar = screen.getByRole('complementary', { name: '复刻' });
+    await within(sidebar).findByText('upstream/org-fork');
+    const refreshButton = within(sidebar).getByRole('button', { name: '刷新' });
     expect(refreshButton).not.toBeNull();
-    fireEvent.click(refreshButton!);
+    fireEvent.click(refreshButton);
     await waitFor(() => {
       expect(checkForkSyncNeeded).toHaveBeenCalledWith('team-org', 'org-fork', 'main', 'upstream/org-fork');
     });

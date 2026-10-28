@@ -43,7 +43,20 @@
     "target-branch": "대상 지점",
     "loading-branches": "지점 목록 로드 중…",
     "cancel": "취소",
-    "sync-branch": "동기화 확인"
+    "sync-branch": "동기화 확인",
+    "filters": "포크 필터",
+    "fork-control-label": "Fork 제어",
+    "fork-status": "Fork 상태",
+    "status": "상태",
+    "all-forks": "모든 Fork",
+    "update-available": "업데이트 있음",
+    "up-to-date": "최신 상태",
+    "check-pending": "확인 대기",
+    "forked-repositories": "업스트림 저장소",
+    "show-all-upstreams": "{{count}}개 모두 표시",
+    "show-fewer-upstreams": "업스트림 저장소 접기",
+    "fork-count": "Fork {{count}}개",
+    "update-count": "업데이트 {{count}}개"
   },
   "releaseCard": {
     "assets-updated": "자산이 업데이트되었습니다.",
@@ -133,6 +146,7 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "감시 창고 동기화를 사용하거나 창고 목록을 릴리스 소스로 사용자 정의할 수도 있습니다.",
     "configure-release-sources": "릴리스 소스 구성",
     "release-timeline": "출시 일정",
+    "release": "릴리스",
     "latest-releases-from-your-activereleaserepocount": "{{activeReleaseRepoCount}} 구독 저장소의 최신 릴리스",
     "pre": "Pre",
     "refresh": "새로 고치다",
@@ -173,7 +187,12 @@
     "previous-page": "이전 페이지",
     "next-page": "다음 페이지",
     "last-page": "마지막 페이지",
-    "last-refresh-time": "마지막 새로고침 {{time}}"
+    "last-refresh-time": "마지막 새로고침 {{time}}",
+    "filters": "릴리스 필터",
+    "inbox-label": "Release 받은편지함",
+    "inbox-section": "받은편지함",
+    "all-releases": "모든 Release",
+    "release-count": "Release {{count}}개"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "이 릴리스에는 다운로드 가능한 자산이 없습니다.",
