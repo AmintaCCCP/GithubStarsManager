@@ -509,7 +509,9 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onChange={(e) => {
                               const value = e.target.value;
                               const graphemeCount = Array.from(value).length;
-                              if (graphemeCount <= 2) {
+                              // CategoryEditModal 生成的 lucide:xxx 图标超过 2 字素，
+                              // 放行该前缀使这类图标值仍可局部编辑
+                              if (graphemeCount <= 2 || value.startsWith('lucide:')) {
                                 setEditIcon(value);
                               }
                             }}

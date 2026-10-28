@@ -70,8 +70,9 @@ export const DiscoverySidebar: React.FC<DiscoverySidebarProps> = ({
   
   const anyLoading = isLoading && typeof isLoading === 'object' ? Object.values(isLoading).some((v): v is boolean => typeof v === 'boolean' && v) : false;
 
+  // 全高纵向 flex：ContextSidebarBody 独立滚动，页脚经 margin-block-start: auto 固定在底部
   return (
-    <div className="w-full shrink-0">
+    <div className="flex h-full min-h-0 w-full shrink-0 flex-col">
       <div className="context-sidebar-head">
         <div className="min-w-0">
           <p className="app-side-eyebrow">{t('discoverySidebar.discovery-label')}</p>
