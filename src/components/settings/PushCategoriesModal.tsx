@@ -4,6 +4,7 @@ import { Modal } from '../Modal';
 import { Button } from '../ui/button';
 import { Checkbox } from '../ui/checkbox';
 import { Category } from '../../types';
+import { CategoryGlyph } from '../CategoryGlyph';
 
 interface PushCategoriesModalProps {
   isOpen: boolean;
@@ -89,8 +90,13 @@ export const PushCategoriesModal: React.FC<PushCategoriesModalProps> = ({
                 checked={!deselectedIds.has(category.id)}
                 onCheckedChange={(checked) => toggle(category.id, checked === true)}
               />
-              <span className="text-sm font-medium text-foreground dark:text-foreground">
-                {category.icon} {category.name}
+              <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground dark:text-foreground">
+                <CategoryGlyph
+                  icon={category.icon}
+                  name={category.name}
+                  categoryId={category.id}
+                />
+                <span className="truncate">{category.name}</span>
               </span>
             </label>
           ))}

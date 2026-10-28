@@ -431,7 +431,7 @@ describe('RepositoryCard view modes', () => {
     await user.click(screen.getByRole('button', { name: '查看 Release' }));
     expect(await screen.findByText('Loading releases…')).toBeInTheDocument();
 
-    const overlay = document.querySelector('[class*="bg-overlay"]') as HTMLElement;
+    const overlay = document.querySelector('.app-dialog-overlay') as HTMLElement;
     await act(async () => {
       if (overlay) fireEvent.pointerDown(overlay);
       fireEvent.pointerDown(document.body);

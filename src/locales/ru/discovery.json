@@ -23,9 +23,13 @@
     "just-now": "только",
     "m-ago": "минут назад",
     "h-ago": "часов назад",
+    "discovery-label": "Обнаружение",
     "discovery-channels": "канал обнаружения",
     "manage-channels": "Управление каналами обнаружения",
-    "refresh-all": "Обновить все"
+    "refresh-all": "Обновить все",
+    "channels-section": "Каналы",
+    "sources-section": "Источники",
+    "channel-count": "Элементов: {{count}}"
   },
   "discoveryView": {
     "all-loaded": "Все загружено",
@@ -184,6 +188,4 @@
     "stars-gained": "+{{v1}} stars с первого наблюдения",
     "first-seen": "Первая запись о лидере: {{v1}}"
   }
-
-
 }

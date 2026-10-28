@@ -16,6 +16,7 @@
   "forkTimeline": {
     "personal-account": "Personal account",
     "fork": "Fork",
+    "filters": "Fork filters",
     "manage-v2-forked-repositories-for-v2": "Manage {{v2}} forked repositories for {{currentOwnerLabel}}",
     "owner": "Owner:",
     "v1-personal": "{{v1}} (Personal)",
@@ -38,12 +39,25 @@
     "no-matching-forks-found": "No matching forks found.",
     "no-forked-repositories-found-for-currentownerlab": "No forked repositories found for {{currentOwnerLabel}}. Refresh or switch owner.",
     "clear-search-2": "Clear Search",
+    "clear-filters": "Clear Filters",
     "sync-upstream": "Sync Upstream",
     "select-the-branch-to-merge-upstream-changes-into": "Select the branch to merge upstream changes into for {{v1}}:",
     "target-branch": "Target Branch",
     "loading-branches": "Loading branches…",
     "cancel": "Cancel",
-    "sync-branch": "Sync Branch"
+    "sync-branch": "Sync Branch",
+    "fork-control-label": "Fork control",
+    "fork-status": "Fork status",
+    "status": "Status",
+    "all-forks": "All forks",
+    "update-available": "Update available",
+    "up-to-date": "Up to date",
+    "check-pending": "Check pending",
+    "forked-repositories": "Upstream repositories",
+    "show-all-upstreams": "Show all {{count}}",
+    "show-fewer-upstreams": "Show fewer upstreams",
+    "fork-count": "{{count}} forks",
+    "update-count": "{{count}} updates"
   },
   "releaseCard": {
     "assets-updated": "Assets updated",
@@ -116,6 +130,7 @@
     "done": "Done"
   },
   "releaseTimeline": {
+    "filters": "Release filters",
     "no-release-subscriptions": "No Release Subscriptions",
     "no-recent-releases": "No Recent Releases",
     "subscribe-to-repository-releases-from-the-reposi": "Subscribe to repository releases from the Repositories tab to see updates here.",
@@ -125,6 +140,8 @@
     "refresh-releases": "Refresh Releases",
     "release-source-settings": "Release Source Settings",
     "sources": "Sources",
+    "expand-sources": "Expand sources",
+    "collapse-sources": "Collapse sources",
     "last-refresh": "Last refresh:",
     "subscribe-to-repository-releases": "Subscribe to Repository Releases",
     "subscribe-to-receive-the-latest-release-updates": "Subscribe to receive the latest release updates from your favorite repositories in one place.",
@@ -133,6 +150,7 @@
     "you-can-also-use-watch-repository-sync-or-a-cust": "You can also use Watch repository sync or a custom repository list as release sources.",
     "configure-release-sources": "Configure Release Sources",
     "release-timeline": "Release Timeline",
+    "release": "Releases",
     "latest-releases-from-your-activereleaserepocount": "Latest releases from your {{activeReleaseRepoCount}} subscribed repositories",
     "pre": "Pre",
     "refresh": "Refresh",
@@ -173,7 +191,11 @@
     "previous-page": "Previous page",
     "next-page": "Next page",
     "last-page": "Last page",
-    "last-refresh-time": "Last refresh {{time}}"
+    "last-refresh-time": "Last refresh {{time}}",
+    "inbox-label": "Release inbox",
+    "inbox-section": "Inbox",
+    "all-releases": "All releases",
+    "release-count": "{{count}} releases"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "This release has no downloadable assets.",

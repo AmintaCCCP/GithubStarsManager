@@ -459,7 +459,7 @@ export const PluginMarketplaceDialog: React.FC<PluginMarketplaceDialogProps> = (
         isOpen={isOpen}
         onClose={onClose}
         title={t('pluginSettingsPanel.community-registry')}
-        maxWidth="max-w-4xl"
+        fullscreen
         scrollable
       >
         <p className="text-sm text-muted-foreground">{t('pluginSettingsPanel.marketplace-description')}</p>

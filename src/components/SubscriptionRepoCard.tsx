@@ -147,9 +147,9 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
 
   return (
     <>
-    <div 
+    <div
       onClick={handleCardClick}
-      className="ui-card p-5 transition-all duration-200 cursor-pointer"
+      className="app-list-row app-discovery-card ui-card transition-all duration-200 cursor-pointer"
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
       onCut={(e) => e.preventDefault()}
@@ -157,7 +157,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     >
       <div className="flex items-start gap-3 sm:gap-4">
         {/* Rank badge */}
-        <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-lg ${rankBadgeClass}`}>
+        <div className={`app-discovery-rank flex-shrink-0 rounded-full flex items-center justify-center font-bold ${rankBadgeClass}`}>
           {repo.rank}
         </div>
 
@@ -179,13 +179,13 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
             </div>
 
             {/* Action buttons */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <div className="app-row-actions flex items-center flex-shrink-0">
               {/* AI Analyze button */}
               <Button
                 size="icon"
                 onClick={handleAnalyze}
                 disabled={!githubToken || isAnalyzing}
-                className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                className="app-row-action disabled:opacity-50 disabled:cursor-not-allowed"
                 title={
                   isAnalyzed 
                     ? t('subscriptionRepoCard.re-analyze') 
@@ -207,7 +207,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
               <Button
                 size="icon"
                 onClick={handleOpenInZRead}
-                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="app-row-action !hidden sm:!inline-flex"
                 title={t('subscriptionRepoCard.open-in-zread')}
               >
                 <BookOpen className="w-4 h-4" />
@@ -219,7 +219,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   <Button
                     size="icon"
                     onClick={handleOpenTelegramMessage}
-                    className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="app-row-action"
                     title={t('subscriptionRepoCard.view-original-channel-message')}
                   >
                     <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -228,7 +228,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   <Button
                     size="icon"
                     onClick={handleOpenTweet}
-                    className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="app-row-action"
                     title={t('subscriptionRepoCard.view-original-post')}
                   >
                     <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -237,7 +237,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                   <Button
                     size="icon"
                     onClick={handleOpenIssue}
-                    className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="app-row-action"
                     title={t('subscriptionRepoCard.view-original-post')}
                   >
                     <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -251,7 +251,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(event) => event.stopPropagation()}
-                className="hidden sm:flex items-center justify-center w-8 h-8 rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="app-row-action !hidden sm:!inline-flex"
                 title={t('subscriptionRepoCard.open-on-github')}
               >
                 <ExternalLink className="w-4 h-4" />
@@ -262,10 +262,10 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
                 size="icon"
                 onClick={handleStar}
                 disabled={!githubToken || isStarring}
-                className={`flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`app-row-action disabled:opacity-50 disabled:cursor-not-allowed ${
                   isStarred
-                    ? 'bg-primary text-primary-foreground shadow-sm dark:bg-primary/80 dark:text-primary-foreground'
-                    : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    ? 'text-primary'
+                    : ''
                 }`}
                 title={isStarred ? t('subscriptionRepoCard.unstar') : t('subscriptionRepoCard.add-star')}
               >

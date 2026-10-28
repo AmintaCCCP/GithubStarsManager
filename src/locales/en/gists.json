@@ -50,6 +50,7 @@
     "save": "Save"
   },
   "gistView": {
+    "library-label": "Gist library",
     "gist-access-requires-the-gist-scope": "Gist access requires the gist scope",
     "if-your-private-gists-are-missing-or-you-cannot": "If your private gists are missing, or you cannot create/edit/delete gists, go to GitHub → Settings → Developer settings → Personal access tokens and make sure the gist scope is checked for your current token. Re-login with the updated token after changing scopes.",
     "search-gists-filenames-or-summaries": "Search gists, filenames, or summaries",
@@ -65,13 +66,23 @@
     "v1-gists": "{{v1}} gists",
     "search-applied": "Search applied",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "No gists yet. Sync to fetch data, or create a new gist.",
+    "no-gists-match-the-current-filters": "No gists match the current filters.",
     "sort-updated": "Updated",
     "sort-created": "Created",
     "sort-name": "Name",
     "sort-files": "Files",
     "category-all": "All gists",
     "category-starred": "Starred gists",
-    "category-mine": "My gists"
+    "category-mine": "My gists",
+    "context-sidebar": "Gist context sidebar",
+    "sidebar-title": "Gist library",
+    "scope": "Scope",
+    "analysis-status": "Analysis status",
+    "analysis-all": "All gists",
+    "analyzed": "Analyzed",
+    "needs-analysis": "Needs analysis",
+    "gist-count": "{{count}} gists",
+    "analyzed-count": "{{count}} analyzed"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub token not found. Please login again.",

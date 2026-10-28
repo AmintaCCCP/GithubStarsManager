@@ -5,7 +5,25 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Switch } from './ui/switch';
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Package, Bell, Search, X, RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, ChevronDown, CheckCircle, Settings } from 'lucide-react';
+import {
+  Package,
+  Search,
+  X,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  LayoutGrid,
+  ChevronDown,
+  CheckCircle,
+  Inbox,
+  Mail,
+  BadgeCheck,
+  PackageOpen,
+  SlidersHorizontal,
+  CheckCircle2,
+} from 'lucide-react';
 import { AssetFilter, Release } from '../types';
 import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import { useAppStore } from '../store/useAppStore';
@@ -14,6 +32,8 @@ import { AssetFilterManager } from './AssetFilterManager';
 import { PRESET_FILTERS } from '../constants/presetFilters';
 import ReleaseCard from './ReleaseCard';
 import { ReleaseSourceSettingsModal } from './ReleaseSourceSettingsModal';
+import { WorkspacePageHeader } from './WorkspacePageHeader';
+import { ContextSidebarBody } from './ContextSidebarBody';
 import {
   releaseBelongsToResolvedSources,
   resolveReleaseSources,
@@ -66,6 +86,8 @@ export const ReleaseTimeline: React.FC = () => {
   const [expandedReleaseNotes, setExpandedReleaseNotes] = useState<Set<number>>(new Set());
   const [fullContentReleases, setFullContentReleases] = useState<Set<number>>(new Set());
   const [isReleaseSourceSettingsOpen, setIsReleaseSourceSettingsOpen] = useState(false);
+  const [releaseSourceRepoFilter, setReleaseSourceRepoFilter] = useState<string | null>(null);
+  const [releaseSourcesExpanded, setReleaseSourcesExpanded] = useState(true);
 
   // 使用全局状态的别名，保持代码一致性
   const viewMode = releaseViewMode;
@@ -79,6 +101,17 @@ export const ReleaseTimeline: React.FC = () => {
     releaseSourceSettings,
   }), [repositories, releaseSubscriptions, releaseSourceSettings]);
   const activeReleaseRepoCount = resolvedReleaseSources.repositories.length;
+
+  useEffect(() => {
+    if (!releaseSourceRepoFilter) return;
+    const sourceKey = normalizeRepoKey(releaseSourceRepoFilter);
+    const sourceStillAvailable = resolvedReleaseSources.entries.some(
+      entry => normalizeRepoKey(entry.repository.full_name) === sourceKey,
+    );
+    if (sourceStillAvailable) return;
+    setReleaseSourceRepoFilter(null);
+    setCurrentPage(1);
+  }, [releaseSourceRepoFilter, resolvedReleaseSources.entries]);
 
   // Format file size helper function
   const formatFileSize = (bytes: number): string => {
@@ -205,6 +238,14 @@ export const ReleaseTimeline: React.FC = () => {
     ),
     [releases, resolvedReleaseSources, includePreRelease]
   );
+  const releaseCountByRepoName = useMemo(() => {
+    const counts = new Map<string, number>();
+    subscribedReleases.forEach((release) => {
+      const key = normalizeRepoKey(release.repository.full_name);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return counts;
+  }, [subscribedReleases]);
 
   // 未读模式下，快照当前未读 release ID，避免标记已读后立即消失
   // 不依赖 readReleases，避免标记已读时重建快照导致列表项立即消失
@@ -284,6 +325,13 @@ export const ReleaseTimeline: React.FC = () => {
   const preUnreadFilteredReleases = useMemo(() => {
     let filtered = releasesWithLinks;
 
+    if (releaseSourceRepoFilter) {
+      const sourceKey = normalizeRepoKey(releaseSourceRepoFilter);
+      filtered = filtered.filter(({ release }) =>
+        normalizeRepoKey(release.repository.full_name) === sourceKey
+      );
+    }
+
     // 搜索过滤
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -312,7 +360,7 @@ export const ReleaseTimeline: React.FC = () => {
         displayLinks: matchedLinks,
         allLinks
       }));
-  }, [releasesWithLinks, searchQuery, selectedFilters]);
+  }, [releasesWithLinks, releaseSourceRepoFilter, searchQuery, selectedFilters]);
 
   // 仅最新模式过滤：每个仓库只保留最新的 release
   const latestModeReleases = useMemo(() => {
@@ -328,6 +376,12 @@ export const ReleaseTimeline: React.FC = () => {
     }
     return Array.from(repoMap.values());
   }, [preUnreadFilteredReleases, releaseLatestMode]);
+  // 「仅显示最新版本」徽标应反映切换后实际会展示的数量：同一筛选范围内
+  // 每个仓库只保留一条最新 release，因此计数等于其中的去重仓库数
+  const latestOnlyRepoCount = useMemo(
+    () => new Set(preUnreadFilteredReleases.map(({ release }) => release.repository.id)).size,
+    [preUnreadFilteredReleases],
+  );
 
   // 未读模式过滤（使用快照，标记已读后不会立即消失，刷新页面后才更新）
   const filteredReleases = useMemo(() => {
@@ -392,6 +446,9 @@ export const ReleaseTimeline: React.FC = () => {
   const totalPages = viewMode === 'timeline'
     ? Math.ceil(filteredReleases.length / itemsPerPage)
     : Math.ceil(repositoryGroups.length / itemsPerPage);
+  const visibleResultCount = viewMode === 'timeline'
+    ? filteredReleases.length
+    : repositoryGroups.length;
   const clampedPage = Math.max(1, Math.min(currentPage, totalPages || 1));
   const startIndex = (clampedPage - 1) * itemsPerPage;
   const paginatedReleases = filteredReleases.slice(startIndex, startIndex + itemsPerPage);
@@ -531,252 +588,355 @@ export const ReleaseTimeline: React.FC = () => {
     return map;
   }, [paginatedReleases, paginatedRepositoryGroups, getTruncatedBody]);
 
+  const releaseHeaderActions = (
+    <div className="app-release-header-actions">
+      {lastRefreshTime && activeReleaseRepoCount > 0 && (
+        <span className="app-workspace-header-note">
+          {t('releaseTimeline.last-refresh-time', {
+            time: formatDistanceToNow(new Date(lastRefreshTime), {
+              addSuffix: true,
+              locale: getDateFnsLocale(language),
+            }),
+          })}
+        </span>
+      )}
+    </div>
+  );
+
+  const releaseToolbarControls = (
+    <div className="app-release-toolbar-controls">
+      <label className="app-release-option">
+        <span>{t('releaseTimeline.include-pre-release')}</span>
+        <Switch
+          checked={includePreRelease}
+          disabled={activeReleaseRepoCount === 0}
+          onCheckedChange={setIncludePreRelease}
+          aria-label={t('releaseTimeline.include-pre-release')}
+        />
+      </label>
+      {activeReleaseRepoCount > 0 && (
+        <Button
+          onClick={handleRefresh}
+          disabled={releaseIsRefreshing}
+          className="ui-button-primary flex items-center gap-2 px-3 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
+          <span>{releaseIsRefreshing ? t('releaseTimeline.refreshing') : t('releaseTimeline.refresh')}</span>
+        </Button>
+      )}
+    </div>
+  );
+
+  const releaseToolbar = (
+    <div className="ui-toolbar app-page-toolbar app-release-toolbar">
+      <div className="app-release-search-row">
+        <div className="app-release-search-field">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder={t('releaseTimeline.search-releases')}
+            value={searchQuery}
+            onChange={(e) => {
+              setReleaseSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="ui-field app-page-search w-full pl-10 pr-12"
+          />
+          {searchQuery && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setReleaseSearchQuery('');
+                setCurrentPage(1);
+              }}
+              aria-label={t('releaseTimeline.clear-search')}
+              className="absolute right-2 top-1/2 h-8 w-8 p-0 -translate-y-1/2 text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+        {releaseToolbarControls}
+      </div>
+    </div>
+  );
+
+  const releaseContextSidebar = (
+    <aside
+      data-context-sidebar="releases"
+      aria-label={t('releaseTimeline.release')}
+      className="context-sidebar w-full shrink-0 lg:w-(--app-sidebar-width) lg:self-start"
+    >
+      <div className="context-sidebar-head">
+        <div>
+          <p className="app-side-eyebrow">{t('releaseTimeline.inbox-label')}</p>
+          <h3 className="app-side-title">
+            {t('releaseTimeline.filters')}
+          </h3>
+        </div>
+      </div>
+      <ContextSidebarBody>
+        <section className="app-side-section" aria-label={t('releaseTimeline.inbox-section')}>
+          <p className="app-section-label app-side-group-label">
+            {t('releaseTimeline.inbox-section')}
+          </p>
+          <div className="app-side-list">
+            <Button
+              variant="ghost"
+              onClick={() => handleShowModeChange('all')}
+              disabled={activeReleaseRepoCount === 0}
+              aria-pressed={releaseShowMode === 'all'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <Inbox className="h-4 w-4" />
+                <span>{t('releaseTimeline.all-releases')}</span>
+              </span>
+              <span className="app-side-count">{subscribedReleases.length}</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => handleShowModeChange('unread')}
+              disabled={activeReleaseRepoCount === 0}
+              aria-pressed={releaseShowMode === 'unread'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <Mail className="h-4 w-4" />
+                <span>{t('releaseTimeline.unread')}</span>
+              </span>
+              <span className="app-side-count">{unreadCount}</span>
+            </Button>
+          </div>
+        </section>
+
+        <section className="app-side-section" aria-label={t('releaseTimeline.version-range')}>
+          <p className="app-section-label app-side-group-label">
+            {t('releaseTimeline.version-range')}
+          </p>
+          <div className="app-side-list">
+            <Button
+              variant="ghost"
+              onClick={() => handleLatestModeChange('all')}
+              disabled={activeReleaseRepoCount === 0}
+              aria-pressed={releaseLatestMode === 'all'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <Package className="h-4 w-4" />
+                <span>{t('releaseTimeline.show-all-versions')}</span>
+              </span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => handleLatestModeChange('latest')}
+              disabled={activeReleaseRepoCount === 0}
+              aria-pressed={releaseLatestMode === 'latest'}
+              className="app-side-item justify-between"
+            >
+              <span className="app-side-item-label">
+                <BadgeCheck className="h-4 w-4" />
+                <span>{t('releaseTimeline.latest-version-only')}</span>
+              </span>
+              <span className="app-side-count">{latestOnlyRepoCount}</span>
+            </Button>
+          </div>
+        </section>
+
+        <section className="app-side-section app-release-asset-filters" aria-label={t('app:assetFilterManager.filters')}>
+          <AssetFilterManager
+            selectedFilters={selectedFilters}
+            onFilterToggle={handleFilterToggle}
+            onClearFilters={handleClearFilters}
+          />
+        </section>
+
+        <section className="app-side-section" aria-label={t('releaseTimeline.sources')}>
+          <div className="app-collection-row">
+            <p className="app-section-label">{t('releaseTimeline.sources')}</p>
+            <div className="flex items-center gap-1">
+              <Button
+                onClick={() => setIsReleaseSourceSettingsOpen(true)}
+                variant="ghost"
+                size="icon"
+                className="linear-icon-button"
+                title={t('releaseTimeline.release-source-settings')}
+                aria-label={t('releaseTimeline.release-source-settings')}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={() => setReleaseSourcesExpanded((expanded) => !expanded)}
+                variant="ghost"
+                size="icon"
+                className="linear-icon-button"
+                title={releaseSourcesExpanded
+                  ? t('releaseTimeline.collapse-sources')
+                  : t('releaseTimeline.expand-sources')}
+                aria-label={releaseSourcesExpanded
+                  ? t('releaseTimeline.collapse-sources')
+                  : t('releaseTimeline.expand-sources')}
+                aria-expanded={releaseSourcesExpanded}
+                aria-controls="release-source-list"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${releaseSourcesExpanded ? '' : '-rotate-90'}`} />
+              </Button>
+            </div>
+          </div>
+          {releaseSourcesExpanded && (
+            <div id="release-source-list" className="app-side-list">
+              {resolvedReleaseSources.entries.length === 0 ? (
+                <p className="app-side-empty">{t('releaseTimeline.sources-2')}</p>
+              ) : resolvedReleaseSources.entries.map((entry) => {
+                const repoName = entry.repository.full_name;
+                const count = releaseCountByRepoName.get(normalizeRepoKey(repoName)) ?? 0;
+                return (
+                  <Button
+                    key={repoName}
+                    variant="ghost"
+                    onClick={() => {
+                      setReleaseSourceRepoFilter((current) =>
+                        current && normalizeRepoKey(current) === normalizeRepoKey(repoName)
+                          ? null
+                          : repoName
+                      );
+                      setCurrentPage(1);
+                    }}
+                    aria-pressed={
+                      !!releaseSourceRepoFilter &&
+                      normalizeRepoKey(releaseSourceRepoFilter) === normalizeRepoKey(repoName)
+                    }
+                    className="app-side-item justify-between"
+                    title={repoName}
+                  >
+                    <span className="app-side-item-label">
+                      <PackageOpen className="h-4 w-4" />
+                      <span className="truncate">{repoName}</span>
+                    </span>
+                    <span className="app-side-count">{count}</span>
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </ContextSidebarBody>
+      <div className="context-sidebar-foot">
+        <div className="app-side-foot-status">
+          <span className="app-status-dot" aria-hidden="true" />
+          <span>{t('releaseTimeline.release')}</span>
+        </div>
+        <div className="app-side-foot-meta">
+          <span>{t('releaseTimeline.release-count', { count: subscribedReleases.length })}</span>
+          {lastRefreshTime && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+        </div>
+      </div>
+    </aside>
+  );
+
   if (subscribedReleases.length === 0) {
     const subscribedRepoCount = activeReleaseRepoCount;
 
     return (
       <>
-      <div className="text-center py-12">
-               <Package className="w-16 h-16 text-muted-foreground dark:text-quaternary mx-auto mb-4" />
-         <h3 className="text-lg font-medium text-foreground dark:text-foreground mb-2">
-          {subscribedRepoCount === 0 ? t('releaseTimeline.no-release-subscriptions') : t('releaseTimeline.no-recent-releases')}
-        </h3>
-             <p className="text-muted-foreground dark:text-muted-foreground mb-6 max-w-md mx-auto">
-               {subscribedRepoCount === 0
-                 ? t('releaseTimeline.subscribe-to-repository-releases-from-the-reposi')
-                 : t('releaseTimeline.you-re-subscribed-to-subscribedrepocount-reposit', { subscribedRepoCount: subscribedRepoCount })
-               }
-             </p>
-        
-        {/* Pre-release toggle + Refresh button */}
-        {subscribedRepoCount > 0 && (
-           <div className="mb-6 flex flex-col items-center gap-3">
-             {/* Pre-release toggle */}
-             <div className="flex items-center gap-2 select-none">
-               <Switch
-                 checked={includePreRelease}
-                 onCheckedChange={setIncludePreRelease}
-                 aria-label={t('releaseTimeline.include-pre-release')}
-               />
-               <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-                 {t('releaseTimeline.include-pre-release')}
-               </span>
-             </div>
-
-             <div className="flex flex-wrap items-center justify-center gap-2">
-               {/* Refresh button */}
-               <Button
-                 onClick={handleRefresh}
-                 disabled={releaseIsRefreshing}
-                 className="flex items-center space-x-2 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                 <RefreshCw className={`w-5 h-5 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-                 <span>{releaseIsRefreshing ? t('releaseTimeline.refreshing') : t('releaseTimeline.refresh-releases')}</span>
-               </Button>
-               <Button
-                 onClick={() => setIsReleaseSourceSettingsOpen(true)}
-                 className="flex items-center space-x-2 px-4 py-3 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-lg hover:bg-accent dark:hover:bg-accent transition-colors"
-                 title={t('releaseTimeline.release-source-settings')}
-               >
-                 <Settings className="w-5 h-5" />
-                 <span>{t('releaseTimeline.sources')}</span>
-               </Button>
-             </div>
-            {lastRefreshTime && (
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('releaseTimeline.last-refresh-time', { time: formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
-              </p>
-            )}
-          </div>
-        )}
-
-        {subscribedRepoCount === 0 && (
-          <div className="bg-muted dark:bg-muted/20 border border-border dark:border-border rounded-xl p-6 max-w-lg mx-auto">
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0 w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                <Bell className="w-6 h-6 text-primary " />
+        <div className="route-workspace">
+          {releaseContextSidebar}
+          <div className="workspace-content app-workspace-content">
+            <WorkspacePageHeader
+              eyebrow={t('releaseTimeline.inbox-label')}
+              section={t('app:header.menu-releases')}
+              title={t('releaseTimeline.release-timeline')}
+              description={t('releaseTimeline.latest-releases-from-your-activereleaserepocount', {
+                activeReleaseRepoCount: subscribedRepoCount,
+              })}
+              actions={releaseHeaderActions}
+            />
+            {releaseToolbar}
+            <div className="ui-empty-state app-empty-state">
+              <div className="app-empty-visual">
+                <Package className="h-6 w-6" aria-hidden="true" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-muted-foreground dark:text-muted-foreground mb-2">
-                  {t('releaseTimeline.subscribe-to-repository-releases')}
+              <div className="app-empty-copy">
+                <h3 className="app-empty-title">
+                  {subscribedRepoCount === 0 ? t('releaseTimeline.no-release-subscriptions') : t('releaseTimeline.no-recent-releases')}
                 </h3>
-                <p className="text-sm text-muted-foreground dark:text-muted-foreground mb-3 leading-relaxed">
-                  {t('releaseTimeline.subscribe-to-receive-the-latest-release-updates')}
+                <p className="app-empty-description">
+                  {subscribedRepoCount === 0
+                    ? t('releaseTimeline.subscribe-to-repository-releases-from-the-reposi')
+                    : t('releaseTimeline.you-re-subscribed-to-subscribedrepocount-reposit', { subscribedRepoCount: subscribedRepoCount })}
                 </p>
-                <div className="bg-card dark:bg-card/60 rounded-lg p-3 text-sm">
-                  <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium mb-2">
-                    <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs">1</span>
-                    <span>{t('releaseTimeline.go-to-repositories')}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-muted-foreground dark:text-muted-foreground font-medium">
-                    <span className="w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs">2</span>
-                    <span>{t('releaseTimeline.click-the-bell-icon-on-any-repository-card')}</span>
-                  </div>
-                </div>
-                <div className="mt-4 rounded-lg bg-card dark:bg-card/60 p-3 text-sm text-muted-foreground dark:text-muted-foreground">
-                  <p className="mb-3">
+              </div>
+
+              {subscribedRepoCount === 0 && (
+                <>
+                  <ol className="app-empty-steps">
+                    <li className="app-empty-step">
+                      <span className="app-empty-step-marker" aria-hidden="true">1</span>
+                      <span>{t('releaseTimeline.go-to-repositories')}</span>
+                    </li>
+                    <li className="app-empty-step">
+                      <span className="app-empty-step-marker" aria-hidden="true">2</span>
+                      <span>{t('releaseTimeline.click-the-bell-icon-on-any-repository-card')}</span>
+                    </li>
+                  </ol>
+                  <p className="app-empty-note">
                     {t('releaseTimeline.you-can-also-use-watch-repository-sync-or-a-cust')}
                   </p>
-                  <Button
-                    onClick={() => setIsReleaseSourceSettingsOpen(true)}
-                    className="inline-flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    title={t('releaseTimeline.release-source-settings')}
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>{t('releaseTimeline.configure-release-sources')}</span>
-                  </Button>
-                </div>
-              </div>
+                </>
+              )}
             </div>
           </div>
-        )}
-      </div>
-      <ReleaseSourceSettingsModal
-        isOpen={isReleaseSourceSettingsOpen}
-        onClose={() => setIsReleaseSourceSettingsOpen(false)}
-      />
+        </div>
+        <ReleaseSourceSettingsModal
+          isOpen={isReleaseSourceSettingsOpen}
+          onClose={() => setIsReleaseSourceSettingsOpen(false)}
+        />
       </>
     );
   }
 
   return (
-    <div className="max-w-full mx-auto px-2 sm:px-4">
+    <>
+      <div className="route-workspace">
+        {releaseContextSidebar}
+        <div className="workspace-content app-workspace-content">
+          <div className="w-full">
       {/* Header */}
       <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col gap-4 mb-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-foreground dark:text-foreground mb-2">
-              {t('releaseTimeline.release-timeline')}
-            </h2>
-            <p className="text-muted-foreground dark:text-muted-foreground">
-              {t('releaseTimeline.latest-releases-from-your-activereleaserepocount', { activeReleaseRepoCount: activeReleaseRepoCount })}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            {/* Last Refresh Time */}
-            {lastRefreshTime && (
-              <span className="w-full text-sm text-muted-foreground dark:text-muted-foreground lg:w-auto">
-                {t('releaseTimeline.last-refresh-time', { time: formatDistanceToNow(new Date(lastRefreshTime), { addSuffix: true, locale: getDateFnsLocale(language) }) })}
-              </span>
-            )}
+        <WorkspacePageHeader
+          eyebrow={t('releaseTimeline.inbox-label')}
+          section={t('app:header.menu-releases')}
+          title={t('releaseTimeline.release-timeline')}
+          description={t('releaseTimeline.latest-releases-from-your-activereleaserepocount', { activeReleaseRepoCount: activeReleaseRepoCount })}
+          actions={(
+            releaseHeaderActions
+          )}
+        />
 
-            {/* Pre-release toggle */}
-            <div className="flex items-center gap-1.5 select-none">
-              <Switch
-                checked={includePreRelease}
-                onCheckedChange={setIncludePreRelease}
-                aria-label={t('releaseTimeline.include-pre-release')}
-              />
-              <span className="hidden text-xs text-muted-foreground dark:text-muted-foreground sm:inline">
-                {t('releaseTimeline.pre')}
-              </span>
-            </div>
-
-            {/* Refresh Button */}
-            <Button
-              onClick={handleRefresh}
-              disabled={releaseIsRefreshing}
-              className="ui-button-primary flex items-center space-x-2 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`w-4 h-4 ${releaseIsRefreshing ? 'animate-spin' : ''}`} />
-              <span>{releaseIsRefreshing ? t('releaseTimeline.refreshing') : t('releaseTimeline.refresh')}</span>
-            </Button>
-            <Button
-              onClick={() => setIsReleaseSourceSettingsOpen(true)}
-              variant="ghost"
-              className="ui-button flex items-center space-x-2 px-3 py-2"
-              title={t('releaseTimeline.release-source-settings')}
-            >
-              <Settings className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
-              <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('releaseTimeline.sources-2')}</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="ui-toolbar p-3 sm:p-4 mb-4">
-          {/* Search Bar */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 w-5 h-5" />
-            <Input
-              type="text"
-              placeholder={t('releaseTimeline.search-releases')}
-              value={searchQuery}
-              onChange={(e) => {
-                setReleaseSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="ui-field w-full pl-10 pr-12 py-2 text-foreground dark:text-foreground"
-            />
-            {searchQuery && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setReleaseSearchQuery('');
-                  setCurrentPage(1);
-                }}
-                aria-label={t('releaseTimeline.clear-search')}
-                className="absolute right-2 top-1/2 h-8 w-8 p-0 transform -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70 hover:text-muted-foreground dark:text-muted-foreground dark:hover:text-muted-foreground"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-
-          {/* Filters and View Toggle Row */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="flex-1">
-              <AssetFilterManager
-                selectedFilters={selectedFilters}
-                onFilterToggle={handleFilterToggle}
-                onClearFilters={handleClearFilters}
-              />
-            </div>
-
-            {/* View Mode Select */}
-            <Select
-              value={viewMode}
-              onValueChange={(value) => {
-                if (value === 'timeline' || value === 'repository') {
-                  setReleaseViewMode(value);
-                  setCurrentPage(1);
-                }
-              }}
-            >
-              <SelectTrigger
-                aria-label={t('releaseTimeline.view-mode')}
-                className="ui-field h-9 w-48 px-3 py-1 text-sm"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="timeline">{t('releaseTimeline.timeline-view')}</SelectItem>
-                <SelectItem value="repository">{t('releaseTimeline.repository-view')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        {releaseToolbar}
 
         {/* Results Info and Controls */}
         <div className="flex flex-col gap-2 mb-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-            <span className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {viewMode === 'timeline'
-                ? releaseShowMode === 'unread'
-                  ? t('releaseTimeline.showing-v1-v2-of-v3-unread-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length, v4: preUnreadFilteredReleases.length })
-                  : t('releaseTimeline.showing-v1-v2-of-v3-releases', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length })
-                : releaseShowMode === 'unread'
-                  ? t('releaseTimeline.showing-v1-v2-of-v3-unread-repos-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, repositoryGroups.length), v3: repositoryGroups.length, v4: preUnreadFilteredReleases.length })
-                  : t('releaseTimeline.showing-v1-v2-of-v3-repositories', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, repositoryGroups.length), v3: repositoryGroups.length })
-              }
-            </span>
+            {visibleResultCount > 0 && (
+              <span className="text-sm text-muted-foreground dark:text-muted-foreground">
+                {viewMode === 'timeline'
+                  ? releaseShowMode === 'unread'
+                    ? t('releaseTimeline.showing-v1-v2-of-v3-unread-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length, v4: preUnreadFilteredReleases.length })
+                    : t('releaseTimeline.showing-v1-v2-of-v3-releases', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, filteredReleases.length), v3: filteredReleases.length })
+                  : releaseShowMode === 'unread'
+                    ? t('releaseTimeline.showing-v1-v2-of-v3-unread-repos-total-v4', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, repositoryGroups.length), v3: repositoryGroups.length, v4: preUnreadFilteredReleases.length })
+                    : t('releaseTimeline.showing-v1-v2-of-v3-repositories', { v1: startIndex + 1, v2: Math.min(startIndex + itemsPerPage, repositoryGroups.length), v3: repositoryGroups.length })
+                }
+              </span>
+            )}
             {releaseShowMode === 'all' && unreadCount > 0 && (
               <span className="text-sm text-primary dark:text-primary">
                 ({unreadCount} {t('releaseTimeline.unread')})
               </span>
             )}
-            {(searchQuery || selectedFilters.length > 0) && (
+            {(searchQuery || releaseSourceRepoFilter || selectedFilters.length > 0) && (
               <span className="text-sm text-primary dark:text-primary">
                 ({t('releaseTimeline.filtered')})
               </span>
@@ -789,38 +949,6 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
 
           <div className="flex w-full flex-wrap items-center justify-start gap-3 lg:w-auto lg:justify-end">
-            {/* Show Mode Select */}
-            <Select value={releaseShowMode} onValueChange={(value) => {
-              if (value === 'all' || value === 'unread') handleShowModeChange(value);
-            }}>
-              <SelectTrigger
-                aria-label={t('releaseTimeline.display-range')}
-                className="ui-field h-9 w-44 px-3 py-1 text-sm"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('releaseTimeline.show-all')}</SelectItem>
-                <SelectItem value="unread">{t('releaseTimeline.unread-only')}</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Latest Mode Select */}
-            <Select value={releaseLatestMode} onValueChange={(value) => {
-              if (value === 'all' || value === 'latest') handleLatestModeChange(value);
-            }}>
-              <SelectTrigger
-                aria-label={t('releaseTimeline.version-range')}
-                className="ui-field h-9 w-48 px-3 py-1 text-sm"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('releaseTimeline.show-all-versions')}</SelectItem>
-                <SelectItem value="latest">{t('releaseTimeline.latest-version-only')}</SelectItem>
-              </SelectContent>
-            </Select>
-
             {/* Items per page selector */}
             <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
               <span className="whitespace-nowrap text-sm text-muted-foreground dark:text-muted-foreground">{t('releaseTimeline.per-page')}</span>
@@ -841,27 +969,51 @@ export const ReleaseTimeline: React.FC = () => {
               {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
               <span className="text-sm font-medium text-foreground dark:text-muted-foreground">{t('releaseTimeline.mark-all-read')}</span>
             </Button>
+            <Select
+              value={viewMode}
+              onValueChange={(value) => {
+                if (value === 'timeline' || value === 'repository') {
+                  setReleaseViewMode(value);
+                  setCurrentPage(1);
+                }
+              }}
+            >
+              <SelectTrigger
+                aria-label={t('releaseTimeline.view-mode')}
+                className="ui-field app-release-view-select"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="timeline">{t('releaseTimeline.timeline-view')}</SelectItem>
+                <SelectItem value="repository">{t('releaseTimeline.repository-view')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
 
        {/* Releases List */}
-       <div className="space-y-2">
+       <div className="app-flat-list app-release-list">
          {paginatedReleases.length === 0 ? (
-           <div className="ui-empty-state text-center py-12">
-            <Package className="w-12 h-12 text-muted-foreground dark:text-muted-foreground mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-foreground dark:text-muted-foreground mb-1">
-              {releaseShowMode === 'unread'
-                ? t('releaseTimeline.no-unread-releases')
-                : t('releaseTimeline.no-matching-results')}
-            </h3>
-            <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-              {releaseShowMode === 'unread'
-                ? t('releaseTimeline.all-releases-have-been-marked-as-read')
-                : selectedFilters.length > 0
-                  ? t('releaseTimeline.no-assets-match-the-current-filters-try-differen')
-                  : t('releaseTimeline.no-matching-releases-found')}
-            </p>
+           <div className="ui-empty-state app-empty-state">
+            <div className="app-empty-visual">
+              <Package className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <div className="app-empty-copy">
+              <h3 className="app-empty-title">
+                {releaseShowMode === 'unread' && unreadCount === 0
+                  ? t('releaseTimeline.no-unread-releases')
+                  : t('releaseTimeline.no-matching-results')}
+              </h3>
+              <p className="app-empty-description">
+                {releaseShowMode === 'unread' && unreadCount === 0
+                  ? t('releaseTimeline.all-releases-have-been-marked-as-read')
+                  : selectedFilters.length > 0
+                    ? t('releaseTimeline.no-assets-match-the-current-filters-try-differen')
+                    : t('releaseTimeline.no-matching-releases-found')}
+              </p>
+            </div>
             {releaseShowMode === 'unread' && (
               <Button
                 onClick={() => handleShowModeChange('all')}
@@ -1109,6 +1261,9 @@ export const ReleaseTimeline: React.FC = () => {
         isOpen={isReleaseSourceSettingsOpen}
         onClose={() => setIsReleaseSourceSettingsOpen(false)}
       />
-    </div>
+        </div>
+      </div>
+      </div>
+    </>
   );
 };

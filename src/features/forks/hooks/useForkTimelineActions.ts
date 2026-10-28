@@ -220,7 +220,12 @@ export const useForkTimelineActions = () => {
         try {
           const result = await api.checkForkSyncNeeded(owner, repo, fork.default_branch || 'main', fork.parent?.full_name || fork.source?.full_name);
           if (!isCurrentSession(requestSession)) return;
-          setNeedsSyncMap(previous => ({ ...previous, [fork.id]: result.needsSync }));
+          setNeedsSyncMap(previous => {
+            const next = { ...previous };
+            if (result.needsSync === undefined) delete next[fork.id];
+            else next[fork.id] = result.needsSync;
+            return next;
+          });
           if (result.parentFullName && result.parentHtmlUrl && !fork.parent && !fork.source) {
             useAppStore.setState(current => ({
               forks: current.forks.map(item => item.id === fork.id ? {
@@ -231,7 +236,11 @@ export const useForkTimelineActions = () => {
           }
         } catch {
           if (isCurrentSession(requestSession)) {
-            setNeedsSyncMap(previous => ({ ...previous, [fork.id]: false }));
+            setNeedsSyncMap(previous => {
+              const next = { ...previous };
+              delete next[fork.id];
+              return next;
+            });
           }
         }
       }));

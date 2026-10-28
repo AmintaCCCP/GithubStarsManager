@@ -11,783 +11,50 @@ import { useDialog } from '../hooks/useDialog';
 import { validateCategoryName } from '../utils/categoryUtils';
 import { useStarSyncActions } from '../features/settings/hooks/useStarSyncActions';
 import { GITHUB_LISTS_NAME_MAX_LENGTH } from '../store/helpers/listsPushPlan';
+import { CategoryGlyph } from './CategoryGlyph';
 
-// Complete emoji collection for categories
-const availableIcons = [
-  // 笑脸和人物
-  { name: '😀', icon: '😀' },
-  { name: '😃', icon: '😃' },
-  { name: '😄', icon: '😄' },
-  { name: '😁', icon: '😁' },
-  { name: '😆', icon: '😆' },
-  { name: '😅', icon: '😅' },
-  { name: '🤣', icon: '🤣' },
-  { name: '😂', icon: '😂' },
-  { name: '🙂', icon: '🙂' },
-  { name: '🙃', icon: '🙃' },
-  { name: '😉', icon: '😉' },
-  { name: '😊', icon: '😊' },
-  { name: '😇', icon: '😇' },
-  { name: '🥰', icon: '🥰' },
-  { name: '😍', icon: '😍' },
-  { name: '🤩', icon: '🤩' },
-  { name: '😘', icon: '😘' },
-  { name: '😗', icon: '😗' },
-  { name: '😚', icon: '😚' },
-  { name: '😙', icon: '😙' },
-  { name: '🥲', icon: '🥲' },
-  { name: '😋', icon: '😋' },
-  { name: '😛', icon: '😛' },
-  { name: '😜', icon: '😜' },
-  { name: '🤪', icon: '🤪' },
-  { name: '😝', icon: '😝' },
-  { name: '🤑', icon: '🤑' },
-  { name: '🤗', icon: '🤗' },
-  { name: '🤭', icon: '🤭' },
-  { name: '🤫', icon: '🤫' },
-  { name: '🤔', icon: '🤔' },
-  { name: '🤐', icon: '🤐' },
-  { name: '🤨', icon: '🤨' },
-  { name: '😐', icon: '😐' },
-  { name: '😑', icon: '😑' },
-  { name: '😶', icon: '😶' },
-  { name: '😏', icon: '😏' },
-  { name: '😒', icon: '😒' },
-  { name: '🙄', icon: '🙄' },
-  { name: '😬', icon: '😬' },
-  { name: '🤥', icon: '🤥' },
-  { name: '😔', icon: '😔' },
-  { name: '😪', icon: '😪' },
-  { name: '🤤', icon: '🤤' },
-  { name: '😴', icon: '😴' },
-  { name: '😷', icon: '😷' },
-  { name: '🤒', icon: '🤒' },
-  { name: '🤕', icon: '🤕' },
-  { name: '🤢', icon: '🤢' },
-  { name: '🤮', icon: '🤮' },
-  { name: '🤧', icon: '🤧' },
-  { name: '🥵', icon: '🥵' },
-  { name: '🥶', icon: '🥶' },
-  { name: '🥴', icon: '🥴' },
-  { name: '😵', icon: '😵' },
-  { name: '🤯', icon: '🤯' },
-  { name: '🤠', icon: '🤠' },
-  { name: '🥳', icon: '🥳' },
-  { name: '🥸', icon: '🥸' },
-  { name: '😎', icon: '😎' },
-  { name: '🤓', icon: '🤓' },
-  { name: '🧐', icon: '🧐' },
-  { name: '😕', icon: '😕' },
-  { name: '😟', icon: '😟' },
-  { name: '🙁', icon: '🙁' },
-  { name: '😮', icon: '😮' },
-  { name: '😯', icon: '😯' },
-  { name: '😲', icon: '😲' },
-  { name: '😳', icon: '😳' },
-  { name: '🥺', icon: '🥺' },
-  { name: '😦', icon: '😦' },
-  { name: '😧', icon: '😧' },
-  { name: '😨', icon: '😨' },
-  { name: '😰', icon: '😰' },
-  { name: '😥', icon: '😥' },
-  { name: '😢', icon: '😢' },
-  { name: '😭', icon: '😭' },
-  { name: '😱', icon: '😱' },
-  { name: '😖', icon: '😖' },
-  { name: '😣', icon: '😣' },
-  { name: '😞', icon: '😞' },
-  { name: '😓', icon: '😓' },
-  { name: '😩', icon: '😩' },
-  { name: '😫', icon: '😫' },
-  { name: '🥱', icon: '🥱' },
-  { name: '😤', icon: '😤' },
-  { name: '😡', icon: '😡' },
-  { name: '😠', icon: '😠' },
-  { name: '🤬', icon: '🤬' },
-  { name: '😈', icon: '😈' },
-  { name: '👿', icon: '👿' },
-  { name: '💀', icon: '💀' },
-  { name: '☠️', icon: '☠️' },
-  { name: '💩', icon: '💩' },
-  { name: '🤡', icon: '🤡' },
-  { name: '👹', icon: '👹' },
-  { name: '👺', icon: '👺' },
-  { name: '👻', icon: '👻' },
-  { name: '👽', icon: '👽' },
-  { name: '👾', icon: '👾' },
-  { name: '🤖', icon: '🤖' },
-  
-  // 手势和身体部位
-  { name: '👋', icon: '👋' },
-  { name: '🤚', icon: '🤚' },
-  { name: '🖐️', icon: '🖐️' },
-  { name: '✋', icon: '✋' },
-  { name: '🖖', icon: '🖖' },
-  { name: '👌', icon: '👌' },
-  { name: '🤌', icon: '🤌' },
-  { name: '🤏', icon: '🤏' },
-  { name: '✌️', icon: '✌️' },
-  { name: '🤞', icon: '🤞' },
-  { name: '🤟', icon: '🤟' },
-  { name: '🤘', icon: '🤘' },
-  { name: '🤙', icon: '🤙' },
-  { name: '👈', icon: '👈' },
-  { name: '👉', icon: '👉' },
-  { name: '👆', icon: '👆' },
-  { name: '🖕', icon: '🖕' },
-  { name: '👇', icon: '👇' },
-  { name: '☝️', icon: '☝️' },
-  { name: '👍', icon: '👍' },
-  { name: '👎', icon: '👎' },
-  { name: '✊', icon: '✊' },
-  { name: '👊', icon: '👊' },
-  { name: '🤛', icon: '🤛' },
-  { name: '🤜', icon: '🤜' },
-  { name: '👏', icon: '👏' },
-  { name: '🙌', icon: '🙌' },
-  { name: '👐', icon: '👐' },
-  { name: '🤲', icon: '🤲' },
-  { name: '🤝', icon: '🤝' },
-  { name: '🙏', icon: '🙏' },
-  { name: '✍️', icon: '✍️' },
-  { name: '💅', icon: '💅' },
-  { name: '🤳', icon: '🤳' },
-  { name: '💪', icon: '💪' },
-  { name: '🦾', icon: '🦾' },
-  { name: '🦿', icon: '🦿' },
-  { name: '🦵', icon: '🦵' },
-  { name: '🦶', icon: '🦶' },
-  { name: '👂', icon: '👂' },
-  { name: '🦻', icon: '🦻' },
-  { name: '👃', icon: '👃' },
-  { name: '🧠', icon: '🧠' },
-  { name: '🫀', icon: '🫀' },
-  { name: '🫁', icon: '🫁' },
-  { name: '🦷', icon: '🦷' },
-  { name: '🦴', icon: '🦴' },
-  { name: '👀', icon: '👀' },
-  { name: '👁️', icon: '👁️' },
-  { name: '👅', icon: '👅' },
-  { name: '👄', icon: '👄' },
-  
-  // 人物和职业
-  { name: '👶', icon: '👶' },
-  { name: '🧒', icon: '🧒' },
-  { name: '👦', icon: '👦' },
-  { name: '👧', icon: '👧' },
-  { name: '🧑', icon: '🧑' },
-  { name: '👱', icon: '👱' },
-  { name: '👨', icon: '👨' },
-  { name: '🧔', icon: '🧔' },
-  { name: '👩', icon: '👩' },
-  { name: '🧓', icon: '🧓' },
-  { name: '👴', icon: '👴' },
-  { name: '👵', icon: '👵' },
-  { name: '🙍', icon: '🙍' },
-  { name: '🙎', icon: '🙎' },
-  { name: '🙅', icon: '🙅' },
-  { name: '🙆', icon: '🙆' },
-  { name: '💁', icon: '💁' },
-  { name: '🙋', icon: '🙋' },
-  { name: '🧏', icon: '🧏' },
-  { name: '🙇', icon: '🙇' },
-  { name: '🤦', icon: '🤦' },
-  { name: '🤷', icon: '🤷' },
-  { name: '👨‍⚕️', icon: '👨‍⚕️' },
-  { name: '👩‍⚕️', icon: '👩‍⚕️' },
-  { name: '👨‍🌾', icon: '👨‍🌾' },
-  { name: '👩‍🌾', icon: '👩‍🌾' },
-  { name: '👨‍🍳', icon: '👨‍🍳' },
-  { name: '👩‍🍳', icon: '👩‍🍳' },
-  { name: '👨‍🎓', icon: '👨‍🎓' },
-  { name: '👩‍🎓', icon: '👩‍🎓' },
-  { name: '👨‍🎤', icon: '👨‍🎤' },
-  { name: '👩‍🎤', icon: '👩‍🎤' },
-  { name: '👨‍🏫', icon: '👨‍🏫' },
-  { name: '👩‍🏫', icon: '👩‍🏫' },
-  { name: '👨‍🏭', icon: '👨‍🏭' },
-  { name: '👩‍🏭', icon: '👩‍🏭' },
-  { name: '👨‍💻', icon: '👨‍💻' },
-  { name: '👩‍💻', icon: '👩‍💻' },
-  { name: '👨‍💼', icon: '👨‍💼' },
-  { name: '👩‍💼', icon: '👩‍💼' },
-  { name: '👨‍🔧', icon: '👨‍🔧' },
-  { name: '👩‍🔧', icon: '👩‍🔧' },
-  { name: '👨‍🔬', icon: '👨‍🔬' },
-  { name: '👩‍🔬', icon: '👩‍🔬' },
-  { name: '👨‍🎨', icon: '👨‍🎨' },
-  { name: '👩‍🎨', icon: '👩‍🎨' },
-  { name: '👨‍🚒', icon: '👨‍🚒' },
-  { name: '👩‍🚒', icon: '👩‍🚒' },
-  { name: '👨‍✈️', icon: '👨‍✈️' },
-  { name: '👩‍✈️', icon: '👩‍✈️' },
-  { name: '👨‍🚀', icon: '👨‍🚀' },
-  { name: '👩‍🚀', icon: '👩‍🚀' },
-  { name: '👨‍⚖️', icon: '👨‍⚖️' },
-  { name: '👩‍⚖️', icon: '👩‍⚖️' },
-  { name: '👰', icon: '👰' },
-  { name: '🤵', icon: '🤵' },
-  { name: '👸', icon: '👸' },
-  { name: '🤴', icon: '🤴' },
-  { name: '🥷', icon: '🥷' },
-  { name: '🦸', icon: '🦸' },
-  { name: '🦹', icon: '🦹' },
-  { name: '🧙', icon: '🧙' },
-  { name: '🧚', icon: '🧚' },
-  { name: '🧛', icon: '🧛' },
-  { name: '🧜', icon: '🧜' },
-  { name: '🧝', icon: '🧝' },
-  { name: '🧞', icon: '🧞' },
-  { name: '🧟', icon: '🧟' },
-  { name: '💆', icon: '💆' },
-  { name: '💇', icon: '💇' },
-  { name: '🚶', icon: '🚶' },
-  { name: '🧍', icon: '🧍' },
-  { name: '🧎', icon: '🧎' },
-  { name: '🏃', icon: '🏃' },
-  { name: '💃', icon: '💃' },
-  { name: '🕺', icon: '🕺' },
-  { name: '🕴️', icon: '🕴️' },
-  { name: '👯', icon: '👯' },
-  { name: '🧖', icon: '🧖' },
-  { name: '🧗', icon: '🧗' },
-  { name: '🤺', icon: '🤺' },
-  { name: '🏇', icon: '🏇' },
-  { name: '⛷️', icon: '⛷️' },
-  { name: '🏂', icon: '🏂' },
-  { name: '🏌️', icon: '🏌️' },
-  { name: '🏄', icon: '🏄' },
-  { name: '🚣', icon: '🚣' },
-  { name: '🏊', icon: '🏊' },
-  { name: '⛹️', icon: '⛹️' },
-  { name: '🏋️', icon: '🏋️' },
-  { name: '🚴', icon: '🚴' },
-  { name: '🚵', icon: '🚵' },
-  { name: '🤸', icon: '🤸' },
-  { name: '🤼', icon: '🤼' },
-  { name: '🤽', icon: '🤽' },
-  { name: '🤾', icon: '🤾' },
-  { name: '🤹', icon: '🤹' },
-  { name: '🧘', icon: '🧘' },
-  { name: '🛀', icon: '🛀' },
-  { name: '🛌', icon: '🛌' },
-  
-  // 文件和文档
-  { name: '📁', icon: '📁' },
-  { name: '📂', icon: '📂' },
-  { name: '📄', icon: '📄' },
-  { name: '📋', icon: '📋' },
-  { name: '📊', icon: '📊' },
-  { name: '📈', icon: '📈' },
-  { name: '📉', icon: '📉' },
-  { name: '📝', icon: '📝' },
-  { name: '📚', icon: '📚' },
-  { name: '📖', icon: '📖' },
-  { name: '📑', icon: '📑' },
-  { name: '🗂️', icon: '🗂️' },
-  { name: '🗃️', icon: '🗃️' },
-  { name: '🗄️', icon: '🗄️' },
-  { name: '📇', icon: '📇' },
-  
-  // 技术和开发
-  { name: '💻', icon: '💻' },
-  { name: '🖥️', icon: '🖥️' },
-  { name: '⌨️', icon: '⌨️' },
-  { name: '🖱️', icon: '🖱️' },
-  { name: '💾', icon: '💾' },
-  { name: '💿', icon: '💿' },
-  { name: '📀', icon: '📀' },
-  { name: '🔧', icon: '🔧' },
-  { name: '🔨', icon: '🔨' },
-  { name: '⚙️', icon: '⚙️' },
-  { name: '🛠️', icon: '🛠️' },
-  { name: '🔩', icon: '🔩' },
-  { name: '⚡', icon: '⚡' },
-  { name: '🔌', icon: '🔌' },
-  { name: '🔋', icon: '🔋' },
-  { name: '🖨️', icon: '🖨️' },
-  { name: '⌨️', icon: '⌨️' },
-  { name: '🖱️', icon: '🖱️' },
-  { name: '🖲️', icon: '🖲️' },
-  
-  // 网络和通信
-  { name: '🌐', icon: '🌐' },
-  { name: '🌍', icon: '🌍' },
-  { name: '🌎', icon: '🌎' },
-  { name: '🌏', icon: '🌏' },
-  { name: '📡', icon: '📡' },
-  { name: '📶', icon: '📶' },
-  { name: '📱', icon: '📱' },
-  { name: '📞', icon: '📞' },
-  { name: '☎️', icon: '☎️' },
-  { name: '📧', icon: '📧' },
-  { name: '📨', icon: '📨' },
-  { name: '📩', icon: '📩' },
-  { name: '📬', icon: '📬' },
-  { name: '📭', icon: '📭' },
-  { name: '📮', icon: '📮' },
-  { name: '📪', icon: '📪' },
-  { name: '📫', icon: '📫' },
-  { name: '📯', icon: '📯' },
-  { name: '📢', icon: '📢' },
-  { name: '📣', icon: '📣' },
-  
-  // 多媒体
-  { name: '🎵', icon: '🎵' },
-  { name: '🎶', icon: '🎶' },
-  { name: '🎤', icon: '🎤' },
-  { name: '🎧', icon: '🎧' },
-  { name: '📻', icon: '📻' },
-  { name: '📺', icon: '📺' },
-  { name: '📹', icon: '📹' },
-  { name: '📷', icon: '📷' },
-  { name: '📸', icon: '📸' },
-  { name: '🎥', icon: '🎥' },
-  { name: '🎬', icon: '🎬' },
-  { name: '🎭', icon: '🎭' },
-  { name: '🎨', icon: '🎨' },
-  { name: '🖌️', icon: '🖌️' },
-  { name: '🖍️', icon: '🖍️' },
-  { name: '✏️', icon: '✏️' },
-  { name: '✒️', icon: '✒️' },
-  { name: '🖊️', icon: '🖊️' },
-  { name: '🖋️', icon: '🖋️' },
-  { name: '🖍️', icon: '🖍️' },
-  { name: '📐', icon: '📐' },
-  { name: '📏', icon: '📏' },
-  { name: '📌', icon: '📌' },
-  { name: '📍', icon: '📍' },
-  { name: '🖋️', icon: '🖋️' },
-  
-  // 游戏和娱乐
-  { name: '🎮', icon: '🎮' },
-  { name: '🕹️', icon: '🕹️' },
-  { name: '🎯', icon: '🎯' },
-  { name: '🎲', icon: '🎲' },
-  { name: '🃏', icon: '🃏' },
-  { name: '🎰', icon: '🎰' },
-  { name: '🎪', icon: '🎪' },
-  { name: '🎨', icon: '🎨' },
-  { name: '🎭', icon: '🎭' },
-  { name: '🎪', icon: '🎪' },
-  { name: '🎨', icon: '🎨' },
-  
-  // 安全和保护
-  // 安全和保护
-  { name: '🔒', icon: '🔒' },
-  { name: '🔓', icon: '🔓' },
-  { name: '🔐', icon: '🔐' },
-  { name: '🔑', icon: '🔑' },
-  { name: '🗝️', icon: '🗝️' },
-  { name: '🛡️', icon: '🛡️' },
-  { name: '🔰', icon: '🔰' },
-  { name: '⚔️', icon: '⚔️' },
-  
-  // 搜索和导航
-  { name: '🔍', icon: '🔍' },
-  { name: '🔎', icon: '🔎' },
-  { name: '🧭', icon: '🧭' },
-  { name: '🗺️', icon: '🗺️' },
-  { name: '📍', icon: '📍' },
-  { name: '📌', icon: '📌' },
-  { name: '📎', icon: '📎' },
-  { name: '🔗', icon: '🔗' },
-  { name: '⛓️', icon: '⛓️' },
-  { name: '🧭', icon: '🧭' },
-  
-  // 云和存储
-  { name: '☁️', icon: '☁️' },
-  { name: '⛅', icon: '⛅' },
-  { name: '🌤️', icon: '🌤️' },
-  { name: '📦', icon: '📦' },
-  { name: '📫', icon: '📫' },
-  { name: '🗳️', icon: '🗳️' },
-  { name: '🗂️', icon: '🗂️' },
-  { name: '🗃️', icon: '🗃️' },
-  { name: '🗄️', icon: '🗄️' },
-  { name: '🗑️', icon: '🗑️' },
-  
-  // 人物和社交
-  { name: '👤', icon: '👤' },
-  { name: '👥', icon: '👥' },
-  { name: '👨‍💻', icon: '👨‍💻' },
-  { name: '👩‍💻', icon: '👩‍💻' },
-  { name: '🤖', icon: '🤖' },
-  { name: '👾', icon: '👾' },
-  { name: '👥', icon: '👥' },
-  { name: '👪', icon: '👪' },
-  { name: '👫', icon: '👫' },
-  { name: '👬', icon: '👬' },
-  
-  // 符号和标记
-  { name: '⭐', icon: '⭐' },
-  { name: '🌟', icon: '🌟' },
-  { name: '✨', icon: '✨' },
-  { name: '💫', icon: '💫' },
-  { name: '❤️', icon: '❤️' },
-  { name: '💙', icon: '💙' },
-  { name: '💚', icon: '💚' },
-  { name: '💛', icon: '💛' },
-  { name: '🧡', icon: '🧡' },
-  { name: '💜', icon: '💜' },
-  { name: '🖤', icon: '🖤' },
-  { name: '🤍', icon: '🤍' },
-  { name: '💯', icon: '💯' },
-  { name: '✅', icon: '✅' },
-  { name: '❌', icon: '❌' },
-  { name: '⚠️', icon: '⚠️' },
-  { name: '🚀', icon: '🚀' },
-  { name: '🎉', icon: '🎉' },
-  { name: '🎊', icon: '🎊' },
-  { name: '🔥', icon: '🔥' },
-  { name: '💎', icon: '💎' },
-  { name: '🏆', icon: '🏆' },
-  { name: '🥇', icon: '🥇' },
-  { name: '🥈', icon: '🥈' },
-  { name: '🥉', icon: '🥉' },
-  { name: '🏅', icon: '🏅' },
-  
-  // 箭头和方向
-  { name: '⬆️', icon: '⬆️' },
-  { name: '⬇️', icon: '⬇️' },
-  { name: '⬅️', icon: '⬅️' },
-  { name: '➡️', icon: '➡️' },
-  { name: '↗️', icon: '↗️' },
-  { name: '↘️', icon: '↘️' },
-  { name: '↙️', icon: '↙️' },
-  { name: '↖️', icon: '↖️' },
-  { name: '🔄', icon: '🔄' },
-  { name: '🔃', icon: '🔃' },
-  { name: '🔁', icon: '🔁' },
-  { name: '🔂', icon: '🔂' },
-  { name: '⤴️', icon: '⤴️' },
-  { name: '⤵️', icon: '⤵️' },
-  { name: '🔀', icon: '🔀' },
-  { name: '🔄', icon: '🔄' },
-  { name: '🔃', icon: '🔃' },
-  { name: '🔁', icon: '🔁' },
-  { name: '🔂', icon: '🔂' },
-  { name: '▶️', icon: '▶️' },
-  
-  // 其他常用
-  { name: '📅', icon: '📅' },
-  { name: '📆', icon: '📆' },
-  { name: '🗓️', icon: '🗓️' },
-  { name: '⏰', icon: '⏰' },
-  { name: '⏱️', icon: '⏱️' },
-  { name: '⏲️', icon: '⏲️' },
-  { name: '🕐', icon: '🕐' },
-  { name: '📐', icon: '📐' },
-  { name: '📏', icon: '📏' },
-  { name: '♻️', icon: '♻️' },
-  { name: '🔄', icon: '🔄' },
-  { name: '➕', icon: '➕' },
-  { name: '➖', icon: '➖' },
-  { name: '✖️', icon: '✖️' },
-  { name: '➗', icon: '➗' },
-  { name: '🟢', icon: '🟢' },
-  { name: '🔴', icon: '🔴' },
-  { name: '🟡', icon: '🟡' },
-  { name: '🔵', icon: '🔵' },
-  { name: '🟣', icon: '🟣' },
-  { name: '🟠', icon: '🟠' },
-  { name: '⚫', icon: '⚫' },
-  { name: '⚪', icon: '⚪' },
-  
-  // 动物和自然
-  { name: '🐶', icon: '🐶' },
-  { name: '🐱', icon: '🐱' },
-  { name: '🐭', icon: '🐭' },
-  { name: '🐹', icon: '🐹' },
-  { name: '🐰', icon: '🐰' },
-  { name: '🦊', icon: '🦊' },
-  { name: '🐻', icon: '🐻' },
-  { name: '🐼', icon: '🐼' },
-  { name: '🐨', icon: '🐨' },
-  { name: '🐯', icon: '🐯' },
-  { name: '🦁', icon: '🦁' },
-  { name: '🐮', icon: '🐮' },
-  { name: '🐷', icon: '🐷' },
-  { name: '🐽', icon: '🐽' },
-  { name: '🐸', icon: '🐸' },
-  { name: '🐵', icon: '🐵' },
-  { name: '🙈', icon: '🙈' },
-  { name: '🙉', icon: '🙉' },
-  { name: '🙊', icon: '🙊' },
-  { name: '🐒', icon: '🐒' },
-  { name: '🐔', icon: '🐔' },
-  { name: '🐧', icon: '🐧' },
-  { name: '🐦', icon: '🐦' },
-  { name: '🐤', icon: '🐤' },
-  { name: '🐣', icon: '🐣' },
-  { name: '🐥', icon: '🐥' },
-  { name: '🦆', icon: '🦆' },
-  { name: '🦅', icon: '🦅' },
-  { name: '🦉', icon: '🦉' },
-  { name: '🦇', icon: '🦇' },
-  { name: '🐺', icon: '🐺' },
-  { name: '🐗', icon: '🐗' },
-  { name: '🐴', icon: '🐴' },
-  { name: '🦄', icon: '🦄' },
-  { name: '🐝', icon: '🐝' },
-  { name: '🐛', icon: '🐛' },
-  { name: '🦋', icon: '🦋' },
-  { name: '🐌', icon: '🐌' },
-  { name: '🐞', icon: '🐞' },
-  { name: '🐜', icon: '🐜' },
-  { name: '🦟', icon: '🦟' },
-  { name: '🦗', icon: '🦗' },
-  { name: '🕷️', icon: '🕷️' },
-  { name: '🕸️', icon: '🕸️' },
-  { name: '🦂', icon: '🦂' },
-  { name: '🐢', icon: '🐢' },
-  { name: '🐍', icon: '🐍' },
-  { name: '🦎', icon: '🦎' },
-  { name: '🦖', icon: '🦖' },
-  { name: '🦕', icon: '🦕' },
-  { name: '🐙', icon: '🐙' },
-  { name: '🦑', icon: '🦑' },
-  { name: '🦐', icon: '🦐' },
-  { name: '🦞', icon: '🦞' },
-  { name: '🦀', icon: '🦀' },
-  { name: '🐡', icon: '🐡' },
-  { name: '🐠', icon: '🐠' },
-  { name: '🐟', icon: '🐟' },
-  { name: '🐬', icon: '🐬' },
-  { name: '🐳', icon: '🐳' },
-  { name: '🐋', icon: '🐋' },
-  { name: '🦈', icon: '🦈' },
-  { name: '🐊', icon: '🐊' },
-  { name: '🐅', icon: '🐅' },
-  { name: '🐆', icon: '🐆' },
-  { name: '🦓', icon: '🦓' },
-  { name: '🦍', icon: '🦍' },
-  { name: '🦧', icon: '🦧' },
-  { name: '🐘', icon: '🐘' },
-  { name: '🦛', icon: '🦛' },
-  { name: '🦏', icon: '🦏' },
-  { name: '🐪', icon: '🐪' },
-  { name: '🐫', icon: '🐫' },
-  { name: '🦒', icon: '🦒' },
-  { name: '🦘', icon: '🦘' },
-  { name: '🐃', icon: '🐃' },
-  { name: '🐂', icon: '🐂' },
-  { name: '🐄', icon: '🐄' },
-  { name: '🐎', icon: '🐎' },
-  { name: '🐖', icon: '🐖' },
-  { name: '🐏', icon: '🐏' },
-  { name: '🐑', icon: '🐑' },
-  { name: '🦙', icon: '🦙' },
-  { name: '🐐', icon: '🐐' },
-  { name: '🦌', icon: '🦌' },
-  { name: '🐕', icon: '🐕' },
-  { name: '🐩', icon: '🐩' },
-  { name: '🦮', icon: '🦮' },
-  { name: '🐕‍🦺', icon: '🐕‍🦺' },
-  { name: '🐈', icon: '🐈' },
-  { name: '🐈‍⬛', icon: '🐈‍⬛' },
-  { name: '🐓', icon: '🐓' },
-  { name: '🦃', icon: '🦃' },
-  { name: '🦚', icon: '🦚' },
-  { name: '🦜', icon: '🦜' },
-  { name: '🦢', icon: '🦢' },
-  { name: '🦩', icon: '🦩' },
-  { name: '🕊️', icon: '🕊️' },
-  { name: '🐇', icon: '🐇' },
-  { name: '🦝', icon: '🦝' },
-  { name: '🦨', icon: '🦨' },
-  { name: '🦡', icon: '🦡' },
-  { name: '🦦', icon: '🦦' },
-  { name: '🦥', icon: '🦥' },
-  { name: '🐁', icon: '🐁' },
-  { name: '🐀', icon: '🐀' },
-  { name: '🐿️', icon: '🐿️' },
-  { name: '🦔', icon: '🦔' },
-  
-  // 植物和食物
-  { name: '🌲', icon: '🌲' },
-  { name: '🌳', icon: '🌳' },
-  { name: '🌴', icon: '🌴' },
-  { name: '🌵', icon: '🌵' },
-  { name: '🌶️', icon: '🌶️' },
-  { name: '🍄', icon: '🍄' },
-  { name: '🌰', icon: '🌰' },
-  { name: '🌱', icon: '🌱' },
-  { name: '🌿', icon: '🌿' },
-  { name: '☘️', icon: '☘️' },
-  { name: '🍀', icon: '🍀' },
-  { name: '🎋', icon: '🎋' },
-  { name: '🎍', icon: '🎍' },
-  { name: '🍎', icon: '🍎' },
-  { name: '🍊', icon: '🍊' },
-  { name: '🍋', icon: '🍋' },
-  { name: '🍌', icon: '🍌' },
-  { name: '🍉', icon: '🍉' },
-  { name: '🍇', icon: '🍇' },
-  { name: '🍓', icon: '🍓' },
-  { name: '🫐', icon: '🫐' },
-  { name: '🍈', icon: '🍈' },
-  { name: '🍒', icon: '🍒' },
-  { name: '🍑', icon: '🍑' },
-  { name: '🥭', icon: '🥭' },
-  { name: '🍍', icon: '🍍' },
-  { name: '🥥', icon: '🥥' },
-  { name: '🥝', icon: '🥝' },
-  { name: '🍅', icon: '🍅' },
-  { name: '🍆', icon: '🍆' },
-  { name: '🥑', icon: '🥑' },
-  { name: '🥦', icon: '🥦' },
-  { name: '🥬', icon: '🥬' },
-  { name: '🥒', icon: '🥒' },
-  { name: '🌶️', icon: '🌶️' },
-  { name: '🫑', icon: '🫑' },
-  { name: '🌽', icon: '🌽' },
-  { name: '🥕', icon: '🥕' },
-  { name: '🫒', icon: '🫒' },
-  { name: '🧄', icon: '🧄' },
-  { name: '🧅', icon: '🧅' },
-  { name: '🥔', icon: '🥔' },
-  { name: '🍠', icon: '🍠' },
-  { name: '🥐', icon: '🥐' },
-  { name: '🥖', icon: '🥖' },
-  { name: '🍞', icon: '🍞' },
-  { name: '🥨', icon: '🥨' },
-  { name: '🥯', icon: '🥯' },
-  { name: '🥞', icon: '🥞' },
-  { name: '🧇', icon: '🧇' },
-  { name: '🧀', icon: '🧀' },
-  { name: '🍖', icon: '🍖' },
-  { name: '🍗', icon: '🍗' },
-  { name: '🥩', icon: '🥩' },
-  { name: '🥓', icon: '🥓' },
-  { name: '🍔', icon: '🍔' },
-  { name: '🍟', icon: '🍟' },
-  { name: '🍕', icon: '🍕' },
-  { name: '🌭', icon: '🌭' },
-  { name: '🥪', icon: '🥪' },
-  { name: '🌮', icon: '🌮' },
-  { name: '🌯', icon: '🌯' },
-  { name: '🫔', icon: '🫔' },
-  { name: '🥙', icon: '🥙' },
-  { name: '🧆', icon: '🧆' },
-  { name: '🥚', icon: '🥚' },
-  { name: '🍳', icon: '🍳' },
-  { name: '🥘', icon: '🥘' },
-  { name: '🍲', icon: '🍲' },
-  { name: '🫕', icon: '🫕' },
-  { name: '🥣', icon: '🥣' },
-  { name: '🥗', icon: '🥗' },
-  { name: '🍿', icon: '🍿' },
-  { name: '🧈', icon: '🧈' },
-  { name: '🧂', icon: '🧂' },
-  { name: '🥫', icon: '🥫' },
-  { name: '🍱', icon: '🍱' },
-  { name: '🍘', icon: '🍘' },
-  { name: '🍙', icon: '🍙' },
-  { name: '🍚', icon: '🍚' },
-  { name: '🍛', icon: '🍛' },
-  { name: '🍜', icon: '🍜' },
-  { name: '🍝', icon: '🍝' },
-  { name: '🍠', icon: '🍠' },
-  { name: '🍢', icon: '🍢' },
-  { name: '🍣', icon: '🍣' },
-  { name: '🍤', icon: '🍤' },
-  { name: '🍥', icon: '🍥' },
-  { name: '🥮', icon: '🥮' },
-  { name: '🍡', icon: '🍡' },
-  { name: '🥟', icon: '🥟' },
-  { name: '🥠', icon: '🥠' },
-  { name: '🥡', icon: '🥡' },
-  
-  // 交通工具
-  { name: '🚗', icon: '🚗' },
-  { name: '🚕', icon: '🚕' },
-  { name: '🚙', icon: '🚙' },
-  { name: '🚌', icon: '🚌' },
-  { name: '🚎', icon: '🚎' },
-  { name: '🏎️', icon: '🏎️' },
-  { name: '🚓', icon: '🚓' },
-  { name: '🚑', icon: '🚑' },
-  { name: '🚒', icon: '🚒' },
-  { name: '🚐', icon: '🚐' },
-  { name: '🛻', icon: '🛻' },
-  { name: '🚚', icon: '🚚' },
-  { name: '🚛', icon: '🚛' },
-  { name: '🚜', icon: '🚜' },
-  { name: '🏍️', icon: '🏍️' },
-  { name: '🛵', icon: '🛵' },
-  { name: '🚲', icon: '🚲' },
-  { name: '🛴', icon: '🛴' },
-  { name: '🛹', icon: '🛹' },
-  { name: '🛼', icon: '🛼' },
-  { name: '🚁', icon: '🚁' },
-  { name: '🛸', icon: '🛸' },
-  { name: '✈️', icon: '✈️' },
-  { name: '🛩️', icon: '🛩️' },
-  { name: '🛫', icon: '🛫' },
-  { name: '🛬', icon: '🛬' },
-  { name: '🪂', icon: '🪂' },
-  { name: '💺', icon: '💺' },
-  { name: '🚀', icon: '🚀' },
-  { name: '🛰️', icon: '🛰️' },
-  { name: '🚉', icon: '🚉' },
-  { name: '🚞', icon: '🚞' },
-  { name: '🚝', icon: '🚝' },
-  { name: '🚄', icon: '🚄' },
-  { name: '🚅', icon: '🚅' },
-  { name: '🚈', icon: '🚈' },
-  { name: '🚂', icon: '🚂' },
-  { name: '🚆', icon: '🚆' },
-  { name: '🚇', icon: '🚇' },
-  { name: '🚊', icon: '🚊' },
-  { name: '🚋', icon: '🚋' },
-  { name: '🚃', icon: '🚃' },
-  { name: '🚋', icon: '🚋' },
-  { name: '🚎', icon: '🚎' },
-  { name: '🚐', icon: '🚐' },
-  { name: '🚑', icon: '🚑' },
-  { name: '🚒', icon: '🚒' },
-  { name: '🚓', icon: '🚓' },
-  { name: '🚔', icon: '🚔' },
-  { name: '🚕', icon: '🚕' },
-  { name: '🚖', icon: '🚖' },
-  { name: '🚗', icon: '🚗' },
-  { name: '🚘', icon: '🚘' },
-  { name: '🚙', icon: '🚙' },
-  { name: '🛻', icon: '🛻' },
-  { name: '🚚', icon: '🚚' },
-  { name: '🚛', icon: '🚛' },
-  { name: '🚜', icon: '🚜' },
-  { name: '🏎️', icon: '🏎️' },
-  { name: '🏍️', icon: '🏍️' },
-  { name: '🛵', icon: '🛵' },
-  { name: '🦽', icon: '🦽' },
-  { name: '🦼', icon: '🦼' },
-  { name: '🛺', icon: '🛺' },
-  { name: '🚲', icon: '🚲' },
-  { name: '🛴', icon: '🛴' },
-  { name: '🛹', icon: '🛹' },
-  { name: '🛼', icon: '🛼' },
-  { name: '🚏', icon: '🚏' },
-  { name: '🛣️', icon: '🛣️' },
-  { name: '🛤️', icon: '🛤️' },
-  { name: '🛢️', icon: '🛢️' },
-  { name: '⛽', icon: '⛽' },
-  { name: '🚨', icon: '🚨' },
-  { name: '🚥', icon: '🚥' },
-  { name: '🚦', icon: '🚦' },
-  { name: '🛑', icon: '🛑' },
-  { name: '🚧', icon: '🚧' },
-  { name: '⚓', icon: '⚓' },
-  { name: '⛵', icon: '⛵' },
-  { name: '🛶', icon: '🛶' },
-  { name: '🚤', icon: '🚤' },
-  { name: '🛳️', icon: '🛳️' },
-  { name: '⛴️', icon: '⛴️' },
-  { name: '🚢', icon: '🚢' },
-];
-
-const uniqueAvailableIcons = Array.from(new Map(availableIcons.map((icon) => [icon.name, icon])).values());
+const CATEGORY_ICON_CHOICES = [
+  ['folder', 'Folder'],
+  ['layers', 'Layers'],
+  ['brain-circuit', 'AI'],
+  ['bot', 'Agent'],
+  ['blocks', 'Blocks'],
+  ['cable', 'MCP'],
+  ['sparkles', 'Skills'],
+  ['network', 'Network'],
+  ['globe', 'Web'],
+  ['smartphone', 'Mobile'],
+  ['monitor', 'Desktop'],
+  ['database', 'Database'],
+  ['code', 'Code'],
+  ['terminal', 'Terminal'],
+  ['wrench', 'Tools'],
+  ['shield', 'Security'],
+  ['gamepad', 'Games'],
+  ['palette', 'Design'],
+  ['zap', 'Productivity'],
+  ['graduation', 'Education'],
+  ['book-open', 'Knowledge'],
+  ['clapperboard', 'Media'],
+  ['users', 'Social'],
+  ['chart-no-axes-column', 'Analytics'],
+  ['package', 'Package'],
+  ['flask', 'Experiment'],
+  ['rocket', 'Launch'],
+  ['star', 'Star'],
+  ['tag', 'Tag'],
+  ['lock', 'Private'],
+  ['search', 'Search'],
+  ['file-text', 'Document'],
+  ['git-branch', 'Branch'],
+  ['workflow', 'Workflow'],
+  ['plug', 'Integration'],
+  ['cloud', 'Cloud'],
+  ['cpu', 'Hardware'],
+  ['timer', 'Time'],
+  ['music', 'Music'],
+  ['video', 'Video'],
+] as const satisfies ReadonlyArray<readonly [string, string]>;
 
 interface CategoryEditModalProps {
   isOpen: boolean;
@@ -839,7 +106,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   
   const [formData, setFormData] = useState({
     name: '',
-    icon: 'Folder',
+    icon: 'lucide:folder',
     keywords: ''
   });
   const [customIcon, setCustomIcon] = useState('');
@@ -855,7 +122,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
     } else if (isCreating) {
       setFormData({
         name: '',
-        icon: '📁',
+        icon: 'lucide:folder',
         keywords: ''
       });
     }
@@ -917,20 +184,18 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
     setCustomIcon('');
   }, []);
 
-  const iconGrid = useMemo(() => uniqueAvailableIcons.map((iconItem) => (
+  const iconGrid = useMemo(() => CATEGORY_ICON_CHOICES.map(([key, label]) => (
     <Button
-      key={iconItem.name}
+      key={key}
+      type="button"
       variant="ghost"
-      aria-pressed={formData.icon === iconItem.icon}
-      onClick={() => handleIconSelect(iconItem.icon)}
-      className={`p-2 rounded-lg text-xl hover:bg-muted dark:hover:bg-accent transition-colors ${
-        formData.icon === iconItem.icon
-          ? 'bg-primary/20 dark:bg-primary/30 ring-2 ring-ring'
-          : 'bg-background dark:bg-muted/40'
-      }`}
-      title={iconItem.icon}
+      aria-label={label}
+      aria-pressed={formData.icon === `lucide:${key}`}
+      onClick={() => handleIconSelect(`lucide:${key}`)}
+      className="app-category-icon-option"
+      title={label}
     >
-      {iconItem.icon}
+      <CategoryGlyph icon={key} name={label} />
     </Button>
   )), [formData.icon, handleIconSelect]);
 
@@ -945,7 +210,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
   const handleClose = () => {
     setFormData({
       name: '',
-      icon: 'Folder',
+      icon: 'lucide:folder',
       keywords: ''
     });
     setCustomIcon('');
@@ -959,11 +224,12 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
       onClose={handleClose}
       title={isCreating ? t('categoryEditModal.add-category') : t('categoryEditModal.edit-category')}
       maxWidth="max-w-lg"
+      contentClassName="app-category-editor-dialog"
     >
-      <div className="space-y-4">
+      <div className="app-category-editor">
         {/* Category Name */}
-        <div>
-          <label htmlFor="category-name" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+        <div className="app-form-field">
+          <label htmlFor="category-name" className="app-form-label">
             {t('categoryEditModal.category-name')} *
           </label>
           <Input
@@ -971,43 +237,43 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             type="text"
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="ui-field w-full"
             placeholder={t('categoryEditModal.enter-category-name')}
             autoFocus
           />
           {isNameTooLong && (
-            <p className="mt-1 text-xs text-warning">
+            <p className="app-form-hint text-warning">
               {t('categoryEditModal.name-too-long-for-github-list', { max: GITHUB_LISTS_NAME_MAX_LENGTH })}
             </p>
           )}
         </div>
 
         {/* Icon Selection */}
-        <div>
-          <label className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+        <div className="app-form-field">
+          <label className="app-form-label">
             {t('categoryEditModal.select-icon')} 
-            <span className="text-xs text-muted-foreground dark:text-muted-foreground ml-2">
-              ({uniqueAvailableIcons.length}+ {t('categoryEditModal.available')})
+            <span className="app-form-label-meta">
+              ({CATEGORY_ICON_CHOICES.length} {t('categoryEditModal.available')})
             </span>
           </label>
           
           {/* Custom Icon Input */}
           {showCustomInput && (
-            <div className="mb-3 p-3 bg-muted dark:bg-primary/10 border border-border dark:border-primary/20 rounded-lg">
-              <div className="flex items-center space-x-2">
+            <div className="app-category-custom-icon">
+              <div className="app-category-custom-icon-row">
                 <Input
                   aria-label={t('categoryEditModal.custom-icon')}
                   type="text"
                   value={customIcon}
                   onChange={(e) => setCustomIcon(e.target.value)}
                   placeholder={t('categoryEditModal.enter-any-emoji')}
-                  className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground text-center text-lg"
+                  className="ui-field flex-1 text-center"
                   autoFocus
                 />
                 <Button
                   onClick={handleCustomIconSubmit}
                   disabled={!customIcon.trim()}
-                  className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 dark:bg-primary/80 dark:hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="ui-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {t('categoryEditModal.ok')}
                 </Button>
@@ -1017,41 +283,40 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     setShowCustomInput(false);
                     setCustomIcon('');
                   }}
-                  className="px-3 py-2 bg-muted hover:bg-accent dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:bg-accent dark:hover:bg-accent dark:text-muted-foreground"
+                  className="ui-button"
                 >
                   {t('categoryEditModal.cancel')}
                 </Button>
               </div>
-              <p className="text-xs text-primary dark:text-primary mt-2">
+              <p className="app-form-hint text-primary">
                 {t('categoryEditModal.tip-you-can-enter-any-emoji-like-etc')}
               </p>
             </div>
           )}
           
-          <div className="grid grid-cols-8 gap-2 max-h-64 overflow-y-auto border border-border dark:border-border rounded-lg p-3">
+          <div className="app-category-icon-grid">
             {iconGrid}
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground dark:text-muted-foreground">
-            <span className="whitespace-nowrap">{t('categoryEditModal.selected')} {formData.icon}</span>
+          <div className="app-category-editor-meta">
+            <span className="app-category-editor-selection whitespace-nowrap">
+              {t('categoryEditModal.selected')}
+              <CategoryGlyph icon={formData.icon} name={formData.name} />
+            </span>
             <Button
               type="button"
               onClick={() => setShowCustomInput(true)}
               variant="ghost"
-              size="sm"
-              className="h-8 gap-1 px-2 py-1 text-sm text-primary dark:text-primary hover:underline"
+              className="app-category-custom-trigger"
             >
-              <Plus className="h-3 w-3" />
+              <Plus aria-hidden="true" />
               {t('categoryEditModal.custom-emoji')}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-            {t('categoryEditModal.includes-all-common-emoji-categories-smileys-peo')}
-          </p>
         </div>
 
         {/* Keywords */}
-        <div>
-          <label htmlFor="category-keywords" className="block text-sm font-medium text-foreground dark:text-foreground mb-2">
+        <div className="app-form-field">
+          <label htmlFor="category-keywords" className="app-form-label">
             {t('categoryEditModal.keywords')}
           </label>
           <Input
@@ -1059,22 +324,22 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
             type="text"
             value={formData.keywords}
             onChange={(e) => setFormData(prev => ({ ...prev, keywords: e.target.value }))}
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-muted/40 text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="ui-field w-full"
             placeholder={t('categoryEditModal.comma-separated-keywords')}
           />
-          <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
+          <p className="app-form-hint">
             {t('categoryEditModal.used-to-automatically-match-repositories-to-this')}
           </p>
         </div>
 
         {/* Default Category Modified Hint */}
         {category && !category.isCustom && isDefaultCategoryModified && originalCategory && (
-          <div className="p-3 bg-muted dark:bg-warning/10 rounded-lg border border-border dark:border-warning/20">
-            <p className="text-xs text-warning mb-2">
+          <div className="app-form-notice">
+            <p className="app-form-hint text-warning">
               {t('categoryEditModal.this-default-category-has-been-modified-original', { v1: originalCategory.icon, v2: originalCategory.name })}
             </p>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs text-warning">{t('categoryEditModal.reset')}</span>
+            <div className="app-form-inline-actions">
+              <span>{t('categoryEditModal.reset')}</span>
               {hasNameIconModified && (
                 <Button
                   size="sm"
@@ -1086,7 +351,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       icon: originalCategory.icon
                     }));
                   }}
-                  className="text-xs px-2 py-1 bg-muted text-muted-foreground dark:bg-warning/20 dark:text-warning rounded hover:bg-accent dark:hover:bg-warning/30 transition-colors"
+                  className="ui-button"
                 >
                   {t('categoryEditModal.name-icon')}
                 </Button>
@@ -1101,7 +366,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                       keywords: originalCategory.keywords.join(', ')
                     }));
                   }}
-                  className="text-xs px-2 py-1 bg-muted text-muted-foreground dark:bg-warning/20 dark:text-warning rounded hover:bg-accent dark:hover:bg-warning/30 transition-colors"
+                  className="ui-button"
                 >
                   {t('categoryEditModal.keywords')}
                 </Button>
@@ -1116,7 +381,7 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                     keywords: originalCategory.keywords.join(', ')
                   });
                 }}
-                className="text-xs px-2 py-1 bg-muted text-muted-foreground dark:bg-destructive/20 dark:text-destructive rounded hover:bg-accent dark:hover:bg-destructive/30 transition-colors"
+                className="ui-button text-destructive"
               >
                 {t('categoryEditModal.all')}
               </Button>
@@ -1125,15 +390,15 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
         )}
 
         {category && !category.isCustom && !isDefaultCategoryModified && (
-          <div className="p-3 bg-muted dark:bg-primary/10 rounded-lg border border-primary/20">
-            <p className="text-xs text-primary dark:text-primary">
+          <div className="app-form-notice">
+            <p className="app-form-hint text-primary">
               {t('categoryEditModal.editing-default-category-will-override-original')}
             </p>
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between space-x-3 pt-4 border-t dark:border-border mt-4">
+        <div className="app-category-editor-footer">
           <div>
             {canPush && (
               <Button
@@ -1141,28 +406,28 @@ export const CategoryEditModal: React.FC<CategoryEditModalProps> = ({
                 onClick={handlePush}
                 disabled={!!hasChanges || isListsPushRunning}
                 title={hasChanges ? t('categoryEditModal.save-changes-before-push') : undefined}
-                className="flex items-center space-x-2 px-4 py-2"
+                className="ui-button"
               >
-                <ListPlus className="w-4 h-4" />
+                <ListPlus aria-hidden="true" />
                 <span>{t('categoryEditModal.push-to-github-list')}</span>
               </Button>
             )}
           </div>
-          <div className="flex space-x-3">
+          <div className="app-dialog-actions">
           <Button
             variant="outline"
             onClick={handleClose}
-            className="flex items-center space-x-2 px-4 py-2 text-foreground dark:text-foreground bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent dark:border dark:border-border transition-colors"
+            className="ui-button"
           >
-            <X className="w-4 h-4" />
+            <X aria-hidden="true" />
             <span>{t('categoryEditModal.cancel')}</span>
           </Button>
           <Button
             onClick={handleSave}
             disabled={!hasChanges}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${hasChanges ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground dark:bg-card/5 dark:text-muted-foreground cursor-not-allowed'}`}
+            className="ui-button-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-4 h-4" />
+            <Save aria-hidden="true" />
             <span>{t('categoryEditModal.save')}</span>
           </Button>
           </div>

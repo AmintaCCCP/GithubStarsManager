@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   deleteGist: vi.fn(),
   getGistFileRaw: vi.fn(),
   analyzeGist: vi.fn(),
+  searchGistsWithReranking: vi.fn(),
 }));
 
 vi.mock('../../../store/useAppStore', () => ({
@@ -41,6 +42,7 @@ vi.mock('../../../services/githubApiFactory', () => ({
 vi.mock('../../../services/aiService', () => ({
   AIService: class {
     analyzeGist = mocks.analyzeGist;
+    searchGistsWithReranking = mocks.searchGistsWithReranking;
   },
 }));
 
@@ -49,7 +51,12 @@ const createStoreState = () => ({
   githubToken: 'github-token' as string | null,
   gists: [],
   starredGists: [],
-  gistSearchFilters: { query: '' },
+  gistSearchFilters: {
+    query: '',
+    sortBy: 'updated' as const,
+    sortOrder: 'desc' as const,
+    isAnalyzed: undefined as boolean | undefined,
+  },
   gistSearchResults: [],
   selectedGistCategory: 'all' as const,
   aiConfigs: [{
@@ -302,6 +309,43 @@ describe('useGistActions card actions', () => {
       expect(result.current.isAnalyzingGist('gist-1')).toBe(true);
       expect(result.current.isAnalyzingGist('gist-2')).toBe(false);
     });
+  });
+});
+
+describe('useGistActions AI search', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+  });
+
+  it('reapplies the latest analysis filter without reordering AI-ranked results', async () => {
+    const analyzed: Gist = { ...gist, id: 'analyzed', analyzed_at: '2026-01-03T00:00:00.000Z' };
+    const pending: Gist = { ...gist, id: 'pending' };
+    const ranked: Gist[] = [analyzed, pending];
+    let resolveRanking: (gists: Gist[]) => void = () => undefined;
+    mocks.searchGistsWithReranking.mockReturnValue(new Promise<Gist[]>(resolve => {
+      resolveRanking = resolve;
+    }));
+    const { result } = renderHook(() => useGistActions());
+    const onReranked = vi.fn();
+
+    let searchPromise: Promise<void>;
+    await act(async () => {
+      searchPromise = result.current.aiSearch('query', [gist], onReranked);
+      await Promise.resolve();
+    });
+
+    storeState.gistSearchFilters = {
+      ...storeState.gistSearchFilters,
+      isAnalyzed: false,
+    };
+    await act(async () => {
+      resolveRanking(ranked);
+      await searchPromise;
+    });
+
+    expect(storeState.setGistSearchResults).toHaveBeenCalledWith([pending]);
+    expect(onReranked).toHaveBeenCalledWith(ranked);
   });
 });
 

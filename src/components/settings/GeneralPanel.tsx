@@ -44,7 +44,7 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
             <CardTitle>{t('generalPanel.check-for-updates')}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="flex items-center justify-between">
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="mb-1 text-sm text-muted-foreground dark:text-muted-foreground">{t('generalPanel.current-version-v-version', { version: version })}</p>
             <p className="text-xs text-muted-foreground dark:text-muted-foreground">{t('generalPanel.check-if-a-new-version-is-available')}</p>

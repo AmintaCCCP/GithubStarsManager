@@ -58,7 +58,10 @@ Object.assign(mocks.useAppStore, {
   getState: vi.fn(() => mocks.storeState),
 });
 
-vi.mock('./store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
+vi.mock('./store/useAppStore', () => ({
+  useAppStore: mocks.useAppStore,
+  getAllCategories: () => [],
+}));
 vi.mock('./services/backendAdapter', () => ({ backend: mocks.backend }));
 vi.mock('./services/logger', () => ({
   logger: {

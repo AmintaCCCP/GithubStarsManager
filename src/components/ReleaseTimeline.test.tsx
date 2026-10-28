@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleaseTimeline } from './ReleaseTimeline';
@@ -136,6 +136,17 @@ const createStoreState = (overrides: Partial<ReturnType<typeof baseStoreState>> 
 
 const mockUseAppStore = vi.mocked(useAppStore);
 
+const getMainContent = () => document.querySelector('.workspace-content') as HTMLElement;
+
+const expectMainText = async (text: string) => {
+  expect((await within(getMainContent()).findAllByText(text)).length).toBeGreaterThan(0);
+};
+
+const queryMainByText = (text: string) => {
+  const matches = within(getMainContent()).queryAllByText(text);
+  return matches.length > 0 ? matches[0] : null;
+};
+
 const wireStoreMocks = () => {
   storeState = createStoreState();
 
@@ -265,7 +276,7 @@ describe('ReleaseTimeline asset filter matching', () => {
     activateFilter();
 
     render(<ReleaseTimeline />);
-    expect(await screen.findByText('owner/beta')).toBeInTheDocument();
+    await expectMainText('owner/beta');
   });
 
   it('hides releases that neither hit keywords nor sit on the include list', async () => {
@@ -276,7 +287,7 @@ describe('ReleaseTimeline asset filter matching', () => {
 
     render(<ReleaseTimeline />);
     expect(await screen.findByText('当前过滤器没有匹配到任何资产，请尝试其他过滤条件')).toBeInTheDocument();
-    expect(screen.queryByText('owner/gamma')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/gamma')).not.toBeInTheDocument();
   });
 
   it('shows keyword-matching releases when the filter is active', async () => {
@@ -287,7 +298,7 @@ describe('ReleaseTimeline asset filter matching', () => {
     activateFilter();
 
     render(<ReleaseTimeline />);
-    expect(await screen.findByText('owner/alpha')).toBeInTheDocument();
+    await expectMainText('owner/alpha');
   });
 
   it('lists only the keyword-matching assets and reveals the rest on demand', async () => {
@@ -360,7 +371,7 @@ describe('ReleaseTimeline asset filter matching', () => {
 
     expect(await screen.findByText('beta-1.0.zip')).toBeInTheDocument();
     expect(screen.getByText('beta-1.0.exe')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /显示全部/ })).not.toBeInTheDocument();
+    expect(within(getMainContent()).queryByRole('button', { name: /显示全部/ })).not.toBeInTheDocument();
   });
 
   it('ignores the auto-generated source archives when matching include keywords', async () => {
@@ -380,8 +391,8 @@ describe('ReleaseTimeline asset filter matching', () => {
     activateFilter({ id: 'f1', name: 'Zip', keywords: ['zip'] });
 
     render(<ReleaseTimeline />);
-    expect(await screen.findByText('owner/beta')).toBeInTheDocument();
-    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    await expectMainText('owner/beta');
+    expect(queryMainByText('owner/alpha')).not.toBeInTheDocument();
   });
 });
 
@@ -399,7 +410,7 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
   };
 
   const expectVisible = async (fullName: string) => {
-    expect(await screen.findByText(fullName)).toBeInTheDocument();
+    await expectMainText(fullName);
   };
 
   beforeEach(() => {
@@ -418,7 +429,7 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
 
     render(<ReleaseTimeline />);
     await expectVisible('当前过滤器没有匹配到任何资产，请尝试其他过滤条件');
-    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/alpha')).not.toBeInTheDocument();
   });
 
   it('lets always-include bypass the same filter\u2019s exclude keywords', async () => {
@@ -446,7 +457,7 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
 
     render(<ReleaseTimeline />);
     await expectVisible('owner/beta');
-    expect(screen.queryByText('owner/gamma')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/gamma')).not.toBeInTheDocument();
   });
 
   it('shows every other repository for a pure alwaysExcludeRepos filter', async () => {
@@ -460,7 +471,7 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
 
     render(<ReleaseTimeline />);
     await expectVisible('owner/beta');
-    expect(screen.queryByText('owner/gamma')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/gamma')).not.toBeInTheDocument();
   });
 
   it('hides releases whose real assets are all excluded, even when pseudo assets survive', async () => {
@@ -478,8 +489,8 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
 
     render(<ReleaseTimeline />);
     await expectVisible('owner/gamma');
-    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
-    expect(screen.queryByText('owner/beta')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/alpha')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/beta')).not.toBeInTheDocument();
   });
 
   it('keeps pseudo-asset name matching when include keywords are present (preset-source regression)', async () => {
@@ -526,7 +537,7 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
 
     render(<ReleaseTimeline />);
     await expectVisible('当前过滤器没有匹配到任何资产，请尝试其他过滤条件');
-    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/alpha')).not.toBeInTheDocument();
   });
 
   it('matches repository keys case-insensitively for exclusions and includes', async () => {
@@ -543,7 +554,7 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
 
     render(<ReleaseTimeline />);
     await expectVisible('owner/beta');
-    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/alpha')).not.toBeInTheDocument();
   });
 
   it('hides repositories outside both lists when a filter combines include and exclude repos', async () => {
@@ -563,7 +574,149 @@ describe('ReleaseTimeline per-filter repository exclusions', () => {
     render(<ReleaseTimeline />);
     // 包含列表内的仓库显示；排除列表与两组之外的仓库都隐藏
     await expectVisible('owner/beta');
-    expect(screen.queryByText('owner/alpha')).not.toBeInTheDocument();
-    expect(screen.queryByText('owner/delta')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/alpha')).not.toBeInTheDocument();
+    expect(queryMainByText('owner/delta')).not.toBeInTheDocument();
+  });
+});
+
+describe('ReleaseTimeline context sidebar migration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    wireStoreMocks();
+  });
+
+  it('renders exactly one releases sidebar with inbox controls while main content keeps its own tools', () => {
+    render(<ReleaseTimeline />);
+
+    const sidebars = document.querySelectorAll('[data-context-sidebar="releases"]');
+    expect(sidebars).toHaveLength(1);
+
+    const sidebar = sidebars[0];
+    expect(within(sidebar as HTMLElement).getByRole('button', { name: /^全部 Release/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(sidebar as HTMLElement).getByRole('button', { name: /^未读/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(sidebar as HTMLElement).getByRole('button', { name: '显示全部版本' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(sidebar as HTMLElement).getByRole('button', { name: /^仅显示最新版本/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(sidebar.querySelector('[role="switch"][aria-label="包含 Pre-release"]')).toBeNull();
+    expect(sidebar.querySelectorAll('button[title="Release 来源设置"]')).toHaveLength(1);
+
+    const mainContent = document.querySelector('.workspace-content');
+    expect(mainContent).not.toBeNull();
+    expect(mainContent?.querySelector('input[placeholder="搜索Release…"]')).not.toBeNull();
+    expect(mainContent?.querySelector('[aria-label="视图模式"]')).not.toBeNull();
+    expect(within(mainContent as HTMLElement).getByRole('switch', { name: '包含 Pre-release' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '全部已读' })).toHaveLength(1);
+    expect(within(sidebar as HTMLElement).getByRole('button', { name: '新建过滤器' })).toBeInTheDocument();
+    expect(within(mainContent as HTMLElement).queryByRole('button', { name: '新建过滤器' })).not.toBeInTheDocument();
+    expect(within(mainContent as HTMLElement).queryAllByText('来源设置')).toHaveLength(0);
+    expect(screen.queryAllByText('仓库分类')).toHaveLength(0);
+  });
+
+  it('routes Display range changes through the store action', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseTimeline />);
+
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]') as HTMLElement;
+    await user.click(within(sidebar).getByRole('button', { name: /^全部 Release/ }));
+
+    expect(storeState.setReleaseShowMode).toHaveBeenCalledWith('all');
+  });
+
+  it('expands and collapses the release source list', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseTimeline />);
+
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]') as HTMLElement;
+    const sourceList = sidebar.querySelector('#release-source-list');
+    expect(sourceList).not.toBeNull();
+
+    const collapseButton = within(sidebar).getByRole('button', { name: '收起来源' });
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true');
+    await user.click(collapseButton);
+
+    expect(within(sidebar).getByRole('button', { name: '展开来源' })).toHaveAttribute('aria-expanded', 'false');
+    expect(sidebar.querySelector('#release-source-list')).toBeNull();
+
+    await user.click(within(sidebar).getByRole('button', { name: '展开来源' }));
+    expect(sidebar.querySelector('#release-source-list')).not.toBeNull();
+  });
+
+  it('filters a release source by exact normalized repository name and counts by name', async () => {
+    const user = userEvent.setup();
+    const alpha = makeRepo(7, 'alpha', 'owner/alpha');
+    const beta = makeRepo(8, 'beta', 'owner/beta');
+    const alphaRelease = makeRepoRelease(101, alpha, ['alpha.zip']);
+    const betaRelease = makeRepoRelease(201, beta, ['beta.zip']);
+    betaRelease.body = 'This release mentions owner/alpha in its body.';
+    alphaRelease.repository.id = -1001;
+    betaRelease.repository.id = -1002;
+    storeState.repositories = [alpha, beta];
+    storeState.releaseSubscriptions = new Set([alpha.id, beta.id]);
+    storeState.releases = [alphaRelease, betaRelease];
+    storeState.releaseShowMode = 'all';
+
+    render(<ReleaseTimeline />);
+
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]') as HTMLElement;
+    const alphaSource = sidebar.querySelector('button[title="owner/alpha"]') as HTMLButtonElement;
+    expect(alphaSource).toHaveTextContent('1');
+    expect(within(getMainContent()).getAllByText('owner/beta').length).toBeGreaterThan(0);
+
+    await user.click(alphaSource);
+
+    expect(alphaSource).toHaveAttribute('aria-pressed', 'true');
+    expect(within(getMainContent()).getAllByText('owner/alpha').length).toBeGreaterThan(0);
+    expect(within(getMainContent()).queryAllByText('owner/beta')).toHaveLength(0);
+
+    await user.click(alphaSource);
+
+    expect(alphaSource).toHaveAttribute('aria-pressed', 'false');
+    expect(within(getMainContent()).getAllByText('owner/beta').length).toBeGreaterThan(0);
+  });
+
+  it('keeps the sidebar controls disabled in the no-subscription empty state', () => {
+    storeState.releases = [];
+    storeState.releaseSubscriptions = new Set<number>();
+
+    render(<ReleaseTimeline />);
+
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]');
+    expect(sidebar).not.toBeNull();
+
+    const displayButton = within(sidebar as HTMLElement).getByRole('button', { name: /^全部 Release/ });
+    const versionButton = within(sidebar as HTMLElement).getByRole('button', { name: '显示全部版本' });
+    const mainContent = document.querySelector('.workspace-content') as HTMLElement;
+    const preReleaseSwitch = within(mainContent).getByRole('switch', { name: '包含 Pre-release' });
+    const sourceButton = sidebar?.querySelector('button[title="Release 来源设置"]') as HTMLElement;
+    expect(displayButton).toHaveAttribute('disabled');
+    expect(versionButton).toHaveAttribute('disabled');
+    expect(preReleaseSwitch).toHaveAttribute('disabled');
+    expect(sourceButton).not.toHaveAttribute('disabled');
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Release时间线' })).toBeInTheDocument();
+    expect(screen.getByText('没有Release订阅')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-context-sidebar="releases"]')).toHaveLength(1);
+  });
+
+  it('keeps the sidebar controls disabled in the subscribed-but-no-releases empty state', () => {
+    storeState.releases = [];
+
+    render(<ReleaseTimeline />);
+
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]');
+    expect(sidebar).not.toBeNull();
+
+    const displayButton = within(sidebar as HTMLElement).getByRole('button', { name: /^全部 Release/ });
+    const versionButton = within(sidebar as HTMLElement).getByRole('button', { name: '显示全部版本' });
+    const mainContent = document.querySelector('.workspace-content') as HTMLElement;
+    const preReleaseSwitch = within(mainContent).getByRole('switch', { name: '包含 Pre-release' });
+    const sourceButton = sidebar?.querySelector('button[title="Release 来源设置"]') as HTMLElement;
+    expect(displayButton).not.toHaveAttribute('disabled');
+    expect(versionButton).not.toHaveAttribute('disabled');
+    expect(preReleaseSwitch).not.toHaveAttribute('disabled');
+    expect(sourceButton).not.toHaveAttribute('disabled');
+
+    expect(screen.getByText('没有最近的Release')).toBeInTheDocument();
+    expect(within(mainContent).getByRole('button', { name: '刷新' })).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-context-sidebar="releases"]')).toHaveLength(1);
   });
 });

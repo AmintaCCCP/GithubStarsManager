@@ -587,8 +587,8 @@ Repository information:
 
             {isToolCallCapable(form.apiType) && (
               <div>
-                <label className="flex items-start gap-2 text-sm text-foreground">
-                  <Checkbox checked={form.supportsToolCalls} onCheckedChange={(checked) => setForm(prev => ({ ...prev, supportsToolCalls: checked === true }))} />
+                <label htmlFor="ai-config-supports-tool-calls" className="flex cursor-pointer items-start gap-2 text-sm text-foreground">
+                  <Checkbox id="ai-config-supports-tool-calls" checked={form.supportsToolCalls} onCheckedChange={(checked) => setForm(prev => ({ ...prev, supportsToolCalls: checked === true }))} />
                   <span>
                     {t('aIConfigPanel.supports-tool-calling-function-calling')}
                     <span className="mt-1 block text-xs text-muted-foreground">
@@ -843,8 +843,8 @@ Repository information:
             <h4 id="repository-chat-settings-heading" className="text-sm font-medium text-foreground">{t('aIConfigPanel.repository-chat')}</h4>
             <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.reads-pinned-source-on-demand-and-keeps-local-co')}</p>
           </div>
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <Checkbox checked={repositoryChatSettings.enabled} onCheckedChange={(checked) => setRepositoryChatSettings({ enabled: checked === true })} />
+          <label htmlFor="repository-chat-enabled" className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <Checkbox id="repository-chat-enabled" checked={repositoryChatSettings.enabled} onCheckedChange={(checked) => setRepositoryChatSettings({ enabled: checked === true })} />
             {t('aIConfigPanel.enable-repository-chat')}
           </label>
         </div>
@@ -872,8 +872,8 @@ Repository information:
         <details className="mt-4 rounded-md border border-border px-3 py-2">
           <summary className="cursor-pointer text-sm font-medium text-foreground">{t('aIConfigPanel.advanced-settings')}<span className="ml-2 text-xs font-normal text-muted-foreground">{t('aIConfigPanel.used-by-the-chat-window-when-task-depth-is-defau')}</span></summary>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
-            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('aIConfigPanel.external-web-search-and-fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('aIConfigPanel.disabled-by-default-the-current-version-does-not')}</span></span></label>
-            <label className="flex items-start gap-2 text-sm text-foreground"><Checkbox checked={repositoryChatSettings.enableAgentToolLoop} onCheckedChange={(checked) => setRepositoryChatSettings({ enableAgentToolLoop: checked === true })} /><span>{t('aIConfigPanel.tool-loop-mode-experimental')}<span className="mt-1 block text-xs text-muted-foreground">{t('aIConfigPanel.evidence-gathering-is-driven-by-native-function')}</span></span></label>
+            <label htmlFor="repository-chat-web-tools" className="flex cursor-pointer items-start gap-2 text-sm text-foreground"><Checkbox id="repository-chat-web-tools" checked={repositoryChatSettings.enableWebTools} onCheckedChange={(checked) => setRepositoryChatSettings({ enableWebTools: checked === true })} /><span>{t('aIConfigPanel.external-web-search-and-fetch')}<span className="mt-1 block text-xs text-muted-foreground">{t('aIConfigPanel.disabled-by-default-the-current-version-does-not')}</span></span></label>
+            <label htmlFor="repository-chat-agent-loop" className="flex cursor-pointer items-start gap-2 text-sm text-foreground"><Checkbox id="repository-chat-agent-loop" checked={repositoryChatSettings.enableAgentToolLoop} onCheckedChange={(checked) => setRepositoryChatSettings({ enableAgentToolLoop: checked === true })} /><span>{t('aIConfigPanel.tool-loop-mode-experimental')}<span className="mt-1 block text-xs text-muted-foreground">{t('aIConfigPanel.evidence-gathering-is-driven-by-native-function')}</span></span></label>
             <div>
               <label id="repository-chat-streaming-label" className="mb-1 block text-sm font-medium text-foreground">{t('aIConfigPanel.streaming-answers')}</label>
               <Select value={repositoryChatSettings.streamingMode} onValueChange={(value) => setRepositoryChatSettings({ streamingMode: value === 'off' ? 'off' : 'auto' })}>
@@ -969,8 +969,9 @@ Repository information:
                 : t('aIConfigPanel.free-microsoft-edge-endpoint-no-configuration-ne')}
           </p>
         </div>
-        <label className="mt-4 flex items-start gap-2 text-sm text-foreground dark:text-foreground">
+        <label htmlFor="auto-translate-repo-descriptions" className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-foreground dark:text-foreground">
           <Checkbox
+            id="auto-translate-repo-descriptions"
             checked={autoTranslateRepoDescription}
             onCheckedChange={(checked) => setAutoTranslateRepoDescription(checked === true)}
             className="mt-0.5"

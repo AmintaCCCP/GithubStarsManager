@@ -8,7 +8,7 @@ import { selectGistViewState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { AIService } from '../../../services/aiService';
 import { useDialog } from '../../../hooks/useDialog';
-import { filterAndSortGists } from '../../../utils/gistUtils';
+import { applyGistAnalysisFilter, filterAndSortGists } from '../../../utils/gistUtils';
 
 export type { GistCreateInput, GistUpdateInput };
 
@@ -71,7 +71,7 @@ export const useGistActions = () => {
   const aiSearch = useCallback(async (
     query: string,
     categoryItems: Gist[],
-    onReranked: () => void,
+    onReranked: (ranked: Gist[]) => void,
   ) => {
     if (!query.trim()) return;
     const activeConfig = state.aiConfigs.find(config => config.id === state.activeAIConfig);
@@ -82,13 +82,20 @@ export const useGistActions = () => {
     setIsSearching(true);
     try {
       const aiService = new AIService(activeConfig, state.language);
+      // 候选集不做分析状态预过滤：分析状态是视图层筛选，排序结果需覆盖两种状态，
+      // 否则搜索发起后切换状态会因候选集缺失而漏掉符合条件的 gist
       const ranked = await aiService.searchGistsWithReranking(
-        filterAndSortGists(categoryItems, { ...state.gistSearchFilters, query: '' }),
+        filterAndSortGists(categoryItems, { ...state.gistSearchFilters, query: '', isAnalyzed: undefined }),
         query,
       );
-      onReranked();
-      state.setGistSearchFilters({ query });
-      state.setGistSearchResults(ranked);
+      const currentState = useAppStore.getState();
+      const filteredRanked = applyGistAnalysisFilter(
+        ranked,
+        currentState.gistSearchFilters.isAnalyzed,
+      );
+      onReranked(ranked);
+      currentState.setGistSearchFilters({ query });
+      currentState.setGistSearchResults(filteredRanked);
     } catch {
       state.setGistSearchFilters({ query });
     } finally {
@@ -208,7 +215,8 @@ export const useGistActions = () => {
       return;
     }
 
-    if (gist.analyzed_at) {
+    // 失败的 gist 已写入 analyzed_at，但重试应与批量分析一致：直接执行，不弹覆盖确认
+    if (gist.analyzed_at && !gist.analysis_failed) {
       const shouldContinue = await confirm(
         t('useGistActions.re-analyze-confirmation'),
         t('useGistActions.this-gist-has-already-been-analyzed-overwrite-th'),

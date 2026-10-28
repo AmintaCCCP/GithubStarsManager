@@ -153,7 +153,7 @@
     "hide-category-confirmation": "Ocultar confirmación de categoría",
     "hide-default-category-v1-this-will-not-delete-an": "¿Ocultar categoría predeterminada \"{{v1}}\"?\n\nEsto no eliminará ningún repositorio, simplemente ocultará la categoría predeterminada a la izquierda.",
     "failed-to-hide-category-please-check-backend-con": "No se pudieron ocultar las categorías; verifique la conexión de backend.",
-    "categories": "Clasificación de aplicaciones",
+    "categories": "Categorías de repositorios",
     "add-category": "Añadir categoría",
     "drag-repository-cards-here-to-quickly-change-cat": "Puede arrastrar tarjetas de almacén aquí para cambiar rápidamente de categoría.",
     "drop-here-to-remove-category": "Arrastra aquí para cancelar la clasificación",
@@ -167,7 +167,14 @@
     "delete-category": "Eliminar categoría",
     "hide-default-category": "Ocultar categorías predeterminadas",
     "drag-hint": "{{name}} — Arrastre la tarjeta de almacén aquí para modificar rápidamente la clasificación",
-    "sync-failed-reverted": "Error al sincronizar con el backend. El cambio de categoría se ha revertido."
+    "sync-failed-reverted": "Error al sincronizar con el backend. El cambio de categoría se ha revertido.",
+    "category-group": "Categorías",
+    "workspace-label": "Espacio de trabajo",
+    "quick-access": "Acceso rápido",
+    "all-repositories": "Todos los repositorios",
+    "needs-review": "Revisión pendiente",
+    "synced": "Sincronizado",
+    "repository-count": "{{count}} repositorios"
   },
   "codeSearchView": {
     "show-less": "cerca",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "búsqueda por IA"
   },
   "settingsPanel": {
+    "section-app": "Aplicación",
+    "section-ai-data": "IA y datos",
+    "section-connection": "Conexión y diagnóstico",
     "general": "Universal",
     "appearance": "Apariencia",
     "star-sync": "Sincronización de estrellas",
@@ -421,7 +431,8 @@
     "settings-content": "Establecer contenido",
     "settings": "configuración",
     "close-settings": "Cerrar configuración",
-    "settings-tabs": "Configurar pestañas"
+    "settings-tabs": "Configurar pestañas",
+    "preferences-label": "Preferencias"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "Visita",

@@ -6,9 +6,9 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { Package, Plus, Trash2, Edit3, Save, X, Eye, EyeOff, GripVertical, ArrowUp, ArrowDown, ArrowUpToLine, ArrowDownToLine, LayoutGrid } from 'lucide-react';
 import { useAppStore, getAllCategories, sortCategoriesByOrder } from '../../store/useAppStore';
-import { StepperInput } from '../ui/StepperInput';
 import { useDialog } from '../../hooks/useDialog';
 import { validateCategoryName } from '../../utils/categoryUtils';
+import { CategoryGlyph } from '../CategoryGlyph';
 
 interface CategoryPanelProps {
   t: TranslateFn;
@@ -19,7 +19,6 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const hiddenDefaultCategoryIds = useAppStore(state => state.hiddenDefaultCategoryIds);
   const defaultCategoryOverrides = useAppStore(state => state.defaultCategoryOverrides);
   const categoryOrder = useAppStore(state => state.categoryOrder);
-  const collapsedSidebarCategoryCount = useAppStore(state => state.collapsedSidebarCategoryCount);
   const categoryMatchMode = useAppStore(state => state.categoryMatchMode);
   const language = useAppStore(state => state.language);
   const addCustomCategory = useAppStore(state => state.addCustomCategory);
@@ -32,7 +31,6 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
   const hideDefaultCategory = useAppStore(state => state.hideDefaultCategory);
   const showDefaultCategory = useAppStore(state => state.showDefaultCategory);
   const setCategoryOrder = useAppStore(state => state.setCategoryOrder);
-  const setCollapsedSidebarCategoryCount = useAppStore(state => state.setCollapsedSidebarCategoryCount);
   const setCategoryMatchMode = useAppStore(state => state.setCategoryMatchMode);
 
   const { toast, confirm } = useDialog();
@@ -284,36 +282,6 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
         </Button>
       </div>
 
-      {/* 折叠侧边栏显示设置 */}
-      <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border dark:border-border dark:border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <LayoutGrid className="w-5 h-5 text-muted-foreground dark:text-muted-foreground" />
-            <div>
-              <h4 className="font-medium text-foreground dark:text-foreground">
-                {t('categoryPanel.collapsed-sidebar-display')}
-              </h4>
-              <p className="text-sm text-muted-foreground dark:text-muted-foreground">
-                {t('categoryPanel.set-the-number-of-categories-to-display-when-col')}
-              </p>
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
-                {t('categoryPanel.tip-the-collapsed-sidebar-only-affects-display-a')}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center space-x-3">
-            <StepperInput
-              value={collapsedSidebarCategoryCount}
-              onChange={setCollapsedSidebarCategoryCount}
-              min={1}
-              step={1}
-              decreaseLabel={t('categoryPanel.decrease-category-count')}
-              increaseLabel={t('categoryPanel.increase-category-count')}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* 分类匹配模式设置 */}
       <div className="p-4 bg-muted dark:bg-muted/40 rounded-lg border border-border dark:border-border">
         <div className="flex items-center space-x-3 mb-2">
@@ -541,7 +509,9 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             onChange={(e) => {
                               const value = e.target.value;
                               const graphemeCount = Array.from(value).length;
-                              if (graphemeCount <= 2) {
+                              // CategoryEditModal 生成的 lucide:xxx 图标超过 2 字素，
+                              // 放行该前缀使这类图标值仍可局部编辑
+                              if (graphemeCount <= 2 || value.startsWith('lucide:')) {
                                 setEditIcon(value);
                               }
                             }}
@@ -632,7 +602,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                         {isReordering && (
                           <GripVertical className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
                         )}
-                        <span className="text-base w-6 text-center inline-block">{category.icon}</span>
+                        <CategoryGlyph
+                          icon={category.icon}
+                          name={category.name}
+                          categoryId={category.id}
+                          className="app-settings-category-glyph"
+                        />
                         <span className="text-sm font-medium text-foreground dark:text-foreground">
                           {category.name}
                         </span>
@@ -764,7 +739,12 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   className="inline-flex items-center space-x-2 px-3 py-2 rounded-lg bg-muted text-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent transition-colors"
                 >
                   <Eye className="w-4 h-4" />
-                  <span className="w-5 text-center inline-block">{category.icon}</span>
+                  <CategoryGlyph
+                    icon={category.icon}
+                    name={category.name}
+                    categoryId={category.id}
+                    className="app-settings-category-glyph"
+                  />
                   <span>{category.name}</span>
                 </Button>
               ))}

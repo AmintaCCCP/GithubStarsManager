@@ -23,9 +23,13 @@
     "just-now": "剛剛",
     "m-ago": "分鐘前",
     "h-ago": "小時前",
+    "discovery-label": "發現",
     "discovery-channels": "發現頻道",
     "manage-channels": "管理發現頻道",
-    "refresh-all": "刷新全部"
+    "refresh-all": "刷新全部",
+    "channels-section": "頻道",
+    "sources-section": "發現來源",
+    "channel-count": "{{count}} 項內容"
   },
   "discoveryView": {
     "all-loaded": "已載入全部",
@@ -184,6 +188,4 @@
     "stars-gained": "自首次記錄新增 {{v1}} stars",
     "first-seen": "榜首首次記錄於{{v1}}"
   }
-
-
 }

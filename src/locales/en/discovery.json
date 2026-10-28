@@ -23,9 +23,13 @@
     "just-now": "Just now",
     "m-ago": "m ago",
     "h-ago": "h ago",
+    "discovery-label": "Discovery",
     "discovery-channels": "Discovery Channels",
     "manage-channels": "Manage discovery channels",
-    "refresh-all": "Refresh All"
+    "refresh-all": "Refresh All",
+    "channels-section": "Channels",
+    "sources-section": "Sources",
+    "channel-count": "{{count}} items"
   },
   "discoveryView": {
     "all-loaded": "All loaded",
@@ -184,6 +188,4 @@
     "stars-gained": "+{{v1}} stars since we first recorded it",
     "first-seen": "Top entry first recorded {{v1}}"
   }
-
-
 }

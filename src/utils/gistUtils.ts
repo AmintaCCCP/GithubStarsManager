@@ -90,6 +90,17 @@ export const getGistCategoryItems = (
   return all;
 };
 
+export const applyGistAnalysisFilter = (
+  gists: Gist[],
+  isAnalyzed: GistSearchFilters['isAnalyzed'],
+): Gist[] => {
+  if (isAnalyzed === undefined) return gists;
+  return gists.filter(gist => {
+    const analyzed = !!gist.analyzed_at && !gist.analysis_failed;
+    return isAnalyzed ? analyzed : !analyzed;
+  });
+};
+
 export const filterAndSortGists = (gists: Gist[], filters: GistSearchFilters): Gist[] => {
   const queryWords = filters.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   let filtered = gists;
@@ -115,11 +126,7 @@ export const filterAndSortGists = (gists: Gist[], filters: GistSearchFilters): G
     });
   }
 
-  if (filters.isAnalyzed !== undefined) {
-    filtered = filtered.filter(gist =>
-      filters.isAnalyzed ? (!!gist.analyzed_at && !gist.analysis_failed) : !gist.analyzed_at
-    );
-  }
+  filtered = applyGistAnalysisFilter(filtered, filters.isAnalyzed);
 
   const sorted = [...filtered];
   sorted.sort((a, b) => {
@@ -145,4 +152,21 @@ export const filterAndSortGists = (gists: Gist[], filters: GistSearchFilters): G
   });
 
   return sorted;
+};
+
+export const resolveGistAiSearchResults = (
+  aiResults: Gist[],
+  currentItems: Gist[],
+  filters: GistSearchFilters,
+  preserveAiOrder: boolean,
+): Gist[] => {
+  const currentById = new Map(currentItems.map((gist) => [gist.id, gist]));
+  const latestAiItems = aiResults.flatMap((gist) => {
+    const current = currentById.get(gist.id);
+    return current ? [current] : [];
+  });
+  const orderedItems = preserveAiOrder
+    ? latestAiItems
+    : filterAndSortGists(latestAiItems, { ...filters, query: '' });
+  return applyGistAnalysisFilter(orderedItems, filters.isAnalyzed);
 };
