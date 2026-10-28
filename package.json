@@ -101,7 +101,7 @@
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",
     "eslint": "^10.13.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "fake-indexeddb": "^6.2.6",
     "github-markdown-css": "^5.9.0",
