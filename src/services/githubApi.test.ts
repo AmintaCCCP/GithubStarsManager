@@ -422,3 +422,31 @@ describe('GitHubApiService 401 来源区分', () => {
     expect(window.fetch).toHaveBeenCalledWith('https://api.github.com/user', expect.anything());
   });
 });
+
+describe('GitHubApiService.makeRequest 请求超时（issue #523）', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('连接挂起时超时中止并重试，最终抛出超时错误而不是永远等待', async () => {
+    vi.useFakeTimers();
+    const hangFetch = vi.fn((_url: unknown, init?: RequestInit): Promise<Response> =>
+      new Promise((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        );
+      })
+    );
+    vi.stubGlobal('fetch', hangFetch);
+    const service = new GitHubApiService('token');
+
+    const assertion = expect(service.getCurrentUser()).rejects.toThrow(
+      'GitHub API request timed out after 30000ms'
+    );
+    // 4 次尝试（每次 30s 超时）+ 3 次退避（1s/2s/4s）
+    await vi.advanceTimersByTimeAsync(30_000 + 1_000 + 30_000 + 2_000 + 30_000 + 4_000 + 30_000);
+    await assertion;
+    expect(hangFetch).toHaveBeenCalledTimes(4);
+  });
+});

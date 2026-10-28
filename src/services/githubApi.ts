@@ -24,6 +24,11 @@ import {
 import { logger } from './logger';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 import { secureRandomString } from '../utils/cryptoRandom';
+import { createCombinedAbortController } from '../utils/abortUtils';
+
+// 单次 fetch 尝试的超时：断网/睡眠时挂起的连接不会自行 reject，
+// 没有超时会让上层同步流程永远等待，刷新按钮一直处于禁用状态。
+const REQUEST_TIMEOUT_MS = 30_000;
 
 interface GitHubContentResponse {
   content?: string;
@@ -440,6 +445,8 @@ export class GitHubApiService {
     let response: Response | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const viaProxy = this.backendUrl != null;
+      // 每次尝试独立超时：超时上限不被重试+退避消耗（与 githubListsApi 一致）
+      const timeoutController = createCombinedAbortController(signal, REQUEST_TIMEOUT_MS);
       try {
         if (this.backendUrl) {
           // 通过后端代理路由：POST {backendUrl}/proxy/github/{endpoint}?query
@@ -458,14 +465,14 @@ export class GitHubApiService {
 
           response = await fetch(proxyUrl, {
             method: 'POST',
-            signal,
+            signal: timeoutController.signal,
             headers: this.getBackendHeaders(),
             body: JSON.stringify(proxyBody),
           });
         } else {
           response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
             ...fetchOptions,
-            signal,
+            signal: timeoutController.signal,
             headers: {
               'Authorization': `Bearer ${this.token}`,
               'Accept': 'application/vnd.github.v3+json',
@@ -474,7 +481,12 @@ export class GitHubApiService {
             },
           });
         }
-      } catch (fetchError) {
+      } catch (caughtError) {
+        // 超时中止与用户中止都表现为 AbortError；只有用户中止才算取消，
+        // 超时按普通网络错误处理，走下面的指数退避重试。
+        const fetchError = (caughtError as { name?: string })?.name === 'AbortError' && !signal?.aborted
+          ? new Error(`GitHub API request timed out after ${REQUEST_TIMEOUT_MS}ms`)
+          : caughtError;
         const durationMs = Date.now() - startTime;
         // 网络错误（连接断开、DNS 超时、socket hang-up 等）视为可重试的瞬时故障，
         // 仅在最后一次尝试时抛出；之前的尝试会继续走指数退避重试。
@@ -601,7 +613,16 @@ export class GitHubApiService {
       });
     }
 
-    const data = finalResponse.status === 204 ? null : await finalResponse.json();
+    let data: T;
+    try {
+      data = finalResponse.status === 204 ? null : await finalResponse.json();
+    } catch (bodyError) {
+      // 超时覆盖到响应体消费：body 读取挂起时同样按超时失败，让上层流程能结束。
+      if ((bodyError as { name?: string })?.name === 'AbortError' && !signal?.aborted) {
+        throw new Error(`GitHub API request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+      }
+      throw bodyError;
+    }
 
     // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
