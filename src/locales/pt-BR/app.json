@@ -153,7 +153,7 @@
     "hide-category-confirmation": "Ocultar confirmação de categoria",
     "hide-default-category-v1-this-will-not-delete-an": "Ocultar categoria padrão \"{{v1}}\"?\n\nIsso não excluirá nenhum repositório, apenas ocultará a categoria padrão à esquerda.",
     "failed-to-hide-category-please-check-backend-con": "Falha ao ocultar categorias. Verifique a conexão de back-end.",
-    "categories": "Classificação de aplicativos",
+    "categories": "Categorias de repositórios",
     "add-category": "Adicionar categoria",
     "drag-repository-cards-here-to-quickly-change-cat": "Você pode arrastar cartões de armazém aqui para alterar rapidamente as categorias",
     "drop-here-to-remove-category": "Arraste aqui para cancelar a classificação",
@@ -167,7 +167,14 @@
     "delete-category": "Excluir categoria",
     "hide-default-category": "Ocultar categorias padrão",
     "drag-hint": "{{name}} — Arraste o cartão do armazém aqui para modificar rapidamente a classificação",
-    "sync-failed-reverted": "Falha ao sincronizar com o backend. A alteração de categoria foi revertida."
+    "sync-failed-reverted": "Falha ao sincronizar com o backend. A alteração de categoria foi revertida.",
+    "category-group": "Categorias",
+    "workspace-label": "Espaço de trabalho",
+    "quick-access": "Acesso rápido",
+    "all-repositories": "Todos os repositórios",
+    "needs-review": "Revisão pendente",
+    "synced": "Sincronizado",
+    "repository-count": "{{count}} repositórios"
   },
   "codeSearchView": {
     "show-less": "fechar",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "Pesquisa de IA"
   },
   "settingsPanel": {
+    "section-app": "Aplicativo",
+    "section-ai-data": "IA e dados",
+    "section-connection": "Conexão e diagnóstico",
     "general": "Universal",
     "appearance": "Aparência",
     "star-sync": "Sincronização de estrelas",
@@ -421,7 +431,8 @@
     "settings-content": "Definir conteúdo",
     "settings": "configurar",
     "close-settings": "Fechar configurações",
-    "settings-tabs": "Configurar guias"
+    "settings-tabs": "Configurar guias",
+    "preferences-label": "Preferências"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "Visualizando",

@@ -160,9 +160,9 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       <div className="p-3 sm:p-4">
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
-            {isUnread && (
-              <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse mr-2"></div>
-            )}
+            <span className="app-unread-marker-slot" aria-hidden="true">
+              {isUnread && <span className="app-unread-marker" />}
+            </span>
             <div className="linear-platform-icon flex items-center justify-center w-8 h-8 flex-shrink-0">
               <GitBranch className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
             </div>
@@ -213,7 +213,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               )}
             </div>
             {/* 固定宽度需容纳英文五控件（Assets/Notes/Summary+2图标，约340px），否则换行按钮会溢出头部 */}
-            <div className="flex items-center justify-end gap-1 flex-shrink-0 md:w-[344px] md:min-w-[344px]">
+            <div className="app-row-actions flex items-center justify-end flex-shrink-0 md:w-[344px] md:min-w-[344px]">
             {downloadLinks.length > 0 && (
               <Button
                 onClick={(e) => {
@@ -221,7 +221,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   onToggleAssets();
                 }}
                 variant={isAssetsExpanded ? 'secondary' : 'ghost'}
-                className="h-8 gap-1 px-2 text-xs whitespace-nowrap"
+                className="app-row-action app-row-action--label whitespace-nowrap"
                 title={isAssetsExpanded ? t('releaseCard.hide-assets') : t('releaseCard.show-assets')}
                 aria-label={isAssetsExpanded ? t('releaseCard.hide-assets') : t('releaseCard.show-assets')}
                 aria-expanded={isAssetsExpanded}
@@ -239,7 +239,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   onToggleReleaseNotes();
                 }}
                 variant={isReleaseNotesExpanded ? 'secondary' : 'ghost'}
-                className="h-8 gap-1 px-2 text-xs whitespace-nowrap"
+                className="app-row-action app-row-action--label whitespace-nowrap"
                 title={isReleaseNotesExpanded ? t('releaseCard.hide-changelog') : t('releaseCard.show-changelog')}
                 aria-label={isReleaseNotesExpanded ? t('releaseCard.hide-changelog') : t('releaseCard.show-changelog')}
                 aria-expanded={isReleaseNotesExpanded}
@@ -255,7 +255,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 onClick={handleToggleSummary}
                 disabled={summary.status === 'loading'}
                 variant={isSummaryExpanded ? 'secondary' : 'ghost'}
-                className="h-8 gap-1 px-2 text-xs whitespace-nowrap disabled:opacity-70"
+                className="app-row-action app-row-action--label whitespace-nowrap disabled:opacity-70"
                 title={isSummaryExpanded ? t('releaseCard.hide-ai-summary') : (summary.status === 'error' ? t('releaseCard.retry-ai-summary') : t('releaseCard.ai-summary-of-this-update'))}
                 aria-label={isSummaryExpanded ? t('releaseCard.hide-ai-summary') : (summary.status === 'error' ? t('releaseCard.retry-ai-summary') : t('releaseCard.ai-summary-of-this-update'))}
                 aria-expanded={isSummaryExpanded}
@@ -275,7 +275,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                 e.stopPropagation();
                 onUnsubscribe();
               }}
-              className="h-auto p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+              className="app-row-action"
               title={t('releaseCard.unsubscribe-from-releases')}
               aria-label={t('releaseCard.unsubscribe-from-releases')}
             >
@@ -285,7 +285,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
               href={release.html_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="h-auto p-1 rounded bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
+              className="app-row-action"
               title={t('releaseCard.view-on-github')}
               aria-label={t('releaseCard.view-on-github')}
               onClick={(e) => {

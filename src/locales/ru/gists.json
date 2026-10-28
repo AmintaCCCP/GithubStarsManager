@@ -71,7 +71,17 @@
     "sort-files": "По количеству файлов",
     "category-all": "все суть",
     "category-starred": "суть звезды",
-    "category-mine": "моя суть"
+    "category-mine": "моя суть",
+    "context-sidebar": "Боковая панель контекста Gist",
+    "library-label": "Библиотека Gist",
+    "sidebar-title": "Библиотека Gist",
+    "scope": "Область",
+    "analysis-status": "Состояние анализа",
+    "analysis-all": "Все Gist",
+    "analyzed": "Проанализировано",
+    "needs-analysis": "Нужен анализ",
+    "gist-count": "Gist: {{count}}",
+    "analyzed-count": "Проанализировано: {{count}}"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "Токен GitHub не найден. Войдите снова.",

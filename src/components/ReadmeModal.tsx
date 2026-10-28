@@ -35,6 +35,13 @@ const FONT_SIZES = [
 
 const TOC_MAX_LEVEL = 6;
 
+const shouldOpenTocByDefault = (): boolean => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return true;
+  }
+  return !window.matchMedia('(max-width: 767px)').matches;
+};
+
 const getDefaultReadmeVariant = (language: AppLanguage): ReadmeVariant => ({
   ...DEFAULT_README_VARIANT,
   label: i18n.getFixedT(language, 'app')('readmeModal.default-readme'),
@@ -57,7 +64,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
   const [readmeContent, setReadmeContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showToc, setShowToc] = useState(true);
+  const [showToc, setShowToc] = useState(shouldOpenTocByDefault);
   const [fontSizeIndex, setFontSizeIndex] = useState(1);
   const [tocItems, setTocItems] = useState<TocItem[]>([]);
   const [headingIdMap, setHeadingIdMap] = useState<Map<string, string>>(new Map());
@@ -494,7 +501,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     } else {
-      setShowToc(true);
+      setShowToc(shouldOpenTocByDefault());
     }
   }, [isOpen, language, cancelFetches]);
 
@@ -527,8 +534,9 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showClose={false}
+        fullscreen
         aria-describedby={undefined}
-        className="flex h-[calc(100vh_-_2rem)] max-h-[calc(100vh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-none min-w-0 flex-col overflow-hidden p-0"
+        className="flex min-w-0 flex-col overflow-hidden p-0"
         onCloseAutoFocus={(event) => {
           if (!onCloseAutoFocus) return;
           event.preventDefault();
@@ -707,11 +715,11 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
             </div>
           </div>
 
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="app-readme-body flex min-h-0 min-w-0 flex-1 overflow-hidden">
             {showToc && tocItems.length > 0 && (
               <>
                 <div
-                  className="border-r border-border dark:border-border overflow-y-auto p-4 flex-shrink-0 readme-scrollbar"
+                  className="app-readme-toc border-r border-border dark:border-border overflow-y-auto p-4 flex-shrink-0 readme-scrollbar"
                   style={{ width: tocWidth }}
                 >
                   <h4 className="text-sm font-semibold text-foreground dark:text-foreground mb-3">
@@ -724,7 +732,12 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                         <Button
                           key={item.id}
                           variant="ghost"
-                          onClick={() => scrollToHeading(item.id, item.text)}
+                          onClick={() => {
+                            scrollToHeading(item.id, item.text);
+                            if (window.matchMedia?.('(max-width: 767px)').matches) {
+                              setShowToc(false);
+                            }
+                          }}
                           className={`h-auto block w-full text-left text-sm py-1 px-2 rounded transition-colors truncate ${tocIndentClass(item.level)} ${tocTextClass(item.level)} ${
                             activeHeadingId === item.id
                               ? 'bg-primary/10 text-primary dark:bg-primary/10 dark:text-primary font-medium'
@@ -740,7 +753,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
                 </div>
                 <div
                   onMouseDown={handleResizeMouseDown}
-                  className="w-1.5 cursor-col-resize bg-transparent hover:bg-ring dark:hover:bg-ring transition-colors flex-shrink-0 relative group"
+                  className="app-readme-resize-handle w-1.5 cursor-col-resize bg-transparent hover:bg-ring dark:hover:bg-ring transition-colors flex-shrink-0 relative group"
                 >
                   <div className="absolute inset-y-0 -left-1 -right-1" />
                 </div>
@@ -749,7 +762,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
 
             <div
               ref={contentRef}
-              className={`min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
+              className={`app-readme-content min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-auto p-6 ${currentFontSize} select-text readme-scrollbar relative`}
               onScroll={handleScroll}
             >
             {loading ? (

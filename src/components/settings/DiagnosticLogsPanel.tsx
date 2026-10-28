@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ScrollText,
@@ -206,24 +206,25 @@ const LogDetailModal: React.FC<LogDetailModalProps> = ({ entry, language, t, onC
       <DialogContent
         aria-describedby={undefined}
         showClose={false}
-        className="grid-rows-[auto_auto_minmax(0,1fr)] max-w-3xl max-h-[80vh] overflow-hidden p-0"
+        className="app-diagnostic-detail-dialog grid-rows-[auto_auto_minmax(0,1fr)] max-w-3xl max-h-[80vh] overflow-hidden p-0 pr-12"
       >
         {/* Header */}
-        <DialogHeader className="flex-row items-center justify-between space-y-0 border-b border-border px-5 py-4">
+        <DialogHeader className="app-diagnostic-dialog-header items-center justify-between space-y-0 border-b border-border px-5 py-4">
           <div className="flex min-w-0 items-center space-x-3">
             <Badge variant={LEVEL_BADGE_VARIANTS[entry.level]} className="shrink-0">{entry.level}</Badge>
             <DialogTitle className="truncate text-sm font-medium leading-normal tracking-normal">{entry.message}</DialogTitle>
           </div>
+        </DialogHeader>
+        <DialogClose asChild>
           <Button
             variant="ghost"
             size="icon"
-            onClick={onClose}
             aria-label={t('diagnosticLogsPanel.close-log-details')}
-            className="ml-2 h-8 w-8 shrink-0"
+            className="app-dialog-close"
           >
             <X className="h-5 w-5 text-muted-foreground dark:text-muted-foreground" />
           </Button>
-        </DialogHeader>
+        </DialogClose>
 
         {/* Tabs */}
         <div className="flex min-w-0 overflow-x-auto border-b border-border px-5">
@@ -533,15 +534,15 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
       {/* Detail modal */}
       {detailEntry && <LogDetailModal entry={detailEntry} language={language} t={t} onClose={() => setDetailEntry(null)} />}
 
-      <div className="space-y-4">
+      <div className="app-diagnostic-panel space-y-4">
         {/* Debug Mode Section */}
-        <section>
-          <h3 className="text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
+        <section className="app-diagnostic-section">
+          <h3 className="app-diagnostic-section-title text-lg font-semibold text-foreground dark:text-foreground mb-4 flex items-center">
             <ScrollText className="w-5 h-5 mr-2 text-muted-foreground dark:text-muted-foreground" />
             {t('diagnosticLogsPanel.debug-mode')}
           </h3>
-          <div className="bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="app-diagnostic-card bg-card dark:bg-card rounded-lg border border-border dark:border-border p-4 space-y-4">
+            <div className="app-diagnostic-row flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <span className="font-medium text-foreground dark:text-foreground">{t('diagnosticLogsPanel.frontend-debug')}</span>
@@ -559,7 +560,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                 aria-label={t('diagnosticLogsPanel.toggle-frontend-debug')}
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="app-diagnostic-row flex items-center justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
                   <span className={`font-medium ${backendAvailable ? 'text-foreground dark:text-foreground' : 'text-muted-foreground dark:text-muted-foreground/70'}`}>{t('diagnosticLogsPanel.backend-debug')}</span>

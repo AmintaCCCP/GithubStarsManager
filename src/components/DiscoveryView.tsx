@@ -43,6 +43,7 @@ import { TelegramSettingsModal } from './TelegramSettingsModal';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { WorkspacePageHeader } from './WorkspacePageHeader';
 import type {
   DiscoveryChannel,
   DiscoveryChannelId,
@@ -307,7 +308,7 @@ const PlatformFilter: React.FC<PlatformFilterProps> = ({ platform, onPlatformCha
             <DropdownMenuRadioItem
               key={p.id}
               value={p.id}
-              className={platform === p.id ? 'bg-accent text-accent-foreground' : ''}
+              className={`app-platform-menu-item flex items-center gap-2 ${platform === p.id ? 'bg-accent text-accent-foreground' : ''}`}
             >
               {p.icon}
               <span>{discoveryPlatformName(p, language)}</span>
@@ -836,12 +837,13 @@ export const DiscoveryView: React.FC = React.memo(() => {
       />
 
       <div
-        className="flex flex-col gap-4 lg:flex-row lg:gap-6 flex-1 min-h-0 min-w-0 items-start"
+        className="route-workspace flex-1 min-h-0 min-w-0"
       >
-        <div
+        <aside
           ref={sidebarRef}
-          className="hidden lg:block w-72 shrink-0 sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overflow-x-hidden"
-          style={{ WebkitOverflowScrolling: 'touch' }}
+          data-context-sidebar="discovery"
+          aria-label={t('discoverySidebar.discovery-channels')}
+          className="context-sidebar hidden shrink-0 lg:flex lg:w-(--app-sidebar-width)"
         >
           <DiscoverySidebar
             channels={safeDiscoveryChannels}
@@ -857,72 +859,72 @@ export const DiscoveryView: React.FC = React.memo(() => {
               setSelectedDiscoveryChannel(channel);
             }}
             onRefreshAll={refreshAll}
+            totalCount={discoveryTotalCount}
             isLoading={discoveryIsLoading}
             lastRefresh={discoveryLastRefresh}
             isAnalyzing={isAnalyzing}
             language={language}
           />
-        </div>
+        </aside>
 
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 relative">
+        <div className="workspace-content app-workspace-content flex flex-col min-h-0 min-w-0 relative">
+          <WorkspacePageHeader
+            eyebrow={t('discoverySidebar.channels-section')}
+            section={t('app:header.menu-subscription')}
+            title={language === 'zh'
+              ? currentChannel?.name ?? t('discoveryView.repo-search')
+              : discoveryChannelName(currentChannel ?? { id: 'search', name: '仓库搜索', nameEn: 'Repo Search' }, language)}
+            description={currentLastRefresh
+              ? `${t('discoveryView.updated')} ${formatLastRefresh(currentLastRefresh)}`
+              : undefined}
+            meta={selectedDiscoveryChannel !== 'code-search' ? (
+              <span className="app-workspace-meta-pill">
+                {t('discoveryView.items-count', { currentCount: currentTotalCount })}
+              </span>
+            ) : undefined}
+            actions={selectedDiscoveryChannel !== 'code-search' ? (
+              <div className="relative group/refresh shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
+                  disabled={currentIsLoading || isAnalyzing}
+                  className="ui-icon-button"
+                  title={t('discoveryView.refresh')}
+                  aria-label={t('discoveryView.refresh')}
+                >
+                  <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
+                </Button>
+                {selectedDiscoveryChannel === 'hot-release' && (
+                  <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
+                    <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                      {t('discoveryView.each-refresh-shows-different-content')}
+                    </div>
+                    <div className="absolute -top-1 right-3 w-2 h-2 bg-popover border-t border-l border-border rotate-45" />
+                  </div>
+                )}
+              </div>
+            ) : undefined}
+          />
           {/* 顶部工具栏 - 随滚动显示/隐藏 */}
           <div 
             className={`flex-shrink-0 pr-2 transition-transform duration-300 ease-in-out z-10 ${
               isToolbarVisible ? 'translate-y-0' : '-translate-y-full opacity-0 pointer-events-none'
             }`}
           >
-            <div className="ui-toolbar p-3.5 sm:p-4 mb-4">
-              {/* 第一行：标题和刷新按钮 */}
-              <div className="flex items-center justify-between gap-2 mb-2.5">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${currentChannelStyle.gradient} flex items-center justify-center shadow-md ${currentChannelStyle.shadow}`}>
-                    {currentChannelIconNode}
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-base sm:text-lg font-bold text-foreground dark:text-foreground truncate leading-tight">
-                      {language === 'zh'
-                        ? currentChannel?.name
-                        : discoveryChannelName(currentChannel ?? { id: 'search', name: '仓库搜索', nameEn: 'Repo Search' }, language)}
-                    </h2>
-                    {currentLastRefresh && (
-                      <p className="hidden sm:block text-xs text-muted-foreground dark:text-muted-foreground">
-                        {t('discoveryView.updated')} {formatLastRefresh(currentLastRefresh)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {selectedDiscoveryChannel !== 'code-search' && (
-                <div className="relative group/refresh shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => refreshChannel(selectedDiscoveryChannel, 1, false)}
-                    disabled={currentIsLoading || isAnalyzing}
-                    className="p-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={t('discoveryView.refresh')}
-                  >
-                    <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
-                  </Button>
-                  {selectedDiscoveryChannel === 'hot-release' && (
-                    <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
-                      <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
-                        {t('discoveryView.each-refresh-shows-different-content')}
-                      </div>
-                      <div className="absolute -top-1 right-3 w-2 h-2 bg-popover border-t border-l border-border rotate-45" />
-                    </div>
-                  )}
-                </div>
-                )}
-              </div>
-              
+            {selectedDiscoveryChannel !== 'code-search' && (
+            <div className="ui-toolbar app-page-toolbar app-discovery-toolbar p-3.5 sm:p-4 mb-4">
               {/* 第二行：筛选和操作按钮（代码搜索频道使用自有工具条，此处隐藏仓库维度控件） */}
-              {selectedDiscoveryChannel !== 'code-search' && (
               <div className="flex items-center gap-2 flex-wrap">
                 {selectedDiscoveryChannel === 'trending' && (
-            <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+            <div className="app-discovery-time-filter">
               <Select value={trendingTimeRange} onValueChange={(value) => setTrendingTimeRange(value as TrendingTimeRange)}>
-                <SelectTrigger aria-label={t('discoveryView.time-range')} className="ui-field h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label={t('discoveryView.time-range')} className="ui-field app-discovery-time-select h-9 w-auto min-w-28 px-3 py-1.5 text-sm font-medium text-foreground dark:text-foreground">
+                  <span className="app-discovery-time-select-value">
+                    <Calendar className="h-4 w-4 text-muted-foreground dark:text-muted-foreground" />
+                    <SelectValue />
+                  </span>
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">{t('discoveryView.today')}</SelectItem>
                   <SelectItem value="weekly">{t('discoveryView.this-week')}</SelectItem>
@@ -1067,8 +1069,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   />
                 </div>
               </div>
-              )}
             </div>
+            )}
           </div>
 
           {/* 内容区域 */}
@@ -1386,7 +1388,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
             )}
 
             {allRepos.length > 0 && (
-              <div className={isDesktopSafeMode ? 'space-y-3' : 'space-y-4'}>
+              <div className="app-flat-list app-discovery-list">
                 {allRepos.map((repo, index) => (
                   <div key={repo.id} data-repo-index={index}>
                     <SubscriptionRepoCard repo={repo} desktopSafeMode={isDesktopSafeMode} />

@@ -8,7 +8,7 @@ import { selectGistViewState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { AIService } from '../../../services/aiService';
 import { useDialog } from '../../../hooks/useDialog';
-import { filterAndSortGists } from '../../../utils/gistUtils';
+import { applyGistAnalysisFilter, filterAndSortGists } from '../../../utils/gistUtils';
 
 export type { GistCreateInput, GistUpdateInput };
 
@@ -71,7 +71,7 @@ export const useGistActions = () => {
   const aiSearch = useCallback(async (
     query: string,
     categoryItems: Gist[],
-    onReranked: () => void,
+    onReranked: (ranked: Gist[]) => void,
   ) => {
     if (!query.trim()) return;
     const activeConfig = state.aiConfigs.find(config => config.id === state.activeAIConfig);
@@ -86,9 +86,14 @@ export const useGistActions = () => {
         filterAndSortGists(categoryItems, { ...state.gistSearchFilters, query: '' }),
         query,
       );
-      onReranked();
-      state.setGistSearchFilters({ query });
-      state.setGistSearchResults(ranked);
+      const currentState = useAppStore.getState();
+      const filteredRanked = applyGistAnalysisFilter(
+        ranked,
+        currentState.gistSearchFilters.isAnalyzed,
+      );
+      onReranked(ranked);
+      currentState.setGistSearchFilters({ query });
+      currentState.setGistSearchResults(filteredRanked);
     } catch {
       state.setGistSearchFilters({ query });
     } finally {

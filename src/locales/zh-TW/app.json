@@ -153,7 +153,7 @@
     "hide-category-confirmation": "隱藏分類確認",
     "hide-default-category-v1-this-will-not-delete-an": "隱藏預設分類\"{{v1}}\"？\n\n這不會刪除任何倉庫，只是在左側隱藏這個預設分類。",
     "failed-to-hide-category-please-check-backend-con": "隱藏分類失敗，請檢查後端連線。",
-    "categories": "應用分類",
+    "categories": "倉庫分類",
     "add-category": "添加分類",
     "drag-repository-cards-here-to-quickly-change-cat": "可將倉庫卡拖到這裡快速改分類",
     "drop-here-to-remove-category": "拖到這裡取消分類",
@@ -167,7 +167,14 @@
     "delete-category": "刪除分類",
     "hide-default-category": "隱藏預設分類",
     "drag-hint": "{{name}} — 拖曳倉庫卡片到此處可快速修改分類",
-    "sync-failed-reverted": "同步到後端失敗，已恢復分類更改。"
+    "sync-failed-reverted": "同步到後端失敗，已恢復分類更改。",
+    "category-group": "分類",
+    "workspace-label": "工作區",
+    "quick-access": "快速存取",
+    "all-repositories": "全部倉庫",
+    "needs-review": "待檢視",
+    "synced": "星標已同步",
+    "repository-count": "{{count}} 個倉庫"
   },
   "codeSearchView": {
     "show-less": "收起",
@@ -317,9 +324,9 @@
     "show-repositories-with-failed-ai-analysis": "顯示AI分析失敗的倉庫",
     "analysis-failed": "分析失敗",
     "show-repositories-subscribed-to-release-notifica": "顯示已訂閱Release通知的倉庫",
-    "subscribed-to-releases": "已訂閱Release",
+    "subscribed-to-releases": "已訂閱 Release",
     "show-repositories-not-subscribed-to-releases": "顯示未訂閱Release通知的倉庫",
-    "not-subscribed-to-releases": "未訂閱Release",
+    "not-subscribed-to-releases": "未訂閱 Release",
     "show-customized-repositories-including-custom-de": "顯示已自訂的倉庫（包括自訂描述、標籤、分類）",
     "customized": "已自訂",
     "show-repositories-with-locked-category-won-t-aut": "顯示分類已鎖定的倉庫（同步時不會自動變更分類）",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "AI搜尋"
   },
   "settingsPanel": {
+    "section-app": "應用程式",
+    "section-ai-data": "AI 與資料",
+    "section-connection": "連接與診斷",
     "general": "一般",
     "appearance": "外觀設定",
     "star-sync": "星標同步",
@@ -421,7 +431,8 @@
     "settings-content": "設定內容",
     "settings": "設定",
     "close-settings": "關閉設定",
-    "settings-tabs": "設定標籤頁"
+    "settings-tabs": "設定標籤頁",
+    "preferences-label": "偏好設定"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "正在查看",

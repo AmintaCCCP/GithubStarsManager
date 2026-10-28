@@ -18,6 +18,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   maxWidth?: string;
+  fullscreen?: boolean;
   footer?: React.ReactNode;
   scrollable?: boolean;
   contentClassName?: string;
@@ -32,6 +33,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   maxWidth = 'max-w-md',
+  fullscreen = false,
   footer,
   scrollable = false,
   contentClassName,
@@ -72,7 +74,11 @@ export const Modal: React.FC<ModalProps> = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         aria-describedby={undefined}
-        className={cn(scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0', maxWidth)}
+        fullscreen={fullscreen}
+        className={cn(
+          scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0',
+          !fullscreen && maxWidth,
+        )}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
         onPointerDownOutside={onPointerDownOutside}

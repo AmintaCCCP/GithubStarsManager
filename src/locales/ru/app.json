@@ -153,7 +153,7 @@
     "hide-category-confirmation": "Скрыть подтверждение категории",
     "hide-default-category-v1-this-will-not-delete-an": "Скрыть категорию по умолчанию \"{{v1}}\"?\n\nЭто не приведет к удалению репозиториев, а просто скроет категорию по умолчанию слева.",
     "failed-to-hide-category-please-check-backend-con": "Не удалось скрыть категории. Проверьте подключение к серверной части.",
-    "categories": "Классификация приложений",
+    "categories": "Категории репозиториев",
     "add-category": "Добавить категорию",
     "drag-repository-cards-here-to-quickly-change-cat": "Вы можете перетащить сюда карточки складов, чтобы быстро менять категории.",
     "drop-here-to-remove-category": "Перетащите сюда, чтобы отменить классификацию",
@@ -167,7 +167,14 @@
     "delete-category": "Удалить категорию",
     "hide-default-category": "Скрыть категории по умолчанию",
     "drag-hint": "{{name}} – перетащите сюда карточку склада, чтобы быстро изменить классификацию.",
-    "sync-failed-reverted": "Не удалось синхронизировать с сервером. Изменение категории отменено."
+    "sync-failed-reverted": "Не удалось синхронизировать с сервером. Изменение категории отменено.",
+    "category-group": "Категории",
+    "workspace-label": "Рабочая область",
+    "quick-access": "Быстрый доступ",
+    "all-repositories": "Все репозитории",
+    "needs-review": "Требуют разбора",
+    "synced": "Синхронизировано",
+    "repository-count": "Репозиториев: {{count}}"
   },
   "codeSearchView": {
     "show-less": "закрывать",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "AI-поиск"
   },
   "settingsPanel": {
+    "section-app": "Приложение",
+    "section-ai-data": "AI и данные",
+    "section-connection": "Подключение и диагностика",
     "general": "Универсальный",
     "appearance": "Оформление",
     "star-sync": "Звездная синхронизация",
@@ -421,7 +431,8 @@
     "settings-content": "Установить контент",
     "settings": "настраивать",
     "close-settings": "Закрыть настройки",
-    "settings-tabs": "Настройка вкладок"
+    "settings-tabs": "Настройка вкладок",
+    "preferences-label": "Настройки"
   },
   "similarViewBanner": {
     "viewing-similar-repositories-of": "Просмотр",

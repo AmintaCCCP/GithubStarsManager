@@ -66,11 +66,11 @@ export const GistCard: React.FC<GistCardProps> = ({
   return (
     <article
       onClick={() => onOpen(gist)}
-      className="ui-card group cursor-pointer p-5"
+      className="app-list-row ui-card group cursor-pointer"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-semibold text-foreground dark:text-foreground">{title}</h3>
+          <h3 className="app-list-row-title truncate">{title}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground dark:text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
               <User className="h-4 w-4" />
@@ -89,13 +89,13 @@ export const GistCard: React.FC<GistCardProps> = ({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="app-row-actions flex shrink-0 items-center">
           <Button
             type="button"
             variant="ghost"
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-50 dark:text-muted-foreground dark:hover:bg-primary/15 dark:hover:text-primary"
+            className="app-row-action"
             title={t('gistCard.ai-analyze')}
           >
             {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
@@ -104,7 +104,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             type="button"
             variant="ghost"
             onClick={handleCopyLink}
-            className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="app-row-action"
             title={t('gistCard.copy-link')}
           >
             <Copy className="h-4 w-4" />
@@ -114,7 +114,7 @@ export const GistCard: React.FC<GistCardProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            className="app-row-action"
             title={t('gistCard.open-link')}
           >
             <ExternalLink className="h-4 w-4" />
@@ -125,7 +125,7 @@ export const GistCard: React.FC<GistCardProps> = ({
               variant="ghost"
               onClick={handleUnstar}
               disabled={isMutating}
-              className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-warning/10 hover:text-warning disabled:opacity-50 dark:text-muted-foreground"
+              className="app-row-action text-warning"
               title={t('gistCard.unstar')}
             >
               <StarOff className="h-4 w-4" />
@@ -140,7 +140,7 @@ export const GistCard: React.FC<GistCardProps> = ({
                   event.stopPropagation();
                   onEdit(gist);
                 }}
-                className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="app-row-action"
                 title={t('gistCard.edit')}
               >
                 <Edit3 className="h-4 w-4" />
@@ -150,7 +150,7 @@ export const GistCard: React.FC<GistCardProps> = ({
                 variant="ghost"
                 onClick={handleDelete}
                 disabled={isMutating}
-                className="h-8 w-8 rounded-lg p-0 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 dark:text-muted-foreground"
+                className="app-row-action text-destructive"
                 title={t('gistCard.delete')}
               >
                 <Trash2 className="h-4 w-4" />
@@ -160,7 +160,7 @@ export const GistCard: React.FC<GistCardProps> = ({
         </div>
       </div>
 
-      <p className="mt-4 line-clamp-2 text-sm leading-6 text-muted-foreground dark:text-muted-foreground">
+      <p className="app-list-row-description mt-4 line-clamp-2 text-muted-foreground dark:text-muted-foreground">
         {gist.ai_summary || gist.description || fileNames || t('gistCard.no-description')}
       </p>
 

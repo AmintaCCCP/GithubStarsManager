@@ -4,13 +4,14 @@ import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { RepositoryList } from './components/RepositoryList';
 import { CategorySidebar } from './components/CategorySidebar';
+import { WorkspacePageHeader } from './components/WorkspacePageHeader';
 
 import { DebugModeIndicator } from './components/DebugModeIndicator';
 
 import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
-import { useAppStore } from './store/useAppStore';
+import { useAppStore, getAllCategories } from './store/useAppStore';
 import { selectAppShellState } from './store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { applyThemePreset } from './lib/themePresets';
@@ -25,6 +26,8 @@ import { useBackendLifecycle } from './features/lifecycle/hooks/useBackendLifecy
 import type { AppState } from './types';
 import { hasActiveSearchFilters } from './utils/repoSearch';
 import { isElectron, loadEncryptedXAuthViaDesktop } from './services/electronProxy';
+import { useT } from './i18n/useT';
+import { matchesCategory } from './utils/categoryUtils';
 
 const LazyReleaseTimeline = React.lazy(() =>
   import('./components/ReleaseTimeline').then((module) => ({ default: module.ReleaseTimeline }))
@@ -71,9 +74,38 @@ const RepositoriesView = React.memo(({
   selectedCategory: string;
   onCategorySelect: (category: string) => void;
 }) => {
+  const t = useT('app');
   const isActive = hasActiveSearchFilters(searchFilters);
   const similarView = useAppStore((state) => state.similarView);
   const exitSimilarView = useAppStore((state) => state.exitSimilarView);
+  const {
+    language,
+    customCategories,
+    hiddenDefaultCategoryIds,
+    defaultCategoryOverrides,
+    categoryMatchMode,
+  } = useAppStore(useShallow((state) => ({
+    language: state.language,
+    customCategories: state.customCategories,
+    hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
+    defaultCategoryOverrides: state.defaultCategoryOverrides,
+    categoryMatchMode: state.categoryMatchMode,
+  })));
+  const allCategories = useMemo(
+    () => getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides),
+    [customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides]
+  );
+  const currentCategory = allCategories.find((category) => category.id === selectedCategory);
+  const currentCategoryRepositories = useMemo(() => {
+    if (selectedCategory === 'all') return repositories;
+    const category = allCategories.find((item) => item.id === selectedCategory);
+    return category
+      ? repositories.filter((repository) => matchesCategory(repository, category, categoryMatchMode))
+      : [];
+  }, [repositories, selectedCategory, allCategories, categoryMatchMode]);
+  const analyzedRepositoryCount = currentCategoryRepositories.filter(
+    (repository) => repository.analyzed_at && !repository.analysis_failed
+  ).length;
   // Similar view preserves the user's sort preference, which is not a search
   // filter and must not trigger the "search takes precedence" exit.
   const hasActiveQueryOrFilter = hasActiveSearchFilters({
@@ -95,13 +127,32 @@ const RepositoriesView = React.memo(({
     : (isActive ? searchResults : repositories);
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:gap-6">
+    <div className="route-workspace">
       <CategorySidebar
         repositories={repositories}
         selectedCategory={selectedCategory}
         onCategorySelect={onCategorySelect}
       />
-      <div className="flex-1 space-y-6">
+      <div className="workspace-content app-workspace-content space-y-5">
+        <WorkspacePageHeader
+          eyebrow={t('categorySidebar.workspace-label')}
+          section={t('header.menu-repositories')}
+          title={selectedCategory === 'all'
+            ? t('categorySidebar.all-repositories')
+            : currentCategory?.name ?? t('categorySidebar.all-repositories')}
+          meta={(
+            <>
+              <span className="app-workspace-meta-pill">
+                {t('categorySidebar.repository-count', { count: currentCategoryRepositories.length })}
+              </span>
+              {analyzedRepositoryCount > 0 && (
+                <span className="app-workspace-meta-pill">
+                  {t('searchResultStats.ai-analyzed-count', { count: analyzedRepositoryCount })}
+                </span>
+              )}
+            </>
+          )}
+        />
         <SearchBar />
         <RepositoryList
           repositories={listRepositories}
@@ -224,6 +275,10 @@ function App() {
     applyThemeTokens(themeTokens);
   }, [themeTokens, theme, themePreset]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [currentView]);
+
   // Language side effect: zustand 的 language 是唯一事实源，这里只负责装载
   // 语言包、切换 i18next 并同步 <html lang>。
   useEffect(() => {
@@ -288,7 +343,7 @@ function App() {
     <div className="ui-shell min-h-screen transition-colors duration-200">
       <UpdateNotificationBanner />
       <Header />
-      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+      <main className="app-main">
         {currentViewContent}
       </main>
       <BackToTop />

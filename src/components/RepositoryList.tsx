@@ -543,7 +543,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
             />
           </div>
         )}
-        <div className="ui-empty-state flex flex-col items-center px-6 py-14 text-center">
+        <div className="ui-empty-state app-empty-state flex flex-col items-center px-6 py-14 text-center">
           <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <SearchX className="h-5 w-5" aria-hidden="true" />
           </div>
@@ -603,7 +603,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       )}
 
       {/* Controls Bar */}
-      <div className="ui-toolbar flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 sm:gap-0">
+      <div className="ui-toolbar app-repository-controls flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 sm:gap-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
 
           {/* AI Analysis Select */}
@@ -670,11 +670,11 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
           {/* Description Toggle - Radio Style - 移动端优化 */}
           {!isLoading && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="app-repository-display-row flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
               <span id="repository-display-content-label" className="text-xs sm:text-sm text-muted-foreground dark:text-muted-foreground">
                 {t('repositoryList.display')}
               </span>
-              <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="flex items-center space-x-3 sm:space-x-4">
+              <RadioGroup aria-labelledby="repository-display-content-label" value={showAISummary ? 'ai' : 'original'} onValueChange={(value) => { if (value === 'ai' && !hasAnalyzedRepos) return; setShowAISummary(value === 'ai'); }} className="app-compact-radio-group flex items-center space-x-3 sm:space-x-4">
                 <label onClick={() => { if (hasAnalyzedRepos) setShowAISummary(true); }} className={`flex items-center space-x-1.5 sm:space-x-2 ${hasAnalyzedRepos ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`} title={hasAnalyzedRepos ? t('repositoryList.show-ai-generated-analysis-summary') : t('repositoryList.no-ai-analysis-content-available')}>
                   <RadioGroupItem value="ai" id="display-content-ai" aria-labelledby="display-content-ai-label" disabled={!hasAnalyzedRepos} />
                   <span id="display-content-ai-label" className="text-xs font-medium text-foreground dark:text-muted-foreground sm:text-sm">{t('repositoryList.ai-analysis-2')}</span>
@@ -691,7 +691,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
 
         {/* Statistics and view mode: the layout switch remains at the toolbar's far right. */}
         <div className={`ml-auto flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 ${disableCardAnimations ? 'repository-list-syncing' : ''}`}>
-          <div className="text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
+          <div className="app-context-row-copy text-xs text-muted-foreground dark:text-muted-foreground mt-0.5 sm:text-right tabular-nums">
             <div className="flex items-center justify-between">
               <div>
                 {t('repositoryList.showing-startindex-endindex-of-v3-repositories', { startIndex: startIndex, endIndex: endIndex, v3: filteredRepositories.length })}
@@ -722,7 +722,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
           </div>
 
           {!isLoading && (
-            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted p-0.5 dark:border-border dark:bg-muted/40" role="group" aria-label={t('repositoryList.repository-layout')}>
+            <div className="app-segmented-control shrink-0" role="group" aria-label={t('repositoryList.repository-layout')}>
               <Button
                 type="button"
                 variant="ghost"
@@ -730,7 +730,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('grid')}
                 aria-pressed={repositoryViewMode === 'grid'}
                 aria-label={t('repositoryList.grid-view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'grid' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
+                className="app-segmented-control-item"
                 title={t('repositoryList.grid-view')}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -742,7 +742,7 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
                 onClick={() => setRepositoryViewMode('list')}
                 aria-pressed={repositoryViewMode === 'list'}
                 aria-label={t('repositoryList.list-view')}
-                className={`flex h-7 w-8 items-center justify-center rounded-md p-0 transition-colors ${repositoryViewMode === 'list' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
+                className="app-segmented-control-item"
                 title={t('repositoryList.list-view')}
               >
                 <List className="w-4 h-4" />
@@ -755,8 +755,8 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
       {/* Repository Grid with consistent card widths */}
       <div
         className={repositoryViewMode === 'list'
-          ? 'space-y-2 min-h-[200px]'
-          : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]'}
+          ? 'app-repository-list min-h-[200px]'
+          : 'app-repository-grid min-h-[200px]'}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       >

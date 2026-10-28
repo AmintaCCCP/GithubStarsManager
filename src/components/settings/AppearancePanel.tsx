@@ -1,6 +1,6 @@
 import { TranslateFn } from '../../i18n/useT';
 import React from 'react';
-import { Globe, Palette } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { APP_LANGUAGES, type AppLanguage } from '../../i18n/languages';
@@ -21,11 +21,6 @@ export const AppearancePanel: React.FC<AppearancePanelProps> = ({ t }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-3">
-        <Palette className="h-6 w-6 text-muted-foreground dark:text-muted-foreground" />
-        <h3 className="text-lg font-semibold text-foreground dark:text-foreground">{t('settingsPanel.appearance')}</h3>
-      </div>
-
       <ThemeSettingsCard t={t} />
 
       <Card>

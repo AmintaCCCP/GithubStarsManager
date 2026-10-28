@@ -13,6 +13,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useCategorySyncActions } from '../features/repositories/hooks/useCategorySyncActions';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../utils/categoryUtils';
 import { deferOutsideDismiss } from './modalDismiss';
+import { CategoryGlyph } from './CategoryGlyph';
 
 interface RepositoryEditModalProps {
   isOpen: boolean;
@@ -882,7 +883,18 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <SelectTrigger aria-label={t('repositoryEditModal.category')} className={inputClass}><SelectValue placeholder={t('repositoryEditModal.select-category')} /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">{t('repositoryEditModal.select-category')}</SelectItem>
-              {allCategories.filter(cat => cat.id !== 'all' && cat.name.trim().toLowerCase() !== 'none').map(category => <SelectItem key={category.id} value={category.name}>{category.icon} {category.name}</SelectItem>)}
+              {allCategories.filter(cat => cat.id !== 'all' && cat.name.trim().toLowerCase() !== 'none').map(category => (
+                <SelectItem key={category.id} value={category.name}>
+                  <span className="flex items-center gap-2">
+                    <CategoryGlyph
+                      icon={category.icon}
+                      name={category.name}
+                      categoryId={category.id}
+                    />
+                    <span>{category.name}</span>
+                  </span>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 

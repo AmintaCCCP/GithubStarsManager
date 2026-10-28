@@ -1644,8 +1644,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           {t('dataManagementPanel.data-export-import')}
         </h3>
 
-        {/* Include Keys Toggle - Independent Container */}
-        <div className="mb-4 p-6 bg-card dark:bg-card rounded-lg border border-border dark:border-border">
+        <div className="mb-4">
           <IncludeKeysToggle t={t} />
         </div>
 

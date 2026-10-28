@@ -71,7 +71,17 @@
     "sort-files": "Nach Anzahl der Dateien",
     "category-all": "Alles Wesentliche",
     "category-starred": "Der Kern des Sterns",
-    "category-mine": "mein Kern"
+    "category-mine": "mein Kern",
+    "context-sidebar": "Gist-Kontextseitenleiste",
+    "library-label": "Gist-Bibliothek",
+    "sidebar-title": "Gist-Bibliothek",
+    "scope": "Bereich",
+    "analysis-status": "Analysestatus",
+    "analysis-all": "Alle Gists",
+    "analyzed": "Analysiert",
+    "needs-analysis": "Analyse ausstehend",
+    "gist-count": "{{count}} Gists",
+    "analyzed-count": "{{count}} analysiert"
   },
   "useGistActions": {
     "github-token-not-found-please-login-again": "GitHub-Token nicht gefunden, bitte melden Sie sich erneut an.",

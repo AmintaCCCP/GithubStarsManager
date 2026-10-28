@@ -326,7 +326,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                 type="button"
                 onClick={() => handleToggle(source.id)}
                 aria-pressed={checked}
-                className={`h-auto flex w-full items-start justify-between gap-4 rounded-lg border p-4 text-left transition-colors ${
+                className={`app-release-source-row h-auto flex w-full gap-4 rounded-lg border p-4 text-left transition-colors ${
                   checked
                     // hover 必须显式声明：默认 variant 自带 hover:bg-primary/90，
                     // 深色实心底会压过内部 text-foreground 造成 WCAG 对比度不达标
@@ -334,7 +334,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                     : 'border-border bg-card hover:bg-muted dark:border-border dark:bg-muted/20 dark:hover:bg-card/[0.05]'
                 }`}
               >
-                <span className="flex items-start gap-3">
+                <span className="app-release-source-main flex items-start gap-3">
                   <span className={`mt-0.5 rounded-lg p-2 ${checked ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                     <Bell className="h-4 w-4" />
                   </span>
@@ -343,7 +343,7 @@ export const ReleaseSourceSettingsModal: React.FC<ReleaseSourceSettingsModalProp
                     <span className="mt-1 block text-xs text-muted-foreground dark:text-muted-foreground">{source.description}</span>
                   </span>
                 </span>
-                <span className="flex flex-shrink-0 items-center gap-3">
+                <span className="app-release-source-control flex flex-shrink-0 items-center gap-3">
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                     {source.count}
                   </span>

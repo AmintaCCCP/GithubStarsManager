@@ -23,7 +23,7 @@ interface ForkCardProps {
   isLoadingWorkflows: boolean;
   isSyncing: boolean;
   isRunningWorkflow: boolean;
-  needsSync: boolean; // true = out-of-date, can sync; false = already up-to-date
+  needsSync?: boolean; // true = out-of-date; false = current; undefined = check failed
   language: AppLanguage;
 }
 
@@ -57,28 +57,28 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
       <div className="p-3 sm:p-4">
         <div className="flex items-stretch justify-between gap-3">
           <div className="flex items-center min-w-0 flex-1">
-            {isUnread && (
-              <div className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0 animate-pulse mr-2"></div>
-            )}
-            <div className="flex items-center justify-center w-8 h-8 bg-muted dark:bg-muted/40 rounded-lg flex-shrink-0 border border-transparent dark:border-border">
-              <GitFork className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" />
+            <span className="app-unread-marker-slot" aria-hidden="true">
+              {isUnread && <span className="app-unread-marker" />}
+            </span>
+            <div className="app-list-row-icon flex items-center justify-center flex-shrink-0">
+              <GitFork aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1 ml-3">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                <h4 className="font-semibold text-foreground dark:text-foreground text-sm truncate">
+                <h4 className="app-list-row-title truncate">
                   {fork.name}
                 </h4>
                 {fork.language && (
-                  <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-xs font-medium rounded-md border border-border shrink-0">
+                  <span className="app-list-row-tag shrink-0">
                     {fork.language}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate mt-1">
+              <p className="app-list-row-meta truncate mt-1">
                 {fork.full_name}
               </p>
               {sourceFullName && (
-                <p className="text-xs text-muted-foreground dark:text-muted-foreground/70 truncate mt-0.5 flex items-center gap-1">
+                <p className="app-list-row-meta truncate mt-0.5 flex items-center gap-1">
                   <span>{t('forkCard.forked-from')}</span>
                   {fork.parent?.html_url || fork.source?.html_url ? (
                     <a
@@ -120,7 +120,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 </div>
               )}
             </div>
-            <div className="flex items-center space-x-1 flex-shrink-0">
+            <div className="app-row-actions flex items-center flex-shrink-0">
               {/* Workflows dropdown */}
               <Button
                 variant={isWorkflowsExpanded ? 'secondary' : 'ghost'}
@@ -129,7 +129,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onToggleWorkflows();
                   onMarkAsRead();
                 }}
-                className="h-8 shrink-0 gap-1 whitespace-nowrap px-2 text-xs"
+                className="app-row-action app-row-action--label shrink-0"
                 title={isWorkflowsExpanded ? t('forkCard.hide-workflows') : t('forkCard.show-workflows')}
                 aria-label={isWorkflowsExpanded ? t('forkCard.hide-workflows') : t('forkCard.show-workflows')}
                 aria-expanded={isWorkflowsExpanded}
@@ -147,18 +147,20 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                   onSyncUpstream();
                   onMarkAsRead();
                 }}
-                disabled={isSyncing || !needsSync}
-                className={`h-7 w-7 p-1 rounded transition-colors disabled:cursor-not-allowed ${
-                  needsSync
-                    ? 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    : 'bg-transparent text-muted-foreground/50 dark:text-muted-foreground/50 cursor-not-allowed'
+                disabled={isSyncing || needsSync !== true}
+                className={`app-row-action disabled:cursor-not-allowed ${
+                  needsSync === true ? '' : 'opacity-45'
                 } ${isSyncing ? 'opacity-50' : ''}`}
-                title={needsSync
+                title={needsSync === true
                   ? t('forkCard.update-branch')
-                  : t('forkCard.already-up-to-date')}
-                aria-label={needsSync
+                  : needsSync === false
+                    ? t('forkCard.already-up-to-date')
+                    : t('forkTimeline.check-pending')}
+                aria-label={needsSync === true
                   ? t('forkCard.update-branch')
-                  : t('forkCard.already-up-to-date')}
+                  : needsSync === false
+                    ? t('forkCard.already-up-to-date')
+                    : t('forkTimeline.check-pending')}
               >
                 {isSyncing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -172,7 +174,7 @@ const ForkCard: React.FC<ForkCardProps> = memo(({
                 href={fork.html_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1 rounded bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                className="app-row-action"
                 title={t('forkCard.view-on-github')}
                 aria-label={t('forkCard.view-on-github')}
                 onClick={(e) => {

@@ -52,8 +52,9 @@ const ReadmeModalLoadingFallback: React.FC<{
 }> = ({ onClose, onCloseAutoFocus }) => (
   <Dialog open onOpenChange={(open) => !open && onClose()}>
     <DialogContent
+      fullscreen
       aria-describedby={undefined}
-      className="flex h-[calc(100vh_-_2rem)] max-h-[calc(100vh_-_2rem)] w-[calc(100vw_-_2rem)] max-w-none flex-col overflow-hidden p-6"
+      className="flex flex-col overflow-hidden p-6"
       onCloseAutoFocus={(event) => {
         event.preventDefault();
         onCloseAutoFocus();
@@ -1044,24 +1045,24 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       aria-disabled={isModalOpen}
     >
       {/* Header - Repository Info */}
-      <div className="flex items-start space-x-3 mb-3">
+      <div className="app-repository-card-header flex items-start space-x-3 mb-3">
         <img
           src={repository.owner.avatar_url}
           alt={repository.owner.login}
-          className={`${viewMode === 'list' ? 'w-10 h-10' : 'w-8 h-8'} rounded-full flex-shrink-0`}
+          className={`app-repository-card-avatar ${viewMode === 'list' ? 'w-10 h-10' : 'w-8 h-8'} rounded-full flex-shrink-0`}
         />
-        <div className="min-w-0 flex-1">
-          <h3 className={`${viewMode === 'list' ? 'text-base' : ''} font-semibold text-foreground dark:text-foreground truncate`}>
+        <div className="app-repository-card-identity min-w-0 flex-1">
+          <h3 className={`app-repository-card-title ${viewMode === 'list' ? 'text-base' : ''} font-semibold text-foreground dark:text-foreground truncate`}>
             {highlightSearchTerm(repository.name, searchQuery)}
           </h3>
-          <p className="text-sm text-muted-foreground dark:text-muted-foreground truncate">
+          <p className="app-repository-card-owner text-sm text-muted-foreground dark:text-muted-foreground truncate">
             {repository.owner.login}
           </p>
         </div>
         
         {/* 拖拽按钮 - 右上角 - 手机和平板端隐藏 */}
         {viewMode === 'list' && (
-          <div className="ml-auto flex min-w-0 flex-1 items-start justify-end gap-1.5">
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-1.5">
             {displayContent.isCustomized && (
               <span className="inline-flex shrink-0 items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground">
                 <Edit3 className="w-3 h-3" />
@@ -1088,7 +1089,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
               <OverflowActionRow
                 actionRowRef={overflowActionRowRef}
                 testId="list-action-row"
-                className="flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-hidden"
+                className="app-repository-actions flex min-w-0 flex-1 items-center justify-end gap-1.5 overflow-hidden"
                 visibleActionCount={visibleOverflowActionCount}
                 primaryActionCount={primaryOverflowActionCount}
                 actionPreferences={actionPreferences}
@@ -1179,11 +1180,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         )}
       </div>
 
-      {viewMode === 'grid' ? (
+      {viewMode === 'grid' && !selectionMode && (
         <OverflowActionRow
           actionRowRef={overflowActionRowRef}
           testId="grid-action-row"
-          className="mb-4 flex w-full items-center justify-start gap-1.5 overflow-hidden"
+          className="app-repository-actions flex w-full items-center justify-start gap-1.5 overflow-hidden"
           visibleActionCount={visibleOverflowActionCount}
           primaryActionCount={primaryOverflowActionCount}
           actionPreferences={actionPreferences}
@@ -1215,22 +1216,22 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           }}
           t={t}
         />
-      ) : null}
+      )}
 
       {/* Description with shared Tooltip. Keep analysis status visible independently. */}
       {(showDescription || (
         viewMode === 'grid'
         && (displayContent.isCustomized || displayContent.isAnalysisFailed || displayContent.isAnalyzed)
       )) && (
-      <div className={viewMode === 'list' ? 'mb-3' : 'mb-4 flex-1'}>
+      <div className={viewMode === 'list' ? 'mb-3' : 'app-repository-card-copy'}>
         {showDescription && (
         <Tooltip>
           <TooltipTrigger asChild>
             <p
               tabIndex={0}
-              className={viewMode === 'list'
+              className={`app-repository-card-description ${viewMode === 'list'
                 ? 'text-sm leading-6 text-muted-foreground dark:text-muted-foreground line-clamp-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground'
-                : 'text-foreground dark:text-muted-foreground text-[13px] leading-[1.625] line-clamp-3 mb-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}
+                : 'text-foreground dark:text-muted-foreground line-clamp-2 mb-2 transition-colors duration-200 [text-wrap:pretty] hover:text-foreground dark:hover:text-foreground rounded-md px-1 -mx-1 hover:bg-muted dark:hover:bg-card/[0.02]'}`}
             >
               {highlightSearchTerm(displayContent.content, searchQuery)}
             </p>
@@ -1284,11 +1285,11 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       <div className={viewMode === 'list' ? 'flex flex-wrap items-center gap-x-3 gap-y-2' : 'contents'}>
       {/* Tags - 未AI分析时显示Topics，AI分析后显示AI标签 */}
       {isRepositoryCardFieldVisible(cardFields, 'tags') && displayTags.tags.length > 0 && (
-        <div className={`flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-2 mb-4'}`}>
+        <div className={`app-repository-card-tags flex flex-wrap ${viewMode === 'list' ? 'gap-1' : 'gap-2'}`}>
           {displayTags.tags.map((tagItem, index) => (
             <span
               key={`tag-${index}`}
-              className={`linear-card-tag font-medium ${viewMode === 'list' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-xs'}`}
+              className={`linear-card-tag app-repository-card-tag font-medium ${viewMode === 'list' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-xs'}`}
             >
               {highlightSearchTerm(tagItem.tag, searchQuery)}
             </span>
@@ -1298,7 +1299,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
       {/* Platform Icons */}
       {viewMode === 'grid' && displayPlatforms.length > 0 && (
-        <div className="flex items-center space-x-2 mb-4">
+        <div className="app-repository-card-platforms flex items-center space-x-2">
           <span className="text-xs text-muted-foreground dark:text-muted-foreground">
             {t('repositoryCard.platforms')}
           </span>
@@ -1322,9 +1323,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       )}
 
       {/* Stats */}
-      <div className={viewMode === 'list' ? 'contents' : 'space-y-3 mt-auto'}>
+      <div className={viewMode === 'list' ? 'app-repository-list-stats' : 'app-repository-card-stats space-y-3'}>
         {/* Language and Stars */}
-        <div className={`flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-muted-foreground dark:text-muted-foreground`}>
+        <div className={`app-repository-card-meta flex items-center ${viewMode === 'list' ? 'space-x-3 flex-wrap gap-y-1' : 'space-x-4'} text-xs text-muted-foreground dark:text-muted-foreground`}>
           {isRepositoryCardFieldVisible(cardFields, 'language') && repository.language && (
             <div className="flex items-center space-x-1 min-w-0">
               <div
@@ -1360,8 +1361,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         </div>
 
         {/* Update time is a compact footer in list mode and stays centered between divider and card edge. */}
-        <div className={viewMode === 'list' ? 'basis-full flex-none' : 'mt-4'}>
-        <div className={`flex items-center justify-between text-muted-foreground dark:text-muted-foreground border-t ui-divider ${viewMode === 'list' ? 'w-full h-14 mt-4 text-sm leading-5' : 'pt-2 text-sm'}`}>
+        <div className={viewMode === 'list' ? 'app-repository-list-time flex-none' : 'mt-4'}>
+        <div className={`app-repository-card-footer flex items-center justify-between text-muted-foreground dark:text-muted-foreground border-t ui-divider ${viewMode === 'list' ? 'w-full text-xs' : 'pt-2 text-sm'}`}>
           <div className="group/footer relative flex min-w-0 items-center gap-1.5 leading-none">
             {isRepositoryCardFieldVisible(cardFields, 'lastUpdated') && (
             <>
@@ -1399,7 +1400,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 e.stopPropagation();
                 onSelect(repository.id);
               }}
-              className={`flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
+              className={`app-repository-select-toggle flex items-center justify-center w-7 h-7 rounded-md p-0 transition-colors ${
                 isSelected
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'

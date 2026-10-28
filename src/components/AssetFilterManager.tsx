@@ -4,7 +4,7 @@
 
 import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit3, Trash2, Filter, ChevronDown, ChevronUp, X, Package } from 'lucide-react';
+import { Plus, PencilLine, Trash2, Filter, X, Package } from 'lucide-react';
 import { SiAndroid, SiApple, SiLinux } from '@icons-pack/react-simple-icons';
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
@@ -57,7 +57,6 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<AssetFilter | undefined>();
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // 归一化 assetFilters：匹配预设标识的项设为 isPreset=true
   const normalizedFilters = useMemo(() => assetFilters.map(f => {
@@ -105,201 +104,98 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
     }
   };
 
-  const handlePresetToggle = (presetId: string) => {
-    onFilterToggle(presetId);
-  };
-
   const t = useT('app');
 
   return (
-    <div className="space-y-3">
-      {/* Compact Header with Toggle */}
-      <div className="flex items-center justify-between">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center space-x-2 px-3 py-2 bg-muted dark:bg-muted/40 rounded-lg hover:bg-accent dark:hover:bg-accent transition-all group"
-          title={isExpanded ? t('assetFilterManager.collapse-filters') : t('assetFilterManager.expand-filters')}
-          aria-expanded={isExpanded}
-          aria-controls="asset-filter-panel"
-        >
-          <Filter className={`w-4 h-4 text-muted-foreground dark:text-muted-foreground transition-transform ${
-            isExpanded ? 'text-primary dark:text-primary' : ''
-          }`} aria-hidden="true" />
-          <span className="text-sm font-medium text-foreground dark:text-muted-foreground">
-            {t('assetFilterManager.filters')}
-          </span>
+    <div className="app-side-filter-manager">
+      <div className="app-collection-row">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="app-section-label">{t('assetFilterManager.filters')}</p>
           {selectedFilters.length > 0 && (
-            <span className="px-2 py-0.5 bg-primary text-primary-foreground text-xs rounded-full">
-              {selectedFilters.length}
-            </span>
+            <span className="app-side-count">{selectedFilters.length}</span>
           )}
-          {isExpanded ? (
-            <ChevronUp className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-muted-foreground dark:text-muted-foreground" aria-hidden="true" />
-          )}
-        </Button>
-
-        <div className="flex items-center space-x-2">
+        </div>
+        <div className="app-side-filter-toolbar">
           {selectedFilters.length > 0 && (
             <Button
               variant="ghost"
               onClick={onClearFilters}
-              className="flex items-center space-x-1 px-2 py-1.5 text-xs text-muted-foreground dark:text-muted-foreground hover:bg-muted dark:hover:bg-accent rounded-lg transition-colors"
+              className="linear-icon-button app-side-action-button"
               title={t('assetFilterManager.clear-all-filters')}
               type="button"
               aria-label={t('assetFilterManager.clear-all-filters')}
             >
-              <X className="w-3 h-3" aria-hidden="true" />
-              <span className="hidden sm:inline">{t('assetFilterManager.clear-all-filters')}</span>
+              <X aria-hidden="true" />
             </Button>
           )}
           <Button
             onClick={handleCreateFilter}
-            className="flex items-center space-x-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+            variant="ghost"
+            className="linear-icon-button app-side-action-button"
             title={t('assetFilterManager.new-filter')}
             type="button"
             aria-label={t('assetFilterManager.new-filter')}
           >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{t('assetFilterManager.new')}</span>
+            <Plus aria-hidden="true" />
           </Button>
         </div>
       </div>
 
-      {/* 多过滤器组合说明：常驻可见（不藏 tooltip），解释 OR 组合与排除作用域 */}
-      <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-        {t('assetFilterManager.filter-scope-note')}
-      </p>
-
-      {/* Expandable Content */}
-      <div
-        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
-        style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
-      >
-        <div className="overflow-hidden min-h-0">
-          <div id="asset-filter-panel" className="space-y-3">
-          {/* Preset Filters */}
-          {presetFilters.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-2">
-                {t('assetFilterManager.preset-filters')}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {presetFilters.map(preset => {
-                  const Icon = preset.icon ? ICON_MAP[preset.icon] : Filter;
-                  const isSelected = selectedFilters.includes(preset.id);
-                  return (
-                    <div
-                      key={preset.id}
-                      className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
-                        isSelected
-                          ? 'bg-primary border-transparent text-primary-foreground font-medium'
-                          : 'bg-card border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      }`}
-                    >
-                      <Button
-                        variant="ghost"
-                        onClick={() => handlePresetToggle(preset.id)}
-                        className="h-auto min-h-0 flex items-center space-x-1.5 p-0"
-                        title={preset.keywords.join(', ')}
-                        type="button"
-                        aria-pressed={isSelected}
-                      >
-                        {Icon && <Icon className="w-3.5 h-3.5" aria-hidden="true" />}
-                        <span>{preset.name}</span>
-                      </Button>
-
-                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleEditFilter(preset)}
-                          className="h-6 w-6 rounded p-0 hover:bg-accent hover:text-accent-foreground transition-colors"
-                          title={t('assetFilterManager.edit')}
-                          type="button"
-                          aria-label={t('assetFilterManager.edit')}
-                        >
-                          <Edit3 className="w-3 h-3" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+      <div id="asset-filter-panel" className="app-side-list app-side-filter-list">
+        {[...presetFilters, ...customFilters].map((filter) => {
+          const Icon = filter.icon ? ICON_MAP[filter.icon] : Filter;
+          const isSelected = selectedFilters.includes(filter.id);
+          return (
+            <div key={filter.id} className="app-side-filter-row">
+              <Button
+                variant="ghost"
+                onClick={() => onFilterToggle(filter.id)}
+                className="app-side-item justify-between"
+                title={filter.keywords.join(', ')}
+                type="button"
+                aria-pressed={isSelected}
+              >
+                <span className="app-side-item-label">
+                  {Icon && <Icon aria-hidden="true" />}
+                  <span className="truncate">{filter.name}</span>
+                </span>
+              </Button>
+              <div className="app-side-row-actions">
+                <Button
+                  variant="ghost"
+                  onClick={() => handleEditFilter(filter)}
+                  className="linear-icon-button app-side-action-button"
+                  title={t('assetFilterManager.edit')}
+                  type="button"
+                  aria-label={`${t('assetFilterManager.edit')} ${filter.name}`}
+                >
+                  <PencilLine aria-hidden="true" />
+                </Button>
+                {!filter.isPreset && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => void handleDeleteFilter(filter.id)}
+                    className="linear-icon-button app-side-action-button text-destructive"
+                    title={t('assetFilterManager.delete')}
+                    type="button"
+                    aria-label={`${t('assetFilterManager.delete')} ${filter.name}`}
+                  >
+                    <Trash2 aria-hidden="true" />
+                  </Button>
+                )}
               </div>
             </div>
-          )}
+          );
+        })}
 
-          {/* Custom Filters */}
-          {customFilters.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground mb-2">
-                {t('assetFilterManager.custom-filters')}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {customFilters.map(filter => {
-                  const isSelected = selectedFilters.includes(filter.id);
-                  return (
-                    <div
-                      key={filter.id}
-                      className={`group flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs transition-colors ${
-                        isSelected
-                          ? 'bg-primary border-transparent text-primary-foreground font-medium'
-                          : 'bg-card border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      }`}
-                    >
-                      <Button
-                        variant="ghost"
-                        onClick={() => onFilterToggle(filter.id)}
-                        className="h-auto min-h-0 flex items-center space-x-1.5 p-0"
-                        title={filter.keywords.join(', ')}
-                        type="button"
-                        aria-pressed={isSelected}
-                      >
-                        <span>{filter.name}</span>
-                      </Button>
-
-                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleEditFilter(filter)}
-                          className="h-6 w-6 rounded p-0 hover:bg-accent hover:text-accent-foreground transition-colors"
-                          title={t('assetFilterManager.edit')}
-                          type="button"
-                          aria-label={t('assetFilterManager.edit')}
-                        >
-                          <Edit3 className="w-3 h-3" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          onClick={() => handleDeleteFilter(filter.id)}
-                          className="h-6 w-6 rounded p-0 text-destructive hover:text-destructive transition-colors"
-                          title={t('assetFilterManager.delete')}
-                          type="button"
-                          aria-label={t('assetFilterManager.delete')}
-                        >
-                          <Trash2 className="w-3 h-3" aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {presetFilters.length === 0 && customFilters.length === 0 && (
-            <div className="text-center py-4 bg-background dark:bg-card rounded-lg border-2 border-dashed border-border dark:border-border">
-              <p className="text-xs text-muted-foreground dark:text-muted-foreground">
-                {t('assetFilterManager.no-filters-click-new-to-create')}
-              </p>
-            </div>
-          )}
-
-          </div>
-        </div>
+        {presetFilters.length === 0 && customFilters.length === 0 && (
+          <p className="app-side-empty">
+            {t('assetFilterManager.no-filters-click-new-to-create')}
+          </p>
+        )}
       </div>
+
+      <p className="app-side-filter-note">{t('assetFilterManager.filter-scope-note')}</p>
 
       {/* Filter Modal */}
       <FilterModal

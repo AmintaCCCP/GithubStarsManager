@@ -153,7 +153,9 @@
     "hide-category-confirmation": "隐藏分类确认",
     "hide-default-category-v1-this-will-not-delete-an": "隐藏默认分类\"{{v1}}\"？\n\n这不会删除任何仓库，只是在左侧隐藏这个预设分类。",
     "failed-to-hide-category-please-check-backend-con": "隐藏分类失败，请检查后端连接。",
-    "categories": "应用分类",
+    "categories": "仓库分类",
+    "category-group": "分类",
+    "workspace-label": "工作区",
     "add-category": "添加分类",
     "drag-repository-cards-here-to-quickly-change-cat": "可将仓库卡片拖到这里快速改分类",
     "drop-here-to-remove-category": "拖到这里取消分类",
@@ -167,7 +169,12 @@
     "delete-category": "删除分类",
     "hide-default-category": "隐藏默认分类",
     "drag-hint": "{{name}} — 拖动仓库卡片到此处可快速修改分类",
-    "sync-failed-reverted": "同步到后端失败，已恢复分类更改。"
+    "sync-failed-reverted": "同步到后端失败，已恢复分类更改。",
+    "quick-access": "快速访问",
+    "all-repositories": "全部仓库",
+    "needs-review": "待整理",
+    "synced": "星标已同步",
+    "repository-count": "{{count}} 个仓库"
   },
   "codeSearchView": {
     "show-less": "收起",
@@ -317,9 +324,9 @@
     "show-repositories-with-failed-ai-analysis": "显示AI分析失败的仓库",
     "analysis-failed": "分析失败",
     "show-repositories-subscribed-to-release-notifica": "显示已订阅Release通知的仓库",
-    "subscribed-to-releases": "已订阅Release",
+    "subscribed-to-releases": "已订阅 Release",
     "show-repositories-not-subscribed-to-releases": "显示未订阅Release通知的仓库",
-    "not-subscribed-to-releases": "未订阅Release",
+    "not-subscribed-to-releases": "未订阅 Release",
     "show-customized-repositories-including-custom-de": "显示已自定义的仓库（包括自定义描述、标签、分类）",
     "customized": "已自定义",
     "show-repositories-with-locked-category-won-t-aut": "显示分类已锁定的仓库（同步时不会自动更改分类）",
@@ -403,6 +410,9 @@
     "shortcut-ai-search": "AI搜索"
   },
   "settingsPanel": {
+    "section-app": "应用",
+    "section-ai-data": "AI 与数据",
+    "section-connection": "连接与诊断",
     "general": "通用",
     "appearance": "外观设置",
     "star-sync": "星标同步",
@@ -420,6 +430,7 @@
     "mcp-server": "MCP服务",
     "settings-content": "设置内容",
     "settings": "设置",
+    "preferences-label": "偏好设置",
     "close-settings": "关闭设置",
     "settings-tabs": "设置标签页"
   },

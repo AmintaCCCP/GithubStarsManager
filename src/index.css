@@ -522,9 +522,9 @@ html:has(body[data-scroll-locked]) {
 
   /* Typography stacks (theme presets may swap families). Inter leads the
      latin stack for the premium SaaS voice; CJK falls through to the OS face. */
-  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
   /* Elevation recipes consumed by the Tailwind boxShadow tokens. */
   --shadow-color: 0 0% 0%;
@@ -541,6 +541,7 @@ html:has(body[data-scroll-locked]) {
   --ui-text: hsl(var(--foreground));
   --ui-text-muted: hsl(var(--muted-foreground));
   --ui-text-faint: hsl(var(--muted-foreground) / 0.75);
+  --ui-text-caption: hsl(var(--foreground));
   --ui-line: hsl(var(--border));
   --ui-line-subtle: hsl(var(--border) / 0.7);
   --ui-line-strong: hsl(var(--border-strong));
@@ -571,6 +572,349 @@ html:has(body[data-scroll-locked]) {
   --ui-radius-sm: calc(var(--radius) - 2px);
   --ui-radius-md: var(--radius);
   --ui-radius-lg: calc(var(--radius) + 4px);
+
+  /* Application workspace layout tokens (see UI redesign plan §6.4).
+     Layout/motion constants only — colors and fonts stay theme-driven. */
+  --app-shell-max-width: none;
+  --app-header-height: 3.5rem;
+  --app-header-offset: calc(var(--app-header-height) + var(--app-border-width));
+  --app-gutter-inline: clamp(1.25rem, 2.5vw, 2.25rem);
+  --app-content-padding-block: 1.75rem;
+  --app-route-stack-gap: 1rem;
+  --app-sidebar-width: 15.5rem;
+  --app-sidebar-gap: 1.5rem;
+  --app-sidebar-offset: 1rem;
+  --app-section-gap: 1.5rem;
+  --app-control-height-xs: 1.75rem;
+  --app-control-height-sm: 2rem;
+  --app-control-height-md: 2.5rem;
+  --app-control-font-size: 0.8125rem;
+  --app-border-width: 1px;
+  --app-motion-fast: 120ms;
+  --app-motion-base: 180ms;
+  --app-z-header: 50;
+  --app-z-sidebar: 10;
+  --app-z-popover: 9999;
+  --app-gist-help-popover-shift: -0.5rem;
+
+  /* Desktop workspace visual tokens. Every surface derives from the active
+     theme palette, so presets and light/dark mode remain authoritative. */
+  --app-canvas-surface: hsl(var(--background));
+  --app-canvas-wash: hsl(var(--background));
+  --app-canvas-image: none;
+  --app-canvas-size: 100% 100%;
+  --app-main-padding-block: 0;
+  --app-workspace-gap: 1.125rem;
+  --app-header-gap: 1rem;
+  --app-header-action-gap: 0.5rem;
+  --app-nav-tracking: -0.006em;
+  --app-header-surface: color-mix(in srgb, hsl(var(--background)) 96%, hsl(var(--card)) 4%);
+  --app-header-border: transparent;
+  --app-header-shadow: none;
+  --app-nav-surface: color-mix(in srgb, hsl(var(--muted)) 46%, transparent);
+  --app-nav-border: color-mix(in srgb, hsl(var(--border)) 76%, transparent);
+  --app-nav-padding: 0.1875rem;
+  --app-nav-item-height: 2.125rem;
+  --app-nav-item-padding-inline: 0.6875rem;
+  --app-nav-font-size: 0.84375rem;
+  --app-nav-font-weight: 520;
+  --app-nav-active-font-weight: 560;
+  --app-nav-icon-size: 0.9375rem;
+  --app-nav-icon-stroke: 1.8;
+  --app-nav-active-surface: hsl(var(--card));
+  --app-nav-active-border: var(--app-nav-border);
+  --app-nav-active-shadow: 0 1px 2px color-mix(in srgb, hsl(var(--shadow-color)) 5%, transparent);
+  --app-brand-mark-size: 2rem;
+  --app-brand-mark-radius: calc(var(--radius) - 2px);
+  --app-brand-mark-shadow: 0 1px 3px color-mix(in srgb, hsl(var(--shadow-color)) 16%, transparent);
+  --app-brand-title-size: 0.8125rem;
+  --app-brand-title-weight: 620;
+  --app-brand-title-tracking: -0.014em;
+  --app-brand-title-line-height: 1.25;
+  --app-brand-subtitle-size: 0.65625rem;
+  --app-brand-subtitle-color: hsl(var(--muted-foreground));
+  --app-brand-subtitle-line-height: 1.35;
+  --app-header-user-name-size: 0.75rem;
+  --app-header-user-name-weight: 550;
+  --app-icon-size: 1rem;
+  /* A quiet canvas blend separates the rail without a hard divider. */
+  --app-sidebar-surface: color-mix(in srgb, hsl(var(--muted)) 26%, hsl(var(--background)) 74%);
+  --app-sidebar-border: transparent;
+  --app-sidebar-padding: 0;
+  --app-sidebar-padding-collapsed: 0.5rem;
+  --app-sidebar-head-min-height: 3.75rem;
+  --app-sidebar-head-gap: 0.5rem;
+  --app-sidebar-head-padding-block-start: 0.5625rem;
+  --app-sidebar-head-padding-block-end: 0.4375rem;
+  --app-sidebar-head-padding-inline-start: 1rem;
+  --app-sidebar-head-padding-inline-end: 0.75rem;
+  --app-sidebar-body-padding-block-start: 0.25rem;
+  --app-sidebar-body-padding-block-end: 0.75rem;
+  --app-sidebar-body-padding-inline: 0.5rem;
+  --app-sidebar-section-padding-block: 0.75rem;
+  --app-sidebar-section-padding-inline: 0.5rem;
+  --app-sidebar-section-gap: 0.25rem;
+  --app-sidebar-heading-size: 0.9375rem;
+  --app-sidebar-heading-weight: 600;
+  --app-sidebar-heading-tracking: -0.012em;
+  --app-sidebar-heading-color: color-mix(in srgb, hsl(var(--foreground)) 90%, hsl(var(--muted-foreground)) 10%);
+  --app-sidebar-muted-color: color-mix(in srgb, hsl(var(--foreground)) 28%, hsl(var(--muted-foreground)) 72%);
+  --app-sidebar-title-gap: 0.125rem;
+  --app-sidebar-line-height: 1.2;
+  --app-sidebar-eyebrow-size: 0.625rem;
+  --app-sidebar-eyebrow-weight: 600;
+  --app-sidebar-eyebrow-tracking: 0.075em;
+  --app-sidebar-label-size: 0.6875rem;
+  --app-sidebar-label-weight: 560;
+  --app-sidebar-label-tracking: 0.025em;
+  --app-sidebar-caption-size: 0.75rem;
+  --app-sidebar-tab-height: 2.5rem;
+  --app-sidebar-item-height: 2.25rem;
+  --app-sidebar-item-gap: 0.625rem;
+  --app-sidebar-item-padding-inline: 0.625rem;
+  --app-sidebar-item-font-size: 0.875rem;
+  --app-sidebar-item-font-weight: var(--app-nav-font-weight);
+  --app-sidebar-item-color: color-mix(in srgb, hsl(var(--foreground)) 42%, hsl(var(--muted-foreground)) 58%);
+  --app-sidebar-active-item-font-weight: 550;
+  --app-sidebar-active-item-color: hsl(var(--foreground));
+  --app-sidebar-active-surface: color-mix(in srgb, hsl(var(--primary)) 8%, transparent);
+  --app-sidebar-active-border: transparent;
+  --app-sidebar-active-shadow: none;
+  --app-sidebar-item-tracking: -0.002em;
+  --app-sidebar-list-gap: 0.125rem;
+  --app-side-label-margin-inline: 0.5rem;
+  --app-side-label-padding-block-start: 0.75rem;
+  --app-side-label-padding-block-end: 0.25rem;
+  --app-sidebar-tab-padding-inline: 0.5rem;
+  --app-sidebar-count-size: 0.6875rem;
+  --app-sidebar-count-color: color-mix(in srgb, hsl(var(--foreground)) 45%, hsl(var(--muted-foreground)) 55%);
+  --app-sidebar-count-min-width: 1.5rem;
+  --app-sidebar-count-padding-block: 0.09375rem;
+  --app-sidebar-count-padding-inline: 0.375rem;
+  --app-sidebar-count-radius: 999px;
+  --app-sidebar-section-gap: 0.375rem;
+  --app-sidebar-control-gap: 0.375rem;
+  --app-sidebar-control-row-min-height: 2rem;
+  --app-sidebar-control-row-padding-inline: 0.5rem;
+  --app-sidebar-control-row-font-size: 0.6875rem;
+  --app-sidebar-more-height: 2rem;
+  --app-sidebar-more-font-size: 0.6875rem;
+  --app-sidebar-inline-status-font-size: 0.6875rem;
+  --app-sidebar-empty-padding-block: 0.5rem;
+  --app-sidebar-empty-padding-inline: 0.5rem;
+  --app-sidebar-empty-font-size: 0.6875rem;
+  --app-sidebar-empty-line-height: 1.45;
+  --app-sidebar-foot-border: color-mix(in srgb, hsl(var(--border)) 62%, transparent);
+  --app-sidebar-foot-padding-block: 0.625rem;
+  --app-sidebar-foot-padding-inline: 0.75rem;
+  --app-sidebar-foot-gap: 0.25rem;
+  --app-sidebar-foot-status-size: 0.625rem;
+  --app-sidebar-foot-meta-size: 0.59375rem;
+  --app-sidebar-status-dot-size: 0.375rem;
+  --app-sidebar-rail-gap: 0.5rem;
+  --app-sidebar-rail-padding-block: 0.25rem;
+  --app-sidebar-rail-divider-color: color-mix(in srgb, hsl(var(--border)) 70%, transparent);
+  --app-sidebar-category-emoji-size: 1rem;
+  --app-sidebar-category-emoji-line-height: 1;
+  --app-sidebar-icon-stroke: 1.8;
+  --app-sidebar-toggle-size: 2rem;
+  --app-sidebar-toggle-icon-size: 0.9375rem;
+  --app-sidebar-toggle-icon-stroke: 1.75;
+  --app-sidebar-toggle-radius: var(--ui-radius-sm);
+  --app-sidebar-action-size: 1.5rem;
+  --app-sidebar-action-icon-size: 0.75rem;
+  --app-sidebar-action-icon-stroke: 1.7;
+  --app-sidebar-action-gap: 0.125rem;
+  --app-sidebar-action-radius: var(--ui-radius-xs);
+  --app-scope-label-size: 0.625rem;
+  --app-scope-label-color: var(--app-sidebar-muted-color);
+  --app-scope-trigger-height: 2rem;
+  --app-scope-trigger-padding-inline: 0.5rem;
+  --app-scope-trigger-gap: 0.375rem;
+  --app-scope-trigger-font-size: 0.6875rem;
+  --app-scope-trigger-max-width: 14rem;
+  --app-collection-row-min-height: 2rem;
+  --app-collection-row-gap: 0.25rem;
+  --app-collection-row-padding-inline: 0.5rem;
+  --app-category-strip-gap: 0.5rem;
+  --app-category-strip-padding-block-end: 0.25rem;
+  --app-category-pill-min-width: 8.75rem;
+  --app-page-heading-margin-block-end: 1.25rem;
+  --app-page-title-size: 1.625rem;
+  --app-page-title-weight: 600;
+  --app-page-title-tracking: -0.022em;
+  --app-workspace-header-gap: 2rem;
+  --app-workspace-header-border: transparent;
+  --app-workspace-header-padding-block-end: 0;
+  --app-workspace-header-margin-block-end: 1.25rem;
+  --app-workspace-breadcrumb-size: 0.625rem;
+  --app-workspace-breadcrumb-weight: 600;
+  --app-workspace-breadcrumb-tracking: 0.08em;
+  --app-workspace-breadcrumb-gap: 0.375rem;
+  --app-workspace-breadcrumb-margin-block-end: 0.4375rem;
+  --app-workspace-title-size: 1.75rem;
+  --app-workspace-title-weight: 600;
+  --app-workspace-title-tracking: -0.025em;
+  --app-workspace-title-line-height: 1.15;
+  --app-workspace-title-row-gap: 0.625rem;
+  --app-workspace-description-max-width: 64rem;
+  --app-workspace-description-margin-block-start: 0.4375rem;
+  --app-workspace-description-color: hsl(var(--muted-foreground));
+  --app-workspace-description-size: 0.8125rem;
+  --app-workspace-description-line-height: 1.55;
+  --app-workspace-meta-gap: 0.375rem;
+  --app-workspace-meta-size: 0.6875rem;
+  --app-workspace-meta-height: 1.625rem;
+  --app-workspace-meta-padding-inline: 0.5625rem;
+  --app-workspace-meta-border: color-mix(in srgb, hsl(var(--border)) 62%, transparent);
+  --app-workspace-meta-surface: color-mix(in srgb, hsl(var(--card)) 76%, transparent);
+  --app-workspace-actions-gap: 0.5rem;
+  --app-workspace-header-note-size: 0.6875rem;
+  --app-workspace-header-note-color: hsl(var(--muted-foreground));
+  --app-hover-surface: color-mix(in srgb, hsl(var(--foreground)) 4%, transparent);
+  --app-count-surface: color-mix(in srgb, hsl(var(--foreground)) 7%, transparent);
+  --app-count-active-surface: color-mix(in srgb, hsl(var(--primary)) 15%, transparent);
+  --app-toolbar-surface: transparent;
+  --app-toolbar-border: transparent;
+  --app-toolbar-shadow: none;
+  --app-toolbar-padding: 0;
+  --app-panel-surface: hsl(var(--card));
+  --app-panel-border: color-mix(in srgb, hsl(var(--border)) 64%, transparent);
+  --app-panel-shadow: none;
+  --app-panel-hover-border: color-mix(in srgb, hsl(var(--border-strong)) 58%, hsl(var(--border)));
+  --app-panel-hover-shadow: none;
+  --app-active-surface: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)) 92%);
+  --app-active-border: color-mix(in srgb, hsl(var(--primary)) 24%, hsl(var(--border)) 76%);
+  --app-active-text: hsl(var(--primary-emphasis, var(--primary)));
+  --app-active-shadow: none;
+  --app-workspace-surface: hsl(var(--background));
+  --app-workspace-image: none;
+  --app-workspace-image-size: 100% 100%;
+  --app-workspace-min-height: calc(100dvh - var(--app-header-offset));
+  --app-settings-content-max-width: 74rem;
+  --app-settings-section-surface: transparent;
+  --app-settings-section-border: color-mix(in srgb, hsl(var(--border)) 66%, transparent);
+  --app-settings-section-radius: 0;
+  --app-settings-section-shadow: none;
+  --app-settings-section-padding: 1.5rem;
+  --app-settings-card-padding-block: 1.375rem;
+  --app-settings-card-padding-inline: 1.5rem;
+  --app-settings-card-gap: 0.875rem;
+  --app-settings-stack-surface: color-mix(in srgb, hsl(var(--card)) 88%, hsl(var(--background)) 12%);
+  --app-settings-stack-border: color-mix(in srgb, hsl(var(--border)) 72%, transparent);
+  --app-settings-stack-radius: var(--ui-radius-lg);
+  --app-fork-list-gap: 0;
+  --app-fork-list-item-surface: transparent;
+  --app-fork-list-item-hover-surface: var(--app-hover-surface);
+  --app-fork-list-item-border: color-mix(in srgb, hsl(var(--border)) 66%, transparent);
+  --app-fork-list-item-radius: 0;
+  --app-fork-list-item-shadow: none;
+  --app-fork-list-surface: color-mix(in srgb, hsl(var(--card)) 84%, hsl(var(--background)) 16%);
+  --app-fork-list-border: color-mix(in srgb, hsl(var(--border)) 66%, transparent);
+  --app-fork-list-radius: var(--app-card-radius);
+  --app-fork-list-shadow: none;
+  --app-command-gap: 0.75rem;
+  --app-command-input-height: var(--app-control-height-md);
+  --app-command-input-surface: color-mix(in srgb, hsl(var(--card)) 72%, hsl(var(--background)) 28%);
+  --app-command-input-border: color-mix(in srgb, hsl(var(--border)) 74%, transparent);
+  --app-command-input-radius: var(--ui-radius-sm);
+  --app-command-input-font-size: var(--app-control-font-size);
+  --app-command-chip-height: 1.75rem;
+  --app-command-chip-padding-inline: 0.625rem;
+  --app-command-chip-gap: 0.375rem;
+  --app-command-chip-radius: 999px;
+  --app-command-chip-surface: color-mix(in srgb, hsl(var(--card)) 72%, transparent);
+  --app-command-chip-border: color-mix(in srgb, hsl(var(--border)) 76%, transparent);
+  --app-command-chip-color: hsl(var(--muted-foreground));
+  --app-command-chip-font-size: 0.6875rem;
+  --app-command-chip-font-weight: 560;
+  --app-command-chip-active-surface: color-mix(in srgb, hsl(var(--primary)) 9%, transparent);
+  --app-command-chip-active-border: color-mix(in srgb, hsl(var(--primary)) 24%, hsl(var(--border)) 76%);
+  --app-command-chip-active-color: hsl(var(--primary-emphasis, var(--primary)));
+  --app-command-control-height: var(--app-control-height-sm);
+  --app-command-control-radius: var(--ui-radius-sm);
+  --app-command-control-font-size: 0.75rem;
+  --app-command-filter-panel-gap: 0.75rem;
+  --app-command-filter-panel-padding-block: 1rem;
+  --app-command-filter-panel-padding-inline: 1.125rem;
+  --app-command-filter-panel-surface: color-mix(in srgb, hsl(var(--muted)) 32%, hsl(var(--background)) 68%);
+  --app-command-filter-panel-border: color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  --app-command-filter-title-size: 0.75rem;
+  --app-command-filter-title-weight: 600;
+  --app-context-row-gap: 0.625rem;
+  --app-context-row-padding-block: 0.125rem;
+  --app-context-row-color: hsl(var(--muted-foreground));
+  --app-context-row-font-size: 0.6875rem;
+  --app-card-gap: 0.75rem;
+  --app-card-padding: 1rem;
+  --app-card-radius: var(--ui-radius-md);
+  --app-card-hover-surface: color-mix(in srgb, hsl(var(--card)) 94%, hsl(var(--muted)) 6%);
+  --app-card-title-size: 0.9375rem;
+  --app-card-title-weight: 600;
+  --app-card-title-tracking: -0.012em;
+  --app-card-meta-size: 0.75rem;
+  --app-card-description-size: 0.875rem;
+  --app-card-description-line-height: 1.55;
+  --app-card-description-color: color-mix(in srgb, hsl(var(--foreground)) 76%, hsl(var(--muted-foreground)) 24%);
+  --app-repository-card-avatar-size: 2rem;
+  --app-card-tag-height: 1.375rem;
+  --app-card-tag-padding-inline: 0.4375rem;
+  --app-card-tag-radius: var(--ui-radius-xs);
+  --app-card-tag-surface: color-mix(in srgb, hsl(var(--muted)) 72%, transparent);
+  --app-card-action-size: 1.75rem;
+  --app-card-action-icon-size: 1rem;
+  --app-flat-list-surface: color-mix(in srgb, hsl(var(--card)) 90%, hsl(var(--background)) 10%);
+  --app-flat-list-border: color-mix(in srgb, hsl(var(--border)) 72%, transparent);
+  --app-flat-list-radius: var(--app-card-radius);
+  --app-flat-list-row-padding-block: 0.875rem;
+  --app-flat-list-row-padding-inline: 1rem;
+  --app-flat-list-row-hover-surface: color-mix(in srgb, hsl(var(--muted)) 42%, transparent);
+  --app-flat-list-divider: color-mix(in srgb, hsl(var(--border)) 62%, transparent);
+  --app-empty-icon-size: 2.75rem;
+  --app-empty-icon-radius: var(--ui-radius-md);
+  --app-empty-icon-surface: color-mix(in srgb, hsl(var(--muted)) 78%, transparent);
+  --app-empty-gap: 0.75rem;
+  --app-empty-padding-block: 3.5rem;
+  --app-empty-padding-inline: 1.5rem;
+  --app-empty-title-size: 0.9375rem;
+  --app-empty-title-weight: 600;
+  --app-empty-copy-size: 0.75rem;
+  --app-empty-copy-line-height: 1.6;
+  --app-empty-steps-gap: 0.5rem;
+  --app-empty-step-surface: color-mix(in srgb, hsl(var(--background)) 62%, transparent);
+  --app-empty-step-border: color-mix(in srgb, hsl(var(--border)) 68%, transparent);
+  --app-empty-step-radius: var(--ui-radius-sm);
+  --app-empty-step-marker-size: 1.25rem;
+  --app-empty-step-marker-surface: color-mix(in srgb, hsl(var(--foreground)) 8%, transparent);
+  --app-empty-step-padding-block: 0.625rem;
+  --app-empty-step-padding-inline: 0.75rem;
+  --app-empty-step-font-size: 0.6875rem;
+  --app-release-option-height: 2rem;
+  --app-release-option-gap: 0.5rem;
+  --app-release-option-padding-inline: 0.625rem;
+  --app-release-option-radius: var(--ui-radius-sm);
+  --app-release-option-surface: color-mix(in srgb, hsl(var(--card)) 72%, transparent);
+  --app-release-option-border: color-mix(in srgb, hsl(var(--border)) 76%, transparent);
+  --app-release-option-color: hsl(var(--muted-foreground));
+  --app-release-option-font-size: 0.6875rem;
+  --app-release-toolbar-gap: 0.75rem;
+  --app-release-search-max-width: 34rem;
+  --app-dialog-width: min(calc(100vw - 2rem), 36rem);
+  --app-dialog-padding: 1.25rem;
+  --app-dialog-gap: 1rem;
+  --app-dialog-radius: var(--ui-radius-lg);
+  --app-dialog-header-gap: 0.375rem;
+  --app-dialog-title-size: 1.0625rem;
+  --app-dialog-title-weight: 600;
+  --app-dialog-description-size: 0.8125rem;
+  --app-dialog-footer-gap: 0.5rem;
+  --app-dialog-footer-padding-block-start: 0.875rem;
+  --app-dialog-footer-border: color-mix(in srgb, hsl(var(--border)) 64%, transparent);
+  --app-dialog-overlay: hsl(var(--overlay) / 0.38);
+  --app-dialog-shadow: var(--app-shadow-dialog);
+  --app-radius-shell: calc(var(--radius) + 2px);
+  --app-radius-control: calc(var(--radius) - 2px);
+  --app-motion-surface: background-color var(--app-motion-fast) ease, border-color var(--app-motion-fast) ease, color var(--app-motion-fast) ease, box-shadow var(--app-motion-base) ease;
 }
 
 html.dark {
@@ -720,6 +1064,590 @@ textarea:focus-visible,
   box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.03);
 }
 
+/* Application workspace shell (UI redesign plan §6). Layout only: document
+   stays the single scroll root and sidebars must not clip portal popovers. */
+.app-main {
+  width: 100%;
+  max-width: var(--app-shell-max-width);
+  margin-inline: auto;
+  padding: var(--app-main-padding-block) var(--app-gutter-inline);
+}
+
+.app-header-inner {
+  max-width: var(--app-shell-max-width);
+  margin-inline: auto;
+  padding-inline: var(--app-gutter-inline);
+}
+
+.route-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-route-stack-gap);
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    padding: 0;
+  }
+
+  .route-workspace {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .workspace-content {
+    padding: var(--app-content-padding-block) var(--app-gutter-inline);
+  }
+}
+
+.workspace-content {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.context-sidebar {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  z-index: var(--app-z-sidebar);
+}
+
+@media (min-width: 1024px) {
+  .context-sidebar {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: var(--app-header-offset);
+    height: var(--app-sidebar-min-height);
+    max-height: var(--app-sidebar-min-height);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .context-sidebar[data-context-sidebar='settings'] {
+    position: sticky;
+    height: var(--app-sidebar-min-height);
+    max-height: var(--app-sidebar-min-height);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}
+
+.context-sidebar-section {
+  display: flex;
+  flex-direction: column;
+  padding: var(--app-sidebar-section-padding-block) var(--app-sidebar-section-padding-inline);
+  border-bottom: var(--app-border-width) solid var(--app-sidebar-border);
+}
+
+.context-sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-section-gap);
+}
+
+.context-sidebar-head {
+  display: flex;
+  min-height: var(--app-sidebar-head-min-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-sidebar-head-gap);
+  padding:
+    var(--app-sidebar-head-padding-block-start)
+    var(--app-sidebar-head-padding-inline-end)
+    var(--app-sidebar-head-padding-block-end)
+    var(--app-sidebar-head-padding-inline-start);
+}
+
+.context-sidebar-title {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: var(--app-sidebar-heading-size);
+  font-weight: var(--app-sidebar-heading-weight);
+  letter-spacing: var(--app-sidebar-heading-tracking);
+}
+
+.context-sidebar-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding:
+    var(--app-sidebar-body-padding-block-start)
+    var(--app-sidebar-body-padding-inline)
+    var(--app-sidebar-body-padding-block-end);
+}
+
+.context-sidebar-body.scrollbar-on-scroll::-webkit-scrollbar {
+  width: var(--app-sidebar-scrollbar-size);
+  height: var(--app-sidebar-scrollbar-size);
+}
+
+.context-sidebar-body.scrollbar-on-scroll.scrolling::-webkit-scrollbar-thumb {
+  background: var(--app-sidebar-scrollbar-thumb);
+}
+
+.app-collection-row {
+  display: flex;
+  min-height: var(--app-collection-row-min-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-collection-row-gap);
+  padding-inline: var(--app-collection-row-padding-inline);
+}
+
+.app-page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-sidebar-head-gap);
+  margin-block-end: var(--app-page-heading-margin-block-end);
+}
+
+.app-page-title {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: var(--app-page-title-size);
+  font-weight: var(--app-page-title-weight);
+  letter-spacing: var(--app-page-title-tracking);
+}
+
+.app-workspace-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--app-workspace-header-gap);
+  margin-block-end: var(--app-workspace-header-margin-block-end);
+  padding-block-end: var(--app-workspace-header-padding-block-end);
+  border-bottom: var(--app-border-width) solid var(--app-workspace-header-border);
+}
+
+.app-workspace-page-header-copy {
+  min-width: 0;
+}
+
+.app-workspace-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--app-workspace-breadcrumb-gap);
+  margin-block-end: var(--app-workspace-breadcrumb-margin-block-end);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-workspace-breadcrumb-size);
+  font-weight: var(--app-workspace-breadcrumb-weight);
+  letter-spacing: var(--app-workspace-breadcrumb-tracking);
+  text-transform: uppercase;
+}
+
+.app-workspace-title-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-workspace-title-row-gap);
+}
+
+.app-workspace-title {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: var(--app-workspace-title-size);
+  font-weight: var(--app-workspace-title-weight);
+  letter-spacing: var(--app-workspace-title-tracking);
+  line-height: var(--app-workspace-title-line-height);
+}
+
+.app-workspace-description {
+  max-width: var(--app-workspace-description-max-width);
+  margin: var(--app-workspace-description-margin-block-start) 0 0;
+  color: var(--app-workspace-description-color);
+  font-size: var(--app-workspace-description-size);
+  line-height: var(--app-workspace-description-line-height);
+}
+
+.app-workspace-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-workspace-meta-gap);
+}
+
+.app-workspace-meta-pill {
+  display: inline-flex;
+  min-height: var(--app-workspace-meta-height);
+  align-items: center;
+  padding-inline: var(--app-workspace-meta-padding-inline);
+  border: var(--app-border-width) solid var(--app-workspace-meta-border);
+  border-radius: var(--app-sidebar-count-radius);
+  background: var(--app-workspace-meta-surface);
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-workspace-meta-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-workspace-page-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--app-workspace-actions-gap);
+}
+
+.app-command-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-command-gap);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-command-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--app-command-gap);
+}
+
+.app-command-filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-command-chip-gap);
+}
+
+.app-command-filter-group,
+.app-command-controls {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-command-chip-gap);
+}
+
+.app-command-controls {
+  margin-inline-start: auto;
+}
+
+.app-command-panel .ui-field {
+  height: var(--app-command-input-height);
+  border-color: var(--app-command-input-border);
+  border-radius: var(--app-command-input-radius);
+  background: var(--app-command-input-surface);
+  font-size: var(--app-command-input-font-size);
+  box-shadow: none;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip) {
+  min-height: var(--app-command-chip-height);
+  height: var(--app-command-chip-height);
+  gap: var(--app-command-chip-gap);
+  padding-inline: var(--app-command-chip-padding-inline);
+  border-color: var(--app-command-chip-border);
+  border-radius: var(--app-command-chip-radius);
+  background: var(--app-command-chip-surface);
+  color: var(--app-command-chip-color);
+  font-size: var(--app-command-chip-font-size);
+  font-weight: var(--app-command-chip-font-weight);
+  box-shadow: none;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip).is-active {
+  border-color: var(--app-command-chip-active-border);
+  background: var(--app-command-chip-active-surface);
+  color: var(--app-command-chip-active-color);
+}
+
+.app-command-panel .ui-button-primary {
+  min-height: var(--app-command-control-height);
+  border-radius: var(--app-command-control-radius);
+  font-size: var(--app-command-control-font-size);
+  box-shadow: none;
+}
+
+.app-repository-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-command-gap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-repository-controls .ui-field {
+  height: var(--app-command-control-height);
+  border-radius: var(--app-command-control-radius);
+  font-size: var(--app-command-control-font-size);
+}
+
+.app-context-row-copy {
+  padding-block: var(--app-context-row-padding-block);
+  color: var(--app-context-row-color);
+  font-size: var(--app-context-row-font-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--app-sidebar-action-gap);
+  padding: var(--app-sidebar-action-gap);
+  border: var(--app-border-width) solid var(--app-command-chip-border);
+  border-radius: var(--app-command-control-radius);
+  background: var(--app-command-chip-surface);
+}
+
+.app-segmented-control > button {
+  width: var(--app-card-action-size);
+  height: var(--app-card-action-size);
+  padding: 0;
+  border-radius: var(--app-sidebar-action-radius);
+}
+
+.app-repository-grid {
+  gap: var(--app-card-gap);
+}
+
+.app-repository-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-action-gap);
+}
+
+.app-repository-card-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--app-sidebar-item-gap);
+}
+
+.app-repository-card-avatar {
+  width: var(--app-repository-card-avatar-size, 1.875rem);
+  height: var(--app-repository-card-avatar-size, 1.875rem);
+  flex: none;
+  border-radius: var(--app-sidebar-count-radius);
+}
+
+.app-repository-card-identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-repository-card-title {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: var(--app-card-title-size);
+  font-weight: var(--app-card-title-weight);
+  letter-spacing: var(--app-card-title-tracking);
+  line-height: var(--app-sidebar-line-height);
+}
+
+.app-repository-card-owner {
+  margin-block-start: var(--app-sidebar-action-gap);
+  color: var(--app-sidebar-muted-color);
+  font-family: var(--font-mono);
+  font-size: var(--app-card-meta-size);
+  line-height: var(--app-sidebar-line-height);
+}
+
+.app-repository-card-description {
+  color: var(--app-card-description-color);
+  font-size: var(--app-card-description-size);
+  line-height: var(--app-card-description-line-height);
+}
+
+.app-repository-card-tags {
+  gap: var(--app-sidebar-action-gap);
+}
+
+.app-repository-card-tag {
+  min-height: var(--app-card-tag-height);
+  padding-block: 0;
+  padding-inline: var(--app-card-tag-padding-inline);
+  border-color: transparent;
+  border-radius: var(--app-card-tag-radius);
+  background: var(--app-card-tag-surface);
+  font-size: var(--app-card-meta-size);
+  line-height: var(--app-card-tag-height);
+}
+
+.app-repository-card-meta {
+  gap: var(--app-sidebar-item-gap);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-card-meta-size);
+}
+
+.app-repository-card-footer {
+  border-color: var(--app-panel-border);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-card-meta-size);
+}
+
+.app-repository-actions {
+  gap: var(--app-sidebar-action-gap);
+}
+
+.app-repository-actions :is(button, a) {
+  width: var(--app-card-action-size);
+  height: var(--app-card-action-size);
+  border-radius: var(--app-sidebar-action-radius);
+}
+
+.app-repository-actions :is(svg) {
+  width: var(--app-card-action-icon-size);
+  height: var(--app-card-action-icon-size);
+}
+
+.app-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--app-empty-gap);
+  padding: var(--app-empty-padding-block) var(--app-empty-padding-inline);
+  border-color: var(--app-panel-border);
+  border-radius: var(--app-card-radius);
+  background: color-mix(in srgb, var(--app-panel-surface) 72%, transparent);
+  box-shadow: none;
+  text-align: center;
+}
+
+.app-empty-visual {
+  display: grid;
+  width: var(--app-empty-icon-size);
+  height: var(--app-empty-icon-size);
+  place-items: center;
+  border-radius: var(--app-empty-icon-radius);
+  background: var(--app-empty-icon-surface);
+  color: var(--app-sidebar-muted-color);
+}
+
+.app-empty-copy {
+  display: flex;
+  max-width: 34rem;
+  flex-direction: column;
+  gap: var(--app-card-tag-padding-inline);
+}
+
+.app-empty-title {
+  margin: 0;
+  color: hsl(var(--foreground));
+  font-size: var(--app-empty-title-size);
+  font-weight: var(--app-empty-title-weight);
+  letter-spacing: var(--app-card-title-tracking);
+}
+
+.app-empty-description {
+  margin: 0;
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-empty-copy-size);
+  line-height: var(--app-empty-copy-line-height);
+}
+
+.app-empty-steps {
+  display: flex;
+  width: min(100%, 30rem);
+  flex-direction: column;
+  gap: var(--app-empty-steps-gap);
+  margin: var(--app-empty-gap) 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+
+.app-empty-step {
+  display: flex;
+  align-items: center;
+  gap: var(--app-sidebar-item-gap);
+  padding: var(--app-empty-step-padding-block) var(--app-empty-step-padding-inline);
+  border: var(--app-border-width) solid var(--app-empty-step-border);
+  border-radius: var(--app-empty-step-radius);
+  background: var(--app-empty-step-surface);
+  color: var(--app-sidebar-item-color);
+  font-size: var(--app-empty-step-font-size);
+}
+
+.app-empty-step-marker {
+  display: grid;
+  width: var(--app-empty-step-marker-size);
+  height: var(--app-empty-step-marker-size);
+  flex: none;
+  place-items: center;
+  border-radius: var(--app-sidebar-count-radius);
+  background: var(--app-empty-step-marker-surface);
+  color: hsl(var(--foreground));
+  font-family: var(--font-mono);
+  font-size: var(--app-card-meta-size);
+}
+
+.app-empty-note {
+  max-width: 30rem;
+  margin: 0;
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-empty-step-font-size);
+  line-height: var(--app-empty-copy-line-height);
+}
+
+.app-release-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--app-workspace-actions-gap);
+}
+
+.app-release-option {
+  display: inline-flex;
+  min-height: var(--app-release-option-height);
+  align-items: center;
+  gap: var(--app-release-option-gap);
+  padding-inline: var(--app-release-option-padding-inline);
+  border: var(--app-border-width) solid var(--app-release-option-border);
+  border-radius: var(--app-release-option-radius);
+  background: var(--app-release-option-surface);
+  color: var(--app-release-option-color);
+  font-size: var(--app-release-option-font-size);
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .app-workspace-page-header {
+    flex-direction: column;
+  }
+
+  .app-workspace-page-actions {
+    justify-content: flex-start;
+  }
+
+  .app-command-row,
+  .app-command-filters,
+  .app-command-filter-group,
+  .app-command-controls,
+  .app-release-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+.app-workspace-header-note {
+  color: var(--app-workspace-header-note-color);
+  font-size: var(--app-workspace-header-note-size);
+  white-space: nowrap;
+}
+
+.workspace-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-gap);
+}
+
 
 /* Interactive card surfaces share the same quiet elevation in every view.
    Selected and expanded cards retain their own ring/shadow treatment while
@@ -866,6 +1794,7 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
 
 .linear-header-inner {
   position: relative;
+  height: var(--app-header-height);
 }
 
 .linear-header-inner::after {
@@ -919,11 +1848,11 @@ html::-webkit-scrollbar-thumb:hover { background: var(--ui-text-faint); border: 
   z-index: 1;
 }
 
-.linear-sidebar .category-scrollbar::-webkit-scrollbar-thumb {
+.linear-sidebar .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
   background: var(--ui-line-strong);
 }
 
-.linear-sidebar .category-scrollbar::-webkit-scrollbar-thumb:hover {
+.linear-sidebar .category-scrollbar.is-scrolling::-webkit-scrollbar-thumb:hover {
   background: var(--ui-text-faint);
 }
 
@@ -1053,7 +1982,7 @@ html.dark .release-card.is-expanded {
 .ui-empty-state {
   color: hsl(var(--muted-foreground));
   background: hsl(var(--card));
-  border: 1px dashed hsl(var(--border));
+  border: var(--app-border-width) solid var(--app-panel-border);
   border-radius: var(--ui-radius-md);
 }
 
@@ -1082,14 +2011,272 @@ html.dark .release-card.is-expanded {
 }
 
 .linear-settings-nav-item:hover {
-  color: hsl(var(--accent-foreground));
-  background: hsl(var(--accent));
+  color: hsl(var(--foreground));
+  background: var(--app-hover-surface);
 }
 
 .linear-settings-nav-item.is-active {
-  color: hsl(var(--accent-foreground));
-  background: hsl(var(--accent));
-  border-color: hsl(var(--border));
+  color: var(--app-active-text);
+  background: var(--app-active-surface);
+  border-color: var(--app-active-border);
+  box-shadow: var(--app-active-shadow);
+}
+
+/* Desktop workspace visual layer. Layout stays unchanged; these rules turn the
+   existing shell classes into one quiet, native-feeling application chrome. */
+.ui-shell {
+  background-color: var(--app-canvas-surface);
+  background-image: var(--app-canvas-image);
+  background-size: var(--app-canvas-size);
+}
+
+.app-main {
+  padding: var(--app-main-padding-block) var(--app-gutter-inline);
+}
+
+.route-workspace {
+  gap: var(--app-route-stack-gap);
+}
+
+.linear-header {
+  background: var(--app-header-surface);
+  border-bottom-color: var(--app-header-border);
+  box-shadow: var(--app-header-shadow);
+}
+
+.linear-header-inner {
+  gap: var(--app-header-gap);
+}
+
+.app-brand-title {
+  color: hsl(var(--foreground));
+  font-size: var(--app-brand-title-size);
+  font-weight: var(--app-brand-title-weight);
+  letter-spacing: var(--app-brand-title-tracking);
+  line-height: var(--app-brand-title-line-height);
+}
+
+.app-brand-subtitle {
+  color: var(--app-brand-subtitle-color);
+  font-size: var(--app-brand-subtitle-size);
+  line-height: var(--app-brand-subtitle-line-height);
+}
+
+.app-header-user-name {
+  color: hsl(var(--foreground));
+  font-size: var(--app-header-user-name-size);
+  font-weight: var(--app-header-user-name-weight);
+}
+
+.app-brand-mark {
+  width: var(--app-brand-mark-size);
+  height: var(--app-brand-mark-size);
+  border-radius: var(--app-brand-mark-radius);
+  box-shadow: var(--app-brand-mark-shadow);
+}
+
+.app-header-nav {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.app-header-nav button {
+  height: var(--app-nav-item-height);
+  padding-inline: var(--app-nav-item-padding-inline);
+  border-radius: var(--app-radius-control);
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-nav-font-size);
+  font-weight: var(--app-nav-font-weight);
+  letter-spacing: var(--app-nav-tracking);
+  transition: var(--app-motion-surface);
+}
+
+.app-header-nav button:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-header-nav button[aria-pressed='true'] {
+  background: var(--app-nav-active-surface);
+  border-color: var(--app-nav-active-border);
+  color: hsl(var(--foreground));
+  box-shadow: var(--app-nav-active-shadow);
+  font-weight: var(--app-nav-active-font-weight);
+}
+
+.app-header-nav button[aria-pressed='true'] svg {
+  color: hsl(var(--foreground));
+}
+
+.app-header-nav svg {
+  width: var(--app-nav-icon-size);
+  height: var(--app-nav-icon-size);
+  stroke-width: var(--app-nav-icon-stroke);
+}
+
+.app-header-actions {
+  gap: var(--app-header-action-gap);
+}
+
+.context-sidebar,
+.linear-sidebar {
+  /* Fallback for browsers without color-mix support. */
+  background: hsl(var(--card));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-synthesis: none;
+}
+
+.workspace-content {
+  background-color: var(--app-workspace-surface);
+  background-image: var(--app-workspace-image);
+  background-size: var(--app-workspace-image-size);
+}
+
+@media (min-width: 1024px) {
+  .app-main {
+    padding: 0;
+  }
+
+  .route-workspace {
+    gap: 0;
+  }
+
+  .workspace-content {
+    min-height: var(--app-workspace-min-height);
+    padding: var(--app-content-padding-block) var(--app-gutter-inline);
+  }
+
+  .route-workspace > [data-context-sidebar] {
+    min-height: calc(100dvh - var(--app-header-offset));
+    margin-block-start: 0;
+  }
+
+  .context-sidebar,
+  .linear-sidebar {
+    border-right: 0;
+  }
+}
+
+@supports (background: color-mix(in srgb, red 50%, blue)) {
+  :root {
+    --ui-text-caption: color-mix(
+      in srgb,
+      hsl(var(--foreground)) 50%,
+      hsl(var(--muted-foreground))
+    );
+  }
+
+  .context-sidebar,
+  .linear-sidebar {
+    background: var(--app-sidebar-surface);
+  }
+
+  @media (min-width: 1024px) {
+    .context-sidebar,
+    .linear-sidebar {
+      border-right-color: var(--app-sidebar-border);
+    }
+  }
+}
+
+.context-sidebar-title {
+  font-size: var(--app-sidebar-heading-size);
+  font-weight: var(--app-sidebar-heading-weight);
+  letter-spacing: var(--app-sidebar-heading-tracking);
+}
+
+.context-sidebar [role='tab'] {
+  min-height: var(--app-sidebar-tab-height);
+  padding: var(--app-sidebar-count-padding-block) var(--app-sidebar-tab-padding-inline);
+  border-radius: var(--app-radius-control);
+  color: var(--app-sidebar-item-color);
+  font-size: var(--app-sidebar-item-font-size);
+  font-weight: var(--app-sidebar-item-font-weight);
+  letter-spacing: var(--app-sidebar-item-tracking);
+  transition: var(--app-motion-surface);
+}
+
+.context-sidebar [role='tab']:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.context-sidebar [role='tab'][aria-selected='true'] {
+  background: var(--app-sidebar-active-surface);
+  border-color: var(--app-sidebar-active-border);
+  color: var(--app-sidebar-active-item-color);
+  box-shadow: var(--app-sidebar-active-shadow);
+  font-weight: var(--app-sidebar-active-item-font-weight);
+}
+
+.context-sidebar [role='tab'][aria-selected='true'] .app-side-count {
+  background: var(--app-count-active-surface);
+  color: var(--app-sidebar-active-item-color);
+}
+
+.context-sidebar [role='tab'][aria-selected='true'] svg {
+  color: var(--app-sidebar-active-item-color);
+}
+
+.context-sidebar [role='tab'] svg,
+.linear-sidebar [role='tab'] svg {
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+}
+
+.linear-sidebar {
+  min-height: calc(100dvh - var(--app-header-offset));
+  padding: var(--app-sidebar-padding);
+}
+
+.linear-sidebar.is-collapsed {
+  padding: var(--app-sidebar-padding-collapsed);
+}
+
+.linear-sidebar button[aria-pressed='true'] {
+  background: var(--app-sidebar-active-surface);
+  border-color: var(--app-sidebar-active-border);
+  color: var(--app-sidebar-active-item-color);
+  box-shadow: var(--app-sidebar-active-shadow);
+  font-weight: var(--app-sidebar-active-item-font-weight);
+}
+
+.linear-sidebar button[aria-pressed='false']:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.ui-toolbar {
+  padding: var(--app-toolbar-padding);
+  background: var(--app-toolbar-surface);
+  border-color: var(--app-toolbar-border);
+  border-radius: var(--app-radius-shell);
+  box-shadow: var(--app-toolbar-shadow);
+}
+
+.ui-panel {
+  background: var(--app-panel-surface);
+  border-color: var(--app-panel-border);
+  border-radius: var(--app-radius-shell);
+  box-shadow: var(--app-panel-shadow);
+}
+
+.ui-card {
+  background: var(--app-panel-surface);
+  border-color: var(--app-panel-border);
+  border-radius: var(--app-card-radius);
+  box-shadow: var(--app-panel-shadow);
+  transition: var(--app-motion-surface);
+}
+
+.ui-card:not(.linear-card-selected):hover {
+  border-color: var(--app-panel-hover-border);
+  background: var(--app-card-hover-surface);
+  box-shadow: var(--app-panel-hover-shadow);
 }
 
 /* Auth is part of the application, not a marketing landing page. */
@@ -1161,5 +2348,4701 @@ html.dark .release-card.is-expanded {
   .animate-spin {
     animation-duration: 1.2s !important;
     animation-iteration-count: infinite !important;
+  }
+}
+
+/* Option-1 prototype sidebar language: mono uppercase eyebrow + compact
+   semibold heading + quiet group labels + right-aligned tabular count badges.
+   Pure visual layer; components keep their existing layout and handlers. */
+.app-side-eyebrow {
+  color: var(--app-sidebar-muted-color);
+  font-family: var(--font-mono);
+  font-size: var(--app-sidebar-eyebrow-size);
+  font-weight: var(--app-sidebar-eyebrow-weight);
+  letter-spacing: var(--app-sidebar-eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.app-side-title {
+  margin-block-start: var(--app-sidebar-title-gap);
+  color: var(--app-sidebar-heading-color);
+  font-size: var(--app-sidebar-heading-size);
+  font-weight: var(--app-sidebar-heading-weight);
+  letter-spacing: var(--app-sidebar-heading-tracking);
+  line-height: var(--app-sidebar-line-height);
+}
+
+.app-section-label {
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-sidebar-label-size);
+  font-weight: var(--app-sidebar-label-weight);
+  letter-spacing: var(--app-sidebar-label-tracking);
+}
+
+.app-side-group-label {
+  margin-inline: var(--app-side-label-margin-inline);
+  padding-block:
+    var(--app-side-label-padding-block-start)
+    var(--app-side-label-padding-block-end);
+}
+
+.app-side-count {
+  color: var(--app-sidebar-count-color);
+  background: var(--app-count-surface);
+  font-family: var(--font-mono);
+  font-size: var(--app-sidebar-count-size);
+  font-variant-numeric: tabular-nums;
+  min-width: var(--app-sidebar-count-min-width);
+  padding:
+    var(--app-sidebar-count-padding-block)
+    var(--app-sidebar-count-padding-inline);
+  border-radius: var(--app-sidebar-count-radius);
+  text-align: center;
+}
+
+.app-side-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: var(--app-sidebar-item-height);
+  min-height: var(--app-sidebar-item-height);
+  align-items: center;
+  gap: var(--app-sidebar-item-gap);
+  padding-block: 0;
+  padding-inline: var(--app-sidebar-item-padding-inline);
+  border: var(--app-border-width) solid transparent;
+  border-radius: var(--ui-radius-sm);
+  color: var(--app-sidebar-item-color);
+  font-size: var(--app-sidebar-item-font-size);
+  font-weight: var(--app-sidebar-item-font-weight);
+  letter-spacing: var(--app-sidebar-item-tracking);
+  transition:
+    var(--app-motion-surface),
+    opacity var(--app-motion-base) ease,
+    transform var(--app-motion-base) ease;
+}
+
+.app-side-item[aria-pressed='false']:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-side-item:hover svg,
+.app-side-item[aria-pressed='true'] svg {
+  color: currentColor;
+}
+
+.app-side-item[aria-pressed='true'] {
+  background: var(--app-sidebar-active-surface);
+  border-color: var(--app-sidebar-active-border);
+  color: var(--app-sidebar-active-item-color);
+  box-shadow: var(--app-sidebar-active-shadow);
+  font-weight: var(--app-sidebar-active-item-font-weight);
+}
+
+.app-side-action-button {
+  width: var(--app-sidebar-action-size);
+  height: var(--app-sidebar-action-size);
+  flex: none;
+  padding: 0;
+  border-radius: var(--app-sidebar-action-radius);
+}
+
+.app-side-action-button svg {
+  width: var(--app-sidebar-action-icon-size);
+  height: var(--app-sidebar-action-icon-size);
+  stroke-width: var(--app-sidebar-action-icon-stroke);
+}
+
+.app-side-item[aria-pressed='true'] .app-side-count,
+.linear-settings-nav-item.is-active .app-side-count {
+  background: var(--app-count-active-surface);
+  color: var(--app-sidebar-active-item-color);
+}
+
+.app-side-item svg {
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+  color: color-mix(in srgb, hsl(var(--foreground)) 24%, hsl(var(--muted-foreground)) 76%);
+  stroke-width: var(--app-sidebar-icon-stroke);
+}
+
+.app-side-item[aria-pressed='true'] svg {
+  color: var(--app-sidebar-active-item-color);
+}
+
+.app-sidebar-toggle {
+  width: var(--app-sidebar-toggle-size);
+  height: var(--app-sidebar-toggle-size);
+  flex: none;
+  padding: 0;
+  border-radius: var(--app-sidebar-toggle-radius);
+}
+
+.context-sidebar .linear-icon-button:hover,
+.linear-sidebar .linear-icon-button:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-sidebar-toggle-icon {
+  width: var(--app-sidebar-toggle-icon-size);
+  height: var(--app-sidebar-toggle-icon-size);
+  stroke-width: var(--app-sidebar-toggle-icon-stroke);
+}
+
+.app-workspace-content .ui-toolbar {
+  padding: 0;
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6 {
+  gap: var(--app-settings-card-gap);
+}
+
+.app-settings-content-panel [data-settings-sections] :is(.bg-card.rounded-xl.border) {
+  gap: var(--app-settings-card-gap);
+  padding-block: var(--app-settings-card-padding-block);
+  border-color: var(--app-settings-section-border);
+  border-radius: var(--app-settings-section-radius);
+  background: var(--app-settings-section-surface);
+  box-shadow: var(--app-settings-section-shadow);
+}
+
+.app-settings-content-panel [data-settings-sections] :is(.bg-card.rounded-xl.border) > div {
+  padding-inline: var(--app-settings-card-padding-inline);
+}
+
+.app-fork-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-fork-list-gap);
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--app-fork-list-border);
+  border-radius: var(--app-fork-list-radius);
+  background: var(--app-fork-list-surface);
+  box-shadow: var(--app-fork-list-shadow);
+}
+
+.app-fork-list > .ui-card {
+  border: 0;
+  border-bottom: var(--app-border-width) solid var(--app-fork-list-item-border);
+  border-radius: var(--app-fork-list-item-radius);
+  background: var(--app-fork-list-item-surface);
+  box-shadow: var(--app-fork-list-item-shadow);
+}
+
+.app-fork-list > .ui-card:hover {
+  background: var(--app-fork-list-item-hover-surface);
+}
+
+.app-fork-list > .ui-card:last-child {
+  border-bottom: 0;
+}
+
+.release-card.ui-card {
+  border-radius: var(--app-card-radius);
+  background: var(--app-panel-surface);
+  box-shadow: none;
+}
+
+.release-card.ui-card:hover {
+  background: var(--app-card-hover-surface);
+  box-shadow: none;
+}
+
+.release-card.is-expanded,
+html.dark .release-card.is-expanded {
+  border-color: var(--app-panel-hover-border);
+  background: var(--app-card-hover-surface);
+  background-image: none;
+  box-shadow: none;
+}
+
+.app-side-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-list-gap);
+}
+
+.app-side-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-section-gap);
+  padding-block: var(--app-sidebar-section-padding-block);
+}
+
+.app-side-item-label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--app-sidebar-item-gap);
+  line-height: var(--app-sidebar-line-height);
+}
+
+.app-category-emoji {
+  display: inline-grid;
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+  flex: none;
+  place-items: center;
+  font-size: var(--app-sidebar-category-emoji-size);
+  line-height: var(--app-sidebar-category-emoji-line-height);
+}
+
+.app-side-icon-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--app-sidebar-rail-gap);
+  padding-block: var(--app-sidebar-rail-padding-block);
+}
+
+.app-side-rail-divider {
+  width: 100%;
+  height: var(--app-border-width);
+  background: var(--app-sidebar-rail-divider-color);
+}
+
+.context-sidebar-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-foot-gap);
+  margin-block-start: auto;
+  padding:
+    var(--app-sidebar-foot-padding-block)
+    var(--app-sidebar-foot-padding-inline);
+  border-top: var(--app-border-width) solid var(--app-sidebar-foot-border);
+}
+
+.app-side-foot-status {
+  display: flex;
+  align-items: center;
+  gap: var(--app-sidebar-control-gap);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-sidebar-foot-status-size);
+}
+
+.app-status-dot {
+  width: var(--app-sidebar-status-dot-size);
+  height: var(--app-sidebar-status-dot-size);
+  flex: none;
+  border-radius: var(--app-sidebar-count-radius);
+  background: var(--ui-success);
+}
+
+.app-side-foot-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-sidebar-control-gap);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-sidebar-foot-meta-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-route-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--app-scope-trigger-gap);
+}
+
+.app-route-scope-label {
+  color: var(--app-scope-label-color);
+  font-size: var(--app-scope-label-size);
+}
+
+.app-route-scope-trigger {
+  width: auto;
+  max-width: var(--app-scope-trigger-max-width);
+  height: var(--app-scope-trigger-height);
+  min-height: var(--app-scope-trigger-height);
+  min-width: 0;
+  gap: var(--app-scope-trigger-gap);
+  padding-inline: var(--app-scope-trigger-padding-inline);
+  border-color: var(--app-toolbar-border);
+  background: var(--app-toolbar-surface);
+  color: var(--app-sidebar-item-color);
+  box-shadow: none;
+  font-size: var(--app-scope-trigger-font-size);
+  font-weight: var(--app-sidebar-item-font-weight);
+}
+
+.app-route-scope-trigger:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-route-scope-trigger svg {
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+}
+
+.app-side-more {
+  display: flex;
+  width: 100%;
+  min-height: var(--app-sidebar-more-height);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-sidebar-more-font-size);
+  font-weight: var(--app-sidebar-item-font-weight);
+}
+
+.app-side-more:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-side-control-row {
+  display: flex;
+  min-height: var(--app-sidebar-control-row-min-height);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-sidebar-control-gap);
+  padding-inline: var(--app-sidebar-control-row-padding-inline);
+  color: var(--ui-text-muted);
+  font-size: var(--app-sidebar-control-row-font-size);
+}
+
+.app-side-inline-status {
+  display: flex;
+  align-items: center;
+  gap: var(--app-sidebar-control-gap);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-sidebar-inline-status-font-size);
+}
+
+.app-side-empty {
+  margin: 0;
+  padding:
+    var(--app-sidebar-empty-padding-block)
+    var(--app-sidebar-empty-padding-inline);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-sidebar-empty-font-size);
+  line-height: var(--app-sidebar-empty-line-height);
+}
+
+.app-category-strip {
+  display: flex;
+  gap: var(--app-category-strip-gap);
+  overflow-x: auto;
+  padding-block-end: var(--app-category-strip-padding-block-end);
+}
+
+.app-category-pill {
+  min-width: var(--app-category-pill-min-width);
+}
+
+.repository-card.ui-card {
+  padding: var(--app-card-padding);
+  border-radius: var(--app-card-radius);
+  background: var(--app-panel-surface);
+  box-shadow: none;
+}
+
+.repository-card.ui-card:hover {
+  transform: none;
+}
+
+.repository-card--list.ui-card {
+  padding-block-start: var(--app-card-padding);
+  padding-inline: var(--app-card-padding);
+}
+
+.repository-card .app-repository-card-footer .ui-divider {
+  border-color: var(--app-repository-footer-divider) !important;
+}
+
+.gist-access-help-popover {
+  z-index: var(--app-z-popover);
+  transform: translateX(var(--app-gist-help-popover-shift));
+}
+
+/* Desktop workspace refinements. All visual values remain token-driven so
+   presets, light/dark mode, accent, radius and font-scale continue to own the
+   final appearance. */
+:root {
+  --app-sidebar-min-height: calc(100dvh - var(--app-header-offset));
+  --app-sidebar-line: transparent;
+  --app-workspace-surface: hsl(var(--background));
+  --app-command-search-max-width: none;
+  --app-command-status-font-size: 0.75rem;
+  --app-command-filter-panel-margin-block-start: 1rem;
+  --app-command-filter-panel-title-size: 0.75rem;
+  --app-flat-list-row-surface: transparent;
+  --app-flat-list-row-hover-surface: color-mix(in srgb, hsl(var(--muted)) 38%, transparent);
+  --app-flat-list-gist-padding-block: 1rem;
+  --app-flat-list-gist-padding-inline: 1.125rem;
+  --app-flat-list-discovery-padding: 1rem;
+  --app-settings-shell-surface: color-mix(in srgb, hsl(var(--card)) 82%, hsl(var(--background)) 18%);
+  --app-settings-shell-border: color-mix(in srgb, hsl(var(--border)) 70%, transparent);
+  --app-settings-shell-radius: var(--ui-radius-lg);
+  --app-settings-heading-padding-block: 1.25rem;
+  --app-settings-heading-padding-inline: 1.5rem;
+  --app-settings-row-padding-block: 1.25rem;
+  --app-settings-row-padding-inline: 1.5rem;
+  --app-release-toolbar-gap: 0.75rem;
+  --app-release-toolbar-margin-block-end: 1rem;
+  --app-release-search-max-width: 30rem;
+  --app-release-option-surface: transparent;
+  --app-release-option-border: transparent;
+  --app-release-option-padding-inline: 0;
+  --app-release-option-font-size: 0.75rem;
+  --app-dialog-default-width: 36rem;
+  --app-dialog-md-width: 28rem;
+  --app-dialog-lg-width: 32rem;
+  --app-dialog-xl-width: 42rem;
+  --app-dialog-wide-width: 48rem;
+  --app-dialog-settings-width: 64rem;
+  --app-dialog-backdrop-filter: blur(3px);
+  --app-dialog-close-size: 2rem;
+  --app-dialog-close-icon-size: 1rem;
+}
+
+.linear-header {
+  background: var(--app-header-surface);
+  border-bottom-color: var(--app-header-border);
+  box-shadow: var(--app-header-shadow);
+}
+
+.app-header-inner,
+.app-main {
+  max-width: none;
+}
+
+.app-main {
+  width: 100%;
+  margin-inline: 0;
+}
+
+.app-workspace-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-section-gap);
+  min-height: var(--app-sidebar-min-height);
+  background: var(--app-workspace-surface);
+}
+
+.app-workspace-content > * {
+  min-width: 0;
+}
+
+.context-sidebar,
+.linear-sidebar {
+  border: 0;
+  border-radius: 0;
+  background: var(--app-sidebar-surface);
+  box-shadow: none;
+}
+
+.context-sidebar {
+  min-height: var(--app-sidebar-min-height);
+}
+
+.linear-sidebar {
+  min-height: var(--app-sidebar-min-height);
+  border-inline-end: var(--app-border-width) solid var(--app-sidebar-line);
+}
+
+.context-sidebar-head,
+.context-sidebar-foot {
+  border-color: var(--app-sidebar-line);
+}
+
+.app-side-item-label,
+.app-side-item-label > span:last-child {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.app-category-glyph {
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+  flex: none;
+  stroke-width: var(--app-sidebar-icon-stroke);
+}
+
+.app-command-search-area {
+  max-width: var(--app-command-search-max-width);
+}
+
+.app-command-row > .flex {
+  width: 100%;
+}
+
+.app-command-panel .app-command-input {
+  height: var(--app-command-input-height);
+  font-size: var(--app-command-input-font-size);
+}
+
+.app-command-status {
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-command-status-font-size);
+}
+
+.app-command-controls > :is(.ui-button, .ui-button-primary),
+.app-command-controls .ui-button-primary :is(button, a),
+.app-repository-controls :is(button, [role='combobox']) {
+  height: var(--app-command-control-height);
+  min-height: var(--app-command-control-height);
+  font-size: var(--app-command-control-font-size);
+}
+
+.app-command-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-command-filter-panel-gap);
+  margin-block-start: var(--app-command-filter-panel-margin-block-start);
+  padding:
+    var(--app-command-filter-panel-padding-block)
+    var(--app-command-filter-panel-padding-inline);
+  border: var(--app-border-width) solid var(--app-command-filter-panel-border);
+  border-radius: var(--app-command-control-radius);
+  background: var(--app-command-filter-panel-surface);
+}
+
+.app-command-filter-panel h4 {
+  color: hsl(var(--foreground));
+  font-size: var(--app-command-filter-panel-title-size);
+  font-weight: var(--app-command-filter-title-weight);
+}
+
+.app-repository-controls {
+  min-height: var(--app-command-control-height);
+}
+
+.app-repository-controls :is(button, [role='combobox'], .ui-field) {
+  font-size: var(--app-command-control-font-size);
+}
+
+.app-segmented-control {
+  height: var(--app-command-control-height);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.app-segmented-control > button {
+  height: var(--app-card-action-size);
+  min-height: var(--app-card-action-size);
+  border-radius: var(--app-sidebar-action-radius);
+}
+
+.repository-card .app-repository-card-title {
+  font-size: var(--app-card-title-size);
+}
+
+.repository-card .app-repository-card-description {
+  font-size: var(--app-card-description-size);
+}
+
+.repository-card .app-repository-card-owner,
+.repository-card .app-repository-card-meta,
+.repository-card .app-repository-card-footer {
+  font-size: var(--app-card-meta-size);
+}
+
+.ui-card {
+  box-shadow: none;
+}
+
+.ui-card:not(.linear-card-selected):not(.is-expanded):not(.ring-1):hover {
+  box-shadow: none;
+}
+
+.app-repository-list {
+  overflow: hidden;
+  gap: 0;
+  border: var(--app-border-width) solid var(--app-flat-list-border);
+  border-radius: var(--app-flat-list-radius);
+  background: var(--app-flat-list-surface);
+}
+
+.app-repository-list > .ui-card {
+  border: 0;
+  border-bottom: var(--app-border-width) solid var(--app-flat-list-divider);
+  border-radius: 0;
+  background: var(--app-flat-list-row-surface);
+  box-shadow: none;
+}
+
+.app-repository-list > .ui-card:last-child {
+  border-bottom: 0;
+}
+
+.app-repository-list > .ui-card:hover {
+  background: var(--app-flat-list-row-hover-surface);
+}
+
+.app-flat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--app-flat-list-border);
+  border-radius: var(--app-flat-list-radius);
+  background: var(--app-flat-list-surface);
+}
+
+.app-flat-list > .ui-card,
+.app-flat-list > div > .ui-card {
+  border: 0;
+  border-bottom: var(--app-border-width) solid var(--app-flat-list-divider);
+  border-radius: 0;
+  background: var(--app-flat-list-row-surface);
+  box-shadow: none;
+}
+
+.app-flat-list > .ui-card:last-child,
+.app-flat-list > div:last-child > .ui-card {
+  border-bottom: 0;
+}
+
+.app-flat-list > .ui-card:hover,
+.app-flat-list > div > .ui-card:hover {
+  background: var(--app-flat-list-row-hover-surface);
+}
+
+.app-gist-list > .ui-card {
+  padding:
+    var(--app-flat-list-gist-padding-block)
+    var(--app-flat-list-gist-padding-inline);
+}
+
+.app-discovery-list > div > .ui-card {
+  padding: var(--app-flat-list-discovery-padding);
+}
+
+.app-release-list > .ui-card {
+  padding: 0;
+}
+
+.app-release-list .release-card.ui-card {
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-flat-list-divider);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-release-list .release-card.is-expanded {
+  background: var(--app-card-hover-surface);
+}
+
+.app-flat-list > .ui-empty-state {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-fork-list {
+  min-height: 0;
+}
+
+.app-fork-list > .ui-card {
+  padding: 0;
+  border-color: var(--app-fork-list-item-border);
+}
+
+.app-fork-list > .ui-card:hover {
+  background: var(--app-fork-list-item-hover-surface);
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6 {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--app-settings-shell-border);
+  border-radius: var(--app-settings-shell-radius);
+  background: var(--app-settings-shell-surface);
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6 > * {
+  margin-block-start: 0 !important;
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6 > :first-child {
+  padding:
+    var(--app-settings-heading-padding-block)
+    var(--app-settings-heading-padding-inline);
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6 > .bg-card.rounded-xl.border,
+.app-settings-content-panel [data-settings-sections] > .space-y-6 > .bg-card.rounded-lg.border {
+  gap: var(--app-settings-card-gap);
+  padding-block: var(--app-settings-row-padding-block);
+  padding-inline: 0;
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-settings-shell-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6 > .bg-card.rounded-xl.border > div,
+.app-settings-content-panel [data-settings-sections] > .space-y-6 > .bg-card.rounded-lg.border > div {
+  padding-inline: var(--app-settings-row-padding-inline);
+}
+
+.app-settings-content-panel :is(.bg-card.rounded-xl.border, .bg-card.rounded-lg.border) {
+  box-shadow: none;
+}
+
+.app-release-toolbar {
+  margin-block-end: var(--app-release-toolbar-margin-block-end);
+}
+
+.app-release-search-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--app-release-toolbar-gap);
+}
+
+.app-release-search-row > .relative {
+  max-width: var(--app-release-search-max-width);
+}
+
+.app-release-toolbar-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--app-release-toolbar-gap);
+}
+
+.app-release-option {
+  min-height: var(--app-command-control-height);
+  padding-inline: var(--app-release-option-padding-inline);
+  border-color: var(--app-release-option-border);
+  border-radius: var(--app-command-control-radius);
+  background: var(--app-release-option-surface);
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-release-option-font-size);
+}
+
+.app-release-search-row > [role='combobox'] {
+  margin-inline-start: auto;
+}
+
+.app-release-asset-filters {
+  padding-inline: var(--app-sidebar-section-padding-inline);
+}
+
+.app-release-asset-filters > div {
+  gap: var(--app-sidebar-section-gap);
+}
+
+.app-release-asset-filters > div > .flex {
+  flex-wrap: wrap;
+  gap: var(--app-sidebar-control-gap);
+}
+
+.app-release-asset-filters :is(button, span, p) {
+  font-size: var(--app-sidebar-control-row-font-size);
+}
+
+.app-release-asset-filters :is(button) {
+  min-height: var(--app-sidebar-control-row-min-height);
+}
+
+.app-dialog-overlay {
+  background: var(--app-dialog-overlay);
+  backdrop-filter: var(--app-dialog-backdrop-filter);
+  -webkit-backdrop-filter: var(--app-dialog-backdrop-filter);
+}
+
+.app-dialog-content {
+  width: calc(100% - 2rem);
+  max-width: var(--app-dialog-default-width);
+  gap: var(--app-dialog-gap);
+  padding: var(--app-dialog-padding);
+  border: var(--app-border-width) solid var(--app-border);
+  border-radius: var(--app-dialog-radius);
+  background: hsl(var(--popover));
+  box-shadow: var(--app-dialog-shadow);
+}
+
+.app-dialog-content.max-w-md { max-width: var(--app-dialog-md-width); }
+.app-dialog-content.max-w-lg { max-width: var(--app-dialog-lg-width); }
+.app-dialog-content.max-w-2xl { max-width: var(--app-dialog-xl-width); }
+.app-dialog-content.max-w-3xl { max-width: var(--app-dialog-wide-width); }
+.app-dialog-content.max-w-5xl { max-width: var(--app-dialog-settings-width); }
+
+.app-dialog-content.p-0 {
+  padding: 0;
+}
+
+.app-dialog-close {
+  position: absolute;
+  top: var(--app-dialog-padding);
+  right: var(--app-dialog-padding);
+  display: inline-grid;
+  width: var(--app-dialog-close-size);
+  height: var(--app-dialog-close-size);
+  place-items: center;
+  border: 0;
+  border-radius: var(--app-sidebar-action-radius);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  opacity: 1;
+}
+
+.app-dialog-close:hover {
+  background: var(--app-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-dialog-close > svg {
+  width: var(--app-dialog-close-icon-size);
+  height: var(--app-dialog-close-icon-size);
+}
+
+.app-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-dialog-header-gap);
+  padding-inline-end: var(--app-dialog-close-size);
+}
+
+.app-dialog-footer {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--app-dialog-footer-gap);
+  padding-block-start: var(--app-dialog-footer-padding-block-start);
+  border-top: var(--app-border-width) solid var(--app-dialog-footer-border);
+}
+
+.app-dialog-title {
+  color: hsl(var(--foreground));
+  font-size: var(--app-dialog-title-size);
+  font-weight: var(--app-dialog-title-weight);
+  letter-spacing: var(--app-card-title-tracking);
+}
+
+.app-dialog-description {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-dialog-description-size);
+  line-height: var(--app-card-description-line-height);
+}
+
+@media (min-width: 640px) {
+  .app-dialog-footer {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 1023px) {
+  .context-sidebar,
+  .linear-sidebar {
+    min-height: 0;
+  }
+}
+
+/* Prototype parity pass. These tokens are the single visual contract for the
+   desktop shell, sidebars, flat collections, controls and dialogs. Palette,
+   dark mode, accent, radius and font tokens still come from the active preset. */
+:root {
+  --app-shell-max-width: none;
+  --app-header-height: 3.375rem;
+  --app-gutter-inline: clamp(1.25rem, 2vw, 1.75rem);
+  --app-content-padding-block: 1.5rem;
+  --app-section-gap: 1.125rem;
+  --app-sidebar-width: 14rem;
+  --app-sidebar-gap: 1.75rem;
+  --app-sidebar-offset: 0;
+  --app-control-height-xs: 1.75rem;
+  --app-control-height-sm: 2rem;
+  --app-control-height-md: 2.25rem;
+  --app-control-font-size: 0.8125rem;
+  --app-canvas-surface: color-mix(in srgb, hsl(var(--foreground)) 4.5%, hsl(var(--background)));
+  --app-canvas-wash: var(--app-canvas-surface);
+  --app-canvas-image: none;
+  --app-header-surface: color-mix(in srgb, hsl(var(--background)) 94%, hsl(var(--card)) 6%);
+  --app-header-border: color-mix(in srgb, hsl(var(--border)) 48%, transparent);
+  --app-sidebar-surface: color-mix(in srgb, hsl(var(--card)) 78%, hsl(var(--background)) 22%);
+  --app-sidebar-border: transparent;
+  --app-sidebar-heading-size: 0.9375rem;
+  --app-sidebar-heading-weight: 600;
+  --app-sidebar-heading-color: hsl(var(--foreground));
+  --app-sidebar-item-height: 2.125rem;
+  --app-sidebar-item-font-size: 0.8125rem;
+  --app-sidebar-item-font-weight: 470;
+  --app-sidebar-item-color: color-mix(in srgb, hsl(var(--foreground)) 58%, hsl(var(--muted-foreground)) 42%);
+  --app-sidebar-active-item-font-weight: 520;
+  --app-sidebar-active-item-color: color-mix(in srgb, hsl(var(--foreground)) 92%, hsl(var(--muted-foreground)) 8%);
+  --app-sidebar-active-surface: color-mix(in srgb, hsl(var(--primary)) 7%, hsl(var(--card)) 93%);
+  --app-sidebar-active-border: transparent;
+  --app-sidebar-active-shadow: none;
+  --app-sidebar-icon-stroke: 1.7;
+  --app-nav-font-weight: 500;
+  --app-nav-active-surface: color-mix(in srgb, hsl(var(--primary)) 7%, hsl(var(--card)) 93%);
+  --app-nav-active-border: transparent;
+  --app-nav-active-shadow: none;
+  --app-workspace-surface: transparent;
+  --app-workspace-image: none;
+  --app-workspace-header-border: color-mix(in srgb, hsl(var(--border)) 44%, transparent);
+  --app-workspace-header-padding-block-end: 0.875rem;
+  --app-workspace-header-margin-block-end: 1rem;
+  --app-panel-surface: hsl(var(--card));
+  --app-panel-border: color-mix(in srgb, hsl(var(--border)) 56%, transparent);
+  --app-panel-hover-border: color-mix(in srgb, hsl(var(--border)) 82%, transparent);
+  --app-panel-shadow: none;
+  --app-panel-hover-shadow: none;
+  --app-card-gap: 0.875rem;
+  --app-card-padding: 1rem;
+  --app-card-radius: var(--ui-radius-md);
+  --app-card-title-size: 0.9375rem;
+  --app-card-description-size: 0.875rem;
+  --app-card-meta-size: 0.75rem;
+  --app-flat-list-surface: hsl(var(--card));
+  --app-flat-list-border: color-mix(in srgb, hsl(var(--border)) 54%, transparent);
+  --app-flat-list-radius: var(--app-card-radius);
+  --app-flat-list-row-hover-surface: color-mix(in srgb, hsl(var(--muted)) 38%, transparent);
+  --app-flat-list-divider: color-mix(in srgb, hsl(var(--border)) 52%, transparent);
+  --app-command-input-height: var(--app-control-height-md);
+  --app-command-input-font-size: var(--app-control-font-size);
+  --app-command-control-height: var(--app-control-height-sm);
+  --app-command-control-font-size: var(--app-control-font-size);
+  --app-command-chip-height: var(--app-control-height-xs);
+  --app-command-control-radius: var(--ui-radius-sm);
+  --app-command-filter-panel-margin-block-start: 0.875rem;
+  --app-command-filter-panel-padding-block: 1rem;
+  --app-command-filter-panel-padding-inline: 1rem;
+  --app-release-toolbar-gap: 0.5rem;
+  --app-release-search-max-width: 26rem;
+  --app-release-view-select-width: 10rem;
+  --app-release-option-height: var(--app-control-height-sm);
+  --app-release-option-gap: 0.375rem;
+  --app-release-option-surface: transparent;
+  --app-release-option-border: transparent;
+  --app-release-option-color: hsl(var(--muted-foreground));
+  --app-release-option-font-size: 0.75rem;
+  --app-release-switch-width: 2rem;
+  --app-release-switch-height: 1.125rem;
+  --app-release-switch-thumb-size: 0.8125rem;
+  --app-release-switch-thumb-offset: 0.125rem;
+  --app-release-switch-thumb-on: 0.8125rem;
+  --app-settings-shell-surface: hsl(var(--card));
+  --app-settings-shell-border: color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  --app-settings-shell-radius: var(--ui-radius-md);
+  --app-settings-heading-padding-block: 1rem;
+  --app-settings-heading-padding-inline: 1.25rem;
+  --app-settings-row-padding-block: 1.125rem;
+  --app-settings-row-padding-inline: 1.25rem;
+  --app-dialog-border: color-mix(in srgb, hsl(var(--border)) 72%, transparent);
+  --app-dialog-padding: 1.25rem;
+  --app-dialog-radius: var(--ui-radius-md);
+  --app-dialog-shadow:
+    0 18px 48px color-mix(in srgb, hsl(var(--shadow-color)) 16%, transparent),
+    0 2px 8px color-mix(in srgb, hsl(var(--shadow-color)) 8%, transparent);
+  --app-side-filter-note-font-size: 0.6875rem;
+}
+
+.ui-shell {
+  background: var(--app-canvas-surface);
+}
+
+.linear-header {
+  background: var(--app-header-surface);
+  border-bottom-color: var(--app-header-border);
+}
+
+.app-header-inner,
+.app-main {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.app-main {
+  padding: 0;
+}
+
+.route-workspace {
+  min-height: calc(100dvh - var(--app-header-offset));
+}
+
+.context-sidebar,
+.linear-sidebar {
+  border: 0;
+  border-radius: 0;
+  background: var(--app-sidebar-surface);
+  box-shadow: none;
+}
+
+.workspace-content,
+.app-workspace-content {
+  background: transparent;
+}
+
+.app-header-nav button[aria-pressed='true'] {
+  background: var(--app-nav-active-surface);
+  border-color: var(--app-nav-active-border);
+  box-shadow: var(--app-nav-active-shadow);
+}
+
+.app-side-item,
+.linear-sidebar button[aria-pressed],
+.context-sidebar [role='tab'] {
+  font-size: var(--app-sidebar-item-font-size);
+  font-weight: var(--app-sidebar-item-font-weight);
+}
+
+.app-side-item[aria-pressed='true'],
+.linear-sidebar button[aria-pressed='true'],
+.context-sidebar [role='tab'][aria-selected='true'] {
+  border-color: var(--app-sidebar-active-border);
+  background: var(--app-sidebar-active-surface);
+  color: var(--app-sidebar-active-item-color);
+  box-shadow: var(--app-sidebar-active-shadow);
+  font-weight: var(--app-sidebar-active-item-font-weight);
+}
+
+.app-side-item svg,
+.context-sidebar [role='tab'] svg {
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+  stroke-width: var(--app-sidebar-icon-stroke);
+}
+
+.app-side-action-button svg {
+  width: var(--app-sidebar-action-icon-size);
+  height: var(--app-sidebar-action-icon-size);
+}
+
+.app-workspace-content .ui-field,
+.app-workspace-content [role='combobox'] {
+  min-height: var(--app-control-height-md);
+  font-size: var(--app-control-font-size);
+}
+
+.app-command-row,
+.app-command-filters,
+.app-command-filter-group,
+.app-command-controls,
+.app-command-controls > *,
+.app-repository-controls,
+.app-release-toolbar,
+.app-release-search-row,
+.app-release-toolbar-controls {
+  align-items: center;
+}
+
+.app-command-controls :is(button, [role='combobox']),
+.app-repository-controls :is(button, [role='combobox'], .ui-field),
+.app-release-toolbar :is(button, [role='combobox'], .ui-field) {
+  height: var(--app-control-height-sm);
+  min-height: var(--app-control-height-sm);
+  font-size: var(--app-control-font-size);
+}
+
+.app-command-panel .app-command-input {
+  height: var(--app-control-height-md);
+}
+
+.app-command-controls .ui-button-primary button,
+.app-command-controls .ui-button-primary {
+  height: var(--app-control-height-sm);
+}
+
+.app-command-filter-panel {
+  margin-block-start: var(--app-command-filter-panel-margin-block-start);
+  padding:
+    var(--app-command-filter-panel-padding-block)
+    var(--app-command-filter-panel-padding-inline);
+  border-color: var(--app-flat-list-border);
+  border-radius: var(--app-command-control-radius);
+  background: color-mix(in srgb, hsl(var(--muted)) 24%, hsl(var(--background)) 76%);
+}
+
+.app-repository-list,
+.app-flat-list,
+.app-fork-list {
+  border-color: var(--app-flat-list-border);
+  border-radius: var(--app-flat-list-radius);
+  background: var(--app-flat-list-surface);
+  box-shadow: none;
+}
+
+.app-repository-list > .ui-card,
+.app-flat-list > .ui-card,
+.app-flat-list > div > .ui-card,
+.app-fork-list > .ui-card {
+  border-radius: 0;
+  border-color: transparent;
+  border-bottom-color: var(--app-flat-list-divider);
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-repository-list > .ui-card:hover,
+.app-flat-list > .ui-card:hover,
+.app-flat-list > div > .ui-card:hover,
+.app-fork-list > .ui-card:hover {
+  background: var(--app-flat-list-row-hover-surface);
+}
+
+.app-release-list > .release-card.ui-card,
+.app-release-list .release-card.ui-card {
+  border-radius: 0;
+  border-color: transparent;
+  border-top-color: var(--app-flat-list-divider);
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-release-list > .release-card.ui-card:first-child {
+  border-top: 0;
+}
+
+.app-release-list .release-card.is-expanded {
+  border-color: var(--app-flat-list-divider);
+  background: color-mix(in srgb, hsl(var(--muted)) 30%, transparent);
+  background-image: none;
+}
+
+.app-empty-state {
+  padding-block: 3rem;
+  border-color: var(--app-flat-list-border);
+  border-radius: var(--app-flat-list-radius);
+  background: var(--app-flat-list-surface);
+}
+
+.app-flat-list > .app-empty-state {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-release-search-field {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  max-width: var(--app-release-search-max-width);
+  flex: 1 1 var(--app-release-search-max-width);
+}
+
+.app-release-view-select {
+  width: var(--app-release-view-select-width);
+  margin-inline-start: auto;
+}
+
+.app-release-option {
+  min-height: var(--app-release-option-height);
+  gap: var(--app-release-option-gap);
+  padding-inline: 0;
+  border-color: var(--app-release-option-border);
+  background: var(--app-release-option-surface);
+  color: var(--app-release-option-color);
+  font-size: var(--app-release-option-font-size);
+}
+
+.app-release-option [role='switch'] {
+  width: var(--app-release-switch-width);
+  height: var(--app-release-switch-height);
+  border-width: 1px;
+}
+
+.app-release-option [role='switch'] > span {
+  width: var(--app-release-switch-thumb-size);
+  height: var(--app-release-switch-thumb-size);
+  transform: translateX(var(--app-release-switch-thumb-offset));
+  box-shadow: none;
+}
+
+.app-release-option [role='switch'][data-state='checked'] > span {
+  transform: translateX(var(--app-release-switch-thumb-on));
+}
+
+.app-release-asset-filters {
+  padding-inline: var(--app-sidebar-section-padding-inline);
+}
+
+.app-side-filter-manager {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-sidebar-section-gap);
+}
+
+.app-side-filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--app-sidebar-action-gap);
+}
+
+.app-side-filter-row {
+  position: relative;
+}
+
+.app-side-filter-row > .app-side-item {
+  padding-inline-end: calc(
+    var(--app-sidebar-action-size) * 2 + var(--app-sidebar-action-gap) +
+      var(--app-sidebar-item-padding-inline)
+  );
+}
+
+.app-side-row-actions {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--app-sidebar-action-gap);
+  display: flex;
+  align-items: center;
+  gap: var(--app-sidebar-action-gap);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--app-motion-fast) ease;
+}
+
+.app-side-filter-row:hover .app-side-row-actions,
+.app-side-filter-row:focus-within .app-side-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-side-filter-note {
+  margin: 0;
+  padding-inline: var(--app-side-label-margin-inline);
+  color: var(--app-sidebar-muted-color);
+  font-size: var(--app-side-filter-note-font-size);
+  line-height: 1.5;
+}
+
+@media (hover: none) {
+  .app-side-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Treat each settings tab as one bounded surface with divider-separated rows. */
+.app-settings-content-panel {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel [data-settings-sections] > :is(.space-y-4, .space-y-5, .space-y-6) {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--app-settings-shell-border);
+  border-radius: var(--app-settings-shell-radius);
+  background: var(--app-settings-shell-surface);
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > * {
+  margin-block-start: 0 !important;
+  padding:
+    var(--app-settings-row-padding-block)
+    var(--app-settings-row-padding-inline);
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-settings-shell-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :first-child {
+  padding:
+    var(--app-settings-heading-padding-block)
+    var(--app-settings-heading-padding-inline);
+  border-top: 0;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > .shadow-sm {
+  gap: var(--app-settings-card-gap);
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > .shadow-sm
+  > * {
+  padding-inline: 0;
+}
+
+.app-settings-content-panel [data-settings-sections] * {
+  box-shadow: none;
+}
+
+.app-dialog-content {
+  border-color: var(--app-dialog-border);
+  border-radius: var(--app-dialog-radius);
+  box-shadow: var(--app-dialog-shadow);
+}
+
+.app-dialog-content :is(input, [role='combobox'], .ui-field) {
+  min-height: var(--app-control-height-md);
+  font-size: var(--app-control-font-size);
+}
+
+.app-dialog-content :is(.ui-card, .ui-panel, .ui-toolbar) {
+  box-shadow: none;
+}
+
+@media (max-width: 639px) {
+  .app-release-search-row {
+    flex-wrap: wrap;
+  }
+
+  .app-release-search-field {
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .app-release-view-select {
+    margin-inline-start: 0;
+  }
+}
+
+/* Native workspace parity polish. Keep the document as the only scroll root:
+   visual density comes from spacing, tonal surfaces and shared control tokens,
+   never from nested full-height application panes. */
+:root {
+  --app-native-canvas-surface: color-mix(in srgb, hsl(var(--foreground)) 3%, hsl(var(--background)));
+  --app-native-canvas-pattern: radial-gradient(
+    circle at 1px 1px,
+    color-mix(in srgb, hsl(var(--foreground)) 3.2%, transparent) 1px,
+    transparent 0
+  );
+  --app-native-canvas-pattern-size: 16px 16px;
+  --app-native-header-surface: color-mix(in srgb, hsl(var(--background)) 91%, hsl(var(--card)) 9%);
+  --app-native-header-border: color-mix(in srgb, hsl(var(--border)) 42%, transparent);
+  --app-native-sidebar-surface: color-mix(in srgb, hsl(var(--card)) 72%, hsl(var(--background)) 28%);
+  --app-native-sidebar-border: color-mix(in srgb, hsl(var(--border)) 32%, transparent);
+  --app-native-item-hover: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
+  --app-native-item-active: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)) 90%);
+  --app-native-item-active-border: color-mix(in srgb, hsl(var(--primary)) 18%, transparent);
+  --app-native-item-active-text: hsl(var(--foreground));
+  --app-native-item-active-icon: hsl(var(--foreground));
+  --app-native-item-active-count: color-mix(in srgb, hsl(var(--primary)) 14%, transparent);
+  --app-native-control-height: 2.125rem;
+  --app-native-search-height: 2.25rem;
+  --app-native-control-font-size: 0.8125rem;
+  --app-native-chip-height: 1.625rem;
+  --app-native-control-radius: var(--ui-radius-sm);
+  --app-native-control-padding-inline: 0.6875rem;
+  --app-native-control-surface: color-mix(in srgb, hsl(var(--card)) 88%, hsl(var(--background)) 12%);
+  --app-native-control-hover-surface: color-mix(in srgb, hsl(var(--muted)) 62%, hsl(var(--card)) 38%);
+  --app-native-control-border: color-mix(in srgb, hsl(var(--border)) 78%, transparent);
+  --app-native-toolbar-gap: 0.5rem;
+  --app-native-toolbar-margin-block-end: 1rem;
+  --app-native-card-surface: hsl(var(--card));
+  --app-native-card-border: color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  --app-native-card-hover-border: color-mix(in srgb, hsl(var(--border-strong)) 52%, hsl(var(--border)));
+  --app-native-card-title-size: 0.96875rem;
+  --app-native-card-description-size: 0.90625rem;
+  --app-native-card-meta-size: 0.78125rem;
+  --app-native-list-surface: color-mix(in srgb, hsl(var(--card)) 91%, hsl(var(--background)) 9%);
+  --app-native-list-border: color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  --app-native-list-divider: color-mix(in srgb, hsl(var(--border)) 48%, transparent);
+  --app-native-list-hover: color-mix(in srgb, hsl(var(--muted)) 42%, transparent);
+  --app-native-settings-surface: color-mix(in srgb, hsl(var(--card)) 84%, hsl(var(--background)) 16%);
+  --app-native-settings-border: color-mix(in srgb, hsl(var(--border)) 50%, transparent);
+  --app-native-settings-row-border: color-mix(in srgb, hsl(var(--border)) 42%, transparent);
+  --app-native-settings-heading-padding: 1rem 1.25rem;
+  --app-native-settings-row-padding: 1.125rem 1.25rem;
+  --app-native-filter-panel-surface: color-mix(in srgb, hsl(var(--card)) 74%, hsl(var(--background)) 26%);
+  --app-native-filter-panel-border: color-mix(in srgb, hsl(var(--border)) 52%, transparent);
+  --app-native-filter-panel-gap: 0.875rem 1.5rem;
+  --app-native-filter-panel-padding: 1rem 1.125rem;
+  --app-native-filter-title-size: 0.6875rem;
+  --app-native-filter-title-weight: 620;
+  --app-native-empty-surface: color-mix(in srgb, hsl(var(--card)) 76%, hsl(var(--background)) 24%);
+  --app-native-empty-border: color-mix(in srgb, hsl(var(--border-strong)) 45%, transparent);
+  --app-native-empty-marker-surface: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)) 90%);
+  --app-native-empty-marker-border: color-mix(in srgb, hsl(var(--primary)) 18%, transparent);
+  --app-native-empty-title-size: 0.9375rem;
+  --app-native-empty-copy-size: 0.8125rem;
+  --app-native-switch-width: 1.875rem;
+  --app-native-switch-height: 1rem;
+  --app-native-switch-thumb-size: 0.75rem;
+  --app-native-switch-thumb-offset: 0.125rem;
+  --app-native-switch-thumb-on: 0.9375rem;
+  --app-native-switch-off-surface: color-mix(in srgb, hsl(var(--foreground)) 18%, transparent);
+  --app-native-switch-on-surface: color-mix(in srgb, hsl(var(--primary)) 46%, hsl(var(--muted)) 54%);
+  --app-native-switch-thumb-surface: hsl(var(--background));
+  --app-native-dialog-surface: color-mix(in srgb, hsl(var(--popover)) 94%, hsl(var(--background)) 6%);
+  --app-native-dialog-border: color-mix(in srgb, hsl(var(--border)) 64%, transparent);
+  --app-native-dialog-shadow:
+    0 18px 44px color-mix(in srgb, hsl(var(--shadow-color)) 14%, transparent),
+    0 2px 8px color-mix(in srgb, hsl(var(--shadow-color)) 8%, transparent);
+  --app-native-dialog-overlay: hsl(var(--overlay) / 0.32);
+  --app-native-dialog-padding: 1.125rem;
+  --app-native-dialog-title-size: 1.0625rem;
+  --app-native-dialog-control-height: 2.125rem;
+  --app-native-dialog-control-font-size: 0.8125rem;
+}
+
+html,
+body,
+#root {
+  min-height: 100dvh;
+}
+
+body,
+.ui-shell {
+  background-color: var(--app-native-canvas-surface);
+}
+
+.linear-header {
+  background: var(--app-native-header-surface);
+  border-bottom-color: var(--app-native-header-border);
+  box-shadow: none;
+}
+
+.app-header-inner,
+.app-main {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.app-header-nav button[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--app-native-item-active);
+  box-shadow: none;
+  color: var(--app-native-item-active-text);
+}
+
+.app-header-nav button:hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.context-sidebar,
+.linear-sidebar {
+  background: var(--app-native-sidebar-surface);
+}
+
+@media (min-width: 1024px) {
+  .context-sidebar,
+  .linear-sidebar {
+    border-inline-end: var(--app-border-width) solid var(--app-native-sidebar-border);
+  }
+}
+
+.workspace-content.app-workspace-content {
+  background-color: transparent;
+  background-image: var(--app-native-canvas-pattern);
+  background-size: var(--app-native-canvas-pattern-size);
+}
+
+.app-side-eyebrow {
+  font-size: 0.625rem;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+}
+
+.app-side-title {
+  overflow: visible;
+  max-width: none;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.app-section-label {
+  font-size: 0.625rem;
+  font-weight: 620;
+  letter-spacing: 0.035em;
+}
+
+.app-side-item {
+  height: var(--app-sidebar-item-height);
+  min-height: var(--app-sidebar-item-height);
+  border-color: transparent;
+  color: var(--app-sidebar-item-color);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.app-side-item:hover,
+.app-side-item[aria-pressed='false']:hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.app-side-item[aria-pressed='true'],
+.context-sidebar [role='tab'][aria-selected='true'] {
+  border-color: var(--app-native-item-active-border);
+  background: var(--app-native-item-active);
+  box-shadow: none;
+  color: var(--app-native-item-active-text);
+  font-weight: 560;
+}
+
+.app-side-item[aria-pressed='true'] svg,
+.context-sidebar [role='tab'][aria-selected='true'] svg {
+  color: var(--app-native-item-active-icon);
+}
+
+.app-side-item[aria-pressed='true'] .app-side-count,
+.context-sidebar [role='tab'][aria-selected='true'] .app-side-count {
+  background: var(--app-native-item-active-count);
+  color: var(--app-native-item-active-text);
+}
+
+.app-side-item svg {
+  color: var(--app-sidebar-muted-color);
+}
+
+.app-side-item:hover svg {
+  color: currentColor;
+}
+
+.app-category-glyph {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  stroke-width: 1.75;
+}
+
+.app-sidebar-toggle {
+  width: 1.875rem;
+  height: 1.875rem;
+  color: var(--app-sidebar-muted-color);
+}
+
+.app-sidebar-toggle:hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.app-sidebar-toggle-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 1.7;
+}
+
+.app-side-action-button {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.app-side-action-button svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.app-command-panel {
+  margin-block-end: var(--app-native-toolbar-margin-block-end);
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-command-row {
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-command-input,
+.app-command-panel .ui-field {
+  height: var(--app-native-search-height);
+  min-height: var(--app-native-search-height);
+  border-color: var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-command-row > .flex:last-child > :is(button, [role='combobox']) {
+  height: var(--app-native-search-height);
+  min-height: var(--app-native-search-height);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-command-secondary-action {
+  border: var(--app-border-width) solid var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-command-secondary-action:hover {
+  background: var(--app-native-control-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip) {
+  height: var(--app-native-chip-height);
+  min-height: var(--app-native-chip-height);
+  border-color: var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+  font-size: 0.6875rem;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip):hover {
+  background: var(--app-native-control-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip).is-active {
+  border-color: var(--app-native-item-active-border);
+  background: var(--app-native-item-active);
+  color: var(--app-native-item-active-text);
+}
+
+.app-command-controls :is(.ui-button, .ui-button-primary, [role='combobox']) {
+  height: var(--app-native-control-height);
+  min-height: var(--app-native-control-height);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-command-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-native-filter-panel-gap);
+  margin-block: 0.875rem 0;
+  padding: var(--app-native-filter-panel-padding);
+  border-color: var(--app-native-filter-panel-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-filter-panel-surface);
+  box-shadow: none;
+}
+
+.app-command-filter-panel > div {
+  min-width: 0;
+}
+
+.app-command-filter-panel h4 {
+  margin-block: 0 0.625rem;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-native-filter-title-size);
+  font-weight: var(--app-native-filter-title-weight);
+  letter-spacing: 0.025em;
+}
+
+.app-command-filter-panel .flex {
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-page-toolbar {
+  margin-block-end: var(--app-native-toolbar-margin-block-end);
+}
+
+.app-page-toolbar :is(button:not([role='switch']), [role='combobox'], .ui-field) {
+  height: var(--app-native-control-height);
+  min-height: var(--app-native-control-height);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-page-toolbar .ui-field {
+  background: var(--app-native-control-surface);
+}
+
+.app-page-toolbar :is(.ui-button, .ui-button-primary, [role='combobox']) {
+  border-color: var(--app-native-control-border);
+}
+
+.app-page-toolbar :is(.ui-button, .ui-button-primary):hover {
+  border-color: var(--app-native-card-hover-border);
+}
+
+.app-repository-controls {
+  min-height: var(--app-native-control-height);
+  margin-block-end: 1rem;
+}
+
+.app-repository-controls :is(button, [role='combobox'], .ui-field) {
+  height: var(--app-native-control-height);
+  min-height: var(--app-native-control-height);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-repository-controls :is(.ui-button, .ui-field, [role='combobox']) {
+  border-color: var(--app-native-control-border);
+  background-color: var(--app-native-control-surface);
+}
+
+.app-context-row-copy {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.71875rem;
+  line-height: 1.45;
+}
+
+.app-segmented-control {
+  height: var(--app-native-control-height);
+  padding: 0.1875rem;
+  border: var(--app-border-width) solid var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+}
+
+.app-segmented-control > button {
+  width: 1.75rem;
+  height: 1.625rem;
+  min-height: 1.625rem;
+  box-shadow: none;
+}
+
+.app-segmented-control > button[aria-pressed='true'] {
+  background: var(--app-native-item-active);
+  color: var(--app-native-item-active-text);
+  box-shadow: none;
+}
+
+.app-repository-grid {
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.repository-card.ui-card {
+  padding: 0.875rem;
+  border-color: var(--app-native-card-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-card-surface);
+  box-shadow: none;
+}
+
+.repository-card.ui-card:hover {
+  border-color: var(--app-native-card-hover-border);
+  background: var(--app-native-card-surface);
+  box-shadow: none;
+  transform: none;
+}
+
+.repository-card .app-repository-card-title {
+  font-size: var(--app-native-card-title-size);
+  font-weight: 620;
+}
+
+.repository-card .app-repository-card-owner {
+  font-size: var(--app-native-card-meta-size);
+}
+
+.repository-card .app-repository-card-description {
+  color: color-mix(in srgb, hsl(var(--foreground)) 72%, hsl(var(--muted-foreground)) 28%);
+  font-size: var(--app-native-card-description-size);
+}
+
+.repository-card .app-repository-card-meta,
+.repository-card .app-repository-card-footer {
+  font-size: var(--app-native-card-meta-size);
+}
+
+.app-repository-list,
+.app-flat-list,
+.app-fork-list {
+  border-color: var(--app-native-list-border);
+  background: var(--app-native-list-surface);
+  box-shadow: none;
+}
+
+.app-repository-list > .ui-card,
+.app-flat-list > .ui-card,
+.app-flat-list > div > .ui-card,
+.app-fork-list > .ui-card {
+  border-bottom-color: var(--app-native-list-divider);
+  background: transparent;
+}
+
+.app-repository-list > .ui-card:hover,
+.app-flat-list > .ui-card:hover,
+.app-flat-list > div > .ui-card:hover,
+.app-fork-list > .ui-card:hover {
+  background: var(--app-native-list-hover);
+}
+
+.app-release-toolbar {
+  width: 100%;
+}
+
+.app-release-search-row {
+  display: grid;
+  grid-template-columns: minmax(18rem, 1fr) auto auto;
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-release-search-field {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  flex: none;
+}
+
+.app-release-toolbar-controls {
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-release-option {
+  height: var(--app-native-control-height);
+  min-height: var(--app-native-control-height);
+  gap: 0.375rem;
+  padding-inline: 0.25rem;
+  border-color: transparent;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+
+.app-release-option [role='switch'] {
+  width: var(--app-native-switch-width);
+  height: var(--app-native-switch-height);
+  min-height: var(--app-native-switch-height);
+  max-height: var(--app-native-switch-height);
+  flex: none;
+  padding: 0;
+  border-width: var(--app-border-width);
+  border-color: transparent;
+  border-radius: 999px;
+  background: var(--app-native-switch-off-surface);
+  box-shadow: none;
+}
+
+.app-release-option [role='switch'][data-state='checked'] {
+  background: var(--app-native-switch-on-surface);
+}
+
+.app-release-option [role='switch'] > span {
+  width: var(--app-native-switch-thumb-size);
+  height: var(--app-native-switch-thumb-size);
+  transform: translateX(var(--app-native-switch-thumb-offset));
+  background: var(--app-native-switch-thumb-surface);
+  box-shadow: none;
+}
+
+.app-release-option [role='switch'][data-state='checked'] > span {
+  transform: translateX(var(--app-native-switch-thumb-on));
+}
+
+.app-release-view-select {
+  width: 10rem;
+  margin-inline-start: 0;
+}
+
+.app-empty-state {
+  gap: 0.75rem;
+  border: var(--app-border-width) dashed var(--app-native-empty-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-empty-surface);
+  box-shadow: none;
+}
+
+.app-empty-visual {
+  border: var(--app-border-width) solid var(--app-native-empty-marker-border);
+  background: var(--app-native-empty-marker-surface);
+  color: hsl(var(--muted-foreground));
+}
+
+.app-empty-title {
+  font-size: var(--app-native-empty-title-size);
+  font-weight: 620;
+}
+
+.app-empty-description {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-native-empty-copy-size);
+}
+
+.app-empty-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 36rem);
+  gap: 0.5rem;
+}
+
+.app-empty-step {
+  padding: 0.625rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--app-sidebar-item-color);
+  font-size: var(--app-native-empty-copy-size);
+}
+
+.app-empty-step-marker {
+  background: var(--app-native-empty-marker-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-empty-note {
+  font-size: var(--app-native-empty-copy-size);
+}
+
+.app-settings-content-panel {
+  max-width: none;
+}
+
+.app-settings-content-panel [data-settings-sections] > .space-y-6,
+.app-settings-content-panel [data-settings-sections] > .space-y-5,
+.app-settings-content-panel [data-settings-sections] > .space-y-4 {
+  border-color: var(--app-native-settings-border);
+  background: var(--app-native-settings-surface);
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-6, .space-y-5, .space-y-4)
+  > :first-child {
+  padding: var(--app-native-settings-heading-padding);
+  border-bottom-color: var(--app-native-settings-row-border);
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-6, .space-y-5, .space-y-4)
+  > .bg-card.rounded-xl.border,
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-6, .space-y-5, .space-y-4)
+  > .bg-card.rounded-lg.border {
+  padding-block: 1rem;
+  border-top-color: var(--app-native-settings-row-border);
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-6, .space-y-5, .space-y-4)
+  > .bg-card.rounded-xl.border
+  > div,
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-6, .space-y-5, .space-y-4)
+  > .bg-card.rounded-lg.border
+  > div {
+  padding-inline: var(--app-native-settings-row-padding);
+}
+
+.app-settings-content-panel :is(.bg-card.rounded-xl.border, .bg-card.rounded-lg.border, .shadow-sm) {
+  box-shadow: none;
+}
+
+.app-settings-content-panel :is(input, textarea, [role='combobox']) {
+  min-height: var(--app-native-control-height);
+  border-color: var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-settings-content-panel :is(.ui-button, .ui-button-primary) {
+  min-height: var(--app-native-control-height);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-dialog-overlay {
+  background: var(--app-native-dialog-overlay);
+}
+
+.app-dialog-content {
+  padding: var(--app-native-dialog-padding);
+  border-color: var(--app-native-dialog-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-dialog-surface);
+  box-shadow: var(--app-native-dialog-shadow);
+}
+
+.app-dialog-title {
+  font-size: var(--app-native-dialog-title-size);
+  font-weight: 620;
+}
+
+.app-dialog-content :is(input, textarea, [role='combobox']) {
+  min-height: var(--app-native-dialog-control-height);
+  border-color: var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+  font-size: var(--app-native-dialog-control-font-size);
+}
+
+.app-dialog-footer :is(button, .ui-button, .ui-button-primary) {
+  min-height: var(--app-native-control-height);
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+@media (max-width: 1023px) {
+  .context-sidebar,
+  .linear-sidebar {
+    border-inline-end: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-release-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .app-release-search-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-command-filter-panel,
+  .app-empty-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-release-search-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-release-toolbar-controls,
+  .app-release-view-select {
+    width: 100%;
+  }
+
+  .app-release-toolbar-controls {
+    justify-content: space-between;
+  }
+
+  .app-release-view-select {
+    margin-inline-start: 0;
+  }
+}
+
+/* Native-density polish. Every visual value below derives from the active
+   preset tokens; page ownership and document scrolling remain unchanged. */
+:root {
+  --app-sidebar-width: 15rem;
+  --app-native-canvas-surface: color-mix(in srgb, hsl(var(--foreground)) 3%, hsl(var(--background)));
+  --app-native-canvas-pattern: none;
+  --app-native-header-surface: color-mix(in srgb, hsl(var(--background)) 94%, hsl(var(--card)) 6%);
+  --app-native-header-border: color-mix(in srgb, hsl(var(--border)) 38%, transparent);
+  --app-native-sidebar-surface: color-mix(in srgb, hsl(var(--card)) 66%, hsl(var(--background)) 34%);
+  --app-native-sidebar-border: transparent;
+  --app-native-item-hover: color-mix(in srgb, hsl(var(--foreground)) 4%, transparent);
+  --app-native-item-active: color-mix(in srgb, hsl(var(--foreground)) 6%, transparent);
+  --app-native-item-active-border: transparent;
+  --app-native-item-active-text: hsl(var(--foreground));
+  --app-native-item-active-icon: color-mix(in srgb, hsl(var(--foreground)) 78%, hsl(var(--muted-foreground)) 22%);
+  --app-native-item-active-count: color-mix(in srgb, hsl(var(--foreground)) 7%, transparent);
+  --app-native-control-height: 2rem;
+  --app-native-search-height: 2.25rem;
+  --app-native-control-font-size: 0.8125rem;
+  --app-native-chip-height: 1.625rem;
+  --app-native-control-radius: var(--ui-radius-sm);
+  --app-native-control-padding-inline: 0.6875rem;
+  --app-native-control-surface: color-mix(in srgb, hsl(var(--card)) 90%, hsl(var(--background)) 10%);
+  --app-native-control-hover-surface: color-mix(in srgb, hsl(var(--muted)) 46%, hsl(var(--card)) 54%);
+  --app-native-control-border: color-mix(in srgb, hsl(var(--border)) 76%, transparent);
+  --app-native-toolbar-gap: 0.5rem;
+  --app-native-toolbar-margin-block-end: 0.875rem;
+  --app-native-card-surface: color-mix(in srgb, hsl(var(--card)) 78%, hsl(var(--background)) 22%);
+  --app-native-card-border: color-mix(in srgb, hsl(var(--border)) 54%, transparent);
+  --app-native-card-hover-border: color-mix(in srgb, hsl(var(--border-strong)) 46%, hsl(var(--border)));
+  --app-native-card-title-size: 0.9375rem;
+  --app-native-card-description-size: 0.84375rem;
+  --app-native-card-meta-size: 0.75rem;
+  --app-native-list-surface: color-mix(in srgb, hsl(var(--card)) 86%, hsl(var(--background)) 14%);
+  --app-native-list-border: color-mix(in srgb, hsl(var(--border)) 52%, transparent);
+  --app-native-list-divider: color-mix(in srgb, hsl(var(--border)) 42%, transparent);
+  --app-native-list-hover: color-mix(in srgb, hsl(var(--muted)) 30%, transparent);
+  --app-native-list-padding-block: 0.875rem;
+  --app-native-list-padding-inline: 1rem;
+  --app-row-title-size: 0.9375rem;
+  --app-row-copy-size: 0.8125rem;
+  --app-row-meta-size: 0.75rem;
+  --app-row-action-size: 1.75rem;
+  --app-row-action-icon-size: 0.875rem;
+  --app-row-action-gap: 0.125rem;
+  --app-row-action-label-height: 1.75rem;
+  --app-row-action-label-padding-inline: 0.5rem;
+  --app-native-settings-surface: color-mix(in srgb, hsl(var(--card)) 58%, hsl(var(--background)) 42%);
+  --app-native-settings-border: color-mix(in srgb, hsl(var(--border)) 46%, transparent);
+  --app-native-settings-row-border: color-mix(in srgb, hsl(var(--border)) 38%, transparent);
+  --app-native-settings-heading-padding: 1rem 1.25rem;
+  --app-native-settings-row-padding: 1rem 1.25rem;
+  --app-native-filter-panel-surface: color-mix(in srgb, hsl(var(--card)) 52%, hsl(var(--background)) 48%);
+  --app-native-filter-panel-border: color-mix(in srgb, hsl(var(--border)) 46%, transparent);
+  --app-native-filter-panel-gap: 0.875rem 1.5rem;
+  --app-native-filter-panel-padding: 0.875rem 1rem;
+  --app-native-filter-title-size: 0.6875rem;
+  --app-native-filter-title-weight: 620;
+  --app-native-empty-surface: color-mix(in srgb, hsl(var(--card)) 62%, hsl(var(--background)) 38%);
+  --app-native-empty-border: color-mix(in srgb, hsl(var(--border)) 48%, transparent);
+  --app-native-empty-marker-surface: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
+  --app-native-empty-marker-border: color-mix(in srgb, hsl(var(--border)) 48%, transparent);
+  --app-native-empty-title-size: 0.9375rem;
+  --app-native-empty-copy-size: 0.8125rem;
+  --app-native-switch-width: 1.875rem;
+  --app-native-switch-height: 1rem;
+  --app-native-switch-thumb-size: 0.75rem;
+  --app-native-switch-thumb-offset: 0.125rem;
+  --app-native-switch-thumb-on: 0.9375rem;
+  --app-native-switch-off-surface: color-mix(in srgb, hsl(var(--foreground)) 16%, transparent);
+  --app-native-switch-on-surface: color-mix(in srgb, hsl(var(--primary)) 52%, hsl(var(--muted)) 48%);
+  --app-native-switch-thumb-surface: hsl(var(--background));
+  --app-native-dialog-surface: color-mix(in srgb, hsl(var(--popover)) 90%, hsl(var(--background)) 10%);
+  --app-native-dialog-border: color-mix(in srgb, hsl(var(--border)) 56%, transparent);
+  --app-native-dialog-shadow:
+    0 20px 52px color-mix(in srgb, hsl(var(--shadow-color)) 16%, transparent),
+    0 2px 8px color-mix(in srgb, hsl(var(--shadow-color)) 8%, transparent);
+  --app-native-dialog-overlay: hsl(var(--overlay) / 0.28);
+  --app-native-dialog-padding: 1.125rem;
+  --app-native-dialog-title-size: 1.0625rem;
+  --app-native-dialog-control-height: 2.125rem;
+  --app-native-dialog-control-font-size: 0.8125rem;
+  --app-category-icon-cell: 2.125rem;
+  --app-category-icon-gap: 0.25rem;
+  --app-category-icon-font-size: 1.125rem;
+}
+
+html,
+body,
+#root,
+.ui-shell {
+  min-width: 100%;
+  min-height: 100dvh;
+}
+
+body,
+.ui-shell {
+  background: var(--app-native-canvas-surface);
+}
+
+.app-main,
+.app-header-inner {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.linear-header {
+  min-height: var(--app-header-height);
+  background: var(--app-native-header-surface);
+  border-bottom-color: var(--app-native-header-border);
+  box-shadow: none;
+}
+
+.app-header-inner,
+.linear-header-inner {
+  height: 100%;
+}
+
+.app-header-nav button {
+  height: var(--app-native-control-height);
+  padding-inline: 0.625rem;
+  border: var(--app-border-width) solid transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-native-control-font-size);
+  font-weight: 500;
+}
+
+.app-header-nav button[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--app-native-item-active);
+  box-shadow: none;
+  color: var(--app-native-item-active-text);
+  font-weight: 550;
+}
+
+.app-header-nav button:hover {
+  background: var(--app-native-item-hover);
+}
+
+.context-sidebar,
+.linear-sidebar {
+  border-inline-end-color: var(--app-native-sidebar-border);
+  background: var(--app-native-sidebar-surface);
+}
+
+.context-sidebar-head {
+  padding-block: 0.75rem 0.5rem;
+}
+
+.app-side-eyebrow {
+  font-size: 0.625rem;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+}
+
+.app-side-title {
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.app-section-label {
+  color: color-mix(in srgb, hsl(var(--foreground)) 38%, hsl(var(--muted-foreground)) 62%);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+}
+
+.app-side-item,
+.context-sidebar [role='tab'],
+.linear-settings-nav-item {
+  min-height: var(--app-sidebar-item-height);
+  border-color: transparent;
+  color: color-mix(in srgb, hsl(var(--foreground)) 70%, hsl(var(--muted-foreground)) 30%);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.app-side-item:hover,
+.app-side-item[aria-pressed='false']:hover,
+.context-sidebar [role='tab']:hover,
+.linear-settings-nav-item:hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.app-side-item[aria-pressed='true'],
+.context-sidebar [role='tab'][aria-selected='true'],
+.linear-settings-nav-item.is-active,
+.linear-sidebar button[aria-pressed='true'] {
+  border-color: var(--app-native-item-active-border);
+  background: var(--app-native-item-active);
+  box-shadow: none;
+  color: var(--app-native-item-active-text);
+  font-weight: 550;
+}
+
+.app-side-item[aria-pressed='true'] svg,
+.context-sidebar [role='tab'][aria-selected='true'] svg,
+.linear-settings-nav-item.is-active svg {
+  color: var(--app-native-item-active-icon);
+}
+
+.app-side-item[aria-pressed='true'] .app-side-count,
+.context-sidebar [role='tab'][aria-selected='true'] .app-side-count,
+.linear-settings-nav-item.is-active .app-side-count {
+  background: var(--app-native-item-active-count);
+  color: var(--app-native-item-active-text);
+}
+
+.app-side-item svg,
+.app-category-glyph {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  stroke-width: 1.75;
+}
+
+.app-sidebar-toggle,
+.app-side-action-button {
+  color: hsl(var(--muted-foreground));
+}
+
+.app-sidebar-toggle:hover,
+.app-side-action-button:hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.app-side-count {
+  background: var(--app-native-item-active-count);
+  font-size: 0.6875rem;
+}
+
+.workspace-content.app-workspace-content {
+  background-color: transparent;
+  background-image: none;
+}
+
+.app-workspace-page-header {
+  padding-block-end: 0.75rem;
+  margin-block-end: 1rem;
+}
+
+.app-workspace-breadcrumb {
+  color: color-mix(in srgb, hsl(var(--foreground)) 36%, hsl(var(--muted-foreground)) 64%);
+  font-size: 0.625rem;
+}
+
+.app-workspace-title {
+  font-size: 1.625rem;
+  font-weight: 620;
+}
+
+.app-workspace-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.app-workspace-meta-pill,
+.app-list-row-tag {
+  border-color: var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+  color: hsl(var(--muted-foreground));
+}
+
+.app-page-toolbar,
+.app-repository-controls,
+.app-command-panel {
+  margin-block-end: var(--app-native-toolbar-margin-block-end);
+}
+
+.app-page-toolbar,
+.app-repository-controls,
+.app-command-row,
+.app-command-filters,
+.app-command-filter-group,
+.app-command-controls,
+.app-release-search-row,
+.app-release-toolbar-controls {
+  align-items: center;
+}
+
+.app-command-row {
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-command-input,
+.app-command-panel .ui-field,
+.app-page-search {
+  height: var(--app-native-search-height);
+  min-height: var(--app-native-search-height);
+  border-color: var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+  font-size: var(--app-native-control-font-size);
+  box-shadow: none;
+}
+
+.app-command-row > .flex:last-child > :is(button, [role='combobox']),
+.app-command-controls :is(.ui-button, .ui-button-primary, [role='combobox']),
+.app-page-toolbar :is(button:not([role='switch']), [role='combobox']),
+.app-repository-controls :is(button, [role='combobox']) {
+  height: var(--app-native-control-height);
+  min-height: var(--app-native-control-height);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+  line-height: 1;
+}
+
+.app-command-secondary-action,
+.app-page-toolbar :is(.ui-button, .ui-button-primary, [role='combobox']),
+.app-repository-controls :is(.ui-button, .ui-field, [role='combobox']) {
+  border-color: var(--app-native-control-border);
+  background-color: var(--app-native-control-surface);
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+
+.app-command-secondary-action:hover,
+.app-page-toolbar :is(.ui-button, .ui-button-primary, [role='combobox']):hover,
+.app-repository-controls :is(.ui-button, .ui-field, [role='combobox']):hover {
+  background-color: var(--app-native-control-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip) {
+  height: var(--app-native-chip-height);
+  min-height: var(--app-native-chip-height);
+  padding-inline: 0.625rem;
+  border-color: var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+  font-size: 0.6875rem;
+  font-weight: 560;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip).is-active {
+  border-color: var(--app-native-item-active-border);
+  background: var(--app-native-item-active);
+  color: var(--app-native-item-active-text);
+}
+
+.app-command-filter-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--app-native-filter-panel-gap);
+  margin-block: 0.75rem 0.25rem;
+  padding: var(--app-native-filter-panel-padding);
+  border-color: var(--app-native-filter-panel-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-filter-panel-surface);
+}
+
+.app-command-filter-panel h4 {
+  margin-block-end: 0.5rem;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-native-filter-title-size);
+  font-weight: var(--app-native-filter-title-weight);
+}
+
+.app-command-filter-panel button {
+  min-height: 1.625rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+}
+
+.app-repository-controls {
+  margin-block-end: 0.75rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-context-row-copy {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.71875rem;
+}
+
+.app-segmented-control {
+  height: var(--app-native-control-height);
+  padding: 0.1875rem;
+  border-color: var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+}
+
+.app-repository-grid {
+  gap: 0.75rem;
+}
+
+.repository-card.ui-card {
+  padding: 0.875rem;
+  border-color: var(--app-native-card-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-card-surface);
+  box-shadow: none;
+}
+
+.repository-card.ui-card:hover {
+  border-color: var(--app-native-card-hover-border);
+  background: var(--app-native-card-surface);
+  box-shadow: none;
+  transform: none;
+}
+
+.repository-card .app-repository-card-title {
+  font-size: var(--app-native-card-title-size);
+  font-weight: 620;
+}
+
+.repository-card .app-repository-card-owner,
+.repository-card .app-repository-card-meta,
+.repository-card .app-repository-card-footer {
+  font-size: var(--app-native-card-meta-size);
+}
+
+.repository-card .app-repository-card-description {
+  color: color-mix(in srgb, hsl(var(--foreground)) 70%, hsl(var(--muted-foreground)) 30%);
+  font-size: var(--app-native-card-description-size);
+  line-height: 1.55;
+}
+
+.repository-card .app-repository-card-tag {
+  min-height: 1.25rem;
+  border-color: transparent;
+  background: var(--app-native-item-hover);
+  font-size: 0.6875rem;
+}
+
+.repository-card .app-repository-actions :is(button, a) {
+  border-color: transparent;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+
+.repository-card .app-repository-actions :is(button, a):hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.repository-card .app-repository-actions :is(button, a)[aria-pressed='true'] {
+  background: var(--app-native-item-active);
+  color: var(--app-native-item-active-text);
+}
+
+.app-row-actions {
+  gap: var(--app-row-action-gap);
+}
+
+.app-row-action {
+  display: inline-flex;
+  width: var(--app-row-action-size);
+  height: var(--app-row-action-size);
+  min-width: var(--app-row-action-size);
+  min-height: var(--app-row-action-size);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--app-native-control-radius);
+  background: transparent;
+  color: color-mix(in srgb, hsl(var(--muted-foreground)) 86%, transparent);
+  box-shadow: none;
+}
+
+.app-row-action:hover {
+  background: var(--app-native-item-hover);
+  color: hsl(var(--foreground));
+}
+
+.app-row-action.text-primary {
+  color: hsl(var(--primary));
+}
+
+.app-row-action svg {
+  width: var(--app-row-action-icon-size);
+  height: var(--app-row-action-icon-size);
+}
+
+.app-row-action--label {
+  width: auto;
+  min-width: 0;
+  height: var(--app-row-action-label-height);
+  min-height: var(--app-row-action-label-height);
+  gap: 0.375rem;
+  padding-inline: var(--app-row-action-label-padding-inline);
+  font-size: 0.75rem;
+  font-weight: 520;
+}
+
+.app-list-row,
+.app-discovery-list .app-list-row,
+.app-flat-list > .app-list-row {
+  padding: var(--app-native-list-padding-block) var(--app-native-list-padding-inline);
+}
+
+.app-list-row-title {
+  color: hsl(var(--foreground));
+  font-size: var(--app-row-title-size);
+  font-weight: 610;
+  letter-spacing: -0.008em;
+}
+
+.app-list-row-description {
+  font-size: var(--app-row-copy-size);
+  line-height: 1.55;
+}
+
+.app-list-row-meta {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-row-meta-size);
+}
+
+.app-list-row-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-item-hover);
+  color: hsl(var(--muted-foreground));
+}
+
+.app-list-row-icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.app-discovery-rank {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.75rem;
+}
+
+.app-discovery-card {
+  padding: var(--app-native-list-padding-block) var(--app-native-list-padding-inline);
+}
+
+.app-release-search-row {
+  display: flex;
+  min-width: 0;
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-release-search-field {
+  width: min(100%, var(--app-release-search-max-width));
+  max-width: var(--app-release-search-max-width);
+  flex: 0 1 var(--app-release-search-max-width);
+}
+
+.app-release-toolbar-controls {
+  flex: none;
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-release-view-select {
+  width: var(--app-release-view-select-width);
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.app-release-option {
+  min-height: var(--app-native-control-height);
+  padding-inline: 0.25rem;
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.75rem;
+}
+
+.release-card .app-row-actions {
+  min-width: 18.5rem;
+}
+
+.release-card .app-row-action--label {
+  color: hsl(var(--muted-foreground));
+}
+
+.app-empty-state {
+  gap: 0.75rem;
+  padding-block: 2.75rem;
+  border: var(--app-border-width) solid var(--app-native-empty-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-empty-surface);
+  box-shadow: none;
+}
+
+.app-empty-visual {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: var(--app-border-width) solid var(--app-native-empty-marker-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-empty-marker-surface);
+}
+
+.app-empty-title {
+  font-size: var(--app-native-empty-title-size);
+  font-weight: 620;
+}
+
+.app-empty-description,
+.app-empty-note {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-native-empty-copy-size);
+}
+
+.app-empty-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 32rem);
+  gap: 0.5rem;
+}
+
+.app-empty-step {
+  padding: 0.5rem 0.625rem;
+  border: var(--app-border-width) solid var(--app-native-empty-border);
+  border-radius: var(--app-native-control-radius);
+  background: transparent;
+  font-size: var(--app-native-empty-copy-size);
+}
+
+.app-empty-step-marker {
+  background: var(--app-native-empty-marker-surface);
+}
+
+.app-fork-owner-picker {
+  gap: 0.375rem;
+}
+
+.app-fork-owner-picker .app-route-scope-label {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.6875rem;
+}
+
+.app-fork-owner-picker .app-route-scope-trigger {
+  height: var(--app-native-control-height);
+  border-color: var(--app-native-control-border);
+  background: var(--app-native-control-surface);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-settings-content-panel {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel [data-settings-sections] > :is(.space-y-4, .space-y-5, .space-y-6) {
+  gap: 0;
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--app-native-settings-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-settings-surface);
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > * {
+  margin-block-start: 0 !important;
+  padding: var(--app-native-settings-row-padding);
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-native-settings-row-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :first-child {
+  padding: var(--app-native-settings-heading-padding);
+  border-top: 0;
+}
+
+.app-settings-content-panel [data-settings-sections] :is(h3, .text-lg) {
+  color: hsl(var(--foreground));
+  font-size: 0.9375rem;
+  font-weight: 620;
+  letter-spacing: -0.008em;
+}
+
+/* Card resets must not inherit into controls; checkbox/radio roots also use shadow-sm. */
+.app-settings-content-panel [data-settings-sections] :is(.bg-card.rounded-xl.border, .bg-card.rounded-lg.border, .shadow-sm:not(button)) {
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :is(.bg-card.rounded-xl.border, .bg-card.rounded-lg.border) {
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-native-settings-row-border);
+  border-radius: 0;
+}
+
+.app-settings-content-panel [data-settings-sections] :is(input, textarea, [role='combobox']) {
+  min-height: var(--app-native-control-height);
+  border-color: var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-settings-content-panel [data-settings-sections] :is(.ui-button, .ui-button-primary, button) {
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-settings-content-panel [data-settings-sections] :is(.ui-button, .ui-button-primary) {
+  min-height: var(--app-native-control-height);
+}
+
+.app-dialog-overlay {
+  background: var(--app-native-dialog-overlay);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.app-dialog-content {
+  gap: 0.875rem;
+  padding: var(--app-native-dialog-padding);
+  border-color: var(--app-native-dialog-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-native-dialog-surface);
+  box-shadow: var(--app-native-dialog-shadow);
+}
+
+.app-dialog-header {
+  gap: 0.25rem;
+  padding-block-end: 0.75rem;
+  border-bottom: var(--app-border-width) solid var(--app-native-settings-row-border);
+}
+
+.app-dialog-title {
+  font-size: var(--app-native-dialog-title-size);
+  font-weight: 620;
+}
+
+.app-dialog-description {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-dialog-footer {
+  gap: 0.5rem;
+  padding-block-start: 0.875rem;
+  border-top-color: var(--app-native-settings-row-border);
+}
+
+.app-dialog-content :is(input, textarea, [role='combobox']) {
+  min-height: var(--app-native-dialog-control-height);
+  border-color: var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+  font-size: var(--app-native-dialog-control-font-size);
+}
+
+.app-dialog-content :is(.ui-button, .ui-button-primary, button) {
+  min-height: var(--app-native-control-height);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--app-native-control-radius);
+  font-size: var(--app-native-control-font-size);
+}
+
+.app-category-editor-dialog {
+  max-width: 32rem;
+}
+
+.app-category-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.app-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-form-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: hsl(var(--foreground));
+  font-size: 0.8125rem;
+  font-weight: 590;
+}
+
+.app-form-label-meta,
+.app-form-hint {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.71875rem;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.app-form-hint {
+  margin: 0;
+}
+
+.app-category-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: var(--app-category-icon-gap);
+  max-height: 13rem;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: var(--app-border-width) solid var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+}
+
+.app-category-icon-option {
+  display: inline-grid;
+  width: 100%;
+  height: var(--app-category-icon-cell);
+  min-width: 0;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--app-native-control-radius);
+  background: transparent;
+  font-size: var(--app-category-icon-font-size);
+  line-height: 1;
+}
+
+.app-category-icon-option:hover {
+  background: var(--app-native-item-hover);
+}
+
+.app-category-icon-option[aria-pressed='true'] {
+  background: var(--app-native-item-active);
+  box-shadow: inset 0 0 0 1px var(--app-native-control-border);
+}
+
+.app-category-custom-icon {
+  padding: 0.75rem;
+  border: var(--app-border-width) solid var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+}
+
+.app-category-custom-icon-row,
+.app-category-editor-meta,
+.app-category-editor-footer,
+.app-dialog-actions,
+.app-form-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-category-custom-icon-row {
+  margin-block-end: 0.5rem;
+}
+
+.app-category-editor-meta {
+  min-height: 1.75rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.71875rem;
+}
+
+.app-category-custom-trigger {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  gap: 0.25rem;
+  padding-inline: 0.5rem;
+  color: hsl(var(--primary-emphasis, var(--primary)));
+  font-size: 0.75rem;
+}
+
+.app-category-custom-trigger svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.app-form-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: var(--app-border-width) solid var(--app-native-control-border);
+  border-radius: var(--app-native-control-radius);
+  background: var(--app-native-control-surface);
+}
+
+.app-form-inline-actions {
+  flex-wrap: wrap;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.71875rem;
+}
+
+.app-category-editor-footer {
+  justify-content: space-between;
+  padding-block-start: 0.875rem;
+  border-top: var(--app-border-width) solid var(--app-native-settings-row-border);
+}
+
+.app-dialog-actions {
+  margin-inline-start: auto;
+}
+
+@media (max-width: 639px) {
+  .app-category-icon-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+
+  .app-category-editor-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-dialog-actions {
+    margin-inline-start: 0;
+  }
+
+  .app-dialog-actions > * {
+    flex: 1 1 0;
+  }
+
+  .release-card .app-row-actions {
+    min-width: 0;
+  }
+}
+
+/* Final desktop-app polish. These values are intentionally centralized here
+   because the legacy stylesheet contains several historical UI layers. */
+:root {
+  --app-final-edge: 0;
+  --app-final-sidebar-width: 15rem;
+  --app-final-content-padding-block: 1.5rem;
+  --app-final-content-padding-inline: clamp(1.25rem, 2.2vw, 2.25rem);
+  --app-final-section-gap: 1rem;
+  --app-final-control-height: 2.25rem;
+  --app-final-control-font-size: 0.8125rem;
+  --app-final-control-radius: var(--ui-radius-sm);
+  --app-final-row-title-size: 0.9375rem;
+  --app-final-row-copy-size: 0.8125rem;
+  --app-final-row-meta-size: 0.75rem;
+  --app-final-card-title-size: 1rem;
+  --app-final-card-copy-size: 0.875rem;
+  --app-final-card-meta-size: 0.75rem;
+  --app-final-sidebar-title-size: 0.875rem;
+  --app-final-sidebar-item-size: 0.8125rem;
+  --app-final-sidebar-icon-size: 0.9375rem;
+  --app-final-active-surface: color-mix(in srgb, hsl(var(--foreground)) 6%, transparent);
+  --app-final-active-icon: color-mix(
+    in srgb,
+    hsl(var(--primary-emphasis, var(--primary))) 44%,
+    hsl(var(--foreground)) 56%
+  );
+  --app-final-control-surface: color-mix(in srgb, hsl(var(--card)) 92%, hsl(var(--background)) 8%);
+  --app-final-control-border: color-mix(in srgb, hsl(var(--border)) 72%, transparent);
+  --app-final-control-hover: color-mix(in srgb, hsl(var(--muted)) 48%, hsl(var(--card)) 52%);
+  --app-final-floating-surface: color-mix(in srgb, hsl(var(--popover)) 96%, hsl(var(--background)) 4%);
+  --app-final-floating-border: color-mix(in srgb, hsl(var(--border)) 70%, transparent);
+  --app-final-floating-shadow:
+    0 18px 46px color-mix(in srgb, hsl(var(--shadow-color)) 15%, transparent),
+    0 2px 8px color-mix(in srgb, hsl(var(--shadow-color)) 7%, transparent);
+  --app-final-dialog-padding: 1.25rem;
+  --app-final-dialog-gap: 1rem;
+  --app-final-focus-ring: 0 0 0 3px
+    color-mix(in srgb, hsl(var(--primary-emphasis, var(--primary))) 18%, transparent);
+  --app-final-settings-max-width: 76rem;
+  --app-final-settings-surface: color-mix(in srgb, hsl(var(--card)) 72%, hsl(var(--background)) 28%);
+  --app-final-settings-border: color-mix(in srgb, hsl(var(--border)) 54%, transparent);
+  --app-final-settings-row-border: color-mix(in srgb, hsl(var(--border)) 44%, transparent);
+  --app-final-settings-padding-block: 1.125rem;
+  --app-final-settings-padding-inline: 1.25rem;
+  --app-final-empty-surface: color-mix(in srgb, hsl(var(--card)) 64%, hsl(var(--background)) 36%);
+  --app-final-empty-border: color-mix(in srgb, hsl(var(--border)) 62%, transparent);
+  --app-final-release-search-width: 32rem;
+}
+
+html,
+body,
+#root,
+.ui-shell {
+  width: 100%;
+  min-width: 100%;
+  margin: 0;
+}
+
+.ui-shell {
+  overflow-x: clip;
+}
+
+.app-header-inner,
+.app-main {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.app-main {
+  padding: 0;
+}
+
+.route-workspace {
+  width: 100%;
+  gap: 0;
+}
+
+.context-sidebar,
+.linear-sidebar {
+  width: var(--app-final-sidebar-width);
+  border: 0;
+  border-inline-end: var(--app-border-width) solid
+    color-mix(in srgb, hsl(var(--border)) 38%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, hsl(var(--card)) 68%, hsl(var(--background)) 32%);
+  box-shadow: none;
+}
+
+.context-sidebar-head {
+  min-height: 3.375rem;
+  padding: 0.75rem 0.75rem 0.625rem 1rem;
+  border-bottom: 0;
+}
+
+.context-sidebar-body {
+  padding: 0.125rem 0.5rem 0.75rem;
+}
+
+.app-side-eyebrow {
+  color: color-mix(in srgb, hsl(var(--muted-foreground)) 82%, transparent);
+  font-size: 0.625rem;
+  font-weight: 620;
+  letter-spacing: 0.075em;
+}
+
+.app-side-title {
+  color: hsl(var(--foreground));
+  font-size: var(--app-final-sidebar-title-size);
+  font-weight: 620;
+  letter-spacing: -0.012em;
+}
+
+.app-section-label {
+  margin-inline: 0.5rem;
+  color: color-mix(in srgb, hsl(var(--muted-foreground)) 76%, transparent);
+  font-size: 0.625rem;
+  font-weight: 610;
+  letter-spacing: 0.035em;
+}
+
+.app-side-item,
+.context-sidebar [role='tab'],
+.linear-settings-nav-item {
+  min-height: 2rem;
+  border-color: transparent;
+  border-radius: var(--app-final-control-radius);
+  background: transparent;
+  color: color-mix(in srgb, hsl(var(--foreground)) 64%, hsl(var(--muted-foreground)) 36%);
+  font-size: var(--app-final-sidebar-item-size);
+  font-weight: 500;
+  letter-spacing: -0.002em;
+}
+
+.app-side-item:hover,
+.context-sidebar [role='tab']:hover,
+.linear-settings-nav-item:hover {
+  background: color-mix(in srgb, hsl(var(--foreground)) 4%, transparent);
+  color: hsl(var(--foreground));
+}
+
+.app-side-item[aria-pressed='true'],
+.context-sidebar [role='tab'][aria-selected='true'],
+.linear-settings-nav-item.is-active {
+  border-color: transparent;
+  background: var(--app-final-active-surface);
+  color: hsl(var(--foreground));
+  box-shadow: none;
+  font-weight: 550;
+}
+
+.app-side-item[aria-pressed='true'] svg,
+.context-sidebar [role='tab'][aria-selected='true'] svg,
+.linear-settings-nav-item.is-active svg {
+  color: var(--app-final-active-icon);
+}
+
+.app-side-item svg,
+.context-sidebar [role='tab'] svg,
+.app-category-glyph {
+  width: var(--app-final-sidebar-icon-size);
+  height: var(--app-final-sidebar-icon-size);
+  stroke-width: 1.75;
+}
+
+.app-category-glyph-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--app-final-sidebar-icon-size);
+  line-height: 1;
+}
+
+.app-side-count {
+  min-width: 1.375rem;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, hsl(var(--foreground)) 7%, transparent);
+  color: hsl(var(--muted-foreground));
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+
+.app-side-item[aria-pressed='true'] .app-side-count,
+.context-sidebar [role='tab'][aria-selected='true'] .app-side-count {
+  background: color-mix(in srgb, hsl(var(--foreground)) 8%, transparent);
+  color: hsl(var(--foreground));
+}
+
+.app-sidebar-toggle,
+.app-side-action-button,
+.context-sidebar-head .linear-icon-button {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--ui-radius-xs);
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+
+.app-sidebar-toggle:hover,
+.app-side-action-button:hover,
+.context-sidebar-head .linear-icon-button:hover {
+  background: color-mix(in srgb, hsl(var(--foreground)) 6%, transparent);
+  color: hsl(var(--foreground));
+}
+
+.app-side-action-button svg,
+.context-sidebar-head .linear-icon-button svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  stroke-width: 1.7;
+}
+
+.workspace-content.app-workspace-content {
+  min-height: calc(100dvh - var(--app-header-height));
+  gap: var(--app-final-section-gap);
+  padding:
+    var(--app-final-content-padding-block)
+    var(--app-final-content-padding-inline)
+    calc(var(--app-final-content-padding-block) * 2);
+  background: hsl(var(--background));
+  background-image: none;
+}
+
+.app-workspace-page-header {
+  margin: 0;
+  padding: 0 0 0.75rem;
+  border: 0;
+}
+
+.app-workspace-breadcrumb {
+  margin-block-end: 0.375rem;
+  color: color-mix(in srgb, hsl(var(--muted-foreground)) 82%, transparent);
+  font-size: 0.625rem;
+}
+
+.app-workspace-title {
+  color: hsl(var(--foreground));
+  font-size: clamp(1.5rem, 1.8vw, 1.875rem);
+  font-weight: 640;
+  letter-spacing: -0.035em;
+}
+
+.app-workspace-description {
+  margin-block-start: 0.375rem;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-final-row-copy-size);
+}
+
+.app-workspace-meta-pill,
+.app-list-row-tag {
+  min-height: 1.375rem;
+  border-color: var(--app-final-control-border);
+  background: color-mix(in srgb, hsl(var(--muted)) 38%, transparent);
+  color: hsl(var(--muted-foreground));
+}
+
+.app-command-panel,
+.app-page-toolbar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-command-row {
+  gap: 0.5rem;
+  margin-block-end: 0.625rem;
+}
+
+.app-command-panel .app-command-input,
+.app-page-toolbar .ui-field,
+.app-workspace-content [role='combobox'],
+.app-workspace-content .ui-field {
+  min-height: var(--app-final-control-height);
+  height: var(--app-final-control-height);
+  border-color: var(--app-final-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--app-final-control-surface);
+  color: hsl(var(--foreground));
+  font-size: var(--app-final-control-font-size);
+  box-shadow: none;
+}
+
+.app-command-row > .flex:last-child > :is(button, [role='combobox']),
+.app-command-controls :is(button, [role='combobox']),
+.app-page-toolbar :is(button:not([role='switch']), [role='combobox']),
+.app-repository-controls :is(button, [role='combobox']) {
+  height: var(--app-final-control-height);
+  min-height: var(--app-final-control-height);
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--app-final-control-font-size);
+  box-shadow: none;
+}
+
+.app-workspace-content :is(.ui-button, .ui-button-primary, .ui-button-secondary) {
+  box-shadow: none;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip) {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding-inline: 0.625rem;
+  border-color: var(--app-final-control-border);
+  background: color-mix(in srgb, hsl(var(--card)) 66%, transparent);
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  font-weight: 550;
+  box-shadow: none;
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip):hover {
+  border-color: color-mix(in srgb, hsl(var(--border-strong)) 54%, hsl(var(--border)));
+  background: var(--app-final-control-hover);
+  color: hsl(var(--foreground));
+}
+
+.app-command-panel :is(.linear-filter-toggle, .linear-filter-chip).is-active {
+  border-color: color-mix(in srgb, hsl(var(--primary)) 28%, var(--app-final-control-border));
+  background: color-mix(in srgb, hsl(var(--primary)) 9%, transparent);
+  color: hsl(var(--primary-emphasis, var(--primary)));
+}
+
+.app-command-filter-panel {
+  margin-block: 0.75rem 0;
+  padding: 1rem;
+  border: var(--app-border-width) solid var(--app-final-control-border);
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, hsl(var(--muted)) 26%, hsl(var(--background)) 74%);
+  box-shadow: none;
+}
+
+.app-repository-controls {
+  min-height: var(--app-final-control-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-context-row-copy {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+
+.app-segmented-control {
+  height: var(--app-final-control-height);
+  padding: 0.1875rem;
+  border: var(--app-border-width) solid var(--app-final-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, hsl(var(--muted)) 42%, transparent);
+}
+
+.app-segmented-control > button {
+  width: 1.75rem;
+  height: 1.625rem;
+  min-height: 1.625rem;
+  border-radius: var(--ui-radius-xs);
+  box-shadow: none;
+}
+
+.app-segmented-control > button[aria-pressed='true'] {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: none;
+}
+
+.repository-card.ui-card {
+  padding: 0.9375rem;
+  border-color: color-mix(in srgb, hsl(var(--border)) 62%, transparent);
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, hsl(var(--card)) 84%, hsl(var(--background)) 16%);
+  box-shadow: none;
+}
+
+.repository-card.ui-card:hover {
+  border-color: color-mix(in srgb, hsl(var(--border-strong)) 58%, hsl(var(--border)));
+  background: color-mix(in srgb, hsl(var(--card)) 88%, hsl(var(--background)) 12%);
+  box-shadow: none;
+  transform: none;
+}
+
+.repository-card .app-repository-card-header {
+  gap: 0.625rem;
+  margin-block-end: 0;
+}
+
+.repository-card .app-repository-card-avatar {
+  width: 1.875rem;
+  height: 1.875rem;
+}
+
+.repository-card .app-repository-card-title {
+  color: hsl(var(--foreground));
+  font-size: var(--app-final-card-title-size);
+  font-weight: 620;
+  letter-spacing: -0.02em;
+}
+
+.repository-card .app-repository-card-owner,
+.repository-card .app-repository-card-meta,
+.repository-card .app-repository-card-footer {
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-final-card-meta-size);
+}
+
+.repository-card .app-repository-card-copy {
+  margin-block: 0.75rem 0.625rem;
+}
+
+.repository-card .app-repository-card-description {
+  color: color-mix(in srgb, hsl(var(--foreground)) 74%, hsl(var(--muted-foreground)) 26%);
+  font-size: var(--app-final-card-copy-size);
+  line-height: 1.55;
+}
+
+.repository-card .app-repository-card-tags {
+  gap: 0.3125rem;
+}
+
+.repository-card .app-repository-card-tag {
+  min-height: 1.25rem;
+  padding-inline: 0.4375rem;
+  border-color: transparent;
+  border-radius: var(--ui-radius-xs);
+  background: color-mix(in srgb, hsl(var(--muted)) 68%, transparent);
+  color: hsl(var(--muted-foreground));
+  font-size: 0.6875rem;
+}
+
+.repository-card .app-repository-card-platforms {
+  margin-block-start: 0.625rem;
+}
+
+.repository-card .app-repository-actions {
+  margin-block: 0.625rem 0;
+  gap: 0.125rem;
+}
+
+.repository-card .app-repository-actions :is(button, a) {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-color: transparent;
+  border-radius: var(--ui-radius-xs);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+
+.repository-card .app-repository-actions :is(button, a):hover {
+  background: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
+  color: hsl(var(--foreground));
+}
+
+.repository-card .app-repository-card-footer {
+  margin-block-start: 0.75rem;
+  padding-block-start: 0.625rem;
+  border-color: color-mix(in srgb, hsl(var(--border)) 54%, transparent);
+}
+
+.app-repository-grid {
+  gap: 0.75rem;
+}
+
+.app-repository-list,
+.app-flat-list,
+.app-fork-list {
+  overflow: hidden;
+  border: var(--app-border-width) solid color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, hsl(var(--card)) 72%, hsl(var(--background)) 28%);
+  box-shadow: none;
+}
+
+.app-repository-list > .ui-card,
+.app-flat-list > .ui-card,
+.app-flat-list > div > .ui-card,
+.app-fork-list > .ui-card {
+  border: 0;
+  border-bottom: var(--app-border-width) solid
+    color-mix(in srgb, hsl(var(--border)) 46%, transparent);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-repository-list > .ui-card:last-child,
+.app-flat-list > .ui-card:last-child,
+.app-flat-list > div:last-child > .ui-card,
+.app-fork-list > .ui-card:last-child {
+  border-bottom: 0;
+}
+
+.app-repository-list > .ui-card:hover,
+.app-flat-list > .ui-card:hover,
+.app-flat-list > div > .ui-card:hover,
+.app-fork-list > .ui-card:hover {
+  background: color-mix(in srgb, hsl(var(--foreground)) 3.5%, transparent);
+}
+
+.app-release-search-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-release-search-field {
+  width: min(100%, var(--app-final-release-search-width));
+  max-width: var(--app-final-release-search-width);
+  flex: 0 1 var(--app-final-release-search-width);
+}
+
+.app-release-toolbar-controls {
+  margin-inline-start: auto;
+}
+
+.app-release-option {
+  height: var(--app-final-control-height);
+  min-height: var(--app-final-control-height);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+
+.app-release-view-select {
+  width: 9.5rem;
+  flex: none;
+  margin-inline-start: 0;
+}
+
+.app-empty-state {
+  gap: 0.75rem;
+  padding: 2.75rem 1.5rem;
+  border: var(--app-border-width) solid var(--app-final-empty-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--app-final-empty-surface);
+  box-shadow: none;
+}
+
+.app-empty-visual {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: var(--app-border-width) solid color-mix(in srgb, hsl(var(--border)) 58%, transparent);
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
+  color: hsl(var(--muted-foreground));
+}
+
+.app-empty-title {
+  font-size: 0.9375rem;
+  font-weight: 620;
+}
+
+.app-empty-description,
+.app-empty-note {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.app-empty-steps {
+  width: min(100%, 34rem);
+  gap: 0;
+  border-block: var(--app-border-width) solid
+    color-mix(in srgb, hsl(var(--border)) 48%, transparent);
+}
+
+.app-empty-step {
+  padding: 0.5rem 0;
+  border: 0;
+  background: transparent;
+}
+
+.app-settings-content-panel {
+  width: 100%;
+  max-width: var(--app-final-settings-max-width);
+  margin-inline: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel [data-settings-sections] > :is(.space-y-4, .space-y-5, .space-y-6) {
+  overflow: hidden;
+  border: var(--app-border-width) solid var(--app-final-settings-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--app-final-settings-surface);
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > * {
+  margin-block-start: 0;
+  padding:
+    var(--app-final-settings-padding-block)
+    var(--app-final-settings-padding-inline);
+  border: 0;
+  border-top: var(--app-border-width) solid var(--app-final-settings-row-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :first-child {
+  border-top: 0;
+}
+
+.app-settings-content-panel [data-settings-sections] * {
+  box-shadow: none;
+}
+
+.app-settings-content-panel [data-settings-sections] :is(input, textarea, [role='combobox']) {
+  min-height: 2.125rem;
+  border-color: var(--app-final-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--app-final-control-surface);
+  font-size: var(--app-final-control-font-size);
+}
+
+.app-settings-content-panel [data-settings-sections] :is(button, .ui-button, .ui-button-primary) {
+  min-height: 2.125rem;
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--app-final-control-font-size);
+}
+
+.app-settings-category-glyph {
+  width: 1rem;
+  height: 1rem;
+  flex: none;
+  color: hsl(var(--muted-foreground));
+}
+
+.app-dialog-overlay {
+  background: hsl(var(--overlay) / 0.3);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.app-dialog-content {
+  gap: var(--app-final-dialog-gap);
+  padding: var(--app-final-dialog-padding);
+  border: var(--app-border-width) solid var(--app-final-floating-border);
+  border-radius: var(--ui-radius-lg);
+  background: var(--app-final-floating-surface);
+  box-shadow: var(--app-final-floating-shadow);
+}
+
+.app-dialog-header {
+  padding-block-end: 0.75rem;
+  border-bottom: var(--app-border-width) solid var(--app-final-settings-row-border);
+}
+
+.app-dialog-title {
+  color: hsl(var(--foreground));
+  font-size: 1.0625rem;
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.app-dialog-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+
+.app-dialog-content :is(input, textarea, [role='combobox']) {
+  min-height: 2.125rem;
+  border-color: var(--app-final-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--app-final-control-surface);
+  font-size: 0.8125rem;
+  box-shadow: none;
+}
+
+.app-dialog-content :is(input, textarea, [role='combobox']):focus-visible,
+.app-workspace-content :is(input, textarea, [role='combobox']):focus-visible {
+  border-color: hsl(var(--primary));
+  outline: none;
+  box-shadow: var(--app-final-focus-ring);
+}
+
+.app-dialog-content :is(button, .ui-button, .ui-button-primary) {
+  min-height: var(--app-final-control-height);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ui-radius-sm);
+  font-size: var(--app-final-control-font-size);
+  box-shadow: none;
+}
+
+.app-dialog-footer {
+  gap: 0.5rem;
+  padding-block-start: 0.875rem;
+  border-top-color: var(--app-final-settings-row-border);
+}
+
+.app-category-editor-dialog {
+  max-width: 32rem;
+}
+
+.app-category-editor {
+  gap: 1rem;
+}
+
+.app-category-icon-grid {
+  grid-template-columns: repeat(auto-fill, minmax(2.125rem, 1fr));
+  gap: 0.25rem;
+  max-height: 13.5rem;
+  padding: 0.5rem;
+  border: var(--app-border-width) solid var(--app-final-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, hsl(var(--background)) 66%, transparent);
+}
+
+.app-category-icon-option,
+.app-category-icon-option:is(:hover, :focus-visible) {
+  display: inline-grid;
+  width: 2.125rem;
+  height: 2.125rem;
+  min-height: 2.125rem;
+  place-items: center;
+  border: 0;
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+
+.app-category-icon-option:hover {
+  background: color-mix(in srgb, hsl(var(--foreground)) 5%, transparent);
+  color: hsl(var(--foreground));
+}
+
+.app-category-icon-option[aria-pressed='true'] {
+  background: var(--app-final-active-surface);
+  color: var(--app-final-active-icon);
+  box-shadow: inset 0 0 0 1px var(--app-final-control-border);
+}
+
+.app-category-icon-option .app-category-glyph {
+  width: 1rem;
+  height: 1rem;
+}
+
+.app-category-editor-selection {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.app-form-label {
+  color: hsl(var(--foreground));
+  font-size: 0.8125rem;
+  font-weight: 590;
+}
+
+.app-form-hint,
+.app-form-label-meta {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.app-form-notice,
+.app-category-custom-icon {
+  border-color: var(--app-final-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: color-mix(in srgb, hsl(var(--muted)) 24%, transparent);
+}
+
+[role='menu'],
+[role='listbox'] {
+  padding: 0.25rem;
+  border: var(--app-border-width) solid var(--app-final-floating-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--app-final-floating-surface);
+  color: hsl(var(--popover-foreground));
+  box-shadow: var(--app-final-floating-shadow);
+}
+
+[role='menuitem'],
+[role='menuitemradio'],
+[role='option'] {
+  min-height: 2rem;
+  border-radius: var(--ui-radius-xs);
+  color: hsl(var(--popover-foreground));
+  font-size: var(--app-final-control-font-size);
+}
+
+@media (max-width: 1023px) {
+  .context-sidebar,
+  .linear-sidebar {
+    width: 100%;
+    border-inline-end: 0;
+    border-bottom: var(--app-border-width) solid
+      color-mix(in srgb, hsl(var(--border)) 38%, transparent);
+  }
+}
+
+@media (max-width: 900px) {
+  .app-release-search-row {
+    flex-wrap: wrap;
+  }
+
+  .app-release-search-field {
+    width: 100%;
+    max-width: none;
+    flex-basis: 100%;
+  }
+
+  .app-release-toolbar-controls {
+    margin-inline-start: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .workspace-content.app-workspace-content {
+    padding: 1rem;
+  }
+
+  .app-category-icon-grid {
+    grid-template-columns: repeat(auto-fill, minmax(2rem, 1fr));
+  }
+
+  .app-category-editor-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-dialog-actions {
+    margin-inline-start: 0;
+  }
+}
+
+/* Final interaction-density pass. Keep every visual value on the active
+   theme tokens so presets, accent colors and light/dark mode remain intact. */
+:root {
+  --app-control-radio-size: 1rem;
+  --app-control-choice-radius: 999px;
+  --app-switch-width: 1.875rem;
+  --app-switch-height: 1rem;
+  --app-switch-thumb-size: 0.75rem;
+  --app-switch-padding: 0.125rem;
+  --app-sidebar-scrollbar-size: 0.25rem;
+  --app-sidebar-scrollbar-thumb: color-mix(
+    in srgb,
+    hsl(var(--muted-foreground)) 34%,
+    transparent
+  );
+  --app-switch-thumb-on: calc(
+    var(--app-switch-width) - var(--app-switch-thumb-size) -
+      (var(--app-switch-padding) * 2)
+  );
+  --app-content-surface: hsl(var(--card));
+  --app-sidebar-divider: color-mix(in srgb, hsl(var(--border)) 26%, transparent);
+  --app-sidebar-item-color: color-mix(
+    in srgb,
+    hsl(var(--foreground)) 70%,
+    hsl(var(--muted-foreground)) 30%
+  );
+  --app-settings-title-height: 3rem;
+  --app-settings-block-gap: 1rem;
+  --app-settings-block-padding: 1rem;
+  --app-repository-card-min-height: 0;
+  --app-repository-action-offset: 0.75rem;
+  --app-repository-footer-divider: color-mix(
+    in srgb,
+    hsl(var(--border)) 30%,
+    transparent
+  );
+  --app-unread-marker-slot-size: 0.875rem;
+  --app-unread-marker-size: 0.375rem;
+  --app-unread-marker-color: hsl(var(--primary));
+  --app-list-footer-size: 0.6875rem;
+  --app-dialog-fullscreen-width: 100%;
+  --app-dialog-fullscreen-height: 100dvh;
+  --app-dialog-fullscreen-radius: 0;
+}
+
+.linear-header,
+.linear-header-inner {
+  height: var(--app-header-height);
+}
+
+.linear-header-inner,
+.app-header-nav,
+.app-header-actions {
+  align-items: center;
+}
+
+.app-header-nav button {
+  height: var(--app-native-control-height);
+  min-height: var(--app-native-control-height);
+}
+
+.app-header-nav button[data-ui-variant='secondary'],
+.app-header-nav button[aria-pressed='true'] {
+  border-color: transparent;
+  background: var(--app-native-item-active);
+  color: var(--app-native-item-active-text);
+  box-shadow: none;
+}
+
+.context-sidebar,
+.linear-sidebar {
+  border-inline-end-color: var(--app-sidebar-divider);
+}
+
+.app-side-item,
+.context-sidebar [role='tab'],
+.linear-settings-nav-item {
+  border-radius: var(--ui-radius-sm);
+  color: var(--app-sidebar-item-color);
+  font-size: var(--app-final-sidebar-item-size);
+  font-weight: 500;
+}
+
+.app-side-item[aria-pressed='true'],
+.context-sidebar [role='tab'][aria-selected='true'],
+.linear-settings-nav-item.is-active {
+  border-color: transparent;
+  background: var(--app-final-active-surface);
+  color: hsl(var(--foreground));
+  font-weight: 550;
+  box-shadow: none;
+}
+
+.workspace-content.app-workspace-content {
+  background: var(--app-content-surface);
+  background-image: none;
+}
+
+.app-command-filter-panel {
+  margin-block: var(--app-settings-block-gap) var(--app-settings-block-gap);
+  padding: var(--app-settings-block-padding);
+  border: var(--app-border-width) solid var(--app-native-filter-panel-border);
+  border-radius: var(--ui-radius-md);
+  background: color-mix(in srgb, hsl(var(--muted)) 22%, var(--app-content-surface) 78%);
+  box-shadow: none;
+}
+
+.app-compact-radio-group {
+  min-height: var(--app-native-control-height);
+}
+
+.app-compact-radio-group label {
+  min-height: var(--app-native-control-height);
+  line-height: 1;
+}
+
+button.ui-radio,
+button.ui-checkbox {
+  width: var(--app-control-radio-size) !important;
+  min-width: var(--app-control-radio-size) !important;
+  max-width: var(--app-control-radio-size) !important;
+  height: var(--app-control-radio-size) !important;
+  min-height: var(--app-control-radio-size) !important;
+  max-height: var(--app-control-radio-size) !important;
+  flex: 0 0 var(--app-control-radio-size);
+  padding: 0;
+}
+
+button.ui-radio {
+  border-radius: var(--app-control-choice-radius) !important;
+}
+
+button.ui-checkbox {
+  border-radius: var(--ui-radius-xs) !important;
+}
+
+button.ui-switch {
+  box-sizing: border-box;
+  width: var(--app-switch-width) !important;
+  min-width: var(--app-switch-width) !important;
+  max-width: var(--app-switch-width) !important;
+  height: var(--app-switch-height) !important;
+  min-height: var(--app-switch-height) !important;
+  max-height: var(--app-switch-height) !important;
+  flex: 0 0 var(--app-switch-width);
+  padding: var(--app-switch-padding);
+  border: 0;
+  background: var(--app-native-switch-off-surface);
+  box-shadow: none;
+}
+
+button.ui-switch[data-state='checked'] {
+  background: var(--app-native-switch-on-surface);
+}
+
+button.ui-switch > span {
+  width: var(--app-switch-thumb-size);
+  height: var(--app-switch-thumb-size);
+  flex: 0 0 var(--app-switch-thumb-size);
+  border-radius: var(--app-control-choice-radius);
+  background: var(--app-native-switch-thumb-surface);
+  box-shadow: none;
+  transform: translateX(0);
+}
+
+button.ui-switch[data-state='checked'] > span {
+  transform: translateX(var(--app-switch-thumb-on));
+}
+
+.app-settings-content-panel [data-settings-sections] :is(
+    button.ui-radio,
+    button.ui-checkbox,
+    button.ui-switch
+  ),
+.app-dialog-content :is(button.ui-radio, button.ui-checkbox, button.ui-switch),
+.app-workspace-content :is(button.ui-radio, button.ui-checkbox, button.ui-switch) {
+  font-size: inherit;
+}
+
+.app-page-toolbar [data-ui-variant='default'],
+.app-command-row [data-ui-variant='default'],
+.app-dialog-footer [data-ui-variant='default'],
+.app-workspace-content .ui-button-primary {
+  border-color: transparent;
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: none;
+}
+
+.app-page-toolbar [data-ui-variant='default']:hover,
+.app-command-row [data-ui-variant='default']:hover,
+.app-dialog-footer [data-ui-variant='default']:hover {
+  background-color: hsl(var(--primary) / 0.9);
+}
+
+.app-page-toolbar .app-sync-action {
+  border-color: color-mix(in srgb, hsl(var(--primary)) 30%, var(--app-native-control-border));
+  background: color-mix(in srgb, hsl(var(--primary)) 8%, var(--app-native-control-surface));
+  color: hsl(var(--primary-emphasis, var(--primary)));
+}
+
+.app-page-toolbar .app-sync-action:hover {
+  border-color: color-mix(in srgb, hsl(var(--primary)) 44%, var(--app-native-control-border));
+  background: color-mix(in srgb, hsl(var(--primary)) 12%, var(--app-native-control-surface));
+  color: hsl(var(--primary-emphasis, var(--primary)));
+}
+
+.app-release-toolbar-controls {
+  margin-inline-start: auto;
+}
+
+.app-release-option {
+  gap: 0.5rem;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-final-control-font-size);
+}
+
+.app-release-view-select {
+  width: 10rem;
+  flex: none;
+}
+
+.app-empty-state {
+  padding: 2.5rem var(--app-settings-block-padding);
+  border: var(--app-border-width) solid var(--app-native-empty-border);
+  border-radius: var(--ui-radius-lg);
+  background: color-mix(in srgb, hsl(var(--muted)) 18%, var(--app-content-surface) 82%);
+  box-shadow: none;
+}
+
+.app-empty-visual {
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: var(--ui-radius-md);
+  background: var(--app-final-active-surface);
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+
+.app-empty-step {
+  display: flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: var(--app-border-width) solid var(--app-native-empty-border);
+  border-radius: var(--ui-radius-sm);
+  background: transparent;
+}
+
+.repository-card.ui-card {
+  background: color-mix(in srgb, hsl(var(--card)) 94%, hsl(var(--background)) 6%);
+}
+
+.app-repository-grid > .repository-card {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--app-repository-card-min-height);
+}
+
+.app-repository-grid .app-repository-actions {
+  margin-block: var(--app-repository-action-offset) 0;
+  padding-block-start: 0;
+}
+
+.app-repository-grid .app-repository-card-stats {
+  margin-block-start: auto;
+}
+
+.app-repository-grid .app-repository-card-meta {
+  margin-block-start: 0;
+}
+
+.app-repository-grid .app-repository-card-footer {
+  margin-block-start: var(--app-repository-action-offset);
+  padding-block-start: 0.625rem;
+  border-color: var(--app-repository-footer-divider);
+}
+
+.app-unread-marker-slot {
+  display: inline-flex;
+  width: var(--app-unread-marker-slot-size);
+  height: var(--app-unread-marker-slot-size);
+  flex: 0 0 var(--app-unread-marker-slot-size);
+  align-items: center;
+  justify-content: center;
+}
+
+.app-unread-marker {
+  width: var(--app-unread-marker-size);
+  height: var(--app-unread-marker-size);
+  border-radius: var(--app-control-choice-radius);
+  background: var(--app-unread-marker-color);
+}
+
+.app-dialog-content.app-dialog-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: var(--app-dialog-fullscreen-width);
+  max-width: var(--app-dialog-fullscreen-width);
+  height: var(--app-dialog-fullscreen-height);
+  max-height: var(--app-dialog-fullscreen-height);
+  margin: 0;
+  padding: 0;
+  transform: none;
+  translate: none;
+  border: 0;
+  border-radius: var(--app-dialog-fullscreen-radius);
+  overflow: hidden;
+}
+
+.repository-card--list {
+  padding: var(--app-native-list-padding-block) var(--app-native-list-padding-inline) !important;
+}
+
+.repository-card--list .app-repository-card-header {
+  align-items: center;
+  margin-block-end: 0.375rem;
+}
+
+.repository-card--list .app-repository-card-header > .ml-auto {
+  flex: 0 1 auto !important;
+  align-items: center !important;
+}
+
+.repository-card--list .app-repository-actions {
+  flex: 0 1 auto !important;
+  justify-content: flex-end !important;
+}
+
+.repository-card--list .app-repository-card-description {
+  margin-block-end: 0.5rem;
+}
+
+.repository-card--list .app-repository-card-tags {
+  justify-content: flex-start;
+}
+
+.app-repository-list-stats {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-block-start: 0.625rem;
+}
+
+.app-repository-list-stats .app-repository-card-meta {
+  min-width: 0;
+}
+
+.app-repository-list-time {
+  margin-inline-start: auto;
+}
+
+.app-repository-list-time .app-repository-card-footer {
+  width: auto !important;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: var(--app-list-footer-size);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.app-repository-list-time .app-repository-card-footer svg {
+  width: var(--app-icon-size);
+  height: var(--app-icon-size);
+}
+
+.app-gist-list .app-list-row-title,
+.app-discovery-list .app-list-row-title,
+.app-repository-list .app-repository-card-title {
+  font-size: var(--app-row-title-size);
+  font-weight: 610;
+}
+
+.app-gist-list .app-list-row-description,
+.app-discovery-list .app-list-row-description,
+.app-repository-list .app-repository-card-description {
+  font-size: var(--app-row-copy-size);
+  line-height: 1.5;
+}
+
+.app-gist-toolbar {
+  margin-block-end: var(--app-settings-block-gap);
+}
+
+.app-settings-content-panel {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6) {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > * {
+  margin-block-start: 0 !important;
+  padding: var(--app-settings-block-padding) 0 !important;
+  border: 0 !important;
+  border-bottom: var(--app-border-width) solid var(--app-native-settings-row-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :first-child:not(.bg-card):not(.shadow-sm),
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :last-child {
+  border-bottom: 0 !important;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :first-child:not(.bg-card):not(.shadow-sm) {
+  display: flex;
+  min-height: var(--app-settings-title-height);
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0 0.75rem !important;
+  border-bottom: var(--app-border-width) solid var(--app-native-settings-row-border) !important;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :first-child:not(.bg-card):not(.shadow-sm)
+  > * {
+  margin-block: 0 !important;
+}
+
+.app-settings-content-panel [data-settings-sections] :is(h3, .text-lg) {
+  font-size: 0.9375rem;
+  font-weight: 620;
+  letter-spacing: -0.008em;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > .bg-card
+  > * {
+  padding-inline: 0;
+}
+
+.app-settings-content-panel
+  [data-settings-sections]
+  > :is(.space-y-4, .space-y-5, .space-y-6)
+  > :is(.bg-card.rounded-xl.border, .bg-card.rounded-lg.border) {
+  border-width: 0 0 var(--app-border-width) !important;
+  border-color: var(--app-native-settings-row-border) !important;
+}
+
+.app-settings-content-panel [data-settings-sections] :is(
+    .rounded-xl.border,
+    .rounded-lg.border,
+    .shadow-sm
+  ) {
+  box-shadow: none;
+}
+
+@media (max-width: 767px) {
+  .app-settings-content-panel
+    [data-settings-sections]
+    > :is(.space-y-4, .space-y-5, .space-y-6)
+    > :first-child {
+    min-height: auto;
+  }
+
+  .app-repository-list-time {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+}
+
+/* Final UI walkthrough contract. Keep layout and control fixes here token-driven
+   so theme presets, accent colors, light/dark mode and Docker builds stay aligned. */
+:root {
+  --app-repository-card-min-width: 18rem;
+  --app-repository-display-gap: 1rem;
+  --app-repository-platform-gap: 0.5rem;
+  --app-segmented-height: 2rem;
+  --app-segmented-padding: 0.125rem;
+  --app-segmented-gap: 0.125rem;
+  --app-segmented-item-width: 1.75rem;
+  --app-segmented-item-height: 1.5rem;
+  --app-star-range-input-height: 2rem;
+  --app-diagnostic-dialog-width: 3rem;
+  --app-diagnostic-card-gap: 0.75rem;
+  --app-release-source-gap: 0.75rem;
+  --app-platform-menu-gap: 0.5rem;
+  --app-fork-toolbar-gap: 1rem;
+}
+
+.app-dialog-content.app-dialog-fullscreen > * {
+  min-width: 0;
+}
+
+button.ui-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  padding: var(--app-switch-padding) !important;
+  vertical-align: middle;
+}
+
+button.ui-switch .ui-switch-thumb {
+  display: block;
+  flex: 0 0 var(--app-switch-thumb-size);
+  width: var(--app-switch-thumb-size);
+  height: var(--app-switch-thumb-size);
+  border-radius: var(--app-control-choice-radius);
+  background: var(--app-native-switch-thumb-surface);
+  box-shadow: none;
+  transform: translateX(0);
+  transition: transform var(--app-motion-fast) ease;
+}
+
+button.ui-switch[data-state='checked'] .ui-switch-thumb {
+  transform: translateX(var(--app-switch-thumb-on));
+}
+
+button.ui-checkbox,
+button.ui-radio {
+  box-sizing: border-box;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+}
+
+button.ui-checkbox > span,
+button.ui-radio > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+button.ui-checkbox > span svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+button.ui-radio > span svg {
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.app-repository-display-row {
+  min-height: var(--app-native-control-height);
+  margin-block-end: 0;
+}
+
+.app-repository-controls {
+  margin-block-end: var(--app-repository-display-gap) !important;
+}
+
+.app-repository-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--app-repository-card-min-width), 1fr)
+  );
+  align-items: stretch;
+  gap: var(--app-card-gap);
+}
+
+.app-repository-grid .app-repository-card-platforms {
+  margin-block-start: var(--app-repository-platform-gap);
+  margin-block-end: var(--app-repository-platform-gap);
+}
+
+.app-repository-grid .app-repository-card-footer {
+  margin-block-start: var(--app-repository-action-offset);
+  padding-block-start: 0.625rem;
+  border-color: var(--app-repository-footer-divider);
+}
+
+.repository-card--list .app-repository-select-toggle {
+  position: absolute;
+  right: var(--app-card-padding);
+  bottom: var(--app-native-list-padding-block);
+}
+
+.repository-card--list .app-repository-actions {
+  margin-block: 0 !important;
+}
+
+.repository-card .app-repository-card-footer.ui-divider {
+  border-color: var(--app-repository-footer-divider) !important;
+}
+
+.app-segmented-control {
+  display: inline-flex;
+  height: var(--app-segmented-height);
+  min-height: var(--app-segmented-height);
+  align-items: center;
+  gap: var(--app-segmented-gap);
+  overflow: hidden;
+  padding: var(--app-segmented-padding);
+  border: var(--app-border-width) solid var(--app-native-control-border);
+  border-radius: var(--ui-radius-sm);
+  background: var(--app-native-control-surface);
+}
+
+.app-segmented-control > .app-segmented-control-item {
+  display: inline-flex;
+  width: var(--app-segmented-item-width);
+  height: var(--app-segmented-item-height);
+  min-height: var(--app-segmented-item-height);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-xs);
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  box-shadow: none;
+}
+
+.app-segmented-control > .app-segmented-control-item:hover {
+  background: var(--app-native-control-hover-surface);
+  color: hsl(var(--foreground));
+}
+
+.app-segmented-control > .app-segmented-control-item[aria-pressed='true'] {
+  background: var(--app-native-item-active);
+  color: var(--app-native-item-active-text);
+  box-shadow: none;
+}
+
+.app-star-range-input {
+  height: var(--app-star-range-input-height) !important;
+  min-height: var(--app-star-range-input-height) !important;
+  padding-block: 0 !important;
+}
+
+.app-repository-secondary-action {
+  color: hsl(var(--primary-emphasis, var(--primary))) !important;
+  font-weight: 400 !important;
+}
+
+.app-repository-secondary-action:hover {
+  color: hsl(var(--primary-emphasis, var(--primary))) !important;
+}
+
+.app-diagnostic-dialog-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.app-diagnostic-detail-dialog > .app-dialog-close {
+  top: var(--app-dialog-padding) !important;
+  right: var(--app-dialog-padding) !important;
+}
+
+.app-diagnostic-panel,
+.app-diagnostic-section,
+.app-diagnostic-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.app-settings-content-panel [data-settings-sections] .app-diagnostic-section {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  margin: 0 !important;
+  padding: 0 0 var(--app-settings-block-padding) !important;
+}
+
+.app-diagnostic-section-title {
+  width: 100%;
+  margin-block-end: var(--app-diagnostic-card-gap);
+}
+
+.app-diagnostic-row {
+  min-width: 0;
+  gap: var(--app-diagnostic-card-gap);
+}
+
+.app-release-source-row {
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  text-align: left !important;
+}
+
+.app-release-source-main {
+  min-width: 0;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.app-release-source-control {
+  align-items: center !important;
+  justify-content: flex-end !important;
+  margin-inline-start: auto;
+}
+
+.app-platform-menu-item {
+  gap: var(--app-platform-menu-gap);
+}
+
+.app-platform-menu-item > svg {
+  flex: 0 0 auto;
+}
+
+.app-platform-menu-item > span {
+  min-width: 0;
+}
+
+.app-fork-branch-select {
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.app-fork-search {
+  margin-block-end: var(--app-fork-toolbar-gap) !important;
+}
+
+@media (min-width: 1024px) {
+  .app-category-sidebar-shell {
+    position: sticky;
+    top: var(--app-header-offset);
+    height: var(--app-sidebar-min-height);
+    max-height: var(--app-sidebar-min-height);
+    align-self: flex-start;
+  }
+
+  .app-category-sidebar-shell > .linear-sidebar {
+    display: flex;
+    height: 100%;
+    max-height: 100%;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .app-category-sidebar-shell .context-sidebar-body {
+    overflow-y: auto;
+  }
+}
+
+.app-workspace-content .app-release-toolbar {
+  margin-block-end: var(--app-release-toolbar-gap) !important;
+}
+
+.app-release-search-field {
+  display: flex;
+  height: var(--app-final-control-height);
+  align-items: center;
+}
+
+.app-workspace-content .app-release-search-field .ui-field {
+  height: var(--app-final-control-height);
+  min-height: var(--app-final-control-height);
+}
+
+.app-discovery-time-filter,
+.app-discovery-time-select-value {
+  display: flex;
+  align-items: center;
+}
+
+.app-discovery-time-select {
+  justify-content: flex-start !important;
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-discovery-time-select-value {
+  min-width: 0;
+  gap: var(--app-native-toolbar-gap);
+}
+
+.app-discovery-time-select-value > svg {
+  flex: 0 0 auto;
+}
+
+.app-discovery-time-select > svg:last-child {
+  margin-inline-start: auto;
+}
+
+@media (max-width: 639px) {
+  .app-repository-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .app-readme-body {
+    position: relative;
+  }
+
+  .app-readme-toc {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 20;
+    width: min(18rem, 82vw) !important;
+    max-width: 82vw;
+    background: hsl(var(--card));
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  .app-readme-resize-handle {
+    display: none;
+  }
+
+  .app-readme-content {
+    width: 100%;
+    padding: var(--app-settings-block-padding);
   }
 }
