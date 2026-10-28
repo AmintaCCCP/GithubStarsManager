@@ -82,12 +82,6 @@ export const GistView: React.FC = () => {
     (gist) => !!gist.analyzed_at && !gist.analysis_failed,
   ).length;
   const needsAnalysisGistCount = currentCategoryItems.length - analyzedGistCount;
-  // 当前文本筛选范围内（不套分析状态）的条目数：区分「范围内确实为空」与
-  // 「仅分析状态筛掉了全部条目」，后者需要专属空状态文案
-  const textScopedGistCount = useMemo(
-    () => filterAndSortGists(currentCategoryItems, { ...gistSearchFilters, isAnalyzed: undefined }).length,
-    [currentCategoryItems, gistSearchFilters],
-  );
   const aiSearchSnapshotRef = useRef<{
     query: string;
     category: GistCategoryId;
@@ -407,8 +401,8 @@ export const GistView: React.FC = () => {
           </div>
         ) : (
           <div className="ui-empty-state p-12 text-center">
-            {gistSearchFilters.isAnalyzed !== undefined && textScopedGistCount > 0
-              ? t('gistView.no-gists-match-the-current-analysis-status-filter')
+            {currentCategoryItems.length > 0
+              ? t('gistView.no-gists-match-the-current-filters')
               : t('gistView.no-gists-yet-sync-to-fetch-data-or-create-a-new')}
           </div>
         )}

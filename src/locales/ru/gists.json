@@ -65,7 +65,7 @@
     "v1-gists": "Всего {{v1}} сути",
     "search-applied": "Поиск применен",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Сути пока нет. Нажмите «Синхронизировать», чтобы получить данные, или создайте новый список.",
-    "no-gists-match-the-current-analysis-status-filter": "Сути, соответствующие текущему фильтру статуса анализа, отсутствуют.",
+    "no-gists-match-the-current-filters": "Сути, соответствующие текущим фильтрам, отсутствуют.",
     "sort-updated": "по времени обновления",
     "sort-created": "по времени создания",
     "sort-name": "по имени",

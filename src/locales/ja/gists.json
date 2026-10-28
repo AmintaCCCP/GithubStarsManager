@@ -65,7 +65,7 @@
     "v1-gists": "合計 {{v1}} 件の要旨",
     "search-applied": "検索が適用されました",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "まだ要点はありません。 「同期」をクリックしてデータを取得するか、新しい要点を作成します。",
-    "no-gists-match-the-current-analysis-status-filter": "現在の分析状態のフィルターに一致する要点はありません。",
+    "no-gists-match-the-current-filters": "現在のフィルターに一致する要点はありません。",
     "sort-updated": "更新時間までに",
     "sort-created": "作成時間までに",
     "sort-name": "名前で",

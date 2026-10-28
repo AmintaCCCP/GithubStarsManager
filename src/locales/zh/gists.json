@@ -66,7 +66,7 @@
     "v1-gists": "共 {{v1}} 个 gist",
     "search-applied": "已应用搜索",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "暂无 gist。点击同步获取数据，或新建一个 gist。",
-    "no-gists-match-the-current-analysis-status-filter": "没有符合当前分析状态的 gist。",
+    "no-gists-match-the-current-filters": "没有符合当前筛选条件的 gist。",
     "sort-updated": "按更新时间",
     "sort-created": "按创建时间",
     "sort-name": "按名称",

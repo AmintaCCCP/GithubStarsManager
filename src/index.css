@@ -5530,6 +5530,8 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 自定义图标允许保存多字符文本：裁剪在固定宽度图标槽内，避免压到分类名 */
+  overflow: hidden;
   font-size: var(--app-final-sidebar-icon-size);
   line-height: 1;
 }
