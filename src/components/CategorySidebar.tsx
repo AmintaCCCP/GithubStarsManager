@@ -18,6 +18,7 @@ import { useRepositoryDragStore } from '../store/useRepositoryDragStore';
 import { useShallow } from 'zustand/react/shallow';
 import { CategoryEditModal } from './CategoryEditModal';
 import { useCategorySyncActions } from '../features/repositories/hooks/useCategorySyncActions';
+import { cancelActiveAiSearch } from '../features/repositories/hooks/useSearchActions';
 import { getAICategory, getDefaultCategory, computeCustomCategory, matchesCategory } from '../utils/categoryUtils';
 import { useDialog } from '../hooks/useDialog';
 import { CategoryGlyph } from './CategoryGlyph';
@@ -77,6 +78,23 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  // 分类同步进行中/失败时，footer 不显示「已同步」：lastSync 只反映星标同步，
+  // 分类变更是否落库需要单独跟踪，避免同步失败后状态文案失真
+  const [isSyncingCategories, setIsSyncingCategories] = useState(false);
+  const [hasCategorySyncFailure, setHasCategorySyncFailure] = useState(false);
+
+  const syncCategories = async () => {
+    setIsSyncingCategories(true);
+    try {
+      await forceSyncToBackend({ reportFailures: true });
+      setHasCategorySyncFailure(false);
+    } catch (error) {
+      setHasCategorySyncFailure(true);
+      throw error;
+    } finally {
+      setIsSyncingCategories(false);
+    }
+  };
   const [dragOverCategoryId, setDragOverCategoryId] = useState<string | null>(null);
   // 用于防止拖拽后触发点击的标志
   const justDroppedRef = useRef(false);
@@ -199,7 +217,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     deleteCustomCategory(category.id);
     try {
-      await forceSyncToBackend();
+      await syncCategories();
     } catch {
       toast(t('categorySidebar.failed-to-delete-category-please-check-backend-c'), 'error');
     }
@@ -216,7 +234,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
 
     hideDefaultCategory(category.id);
     try {
-      await forceSyncToBackend();
+      await syncCategories();
     } catch {
       showDefaultCategory(category.id);
       toast(t('categorySidebar.failed-to-hide-category-please-check-backend-con'), 'error');
@@ -282,7 +300,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
       updateRepository(nextRepo);
 
       try {
-        await forceSyncToBackend();
+        await syncCategories();
       } catch {
         handleSyncError(originalRepo);
       }
@@ -308,7 +326,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
     updateRepository(nextRepo);
 
     try {
-      await forceSyncToBackend();
+      await syncCategories();
     } catch {
       handleSyncError(originalRepo);
     }
@@ -328,6 +346,9 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
   };
 
   const handleQuickAccess = (mode: 'all' | 'subscribed' | 'needs-review') => {
+    // 快速访问会清空搜索条件：先中止在途 AI 搜索，
+    // 防止旧搜索完成后写回过期结果并恢复旧查询词
+    cancelActiveAiSearch();
     const resetFilters = {
       query: '',
       tags: [],
@@ -709,7 +730,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               </section>
             </ContextSidebarBody>
             <div className="context-sidebar-foot">
-              {lastSync && !isSyncingStars && (
+              {lastSync && !isSyncingStars && !isSyncingCategories && !hasCategorySyncFailure && (
                 <div className="app-side-foot-status">
                   <span className="app-status-dot" aria-hidden="true" />
                   <span>{t('categorySidebar.synced')}</span>
@@ -717,7 +738,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
               )}
               <div className="app-side-foot-meta">
                 <span>{t('categorySidebar.repository-count', { count: repositories.length })}</span>
-                {lastSync && !isSyncingStars && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                {lastSync && !isSyncingStars && !isSyncingCategories && !hasCategorySyncFailure && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
               </div>
             </div>
           </div>

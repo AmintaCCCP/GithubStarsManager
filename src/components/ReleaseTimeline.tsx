@@ -376,6 +376,12 @@ export const ReleaseTimeline: React.FC = () => {
     }
     return Array.from(repoMap.values());
   }, [preUnreadFilteredReleases, releaseLatestMode]);
+  // 「仅显示最新版本」徽标应反映切换后实际会展示的数量：同一筛选范围内
+  // 每个仓库只保留一条最新 release，因此计数等于其中的去重仓库数
+  const latestOnlyRepoCount = useMemo(
+    () => new Set(preUnreadFilteredReleases.map(({ release }) => release.repository.id)).size,
+    [preUnreadFilteredReleases],
+  );
 
   // 未读模式过滤（使用快照，标记已读后不会立即消失，刷新页面后才更新）
   const filteredReleases = useMemo(() => {
@@ -733,7 +739,7 @@ export const ReleaseTimeline: React.FC = () => {
                 <BadgeCheck className="h-4 w-4" />
                 <span>{t('releaseTimeline.latest-version-only')}</span>
               </span>
-              <span className="app-side-count">{activeReleaseRepoCount}</span>
+              <span className="app-side-count">{latestOnlyRepoCount}</span>
             </Button>
           </div>
         </section>

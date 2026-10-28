@@ -65,6 +65,7 @@
     "v1-gists": "{{v1}} puntos esenciales en total",
     "search-applied": "Búsqueda aplicada",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Aún no hay esencias. Haga clic en Sincronizar para obtener datos o crear una nueva esencia.",
+    "no-gists-match-the-current-analysis-status-filter": "No hay esencias que coincidan con el filtro de estado de análisis actual.",
     "sort-updated": "por hora de actualización",
     "sort-created": "por el tiempo de creación",
     "sort-name": "por nombre",

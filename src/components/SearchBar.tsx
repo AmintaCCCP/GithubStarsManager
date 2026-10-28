@@ -125,9 +125,12 @@ export const SearchBar: React.FC = () => {
   // remains local until Enter or real-time search commits it.
   useEffect(() => {
     if (searchFilters.query === previousStoredQueryRef.current) return;
+    const previousStoredQuery = previousStoredQueryRef.current;
     previousStoredQueryRef.current = searchFilters.query;
+    // 输入框已有未提交修改时不回写：异步到达的旧查询不得覆盖正在输入的内容
+    if (searchQuery !== previousStoredQuery) return;
     setSearchQuery(searchFilters.query);
-  }, [searchFilters.query]);
+  }, [searchFilters.query, searchQuery]);
 
   const openGlobalChatHistory = () => {
     window.dispatchEvent(new CustomEvent('gsm:open-global-chat-history'));

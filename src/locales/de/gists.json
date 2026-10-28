@@ -65,6 +65,7 @@
     "v1-gists": "Insgesamt {{v1}} Gists",
     "search-applied": "Suche angewendet",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Es gibt noch keine Kernaussagen. Klicken Sie auf „Synchronisieren“, um Daten abzurufen oder einen neuen Gist zu erstellen.",
+    "no-gists-match-the-current-analysis-status-filter": "Keine Gists entsprechen dem aktuellen Analysestatusfilter.",
     "sort-updated": "nach Aktualisierungszeit",
     "sort-created": "nach Erstellungszeit",
     "sort-name": "mit Namen",

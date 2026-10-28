@@ -65,6 +65,7 @@
     "v1-gists": "{{v1}} résumés au total",
     "search-applied": "Recherche appliquée",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "Il n’y a pas encore d’essentiel. Cliquez sur Synchroniser pour obtenir des données ou créer un nouvel aperçu.",
+    "no-gists-match-the-current-analysis-status-filter": "Aucun gist ne correspond au filtre d'état d'analyse actuel.",
     "sort-updated": "par heure de mise à jour",
     "sort-created": "par heure de création",
     "sort-name": "par nom",

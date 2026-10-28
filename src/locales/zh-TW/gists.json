@@ -65,6 +65,7 @@
     "v1-gists": "共 {{v1}} 個 gist",
     "search-applied": "已應用程式搜尋",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "暫無 gist。點選同步取得數據，或新建一個 gist。",
+    "no-gists-match-the-current-analysis-status-filter": "沒有符合目前分析狀態的 gist。",
     "sort-updated": "按更新時間",
     "sort-created": "按創建時間",
     "sort-name": "按名稱",

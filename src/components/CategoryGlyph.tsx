@@ -229,6 +229,11 @@ const normalizeIconValue = (value: string | undefined): string => {
   return trimmed.toLowerCase().replace(/^lucide:/, '');
 };
 
+// 普通对象字面量会命中 Object.prototype 上的键（如 __proto__），
+// 图标查找必须限制在自有属性，否则该值会被当作组件渲染导致崩溃
+const lookupOwnIcon = <T,>(table: Record<string, T>, key: string): T | undefined =>
+  Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+
 const resolveCategoryGlyph = (
   icon: string | undefined,
   name: string | undefined,
@@ -237,12 +242,12 @@ const resolveCategoryGlyph = (
   const rawIcon = icon?.trim() ?? '';
   const iconKey = normalizeIconValue(rawIcon);
   if (rawIcon) {
-    return CATEGORY_ICON_BY_VALUE[rawIcon]
-      ?? CATEGORY_ICON_CHOICE_BY_KEY[iconKey]
+    return lookupOwnIcon(CATEGORY_ICON_BY_VALUE, rawIcon)
+      ?? lookupOwnIcon(CATEGORY_ICON_CHOICE_BY_KEY, iconKey)
       ?? rawIcon;
   }
 
-  const byId = categoryId ? CATEGORY_ICON_BY_ID[categoryId] : undefined;
+  const byId = categoryId ? lookupOwnIcon(CATEGORY_ICON_BY_ID, categoryId) : undefined;
   const byName = name ? NAME_RULES.find(([pattern]) => pattern.test(name))?.[1] : undefined;
   if (byId || byName) {
     return byId ?? (byName as LucideIcon);

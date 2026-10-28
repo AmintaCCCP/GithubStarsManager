@@ -3180,6 +3180,7 @@ html.dark .release-card.is-expanded {
 
 .app-dialog-content.max-w-md { max-width: var(--app-dialog-md-width); }
 .app-dialog-content.max-w-lg { max-width: var(--app-dialog-lg-width); }
+.app-dialog-content.max-w-sm { max-width: 24rem; }
 .app-dialog-content.max-w-2xl { max-width: var(--app-dialog-xl-width); }
 .app-dialog-content.max-w-3xl { max-width: var(--app-dialog-wide-width); }
 .app-dialog-content.max-w-5xl { max-width: var(--app-dialog-settings-width); }
@@ -6734,6 +6735,12 @@ button.ui-switch {
   overflow: hidden;
   padding: var(--app-switch-padding) !important;
   vertical-align: middle;
+}
+
+/* .app-dialog-content :is(button, .ui-button, ...) 的 justify-content: center
+   特异性更高，会把对话框内开关的滑块推到轨道外，这里显式恢复左对齐 */
+.app-dialog-content button.ui-switch {
+  justify-content: flex-start;
 }
 
 button.ui-switch .ui-switch-thumb {

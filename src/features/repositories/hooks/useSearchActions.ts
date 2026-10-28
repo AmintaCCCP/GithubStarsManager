@@ -48,6 +48,14 @@ const assignStarredRepositories = (
   storeRepos: Repository[],
 ): Array<Repository | undefined> => assignIdentityMatches(newRepos, storeRepos);
 
+// 当前在途 AI 搜索的控制器（模块级）：新搜索启动时中止旧请求（超代语义），
+// Quick Access 等外部流程也通过 cancelActiveAiSearch 中止，避免过期结果落盘
+const aiSearchAbortRef: { current: AbortController | null } = { current: null };
+
+export const cancelActiveAiSearch = () => {
+  aiSearchAbortRef.current?.abort();
+};
+
 /** 统计本次同步中真正新增的仓库数（与合并口径一致）。 */
 export const countNewStarredRepositories = (
   newRepos: Repository[],
@@ -273,8 +281,6 @@ export const useSearchActions = (): SearchActions => {
   const [searchPhase, setSearchPhase] = useState<string | null>(null);
   const vectorScoreMapRef = useRef<{ query: string; scores: Map<string, number> } | null>(null);
   const skipNextTextSearchRef = useRef(false);
-  // 当前在途 AI 搜索的控制器：新搜索启动时中止旧请求（超代语义）
-  const aiSearchAbortRef = useRef<AbortController | null>(null);
   const t = useT('repositories');
 
   const keywordSearch = useCallback(async (

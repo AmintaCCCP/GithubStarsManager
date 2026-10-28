@@ -2218,7 +2218,7 @@ export class GitHubApiService {
   }
 
   // Check if a fork's branch is behind its upstream — returns true if "out-of-date"
-  async checkForkSyncNeeded(owner: string, repo: string, branch: string, parentFullName?: string): Promise<{ needsSync: boolean, parentFullName?: string, parentHtmlUrl?: string }> {
+  async checkForkSyncNeeded(owner: string, repo: string, branch: string, parentFullName?: string): Promise<{ needsSync: boolean | undefined, parentFullName?: string, parentHtmlUrl?: string }> {
     try {
       let parentOwner = '';
       let resultParentFullName = parentFullName;
@@ -2246,7 +2246,8 @@ export class GitHubApiService {
       };
     } catch (error) {
       logger.warn('githubApi', `Failed to check sync status for ${owner}/${repo}`, error);
-      return { needsSync: false };
+      // undefined = 检查失败：调用方应保留「未检查」状态，避免误计入「已是最新」
+      return { needsSync: undefined };
     }
   }
 

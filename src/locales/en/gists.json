@@ -66,6 +66,7 @@
     "v1-gists": "{{v1}} gists",
     "search-applied": "Search applied",
     "no-gists-yet-sync-to-fetch-data-or-create-a-new": "No gists yet. Sync to fetch data, or create a new gist.",
+    "no-gists-match-the-current-analysis-status-filter": "No gists match the current analysis status filter.",
     "sort-updated": "Updated",
     "sort-created": "Created",
     "sort-name": "Name",
