@@ -1,7 +1,7 @@
 
 import { useT } from '../../../i18n/useT';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { shallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
@@ -64,26 +64,27 @@ export const useRepositoryCardActions = ({
     aiConfigs,
     toggleReleaseSubscription: toggleStoreReleaseSubscription,
   } = useAppStore(
-    useCallback(
-      (state) => ({
-        githubToken: state.githubToken,
-        activeAIConfig: state.activeAIConfig,
-        setAnalyzingRepository: state.setAnalyzingRepository,
-        language: state.language,
-        updateRepository: state.updateRepository,
-        deleteRepository: state.deleteRepository,
-        vectorSearchConfig: state.vectorSearchConfig,
-        vectorSearchStatus: state.vectorSearchStatus,
-        embeddingConfigs: state.embeddingConfigs,
-        activeEmbeddingConfig: state.activeEmbeddingConfig,
-        repositories: state.repositories,
-        enterSimilarView: state.enterSimilarView,
-        aiConfigs: state.aiConfigs,
-        toggleReleaseSubscription: state.toggleReleaseSubscription,
-      }),
-      [],
+    useShallow(
+      useCallback(
+        (state) => ({
+          githubToken: state.githubToken,
+          activeAIConfig: state.activeAIConfig,
+          setAnalyzingRepository: state.setAnalyzingRepository,
+          language: state.language,
+          updateRepository: state.updateRepository,
+          deleteRepository: state.deleteRepository,
+          vectorSearchConfig: state.vectorSearchConfig,
+          vectorSearchStatus: state.vectorSearchStatus,
+          embeddingConfigs: state.embeddingConfigs,
+          activeEmbeddingConfig: state.activeEmbeddingConfig,
+          repositories: state.repositories,
+          enterSimilarView: state.enterSimilarView,
+          aiConfigs: state.aiConfigs,
+          toggleReleaseSubscription: state.toggleReleaseSubscription,
+        }),
+        [],
+      ),
     ),
-    shallow,
   );
   const { toast, confirm } = useDialog();
   const abortControllerRef = useRef<AbortController | null>(null);
