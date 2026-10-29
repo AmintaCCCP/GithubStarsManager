@@ -152,10 +152,14 @@ export function withBudget<T>(
 
 function buildRepoIndex(repositories: Repository[]): Map<string, Repository> {
   const repoById = new Map<string, Repository>();
+  const reportedDuplicateIds = new Set<string>();
   for (const repo of repositories) {
     const id = String(repo.id);
     if (repoById.has(id)) {
-      logger.warn('vector-search', 'Duplicate local repository ID ignored', { id });
+      if (!reportedDuplicateIds.has(id)) {
+        reportedDuplicateIds.add(id);
+        logger.debug('vector-search', 'Duplicate local repository ID ignored', { id });
+      }
       continue;
     }
     repoById.set(id, repo);

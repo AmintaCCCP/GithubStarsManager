@@ -317,6 +317,9 @@ function mapGraphqlRepoDetail(node: Record<string, unknown>): GitHubRepoDetailRe
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+// 403 多来自无 token/低速率限制的周期性探测，属于持续噪音：同一 (method, endpoint)
+// 会话内只 warn 一次，重复失败降级为 debug，不改变抛错行为。
+const warned403Requests = new Set<string>();
 // Sentinel message for the 401 thrown above; callers match on it to tell a
 // confirmed auth failure apart from network/rate-limit/5xx errors.
 export const GITHUB_TOKEN_INVALID_ERROR = 'GitHub token expired or invalid';
@@ -597,7 +600,13 @@ export class GitHubApiService {
       // 5xx 视为可重试的瞬时故障；其余 4xx 直接抛出（重试无意义）。
       const isRetryable = response.status >= 500 && response.status <= 599;
       if (!isRetryable || attempt === maxRetries) {
-        logger.warn('githubApi', 'API request failed', { method, endpoint, status: response.status, durationMs });
+        const warnKey = `${method} ${endpoint}`;
+        if (response.status === 403 && warned403Requests.has(warnKey)) {
+          logger.debug('githubApi', 'API request failed (deduplicated)', { method, endpoint, status: response.status, durationMs });
+        } else {
+          if (response.status === 403) warned403Requests.add(warnKey);
+          logger.warn('githubApi', 'API request failed', { method, endpoint, status: response.status, durationMs });
+        }
         throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
       }
 

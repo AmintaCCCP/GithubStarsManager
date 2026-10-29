@@ -84,7 +84,18 @@ let persistDebounceMs = 1000;
 let idleCallbackTimeoutMs = 3000;
 const lastWrittenShardBytes = new Map<PersistenceShardName, number>();
 const lastShardWriteAt = new Map<PersistenceShardName, number>();
+// 「Large state *」属于性能观测而非可行动告警：同一分片体积增长 ≤10% 时
+// 不再重复 warn，避免每次 idle persist 都刷一条大分片日志。
+const lastWarnedShardBytes = new Map<PersistenceShardName, number>();
+const SHARD_WARN_REGROWTH_RATIO = 1.1;
 let deferredLargeShardWriteTimerId: ReturnType<typeof setTimeout> | null = null;
+
+const shouldWarnLargeShard = (shard: PersistenceShardName, bytes: number): boolean => {
+  const lastWarned = lastWarnedShardBytes.get(shard);
+  if (lastWarned !== undefined && bytes <= lastWarned * SHARD_WARN_REGROWTH_RATIO) return false;
+  lastWarnedShardBytes.set(shard, bytes);
+  return true;
+};
 
 /**
  * 仅供测试注入更小的时序参数（写入防抖 / 空闲回调上限 / 大分片 idle 写入最小
@@ -424,13 +435,15 @@ const writeShardedSnapshot = async (
       serializedBytes.set(shard, byteLength);
       const stringifyMs = Math.round(performance.now() - stringifyStartedAt);
       if (stringifyMs > 50) {
-        logger.warn('store.persist', 'Large state stringify completed', {
-          source,
-          shard,
-          stringifyMs,
-          bytes: byteLength,
-        });
-      } else if (byteLength > SHARD_SIZE_WARN_BYTES) {
+        if (shouldWarnLargeShard(shard, byteLength)) {
+          logger.warn('store.persist', 'Large state stringify completed', {
+            source,
+            shard,
+            stringifyMs,
+            bytes: byteLength,
+          });
+        }
+      } else if (byteLength > SHARD_SIZE_WARN_BYTES && shouldWarnLargeShard(shard, byteLength)) {
         logger.warn('store.persist', 'Large state shard serialized', {
           source,
           shard,
@@ -464,7 +477,7 @@ const writeShardedSnapshot = async (
   }
   const writeMs = Math.round(performance.now() - writeStartedAt);
   if (writeMs > 50) {
-    logger.warn('store.persist', 'Large state IndexedDB write completed', {
+    logger.debug('store.persist', 'Large state IndexedDB write completed', {
       source,
       shards: dirty,
       writeMs,

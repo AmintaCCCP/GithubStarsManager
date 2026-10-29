@@ -10,6 +10,7 @@ import {
 } from '../../services/indexedDbStorage';
 import { appPersistenceOptions } from './options';
 import { createInitialState } from '../initialState';
+import { logger } from '../../services/logger';
 import { flushPendingPersistSnapshot, __setPersistTimingsForTest } from './storage';
 import { debouncedPersistStorage, removePersistedSnapshot } from './storage';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
@@ -839,6 +840,28 @@ describe('idle 大分片写入节流', () => {
     } finally {
       commitGate.reset(); // 失败路径也不让挂停状态泄漏到后续用例
     }
+  });
+
+  it('相同体积的大分片重复写入不重复 warn，体积增长超 10% 才再次 warn', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const largeWarnCount = () => warnSpy.mock.calls.filter(([, message]) =>
+      message === 'Large state stringify completed' || message === 'Large state shard serialized'
+    ).length;
+    const releasesOf = (ch: string): unknown[] => [{ id: 1, blob: ch.repeat(6 * 1024 * 1024) }];
+
+    // 6 MiB 相对此前用例的 ~5 MiB 基准增长 >10%，首次写入必然 warn。
+    const first = { ...buildState(), releases: releasesOf('x') };
+    debouncedPersistStorage.setItem(KEY, { state: first, version: 16 });
+    await flushPendingPersistSnapshot();
+    const afterFirst = largeWarnCount();
+    expect(afterFirst).toBeGreaterThan(0);
+
+    // 引用变化但序列化体积不变：性能日志不重复；持久化内容不受影响。
+    const second = { ...buildState(), releases: releasesOf('y') };
+    debouncedPersistStorage.setItem(KEY, { state: second, version: 16 });
+    await flushPendingPersistSnapshot();
+    expect(largeWarnCount()).toBe(afterFirst);
+    expect(await readShardState('releases')).toEqual({ releases: releasesOf('y') });
   });
 });
 

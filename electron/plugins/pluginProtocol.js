@@ -318,6 +318,7 @@ function validatePluginExporterResult(input) {
 
 module.exports = {
   MAX_REPOSITORIES_PER_ACTION,
+  MAX_RELEASE_ASSETS,
   MAX_RESULT_BYTES,
   protocolError,
   validateRunActionRequest,
