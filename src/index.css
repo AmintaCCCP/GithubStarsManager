@@ -1713,7 +1713,7 @@ textarea:focus-visible,
 }
 
 .ui-button-primary:hover {
-  background: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--primary-foreground)) 10%);
+  background: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--background)) 10%);
   border-color: transparent;
 }
 
@@ -6398,7 +6398,7 @@ button.ui-switch[data-state='checked'] > span {
 .app-command-row [data-ui-variant='default']:hover,
 .app-dialog-footer [data-ui-variant='default']:hover,
 .app-workspace-content .ui-button-primary:hover {
-  background-color: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--primary-foreground)) 10%);
+  background-color: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--background)) 10%);
   color: hsl(var(--primary-foreground));
 }
 
