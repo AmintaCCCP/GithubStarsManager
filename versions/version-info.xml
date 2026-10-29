@@ -735,4 +735,21 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.7</downloadUrl>
   </version>
+  <version>
+    <number>0.8.8</number>
+    <releaseDate>2026-10-29</releaseDate>
+    <changelog>
+      <item>feat: 全面优化向量搜索重排流水线，免重建索引支持硅基流动 BAAI/bge-reranker-v2-m3 与 LLM 智能重排。(PR #505)</item>
+      <item>feat: 推出源画像相似仓库推荐流水线，大幅提升相似仓库关联召回质量与推荐精准度。(PR #507)</item>
+      <item>feat: 重构桌面端工作区布局（Workspace Shell），各模块配备独立上下文侧栏并拓宽有效工作区视窗。(PR #524)</item>
+      <item>feat: 发现页仓库搜索新增 AI 语义搜索模式，支持多语言意图扩展与文档域优先召回精选。(PR #494)</item>
+      <item>fix: 优化 Windows 托盘最小化调度机制，彻底解决从系统托盘恢复窗口卡死的问题。(PR #527)</item>
+      <item>fix: GitHub API 请求增加 30 秒超时控制与指数退避重试，解决休眠或断网后同步挂起问题，托盘新增「重启应用」。(PR #526)</item>
+      <item>fix: 修复全栈 Docker 容器在 Helmet CSP 与纯 HTTP 访问下脚本被拦截导致的白屏故障。(PR #481)</item>
+      <item>fix: 处置 CodeQL 存量安全告警，加固 RPC 输入参数校验与 SSRF 防护。(PR #498)</item>
+      <item>fix: 升级 undici 修复已知 CVE-2026-109869 安全漏洞，修复 hono 与 follow-redirects 依赖。(PR #495, #504)</item>
+      <item>build: 升级 Electron 45、Zustand 5、Better-SQLite3 13、Parse5 8、Date-fns 4 等核心依赖至最新版本。(PR #482-#493, #499-#503, #509-#520, #525)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.8</downloadUrl>
+  </version>
 </versions>
