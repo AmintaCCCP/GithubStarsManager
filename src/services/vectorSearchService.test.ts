@@ -289,6 +289,9 @@ describe('indexAllRepos duplicate id handling', () => {
     });
 
     expect(vectorService.upsert).toHaveBeenCalledTimes(1);
+    const uploaded = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0] as Array<{ metadata: { description: string } }>;
+    expect(uploaded).toHaveLength(1);
+    expect(uploaded[0].metadata.description).toBe('first');
     const embeddedText = embed.mock.calls.flatMap(([texts]) => texts).join('\n');
     expect(embeddedText).toContain('first');
     expect(embeddedText).not.toContain('second');
