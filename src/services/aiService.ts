@@ -60,13 +60,16 @@ export class AIRequestError extends Error {
   readonly status: number;
   readonly retryAfterMs?: number;
   readonly isRateLimit: boolean;
+  /** 错误是否来自 HTTP 200 响应体里的网关错误对象（区别于真实 HTTP 非 2xx 错误）。 */
+  readonly fromGatewayBody: boolean;
 
-  constructor(message: string, status: number, retryAfterMs?: number) {
+  constructor(message: string, status: number, retryAfterMs?: number, fromGatewayBody = false) {
     super(message);
     this.name = 'AIRequestError';
     this.status = status;
     this.retryAfterMs = retryAfterMs;
     this.isRateLimit = status === 429;
+    this.fromGatewayBody = fromGatewayBody;
   }
 }
 
@@ -75,7 +78,7 @@ export function isRateLimitedError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const e = error as { statusCode?: unknown; status?: unknown; isRateLimit?: unknown; message?: unknown };
   if (e.isRateLimit === true) return true;
-  if (error instanceof AIRequestError && error.isRateLimit === false) return false;
+  if (error instanceof AIRequestError && error.fromGatewayBody && !error.isRateLimit) return false;
   if (typeof e.statusCode === 'number' && e.statusCode === 429) return true;
   if (typeof e.status === 'number' && e.status === 429) return true;
   const msg = typeof e.message === 'string' ? e.message : '';
@@ -665,7 +668,7 @@ export class AIService {
       const gatewayError = extractGatewayErrorFromData(data);
       if (gatewayError) {
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, httpDetails);
-        throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
       }
       if (logger.isDebugMode()) {
         logger.warn('ai', 'No content received from AI service', {
@@ -1027,7 +1030,7 @@ ${options.user}` : options.user;
           const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
           if (gatewayError) {
             this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-            throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+            throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
           }
         }
         const deltas = ssePayloads
@@ -1056,7 +1059,7 @@ ${options.user}` : options.user;
         const gatewayError = extractGatewayErrorFromData(parsed);
         if (gatewayError) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
         }
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');
@@ -1082,7 +1085,7 @@ ${options.user}` : options.user;
         const gatewayError = extractGatewayErrorFromData(parsed);
         if (gatewayError) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
         }
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');
@@ -1107,7 +1110,7 @@ ${options.user}` : options.user;
         const gatewayError = extractGatewayErrorFromSsePayloads([payload]);
         if (gatewayError) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
         }
       }
     });
