@@ -85,19 +85,23 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
         const applyPatches = (list: Repository[]): { repositories: Repository[]; changed: boolean } => {
           let changed = false;
-          // 用 Map 索引避免多次 findIndex；重复 id 定位首条记录，与 indexAllRepos 去重规则一致
-          const indexById = new Map<number, number>();
+          // 用 Map 索引避免多次 findIndex；重复 id 的所有记录统一应用补丁：
+          // 向量按 id 唯一，索引标记是 id 级事实，只标首条/末条都会让增量
+          // 模式下实际上传的副本漏标而反复重嵌。
+          const indicesById = new Map<number, number[]>();
           list.forEach((r, i) => {
-            if (!indexById.has(r.id)) indexById.set(r.id, i);
+            const indices = indicesById.get(r.id);
+            if (indices) indices.push(i);
+            else indicesById.set(r.id, [i]);
           });
           const next = list.slice();
           for (const [id, patch] of patchMap) {
-            const idx = indexById.get(id);
-            if (idx === undefined) continue;
-            const merged = { ...next[idx], ...patch };
-            if (!areRepositoryRecordsEqual(next[idx], merged)) {
-              next[idx] = merged;
-              changed = true;
+            for (const idx of indicesById.get(id) ?? []) {
+              const merged = { ...next[idx], ...patch };
+              if (!areRepositoryRecordsEqual(next[idx], merged)) {
+                next[idx] = merged;
+                changed = true;
+              }
             }
           }
           return { repositories: next, changed };
