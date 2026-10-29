@@ -2169,25 +2169,7 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
       const err = error as Error;
       const errorMessage = err.message || '';
 
-      // 解析状态码
-      const statusMatch = errorMessage.match(/(\d{3})/);
-      const statusCode = error instanceof AIRequestError && Number.isInteger(error.status)
-        ? error.status
-        : (statusMatch ? parseInt(statusMatch[1], 10) : undefined);
-
-      // 处理超时错误
-      if (errorMessage.includes('timeout') || errorMessage.includes('abort') || err.name === 'AbortError') {
-        return {
-          success: false,
-          errorType: 'timeout',
-          message: this.language === 'zh'
-            ? `连接超时（${timeoutMs / 1000}秒）。请检查：1. 网络连接是否正常 2. API端点是否正确 3. 服务器是否响应缓慢`
-            : `Connection timeout (${timeoutMs / 1000}s). Please check: 1. Network connection 2. API endpoint 3. Server response time`,
-        };
-      }
-
-      // 已映射的状态码优先于 network 等消息关键词分类，避免网关限流错误被误报为网络问题。
-      if (statusCode) {
+      const statusFailure = (statusCode: number) => {
         const meaning = getStatusCodeMeaning(statusCode, this.language);
         const errorType = getErrorTypeFromStatus(statusCode) ?? 'unknown';
         const suggestions: Record<string, { zh: string; en: string }> = {
@@ -2218,9 +2200,25 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
             ? `HTTP ${statusCode} - ${meaning}\n建议：${suggestions[errorType].zh}`
             : `HTTP ${statusCode} - ${meaning}\nSuggestion: ${suggestions[errorType].en}`,
         };
+      };
+
+      // AIRequestError 已映射的状态码优先于消息关键词，避免限流错误被误报为网络/超时问题。
+      if (error instanceof AIRequestError && Number.isInteger(error.status)) {
+        return statusFailure(error.status);
       }
 
-      // 处理网络错误
+      // 处理超时错误（原生 AbortError 或普通错误消息）
+      if (err.name === 'AbortError' || errorMessage.includes('timeout') || errorMessage.includes('abort')) {
+        return {
+          success: false,
+          errorType: 'timeout',
+          message: this.language === 'zh'
+            ? `连接超时（${timeoutMs / 1000}秒）。请检查：1. 网络连接是否正常 2. API端点是否正确 3. 服务器是否响应缓慢`
+            : `Connection timeout (${timeoutMs / 1000}s). Please check: 1. Network connection 2. API endpoint 3. Server response time`,
+        };
+      }
+
+      // 普通错误：网络关键词先于消息里的状态码（如消息含 127.0.0.1 会被误读为状态码）。
       if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
         return {
           success: false,
@@ -2229,6 +2227,12 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
             ? '网络连接失败。请检查：1. 网络连接是否正常 2. API端点地址是否正确 3. 防火墙或代理设置'
             : 'Network connection failed. Please check: 1. Network connection 2. API endpoint 3. Firewall or proxy settings',
         };
+      }
+
+      // 普通错误消息中携带的三位状态码
+      const statusMatch = errorMessage.match(/(\d{3})/);
+      if (statusMatch) {
+        return statusFailure(parseInt(statusMatch[1], 10));
       }
 
       // 默认错误

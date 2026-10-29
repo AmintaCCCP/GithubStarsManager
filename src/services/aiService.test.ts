@@ -1045,6 +1045,23 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect(result.message).toContain('HTTP 429');
   });
 
+  it('testConnection 普通错误消息含网络关键词与 IP 地址时归类为 network', async () => {
+    mockFetch().mockRejectedValueOnce(new Error('network request failed to 127.0.0.1'));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, errorType: 'network' });
+  });
+
+  it('testConnection 已映射状态码的 AIRequestError 不因消息含 abort 关键词被归类为超时', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'connection aborted by gateway', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, statusCode: 429, errorType: 'unknown' });
+    expect(result.message).toContain('HTTP 429');
+  });
+
   it('analyzeRepository 信号已中止但请求抛出普通 Error 时不记录失败日志', async () => {
     mockFetch().mockRejectedValue(new Error('network down'));
     const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
