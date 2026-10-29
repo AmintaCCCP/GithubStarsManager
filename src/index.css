@@ -6399,6 +6399,7 @@ button.ui-switch[data-state='checked'] > span {
 .app-dialog-footer [data-ui-variant='default']:hover,
 .app-workspace-content .ui-button-primary:hover {
   background-color: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--primary-foreground)) 10%);
+  color: hsl(var(--primary-foreground));
 }
 
 .app-page-toolbar .app-sync-action {
