@@ -590,8 +590,8 @@ html:has(body[data-scroll-locked]) {
   --app-control-height-md: 2.5rem;
   --app-control-font-size: 0.8125rem;
   --app-border-width: 1px;
-  --app-motion-fast: 120ms;
-  --app-motion-base: 180ms;
+  --app-motion-fast: 150ms;
+  --app-motion-base: 150ms;
   --app-z-header: 50;
   --app-z-sidebar: 10;
   --app-z-popover: 9999;
@@ -1713,7 +1713,7 @@ textarea:focus-visible,
 }
 
 .ui-button-primary:hover {
-  background: hsl(var(--primary) / 0.9);
+  background: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--primary-foreground)) 10%);
   border-color: transparent;
 }
 
@@ -4435,9 +4435,9 @@ body,
   --app-native-canvas-pattern: none;
   --app-native-header-surface: color-mix(in srgb, hsl(var(--background)) 94%, hsl(var(--card)) 6%);
   --app-native-header-border: color-mix(in srgb, hsl(var(--border)) 38%, transparent);
-  --app-native-sidebar-surface: color-mix(in srgb, hsl(var(--card)) 66%, hsl(var(--background)) 34%);
+  --app-native-sidebar-surface: color-mix(in srgb, hsl(var(--foreground)) 3%, hsl(var(--background)) 97%);
   --app-native-sidebar-border: transparent;
-  --app-native-item-hover: color-mix(in srgb, hsl(var(--foreground)) 4%, transparent);
+  --app-native-item-hover: color-mix(in srgb, hsl(var(--foreground)) 7%, transparent);
   --app-native-item-active: color-mix(in srgb, hsl(var(--foreground)) 6%, transparent);
   --app-native-item-active-border: transparent;
   --app-native-item-active-text: hsl(var(--foreground));
@@ -4450,7 +4450,7 @@ body,
   --app-native-control-radius: var(--ui-radius-sm);
   --app-native-control-padding-inline: 0.6875rem;
   --app-native-control-surface: color-mix(in srgb, hsl(var(--card)) 90%, hsl(var(--background)) 10%);
-  --app-native-control-hover-surface: color-mix(in srgb, hsl(var(--muted)) 46%, hsl(var(--card)) 54%);
+  --app-native-control-hover-surface: color-mix(in srgb, hsl(var(--accent)) 70%, hsl(var(--card)) 30%);
   --app-native-control-border: color-mix(in srgb, hsl(var(--border)) 76%, transparent);
   --app-native-toolbar-gap: 0.5rem;
   --app-native-toolbar-margin-block-end: 0.875rem;
@@ -5389,7 +5389,7 @@ body,
   );
   --app-final-control-surface: color-mix(in srgb, hsl(var(--card)) 92%, hsl(var(--background)) 8%);
   --app-final-control-border: color-mix(in srgb, hsl(var(--border)) 72%, transparent);
-  --app-final-control-hover: color-mix(in srgb, hsl(var(--muted)) 48%, hsl(var(--card)) 52%);
+  --app-final-control-hover: color-mix(in srgb, hsl(var(--accent)) 70%, hsl(var(--card)) 30%);
   --app-final-floating-surface: color-mix(in srgb, hsl(var(--popover)) 96%, hsl(var(--background)) 4%);
   --app-final-floating-border: color-mix(in srgb, hsl(var(--border)) 70%, transparent);
   --app-final-floating-shadow:
@@ -5446,7 +5446,7 @@ body,
   border-inline-end: var(--app-border-width) solid
     color-mix(in srgb, hsl(var(--border)) 38%, transparent);
   border-radius: 0;
-  background: color-mix(in srgb, hsl(var(--card)) 68%, hsl(var(--background)) 32%);
+  background: var(--app-native-sidebar-surface);
   box-shadow: none;
 }
 
@@ -5498,7 +5498,7 @@ body,
 .app-side-item:hover,
 .context-sidebar [role='tab']:hover,
 .linear-settings-nav-item:hover {
-  background: color-mix(in srgb, hsl(var(--foreground)) 4%, transparent);
+  background: var(--app-native-item-hover);
   color: hsl(var(--foreground));
 }
 
@@ -6225,7 +6225,7 @@ body,
       (var(--app-switch-padding) * 2)
   );
   --app-content-surface: hsl(var(--card));
-  --app-sidebar-divider: color-mix(in srgb, hsl(var(--border)) 26%, transparent);
+  --app-sidebar-divider: color-mix(in srgb, hsl(var(--border)) 48%, transparent);
   --app-sidebar-item-color: color-mix(
     in srgb,
     hsl(var(--foreground)) 70%,
@@ -6396,8 +6396,9 @@ button.ui-switch[data-state='checked'] > span {
 
 .app-page-toolbar [data-ui-variant='default']:hover,
 .app-command-row [data-ui-variant='default']:hover,
-.app-dialog-footer [data-ui-variant='default']:hover {
-  background-color: hsl(var(--primary) / 0.9);
+.app-dialog-footer [data-ui-variant='default']:hover,
+.app-workspace-content .ui-button-primary:hover {
+  background-color: color-mix(in srgb, hsl(var(--primary)) 90%, hsl(var(--primary-foreground)) 10%);
 }
 
 .app-page-toolbar .app-sync-action {
@@ -6408,7 +6409,7 @@ button.ui-switch[data-state='checked'] > span {
 
 .app-page-toolbar .app-sync-action:hover {
   border-color: color-mix(in srgb, hsl(var(--primary)) 44%, var(--app-native-control-border));
-  background: color-mix(in srgb, hsl(var(--primary)) 12%, var(--app-native-control-surface));
+  background: color-mix(in srgb, hsl(var(--primary)) 16%, var(--app-native-control-surface));
   color: hsl(var(--primary-emphasis, var(--primary)));
 }
 
