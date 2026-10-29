@@ -97,7 +97,7 @@ function extractGatewayErrorFromData(data: unknown): { message: string; status: 
     : (() => { try { return JSON.stringify(err); } catch { return 'unknown gateway error'; } })();
   const code = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : '';
   const type = typeof e.type === 'string' ? e.type : '';
-  const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`);
+  const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type} ${message}`);
   return { message, status: isThrottling ? 429 : 502 };
 }
 
@@ -659,7 +659,11 @@ export class AIService {
         throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
       }
       if (logger.isDebugMode()) {
-        logger.warn('ai', 'No content received from AI service', { model, configId, data: stringifyDataForWarn(data) });
+        logger.warn('ai', 'No content received from AI service', {
+          model,
+          configId,
+          ...(this.redactDebugPayload ? {} : { data: stringifyDataForWarn(data) }),
+        });
       }
       this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
@@ -1007,10 +1011,15 @@ ${options.user}` : options.user;
       if (ssePayloads.length > 0) {
         // 只有至少一帧解出当前 API 的有效增量才算 SSE；普通文本里恰好出现
         // "data:" 开头的行时继续走下方 JSON / 纯文本回退。
-        const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
-        if (gatewayError) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        // 缺失 Content-Type 时，仅当整段 body 都由 SSE 帧行组成才视为真 SSE，
+        // 避免把纯文本回答里恰好出现的 data: 行误判为网关错误帧。
+        const isSseFramed = raw.split(/\r\n|\r|\n/).every((line) => line === '' || /^(data|event|id|retry|:)/.test(line));
+        if (isSseFramed) {
+          const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
+          if (gatewayError) {
+            this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+            throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+          }
         }
         const deltas = ssePayloads
           .map((payload) => extractDelta(payload))
@@ -1090,12 +1099,12 @@ ${options.user}` : options.user;
       }
     });
 
-    this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
     const gatewayError = extractGatewayErrorFromSsePayloads(nonDeltaPayloads);
     if (gatewayError) {
       this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
       throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
     }
+    this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
     if (!full.trim()) {
       throw new Error('No content received from AI service (stream)');
     }
@@ -2156,7 +2165,9 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
 
       // 解析状态码
       const statusMatch = errorMessage.match(/(\d{3})/);
-      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
+      const statusCode = error instanceof AIRequestError && Number.isInteger(error.status)
+        ? error.status
+        : (statusMatch ? parseInt(statusMatch[1], 10) : undefined);
 
       // 处理超时错误
       if (errorMessage.includes('timeout') || errorMessage.includes('abort') || err.name === 'AbortError') {

@@ -932,6 +932,17 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect(aiError.message).toContain('max connections reached');
   });
 
+  it('HTTP 200 错误体 message 含 rate-limit 字样时也转为限流 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'rate-limit exceeded' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
   it('HTTP 200 携带非限流网关错误体时转为 502 AIRequestError', async () => {
     mockFetch().mockResolvedValueOnce(fetchJson({
       error: { message: 'upstream unavailable', code: 'bad_gateway' },
@@ -992,6 +1003,16 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     }
   });
 
+  it('testConnection 对 HTTP 200 网关错误体按映射状态码分类', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'max connections reached', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, statusCode: 429, errorType: 'unknown' });
+    expect(result.message).toContain('HTTP 429');
+  });
+
   it('analyzeRepository 信号已中止但请求抛出普通 Error 时不记录失败日志', async () => {
     mockFetch().mockRejectedValue(new Error('network down'));
     const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
@@ -1041,14 +1062,29 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
   });
 
   it('requestTextStream 增量后接 SSE 错误帧时整体抛出 429 AIRequestError', async () => {
+    const chunks: string[] = [];
     mockFetch().mockResolvedValueOnce(new Response(
       'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'
       + 'data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n',
       { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
     ));
     const service = new AIService(makeConfig() as never, 'zh');
-    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: (delta) => chunks.push(delta) }).then(() => null, e => e);
     expect(error).toBeInstanceOf(AIRequestError);
     expect((error as AIRequestError).status).toBe(429);
+    expect(chunks).toEqual(['partial']);
+  });
+
+  it('requestTextStream 缺失 Content-Type 时纯文本中的 data: 行不被误判为网关错误帧', async () => {
+    const plainText = 'Sure!\ndata: {"error":{"message":"not really","code":"bad_gateway"}}\nDone';
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => plainText,
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const result = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} });
+    expect(result).toBe(plainText);
   });
 });
