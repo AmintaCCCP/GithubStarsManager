@@ -617,7 +617,9 @@ export class GitHubApiService {
       if (!isRetryable || attempt === maxRetries) {
         const failureMeta = { method, endpoint, status: response.status, durationMs };
         if (response.status === 403) {
-          this.log403Failure('API request failed', failureMeta);
+          // 与 log403Failure 的键约定一致：失败原因取响应体 message，不同成因各自 warn 一次。
+          const failureBody = await response.clone().json().catch(() => null) as { message?: string } | null;
+          this.log403Failure(failureBody?.message || 'API request failed', failureMeta);
         } else {
           logger.warn('githubApi', 'API request failed', failureMeta);
         }

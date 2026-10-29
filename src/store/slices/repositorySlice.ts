@@ -85,8 +85,11 @@ export const createRepositorySlice: AppStoreSlice<Pick<import('../types').AppAct
 
         const applyPatches = (list: Repository[]): { repositories: Repository[]; changed: boolean } => {
           let changed = false;
-          // 用 Map 索引避免多次 findIndex
-          const indexById = new Map(list.map((r, i) => [r.id, i]));
+          // 用 Map 索引避免多次 findIndex；重复 id 定位首条记录，与 indexAllRepos 去重规则一致
+          const indexById = new Map<number, number>();
+          list.forEach((r, i) => {
+            if (!indexById.has(r.id)) indexById.set(r.id, i);
+          });
           const next = list.slice();
           for (const [id, patch] of patchMap) {
             const idx = indexById.get(id);

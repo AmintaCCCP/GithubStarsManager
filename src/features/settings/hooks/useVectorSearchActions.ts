@@ -6,6 +6,7 @@ import {
   EmbeddingClient,
   indexAllRepos,
   needsReindex,
+  selectIndexableRepos,
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
@@ -78,11 +79,14 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   }, [state.vectorSearchConfig.embeddingFormatVersion]);
 
   const { incrementalTargetCount, unindexedRepoCount } = useMemo(() => {
+    const seenCountIds = new Set<number>();
     let indexable = 0;
     let unindexed = 0;
     let unindexedWithMigration = 0;
     for (const repository of state.repositories) {
       if (!repository.analyzed_at || repository.analysis_failed) continue;
+      if (seenCountIds.has(repository.id)) continue;
+      seenCountIds.add(repository.id);
       indexable += 1;
       if (needsReindex(repository, false)) unindexed += 1;
       if (needsReindex(repository, formatVersionChanged)) unindexedWithMigration += 1;
@@ -151,10 +155,11 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
       const now = new Date().toISOString();
-      // 与 indexAllRepos 的按 id 首条去重保持一致：标记使用首条记录的 license，
-      // 避免重复 id 时标记与已上传向量的元数据来源不同。
+      // 标记必须来自实际上传的副本：与 indexAllRepos 共用同一候选选择规则
+      // （分析/增量过滤 + 按 id 首条去重），避免重复 id 时标记与向量元数据错位。
+      const uploadCandidates = selectIndexableRepos(repositories, { incremental, formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION });
       const licenseById = new Map<number, string | null>();
-      for (const repository of repositories) {
+      for (const repository of uploadCandidates) {
         if (!licenseById.has(repository.id)) licenseById.set(repository.id, repository.license ?? null);
       }
       const stamp = (id: number) => ({ id, patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) } });
@@ -209,14 +214,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         state.setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const repositories = useAppStore.getState().repositories;
-        const indexableSeenIds = new Set<number>();
-        const indexable = repositories.filter((repository) => {
-          if (!repository.analyzed_at || repository.analysis_failed) return false;
-          if (incremental && !needsReindex(repository, currentFormatVersion < EMBEDDING_FORMAT_VERSION)) return false;
-          if (indexableSeenIds.has(repository.id)) return false;
-          indexableSeenIds.add(repository.id);
-          return true;
-        }).length;
+        const indexable = selectIndexableRepos(repositories, { incremental, formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION }).length;
         state.setVectorIndexingState({
           isIndexing: false,
           phase: null,

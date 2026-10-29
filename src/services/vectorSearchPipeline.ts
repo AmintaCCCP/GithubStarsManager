@@ -150,9 +150,11 @@ export function withBudget<T>(
   });
 }
 
+// 会话级去重：buildRepoIndex 每次搜索都会执行，同一重复 id 整个会话只记录一次 debug。
+const reportedDuplicateIds = new Set<string>();
+
 function buildRepoIndex(repositories: Repository[]): Map<string, Repository> {
   const repoById = new Map<string, Repository>();
-  const reportedDuplicateIds = new Set<string>();
   for (const repo of repositories) {
     const id = String(repo.id);
     if (repoById.has(id)) {

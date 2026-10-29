@@ -584,8 +584,8 @@ describe('GitHubApiService 403 warn 去重', () => {
     await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
     await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
 
-    const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'API request failed');
-    const failedDebugs = debugSpy.mock.calls.filter(([, message]) => message === 'API request failed (deduplicated)');
+    const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'forbidden');
+    const failedDebugs = debugSpy.mock.calls.filter(([, message]) => message === 'forbidden (deduplicated)');
     expect(failedWarns).toHaveLength(1);
     expect(failedDebugs).toHaveLength(1);
   });
@@ -623,7 +623,7 @@ describe('GitHubApiService 403 warn 去重', () => {
     (service as unknown as { backendUrl: string | null }).backendUrl = 'http://localhost:3000/api';
     await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
 
-    const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'API request failed');
+    const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'forbidden');
     expect(failedWarns).toHaveLength(2);
   });
 });
