@@ -31,6 +31,10 @@ import { createCombinedAbortController } from '../utils/abortUtils';
 const REQUEST_TIMEOUT_MS = 30_000;
 const TIMEOUT_ERROR_MESSAGE = `GitHub API request timed out after ${REQUEST_TIMEOUT_MS}ms`;
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+// 发布刷新批次的总等待上限：单请求最坏约 127s（4 次 ×30s + 退避），
+// 没有批次上限时持续断网会让刷新一直占住。超预算后跳过剩余仓库，
+// 已完成的仓库结果照常返回，跳过的仓库不推进 watermark、下次刷新重试。
+const REFRESH_BATCH_BUDGET_MS = 10 * 60_000;
 
 /** 超时中止与用户主动取消都表现为 AbortError；父信号未中止时才算超时。 */
 function isTimeoutAbort(error: unknown, parentSignal: AbortSignal | undefined): boolean {
@@ -1439,6 +1443,7 @@ export class GitHubApiService {
     options: ReleaseFetchOptions = {}
   ): Promise<MultipleReleasesResult> {
     const startTime = Date.now();
+    const batchDeadline = startTime + REFRESH_BATCH_BUDGET_MS;
     const { includePreRelease = true, refreshExistingAssets = false } = options;
     const allReleases: Release[] = [];
     const latestReleases: Release[] = [];
@@ -1454,6 +1459,14 @@ export class GitHubApiService {
         if (currentIndex >= repositories.length) break;
 
         const repo = repositories[currentIndex];
+        if (Date.now() >= batchDeadline) {
+          failedRepos.push({
+            repoId: repo.id,
+            full_name: repo.full_name,
+            error: `刷新批次超过 ${REFRESH_BATCH_BUDGET_MS / 60_000} 分钟上限，已跳过以保留已完成结果`,
+          });
+          continue;
+        }
         const [owner, name] = repo.full_name.split('/');
 
         try {

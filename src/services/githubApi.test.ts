@@ -529,4 +529,30 @@ describe('GitHubApiService.makeRequest 请求超时（issue #523）', () => {
     await assertion;
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('超过批次总预算后跳过剩余仓库并保留已完成结果', async () => {
+    vi.useFakeTimers();
+    const service = new GitHubApiService('token');
+    const pageStub = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 11 * 60_000));
+      return { releases: [], hasMore: false };
+    });
+    (service as unknown as { getRepositoryReleasesPage: typeof pageStub })
+      .getRepositoryReleasesPage = pageStub;
+
+    const repos = Array.from({ length: 4 }, (_, i) => ({
+      ...makeRepository(i + 1, `owner/repo${i + 1}`),
+      has_fetched_releases: true,
+      last_release_fetch_time: '2026-01-01T00:00:00.000Z',
+    }));
+
+    const promise = service.getMultipleRepositoryReleases(repos);
+    // 3 个并发 worker 各耗时 11 分钟（超过 10 分钟批次预算），第 4 个仓库被跳过
+    await vi.advanceTimersByTimeAsync(11 * 60_000 + 500);
+    const result = await promise;
+
+    expect(result.failedRepos).toHaveLength(1);
+    expect(result.failedRepos[0].error).toContain('刷新批次');
+    expect(result.releases).toHaveLength(0);
+  });
 });
