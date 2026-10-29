@@ -449,4 +449,84 @@ describe('GitHubApiService.makeRequest 请求超时（issue #523）', () => {
     await assertion;
     expect(hangFetch).toHaveBeenCalledTimes(4);
   });
+
+  it('非幂等请求（POST）超时后不重试，直接抛出超时错误', async () => {
+    vi.useFakeTimers();
+    const hangFetch = vi.fn((_url: unknown, init?: RequestInit): Promise<Response> =>
+      new Promise((_, reject) => {
+        init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        );
+      })
+    );
+    vi.stubGlobal('fetch', hangFetch);
+    const service = new GitHubApiService('token');
+    const makeRequest = (service as unknown as {
+      makeRequest: (endpoint: string, options: RequestInit) => Promise<unknown>;
+    }).makeRequest.bind(service);
+
+    const assertion = expect(makeRequest('/gists', { method: 'POST', body: '{}' })).rejects.toThrow(
+      'GitHub API request timed out after 30000ms'
+    );
+    await vi.advanceTimersByTimeAsync(30_001);
+    await assertion;
+    expect(hangFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('安全读请求响应体停滞时重试，下一次尝试成功', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const fetchMock = vi.fn((_url: unknown, init?: RequestInit): Promise<Response> => {
+      calls += 1;
+      const attempt = calls;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: { get: () => null },
+        json: () => attempt === 1
+          ? new Promise((_, reject) => {
+              init?.signal?.addEventListener('abort', () =>
+                reject(new DOMException('The operation was aborted.', 'AbortError'))
+              );
+            })
+          : Promise.resolve({ login: 'octocat' }),
+      } as unknown as Response);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    const promise = service.getCurrentUser();
+    // 首次响应体 30s 超时 + 1s 退避后第二次尝试返回有效 JSON
+    await vi.advanceTimersByTimeAsync(31_000);
+    await expect(promise).resolves.toMatchObject({ login: 'octocat' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('代理 401 响应体读取超时时抛超时错误，而不是 token 无效', async () => {
+    vi.useFakeTimers();
+    const service = new GitHubApiService('token');
+    (service as unknown as { backendUrl: string | null }).backendUrl = 'http://localhost:3000/api';
+    const fetchMock = vi.fn((_url: unknown, init?: RequestInit): Promise<Response> =>
+      Promise.resolve({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        headers: { get: () => null },
+        json: () => new Promise((_, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError'))
+          );
+        }),
+      } as unknown as Response)
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const assertion = expect(service.getCurrentUser()).rejects.toThrow(
+      'GitHub API request timed out after 30000ms'
+    );
+    await vi.advanceTimersByTimeAsync(30_001);
+    await assertion;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
