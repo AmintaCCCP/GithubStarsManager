@@ -943,6 +943,17 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect(isRateLimitedError(error)).toBe(true);
   });
 
+  it('HTTP 200 字符串错误内容为明确限流短语时转为 429', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: 'rate-limit exceeded',
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
   it('HTTP 200 错误体 message 仅包含 rate_limit 字样但不表示限流时仍为 502', async () => {
     mockFetch().mockResolvedValueOnce(fetchJson({
       error: { type: 'invalid_request_error', message: 'invalid parameter: rate_limit must be positive' },
@@ -1024,6 +1035,16 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect(result.message).toContain('HTTP 429');
   });
 
+  it('testConnection 映射状态码优先于消息中的 network 关键词', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'network capacity exceeded', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, statusCode: 429, errorType: 'unknown' });
+    expect(result.message).toContain('HTTP 429');
+  });
+
   it('analyzeRepository 信号已中止但请求抛出普通 Error 时不记录失败日志', async () => {
     mockFetch().mockRejectedValue(new Error('network down'));
     const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
@@ -1085,6 +1106,24 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect((error as AIRequestError).status).toBe(429);
     expect(chunks).toEqual(['partial']);
   });
+
+  it('requestTextStream SSE 错误帧后连接挂起时也立即抛出 429', async () => {
+    const encoder = new TextEncoder();
+    const hangingBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n'));
+        // 故意不关闭流：模拟网关发送错误帧后保持连接。
+      },
+    });
+    mockFetch().mockResolvedValueOnce(new Response(hangingBody, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+  }, 2000);
 
   it('requestTextStream 缺失 Content-Type 时纯文本中的 data: 行不被误判为网关错误帧', async () => {
     const plainText = 'Sure!\ndata: {"error":{"message":"not really","code":"bad_gateway"}}\nDone';

@@ -85,11 +85,14 @@ export function isRateLimitedError(error: unknown): boolean {
  * 网关可能在 HTTP 200 的 JSON body 里返回错误对象（如 agnes 的 429 throttling_error）。
  * 识别这类"伪成功"响应并转为带状态码的 AIRequestError，让限流/退避逻辑正常生效。
  */
+/** 明确表示限流已触发的错误短语；避免把恰好提到 rate_limit 的参数错误误判为限流。 */
+const THROTTLING_MESSAGE_PATTERN = /throttling|rate[\s-]limit (exceeded|reached)|too many requests/i;
+
 function extractGatewayErrorFromData(data: unknown): { message: string; status: number } | null {
   if (!data || typeof data !== 'object') return null;
   const err = (data as { error?: unknown }).error;
   if (!err) return null;
-  if (typeof err === 'string') return { message: err, status: 502 };
+  if (typeof err === 'string') return { message: err, status: THROTTLING_MESSAGE_PATTERN.test(err) ? 429 : 502 };
   if (typeof err !== 'object') return null;
   const e = err as { message?: unknown; code?: unknown; type?: unknown; status?: unknown };
   const message = typeof e.message === 'string' && e.message
@@ -98,7 +101,7 @@ function extractGatewayErrorFromData(data: unknown): { message: string; status: 
   const code = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : '';
   const type = typeof e.type === 'string' ? e.type : '';
   const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`)
-    || /throttling|rate[\s-]limit (exceeded|reached)|too many requests/i.test(message);
+    || THROTTLING_MESSAGE_PATTERN.test(message);
   return { message, status: isThrottling ? 429 : 502 };
 }
 
@@ -258,6 +261,10 @@ export async function consumeSseStream(body: ReadableStream<Uint8Array>, onData:
       }
     }
     flush();
+  } catch (error) {
+    // 回调抛错（如网关错误帧）时主动取消底层流，避免错误帧后连接被挂起。
+    await reader.cancel().catch(() => {});
+    throw error;
   } finally {
     reader.releaseLock();
   }
@@ -1089,22 +1096,20 @@ ${options.user}` : options.user;
       throw new Error('No content received from AI service (empty body)');
     }
     let full = '';
-    const nonDeltaPayloads: string[] = [];
     await consumeSseStream(response.body, (payload) => {
       const delta = extractDelta(payload);
       if (delta) {
         full += delta;
         options.onChunk(delta);
       } else {
-        nonDeltaPayloads.push(payload);
+        // 网关可能在 HTTP 200 流里夹带错误帧；收到即抛出，不等流结束。
+        const gatewayError = extractGatewayErrorFromSsePayloads([payload]);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        }
       }
     });
-
-    const gatewayError = extractGatewayErrorFromSsePayloads(nonDeltaPayloads);
-    if (gatewayError) {
-      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-      throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
-    }
     this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
     if (!full.trim()) {
       throw new Error('No content received from AI service (stream)');
@@ -2181,18 +2186,7 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
         };
       }
 
-      // 处理网络错误
-      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
-        return {
-          success: false,
-          errorType: 'network',
-          message: this.language === 'zh'
-            ? '网络连接失败。请检查：1. 网络连接是否正常 2. API端点地址是否正确 3. 防火墙或代理设置'
-            : 'Network connection failed. Please check: 1. Network connection 2. API endpoint 3. Firewall or proxy settings',
-        };
-      }
-
-      // 如果有状态码，提供详细的错误信息
+      // 已映射的状态码优先于 network 等消息关键词分类，避免网关限流错误被误报为网络问题。
       if (statusCode) {
         const meaning = getStatusCodeMeaning(statusCode, this.language);
         const errorType = getErrorTypeFromStatus(statusCode) ?? 'unknown';
@@ -2223,6 +2217,17 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
           message: this.language === 'zh'
             ? `HTTP ${statusCode} - ${meaning}\n建议：${suggestions[errorType].zh}`
             : `HTTP ${statusCode} - ${meaning}\nSuggestion: ${suggestions[errorType].en}`,
+        };
+      }
+
+      // 处理网络错误
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+        return {
+          success: false,
+          errorType: 'network',
+          message: this.language === 'zh'
+            ? '网络连接失败。请检查：1. 网络连接是否正常 2. API端点地址是否正确 3. 防火墙或代理设置'
+            : 'Network connection failed. Please check: 1. Network connection 2. API endpoint 3. Firewall or proxy settings',
         };
       }
 
