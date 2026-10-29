@@ -1071,6 +1071,16 @@ function refreshTrayMenu() {
     },
     { type: 'separator' },
     {
+      label: '重启应用',
+      click: () => {
+        // relaunch 后再正常 quit：让渲染进程的 pagehide flush 跑完再退出，
+        // 不能用 app.exit 硬退，避免丢未持久化的分片数据。
+        app.relaunch();
+        isQuitting = true;
+        app.quit();
+      },
+    },
+    {
       label: '退出',
       click: () => {
         isQuitting = true;
