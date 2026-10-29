@@ -58,6 +58,7 @@ const {
   loadEncryptedXAuth,
   clearEncryptedXAuth,
 } = require('./xAuthStorage');
+const { scheduleMinimizeToTray } = require('./windowLifecycle');
 
 let mainWindow;
 let tray = null;
@@ -384,12 +385,13 @@ function createWindow() {
     }
   });
 
-  mainWindow.on('minimize', (event) => {
-    // #345: 最小化默认隐藏到托盘。
-    if (desktopPrefs.minimizeToTray) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
+  mainWindow.on('minimize', () => {
+    // Electron emits this after the native minimized state is committed.
+    // Defer tray hide to avoid re-entering Windows window-state handling.
+    scheduleMinimizeToTray({
+      win: mainWindow,
+      shouldHide: () => desktopPrefs.minimizeToTray,
+    });
   });
 
   mainWindow.on('closed', () => {
