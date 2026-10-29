@@ -151,7 +151,12 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
       const now = new Date().toISOString();
-      const licenseById = new Map(repositories.map((repository) => [repository.id, repository.license ?? null]));
+      // 与 indexAllRepos 的按 id 首条去重保持一致：标记使用首条记录的 license，
+      // 避免重复 id 时标记与已上传向量的元数据来源不同。
+      const licenseById = new Map<number, string | null>();
+      for (const repository of repositories) {
+        if (!licenseById.has(repository.id)) licenseById.set(repository.id, repository.license ?? null);
+      }
       const stamp = (id: number) => ({ id, patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) } });
       const newlyIndexed = new Set(repositories.filter((repository) => !repository.vector_indexed_at).map((repository) => repository.id));
       if (!incremental) {

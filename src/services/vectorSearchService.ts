@@ -547,15 +547,8 @@ export async function indexAllRepos(
     throw new Error('batchSize must be a positive integer');
   }
 
-  // 只索引已分析且未失败的仓库；同一 id 在本地存储出现重复时只保留一条，
-  // 避免向量重复 upsert 与进度重复计数（嵌入格式与索引结构不受影响）。
-  const seenRepoIds = new Set<number>();
-  let indexable = repos.filter((r) => {
-    if (!r.analyzed_at || r.analysis_failed) return false;
-    if (seenRepoIds.has(r.id)) return false;
-    seenRepoIds.add(r.id);
-    return true;
-  });
+  // 只索引已分析且未失败的仓库
+  let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
   // 增量模式下跳过已索引且内容未更新的仓库
   if (incremental) {
     // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
@@ -563,6 +556,14 @@ export async function indexAllRepos(
     const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? EMBEDDING_FORMAT_VERSION);
     indexable = indexable.filter((r) => needsReindex(r, formatVersionChanged));
   }
+  // 同一 id 只保留一条，避免向量重复 upsert 与进度重复计数；放在增量过滤之后，
+  // 使未变化的重复记录不会遮蔽已更新的记录（嵌入格式与索引结构不受影响）。
+  const seenRepoIds = new Set<number>();
+  indexable = indexable.filter((r) => {
+    if (seenRepoIds.has(r.id)) return false;
+    seenRepoIds.add(r.id);
+    return true;
+  });
   let indexed = 0;
   let errors = 0;
   let lastError = '';

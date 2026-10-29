@@ -416,10 +416,13 @@ const writeShardedSnapshot = async (
   const serializedBytes = new Map<PersistenceShardName, number>();
   // serialized.length 是 UTF-16 码元数；含 CJK/emoji 等多字节字符时 UTF-8 字节数
   // 更大（至多 3 倍），而 UTF-8 字节数恒 ≥ 码元数。故码元数已达阈值可直接判定；
-  // 低于阈值才用 TextEncoder 精确计字节数（此时上界为 3×阈值，开销有界）——
-  // 避免为 140MB 级分片整串转码一份字节副本。
+  // 大分片增长判定与日志依赖精确 UTF-8 字节数：纯 ASCII 时码元数即字节数，
+  // 跳过整串转码；含非 ASCII 时才完整 encode，避免低估体积导致误抑制增长告警。
+  // JSON.stringify 会转义全部控制字符（U+007F 除外，保守起见也走精确编码），
+  // 因此「全部落在可见 ASCII 区间」即可断定码元数等于 UTF-8 字节数。
+  const NON_PRINTABLE_ASCII_PATTERN = /[^\x20-\x7E]/;
   const byteLengthOf = (serialized: string): number => {
-    if (serialized.length >= SHARD_SIZE_WARN_BYTES) return serialized.length;
+    if (serialized.length >= SHARD_SIZE_WARN_BYTES && !NON_PRINTABLE_ASCII_PATTERN.test(serialized)) return serialized.length;
     return new TextEncoder().encode(serialized).length;
   };
   try {
