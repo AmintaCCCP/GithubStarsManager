@@ -97,7 +97,8 @@ function extractGatewayErrorFromData(data: unknown): { message: string; status: 
     : (() => { try { return JSON.stringify(err); } catch { return 'unknown gateway error'; } })();
   const code = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : '';
   const type = typeof e.type === 'string' ? e.type : '';
-  const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type} ${message}`);
+  const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`)
+    || /throttling|rate[\s-]limit (exceeded|reached)|too many requests/i.test(message);
   return { message, status: isThrottling ? 429 : 502 };
 }
 
