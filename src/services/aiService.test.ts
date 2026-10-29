@@ -1098,4 +1098,17 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     const result = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} });
     expect(result).toBe(plainText);
   });
+
+  it('requestTextStream 缺失 Content-Type 时 id 前缀的普通文本行不被误判为 SSE 帧', async () => {
+    const plainText = 'identity check\ndata: {"error":{"message":"x","code":"429"}}';
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => plainText,
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const result = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} });
+    expect(result).toBe(plainText);
+  });
 });

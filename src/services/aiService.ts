@@ -1014,7 +1014,7 @@ ${options.user}` : options.user;
         // "data:" 开头的行时继续走下方 JSON / 纯文本回退。
         // 缺失 Content-Type 时，仅当整段 body 都由 SSE 帧行组成才视为真 SSE，
         // 避免把纯文本回答里恰好出现的 data: 行误判为网关错误帧。
-        const isSseFramed = raw.split(/\r\n|\r|\n/).every((line) => line === '' || /^(data|event|id|retry|:)/.test(line));
+        const isSseFramed = raw.split(/\r\n|\r|\n/).every((line) => line === '' || /^(?:(?:data|event|id|retry):|:)/.test(line));
         if (isSseFramed) {
           const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
           if (gatewayError) {
