@@ -279,14 +279,19 @@ describe('indexAllRepos duplicate id handling', () => {
       makeRepository(1, { description: 'first' }),
       makeRepository(1, { description: 'second' }),
     ];
+    const embed = vi.fn(async (texts: string[]) => texts.map((_, i) => vec(i)));
+    const indexClient = { embed } as unknown as Parameters<typeof indexAllRepos>[1];
     const vectorService = makeVectorService();
     const indexedIds: number[] = [];
-    const result = await indexAllRepos(repos, makeIndexClient(), vectorService, {
+    const result = await indexAllRepos(repos, indexClient, vectorService, {
       indexMode: 'description',
       onRepoIndexed: (repoId) => indexedIds.push(repoId),
     });
 
     expect(vectorService.upsert).toHaveBeenCalledTimes(1);
+    const embeddedText = embed.mock.calls.flatMap(([texts]) => texts).join('\n');
+    expect(embeddedText).toContain('first');
+    expect(embeddedText).not.toContain('second');
     expect(indexedIds).toEqual([1]);
     expect(result.indexedRepoIds).toEqual([1]);
     expect(result.skipped).toBe(1);

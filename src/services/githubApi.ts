@@ -615,7 +615,12 @@ export class GitHubApiService {
       // 5xx 视为可重试的瞬时故障；其余 4xx 直接抛出（重试无意义）。
       const isRetryable = response.status >= 500 && response.status <= 599;
       if (!isRetryable || attempt === maxRetries) {
-        this.log403Failure('API request failed', { method, endpoint, status: response.status, durationMs });
+        const failureMeta = { method, endpoint, status: response.status, durationMs };
+        if (response.status === 403) {
+          this.log403Failure('API request failed', failureMeta);
+        } else {
+          logger.warn('githubApi', 'API request failed', failureMeta);
+        }
         throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
       }
 

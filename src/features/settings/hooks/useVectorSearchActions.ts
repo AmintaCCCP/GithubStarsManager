@@ -194,7 +194,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         connected: true,
         vectorCount: incremental
           ? previousCount + result.indexedRepoIds.filter((id) => newlyIndexed.has(id)).length
-          : result.indexed + excludedVectorIds.length,
+            : result.indexed + excludedVectorIdSet.size,
         dimensions: draft.dimensions,
         lastSyncAt: new Date().toISOString(),
       });
@@ -209,7 +209,14 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         state.setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const repositories = useAppStore.getState().repositories;
-        const indexable = repositories.filter((repository) => repository.analyzed_at && !repository.analysis_failed && (!incremental || needsReindex(repository, currentFormatVersion < EMBEDDING_FORMAT_VERSION))).length;
+        const indexableSeenIds = new Set<number>();
+        const indexable = repositories.filter((repository) => {
+          if (!repository.analyzed_at || repository.analysis_failed) return false;
+          if (incremental && !needsReindex(repository, currentFormatVersion < EMBEDDING_FORMAT_VERSION)) return false;
+          if (indexableSeenIds.has(repository.id)) return false;
+          indexableSeenIds.add(repository.id);
+          return true;
+        }).length;
         state.setVectorIndexingState({
           isIndexing: false,
           phase: null,
