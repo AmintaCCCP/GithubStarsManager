@@ -81,6 +81,35 @@ export function isRateLimitedError(error: unknown): boolean {
   return /429|rate\s*limit|too many requests/i.test(msg);
 }
 
+/**
+ * 网关可能在 HTTP 200 的 JSON body 里返回错误对象（如 agnes 的 429 throttling_error）。
+ * 识别这类"伪成功"响应并转为带状态码的 AIRequestError，让限流/退避逻辑正常生效。
+ */
+function extractGatewayErrorFromData(data: unknown): { message: string; status: number } | null {
+  if (!data || typeof data !== 'object') return null;
+  const err = (data as { error?: unknown }).error;
+  if (!err) return null;
+  if (typeof err === 'string') return { message: err, status: 502 };
+  if (typeof err !== 'object') return null;
+  const e = err as { message?: unknown; code?: unknown; type?: unknown };
+  const message = typeof e.message === 'string' && e.message
+    ? e.message
+    : (() => { try { return JSON.stringify(err); } catch { return 'unknown gateway error'; } })();
+  const code = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : '';
+  const type = typeof e.type === 'string' ? e.type : '';
+  const isThrottling = code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`);
+  return { message, status: isThrottling ? 429 : 502 };
+}
+
+function stringifyDataForWarn(data: unknown): string {
+  try {
+    const s = JSON.stringify(data);
+    return s.length > 500 ? `${s.slice(0, 500)}...[truncated]` : s;
+  } catch {
+    return String(data);
+  }
+}
+
 /** 从限流错误中读取服务端建议的等待毫秒数（Retry-After / retry-after-ms）。 */
 export function getRetryAfterMsFromError(error: unknown): number | undefined {
   if (!error || typeof error !== 'object') return undefined;
@@ -613,6 +642,15 @@ export class AIService {
         }
       }
 
+      // 网关可能在 HTTP 200 body 里携带错误对象；先识别再按"无内容"兜底。
+      const gatewayError = extractGatewayErrorFromData(data);
+      if (gatewayError) {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, httpDetails);
+        throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+      }
+      if (logger.isDebugMode()) {
+        logger.warn('ai', 'No content received from AI service', { model, configId, data: stringifyDataForWarn(data) });
+      }
       this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
     }
@@ -974,12 +1012,19 @@ ${options.user}` : options.user;
       }
 
       let text = '';
+      let parsed: unknown;
       try {
-        text = extractFullTextFromResponse(apiType, JSON.parse(raw));
+        parsed = JSON.parse(raw);
+        text = extractFullTextFromResponse(apiType, parsed);
       } catch {
         text = raw;
       }
       if (!text) {
+        const gatewayError = extractGatewayErrorFromData(parsed);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        }
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');
       }
@@ -993,12 +1038,19 @@ ${options.user}` : options.user;
       // 回答：先按 JSON 解析提取结构化文本，失败则把原始文本作为一次性 chunk。
       const raw = await response.text();
       let text = '';
+      let parsed: unknown;
       try {
-        text = extractFullTextFromResponse(apiType, JSON.parse(raw));
+        parsed = JSON.parse(raw);
+        text = extractFullTextFromResponse(apiType, parsed);
       } catch {
         text = raw;
       }
       if (!text) {
+        const gatewayError = extractGatewayErrorFromData(parsed);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        }
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');
       }
@@ -1296,7 +1348,10 @@ ${options.user}` : options.user;
         ? `AI返回内容不符合要求，已重试${AIService.ANALYSIS_MAX_ATTEMPTS - 1}次：${lastInvalidReason}`
         : `AI response did not meet requirements after ${AIService.ANALYSIS_MAX_ATTEMPTS - 1} retries: ${lastInvalidReason}`);
     } catch (error) {
-      logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
+      // 取消不是失败：用户主动停止时不要把 AbortError 记成分析失败。
+      if (!isAbortError(error) && !signal?.aborted) {
+        logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
+      }
       // 抛出错误，让调用方处理失败状态
       throw error;
     }
@@ -2034,8 +2089,7 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   async testConnection(): Promise<ConnectionTestResult> {
-    const apiType = this.getApiType();
-    const timeoutMs = apiType === 'openai-responses' || apiType === 'gemini' || this.config.reasoningEffort ? 30000 : 10000;
+    const timeoutMs = 30000;
 
     try {
       const base = new URL(this.config.baseUrl);

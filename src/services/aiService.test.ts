@@ -3,6 +3,7 @@ import type { Repository } from '../types';
 import {
   AIService,
   AIRequestError,
+  isAbortError,
   isRateLimitedError,
   getRetryAfterMsFromError,
   isAIToolCallUnsupportedError,
@@ -906,5 +907,86 @@ describe('AIService vector query analysis and graded reranking', () => {
     const publicResult = AIService.rankLexicalCandidates([repo], '技能', ['skill']);
     const privateResult = service['scoreRepositoriesByKeywords']([repo], '技能', ['skill']);
     expect(privateResult).toEqual(publicResult);
+  });
+});
+
+describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+
+  it('HTTP 200 携带 429/throttling 错误体时转为限流 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'max connections reached', type: 'throttling_error', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    const aiError = error as AIRequestError;
+    expect(aiError.status).toBe(429);
+    expect(aiError.isRateLimit).toBe(true);
+    expect(isRateLimitedError(aiError)).toBe(true);
+    expect(aiError.message).toContain('max connections reached');
+  });
+
+  it('HTTP 200 携带非限流网关错误体时转为 502 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'upstream unavailable', code: 'bad_gateway' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    const aiError = error as AIRequestError;
+    expect(aiError.status).toBe(502);
+    expect(aiError.isRateLimit).toBe(false);
+    expect(aiError.message).toContain('upstream unavailable');
+  });
+
+  it('普通 openai 兼容配置的连接测试在 30s 才超时（不再 10s 判“渠道不可用”）', async () => {
+    vi.useFakeTimers();
+    try {
+      const service = new AIService(makeConfig() as never);
+      mockFetch().mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
+      }));
+      let settled = false;
+      const pending = service.testConnection().then(() => { settled = true; }, () => { settled = true; });
+      await vi.advanceTimersByTimeAsync(29999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+      await pending;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('analyzeRepository 遇到 AbortError 不记“AI analysis failed”日志但仍抛出', async () => {
+    mockFetch().mockRejectedValue(new DOMException('signal is aborted without reason', 'AbortError'));
+    const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
+    try {
+      const service = new AIService(makeConfig() as never, 'zh');
+      await expect(service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme'))
+        .rejects.toSatisfy(isAbortError);
+      expect(errorFromLogger).not.toHaveBeenCalled();
+    } finally {
+      errorFromLogger.mockRestore();
+    }
+  });
+
+  it('analyzeRepository 非 AbortError 仍照常记录失败日志', async () => {
+    mockFetch().mockRejectedValue(new Error('network down'));
+    const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
+    try {
+      const service = new AIService(makeConfig() as never, 'zh');
+      await expect(service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme'))
+        .rejects.toThrow('network down');
+      expect(errorFromLogger).toHaveBeenCalledWith('ai', 'AI analysis failed', expect.any(Error), expect.anything());
+    } finally {
+      errorFromLogger.mockRestore();
+    }
   });
 });
