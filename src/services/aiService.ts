@@ -75,6 +75,7 @@ export function isRateLimitedError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const e = error as { statusCode?: unknown; status?: unknown; isRateLimit?: unknown; message?: unknown };
   if (e.isRateLimit === true) return true;
+  if (error instanceof AIRequestError && error.isRateLimit === false) return false;
   if (typeof e.statusCode === 'number' && e.statusCode === 429) return true;
   if (typeof e.status === 'number' && e.status === 429) return true;
   const msg = typeof e.message === 'string' ? e.message : '';

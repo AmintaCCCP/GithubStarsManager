@@ -965,6 +965,18 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect(isRateLimitedError(error)).toBe(false);
   });
 
+  it('HTTP 200 非限流网关错误即使消息含 rate limit 也不触发限流判定', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { type: 'upstream_error', message: 'upstream rate limit hit for key' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(502);
+    expect((error as AIRequestError).isRateLimit).toBe(false);
+    expect(isRateLimitedError(error)).toBe(false);
+  });
+
   it('HTTP 200 携带非限流网关错误体时转为 502 AIRequestError', async () => {
     mockFetch().mockResolvedValueOnce(fetchJson({
       error: { message: 'upstream unavailable', code: 'bad_gateway' },
