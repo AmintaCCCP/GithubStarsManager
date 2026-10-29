@@ -953,12 +953,14 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
         init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
       }));
       let settled = false;
-      const pending = service.testConnection().then(() => { settled = true; }, () => { settled = true; });
+      let result: unknown;
+      const pending = service.testConnection().then((value) => { result = value; settled = true; }, () => { settled = true; });
       await vi.advanceTimersByTimeAsync(29999);
       expect(settled).toBe(false);
       await vi.advanceTimersByTimeAsync(1);
       expect(settled).toBe(true);
       await pending;
+      expect(result).toMatchObject({ success: false, errorType: 'timeout' });
     } finally {
       vi.useRealTimers();
     }
@@ -988,5 +990,53 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     } finally {
       errorFromLogger.mockRestore();
     }
+  });
+
+  it('analyzeRepository 信号已中止但请求抛出普通 Error 时不记录失败日志', async () => {
+    mockFetch().mockRejectedValue(new Error('network down'));
+    const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const service = new AIService(makeConfig() as never, 'zh');
+      await expect(service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme', undefined, undefined, controller.signal))
+        .rejects.toThrow('network down');
+      expect(errorFromLogger).not.toHaveBeenCalled();
+    } finally {
+      errorFromLogger.mockRestore();
+    }
+  });
+
+  it('requestTextStream 缺失 Content-Type 的 HTTP 200 限流错误体转为 429 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => JSON.stringify({ error: { message: 'max connections reached', type: 'throttling_error', code: '429' } }),
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
+  it('requestTextStream application/json 的 HTTP 200 网关错误体转为 502 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({ error: { message: 'bad gateway', type: 'bad_gateway' } }, 200));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(502);
+  });
+
+  it('requestTextStream SSE 帧携带网关错误体时转为 429 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(
+      'data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
   });
 });

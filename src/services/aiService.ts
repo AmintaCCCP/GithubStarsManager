@@ -91,14 +91,24 @@ function extractGatewayErrorFromData(data: unknown): { message: string; status: 
   if (!err) return null;
   if (typeof err === 'string') return { message: err, status: 502 };
   if (typeof err !== 'object') return null;
-  const e = err as { message?: unknown; code?: unknown; type?: unknown };
+  const e = err as { message?: unknown; code?: unknown; type?: unknown; status?: unknown };
   const message = typeof e.message === 'string' && e.message
     ? e.message
     : (() => { try { return JSON.stringify(err); } catch { return 'unknown gateway error'; } })();
   const code = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : '';
   const type = typeof e.type === 'string' ? e.type : '';
-  const isThrottling = code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`);
+  const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`);
   return { message, status: isThrottling ? 429 : 502 };
+}
+
+function extractGatewayErrorFromSsePayloads(payloads: string[]): { message: string; status: number } | null {
+  for (const payload of payloads) {
+    try {
+      const gatewayError = extractGatewayErrorFromData(JSON.parse(payload));
+      if (gatewayError) return gatewayError;
+    } catch { /* 非 JSON 载荷 */ }
+  }
+  return null;
 }
 
 function stringifyDataForWarn(data: unknown): string {
@@ -1009,6 +1019,11 @@ ${options.user}` : options.user;
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
           return full;
         }
+        const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        }
       }
 
       let text = '';
@@ -1064,16 +1079,24 @@ ${options.user}` : options.user;
       throw new Error('No content received from AI service (empty body)');
     }
     let full = '';
+    const nonDeltaPayloads: string[] = [];
     await consumeSseStream(response.body, (payload) => {
       const delta = extractDelta(payload);
       if (delta) {
         full += delta;
         options.onChunk(delta);
+      } else {
+        nonDeltaPayloads.push(payload);
       }
     });
 
     this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
     if (!full.trim()) {
+      const gatewayError = extractGatewayErrorFromSsePayloads(nonDeltaPayloads);
+      if (gatewayError) {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+        throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+      }
       throw new Error('No content received from AI service (stream)');
     }
     return full;
