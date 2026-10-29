@@ -1007,6 +1007,11 @@ ${options.user}` : options.user;
       if (ssePayloads.length > 0) {
         // 只有至少一帧解出当前 API 的有效增量才算 SSE；普通文本里恰好出现
         // "data:" 开头的行时继续走下方 JSON / 纯文本回退。
+        const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+        }
         const deltas = ssePayloads
           .map((payload) => extractDelta(payload))
           .filter((delta) => delta !== '');
@@ -1018,11 +1023,6 @@ ${options.user}` : options.user;
           }
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
           return full;
-        }
-        const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
-        if (gatewayError) {
-          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
         }
       }
 
@@ -1091,12 +1091,12 @@ ${options.user}` : options.user;
     });
 
     this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
+    const gatewayError = extractGatewayErrorFromSsePayloads(nonDeltaPayloads);
+    if (gatewayError) {
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+      throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
+    }
     if (!full.trim()) {
-      const gatewayError = extractGatewayErrorFromSsePayloads(nonDeltaPayloads);
-      if (gatewayError) {
-        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
-        throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status);
-      }
       throw new Error('No content received from AI service (stream)');
     }
     return full;

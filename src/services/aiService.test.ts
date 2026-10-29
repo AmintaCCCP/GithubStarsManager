@@ -1039,4 +1039,16 @@ describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () =>
     expect(error).toBeInstanceOf(AIRequestError);
     expect((error as AIRequestError).status).toBe(429);
   });
+
+  it('requestTextStream 增量后接 SSE 错误帧时整体抛出 429 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(
+      'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'
+      + 'data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+  });
 });
