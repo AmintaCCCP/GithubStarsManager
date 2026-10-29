@@ -24,6 +24,39 @@ import {
 import { logger } from './logger';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 import { secureRandomString } from '../utils/cryptoRandom';
+import { createCombinedAbortController } from '../utils/abortUtils';
+
+// 单次 fetch 尝试的超时：断网/睡眠时挂起的连接不会自行 reject，
+// 没有超时会让上层同步流程永远等待，刷新按钮一直处于禁用状态。
+const REQUEST_TIMEOUT_MS = 30_000;
+const TIMEOUT_ERROR_MESSAGE = `GitHub API request timed out after ${REQUEST_TIMEOUT_MS}ms`;
+const SAFE_METHODS = new Set(['GET', 'HEAD']);
+// 发布刷新批次的总等待上限：单请求最坏约 127s（4 次 ×30s + 退避），
+// 没有批次上限时持续断网会让刷新一直占住。超预算后跳过剩余仓库，
+// 已完成的仓库结果照常返回，跳过的仓库不推进 watermark、下次刷新重试。
+const REFRESH_BATCH_BUDGET_MS = 10 * 60_000;
+
+/** 超时中止与用户主动取消都表现为 AbortError；父信号未中止时才算超时。 */
+function isTimeoutAbort(error: unknown, parentSignal: AbortSignal | undefined): boolean {
+  return (error as { name?: string } | null)?.name === 'AbortError' && !parentSignal?.aborted;
+}
+
+/** 退避等待，可被父信号中止。 */
+function delayWithAbort(delayMs: number, signal: AbortSignal | undefined): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', onAbort);
+      reject(new Error('Aborted'));
+    };
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener('abort', onAbort);
+    if (signal?.aborted) onAbort();
+  });
+}
 
 interface GitHubContentResponse {
   content?: string;
@@ -437,9 +470,13 @@ export class GitHubApiService {
     // GitHub 的 gist 等端点偶发 502/503/504（网关瞬时故障），这里对 5xx 做指数退避重试，
     // 退避策略与 backendAdapter.fetchWithRetry 保持一致（1s/2s/4s，最多重试 3 次）。
     const maxRetries = 3;
+    const isSafeMethod = SAFE_METHODS.has(method.toUpperCase());
     let response: Response | undefined;
+    let data: T | null | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const viaProxy = this.backendUrl != null;
+      // 每次尝试独立超时：超时上限不被重试+退避消耗（与 githubListsApi 一致）
+      const timeoutController = createCombinedAbortController(signal, REQUEST_TIMEOUT_MS);
       try {
         if (this.backendUrl) {
           // 通过后端代理路由：POST {backendUrl}/proxy/github/{endpoint}?query
@@ -458,14 +495,14 @@ export class GitHubApiService {
 
           response = await fetch(proxyUrl, {
             method: 'POST',
-            signal,
+            signal: timeoutController.signal,
             headers: this.getBackendHeaders(),
             body: JSON.stringify(proxyBody),
           });
         } else {
           response = await fetch(`${GITHUB_API_BASE}${endpoint}`, {
             ...fetchOptions,
-            signal,
+            signal: timeoutController.signal,
             headers: {
               'Authorization': `Bearer ${this.token}`,
               'Accept': 'application/vnd.github.v3+json',
@@ -474,8 +511,16 @@ export class GitHubApiService {
             },
           });
         }
-      } catch (fetchError) {
+      } catch (caughtError) {
+        const timedOut = isTimeoutAbort(caughtError, signal);
+        const fetchError = timedOut ? new Error(TIMEOUT_ERROR_MESSAGE) : caughtError;
         const durationMs = Date.now() - startTime;
+        // 非幂等请求超时可能已在服务端生效，重试会造成重复副作用
+        // （如重复创建 gist / 重复触发 workflow），直接抛出。
+        if (timedOut && !isSafeMethod) {
+          logger.error('githubApi', 'API request timed out, not retrying non-idempotent method', { method, endpoint, durationMs, attempt: attempt + 1 });
+          throw fetchError;
+        }
         // 网络错误（连接断开、DNS 超时、socket hang-up 等）视为可重试的瞬时故障，
         // 仅在最后一次尝试时抛出；之前的尝试会继续走指数退避重试。
         if (attempt === maxRetries || signal?.aborted) {
@@ -484,19 +529,7 @@ export class GitHubApiService {
         }
         logger.warn('githubApi', 'API request network error, retrying', { method, endpoint, attempt: attempt + 1, maxRetries: maxRetries + 1, durationMs, error: fetchError instanceof Error ? fetchError.message : String(fetchError) });
         const delayMs = Math.min(1000 * Math.pow(2, attempt), 4000);
-        await new Promise<void>((resolve, reject) => {
-          const onAbort = () => {
-            clearTimeout(timeoutId);
-            signal?.removeEventListener('abort', onAbort);
-            reject(new Error('Aborted'));
-          };
-          const timeoutId = setTimeout(() => {
-            signal?.removeEventListener('abort', onAbort);
-            resolve();
-          }, delayMs);
-          signal?.addEventListener('abort', onAbort);
-          if (signal?.aborted) onAbort();
-        });
+        await delayWithAbort(delayMs, signal);
         continue;
       }
 
@@ -510,7 +543,21 @@ export class GitHubApiService {
         this.rateLimitReset = parseInt(reset, 10);
       }
 
-      if (response.ok) break;
+      if (response.ok) {
+        try {
+          data = response.status === 204 ? null : await response.json() as T;
+          break;
+        } catch (bodyError) {
+          const timedOut = isTimeoutAbort(bodyError, signal);
+          // 响应体停滞同样只对幂等读请求重试；写请求可能已成功，不能重放。
+          if (!timedOut || !isSafeMethod || attempt === maxRetries || signal?.aborted) {
+            throw timedOut ? new Error(TIMEOUT_ERROR_MESSAGE) : bodyError;
+          }
+          logger.warn('githubApi', 'API response body timed out, retrying', { method, endpoint, attempt: attempt + 1, maxRetries: maxRetries + 1 });
+          await delayWithAbort(Math.min(1000 * Math.pow(2, attempt), 4000), signal);
+          continue;
+        }
+      }
 
       const durationMs = Date.now() - startTime;
       if (response.status === 401) {
@@ -519,7 +566,13 @@ export class GitHubApiService {
           // The proxy forwards upstream GitHub bodies verbatim, while the
           // backend's own auth middleware marks its 401s with code
           // 'UNAUTHORIZED'. Only the latter is a backend API key problem.
-          const body = await response.json().catch(() => null) as { code?: string } | null;
+          let body: { code?: string } | null = null;
+          try {
+            body = await response.json() as { code?: string } | null;
+          } catch (bodyError) {
+            // 响应体读取超时不能吞成 "token 无效"，如实抛超时错误。
+            if (isTimeoutAbort(bodyError, signal)) throw new Error(TIMEOUT_ERROR_MESSAGE);
+          }
           if (body?.code === 'UNAUTHORIZED') {
             throw new Error(BACKEND_PROXY_UNAUTHORIZED_ERROR);
           }
@@ -555,19 +608,7 @@ export class GitHubApiService {
       }
       const delayMs = Math.min(1000 * Math.pow(2, attempt), 4000);
       logger.warn('githubApi', 'API request failed, retrying', { method, endpoint, status: response.status, attempt: attempt + 1, maxRetries: maxRetries + 1, delayMs, durationMs });
-      await new Promise<void>((resolve, reject) => {
-        const onAbort = () => {
-          clearTimeout(timeoutId);
-          signal?.removeEventListener('abort', onAbort);
-          reject(new Error('Aborted'));
-        };
-        const timeoutId = setTimeout(() => {
-          signal?.removeEventListener('abort', onAbort);
-          resolve();
-        }, delayMs);
-        signal?.addEventListener('abort', onAbort);
-        if (signal?.aborted) onAbort();
-      });
+      await delayWithAbort(delayMs, signal);
     }
 
     // 循环正常退出时 response 一定已赋值（最后一次成功 break 或在循环内抛出）。
@@ -601,11 +642,9 @@ export class GitHubApiService {
       });
     }
 
-    const data = finalResponse.status === 204 ? null : await finalResponse.json();
-
     // 如果是starred repositories的响应，需要处理特殊格式
     if (endpoint.includes('/user/starred') && Array.isArray(data)) {
-      return data.map((item: GitHubStarredItem) => {
+      return (data as GitHubStarredItem[]).map((item) => {
         // 如果使用了star+json格式，数据结构会不同
         if (item.starred_at && item.repo) {
           return {
@@ -622,7 +661,7 @@ export class GitHubApiService {
       }) as T;
     }
 
-    return data;
+    return data as T;
   }
 
   async getCurrentUser(): Promise<GitHubUser> {
@@ -1404,6 +1443,8 @@ export class GitHubApiService {
     options: ReleaseFetchOptions = {}
   ): Promise<MultipleReleasesResult> {
     const startTime = Date.now();
+    // 用单调时钟，避免系统时钟回拨导致批次预算失效；startTime 仅用于日志。
+    const batchDeadline = performance.now() + REFRESH_BATCH_BUDGET_MS;
     const { includePreRelease = true, refreshExistingAssets = false } = options;
     const allReleases: Release[] = [];
     const latestReleases: Release[] = [];
@@ -1419,6 +1460,14 @@ export class GitHubApiService {
         if (currentIndex >= repositories.length) break;
 
         const repo = repositories[currentIndex];
+        if (performance.now() >= batchDeadline) {
+          failedRepos.push({
+            repoId: repo.id,
+            full_name: repo.full_name,
+            error: `刷新批次超过 ${REFRESH_BATCH_BUDGET_MS / 60_000} 分钟上限，已跳过以保留已完成结果`,
+          });
+          continue;
+        }
         const [owner, name] = repo.full_name.split('/');
 
         try {
