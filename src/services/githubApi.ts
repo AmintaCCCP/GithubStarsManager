@@ -1443,7 +1443,8 @@ export class GitHubApiService {
     options: ReleaseFetchOptions = {}
   ): Promise<MultipleReleasesResult> {
     const startTime = Date.now();
-    const batchDeadline = startTime + REFRESH_BATCH_BUDGET_MS;
+    // 用单调时钟，避免系统时钟回拨导致批次预算失效；startTime 仅用于日志。
+    const batchDeadline = performance.now() + REFRESH_BATCH_BUDGET_MS;
     const { includePreRelease = true, refreshExistingAssets = false } = options;
     const allReleases: Release[] = [];
     const latestReleases: Release[] = [];
@@ -1459,7 +1460,7 @@ export class GitHubApiService {
         if (currentIndex >= repositories.length) break;
 
         const repo = repositories[currentIndex];
-        if (Date.now() >= batchDeadline) {
+        if (performance.now() >= batchDeadline) {
           failedRepos.push({
             repoId: repo.id,
             full_name: repo.full_name,
