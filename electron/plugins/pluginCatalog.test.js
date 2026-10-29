@@ -40,6 +40,35 @@ test('rejects non-GitHub and non-HTTPS asset URLs', () => {
   assert.throws(() => catalog.update({ repositories: [], releases: [input] }), { code: 'PLUGIN_SNAPSHOT_INVALID' });
 });
 
+test('snapshot truncates releases with more than 500 assets instead of rejecting', () => {
+  const catalog = createPluginCatalog();
+  const oversized = release();
+  oversized.assets = Array.from({ length: 600 }, (_, index) => ({
+    id: 10 + index,
+    name: `asset-${index}.zip`, size: 1, download_count: 0,
+    browser_download_url: `https://github.com/owner/project/releases/download/v1.0.0/asset-${index}.zip`,
+    content_type: 'application/octet-stream', created_at: '2026-01-04', updated_at: '2026-01-04',
+  }));
+
+  assert.deepEqual(catalog.update({ repositories: [repository()], releases: [oversized] }), { repositories: 1, releases: 1 });
+  assert.equal(catalog.getRelease(2).assets.length, 500);
+  assert.equal(catalog.getRelease(2).assets[0].name, 'asset-0.zip');
+  assert.equal(catalog.getDownloadAsset(2, 10).asset.browser_download_url.includes('asset-0.zip'), true);
+});
+
+test('direct plugin release submissions keep the strict 500-asset limit', () => {
+  const catalog = createPluginCatalog();
+  const oversized = release();
+  oversized.assets = Array.from({ length: 501 }, (_, index) => ({
+    id: 10 + index,
+    name: `asset-${index}.zip`, size: 1, download_count: 0,
+    browser_download_url: `https://github.com/owner/project/releases/download/v1.0.0/asset-${index}.zip`,
+    content_type: 'application/octet-stream', created_at: '2026-01-04', updated_at: '2026-01-04',
+  }));
+
+  assert.throws(() => catalog.upsert(repository(), oversized));
+});
+
 test('does not partially update a repository when release validation fails', () => {
   const catalog = createPluginCatalog();
   const invalidRelease = release();

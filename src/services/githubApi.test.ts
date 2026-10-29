@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository, Release } from '../types';
-import { BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
+import { logger } from './logger';
+import { __reset403WarnStateForTest, BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
 
 const makeRepository = (id: number, fullName: string, overrides: Partial<Repository> = {}): Repository => {
   const [owner, name] = fullName.split('/');
@@ -554,5 +555,91 @@ describe('GitHubApiService.makeRequest 请求超时（issue #523）', () => {
     expect(result.failedRepos).toHaveLength(1);
     expect(result.failedRepos[0].error).toContain('刷新批次');
     expect(result.releases).toHaveLength(0);
+  });
+});
+
+describe('GitHubApiService 403 warn 去重', () => {
+  const make403Response = (headers: Record<string, string>, body: unknown): Response => ({
+    ok: false,
+    status: 403,
+    statusText: 'Forbidden',
+    headers: { get: (name: string) => headers[name] ?? null },
+    json: async () => body,
+    clone() {
+      return this as unknown as Response;
+    },
+  } as unknown as Response);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    __reset403WarnStateForTest();
+  });
+
+  it('同一端点的重复通用 403 只 warn 一次，后续降级 debug，且仍正常抛错', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => make403Response({}, { message: 'forbidden' })));
+    const service = new GitHubApiService('token');
+
+    await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+    await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+
+    const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'forbidden');
+    const failedDebugs = debugSpy.mock.calls.filter(([, message]) => message === 'forbidden (deduplicated)');
+    expect(failedWarns).toHaveLength(1);
+    expect(failedDebugs).toHaveLength(1);
+  });
+
+  it('rate-limit 403 与 token-permission 403 同样按端点去重', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+    const service = new GitHubApiService('token');
+
+    vi.stubGlobal('fetch', vi.fn(async () => make403Response({ 'X-RateLimit-Remaining': '0' }, { message: 'rate limit' })));
+    await expect(service.getCurrentUser()).rejects.toThrow(/rate limit exceeded/);
+    await expect(service.getCurrentUser()).rejects.toThrow(/rate limit exceeded/);
+
+    vi.stubGlobal('fetch', vi.fn(async () => make403Response({}, { message: 'Resource not accessible by personal access token' })));
+    await expect(service.getCurrentUser()).rejects.toThrow(/not accessible/);
+    await expect(service.getCurrentUser()).rejects.toThrow(/not accessible/);
+
+    const rateLimitWarns = warnSpy.mock.calls.filter(([, message]) => message === 'API request failed: rate limit exceeded');
+    const rateLimitDebugs = debugSpy.mock.calls.filter(([, message]) => message === 'API request failed: rate limit exceeded (deduplicated)');
+    const permissionWarns = warnSpy.mock.calls.filter(([, message]) => message === 'API request failed: token permission');
+    const permissionDebugs = debugSpy.mock.calls.filter(([, message]) => message === 'API request failed: token permission (deduplicated)');
+    expect(rateLimitWarns).toHaveLength(1);
+    expect(rateLimitDebugs).toHaveLength(1);
+    expect(permissionWarns).toHaveLength(1);
+    expect(permissionDebugs).toHaveLength(1);
+  });
+
+  it('去重键包含后端路由：直连与代理的同端点 403 各自 warn 一次', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => make403Response({}, { message: 'forbidden' })));
+    const service = new GitHubApiService('token');
+
+    await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+
+    (service as unknown as { backendUrl: string | null }).backendUrl = 'http://localhost:3000/api';
+    await expect(service.getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+
+    const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'forbidden');
+    expect(failedWarns).toHaveLength(2);
+  });
+
+  it('会话级去重跨实例生效：相同凭据的不同实例只 warn 一次', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => make403Response({}, { message: 'forbidden' })));
+
+    await expect(new GitHubApiService('session-token').getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+    await expect(new GitHubApiService('session-token').getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+
+    expect(warnSpy.mock.calls.filter(([, message]) => message === 'forbidden')).toHaveLength(1);
+    expect(debugSpy.mock.calls.filter(([, message]) => message === 'forbidden (deduplicated)')).toHaveLength(1);
   });
 });

@@ -22,6 +22,7 @@ import {
   WorkflowDefinition,
 } from '../types';
 import { logger } from './logger';
+import { redactInline } from '../utils/logSanitizer';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 import { secureRandomString } from '../utils/cryptoRandom';
 import { createCombinedAbortController } from '../utils/abortUtils';
@@ -317,6 +318,24 @@ function mapGraphqlRepoDetail(node: Record<string, unknown>): GitHubRepoDetailRe
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
+// 会话级 403 去重：README/Release/Gist 等生产路径按操作新建 service 实例，
+// 实例级状态会让同一 403 在同一会话内重复 warn。按「凭据 + 后端上下文」的
+// 非敏感指纹分桶（指纹仅用于判断凭据是否变化，绝不写入日志），凭据切换后
+// 自然换桶重新 warn。
+const warned403RequestsByContext = new Map<string, Set<string>>();
+const credentialContextFingerprint = (value: string): string => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+/** 仅供测试重置会话级 403 去重状态，避免模块级状态跨用例泄漏。 */
+export function __reset403WarnStateForTest(): void {
+  warned403RequestsByContext.clear();
+}
 // Sentinel message for the 401 thrown above; callers match on it to tell a
 // confirmed auth failure apart from network/rate-limit/5xx errors.
 export const GITHUB_TOKEN_INVALID_ERROR = 'GitHub token expired or invalid';
@@ -435,6 +454,32 @@ export class GitHubApiService {
       headers.Authorization = `Bearer ${this.backendAuthToken}`;
     }
     return headers;
+  }
+
+  // 403 多来自无 token/低速率限制的周期性探测，属于持续噪音：同一（凭据上下文,
+  // 后端路由, method, endpoint, 失败原因）只 warn 一次，重复失败降级为 debug。
+  // 键含失败原因，新出现的不同 403 成因仍可 warn。仅影响日志，不改变抛错行为。
+  private log403Failure(
+    message: string,
+    meta: { method: string; endpoint: string; status: number; durationMs: number },
+  ): void {
+    // message 可能来自代理/后端响应体，写入日志与去重键前先做内联脱敏。
+    const safeMessage = redactInline(message);
+    const contextKey = credentialContextFingerprint(
+      `${this.token}\u0000${this.backendAuthToken ?? ''}\u0000${this.backendUrl ?? ''}`,
+    );
+    let warned403Requests = warned403RequestsByContext.get(contextKey);
+    if (!warned403Requests) {
+      warned403Requests = new Set();
+      warned403RequestsByContext.set(contextKey, warned403Requests);
+    }
+    const warnKey = `${this.backendUrl ?? 'direct'} ${meta.method} ${meta.endpoint} ${safeMessage}`;
+    if (warned403Requests.has(warnKey)) {
+      logger.debug('githubApi', `${safeMessage} (deduplicated)`, meta);
+    } else {
+      warned403Requests.add(warnKey);
+      logger.warn('githubApi', safeMessage, meta);
+    }
   }
 
   private async makeRequest<T>(endpoint: string, options: RequestInit & { operationTag?: string } = {}, signal?: AbortSignal): Promise<T> {
@@ -583,13 +628,13 @@ export class GitHubApiService {
         const resetDate = this.rateLimitReset
           ? new Date(this.rateLimitReset * 1000).toLocaleString()
           : 'unknown';
-        logger.warn('githubApi', 'API request failed: rate limit exceeded', { method, endpoint, status: response.status, durationMs });
+        this.log403Failure('API request failed: rate limit exceeded', { method, endpoint, status: response.status, durationMs });
         throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
       }
       if (response.status === 403) {
         const body = await response.clone().json().catch(() => null) as { message?: string } | null;
         if (body?.message === 'Resource not accessible by personal access token') {
-          logger.warn('githubApi', 'API request failed: token permission', { method, endpoint, status: response.status, durationMs });
+          this.log403Failure('API request failed: token permission', { method, endpoint, status: response.status, durationMs });
           throw new GitHubTokenPermissionError();
         }
       }
@@ -597,7 +642,14 @@ export class GitHubApiService {
       // 5xx 视为可重试的瞬时故障；其余 4xx 直接抛出（重试无意义）。
       const isRetryable = response.status >= 500 && response.status <= 599;
       if (!isRetryable || attempt === maxRetries) {
-        logger.warn('githubApi', 'API request failed', { method, endpoint, status: response.status, durationMs });
+        const failureMeta = { method, endpoint, status: response.status, durationMs };
+        if (response.status === 403) {
+          // 与 log403Failure 的键约定一致：失败原因取响应体 message，不同成因各自 warn 一次。
+          const failureBody = await response.clone().json().catch(() => null) as { message?: string } | null;
+          this.log403Failure(failureBody?.message || 'API request failed', failureMeta);
+        } else {
+          logger.warn('githubApi', 'API request failed', failureMeta);
+        }
         throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
       }
 

@@ -6,6 +6,7 @@ import {
   EmbeddingClient,
   indexAllRepos,
   needsReindex,
+  selectIndexableRepos,
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
@@ -78,18 +79,24 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   }, [state.vectorSearchConfig.embeddingFormatVersion]);
 
   const { incrementalTargetCount, unindexedRepoCount } = useMemo(() => {
-    let indexable = 0;
-    let unindexed = 0;
-    let unindexedWithMigration = 0;
-    for (const repository of state.repositories) {
-      if (!repository.analyzed_at || repository.analysis_failed) continue;
-      indexable += 1;
-      if (needsReindex(repository, false)) unindexed += 1;
-      if (needsReindex(repository, formatVersionChanged)) unindexedWithMigration += 1;
-    }
+    // 与 selectIndexableRepos 的顺序一致：先按增量谓词筛选，再按 id 去重，
+    // 否则同 id 首条无需重建时会漏计第二条待索引记录。mode=null 表示全量目标，
+    // 只做分析状态过滤（对应 formatVersionChanged 时的增量目标）。
+    const countAfter = (mode: boolean | null): number => {
+      const seen = new Set<number>();
+      let count = 0;
+      for (const repository of state.repositories) {
+        if (!repository.analyzed_at || repository.analysis_failed) continue;
+        if (mode !== null && !needsReindex(repository, mode)) continue;
+        if (seen.has(repository.id)) continue;
+        seen.add(repository.id);
+        count += 1;
+      }
+      return count;
+    };
     return {
-      incrementalTargetCount: formatVersionChanged ? indexable : unindexed,
-      unindexedRepoCount: state.vectorSearchConfig.enabled ? unindexedWithMigration : 0,
+      incrementalTargetCount: formatVersionChanged ? countAfter(null) : countAfter(false),
+      unindexedRepoCount: state.vectorSearchConfig.enabled ? countAfter(formatVersionChanged) : 0,
     };
   }, [formatVersionChanged, state.repositories, state.vectorSearchConfig.enabled]);
 
@@ -151,7 +158,13 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         ? currentState.vectorSearchConfig.embeddingFormatVersion
         : LEGACY_EMBEDDING_FORMAT_VERSION;
       const now = new Date().toISOString();
-      const licenseById = new Map(repositories.map((repository) => [repository.id, repository.license ?? null]));
+      // 标记必须来自实际上传的副本：与 indexAllRepos 共用同一候选选择规则
+      // （分析/增量过滤 + 按 id 首条去重），避免重复 id 时标记与向量元数据错位。
+      const uploadCandidates = selectIndexableRepos(repositories, { incremental, formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION });
+      const licenseById = new Map<number, string | null>();
+      for (const repository of uploadCandidates) {
+        if (!licenseById.has(repository.id)) licenseById.set(repository.id, repository.license ?? null);
+      }
       const stamp = (id: number) => ({ id, patch: { vector_indexed_at: now, vector_indexed_license: normalizeLicense(licenseById.get(id) ?? null) } });
       const newlyIndexed = new Set(repositories.filter((repository) => !repository.vector_indexed_at).map((repository) => repository.id));
       if (!incremental) {
@@ -189,7 +202,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         connected: true,
         vectorCount: incremental
           ? previousCount + result.indexedRepoIds.filter((id) => newlyIndexed.has(id)).length
-          : result.indexed + excludedVectorIds.length,
+            : result.indexed + excludedVectorIdSet.size,
         dimensions: draft.dimensions,
         lastSyncAt: new Date().toISOString(),
       });
@@ -204,7 +217,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         state.setVectorIndexingState({ isIndexing: false, phase: null, result: null });
       } else {
         const repositories = useAppStore.getState().repositories;
-        const indexable = repositories.filter((repository) => repository.analyzed_at && !repository.analysis_failed && (!incremental || needsReindex(repository, currentFormatVersion < EMBEDDING_FORMAT_VERSION))).length;
+        const indexable = selectIndexableRepos(repositories, { incremental, formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION }).length;
         state.setVectorIndexingState({
           isIndexing: false,
           phase: null,

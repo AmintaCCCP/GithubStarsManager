@@ -273,6 +273,55 @@ describe('indexAllRepos incremental filtering — license change invalidation', 
   });
 });
 
+describe('indexAllRepos duplicate id handling', () => {
+  it('indexes duplicate ids only once in full mode (first record wins)', async () => {
+    const repos = [
+      makeRepository(1, { description: 'first' }),
+      makeRepository(1, { description: 'second' }),
+    ];
+    const embed = vi.fn(async (texts: string[]) => texts.map((_, i) => vec(i)));
+    const indexClient = { embed } as unknown as Parameters<typeof indexAllRepos>[1];
+    const vectorService = makeVectorService();
+    const indexedIds: number[] = [];
+    const result = await indexAllRepos(repos, indexClient, vectorService, {
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedIds.push(repoId),
+    });
+
+    expect(vectorService.upsert).toHaveBeenCalledTimes(1);
+    const uploaded = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0] as Array<{ metadata: { description: string } }>;
+    expect(uploaded).toHaveLength(1);
+    expect(uploaded[0].metadata.description).toBe('first');
+    const embeddedText = embed.mock.calls.flatMap(([texts]) => texts).join('\n');
+    expect(embeddedText).toContain('first');
+    expect(embeddedText).not.toContain('second');
+    expect(indexedIds).toEqual([1]);
+    expect(result.indexedRepoIds).toEqual([1]);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('lets an updated duplicate survive incremental filtering instead of being shadowed by an unchanged duplicate', async () => {
+    // 同一 id 出现两条记录：首条已索引且未变化，第二条是更新后的副本。
+    // 去重必须发生在增量过滤之后，否则未变化的首条会遮蔽需要重索引的第二条。
+    const repos = [
+      makeRepository(1, { vector_indexed_at: '2026-01-10T00:00:00.000Z' }),
+      makeRepository(1, { vector_indexed_at: undefined, updated_at: '2026-01-12T00:00:00.000Z' }),
+    ];
+    const vectorService = makeVectorService();
+    const indexedIds: number[] = [];
+    const result = await indexAllRepos(repos, makeIndexClient(), vectorService, {
+      incremental: true,
+      formatVersion: EMBEDDING_FORMAT_VERSION,
+      currentFormatVersion: EMBEDDING_FORMAT_VERSION,
+      indexMode: 'description',
+      onRepoIndexed: (repoId) => indexedIds.push(repoId),
+    });
+
+    expect(indexedIds).toEqual([1]);
+    expect(result.indexedRepoIds).toEqual([1]);
+  });
+});
+
 describe('embedWithFallback', () => {
   it('uses fast batch path on success', async () => {
     const client = makeClient(async (texts) => texts.map((_, i) => vec(i)));

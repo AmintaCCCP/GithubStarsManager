@@ -84,7 +84,18 @@ let persistDebounceMs = 1000;
 let idleCallbackTimeoutMs = 3000;
 const lastWrittenShardBytes = new Map<PersistenceShardName, number>();
 const lastShardWriteAt = new Map<PersistenceShardName, number>();
+// 「Large state *」属于性能观测而非可行动告警：同一分片体积增长 ≤10% 时
+// 不再重复 warn，避免每次 idle persist 都刷一条大分片日志。
+const lastWarnedShardBytes = new Map<PersistenceShardName, number>();
+const SHARD_WARN_REGROWTH_RATIO = 1.1;
 let deferredLargeShardWriteTimerId: ReturnType<typeof setTimeout> | null = null;
+
+const shouldWarnLargeShard = (shard: PersistenceShardName, bytes: number): boolean => {
+  const lastWarned = lastWarnedShardBytes.get(shard);
+  if (lastWarned !== undefined && bytes <= lastWarned * SHARD_WARN_REGROWTH_RATIO) return false;
+  lastWarnedShardBytes.set(shard, bytes);
+  return true;
+};
 
 /**
  * 仅供测试注入更小的时序参数（写入防抖 / 空闲回调上限 / 大分片 idle 写入最小
@@ -98,6 +109,11 @@ export function __setPersistTimingsForTest(timings: {
   if (timings.debounceMs !== undefined) persistDebounceMs = timings.debounceMs;
   if (timings.idleTimeoutMs !== undefined) idleCallbackTimeoutMs = timings.idleTimeoutMs;
   if (timings.largeShardIdleMinIntervalMs !== undefined) largeShardIdleWriteMinIntervalMs = timings.largeShardIdleMinIntervalMs;
+}
+
+/** 仅供测试重置大分片告警基准，避免模块级状态跨用例/重复运行泄漏。 */
+export function __resetLargeShardWarnStateForTest(): void {
+  lastWarnedShardBytes.clear();
 }
 
 const emptyShardViews = (): ShardViews => {
@@ -405,10 +421,13 @@ const writeShardedSnapshot = async (
   const serializedBytes = new Map<PersistenceShardName, number>();
   // serialized.length 是 UTF-16 码元数；含 CJK/emoji 等多字节字符时 UTF-8 字节数
   // 更大（至多 3 倍），而 UTF-8 字节数恒 ≥ 码元数。故码元数已达阈值可直接判定；
-  // 低于阈值才用 TextEncoder 精确计字节数（此时上界为 3×阈值，开销有界）——
-  // 避免为 140MB 级分片整串转码一份字节副本。
+  // 大分片增长判定与日志依赖精确 UTF-8 字节数：纯 ASCII 时码元数即字节数，
+  // 跳过整串转码；含非 ASCII 时才完整 encode，避免低估体积导致误抑制增长告警。
+  // JSON.stringify 会转义全部控制字符（U+007F 除外，保守起见也走精确编码），
+  // 因此「全部落在可见 ASCII 区间」即可断定码元数等于 UTF-8 字节数。
+  const NON_PRINTABLE_ASCII_PATTERN = /[^\x20-\x7E]/;
   const byteLengthOf = (serialized: string): number => {
-    if (serialized.length >= SHARD_SIZE_WARN_BYTES) return serialized.length;
+    if (serialized.length >= SHARD_SIZE_WARN_BYTES && !NON_PRINTABLE_ASCII_PATTERN.test(serialized)) return serialized.length;
     return new TextEncoder().encode(serialized).length;
   };
   try {
@@ -424,13 +443,15 @@ const writeShardedSnapshot = async (
       serializedBytes.set(shard, byteLength);
       const stringifyMs = Math.round(performance.now() - stringifyStartedAt);
       if (stringifyMs > 50) {
-        logger.warn('store.persist', 'Large state stringify completed', {
-          source,
-          shard,
-          stringifyMs,
-          bytes: byteLength,
-        });
-      } else if (byteLength > SHARD_SIZE_WARN_BYTES) {
+        if (shouldWarnLargeShard(shard, byteLength)) {
+          logger.warn('store.persist', 'Large state stringify completed', {
+            source,
+            shard,
+            stringifyMs,
+            bytes: byteLength,
+          });
+        }
+      } else if (byteLength > SHARD_SIZE_WARN_BYTES && shouldWarnLargeShard(shard, byteLength)) {
         logger.warn('store.persist', 'Large state shard serialized', {
           source,
           shard,
@@ -464,7 +485,7 @@ const writeShardedSnapshot = async (
   }
   const writeMs = Math.round(performance.now() - writeStartedAt);
   if (writeMs > 50) {
-    logger.warn('store.persist', 'Large state IndexedDB write completed', {
+    logger.debug('store.persist', 'Large state IndexedDB write completed', {
       source,
       shards: dirty,
       writeMs,

@@ -417,6 +417,30 @@ export function needsReindex(repo: Pick<Repository, 'last_edited' | 'analyzed_at
 }
 
 /**
+ * indexAllRepos 的候选选择规则（唯一实现，UI 计数与 license 标记共用）：
+ * 分析过滤 → 增量模式按 needsReindex 过滤 → 同一 id 只保留首条。去重放在
+ * 增量过滤之后，使未变化的重复记录不会遮蔽已更新的记录。
+ */
+export function selectIndexableRepos(
+  repos: Repository[],
+  options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {},
+): Repository[] {
+  let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
+  if (options.incremental) {
+    // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
+    // 缺失版本号视为 v1（旧格式），仍需触发升级
+    const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? EMBEDDING_FORMAT_VERSION);
+    indexable = indexable.filter((r) => needsReindex(r, formatVersionChanged));
+  }
+  const seenRepoIds = new Set<number>();
+  return indexable.filter((r) => {
+    if (seenRepoIds.has(r.id)) return false;
+    seenRepoIds.add(r.id);
+    return true;
+  });
+}
+
+/**
  * 全量/增量重建向量索引
  * 遍历已分析仓库，分批生成 embedding 并 upsert 到 Worker
  * @param readmeFetcher 可选：获取仓库 README 内容的函数 (owner, repo) => content
@@ -547,15 +571,7 @@ export async function indexAllRepos(
     throw new Error('batchSize must be a positive integer');
   }
 
-  // 只索引已分析且未失败的仓库
-  let indexable = repos.filter((r) => r.analyzed_at && !r.analysis_failed);
-  // 增量模式下跳过已索引且内容未更新的仓库
-  if (incremental) {
-    // 嵌入文本格式版本变化时，强制重新索引所有向量以避免混合格式
-    // 缺失版本号视为 v1（旧格式），仍需触发升级
-    const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? EMBEDDING_FORMAT_VERSION);
-    indexable = indexable.filter((r) => needsReindex(r, formatVersionChanged));
-  }
+  const indexable = selectIndexableRepos(repos, { incremental, formatVersion: options.formatVersion, currentFormatVersion: options.currentFormatVersion });
   let indexed = 0;
   let errors = 0;
   let lastError = '';
