@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository, Release } from '../types';
 import { logger } from './logger';
-import { BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
+import { __reset403WarnStateForTest, BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
 
 const makeRepository = (id: number, fullName: string, overrides: Partial<Repository> = {}): Repository => {
   const [owner, name] = fullName.split('/');
@@ -575,6 +575,10 @@ describe('GitHubApiService 403 warn 去重', () => {
     vi.restoreAllMocks();
   });
 
+  beforeEach(() => {
+    __reset403WarnStateForTest();
+  });
+
   it('同一端点的重复通用 403 只 warn 一次，后续降级 debug，且仍正常抛错', async () => {
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const debugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
@@ -625,5 +629,17 @@ describe('GitHubApiService 403 warn 去重', () => {
 
     const failedWarns = warnSpy.mock.calls.filter(([, message]) => message === 'forbidden');
     expect(failedWarns).toHaveLength(2);
+  });
+
+  it('会话级去重跨实例生效：相同凭据的不同实例只 warn 一次', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn(async () => make403Response({}, { message: 'forbidden' })));
+
+    await expect(new GitHubApiService('session-token').getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+    await expect(new GitHubApiService('session-token').getCurrentUser()).rejects.toThrow('GitHub API error: 403 Forbidden');
+
+    expect(warnSpy.mock.calls.filter(([, message]) => message === 'forbidden')).toHaveLength(1);
+    expect(debugSpy.mock.calls.filter(([, message]) => message === 'forbidden (deduplicated)')).toHaveLength(1);
   });
 });
