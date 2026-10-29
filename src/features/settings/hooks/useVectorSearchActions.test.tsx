@@ -30,6 +30,20 @@ vi.mock('../../../services/vectorSearchService', () => ({
   },
   indexAllRepos: mocks.indexAllRepos,
   needsReindex: mocks.needsReindex,
+  // 与真实实现同构：分析过滤 → 增量 needsReindex → 按 id 首条去重
+  selectIndexableRepos: (repos: Repository[], options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {}) => {
+    let indexable = repos.filter((repo) => repo.analyzed_at && !repo.analysis_failed);
+    if (options.incremental) {
+      const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? 3);
+      indexable = indexable.filter((repo) => mocks.needsReindex(repo, formatVersionChanged));
+    }
+    const seen = new Set<number>();
+    return indexable.filter((repo) => {
+      if (seen.has(repo.id)) return false;
+      seen.add(repo.id);
+      return true;
+    });
+  },
 }));
 vi.mock('../../../services/githubApi', () => ({ GitHubApiService: class {} }));
 vi.mock('../../../utils/licenseFilter', () => ({ normalizeLicense: (value: string | null) => value }));
