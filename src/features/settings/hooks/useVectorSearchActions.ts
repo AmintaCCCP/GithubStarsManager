@@ -79,21 +79,24 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   }, [state.vectorSearchConfig.embeddingFormatVersion]);
 
   const { incrementalTargetCount, unindexedRepoCount } = useMemo(() => {
-    const seenCountIds = new Set<number>();
-    let indexable = 0;
-    let unindexed = 0;
-    let unindexedWithMigration = 0;
-    for (const repository of state.repositories) {
-      if (!repository.analyzed_at || repository.analysis_failed) continue;
-      if (seenCountIds.has(repository.id)) continue;
-      seenCountIds.add(repository.id);
-      indexable += 1;
-      if (needsReindex(repository, false)) unindexed += 1;
-      if (needsReindex(repository, formatVersionChanged)) unindexedWithMigration += 1;
-    }
+    // 与 selectIndexableRepos 的顺序一致：先按增量谓词筛选，再按 id 去重，
+    // 否则同 id 首条无需重建时会漏计第二条待索引记录。mode=null 表示全量目标，
+    // 只做分析状态过滤（对应 formatVersionChanged 时的增量目标）。
+    const countAfter = (mode: boolean | null): number => {
+      const seen = new Set<number>();
+      let count = 0;
+      for (const repository of state.repositories) {
+        if (!repository.analyzed_at || repository.analysis_failed) continue;
+        if (mode !== null && !needsReindex(repository, mode)) continue;
+        if (seen.has(repository.id)) continue;
+        seen.add(repository.id);
+        count += 1;
+      }
+      return count;
+    };
     return {
-      incrementalTargetCount: formatVersionChanged ? indexable : unindexed,
-      unindexedRepoCount: state.vectorSearchConfig.enabled ? unindexedWithMigration : 0,
+      incrementalTargetCount: formatVersionChanged ? countAfter(null) : countAfter(false),
+      unindexedRepoCount: state.vectorSearchConfig.enabled ? countAfter(formatVersionChanged) : 0,
     };
   }, [formatVersionChanged, state.repositories, state.vectorSearchConfig.enabled]);
 

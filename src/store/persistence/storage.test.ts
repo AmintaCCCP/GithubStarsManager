@@ -11,7 +11,7 @@ import {
 import { appPersistenceOptions } from './options';
 import { createInitialState } from '../initialState';
 import { logger } from '../../services/logger';
-import { flushPendingPersistSnapshot, __setPersistTimingsForTest } from './storage';
+import { flushPendingPersistSnapshot, __resetLargeShardWarnStateForTest, __setPersistTimingsForTest } from './storage';
 import { debouncedPersistStorage, removePersistedSnapshot } from './storage';
 import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
 import {
@@ -843,13 +843,15 @@ describe('idle 大分片写入节流', () => {
   });
 
   it('相同体积的大分片重复写入不重复 warn，体积增长超 10% 才再次 warn', async () => {
+    // 告警基准是模块级状态：重置后本用例自建基准，--repeats 重复运行也成立。
+    __resetLargeShardWarnStateForTest();
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const largeWarnCount = () => warnSpy.mock.calls.filter(([, message]) =>
       message === 'Large state stringify completed' || message === 'Large state shard serialized'
     ).length;
     const releasesOf = (ch: string): unknown[] => [{ id: 1, blob: ch.repeat(6 * 1024 * 1024) }];
 
-    // 6 MiB 相对此前用例的 ~5 MiB 基准增长 >10%，首次写入必然 warn。
+    // 基准已重置，首次写入必然 warn。
     const first = { ...buildState(), releases: releasesOf('x') };
     debouncedPersistStorage.setItem(KEY, { state: first, version: 16 });
     await flushPendingPersistSnapshot();

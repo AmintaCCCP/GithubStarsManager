@@ -22,6 +22,7 @@ import {
   WorkflowDefinition,
 } from '../types';
 import { logger } from './logger';
+import { redactInline } from '../utils/logSanitizer';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 import { secureRandomString } from '../utils/cryptoRandom';
 import { createCombinedAbortController } from '../utils/abortUtils';
@@ -446,12 +447,14 @@ export class GitHubApiService {
     message: string,
     meta: { method: string; endpoint: string; status: number; durationMs: number },
   ): void {
-    const warnKey = `${this.backendUrl ?? 'direct'} ${meta.method} ${meta.endpoint} ${message}`;
+    // message 可能来自代理/后端响应体，写入日志与去重键前先做内联脱敏。
+    const safeMessage = redactInline(message);
+    const warnKey = `${this.backendUrl ?? 'direct'} ${meta.method} ${meta.endpoint} ${safeMessage}`;
     if (this.warned403Requests.has(warnKey)) {
-      logger.debug('githubApi', `${message} (deduplicated)`, meta);
+      logger.debug('githubApi', `${safeMessage} (deduplicated)`, meta);
     } else {
       this.warned403Requests.add(warnKey);
-      logger.warn('githubApi', message, meta);
+      logger.warn('githubApi', safeMessage, meta);
     }
   }
 

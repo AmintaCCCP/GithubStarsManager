@@ -111,6 +111,11 @@ export function __setPersistTimingsForTest(timings: {
   if (timings.largeShardIdleMinIntervalMs !== undefined) largeShardIdleWriteMinIntervalMs = timings.largeShardIdleMinIntervalMs;
 }
 
+/** 仅供测试重置大分片告警基准，避免模块级状态跨用例/重复运行泄漏。 */
+export function __resetLargeShardWarnStateForTest(): void {
+  lastWarnedShardBytes.clear();
+}
+
 const emptyShardViews = (): ShardViews => {
   const views = {} as ShardViews;
   for (const shard of PERSISTENCE_SHARD_NAMES) {
