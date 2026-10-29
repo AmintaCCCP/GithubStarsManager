@@ -3,6 +3,7 @@ import type { Repository } from '../types';
 import {
   AIService,
   AIRequestError,
+  isAbortError,
   isRateLimitedError,
   getRetryAfterMsFromError,
   isAIToolCallUnsupportedError,
@@ -906,5 +907,286 @@ describe('AIService vector query analysis and graded reranking', () => {
     const publicResult = AIService.rankLexicalCandidates([repo], '技能', ['skill']);
     const privateResult = service['scoreRepositoriesByKeywords']([repo], '技能', ['skill']);
     expect(privateResult).toEqual(publicResult);
+  });
+});
+
+describe('AIService — 慢/限流 OpenAI 兼容网关的防御性解析', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+
+  it('HTTP 200 携带 429/throttling 错误体时转为限流 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'max connections reached', type: 'throttling_error', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    const aiError = error as AIRequestError;
+    expect(aiError.status).toBe(429);
+    expect(aiError.isRateLimit).toBe(true);
+    expect(isRateLimitedError(aiError)).toBe(true);
+    expect(aiError.message).toContain('max connections reached');
+  });
+
+  it('HTTP 200 错误体 message 含 rate-limit 字样时也转为限流 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'rate-limit exceeded' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
+  it('HTTP 200 字符串错误内容为明确限流短语时转为 429', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: 'rate-limit exceeded',
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
+  it('HTTP 200 错误体 message 仅包含 rate_limit 字样但不表示限流时仍为 502', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { type: 'invalid_request_error', message: 'invalid parameter: rate_limit must be positive' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(502);
+    expect(isRateLimitedError(error)).toBe(false);
+  });
+
+  it('HTTP 200 非限流网关错误即使消息含 rate limit 也不触发限流判定', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { type: 'upstream_error', message: 'upstream rate limit hit for key' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(502);
+    expect((error as AIRequestError).isRateLimit).toBe(false);
+    expect(isRateLimitedError(error)).toBe(false);
+  });
+
+  it('真实 HTTP 503 错误详情含限流短语时仍判定为限流', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({ error: 'rate limit exceeded' }, 503));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(503);
+    expect((error as AIRequestError).fromGatewayBody).toBe(false);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
+  it('HTTP 200 携带非限流网关错误体时转为 502 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'upstream unavailable', code: 'bad_gateway' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.expandSearchQuery('anything').then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    const aiError = error as AIRequestError;
+    expect(aiError.status).toBe(502);
+    expect(aiError.isRateLimit).toBe(false);
+    expect(aiError.message).toContain('upstream unavailable');
+  });
+
+  it('普通 openai 兼容配置的连接测试在 30s 才超时（不再 10s 判“渠道不可用”）', async () => {
+    vi.useFakeTimers();
+    try {
+      const service = new AIService(makeConfig() as never);
+      mockFetch().mockImplementation((_url, init) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')));
+      }));
+      let settled = false;
+      let result: unknown;
+      const pending = service.testConnection().then((value) => { result = value; settled = true; }, () => { settled = true; });
+      await vi.advanceTimersByTimeAsync(29999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+      await pending;
+      expect(result).toMatchObject({ success: false, errorType: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('analyzeRepository 遇到 AbortError 不记“AI analysis failed”日志但仍抛出', async () => {
+    mockFetch().mockRejectedValue(new DOMException('signal is aborted without reason', 'AbortError'));
+    const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
+    try {
+      const service = new AIService(makeConfig() as never, 'zh');
+      await expect(service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme'))
+        .rejects.toSatisfy(isAbortError);
+      expect(errorFromLogger).not.toHaveBeenCalled();
+    } finally {
+      errorFromLogger.mockRestore();
+    }
+  });
+
+  it('analyzeRepository 非 AbortError 仍照常记录失败日志', async () => {
+    mockFetch().mockRejectedValue(new Error('network down'));
+    const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
+    try {
+      const service = new AIService(makeConfig() as never, 'zh');
+      await expect(service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme'))
+        .rejects.toThrow('network down');
+      expect(errorFromLogger).toHaveBeenCalledWith('ai', 'AI analysis failed', expect.any(Error), expect.anything());
+    } finally {
+      errorFromLogger.mockRestore();
+    }
+  });
+
+  it('testConnection 对 HTTP 200 网关错误体按映射状态码分类', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'max connections reached', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, statusCode: 429, errorType: 'unknown' });
+    expect(result.message).toContain('HTTP 429');
+  });
+
+  it('testConnection 映射状态码优先于消息中的 network 关键词', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'network capacity exceeded', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, statusCode: 429, errorType: 'unknown' });
+    expect(result.message).toContain('HTTP 429');
+  });
+
+  it('testConnection 普通错误消息含网络关键词与 IP 地址时归类为 network', async () => {
+    mockFetch().mockRejectedValueOnce(new Error('network request failed to 127.0.0.1'));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, errorType: 'network' });
+  });
+
+  it('testConnection 已映射状态码的 AIRequestError 不因消息含 abort 关键词被归类为超时', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({
+      error: { message: 'connection aborted by gateway', code: '429' },
+    }));
+    const service = new AIService(makeConfig() as never);
+    const result = await service.testConnection();
+    expect(result).toMatchObject({ success: false, statusCode: 429, errorType: 'unknown' });
+    expect(result.message).toContain('HTTP 429');
+  });
+
+  it('analyzeRepository 信号已中止但请求抛出普通 Error 时不记录失败日志', async () => {
+    mockFetch().mockRejectedValue(new Error('network down'));
+    const errorFromLogger = vi.spyOn(logger, 'errorFromError').mockImplementation(() => {});
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      const service = new AIService(makeConfig() as never, 'zh');
+      await expect(service.analyzeRepository(makeRepo({ id: 1, name: 'sample', full_name: 'acme/sample' }), '# readme', undefined, undefined, controller.signal))
+        .rejects.toThrow('network down');
+      expect(errorFromLogger).not.toHaveBeenCalled();
+    } finally {
+      errorFromLogger.mockRestore();
+    }
+  });
+
+  it('requestTextStream 缺失 Content-Type 的 HTTP 200 限流错误体转为 429 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => JSON.stringify({ error: { message: 'max connections reached', type: 'throttling_error', code: '429' } }),
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(isRateLimitedError(error)).toBe(true);
+  });
+
+  it('requestTextStream application/json 的 HTTP 200 网关错误体转为 502 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(fetchJson({ error: { message: 'bad gateway', type: 'bad_gateway' } }, 200));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(502);
+  });
+
+  it('requestTextStream SSE 帧携带网关错误体时转为 429 AIRequestError', async () => {
+    mockFetch().mockResolvedValueOnce(new Response(
+      'data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+  });
+
+  it('requestTextStream 增量后接 SSE 错误帧时整体抛出 429 AIRequestError', async () => {
+    const chunks: string[] = [];
+    mockFetch().mockResolvedValueOnce(new Response(
+      'data: {"choices":[{"delta":{"content":"partial"}}]}\n\n'
+      + 'data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: (delta) => chunks.push(delta) }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+    expect(chunks).toEqual(['partial']);
+  });
+
+  it('requestTextStream SSE 错误帧后连接挂起时也立即抛出 429', async () => {
+    const encoder = new TextEncoder();
+    const hangingBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"error":{"message":"max connections reached","type":"throttling_error","code":"429"}}\n\n'));
+        // 故意不关闭流：模拟网关发送错误帧后保持连接。
+      },
+    });
+    mockFetch().mockResolvedValueOnce(new Response(hangingBody, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    }));
+    const service = new AIService(makeConfig() as never, 'zh');
+    const error: unknown = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} }).then(() => null, e => e);
+    expect(error).toBeInstanceOf(AIRequestError);
+    expect((error as AIRequestError).status).toBe(429);
+  }, 2000);
+
+  it('requestTextStream 缺失 Content-Type 时纯文本中的 data: 行不被误判为网关错误帧', async () => {
+    const plainText = 'Sure!\ndata: {"error":{"message":"not really","code":"bad_gateway"}}\nDone';
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => plainText,
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const result = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} });
+    expect(result).toBe(plainText);
+  });
+
+  it('requestTextStream 缺失 Content-Type 时 id 前缀的普通文本行不被误判为 SSE 帧', async () => {
+    const plainText = 'identity check\ndata: {"error":{"message":"x","code":"429"}}';
+    mockFetch().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      text: async () => plainText,
+    });
+    const service = new AIService(makeConfig() as never, 'zh');
+    const result = await service.generateChatTextStream({ system: 's', user: 'u', onChunk: () => {} });
+    expect(result).toBe(plainText);
   });
 });

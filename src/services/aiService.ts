@@ -60,13 +60,16 @@ export class AIRequestError extends Error {
   readonly status: number;
   readonly retryAfterMs?: number;
   readonly isRateLimit: boolean;
+  /** 错误是否来自 HTTP 200 响应体里的网关错误对象（区别于真实 HTTP 非 2xx 错误）。 */
+  readonly fromGatewayBody: boolean;
 
-  constructor(message: string, status: number, retryAfterMs?: number) {
+  constructor(message: string, status: number, retryAfterMs?: number, fromGatewayBody = false) {
     super(message);
     this.name = 'AIRequestError';
     this.status = status;
     this.retryAfterMs = retryAfterMs;
     this.isRateLimit = status === 429;
+    this.fromGatewayBody = fromGatewayBody;
   }
 }
 
@@ -75,10 +78,54 @@ export function isRateLimitedError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const e = error as { statusCode?: unknown; status?: unknown; isRateLimit?: unknown; message?: unknown };
   if (e.isRateLimit === true) return true;
+  if (error instanceof AIRequestError && error.fromGatewayBody && !error.isRateLimit) return false;
   if (typeof e.statusCode === 'number' && e.statusCode === 429) return true;
   if (typeof e.status === 'number' && e.status === 429) return true;
   const msg = typeof e.message === 'string' ? e.message : '';
   return /429|rate\s*limit|too many requests/i.test(msg);
+}
+
+/**
+ * 网关可能在 HTTP 200 的 JSON body 里返回错误对象（如 agnes 的 429 throttling_error）。
+ * 识别这类"伪成功"响应并转为带状态码的 AIRequestError，让限流/退避逻辑正常生效。
+ */
+/** 明确表示限流已触发的错误短语；避免把恰好提到 rate_limit 的参数错误误判为限流。 */
+const THROTTLING_MESSAGE_PATTERN = /throttling|rate[\s-]limit (exceeded|reached)|too many requests/i;
+
+function extractGatewayErrorFromData(data: unknown): { message: string; status: number } | null {
+  if (!data || typeof data !== 'object') return null;
+  const err = (data as { error?: unknown }).error;
+  if (!err) return null;
+  if (typeof err === 'string') return { message: err, status: THROTTLING_MESSAGE_PATTERN.test(err) ? 429 : 502 };
+  if (typeof err !== 'object') return null;
+  const e = err as { message?: unknown; code?: unknown; type?: unknown; status?: unknown };
+  const message = typeof e.message === 'string' && e.message
+    ? e.message
+    : (() => { try { return JSON.stringify(err); } catch { return 'unknown gateway error'; } })();
+  const code = typeof e.code === 'string' || typeof e.code === 'number' ? String(e.code) : '';
+  const type = typeof e.type === 'string' ? e.type : '';
+  const isThrottling = e.status === 429 || code === '429' || /throttling|rate.?limit|too many requests/i.test(`${code} ${type}`)
+    || THROTTLING_MESSAGE_PATTERN.test(message);
+  return { message, status: isThrottling ? 429 : 502 };
+}
+
+function extractGatewayErrorFromSsePayloads(payloads: string[]): { message: string; status: number } | null {
+  for (const payload of payloads) {
+    try {
+      const gatewayError = extractGatewayErrorFromData(JSON.parse(payload));
+      if (gatewayError) return gatewayError;
+    } catch { /* 非 JSON 载荷 */ }
+  }
+  return null;
+}
+
+function stringifyDataForWarn(data: unknown): string {
+  try {
+    const s = JSON.stringify(data);
+    return s.length > 500 ? `${s.slice(0, 500)}...[truncated]` : s;
+  } catch {
+    return String(data);
+  }
 }
 
 /** 从限流错误中读取服务端建议的等待毫秒数（Retry-After / retry-after-ms）。 */
@@ -218,6 +265,10 @@ export async function consumeSseStream(body: ReadableStream<Uint8Array>, onData:
       }
     }
     flush();
+  } catch (error) {
+    // 回调抛错（如网关错误帧）时主动取消底层流，避免错误帧后连接被挂起。
+    await reader.cancel().catch(() => {});
+    throw error;
   } finally {
     reader.releaseLock();
   }
@@ -613,6 +664,19 @@ export class AIService {
         }
       }
 
+      // 网关可能在 HTTP 200 body 里携带错误对象；先识别再按"无内容"兜底。
+      const gatewayError = extractGatewayErrorFromData(data);
+      if (gatewayError) {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, httpDetails);
+        throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
+      }
+      if (logger.isDebugMode()) {
+        logger.warn('ai', 'No content received from AI service', {
+          model,
+          configId,
+          ...(this.redactDebugPayload ? {} : { data: stringifyDataForWarn(data) }),
+        });
+      }
       this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
     }
@@ -959,6 +1023,16 @@ ${options.user}` : options.user;
       if (ssePayloads.length > 0) {
         // 只有至少一帧解出当前 API 的有效增量才算 SSE；普通文本里恰好出现
         // "data:" 开头的行时继续走下方 JSON / 纯文本回退。
+        // 缺失 Content-Type 时，仅当整段 body 都由 SSE 帧行组成才视为真 SSE，
+        // 避免把纯文本回答里恰好出现的 data: 行误判为网关错误帧。
+        const isSseFramed = raw.split(/\r\n|\r|\n/).every((line) => line === '' || /^(?:(?:data|event|id|retry):|:)/.test(line));
+        if (isSseFramed) {
+          const gatewayError = extractGatewayErrorFromSsePayloads(ssePayloads);
+          if (gatewayError) {
+            this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+            throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
+          }
+        }
         const deltas = ssePayloads
           .map((payload) => extractDelta(payload))
           .filter((delta) => delta !== '');
@@ -974,12 +1048,19 @@ ${options.user}` : options.user;
       }
 
       let text = '';
+      let parsed: unknown;
       try {
-        text = extractFullTextFromResponse(apiType, JSON.parse(raw));
+        parsed = JSON.parse(raw);
+        text = extractFullTextFromResponse(apiType, parsed);
       } catch {
         text = raw;
       }
       if (!text) {
+        const gatewayError = extractGatewayErrorFromData(parsed);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
+        }
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');
       }
@@ -993,12 +1074,19 @@ ${options.user}` : options.user;
       // 回答：先按 JSON 解析提取结构化文本，失败则把原始文本作为一次性 chunk。
       const raw = await response.text();
       let text = '';
+      let parsed: unknown;
       try {
-        text = extractFullTextFromResponse(apiType, JSON.parse(raw));
+        parsed = JSON.parse(raw);
+        text = extractFullTextFromResponse(apiType, parsed);
       } catch {
         text = raw;
       }
       if (!text) {
+        const gatewayError = extractGatewayErrorFromData(parsed);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
+        }
         this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, { url: maskedUrl });
         throw new Error('No content received from AI service');
       }
@@ -1017,9 +1105,15 @@ ${options.user}` : options.user;
       if (delta) {
         full += delta;
         options.onChunk(delta);
+      } else {
+        // 网关可能在 HTTP 200 流里夹带错误帧；收到即抛出，不等流结束。
+        const gatewayError = extractGatewayErrorFromSsePayloads([payload]);
+        if (gatewayError) {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'gateway error body' }, { url: maskedUrl });
+          throw new AIRequestError(`AI gateway error: ${gatewayError.message}`, gatewayError.status, undefined, true);
+        }
       }
     });
-
     this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: full.length }, { url: maskedUrl, streamed: true });
     if (!full.trim()) {
       throw new Error('No content received from AI service (stream)');
@@ -1296,7 +1390,10 @@ ${options.user}` : options.user;
         ? `AI返回内容不符合要求，已重试${AIService.ANALYSIS_MAX_ATTEMPTS - 1}次：${lastInvalidReason}`
         : `AI response did not meet requirements after ${AIService.ANALYSIS_MAX_ATTEMPTS - 1} retries: ${lastInvalidReason}`);
     } catch (error) {
-      logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
+      // 取消不是失败：用户主动停止时不要把 AbortError 记成分析失败。
+      if (!isAbortError(error) && !signal?.aborted) {
+        logger.errorFromError('ai', 'AI analysis failed', error, { configId, durationMs: Date.now() - startTime });
+      }
       // 抛出错误，让调用方处理失败状态
       throw error;
     }
@@ -2034,8 +2131,7 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
   }
 
   async testConnection(): Promise<ConnectionTestResult> {
-    const apiType = this.getApiType();
-    const timeoutMs = apiType === 'openai-responses' || apiType === 'gemini' || this.config.reasoningEffort ? 30000 : 10000;
+    const timeoutMs = 30000;
 
     try {
       const base = new URL(this.config.baseUrl);
@@ -2077,34 +2173,7 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
       const err = error as Error;
       const errorMessage = err.message || '';
 
-      // 解析状态码
-      const statusMatch = errorMessage.match(/(\d{3})/);
-      const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : undefined;
-
-      // 处理超时错误
-      if (errorMessage.includes('timeout') || errorMessage.includes('abort') || err.name === 'AbortError') {
-        return {
-          success: false,
-          errorType: 'timeout',
-          message: this.language === 'zh'
-            ? `连接超时（${timeoutMs / 1000}秒）。请检查：1. 网络连接是否正常 2. API端点是否正确 3. 服务器是否响应缓慢`
-            : `Connection timeout (${timeoutMs / 1000}s). Please check: 1. Network connection 2. API endpoint 3. Server response time`,
-        };
-      }
-
-      // 处理网络错误
-      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
-        return {
-          success: false,
-          errorType: 'network',
-          message: this.language === 'zh'
-            ? '网络连接失败。请检查：1. 网络连接是否正常 2. API端点地址是否正确 3. 防火墙或代理设置'
-            : 'Network connection failed. Please check: 1. Network connection 2. API endpoint 3. Firewall or proxy settings',
-        };
-      }
-
-      // 如果有状态码，提供详细的错误信息
-      if (statusCode) {
+      const statusFailure = (statusCode: number) => {
         const meaning = getStatusCodeMeaning(statusCode, this.language);
         const errorType = getErrorTypeFromStatus(statusCode) ?? 'unknown';
         const suggestions: Record<string, { zh: string; en: string }> = {
@@ -2135,6 +2204,39 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
             ? `HTTP ${statusCode} - ${meaning}\n建议：${suggestions[errorType].zh}`
             : `HTTP ${statusCode} - ${meaning}\nSuggestion: ${suggestions[errorType].en}`,
         };
+      };
+
+      // AIRequestError 已映射的状态码优先于消息关键词，避免限流错误被误报为网络/超时问题。
+      if (error instanceof AIRequestError && Number.isInteger(error.status)) {
+        return statusFailure(error.status);
+      }
+
+      // 处理超时错误（原生 AbortError 或普通错误消息）
+      if (err.name === 'AbortError' || errorMessage.includes('timeout') || errorMessage.includes('abort')) {
+        return {
+          success: false,
+          errorType: 'timeout',
+          message: this.language === 'zh'
+            ? `连接超时（${timeoutMs / 1000}秒）。请检查：1. 网络连接是否正常 2. API端点是否正确 3. 服务器是否响应缓慢`
+            : `Connection timeout (${timeoutMs / 1000}s). Please check: 1. Network connection 2. API endpoint 3. Server response time`,
+        };
+      }
+
+      // 普通错误：网络关键词先于消息里的状态码（如消息含 127.0.0.1 会被误读为状态码）。
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+        return {
+          success: false,
+          errorType: 'network',
+          message: this.language === 'zh'
+            ? '网络连接失败。请检查：1. 网络连接是否正常 2. API端点地址是否正确 3. 防火墙或代理设置'
+            : 'Network connection failed. Please check: 1. Network connection 2. API endpoint 3. Firewall or proxy settings',
+        };
+      }
+
+      // 普通错误消息中携带的三位状态码
+      const statusMatch = errorMessage.match(/(\d{3})/);
+      if (statusMatch) {
+        return statusFailure(parseInt(statusMatch[1], 10));
       }
 
       // 默认错误
