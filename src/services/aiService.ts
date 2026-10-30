@@ -406,7 +406,6 @@ export class AIService {
   private static readonly SELECTION_MIN_CANDIDATES = 15;
   /** LLM 精选最多返回的相关仓库数。 */
   private static readonly SELECTION_MAX_RESULTS = 20;
-  private static readonly SELECTION_MAX_TOKENS = 800;
 
   constructor(config: AIConfig, language: string = 'zh', private readonly redactDebugPayload = false) {
     this.config = config;
@@ -2946,12 +2945,11 @@ Output only the JSON object.`;
       system,
       user,
       temperature: 0.1,
-      // 推理 token 与输出共享预算（openai reasoning 模型、gemini 2.5 思考模型）：
-      // 小预算被推理耗尽时 content 为空、精选会静默退化，故复用重排序的 4096
-      // 预算；普通模型 800 足够容纳 ≤20 个 ID 的 JSON 数组。
-      maxTokens: (this.config.reasoningEffort || this.getApiType() === 'gemini')
-        ? AIService.RERANKING_MAX_TOKENS
-        : AIService.SELECTION_MAX_TOKENS,
+      // 推理 token 与输出共享预算。不少自定义 OpenAI 兼容端点（如 flash/grok）
+      // 没有 reasoningEffort 标记却会先输出 reasoning_content；800 会被推理
+      // 耗尽导致 content 为空、精选静默退回词法兜底。max_tokens 只是上限，
+      // 普通模型仍会在 JSON 结束后停止，因此统一给足 4096。
+      maxTokens: AIService.RERANKING_MAX_TOKENS,
       signal,
     });
 

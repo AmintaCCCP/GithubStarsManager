@@ -630,7 +630,7 @@ export class GitHubApiService {
       if (response.status === 403 && remaining === '0') {
         // Search has its own quota bucket: read the reset from the current
         // response, since this.rateLimitReset only tracks the core bucket.
-        const resetEpoch = isSearchEndpoint && reset !== null ? parseInt(reset, 10) : this.rateLimitReset;
+        const resetEpoch = isSearchEndpoint ? parseInt(reset ?? '', 10) : this.rateLimitReset;
         const resetDate = resetEpoch
           ? new Date(resetEpoch * 1000).toLocaleString()
           : 'unknown';

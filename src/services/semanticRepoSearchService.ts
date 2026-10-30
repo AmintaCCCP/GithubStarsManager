@@ -100,7 +100,7 @@ export interface GithubSearchRecallOptions {
 export interface RecallAggregatedEntry {
   /** 仓库 full_name（保留召回结果里的原始大小写形态） */
   repo: string;
-  /** 召回排序分：grep 路径为命中次数；GitHub 路径为 star 数（供词法兜底排序）。 */
+  /** 召回排序分：grep 路径为命中次数；GitHub 路径为查询优先级 + 返回位次的召回分。 */
   count: number;
   /** 样本文件路径（≤3、去重，取自 hits） */
   paths: string[];
@@ -264,9 +264,9 @@ export function __resetGithubSearchPacingForTest(): void {
 }
 
 /**
- * GitHub Search 召回：5 条语法槽查询串行执行，按 full_name 去重、star 降序
- * 截断到 60。单条非限流失败跳过；403/429 与 abort 立即上抛；全部失败也上抛，
- * 由主流程回退到 grep.app。
+ * GitHub Search 召回：5 条语法槽查询串行执行，按 full_name 去重、查询优先级与
+ * 返回位次排序并截断到 60。单条非限流失败跳过；403/429 与 abort 立即上抛；
+ * 全部失败也上抛，由主流程回退到 grep.app。
  */
 export async function runGithubSearchRecall(
   query: string,
@@ -308,14 +308,22 @@ export async function runGithubSearchRecall(
     try {
       const repos = await api.searchRepositoriesRaw(q, GITHUB_SEARCH_PER_PAGE, signal);
       successfulRequests += 1;
-      for (const repo of repos) {
+      const queryWeight = assembled.length - i;
+      for (let rank = 0; rank < repos.length; rank++) {
+        const repo = repos[rank];
         if (!repo.full_name) continue;
         const key = repo.full_name.toLowerCase();
-        if (byRepo.has(key)) continue;
-        const stars = Number.isFinite(repo.stargazers_count) ? Math.max(0, repo.stargazers_count) : 0;
+        // GitHub returns best-match order; earlier queries (metadata) and
+        // earlier ranks are stronger signals than stars.
+        const score = queryWeight * GITHUB_SEARCH_PER_PAGE - rank;
+        const existing = byRepo.get(key);
+        if (existing) {
+          if (score > existing.count) existing.count = score;
+          continue;
+        }
         byRepo.set(key, {
           repo: repo.full_name,
-          count: stars,
+          count: score,
           paths: [],
           langs: new Set(repo.language ? [repo.language] : []),
         });
@@ -683,13 +691,30 @@ function matchesLanguageFilter(repoLanguage: string | null | undefined, filter: 
   return repoLanguage.toLowerCase() === expected;
 }
 
-/** 词法命中数兜底排序：count 降序（同 count 保持召回顺序），≤20。 */
-function fallbackOrderByCount(pool: Array<{ repo: DiscoveryRepo; count: number }>): DiscoveryRepo[] {
-  return pool
-    .slice()
-    .sort((a, b) => b.count - a.count)
-    .slice(0, MAX_RESULT_COUNT)
-    .map(candidate => candidate.repo);
+/**
+ * 用查询词 + 扩展词对补全后的仓库元数据做词法打分排序，避免重排失败时退回
+ * 纯 star 排序把"高星但无关"的仓库顶到前面；同分再用召回分稳定排序。
+ */
+function orderPoolByLexicalRelevance<T extends { repo: DiscoveryRepo; count: number }>(
+  pool: T[],
+  query: string,
+  terms: string[],
+  specificRepoKeys: Set<string>,
+): T[] {
+  const scored = AIService.rankLexicalCandidates(
+    pool.map(candidate => candidate.repo),
+    query,
+    terms,
+    { includePopularity: false },
+  );
+  const scoreByKey = new Map(scored.map(item => [item.repo.full_name.toLowerCase(), item.score]));
+  return pool.slice().sort((a, b) => {
+    const specificA = specificRepoKeys.has(a.repo.full_name.toLowerCase()) ? 1 : 0;
+    const specificB = specificRepoKeys.has(b.repo.full_name.toLowerCase()) ? 1 : 0;
+    const scoreA = scoreByKey.get(a.repo.full_name.toLowerCase()) ?? 0;
+    const scoreB = scoreByKey.get(b.repo.full_name.toLowerCase()) ?? 0;
+    return specificB - specificA || scoreB - scoreA || b.count - a.count;
+  });
 }
 
 /**
@@ -697,7 +722,7 @@ function fallbackOrderByCount(pool: Array<{ repo: DiscoveryRepo; count: number }
  * - 召回为空 → onFallback('recall_empty') + 空结果；
  * - LLM 精选返回 []（明确判空）→ onFallback('ai_empty') + 按池序词法兜底
  *   （全网搜索语境下判空几乎必是模型塌缩而非真实空态，不清空结果）；
- * - LLM 精选不可解析/失败（非 abort）→ onFallback('unparseable'/'ai_failed') + 按命中数兜底；
+ * - LLM 精选不可解析/失败（非 abort）→ onFallback('unparseable'/'ai_failed') + 按词法相关性兜底；
  * - abort 一律重抛，绝不产出兜底结果。
  */
 export async function searchRepositoriesSemantically(
@@ -757,7 +782,7 @@ export async function searchRepositoriesSemantically(
   }
 
   // ③ GitHub 元数据补全：top-60。grep 路径按辅路命中优先、并集计数降序；
-  //     GitHub 路径的 count 是 star 数，因此等价于 star 降序。Array.sort 稳定。
+  //     GitHub 路径按查询优先级与返回位次排序。Array.sort 稳定。
   const buildCandidates = async (
     pool: Map<string, RecallAggregatedEntry>,
     specific: Set<string>,
@@ -827,6 +852,7 @@ export async function searchRepositoriesSemantically(
     const filtered = candidates.filter(candidate => matchesLanguageFilter(candidate.repo.language, languageFilter));
     if (filtered.length >= LANGUAGE_FILTER_MIN_RESULT) pool = filtered;
   }
+  pool = orderPoolByLexicalRelevance(pool, trimmed, terms, specificRepoKeys);
 
   // 召回证据行（语言中性格式）：让重排模型看到"为什么被召回"
   const evidence = new Map<string, string>();
@@ -851,9 +877,9 @@ export async function searchRepositoriesSemantically(
       evidence,
     );
     if (ranked === null) {
-      // 响应缺失/格式非法：按词法命中数兜底
+      // 响应缺失/格式非法：按词法相关性兜底
       onFallback?.('unparseable');
-      ordered = fallbackOrderByCount(pool);
+      ordered = pool.slice(0, MAX_RESULT_COUNT).map(candidate => candidate.repo);
     } else if (ranked.length === 0) {
       // 全网搜索语境下召回池按扩展词构造，"所有候选都与查询无关"几乎不可能是真命题：
       // 模型判空基本是塌缩失败而非真实空态（实测提示词过严时 flash 模型 3/3 判空，
@@ -868,7 +894,7 @@ export async function searchRepositoriesSemantically(
   } catch (error) {
     if (signal?.aborted || isAbortError(error)) throw error;
     onFallback?.('ai_failed');
-    ordered = fallbackOrderByCount(pool);
+    ordered = pool.slice(0, MAX_RESULT_COUNT).map(candidate => candidate.repo);
   }
 
   const repos = ordered.slice(0, MAX_RESULT_COUNT).map((repo, index) => ({ ...repo, rank: index + 1 }));

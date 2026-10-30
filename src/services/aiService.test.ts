@@ -211,8 +211,8 @@ describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
     expect(selectionPrompt).toContain('用户意图说明：找 markdown 编辑器');
     expect(selectionPrompt).toContain('共 2 个');
     expect(selectionPrompt).toContain('acme/quick-md');
-    // 普通模型的精选请求维持紧凑预算
-    expect(requests[1].max_tokens).toBe(800);
+    // 精选请求统一给足预算，避免自定义推理模型把 800 全耗在 reasoning 上
+    expect(requests[1].max_tokens).toBe(4096);
   });
 
   it('模型把候选行号当作 ID 返回时按行号解析，重排结果不被静默丢弃', async () => {

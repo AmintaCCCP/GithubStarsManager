@@ -684,6 +684,24 @@ describe('GitHubApiService search 端点限流隔离', () => {
     await expect(service.searchRepositoriesRaw('q', 25)).rejects.toThrow(expected);
   });
 
+  it('search 403 缺少 X-RateLimit-Reset 时显示 unknown，不复用核心桶重置时间', async () => {
+    const coreReset = Math.floor(Date.now() / 1000) + 3600;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ login: 'me' }), {
+        status: 200,
+        headers: { 'X-RateLimit-Remaining': '4999', 'X-RateLimit-Reset': String(coreReset) },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'rate limit' }), {
+        status: 403,
+        headers: { 'X-RateLimit-Remaining': '0' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    await service.getCurrentUser();
+    await expect(service.searchRepositoriesRaw('q', 25)).rejects.toThrow('Resets at unknown');
+  });
+
   it('search 响应低剩余量/未来重置不污染核心桶：后续核心请求立即发出', async () => {
     vi.useFakeTimers();
     const futureReset = Math.floor(Date.now() / 1000) + 3600;

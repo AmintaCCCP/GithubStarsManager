@@ -367,7 +367,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     { terms: ['file manager'], scope: 'readme' },
   ];
 
-  it('串行查询、按 full_name 去重、star 降序并截断 60，同时记录查询证据', async () => {
+  it('串行查询、按 full_name 去重、查询优先级降序并截断 60，同时记录查询证据', async () => {
     __resetGithubSearchPacingForTest();
     let clock = 1_000_000;
     const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
@@ -404,8 +404,9 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     expect(sleepImpl).toHaveBeenCalledTimes(2);
     expect(sleepImpl.mock.calls.every(call => call[0] === 2100)).toBe(true);
     expect(result.aggregation.size).toBe(60);
-    expect([...result.aggregation.values()][0]).toMatchObject({ repo: 'o/b-24', count: 224 });
-    expect(result.aggregation.get('o/a-0')).toMatchObject({ repo: 'o/a-0', count: 100 });
+    expect([...result.aggregation.values()][0]).toMatchObject({ repo: 'o/a-0', count: 75 });
+    expect(result.aggregation.get('o/a-0')).toMatchObject({ repo: 'o/a-0', count: 75 });
+    expect(result.aggregation.get('o/b-0')).toMatchObject({ repo: 'o/b-0', count: 50 });
     expect(result.evidence.get('o/a-0')).toBe('gh_search=terminal file manager in:name,description,topics');
     } finally {
       nowSpy.mockRestore();
@@ -426,7 +427,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       sleepImpl: async () => {},
     });
     expect(rawSearch).toHaveBeenCalledTimes(3);
-    expect([...result.aggregation.keys()]).toEqual(['o/ok-2', 'o/ok-1']);
+    expect([...result.aggregation.keys()]).toEqual(['o/ok-1', 'o/ok-2']);
   });
 
   it('全部查询失败时抛错；真实限流立即上抛，普通 403 视作可跳过', async () => {
@@ -549,7 +550,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(rawSearch).toHaveBeenCalledTimes(3);
-    expect(result.repos.map(repo => repo.full_name)).toEqual(['o/github-b', 'o/github-a']);
+    expect(result.repos.map(repo => repo.full_name)).toEqual(['o/github-a', 'o/github-b']);
     const evidence = select.mock.calls[0][4] as Map<string, string>;
     expect(evidence.get('o/github-b')).toBe('gh_search=terminal file manager in:name,description,topics');
     expect(evidence.get('o/github-a')).toBe('gh_search=terminal file manager in:name,description,topics');

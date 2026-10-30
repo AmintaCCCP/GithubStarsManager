@@ -40,6 +40,15 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
   }
 };
 
+// Survives DiscoveryView remounts (SPA navigation) so returning to the search
+// tab with the same query/mode does not restart a completed or cancelled search.
+let lastSettledSearchKey: string | null = null;
+
+export const buildDiscoverySearchKey = (query: string, mode: string, owner: string | null = ''): string =>
+  JSON.stringify([owner, query.trim(), mode]);
+
+export const getLastSettledSearchKey = (): string | null => lastSettledSearchKey;
+
 /**
  * Owns network-backed Discovery loading and AI analysis. UI scrolling and view
  * composition remain in DiscoveryView, while stale topic response protection
@@ -63,6 +72,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   useEffect(() => {
     setIsAnalyzing(false);
     setAnalysisProgress({ current: 0, total: 0 });
+    const controllers = channelRequestControllersRef.current;
+    const versions = channelRequestVersionRef.current;
     // 账号切换后旧会话的周刊/推文/频道同步进度不再属于当前页面，直接清空
     useAppStore.getState().setWeeklySyncStatus(null);
     useAppStore.getState().setXTweetSyncStatus(null);
@@ -71,7 +82,11 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       optimizerRef.current?.abort();
       optimizerRef.current = null;
       // 账号切换/卸载时中止外部频道仍在途的 GitHub 详情请求
-      for (const controller of Object.values(channelRequestControllersRef.current)) controller?.abort();
+      for (const [channelId, controller] of Object.entries(controllers)) {
+        // Invalidate before aborting so the aborted request cannot write empty results.
+        versions[channelId as DiscoveryChannelId] = (versions[channelId as DiscoveryChannelId] ?? 0) + 1;
+        controller?.abort();
+      }
       channelRequestControllersRef.current = {};
     };
   }, [authSessionIdentity, setAnalysisProgress]);
@@ -290,6 +305,13 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       currentState.setDiscoveryNextPage(channelId, result.nextPageIndex);
       if (result.totalCount !== undefined) currentState.setDiscoveryTotalCount(channelId, result.totalCount);
       currentState.setDiscoveryLastRefresh(channelId, new Date().toISOString());
+      if (channelId === 'search' && !append) {
+        lastSettledSearchKey = buildDiscoverySearchKey(
+          currentState.discoverySearchQuery,
+          currentState.discoverySearchMode,
+          currentState.githubToken,
+        );
+      }
       if (append && !replacesOnAppend && scrollContainerRef.current) {
         requestAnimationFrame(() => {
           const cards = scrollContainerRef.current?.querySelectorAll('[data-repo-index]');
@@ -331,19 +353,6 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       }
     }
   }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
-
-  // 搜索模式切换后自动重搜。不能在 onChange 里同步调 refreshChannel：它读
-  // latestStateRef.current（渲染提交后才同步），会以旧模式发请求、随即被签名
-  // 守卫（isCurrentRequest 用 getState 重算签名）丢弃，列表不刷新。本 effect
-  // 注册在 latestStateRef 同步 effect 之后，触发时读到的已是新模式
-  const prevSearchModeRef = useRef(state.discoverySearchMode);
-  useEffect(() => {
-    if (prevSearchModeRef.current === state.discoverySearchMode) return;
-    prevSearchModeRef.current = state.discoverySearchMode;
-    if (state.selectedDiscoveryChannel === 'search' && state.discoverySearchQuery.trim()) {
-      void refreshChannel('search', 1, false);
-    }
-  }, [state.discoverySearchMode, state.selectedDiscoveryChannel, state.discoverySearchQuery, refreshChannel]);
 
   const handleAnalyzePage = useCallback(async () => {
     const analysisState = latestStateRef.current;
@@ -444,5 +453,18 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     optimizerRef.current?.abort();
   }, []);
 
-  return { ...state, t, isAnalyzing, refreshChannel, handleAnalyzePage, handleAbortAnalysis };
+  const handleAbortSearch = useCallback(() => {
+    // Bump the version first so the aborted request is treated as stale and
+    // cannot overwrite the current list with its empty fallback result.
+    channelRequestVersionRef.current['search'] = (channelRequestVersionRef.current['search'] ?? 0) + 1;
+    channelRequestControllersRef.current['search']?.abort();
+    delete channelRequestControllersRef.current['search'];
+    const store = useAppStore.getState();
+    lastSettledSearchKey = buildDiscoverySearchKey(store.discoverySearchQuery, store.discoverySearchMode, store.githubToken);
+    store.setDiscoverySearchPhase(null);
+    store.setDiscoverySearchPhaseDetail(null);
+    store.setDiscoveryLoading('search', false);
+  }, []);
+
+  return { ...state, t, isAnalyzing, refreshChannel, handleAnalyzePage, handleAbortAnalysis, handleAbortSearch };
 };
