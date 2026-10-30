@@ -1,7 +1,14 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { EventEmitter } = require('node:events');
 
-const { scheduleMinimizeToTray, probeWindowPaint } = require('./windowLifecycle');
+const {
+  scheduleMinimizeToTray,
+  registerDidFinishLoadPaintProbe,
+  probeWindowPaint,
+} = require('./windowLifecycle');
 
 function makeWindow({ minimized = true, destroyed = false } = {}) {
   return {
@@ -94,6 +101,32 @@ describe('scheduleMinimizeToTray', () => {
     win.destroyed = true;
     callbacks[1]();
     assert.equal(win.hidden, false);
+  });
+});
+
+describe('registerDidFinishLoadPaintProbe', () => {
+  it('schedules a probe after did-finish-load when the window is visible', () => {
+    const webContents = new EventEmitter();
+    let visible = false;
+    const reasons = [];
+
+    registerDidFinishLoadPaintProbe({
+      webContents,
+      getWindow: () => ({ isVisible: () => visible }),
+      scheduleProbe: (reason) => reasons.push(reason),
+    });
+
+    webContents.emit('did-finish-load');
+    assert.deepEqual(reasons, []);
+
+    visible = true;
+    webContents.emit('did-finish-load');
+    assert.deepEqual(reasons, ['did-finish-load']);
+  });
+
+  it('is wired into the Electron main process', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
+    assert.match(source, /registerDidFinishLoadPaintProbe\(\{/);
   });
 });
 

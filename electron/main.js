@@ -58,7 +58,11 @@ const {
   loadEncryptedXAuth,
   clearEncryptedXAuth,
 } = require('./xAuthStorage');
-const { scheduleMinimizeToTray, probeWindowPaint } = require('./windowLifecycle');
+const {
+  scheduleMinimizeToTray,
+  registerDidFinishLoadPaintProbe,
+  probeWindowPaint,
+} = require('./windowLifecycle');
 
 let mainWindow;
 let tray = null;
@@ -181,7 +185,11 @@ function createWindow() {
     if (!startHidden && !mainWindow.isVisible()) {
       mainWindow.show();
     }
-    if (mainWindow.isVisible()) scheduleWindowPaintProbe('did-finish-load');
+  });
+  registerDidFinishLoadPaintProbe({
+    webContents: mainWindow.webContents,
+    getWindow: () => mainWindow,
+    scheduleProbe: scheduleWindowPaintProbe,
   });
 
   // Renderer console errors that escaped every try/catch: record a capped

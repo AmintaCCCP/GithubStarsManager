@@ -19,6 +19,13 @@ function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
   });
 }
 
+function registerDidFinishLoadPaintProbe({ webContents, getWindow, scheduleProbe }) {
+  webContents.on('did-finish-load', () => {
+    const win = getWindow();
+    if (win?.isVisible()) scheduleProbe('did-finish-load');
+  });
+}
+
 const paintProbeStates = new WeakMap();
 const lastPaintReloads = new WeakMap();
 const BUSY_RENDERER_CPU_PERCENT = 20;
@@ -232,4 +239,8 @@ function probeWindowPaint({
   }
 }
 
-module.exports = { scheduleMinimizeToTray, probeWindowPaint };
+module.exports = {
+  scheduleMinimizeToTray,
+  registerDidFinishLoadPaintProbe,
+  probeWindowPaint,
+};
