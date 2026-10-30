@@ -61,9 +61,17 @@ function probeWindowPaint({
 
   const existing = paintProbeStates.get(win);
   if (existing) {
+    existing.reason = reason;
     try {
       contents.invalidate();
-    } catch { /* reuse of an existing probe is best-effort */ }
+    } catch (error) {
+      record({
+        level: 'warn',
+        module: 'electron.window',
+        message: 'Window paint probe reuse invalidate failed',
+        data: { reason, error: error instanceof Error ? error.message : String(error) },
+      });
+    }
     existing.restartRequested = true;
     existing.arm?.(true);
     return;
@@ -75,6 +83,7 @@ function probeWindowPaint({
     busyRetries: 0,
     deadlineAt: now() + timeoutMs * 3,
     restartRequested: false,
+    reason,
     arm: null,
   };
   paintProbeStates.set(win, state);
@@ -110,14 +119,14 @@ function probeWindowPaint({
         module: 'electron.window',
         message: 'Window paint probe failed',
         data: {
-          reason,
+          reason: state.reason,
           ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
         },
       });
       if (state.restartRequested && !contents.isDestroyed() && !contents.isLoadingMainFrame()) {
         probeWindowPaint({
           win,
-          reason,
+          reason: state.reason,
           record,
           timeoutMs,
           reloadCooldownMs,
@@ -142,7 +151,7 @@ function probeWindowPaint({
         level: 'info',
         module: 'electron.window',
         message: 'Window paint probe deferred while loading',
-        data: { reason },
+        data: { reason: state.reason },
       });
       close();
       return;
@@ -152,7 +161,7 @@ function probeWindowPaint({
       module: 'electron.window',
       message: 'Window paint probe timed out',
       data: {
-        reason,
+        reason: state.reason,
         focused,
         loading,
         cpuPercent,
@@ -166,14 +175,14 @@ function probeWindowPaint({
           level: 'warn',
           module: 'electron.window',
           message: 'Renderer busy retry limit reached',
-          data: { reason, cpuPercent, busyRetries: state.busyRetries },
+          data: { reason: state.reason, cpuPercent, busyRetries: state.busyRetries },
         });
       } else {
         record({
           level: 'info',
           module: 'electron.window',
           message: 'Window reload suppressed by renderer activity',
-          data: { reason, cpuPercent, busyRetries: state.busyRetries },
+          data: { reason: state.reason, cpuPercent, busyRetries: state.busyRetries },
         });
         state.arm();
         return;
@@ -190,7 +199,7 @@ function probeWindowPaint({
         level: 'info',
         module: 'electron.window',
         message: 'Window reload suppressed by cooldown',
-        data: { reason, cooldownRemainingMs },
+        data: { reason: state.reason, cooldownRemainingMs },
       });
       return;
     }
@@ -201,7 +210,7 @@ function probeWindowPaint({
       level: 'warn',
       module: 'electron.window',
       message: 'Reloading window after frozen compositor',
-      data: { reason },
+      data: { reason: state.reason },
     });
     try {
       contents.reload();
@@ -210,7 +219,7 @@ function probeWindowPaint({
         level: 'error',
         module: 'electron.window',
         message: 'Window reload failed',
-        data: { reason, error: error instanceof Error ? error.message : String(error) },
+        data: { reason: state.reason, error: error instanceof Error ? error.message : String(error) },
       });
     }
   };
@@ -227,11 +236,28 @@ function probeWindowPaint({
     timer = schedule(() => handleFailure('timeout'), Math.max(0, Math.min(timeoutMs, remainingMs)));
   };
   timer = schedule(() => handleFailure('timeout'), timeoutMs);
+  // Establish the app.getAppMetrics() CPU measurement interval before timeout.
+  sampleCpuPercent();
 
   try {
     contents.invalidate();
     contents.executeJavaScript(FRAME_PROBE_SCRIPT, false).then(
-      () => close(),
+      () => {
+        if (!close()) return;
+        if (state.restartRequested && !contents.isDestroyed() && !contents.isLoadingMainFrame()) {
+          probeWindowPaint({
+            win,
+            reason: state.reason,
+            record,
+            timeoutMs,
+            reloadCooldownMs,
+            now,
+            getRendererCpuPercent,
+            schedule,
+            cancel,
+          });
+        }
+      },
       (error) => handleFailure('probe-failed', error),
     );
   } catch (error) {

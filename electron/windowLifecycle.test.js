@@ -151,6 +151,7 @@ function makeProbeWindow({
   let minimizedState = minimized;
   let loadingState = loading;
   let cpuPercent = null;
+  let invalidateError = null;
   const win = {
     webContents: {
       executeJavaScript(script) {
@@ -161,6 +162,7 @@ function makeProbeWindow({
         });
       },
       invalidate() {
+        if (invalidateError) throw invalidateError;
         invalidations += 1;
       },
       isLoadingMainFrame() {
@@ -189,6 +191,9 @@ function makeProbeWindow({
     },
     set cpuPercent(value) {
       cpuPercent = value;
+    },
+    set invalidateError(value) {
+      invalidateError = value;
     },
     get reloads() {
       return reloads;
@@ -276,8 +281,47 @@ describe('probeWindowPaint', () => {
     probe.resolveFrame();
     await Promise.resolve();
     run();
-    assert.equal(probe.invalidations, 3);
+    assert.equal(probe.invalidations, 4);
     assert.equal(probe.scripts.length, 2);
+  });
+
+  it('records a reuse invalidate failure without starting another script', () => {
+    const probe = makeProbeWindow();
+    const run = (reason) => probeWindowPaint({
+      win: probe.win,
+      reason,
+      record: (entry) => probe.records.push(entry),
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run('show');
+    probe.invalidateError = new Error('invalidate failed');
+    run('focus');
+
+    assert.equal(probe.records[0].message, 'Window paint probe reuse invalidate failed');
+    assert.equal(probe.records[0].data.reason, 'focus');
+    assert.equal(probe.records[0].data.error, 'invalidate failed');
+    assert.equal(probe.scripts.length, 1);
+    assert.equal(probe.timerCount, 1);
+  });
+
+  it('uses the latest event reason for an active probe timeout', () => {
+    const probe = makeProbeWindow();
+    const run = (reason) => probeWindowPaint({
+      win: probe.win,
+      reason,
+      record: (entry) => probe.records.push(entry),
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run('show');
+    run('display-metrics-changed');
+    probe.runTimers();
+
+    assert.equal(probe.records[0].message, 'Window paint probe timed out');
+    assert.equal(probe.records[0].data.reason, 'display-metrics-changed');
   });
 
   it('reloads a focused window when no frame arrives', () => {
@@ -346,6 +390,26 @@ describe('probeWindowPaint', () => {
     probe.runTimers();
 
     assert.equal(probe.reloads, 2);
+  });
+
+  it('samples CPU at probe start to establish a baseline', () => {
+    const probe = makeProbeWindow();
+    let samples = 0;
+    probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      getRendererCpuPercent: () => {
+        samples += 1;
+        return 0;
+      },
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    assert.equal(samples, 1);
+    probe.runTimers();
+    assert.equal(samples, 2);
   });
 
   it('reloads after the renderer stays busy past the retry limit', () => {
@@ -433,6 +497,30 @@ describe('probeWindowPaint', () => {
     await Promise.resolve();
 
     assert.equal(probe.records[0].message, 'Window paint probe failed');
+    assert.equal(probe.scripts.length, 2);
+    assert.equal(probe.timerCount, 1);
+
+    probe.resolveFrame();
+    await Promise.resolve();
+    probe.runTimers();
+    assert.equal(probe.reloads, 0);
+  });
+
+  it('starts a fresh probe when an old script resolves after a new window event', async () => {
+    const probe = makeProbeWindow();
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    run();
+    probe.resolveFrame();
+    await Promise.resolve();
+
     assert.equal(probe.scripts.length, 2);
     assert.equal(probe.timerCount, 1);
 
