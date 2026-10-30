@@ -91,6 +91,8 @@ const LINUX_TOKENS = new Set([
 
 const FOREIGN_ARCH_PATTERN = /^(?:mips|ppc|powerpc|s390x|riscv|loong|sparc)/;
 const ARM32_PATTERN = /^arm(?:v[5-8][a-z]?|hf|el|eabi|32v\d*)?$/;
+/** Tokens that may follow `…-linux-android` when it really is the end of a triple. */
+const ANDROID_TRIPLE_TAIL = /^(?:tar|gz|tgz|xz|bz2|zst|zip|7z|appimage|apk|deb|rpm|msi|exe|dmg|pkg)$/;
 
 const KNOWN_VIDEO_AUDIO = new Set([
   'mp4', 'webm', 'mov', 'mkv', 'avi', 'mp3', 'wav', 'ogg', 'flac',
@@ -368,9 +370,15 @@ function scanName(name: string): ScannedName {
     hasWin32,
     hasWin64,
     // Rust/NDK triples end with `-android` (aarch64-linux-android). A product
-    // merely named after Android (`android-studio-…-linux`) is not a triple.
-    androidTriple: tokens.some((token, index) => token === 'linux'
-      && (tokens[index + 1] ?? '').startsWith('android')),
+    // merely named after Android (`android-studio-…-linux`) is not a triple,
+    // and neither is a name that keeps going after the target
+    // (`tool-linux-android-sdk`).
+    androidTriple: tokens.some((token, index) => {
+      const target = tokens[index + 1] ?? '';
+      const afterTarget = tokens[index + 2];
+      return token === 'linux' && target.startsWith('android')
+        && (afterTarget === undefined || ANDROID_TRIPLE_TAIL.test(afterTarget));
+    }),
     ambiguousArchitecture: [...declaredArchitectures].filter((arch) => arch !== 'universal').length > 1,
     variants,
     variantScore,

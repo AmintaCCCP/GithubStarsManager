@@ -229,6 +229,9 @@ describe('evaluateCurrentSystem — synthetic edge cases', () => {
       .toEqual([0]);
     expect(evaluate(['android-studio-2024.1-linux.deb'], device('android', 'arm64')).matchesRelease)
       .toBe(false);
+    // A name that keeps going after the android token is not a triple either.
+    expect(evaluate(['tool-linux-android-sdk.tar.gz'], device('linux', 'x64')).orderedIndexes)
+      .toEqual([0]);
   });
 
   it('keeps a pure-Java jar as unverified but excludes source jars', () => {
