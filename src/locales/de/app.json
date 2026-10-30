@@ -51,7 +51,17 @@
       "cancel": "Abbrechen",
       "save": "Speichern",
       "create": "Erstellen"
-    }
+    },
+    "builtin-current-system": "Dieses Gerät",
+    "builtin-badge": "Integriert",
+    "builtin-detecting": "{{platform}} · Wird erkannt…",
+    "builtin-arch-unknown": "{{platform}} · Architektur unbekannt",
+    "builtin-unsupported": "Dieses Gerät kann nicht erkannt werden",
+    "builtin-ignored": "Auf diesem Gerät nicht unterstützt; ignoriert",
+    "builtin-locked": "Integrierte Filter können nicht bearbeitet werden",
+    "builtin-tooltip": "Zeigt Assets, die auf {{device}} laufen, sowie Assets mit unbestätigter Plattform, basierend auf Dateinamen, Assets derselben Version und Repository-Informationen. Über „Alle anzeigen“ auf der Karte sind die übrigen Assets erreichbar.",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "zurück nach oben"

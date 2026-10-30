@@ -337,7 +337,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     // 四个数组始终写回（允许空数组）：updateAssetFilter 是 spread 合并，
     // 省略键会导致清空后的黑名单/始终包含/始终排除仓库残留旧值。
     const savedFilter: AssetFilter = {
-      id: filter?.id || Date.now().toString(),
+      id: filter?.id || `custom-${Date.now()}`,
       name: name.trim(),
       keywords: keywords.filter(k => k.trim()),
       excludeKeywords: excludeKeywords.filter(k => k.trim()),

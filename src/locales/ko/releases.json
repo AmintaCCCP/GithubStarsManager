@@ -86,7 +86,14 @@
     "ai-summary": "AI 요약",
     "analyzing-update": "업데이트 분석 중...",
     "failed-to-generate-summary-please-try-again": "요약을 생성하지 못했습니다. 다시 시도해 주세요.",
-    "download-count": "{{count}} 다운로드"
+    "download-count": "{{count}} 다운로드",
+    "asset-recommended": "추천",
+    "asset-recommended-tip": "현재 OS 및 아키텍처와 정확히 일치",
+    "asset-emulated": "변환 실행",
+    "asset-emulated-tip-macos": "Rosetta 2를 통해 실행됩니다",
+    "asset-emulated-tip-windows": "에뮬레이션을 통해 실행됩니다",
+    "asset-unverified": "플랫폼 미확인",
+    "asset-unverified-tip": "파일 이름에 플랫폼이 없고, 같은 릴리스의 자산이나 저장소 정보로도 판단할 수 없습니다"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "플러그인 분석 실패",
@@ -195,7 +202,9 @@
     "inbox-label": "Release 받은편지함",
     "inbox-section": "받은편지함",
     "all-releases": "모든 Release",
-    "release-count": "Release {{count}}개"
+    "release-count": "Release {{count}}개",
+    "no-assets-for-device": "{{device}}에 사용할 수 있는 자산이 없습니다",
+    "disable-current-system-filter": "“이 기기” 필터 끄기"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "이 릴리스에는 다운로드 가능한 자산이 없습니다.",

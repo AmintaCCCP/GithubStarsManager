@@ -22,6 +22,13 @@ const matchedIndexes = (
 ): number[] => [...evaluateAssetFilter(filter, repoKey, allLinkNames, realAssetNames).matchedLinkIndexes];
 
 describe('normalizeAssetFilters', () => {
+  it('drops built-in filter ids so imported data cannot create editable duplicates', () => {
+    expect(normalizeAssetFilters([
+      { id: 'builtin-current-system', name: 'This device', keywords: [] },
+      { id: 'custom', name: 'Custom', keywords: ['dmg'] },
+    ])).toEqual([{ id: 'custom', name: 'Custom', keywords: ['dmg'] }]);
+  });
+
   it('strips the obsolete excludeRepos field from persisted filters', () => {
     // #405 曾短暂实现反向语义的 excludeRepos，hydration 时必须剥掉旧键
     const filters = [

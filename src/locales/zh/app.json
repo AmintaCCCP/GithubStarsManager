@@ -51,7 +51,17 @@
       "cancel": "取消",
       "save": "保存",
       "create": "创建"
-    }
+    },
+    "builtin-current-system": "当前系统",
+    "builtin-badge": "内置",
+    "builtin-detecting": "{{platform}} · 识别中…",
+    "builtin-arch-unknown": "{{platform}} · 架构未知",
+    "builtin-unsupported": "无法识别当前系统",
+    "builtin-ignored": "当前设备不支持，已忽略",
+    "builtin-locked": "内置过滤器不可编辑",
+    "builtin-tooltip": "显示能在 {{device}} 上运行的资产，以及平台未确认的资产。依据文件名、同版本资产和仓库信息识别；卡片中可点「显示全部」查看其余资产。",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "回到顶部"

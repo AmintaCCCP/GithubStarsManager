@@ -51,7 +51,17 @@
       "cancel": "취소",
       "save": "저장",
       "create": "만들기"
-    }
+    },
+    "builtin-current-system": "이 기기",
+    "builtin-badge": "내장",
+    "builtin-detecting": "{{platform}} · 감지 중…",
+    "builtin-arch-unknown": "{{platform}} · 아키텍처 알 수 없음",
+    "builtin-unsupported": "현재 기기를 인식할 수 없습니다",
+    "builtin-ignored": "현재 기기에서 지원하지 않아 무시됨",
+    "builtin-locked": "내장 필터는 편집할 수 없습니다",
+    "builtin-tooltip": "{{device}}에서 실행할 수 있는 자산과 플랫폼이 확인되지 않은 자산을 표시합니다. 파일 이름, 같은 릴리스의 자산, 저장소 정보를 기준으로 판단합니다. 카드에서 “모두 표시”를 눌러 나머지를 확인하세요.",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "맨 위로 돌아가기"

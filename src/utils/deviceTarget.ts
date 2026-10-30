@@ -15,7 +15,7 @@
  * 只能异步获取。拿不到时返回 undefined，调用方应跳过架构过滤、并列展示候选，
  * 而不是猜一个。
  */
-import type { InstallableArchitecture, InstallablePlatform } from '../types/installableAsset';
+import type { DeviceTarget, InstallableArchitecture, InstallablePlatform } from '../types/installableAsset';
 
 /** `navigator.userAgentData` 的最小类型（TS DOM lib 未内建 getHighEntropyValues）。 */
 interface UADataLike {
@@ -111,45 +111,103 @@ export function detectDevicePlatformSync(): InstallablePlatform | null {
 function normalizeArchitecture(
   architecture: string | undefined,
   bitness: string | undefined,
-): InstallableArchitecture | undefined {
+): Exclude<InstallableArchitecture, 'universal'> | undefined {
   const arch = (architecture ?? '').toLowerCase();
   const bits = (bitness ?? '').toLowerCase();
   if (arch === 'x86') return bits === '64' ? 'x64' : bits === '32' ? 'x86' : undefined;
-  if (arch === 'arm') return bits === '64' ? 'arm64' : undefined;
+  if (arch === 'arm') return bits === '64' ? 'arm64' : bits === '32' ? 'arm' : undefined;
   if (arch === 'arm64' || arch === 'aarch64') return 'arm64';
   if (arch === 'x86_64' || arch === 'amd64' || arch === 'x64') return 'x64';
   return undefined;
 }
 
-/** 进程内缓存：架构在一次会话里不会变，避免多次异步探测。 */
-let architectureCache: InstallableArchitecture | undefined;
-let architectureProbe: Promise<InstallableArchitecture | undefined> | null = null;
-let architectureProbeComplete = false;
+function architectureFromPlatformString(
+  platform: InstallablePlatform,
+): Exclude<InstallableArchitecture, 'universal'> | undefined {
+  // macOS browsers report Intel even on Apple Silicon. UA-CH or WebGL is the
+  // only trustworthy source there, so never infer from this signal.
+  if (platform === 'macos' || typeof navigator === 'undefined') return undefined;
+  const value = `${navigator.platform ?? ''} ${navigator.userAgent ?? ''}`.toLowerCase();
+  if (/aarch64|arm64/.test(value)) return 'arm64';
+  if (/armv[5-8]l?|armv8l/.test(value)) return 'arm';
+  if (/i[3-6]86/.test(value)) return 'x86';
+  // Windows reports `Win64; x64` (and WoW64) on ARM64 machines too, so a
+  // Windows UA cannot prove x64; only non-Windows signals are trusted here.
+  if (platform !== 'windows' && /x86_64|amd64/.test(value)) return 'x64';
+  return undefined;
+}
 
-/**
- * 尽力解析当前设备架构。
- * 拿不到 high-entropy hints 时返回 undefined（例如 Firefox/Safari，或 API 拒绝），
- * 调用方应据此放弃架构过滤而不是假定 x64。
- */
-export function resolveDeviceArchitecture(): Promise<InstallableArchitecture | undefined> {
+function architectureFromWebGl(): Exclude<InstallableArchitecture, 'universal'> | undefined {
+  if (typeof document === 'undefined' || typeof WebGLRenderingContext === 'undefined') return undefined;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl') as WebGLRenderingContext | null;
+    const extension = gl?.getExtension('WEBGL_debug_renderer_info');
+    const renderer = extension
+      ? String(gl?.getParameter(extension.UNMASKED_RENDERER_WEBGL) ?? '')
+      : '';
+    if (/apple\s+m\d|apple\s+gpu/i.test(renderer)) return 'arm64';
+    if (/intel|amd|radeon/i.test(renderer)) return 'x64';
+  } catch {
+    // Privacy modes may throw while returning the renderer.
+  }
+  return undefined;
+}
+
+export interface DeviceArchitectureResolution {
+  architecture: Exclude<InstallableArchitecture, 'universal'> | undefined;
+  source: DeviceTarget['architectureSource'];
+}
+
+/** 进程内缓存：架构在一次会话里不会变，避免多次异步探测。 */
+let architectureCache: DeviceArchitectureResolution = { architecture: undefined, source: 'none' };
+let architectureProbe: Promise<DeviceArchitectureResolution> | null = null;
+let architectureProbeComplete = false;
+const ARCHITECTURE_HINT_TIMEOUT_MS = 1500;
+
+function withArchitectureHintTimeout<T>(promise: Promise<T>): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ARCHITECTURE_HINT_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+export function resolveDeviceArchitectureDetails(): Promise<DeviceArchitectureResolution> {
   if (architectureProbeComplete) return Promise.resolve(architectureCache);
   if (architectureProbe) return architectureProbe;
-  const data = readUserAgentData();
-  if (!data?.getHighEntropyValues) {
-    architectureProbeComplete = true;
-    return Promise.resolve(undefined);
-  }
 
-  architectureProbe = data
-    .getHighEntropyValues(['architecture', 'bitness'])
-    .then((values) => {
-      architectureCache = normalizeArchitecture(values?.architecture, values?.bitness);
+  const platform = detectDevicePlatformSync();
+  const data = readUserAgentData();
+  architectureProbe = (async () => {
+    if (data?.getHighEntropyValues) {
+      try {
+        const values = await withArchitectureHintTimeout(
+          data.getHighEntropyValues(['architecture', 'bitness']),
+        );
+        const architecture = normalizeArchitecture(values?.architecture, values?.bitness);
+        if (architecture) return { architecture, source: 'ua-ch' as const };
+      } catch {
+        // Fall through to the lower-confidence synchronous signals.
+      }
+    }
+
+    const fromPlatform = platform ? architectureFromPlatformString(platform) : undefined;
+    if (fromPlatform) return { architecture: fromPlatform, source: 'platform-string' as const };
+
+    if (platform === 'macos') {
+      const fromWebGl = architectureFromWebGl();
+      if (fromWebGl) return { architecture: fromWebGl, source: 'webgl' as const };
+    }
+
+    return { architecture: undefined, source: 'none' as const };
+  })()
+    .then((result) => {
+      architectureCache = result;
       architectureProbeComplete = true;
-      return architectureCache;
-    })
-    .catch(() => {
-      architectureProbeComplete = true;
-      return undefined;
+      return result;
     })
     .finally(() => {
       architectureProbe = null;
@@ -158,9 +216,18 @@ export function resolveDeviceArchitecture(): Promise<InstallableArchitecture | u
   return architectureProbe;
 }
 
+/**
+ * 尽力解析当前设备架构。
+ * 拿不到 high-entropy hints 时返回 undefined（例如 Firefox/Safari，或 API 拒绝），
+ * 调用方应据此放弃架构过滤而不是假定 x64。
+ */
+export function resolveDeviceArchitecture(): Promise<InstallableArchitecture | undefined> {
+  return resolveDeviceArchitectureDetails().then(({ architecture }) => architecture);
+}
+
 /** 仅供测试：清空架构缓存。 */
 export function resetDeviceTargetCacheForTests(): void {
-  architectureCache = undefined;
+  architectureCache = { architecture: undefined, source: 'none' };
   architectureProbe = null;
   architectureProbeComplete = false;
 }

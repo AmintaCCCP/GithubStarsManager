@@ -86,7 +86,14 @@
     "ai-summary": "KI-Zusammenfassung",
     "analyzing-update": "Updates werden analysiert...",
     "failed-to-generate-summary-please-try-again": "Die Generierung der Zusammenfassung ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
-    "download-count": "{{count}} Downloads"
+    "download-count": "{{count}} Downloads",
+    "asset-recommended": "Empfohlen",
+    "asset-recommended-tip": "Exakte Übereinstimmung mit diesem System und dieser Architektur",
+    "asset-emulated": "Übersetzt",
+    "asset-emulated-tip-macos": "Wird über Rosetta 2 ausgeführt",
+    "asset-emulated-tip-windows": "Wird über Emulation ausgeführt",
+    "asset-unverified": "Plattform unbestätigt",
+    "asset-unverified-tip": "Plattform nicht im Dateinamen und aus Assets derselben Version oder Repository-Informationen nicht ableitbar"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Die Plugin-Analyse ist fehlgeschlagen",
@@ -195,7 +202,9 @@
     "inbox-label": "Release-Posteingang",
     "inbox-section": "Posteingang",
     "all-releases": "Alle Releases",
-    "release-count": "{{count}} Releases"
+    "release-count": "{{count}} Releases",
+    "no-assets-for-device": "Keine Assets für {{device}} gefunden",
+    "disable-current-system-filter": "Filter „Dieses Gerät“ ausschalten"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "Für diese Version gibt es keine herunterladbaren Assets.",

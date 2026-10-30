@@ -86,7 +86,14 @@
     "ai-summary": "AI 總結",
     "analyzing-update": "正在分析更新內容…",
     "failed-to-generate-summary-please-try-again": "總結生成失敗，請重試。",
-    "download-count": "{{count}} 次下載"
+    "download-count": "{{count}} 次下載",
+    "asset-recommended": "推薦",
+    "asset-recommended-tip": "與目前系統和架構精確符合",
+    "asset-emulated": "需轉譯",
+    "asset-emulated-tip-macos": "將透過 Rosetta 2 執行",
+    "asset-emulated-tip-windows": "將透過模擬執行",
+    "asset-unverified": "平台未確認",
+    "asset-unverified-tip": "檔名未宣告平台，也無法根據同版本資產或倉庫資訊推斷"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "插件分析失敗",
@@ -195,7 +202,9 @@
     "inbox-label": "Release 收件匣",
     "inbox-section": "收件匣",
     "all-releases": "全部發布版本",
-    "release-count": "{{count}} 則 Release"
+    "release-count": "{{count}} 則 Release",
+    "no-assets-for-device": "找不到適用於 {{device}} 的資產",
+    "disable-current-system-filter": "關閉「目前系統」篩選器"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "該 Release 沒有可下載的資產。",

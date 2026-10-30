@@ -186,12 +186,15 @@ export type AssetPlatform = 'macos' | 'windows' | 'linux' | 'android' | 'ios' | 
 export const OS_TOKEN_PLATFORM: Record<string, AssetPlatform> = {
   // macOS（含历史写法 osx 与内核名 darwin）
   macos: 'macos', mac: 'macos', osx: 'macos', darwin: 'macos', apple: 'macos',
+  macosx: 'macos', osx64: 'macos', darwin64: 'macos',
   // Windows（win32/win64 常见于 C++ 生态，mingw 是其工具链）
   windows: 'windows', win: 'windows', win32: 'windows', win64: 'windows', mingw: 'windows',
+  msvc: 'windows',
   // Linux（发行版与 libc 变体：alpine/musl 只出现在 Linux 生态）
   linux: 'linux', ubuntu: 'linux', debian: 'linux', fedora: 'linux', redhat: 'linux',
   archlinux: 'linux', arch: 'linux', manjaro: 'linux', alpine: 'linux', musl: 'linux',
-  raspberrypi: 'linux', raspbian: 'linux', nixos: 'linux',
+  raspberrypi: 'linux', raspbian: 'linux', nixos: 'linux', linux64: 'linux', linux32: 'linux',
+  musllinux: 'linux', manylinux: 'linux', anylinux: 'linux',
   // 移动端
   android: 'android',
   ios: 'ios', ipados: 'ios', iphone: 'ios',
