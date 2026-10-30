@@ -224,9 +224,28 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
               toast(tRef.current('discoveryView.semantic-no-ai-config'), 'warning');
             }
             // 关键词分支（默认）：行为与历史版本完全一致
-            result = currentState.discoverySearchQuery.trim()
-              ? await api.searchRepositories(currentState.discoverySearchQuery, currentState.discoveryPlatform, currentState.discoveryLanguage, currentState.discoverySortBy, currentState.discoverySortOrder, page)
-              : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+            if (currentState.discoverySearchQuery.trim()) {
+              const keywordController = new AbortController();
+              channelRequestControllersRef.current['search'] = keywordController;
+              try {
+                result = await api.searchRepositories(
+                  currentState.discoverySearchQuery,
+                  currentState.discoveryPlatform,
+                  currentState.discoveryLanguage,
+                  currentState.discoverySortBy,
+                  currentState.discoverySortOrder,
+                  page,
+                  20,
+                  keywordController.signal,
+                );
+              } finally {
+                if (channelRequestControllersRef.current['search'] === keywordController) {
+                  delete channelRequestControllersRef.current['search'];
+                }
+              }
+            } else {
+              result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+            }
           }
           break;
         }

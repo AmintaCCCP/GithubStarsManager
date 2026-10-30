@@ -124,6 +124,40 @@ describe('useDiscoveryActions — 搜索生命周期', () => {
     ));
   });
 
+  it('停止关键词搜索也会中止底层 GitHub 请求', async () => {
+    let searchSignal: AbortSignal | undefined;
+    mocks.searchRepositories.mockImplementation(async (
+      _query: string,
+      _platform: unknown,
+      _language: unknown,
+      _sortBy: unknown,
+      _sortOrder: unknown,
+      _page: number,
+      _perPage: number,
+      signal?: AbortSignal,
+    ) => {
+      searchSignal = signal;
+      await new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        }, { once: true });
+      });
+      return emptyPage;
+    });
+    setupStore('keyword');
+    const { result } = renderActions();
+
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.refreshChannel('search', 1, false); });
+    await waitFor(() => expect(searchSignal).toBeDefined());
+
+    act(() => { result.current.handleAbortSearch(); });
+    await act(async () => { await pending; });
+
+    expect(searchSignal?.aborted).toBe(true);
+    expect(useAppStore.getState().discoveryIsLoading.search).toBe(false);
+  });
+
   it('查询为空时切换模式不触发重搜', async () => {
     setupStore('keyword', '   ');
     renderActions();

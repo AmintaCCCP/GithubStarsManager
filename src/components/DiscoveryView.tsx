@@ -665,6 +665,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
     if (lastAutoSearchKeyRef.current === key) return;
     lastAutoSearchKeyRef.current = key;
     refreshChannel('search', 1, false);
+    // StrictMode replays effects after cleanup; re-arm so the replay can restart
+    // the request that useDiscoveryActions just aborted.
+    return () => { lastAutoSearchKeyRef.current = null; };
   }, [selectedDiscoveryChannel, discoverySearchQuery, discoverySearchMode, githubToken, refreshChannel]);
 
   // 趋势时间范围改变时刷新数据

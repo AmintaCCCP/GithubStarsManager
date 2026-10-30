@@ -2217,7 +2217,8 @@ export class GitHubApiService {
     sortBy: SortBy,
     sortOrder: SortOrder,
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    signal?: AbortSignal,
   ): Promise<PaginatedDiscoveryRepositories> {
     const platformQuery = this.buildPlatformQuery(platform);
     const languageQuery = this.buildLanguageQuery(language);
@@ -2236,7 +2237,7 @@ export class GitHubApiService {
       url += `&sort=${sort}&order=${order}`;
     }
 
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(url);
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(url, {}, signal);
 
     const repos = (data.items || []).map((repo, index) => ({
       ...repo,
