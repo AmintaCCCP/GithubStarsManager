@@ -106,13 +106,20 @@ function makeProbeWindow({
 } = {}) {
   const timers = [];
   const records = [];
+  const scripts = [];
   let reloads = 0;
   let invalidations = 0;
   let resolveFrame;
   let rejectFrame;
+  let focusedState = focused;
+  let visibleState = visible;
+  let minimizedState = minimized;
+  let loadingState = loading;
+  let cpuPercent = null;
   const win = {
     webContents: {
-      executeJavaScript() {
+      executeJavaScript(script) {
+        scripts.push(script);
         return new Promise((resolve, reject) => {
           resolveFrame = resolve;
           rejectFrame = reject;
@@ -122,7 +129,7 @@ function makeProbeWindow({
         invalidations += 1;
       },
       isLoadingMainFrame() {
-        return loading;
+        return loadingState;
       },
       isDestroyed() {
         return false;
@@ -133,14 +140,21 @@ function makeProbeWindow({
       },
     },
     isDestroyed: () => false,
-    isVisible: () => visible,
-    isMinimized: () => minimized,
-    isFocused: () => focused,
+    isVisible: () => visibleState,
+    isMinimized: () => minimizedState,
+    isFocused: () => focusedState,
   };
 
   return {
     win,
     records,
+    scripts,
+    get cpuPercent() {
+      return cpuPercent;
+    },
+    set cpuPercent(value) {
+      cpuPercent = value;
+    },
     get reloads() {
       return reloads;
     },
@@ -161,6 +175,12 @@ function makeProbeWindow({
     runTimers() {
       for (const callback of timers.splice(0)) callback();
     },
+    setState(next) {
+      if ('focused' in next) focusedState = next.focused;
+      if ('visible' in next) visibleState = next.visible;
+      if ('minimized' in next) minimizedState = next.minimized;
+      if ('loading' in next) loadingState = next.loading;
+    },
   };
 }
 
@@ -176,6 +196,7 @@ describe('probeWindowPaint', () => {
     });
 
     assert.equal(probe.invalidations, 1);
+    assert.match(probe.scripts[0], /requestAnimationFrame\(\(\) => requestAnimationFrame/);
     probe.resolveFrame();
     await Promise.resolve();
     probe.runTimers();
@@ -196,12 +217,14 @@ describe('probeWindowPaint', () => {
 
     run();
     run();
-    assert.equal(probe.invalidations, 1);
+    assert.equal(probe.invalidations, 2);
+    assert.equal(probe.scripts.length, 1);
 
     probe.resolveFrame();
     await Promise.resolve();
     run();
-    assert.equal(probe.invalidations, 2);
+    assert.equal(probe.invalidations, 3);
+    assert.equal(probe.scripts.length, 2);
   });
 
   it('reloads a focused window when no frame arrives', () => {
@@ -251,6 +274,50 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.reloads, 2);
   });
 
+  it('treats a backward clock jump as an expired cooldown', () => {
+    const probe = makeProbeWindow();
+    let currentTime = 10_000;
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      now: () => currentTime,
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    probe.runTimers();
+    currentTime -= 1_000;
+    run();
+    probe.runTimers();
+
+    assert.equal(probe.reloads, 2);
+  });
+
+  it('suppresses reload while the renderer process is active', () => {
+    const probe = makeProbeWindow();
+    probe.cpuPercent = 75;
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      getRendererCpuPercent: () => probe.cpuPercent,
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    probe.runTimers();
+
+    assert.equal(probe.reloads, 0);
+    assert.equal(probe.records.at(-1).message, 'Window reload suppressed by renderer activity');
+
+    probe.cpuPercent = 0;
+    probe.runTimers();
+    assert.equal(probe.reloads, 1);
+  });
+
   it('records a failed renderer probe without throwing', async () => {
     const probe = makeProbeWindow();
     probeWindowPaint({
@@ -269,9 +336,9 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.reloads, 0);
   });
 
-  it('does not reload an unfocused, occluded window', () => {
-    const probe = makeProbeWindow({ focused: false });
-    probeWindowPaint({
+  it('reuses one pending script and re-arms after focus returns', () => {
+    const probe = makeProbeWindow();
+    const run = () => probeWindowPaint({
       win: probe.win,
       reason: 'display-metrics-changed',
       record: (entry) => probe.records.push(entry),
@@ -279,11 +346,19 @@ describe('probeWindowPaint', () => {
       cancel: probe.cancel,
     });
 
+    probe.setState({ focused: false });
+    run();
     probe.runTimers();
-
     assert.equal(probe.reloads, 0);
     assert.equal(probe.records[0].level, 'info');
     assert.equal(probe.records[0].data.focused, false);
+
+    probe.setState({ focused: true });
+    run();
+    probe.runTimers();
+
+    assert.equal(probe.reloads, 1);
+    assert.equal(probe.scripts.length, 1);
   });
 
   it('does not reload while the main frame is still loading', () => {
@@ -300,6 +375,10 @@ describe('probeWindowPaint', () => {
 
     assert.equal(probe.reloads, 0);
     assert.equal(probe.records[0].data.loading, true);
+
+    probe.setState({ loading: false });
+    probe.runTimers();
+    assert.equal(probe.reloads, 1);
   });
 
   it('records a failed reload instead of throwing from the timer', () => {

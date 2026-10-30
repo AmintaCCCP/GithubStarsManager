@@ -1052,6 +1052,16 @@ function restoreMainWindow() {
 
 let paintProbeTimer = null;
 
+function getMainWindowRendererCpuPercent(contents) {
+  try {
+    const pid = contents.getOSProcessId();
+    const metric = app.getAppMetrics().find((entry) => entry.pid === pid);
+    return metric?.cpu?.percentCPUUsage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function scheduleWindowPaintProbe(reason) {
   if (paintProbeTimer) clearTimeout(paintProbeTimer);
   paintProbeTimer = setTimeout(() => {
@@ -1060,6 +1070,7 @@ function scheduleWindowPaintProbe(reason) {
     probeWindowPaint({
       win: mainWindow,
       reason,
+      getRendererCpuPercent: getMainWindowRendererCpuPercent,
       record: (entry) => {
         try {
           diagLog.record(entry);

@@ -1,5 +1,7 @@
 'use strict';
 
+const { performance } = require('node:perf_hooks');
+
 /**
  * Electron commits the native minimized state before emitting `minimize`.
  * Hide on the next event-loop turn instead of re-entering Windows window-state
@@ -17,8 +19,9 @@ function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
   });
 }
 
-const activePaintProbes = new WeakSet();
+const paintProbeStates = new WeakMap();
 const lastPaintReloads = new WeakMap();
+const BUSY_RENDERER_CPU_PERCENT = 20;
 // Avoid beginFrameSubscription here: electron/electron#37412 can crash the GPU
 // process when frame capture overlaps window resizing. Two rAF turns still prove
 // that the renderer/compositor BeginFrame pipeline resumed after invalidate().
@@ -36,52 +39,106 @@ function probeWindowPaint({
   win,
   reason = 'unknown',
   record = () => {},
-  timeoutMs = 1500,
+  timeoutMs = 5000,
   reloadCooldownMs = 60_000,
-  now = Date.now,
+  now = () => performance.now(),
+  getRendererCpuPercent = () => null,
   schedule = setTimeout,
   cancel = clearTimeout,
 }) {
   if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized()) return;
-  if (activePaintProbes.has(win)) return;
 
   const contents = win.webContents;
   if (!contents || contents.isDestroyed()) return;
 
-  let finished = false;
-  const finish = () => {
-    if (finished) return false;
-    finished = true;
-    activePaintProbes.delete(win);
-    cancel(timer);
+  const existing = paintProbeStates.get(win);
+  if (existing) {
+    try {
+      contents.invalidate();
+    } catch { /* reuse of an existing probe is best-effort */ }
+    existing.arm?.();
+    return;
+  }
+
+  const state = { closed: false, timerDone: false, arm: null };
+  paintProbeStates.set(win, state);
+  let timer;
+
+  const release = () => {
+    if (paintProbeStates.get(win) === state) paintProbeStates.delete(win);
+  };
+  const close = () => {
+    if (state.closed) return false;
+    state.closed = true;
+    if (!state.timerDone) {
+      state.timerDone = true;
+      cancel(timer);
+    }
+    release();
     return true;
   };
-  activePaintProbes.add(win);
+  const sampleCpuPercent = () => {
+    try {
+      const value = getRendererCpuPercent(contents);
+      return Number.isFinite(value) ? value : null;
+    } catch {
+      return null;
+    }
+  };
 
   const handleFailure = (kind, error) => {
-    if (finished) return;
+    if (kind !== 'timeout') {
+      if (!close()) return;
+      record({
+        level: 'warn',
+        module: 'electron.window',
+        message: 'Window paint probe failed',
+        data: {
+          reason,
+          ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
+        },
+      });
+      return;
+    }
+    if (state.closed || state.timerDone) return;
+    state.timerDone = true;
+
     const stillVisible = !win.isDestroyed() && win.isVisible() && !win.isMinimized();
     const focused = stillVisible && win.isFocused();
     const contentsGone = contents.isDestroyed();
     const loading = !contentsGone && contents.isLoadingMainFrame();
-    finish();
+    const cpuPercent = contentsGone ? null : sampleCpuPercent();
     record({
       level: focused ? 'warn' : 'info',
       module: 'electron.window',
-      message: kind === 'timeout' ? 'Window paint probe timed out' : 'Window paint probe failed',
+      message: 'Window paint probe timed out',
       data: {
         reason,
         focused,
         loading,
-        ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
+        cpuPercent,
       },
     });
-    if (kind !== 'timeout' || !focused || loading || contentsGone) return;
+    if (!focused || contentsGone) return;
+    if (loading) {
+      // The same pending probe can recover once loading completes.
+      state.arm();
+      return;
+    }
+    if (cpuPercent !== null && cpuPercent >= BUSY_RENDERER_CPU_PERCENT) {
+      record({
+        level: 'info',
+        module: 'electron.window',
+        message: 'Window reload suppressed by renderer activity',
+        data: { reason, cpuPercent },
+      });
+      state.arm();
+      return;
+    }
 
     const lastReloadAt = lastPaintReloads.get(win);
-    const cooldownRemainingMs = lastReloadAt === undefined
-      ? 0
-      : reloadCooldownMs - (now() - lastReloadAt);
+    const elapsedMs = lastReloadAt === undefined ? reloadCooldownMs : now() - lastReloadAt;
+    const cooldownRemainingMs = elapsedMs < 0 ? 0 : reloadCooldownMs - elapsedMs;
     if (cooldownRemainingMs > 0) {
       record({
         level: 'info',
@@ -92,6 +149,7 @@ function probeWindowPaint({
       return;
     }
 
+    close();
     lastPaintReloads.set(win, now());
     record({
       level: 'warn',
@@ -111,12 +169,17 @@ function probeWindowPaint({
     }
   };
 
-  const timer = schedule(() => handleFailure('timeout'), timeoutMs);
+  state.arm = () => {
+    if (state.closed || !state.timerDone) return;
+    state.timerDone = false;
+    timer = schedule(() => handleFailure('timeout'), timeoutMs);
+  };
+  timer = schedule(() => handleFailure('timeout'), timeoutMs);
 
   try {
     contents.invalidate();
     contents.executeJavaScript(FRAME_PROBE_SCRIPT, false).then(
-      () => finish(),
+      () => close(),
       (error) => handleFailure('probe-failed', error),
     );
   } catch (error) {
