@@ -173,16 +173,16 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               type="button"
               aria-pressed={currentSystemSelected}
             >
-              <span className="app-side-item-label min-w-0">
+              <span className="app-side-item-label min-w-0 flex-1 overflow-hidden">
                 <CurrentSystemIcon aria-hidden="true" />
-                <span className="flex min-w-0 flex-col items-start">
-                  <span className="flex items-center gap-1.5">
+                <span className="flex min-w-0 flex-1 flex-col items-start overflow-hidden">
+                  <span className="flex w-full min-w-0 items-center gap-1.5">
                     <span className="truncate">{t('assetFilterManager.builtin-current-system')}</span>
-                    <Badge variant="secondary" className="h-4 px-1 text-[9px] font-medium">
+                    <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[9px] font-medium">
                       {t('assetFilterManager.builtin-badge')}
                     </Badge>
                   </span>
-                  <span className={`truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <span className={`w-full truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {currentSystemUnsupported
                       ? currentSystemSelected
                         ? t('assetFilterManager.builtin-ignored')
@@ -192,7 +192,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                 </span>
               </span>
               {typeof currentSystemFilter.matchCount === 'number' && (
-                <span className="app-side-count">{currentSystemFilter.matchCount}</span>
+                <span className="app-side-count shrink-0">{currentSystemFilter.matchCount}</span>
               )}
             </Button>
             <div className="app-side-row-actions">
