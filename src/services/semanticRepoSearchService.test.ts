@@ -312,6 +312,35 @@ describe('semanticRepoSearchService — assembleGithubQuery', () => {
       'file browser in:readme',
     ]);
   });
+
+  it('用户词按标点拆分：todo/task 能匹配 todo 或 task', () => {
+    const queries: RepoSearchQuery[] = [
+      { terms: ['todo manager'], scope: 'metadata' },
+      { terms: ['task sync'], scope: 'metadata' },
+      { terms: ['task list'], scope: 'readme' },
+    ];
+    expect(assembleGithubQuery(queries, 'todo/task')).toEqual([
+      'todo manager in:name,description,topics',
+      'task sync in:name,description,topics',
+      'task list in:readme',
+    ]);
+  });
+
+  it('截断前优先保留 metadata/readme，避免前 5 条全是 any', () => {
+    const queries: RepoSearchQuery[] = [
+      ...Array.from({ length: 5 }, (_, i) => ({ terms: [`any${i} word${i}`], scope: 'any' as const })),
+      { terms: ['meta one'], scope: 'metadata' as const },
+      { terms: ['meta two'], scope: 'metadata' as const },
+      { terms: ['read me'], scope: 'readme' as const },
+    ];
+    const result = assembleGithubQuery(queries);
+    expect(result).toHaveLength(5);
+    expect(result).toEqual(expect.arrayContaining([
+      'meta one in:name,description,topics',
+      'meta two in:name,description,topics',
+      'read me in:readme',
+    ]));
+  });
 });
 
 describe('semanticRepoSearchService — runGithubSearchRecall', () => {
@@ -425,6 +454,40 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       api: makeApi({ rawSearch }),
       aiService: makeAi({ generateQueries: async () => { throw abort; } }),
     })).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('abort 等待时回滚未使用的节流时隙', async () => {
+    __resetGithubSearchPacingForTest();
+    let clock = 1_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      let sleepCalls = 0;
+      const abortingSleep = vi.fn(async (ms: number) => {
+        sleepCalls += 1;
+        if (sleepCalls === 1) {
+          clock += ms;
+          return;
+        }
+        throw new DOMException('Aborted', 'AbortError');
+      });
+      await expect(runGithubSearchRecall('terminal file manager', '', {
+        api: makeApi({ rawSearch: vi.fn(async () => []) }),
+        aiService: makeAi({ generateQueries: async () => generated }),
+        sleepImpl: abortingSleep,
+      })).rejects.toMatchObject({ name: 'AbortError' });
+
+      const nextSleep = vi.fn(async (ms: number) => { clock += ms; });
+      await runGithubSearchRecall('terminal file manager', '', {
+        api: makeApi({ rawSearch: vi.fn(async () => []) }),
+        aiService: makeAi({ generateQueries: async () => generated }),
+        sleepImpl: nextSleep,
+      });
+      // 不回滚时会残留第三个未发送请求的时隙，首个等待会变成 4200ms。
+      expect(nextSleep.mock.calls[0][0]).toBe(2100);
+    } finally {
+      nowSpy.mockRestore();
+      __resetGithubSearchPacingForTest();
+    }
   });
 });
 
@@ -577,6 +640,24 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     expect(graphql).toHaveBeenCalledTimes(2);
     expect(result.repos.map(repo => repo.full_name)).toEqual(['grep/result']);
     expect(onFallback).not.toHaveBeenCalledWith('recall_empty');
+  });
+
+  it('GraphQL 429（无 statusText）按限流上抛，不回退 REST', async () => {
+    const generated: RepoSearchQuery[] = [
+      { terms: ['terminal file manager'], scope: 'metadata' },
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file manager'], scope: 'readme' },
+    ];
+    const rawSearch = vi.fn(async () => [makeSearchRepo('o/gh-a', 10)]);
+    const graphql = vi.fn(async () => { throw new Error('GitHub API error: 429'); });
+    const rest = vi.fn(async () => makeDetail('o/gh-a', 1));
+    await expect(searchRepositoriesSemantically(
+      makeApi({ rawSearch, graphql, rest }),
+      makeAi({ generateQueries: async () => generated }),
+      'terminal file manager',
+      { githubSleepImpl: async () => {} },
+    )).rejects.toThrow('GitHub API error: 429');
+    expect(rest).not.toHaveBeenCalled();
   });
 
   it('单次正则交替查询（regexp=true），映射 channel/platform 并按 AI 顺序赋 rank，携带召回证据', async () => {

@@ -754,6 +754,15 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
       .resolves.toEqual([{ terms: ['terminal manager'], scope: 'metadata' }]);
   });
 
+  it('未闭合的散落 { 不会吞掉后面的完整查询对象', async () => {
+    const fetchMock = mockFetch();
+    const content = `{ stray\n${JSON.stringify({ queries: [{ terms: ['terminal manager'], scope: 'metadata' }] })}`;
+    fetchMock.mockResolvedValueOnce(chatResponse(content));
+
+    await expect(new AIService(makeConfig() as never, 'zh').generateRepoSearchQueries('q', 'i'))
+      .resolves.toEqual([{ terms: ['terminal manager'], scope: 'metadata' }]);
+  });
+
   it('reasoning 模型使用更大的 max_tokens', async () => {
     const fetchMock = mockFetch();
     let maxTokens: number | undefined;

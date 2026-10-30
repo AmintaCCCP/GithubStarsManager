@@ -2174,7 +2174,11 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
           }
         }
       }
-      if (end === -1) break;
+      if (end === -1) {
+        // Unclosed brace (stray `{` in prose): skip it and keep scanning.
+        start = cleaned.indexOf('{', start + 1);
+        continue;
+      }
       const parsed = this.tryParseJsonObject(cleaned.slice(start, end + 1));
       if (parsed) {
         objects.push(parsed);

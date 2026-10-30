@@ -163,6 +163,7 @@ function isGithubRateLimitError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   if ((error as { status?: unknown }).status === 429) return true;
   return /rate limit exceeded/i.test(error.message)
+    || /GitHub API error:\s*429\b/.test(error.message)
     || /too many requests/i.test(error.message);
 }
 
@@ -170,11 +171,9 @@ function isGithubRateLimitError(error: unknown): boolean {
 function topicWordSet(...sources: string[]): Set<string> {
   const words = new Set<string>();
   for (const source of sources) {
-    for (const raw of source.split(/\s+/)) {
-      const word = raw
-        .toLowerCase()
-        .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
-      if (word.length >= 2) words.add(word);
+    // Split on any non-alphanumeric run so `todo/task` yields `todo` and `task`.
+    for (const part of source.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+      if (part.length >= 2) words.add(part);
     }
   }
   return words;
@@ -191,6 +190,7 @@ export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: strin
   const hasTopicFilter = topicWords !== null && topicWords.size > 0;
   const assembled: string[] = [];
   const seen = new Set<string>();
+  const scopeByQuery = new Map<string, RepoSearchQuery['scope']>();
   let metadataCount = 0;
   let readmeCount = 0;
   for (const query of queries) {
@@ -234,11 +234,21 @@ export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: strin
     if (seen.has(key)) continue;
     seen.add(key);
     assembled.push(q);
+    scopeByQuery.set(q, query.scope);
     if (query.scope === 'metadata') metadataCount++;
     else if (query.scope === 'readme') readmeCount++;
   }
   if (assembled.length < GITHUB_QUERY_MIN_VALID || metadataCount < 2 || readmeCount < 1) return null;
-  return assembled.slice(0, GITHUB_QUERY_MAX_VALID);
+  // Keep the required scoped queries inside the cap even if the model listed
+  // five `any` queries first.
+  const required = new Set<string>([
+    ...assembled.filter(q => scopeByQuery.get(q) === 'metadata').slice(0, 2),
+    ...assembled.filter(q => scopeByQuery.get(q) === 'readme').slice(0, 1),
+  ]);
+  return [
+    ...required,
+    ...assembled.filter(q => !required.has(q)),
+  ].slice(0, GITHUB_QUERY_MAX_VALID);
 }
 
 /**
@@ -282,8 +292,17 @@ export async function runGithubSearchRecall(
     // recalls queue behind each other instead of firing five requests in parallel.
     const now = Date.now();
     const scheduledAt = Math.max(now, nextGithubSearchAt);
-    nextGithubSearchAt = scheduledAt + GITHUB_SEARCH_INTERVAL_MS;
-    if (scheduledAt > now) await wait(scheduledAt - now, signal);
+    const reservedUntil = scheduledAt + GITHUB_SEARCH_INTERVAL_MS;
+    nextGithubSearchAt = reservedUntil;
+    if (scheduledAt > now) {
+      try {
+        await wait(scheduledAt - now, signal);
+      } catch (error) {
+        // Aborted before the request: release the unused slot if no later call claimed it.
+        if (nextGithubSearchAt === reservedUntil) nextGithubSearchAt = scheduledAt;
+        throw error;
+      }
+    }
     const q = assembled[i];
     try {
       const repos = await api.searchRepositoriesRaw(q, GITHUB_SEARCH_PER_PAGE, signal);
@@ -634,7 +653,7 @@ async function enrichViaRest(
         // GitHub 限流（主限流/次级限流均报 403 "rate limit exceeded"）不能吞成
         // "仓库不可用"，否则管道会拿着不完整的候选集继续跑并把残缺结果交给 LLM：
         // 直接向上抛，由 hook 的错误路径提示用户
-        if (error instanceof Error && /rate limit exceeded/i.test(error.message)) {
+        if (isGithubRateLimitError(error)) {
           stopped = true;
           throw error;
         }
@@ -766,7 +785,7 @@ export async function searchRepositoriesSemantically(
       // GraphQL 限流时直接向上抛：REST 回退与 GraphQL 共用限流退避
       // （rateLimitRemaining/rateLimitReset），会静默等待限流窗口重置（最长约 1 小时）
       // 且不向用户报错，与 enrichViaRest 的"限流即上抛"约定保持一致
-      if (error instanceof Error && /rate limit exceeded/i.test(error.message)) throw error;
+      if (isGithubRateLimitError(error)) throw error;
       logger.warn('semanticSearch', 'GraphQL 批量补全失败，回退 REST 逐仓补全', { error: errorMessage(error) });
       details = await enrichViaRest(api, fullNames, signal);
     }
