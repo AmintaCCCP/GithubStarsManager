@@ -166,6 +166,9 @@ function makeProbeWindow({
     get timerCount() {
       return timers.size;
     },
+    get activeTimerIds() {
+      return [...timers.keys()];
+    },
     get scheduledTimerCount() {
       return scheduledTimerCount;
     },
@@ -378,6 +381,32 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.records[0].message, 'Window paint probe failed');
     assert.equal(probe.records[0].data.error, 'renderer gone');
     assert.equal(probe.reloads, 0);
+    assert.equal(probe.scripts.length, 1);
+  });
+
+  it('starts a fresh probe when an old script rejects after a new window event', async () => {
+    const probe = makeProbeWindow();
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    run();
+    probe.rejectFrame(new Error('navigation'));
+    await Promise.resolve();
+
+    assert.equal(probe.records[0].message, 'Window paint probe failed');
+    assert.equal(probe.scripts.length, 2);
+    assert.equal(probe.timerCount, 1);
+
+    probe.resolveFrame();
+    await Promise.resolve();
+    probe.runTimers();
+    assert.equal(probe.reloads, 0);
   });
 
   it('reuses one pending script and re-arms after focus returns', () => {
@@ -425,6 +454,7 @@ describe('probeWindowPaint', () => {
     run();
 
     assert.equal(probe.timerCount, 1);
+    assert.deepEqual(probe.activeTimerIds, [3]);
     assert.equal(probe.scheduledTimerCount, 3);
     assert.equal(probe.scripts.length, 1);
     assert.equal(probe.invalidations, 3);

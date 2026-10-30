@@ -57,6 +57,7 @@ function probeWindowPaint({
     try {
       contents.invalidate();
     } catch { /* reuse of an existing probe is best-effort */ }
+    existing.restartRequested = true;
     existing.arm?.(true);
     return;
   }
@@ -66,6 +67,7 @@ function probeWindowPaint({
     timerDone: false,
     busyRetries: 0,
     deadlineAt: now() + timeoutMs * 3,
+    restartRequested: false,
     arm: null,
   };
   paintProbeStates.set(win, state);
@@ -105,6 +107,19 @@ function probeWindowPaint({
           ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
         },
       });
+      if (state.restartRequested && !contents.isDestroyed() && !contents.isLoadingMainFrame()) {
+        probeWindowPaint({
+          win,
+          reason,
+          record,
+          timeoutMs,
+          reloadCooldownMs,
+          now,
+          getRendererCpuPercent,
+          schedule,
+          cancel,
+        });
+      }
       return;
     }
     if (state.closed || state.timerDone) return;
