@@ -28,7 +28,7 @@ import {
 import { SiAndroid, SiApple, SiLinux, SiX, SiTelegram } from '@icons-pack/react-simple-icons';
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
-import { useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
+import { buildDiscoverySearchKey, getLastSettledSearchKey, useDiscoveryActions } from '../features/discovery/hooks/useDiscoveryActions';
 import { useWebScrapeSupport } from '../hooks/useWebScrapeSupport';
 import { DiscoverySidebar } from './DiscoverySidebar';
 import { DiscoveryChannelMenu } from './DiscoveryChannelMenu';
@@ -541,6 +541,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
     refreshChannel,
     handleAnalyzePage,
     handleAbortAnalysis,
+    handleAbortSearch,
   } = useDiscoveryActions(scrollContainerRef);
 
   const [searchInput, setSearchInput] = useState(discoverySearchQuery);
@@ -654,11 +655,36 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [selectedDiscoveryChannel, refreshChannel]);
 
+  // 只在查询/模式真正变化时触发搜索。组件重新挂载（切到别的页面再切回发现页）
+  // 时，同一查询已完成或已取消则复用现有结果，不重跑整条语义搜索。
+  const lastAutoSearchKeyRef = useRef<string | null>(getLastSettledSearchKey());
   useEffect(() => {
-    if (selectedDiscoveryChannel === 'search' && discoverySearchQuery.trim()) {
-      refreshChannel('search', 1, false);
-    }
-  }, [selectedDiscoveryChannel, discoverySearchQuery, refreshChannel]);
+    if (selectedDiscoveryChannel !== 'search') return;
+    if (!discoverySearchQuery.trim()) return;
+    const key = buildDiscoverySearchKey(discoverySearchQuery, discoverySearchMode, {
+      owner: githubToken,
+      platform: discoveryPlatform,
+      language: discoveryLanguage,
+      sortBy: discoverySortBy,
+      sortOrder: discoverySortOrder,
+    });
+    if (lastAutoSearchKeyRef.current === key) return;
+    lastAutoSearchKeyRef.current = key;
+    refreshChannel('search', 1, false);
+    // StrictMode replays effects after cleanup; restore the last settled key
+    // so the aborted replay can restart without repeating a completed search.
+    return () => { lastAutoSearchKeyRef.current = getLastSettledSearchKey(); };
+  }, [
+    selectedDiscoveryChannel,
+    discoverySearchQuery,
+    discoverySearchMode,
+    githubToken,
+    discoveryPlatform,
+    discoveryLanguage,
+    discoverySortBy,
+    discoverySortOrder,
+    refreshChannel,
+  ]);
 
   // 趋势时间范围改变时刷新数据
   useEffect(() => {
@@ -770,9 +796,8 @@ export const DiscoveryView: React.FC = React.memo(() => {
     }
   }, [selectedDiscoveryChannel, discoverySearchQuery, searchInput, setDiscoverySearchQuery, refreshChannel]);
 
-  // 搜索模式切换：关键词 ↔ AI 语义。这里只写 store；已有查询时的自动重搜由
-  // useDiscoveryActions 的模式变化 effect 触发（该 effect 在 latestStateRef 同步
-  // 之后执行，refreshChannel 读到的已是新模式，请求签名校验才能通过）
+  // 搜索模式切换：关键词 ↔ AI 语义。这里只写 store；查询/模式变化的自动搜索
+  // 统一由下方 key 守卫 effect 触发，避免重复请求。
   const handleSearchModeChange = useCallback((value: string) => {
     setDiscoverySearchMode(value as 'keyword' | 'semantic');
   }, [setDiscoverySearchMode]);
@@ -1111,15 +1136,27 @@ export const DiscoveryView: React.FC = React.memo(() => {
                         : t('discoveryView.search-repositories-2')}
                       className="ui-field h-auto w-full py-2.5 pl-10 pr-4 text-foreground dark:text-foreground" />
                   </div>
-                  <Button
-                    onClick={handleSearch}
-                    aria-label={t('discoveryView.search')}
-                    disabled={!searchInput.trim() || currentIsLoading}
-                    className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
-                  >
-                    <Search className="w-4 h-4" />
-                    <span className="hidden sm:inline">{t('discoveryView.search')}</span>
-                  </Button>
+                  {currentIsLoading ? (
+                    <Button
+                      onClick={handleAbortSearch}
+                      aria-label={t('discoveryView.stop')}
+                      title={t('discoveryView.stop')}
+                      className="ui-button-secondary px-5 py-2.5 flex items-center gap-2 font-medium"
+                    >
+                      <X className="w-4 h-4" />
+                      <span className="hidden sm:inline">{t('discoveryView.stop')}</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleSearch}
+                      aria-label={t('discoveryView.search')}
+                      disabled={!searchInput.trim()}
+                      className="ui-button-primary px-5 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+                    >
+                      <Search className="w-4 h-4" />
+                      <span className="hidden sm:inline">{t('discoveryView.search')}</span>
+                    </Button>
+                  )}
                 </div>
                 {discoverySearchMode === 'semantic' && (
                   <p className="text-xs text-muted-foreground dark:text-muted-foreground">

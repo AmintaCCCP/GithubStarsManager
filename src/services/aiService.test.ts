@@ -211,8 +211,8 @@ describe('AIService.searchRepositoriesWithSelection — LLM 精选', () => {
     expect(selectionPrompt).toContain('用户意图说明：找 markdown 编辑器');
     expect(selectionPrompt).toContain('共 2 个');
     expect(selectionPrompt).toContain('acme/quick-md');
-    // 普通模型的精选请求维持紧凑预算
-    expect(requests[1].max_tokens).toBe(800);
+    // 精选请求统一给足预算，避免自定义推理模型把 800 全耗在 reasoning 上
+    expect(requests[1].max_tokens).toBe(4096);
   });
 
   it('模型把候选行号当作 ID 返回时按行号解析，重排结果不被静默丢弃', async () => {
@@ -681,6 +681,132 @@ describe('AIService.expandSearchQuery — 多语言关键词约束（multilingua
     // 追加段在原提示词之后，且原文完整保留
     expect(requests[1].startsWith(requests[0])).toBe(true);
     expect(requests[1].length).toBeGreaterThan(requests[0].length);
+  });
+});
+
+describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as {
+    messages: Array<{ content: string }>;
+    temperature: number;
+    max_tokens: number;
+  };
+
+  it('从垃圾文本中提取 JSON 对象，过滤非法条目且不提前截断', async () => {
+    const fetchMock = mockFetch();
+    let body: Awaited<ReturnType<typeof captureBody>> | undefined;
+    const content = [
+      'noise before',
+      JSON.stringify({
+        queries: [
+          { terms: ['terminal', 'file manager'], scope: 'metadata' },
+          { terms: ['password vault'], scope: 'readme' },
+          { terms: ['todo task'], scope: 'any' },
+          { terms: ['code review'], scope: 'METADATA' },
+          { terms: ['photo backup'], scope: 'readme' },
+          { terms: ['sixth query'], scope: 'any' },
+          { terms: 'not-an-array', scope: 'metadata' },
+          { terms: ['bad scope'], scope: 'topic' },
+          { terms: [], scope: 'any' },
+        ],
+      }),
+      'noise after',
+    ].join('\n');
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      body = await captureBody(init);
+      return chatResponse(content);
+    });
+
+    const result = await new AIService(makeConfig() as never, 'zh')
+      .generateRepoSearchQueries('终端文件管理器', '找终端文件管理器');
+
+    expect(result).toEqual([
+      { terms: ['terminal', 'file manager'], scope: 'metadata' },
+      { terms: ['password vault'], scope: 'readme' },
+      { terms: ['todo task'], scope: 'any' },
+      { terms: ['code review'], scope: 'metadata' },
+      { terms: ['photo backup'], scope: 'readme' },
+      { terms: ['sixth query'], scope: 'any' },
+    ]);
+    expect(body?.temperature).toBe(0.1);
+    expect(body?.max_tokens).toBe(4096);
+    const userPrompt = body?.messages[1].content ?? '';
+    expect(userPrompt).toContain('至少 2 条 metadata');
+    expect(userPrompt).toContain('至少 1 条 readme');
+    expect(userPrompt).toContain('禁止只写泛词');
+  });
+
+  it('跳过提示词示例对象，选择首个含有效查询的 JSON 对象', async () => {
+    const fetchMock = mockFetch();
+    const content = [
+      JSON.stringify({ queries: [{ terms: ['example term'], scope: 'metadata | readme | any' }] }),
+      JSON.stringify({ queries: [{ terms: ['terminal manager'], scope: 'metadata' }] }),
+    ].join('\n');
+    fetchMock.mockResolvedValueOnce(chatResponse(content));
+
+    await expect(new AIService(makeConfig() as never, 'zh').generateRepoSearchQueries('终端文件管理器', 'i'))
+      .resolves.toEqual([{ terms: ['terminal manager'], scope: 'metadata' }]);
+  });
+
+  it('未闭合的散落 { 不会吞掉后面的完整查询对象', async () => {
+    const fetchMock = mockFetch();
+    const content = `{ stray\n${JSON.stringify({ queries: [{ terms: ['terminal manager'], scope: 'metadata' }] })}`;
+    fetchMock.mockResolvedValueOnce(chatResponse(content));
+
+    await expect(new AIService(makeConfig() as never, 'zh').generateRepoSearchQueries('q', 'i'))
+      .resolves.toEqual([{ terms: ['terminal manager'], scope: 'metadata' }]);
+  });
+
+  it.each([
+    ['普通端点', makeConfig()],
+    ['reasoning 兼容端点', { ...makeConfig(), reasoningEffort: 'medium' }],
+  ])('%s统一使用 4096 max_tokens', async (_label, config) => {
+    const fetchMock = mockFetch();
+    let maxTokens: number | undefined;
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      maxTokens = (await captureBody(init)).max_tokens;
+      return chatResponse('{"queries":[{"terms":["x"],"scope":"any"}]}');
+    });
+
+    await new AIService(config as never, 'zh').generateRepoSearchQueries('q', 'i');
+    expect(maxTokens).toBe(4096);
+  });
+
+  it('非数组、非法 JSON 或请求失败时返回 []', async () => {
+    const fetchMock = mockFetch();
+    fetchMock
+      .mockResolvedValueOnce(chatResponse('{"queries":"not-an-array"}'))
+      .mockResolvedValueOnce(chatResponse('not json at all'))
+      .mockRejectedValueOnce(new Error('network down'));
+    const service = new AIService(makeConfig() as never, 'zh');
+
+    await expect(service.generateRepoSearchQueries('q', 'i')).resolves.toEqual([]);
+    await expect(service.generateRepoSearchQueries('q', 'i')).resolves.toEqual([]);
+    await expect(service.generateRepoSearchQueries('q', 'i')).resolves.toEqual([]);
+  });
+
+  it('abort 向上传播；en 提示词包含同等语法槽约束', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockRejectedValueOnce(new DOMException('aborted', 'AbortError'));
+    const service = new AIService(makeConfig() as never, 'zh');
+    await expect(service.generateRepoSearchQueries('q', 'i')).rejects.toSatisfy(isAbortError);
+
+    let enPrompt = '';
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      enPrompt = body.messages[1].content;
+      return chatResponse('{"queries":[{"terms":["x"],"scope":"any"}]}');
+    });
+    await new AIService(makeConfig() as never, 'en').generateRepoSearchQueries('q', 'i');
+    expect(enPrompt).toContain('At least 2 metadata queries');
+    expect(enPrompt).toContain('at least 1 readme query');
+    expect(enPrompt).toContain('never use only generic words');
   });
 });
 

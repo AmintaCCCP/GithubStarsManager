@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository, Release } from '../types';
 import { logger } from './logger';
-import { __reset403WarnStateForTest, BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
+import {
+  __reset403WarnStateForTest,
+  __setGithubSearchPacingForTest,
+  BACKEND_PROXY_UNAUTHORIZED_ERROR,
+  GITHUB_TOKEN_INVALID_ERROR,
+  GitHubApiService,
+} from './githubApi';
+
+beforeEach(() => {
+  __setGithubSearchPacingForTest(0);
+});
 
 const makeRepository = (id: number, fullName: string, overrides: Partial<Repository> = {}): Repository => {
   const [owner, name] = fullName.split('/');
@@ -641,5 +651,110 @@ describe('GitHubApiService 403 warn 去重', () => {
 
     expect(warnSpy.mock.calls.filter(([, message]) => message === 'forbidden')).toHaveLength(1);
     expect(debugSpy.mock.calls.filter(([, message]) => message === 'forbidden (deduplicated)')).toHaveLength(1);
+  });
+});
+
+describe('GitHubApiService search 端点限流隔离', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('核心桶剩余量低时 search 请求仍立即发出，不等待核心桶重置', async () => {
+    vi.useFakeTimers();
+    const reset = Math.floor(Date.now() / 1000) + 3600;
+    const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'X-RateLimit-Remaining': '1', 'X-RateLimit-Reset': String(reset) },
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ login: 'me' }))
+      .mockResolvedValueOnce(jsonResponse({ total_count: 0, items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    await service.getCurrentUser();
+    // 旧实现会因核心桶 remaining=1 在 search 请求前等待约 1 小时
+    await service.searchRepositoriesRaw('terminal file manager', 25);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('search 403 remaining=0 时使用当前响应的 X-RateLimit-Reset', async () => {
+    const searchReset = Math.floor(Date.now() / 1000) + 1234;
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ message: 'rate limit' }), {
+      status: 403,
+      headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(searchReset) },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    const expected = new Date(searchReset * 1000).toLocaleString();
+    await expect(service.searchRepositoriesRaw('q', 25)).rejects.toThrow(expected);
+  });
+
+  it('search 403 缺少 X-RateLimit-Reset 时显示 unknown，不复用核心桶重置时间', async () => {
+    const coreReset = Math.floor(Date.now() / 1000) + 3600;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ login: 'me' }), {
+        status: 200,
+        headers: { 'X-RateLimit-Remaining': '4999', 'X-RateLimit-Reset': String(coreReset) },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ message: 'rate limit' }), {
+        status: 403,
+        headers: { 'X-RateLimit-Remaining': '0' },
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    await service.getCurrentUser();
+    await expect(service.searchRepositoriesRaw('q', 25)).rejects.toThrow('Resets at unknown');
+  });
+
+  it('search 响应低剩余量/未来重置不污染核心桶：后续核心请求立即发出', async () => {
+    vi.useFakeTimers();
+    const futureReset = Math.floor(Date.now() / 1000) + 3600;
+    const coreOk = () => new Response(JSON.stringify({ login: 'me' }), {
+      status: 200,
+      headers: { 'X-RateLimit-Remaining': '4999', 'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 60) },
+    });
+    const searchLow = () => new Response(JSON.stringify({ total_count: 0, items: [] }), {
+      status: 200,
+      headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(futureReset) },
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(coreOk())
+      .mockResolvedValueOnce(searchLow())
+      .mockResolvedValueOnce(coreOk());
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    await service.getCurrentUser();
+    await service.searchRepositoriesRaw('q', 25);
+    // 若 search 的低剩余量/未来重置写进核心桶，这里会等待约 1 小时
+    await service.getCurrentUser();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('所有 /search/* 调用共享同一 token 的节流时间轴', async () => {
+    vi.useFakeTimers();
+    __setGithubSearchPacingForTest(2100);
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ total_count: 0, items: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    const rawSearch = service.searchRepositoriesRaw('terminal file manager', 25);
+    const issueSearch = service.searchRepositoryIssues('owner', 'repo', ['crash']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(2100);
+    await Promise.all([rawSearch, issueSearch]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

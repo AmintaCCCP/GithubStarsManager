@@ -119,6 +119,7 @@ const mocks = vi.hoisted(() => {
     refreshChannel: vi.fn(),
     handleAnalyzePage: vi.fn(),
     handleAbortAnalysis: vi.fn(),
+    handleAbortSearch: vi.fn(),
   };
 
   return {
@@ -306,6 +307,9 @@ vi.mock('./features/discovery/hooks/useDiscoveryActions', async () => {
   const { makeT } = await import('./i18n/useT');
   const t = makeT('zh', 'discovery');
   return {
+    buildDiscoverySearchKey: (query: string, mode: string, options: { owner?: string | null } = {}) =>
+      JSON.stringify([options.owner ?? '', query.trim(), mode]),
+    getLastSettledSearchKey: () => null,
     useDiscoveryActions: () => ({ ...mocks.discoveryActions, t }),
   };
 });

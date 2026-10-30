@@ -41,6 +41,11 @@ export interface ConnectionTestResult {
   message: string;
 }
 
+export interface RepoSearchQuery {
+  terms: string[];
+  scope: 'metadata' | 'readme' | 'any';
+}
+
 type RepositoryAnalysisResult = {
   summary: string;
   tags: string[];
@@ -401,7 +406,6 @@ export class AIService {
   private static readonly SELECTION_MIN_CANDIDATES = 15;
   /** LLM 精选最多返回的相关仓库数。 */
   private static readonly SELECTION_MAX_RESULTS = 20;
-  private static readonly SELECTION_MAX_TOKENS = 800;
 
   constructor(config: AIConfig, language: string = 'zh', private readonly redactDebugPayload = false) {
     this.config = config;
@@ -2130,6 +2134,81 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
     }
   }
 
+  /**
+   * Collect every top-level `{...}` object (think blocks stripped), so callers
+   * can skip prompt-echo objects instead of accepting the first one blindly.
+   */
+  private scanTopLevelJsonObjects(content: string): Record<string, unknown>[] {
+    const cleaned = content
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<think>[\s\S]*$/gi, '');
+    const objects: Record<string, unknown>[] = [];
+    let start = cleaned.indexOf('{');
+    while (start !== -1) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let end = -1;
+      for (let i = start; i < cleaned.length; i++) {
+        const char = cleaned[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (inString) continue;
+        if (char === '{') depth++;
+        else if (char === '}') {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+      if (end === -1) {
+        // Unclosed brace (stray `{` in prose): skip it and keep scanning.
+        start = cleaned.indexOf('{', start + 1);
+        continue;
+      }
+      const parsed = this.tryParseJsonObject(cleaned.slice(start, end + 1));
+      if (parsed) {
+        objects.push(parsed);
+        start = cleaned.indexOf('{', end + 1);
+      } else {
+        // Not valid JSON (e.g. a stray brace in prose): retry from the next brace.
+        start = cleaned.indexOf('{', start + 1);
+      }
+    }
+    return objects;
+  }
+
+  private normalizeRepoSearchQueries(raw: unknown): RepoSearchQuery[] {
+    if (!Array.isArray(raw)) return [];
+    const queries: RepoSearchQuery[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const entry = item as { terms?: unknown; scope?: unknown };
+      if (!Array.isArray(entry.terms) || typeof entry.scope !== 'string') continue;
+      const scope = entry.scope.trim().toLowerCase();
+      if (scope !== 'metadata' && scope !== 'readme' && scope !== 'any') continue;
+      const terms = entry.terms
+        .filter((term): term is string => typeof term === 'string')
+        .map(term => term.trim())
+        .filter(Boolean);
+      if (terms.length === 0) continue;
+      queries.push({ terms, scope });
+    }
+    return queries;
+  }
+
   async testConnection(): Promise<ConnectionTestResult> {
     const timeoutMs = 30000;
 
@@ -2642,6 +2721,86 @@ Return:
   }
 
   /**
+   * 把全网仓库搜索需求填进固定语法槽。模型只产出 terms/scope，GitHub 限定符
+   * 由 semanticRepoSearchService 校验后拼装，避免模型自行写入无效查询语法。
+   * 请求或解析失败返回 []，由调用方回退到既有 grep.app 召回。
+   */
+  async generateRepoSearchQueries(
+    query: string,
+    intent: string,
+    signal?: AbortSignal,
+  ): Promise<RepoSearchQuery[]> {
+    const system = this.language === 'zh'
+      ? '你是 GitHub 仓库搜索查询解析器。只输出严格 JSON 对象，不输出思考过程、Markdown 或任何额外文字。'
+      : 'You are a GitHub repository search query parser. Output only a strict JSON object, with no thinking, Markdown, or extra text.';
+    const user = this.language === 'zh'
+      ? `把用户需求填进固定 JSON 语法槽，不要输出任何其他文字。
+
+用户查询：「${this.sanitizeForPrompt(query)}」
+意图：${this.sanitizeForPrompt(intent)}
+
+JSON 语法：
+{
+  "queries": [
+    { "terms": ["1-3 个英文内容词"], "scope": "metadata | readme | any" }
+  ]
+}
+
+规则（代码会强制执行）：
+- 恰好 5 条 queries；terms 每条 1-3 个词，禁止 GitHub 语法/引号/限定符；
+- 覆盖同义词的不同说法（todo/task、password/vault、code review/PR review 等）；
+- 至少 2 条 metadata，至少 1 条 readme；
+- 每条必须包含锁定主题的词，禁止只写泛词（cli/app/tool/open source/software）。
+
+只输出 JSON 对象。`
+      : `Fill the fixed JSON grammar slots for the user's need. Output nothing else.
+
+User query: "${this.sanitizeForPrompt(query)}"
+Intent: ${this.sanitizeForPrompt(intent)}
+
+JSON grammar:
+{
+  "queries": [
+    { "terms": ["1-3 English content words"], "scope": "metadata | readme | any" }
+  ]
+}
+
+Rules (enforced by code):
+- Exactly 5 queries; each terms entry must contain 1-3 words and no GitHub syntax, quotes, or qualifiers;
+- Cover alternate wording and synonyms (todo/task, password/vault, code review/PR review, etc.);
+- At least 2 metadata queries and at least 1 readme query;
+- Every query must include a topic-locking term; never use only generic words (cli/app/tool/open source/software).
+
+Output only the JSON object.`;
+    try {
+      const content = await this.requestText({
+        system,
+        user,
+        temperature: 0.1,
+        // Custom OpenAI-compatible reasoning endpoints may spend a smaller
+        // budget entirely on reasoning_content and return no JSON content.
+        maxTokens: AIService.RERANKING_MAX_TOKENS,
+        signal,
+      });
+      // The model may echo the prompt's example object before the real reply;
+      // scan every top-level object and take the first one with a valid query.
+      for (const candidate of this.scanTopLevelJsonObjects(content)) {
+        const queries = this.normalizeRepoSearchQueries(candidate.queries);
+        if (queries.length > 0) return queries;
+      }
+      return [];
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) throw error;
+      logger.warn('ai', 'Failed to generate repository search queries', {
+        model: this.config.model,
+        configId: this.config.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
    * 无向量路径的 AI 语义搜索（向量搜索不可用时的降级链）。
    * 三段式：
    * ① 查询扩展 + 意图复述（一次 chat 调用）；
@@ -2786,12 +2945,11 @@ Return:
       system,
       user,
       temperature: 0.1,
-      // 推理 token 与输出共享预算（openai reasoning 模型、gemini 2.5 思考模型）：
-      // 小预算被推理耗尽时 content 为空、精选会静默退化，故复用重排序的 4096
-      // 预算；普通模型 800 足够容纳 ≤20 个 ID 的 JSON 数组。
-      maxTokens: (this.config.reasoningEffort || this.getApiType() === 'gemini')
-        ? AIService.RERANKING_MAX_TOKENS
-        : AIService.SELECTION_MAX_TOKENS,
+      // 推理 token 与输出共享预算。不少自定义 OpenAI 兼容端点（如 flash/grok）
+      // 没有 reasoningEffort 标记却会先输出 reasoning_content；800 会被推理
+      // 耗尽导致 content 为空、精选静默退回词法兜底。max_tokens 只是上限，
+      // 普通模型仍会在 JSON 结束后停止，因此统一给足 4096。
+      maxTokens: AIService.RERANKING_MAX_TOKENS,
       signal,
     });
 

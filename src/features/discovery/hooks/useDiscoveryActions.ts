@@ -40,6 +40,34 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
   }
 };
 
+// Survives DiscoveryView remounts (SPA navigation) so returning to the search
+// tab with the same query/mode does not restart a completed or cancelled search.
+let lastSettledSearchKey: string | null = null;
+
+export interface DiscoverySearchKeyOptions {
+  owner?: string | null;
+  platform?: string;
+  language?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}
+
+export const buildDiscoverySearchKey = (
+  query: string,
+  mode: string,
+  options: DiscoverySearchKeyOptions = {},
+): string => JSON.stringify([
+  options.owner ?? '',
+  query.trim(),
+  mode,
+  options.platform ?? '',
+  options.language ?? '',
+  options.sortBy ?? '',
+  options.sortOrder ?? '',
+]);
+
+export const getLastSettledSearchKey = (): string | null => lastSettledSearchKey;
+
 /**
  * Owns network-backed Discovery loading and AI analysis. UI scrolling and view
  * composition remain in DiscoveryView, while stale topic response protection
@@ -63,6 +91,8 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
   useEffect(() => {
     setIsAnalyzing(false);
     setAnalysisProgress({ current: 0, total: 0 });
+    const controllers = channelRequestControllersRef.current;
+    const versions = channelRequestVersionRef.current;
     // 账号切换后旧会话的周刊/推文/频道同步进度不再属于当前页面，直接清空
     useAppStore.getState().setWeeklySyncStatus(null);
     useAppStore.getState().setXTweetSyncStatus(null);
@@ -70,8 +100,16 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     return () => {
       optimizerRef.current?.abort();
       optimizerRef.current = null;
+      // Revoke this instance's loading ownership before aborting so a pending
+      // request cannot clear a replacement instance's loading state in finally.
+      channelLoadingVersionRef.current = {};
       // 账号切换/卸载时中止外部频道仍在途的 GitHub 详情请求
-      for (const controller of Object.values(channelRequestControllersRef.current)) controller?.abort();
+      for (const [channelId, controller] of Object.entries(controllers)) {
+        // Invalidate before aborting so the aborted request cannot write empty results.
+        versions[channelId as DiscoveryChannelId] = (versions[channelId as DiscoveryChannelId] ?? 0) + 1;
+        controller?.abort();
+        useAppStore.getState().setDiscoveryLoading(channelId as DiscoveryChannelId, false);
+      }
       channelRequestControllersRef.current = {};
     };
   }, [authSessionIdentity, setAnalysisProgress]);
@@ -209,9 +247,28 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
               toast(tRef.current('discoveryView.semantic-no-ai-config'), 'warning');
             }
             // 关键词分支（默认）：行为与历史版本完全一致
-            result = currentState.discoverySearchQuery.trim()
-              ? await api.searchRepositories(currentState.discoverySearchQuery, currentState.discoveryPlatform, currentState.discoveryLanguage, currentState.discoverySortBy, currentState.discoverySortOrder, page)
-              : { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+            if (currentState.discoverySearchQuery.trim()) {
+              const keywordController = new AbortController();
+              channelRequestControllersRef.current['search'] = keywordController;
+              try {
+                result = await api.searchRepositories(
+                  currentState.discoverySearchQuery,
+                  currentState.discoveryPlatform,
+                  currentState.discoveryLanguage,
+                  currentState.discoverySortBy,
+                  currentState.discoverySortOrder,
+                  page,
+                  20,
+                  keywordController.signal,
+                );
+              } finally {
+                if (channelRequestControllersRef.current['search'] === keywordController) {
+                  delete channelRequestControllersRef.current['search'];
+                }
+              }
+            } else {
+              result = { repos: [], hasMore: false, nextPageIndex: page + 1, totalCount: 0 };
+            }
           }
           break;
         }
@@ -290,6 +347,19 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       currentState.setDiscoveryNextPage(channelId, result.nextPageIndex);
       if (result.totalCount !== undefined) currentState.setDiscoveryTotalCount(channelId, result.totalCount);
       currentState.setDiscoveryLastRefresh(channelId, new Date().toISOString());
+      if (channelId === 'search' && !append) {
+        lastSettledSearchKey = buildDiscoverySearchKey(
+          currentState.discoverySearchQuery,
+          currentState.discoverySearchMode,
+          {
+            owner: currentState.githubToken,
+            platform: currentState.discoveryPlatform,
+            language: currentState.discoveryLanguage,
+            sortBy: currentState.discoverySortBy,
+            sortOrder: currentState.discoverySortOrder,
+          },
+        );
+      }
       if (append && !replacesOnAppend && scrollContainerRef.current) {
         requestAnimationFrame(() => {
           const cards = scrollContainerRef.current?.querySelectorAll('[data-repo-index]');
@@ -331,19 +401,6 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
       }
     }
   }, [captureSession, isCurrentSession, scrollContainerRef, toast]);
-
-  // 搜索模式切换后自动重搜。不能在 onChange 里同步调 refreshChannel：它读
-  // latestStateRef.current（渲染提交后才同步），会以旧模式发请求、随即被签名
-  // 守卫（isCurrentRequest 用 getState 重算签名）丢弃，列表不刷新。本 effect
-  // 注册在 latestStateRef 同步 effect 之后，触发时读到的已是新模式
-  const prevSearchModeRef = useRef(state.discoverySearchMode);
-  useEffect(() => {
-    if (prevSearchModeRef.current === state.discoverySearchMode) return;
-    prevSearchModeRef.current = state.discoverySearchMode;
-    if (state.selectedDiscoveryChannel === 'search' && state.discoverySearchQuery.trim()) {
-      void refreshChannel('search', 1, false);
-    }
-  }, [state.discoverySearchMode, state.selectedDiscoveryChannel, state.discoverySearchQuery, refreshChannel]);
 
   const handleAnalyzePage = useCallback(async () => {
     const analysisState = latestStateRef.current;
@@ -444,5 +501,24 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     optimizerRef.current?.abort();
   }, []);
 
-  return { ...state, t, isAnalyzing, refreshChannel, handleAnalyzePage, handleAbortAnalysis };
+  const handleAbortSearch = useCallback(() => {
+    // Bump the version first so the aborted request is treated as stale and
+    // cannot overwrite the current list with its empty fallback result.
+    channelRequestVersionRef.current['search'] = (channelRequestVersionRef.current['search'] ?? 0) + 1;
+    channelRequestControllersRef.current['search']?.abort();
+    delete channelRequestControllersRef.current['search'];
+    const store = useAppStore.getState();
+    lastSettledSearchKey = buildDiscoverySearchKey(store.discoverySearchQuery, store.discoverySearchMode, {
+      owner: store.githubToken,
+      platform: store.discoveryPlatform,
+      language: store.discoveryLanguage,
+      sortBy: store.discoverySortBy,
+      sortOrder: store.discoverySortOrder,
+    });
+    store.setDiscoverySearchPhase(null);
+    store.setDiscoverySearchPhaseDetail(null);
+    store.setDiscoveryLoading('search', false);
+  }, []);
+
+  return { ...state, t, isAnalyzing, refreshChannel, handleAnalyzePage, handleAbortAnalysis, handleAbortSearch };
 };

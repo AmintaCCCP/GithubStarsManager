@@ -32,6 +32,7 @@ import { createCombinedAbortController } from '../utils/abortUtils';
 const REQUEST_TIMEOUT_MS = 30_000;
 const TIMEOUT_ERROR_MESSAGE = `GitHub API request timed out after ${REQUEST_TIMEOUT_MS}ms`;
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+const GITHUB_SEARCH_INTERVAL_MS = 2100;
 // 发布刷新批次的总等待上限：单请求最坏约 127s（4 次 ×30s + 退避），
 // 没有批次上限时持续断网会让刷新一直占住。超预算后跳过剩余仓库，
 // 已完成的仓库结果照常返回，跳过的仓库不推进 watermark、下次刷新重试。
@@ -57,6 +58,35 @@ function delayWithAbort(delayMs: number, signal: AbortSignal | undefined): Promi
     signal?.addEventListener('abort', onAbort);
     if (signal?.aborted) onAbort();
   });
+}
+
+// Search has a separate, per-token quota bucket. Keep every /search/* caller
+// on one timeline so discovery recall cannot race issue search or other tools.
+let githubSearchPacingIntervalMs = GITHUB_SEARCH_INTERVAL_MS;
+const nextGithubSearchAtByToken = new Map<string, number>();
+
+/** Test hook: disable pacing for ordinary unit tests, or install a test interval. */
+export function __setGithubSearchPacingForTest(intervalMs: number): void {
+  githubSearchPacingIntervalMs = Math.max(0, intervalMs);
+  nextGithubSearchAtByToken.clear();
+}
+
+async function waitForGithubSearchSlot(token: string, signal?: AbortSignal): Promise<void> {
+  if (githubSearchPacingIntervalMs <= 0) return;
+  const now = Date.now();
+  const scheduledAt = Math.max(now, nextGithubSearchAtByToken.get(token) ?? 0);
+  const reservedUntil = scheduledAt + githubSearchPacingIntervalMs;
+  nextGithubSearchAtByToken.set(token, reservedUntil);
+  if (scheduledAt <= now) return;
+  try {
+    await delayWithAbort(scheduledAt - now, signal);
+  } catch (error) {
+    // Release the unused slot if no later request has claimed it.
+    if (nextGithubSearchAtByToken.get(token) === reservedUntil) {
+      nextGithubSearchAtByToken.set(token, scheduledAt);
+    }
+    throw error;
+  }
 }
 
 interface GitHubContentResponse {
@@ -486,9 +516,15 @@ export class GitHubApiService {
     const startTime = Date.now();
     const method = (options.method || 'GET') as string;
     const { operationTag, ...fetchOptions } = options;
+    // Search API 有独立配额桶（认证态 30/min），核心桶的剩余量/重置时间对它不适用：
+    // 共用状态会让多查询召回每条都等满一个重置窗口，也会让 search 的剩余量污染核心桶。
+    const isSearchEndpoint = endpoint.startsWith('/search/');
+    if (isSearchEndpoint) {
+      await waitForGithubSearchSlot(this.token, signal);
+    }
 
     // Check rate limit before making request
-    if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
+    if (!isSearchEndpoint && this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
       const waitMs = (this.rateLimitReset * 1000) - Date.now();
       if (waitMs > 0) {
         logger.warn('githubApi', 'Rate limit low, waiting for reset', { remaining: this.rateLimitRemaining, resetTime: this.rateLimitReset });
@@ -581,10 +617,10 @@ export class GitHubApiService {
       // Parse rate limit headers
       const remaining = response.headers.get('X-RateLimit-Remaining');
       const reset = response.headers.get('X-RateLimit-Reset');
-      if (remaining !== null) {
+      if (!isSearchEndpoint && remaining !== null) {
         this.rateLimitRemaining = parseInt(remaining, 10);
       }
-      if (reset !== null) {
+      if (!isSearchEndpoint && reset !== null) {
         this.rateLimitReset = parseInt(reset, 10);
       }
 
@@ -625,8 +661,11 @@ export class GitHubApiService {
         throw new Error(GITHUB_TOKEN_INVALID_ERROR);
       }
       if (response.status === 403 && remaining === '0') {
-        const resetDate = this.rateLimitReset
-          ? new Date(this.rateLimitReset * 1000).toLocaleString()
+        // Search has its own quota bucket: read the reset from the current
+        // response, since this.rateLimitReset only tracks the core bucket.
+        const resetEpoch = isSearchEndpoint ? parseInt(reset ?? '', 10) : this.rateLimitReset;
+        const resetDate = resetEpoch
+          ? new Date(resetEpoch * 1000).toLocaleString()
           : 'unknown';
         this.log403Failure('API request failed: rate limit exceeded', { method, endpoint, status: response.status, durationMs });
         throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
@@ -2191,6 +2230,19 @@ export class GitHubApiService {
     return this.searchByTopic(topicKeywords[topic], platform, page, perPage);
   }
 
+  /**
+   * 单次原始仓库搜索：q 由调用方完整构造（可携带 in: 限定符），
+   * 复用 makeRequest 的鉴权、超时与限流语义。
+   */
+  async searchRepositoriesRaw(query: string, perPage = 25, signal?: AbortSignal): Promise<Repository[]> {
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=${encodeURIComponent(query)}&per_page=${perPage}`,
+      { operationTag: 'repo-search-recall' },
+      signal,
+    );
+    return Array.isArray(data.items) ? data.items : [];
+  }
+
   async searchRepositories(
     query: string,
     platform: DiscoveryPlatform,
@@ -2198,7 +2250,8 @@ export class GitHubApiService {
     sortBy: SortBy,
     sortOrder: SortOrder,
     page: number = 1,
-    perPage: number = 20
+    perPage: number = 20,
+    signal?: AbortSignal,
   ): Promise<PaginatedDiscoveryRepositories> {
     const platformQuery = this.buildPlatformQuery(platform);
     const languageQuery = this.buildLanguageQuery(language);
@@ -2217,7 +2270,7 @@ export class GitHubApiService {
       url += `&sort=${sort}&order=${order}`;
     }
 
-    const data = await this.makeRequest<GitHubSearchRepoResponse>(url);
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(url, {}, signal);
 
     const repos = (data.items || []).map((repo, index) => ({
       ...repo,

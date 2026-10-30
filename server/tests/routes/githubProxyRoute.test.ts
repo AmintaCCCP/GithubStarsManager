@@ -169,4 +169,18 @@ describe('GitHub proxy routes', () => {
     expect(res.headers['x-debug-id']).toBeUndefined();
     expect(res.headers['set-cookie']).toBeUndefined();
   });
+
+  it('encodes search query parameters exactly once', async () => {
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/github/search/repositories?q=terminal%20file%20manager%20in%3Aname%2Cdescription%2Ctopics&per_page=25')
+      .send({ method: 'GET' })
+      .expect(200, { ok: true });
+
+    const options = proxyRequestMock.mock.calls[0][0];
+    expect(options.url).toBe(
+      'https://api.github.com/search/repositories?q=terminal+file+manager+in%3Aname%2Cdescription%2Ctopics&per_page=25',
+    );
+  });
 });
