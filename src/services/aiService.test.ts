@@ -684,6 +684,95 @@ describe('AIService.expandSearchQuery — 多语言关键词约束（multilingua
   });
 });
 
+describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
+  const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const chatResponse = (content: string) => fetchJson({ choices: [{ message: { content } }] });
+  const mockFetch = () => {
+    const fetchMock = window.fetch as ReturnType<typeof vi.fn>;
+    fetchMock.mockReset();
+    return fetchMock;
+  };
+  const captureBody = async (init?: RequestInit) => JSON.parse(String(init?.body)) as {
+    messages: Array<{ content: string }>;
+    temperature: number;
+    max_tokens: number;
+  };
+
+  it('从垃圾文本中提取首个 JSON 对象，过滤非法条目并最多保留 5 条', async () => {
+    const fetchMock = mockFetch();
+    let body: Awaited<ReturnType<typeof captureBody>> | undefined;
+    const content = [
+      'noise before',
+      JSON.stringify({
+        queries: [
+          { terms: ['terminal', 'file manager'], scope: 'metadata' },
+          { terms: ['password vault'], scope: 'readme' },
+          { terms: ['todo task'], scope: 'any' },
+          { terms: ['code review'], scope: 'METADATA' },
+          { terms: ['photo backup'], scope: 'readme' },
+          { terms: ['sixth query'], scope: 'any' },
+          { terms: 'not-an-array', scope: 'metadata' },
+          { terms: ['bad scope'], scope: 'topic' },
+          { terms: [], scope: 'any' },
+        ],
+      }),
+      'noise after',
+    ].join('\n');
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      body = await captureBody(init);
+      return chatResponse(content);
+    });
+
+    const result = await new AIService(makeConfig() as never, 'zh')
+      .generateRepoSearchQueries('终端文件管理器', '找终端文件管理器');
+
+    expect(result).toEqual([
+      { terms: ['terminal', 'file manager'], scope: 'metadata' },
+      { terms: ['password vault'], scope: 'readme' },
+      { terms: ['todo task'], scope: 'any' },
+      { terms: ['code review'], scope: 'metadata' },
+      { terms: ['photo backup'], scope: 'readme' },
+    ]);
+    expect(body?.temperature).toBe(0.1);
+    expect(body?.max_tokens).toBe(2000);
+    const userPrompt = body?.messages[1].content ?? '';
+    expect(userPrompt).toContain('至少 2 条 metadata');
+    expect(userPrompt).toContain('至少 1 条 readme');
+    expect(userPrompt).toContain('禁止只写泛词');
+  });
+
+  it('非数组、非法 JSON 或请求失败时返回 []', async () => {
+    const fetchMock = mockFetch();
+    fetchMock
+      .mockResolvedValueOnce(chatResponse('{"queries":"not-an-array"}'))
+      .mockResolvedValueOnce(chatResponse('not json at all'))
+      .mockRejectedValueOnce(new Error('network down'));
+    const service = new AIService(makeConfig() as never, 'zh');
+
+    await expect(service.generateRepoSearchQueries('q', 'i')).resolves.toEqual([]);
+    await expect(service.generateRepoSearchQueries('q', 'i')).resolves.toEqual([]);
+    await expect(service.generateRepoSearchQueries('q', 'i')).resolves.toEqual([]);
+  });
+
+  it('abort 向上传播；en 提示词包含同等语法槽约束', async () => {
+    const fetchMock = mockFetch();
+    fetchMock.mockRejectedValueOnce(new DOMException('aborted', 'AbortError'));
+    const service = new AIService(makeConfig() as never, 'zh');
+    await expect(service.generateRepoSearchQueries('q', 'i')).rejects.toSatisfy(isAbortError);
+
+    let enPrompt = '';
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      const body = await captureBody(init);
+      enPrompt = body.messages[1].content;
+      return chatResponse('{"queries":[{"terms":["x"],"scope":"any"}]}');
+    });
+    await new AIService(makeConfig() as never, 'en').generateRepoSearchQueries('q', 'i');
+    expect(enPrompt).toContain('At least 2 metadata queries');
+    expect(enPrompt).toContain('at least 1 readme query');
+    expect(enPrompt).toContain('never use only generic words');
+  });
+});
+
 describe('AIService vector query analysis and graded reranking', () => {
   const fetchJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
     status,

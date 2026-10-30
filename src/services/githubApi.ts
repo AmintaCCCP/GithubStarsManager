@@ -486,9 +486,12 @@ export class GitHubApiService {
     const startTime = Date.now();
     const method = (options.method || 'GET') as string;
     const { operationTag, ...fetchOptions } = options;
+    // Search API 有独立配额桶（认证态 30/min），核心桶的剩余量/重置时间对它不适用：
+    // 共用状态会让多查询召回每条都等满一个重置窗口，也会让 search 的剩余量污染核心桶。
+    const isSearchEndpoint = endpoint.startsWith('/search/');
 
     // Check rate limit before making request
-    if (this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
+    if (!isSearchEndpoint && this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
       const waitMs = (this.rateLimitReset * 1000) - Date.now();
       if (waitMs > 0) {
         logger.warn('githubApi', 'Rate limit low, waiting for reset', { remaining: this.rateLimitRemaining, resetTime: this.rateLimitReset });
@@ -581,10 +584,10 @@ export class GitHubApiService {
       // Parse rate limit headers
       const remaining = response.headers.get('X-RateLimit-Remaining');
       const reset = response.headers.get('X-RateLimit-Reset');
-      if (remaining !== null) {
+      if (!isSearchEndpoint && remaining !== null) {
         this.rateLimitRemaining = parseInt(remaining, 10);
       }
-      if (reset !== null) {
+      if (!isSearchEndpoint && reset !== null) {
         this.rateLimitReset = parseInt(reset, 10);
       }
 
@@ -2189,6 +2192,19 @@ export class GitHubApiService {
     };
 
     return this.searchByTopic(topicKeywords[topic], platform, page, perPage);
+  }
+
+  /**
+   * 单次原始仓库搜索：q 由调用方完整构造（可携带 in: 限定符），
+   * 复用 makeRequest 的鉴权、超时与限流语义。
+   */
+  async searchRepositoriesRaw(query: string, perPage = 25, signal?: AbortSignal): Promise<Repository[]> {
+    const data = await this.makeRequest<GitHubSearchRepoResponse>(
+      `/search/repositories?q=${encodeURIComponent(query)}&per_page=${perPage}`,
+      { operationTag: 'repo-search-recall' },
+      signal,
+    );
+    return Array.isArray(data.items) ? data.items : [];
   }
 
   async searchRepositories(

@@ -41,6 +41,11 @@ export interface ConnectionTestResult {
   message: string;
 }
 
+export interface RepoSearchQuery {
+  terms: string[];
+  scope: 'metadata' | 'readme' | 'any';
+}
+
 type RepositoryAnalysisResult = {
   summary: string;
   tags: string[];
@@ -2639,6 +2644,95 @@ Return:
       return this.parseSearchResponse(content);
     }
     return { terms: [], intent: '' };
+  }
+
+  /**
+   * 把全网仓库搜索需求填进固定语法槽。模型只产出 terms/scope，GitHub 限定符
+   * 由 semanticRepoSearchService 校验后拼装，避免模型自行写入无效查询语法。
+   * 请求或解析失败返回 []，由调用方回退到既有 grep.app 召回。
+   */
+  async generateRepoSearchQueries(
+    query: string,
+    intent: string,
+    signal?: AbortSignal,
+  ): Promise<RepoSearchQuery[]> {
+    const system = this.language === 'zh'
+      ? '你是 GitHub 仓库搜索查询解析器。只输出严格 JSON 对象，不输出思考过程、Markdown 或任何额外文字。'
+      : 'You are a GitHub repository search query parser. Output only a strict JSON object, with no thinking, Markdown, or extra text.';
+    const user = this.language === 'zh'
+      ? `把用户需求填进固定 JSON 语法槽，不要输出任何其他文字。
+
+用户查询：「${this.sanitizeForPrompt(query)}」
+意图：${this.sanitizeForPrompt(intent)}
+
+JSON 语法：
+{
+  "queries": [
+    { "terms": ["1-3 个英文内容词"], "scope": "metadata | readme | any" }
+  ]
+}
+
+规则（代码会强制执行）：
+- 恰好 5 条 queries；terms 每条 1-3 个词，禁止 GitHub 语法/引号/限定符；
+- 覆盖同义词的不同说法（todo/task、password/vault、code review/PR review 等）；
+- 至少 2 条 metadata，至少 1 条 readme；
+- 每条必须包含锁定主题的词，禁止只写泛词（cli/app/tool/open source/software）。
+
+只输出 JSON 对象。`
+      : `Fill the fixed JSON grammar slots for the user's need. Output nothing else.
+
+User query: "${this.sanitizeForPrompt(query)}"
+Intent: ${this.sanitizeForPrompt(intent)}
+
+JSON grammar:
+{
+  "queries": [
+    { "terms": ["1-3 English content words"], "scope": "metadata | readme | any" }
+  ]
+}
+
+Rules (enforced by code):
+- Exactly 5 queries; each terms entry must contain 1-3 words and no GitHub syntax, quotes, or qualifiers;
+- Cover alternate wording and synonyms (todo/task, password/vault, code review/PR review, etc.);
+- At least 2 metadata queries and at least 1 readme query;
+- Every query must include a topic-locking term; never use only generic words (cli/app/tool/open source/software).
+
+Output only the JSON object.`;
+    try {
+      const content = await this.requestText({
+        system,
+        user,
+        temperature: 0.1,
+        maxTokens: 2000,
+        signal,
+      });
+      const parsed = this.extractAndParseAIJson(content);
+      if (!parsed || !Array.isArray(parsed.queries)) return [];
+      const queries: RepoSearchQuery[] = [];
+      for (const raw of parsed.queries) {
+        if (!raw || typeof raw !== 'object') continue;
+        const item = raw as { terms?: unknown; scope?: unknown };
+        if (!Array.isArray(item.terms) || typeof item.scope !== 'string') continue;
+        const scope = item.scope.trim().toLowerCase();
+        if (scope !== 'metadata' && scope !== 'readme' && scope !== 'any') continue;
+        const terms = item.terms
+          .filter((term): term is string => typeof term === 'string')
+          .map(term => term.trim())
+          .filter(Boolean);
+        if (terms.length === 0) continue;
+        queries.push({ terms, scope });
+        if (queries.length >= 5) break;
+      }
+      return queries;
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) throw error;
+      logger.warn('ai', 'Failed to generate repository search queries', {
+        model: this.config.model,
+        configId: this.config.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
   }
 
   /**

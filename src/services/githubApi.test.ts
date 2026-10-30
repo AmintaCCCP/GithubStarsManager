@@ -643,3 +643,31 @@ describe('GitHubApiService 403 warn 去重', () => {
     expect(debugSpy.mock.calls.filter(([, message]) => message === 'forbidden (deduplicated)')).toHaveLength(1);
   });
 });
+
+describe('GitHubApiService search 端点限流隔离', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('核心桶剩余量低时 search 请求仍立即发出，不等待核心桶重置', async () => {
+    vi.useFakeTimers();
+    const reset = Math.floor(Date.now() / 1000) + 3600;
+    const jsonResponse = (body: unknown) => new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'X-RateLimit-Remaining': '1', 'X-RateLimit-Reset': String(reset) },
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ login: 'me' }))
+      .mockResolvedValueOnce(jsonResponse({ total_count: 0, items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    await service.getCurrentUser();
+    // 旧实现会因核心桶 remaining=1 在 search 请求前等待约 1 小时
+    await service.searchRepositoriesRaw('terminal file manager', 25);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
