@@ -431,9 +431,8 @@ export const ReleaseTimeline: React.FC = () => {
             : 'ready' as const,
       platform: device.platform,
       label,
-      matchCount: device.platform ? currentSystemMatchCount : undefined,
     };
-  }, [device, currentSystemMatchCount, tApp]);
+  }, [device, tApp]);
 
   const releaseCountByRepoName = useMemo(() => {
     const counts = new Map<string, number>();

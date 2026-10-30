@@ -47,7 +47,6 @@ interface AssetFilterManagerProps {
     status: 'ready' | 'detecting-arch' | 'arch-unknown' | 'unsupported';
     platform: InstallablePlatform | null;
     label: string;
-    matchCount?: number;
   };
 }
 
@@ -191,9 +190,6 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
                   </span>
                 </span>
               </span>
-              {typeof currentSystemFilter.matchCount === 'number' && (
-                <span className="app-side-count shrink-0">{currentSystemFilter.matchCount}</span>
-              )}
             </Button>
             <div className="app-side-row-actions">
               <span title={t('assetFilterManager.builtin-locked')}>
