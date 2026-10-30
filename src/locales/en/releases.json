@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "Runs via Rosetta 2",
     "asset-emulated-tip-windows": "Runs via emulation",
     "asset-unverified": "Unverified platform",
-    "asset-unverified-tip": "Platform not in file name; inferred from sibling assets or repository info"
+    "asset-unverified-tip": "Platform not in file name and could not be inferred from sibling assets or repository info"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Plugin analysis failed",

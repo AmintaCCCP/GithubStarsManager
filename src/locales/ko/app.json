@@ -59,7 +59,7 @@
     "builtin-unsupported": "현재 기기를 인식할 수 없습니다",
     "builtin-ignored": "현재 기기에서 지원하지 않아 무시됨",
     "builtin-locked": "내장 필터는 편집할 수 없습니다",
-    "builtin-tooltip": "{{device}}에서 실행할 수 있는 자산만 표시합니다. 파일 이름, 같은 릴리스의 자산, 저장소 정보를 기준으로 판단합니다. 카드에서 “모두 표시”를 눌러 나머지를 확인하세요.",
+    "builtin-tooltip": "{{device}}에서 실행할 수 있는 자산과 플랫폼이 확인되지 않은 자산을 표시합니다. 파일 이름, 같은 릴리스의 자산, 저장소 정보를 기준으로 판단합니다. 카드에서 “모두 표시”를 눌러 나머지를 확인하세요.",
     "arch-apple-silicon": "Apple Silicon",
     "arch-intel": "Intel"
   },

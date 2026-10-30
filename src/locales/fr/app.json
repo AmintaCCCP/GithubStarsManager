@@ -59,7 +59,7 @@
     "builtin-unsupported": "Impossible d’identifier cet appareil",
     "builtin-ignored": "Non pris en charge sur cet appareil ; ignoré",
     "builtin-locked": "Le filtre intégré ne peut pas être modifié",
-    "builtin-tooltip": "Affiche uniquement les ressources exécutables sur {{device}}, d’après les noms de fichiers, les ressources de la même version et les informations du dépôt. Utilisez « Tout afficher » sur la carte pour voir le reste.",
+    "builtin-tooltip": "Affiche les ressources exécutables sur {{device}} ainsi que celles dont la plateforme n’est pas confirmée, d’après les noms de fichiers, les ressources de la même version et les informations du dépôt. Utilisez « Tout afficher » sur la carte pour voir le reste.",
     "arch-apple-silicon": "Apple Silicon",
     "arch-intel": "Intel"
   },

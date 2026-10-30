@@ -301,6 +301,39 @@ describe('evaluateCurrentSystem — synthetic edge cases', () => {
     ).orderedIndexes).toEqual([0]);
   });
 
+  it('keeps unlabelled .apk visible on Linux without disturbing Android', () => {
+    expect(evaluate(['tool-1.0.apk'], device('linux', 'x64')).orderedIndexes).toEqual([0]);
+    expect(evaluate(['tool-1.0.apk'], device('android', 'arm64')).verdicts.get(0))
+      .toMatchObject({ kind: 'compatible', platform: 'android' });
+    expect(evaluate(['tool-1.0.apk'], device('windows', 'x64')).matchesRelease).toBe(false);
+  });
+
+  it('does not treat 64bit as x64 when a different architecture is declared', () => {
+    expect(evaluate(['tool-linux-arm64-64bit.tar.gz'], device('linux', 'x64')).matchesRelease)
+      .toBe(false);
+    expect(evaluate(['tool-linux-arm64-64bit.tar.gz'], device('linux', 'arm64')).orderedIndexes)
+      .toEqual([0]);
+    expect(evaluate(['tool-linux-64bit.tar.gz'], device('linux', 'x64')).orderedIndexes)
+      .toEqual([0]);
+  });
+
+  it('still filters architectures when only the architecture is known', () => {
+    const architectureOnly: DeviceTarget = {
+      platform: null,
+      architecture: 'x64',
+      architectureSource: 'ua-ch',
+      architectureSettled: true,
+    };
+    expect(evaluate(['app-x64.dmg', 'app-arm64.dmg'], architectureOnly).orderedIndexes)
+      .toEqual([0]);
+  });
+
+  it('only infers sibling architecture within the same product', () => {
+    // `Tool-x64.zip` must not decide the architecture of an unrelated `Other.zip`.
+    expect(evaluate(['Tool-x64.zip', 'Other.zip'], device('windows', 'x64')).orderedIndexes)
+      .toEqual([0, 1]);
+  });
+
   it('uses the URL basename for body links', () => {
     const link: AssetLinkInput = {
       index: 0,

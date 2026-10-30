@@ -131,7 +131,9 @@ function architectureFromPlatformString(
   if (/aarch64|arm64/.test(value)) return 'arm64';
   if (/armv[5-8]l?|armv8l/.test(value)) return 'arm';
   if (/i[3-6]86/.test(value)) return 'x86';
-  if (/x86_64|amd64|win64;\s*x64|wow64/.test(value)) return 'x64';
+  // Windows reports `Win64; x64` (and WoW64) on ARM64 machines too, so a
+  // Windows UA cannot prove x64; only non-Windows signals are trusted here.
+  if (platform !== 'windows' && /x86_64|amd64/.test(value)) return 'x64';
   return undefined;
 }
 

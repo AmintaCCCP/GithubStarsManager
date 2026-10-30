@@ -226,6 +226,15 @@ describe('detectInstallableAssets — 不确定时并列候选', () => {
     ]);
   });
 
+  it('does not filter architectures when the caller omits the architecture', () => {
+    const result = detectInstallableAssets(
+      [asset(1, 'App-x64.AppImage'), asset(2, 'App-armv7l.AppImage')],
+      { platform: 'linux' },
+    );
+
+    expect(result.matches.map((match) => match.assetId)).toEqual([1, 2]);
+  });
+
   it('orders candidates by confidence, then architecture fit, then asset id', () => {
     const result = detectInstallableAssets(
       [

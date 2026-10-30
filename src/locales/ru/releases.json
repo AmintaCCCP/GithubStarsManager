@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "Запускается через Rosetta 2",
     "asset-emulated-tip-windows": "Запускается через эмуляцию",
     "asset-unverified": "Платформа не подтверждена",
-    "asset-unverified-tip": "Платформа не указана в имени файла; определена по файлам того же выпуска или данным репозитория"
+    "asset-unverified-tip": "Платформа не указана в имени файла и не определяется по файлам того же выпуска или сведениям о репозитории"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Анализ плагина не удался",

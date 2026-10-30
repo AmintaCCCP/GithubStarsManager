@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "Wird über Rosetta 2 ausgeführt",
     "asset-emulated-tip-windows": "Wird über Emulation ausgeführt",
     "asset-unverified": "Plattform unbestätigt",
-    "asset-unverified-tip": "Plattform nicht im Dateinamen; aus Assets derselben Version oder Repository-Informationen abgeleitet"
+    "asset-unverified-tip": "Plattform nicht im Dateinamen und aus Assets derselben Version oder Repository-Informationen nicht ableitbar"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Die Plugin-Analyse ist fehlgeschlagen",

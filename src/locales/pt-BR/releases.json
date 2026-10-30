@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "Executado via Rosetta 2",
     "asset-emulated-tip-windows": "Executado via emulação",
     "asset-unverified": "Plataforma não confirmada",
-    "asset-unverified-tip": "Plataforma ausente no nome do arquivo; inferida pelos recursos da mesma versão ou pelo repositório"
+    "asset-unverified-tip": "Plataforma ausente no nome do arquivo e não foi possível inferir pelos recursos da mesma versão ou pelo repositório"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Falha na análise do plug-in",

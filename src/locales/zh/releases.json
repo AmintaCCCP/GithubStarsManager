@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "将通过 Rosetta 2 运行",
     "asset-emulated-tip-windows": "将通过仿真运行",
     "asset-unverified": "平台未确认",
-    "asset-unverified-tip": "文件名未声明平台，根据同版本资产或仓库信息推断"
+    "asset-unverified-tip": "文件名未声明平台，也无法根据同版本资产或仓库信息推断"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "插件分析失败",

@@ -59,7 +59,7 @@
     "builtin-unsupported": "Can't detect this device",
     "builtin-ignored": "Not supported on this device; ignored",
     "builtin-locked": "Built-in filter can't be edited",
-    "builtin-tooltip": "Shows only assets that run on {{device}}, based on file names, sibling assets and repository info. Use \"Show all\" on a card to see the rest.",
+    "builtin-tooltip": "Shows assets that run on {{device}} plus assets whose platform is unverified, based on file names, sibling assets and repository info. Use \"Show all\" on a card to see the rest.",
     "arch-apple-silicon": "Apple Silicon",
     "arch-intel": "Intel"
   },

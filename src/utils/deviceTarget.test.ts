@@ -186,11 +186,11 @@ describe('resolveDeviceArchitecture', () => {
     vi.useFakeTimers();
     stubNavigator({
       userAgentData: {
-        platform: 'Windows',
+        platform: 'Linux',
         getHighEntropyValues: vi.fn(() => new Promise(() => {})),
       },
-      platform: 'Win32',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      platform: 'Linux x86_64',
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64)',
     });
 
     const resolution = resolveDeviceArchitectureDetails();
@@ -198,6 +198,19 @@ describe('resolveDeviceArchitecture', () => {
     await expect(resolution).resolves.toEqual({
       architecture: 'x64',
       source: 'platform-string',
+    });
+  });
+
+  it('never infers x64 from a Windows UA, which ARM64 machines also send', async () => {
+    stubNavigator({
+      userAgentData: undefined,
+      platform: 'Win32',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:142.0) Gecko/20100101 Firefox/142.0',
+    });
+
+    await expect(resolveDeviceArchitectureDetails()).resolves.toEqual({
+      architecture: undefined,
+      source: 'none',
     });
   });
 
@@ -233,7 +246,7 @@ describe('resolveDeviceArchitecture', () => {
     expect(getHighEntropyValues).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to navigator.platform on Windows, Linux and Android', async () => {
+  it('falls back to navigator.platform on Linux and Android', async () => {
     stubNavigator({
       userAgentData: { platform: 'Linux' },
       platform: 'Linux aarch64',
@@ -243,11 +256,11 @@ describe('resolveDeviceArchitecture', () => {
 
     resetDeviceTargetCacheForTests();
     stubNavigator({
-      userAgentData: { platform: 'Windows' },
-      platform: 'Win32',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      userAgentData: { platform: 'Android' },
+      platform: 'Linux armv8l',
+      userAgent: 'Mozilla/5.0 (Android 14; Mobile; rv:142.0) Gecko/142.0 Firefox/142.0',
     });
-    await expect(resolveDeviceArchitecture()).resolves.toBe('x64');
+    await expect(resolveDeviceArchitecture()).resolves.toBe('arm');
   });
 
   it('never trusts the Intel token in a macOS user agent', async () => {

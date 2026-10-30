@@ -65,6 +65,15 @@ export interface RepositoryHints {
   repository?: Pick<Repository, 'topics' | 'description' | 'language'>;
 }
 
+export interface EvaluationOptions {
+  /**
+   * 默认 true：设备架构未知时按平台保守隐藏 32 位 ARM / Windows ARM 等架构包。
+   * 未请求架构过滤的 API 调用方（`detectInstallableAssets` 不传 architecture）
+   * 传 false，保持「不传架构就不过滤架构」的既有契约。
+   */
+  filterUnknownArchitecture?: boolean;
+}
+
 const SUPPORTED_PLATFORMS: readonly InstallablePlatform[] = ['windows', 'macos', 'linux', 'android'];
 
 const FOREIGN_OS_TOKENS = new Set([
@@ -408,6 +417,7 @@ function applyPlatformArchitecture(entry: Classified, releaseHasWin64: boolean):
   if (!entry.platform || entry.nonInstallable || entry.incompatibleDetail) return;
   const declared = new Set(entry.scan.declaredArchitectures);
   if ((entry.platform === 'windows' || entry.platform === 'linux')
+    && ![...declared].some((architecture) => architecture !== 'universal')
     && entry.scan.tokens.includes('64bit')) {
     declared.add('x64');
   }
@@ -453,6 +463,7 @@ function applyPlatformArchitecture(entry: Classified, releaseHasWin64: boolean):
 function classifyLink(
   link: AssetLinkInput,
   releaseHasWin64: boolean,
+  devicePlatform: InstallablePlatform | null,
   name = displayName(link),
   scan = scanName(name),
 ): Classified {
@@ -500,7 +511,10 @@ function classifyLink(
   }
   if (declared.size === 1) {
     const tokenPlatform = [...declared][0];
-    if (decisivePlatform && decisivePlatform !== tokenPlatform) {
+    // Alpine Linux also ships .apk packages, so an explicit Linux token wins.
+    const alpineApk = decisivePlatform === 'android' && tokenPlatform === 'linux'
+      && base.packageInfo?.packageType === 'apk';
+    if (decisivePlatform && decisivePlatform !== tokenPlatform && !alpineApk) {
       return {
         ...base,
         incompatibleDetail: `package extension targets ${decisivePlatform} but filename declares ${tokenPlatform}`,
@@ -514,8 +528,12 @@ function classifyLink(
     base.platform = decisivePlatform && declared.has(decisivePlatform) ? decisivePlatform : null;
     if (base.platform) base.platformSource = 'extension';
   } else if (decisivePlatform) {
-    base.platform = decisivePlatform;
-    base.platformSource = 'extension';
+    // An unlabelled .apk is ambiguous on Linux (Alpine packages use .apk too),
+    // so keep it as an unverified candidate instead of hiding it there.
+    const ambiguousAlpineApk = decisivePlatform === 'android'
+      && base.packageInfo?.packageType === 'apk' && devicePlatform === 'linux';
+    base.platform = ambiguousAlpineApk ? null : decisivePlatform;
+    if (!ambiguousAlpineApk) base.platformSource = 'extension';
   } else {
     const fromMime = platformFromContentType(link.contentType, extension);
     if (fromMime) {
@@ -556,13 +574,15 @@ function architectureCompatibility(
   devicePlatform: InstallablePlatform | null,
   deviceArchitecture: DeviceTarget['architecture'],
   hasForeignArchitecture: boolean,
+  filterUnknownArchitecture: boolean,
 ): { compatible: boolean; emulated: boolean } {
   if (devicePlatform && platform !== devicePlatform) return { compatible: false, emulated: false };
   if (hasForeignArchitecture) return { compatible: false, emulated: false };
   if (!architecture || architecture === 'universal') return { compatible: true, emulated: false };
-  if (!devicePlatform) return { compatible: true, emulated: false };
+  if (!devicePlatform && !deviceArchitecture) return { compatible: true, emulated: false };
 
   if (!deviceArchitecture) {
+    if (!filterUnknownArchitecture) return { compatible: true, emulated: false };
     if (platform === 'macos' || platform === 'windows') {
       return { compatible: architecture !== 'arm', emulated: false };
     }
@@ -659,6 +679,20 @@ function confidenceRank(confidence: 'high' | 'medium' | 'low'): number {
   return confidence === 'high' ? 0 : confidence === 'medium' ? 1 : 2;
 }
 
+function isArchitectureToken(token: string): boolean {
+  return token === 'x86x64' || token === 'x64' || token === 'amd64' || token === 'x86'
+    || token === 'arm64' || token === 'arm64e' || token === 'arm64v8' || token === 'aarch64'
+    || token === 'ia32' || token === '386' || token === '32bit' || token === '64bit'
+    || token === 'universal' || token === 'universal2' || token === 'multiarch'
+    || token === 'fat' || token === 'allarch' || token === 'arm32v7'
+    || /^i[3-6]86$/.test(token) || ARM32_PATTERN.test(token);
+}
+
+/** Product identity with architecture markers removed, so only same-product siblings vote. */
+function productStem(scan: ScannedName): string {
+  return scan.tokens.filter((token) => !isArchitectureToken(token)).join('');
+}
+
 function platformNameRank(name: string): number {
   return /\b(?:windows|macos|linux|android)\b/.test(normalizeName(name)) ? 0 : 1;
 }
@@ -667,7 +701,9 @@ export function evaluateCurrentSystem(
   links: AssetLinkInput[],
   device: DeviceTarget,
   hints?: RepositoryHints,
+  options: EvaluationOptions = {},
 ): CurrentSystemEvaluation {
+  const filterUnknownArchitecture = options.filterUnknownArchitecture !== false;
   const preparedLinks = links.map((link) => {
     const name = displayName(link);
     return { link, name, scan: scanName(name) };
@@ -676,7 +712,7 @@ export function evaluateCurrentSystem(
   const classified = preparedLinks
     .slice()
     .sort((left, right) => left.link.index - right.link.index)
-    .map(({ link, name, scan }) => classifyLink(link, releaseHasWin64, name, scan));
+    .map(({ link, name, scan }) => classifyLink(link, releaseHasWin64, device.platform, name, scan));
 
   // .jar/.vsix/.xpi/.crx are normally library packages. If the release has no
   // other installable product, retain them as unconfirmed candidates.
@@ -736,10 +772,12 @@ export function evaluateCurrentSystem(
     if (entry.nonInstallable || entry.incompatibleDetail || !entry.platform
       || entry.architecture || !entry.packageInfo) continue;
     const siblingArchitectures = new Set<InstallableArchitecture>();
+    const stem = productStem(entry.scan);
     for (const sibling of classified) {
       if (sibling === entry || sibling.nonInstallable || sibling.platform !== entry.platform
         || sibling.packageInfo?.packageType !== entry.packageInfo.packageType
-        || sibling.archSource !== 'declared' || !sibling.architecture) continue;
+        || sibling.archSource !== 'declared' || !sibling.architecture
+        || productStem(sibling.scan) !== stem) continue;
       siblingArchitectures.add(sibling.architecture);
     }
     let inferred: InstallableArchitecture | undefined;
@@ -765,6 +803,7 @@ export function evaluateCurrentSystem(
       device.platform,
       device.architecture,
       entry.hasForeignArchitecture,
+      filterUnknownArchitecture,
     );
     if (!compatibility.compatible) {
       if (device.platform && entry.platform !== device.platform) {

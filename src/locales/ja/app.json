@@ -59,7 +59,7 @@
     "builtin-unsupported": "このデバイスを識別できません",
     "builtin-ignored": "このデバイスではサポートされていないため無視されます",
     "builtin-locked": "内蔵フィルターは編集できません",
-    "builtin-tooltip": "{{device}} で実行できるアセットのみを表示します。ファイル名、同じリリースのアセット、リポジトリ情報から判定します。カードの「すべて表示」で残りを確認できます。",
+    "builtin-tooltip": "{{device}} で実行できるアセットと、プラットフォーム未確認のアセットを表示します。ファイル名、同じリリースのアセット、リポジトリ情報から判定します。カードの「すべて表示」で残りを確認できます。",
     "arch-apple-silicon": "Apple Silicon",
     "arch-intel": "Intel"
   },

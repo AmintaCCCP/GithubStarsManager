@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "Rosetta 2 で実行されます",
     "asset-emulated-tip-windows": "エミュレーションで実行されます",
     "asset-unverified": "プラットフォーム未確認",
-    "asset-unverified-tip": "ファイル名にプラットフォームがなく、同じリリースのアセットまたはリポジトリ情報から推定しました"
+    "asset-unverified-tip": "ファイル名にプラットフォームがなく、同じリリースのアセットやリポジトリ情報からも判定できませんでした"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "プラグイン解析に失敗しました",

@@ -311,6 +311,15 @@ export const ReleaseTimeline: React.FC = () => {
       list.push(release);
       releasesByRepo.set(release.repository.id, list);
     }
+    // Platform inference only reads the 10 newest releases, so keep 11 per repo
+    // (the extra one covers the release being evaluated) instead of copying N-1
+    // siblings into every release's hints.
+    for (const [repoId, list] of releasesByRepo) {
+      releasesByRepo.set(repoId, [...list]
+        .sort((left, right) =>
+          new Date(right.published_at).getTime() - new Date(left.published_at).getTime())
+        .slice(0, 11));
+    }
     const repositoriesById = new Map(repositories.map((repository) => [repository.id, repository]));
     const hints = new Map<number, RepositoryHints>();
     for (const release of releases) {
@@ -392,6 +401,12 @@ export const ReleaseTimeline: React.FC = () => {
     () => [...systemEvaluations.values()].filter((evaluation) => evaluation.matchesRelease).length,
     [systemEvaluations],
   );
+  // Only blame the device filter for an empty list when nothing else narrowed it.
+  const deviceEmptyState = currentSystemActive
+    && currentSystemMatchCount === 0
+    && regularFilterIds.length === 0
+    && !searchQuery.trim()
+    && !releaseSourceRepoFilter;
   const currentSystemFilter = useMemo(() => {
     const platformName = device.platform ? getPlatformDisplayName(device.platform) : '';
     const label = !device.platform
@@ -1227,7 +1242,7 @@ export const ReleaseTimeline: React.FC = () => {
               <p className="app-empty-description">
                 {releaseShowMode === 'unread' && unreadCount === 0
                   ? t('releaseTimeline.all-releases-have-been-marked-as-read')
-                  : currentSystemActive
+                  : deviceEmptyState
                     ? t('releaseTimeline.no-assets-for-device', { device: currentSystemFilter.label })
                     : effectiveFilterIds.length > 0
                     ? t('releaseTimeline.no-assets-match-the-current-filters-try-differen')
@@ -1242,7 +1257,7 @@ export const ReleaseTimeline: React.FC = () => {
                 {t('releaseTimeline.show-all-2')}
               </Button>
             )}
-            {currentSystemActive && releaseShowMode !== 'unread' && (
+            {deviceEmptyState && releaseShowMode !== 'unread' && (
               <Button
                 onClick={() => handleFilterToggle(BUILTIN_CURRENT_SYSTEM_FILTER_ID)}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
@@ -1250,7 +1265,7 @@ export const ReleaseTimeline: React.FC = () => {
                 {t('releaseTimeline.disable-current-system-filter')}
               </Button>
             )}
-            {effectiveFilterIds.length > 0 && !currentSystemActive && releaseShowMode !== 'unread' && (
+            {effectiveFilterIds.length > 0 && !deviceEmptyState && releaseShowMode !== 'unread' && (
               <Button
                 onClick={handleClearFilters}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"

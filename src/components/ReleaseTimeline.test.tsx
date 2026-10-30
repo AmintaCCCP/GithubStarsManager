@@ -847,4 +847,16 @@ describe('ReleaseTimeline current-system built-in filter', () => {
     await user.click(screen.getByRole('button', { name: '关闭「当前系统」过滤器' }));
     expect(storeState.toggleReleaseSelectedFilter).toHaveBeenCalledWith('builtin-current-system');
   });
+
+  it('does not blame the device filter when the search box hides everything', async () => {
+    deviceState.current = macDevice;
+    activateCurrentSystem();
+    storeState.releases = [makeRepoRelease(706, alpha, ['App-arm64.dmg'])];
+    storeState.releaseSearchQuery = 'no-such-release';
+
+    render(<ReleaseTimeline />);
+    expect(await screen.findByText('当前过滤器没有匹配到任何资产，请尝试其他过滤条件'))
+      .toBeInTheDocument();
+    expect(screen.queryByText(/没有找到适用于/)).not.toBeInTheDocument();
+  });
 });

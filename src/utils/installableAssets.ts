@@ -73,7 +73,10 @@ export function detectInstallableAssets(
     architectureSource: 'none' as const,
     architectureSettled: true,
   };
-  const evaluation = evaluateCurrentSystem(links, device);
+  const evaluation = evaluateCurrentSystem(links, device, undefined, {
+    // 省略 architecture 表示调用方没要求架构过滤，不能当成「设备架构未知」处理。
+    filterUnknownArchitecture: options.architecture !== undefined,
+  });
   const matches: InstallableAsset[] = [];
   const excluded: InstallableAssetDetectionResult['excluded'] = [];
 

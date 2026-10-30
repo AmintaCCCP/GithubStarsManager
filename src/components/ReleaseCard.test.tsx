@@ -325,7 +325,7 @@ describe('ReleaseCard current-system asset badges', () => {
     expect(screen.getByText('需转译')).toHaveAttribute('title', '将通过 Rosetta 2 运行');
     expect(screen.getByText('平台未确认')).toHaveAttribute(
       'title',
-      '文件名未声明平台，根据同版本资产或仓库信息推断',
+      '文件名未声明平台，也无法根据同版本资产或仓库信息推断',
     );
   });
 });

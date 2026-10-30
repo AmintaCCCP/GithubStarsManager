@@ -93,7 +93,7 @@
     "asset-emulated-tip-macos": "Rosetta 2를 통해 실행됩니다",
     "asset-emulated-tip-windows": "에뮬레이션을 통해 실행됩니다",
     "asset-unverified": "플랫폼 미확인",
-    "asset-unverified-tip": "파일 이름에 플랫폼이 없어 같은 릴리스의 자산 또는 저장소 정보로 추론했습니다"
+    "asset-unverified-tip": "파일 이름에 플랫폼이 없고, 같은 릴리스의 자산이나 저장소 정보로도 판단할 수 없습니다"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "플러그인 분석 실패",
