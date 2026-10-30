@@ -2135,6 +2135,77 @@ ${repoInfo}${outputLanguageDirective ? `\n\n${outputLanguageDirective}` : ''}
     }
   }
 
+  /**
+   * Collect every top-level `{...}` object (think blocks stripped), so callers
+   * can skip prompt-echo objects instead of accepting the first one blindly.
+   */
+  private scanTopLevelJsonObjects(content: string): Record<string, unknown>[] {
+    const cleaned = content
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<think>[\s\S]*$/gi, '');
+    const objects: Record<string, unknown>[] = [];
+    let start = cleaned.indexOf('{');
+    while (start !== -1) {
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let end = -1;
+      for (let i = start; i < cleaned.length; i++) {
+        const char = cleaned[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (inString) continue;
+        if (char === '{') depth++;
+        else if (char === '}') {
+          depth--;
+          if (depth === 0) {
+            end = i;
+            break;
+          }
+        }
+      }
+      if (end === -1) break;
+      const parsed = this.tryParseJsonObject(cleaned.slice(start, end + 1));
+      if (parsed) {
+        objects.push(parsed);
+        start = cleaned.indexOf('{', end + 1);
+      } else {
+        // Not valid JSON (e.g. a stray brace in prose): retry from the next brace.
+        start = cleaned.indexOf('{', start + 1);
+      }
+    }
+    return objects;
+  }
+
+  private normalizeRepoSearchQueries(raw: unknown): RepoSearchQuery[] {
+    if (!Array.isArray(raw)) return [];
+    const queries: RepoSearchQuery[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const entry = item as { terms?: unknown; scope?: unknown };
+      if (!Array.isArray(entry.terms) || typeof entry.scope !== 'string') continue;
+      const scope = entry.scope.trim().toLowerCase();
+      if (scope !== 'metadata' && scope !== 'readme' && scope !== 'any') continue;
+      const terms = entry.terms
+        .filter((term): term is string => typeof term === 'string')
+        .map(term => term.trim())
+        .filter(Boolean);
+      if (terms.length === 0) continue;
+      queries.push({ terms, scope });
+    }
+    return queries;
+  }
+
   async testConnection(): Promise<ConnectionTestResult> {
     const timeoutMs = 30000;
 
@@ -2703,27 +2774,18 @@ Output only the JSON object.`;
         system,
         user,
         temperature: 0.1,
-        maxTokens: 2000,
+        maxTokens: (this.config.reasoningEffort || this.getApiType() === 'gemini')
+          ? AIService.RERANKING_MAX_TOKENS
+          : 2000,
         signal,
       });
-      const parsed = this.extractAndParseAIJson(content);
-      if (!parsed || !Array.isArray(parsed.queries)) return [];
-      const queries: RepoSearchQuery[] = [];
-      for (const raw of parsed.queries) {
-        if (!raw || typeof raw !== 'object') continue;
-        const item = raw as { terms?: unknown; scope?: unknown };
-        if (!Array.isArray(item.terms) || typeof item.scope !== 'string') continue;
-        const scope = item.scope.trim().toLowerCase();
-        if (scope !== 'metadata' && scope !== 'readme' && scope !== 'any') continue;
-        const terms = item.terms
-          .filter((term): term is string => typeof term === 'string')
-          .map(term => term.trim())
-          .filter(Boolean);
-        if (terms.length === 0) continue;
-        queries.push({ terms, scope });
-        if (queries.length >= 5) break;
+      // The model may echo the prompt's example object before the real reply;
+      // scan every top-level object and take the first one with a valid query.
+      for (const candidate of this.scanTopLevelJsonObjects(content)) {
+        const queries = this.normalizeRepoSearchQueries(candidate.queries);
+        if (queries.length > 0) return queries;
       }
-      return queries;
+      return [];
     } catch (error) {
       if (signal?.aborted || isAbortError(error)) throw error;
       logger.warn('ai', 'Failed to generate repository search queries', {

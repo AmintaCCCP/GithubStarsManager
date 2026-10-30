@@ -628,8 +628,11 @@ export class GitHubApiService {
         throw new Error(GITHUB_TOKEN_INVALID_ERROR);
       }
       if (response.status === 403 && remaining === '0') {
-        const resetDate = this.rateLimitReset
-          ? new Date(this.rateLimitReset * 1000).toLocaleString()
+        // Search has its own quota bucket: read the reset from the current
+        // response, since this.rateLimitReset only tracks the core bucket.
+        const resetEpoch = isSearchEndpoint && reset !== null ? parseInt(reset, 10) : this.rateLimitReset;
+        const resetDate = resetEpoch
+          ? new Date(resetEpoch * 1000).toLocaleString()
           : 'unknown';
         this.log403Failure('API request failed: rate limit exceeded', { method, endpoint, status: response.status, durationMs });
         throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);

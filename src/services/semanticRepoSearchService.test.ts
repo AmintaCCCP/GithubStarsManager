@@ -3,6 +3,7 @@ import type { Repository } from '../types';
 import type { GitHubApiService, GitHubRepoDetailRead } from './githubApi';
 import type { AIService, RepoSearchQuery } from './aiService';
 import {
+  __resetGithubSearchPacingForTest,
   aggregateRecall,
   assembleGithubQuery,
   buildRecallRegex,
@@ -243,14 +244,16 @@ describe('semanticRepoSearchService — assembleGithubQuery', () => {
   it('清理 GitHub 语法、映射 scope 并全局去重', () => {
     const queries: RepoSearchQuery[] = [
       { terms: ['"(terminal)"', 'file:manager'], scope: 'metadata' },
-      { terms: ['password vault'], scope: 'readme' },
-      { terms: ['todo', 'task'], scope: 'any' },
-      { terms: ['password vault'], scope: 'readme' },
+      { terms: ['password vault'], scope: 'metadata' },
+      { terms: ['todo', 'task'], scope: 'readme' },
+      { terms: ['password vault'], scope: 'metadata' },
+      { terms: ['sync engine'], scope: 'any' },
     ];
     expect(assembleGithubQuery(queries)).toEqual([
       'terminal file manager in:name,description,topics',
-      'password vault in:readme',
-      'todo task',
+      'password vault in:name,description,topics',
+      'todo task in:readme',
+      'sync engine',
     ]);
   });
 
@@ -272,16 +275,57 @@ describe('semanticRepoSearchService — assembleGithubQuery', () => {
     }));
     expect(assembleGithubQuery(queries)).toHaveLength(5);
   });
+
+  it('丢弃含大写 NOT（GitHub 布尔运算符）的整条查询', () => {
+    const queries: RepoSearchQuery[] = [
+      { terms: ['password NOT vault'], scope: 'metadata' },
+      { terms: ['password vault'], scope: 'metadata' },
+      { terms: ['password sync'], scope: 'metadata' },
+      { terms: ['vault readme'], scope: 'readme' },
+    ];
+    expect(assembleGithubQuery(queries)).toEqual([
+      'password vault in:name,description,topics',
+      'password sync in:name,description,topics',
+      'vault readme in:readme',
+    ]);
+  });
+
+  it('缺少 2 条 metadata 或 1 条 readme 时返回 null', () => {
+    const queries: RepoSearchQuery[] = [
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file browser'], scope: 'metadata' },
+      { terms: ['terminal sync'], scope: 'any' },
+    ];
+    expect(assembleGithubQuery(queries)).toBeNull();
+  });
+
+  it('传入用户词时只保留至少命中一个主题词的查询', () => {
+    const queries: RepoSearchQuery[] = [
+      { terms: ['terminal file manager'], scope: 'metadata' },
+      { terms: ['password vault'], scope: 'metadata' },
+      { terms: ['terminal sync'], scope: 'metadata' },
+      { terms: ['file browser'], scope: 'readme' },
+    ];
+    expect(assembleGithubQuery(queries, 'terminal file manager')).toEqual([
+      'terminal file manager in:name,description,topics',
+      'terminal sync in:name,description,topics',
+      'file browser in:readme',
+    ]);
+  });
 });
 
 describe('semanticRepoSearchService — runGithubSearchRecall', () => {
   const generated: RepoSearchQuery[] = [
     { terms: ['terminal file manager'], scope: 'metadata' },
-    { terms: ['password vault'], scope: 'readme' },
-    { terms: ['todo task'], scope: 'any' },
+    { terms: ['terminal manager'], scope: 'metadata' },
+    { terms: ['file manager'], scope: 'readme' },
   ];
 
   it('串行查询、按 full_name 去重、star 降序并截断 60，同时记录查询证据', async () => {
+    __resetGithubSearchPacingForTest();
+    let clock = 1_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
     const first = Array.from({ length: 25 }, (_, i) => makeSearchRepo(`o/a-${i}`, 100 + i));
     const second = [
       ...Array.from({ length: 25 }, (_, i) => makeSearchRepo(`o/b-${i}`, 200 + i)),
@@ -295,9 +339,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       .mockResolvedValueOnce(first)
       .mockResolvedValueOnce(second)
       .mockResolvedValueOnce(third);
-    const sleepImpl = vi.fn(async (ms: number) => {
-      if (ms !== 2100) throw new Error(`unexpected sleep: ${ms}`);
-    });
+    const sleepImpl = vi.fn(async (ms: number) => { clock += ms; });
     const ai = makeAi({ generateQueries: async () => generated });
 
     const result = await runGithubSearchRecall('terminal file manager', 'find a TUI file manager', {
@@ -309,8 +351,8 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     expect(rawSearch).toHaveBeenCalledTimes(3);
     expect(rawSearch.mock.calls.map(call => call[0])).toEqual([
       'terminal file manager in:name,description,topics',
-      'password vault in:readme',
-      'todo task',
+      'terminal manager in:name,description,topics',
+      'file manager in:readme',
     ]);
     expect(rawSearch.mock.calls.every(call => call[1] === 25)).toBe(true);
     expect(sleepImpl).toHaveBeenCalledTimes(2);
@@ -319,6 +361,10 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     expect([...result.aggregation.values()][0]).toMatchObject({ repo: 'o/b-24', count: 224 });
     expect(result.aggregation.get('o/a-0')).toMatchObject({ repo: 'o/a-0', count: 100 });
     expect(result.evidence.get('o/a-0')).toBe('gh_search=terminal file manager in:name,description,topics');
+    } finally {
+      nowSpy.mockRestore();
+      __resetGithubSearchPacingForTest();
+    }
   });
 
   it('单条查询失败跳过，其余查询继续', async () => {
@@ -337,7 +383,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     expect([...result.aggregation.keys()]).toEqual(['o/ok-2', 'o/ok-1']);
   });
 
-  it('全部查询失败时抛错；403/429 不降级跳过', async () => {
+  it('全部查询失败时抛错；真实限流立即上抛，普通 403 视作可跳过', async () => {
     const allFailed = vi.fn(async () => { throw new Error('GitHub API error: 500 Internal Server Error'); });
     await expect(runGithubSearchRecall('q', '', {
       api: makeApi({ rawSearch: allFailed }),
@@ -345,7 +391,16 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       sleepImpl: async () => {},
     })).rejects.toThrow(/all recall requests failed/);
 
-    for (const message of ['GitHub API error: 403 Forbidden', 'GitHub API error: 429 Too Many Requests']) {
+    // 普通 403（权限/代理拒绝）不是配额信号：按失败跳过，全部失败后聚合上抛
+    const forbidden = vi.fn(async () => { throw new Error('GitHub API error: 403 Forbidden'); });
+    await expect(runGithubSearchRecall('q', '', {
+      api: makeApi({ rawSearch: forbidden }),
+      aiService: makeAi({ generateQueries: async () => generated }),
+      sleepImpl: async () => {},
+    })).rejects.toThrow(/all recall requests failed/);
+    expect(forbidden).toHaveBeenCalledTimes(3);
+
+    for (const message of ['GitHub API error: 429 Too Many Requests', 'GitHub API rate limit exceeded. Resets at 2030/1/1']) {
       const limited = vi.fn(async () => { throw new Error(message); });
       await expect(runGithubSearchRecall('q', '', {
         api: makeApi({ rawSearch: limited }),
@@ -389,8 +444,8 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
   it('GitHub Search 有结果时不走 grep，重排证据使用 gh_search=<query>', async () => {
     const generated: RepoSearchQuery[] = [
       { terms: ['terminal file manager'], scope: 'metadata' },
-      { terms: ['password vault'], scope: 'readme' },
-      { terms: ['todo task'], scope: 'any' },
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file manager'], scope: 'readme' },
     ];
     const rawSearch = vi.fn()
       .mockResolvedValueOnce([
@@ -423,8 +478,8 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
   it('GitHub Search 空池或非限流失败时回退 grep.app，并保留旧 evidence 格式', async () => {
     const generated: RepoSearchQuery[] = [
       { terms: ['terminal file manager'], scope: 'metadata' },
-      { terms: ['password vault'], scope: 'readme' },
-      { terms: ['todo task'], scope: 'any' },
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file manager'], scope: 'readme' },
     ];
     const emptyGithub = vi.fn(async () => []);
     const emptySelect = vi.fn(async (...args: Parameters<AIService['selectRelevantRepositories']>) => args[0]);
@@ -438,7 +493,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     const result = await searchRepositoriesSemantically(
       makeApi({ rawSearch: emptyGithub }),
       makeAi({ generateQueries: async () => generated, select: emptySelect }),
-      'kw',
+      'terminal file manager',
       { fetchImpl, githubSleepImpl: async () => {} },
     );
     expect(emptyGithub).toHaveBeenCalledTimes(3);
@@ -457,30 +512,71 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     const fallbackResult = await searchRepositoriesSemantically(
       makeApi({ rawSearch: failedGithub }),
       makeAi({ generateQueries: async () => generated }),
-      'kw',
+      'terminal file manager',
       { fetchImpl: fallbackFetch, githubSleepImpl: async () => {} },
     );
     expect(failedGithub).toHaveBeenCalledTimes(3);
     expect(fallbackResult.repos.map(repo => repo.full_name)).toEqual(['grep/fallback']);
   });
 
-  it('GitHub Search 403/429 不降级到 grep，直接上抛', async () => {
+  it('GitHub Search 403/429（限流或拒绝）时回退 grep.app，不中止搜索', async () => {
     const generated: RepoSearchQuery[] = [
       { terms: ['terminal file manager'], scope: 'metadata' },
-      { terms: ['password vault'], scope: 'readme' },
-      { terms: ['todo task'], scope: 'any' },
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file manager'], scope: 'readme' },
     ];
-    const limited = vi.fn(async () => { throw new Error('GitHub API error: 403 Forbidden'); });
-    const { fetchImpl } = installGrepFetch([]);
+    for (const message of ['GitHub API error: 403 Forbidden', 'GitHub API error: 429 Too Many Requests']) {
+      const limited = vi.fn(async () => { throw new Error(message); });
+      const { fetchImpl } = installGrepFetch([
+        grepResponse(grepResult({
+          total: 1,
+          repoFacets: [{ val: 'grep/fallback', count: 1 }],
+          hits: [hit('grep/fallback', 'README.md')],
+        })),
+      ]);
+      const result = await searchRepositoriesSemantically(
+        makeApi({ rawSearch: limited }),
+        makeAi({ generateQueries: async () => generated }),
+        'terminal file manager',
+        { fetchImpl, githubSleepImpl: async () => {} },
+      );
+      expect(fetchImpl).toHaveBeenCalled();
+      expect(result.repos.map(repo => repo.full_name)).toEqual(['grep/fallback']);
+    }
+  });
+
+  it('GitHub 召回补全后全被过滤 → 回退 grep.app 重新补全', async () => {
+    const generated: RepoSearchQuery[] = [
+      { terms: ['terminal file manager'], scope: 'metadata' },
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file manager'], scope: 'readme' },
+    ];
+    const rawSearch = vi.fn()
+      .mockResolvedValueOnce([makeSearchRepo('o/gh-a', 10)])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const graphql = vi.fn(async (fullNames: string[]) => new Map<string, GitHubRepoDetailRead | null>(
+      fullNames.map(name => [name.toLowerCase(), name.startsWith('o/gh-') ? null : makeDetail(name, 500)]),
+    ));
+    const { fetchImpl } = installGrepFetch([
+      grepResponse(grepResult({
+        total: 1,
+        repoFacets: [{ val: 'grep/result', count: 2 }],
+        hits: [hit('grep/result', 'README.md')],
+      })),
+    ]);
     const onFallback = vi.fn();
-    await expect(searchRepositoriesSemantically(
-      makeApi({ rawSearch: limited }),
+    const result = await searchRepositoriesSemantically(
+      makeApi({ rawSearch, graphql }),
       makeAi({ generateQueries: async () => generated }),
-      'kw',
-      { fetchImpl, onFallback },
-    )).rejects.toThrow('GitHub API error: 403 Forbidden');
-    expect(fetchImpl).not.toHaveBeenCalled();
-    expect(onFallback).not.toHaveBeenCalled();
+      'terminal file manager',
+      { fetchImpl, githubSleepImpl: async () => {}, onFallback },
+    );
+    expect(rawSearch).toHaveBeenCalledTimes(3);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(graphql).toHaveBeenCalledTimes(2);
+    expect(result.repos.map(repo => repo.full_name)).toEqual(['grep/result']);
+    expect(onFallback).not.toHaveBeenCalledWith('recall_empty');
   });
 
   it('单次正则交替查询（regexp=true），映射 channel/platform 并按 AI 顺序赋 rank，携带召回证据', async () => {

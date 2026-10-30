@@ -670,4 +670,43 @@ describe('GitHubApiService search 端点限流隔离', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('search 403 remaining=0 时使用当前响应的 X-RateLimit-Reset', async () => {
+    const searchReset = Math.floor(Date.now() / 1000) + 1234;
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ message: 'rate limit' }), {
+      status: 403,
+      headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(searchReset) },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    const expected = new Date(searchReset * 1000).toLocaleString();
+    await expect(service.searchRepositoriesRaw('q', 25)).rejects.toThrow(expected);
+  });
+
+  it('search 响应低剩余量/未来重置不污染核心桶：后续核心请求立即发出', async () => {
+    vi.useFakeTimers();
+    const futureReset = Math.floor(Date.now() / 1000) + 3600;
+    const coreOk = () => new Response(JSON.stringify({ login: 'me' }), {
+      status: 200,
+      headers: { 'X-RateLimit-Remaining': '4999', 'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + 60) },
+    });
+    const searchLow = () => new Response(JSON.stringify({ total_count: 0, items: [] }), {
+      status: 200,
+      headers: { 'X-RateLimit-Remaining': '0', 'X-RateLimit-Reset': String(futureReset) },
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(coreOk())
+      .mockResolvedValueOnce(searchLow())
+      .mockResolvedValueOnce(coreOk());
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    await service.getCurrentUser();
+    await service.searchRepositoriesRaw('q', 25);
+    // 若 search 的低剩余量/未来重置写进核心桶，这里会等待约 1 小时
+    await service.getCurrentUser();
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });

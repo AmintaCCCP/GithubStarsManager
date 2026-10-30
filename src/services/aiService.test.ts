@@ -698,7 +698,7 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
     max_tokens: number;
   };
 
-  it('从垃圾文本中提取首个 JSON 对象，过滤非法条目并最多保留 5 条', async () => {
+  it('从垃圾文本中提取 JSON 对象，过滤非法条目且不提前截断', async () => {
     const fetchMock = mockFetch();
     let body: Awaited<ReturnType<typeof captureBody>> | undefined;
     const content = [
@@ -732,6 +732,7 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
       { terms: ['todo task'], scope: 'any' },
       { terms: ['code review'], scope: 'metadata' },
       { terms: ['photo backup'], scope: 'readme' },
+      { terms: ['sixth query'], scope: 'any' },
     ]);
     expect(body?.temperature).toBe(0.1);
     expect(body?.max_tokens).toBe(2000);
@@ -739,6 +740,31 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
     expect(userPrompt).toContain('至少 2 条 metadata');
     expect(userPrompt).toContain('至少 1 条 readme');
     expect(userPrompt).toContain('禁止只写泛词');
+  });
+
+  it('跳过提示词示例对象，选择首个含有效查询的 JSON 对象', async () => {
+    const fetchMock = mockFetch();
+    const content = [
+      JSON.stringify({ queries: [{ terms: ['example term'], scope: 'metadata | readme | any' }] }),
+      JSON.stringify({ queries: [{ terms: ['terminal manager'], scope: 'metadata' }] }),
+    ].join('\n');
+    fetchMock.mockResolvedValueOnce(chatResponse(content));
+
+    await expect(new AIService(makeConfig() as never, 'zh').generateRepoSearchQueries('终端文件管理器', 'i'))
+      .resolves.toEqual([{ terms: ['terminal manager'], scope: 'metadata' }]);
+  });
+
+  it('reasoning 模型使用更大的 max_tokens', async () => {
+    const fetchMock = mockFetch();
+    let maxTokens: number | undefined;
+    fetchMock.mockImplementationOnce(async (_url, init) => {
+      maxTokens = (await captureBody(init)).max_tokens;
+      return chatResponse('{"queries":[{"terms":["x"],"scope":"any"}]}');
+    });
+
+    await new AIService({ ...makeConfig(), reasoningEffort: 'medium' } as never, 'zh')
+      .generateRepoSearchQueries('q', 'i');
+    expect(maxTokens).toBe(4096);
   });
 
   it('非数组、非法 JSON 或请求失败时返回 []', async () => {

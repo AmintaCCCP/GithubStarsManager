@@ -90,6 +90,8 @@ export interface GithubSearchRecallOptions {
   api: GitHubApiService;
   aiService: AIService;
   signal?: AbortSignal;
+  /** 查询扩展词（与用户原始查询一起用于主题校验）。 */
+  topicTerms?: string[];
   /** 测试注入口：替换查询间等待。 */
   sleepImpl?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
@@ -152,26 +154,52 @@ const GITHUB_GENERIC_WORDS = new Set([
   'tools',
 ]);
 
+/**
+ * Only real quota signals count as rate limits. A bare 403 (permission,
+ * secondary abuse limit, proxy denial) must fall back to grep.app instead of
+ * aborting the semantic search.
+ */
 function isGithubRateLimitError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
+  if ((error as { status?: unknown }).status === 429) return true;
   return /rate limit exceeded/i.test(error.message)
-    || /too many requests/i.test(error.message)
-    || /GitHub API error:\s*(?:403|429)\b/.test(error.message);
+    || /too many requests/i.test(error.message);
+}
+
+/** 用户查询与扩展词的去重小写词集合，用于校验生成查询是否锁定主题。 */
+function topicWordSet(...sources: string[]): Set<string> {
+  const words = new Set<string>();
+  for (const source of sources) {
+    for (const raw of source.split(/\s+/)) {
+      const word = raw
+        .toLowerCase()
+        .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+      if (word.length >= 2) words.add(word);
+    }
+  }
+  return words;
 }
 
 /**
  * 校验模型生成的语法槽并拼装 GitHub q。模型不能写限定符：这里只保留
- * 1-3 个内容词，按 scope 追加代码固定后缀；有效查询少于 3 条时返回 null。
+ * 1-3 个内容词，按 scope 追加代码固定后缀。含大写 `NOT`（GitHub 布尔运算符）
+ * 的查询整条丢弃；传入用户词时只保留至少命中一个主题词的查询。有效查询
+ * 少于 3 条，或缺少 ≥2 条 metadata / ≥1 条 readme 时返回 null，触发 grep 回退。
  */
-export function assembleGithubQuery(queries: RepoSearchQuery[]): string[] | null {
+export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: string): string[] | null {
+  const topicWords = userText ? topicWordSet(userText) : null;
+  const hasTopicFilter = topicWords !== null && topicWords.size > 0;
   const assembled: string[] = [];
   const seen = new Set<string>();
+  let metadataCount = 0;
+  let readmeCount = 0;
   for (const query of queries) {
     if (!query || !Array.isArray(query.terms)) continue;
     if (query.scope !== 'metadata' && query.scope !== 'readme' && query.scope !== 'any') continue;
 
     const words: string[] = [];
     const seenWords = new Set<string>();
+    let hasBooleanNot = false;
     for (const raw of query.terms) {
       if (typeof raw !== 'string') continue;
       const cleaned = raw
@@ -180,6 +208,10 @@ export function assembleGithubQuery(queries: RepoSearchQuery[]): string[] | null
         .trim();
       if (!cleaned) continue;
       for (const word of cleaned.split(' ')) {
+        if (word === 'NOT') {
+          hasBooleanNot = true;
+          continue;
+        }
         const key = word.toLowerCase();
         if (!seenWords.has(key)) {
           seenWords.add(key);
@@ -187,8 +219,10 @@ export function assembleGithubQuery(queries: RepoSearchQuery[]): string[] | null
         }
       }
     }
+    if (hasBooleanNot) continue;
     if (words.length === 0 || words.length > 3) continue;
     if (words.every(word => GITHUB_GENERIC_WORDS.has(word.toLowerCase()))) continue;
+    if (hasTopicFilter && topicWords && !words.some(word => topicWords.has(word.toLowerCase()))) continue;
 
     const suffix = query.scope === 'metadata'
       ? ' in:name,description,topics'
@@ -200,9 +234,22 @@ export function assembleGithubQuery(queries: RepoSearchQuery[]): string[] | null
     if (seen.has(key)) continue;
     seen.add(key);
     assembled.push(q);
-    if (assembled.length >= GITHUB_QUERY_MAX_VALID) break;
+    if (query.scope === 'metadata') metadataCount++;
+    else if (query.scope === 'readme') readmeCount++;
   }
-  return assembled.length >= GITHUB_QUERY_MIN_VALID ? assembled : null;
+  if (assembled.length < GITHUB_QUERY_MIN_VALID || metadataCount < 2 || readmeCount < 1) return null;
+  return assembled.slice(0, GITHUB_QUERY_MAX_VALID);
+}
+
+/**
+ * 跨调用共享 GitHub Search 配额时间轴：每次请求在单线程内原子预占一个
+ * 2.1s 时间片，重叠的窗口/调用因此串行排队，而不是各自 5 连发耗尽 30/min。
+ */
+let nextGithubSearchAt = 0;
+
+/** 测试专用：重置共享配额时间轴。 */
+export function __resetGithubSearchPacingForTest(): void {
+  nextGithubSearchAt = 0;
 }
 
 /**
@@ -219,7 +266,7 @@ export async function runGithubSearchRecall(
   const wait = options.sleepImpl ?? sleep;
   const startTime = Date.now();
   const generated = await aiService.generateRepoSearchQueries(query, intent, signal);
-  const assembled = assembleGithubQuery(generated);
+  const assembled = assembleGithubQuery(generated, [query, ...(options.topicTerms ?? [])].join(' '));
   if (!assembled) {
     logger.warn('semanticSearch', 'GitHub search query generation produced fewer than 3 valid queries', {
       generated: generated.length,
@@ -231,7 +278,12 @@ export async function runGithubSearchRecall(
   const evidence = new Map<string, string>();
   let successfulRequests = 0;
   for (let i = 0; i < assembled.length; i++) {
-    if (i > 0) await wait(GITHUB_SEARCH_INTERVAL_MS, signal);
+    // Atomically reserve the next shared slot before awaiting, so concurrent
+    // recalls queue behind each other instead of firing five requests in parallel.
+    const now = Date.now();
+    const scheduledAt = Math.max(now, nextGithubSearchAt);
+    nextGithubSearchAt = scheduledAt + GITHUB_SEARCH_INTERVAL_MS;
+    if (scheduledAt > now) await wait(scheduledAt - now, signal);
     const q = assembled[i];
     try {
       const repos = await api.searchRepositoriesRaw(q, GITHUB_SEARCH_PER_PAGE, signal);
@@ -661,6 +713,7 @@ export async function searchRepositoriesSemantically(
       api,
       aiService,
       signal,
+      topicTerms: terms,
       sleepImpl: options.githubSleepImpl,
     });
     if (githubRecall.aggregation.size > 0) {
@@ -668,10 +721,10 @@ export async function searchRepositoriesSemantically(
       githubEvidence = githubRecall.evidence;
     }
   } catch (error) {
-    if (signal?.aborted || isAbortError(error) || isGithubRateLimitError(error)) throw error;
-    logger.warn('semanticSearch', 'GitHub search recall failed, falling back to grep.app', {
-      error: errorMessage(error),
-    });
+    if (signal?.aborted || isAbortError(error)) throw error;
+    logger.warn('semanticSearch', isGithubRateLimitError(error)
+      ? 'GitHub search rate limited, falling back to grep.app'
+      : 'GitHub search recall failed, falling back to grep.app', { error: errorMessage(error) });
   }
   if (!githubEvidence) {
     const grepRecall = await recallRepositories(trimmed, terms, { signal, fetchImpl });
@@ -685,46 +738,62 @@ export async function searchRepositoriesSemantically(
 
   // ③ GitHub 元数据补全：top-60。grep 路径按辅路命中优先、并集计数降序；
   //     GitHub 路径的 count 是 star 数，因此等价于 star 降序。Array.sort 稳定。
-  const topEntries = [...aggregation.values()]
-    .sort((a, b) => {
-      const aSpecific = specificRepoKeys.has(a.repo.toLowerCase()) ? 1 : 0;
-      const bSpecific = specificRepoKeys.has(b.repo.toLowerCase()) ? 1 : 0;
-      return bSpecific - aSpecific || b.count - a.count;
-    })
-    .slice(0, RECALL_POOL_LIMIT);
-  const fullNames = topEntries.map(entry => entry.repo);
-  onPhase?.('enriching');
-  let details: Map<string, GitHubRepoDetailRead | null>;
-  try {
-    details = await api.graphqlFetchRepositories(fullNames, {
-      signal,
-      batchSize: ENRICH_BATCH_SIZE,
-      onBatchDone: (doneBatches) => {
-        const done = Math.min(fullNames.length, doneBatches * ENRICH_BATCH_SIZE);
-        onPhase?.('enriching', `${done}/${fullNames.length}`);
-      },
-    });
-  } catch (error) {
-    if (signal?.aborted || isAbortError(error)) throw error;
-    // GraphQL 限流时直接向上抛：REST 回退与 GraphQL 共用限流退避
-    // （rateLimitRemaining/rateLimitReset），会静默等待限流窗口重置（最长约 1 小时）
-    // 且不向用户报错，与 enrichViaRest 的"限流即上抛"约定保持一致
-    if (error instanceof Error && /rate limit exceeded/i.test(error.message)) throw error;
-    logger.warn('semanticSearch', 'GraphQL 批量补全失败，回退 REST 逐仓补全', { error: errorMessage(error) });
-    details = await enrichViaRest(api, fullNames, signal);
-  }
+  const buildCandidates = async (
+    pool: Map<string, RecallAggregatedEntry>,
+    specific: Set<string>,
+  ): Promise<Array<{ repo: DiscoveryRepo; count: number; paths: string[]; langs: Set<string> }>> => {
+    const topEntries = [...pool.values()]
+      .sort((a, b) => {
+        const aSpecific = specific.has(a.repo.toLowerCase()) ? 1 : 0;
+        const bSpecific = specific.has(b.repo.toLowerCase()) ? 1 : 0;
+        return bSpecific - aSpecific || b.count - a.count;
+      })
+      .slice(0, RECALL_POOL_LIMIT);
+    const fullNames = topEntries.map(entry => entry.repo);
+    onPhase?.('enriching');
+    let details: Map<string, GitHubRepoDetailRead | null>;
+    try {
+      details = await api.graphqlFetchRepositories(fullNames, {
+        signal,
+        batchSize: ENRICH_BATCH_SIZE,
+        onBatchDone: (doneBatches) => {
+          const done = Math.min(fullNames.length, doneBatches * ENRICH_BATCH_SIZE);
+          onPhase?.('enriching', `${done}/${fullNames.length}`);
+        },
+      });
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) throw error;
+      // GraphQL 限流时直接向上抛：REST 回退与 GraphQL 共用限流退避
+      // （rateLimitRemaining/rateLimitReset），会静默等待限流窗口重置（最长约 1 小时）
+      // 且不向用户报错，与 enrichViaRest 的"限流即上抛"约定保持一致
+      if (error instanceof Error && /rate limit exceeded/i.test(error.message)) throw error;
+      logger.warn('semanticSearch', 'GraphQL 批量补全失败，回退 REST 逐仓补全', { error: errorMessage(error) });
+      details = await enrichViaRest(api, fullNames, signal);
+    }
 
-  // 组装候选：null（已删除/不可访问）与 id===0（GraphQL 映射失败）的仓库直接跳过
-  const candidates: Array<{ repo: DiscoveryRepo; count: number; paths: string[]; langs: Set<string> }> = [];
-  for (const entry of topEntries) {
-    const detail = details.get(entry.repo.toLowerCase());
-    if (!detail || detail.id === 0) continue;
-    candidates.push({
-      repo: { ...detail, rank: candidates.length + 1, channel: 'search', platform: 'All' },
-      count: entry.count,
-      paths: entry.paths,
-      langs: entry.langs,
-    });
+    // 组装候选：null（已删除/不可访问）与 id===0（GraphQL 映射失败）的仓库直接跳过
+    const built: Array<{ repo: DiscoveryRepo; count: number; paths: string[]; langs: Set<string> }> = [];
+    for (const entry of topEntries) {
+      const detail = details.get(entry.repo.toLowerCase());
+      if (!detail || detail.id === 0) continue;
+      built.push({
+        repo: { ...detail, rank: built.length + 1, channel: 'search', platform: 'All' },
+        count: entry.count,
+        paths: entry.paths,
+        langs: entry.langs,
+      });
+    }
+    return built;
+  };
+
+  let candidates = await buildCandidates(aggregation, specificRepoKeys);
+  // GitHub 召回非空但补全后全被过滤 → grep.app 兜底重试一次
+  if (candidates.length === 0 && githubEvidence) {
+    const grepRecall = await recallRepositories(trimmed, terms, { signal, fetchImpl });
+    if (grepRecall.aggregation.size > 0) {
+      githubEvidence = null;
+      candidates = await buildCandidates(grepRecall.aggregation, grepRecall.specificRepoKeys);
+    }
   }
   if (candidates.length === 0) {
     onFallback?.('recall_empty');
