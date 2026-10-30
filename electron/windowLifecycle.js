@@ -56,7 +56,7 @@ function probeWindowPaint({
     try {
       contents.invalidate();
     } catch { /* reuse of an existing probe is best-effort */ }
-    existing.arm?.();
+    existing.arm?.(true);
     return;
   }
 
@@ -169,8 +169,9 @@ function probeWindowPaint({
     }
   };
 
-  state.arm = () => {
-    if (state.closed || !state.timerDone) return;
+  state.arm = (restart = false) => {
+    if (state.closed || (!restart && !state.timerDone)) return;
+    if (!state.timerDone) cancel(timer);
     state.timerDone = false;
     timer = schedule(() => handleFailure('timeout'), timeoutMs);
   };

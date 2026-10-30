@@ -104,7 +104,8 @@ function makeProbeWindow({
   loading = false,
   reloadError = null,
 } = {}) {
-  const timers = [];
+  const timers = new Map();
+  let scheduledTimerCount = 0;
   const records = [];
   const scripts = [];
   let reloads = 0;
@@ -161,6 +162,12 @@ function makeProbeWindow({
     get invalidations() {
       return invalidations;
     },
+    get timerCount() {
+      return timers.size;
+    },
+    get scheduledTimerCount() {
+      return scheduledTimerCount;
+    },
     get resolveFrame() {
       return resolveFrame;
     },
@@ -168,12 +175,17 @@ function makeProbeWindow({
       return rejectFrame;
     },
     schedule(callback) {
-      timers.push(callback);
-      return timers.length;
+      const timer = ++scheduledTimerCount;
+      timers.set(timer, callback);
+      return timer;
     },
-    cancel() {},
+    cancel(timer) {
+      timers.delete(timer);
+    },
     runTimers() {
-      for (const callback of timers.splice(0)) callback();
+      const pending = [...timers.values()];
+      timers.clear();
+      for (const callback of pending) callback();
     },
     setState(next) {
       if ('focused' in next) focusedState = next.focused;
@@ -348,6 +360,7 @@ describe('probeWindowPaint', () => {
 
     probe.setState({ focused: false });
     run();
+    assert.equal(probe.timerCount, 1);
     probe.runTimers();
     assert.equal(probe.reloads, 0);
     assert.equal(probe.records[0].level, 'info');
@@ -355,10 +368,37 @@ describe('probeWindowPaint', () => {
 
     probe.setState({ focused: true });
     run();
+    assert.equal(probe.timerCount, 1);
     probe.runTimers();
 
     assert.equal(probe.reloads, 1);
     assert.equal(probe.scripts.length, 1);
+  });
+
+  it('restarts the pending timeout when a new window event arrives', () => {
+    const probe = makeProbeWindow();
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'display-metrics-changed',
+      record: (entry) => probe.records.push(entry),
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    const staleTimer = probe.scheduledTimerCount;
+    probe.setState({ focused: false });
+    run();
+    probe.setState({ focused: true });
+    run();
+
+    assert.equal(probe.timerCount, 1);
+    assert.equal(probe.scheduledTimerCount, 3);
+    assert.equal(probe.scripts.length, 1);
+    assert.equal(probe.invalidations, 3);
+    assert.equal(staleTimer, 1);
+    probe.runTimers();
+    assert.equal(probe.reloads, 1);
   });
 
   it('does not reload while the main frame is still loading', () => {
