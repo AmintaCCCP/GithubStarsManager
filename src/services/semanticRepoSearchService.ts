@@ -172,8 +172,9 @@ function topicWordSet(...sources: string[]): Set<string> {
   const words = new Set<string>();
   for (const source of sources) {
     // Split on any non-alphanumeric run so `todo/task` yields `todo` and `task`.
+    // Keep single-character words too (e.g. query `C`) so topic filtering stays on.
     for (const part of source.toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
-      if (part.length >= 2) words.add(part);
+      if (part.length >= 1) words.add(part);
     }
   }
   return words;

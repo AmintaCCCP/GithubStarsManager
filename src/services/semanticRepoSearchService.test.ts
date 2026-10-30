@@ -329,6 +329,20 @@ describe('semanticRepoSearchService — assembleGithubQuery', () => {
     ]);
   });
 
+  it('单字符主题词仍启用主题过滤（如查询 C）', () => {
+    const queries: RepoSearchQuery[] = [
+      { terms: ['c compiler'], scope: 'metadata' },
+      { terms: ['c toolchain'], scope: 'metadata' },
+      { terms: ['c library'], scope: 'readme' },
+      { terms: ['rust parser'], scope: 'metadata' },
+    ];
+    expect(assembleGithubQuery(queries, 'C')).toEqual([
+      'c compiler in:name,description,topics',
+      'c toolchain in:name,description,topics',
+      'c library in:readme',
+    ]);
+  });
+
   it('截断前优先保留 metadata/readme，避免前 5 条全是 any', () => {
     const queries: RepoSearchQuery[] = [
       ...Array.from({ length: 5 }, (_, i) => ({ terms: [`any${i} word${i}`], scope: 'any' as const })),
@@ -406,7 +420,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       .mockResolvedValueOnce([makeSearchRepo('o/ok-2', 20)]);
     const ai = makeAi({ generateQueries: async () => generated });
 
-    const result = await runGithubSearchRecall('q', '', {
+    const result = await runGithubSearchRecall('terminal file manager', '', {
       api: makeApi({ rawSearch }),
       aiService: ai,
       sleepImpl: async () => {},
@@ -417,7 +431,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
 
   it('全部查询失败时抛错；真实限流立即上抛，普通 403 视作可跳过', async () => {
     const allFailed = vi.fn(async () => { throw new Error('GitHub API error: 500 Internal Server Error'); });
-    await expect(runGithubSearchRecall('q', '', {
+    await expect(runGithubSearchRecall('terminal file manager', '', {
       api: makeApi({ rawSearch: allFailed }),
       aiService: makeAi({ generateQueries: async () => generated }),
       sleepImpl: async () => {},
@@ -425,7 +439,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
 
     // 普通 403（权限/代理拒绝）不是配额信号：按失败跳过，全部失败后聚合上抛
     const forbidden = vi.fn(async () => { throw new Error('GitHub API error: 403 Forbidden'); });
-    await expect(runGithubSearchRecall('q', '', {
+    await expect(runGithubSearchRecall('terminal file manager', '', {
       api: makeApi({ rawSearch: forbidden }),
       aiService: makeAi({ generateQueries: async () => generated }),
       sleepImpl: async () => {},
@@ -434,7 +448,7 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
 
     for (const message of ['GitHub API error: 429 Too Many Requests', 'GitHub API rate limit exceeded. Resets at 2030/1/1']) {
       const limited = vi.fn(async () => { throw new Error(message); });
-      await expect(runGithubSearchRecall('q', '', {
+      await expect(runGithubSearchRecall('terminal file manager', '', {
         api: makeApi({ rawSearch: limited }),
         aiService: makeAi({ generateQueries: async () => generated }),
         sleepImpl: async () => {},
