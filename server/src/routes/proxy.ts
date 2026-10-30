@@ -132,7 +132,9 @@ router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
     const searchParams = new URL(req.url, 'http://localhost').searchParams;
     const safeSearchParams = new URLSearchParams();
     for (const [key, value] of searchParams.entries()) {
-      safeSearchParams.set(encodeURIComponent(key), encodeURIComponent(value));
+      // URLSearchParams already decoded the incoming values; set them raw so
+      // toString() performs exactly one round of encoding.
+      safeSearchParams.set(key, value);
     }
     const safeQuery = safeSearchParams.toString() ? `?${safeSearchParams.toString()}` : '';
 
