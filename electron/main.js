@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage, session } = require('electron');
+const { app, BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage, session, screen, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -58,7 +58,7 @@ const {
   loadEncryptedXAuth,
   clearEncryptedXAuth,
 } = require('./xAuthStorage');
-const { scheduleMinimizeToTray } = require('./windowLifecycle');
+const { scheduleMinimizeToTray, probeWindowPaint } = require('./windowLifecycle');
 
 let mainWindow;
 let tray = null;
@@ -393,6 +393,10 @@ function createWindow() {
       shouldHide: () => desktopPrefs.minimizeToTray,
     });
   });
+
+  mainWindow.on('show', () => scheduleWindowPaintProbe('show'));
+  mainWindow.on('restore', () => scheduleWindowPaintProbe('restore'));
+  mainWindow.on('focus', () => scheduleWindowPaintProbe('focus'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -1043,6 +1047,26 @@ function restoreMainWindow() {
   if (mainWindow.isMinimized()) mainWindow.restore();
   if (!mainWindow.isVisible()) mainWindow.show();
   mainWindow.focus();
+  scheduleWindowPaintProbe('restore-main-window');
+}
+
+let paintProbeTimer = null;
+
+function scheduleWindowPaintProbe(reason) {
+  if (paintProbeTimer) clearTimeout(paintProbeTimer);
+  paintProbeTimer = setTimeout(() => {
+    paintProbeTimer = null;
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    probeWindowPaint({
+      win: mainWindow,
+      reason,
+      record: (entry) => {
+        try {
+          diagLog.record(entry);
+        } catch { /* diagnostics must not break recovery */ }
+      },
+    });
+  }, 200);
 }
 
 function refreshTrayMenu() {
@@ -1788,6 +1812,10 @@ app.whenReady().then(() => {
     });
   });
   reloadDesktopPrefs();
+  powerMonitor.on('resume', () => scheduleWindowPaintProbe('power-resume'));
+  screen.on('display-added', () => scheduleWindowPaintProbe('display-added'));
+  screen.on('display-removed', () => scheduleWindowPaintProbe('display-removed'));
+  screen.on('display-metrics-changed', () => scheduleWindowPaintProbe('display-metrics-changed'));
   void getPluginManager().initialize().catch((error) => {
     console.error('Failed to initialize plugins:', error instanceof Error ? error.message : 'Unknown error');
   });
