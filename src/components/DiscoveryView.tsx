@@ -671,9 +671,9 @@ export const DiscoveryView: React.FC = React.memo(() => {
     if (lastAutoSearchKeyRef.current === key) return;
     lastAutoSearchKeyRef.current = key;
     refreshChannel('search', 1, false);
-    // StrictMode replays effects after cleanup; re-arm so the replay can restart
-    // the request that useDiscoveryActions just aborted.
-    return () => { lastAutoSearchKeyRef.current = null; };
+    // StrictMode replays effects after cleanup; restore the last settled key
+    // so the aborted replay can restart without repeating a completed search.
+    return () => { lastAutoSearchKeyRef.current = getLastSettledSearchKey(); };
   }, [
     selectedDiscoveryChannel,
     discoverySearchQuery,
