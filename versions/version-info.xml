@@ -752,4 +752,18 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.8</downloadUrl>
   </version>
+  <version>
+    <number>0.8.9</number>
+    <releaseDate>2026-10-30</releaseDate>
+    <changelog>
+      <item>fix: 紧急修复 Windows 窗口被遮挡或从托盘恢复后画面停止重绘导致的假死问题，新增强制重绘、合成器存活检测与主进程自动重载兜底。(PR #534)</item>
+      <item>feat: 发现页语义仓库搜索改用 GitHub Search 召回候选，候选池规模与质量大幅提升，AI 精排效果显著改善。(PR #535)</item>
+      <item>feat: Release 页新增内置「当前系统」资产过滤器，一键筛选当前设备可安装资产并推荐最佳下载。(PR #536)</item>
+      <item>fix: AI 分析与搜索兼容慢速、限流的 OpenAI 兼容网关，连接测试超时延长至 30 秒并正确识别网关错误与限流重试。(PR #529)</item>
+      <item>fix: 消除诊断日志高频噪音：插件快照资产上限、GitHub 403 刷屏、向量重复 ID 与超大持久化分片写入告警。(PR #530)</item>
+      <item>fix: 统一按钮与控件悬停反馈，强化侧边栏视觉层级。(PR #531)</item>
+      <item>fix: 升级 @hono/node-server 修复 serveStatic 路径二次解码绕过漏洞，升级 decode-uri-component 修复高危拒绝服务漏洞。(PR #528, #532)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.9</downloadUrl>
+  </version>
 </versions>
