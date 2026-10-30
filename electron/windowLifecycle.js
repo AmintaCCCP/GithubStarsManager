@@ -61,7 +61,13 @@ function probeWindowPaint({
     return;
   }
 
-  const state = { closed: false, timerDone: false, busyRetries: 0, arm: null };
+  const state = {
+    closed: false,
+    timerDone: false,
+    busyRetries: 0,
+    deadlineAt: now() + timeoutMs * 3,
+    arm: null,
+  };
   paintProbeStates.set(win, state);
   let timer;
 
@@ -189,9 +195,14 @@ function probeWindowPaint({
 
   state.arm = (restart = false) => {
     if (state.closed || (!restart && !state.timerDone)) return;
-    if (!state.timerDone) cancel(timer);
+    if (state.timerDone) {
+      state.deadlineAt = now() + timeoutMs * 3;
+    } else {
+      cancel(timer);
+    }
     state.timerDone = false;
-    timer = schedule(() => handleFailure('timeout'), timeoutMs);
+    const remainingMs = state.deadlineAt - now();
+    timer = schedule(() => handleFailure('timeout'), Math.max(0, Math.min(timeoutMs, remainingMs)));
   };
   timer = schedule(() => handleFailure('timeout'), timeoutMs);
 

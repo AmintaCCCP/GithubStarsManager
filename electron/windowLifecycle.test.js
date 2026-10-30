@@ -105,6 +105,7 @@ function makeProbeWindow({
   reloadError = null,
 } = {}) {
   const timers = new Map();
+  const scheduleDelays = [];
   let scheduledTimerCount = 0;
   const records = [];
   const scripts = [];
@@ -168,15 +169,19 @@ function makeProbeWindow({
     get scheduledTimerCount() {
       return scheduledTimerCount;
     },
+    get scheduleDelays() {
+      return scheduleDelays;
+    },
     get resolveFrame() {
       return resolveFrame;
     },
     get rejectFrame() {
       return rejectFrame;
     },
-    schedule(callback) {
+    schedule(callback, delay) {
       const timer = ++scheduledTimerCount;
       timers.set(timer, callback);
+      scheduleDelays.push(delay);
       return timer;
     },
     cancel(timer) {
@@ -426,6 +431,29 @@ describe('probeWindowPaint', () => {
     assert.equal(staleTimer, 1);
     probe.runTimers();
     assert.equal(probe.reloads, 1);
+  });
+
+  it('caps repeated timeout restarts at the original probe deadline', () => {
+    const probe = makeProbeWindow();
+    let currentTime = 0;
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      now: () => currentTime,
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    currentTime = 4_000;
+    run();
+    currentTime = 9_000;
+    run();
+    currentTime = 13_000;
+    run();
+
+    assert.deepEqual(probe.scheduleDelays, [5_000, 5_000, 5_000, 2_000]);
   });
 
   it('does not reload while the main frame is still loading', () => {
