@@ -276,9 +276,12 @@ describe('semanticRepoSearchService — assembleGithubQuery', () => {
     expect(assembleGithubQuery(queries)).toHaveLength(5);
   });
 
-  it('丢弃含大写 NOT（GitHub 布尔运算符）的整条查询', () => {
+  it('丢弃含布尔运算符（NOT/AND/OR）或 -/+ 前缀词的整条查询', () => {
     const queries: RepoSearchQuery[] = [
       { terms: ['password NOT vault'], scope: 'metadata' },
+      { terms: ['todo OR task'], scope: 'metadata' },
+      { terms: ['-vault'], scope: 'metadata' },
+      { terms: ['+sync'], scope: 'readme' },
       { terms: ['password vault'], scope: 'metadata' },
       { terms: ['password sync'], scope: 'metadata' },
       { terms: ['vault readme'], scope: 'readme' },

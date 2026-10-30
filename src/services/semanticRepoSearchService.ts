@@ -181,8 +181,8 @@ function topicWordSet(...sources: string[]): Set<string> {
 
 /**
  * 校验模型生成的语法槽并拼装 GitHub q。模型不能写限定符：这里只保留
- * 1-3 个内容词，按 scope 追加代码固定后缀。含大写 `NOT`（GitHub 布尔运算符）
- * 的查询整条丢弃；传入用户词时只保留至少命中一个主题词的查询。有效查询
+ * 1-3 个内容词，按 scope 追加代码固定后缀。含 GitHub 布尔运算符（NOT/AND/OR）
+ * 或以 `-`/`+` 开头的词的查询整条丢弃；传入用户词时只保留至少命中一个主题词的查询。有效查询
  * 少于 3 条，或缺少 ≥2 条 metadata / ≥1 条 readme 时返回 null，触发 grep 回退。
  */
 export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: string): string[] | null {
@@ -199,7 +199,7 @@ export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: strin
 
     const words: string[] = [];
     const seenWords = new Set<string>();
-    let hasBooleanNot = false;
+    let hasQuerySyntax = false;
     for (const raw of query.terms) {
       if (typeof raw !== 'string') continue;
       const cleaned = raw
@@ -208,8 +208,8 @@ export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: strin
         .trim();
       if (!cleaned) continue;
       for (const word of cleaned.split(' ')) {
-        if (word === 'NOT') {
-          hasBooleanNot = true;
+        if (/^(?:NOT|AND|OR)$/.test(word) || /^[-+]/.test(word)) {
+          hasQuerySyntax = true;
           continue;
         }
         const key = word.toLowerCase();
@@ -219,7 +219,7 @@ export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: strin
         }
       }
     }
-    if (hasBooleanNot) continue;
+    if (hasQuerySyntax) continue;
     if (words.length === 0 || words.length > 3) continue;
     if (words.every(word => GITHUB_GENERIC_WORDS.has(word.toLowerCase()))) continue;
     if (hasTopicFilter && topicWords && !words.some(word => topicWords.has(word.toLowerCase()))) continue;
