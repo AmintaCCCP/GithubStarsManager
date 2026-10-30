@@ -181,6 +181,7 @@ function createWindow() {
     if (!startHidden && !mainWindow.isVisible()) {
       mainWindow.show();
     }
+    if (mainWindow.isVisible()) scheduleWindowPaintProbe('did-finish-load');
   });
 
   // Renderer console errors that escaped every try/catch: record a capped

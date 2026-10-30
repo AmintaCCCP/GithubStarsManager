@@ -22,6 +22,7 @@ function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
 const paintProbeStates = new WeakMap();
 const lastPaintReloads = new WeakMap();
 const BUSY_RENDERER_CPU_PERCENT = 20;
+const BUSY_RENDERER_RETRY_LIMIT = 2;
 // Avoid beginFrameSubscription here: electron/electron#37412 can crash the GPU
 // process when frame capture overlaps window resizing. Two rAF turns still prove
 // that the renderer/compositor BeginFrame pipeline resumed after invalidate().
@@ -60,7 +61,7 @@ function probeWindowPaint({
     return;
   }
 
-  const state = { closed: false, timerDone: false, arm: null };
+  const state = { closed: false, timerDone: false, busyRetries: 0, arm: null };
   paintProbeStates.set(win, state);
   let timer;
 
@@ -108,6 +109,16 @@ function probeWindowPaint({
     const contentsGone = contents.isDestroyed();
     const loading = !contentsGone && contents.isLoadingMainFrame();
     const cpuPercent = contentsGone ? null : sampleCpuPercent();
+    if (focused && !contentsGone && loading) {
+      record({
+        level: 'info',
+        module: 'electron.window',
+        message: 'Window paint probe deferred while loading',
+        data: { reason },
+      });
+      close();
+      return;
+    }
     record({
       level: focused ? 'warn' : 'info',
       module: 'electron.window',
@@ -120,20 +131,27 @@ function probeWindowPaint({
       },
     });
     if (!focused || contentsGone) return;
-    if (loading) {
-      // The same pending probe can recover once loading completes.
-      state.arm();
-      return;
-    }
     if (cpuPercent !== null && cpuPercent >= BUSY_RENDERER_CPU_PERCENT) {
-      record({
-        level: 'info',
-        module: 'electron.window',
-        message: 'Window reload suppressed by renderer activity',
-        data: { reason, cpuPercent },
-      });
-      state.arm();
-      return;
+      state.busyRetries += 1;
+      if (state.busyRetries > BUSY_RENDERER_RETRY_LIMIT) {
+        record({
+          level: 'warn',
+          module: 'electron.window',
+          message: 'Renderer busy retry limit reached',
+          data: { reason, cpuPercent, busyRetries: state.busyRetries },
+        });
+      } else {
+        record({
+          level: 'info',
+          module: 'electron.window',
+          message: 'Window reload suppressed by renderer activity',
+          data: { reason, cpuPercent, busyRetries: state.busyRetries },
+        });
+        state.arm();
+        return;
+      }
+    } else {
+      state.busyRetries = 0;
     }
 
     const lastReloadAt = lastPaintReloads.get(win);

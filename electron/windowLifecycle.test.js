@@ -307,7 +307,7 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.reloads, 2);
   });
 
-  it('suppresses reload while the renderer process is active', () => {
+  it('reloads after the renderer stays busy past the retry limit', () => {
     const probe = makeProbeWindow();
     probe.cpuPercent = 75;
     const run = () => probeWindowPaint({
@@ -325,9 +325,36 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.reloads, 0);
     assert.equal(probe.records.at(-1).message, 'Window reload suppressed by renderer activity');
 
-    probe.cpuPercent = 0;
+    probe.runTimers();
+    assert.equal(probe.reloads, 0);
+
     probe.runTimers();
     assert.equal(probe.reloads, 1);
+    assert.deepEqual(
+      probe.records.slice(-2).map((entry) => entry.message),
+      ['Renderer busy retry limit reached', 'Reloading window after frozen compositor'],
+    );
+  });
+
+  it('reloads when the renderer becomes idle before the retry limit', () => {
+    const probe = makeProbeWindow();
+    probe.cpuPercent = 75;
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      getRendererCpuPercent: () => probe.cpuPercent,
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    probe.runTimers();
+    probe.cpuPercent = 0;
+    probe.runTimers();
+
+    assert.equal(probe.reloads, 1);
+    assert.equal(probe.records.at(-1).message, 'Reloading window after frozen compositor');
   });
 
   it('records a failed renderer probe without throwing', async () => {
@@ -403,7 +430,7 @@ describe('probeWindowPaint', () => {
 
   it('does not reload while the main frame is still loading', () => {
     const probe = makeProbeWindow({ loading: true });
-    probeWindowPaint({
+    const run = () => probeWindowPaint({
       win: probe.win,
       reason: 'show',
       record: (entry) => probe.records.push(entry),
@@ -411,12 +438,15 @@ describe('probeWindowPaint', () => {
       cancel: probe.cancel,
     });
 
+    run();
     probe.runTimers();
 
     assert.equal(probe.reloads, 0);
-    assert.equal(probe.records[0].data.loading, true);
+    assert.equal(probe.records[0].message, 'Window paint probe deferred while loading');
+    assert.equal(probe.timerCount, 0);
 
     probe.setState({ loading: false });
+    run();
     probe.runTimers();
     assert.equal(probe.reloads, 1);
   });
