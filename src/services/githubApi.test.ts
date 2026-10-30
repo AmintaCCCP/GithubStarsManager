@@ -1,7 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository, Release } from '../types';
 import { logger } from './logger';
-import { __reset403WarnStateForTest, BACKEND_PROXY_UNAUTHORIZED_ERROR, GITHUB_TOKEN_INVALID_ERROR, GitHubApiService } from './githubApi';
+import {
+  __reset403WarnStateForTest,
+  __setGithubSearchPacingForTest,
+  BACKEND_PROXY_UNAUTHORIZED_ERROR,
+  GITHUB_TOKEN_INVALID_ERROR,
+  GitHubApiService,
+} from './githubApi';
+
+beforeEach(() => {
+  __setGithubSearchPacingForTest(0);
+});
 
 const makeRepository = (id: number, fullName: string, overrides: Partial<Repository> = {}): Repository => {
   const [owner, name] = fullName.split('/');
@@ -726,5 +736,25 @@ describe('GitHubApiService search 端点限流隔离', () => {
     await service.getCurrentUser();
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('所有 /search/* 调用共享同一 token 的节流时间轴', async () => {
+    vi.useFakeTimers();
+    __setGithubSearchPacingForTest(2100);
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ total_count: 0, items: [] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const service = new GitHubApiService('token');
+
+    const rawSearch = service.searchRepositoriesRaw('terminal file manager', 25);
+    const issueSearch = service.searchRepositoryIssues('owner', 'repo', ['crash']);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(2100);
+    await Promise.all([rawSearch, issueSearch]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

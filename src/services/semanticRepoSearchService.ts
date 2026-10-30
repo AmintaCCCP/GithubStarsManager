@@ -53,8 +53,6 @@ const FALLBACK_QUERY_LIMIT = 3;
 const FALLBACK_INTERVAL_MS = 250;
 /** GitHub Search 单条查询返回数；5 条查询合并后截断到 RECALL_POOL_LIMIT。 */
 const GITHUB_SEARCH_PER_PAGE = 25;
-/** GitHub Search 串行请求间隔（未认证配额 10 req/min）。 */
-const GITHUB_SEARCH_INTERVAL_MS = 2100;
 /** 少于 3 条有效语法槽查询时视为生成失败，直接走 grep.app 回退。 */
 const GITHUB_QUERY_MIN_VALID = 3;
 const GITHUB_QUERY_MAX_VALID = 5;
@@ -77,8 +75,6 @@ export interface SemanticRepoSearchOptions {
   onFallback?: (reason: 'ai_failed' | 'unparseable' | 'ai_empty' | 'recall_empty') => void;
   /** 测试注入口：透传给 searchGrepApp 的 fetch 实现（生产不传，走默认 fetch） */
   fetchImpl?: typeof fetch;
-  /** 测试注入口：GitHub Search 查询间隔（生产不传，使用默认节流）。 */
-  githubSleepImpl?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 export interface GithubSearchRecallResult {
@@ -92,8 +88,6 @@ export interface GithubSearchRecallOptions {
   signal?: AbortSignal;
   /** 查询扩展词（与用户原始查询一起用于主题校验）。 */
   topicTerms?: string[];
-  /** 测试注入口：替换查询间等待。 */
-  sleepImpl?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 /** 聚合后的召回条目：为什么该仓库被召回（命中次数 / 样本文件 / 语言）。 */
@@ -253,17 +247,6 @@ export function assembleGithubQuery(queries: RepoSearchQuery[], userText?: strin
 }
 
 /**
- * 跨调用共享 GitHub Search 配额时间轴：每次请求在单线程内原子预占一个
- * 2.1s 时间片，重叠的窗口/调用因此串行排队，而不是各自 5 连发耗尽 30/min。
- */
-let nextGithubSearchAt = 0;
-
-/** 测试专用：重置共享配额时间轴。 */
-export function __resetGithubSearchPacingForTest(): void {
-  nextGithubSearchAt = 0;
-}
-
-/**
  * GitHub Search 召回：5 条语法槽查询串行执行，按 full_name 去重、查询优先级与
  * 返回位次排序并截断到 60。单条非限流失败跳过；403/429 与 abort 立即上抛；
  * 全部失败也上抛，由主流程回退到 grep.app。
@@ -274,7 +257,6 @@ export async function runGithubSearchRecall(
   options: GithubSearchRecallOptions,
 ): Promise<GithubSearchRecallResult> {
   const { api, aiService, signal } = options;
-  const wait = options.sleepImpl ?? sleep;
   const startTime = Date.now();
   const generated = await aiService.generateRepoSearchQueries(query, intent, signal);
   const assembled = assembleGithubQuery(generated, [query, ...(options.topicTerms ?? [])].join(' '));
@@ -289,21 +271,6 @@ export async function runGithubSearchRecall(
   const evidence = new Map<string, string>();
   let successfulRequests = 0;
   for (let i = 0; i < assembled.length; i++) {
-    // Atomically reserve the next shared slot before awaiting, so concurrent
-    // recalls queue behind each other instead of firing five requests in parallel.
-    const now = Date.now();
-    const scheduledAt = Math.max(now, nextGithubSearchAt);
-    const reservedUntil = scheduledAt + GITHUB_SEARCH_INTERVAL_MS;
-    nextGithubSearchAt = reservedUntil;
-    if (scheduledAt > now) {
-      try {
-        await wait(scheduledAt - now, signal);
-      } catch (error) {
-        // Aborted before the request: release the unused slot if no later call claimed it.
-        if (nextGithubSearchAt === reservedUntil) nextGithubSearchAt = scheduledAt;
-        throw error;
-      }
-    }
     const q = assembled[i];
     try {
       const repos = await api.searchRepositoriesRaw(q, GITHUB_SEARCH_PER_PAGE, signal);
@@ -759,7 +726,6 @@ export async function searchRepositoriesSemantically(
       aiService,
       signal,
       topicTerms: terms,
-      sleepImpl: options.githubSleepImpl,
     });
     if (githubRecall.aggregation.size > 0) {
       aggregation = githubRecall.aggregation;

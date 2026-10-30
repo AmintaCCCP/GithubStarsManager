@@ -3,7 +3,6 @@ import type { Repository } from '../types';
 import type { GitHubApiService, GitHubRepoDetailRead } from './githubApi';
 import type { AIService, RepoSearchQuery } from './aiService';
 import {
-  __resetGithubSearchPacingForTest,
   aggregateRecall,
   assembleGithubQuery,
   buildRecallRegex,
@@ -368,10 +367,6 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
   ];
 
   it('串行查询、按 full_name 去重、查询优先级降序并截断 60，同时记录查询证据', async () => {
-    __resetGithubSearchPacingForTest();
-    let clock = 1_000_000;
-    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
-    try {
     const first = Array.from({ length: 25 }, (_, i) => makeSearchRepo(`o/a-${i}`, 100 + i));
     const second = [
       ...Array.from({ length: 25 }, (_, i) => makeSearchRepo(`o/b-${i}`, 200 + i)),
@@ -385,13 +380,11 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       .mockResolvedValueOnce(first)
       .mockResolvedValueOnce(second)
       .mockResolvedValueOnce(third);
-    const sleepImpl = vi.fn(async (ms: number) => { clock += ms; });
     const ai = makeAi({ generateQueries: async () => generated });
 
     const result = await runGithubSearchRecall('terminal file manager', 'find a TUI file manager', {
       api: makeApi({ rawSearch }),
       aiService: ai,
-      sleepImpl,
     });
 
     expect(rawSearch).toHaveBeenCalledTimes(3);
@@ -401,17 +394,11 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       'file manager in:readme',
     ]);
     expect(rawSearch.mock.calls.every(call => call[1] === 25)).toBe(true);
-    expect(sleepImpl).toHaveBeenCalledTimes(2);
-    expect(sleepImpl.mock.calls.every(call => call[0] === 2100)).toBe(true);
     expect(result.aggregation.size).toBe(60);
     expect([...result.aggregation.values()][0]).toMatchObject({ repo: 'o/a-0', count: 75 });
     expect(result.aggregation.get('o/a-0')).toMatchObject({ repo: 'o/a-0', count: 75 });
     expect(result.aggregation.get('o/b-0')).toMatchObject({ repo: 'o/b-0', count: 50 });
     expect(result.evidence.get('o/a-0')).toBe('gh_search=terminal file manager in:name,description,topics');
-    } finally {
-      nowSpy.mockRestore();
-      __resetGithubSearchPacingForTest();
-    }
   });
 
   it('单条查询失败跳过，其余查询继续', async () => {
@@ -424,7 +411,6 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     const result = await runGithubSearchRecall('terminal file manager', '', {
       api: makeApi({ rawSearch }),
       aiService: ai,
-      sleepImpl: async () => {},
     });
     expect(rawSearch).toHaveBeenCalledTimes(3);
     expect([...result.aggregation.keys()]).toEqual(['o/ok-1', 'o/ok-2']);
@@ -435,7 +421,6 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     await expect(runGithubSearchRecall('terminal file manager', '', {
       api: makeApi({ rawSearch: allFailed }),
       aiService: makeAi({ generateQueries: async () => generated }),
-      sleepImpl: async () => {},
     })).rejects.toThrow(/all recall requests failed/);
 
     // 普通 403（权限/代理拒绝）不是配额信号：按失败跳过，全部失败后聚合上抛
@@ -443,7 +428,6 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     await expect(runGithubSearchRecall('terminal file manager', '', {
       api: makeApi({ rawSearch: forbidden }),
       aiService: makeAi({ generateQueries: async () => generated }),
-      sleepImpl: async () => {},
     })).rejects.toThrow(/all recall requests failed/);
     expect(forbidden).toHaveBeenCalledTimes(3);
 
@@ -452,7 +436,6 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
       await expect(runGithubSearchRecall('terminal file manager', '', {
         api: makeApi({ rawSearch: limited }),
         aiService: makeAi({ generateQueries: async () => generated }),
-        sleepImpl: async () => {},
       })).rejects.toThrow(message);
       expect(limited).toHaveBeenCalledTimes(1);
     }
@@ -474,39 +457,6 @@ describe('semanticRepoSearchService — runGithubSearchRecall', () => {
     })).rejects.toMatchObject({ name: 'AbortError' });
   });
 
-  it('abort 等待时回滚未使用的节流时隙', async () => {
-    __resetGithubSearchPacingForTest();
-    let clock = 1_000_000;
-    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
-    try {
-      let sleepCalls = 0;
-      const abortingSleep = vi.fn(async (ms: number) => {
-        sleepCalls += 1;
-        if (sleepCalls === 1) {
-          clock += ms;
-          return;
-        }
-        throw new DOMException('Aborted', 'AbortError');
-      });
-      await expect(runGithubSearchRecall('terminal file manager', '', {
-        api: makeApi({ rawSearch: vi.fn(async () => []) }),
-        aiService: makeAi({ generateQueries: async () => generated }),
-        sleepImpl: abortingSleep,
-      })).rejects.toMatchObject({ name: 'AbortError' });
-
-      const nextSleep = vi.fn(async (ms: number) => { clock += ms; });
-      await runGithubSearchRecall('terminal file manager', '', {
-        api: makeApi({ rawSearch: vi.fn(async () => []) }),
-        aiService: makeAi({ generateQueries: async () => generated }),
-        sleepImpl: nextSleep,
-      });
-      // 不回滚时会残留第三个未发送请求的时隙，首个等待会变成 4200ms。
-      expect(nextSleep.mock.calls[0][0]).toBe(2100);
-    } finally {
-      nowSpy.mockRestore();
-      __resetGithubSearchPacingForTest();
-    }
-  });
 });
 
 // ---------- 管道 ----------
@@ -545,7 +495,6 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
 
     const result = await searchRepositoriesSemantically(makeApi({ rawSearch }), ai, 'terminal file manager', {
       fetchImpl,
-      githubSleepImpl: async () => {},
     });
 
     expect(fetchImpl).not.toHaveBeenCalled();
@@ -575,7 +524,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
       makeApi({ rawSearch: emptyGithub }),
       makeAi({ generateQueries: async () => generated, select: emptySelect }),
       'terminal file manager',
-      { fetchImpl, githubSleepImpl: async () => {} },
+      { fetchImpl },
     );
     expect(emptyGithub).toHaveBeenCalledTimes(3);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -594,7 +543,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
       makeApi({ rawSearch: failedGithub }),
       makeAi({ generateQueries: async () => generated }),
       'terminal file manager',
-      { fetchImpl: fallbackFetch, githubSleepImpl: async () => {} },
+      { fetchImpl: fallbackFetch },
     );
     expect(failedGithub).toHaveBeenCalledTimes(3);
     expect(fallbackResult.repos.map(repo => repo.full_name)).toEqual(['grep/fallback']);
@@ -619,7 +568,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
         makeApi({ rawSearch: limited }),
         makeAi({ generateQueries: async () => generated }),
         'terminal file manager',
-        { fetchImpl, githubSleepImpl: async () => {} },
+        { fetchImpl },
       );
       expect(fetchImpl).toHaveBeenCalled();
       expect(result.repos.map(repo => repo.full_name)).toEqual(['grep/fallback']);
@@ -651,7 +600,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
       makeApi({ rawSearch, graphql }),
       makeAi({ generateQueries: async () => generated }),
       'terminal file manager',
-      { fetchImpl, githubSleepImpl: async () => {}, onFallback },
+      { fetchImpl, onFallback },
     );
     expect(rawSearch).toHaveBeenCalledTimes(3);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -696,7 +645,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
         select: async () => null,
       }),
       'terminal file manager',
-      { fetchImpl, githubSleepImpl: async () => {} },
+      { fetchImpl },
     );
 
     expect(result.repos.map(repo => repo.full_name)).toEqual(['specific/terminal', 'noise/generic']);
@@ -715,7 +664,7 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
       makeApi({ rawSearch, graphql, rest }),
       makeAi({ generateQueries: async () => generated }),
       'terminal file manager',
-      { githubSleepImpl: async () => {} },
+      {},
     )).rejects.toThrow('GitHub API error: 429');
     expect(rest).not.toHaveBeenCalled();
   });

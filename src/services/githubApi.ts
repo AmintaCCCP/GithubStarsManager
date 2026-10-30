@@ -32,6 +32,7 @@ import { createCombinedAbortController } from '../utils/abortUtils';
 const REQUEST_TIMEOUT_MS = 30_000;
 const TIMEOUT_ERROR_MESSAGE = `GitHub API request timed out after ${REQUEST_TIMEOUT_MS}ms`;
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+const GITHUB_SEARCH_INTERVAL_MS = 2100;
 // 发布刷新批次的总等待上限：单请求最坏约 127s（4 次 ×30s + 退避），
 // 没有批次上限时持续断网会让刷新一直占住。超预算后跳过剩余仓库，
 // 已完成的仓库结果照常返回，跳过的仓库不推进 watermark、下次刷新重试。
@@ -57,6 +58,35 @@ function delayWithAbort(delayMs: number, signal: AbortSignal | undefined): Promi
     signal?.addEventListener('abort', onAbort);
     if (signal?.aborted) onAbort();
   });
+}
+
+// Search has a separate, per-token quota bucket. Keep every /search/* caller
+// on one timeline so discovery recall cannot race issue search or other tools.
+let githubSearchPacingIntervalMs = GITHUB_SEARCH_INTERVAL_MS;
+const nextGithubSearchAtByToken = new Map<string, number>();
+
+/** Test hook: disable pacing for ordinary unit tests, or install a test interval. */
+export function __setGithubSearchPacingForTest(intervalMs: number): void {
+  githubSearchPacingIntervalMs = Math.max(0, intervalMs);
+  nextGithubSearchAtByToken.clear();
+}
+
+async function waitForGithubSearchSlot(token: string, signal?: AbortSignal): Promise<void> {
+  if (githubSearchPacingIntervalMs <= 0) return;
+  const now = Date.now();
+  const scheduledAt = Math.max(now, nextGithubSearchAtByToken.get(token) ?? 0);
+  const reservedUntil = scheduledAt + githubSearchPacingIntervalMs;
+  nextGithubSearchAtByToken.set(token, reservedUntil);
+  if (scheduledAt <= now) return;
+  try {
+    await delayWithAbort(scheduledAt - now, signal);
+  } catch (error) {
+    // Release the unused slot if no later request has claimed it.
+    if (nextGithubSearchAtByToken.get(token) === reservedUntil) {
+      nextGithubSearchAtByToken.set(token, scheduledAt);
+    }
+    throw error;
+  }
 }
 
 interface GitHubContentResponse {
@@ -489,6 +519,9 @@ export class GitHubApiService {
     // Search API 有独立配额桶（认证态 30/min），核心桶的剩余量/重置时间对它不适用：
     // 共用状态会让多查询召回每条都等满一个重置窗口，也会让 search 的剩余量污染核心桶。
     const isSearchEndpoint = endpoint.startsWith('/search/');
+    if (isSearchEndpoint) {
+      await waitForGithubSearchSlot(this.token, signal);
+    }
 
     // Check rate limit before making request
     if (!isSearchEndpoint && this.rateLimitRemaining !== null && this.rateLimitRemaining < 100 && this.rateLimitReset !== null) {
