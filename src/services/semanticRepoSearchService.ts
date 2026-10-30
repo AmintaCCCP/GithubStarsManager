@@ -837,6 +837,7 @@ export async function searchRepositoriesSemantically(
     const grepRecall = await recallRepositories(trimmed, terms, { signal, fetchImpl });
     if (grepRecall.aggregation.size > 0) {
       githubEvidence = null;
+      specificRepoKeys = grepRecall.specificRepoKeys;
       candidates = await buildCandidates(grepRecall.aggregation, grepRecall.specificRepoKeys);
     }
   }

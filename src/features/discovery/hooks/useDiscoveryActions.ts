@@ -44,8 +44,27 @@ const getChannelRequestSignature = (state: ReturnType<typeof selectDiscoveryView
 // tab with the same query/mode does not restart a completed or cancelled search.
 let lastSettledSearchKey: string | null = null;
 
-export const buildDiscoverySearchKey = (query: string, mode: string, owner: string | null = ''): string =>
-  JSON.stringify([owner, query.trim(), mode]);
+export interface DiscoverySearchKeyOptions {
+  owner?: string | null;
+  platform?: string;
+  language?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}
+
+export const buildDiscoverySearchKey = (
+  query: string,
+  mode: string,
+  options: DiscoverySearchKeyOptions = {},
+): string => JSON.stringify([
+  options.owner ?? '',
+  query.trim(),
+  mode,
+  options.platform ?? '',
+  options.language ?? '',
+  options.sortBy ?? '',
+  options.sortOrder ?? '',
+]);
 
 export const getLastSettledSearchKey = (): string | null => lastSettledSearchKey;
 
@@ -81,11 +100,15 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     return () => {
       optimizerRef.current?.abort();
       optimizerRef.current = null;
+      // Revoke this instance's loading ownership before aborting so a pending
+      // request cannot clear a replacement instance's loading state in finally.
+      channelLoadingVersionRef.current = {};
       // 账号切换/卸载时中止外部频道仍在途的 GitHub 详情请求
       for (const [channelId, controller] of Object.entries(controllers)) {
         // Invalidate before aborting so the aborted request cannot write empty results.
         versions[channelId as DiscoveryChannelId] = (versions[channelId as DiscoveryChannelId] ?? 0) + 1;
         controller?.abort();
+        useAppStore.getState().setDiscoveryLoading(channelId as DiscoveryChannelId, false);
       }
       channelRequestControllersRef.current = {};
     };
@@ -328,7 +351,13 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
         lastSettledSearchKey = buildDiscoverySearchKey(
           currentState.discoverySearchQuery,
           currentState.discoverySearchMode,
-          currentState.githubToken,
+          {
+            owner: currentState.githubToken,
+            platform: currentState.discoveryPlatform,
+            language: currentState.discoveryLanguage,
+            sortBy: currentState.discoverySortBy,
+            sortOrder: currentState.discoverySortOrder,
+          },
         );
       }
       if (append && !replacesOnAppend && scrollContainerRef.current) {
@@ -479,7 +508,13 @@ export const useDiscoveryActions = (scrollContainerRef: RefObject<HTMLDivElement
     channelRequestControllersRef.current['search']?.abort();
     delete channelRequestControllersRef.current['search'];
     const store = useAppStore.getState();
-    lastSettledSearchKey = buildDiscoverySearchKey(store.discoverySearchQuery, store.discoverySearchMode, store.githubToken);
+    lastSettledSearchKey = buildDiscoverySearchKey(store.discoverySearchQuery, store.discoverySearchMode, {
+      owner: store.githubToken,
+      platform: store.discoveryPlatform,
+      language: store.discoveryLanguage,
+      sortBy: store.discoverySortBy,
+      sortOrder: store.discoverySortOrder,
+    });
     store.setDiscoverySearchPhase(null);
     store.setDiscoverySearchPhaseDetail(null);
     store.setDiscoveryLoading('search', false);

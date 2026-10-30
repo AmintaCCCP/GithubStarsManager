@@ -661,14 +661,30 @@ export const DiscoveryView: React.FC = React.memo(() => {
   useEffect(() => {
     if (selectedDiscoveryChannel !== 'search') return;
     if (!discoverySearchQuery.trim()) return;
-    const key = buildDiscoverySearchKey(discoverySearchQuery, discoverySearchMode, githubToken);
+    const key = buildDiscoverySearchKey(discoverySearchQuery, discoverySearchMode, {
+      owner: githubToken,
+      platform: discoveryPlatform,
+      language: discoveryLanguage,
+      sortBy: discoverySortBy,
+      sortOrder: discoverySortOrder,
+    });
     if (lastAutoSearchKeyRef.current === key) return;
     lastAutoSearchKeyRef.current = key;
     refreshChannel('search', 1, false);
     // StrictMode replays effects after cleanup; re-arm so the replay can restart
     // the request that useDiscoveryActions just aborted.
     return () => { lastAutoSearchKeyRef.current = null; };
-  }, [selectedDiscoveryChannel, discoverySearchQuery, discoverySearchMode, githubToken, refreshChannel]);
+  }, [
+    selectedDiscoveryChannel,
+    discoverySearchQuery,
+    discoverySearchMode,
+    githubToken,
+    discoveryPlatform,
+    discoveryLanguage,
+    discoverySortBy,
+    discoverySortOrder,
+    refreshChannel,
+  ]);
 
   // 趋势时间范围改变时刷新数据
   useEffect(() => {

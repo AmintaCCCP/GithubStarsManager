@@ -307,7 +307,8 @@ vi.mock('./features/discovery/hooks/useDiscoveryActions', async () => {
   const { makeT } = await import('./i18n/useT');
   const t = makeT('zh', 'discovery');
   return {
-    buildDiscoverySearchKey: (query: string, mode: string, owner: string | null = '') => JSON.stringify([owner, query.trim(), mode]),
+    buildDiscoverySearchKey: (query: string, mode: string, options: { owner?: string | null } = {}) =>
+      JSON.stringify([options.owner ?? '', query.trim(), mode]),
     getLastSettledSearchKey: () => null,
     useDiscoveryActions: () => ({ ...mocks.discoveryActions, t }),
   };

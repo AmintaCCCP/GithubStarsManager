@@ -82,7 +82,13 @@ describe('useDiscoveryActions — 搜索生命周期', () => {
     expect(getLastSettledSearchKey()).toBe(buildDiscoverySearchKey(
       'markdown editor',
       'keyword',
-      useAppStore.getState().githubToken ?? '',
+      {
+        owner: useAppStore.getState().githubToken,
+        platform: useAppStore.getState().discoveryPlatform,
+        language: useAppStore.getState().discoveryLanguage,
+        sortBy: useAppStore.getState().discoverySortBy,
+        sortOrder: useAppStore.getState().discoverySortOrder,
+      },
     ));
 
     await act(async () => { useAppStore.getState().setDiscoverySearchMode('semantic'); });
@@ -120,7 +126,13 @@ describe('useDiscoveryActions — 搜索生命周期', () => {
     expect(getLastSettledSearchKey()).toBe(buildDiscoverySearchKey(
       'markdown editor',
       'semantic',
-      useAppStore.getState().githubToken ?? '',
+      {
+        owner: useAppStore.getState().githubToken,
+        platform: useAppStore.getState().discoveryPlatform,
+        language: useAppStore.getState().discoveryLanguage,
+        sortBy: useAppStore.getState().discoverySortBy,
+        sortOrder: useAppStore.getState().discoverySortOrder,
+      },
     ));
   });
 
@@ -167,5 +179,65 @@ describe('useDiscoveryActions — 搜索生命周期', () => {
 
     expect(mocks.searchSemantically).not.toHaveBeenCalled();
     expect(mocks.searchRepositories).not.toHaveBeenCalled();
+  });
+
+  it('搜索键包含所有会改变请求的筛选条件', () => {
+    const base = buildDiscoverySearchKey('markdown editor', 'semantic', {
+      owner: 'token',
+      platform: 'GitHub',
+      language: 'TypeScript',
+      sortBy: 'BestMatch',
+      sortOrder: 'Descending',
+    });
+    const variants = [
+      buildDiscoverySearchKey('markdown editor', 'semantic', {
+        owner: 'token', platform: 'GitLab', language: 'TypeScript', sortBy: 'BestMatch', sortOrder: 'Descending',
+      }),
+      buildDiscoverySearchKey('markdown editor', 'semantic', {
+        owner: 'token', platform: 'GitHub', language: 'Go', sortBy: 'BestMatch', sortOrder: 'Descending',
+      }),
+      buildDiscoverySearchKey('markdown editor', 'semantic', {
+        owner: 'token', platform: 'GitHub', language: 'TypeScript', sortBy: 'Stars', sortOrder: 'Descending',
+      }),
+      buildDiscoverySearchKey('markdown editor', 'semantic', {
+        owner: 'token', platform: 'GitHub', language: 'TypeScript', sortBy: 'BestMatch', sortOrder: 'Ascending',
+      }),
+    ];
+
+    expect(new Set([base, ...variants]).size).toBe(5);
+  });
+
+  it('卸载后的旧请求不能清除新实例搜索的加载态', async () => {
+    let resolveOld!: (value: typeof emptyPage) => void;
+    mocks.searchRepositories.mockImplementationOnce(() => new Promise(resolve => {
+      resolveOld = resolve;
+    }));
+    setupStore('keyword');
+    const oldHook = renderActions();
+    let oldPending!: Promise<void>;
+    act(() => { oldPending = oldHook.result.current.refreshChannel('search', 1, false); });
+    await waitFor(() => expect(useAppStore.getState().discoveryIsLoading.search).toBe(true));
+    oldHook.unmount();
+
+    let resolveNew!: (value: typeof emptyPage) => void;
+    mocks.searchRepositories.mockImplementationOnce(() => new Promise(resolve => {
+      resolveNew = resolve;
+    }));
+    const newHook = renderActions();
+    let newPending!: Promise<void>;
+    act(() => { newPending = newHook.result.current.refreshChannel('search', 1, false); });
+    await waitFor(() => expect(useAppStore.getState().discoveryIsLoading.search).toBe(true));
+
+    await act(async () => {
+      resolveOld(emptyPage);
+      await oldPending;
+    });
+    expect(useAppStore.getState().discoveryIsLoading.search).toBe(true);
+
+    await act(async () => {
+      resolveNew(emptyPage);
+      await newPending;
+    });
+    newHook.unmount();
   });
 });

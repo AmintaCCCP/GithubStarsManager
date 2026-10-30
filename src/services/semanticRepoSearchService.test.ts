@@ -660,6 +660,48 @@ describe('semanticRepoSearchService — searchRepositoriesSemantically', () => {
     expect(onFallback).not.toHaveBeenCalledWith('recall_empty');
   });
 
+  it('grep.app 重试后的高具体性命中在词法兜底中优先于噪声', async () => {
+    const generated: RepoSearchQuery[] = [
+      { terms: ['terminal file manager'], scope: 'metadata' },
+      { terms: ['terminal manager'], scope: 'metadata' },
+      { terms: ['file manager'], scope: 'readme' },
+    ];
+    const rawSearch = vi.fn()
+      .mockResolvedValueOnce([makeSearchRepo('o/gh-a', 10)])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const graphql = vi.fn(async (fullNames: string[]) => new Map<string, GitHubRepoDetailRead | null>(
+      fullNames.map(name => [name.toLowerCase(), name.startsWith('o/gh-') ? null : makeDetail(name, 500)]),
+    ));
+    const { fetchImpl } = installGrepFetch([
+      grepResponse(grepResult({
+        total: 100,
+        repoFacets: [
+          { val: 'noise/generic', count: 100 },
+          { val: 'specific/terminal', count: 1 },
+        ],
+        hits: [hit('noise/generic', 'README.md'), hit('specific/terminal', 'README.md')],
+      })),
+      grepResponse(grepResult({
+        total: 1,
+        repoFacets: [{ val: 'specific/terminal', count: 1 }],
+        hits: [hit('specific/terminal', 'README.md')],
+      })),
+    ]);
+    const result = await searchRepositoriesSemantically(
+      makeApi({ rawSearch, graphql }),
+      makeAi({
+        expand: async () => ({ terms: ['terminal file manager'], intent: 'find a terminal file manager' }),
+        generateQueries: async () => generated,
+        select: async () => null,
+      }),
+      'terminal file manager',
+      { fetchImpl, githubSleepImpl: async () => {} },
+    );
+
+    expect(result.repos.map(repo => repo.full_name)).toEqual(['specific/terminal', 'noise/generic']);
+  });
+
   it('GraphQL 429（无 statusText）按限流上抛，不回退 REST', async () => {
     const generated: RepoSearchQuery[] = [
       { terms: ['terminal file manager'], scope: 'metadata' },

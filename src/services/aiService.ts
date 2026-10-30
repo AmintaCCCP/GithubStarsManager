@@ -2777,9 +2777,9 @@ Output only the JSON object.`;
         system,
         user,
         temperature: 0.1,
-        maxTokens: (this.config.reasoningEffort || this.getApiType() === 'gemini')
-          ? AIService.RERANKING_MAX_TOKENS
-          : 2000,
+        // Custom OpenAI-compatible reasoning endpoints may spend a smaller
+        // budget entirely on reasoning_content and return no JSON content.
+        maxTokens: AIService.RERANKING_MAX_TOKENS,
         signal,
       });
       // The model may echo the prompt's example object before the real reply;

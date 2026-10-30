@@ -735,7 +735,7 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
       { terms: ['sixth query'], scope: 'any' },
     ]);
     expect(body?.temperature).toBe(0.1);
-    expect(body?.max_tokens).toBe(2000);
+    expect(body?.max_tokens).toBe(4096);
     const userPrompt = body?.messages[1].content ?? '';
     expect(userPrompt).toContain('至少 2 条 metadata');
     expect(userPrompt).toContain('至少 1 条 readme');
@@ -763,7 +763,10 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
       .resolves.toEqual([{ terms: ['terminal manager'], scope: 'metadata' }]);
   });
 
-  it('reasoning 模型使用更大的 max_tokens', async () => {
+  it.each([
+    ['普通端点', makeConfig()],
+    ['reasoning 兼容端点', { ...makeConfig(), reasoningEffort: 'medium' }],
+  ])('%s统一使用 4096 max_tokens', async (_label, config) => {
     const fetchMock = mockFetch();
     let maxTokens: number | undefined;
     fetchMock.mockImplementationOnce(async (_url, init) => {
@@ -771,8 +774,7 @@ describe('AIService.generateRepoSearchQueries — GitHub 语法槽', () => {
       return chatResponse('{"queries":[{"terms":["x"],"scope":"any"}]}');
     });
 
-    await new AIService({ ...makeConfig(), reasoningEffort: 'medium' } as never, 'zh')
-      .generateRepoSearchQueries('q', 'i');
+    await new AIService(config as never, 'zh').generateRepoSearchQueries('q', 'i');
     expect(maxTokens).toBe(4096);
   });
 
