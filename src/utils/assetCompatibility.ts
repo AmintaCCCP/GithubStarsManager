@@ -415,6 +415,8 @@ interface Classified {
   hasForeignArchitecture: boolean;
   incompatibleDetail?: string;
   nonInstallable?: NonInstallableReason;
+  /** Platform stays unknown on purpose; sibling/repo inference must not fill it in. */
+  ambiguousPlatform?: boolean;
   suppressed?: boolean;
   emulated?: boolean;
   confidence: 'high' | 'medium' | 'low';
@@ -541,6 +543,7 @@ function classifyLink(
     const ambiguousAlpineApk = decisivePlatform === 'android'
       && base.packageInfo?.packageType === 'apk' && devicePlatform === 'linux';
     base.platform = ambiguousAlpineApk ? null : decisivePlatform;
+    base.ambiguousPlatform = ambiguousAlpineApk;
     if (!ambiguousAlpineApk) base.platformSource = 'extension';
   } else {
     const fromMime = platformFromContentType(link.contentType, extension);
@@ -742,7 +745,7 @@ export function evaluateCurrentSystem(
   }
 
   for (const entry of classified) {
-    if (entry.nonInstallable || entry.incompatibleDetail) continue;
+    if (entry.nonInstallable || entry.incompatibleDetail || entry.ambiguousPlatform) continue;
     if (!entry.platform) {
       if (knownPlatforms.size === 1) {
         entry.platform = [...knownPlatforms][0];
@@ -760,7 +763,8 @@ export function evaluateCurrentSystem(
   if (repo.length > 0) {
     const repoSet = new Set(repo.map((entry) => entry.platform));
     for (const entry of classified) {
-      if (entry.nonInstallable || entry.incompatibleDetail || entry.platform) continue;
+      if (entry.nonInstallable || entry.incompatibleDetail || entry.platform
+        || entry.ambiguousPlatform) continue;
       if (device.platform && repoSet.size === 1 && repoSet.has(device.platform)) {
         entry.platform = device.platform;
         entry.platformSource = repo[0].source;

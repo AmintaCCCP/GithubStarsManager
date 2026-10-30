@@ -309,6 +309,12 @@ describe('evaluateCurrentSystem — synthetic edge cases', () => {
     expect(evaluate(['tool-1.0.apk'], device('android', 'arm64')).verdicts.get(0))
       .toMatchObject({ kind: 'compatible', platform: 'android' });
     expect(evaluate(['tool-1.0.apk'], device('windows', 'x64')).matchesRelease).toBe(false);
+
+    // A Linux sibling must not turn the ambiguous .apk into a Linux asset.
+    const mixed = evaluate(['tool-linux-amd64.tar.gz', 'mobile.apk'], device('linux', 'x64'));
+    expect(mixed.orderedIndexes).toEqual([0, 1]);
+    expect(mixed.verdicts.get(1)).toMatchObject({ kind: 'unknown' });
+    expect(mixed.badges.get(1)).toBe('unverified');
   });
 
   it('does not treat 64bit as x64 when a different architecture is declared', () => {
