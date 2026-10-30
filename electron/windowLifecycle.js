@@ -18,18 +18,27 @@ function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
 }
 
 const activePaintProbes = new WeakSet();
+const lastPaintReloads = new WeakMap();
+// Avoid beginFrameSubscription here: electron/electron#37412 can crash the GPU
+// process when frame capture overlaps window resizing. Two rAF turns still prove
+// that the renderer/compositor BeginFrame pipeline resumed after invalidate().
+const FRAME_PROBE_SCRIPT = `new Promise((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+})`;
 
 /**
  * Windows can resume a visible window without resuming its compositor (#533).
- * Force one repaint, then verify a presentation frame actually arrives. Reload
- * only when the window is still focused; an occluded window is expected to
- * stop producing frames and must not lose renderer state.
+ * Force one repaint, then verify requestAnimationFrame resumes. Reload only
+ * when the window is still focused; an occluded window is expected to stop
+ * producing frames and must not lose renderer state.
  */
 function probeWindowPaint({
   win,
   reason = 'unknown',
   record = () => {},
   timeoutMs = 1500,
+  reloadCooldownMs = 60_000,
+  now = Date.now,
   schedule = setTimeout,
   cancel = clearTimeout,
 }) {
@@ -45,14 +54,11 @@ function probeWindowPaint({
     finished = true;
     activePaintProbes.delete(win);
     cancel(timer);
-    try {
-      contents.endFrameSubscription();
-    } catch { /* subscription may already be gone */ }
     return true;
   };
   activePaintProbes.add(win);
 
-  const timer = schedule(() => {
+  const handleFailure = (kind, error) => {
     if (finished) return;
     const stillVisible = !win.isDestroyed() && win.isVisible() && !win.isMinimized();
     const focused = stillVisible && win.isFocused();
@@ -62,11 +68,31 @@ function probeWindowPaint({
     record({
       level: focused ? 'warn' : 'info',
       module: 'electron.window',
-      message: 'Window paint probe timed out',
-      data: { reason, focused, loading },
+      message: kind === 'timeout' ? 'Window paint probe timed out' : 'Window paint probe failed',
+      data: {
+        reason,
+        focused,
+        loading,
+        ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
+      },
     });
-    if (!focused || loading || contentsGone) return;
+    if (kind !== 'timeout' || !focused || loading || contentsGone) return;
 
+    const lastReloadAt = lastPaintReloads.get(win);
+    const cooldownRemainingMs = lastReloadAt === undefined
+      ? 0
+      : reloadCooldownMs - (now() - lastReloadAt);
+    if (cooldownRemainingMs > 0) {
+      record({
+        level: 'info',
+        module: 'electron.window',
+        message: 'Window reload suppressed by cooldown',
+        data: { reason, cooldownRemainingMs },
+      });
+      return;
+    }
+
+    lastPaintReloads.set(win, now());
     record({
       level: 'warn',
       module: 'electron.window',
@@ -83,21 +109,18 @@ function probeWindowPaint({
         data: { reason, error: error instanceof Error ? error.message : String(error) },
       });
     }
-  }, timeoutMs);
+  };
+
+  const timer = schedule(() => handleFailure('timeout'), timeoutMs);
 
   try {
-    contents.beginFrameSubscription(false, () => {
-      finish();
-    });
     contents.invalidate();
+    contents.executeJavaScript(FRAME_PROBE_SCRIPT, false).then(
+      () => finish(),
+      (error) => handleFailure('probe-failed', error),
+    );
   } catch (error) {
-    finish();
-    record({
-      level: 'warn',
-      module: 'electron.window',
-      message: 'Window paint recovery failed',
-      data: { reason, error: error instanceof Error ? error.message : String(error) },
-    });
+    handleFailure('probe-failed', error);
   }
 }
 

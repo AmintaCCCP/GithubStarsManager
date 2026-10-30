@@ -104,18 +104,19 @@ function makeProbeWindow({
   loading = false,
   reloadError = null,
 } = {}) {
-  const subscriptions = [];
   const timers = [];
   const records = [];
   let reloads = 0;
   let invalidations = 0;
+  let resolveFrame;
+  let rejectFrame;
   const win = {
     webContents: {
-      beginFrameSubscription(_onlyDirty, callback) {
-        subscriptions.push(callback);
-      },
-      endFrameSubscription() {
-        subscriptions.length = 0;
+      executeJavaScript() {
+        return new Promise((resolve, reject) => {
+          resolveFrame = resolve;
+          rejectFrame = reject;
+        });
       },
       invalidate() {
         invalidations += 1;
@@ -140,12 +141,17 @@ function makeProbeWindow({
   return {
     win,
     records,
-    subscriptions,
     get reloads() {
       return reloads;
     },
     get invalidations() {
       return invalidations;
+    },
+    get resolveFrame() {
+      return resolveFrame;
+    },
+    get rejectFrame() {
+      return rejectFrame;
     },
     schedule(callback) {
       timers.push(callback);
@@ -159,7 +165,7 @@ function makeProbeWindow({
 }
 
 describe('probeWindowPaint', () => {
-  it('finishes cleanly when the forced repaint produces a frame', () => {
+  it('finishes cleanly when requestAnimationFrame resumes', async () => {
     const probe = makeProbeWindow();
     probeWindowPaint({
       win: probe.win,
@@ -169,16 +175,16 @@ describe('probeWindowPaint', () => {
       cancel: probe.cancel,
     });
 
-    assert.equal(probe.subscriptions.length, 1);
     assert.equal(probe.invalidations, 1);
-    probe.subscriptions[0]();
+    probe.resolveFrame();
+    await Promise.resolve();
     probe.runTimers();
 
     assert.deepEqual(probe.records, []);
     assert.equal(probe.reloads, 0);
   });
 
-  it('does not overlap frame subscriptions for the same window', () => {
+  it('does not overlap probes for the same window', async () => {
     const probe = makeProbeWindow();
     const run = () => probeWindowPaint({
       win: probe.win,
@@ -191,12 +197,11 @@ describe('probeWindowPaint', () => {
     run();
     run();
     assert.equal(probe.invalidations, 1);
-    assert.equal(probe.subscriptions.length, 1);
 
-    probe.subscriptions[0]();
+    probe.resolveFrame();
+    await Promise.resolve();
     run();
     assert.equal(probe.invalidations, 2);
-    assert.equal(probe.subscriptions.length, 1);
   });
 
   it('reloads a focused window when no frame arrives', () => {
@@ -216,6 +221,52 @@ describe('probeWindowPaint', () => {
       probe.records.map((entry) => entry.message),
       ['Window paint probe timed out', 'Reloading window after frozen compositor'],
     );
+  });
+
+  it('does not reload repeatedly during the cooldown window', () => {
+    const probe = makeProbeWindow();
+    let currentTime = 1_000;
+    const run = () => probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      now: () => currentTime,
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    run();
+    probe.runTimers();
+    assert.equal(probe.reloads, 1);
+
+    currentTime += 1_000;
+    run();
+    probe.runTimers();
+    assert.equal(probe.reloads, 1);
+    assert.equal(probe.records.at(-1).message, 'Window reload suppressed by cooldown');
+
+    currentTime += 60_000;
+    run();
+    probe.runTimers();
+    assert.equal(probe.reloads, 2);
+  });
+
+  it('records a failed renderer probe without throwing', async () => {
+    const probe = makeProbeWindow();
+    probeWindowPaint({
+      win: probe.win,
+      reason: 'focus',
+      record: (entry) => probe.records.push(entry),
+      schedule: probe.schedule,
+      cancel: probe.cancel,
+    });
+
+    probe.rejectFrame(new Error('renderer gone'));
+    await Promise.resolve();
+
+    assert.equal(probe.records[0].message, 'Window paint probe failed');
+    assert.equal(probe.records[0].data.error, 'renderer gone');
+    assert.equal(probe.reloads, 0);
   });
 
   it('does not reload an unfocused, occluded window', () => {
