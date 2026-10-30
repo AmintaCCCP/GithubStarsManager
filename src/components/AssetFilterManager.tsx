@@ -4,7 +4,7 @@
 
 import { useT } from '../i18n/useT';
 import React, { useState, useMemo } from 'react';
-import { Plus, PencilLine, Trash2, Filter, X, Package } from 'lucide-react';
+import { Plus, PencilLine, Trash2, Filter, X, Package, Lock, MonitorSmartphone } from 'lucide-react';
 import { SiAndroid, SiApple, SiLinux } from '@icons-pack/react-simple-icons';
 import { SiWindows } from './SiWindows';
 import { useAppStore } from '../store/useAppStore';
@@ -13,6 +13,10 @@ import { FilterModal } from './FilterModal';
 import { AssetFilter } from '../types';
 import { useDialog } from '../hooks/useDialog';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { getPlatformIcon } from './platformMeta';
+import type { InstallablePlatform } from '../types/installableAsset';
+import { BUILTIN_CURRENT_SYSTEM_FILTER_ID } from '../constants/builtinFilters';
 
 // 图标映射。
 // 存量数据里持久化的是 lucide 图标名（见 store/schema.ts PRESET_FILTER_ICONS），
@@ -38,12 +42,20 @@ interface AssetFilterManagerProps {
   selectedFilters: string[];
   onFilterToggle: (filterId: string) => void;
   onClearFilters: () => void;
+  currentSystemFilter?: {
+    id: typeof BUILTIN_CURRENT_SYSTEM_FILTER_ID;
+    status: 'ready' | 'detecting-arch' | 'arch-unknown' | 'unsupported';
+    platform: InstallablePlatform | null;
+    label: string;
+    matchCount?: number;
+  };
 }
 
 export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   selectedFilters,
   onFilterToggle,
-  onClearFilters
+  onClearFilters,
+  currentSystemFilter,
 }) => {
   const { assetFilters, addAssetFilter, updateAssetFilter, deleteAssetFilter } = useAppStore(useShallow((state) => ({
     assetFilters: state.assetFilters,
@@ -105,6 +117,12 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
   };
 
   const t = useT('app');
+  const CurrentSystemIcon = currentSystemFilter?.platform
+    ? getPlatformIcon(currentSystemFilter.platform)
+    : MonitorSmartphone;
+  const currentSystemSelected = !!currentSystemFilter
+    && selectedFilters.includes(currentSystemFilter.id);
+  const currentSystemUnsupported = currentSystemFilter?.status === 'unsupported';
 
   return (
     <div className="app-side-filter-manager">
@@ -142,6 +160,49 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
       </div>
 
       <div id="asset-filter-panel" className="app-side-list app-side-filter-list">
+        {currentSystemFilter && (
+          <div className="app-side-filter-row">
+            <Button
+              variant="ghost"
+              onClick={() => onFilterToggle(currentSystemFilter.id)}
+              disabled={currentSystemUnsupported}
+              className="app-side-item justify-between"
+              title={currentSystemUnsupported
+                ? t('assetFilterManager.builtin-ignored')
+                : t('assetFilterManager.builtin-tooltip', { device: currentSystemFilter.label })}
+              type="button"
+              aria-pressed={currentSystemSelected}
+            >
+              <span className="app-side-item-label min-w-0">
+                <CurrentSystemIcon aria-hidden="true" />
+                <span className="flex min-w-0 flex-col items-start">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate">{t('assetFilterManager.builtin-current-system')}</span>
+                    <Badge variant="secondary" className="h-4 px-1 text-[9px] font-medium">
+                      {t('assetFilterManager.builtin-badge')}
+                    </Badge>
+                  </span>
+                  <span className={`truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {currentSystemUnsupported
+                      ? currentSystemSelected
+                        ? t('assetFilterManager.builtin-ignored')
+                        : t('assetFilterManager.builtin-unsupported')
+                      : currentSystemFilter.label}
+                  </span>
+                </span>
+              </span>
+              {typeof currentSystemFilter.matchCount === 'number' && (
+                <span className="app-side-count">{currentSystemFilter.matchCount}</span>
+              )}
+            </Button>
+            <div className="app-side-row-actions">
+              <span title={t('assetFilterManager.builtin-locked')}>
+                <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              </span>
+            </div>
+          </div>
+        )}
+
         {[...presetFilters, ...customFilters].map((filter) => {
           const Icon = filter.icon ? ICON_MAP[filter.icon] : Filter;
           const isSelected = selectedFilters.includes(filter.id);

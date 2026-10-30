@@ -51,7 +51,17 @@
       "cancel": "Cancel",
       "save": "Save",
       "create": "Create"
-    }
+    },
+    "builtin-current-system": "This device",
+    "builtin-badge": "Built-in",
+    "builtin-detecting": "{{platform}} · Detecting…",
+    "builtin-arch-unknown": "{{platform}} · Unknown architecture",
+    "builtin-unsupported": "Can't detect this device",
+    "builtin-ignored": "Not supported on this device; ignored",
+    "builtin-locked": "Built-in filter can't be edited",
+    "builtin-tooltip": "Shows only assets that run on {{device}}, based on file names, sibling assets and repository info. Use \"Show all\" on a card to see the rest.",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "Back to top"

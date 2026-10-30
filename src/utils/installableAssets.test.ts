@@ -115,10 +115,10 @@ describe('detectInstallableAssets — 排除非安装资产', () => {
     ['app-1.2.0.exe.sha256', 'checksum file'],
     ['app-1.2.0-setup.exe.sig', 'signature file'],
     ['app-1.2.0.pdb', 'debug symbols'],
-    ['App-1.2.0-setup.exe.blockmap', 'electron blockmap'],
+    ['App-1.2.0-setup.exe.blockmap', 'release metadata'],
     ['App-win-x64.pdb.zip', 'debug symbols'],
     ['App-win-x64.sig.zip', 'signature file'],
-    ['App-win-x64.blockmap.zip', 'electron blockmap'],
+    ['App-win-x64.blockmap.zip', 'release metadata'],
     ['app-1.2.0.sbom.json', 'software bill of materials'],
   ])('excludes %s', (name, expectedReason) => {
     const result = detectInstallableAssets([asset(1, name)], WINDOWS_DEVICE);
@@ -139,16 +139,20 @@ describe('detectInstallableAssets — 排除非安装资产', () => {
     expect(result.matches).toHaveLength(1);
   });
 
-  it('keeps unsupported package formats out of the candidates', () => {
+  it('recognises pacman packages while excluding libraries and update metadata', () => {
     const result = detectInstallableAssets(
-      [asset(1, 'app-1.0.pkg.tar.zst'), asset(2, 'app-1.0.nupkg')],
+      [
+        asset(1, 'app-1.0.pkg.tar.zst'),
+        asset(2, 'mineru-4.0.0-py3-none-any.whl'),
+        asset(3, 'app-1.0.nupkg'),
+      ],
       { platform: 'linux' },
     );
 
-    expect(result.matches).toEqual([]);
+    expect(result.matches.map((match) => match.packageType)).toEqual(['pacman']);
     expect(result.excluded.map((entry) => entry.reason)).toEqual([
-      'not a supported installable package format',
-      'not a supported installable package format',
+      'library package',
+      'release metadata',
     ]);
   });
 
@@ -204,7 +208,7 @@ describe('detectInstallableAssets — 不确定时并列候选', () => {
       { platform: 'macos' },
     );
 
-    expect(result.matches.map((match) => match.assetId)).toEqual([1, 2]);
+    expect(result.matches.map((match) => match.assetId)).toEqual([2, 1]);
     expect(result.matches.every((match) => match.confidence === 'high')).toBe(true);
   });
 
@@ -233,21 +237,18 @@ describe('detectInstallableAssets — 不确定时并列候选', () => {
       WINDOWS_DEVICE,
     );
 
-    // 同为 medium 时，声明了 x64 的 5 排在架构未知的 3 前面。
-    expect(result.matches.map((match) => match.assetId)).toEqual([1, 5, 3]);
-    expect(result.matches.map((match) => match.confidence)).toEqual(['high', 'medium', 'medium']);
-    expect(result.excluded.map((entry) => entry.assetId)).toEqual([2]);
+    // 3 被同包类型的兄弟资产推断为 x86，并在原生 x64 存在时按回退规则收起。
+    expect(result.matches.map((match) => match.assetId)).toEqual([1, 5]);
+    expect(result.matches.map((match) => match.confidence)).toEqual(['high', 'medium']);
+    expect(result.excluded.map((entry) => entry.assetId)).toEqual([2, 3]);
   });
 
-  it('excludes an asset that declares multiple architectures', () => {
+  it('treats an asset that declares multiple architectures as universal', () => {
     const result = detectInstallableAssets([asset(1, 'App-x64-arm64-setup.exe')], {
       platform: 'windows',
     });
 
-    expect(result.matches).toHaveLength(0);
-    expect(result.excluded).toEqual([
-      expect.objectContaining({ assetId: 1, reason: 'declares multiple architectures' }),
-    ]);
+    expect(result.matches[0]).toMatchObject({ architecture: 'universal', confidence: 'medium' });
   });
 });
 

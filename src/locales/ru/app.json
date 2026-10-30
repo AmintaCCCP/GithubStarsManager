@@ -51,7 +51,17 @@
       "cancel": "Отмена",
       "save": "Сохранить",
       "create": "Создать"
-    }
+    },
+    "builtin-current-system": "Это устройство",
+    "builtin-badge": "Встроенный",
+    "builtin-detecting": "{{platform}} · Определение…",
+    "builtin-arch-unknown": "{{platform}} · Архитектура неизвестна",
+    "builtin-unsupported": "Не удалось определить устройство",
+    "builtin-ignored": "Не поддерживается на этом устройстве; пропущено",
+    "builtin-locked": "Встроенный фильтр нельзя редактировать",
+    "builtin-tooltip": "Показывает только файлы, которые запускаются на {{device}}, по именам файлов, файлам того же выпуска и сведениям о репозитории. Нажмите «Показать все» на карточке, чтобы увидеть остальные.",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "вернуться наверх"

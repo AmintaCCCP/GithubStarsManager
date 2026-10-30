@@ -3,12 +3,23 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Release, ReleaseAsset } from '../types';
 import { InstallableAssetRecommendation } from './InstallableAssetRecommendation';
-import { resolveDeviceArchitecture } from '../utils/deviceTarget';
 
-// 只替换架构探测，平台探测保持真实实现（它读 navigator，测试里由 stubDevicePlatform 控制）。
-vi.mock('../utils/deviceTarget', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../utils/deviceTarget')>();
-  return { ...actual, resolveDeviceArchitecture: vi.fn() };
+const deviceResolution = vi.hoisted(() => ({
+  architecture: undefined as 'x64' | 'arm64' | 'x86' | 'arm' | undefined,
+  architectureSource: 'none' as 'ua-ch' | 'platform-string' | 'webgl' | 'none',
+  architectureSettled: true,
+}));
+
+vi.mock('../hooks/useDeviceTarget', async () => {
+  const { detectDevicePlatformSync } = await vi.importActual<typeof import('../utils/deviceTarget')>(
+    '../utils/deviceTarget',
+  );
+  return {
+    useDeviceTarget: () => ({
+      platform: detectDevicePlatformSync(),
+      ...deviceResolution,
+    }),
+  };
 });
 
 function asset(id: number, name: string, contentType = 'application/octet-stream'): ReleaseAsset {
@@ -54,8 +65,9 @@ function stubUnknownDevice(): void {
 }
 
 beforeEach(() => {
-  // 默认：架构探测立刻给出「拿不到」的结果
-  vi.mocked(resolveDeviceArchitecture).mockResolvedValue(undefined);
+  deviceResolution.architecture = undefined;
+  deviceResolution.architectureSource = 'none';
+  deviceResolution.architectureSettled = true;
 });
 
 afterEach(() => {
@@ -182,7 +194,7 @@ describe('InstallableAssetRecommendation', () => {
   it('架构探测未完成前不启用下载', async () => {
     stubDevicePlatform('Windows');
     // 探测一直挂起：模拟 high-entropy hints 还没回来
-    vi.mocked(resolveDeviceArchitecture).mockReturnValue(new Promise(() => {}));
+    deviceResolution.architectureSettled = false;
     const onDownload = vi.fn();
     const user = userEvent.setup();
     render(
@@ -207,7 +219,8 @@ describe('InstallableAssetRecommendation', () => {
 
   it('架构探测结束后恢复可下载', async () => {
     stubDevicePlatform('Windows');
-    vi.mocked(resolveDeviceArchitecture).mockResolvedValue('arm64');
+    deviceResolution.architecture = 'arm64';
+    deviceResolution.architectureSource = 'ua-ch';
     const onDownload = vi.fn();
     const user = userEvent.setup();
     render(

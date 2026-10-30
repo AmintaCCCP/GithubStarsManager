@@ -51,7 +51,17 @@
       "cancel": "Annuler",
       "save": "Enregistrer",
       "create": "Créer"
-    }
+    },
+    "builtin-current-system": "Cet appareil",
+    "builtin-badge": "Intégré",
+    "builtin-detecting": "{{platform}} · Détection…",
+    "builtin-arch-unknown": "{{platform}} · Architecture inconnue",
+    "builtin-unsupported": "Impossible d’identifier cet appareil",
+    "builtin-ignored": "Non pris en charge sur cet appareil ; ignoré",
+    "builtin-locked": "Le filtre intégré ne peut pas être modifié",
+    "builtin-tooltip": "Affiche uniquement les ressources exécutables sur {{device}}, d’après les noms de fichiers, les ressources de la même version et les informations du dépôt. Utilisez « Tout afficher » sur la carte pour voir le reste.",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "retour en haut"

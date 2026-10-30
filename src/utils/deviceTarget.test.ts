@@ -3,6 +3,7 @@ import {
   detectDevicePlatformSync,
   resetDeviceTargetCacheForTests,
   resolveDeviceArchitecture,
+  resolveDeviceArchitectureDetails,
 } from './deviceTarget';
 
 /** 覆盖 navigator 上的只读属性（userAgentData / platform）。 */
@@ -25,6 +26,8 @@ afterEach(() => {
   resetDeviceTargetCacheForTests();
   Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'userAgentData');
   Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'maxTouchPoints');
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -179,15 +182,80 @@ describe('resolveDeviceArchitecture', () => {
     await expect(resolveDeviceArchitecture()).resolves.toBeUndefined();
   });
 
-  it('does not invent an architecture for 32-bit ARM', async () => {
+  it('falls back to the platform string when high-entropy hints hang', async () => {
+    vi.useFakeTimers();
+    stubNavigator({
+      userAgentData: {
+        platform: 'Windows',
+        getHighEntropyValues: vi.fn(() => new Promise(() => {})),
+      },
+      platform: 'Win32',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    });
+
+    const resolution = resolveDeviceArchitectureDetails();
+    await vi.advanceTimersByTimeAsync(1500);
+    await expect(resolution).resolves.toEqual({
+      architecture: 'x64',
+      source: 'platform-string',
+    });
+  });
+
+  it('uses WebGL only for macOS when UA-CH is unavailable', async () => {
+    vi.stubGlobal('WebGLRenderingContext', class {});
+    stubNavigator({
+      userAgentData: { platform: 'macOS' },
+      platform: 'MacIntel',
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
+    });
+    vi.spyOn(document, 'createElement').mockReturnValue({
+      getContext: () => ({
+        getExtension: () => ({ UNMASKED_RENDERER_WEBGL: 0x9246 }),
+        getParameter: () => 'ANGLE (Apple, Apple M3, OpenGL)',
+      }),
+    } as unknown as HTMLElement);
+
+    await expect(resolveDeviceArchitectureDetails()).resolves.toEqual({
+      architecture: 'arm64',
+      source: 'webgl',
+    });
+  });
+
+  it('recognises 32-bit ARM from the high-entropy hints', async () => {
     const getHighEntropyValues = vi.fn().mockResolvedValue({ architecture: 'arm', bitness: '32' });
     stubNavigator({
       userAgentData: {
         getHighEntropyValues,
       },
     });
-    await expect(resolveDeviceArchitecture()).resolves.toBeUndefined();
-    await expect(resolveDeviceArchitecture()).resolves.toBeUndefined();
+    await expect(resolveDeviceArchitecture()).resolves.toBe('arm');
+    await expect(resolveDeviceArchitecture()).resolves.toBe('arm');
     expect(getHighEntropyValues).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to navigator.platform on Windows, Linux and Android', async () => {
+    stubNavigator({
+      userAgentData: { platform: 'Linux' },
+      platform: 'Linux aarch64',
+      userAgent: 'Mozilla/5.0 (X11; Linux aarch64)',
+    });
+    await expect(resolveDeviceArchitecture()).resolves.toBe('arm64');
+
+    resetDeviceTargetCacheForTests();
+    stubNavigator({
+      userAgentData: { platform: 'Windows' },
+      platform: 'Win32',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    });
+    await expect(resolveDeviceArchitecture()).resolves.toBe('x64');
+  });
+
+  it('never trusts the Intel token in a macOS user agent', async () => {
+    stubNavigator({
+      userAgentData: { platform: 'macOS' },
+      platform: 'MacIntel',
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0)',
+    });
+    await expect(resolveDeviceArchitecture()).resolves.toBeUndefined();
   });
 });

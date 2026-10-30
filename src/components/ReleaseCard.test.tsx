@@ -304,4 +304,30 @@ describe('ReleaseCard asset list filtering', () => {
   });
 });
 
+describe('ReleaseCard current-system asset badges', () => {
+  it('renders recommended, emulated and unverified badges with tooltips', () => {
+    const links = [
+      { name: 'App.dmg', url: 'https://example.com/App.dmg', size: 1, downloadCount: 0, assetId: 201 },
+      { name: 'App-x64.dmg', url: 'https://example.com/App-x64.dmg', size: 1, downloadCount: 0, assetId: 202 },
+      { name: 'App.zip', url: 'https://example.com/App.zip', size: 1, downloadCount: 0, assetId: 203 },
+    ];
+    renderCard({
+      downloadLinks: links,
+      assetBadges: new Map([
+        [links[0].url, 'recommended'],
+        [links[1].url, 'emulated'],
+        [links[2].url, 'unverified'],
+      ]),
+      currentPlatform: 'macos',
+    });
+
+    expect(screen.getByText('推荐')).toHaveAttribute('title', '与当前系统和架构精确匹配');
+    expect(screen.getByText('需转译')).toHaveAttribute('title', '将通过 Rosetta 2 运行');
+    expect(screen.getByText('平台未确认')).toHaveAttribute(
+      'title',
+      '文件名未声明平台，根据同版本资产或仓库信息推断',
+    );
+  });
+});
+
 });

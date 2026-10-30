@@ -86,7 +86,14 @@
     "ai-summary": "AIの概要",
     "analyzing-update": "アップデートを分析中...",
     "failed-to-generate-summary-please-try-again": "概要の生成に失敗しました。もう一度お試しください。",
-    "download-count": "{{count}} 件のダウンロード"
+    "download-count": "{{count}} 件のダウンロード",
+    "asset-recommended": "推奨",
+    "asset-recommended-tip": "現在の OS とアーキテクチャに完全一致",
+    "asset-emulated": "変換実行",
+    "asset-emulated-tip-macos": "Rosetta 2 で実行されます",
+    "asset-emulated-tip-windows": "エミュレーションで実行されます",
+    "asset-unverified": "プラットフォーム未確認",
+    "asset-unverified-tip": "ファイル名にプラットフォームがなく、同じリリースのアセットまたはリポジトリ情報から推定しました"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "プラグイン解析に失敗しました",
@@ -195,7 +202,9 @@
     "inbox-label": "Release 受信トレイ",
     "inbox-section": "受信トレイ",
     "all-releases": "すべての Release",
-    "release-count": "{{count}} 件の Release"
+    "release-count": "{{count}} 件の Release",
+    "no-assets-for-device": "{{device}} で利用できるアセットが見つかりません",
+    "disable-current-system-filter": "「このデバイス」フィルターをオフにする"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "このリリースにはダウンロード可能なアセットはありません。",

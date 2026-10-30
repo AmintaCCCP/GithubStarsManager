@@ -51,7 +51,17 @@
       "cancel": "キャンセル",
       "save": "保存",
       "create": "作成"
-    }
+    },
+    "builtin-current-system": "このデバイス",
+    "builtin-badge": "内蔵",
+    "builtin-detecting": "{{platform}} · 検出中…",
+    "builtin-arch-unknown": "{{platform}} · アーキテクチャ不明",
+    "builtin-unsupported": "このデバイスを識別できません",
+    "builtin-ignored": "このデバイスではサポートされていないため無視されます",
+    "builtin-locked": "内蔵フィルターは編集できません",
+    "builtin-tooltip": "{{device}} で実行できるアセットのみを表示します。ファイル名、同じリリースのアセット、リポジトリ情報から判定します。カードの「すべて表示」で残りを確認できます。",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "トップに戻る"

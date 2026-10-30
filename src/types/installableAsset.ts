@@ -14,23 +14,42 @@
 /** 当前支持识别的目标平台。 */
 export type InstallablePlatform = 'windows' | 'macos' | 'linux' | 'android';
 
-/** 设备/资产的 CPU 架构；`universal` 表示单一产物覆盖多种架构。 */
-export type InstallableArchitecture = 'x64' | 'arm64' | 'x86' | 'universal';
+/** 设备/资产的 CPU 架构；`universal` 只用于资产，`arm` 表示 32 位 ARM。 */
+export type InstallableArchitecture = 'x64' | 'arm64' | 'x86' | 'arm' | 'universal';
+
+/** 当前设备目标；`platform: null` 表示当前环境不支持或无法可靠识别。 */
+export interface DeviceTarget {
+  platform: InstallablePlatform | null;
+  architecture: Exclude<InstallableArchitecture, 'universal'> | undefined;
+  architectureSource: 'ua-ch' | 'platform-string' | 'webgl' | 'none';
+  architectureSettled: boolean;
+}
 
 /** 支持识别的安装包类型。 */
 export type InstallablePackageType =
   | 'exe'
   | 'msi'
+  | 'msix'
   | 'zip'
   | '7z'
+  | 'rar'
   | 'dmg'
   | 'pkg'
+  | 'app-archive'
   | 'deb'
   | 'rpm'
   | 'appimage'
+  | 'flatpak'
+  | 'snap'
+  | 'pacman'
   | 'tar.gz'
+  | 'tar'
   | 'apk'
-  | 'aab';
+  | 'xapk'
+  | 'apks'
+  | 'aab'
+  | 'raw-binary'
+  | 'compressed-binary';
 
 /**
  * 识别置信度。
@@ -71,7 +90,7 @@ export interface InstallableAssetDetectionOptions {
   /** 目标平台；省略时表示「不按平台过滤」，返回所有平台的候选。 */
   platform?: InstallablePlatform;
   /** 目标架构；省略时不做架构过滤（架构信息仍会解析出来）。 */
-  architecture?: InstallableArchitecture;
+  architecture?: Exclude<InstallableArchitecture, 'universal'>;
   /** AAB 只识别、不作为可直接安装的推荐（Android）。 */
   includeDetectOnly?: boolean;
 }

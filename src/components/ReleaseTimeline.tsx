@@ -24,7 +24,7 @@ import {
   SlidersHorizontal,
   CheckCircle2,
 } from 'lucide-react';
-import { AssetFilter, Release } from '../types';
+import { AssetFilter, Release, Repository } from '../types';
 import { useReleaseTimelineActions } from '../features/releases/hooks/useReleaseTimelineActions';
 import { useAppStore } from '../store/useAppStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -45,6 +45,63 @@ import {
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
 import { evaluateAssetFilter, normalizeMatchedLinkName } from '../utils/assetFilters';
+import {
+  BUILTIN_CURRENT_SYSTEM_FILTER_ID,
+  isBuiltinFilterId,
+} from '../constants/builtinFilters';
+import { useDeviceTarget } from '../hooks/useDeviceTarget';
+import {
+  evaluateCurrentSystem,
+  type AssetLinkInput,
+  type CurrentSystemEvaluation,
+  type RepositoryHints,
+} from '../utils/assetCompatibility';
+import { getPlatformDisplayName } from './platformMeta';
+
+interface HintsCache {
+  releases: Release[];
+  repositories: Repository[];
+  hints: Map<number, RepositoryHints>;
+}
+
+interface SystemEvaluationCacheEntry {
+  release: Release;
+  deviceKey: string;
+  hints: RepositoryHints | undefined;
+  evaluation: CurrentSystemEvaluation;
+}
+
+function sameRepositoryMetadata(left: Repository, right: Repository): boolean {
+  return left.id === right.id
+    && left.description === right.description
+    && left.language === right.language
+    && left.topics.join('\u0000') === right.topics.join('\u0000');
+}
+
+function hintsSourcesUnchanged(
+  cache: HintsCache,
+  releases: Release[],
+  repositories: Repository[],
+): boolean {
+  if (cache.releases.length !== releases.length || cache.repositories.length !== repositories.length) {
+    return false;
+  }
+  const previousReleases = new Map(cache.releases.map((release) => [release.id, release]));
+  for (const release of releases) {
+    const previous = previousReleases.get(release.id);
+    if (!previous
+      || previous.repository.id !== release.repository.id
+      || previous.published_at !== release.published_at
+      || previous.assets !== release.assets) {
+      return false;
+    }
+  }
+  const previousRepositories = new Map(cache.repositories.map((repository) => [repository.id, repository]));
+  return repositories.every((repository) => {
+    const previous = previousRepositories.get(repository.id);
+    return !!previous && sameRepositoryMetadata(previous, repository);
+  });
+}
 
 export const ReleaseTimeline: React.FC = () => {
   const {
@@ -88,6 +145,10 @@ export const ReleaseTimeline: React.FC = () => {
   const [isReleaseSourceSettingsOpen, setIsReleaseSourceSettingsOpen] = useState(false);
   const [releaseSourceRepoFilter, setReleaseSourceRepoFilter] = useState<string | null>(null);
   const [releaseSourcesExpanded, setReleaseSourcesExpanded] = useState(true);
+  const device = useDeviceTarget();
+  const tApp = useT('app');
+  const hintsCacheRef = useRef<HintsCache | null>(null);
+  const systemEvaluationCacheRef = useRef(new Map<number, SystemEvaluationCacheEntry>());
 
   // 使用全局状态的别名，保持代码一致性
   const viewMode = releaseViewMode;
@@ -238,6 +299,127 @@ export const ReleaseTimeline: React.FC = () => {
     ),
     [releases, resolvedReleaseSources, includePreRelease]
   );
+
+  const hintsByReleaseId = useMemo(() => {
+    if (hintsCacheRef.current
+      && hintsSourcesUnchanged(hintsCacheRef.current, releases, repositories)) {
+      return hintsCacheRef.current.hints;
+    }
+    const releasesByRepo = new Map<number, Release[]>();
+    for (const release of releases) {
+      const list = releasesByRepo.get(release.repository.id) ?? [];
+      list.push(release);
+      releasesByRepo.set(release.repository.id, list);
+    }
+    const repositoriesById = new Map(repositories.map((repository) => [repository.id, repository]));
+    const hints = new Map<number, RepositoryHints>();
+    for (const release of releases) {
+      const repository = repositoriesById.get(release.repository.id);
+      hints.set(release.id, {
+        otherReleases: (releasesByRepo.get(release.repository.id) ?? [])
+          .filter((candidate) => candidate.id !== release.id)
+          .map((candidate) => ({
+            assets: candidate.assets,
+            published_at: candidate.published_at,
+          })),
+        repository: repository
+          ? {
+              topics: repository.topics,
+              description: repository.description,
+              language: repository.language,
+            }
+          : undefined,
+      });
+    }
+    hintsCacheRef.current = { releases, repositories, hints };
+    return hints;
+  }, [releases, repositories]);
+
+  const systemEvaluations = useMemo(() => {
+    const evaluations = new Map<number, CurrentSystemEvaluation>();
+    if (!device.platform) return evaluations;
+    const cache = systemEvaluationCacheRef.current;
+    const deviceKey = `${device.platform}:${device.architecture ?? 'unknown'}`;
+    for (const release of subscribedReleases) {
+      const hints = hintsByReleaseId.get(release.id);
+      const cached = cache.get(release.id);
+      if (cached
+        && cached.release === release
+        && cached.deviceKey === deviceKey
+        && cached.hints === hints) {
+        evaluations.set(release.id, cached.evaluation);
+        continue;
+      }
+      const allLinks = getDownloadLinks(release);
+      const inputs: AssetLinkInput[] = allLinks.map((link, index) => ({
+        index,
+        name: link.name,
+        url: link.url,
+        contentType: link.contentType,
+        isSourceCode: link.isSourceCode,
+        downloadCount: link.downloadCount,
+        assetId: link.assetId,
+      }));
+      const evaluation = evaluateCurrentSystem(
+        inputs,
+        device,
+        hints,
+      );
+      cache.set(release.id, { release, deviceKey, hints, evaluation });
+      evaluations.set(release.id, evaluation);
+    }
+    for (const releaseId of cache.keys()) {
+      if (!evaluations.has(releaseId)) cache.delete(releaseId);
+    }
+    return evaluations;
+  }, [subscribedReleases, getDownloadLinks, device, hintsByReleaseId]);
+
+  const currentSystemSelected = selectedFilters.includes(BUILTIN_CURRENT_SYSTEM_FILTER_ID);
+  const currentSystemActive = currentSystemSelected && device.platform !== null;
+  const effectiveFilterIds = useMemo(
+    () => selectedFilters.filter((filterId) =>
+      isBuiltinFilterId(filterId)
+        ? filterId === BUILTIN_CURRENT_SYSTEM_FILTER_ID && currentSystemActive
+        : true,
+    ),
+    [selectedFilters, currentSystemActive],
+  );
+  const regularFilterIds = useMemo(
+    () => effectiveFilterIds.filter((filterId) => !isBuiltinFilterId(filterId)),
+    [effectiveFilterIds],
+  );
+  const currentSystemMatchCount = useMemo(
+    () => [...systemEvaluations.values()].filter((evaluation) => evaluation.matchesRelease).length,
+    [systemEvaluations],
+  );
+  const currentSystemFilter = useMemo(() => {
+    const platformName = device.platform ? getPlatformDisplayName(device.platform) : '';
+    const label = !device.platform
+      ? tApp('assetFilterManager.builtin-unsupported')
+      : !device.architectureSettled
+        ? tApp('assetFilterManager.builtin-detecting', { platform: platformName })
+        : !device.architecture
+          ? tApp('assetFilterManager.builtin-arch-unknown', { platform: platformName })
+          : device.platform === 'macos' && device.architecture === 'arm64'
+            ? `${platformName} · ${tApp('assetFilterManager.arch-apple-silicon')}`
+            : device.platform === 'macos' && device.architecture === 'x64'
+              ? `${platformName} · ${tApp('assetFilterManager.arch-intel')}`
+              : `${platformName} · ${device.architecture}`;
+    return {
+      id: BUILTIN_CURRENT_SYSTEM_FILTER_ID as typeof BUILTIN_CURRENT_SYSTEM_FILTER_ID,
+      status: !device.platform
+        ? 'unsupported' as const
+        : !device.architectureSettled
+          ? 'detecting-arch' as const
+          : !device.architecture
+            ? 'arch-unknown' as const
+            : 'ready' as const,
+      platform: device.platform,
+      label,
+      matchCount: device.platform ? currentSystemMatchCount : undefined,
+    };
+  }, [device, currentSystemMatchCount, tApp]);
+
   const releaseCountByRepoName = useMemo(() => {
     const counts = new Map<string, number>();
     subscribedReleases.forEach((release) => {
@@ -300,27 +482,61 @@ export const ReleaseTimeline: React.FC = () => {
       const lowerRepoKey = normalizeRepoKey(release.repository.full_name);
       // 每个已启用过滤器只求值一次：Release 级取 OR，资产索引取并集
       // （未命中本 Release 的过滤器不贡献任何资产）
-      const evaluations = selectedFilters
+      const evaluations = regularFilterIds
         .map(filterId => resolveActiveFilter(filterId))
         .filter((active): active is NonNullable<typeof active> => !!active)
         .map(active => evaluateAssetFilter(active, lowerRepoKey, lowerLinkNames, lowerRealAssetNames));
-      const matchesFilters = selectedFilters.length === 0 || evaluations.some(({ matchesRelease }) => matchesRelease);
+      const systemEvaluation = systemEvaluations.get(release.id);
+      const hasFilters = effectiveFilterIds.length > 0;
+      const matchesFilters = !hasFilters
+        || evaluations.some(({ matchesRelease }) => matchesRelease)
+        || (currentSystemActive && systemEvaluation?.matchesRelease === true);
       const matchedLinkIndexes = new Set<number>();
+      if (currentSystemActive && systemEvaluation) {
+        systemEvaluation.orderedIndexes.forEach(index => matchedLinkIndexes.add(index));
+      }
       evaluations.forEach(({ matchedLinkIndexes: indexes }) =>
         indexes.forEach(index => matchedLinkIndexes.add(index))
       );
+      const orderedMatchedIndexes: number[] = [];
+      if (currentSystemActive && systemEvaluation) {
+        systemEvaluation.orderedIndexes.forEach(index => {
+          if (!orderedMatchedIndexes.includes(index)) orderedMatchedIndexes.push(index);
+        });
+      }
+      allLinks.forEach((_, index) => {
+        if (matchedLinkIndexes.has(index) && !orderedMatchedIndexes.includes(index)) {
+          orderedMatchedIndexes.push(index);
+        }
+      });
+      const assetBadges = new Map<string, 'recommended' | 'emulated' | 'unverified'>();
+      if (currentSystemActive && systemEvaluation) {
+        systemEvaluation.badges.forEach((badge, index) => {
+          const link = allLinks[index];
+          if (link) assetBadges.set(link.url, badge);
+        });
+      }
       return {
         release,
         allLinks,
+        assetBadges,
         // 无已启用过滤器时不做资产级裁剪，并复用同一数组引用，
         // 避免卡片把「未裁剪」误判成「被过滤后仍显示全部」
-        matchedLinks: selectedFilters.length === 0
+        matchedLinks: !hasFilters
           ? allLinks
-          : allLinks.filter((_, index) => matchedLinkIndexes.has(index)),
+          : orderedMatchedIndexes.map(index => allLinks[index]).filter(Boolean),
         matchesFilters,
       };
     });
-  }, [subscribedReleases, getDownloadLinks, selectedFilters, resolveActiveFilter]);
+  }, [
+    subscribedReleases,
+    getDownloadLinks,
+    effectiveFilterIds,
+    regularFilterIds,
+    resolveActiveFilter,
+    systemEvaluations,
+    currentSystemActive,
+  ]);
 
   const preUnreadFilteredReleases = useMemo(() => {
     let filtered = releasesWithLinks;
@@ -347,7 +563,7 @@ export const ReleaseTimeline: React.FC = () => {
     // 资产类型过滤 - 只显示命中任一已启用过滤器的 release（仓库排除 → 仓库包含
     // → 资产规则，多过滤器取 OR）；命中的 Release 默认只列出命中过滤器的资产，
     // 未命中的资产由卡片《显示全部》按钮按需展开（allLinks 一并透传给卡片）
-    if (selectedFilters.length > 0) {
+    if (effectiveFilterIds.length > 0) {
       filtered = filtered.filter(({ matchesFilters }) => matchesFilters);
     }
 
@@ -355,12 +571,13 @@ export const ReleaseTimeline: React.FC = () => {
       .sort((a, b) =>
         new Date(b.release.published_at).getTime() - new Date(a.release.published_at).getTime()
       )
-      .map(({ release, allLinks, matchedLinks }) => ({
+      .map(({ release, allLinks, matchedLinks, assetBadges }) => ({
         release,
         displayLinks: matchedLinks,
-        allLinks
+        allLinks,
+        assetBadges,
       }));
-  }, [releasesWithLinks, releaseSourceRepoFilter, searchQuery, selectedFilters]);
+  }, [releasesWithLinks, releaseSourceRepoFilter, searchQuery, effectiveFilterIds]);
 
   // 仅最新模式过滤：每个仓库只保留最新的 release
   const latestModeReleases = useMemo(() => {
@@ -405,7 +622,7 @@ export const ReleaseTimeline: React.FC = () => {
       latestRelease: Release;
     }>();
 
-    filteredReleases.forEach(({ release, displayLinks, allLinks }) => {
+    filteredReleases.forEach(({ release, displayLinks, allLinks, assetBadges }) => {
       const repoId = release.repository.id;
       if (!groups.has(repoId)) {
         groups.set(repoId, {
@@ -415,7 +632,7 @@ export const ReleaseTimeline: React.FC = () => {
         });
       }
       const group = groups.get(repoId)!;
-      group.releases.push({ release, displayLinks, allLinks });
+      group.releases.push({ release, displayLinks, allLinks, assetBadges });
       // 更新最新发布
       if (new Date(release.published_at) > new Date(group.latestRelease.published_at)) {
         group.latestRelease = release;
@@ -749,6 +966,7 @@ export const ReleaseTimeline: React.FC = () => {
             selectedFilters={selectedFilters}
             onFilterToggle={handleFilterToggle}
             onClearFilters={handleClearFilters}
+            currentSystemFilter={currentSystemFilter}
           />
         </section>
 
@@ -1009,7 +1227,9 @@ export const ReleaseTimeline: React.FC = () => {
               <p className="app-empty-description">
                 {releaseShowMode === 'unread' && unreadCount === 0
                   ? t('releaseTimeline.all-releases-have-been-marked-as-read')
-                  : selectedFilters.length > 0
+                  : currentSystemActive
+                    ? t('releaseTimeline.no-assets-for-device', { device: currentSystemFilter.label })
+                    : effectiveFilterIds.length > 0
                     ? t('releaseTimeline.no-assets-match-the-current-filters-try-differen')
                     : t('releaseTimeline.no-matching-releases-found')}
               </p>
@@ -1022,7 +1242,15 @@ export const ReleaseTimeline: React.FC = () => {
                 {t('releaseTimeline.show-all-2')}
               </Button>
             )}
-            {selectedFilters.length > 0 && releaseShowMode !== 'unread' && (
+            {currentSystemActive && releaseShowMode !== 'unread' && (
+              <Button
+                onClick={() => handleFilterToggle(BUILTIN_CURRENT_SYSTEM_FILTER_ID)}
+                className="ui-button-primary mt-4 px-4 py-2 text-sm"
+              >
+                {t('releaseTimeline.disable-current-system-filter')}
+              </Button>
+            )}
+            {effectiveFilterIds.length > 0 && !currentSystemActive && releaseShowMode !== 'unread' && (
               <Button
                 onClick={handleClearFilters}
                 className="ui-button-primary mt-4 px-4 py-2 text-sm"
@@ -1033,7 +1261,7 @@ export const ReleaseTimeline: React.FC = () => {
           </div>
         ) : viewMode === 'timeline' ? (
           // 按日期排序视图
-          paginatedReleases.map(({ release, displayLinks, allLinks }) => {
+          paginatedReleases.map(({ release, displayLinks, allLinks, assetBadges }) => {
             const isUnread = isReleaseUnread(release.id);
             const isAssetsExpanded = expandedAssets.has(release.id);
             const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
@@ -1046,6 +1274,8 @@ export const ReleaseTimeline: React.FC = () => {
                 release={release}
                 downloadLinks={displayLinks}
                 allDownloadLinks={allLinks}
+                assetBadges={assetBadges}
+                currentPlatform={device.platform ?? undefined}
                 isUnread={isUnread}
                 isAssetsExpanded={isAssetsExpanded}
                 isReleaseNotesExpanded={isReleaseNotesExpanded}
@@ -1144,7 +1374,7 @@ export const ReleaseTimeline: React.FC = () => {
                   <div className={`overflow-hidden min-h-0 ${isExpanded ? '' : 'collapse-hidden'}`}>
                     <div className="border-t ui-divider bg-background dark:bg-card/50">
                       <div className="p-1.5 space-y-1.5">
-                      {releases.map(({ release, displayLinks, allLinks }) => {
+                      {releases.map(({ release, displayLinks, allLinks, assetBadges }) => {
                         const isUnread = isReleaseUnread(release.id);
                         const isAssetsExpanded = expandedAssets.has(release.id);
                         const isReleaseNotesExpanded = expandedReleaseNotes.has(release.id);
@@ -1157,6 +1387,8 @@ export const ReleaseTimeline: React.FC = () => {
                             release={release}
                             downloadLinks={displayLinks}
                             allDownloadLinks={allLinks}
+                            assetBadges={assetBadges}
+                            currentPlatform={device.platform ?? undefined}
                             isUnread={isUnread}
                             isAssetsExpanded={isAssetsExpanded}
                             isReleaseNotesExpanded={isReleaseNotesExpanded}

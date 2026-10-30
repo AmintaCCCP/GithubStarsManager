@@ -51,7 +51,17 @@
       "cancel": "Cancelar",
       "save": "Guardar",
       "create": "Crear"
-    }
+    },
+    "builtin-current-system": "Este dispositivo",
+    "builtin-badge": "Integrado",
+    "builtin-detecting": "{{platform}} · Detectando…",
+    "builtin-arch-unknown": "{{platform}} · Arquitectura desconocida",
+    "builtin-unsupported": "No se puede identificar este dispositivo",
+    "builtin-ignored": "No compatible con este dispositivo; ignorado",
+    "builtin-locked": "El filtro integrado no se puede editar",
+    "builtin-tooltip": "Muestra solo los recursos que se ejecutan en {{device}}, según los nombres de archivo, los recursos de la misma versión y la información del repositorio. Usa «Mostrar todo» en la tarjeta para ver el resto.",
+    "arch-apple-silicon": "Apple Silicon",
+    "arch-intel": "Intel"
   },
   "backToTop": {
     "back-to-top": "volver arriba"

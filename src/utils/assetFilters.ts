@@ -1,4 +1,5 @@
 import type { AssetFilter } from '../types';
+import { isBuiltinFilterId } from '../constants/builtinFilters';
 import { normalizeRepoKey } from './releaseSources';
 
 /**
@@ -48,6 +49,7 @@ export const normalizeAssetFilters = (filters: unknown): AssetFilter[] => {
     .map(filter => {
       if (
         typeof filter.id !== 'string' || filter.id.length === 0 ||
+        isBuiltinFilterId(filter.id) ||
         typeof filter.name !== 'string' ||
         !Array.isArray(filter.keywords)
       ) {

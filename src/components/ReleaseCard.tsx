@@ -15,7 +15,9 @@ import {
   shouldShowAssetsUpdatedIndicator,
 } from '../utils/releaseAssets';
 import { Button } from './ui/button';
+import { Badge } from './ui/badge';
 import { ReleasePluginRecommendations } from './ReleasePluginRecommendations';
+import type { InstallablePlatform } from '../types/installableAsset';
 
 interface DownloadLink {
   name: string;
@@ -49,6 +51,9 @@ interface ReleaseCardProps {
   downloadLinks: DownloadLink[];
   /** 该 Release 的全部下载链接（未裁剪）；省略时视为与 downloadLinks 相同 */
   allDownloadLinks?: DownloadLink[];
+  /** Keyed by URL because card-local link order can differ from the filter input order. */
+  assetBadges?: Map<string, 'recommended' | 'emulated' | 'unverified'>;
+  currentPlatform?: InstallablePlatform;
   isUnread: boolean;
   isAssetsExpanded: boolean;
   isReleaseNotesExpanded: boolean;
@@ -64,10 +69,52 @@ interface ReleaseCardProps {
   formatFileSize: (bytes: number) => string;
 }
 
+const AssetCompatibilityBadge: React.FC<{
+  kind: 'recommended' | 'emulated' | 'unverified';
+  platform?: InstallablePlatform;
+}> = ({ kind, platform }) => {
+  const t = useT('releases');
+  if (kind === 'recommended') {
+    return (
+      <Badge
+        variant="secondary"
+        className="h-5 shrink-0 border-success/30 bg-success/10 px-1.5 text-[10px] font-medium text-success"
+        title={t('releaseCard.asset-recommended-tip')}
+      >
+        {t('releaseCard.asset-recommended')}
+      </Badge>
+    );
+  }
+  if (kind === 'emulated') {
+    return (
+      <Badge
+        variant="outline"
+        className="h-5 shrink-0 border-amber-500/40 bg-amber-500/10 px-1.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
+        title={platform === 'macos'
+          ? t('releaseCard.asset-emulated-tip-macos')
+          : t('releaseCard.asset-emulated-tip-windows')}
+      >
+        {t('releaseCard.asset-emulated')}
+      </Badge>
+    );
+  }
+  return (
+    <Badge
+      variant="outline"
+      className="h-5 shrink-0 px-1.5 text-[10px] font-normal text-muted-foreground"
+      title={t('releaseCard.asset-unverified-tip')}
+    >
+      {t('releaseCard.asset-unverified')}
+    </Badge>
+  );
+};
+
 const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   release,
   downloadLinks,
   allDownloadLinks,
+  assetBadges,
+  currentPlatform,
   isUnread,
   isAssetsExpanded,
   isReleaseNotesExpanded,
@@ -373,6 +420,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                           <span className={`text-sm truncate ${link.isSourceCode ? 'text-muted-foreground dark:text-muted-foreground font-medium' : 'text-foreground dark:text-muted-foreground'}`}>
                             {link.name}
                           </span>
+                          {assetBadges?.get(link.url) && (
+                            <AssetCompatibilityBadge
+                              kind={assetBadges.get(link.url)!}
+                              platform={currentPlatform}
+                            />
+                          )}
                         </div>
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                           {isAssetUpdated && (
@@ -415,6 +468,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         <span className={`text-sm truncate ${link.isSourceCode ? 'text-muted-foreground dark:text-muted-foreground font-medium' : 'text-foreground dark:text-muted-foreground'}`}>
                           {link.name}
                         </span>
+                        {assetBadges?.get(link.url) && (
+                          <AssetCompatibilityBadge
+                            kind={assetBadges.get(link.url)!}
+                            platform={currentPlatform}
+                          />
+                        )}
                       </div>
                       <div className="flex items-center space-x-2 text-xs text-muted-foreground dark:text-muted-foreground flex-shrink-0">
                         {isAssetUpdated && (

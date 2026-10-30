@@ -9,6 +9,14 @@ import type { AssetFilter, Release, Repository } from '../types';
 const { markAllReleasesOnBackend } = vi.hoisted(() => ({
   markAllReleasesOnBackend: vi.fn(),
 }));
+const deviceState = vi.hoisted(() => ({
+  current: {
+    platform: null as 'windows' | 'macos' | 'linux' | 'android' | null,
+    architecture: undefined as 'x64' | 'arm64' | 'x86' | 'arm' | undefined,
+    architectureSource: 'none' as 'ua-ch' | 'platform-string' | 'webgl' | 'none',
+    architectureSettled: true,
+  },
+}));
 
 vi.mock('../store/useAppStore', () => ({
   useAppStore: vi.fn(),
@@ -34,6 +42,10 @@ vi.mock('../hooks/useDialog', () => ({
     toast: toastMock,
     confirm: confirmMock,
   }),
+}));
+
+vi.mock('../hooks/useDeviceTarget', () => ({
+  useDeviceTarget: () => deviceState.current,
 }));
 
 const repository: Repository = {
@@ -174,9 +186,24 @@ const wireStoreMocks = () => {
   }) as unknown as typeof storeState.markReleaseAsRead;
 };
 
+beforeEach(() => {
+  deviceState.current = {
+    platform: null,
+    architecture: undefined,
+    architectureSource: 'none',
+    architectureSettled: true,
+  };
+});
+
 describe('ReleaseTimeline unread snapshot', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    deviceState.current = {
+      platform: null,
+      architecture: undefined,
+      architectureSource: 'none',
+      architectureSettled: true,
+    };
     wireStoreMocks();
   });
 
@@ -718,5 +745,106 @@ describe('ReleaseTimeline context sidebar migration', () => {
     expect(screen.getByText('没有最近的Release')).toBeInTheDocument();
     expect(within(mainContent).getByRole('button', { name: '刷新' })).toBeInTheDocument();
     expect(document.querySelectorAll('[data-context-sidebar="releases"]')).toHaveLength(1);
+  });
+});
+
+describe('ReleaseTimeline current-system built-in filter', () => {
+  const alpha = makeRepo(7, 'alpha', 'owner/alpha');
+  const macDevice = {
+    platform: 'macos' as const,
+    architecture: 'arm64' as const,
+    architectureSource: 'ua-ch' as const,
+    architectureSettled: true,
+  };
+
+  const activateCurrentSystem = () => {
+    storeState.repositories = [alpha];
+    storeState.releaseSubscriptions = new Set([alpha.id]);
+    storeState.releaseSelectedFilters = ['builtin-current-system'];
+    storeState.releaseShowMode = 'all';
+    storeState.releaseViewMode = 'timeline';
+    storeState.releaseLatestMode = 'all';
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    wireStoreMocks();
+  });
+
+  it('renders the built-in row first with its badge and no edit/delete actions', () => {
+    render(<ReleaseTimeline />);
+    const panel = document.querySelector('#asset-filter-panel') as HTMLElement;
+    const firstRow = panel.querySelector('.app-side-filter-row') as HTMLElement;
+
+    expect(firstRow).toHaveTextContent('当前系统');
+    expect(within(firstRow).getByText('内置')).toBeInTheDocument();
+    expect(within(firstRow).queryByTitle('编辑')).not.toBeInTheDocument();
+    expect(within(firstRow).queryByTitle('删除')).not.toBeInTheDocument();
+  });
+
+  it('filters both releases and default assets by the detected device', async () => {
+    const user = userEvent.setup();
+    deviceState.current = macDevice;
+    activateCurrentSystem();
+    storeState.releases = [
+      makeRepoRelease(701, alpha, ['App-arm64.dmg', 'App-setup.exe', 'App-x86_64.AppImage']),
+    ];
+
+    render(<ReleaseTimeline />);
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]') as HTMLElement;
+    expect(within(sidebar).getByRole('button', { name: /当前系统/ })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(await screen.findByRole('button', { name: '显示下载资产' }));
+    expect(await screen.findByText('App-arm64.dmg')).toBeInTheDocument();
+    expect(screen.queryByText('App-setup.exe')).not.toBeInTheDocument();
+    expect(screen.queryByText('App-x86_64.AppImage')).not.toBeInTheDocument();
+  });
+
+  it('never empties the list when the device platform cannot be detected', async () => {
+    activateCurrentSystem();
+    storeState.releases = [makeRepoRelease(702, alpha, ['App-setup.exe'])];
+
+    render(<ReleaseTimeline />);
+    await expectMainText('owner/alpha');
+  });
+
+  it('takes the OR of the built-in filter and regular filters at release level', async () => {
+    const user = userEvent.setup();
+    deviceState.current = macDevice;
+    activateCurrentSystem();
+    storeState.releaseSelectedFilters = ['builtin-current-system', 'preset-windows'];
+    storeState.releases = [
+      makeRepoRelease(703, alpha, ['App-arm64.dmg', 'App-setup.exe']),
+    ];
+
+    render(<ReleaseTimeline />);
+    await expectMainText('owner/alpha');
+    await user.click(await screen.findByRole('button', { name: '显示下载资产' }));
+    expect(await screen.findByText('App-arm64.dmg')).toBeInTheDocument();
+    expect(await screen.findByText('App-setup.exe')).toBeInTheDocument();
+  });
+
+  it('clears the built-in selection with clear-all', async () => {
+    const user = userEvent.setup();
+    deviceState.current = macDevice;
+    activateCurrentSystem();
+    storeState.releases = [makeRepoRelease(704, alpha, ['App-arm64.dmg'])];
+
+    render(<ReleaseTimeline />);
+    const sidebar = document.querySelector('[data-context-sidebar="releases"]') as HTMLElement;
+    await user.click(within(sidebar).getByTitle('清除所有筛选'));
+    expect(storeState.clearReleaseSelectedFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a device-specific empty state with a turn-off action', async () => {
+    const user = userEvent.setup();
+    deviceState.current = macDevice;
+    activateCurrentSystem();
+    storeState.releases = [makeRepoRelease(705, alpha, ['App-setup.exe'])];
+
+    render(<ReleaseTimeline />);
+    expect(await screen.findByText('没有找到适用于 macOS · Apple Silicon 的资产')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '关闭「当前系统」过滤器' }));
+    expect(storeState.toggleReleaseSelectedFilter).toHaveBeenCalledWith('builtin-current-system');
   });
 });

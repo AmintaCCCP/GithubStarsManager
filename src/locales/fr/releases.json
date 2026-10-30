@@ -86,7 +86,14 @@
     "ai-summary": "Résumé de l'IA",
     "analyzing-update": "Analyse des mises à jour...",
     "failed-to-generate-summary-please-try-again": "La génération du résumé a échoué. Veuillez réessayer.",
-    "download-count": "{{count}} téléchargements"
+    "download-count": "{{count}} téléchargements",
+    "asset-recommended": "Recommandé",
+    "asset-recommended-tip": "Correspondance exacte avec ce système et cette architecture",
+    "asset-emulated": "Émulé",
+    "asset-emulated-tip-macos": "Exécuté via Rosetta 2",
+    "asset-emulated-tip-windows": "Exécuté par émulation",
+    "asset-unverified": "Plateforme non confirmée",
+    "asset-unverified-tip": "Plateforme absente du nom de fichier ; déduite des ressources de la même version ou du dépôt"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "L'analyse du plugin a échoué",
@@ -195,7 +202,9 @@
     "inbox-label": "Boîte de réception Releases",
     "inbox-section": "Boîte de réception",
     "all-releases": "Toutes les releases",
-    "release-count": "{{count}} versions"
+    "release-count": "{{count}} versions",
+    "no-assets-for-device": "Aucune ressource trouvée pour {{device}}",
+    "disable-current-system-filter": "Désactiver le filtre « Cet appareil »"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "Il n'existe aucune ressource téléchargeable pour cette version.",

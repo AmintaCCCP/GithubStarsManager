@@ -86,7 +86,14 @@
     "ai-summary": "Обзор ИИ",
     "analyzing-update": "Анализ обновлений...",
     "failed-to-generate-summary-please-try-again": "Не удалось создать сводку. Повторите попытку.",
-    "download-count": "{{count}} загрузок"
+    "download-count": "{{count}} загрузок",
+    "asset-recommended": "Рекомендуется",
+    "asset-recommended-tip": "Точное совпадение с этой системой и архитектурой",
+    "asset-emulated": "С трансляцией",
+    "asset-emulated-tip-macos": "Запускается через Rosetta 2",
+    "asset-emulated-tip-windows": "Запускается через эмуляцию",
+    "asset-unverified": "Платформа не подтверждена",
+    "asset-unverified-tip": "Платформа не указана в имени файла; определена по файлам того же выпуска или данным репозитория"
   },
   "releasePluginRecommendations": {
     "plugin-analysis-failed": "Анализ плагина не удался",
@@ -195,7 +202,9 @@
     "inbox-label": "Входящие Release",
     "inbox-section": "Входящие",
     "all-releases": "Все Release",
-    "release-count": "Release: {{count}}"
+    "release-count": "Release: {{count}}",
+    "no-assets-for-device": "Не найдено файлов для {{device}}",
+    "disable-current-system-filter": "Отключить фильтр «Это устройство»"
   },
   "repositoryReleaseSheet": {
     "this-release-has-no-downloadable-assets": "Для этого выпуска нет загружаемых ресурсов.",

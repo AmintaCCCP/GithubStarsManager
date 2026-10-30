@@ -1,16 +1,16 @@
 import { useT } from "../i18n/useT";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Download, Info, ShieldQuestion } from 'lucide-react';
 import type { Release } from '../types';
-import type { InstallableArchitecture, InstallablePlatform } from '../types/installableAsset';
+import type { InstallableArchitecture } from '../types/installableAsset';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { getPlatformDisplayName, getPlatformIcon } from './platformMeta';
 import { buildReleaseDownloadLinks, type ReleaseDownloadLink } from '../utils/releaseDownloadLinks';
 import { detectInstallableAssets } from '../utils/installableAssets';
-import { detectDevicePlatformSync, resolveDeviceArchitecture } from '../utils/deviceTarget';
 import { formatFileSize } from '../utils/formatBytes';
 import { computeRpcDownloadKey } from '../hooks/useReleaseArtifactActions';
+import { useDeviceTarget } from '../hooks/useDeviceTarget';
 
 /**
  * 「这台设备能装哪个资产」的内置推荐块。
@@ -35,6 +35,7 @@ const ARCHITECTURE_LABELS: Record<InstallableArchitecture, string> = {
   x64: 'x64',
   arm64: 'arm64',
   x86: 'x86',
+  arm: 'ARM',
   universal: 'Universal',
 };
 
@@ -45,29 +46,11 @@ export const InstallableAssetRecommendation: React.FC<InstallableAssetRecommenda
 }) => {
   const t = useT('app');
 
-  // 平台可同步得到（Electron/Chromium 报告宿主 OS，Web 版报告浏览器所在设备）。
-  const [platform] = useState<InstallablePlatform | null>(() => detectDevicePlatformSync());
-  const [architecture, setArchitecture] = useState<InstallableArchitecture | undefined>(undefined);
-  /**
-   * 架构探测是否已结束。
-   *
-   * 必需状态：`architecture === undefined` 同时表示「还在探测」和「确实拿不到」，
-   * 两者混在一起会让首次渲染就保留全部架构并立刻启用下载按钮——在 arm64 设备上，
-   * 若 x64 资产排序更靠前，用户可能在探测完成前下到错误架构的包。
-   */
-  const [architectureSettled, setArchitectureSettled] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    void resolveDeviceArchitecture().then((resolved) => {
-      if (!active) return;
-      setArchitecture(resolved);
-      setArchitectureSettled(true);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const {
+    platform,
+    architecture,
+    architectureSettled,
+  } = useDeviceTarget();
 
   // 架构拿不到时不传 architecture —— 跳过架构过滤，并列展示候选而不是猜一个。
   const detection = useMemo(
