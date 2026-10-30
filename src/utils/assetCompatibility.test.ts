@@ -222,6 +222,15 @@ describe('evaluateCurrentSystem — synthetic edge cases', () => {
     ).orderedIndexes).toEqual([1]);
   });
 
+  it('keeps Linux builds of Android-named products visible on Linux', () => {
+    expect(evaluate(['android-studio-2024.1-linux.tar.gz'], device('linux', 'x64')).orderedIndexes)
+      .toEqual([0]);
+    expect(evaluate(['android-studio-2024.1-linux.deb'], device('linux', 'x64')).orderedIndexes)
+      .toEqual([0]);
+    expect(evaluate(['android-studio-2024.1-linux.deb'], device('android', 'arm64')).matchesRelease)
+      .toBe(false);
+  });
+
   it('keeps a pure-Java jar as unverified but excludes source jars', () => {
     const evaluation = evaluate(['app-1.2.jar', 'app-1.2-sources.jar'], device('windows', 'x64'));
     expect(evaluation.orderedIndexes).toEqual([0]);

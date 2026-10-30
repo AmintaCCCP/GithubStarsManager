@@ -160,6 +160,7 @@ interface ScannedName {
   hasForeignArchitecture: boolean;
   hasWin32: boolean;
   hasWin64: boolean;
+  androidTriple: boolean;
   ambiguousArchitecture: boolean;
   variants: string[];
   variantScore: number;
@@ -357,6 +358,10 @@ function scanName(name: string): ScannedName {
     hasForeignArchitecture,
     hasWin32,
     hasWin64,
+    // Rust/NDK triples end with `-android` (aarch64-linux-android). A product
+    // merely named after Android (`android-studio-…-linux`) is not a triple.
+    androidTriple: tokens.some((token, index) => token === 'linux'
+      && (tokens[index + 1] ?? '').startsWith('android')),
     ambiguousArchitecture: [...declaredArchitectures].filter((arch) => arch !== 'universal').length > 1,
     variants,
     variantScore,
@@ -485,7 +490,10 @@ function classifyLink(
 
   const decisivePlatform = base.packageInfo?.decisivePlatform ?? null;
   const declared = new Set(scan.declaredPlatforms);
-  if (declared.has('android') && declared.has('linux')) declared.delete('linux');
+  // Android shares the Linux kernel, so `*-linux-android` triples are Android.
+  // Otherwise keep both tokens: an Android-named product can still ship a
+  // Linux build, and dropping Linux would hide it from Linux users.
+  if (declared.has('android') && declared.has('linux') && scan.androidTriple) declared.delete('linux');
 
   if (declared.size === 0 && scan.hasForeignOs) {
     return { ...base, incompatibleDetail: 'targets an unsupported operating system' };
@@ -501,7 +509,10 @@ function classifyLink(
     base.platform = tokenPlatform;
     base.platformSource = 'token';
   } else if (declared.size > 1) {
-    base.platform = null;
+    // The package format is stronger evidence than a stray product-name token
+    // (`android-studio-…-linux.deb` is a Linux package).
+    base.platform = decisivePlatform && declared.has(decisivePlatform) ? decisivePlatform : null;
+    if (base.platform) base.platformSource = 'extension';
   } else if (decisivePlatform) {
     base.platform = decisivePlatform;
     base.platformSource = 'extension';
