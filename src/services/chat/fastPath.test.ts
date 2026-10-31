@@ -475,4 +475,79 @@ describe('selectFastPathSegments', () => {
     const document = documentFrom(['# Example Project', '', '## Changelog', '1.0.0'].join('\n'));
     expect(selectFastPathSegments(document, 'usage', 'How do I install this project?')).toEqual([]);
   });
+
+  it('adds no opening-section lead when no section matches the question', () => {
+    const document = documentFrom([
+      '## License',
+      'MIT.',
+      '',
+      '## Changelog',
+      '1.0.0',
+    ].join('\n'));
+
+    // 审计 UVhl：README 首行为二级标题且没有匹配章节时，首个章节（License）不得
+    // 作为前导段充当证据——否则快速路径会以无关章节直接回答并跳过完整检索循环，
+    // 应回落完整循环（无段产出）。
+    const segments = selectFastPathSegments(document, 'general', 'What is the release history?');
+    expect(segments).toEqual([]);
+  });
+
+  it('does not displace matched sections with an unrelated opening section', () => {
+    const document = documentFrom([
+      '## License',
+      'MIT.',
+      '',
+      '## Introduction',
+      'Introduces the project.',
+      '',
+      '## Features',
+      'Fast and small.',
+      '',
+      '## Highlights',
+      'Notable moments.',
+    ].join('\n'));
+
+    // 审计 UVhx：首行低层级标题未命中问题且三个章节占满名额时，前导段让位，
+    // 三个匹配章节全部保留，排序最低的匹配章节不得被未命中的首章节挤出。
+    const segments = selectFastPathSegments(document, 'general', 'What is the introduction and features and highlights of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Introduction', 'Features', 'Highlights']);
+  });
+
+  it('ends the Overview intro before the first lower-level heading of any depth', () => {
+    const document = documentFrom([
+      '# Example Project',
+      'A documented example project for repository research.',
+      '',
+      '### Features',
+      'Fast and small.',
+      '',
+      '## Deployment',
+      'Deploy with Docker.',
+    ].join('\n'));
+
+    // 审计 UVhp：H1 之后、首个 H2 之前的 H3 章节（Features）不得混入 Overview
+    // 导语段——导语在首个任意层级标题处结束，H3 内容只随其自身章节入选一次，
+    // 不再与选中章节重复，也不额外占用填充名额。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features and how do I deploy?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Features', 'Deployment']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
+    expect(segments[0]?.excerpt).toContain('A documented example project');
+    expect(segments[0]?.excerpt).not.toContain('Fast and small.');
+  });
+
+  it('keeps the README description in the intro when a level-3 heading follows it', () => {
+    const document = documentFrom([
+      '# Example Project',
+      'A documented example project for repository research.',
+      '### Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 UVht：H1（第 1 行）+ 描述（第 2 行）+ H3（第 3 行）时导语段不得为空，
+    // 描述必须进入证据——导语截取到第一个已选章节之前，下限判断放宽到 2 行。
+    const segments = selectFastPathSegments(document, 'general', 'What does this project do?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Features']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 2 });
+    expect(segments[0]?.excerpt).toContain('A documented example project');
+  });
 });

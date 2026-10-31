@@ -69,7 +69,12 @@ const headingRelevance = (title: string, terms: string[]): number => {
  *   参与名额分配（名额有余直接入选并固定占据 segments[0]，名额已满只挤出
  *   排序最低的填充章节）。截断优先级：意图保留章节 > 前导段 > 未被意图保留
  *   的填充章节——已保留的意图章节不会被前导段或低分填充章节挤出；意图保留
- *   章节占满 3 个名额的极端组合下前导段让位。
+ *   章节占满 3 个名额的极端组合下前导段让位。首章节前导段只在有匹配章节
+ *   （chosen 非空）且名额未满（chosen < 3）时入选：无匹配章节时不以无关首
+ *   章节充当证据（快速路径回落完整检索循环），三个匹配章节占满名额时前导段
+ *   让位，已匹配章节绝不被未命中的首章节挤出。Overview 导语段边界为首个
+ *   位于第 1 行之后的任意层级标题（不限于 H1/H2），且只截取到第一个已选
+ *   章节之前，导语内容不与已选章节重复，下限为标题行 + 至少一行导语内容。
  */
 export const selectFastPathSegments = (
   document: CachedDocument,
@@ -108,9 +113,16 @@ export const selectFastPathSegments = (
   //     自身标题（如 `License`、`Example Project`）作为 label（审计 UEIs：不得把
   //     章节内容误标为 Overview）。章节边界复用 sectionSegments 的切章语义，与其
   //     他证据段完全一致；首个章节本身已是选中章节（如 `## Features` 开头且被
-  //     命中）时不再重复入选。
+  //     命中）时不再重复入选。入选条件统一走名额模型：chosen 非空（审计 UVhl：
+  //     无匹配章节时不得以无关首章节如 License 充当证据跳过完整检索，应回落
+  //     完整循环）且 chosen < 3（审计 UVhx：三个匹配章节占满名额时前导段让位，
+  //     未命中的首章节绝不挤掉已匹配章节）。入选后总段数 ≤ 3，无需再让位。
   // (b) 首行为 H1（`# 标题`）或首个标题不在第 1 行：首个标题之前的行是真正的
-  //     导语，按原有逻辑生成 Overview 导语段。
+  //     导语，按原有逻辑生成 Overview 导语段。导语边界为首个位于第 1 行之后的
+  //     任意层级标题（审计 UVhp：不再限于 H1/H2，H1 后的 H3 章节内容不混入导语
+  //     段、不与后续选中章节重复），且只截取到第一个已选章节之前（审计 UVht：
+  //     第 2–3 行的三级标题不再使第 1–2 行的标题与描述被整体丢弃，下限放宽为
+  //     标题行 + 至少一行导语内容，即 introEnd >= 2）。
   // 同一 README 只会命中其中一种形态，不会既出 Overview 导语又出首个章节的
   // 重复内容。
   let lead: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
@@ -120,14 +132,28 @@ export const selectFastPathSegments = (
     if (openingHeading && opensWithLowerLevelHeading) {
       const openingSection = sectionSegments(document, [openingHeading.title])
         .find((segment) => segment.lineStart === openingHeading.lineStart) ?? null;
-      if (openingSection && !Array.from(chosen).some((item) => item.segment.lineStart === openingHeading.lineStart)) {
+      if (
+        openingSection
+        && chosen.size > 0
+        && chosen.size < 3
+        && !Array.from(chosen).some((item) => item.segment.lineStart === openingHeading.lineStart)
+      ) {
         lead = openingSection;
       }
     } else {
       const lines = document.content.split('\n');
-      const firstHeading = document.headings.find((heading) => heading.level <= 2 && heading.lineStart > 1);
-      const introEnd = Math.min(lines.length, (firstHeading?.lineStart ?? lines.length + 1) - 1, 80);
-      if (introEnd >= 3 && !Array.from(chosen).some((item) => item.segment.lineStart <= 3)) {
+      const firstHeading = document.headings.find((heading) => heading.lineStart > 1);
+      const firstChosenLineStart = Array.from(chosen).reduce(
+        (min, item) => Math.min(min, item.segment.lineStart),
+        Number.POSITIVE_INFINITY,
+      );
+      const introEnd = Math.min(
+        lines.length,
+        (firstHeading?.lineStart ?? lines.length + 1) - 1,
+        firstChosenLineStart - 1,
+        80,
+      );
+      if (introEnd >= 2) {
         lead = {
           lineStart: 1,
           lineEnd: introEnd,
@@ -140,6 +166,7 @@ export const selectFastPathSegments = (
       if (chosen.size >= 3) {
         // 名额已满：只牺牲排序最低的填充章节给前导段让位；填充章节为空
         // （意图保留章节占满名额）时前导段让位，绝不挤占保留章节。
+        // （形态 (a) 的入选条件已保证 chosen < 3，此分支只作用于 Overview 导语。）
         const fillerItems = ranked.filter((item) => chosen.has(item) && !reserved.has(item));
         if (fillerItems.length > 0) {
           chosen.delete(fillerItems[fillerItems.length - 1]);
