@@ -10,7 +10,7 @@ import type {
   ToolEvidence,
 } from '../../types/repositoryChat';
 import { TASK_DEPTH_PRESETS, DEFAULT_ANSWER_MAX_TOKENS } from '../../types/repositoryChat';
-import { AIService, isAIStreamUnsupportedError } from '../aiService';
+import { AIService, isAIStreamUnsupportedError, type AIChatTextPurpose } from '../aiService';
 import { createGitHubApiService } from '../githubApiFactory';
 import { makeT } from '../../i18n/useT';
 import {
@@ -48,6 +48,7 @@ import {
   MARKDOWN_EVIDENCE_PATH,
   buildEvidenceWindows,
   citableSegmentsForDocument,
+  collapseCandidateDirectories,
   detectResearchFocus,
   documentationCandidatesFrom,
   evidenceFromSegments,
@@ -55,7 +56,6 @@ import {
   isFileEntry,
   isRepositoryCodePath,
   linkedDocumentationPaths,
-  makeAnswerRequirements,
   makeMarkdownHeadings,
   parseQueryUnderstanding,
   parseRetrievalPlan,
@@ -205,7 +205,7 @@ interface EvidenceToolbox {
   remainingMs: () => number;
   failBudget: (summary: string, stage: RepositoryChatExecutionStage, round?: number) => AgentToolResult<never>;
   invokeTool: <T>(toolName: ChatToolName, params: unknown, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, action: (signal: AbortSignal) => Promise<T>) => Promise<AgentToolResult<T>>;
-  callModelWithRetry: (toolName: ChatToolName, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, system: string, user: string, maxTokens: number, retryLimit: number, timeoutMs?: number, ignoreBudget?: boolean, deadlineAt?: number) => Promise<string | null>;
+  callModelWithRetry: (toolName: ChatToolName, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, system: string, user: string, maxTokens: number, retryLimit: number, timeoutMs?: number, ignoreBudget?: boolean, deadlineAt?: number, purpose?: AIChatTextPurpose) => Promise<string | null>;
 }
 
 export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: RepositoryChatAgentBudget, ai: AIService): EvidenceToolbox => {
@@ -267,7 +267,7 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
     }
   };
 
-  const callModel = async (system: string, user: string, maxTokens: number, timeoutMs = 30_000, ignoreBudget = false): Promise<string> => {
+  const callModel = async (system: string, user: string, maxTokens: number, timeoutMs = 30_000, ignoreBudget = false, purpose: AIChatTextPurpose = 'answer'): Promise<string> => {
     if (input.signal?.aborted) throw input.signal.reason ?? new DOMException('Repository chat request was aborted.', 'AbortError');
     if (!ignoreBudget && !hasTime()) throw new DOMException('Repository chat time budget reached.', 'TimeoutError');
     const controller = new AbortController();
@@ -278,16 +278,16 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
       ignoreBudget ? timeoutMs : Math.min(timeoutMs, remainingMs()),
     );
     try {
-      const text = await ai.generateChatText({ system, user, signal: controller.signal, temperature: 0, maxTokens });
+      const result = await ai.generateChatTextDetailed({ system, user, signal: controller.signal, temperature: 0, maxTokens, purpose });
       if (input.signal?.aborted) throw input.signal.reason ?? new DOMException('Repository chat request was aborted.', 'AbortError');
-      return text;
+      return result.text;
     } finally {
       globalThis.clearTimeout(timeoutId);
       input.signal?.removeEventListener('abort', abortForCaller);
     }
   };
 
-  const callModelWithRetry = async (toolName: ChatToolName, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, system: string, user: string, maxTokens: number, retryLimit: number, timeoutMs = 30_000, ignoreBudget = false, deadlineAt?: number): Promise<string | null> => {
+  const callModelWithRetry = async (toolName: ChatToolName, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, system: string, user: string, maxTokens: number, retryLimit: number, timeoutMs = 30_000, ignoreBudget = false, deadlineAt?: number, purpose: AIChatTextPurpose = 'answer'): Promise<string | null> => {
     const modelStartedAt = Date.now();
     emit({ toolName, status: 'running', paramSummary, stage, round, detail });
     let attempt = 0;
@@ -299,7 +299,7 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
         return null;
       }
       try {
-        const text = await callModel(system, user, maxTokens, deadlineAt ? Math.max(1_000, remainingForAttemptMs) : timeoutMs, ignoreBudget);
+        const text = await callModel(system, user, maxTokens, deadlineAt ? Math.max(1_000, remainingForAttemptMs) : timeoutMs, ignoreBudget, purpose);
         emit({ toolName, status: 'success', paramSummary, stage, round, detail: attempt > 0 ? `${detail} ${input.language === 'zh' ? `第 ${attempt + 1} 次尝试成功。` : `Succeeded on attempt ${attempt + 1}.`}` : detail, durationMs: Date.now() - modelStartedAt, resultSize: text.length });
         return text;
       } catch (error) {
@@ -538,12 +538,15 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     searchConcepts: [],
     likelyDocumentTopics: [],
     informationScope: 'documentation',
-    answerRequirements: makeAnswerRequirements([input.language === 'zh' ? '直接回答用户提出的问题' : 'directly answer the user question'], 'explicit', 1),
+    answerRequirements: [],
     optionalEnrichment: [],
     initialTargets: preliminaryDocumentationCandidates.slice(0, 1),
     target: input.question.trim().slice(0, 240),
   };
-  const understandingPrompt = buildQueryUnderstandingPrompt(input, preliminaryRankedPaths.length > 0 ? preliminaryRankedPaths : allPaths);
+  const understandingPrompt = buildQueryUnderstandingPrompt(
+    input,
+    collapseCandidateDirectories(preliminaryRankedPaths.length > 0 ? preliminaryRankedPaths : allPaths).slice(0, 40),
+  );
   const understandingRaw = await callModelWithRetry(
     'understand_query',
     input.language === 'zh' ? '理解问题并建立回答要求' : 'Understand the question and build answer requirements',
@@ -554,6 +557,10 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     understandingPrompt.user,
     800,
     1,
+    undefined,
+    undefined,
+    undefined,
+    'internal-json',
   );
   const understanding = understandingRaw ? parseQueryUnderstanding(understandingRaw, fallbackUnderstanding, allPathsSet) : fallbackUnderstanding;
   // The LLM supplies a small concept expansion (for example vector search →
@@ -843,6 +850,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       missing,
       turns,
       codeEligible,
+      readPaths,
     );
     const planRaw = await callModelWithRetry(
       turns === 1 ? 'plan_research' : 'replan_research',
@@ -854,6 +862,10 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       planPrompt.user,
       900,
       1,
+      undefined,
+      undefined,
+      undefined,
+      'internal-json',
     );
     const fallbackScope: RetrievalScope = codeEligible ? 'code' : 'documentation';
     const parsedPlan = planRaw ? parseRetrievalPlan(planRaw, documentationSet, codeSet, metaSet, fallbackScope) : null;
@@ -906,7 +918,18 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       if (target.scope === 'code' && !(codeEligible)) return false;
       if (target.scope === 'meta' && !(metaEligible)) return false;
       return target.scope === 'code' ? codeSet.has(target.path) : target.scope === 'meta' ? metaSet.has(target.path) : documentationSet.has(target.path);
-    }).slice(0, 3);
+    })
+      // 规划器仍可能重复提出已读章节或不可读目标：在调用工具前统一过滤，
+      // 避免把预算浪费在重复读取上。
+      .filter((target) => isViableUnseenTarget(target))
+      .slice(0, 3);
+    if (targets.length === 0 && evidences.length > 0) {
+      finalReason = input.language === 'zh'
+        ? '计划目标均已读取或无新章节，改为直接基于现有证据回答。'
+        : 'All planned targets were already read or yielded no new sections; answering from the evidence gathered so far.';
+      canAnswer = true;
+      break;
+    }
     // 规划器只提出了（尚不可用的）code 目标时，回退到未读的文档候选，
     // 保证 README/docs 始终优先被读取。
     if (targets.length === 0) {
@@ -955,6 +978,10 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       gatePrompt.user,
       1_000,
       1,
+      undefined,
+      undefined,
+      undefined,
+      'internal-json',
     );
     const fallbackGate: EvidenceGate = {
       sufficient: false,
@@ -990,6 +1017,14 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     const allApplicableRequirementsVerified = requirements.length > 0 && requirements.every((requirement) => (
       requirement.status === 'verified' || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
     ));
+    const hasAnyVerifiedEvidence = requirements.some((requirement) => requirement.status === 'verified' && requirement.evidence.length > 0);
+    // 采纳 gate 的整体判定：evidence 宽松解析后带注释的引用已可核验，只要
+    // gate 以足够置信度判定可回答且至少一条要求带有效引用（或本轮没有阻断
+    // 要求），就不强制进入下一轮。
+    const gateApprovesAnswer = gate.sufficient
+      && gate.nextAction === 'answer'
+      && gate.confidence >= 0.7
+      && (requirements.length === 0 || hasAnyVerifiedEvidence);
     consecutiveNoProgressRounds = added > 0 || discoveredViableTarget ? 0 : consecutiveNoProgressRounds + 1;
     // 最新版本类问题：文档即使已覆盖全部要求，若 Release/Issue 来源还没拉过，
     // 也先补拉再作答，避免沿用过期的 README 版本号。
@@ -1006,7 +1041,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     };
     // Completion is bounded by the user's explicit and necessary requirements,
     // not by extra areas the gate might prefer to research.
-    if (allApplicableRequirementsVerified && evidences.length > 0) {
+    if ((allApplicableRequirementsVerified || gateApprovesAnswer) && evidences.length > 0) {
       if (unfetchedMetaTargets.length === 0 || !metaBudgetAvailable) {
         canAnswer = true;
         break;

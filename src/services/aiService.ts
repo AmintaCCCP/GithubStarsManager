@@ -25,12 +25,15 @@ interface OpenAIResponseMessage {
 
 interface OpenAIResponseChoice {
   message?: OpenAIResponseMessage;
+  finish_reason?: string;
 }
 
 interface OpenAIResponse {
   output_text?: string;
   output?: OpenAIResponseOutputItem[];
   choices?: OpenAIResponseChoice[];
+  status?: string;
+  incomplete_details?: { reason?: string };
 }
 
 export interface ConnectionTestResult {
@@ -76,6 +79,14 @@ export class AIRequestError extends Error {
     this.isRateLimit = status === 429;
     this.fromGatewayBody = fromGatewayBody;
   }
+}
+
+export type AIChatTextPurpose = 'internal-json' | 'answer';
+
+export interface AIChatTextResult {
+  text: string;
+  /** 归一化后的结束原因：'stop' | 'length' | 其他原始值；未知时为 null。 */
+  finishReason: string | null;
 }
 
 /** 支持检查一个错误对象是否是 AI 限流（429 或代理透传的限流错误）。 */
@@ -418,7 +429,7 @@ export class AIService {
   private logAIRequestDebug(
     startTime: number,
     context: { apiType: string; model: string; configId: string },
-    result: { responseLength: number } | { error: string },
+    result: { responseLength: number; finishReason?: string } | { error: string },
     httpDetails?: {
       url?: string;
       requestHeaders?: Record<string, string>;
@@ -523,19 +534,30 @@ export class AIService {
     }
   }
 
-  private async requestText(options: {
+  private async requestTextResult(options: {
     system: string;
     user: string;
     temperature: number;
     maxTokens: number;
     signal?: AbortSignal;
-  }): Promise<string> {
+    purpose?: AIChatTextPurpose;
+    /** internal-json 默认携带 JSON response_format；端点 400 拒绝后由调用方以 false 重试。 */
+    jsonMode?: boolean;
+  }): Promise<AIChatTextResult> {
     this.requireSecureDirectEndpoint();
     const startTime = Date.now();
     const apiType = this.getApiType();
     const model = this.config.model;
     const configId = this.config.id;
-    const reasoning = this.getOpenAIReasoningPayload();
+    const isInternalJson = options.purpose === 'internal-json';
+    const disableInternalThinking = isInternalJson && this.config.disableThinkingForInternalSteps !== false;
+    const reasoning = disableInternalThinking && this.config.reasoningEffort ? { effort: 'low' as const } : this.getOpenAIReasoningPayload();
+    const normalizeFinishReason = (raw: string | null | undefined): string | null => {
+      if (!raw) return null;
+      if (raw === 'max_tokens' || raw === 'MAX_TOKENS' || raw === 'max_output_tokens') return 'length';
+      return raw.toLowerCase();
+    };
+    let chatFinishReason: string | null = null;
 
     if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
       const messages = [
@@ -561,9 +583,10 @@ export class AIService {
             model: this.config.model,
             messages,
             max_tokens: options.maxTokens,
+            ...(isInternalJson && (options.jsonMode ?? true) ? { response_format: { type: 'json_object' } } : {}),
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
             ...(!isDeepSeekReasoner && !isDeepSeekThinking && !isMiMoModel && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
-            ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
+            ...(isMiMoModel || isDeepSeekThinking || (disableInternalThinking && (apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo')) ? { thinking: { type: 'disabled' } } : {}),
           };
 
       let data: Record<string, unknown>;
@@ -628,9 +651,10 @@ export class AIService {
       if (apiType === 'openai-responses') {
         const typedData = data as OpenAIResponse;
         const outputText = typedData.output_text;
+        const responsesFinishReason = typedData.status === 'incomplete' && typedData.incomplete_details?.reason === 'max_output_tokens' ? 'length' : normalizeFinishReason(typedData.status);
         if (outputText) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: outputText.length }, httpDetails);
-          return outputText;
+          return { text: outputText, finishReason: responsesFinishReason };
         }
 
         const output = typedData.output;
@@ -641,17 +665,22 @@ export class AIService {
             .join('');
           if (text) {
             this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, httpDetails);
-            return text;
+            return { text, finishReason: responsesFinishReason };
           }
+        }
+        if (responsesFinishReason === 'length') {
+          this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: 0, finishReason: responsesFinishReason }, httpDetails);
+          return { text: '', finishReason: 'length' };
         }
       } else {
         const typedData = data as { choices?: OpenAIResponseChoice[] };
         const choices = typedData.choices;
+        chatFinishReason = normalizeFinishReason(choices?.[0]?.finish_reason);
         const message = choices?.[0]?.message;
         const content = message?.content;
         if (content) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: content.length }, httpDetails);
-          return content;
+          return { text: content, finishReason: chatFinishReason };
         }
 
         // Only fall back to reasoning_content for the dedicated deepseek-reasoner model.
@@ -660,7 +689,7 @@ export class AIService {
         const reasoningContent = message?.reasoning_content;
         if (reasoningContent && isDeepSeekReasoner) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: reasoningContent.length }, httpDetails);
-          return reasoningContent;
+          return { text: reasoningContent, finishReason: chatFinishReason };
         }
 
         if (!content && reasoningContent) {
@@ -680,6 +709,10 @@ export class AIService {
           configId,
           ...(this.redactDebugPayload ? {} : { data: stringifyDataForWarn(data) }),
         });
+      }
+      if (chatFinishReason === 'length') {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: 0, finishReason: chatFinishReason }, httpDetails);
+        return { text: '', finishReason: 'length' };
       }
       this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
@@ -754,6 +787,7 @@ export class AIService {
         url: requestUrl, requestHeaders, requestBody, responseHeaders, responseBody: responseBodyPreview, status: responseStatus,
       } : undefined;
 
+      const claudeFinishReason = normalizeFinishReason((data as { stop_reason?: string }).stop_reason);
       const contentBlocks = (data as { content?: unknown }).content;
       if (Array.isArray(contentBlocks)) {
         const text = contentBlocks
@@ -765,8 +799,12 @@ export class AIService {
           .join('');
         if (text) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, httpDetails);
-          return text;
+          return { text, finishReason: claudeFinishReason };
         }
+      }
+      if (claudeFinishReason === 'length') {
+        this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: 0, finishReason: claudeFinishReason }, httpDetails);
+        return { text: '', finishReason: 'length' };
       }
       this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
       throw new Error('No content received from AI service');
@@ -853,6 +891,9 @@ ${options.user}` : options.user;
     } : undefined;
 
     const candidates = (data as { candidates?: unknown }).candidates;
+    const geminiFinishReason = Array.isArray(candidates) && candidates.length > 0
+      ? normalizeFinishReason((candidates[0] as { finishReason?: string }).finishReason)
+      : null;
     if (Array.isArray(candidates) && candidates.length > 0) {
       const candidate = candidates[0] as { content?: { parts?: unknown }; finishReason?: string };
       const parts = candidate.content?.parts;
@@ -868,9 +909,13 @@ ${options.user}` : options.user;
           .join('');
         if (text) {
           this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: text.length }, httpDetails);
-          return text;
+          return { text, finishReason: geminiFinishReason };
         }
       }
+    }
+    if (geminiFinishReason === 'length') {
+      this.logAIRequestDebug(startTime, { apiType, model, configId }, { responseLength: 0, finishReason: geminiFinishReason }, httpDetails);
+      return { text: '', finishReason: 'length' };
     }
     this.logAIRequestDebug(startTime, { apiType, model, configId }, { error: 'request failed' }, httpDetails);
     throw new Error('No content received from AI service');
@@ -1125,6 +1170,19 @@ ${options.user}` : options.user;
     return full;
   }
 
+  /** 兼容包装：只要文本；空响应（含 length 截断）对既有调用方仍按错误抛出。 */
+  private async requestText(options: {
+    system: string;
+    user: string;
+    temperature: number;
+    maxTokens: number;
+    signal?: AbortSignal;
+  }): Promise<string> {
+    const result = await this.requestTextResult(options);
+    if (!result.text) throw new Error('No content received from AI service');
+    return result.text;
+  }
+
   async generateChatText(options: {
     system: string;
     user: string;
@@ -1132,13 +1190,64 @@ ${options.user}` : options.user;
     maxTokens?: number;
     signal?: AbortSignal;
   }): Promise<string> {
-    return await this.requestText({
-      system: options.system,
-      user: options.user,
-      temperature: options.temperature ?? 0.2,
-      maxTokens: options.maxTokens ?? 4000,
-      signal: options.signal,
-    });
+    return (await this.generateChatTextDetailed(options)).text;
+  }
+
+  /**
+   * 带结束原因的文本生成。purpose='internal-json'（理解/规划/gate 等内部步骤）
+   * 时：思考被关闭、尽力携带 JSON response_format（端点 400 拒绝时自动降级
+   * 重试一次）、推理型模型的 max_tokens 抬到至少 4000；若 finishReason=length
+   * 且没有正文，自动以双倍 max_tokens 重试一次（追加“直接输出 JSON”提示）——
+   * 该重试发生在 AIService 内部，不计入调用方的工具/轮次预算。
+   */
+  async generateChatTextDetailed(options: {
+    system: string;
+    user: string;
+    temperature?: number;
+    maxTokens?: number;
+    signal?: AbortSignal;
+    purpose?: AIChatTextPurpose;
+  }): Promise<AIChatTextResult> {
+    const purpose = options.purpose ?? 'answer';
+    const isInternalJson = purpose === 'internal-json';
+    const reasoningModelFloor = isInternalJson
+      && (this.config.reasoningEffort || /(?:r1|reason|think|glm-|qwen3|o\d|gpt-5|deepseek)/i.test(this.config.model));
+    const baseMaxTokens = reasoningModelFloor ? Math.max(options.maxTokens ?? 4_000, 4_000) : options.maxTokens ?? 4_000;
+    try {
+      const result = await this.requestTextResult({
+        system: options.system,
+        user: options.user,
+        temperature: options.temperature ?? 0.2,
+        maxTokens: baseMaxTokens,
+        signal: options.signal,
+        purpose,
+      });
+      if (isInternalJson && result.finishReason === 'length' && !result.text) {
+        return await this.requestTextResult({
+          system: options.system,
+          user: `${options.user}\n\n直接输出 JSON，不要思考过程。`,
+          temperature: options.temperature ?? 0.2,
+          maxTokens: baseMaxTokens * 2,
+          signal: options.signal,
+          purpose,
+        });
+      }
+      return result;
+    } catch (error) {
+      if (isInternalJson && error instanceof AIRequestError && error.status === 400) {
+        // 端点不支持 response_format 时降级为普通请求重试一次。
+        return await this.requestTextResult({
+          system: options.system,
+          user: options.user,
+          temperature: options.temperature ?? 0.2,
+          maxTokens: baseMaxTokens,
+          signal: options.signal,
+          purpose,
+          jsonMode: false,
+        });
+      }
+      throw error;
+    }
   }
 
   /** 流式版本的 generateChatText；不支持流式的通道抛 AIStreamUnsupportedError。 */

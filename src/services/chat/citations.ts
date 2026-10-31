@@ -96,6 +96,16 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
   });
 };
 
+/**
+ * 从模型输出的字符串中宽松提取 `/path - start-end` 引用令牌，忽略模型附带的
+ * 括号注释（如 `/README.md - 94-119（## Install：安装步骤）`）后再做严格校验。
+ */
+export const extractReferenceToken = (raw: string): string => {
+  const stripped = raw.trim().replace(/^`+|`+$/g, '').trim();
+  const match = /(\/?(?:@meta\/|[.\w@-]+\/)*[.\w@-]+\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)/.exec(stripped);
+  return (match?.[1] ?? stripped).trim();
+};
+
 export const sourceReferences = (evidences: ToolEvidence[]): string[] => evidences
   .map(formatSourceReference)
   .filter((reference): reference is string => Boolean(reference));
@@ -321,7 +331,7 @@ export const parseRequirementAssessments = (value: unknown, answerRequirements: 
       ?? (providedText ? byText.get(providedText.toLocaleLowerCase().replace(/\s+/g, ' ').trim()) : undefined);
     const status = candidate.status;
     if (!requirement || (status !== 'verified' && status !== 'missing' && status !== 'not_applicable')) continue;
-    const evidence = asStringArray(candidate.evidence, 4).filter(isValidReference);
+    const evidence = asStringArray(candidate.evidence, 4).map(extractReferenceToken).filter(isValidReference);
     assessments.set(requirement.id, {
       requirementId: requirement.id,
       requirement: requirement.text,

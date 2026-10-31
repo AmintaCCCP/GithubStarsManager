@@ -174,6 +174,44 @@ export const rankedCandidatePaths = (entries: TreeEntry[], question: string, foc
     .map((candidate) => candidate.path);
 };
 
+/**
+ * 把候选清单里同目录、同扩展名且数量超过 threshold 的文件折叠成一行
+ * `dir/*.md (N files)`，但保留排名最高的 2 个代表路径，规划器仍可点名读取。
+ * 输入保持按得分排序；折叠行的位置跟随其首个代表在原清单中的位置。
+ */
+export const collapseCandidateDirectories = (paths: string[], options: { threshold?: number } = {}): string[] => {
+  const threshold = options.threshold ?? 8;
+  const groupOf = (path: string): string => {
+    const directory = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+    const dot = path.lastIndexOf('.');
+    const extension = dot > path.lastIndexOf('/') ? path.slice(dot + 1).toLowerCase() : '';
+    return `${directory}\u0000${extension}`;
+  };
+  const sizes = new Map<string, number>();
+  for (const path of paths) sizes.set(groupOf(path), (sizes.get(groupOf(path)) ?? 0) + 1);
+  const collapsed = new Map<string, boolean>();
+  const representatives = new Map<string, number>();
+  const output: string[] = [];
+  for (const path of paths) {
+    const group = groupOf(path);
+    if ((sizes.get(group) ?? 0) <= threshold) {
+      output.push(path);
+      continue;
+    }
+    if (!collapsed.get(group)) {
+      collapsed.set(group, true);
+      const [directory, extension] = group.split('\u0000');
+      output.push(`${directory}*${extension ? `.${extension}` : ''} (${sizes.get(group)} files)`);
+    }
+    const count = representatives.get(group) ?? 0;
+    if (count < 2) {
+      representatives.set(group, count + 1);
+      output.push(path);
+    }
+  }
+  return output;
+};
+
 export const resolveRepositoryChatHeadSha = async (repository: Repository, githubToken: string, signal?: AbortSignal): Promise<string> => {
   const [owner, repo] = splitOwnerAndRepo(repository.full_name);
   const github = createGitHubApiService(githubToken);
