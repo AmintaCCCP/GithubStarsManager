@@ -23,42 +23,92 @@ import {
 interface GlobalChatHistorySheetProps {
   isOpen: boolean;
   onClose: () => void;
-  repositories: Repository[];
   onSelectSession: (repository: Repository, sessionId: string) => void;
 }
 
 const HISTORY_CHANGE_EVENT = 'gsm:global-chat-history-changed';
+const PAGE_SIZE = 50;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type DateGroupKey = 'today' | 'yesterday' | 'last-7-days' | 'last-30-days' | 'earlier';
+
+const DATE_GROUP_KEYS: DateGroupKey[] = ['today', 'yesterday', 'last-7-days', 'last-30-days', 'earlier'];
+
+const dateGroupKey = (value: string, now: number): DateGroupKey => {
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return 'earlier';
+  const startOfDay = (timestamp: number) => {
+    const date = new Date(timestamp);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  };
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(time)) / DAY_MS);
+  if (dayDiff <= 0) return 'today';
+  if (dayDiff === 1) return 'yesterday';
+  if (dayDiff < 7) return 'last-7-days';
+  if (dayDiff < 30) return 'last-30-days';
+  return 'earlier';
+};
 
 export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   isOpen,
   onClose,
-  repositories,
   onSelectSession,
 }) => {
   const language = useAppStore((state) => state.language);
+  const allRepositories = useAppStore((state) => state.repositories ?? []);
   const t = useT('chat');
   const [sessions, setSessions] = useState<RepositoryChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [page, setPage] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<RepositoryChatSession | null>(null);
   // 重叠刷新只允许最新请求提交，避免旧结果覆盖新状态。
   const requestIdRef = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const repositoryById = useMemo(() => {
     const map = new Map<number, Repository>();
-    repositories.forEach((repository) => map.set(repository.id, repository));
+    allRepositories.forEach((repository) => map.set(repository.id, repository));
     return map;
-  }, [repositories]);
+  }, [allRepositories]);
+
+  const buildFallbackRepository = useCallback((session: RepositoryChatSession): Repository => {
+    const [ownerLogin = 'github', repoName = session.repoFullName] = session.repoFullName.split('/');
+    return {
+      id: session.repoId,
+      name: repoName,
+      full_name: session.repoFullName,
+      description: session.repoSnapshot?.description ?? null,
+      html_url: session.repoSnapshot?.htmlUrl ?? `https://github.com/${session.repoFullName}`,
+      stargazers_count: 0,
+      forks_count: 0,
+      forks: 0,
+      language: session.repoSnapshot?.language ?? null,
+      topics: [],
+      created_at: session.createdAt,
+      updated_at: session.updatedAt,
+      pushed_at: session.updatedAt,
+      owner: {
+        login: session.repoSnapshot?.ownerLogin ?? ownerLogin,
+        avatar_url: session.repoSnapshot?.ownerAvatarUrl ?? `https://github.com/${ownerLogin}.png?size=64`,
+      },
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setLoadError(null);
     try {
-      const nextSessions = await repositoryChatStorage.listRecentSessions(50);
+      const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1);
       if (requestId !== requestIdRef.current) return;
-      setSessions(nextSessions);
+      setHasMore(nextSessions.length > PAGE_SIZE);
+      setSessions(nextSessions.slice(0, PAGE_SIZE));
+      setPage(0);
     } catch {
       if (requestId !== requestIdRef.current) return;
       setLoadError(t('globalChatHistorySheet.failed-to-load-history-please-retry'));
@@ -67,12 +117,38 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     }
   }, [t]);
 
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1, nextPage * PAGE_SIZE);
+      setHasMore(nextSessions.length > PAGE_SIZE);
+      setSessions((previous) => [...previous, ...nextSessions.slice(0, PAGE_SIZE)]);
+      setPage(nextPage);
+    } catch {
+      setLoadError(t('globalChatHistorySheet.failed-to-load-history-please-retry'));
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMore, isLoadingMore, page, t]);
+
   useEffect(() => {
     if (isOpen) {
       setQuery('');
       void refresh();
     }
   }, [isOpen, refresh]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+    }, { rootMargin: '80px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   const handleDelete = useCallback(async (sessionId: string) => {
     await repositoryChatStorage.permanentlyDeleteSession(sessionId);
@@ -99,6 +175,22 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
       minute: '2-digit',
     });
   }, [language]);
+
+  const groupedSessions = useMemo(() => {
+    const groups = new Map<DateGroupKey, RepositoryChatSession[]>();
+    const now = Date.now();
+    visibleSessions.forEach((session) => {
+      const key = dateGroupKey(session.updatedAt, now);
+      const group = groups.get(key);
+      if (group) group.push(session);
+      else groups.set(key, [session]);
+    });
+    return DATE_GROUP_KEYS
+      .filter((key) => groups.has(key))
+      .map((key) => ({ key, sessions: groups.get(key) as RepositoryChatSession[] }));
+  }, [visibleSessions]);
+
+  const dateGroupLabel = useCallback((key: DateGroupKey) => t(`globalChatHistorySheet.group-${key}`), [t]);
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -135,7 +227,17 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
 
         <section aria-label={t('globalChatHistorySheet.chat-history-list')} className="min-h-0 flex-1 overflow-y-auto pr-1">
           {isLoading ? (
-            <p className="py-10 text-center text-sm text-muted-foreground" role="status">{t('globalChatHistorySheet.loading-history')}</p>
+            <div className="space-y-2 py-2" role="status" aria-label={t('globalChatHistorySheet.loading-history')}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-2.5 px-2 py-2">
+                  <div className="h-7 w-7 shrink-0 animate-pulse rounded-md bg-muted" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 w-3/4 animate-pulse rounded bg-muted" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : loadError && visibleSessions.length === 0 ? (
             <div className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-md border border-destructive/40 px-4 text-center text-sm" role="alert">
               <p className="text-destructive">{loadError}</p>
@@ -161,42 +263,59 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
                 </div>
               )}
               <ul className="space-y-1">
-              {visibleSessions.map((session) => {
-                const repository = repositoryById.get(session.repoId);
-                return (
-                  <li key={session.id} className="flex items-center gap-1 rounded-md border border-transparent hover:border-border">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-auto min-w-0 flex-1 items-center justify-start gap-2.5 px-2 py-2 text-left"
-                      onClick={() => {
-                        if (repository) onSelectSession(repository, session.id);
-                      }}
-                      disabled={!repository}
-                      title={repository ? t('globalChatHistorySheet.open-conversation-in-v1', { v1: session.repoFullName }) : t('globalChatHistorySheet.the-repository-is-no-longer-in-the-list')}
-                    >
-                      {repository && (
-                        <img src={repository.owner.avatar_url} alt="" className="h-7 w-7 shrink-0 rounded-md border border-border" />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-foreground">{session.title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{session.repoFullName} · {formatTime(session.updatedAt)}</span>
-                      </span>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => setPendingDeletion(session)}
-                      aria-label={t('globalChatHistorySheet.delete-conversation-v1', { v1: session.title })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </Button>
-                  </li>
-                );
-              })}
+              {groupedSessions.map((group) => (
+                <li key={group.key} className="list-none">
+                  <p className="px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground">{dateGroupLabel(group.key)}</p>
+                  <ul className="space-y-1">
+                    {group.sessions.map((session) => {
+                      const repository = repositoryById.get(session.repoId);
+                      const isUnstarred = !repository;
+                      const targetRepository = repository ?? buildFallbackRepository(session);
+                      const avatarUrl = session.repoSnapshot?.ownerAvatarUrl
+                        ?? repository?.owner.avatar_url
+                        ?? `https://github.com/${session.repoFullName.split('/')[0]}.png?size=64`;
+                      return (
+                        <li key={session.id} className="flex items-center gap-1 rounded-md border border-transparent hover:border-border">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-auto min-w-0 flex-1 items-center justify-start gap-2.5 px-2 py-2 text-left"
+                            onClick={() => onSelectSession(targetRepository, session.id)}
+                            title={t('globalChatHistorySheet.open-conversation-in-v1', { v1: session.repoFullName })}
+                          >
+                            <img src={avatarUrl} alt="" className="h-7 w-7 shrink-0 rounded-md border border-border" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium text-foreground">{session.title}</span>
+                              <span className="block truncate text-xs text-muted-foreground">{session.repoFullName} · {formatTime(session.updatedAt)}</span>
+                            </span>
+                          </Button>
+                          {isUnstarred && (
+                            <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                              {t('globalChatHistorySheet.unstarred-repository')}
+                            </span>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => setPendingDeletion(session)}
+                            aria-label={t('globalChatHistorySheet.delete-conversation-v1', { v1: session.title })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))}
               </ul>
+              {hasMore && (
+                <div ref={sentinelRef} className="py-3 text-center text-xs text-muted-foreground" role="status">
+                  {isLoadingMore ? t('globalChatHistorySheet.loading-history') : ''}
+                </div>
+              )}
             </>
           )}
         </section>

@@ -115,6 +115,13 @@ export const useRepositoryChatSessions = ({
         title: defaultTitle(language),
         createdAt: now,
         updatedAt: now,
+        repoSnapshot: {
+          ownerLogin: repository.owner.login,
+          ownerAvatarUrl: repository.owner.avatar_url,
+          htmlUrl: repository.html_url,
+          ...(repository.description ? { description: repository.description } : {}),
+          ...(repository.language ? { language: repository.language } : {}),
+        },
       };
       await repositoryChatStorage.saveSession(session);
       if (operationId !== operationIdRef.current) return null;

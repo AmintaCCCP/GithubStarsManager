@@ -12,12 +12,18 @@
     "no-matching-conversations-found": "No hay sesiones coincidentes.",
     "open-conversation-in-v1": "Ingrese a la sesión de {{v1}}",
     "the-repository-is-no-longer-in-the-list": "El almacén correspondiente ya no está en la lista",
+    "unstarred-repository": "Unstarred",
     "delete-conversation-v1": "Eliminar sesión: {{v1}}",
     "delete-this-conversation": "¿Eliminar esta conversación?",
     "this-only-deletes-the-conversation-and-tool-trac": "Solo se eliminarán las conversaciones y las pistas de herramientas guardadas por este dispositivo/cuenta. No afectará el repositorio de GitHub, Star, README ni los índices vectoriales existentes.",
     "cancel": "Cancelar",
     "delete-conversation": "Eliminar sesión",
-    "failed-to-load-history-please-retry": "Error al cargar el historial, inténtelo de nuevo."
+    "failed-to-load-history-please-retry": "Error al cargar el historial, inténtelo de nuevo.",
+    "group-today": "Today",
+    "group-yesterday": "Yesterday",
+    "group-last-7-days": "Last 7 days",
+    "group-last-30-days": "Last 30 days",
+    "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {
     "today": "hoy",

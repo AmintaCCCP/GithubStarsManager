@@ -12,12 +12,18 @@
     "no-matching-conversations-found": "No matching conversations found.",
     "open-conversation-in-v1": "Open conversation in {{v1}}",
     "the-repository-is-no-longer-in-the-list": "The repository is no longer in the list",
+    "unstarred-repository": "Unstarred",
     "delete-conversation-v1": "Delete conversation: {{v1}}",
     "delete-this-conversation": "Delete this conversation?",
     "this-only-deletes-the-conversation-and-tool-trac": "This only deletes the conversation and tool trace saved for this device/account. It does not affect the GitHub repository, stars, README, or existing vector index.",
     "cancel": "Cancel",
     "delete-conversation": "Delete conversation",
-    "failed-to-load-history-please-retry": "Failed to load history. Please retry."
+    "failed-to-load-history-please-retry": "Failed to load history. Please retry.",
+    "group-today": "Today",
+    "group-yesterday": "Yesterday",
+    "group-last-7-days": "Last 7 days",
+    "group-last-30-days": "Last 30 days",
+    "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {
     "today": "Today",

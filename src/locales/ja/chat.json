@@ -12,12 +12,18 @@
     "no-matching-conversations-found": "一致するセッションはありません。",
     "open-conversation-in-v1": "{{v1}} のセッションに入る",
     "the-repository-is-no-longer-in-the-list": "対応する倉庫がリストに存在しなくなりました",
+    "unstarred-repository": "Unstarred",
     "delete-conversation-v1": "セッションを削除: {{v1}}",
     "delete-this-conversation": "この会話を削除しますか?",
     "this-only-deletes-the-conversation-and-tool-trac": "このデバイス/アカウントによって保存された会話とツールのトラックのみが削除されます。 GitHub リポジトリ、Star、README、または既存のベクター インデックスには影響しません。",
     "cancel": "キャンセル",
     "delete-conversation": "セッションの削除",
-    "failed-to-load-history-please-retry": "履歴の読み込みに失敗しました。もう一度お試しください。"
+    "failed-to-load-history-please-retry": "履歴の読み込みに失敗しました。もう一度お試しください。",
+    "group-today": "Today",
+    "group-yesterday": "Yesterday",
+    "group-last-7-days": "Last 7 days",
+    "group-last-30-days": "Last 30 days",
+    "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {
     "today": "今日",

@@ -523,7 +523,6 @@ export const RepositoryList: React.FC<RepositoryListProps> = ({
     <GlobalChatHistorySheet
       isOpen={globalHistoryOpen}
       onClose={() => setGlobalHistoryOpen(false)}
-      repositories={repositories}
       onSelectSession={handleSelectGlobalSession}
     />
   );
