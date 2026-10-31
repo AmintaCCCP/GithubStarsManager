@@ -198,6 +198,38 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Setup', 'Self-hosting']);
   });
 
+  it('keeps the deployment section when install headings exceed the cap', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Install 1',
+      'a',
+      '',
+      '## Install 2',
+      'b',
+      '',
+      '## Install 3',
+      'c',
+      '',
+      '## Install 4',
+      'd',
+      '',
+      '## Install 5',
+      'e',
+      '',
+      '## Install 6',
+      'f',
+      '',
+      '## Deployment',
+      'g',
+    ].join('\n'));
+
+    // 6 个 Install 标题触发 6 段上限，Deployment 排在其后且得分并列：
+    // 意图保留必须先于任何上限生效，否则 Deployment 会在截取处被丢弃。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install and deploy?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Install 1', 'Install 2', 'Deployment']);
+  });
+
   it('does not reserve an extra slot for an intent already covered by a chosen section', () => {
     const document = documentFrom([
       '# Example Project',
@@ -238,6 +270,30 @@ describe('selectFastPathSegments', () => {
     expect(segments[0]).toMatchObject({ lineStart: 1, label: 'Overview' });
     expect(segments[0]?.excerpt).toContain('A documented example project');
     expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Features']);
+  });
+
+  it('trims the lowest-ranked match when the general intro plus three matches overflow the cap', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      'A documented example project for repository research.',
+      '',
+      '## Introduction',
+      'Introduces the project.',
+      '',
+      '## Features',
+      'Fast and small.',
+      '',
+      '## Highlights',
+      'Notable moments.',
+    ].join('\n'));
+
+    // general 导语段占用一个名额：三个匹配章节按重合度排序后只保留前两段，
+    // 排序最低的 Highlights 被截掉。
+    const segments = selectFastPathSegments(document, 'general', 'What is the introduction and features of this project?');
+    expect(segments).toHaveLength(3);
+    expect(segments[0]).toMatchObject({ lineStart: 1, label: 'Overview' });
+    expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Introduction', 'Features']);
   });
 
   it('keeps unrelated sections out for a single-intent question', () => {
