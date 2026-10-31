@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolEvidence } from '../../types/repositoryChat';
-import { hasCompleteSourceReferences, pruneUnverifiableSections } from './citations';
+import { ensureVerifiableSources, hasCompleteSourceReferences, pruneUnverifiableSections } from './citations';
 
 const evidence = (path: string, lineStart: number, lineEnd: number): ToolEvidence => ({
   id: `evidence-${path}-${lineStart}`,
@@ -39,6 +39,24 @@ describe('hasCompleteSourceReferences', () => {
     ].join('\n');
     expect(hasCompleteSourceReferences(content, evidences)).toBe(true);
   });
+
+  it('checks indented nested list items individually', () => {
+    const content = [
+      `- Node.js is required ${citation}`,
+      '  - ffmpeg is optional',
+    ].join('\n');
+    expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
+  });
+
+  it('checks pipe-less table rows individually', () => {
+    const content = [
+      'Tool | Purpose',
+      '--- | ---',
+      `skills | install ${citation}`,
+      'ffmpeg | render',
+    ].join('\n');
+    expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
+  });
 });
 
 describe('pruneUnverifiableSections', () => {
@@ -56,5 +74,14 @@ describe('pruneUnverifiableSections', () => {
     const citedPart = pruned.split('未证实或缺失的信息')[0];
     expect(citedPart).toContain('Node.js is required');
     expect(citedPart).not.toContain('ffmpeg is optional');
+  });
+});
+
+describe('ensureVerifiableSources', () => {
+  it('keeps bare filenames of read files but drops unread source paths', () => {
+    const content = `Details are in \`README.md\`, not \`missing.md\`. ${citation}`;
+    const cleaned = ensureVerifiableSources(content, evidences, 'zh');
+    expect(cleaned).toContain('`README.md`');
+    expect(cleaned).not.toContain('missing.md');
   });
 });

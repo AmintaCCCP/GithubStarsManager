@@ -88,7 +88,11 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
     // path as evidence. The final answer may only cite a file-and-line reference
     // generated from ToolEvidence.
     const looksLikeSourcePath = /(?:^|\/)[^\s`]+\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|json|ya?ml|toml|sh|py|go|rs|java|rb|php|cs|html|css|scss|sql)(?:\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)?$/i.test(token);
-    return looksLikeSourcePath ? '' : whole;
+    if (!looksLikeSourcePath) return whole;
+    // 已读文件的裸文件名（如 `package.json`）是正常叙述，不能当未核验来源删掉。
+    const pathPart = token.split(/\s*[-—–]\s*/)[0].replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+    const isReadFile = evidences.some((item) => (item.path ?? '').replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase() === pathPart);
+    return isReadFile ? whole : '';
   });
 };
 
@@ -145,27 +149,34 @@ const hasAnyValidReference = (content: string, evidences: ToolEvidence[]): boole
   return false;
 };
 
-const LIST_ITEM_LINE_RE = /^(?:[-*+]|\d+[.)])\s+/;
+const LIST_ITEM_LINE_RE = /^\s*(?:[-*+]|\d+[.)])\s+/;
 
 const isTableSeparatorRow = (line: string): boolean => {
   const trimmed = line.trim();
-  return trimmed.startsWith('|') && /^[\s|:-]+$/.test(trimmed) && trimmed.includes('-');
+  return /^[\s|:-]+$/.test(trimmed) && trimmed.includes('-') && trimmed.includes('|');
 };
 
 /**
  * 把小节拆成可核验单元：列表项逐项、表格逐行（排除表头与分隔行），
  * 其余内容作为整体单元。标题不进入单元（由调用方按小节排除）。
+ * 表格不要求前导竖线：含 `|` 且与分隔行相邻成块的行都按表格行核验。
  */
 const checkableUnits = (section: string): string[] => {
   const lines = section.split('\n');
+  const separatorAt = new Set(lines.map((line, index) => (isTableSeparatorRow(line) ? index : -1)).filter((index) => index >= 0));
+  const tableRowAt = new Set<number>();
+  for (let i = 0; i < lines.length; i += 1) {
+    if (separatorAt.has(i) || !lines[i].includes('|')) continue;
+    if (separatorAt.has(i + 1) || separatorAt.has(i - 1) || tableRowAt.has(i - 1)) tableRowAt.add(i);
+  }
   const units: string[] = [];
   const proseLines: string[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    if (isTableSeparatorRow(line)) continue;
-    if (line.trim().startsWith('|')) {
-      // 分隔行紧随其后的行是表头，不属于事实内容。
-      if (lines[i + 1] !== undefined && isTableSeparatorRow(lines[i + 1])) continue;
+    if (separatorAt.has(i)) continue;
+    // 分隔行紧邻其上的行是表头，不属于事实内容。
+    if (separatorAt.has(i + 1)) continue;
+    if (tableRowAt.has(i)) {
       units.push(line);
       continue;
     }

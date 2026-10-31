@@ -862,7 +862,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       const fallbackPath = (fallbackScope === 'code' ? unreadCode : unreadDocumentation)[0];
       plan = fallbackPath ? { targets: [{ path: fallbackPath, sections: [], purpose: missing[0] || understanding.target, scope: fallbackScope }], rationale: 'bounded fallback after an unavailable plan' } : null;
     }
-    const plannedTargets = pendingTargets.length > 0 ? pendingTargets : (plan?.targets ?? []);
+    const plannedTargets = (pendingTargets.length > 0 ? pendingTargets : (plan?.targets ?? []))
+      .filter((target) => isRetryableRead(target.path));
     pendingTargets = [];
     // 大纲阶段可能已经下载了无标题文件。它们没有章节可匹配，若本轮不补证据，
     // 后续会因路径已读而永远跳过。只在规划失败时前置，避免挤掉有效计划。
@@ -918,6 +919,12 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     targets.forEach((target) => knownTargetKeys.add(targetKey(target)));
 
     if (targets.length === 0) {
+      // 候选耗尽时，若还有未拉取（含读取失败重试）的 meta 来源，先补拉再收尾。
+      const unfetchedMeta = metaIntentTargets.filter((path) => !metaFetched.has(path));
+      if (metaEligible && unfetchedMeta.length > 0 && turns < budget.maxTurns && hasTime()) {
+        pendingTargets = unfetchedMeta.map((path) => ({ path, sections: [], purpose: missing[0] || understanding.target, scope: 'meta' as const }));
+        continue;
+      }
       finalReason = input.language === 'zh' ? '没有剩余的相关文件可供检索。' : 'No relevant repository files remain to inspect.';
       canAnswer = evidences.length > 0;
       break;
@@ -984,24 +991,38 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       requirement.status === 'verified' || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
     ));
     consecutiveNoProgressRounds = added > 0 || discoveredViableTarget ? 0 : consecutiveNoProgressRounds + 1;
+    // 最新版本类问题：文档即使已覆盖全部要求，若 Release/Issue 来源还没拉过，
+    // 也先补拉再作答，避免沿用过期的 README 版本号。
+    const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
+    const metaBudgetAvailable = turns + 1 <= budget.maxTurns && hasTime();
+    const schedulePendingMeta = (): void => {
+      metaEligible = true;
+      consecutiveNoProgressRounds = 0;
+      pendingTargets = [
+        ...gate.recommendedTargets.filter((target) => target.scope !== 'code' || codeEligible),
+        ...unfetchedMetaTargets.map((path) => ({ path, sections: [], purpose: missing[0] || understanding.target, scope: 'meta' as const })),
+      ];
+      emit({ toolName: 'escalate_to_meta', status: 'success', paramSummary: input.language === 'zh' ? '补充 Release / Issue 来源' : 'Adding release/issue sources', stage: 'escalation', round: turns, detail: finalReason || (input.language === 'zh' ? '问题指向发布物或已知问题，补充仓库元信息来源。' : 'The question targets releases or known issues; adding repository metadata sources.') });
+    };
     // Completion is bounded by the user's explicit and necessary requirements,
     // not by extra areas the gate might prefer to research.
     if (allApplicableRequirementsVerified && evidences.length > 0) {
-      canAnswer = true;
-      break;
+      if (unfetchedMetaTargets.length === 0 || !metaBudgetAvailable) {
+        canAnswer = true;
+        break;
+      }
+      schedulePendingMeta();
     }
-    // meta 安全网要补拉 Release/Issue 时，先不要按 stop 结束：
-    // 最新版本类问题还缺 @meta 来源，直接作答会漏读关键证据。
-    const metaSafetyNetPending = gate.nextAction === 'stop' && !metaEligible
-      && metaIntentTargets.length > 0
-      && metaIntentTargets.some((path) => !metaFetched.has(path))
-      && turns + 1 <= budget.maxTurns
-      && hasTime();
-    if (gate.nextAction === 'stop' && !metaSafetyNetPending) {
-      // A bounded “no reasonable source” decision can still yield a useful,
-      // source-scoped answer that marks the unmet user request as unconfirmed.
-      canAnswer = evidences.length > 0;
-      break;
+    if (gate.nextAction === 'stop') {
+      // meta 安全网要补拉 Release/Issue 时，先不要按 stop 结束：
+      // 最新版本类问题还缺 @meta 来源，直接作答会漏读关键证据。
+      if (unfetchedMetaTargets.length === 0 || !metaBudgetAvailable) {
+        // A bounded “no reasonable source” decision can still yield a useful,
+        // source-scoped answer that marks the unmet user request as unconfirmed.
+        canAnswer = evidences.length > 0;
+        break;
+      }
+      schedulePendingMeta();
     }
     // 文档检索出现停滞时，若代码预算与候选仍在且预算还有执行余量，自动解锁
     // 代码取证：文档没写清楚的默认值、参数与具体行为常常只有代码能回答。
