@@ -25,7 +25,7 @@
   <img src="./assets/readme/sections/see-it.zh.svg" width="100%" alt="先看界面 — Stars、搜索、Release 与仓库问答的产品截图。">
 </p>
 
-<https://github.com/user-attachments/assets/2f7e44c9-7a7e-40dc-9601-269b27c1ec6e>
+https://github.com/user-attachments/assets/ad3493a0-948a-4de5-8de1-4e9afc46ec4d
 
 <table>
   <tr>
