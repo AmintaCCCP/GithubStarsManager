@@ -361,7 +361,7 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Features']);
   });
 
-  it('adds no intro when the README opens with a lower-level heading', () => {
+  it('keeps the opening section under its own heading when the README opens with a lower-level heading', () => {
     const document = documentFrom([
       '## License',
       'MIT License.',
@@ -372,12 +372,52 @@ describe('selectFastPathSegments', () => {
     ].join('\n'));
 
     // README 第一行是二级标题（`## License`）：该章节从第 1 行开始，其后内容
-    // 属于章节而非导语。general 问题只返回 Features，不把 License 章节内容
-    // 误标为 Overview 导语段。
+    // 属于章节而非导语。审计 UEIs 要求该内容不得误标为 Overview 导语段；
+    // 审计 ULc4 进一步要求内容不得丢失：首个章节以自身标题（License）作为
+    // label 进入证据段。
+    const segments = selectFastPathSegments(document, 'general', 'What features does this project have?');
+    expect(segments.map((segment) => segment.label)).toEqual(['License', 'Features']);
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 4 });
+    expect(segments[0]?.excerpt).toContain('MIT License.');
+    expect(segments[0]?.excerpt).toContain('Copyright 2024.');
+    expect(segments[1]).toMatchObject({ lineStart: 5, lineEnd: 6 });
+  });
+
+  it('keeps the opening section description when the README starts with a descriptive section', () => {
+    const document = documentFrom([
+      '## Example Project',
+      'A documented example project for repository research.',
+      '',
+      '## Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 ULc4：首行为二级标题时，其下的描述内容不得因跳过 Overview 导语而
+    // 丢失——首个章节以自身标题（Example Project）作为 label 携带描述内容进入
+    // 证据段，且不出现 Overview 误标（审计 UEIs）。
+    const segments = selectFastPathSegments(document, 'general', 'What does this project do?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Example Project', 'Features']);
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
+    expect(segments[0]?.excerpt).toContain('A documented example project');
+  });
+
+  it('does not duplicate the opening section when it is itself a matched section', () => {
+    const document = documentFrom([
+      '## Features',
+      'Fast and small.',
+      '',
+      '## License',
+      'MIT.',
+    ].join('\n'));
+
+    // 首个章节（Features）本身就是 general 命中章节：只保留该章节自身一段，
+    // 不再以首个章节段或 Overview 导语的形式重复输出其内容。
     const segments = selectFastPathSegments(document, 'general', 'What features does this project have?');
     expect(segments.map((segment) => segment.label)).toEqual(['Features']);
     expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
-    expect(segments[0]).toMatchObject({ lineStart: 5, lineEnd: 6 });
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
   });
 
   it('adds no intro for non-general foci even when the README has an introduction', () => {

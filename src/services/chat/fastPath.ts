@@ -62,11 +62,14 @@ const headingRelevance = (title: string, terms: string[]): number => {
  * - 每个命中的意图保留章节名额：未被已选章节覆盖的意图先取其得分最高的
  *   匹配章节（同一章节可覆盖多个意图，已覆盖的意图不占新名额），剩余名额
  *   按得分补足到 3 段，避免多意图问题只保留单一意图的章节；
- * - general 意图同时带上首个标题前的导语段；导语段与意图保留章节一并参与
- *   名额分配（名额有余直接入选并固定占据 segments[0]，名额已满只挤出排序
- *   最低的填充章节）。截断优先级：意图保留章节 > 导语段 > 未被意图保留的
- *   填充章节——已保留的意图章节不会被导语段或低分填充章节挤出；意图保留
- *   章节占满 3 个名额的极端组合下导语段让位。
+ * - general 意图同时带上文档开头的前导段，前导段有两种互斥形态：README 首行
+ *   是 H1（或首个标题不在第 1 行）时为首个标题前的导语段（Overview）；README
+ *   首行即二级或更低层级标题时为首个章节本身，以该章节自身标题作为 label
+ *   （内容不误标 Overview，也不因跳过导语而丢失）。前导段与意图保留章节一并
+ *   参与名额分配（名额有余直接入选并固定占据 segments[0]，名额已满只挤出
+ *   排序最低的填充章节）。截断优先级：意图保留章节 > 前导段 > 未被意图保留
+ *   的填充章节——已保留的意图章节不会被前导段或低分填充章节挤出；意图保留
+ *   章节占满 3 个名额的极端组合下前导段让位。
  */
 export const selectFastPathSegments = (
   document: CachedDocument,
@@ -98,39 +101,56 @@ export const selectFastPathSegments = (
     if (chosen.size >= 3) break;
     chosen.add(item);
   }
-  let intro: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
-  // README 首行即为二级或更低层级标题（如 `## License`）时，第 1 行已是章节起点，
-  // 其后内容属于该章节而非导语：不生成 Overview 导语段（首个行号 >1 的标题之前
-  // 不存在导语内容，不能把首个章节误标为导语）。首行为 H1（`# 标题`）或首个标题
-  // 不在第 1 行时保持原有导语逻辑。
-  const openingHeading = document.headings[0];
-  const opensWithLowerLevelHeading = openingHeading !== undefined && openingHeading.lineStart === 1 && openingHeading.level > 1;
-  if (focus === 'general' && !opensWithLowerLevelHeading) {
-    const lines = document.content.split('\n');
-    const firstHeading = document.headings.find((heading) => heading.level <= 2 && heading.lineStart > 1);
-    const introEnd = Math.min(lines.length, (firstHeading?.lineStart ?? lines.length + 1) - 1, 80);
-    if (introEnd >= 3 && !Array.from(chosen).some((item) => item.segment.lineStart <= 3)) {
-      const introSegment = {
-        lineStart: 1,
-        lineEnd: introEnd,
-        excerpt: lines.slice(0, introEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
-        label: 'Overview',
-      };
+  // 前导段（导语位）：general 焦点证据的固定开头，两种形态按首个标题位置互斥。
+  // (a) README 首行即为二级或更低层级标题（如 `## License`、`## Example Project`）：
+  //     第 1 行已是章节起点，其后内容属于该章节而非导语。守卫分支改为选中首个
+  //     章节（审计 ULc4：其描述内容不得因跳过 Overview 导语而丢失），并以该章节
+  //     自身标题（如 `License`、`Example Project`）作为 label（审计 UEIs：不得把
+  //     章节内容误标为 Overview）。章节边界复用 sectionSegments 的切章语义，与其
+  //     他证据段完全一致；首个章节本身已是选中章节（如 `## Features` 开头且被
+  //     命中）时不再重复入选。
+  // (b) 首行为 H1（`# 标题`）或首个标题不在第 1 行：首个标题之前的行是真正的
+  //     导语，按原有逻辑生成 Overview 导语段。
+  // 同一 README 只会命中其中一种形态，不会既出 Overview 导语又出首个章节的
+  // 重复内容。
+  let lead: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
+  if (focus === 'general') {
+    const openingHeading = document.headings[0];
+    const opensWithLowerLevelHeading = openingHeading !== undefined && openingHeading.lineStart === 1 && openingHeading.level > 1;
+    if (openingHeading && opensWithLowerLevelHeading) {
+      const openingSection = sectionSegments(document, [openingHeading.title])
+        .find((segment) => segment.lineStart === openingHeading.lineStart) ?? null;
+      if (openingSection && !Array.from(chosen).some((item) => item.segment.lineStart === openingHeading.lineStart)) {
+        lead = openingSection;
+      }
+    } else {
+      const lines = document.content.split('\n');
+      const firstHeading = document.headings.find((heading) => heading.level <= 2 && heading.lineStart > 1);
+      const introEnd = Math.min(lines.length, (firstHeading?.lineStart ?? lines.length + 1) - 1, 80);
+      if (introEnd >= 3 && !Array.from(chosen).some((item) => item.segment.lineStart <= 3)) {
+        lead = {
+          lineStart: 1,
+          lineEnd: introEnd,
+          excerpt: lines.slice(0, introEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
+          label: 'Overview',
+        };
+      }
+    }
+    if (lead) {
       if (chosen.size >= 3) {
-        // 名额已满：只牺牲排序最低的填充章节给导语段让位；填充章节为空
-        // （意图保留章节占满名额）时导语段让位，绝不挤占保留章节。
+        // 名额已满：只牺牲排序最低的填充章节给前导段让位；填充章节为空
+        // （意图保留章节占满名额）时前导段让位，绝不挤占保留章节。
         const fillerItems = ranked.filter((item) => chosen.has(item) && !reserved.has(item));
         if (fillerItems.length > 0) {
           chosen.delete(fillerItems[fillerItems.length - 1]);
-          intro = introSegment;
+        } else {
+          lead = null;
         }
-      } else {
-        intro = introSegment;
       }
     }
   }
   const segments = ranked.filter((item) => chosen.has(item)).map((item) => item.segment);
-  return intro ? [intro, ...segments] : segments;
+  return lead ? [lead, ...segments] : segments;
 };
 
 /**
