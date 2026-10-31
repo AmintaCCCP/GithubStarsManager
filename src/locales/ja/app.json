@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "ローカルセッションを維持する(日数)",
     "deleting-an-individual-conversation-always-takes": "単一セッションの削除は常に直ちに有効になります。",
     "advanced-settings": "詳細設定",
-    "used-by-the-chat-window-when-task-depth-is-defau": "これらのパラメータは、チャット ウィンドウのタスクの深さとして「デフォルト」が選択されている場合に使用されます。",
+    "used-by-the-chat-window-when-task-depth-is-defau": "チャットウィンドウがデフォルトおよびクイック深度で使用する詳細設定",
     "external-web-search-and-fetch": "外部 Web 検索とクロール",
     "disabled-by-default-the-current-version-does-not": "デフォルトではオフです。現在のバージョンではツールとして公開されていません。",
     "tool-loop-mode-experimental": "ツール ループ モード (実験的)",

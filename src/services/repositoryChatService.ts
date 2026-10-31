@@ -27,6 +27,7 @@ export {
   documentationCandidatesFrom,
   evidenceFromSegments,
   evidenceSearchTerms,
+  isFileEntry,
   isRepositoryCodePath,
   linkedDocumentationPaths,
   makeEvidence,
@@ -45,10 +46,12 @@ export {
   resolveTurnLimits,
   runEvidenceDrivenRepositoryChatTurn,
   synthesizeVerifiedAnswer,
+  tryFastPathAnswer,
 } from './chat/loop';
 export type { CachedDocument, TreeEntry } from './chat/retrieval';
 export type {
   ChatToolEventInput,
+  FastPathAttemptContext,
   RepositoryChatTurnInput,
   RepositoryChatTurnResult,
 } from './chat/loop';

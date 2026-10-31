@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Manter sessões locais (dias)",
     "deleting-an-individual-conversation-always-takes": "A exclusão de uma única sessão sempre entra em vigor imediatamente.",
     "advanced-settings": "Configurações avançadas",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Esses parâmetros são usados ​​quando \"Padrão\" é selecionado para a profundidade da tarefa da janela de bate-papo.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Parâmetros avançados usados pela janela de conversa nas profundidades padrão e rápida",
     "external-web-search-and-fetch": "Pesquisa e rastreamento externos na web",
     "disabled-by-default-the-current-version-does-not": "Desativado por padrão; a versão atual não o expõe como uma ferramenta.",
     "tool-loop-mode-experimental": "Modo Loop de Ferramenta (Experimental)",

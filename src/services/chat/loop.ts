@@ -244,7 +244,11 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
   };
   // §5.5 turnMetrics：每轮结束（成功、证据不足或预算耗尽）都记录一次汇总事件。
   // 指标同时以人读摘要（paramSummary）与机器可读 JSON（detail）持久化到 toolEvents。
+  // 幂等：正常出口显式记录后，外层 finally 的兜底记录（aborted / error）自动跳过。
+  let metricsEmitted = false;
   const emitTurnMetrics = ({ fastPath, endReason, rounds }: { fastPath: boolean; endReason: string; rounds: number }): void => {
+    if (metricsEmitted) return;
+    metricsEmitted = true;
     const metrics: RepositoryChatTurnMetrics = {
       llmCalls,
       toolCalls,
@@ -529,6 +533,124 @@ export const synthesizeVerifiedAnswer = async (
   return finalContent ?? sourceBoundEvidenceDigest(input, evidences);
 };
 
+/** 引用键：证据窗口的唯一标识（两个执行循环与快速路径共用同一格式）。 */
+const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
+
+/** 快速路径尝试所需的共享上下文：由当前执行循环持有并传入。 */
+export interface FastPathAttemptContext {
+  input: RepositoryChatTurnInput;
+  github: ReturnType<typeof createGitHubApiService>;
+  owner: string;
+  repo: string;
+  /** detectResearchFocus 的结果（快速路径只服务 usage/general/deployment）。 */
+  focus: string;
+  /** 固定 SHA 文件树中的文件路径（用于定位根 README）。 */
+  treePaths: string[];
+  budget: RepositoryChatAgentBudget;
+  ai: AIService;
+  answerMaxTokens: number;
+  evidences: ToolEvidence[];
+  /** 回落场景下 README 链接文档解析所用的候选集合。 */
+  documentationCandidates: string[];
+  documents: Map<string, CachedDocument>;
+  /** 已读路径（含快速路径种入的 README），用于“已读”过滤。 */
+  readPaths: Set<string>;
+  /** 计入 maxReadFiles 预算的读取；快速路径预读不占用回落流程的预算。 */
+  budgetedReadPaths: Set<string>;
+  readSegments: Set<string>;
+  emit: (event: ChatToolEventInput) => void;
+  invokeTool: EvidenceToolbox['invokeTool'];
+  callModelWithRetry: EvidenceToolbox['callModelWithRetry'];
+  recordLlmCall: () => void;
+  recordFirstToken: () => void;
+  emitTurnMetrics: EvidenceToolbox['emitTurnMetrics'];
+}
+
+/**
+ * §1.1 README 快速路径尝试（两个执行循环共享）：命中并完成可核验回答时返回
+ * 回答文本（调用方直接结束本轮）；未启用 / 追问 / 意图不符 / 无匹配章节 /
+ * 回答不可核验时返回 null，调用方继续完整循环（README 已种入缓存复用）。
+ */
+export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promise<string | null> => {
+  const { input } = fastPath;
+  if (!resolveFastPathEnabled(input) || hasPriorAssistantTurn(input.messages)) return null;
+  if (fastPath.focus !== 'usage' && fastPath.focus !== 'general' && fastPath.focus !== 'deployment') return null;
+  const rootReadmePath = findRootReadmePath(fastPath.treePaths);
+  if (!rootReadmePath) return null;
+
+  const fileResult = await fastPath.invokeTool(
+    'read_repo_file',
+    { path: rootReadmePath, ref: input.session.sourceRefSha },
+    rootReadmePath,
+    'retrieval',
+    undefined,
+    input.language === 'zh'
+      ? '快速路径：优先读取根 README，判断能否直接回答。'
+      : 'Fast path: read the root README first to try answering directly.',
+    async (signal) => {
+      const readFile = () => MARKDOWN_EVIDENCE_PATH.test(rootReadmePath)
+        ? fastPath.github.getRepositoryMarkdownEvidenceFile(fastPath.owner, fastPath.repo, rootReadmePath, input.session.sourceRefSha, signal)
+        : fastPath.github.getRepositoryFile(fastPath.owner, fastPath.repo, rootReadmePath, input.session.sourceRefSha, signal);
+      try {
+        return await readFile();
+      } catch (error) {
+        if (!isTransientAgentError(error)) throw error;
+        return await readFile();
+      }
+    },
+  );
+  if (!fileResult.ok) return null;
+  // 种入完整循环的共享缓存：快速路径未命中或回答不可核验回落时，README 不再
+  // 重复读取（也避免 invokeTool 的重复动作拦截误伤后续读取）。预读不占用
+  // maxReadFiles 预算（审计意见：回落流程要保留预算给真正需要的文档）。
+  const readmeDocument: CachedDocument = {
+    path: fileResult.value.path,
+    content: fileResult.value.content,
+    headings: makeMarkdownHeadings(fileResult.value.content),
+    // 快速路径先于完整 documentationSet 构建：链接解析使用调用方候选，
+    // 仅影响回落场景下规划器对 README 链接文档的感知。
+    linkedDocumentationPaths: linkedDocumentationPaths(fileResult.value.content, rootReadmePath, new Set(fastPath.documentationCandidates)),
+  };
+  fastPath.documents.set(readmeDocument.path, readmeDocument);
+  fastPath.readPaths.add(readmeDocument.path);
+  const segments = selectFastPathSegments(readmeDocument, fastPath.focus, input.question);
+  const newSegments = segments.filter((segment) => {
+    const key = segmentKey(readmeDocument.path, segment.lineStart, segment.lineEnd);
+    if (fastPath.readSegments.has(key)) return false;
+    fastPath.readSegments.add(key);
+    return true;
+  });
+  if (newSegments.length === 0) return null;
+  const fastPathEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, readmeDocument, newSegments);
+  fastPath.evidences.push(...fastPathEvidence);
+  fastPath.emit({
+    toolName: 'read_repo_file',
+    status: 'success',
+    paramSummary: `${readmeDocument.path} · ${segments.map((segment) => segment.label).filter(Boolean).join(' / ')}`,
+    stage: 'retrieval',
+    detail: input.language === 'zh'
+      ? 'README 快速路径命中相关章节，跳过检索规划直接生成回答。'
+      : 'The README fast path matched relevant sections; skipping planning to answer directly.',
+    resultSize: fastPathEvidence.reduce((size, evidence) => size + evidence.excerpt.length, 0),
+  });
+  // 快速路径回答：提示词允许模型声明“README 未覆盖 X”（§1.1）。
+  const fastPathAnswer = await synthesizeVerifiedAnswer(
+    fastPath.ai,
+    input,
+    fastPath.evidences,
+    1,
+    fastPath.answerMaxTokens,
+    fastPath.callModelWithRetry,
+    fastPathAnswerNote(input.language),
+    { recordLlmCall: fastPath.recordLlmCall, recordFirstToken: fastPath.recordFirstToken },
+  );
+  if (fastPathAnswer && fastPathAnswer !== sourceBoundEvidenceDigest(input, fastPath.evidences)) {
+    fastPath.emitTurnMetrics({ fastPath: true, endReason: 'fast_path', rounds: 0 });
+    return fastPathAnswer;
+  }
+  return null;
+};
+
 /**
  * LLM-directed repository research loop. The model plans the next evidence
  * target; programmatic code constrains candidate paths, duplicate reads,
@@ -539,16 +661,32 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   if (!input.githubToken) throw new Error(input.language === 'zh' ? '请先配置 GitHub token。' : 'Configure a GitHub token before asking this repository.');
   if (!input.question.trim()) throw new Error(input.language === 'zh' ? '请输入问题。' : 'Enter a question.');
 
+  const { budget, answerMaxTokens } = resolveTurnLimits(input);
+  const ai = new AIService(input.aiConfig, input.language);
+  const ctx = createEvidenceToolbox(input, budget, ai);
+  const state = { rounds: 0 };
+  try {
+    return await runOrchestratedEvidenceLoop(input, { ai, ctx, budget, answerMaxTokens, state });
+  } finally {
+    // §5.5：用户中止或模型/工具异常的轮次也记录汇总事件；正常结束已在出口
+    // 记录过（emitTurnMetrics 幂等），这里只在缺失时补记 aborted / error。
+    ctx.emitTurnMetrics({ fastPath: false, endReason: input.signal?.aborted ? 'aborted' : 'error', rounds: state.rounds });
+  }
+};
+
+const runOrchestratedEvidenceLoop = async (
+  input: RepositoryChatTurnInput,
+  deps: { ai: AIService; ctx: EvidenceToolbox; budget: RepositoryChatAgentBudget; answerMaxTokens: number; state: { rounds: number } },
+): Promise<RepositoryChatTurnResult> => {
+  const { ai, ctx, budget, answerMaxTokens, state } = deps;
   const [owner, repo] = splitOwnerAndRepo(input.repository.full_name);
   const github = createGitHubApiService(input.githubToken);
-  const ai = new AIService(input.aiConfig, input.language);
-  const { budget, answerMaxTokens } = resolveTurnLimits(input);
-  const ctx = createEvidenceToolbox(input, budget, ai);
   const evidences: ToolEvidence[] = [];
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
   const knownTargetKeys = new Set<string>();
   const readPaths = new Set<string>();
+  const budgetedReadPaths = new Set<string>();
   const codeReadPaths = new Set<string>();
   const failedReadAttempts = new Map<string, number>();
   const isRetryableRead = (path: string): boolean => (failedReadAttempts.get(path) ?? 0) < 2;
@@ -593,92 +731,35 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const preliminaryRankedPaths = rankedCandidatePaths(treeResult.value.entries, input.question, fallbackFocus);
   const preliminaryDocumentationCandidates = documentationCandidatesFrom(preliminaryRankedPaths);
 
-  const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
-
   // ---- §1.1 README 快速路径：usage/general/deployment 首问在 understanding
   // 之前用确定性规则匹配根 README 章节，命中即跳过 understanding/plan/gate
   // 直接合成回答，把回答前的 LLM 调用压缩到 1 次。追问（已有助手回答）、
   // deep/unlimited 档位与设置开关关闭时走完整循环；README 命中失败或回答
   // 被判不可核验时同样回落完整循环（README 已种入缓存，取证可复用）。
-  if (resolveFastPathEnabled(input) && !hasPriorAssistantTurn(input.messages)) {
-    const fastPathFocus = fallbackFocus;
-    if (fastPathFocus === 'usage' || fastPathFocus === 'general' || fastPathFocus === 'deployment') {
-      const rootReadmePath = findRootReadmePath(allPaths);
-      if (rootReadmePath && readPaths.size < budget.maxReadFiles) {
-        const fileResult = await invokeTool(
-          'read_repo_file',
-          { path: rootReadmePath, ref: input.session.sourceRefSha },
-          rootReadmePath,
-          'retrieval',
-          undefined,
-          input.language === 'zh'
-            ? '快速路径：优先读取根 README，判断能否直接回答。'
-            : 'Fast path: read the root README first to try answering directly.',
-          async (signal) => {
-            const readFile = () => MARKDOWN_EVIDENCE_PATH.test(rootReadmePath)
-              ? github.getRepositoryMarkdownEvidenceFile(owner, repo, rootReadmePath, input.session.sourceRefSha, signal)
-              : github.getRepositoryFile(owner, repo, rootReadmePath, input.session.sourceRefSha, signal);
-            try {
-              return await readFile();
-            } catch (error) {
-              if (!isTransientAgentError(error)) throw error;
-              return await readFile();
-            }
-          },
-        );
-        if (fileResult.ok) {
-          // 种入完整循环的共享缓存：快速路径未命中或回答不可核验回落时，
-          // README 不再重复读取（也避免 invokeTool 的重复动作拦截误伤后续读取）。
-          const readmeDocument: CachedDocument = {
-            path: fileResult.value.path,
-            content: fileResult.value.content,
-            headings: makeMarkdownHeadings(fileResult.value.content),
-            // 快速路径先于完整 documentationSet 构建：链接解析使用预初步候选，
-            // 仅影响回落场景下规划器对 README 链接文档的感知。
-            linkedDocumentationPaths: linkedDocumentationPaths(fileResult.value.content, rootReadmePath, new Set(preliminaryDocumentationCandidates)),
-          };
-          documents.set(readmeDocument.path, readmeDocument);
-          readPaths.add(readmeDocument.path);
-          const segments = selectFastPathSegments(readmeDocument, fastPathFocus);
-          const newSegments = segments.filter((segment) => {
-            const key = segmentKey(readmeDocument.path, segment.lineStart, segment.lineEnd);
-            if (readSegments.has(key)) return false;
-            readSegments.add(key);
-            return true;
-          });
-          if (newSegments.length > 0) {
-            const fastPathEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, readmeDocument, newSegments);
-            evidences.push(...fastPathEvidence);
-            emit({
-              toolName: 'read_repo_file',
-              status: 'success',
-              paramSummary: `${readmeDocument.path} · ${segments.map((segment) => segment.label).filter(Boolean).join(' / ')}`,
-              stage: 'retrieval',
-              detail: input.language === 'zh'
-                ? 'README 快速路径命中相关章节，跳过检索规划直接生成回答。'
-                : 'The README fast path matched relevant sections; skipping planning to answer directly.',
-              resultSize: fastPathEvidence.reduce((size, evidence) => size + evidence.excerpt.length, 0),
-            });
-            // 快速路径回答：提示词允许模型声明“README 未覆盖 X”（§1.1）。
-            const fastPathAnswer = await synthesizeVerifiedAnswer(
-              ai,
-              input,
-              evidences,
-              1,
-              answerMaxTokens,
-              ctx.callModelWithRetry,
-              fastPathAnswerNote(input.language),
-              { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
-            );
-            if (fastPathAnswer && fastPathAnswer !== sourceBoundEvidenceDigest(input, evidences)) {
-              ctx.emitTurnMetrics({ fastPath: true, endReason: 'fast_path', rounds: 0 });
-              return { content: fastPathAnswer, evidences };
-            }
-          }
-        }
-      }
-    }
-  }
+  const fastPathAnswer = await tryFastPathAnswer({
+    input,
+    github,
+    owner,
+    repo,
+    focus: fallbackFocus,
+    treePaths: allPaths,
+    budget,
+    ai,
+    answerMaxTokens,
+    evidences,
+    documentationCandidates: preliminaryDocumentationCandidates,
+    documents,
+    readPaths,
+    budgetedReadPaths,
+    readSegments,
+    emit,
+    invokeTool,
+    callModelWithRetry,
+    recordLlmCall: ctx.recordLlmCall,
+    recordFirstToken: ctx.recordFirstToken,
+    emitTurnMetrics: ctx.emitTurnMetrics,
+  });
+  if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
 
   const fallbackUnderstanding: QueryUnderstanding = {
     intent: 'general',
@@ -749,8 +830,11 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const documentInFlight = new Map<string, Promise<CachedDocument | null>>();
 
   const loadDocumentUncached = async (path: string, scope: RetrievalScope, round: number | undefined, summary: string, detail: string): Promise<CachedDocument | null> => {
-    if (readPaths.size >= budget.maxReadFiles || (scope === 'code' && codeReadPaths.size >= budget.maxCodeReads)) return null;
+    // 预算按“计入预算的读取”计算：快速路径种入的 README 已读但不占预算，
+    // 回落流程仍能用完整的 maxReadFiles 读取真正需要的文档。
+    if (budgetedReadPaths.size >= budget.maxReadFiles || (scope === 'code' && codeReadPaths.size >= budget.maxCodeReads)) return null;
     readPaths.add(path);
+    budgetedReadPaths.add(path);
     if (scope === 'code') codeReadPaths.add(path);
     const fileResult = await invokeTool(
       'read_repo_file',
@@ -772,6 +856,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       // 失败的读取不占用读取预算，允许规划器稍后重试一次；
       // 失败两次的目标不再进入未读候选，避免反复撞同一堵墙。
       readPaths.delete(path);
+      budgetedReadPaths.delete(path);
       if (scope === 'code') codeReadPaths.delete(path);
       failedReadAttempts.set(path, (failedReadAttempts.get(path) ?? 0) + 1);
       return null;
@@ -838,7 +923,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       : documentationSet.has(target.path);
     if (!permitted) return false;
     // 已缓存文档的未读章节不占读取预算；只有未缓存的新文件才受 maxReadFiles 限制。
-    if (!document) return readPaths.size < budget.maxReadFiles;
+    if (!document) return budgetedReadPaths.size < budget.maxReadFiles;
     if (target.scope === 'documentation') {
       return citableSegmentsForDocument(
         document,
@@ -1005,6 +1090,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
 
   while (turns < budget.maxTurns && hasTime()) {
     turns += 1;
+    state.rounds = turns;
     const unreadDocumentation = documentationCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const unreadCode = codeCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const planPrompt = buildRetrievalPlanPrompt(

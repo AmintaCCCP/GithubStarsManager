@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "保留本机会话（天）",
     "deleting-an-individual-conversation-always-takes": "删除单个会话始终立即生效。",
     "advanced-settings": "高级设置",
-    "used-by-the-chat-window-when-task-depth-is-defau": "聊天窗口任务深度选“默认”时使用这些参数",
+    "used-by-the-chat-window-when-task-depth-is-defau": "问答窗口在默认与快速档位下使用的高级参数",
     "external-web-search-and-fetch": "外部网页搜索与抓取",
     "disabled-by-default-the-current-version-does-not": "默认关闭；当前版本不会将其暴露为工具。",
     "tool-loop-mode-experimental": "工具循环模式（实验性）",

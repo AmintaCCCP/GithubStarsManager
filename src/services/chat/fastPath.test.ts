@@ -68,10 +68,33 @@ describe('selectFastPathSegments', () => {
       'MIT.',
     ].join('\n'));
 
-    const segments = selectFastPathSegments(document, 'usage');
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install this project?');
     expect(segments.map((segment) => segment.label)).toEqual(['Install', 'Requirements']);
     expect(segments[0]).toMatchObject({ lineStart: 3, lineEnd: 5 });
     expect(segments[0].excerpt).toContain('npx example install');
+  });
+
+  it('ranks matched sections by question wording before taking the first three', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Setup',
+      'Prepare the environment.',
+      '',
+      '## Usage',
+      'Daily commands.',
+      '',
+      '## Requirements',
+      'Node.js 20+.',
+      '',
+      '## Installation',
+      'Run `npx example install`.',
+    ].join('\n'));
+
+    // 问题明确指向安装：Installation（文档中排最后）应排在纯前置条件之前，
+    // 而不是按文档顺序截取前三段。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Setup', 'Usage']);
   });
 
   it('caps the matched sections at three', () => {
@@ -94,8 +117,30 @@ describe('selectFastPathSegments', () => {
       'e',
     ].join('\n'));
 
-    const segments = selectFastPathSegments(document, 'usage');
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install and get started?');
     expect(segments).toHaveLength(3);
+    expect(segments.map((segment) => segment.label)).toContain('Getting started');
+    expect(segments.map((segment) => segment.label)).toContain('Installation');
+  });
+
+  it('collects sections across intents when the question spans them (install and deploy)', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Install',
+      'Run `npx example install`.',
+      '',
+      '## Deployment',
+      'Deploy with Docker.',
+      '',
+      '## License',
+      'MIT.',
+    ].join('\n'));
+
+    // “如何安装并部署”的主 focus 是 deployment（detectResearchFocus 优先级），
+    // 但问题原话同时命中 usage 意图：Install 章节必须一并进入证据。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I install and deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Install', 'Deployment']);
   });
 
   it('adds the pre-heading introduction for general questions once', () => {
@@ -111,13 +156,13 @@ describe('selectFastPathSegments', () => {
       'MIT.',
     ].join('\n'));
 
-    const segments = selectFastPathSegments(document, 'general');
+    const segments = selectFastPathSegments(document, 'general', 'What does this project do?');
     expect(segments[0]).toMatchObject({ lineStart: 1, label: 'Overview' });
     expect(segments[0]?.excerpt).toContain('A documented example project');
     expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Features']);
   });
 
-  it('matches deployment sections only for the deployment focus', () => {
+  it('keeps unrelated sections out for a single-intent question', () => {
     const document = documentFrom([
       '# Example Project',
       '',
@@ -128,12 +173,14 @@ describe('selectFastPathSegments', () => {
       'Client and worker.',
     ].join('\n'));
 
-    expect(selectFastPathSegments(document, 'deployment').map((segment) => segment.label)).toEqual(['Deployment']);
-    expect(selectFastPathSegments(document, 'usage')).toEqual([]);
+    expect(selectFastPathSegments(document, 'deployment', 'How do I deploy this project?').map((segment) => segment.label)).toEqual(['Deployment']);
+    expect(selectFastPathSegments(document, 'usage', 'How do I install this project?')).toEqual([]);
+    // 问题原话同时命中部署意图时，即使主 focus 是 usage 也纳入 Deployment 章节。
+    expect(selectFastPathSegments(document, 'usage', 'How do I deploy this project?').map((segment) => segment.label)).toEqual(['Deployment']);
   });
 
   it('returns no segments when the README has no matching heading', () => {
     const document = documentFrom(['# Example Project', '', '## Changelog', '1.0.0'].join('\n'));
-    expect(selectFastPathSegments(document, 'usage')).toEqual([]);
+    expect(selectFastPathSegments(document, 'usage', 'How do I install this project?')).toEqual([]);
   });
 });

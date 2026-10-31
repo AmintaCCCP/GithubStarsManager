@@ -85,6 +85,8 @@ const turnInput = (question: string) => ({
   aiConfig,
   language: 'en' as const,
   maxToolsPerTurn: 12,
+  // 本套件覆盖原生工具循环自身的决策行为；README 快速路径由 loop.fastPath.test.ts 覆盖。
+  fastPath: false,
   agentBudget: { maxTurns: 6, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
 });
 

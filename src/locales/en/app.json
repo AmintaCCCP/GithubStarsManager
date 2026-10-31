@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Retain local conversations (days)",
     "deleting-an-individual-conversation-always-takes": "Deleting an individual conversation always takes effect immediately.",
     "advanced-settings": "Advanced settings",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Used by the chat window when task depth is “Default”",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Advanced parameters used by the chat window for the default and quick task depths",
     "external-web-search-and-fetch": "External web search and fetch",
     "disabled-by-default-the-current-version-does-not": "Disabled by default; the current version does not expose it as a tool.",
     "tool-loop-mode-experimental": "Tool-loop mode (experimental)",

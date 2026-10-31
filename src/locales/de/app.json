@@ -606,7 +606,7 @@
     "retain-local-conversations-days": "Lokale Sitzungen (Tage) beibehalten",
     "deleting-an-individual-conversation-always-takes": "Das Löschen einer einzelnen Sitzung wird immer sofort wirksam.",
     "advanced-settings": "Erweiterte Einstellungen",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Diese Parameter werden verwendet, wenn „Standard“ für die Aufgabentiefe des Chatfensters ausgewählt ist.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Erweiterte Parameter, die das Chat-Fenster bei den Tiefen „Standard“ und „schnell“ verwendet",
     "external-web-search-and-fetch": "Externe Websuche und Crawling",
     "disabled-by-default-the-current-version-does-not": "Standardmäßig deaktiviert; Die aktuelle Version stellt es nicht als Tool zur Verfügung.",
     "tool-loop-mode-experimental": "Werkzeugschleifenmodus (experimentell)",

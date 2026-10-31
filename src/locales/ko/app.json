@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "로컬 세션 유지(일)",
     "deleting-an-individual-conversation-always-takes": "단일 세션을 삭제하면 항상 즉시 적용됩니다.",
     "advanced-settings": "고급 설정",
-    "used-by-the-chat-window-when-task-depth-is-defau": "이러한 매개변수는 채팅 창 작업 깊이에 대해 \"기본값\"이 선택된 경우 사용됩니다.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "채팅 창이 기본 및 빠른 깊이에서 사용하는 고급 매개변수",
     "external-web-search-and-fetch": "외부 웹 검색 및 크롤링",
     "disabled-by-default-the-current-version-does-not": "기본적으로 꺼져 있습니다. 현재 버전에서는 이를 도구로 노출하지 않습니다.",
     "tool-loop-mode-experimental": "도구 루프 모드(실험적)",

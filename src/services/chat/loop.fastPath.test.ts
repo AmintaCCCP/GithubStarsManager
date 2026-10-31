@@ -6,6 +6,7 @@ import type { ChatToolEventInput } from './loop';
 const mocks = vi.hoisted(() => ({
   generateChatText: vi.fn(),
   generateChatTextStream: vi.fn(),
+  generateWithTools: vi.fn(),
   getRepositoryTree: vi.fn(),
   getRepositoryFile: vi.fn(),
   getRepositoryMarkdownEvidenceFile: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock('../githubApiFactory', () => ({
   }),
 }));
 
+import { runToolLoopRepositoryChatTurn } from '../agentToolLoop';
 import { runEvidenceDrivenRepositoryChatTurn, type RepositoryChatTurnInput } from './loop';
 
 const repository: Repository = {
@@ -265,5 +267,80 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     const metrics = turnMetricsEvent(events);
     expect(metrics).toMatchObject({ fastPath: false });
     expect(metrics?.llmCalls).toBe(mocks.generateChatText.mock.calls.length);
+  });
+
+  it('answers install and deployment questions with evidence from both matched sections', async () => {
+    const readme = [
+      '# Example Project',
+      '',
+      '## Install',
+      'Run `npx example install`.',
+      '',
+      '## Deployment',
+      'Deploy with `docker compose up`.',
+    ].join('\n');
+    configureTreeAndFiles({ 'README.md': readme });
+    respondByPrompt({
+      answer: () => 'Install with `npx example install` `/README.md - 3-5` and deploy with docker `/README.md - 6-7`',
+    });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install and deploy this project?', {
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    // 问题同时命中安装与部署意图：两类章节都进入证据，仍是单次回答调用。
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(1);
+    expect(result.evidences.map((evidence) => evidence.lineStart)).toEqual([3, 6]);
+    expect(result.content).toContain('npx example install');
+    expect(result.content).toContain('/README.md - 6-7');
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: true, endReason: 'fast_path', llmCalls: 1 });
+  });
+
+  it('keeps the read budget available for the fallback loop when maxReadFiles is 1', async () => {
+    configureTreeAndFiles({ 'README.md': '# Example Project\n\n## Changelog\n\n1.0.0', 'docs/deploy.md': 'plain deployment notes without headings' });
+    respondByPrompt({});
+    const events: ChatToolEventInput[] = [];
+
+    await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      agentBudget: { maxTurns: 4, maxToolCalls: 12, maxReadFiles: 1, maxCodeReads: 0, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    // 快速路径的 README 预读不占用读取预算：回落循环仍能读取部署文档。
+    const deployReads = mocks.getRepositoryFile.mock.calls.filter((call: unknown[]) => call[2] === 'docs/deploy.md');
+    expect(deployReads).toHaveLength(1);
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false });
+  });
+
+  it('answers through the fast path in the native tool loop without model tool calls', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
+    respondByPrompt({ answer: () => CITED_ANSWER });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runToolLoopRepositoryChatTurn(turnInput('How do I install this project?', {
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(mocks.generateWithTools).not.toHaveBeenCalled();
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(1);
+    expect(result.evidences).toHaveLength(1);
+    expect(result.evidences[0]).toMatchObject({ path: 'README.md', lineStart: 3, lineEnd: 5 });
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: true, endReason: 'fast_path', llmCalls: 1, rounds: 0 });
+  });
+
+  it('records an aborted turn_metrics event when the user stops the turn', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL });
+    respondByPrompt({});
+    const events: ChatToolEventInput[] = [];
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      signal: controller.signal,
+      onToolEvent: (event) => events.push(event),
+    }))).rejects.toThrow();
+
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false, endReason: 'aborted' });
   });
 });

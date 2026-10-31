@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Сохранить локальные сеансы (дни)",
     "deleting-an-individual-conversation-always-takes": "Удаление одного сеанса всегда вступает в силу немедленно.",
     "advanced-settings": "Расширенные настройки",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Эти параметры используются, когда для глубины задачи окна чата выбрано «По умолчанию».",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Дополнительные параметры окна диалога для уровней «по умолчанию» и «быстрый»",
     "external-web-search-and-fetch": "Внешний веб-поиск и сканирование",
     "disabled-by-default-the-current-version-does-not": "По умолчанию выключено; текущая версия не представляет его как инструмент.",
     "tool-loop-mode-experimental": "Режим цикла инструмента (экспериментальный)",
