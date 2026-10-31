@@ -691,4 +691,153 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Features']);
     expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 4 });
   });
+
+  it('returns no segments when only unrelated headings follow a first-line note', () => {
+    const document = documentFrom([
+      'A CLI for managing stars.',
+      '',
+      '## License',
+      'MIT.',
+    ].join('\n'));
+
+    // 审计 U7mU：首行为普通说明文字、其后只有无关标题时，Overview 前导段不得
+    // 单独充当快速路径证据——无任何匹配章节（chosen 为空）时不产出前导段，
+    // 返回空数组让调用方回落完整检索循环。与首章节前导段（形态 a）的
+    // chosen.size > 0 条件保持语义一致。
+    expect(selectFastPathSegments(document, 'general', 'How do I install this project?')).toEqual([]);
+  });
+
+  it('does not keep a heading-only opening-section lead between nested headings', () => {
+    const document = documentFrom([
+      '## License',
+      '### Metadata',
+      '### Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 U7mX：`## License` → `### Metadata` → `### Features` 布局中，导语
+    // 范围只含标题行（Metadata 本身也是标题行），“非空正文”判定必须排除标题行，
+    // 仅含标题的导语段不得保留，输出只保留带正文的 Features 章节。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Features']);
+    expect(segments.some((segment) => segment.label === 'License')).toBe(false);
+    expect(segments[0]).toMatchObject({ lineStart: 3, lineEnd: 4 });
+  });
+
+  it('excludes a heading-only section that directly precedes a same-level heading', () => {
+    const document = documentFrom([
+      '## Installation',
+      '## License',
+      'MIT.',
+    ].join('\n'));
+
+    // 审计 U7mc：`## Installation` 后紧跟同级标题、自身无正文（区间内只有标题
+    // 行）时不得进入快速路径证据——不重叠候选同样要求正文，返回空数组回落
+    // 完整检索循环，避免以空章节作答。
+    expect(selectFastPathSegments(document, 'usage', 'How do I install this project?')).toEqual([]);
+  });
+
+  it('skips a heading-only section and keeps the next matched section with body', () => {
+    const document = documentFrom([
+      '## Installation',
+      '## Deployment',
+      'Deploy with Docker.',
+    ].join('\n'));
+
+    // 审计 U7mc 补充：同意图的纯标题章节被跳过后，名额继续留给下一个带正文的
+    // 匹配章节（Deployment），Installation 不进入证据。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I install and deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment']);
+    expect(segments.some((segment) => segment.label === 'Installation')).toBe(false);
+  });
+
+  it('keeps the parent prefix and admits the nested child beyond the excerpt truncation point', () => {
+    const padding = 'x'.repeat(25_000);
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      padding,
+      '### Docker',
+      'Docker compose steps.',
+    ].join('\n'));
+
+    // 审计 U7mZ：父章节正文超 24,000 字符后 excerpt 截断，嵌套子章节（Docker，
+    // 第 4 行）落在截断点之后——不得再按“被包含方向”跳过。保留父章节前缀
+    // （含 Deploy with Docker.）并纳入子章节，子章节说明出现在证据 excerpt 中。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
+    expect(segments[0]?.excerpt).toContain('Deploy with Docker.');
+    expect(segments[0]?.excerpt).not.toContain('Docker compose steps.');
+    expect(segments[1]).toMatchObject({ lineStart: 4, lineEnd: 5 });
+    expect(segments[1]?.excerpt).toContain('Docker compose steps.');
+    expect(segments.length).toBeLessThanOrEqual(3);
+  });
+
+  it('preserves sibling sections after the truncated parent for slot allocation', () => {
+    const padding = 'x'.repeat(25_000);
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      padding,
+      '### Docker',
+      'Docker compose steps.',
+      '### macOS',
+      'macOS install steps.',
+    ].join('\n'));
+
+    // 审计 U7mi：包含方向截断父章节后，位于截断点之后、父章节原区间内的其余
+    // 小节（macOS，第 6–7 行）不得静默丢弃——作为独立候选段参与名额分配
+    // （2 段已选 + 1 个剩余名额），行区间与已选段两两不重叠。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'macOS']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
+    expect(segments[1]).toMatchObject({ lineStart: 4, lineEnd: 5 });
+    expect(segments[2]).toMatchObject({ lineStart: 6, lineEnd: 7 });
+    expect(segments[2]?.excerpt).toContain('macOS install steps.');
+    for (let i = 0; i < segments.length; i += 1) {
+      for (let j = i + 1; j < segments.length; j += 1) {
+        expect(segments[j]!.lineStart).toBeGreaterThan(segments[i]!.lineEnd);
+      }
+    }
+  });
+
+  it('preserves sibling sections after a prefix-truncated parent without truncation', () => {
+    const document = documentFrom([
+      '## Installation',
+      'Install with npm.',
+      '### Deployment',
+      'Deploy with Docker.',
+      '### macOS',
+      'macOS install steps.',
+    ].join('\n'));
+
+    // 审计 U7mi（Up04 前缀截断路径）：Installation 因嵌套 Deployment 入选而
+    // 截断为前缀（1–2 行）后，其原区间内 Deployment 之后的 macOS（5–6 行）
+    // 同样作为独立候选段补入名额。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I install and deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Deployment', 'macOS']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 2 });
+    expect(segments[1]).toMatchObject({ lineStart: 3, lineEnd: 4 });
+    expect(segments[2]).toMatchObject({ lineStart: 5, lineEnd: 6 });
+    expect(segments[2]?.excerpt).toContain('macOS install steps.');
+  });
+
+  it('drops a parent whose truncated prefix has no body content and keeps the child', () => {
+    const headingLines = Array.from({ length: 4_000 }, (_, index) => `### note ${index}`);
+    const document = documentFrom([
+      '## Docker deployment',
+      ...headingLines,
+      '### Docker',
+      'Docker compose steps.',
+    ].join('\n'));
+
+    // 全局不变量（纯标题段不入证据）：父章节正文只有嵌套章节内的内容，被包含
+    // 方向截断后前缀只剩标题行——父章节整体丢弃，子章节（超出 excerpt 截断点，
+    // 审计 U7mZ 路径入选）保留，不输出纯标题段。父章节标题与问题词重合度更高，
+    // 保证其在排序中先于子章节入选。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy with Docker?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Docker']);
+    expect(segments[0]?.excerpt).toContain('Docker compose steps.');
+  });
 });

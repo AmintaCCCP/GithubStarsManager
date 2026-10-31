@@ -101,27 +101,62 @@ export const selectFastPathSegments = (
   // 全局不变量：任意两段输出的行号区间两两不重叠。sectionSegments 在同层级或
   // 更高层级标题处切章，嵌套章节（如 `## Installation` 下的 `### Deployment`）
   // 的区间完整落在外层章节区间内，候选与已选区间重叠时按双向语义处置（审计
-  // Up04 + nitpick），让实现本身满足该不变量，而非依赖测试 oracle：
+  // Up04 + nitpick + U7mZ），让实现本身满足该不变量，而非依赖测试 oracle：
   // - 被包含方向（候选起始行落在某个已选章节行区间内，如已选 `## Features`
-  //   覆盖候选 `### Features detail`）：跳过该候选，不重复输出父章节内容；
+  //   覆盖候选 `### Features detail`）：候选起点落在父章节截断后仍覆盖的有效
+  //   区间（excerpt 截断行与已入选嵌套章节前缀终点的较小值）内才跳过，不重复
+  //   输出父章节内容（nitpick 场景不回归）；落在截断点之后（父章节正文超
+  //   24,000 字符后 excerpt 截断、子章节内容在其后，审计 U7mZ）则照常参与名额
+  //   分配，输出阶段把父章节截断为该子章节之前的前缀——保留父前缀并纳入子
+  //   章节，两段零重叠。截断后前缀只剩标题行（除标题行外无正文）时父章节整体
+  //   丢弃，不输出纯标题段。
   // - 包含方向（候选起始行早于某个已选章节起始行，如候选 `## Installation`
   //   覆盖已选 `### Deployment`）：候选截断为该已选章节起始行之前的前缀，前缀
   //   除标题行外无非空正文时整体跳过（不产出纯标题段），否则前缀作为证据段
   //   保留——label 仍为候选章节自身标题，安装说明等前缀正文不因子章节入选而
-  //   丢失。被包含方向优先：候选起点已落在已选区间内时，任何截断都无法避免
-  //   重叠，只能整体跳过。
+  //   丢失。被包含方向优先：候选起点已落在已选有效区间内时，任何截断都无法
+  //   避免重叠，只能整体跳过。
+  // - 包含方向截断后，位于截断点之后、父章节原区间内、未被任何已选段覆盖的
+  //   其余小节（如 `### macOS`，审计 U7mi）不匹配任何快速路径意图、其他检索
+  //   路径也不会选中它们，而快速路径接受部分引用的回答、不回落完整流程——
+  //   它们作为独立候选段补入名额（优先级：意图保留 > 前导段 > 填充 > 剩余
+  //   小节），受 3 段上限与正文校验约束，行区间与全部已选段两两不重叠。
   const headingLinePattern = /^\s{0,3}#{1,6}\s/;
   // 有效性下限（与导语段一致）：区间内除标题行外至少一行非空正文。
   const rangeHasBodyContent = (lineStart: number, lineEnd: number): boolean =>
     lines.slice(lineStart - 1, lineEnd).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
   type RankedItem = (typeof ranked)[number];
-  // 处置结果：null 无重叠；'contained' 被包含方向（跳过）；prefixEnd 为包含
+  // 章节 excerpt 按 MAX_EVIDENCE_EXCERPT_CHARS 截断后仍覆盖到的最后一行（审计
+  // U7mZ）：第 L 行在章节拼接文本中的起始偏移等于其前各行长度与换行符之和，
+  // 起始偏移小于上限的最后一行即 excerpt 实际覆盖到的行。章节正文超上限时，
+  // 截断点之后的行不出现在 excerpt 里，不能视作已被该章节的证据覆盖。
+  const excerptCoveredLineEnd = (item: RankedItem): number => {
+    let offset = 0;
+    let coveredEnd = item.segment.lineStart;
+    for (let line = item.segment.lineStart; line <= item.segment.lineEnd; line += 1) {
+      if (offset >= MAX_EVIDENCE_EXCERPT_CHARS) break;
+      coveredEnd = line;
+      offset += lines[line - 1].length + 1;
+    }
+    return coveredEnd;
+  };
+  // 处置结果：null 无有效重叠；'contained' 被包含方向（跳过）；prefixEnd 为包含
   // 方向前缀的末行（最早的被包含已选章节起始行之前，多个被包含章节取最早）。
+  // 被包含方向的判定基准是父章节截断后仍覆盖的有效区间（审计 U7mZ）：取
+  // excerpt 截断覆盖行与已入选嵌套章节的前缀截断终点的较小值——候选起点落在
+  // 有效区间内才跳过；落在截断点之后（父章节正文超 24,000 字符后的嵌套子章节）
+  // 则照常参与名额分配，由输出阶段把父章节截断为该子章节之前的前缀。
   const overlapDisposition = (candidate: RankedItem, pool: ReadonlySet<RankedItem>): null | 'contained' | { prefixEnd: number } => {
     let prefixEnd: number | null = null;
     for (const item of pool) {
       if (candidate.segment.lineStart > item.segment.lineStart && candidate.segment.lineStart <= item.segment.lineEnd) {
-        return 'contained';
+        let effectiveEnd = excerptCoveredLineEnd(item);
+        for (const nested of pool) {
+          if (nested !== item && nested.segment.lineStart > item.segment.lineStart && nested.segment.lineStart <= item.segment.lineEnd) {
+            effectiveEnd = Math.min(effectiveEnd, nested.segment.lineStart - 1);
+          }
+        }
+        if (candidate.segment.lineStart <= effectiveEnd) return 'contained';
       }
       if (candidate.segment.lineStart < item.segment.lineStart && item.segment.lineStart <= candidate.segment.lineEnd) {
         prefixEnd = prefixEnd === null ? item.segment.lineStart - 1 : Math.min(prefixEnd, item.segment.lineStart - 1);
@@ -129,9 +164,12 @@ export const selectFastPathSegments = (
     }
     return prefixEnd === null ? null : { prefixEnd };
   };
+  // 审计 U7mc：无重叠候选同样要求正文——纯标题章节（如紧跟同级标题、自身无
+  // 正文的 `## Installation`）不得进入证据，否则快速路径会以空章节作答并通过
+  // 核验直接返回，不再执行完整检索。
   const admits = (candidate: RankedItem, pool: ReadonlySet<RankedItem>): boolean => {
     const disposition = overlapDisposition(candidate, pool);
-    if (disposition === null) return true;
+    if (disposition === null) return rangeHasBodyContent(candidate.segment.lineStart, candidate.segment.lineEnd);
     if (disposition === 'contained') return false;
     return rangeHasBodyContent(candidate.segment.lineStart, disposition.prefixEnd);
   };
@@ -179,18 +217,23 @@ export const selectFastPathSegments = (
   // 重复内容；两种形态的前导段都满足“与任意已选章节零重叠”与“标题行之外
   // 至少一行非空内容”的全局不变量。
   let lead: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
+  // 形态 (a) 前导段的源章节原区间终点：前导段是开头章节被嵌套已选章节截断后的
+  // 前缀，其原区间内截断点之后的其余小节同样按 U7mi 补入剩余名额。
+  let leadSourceOriginalEnd: number | null = null;
   if (focus === 'general') {
     const openingHeading = document.headings[0];
     const opensWithLowerLevelHeading = openingHeading !== undefined && openingHeading.lineStart === 1 && openingHeading.level > 1;
     // 首行是否为标题行（审计 Up06）：首行为普通说明文字时，第 1 行本身就是
     // 导语内容，有效性下限不得把它排除在检查之外。
     const firstLineIsHeading = openingHeading?.lineStart === 1;
-    // 前导段有效性下限（审计 Ucta）：除起始标题行之外至少一行非空内容；纯标题
-    // （可再含空行）的前导段不产出，不消耗名额。首行不是标题时从第 1 行开始
-    // 检查（Up06：首行说明文字紧接标题、或隔空行再接标题的布局不再因检查起点
-    // 跳过首行而误判为空导语）；首行是标题（H1 或首章节标题）时照旧跳过第 1 行。
+    // 前导段有效性下限（审计 Ucta + U7mX）：除标题行之外至少一行非空正文；
+    // 标题行不计入内容（U7mX：`## License` → `### Metadata` → `### Features`
+    // 布局中仅含标题的导语段不得保留），与 rangeHasBodyContent 判定一致。
+    // 首行不是标题时从第 1 行开始检查（Up06：首行说明文字紧接标题、或隔空行
+    // 再接标题的布局不再因检查起点跳过首行而误判为空导语）；首行是标题（H1
+    // 或首章节标题）时照旧跳过第 1 行。
     const leadHasContentBeyondHeading = (lineEnd: number): boolean =>
-      lines.slice(firstLineIsHeading ? 1 : 0, lineEnd).some((line) => line.trim() !== '');
+      lines.slice(firstLineIsHeading ? 1 : 0, lineEnd).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
     if (openingHeading && opensWithLowerLevelHeading) {
       const openingSection = sectionSegments(document, [openingHeading.title])
         .find((segment) => segment.lineStart === openingHeading.lineStart) ?? null;
@@ -216,6 +259,7 @@ export const selectFastPathSegments = (
             excerpt: lines.slice(0, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
             label: openingSection.label,
           };
+          leadSourceOriginalEnd = openingSection.lineEnd;
         }
       }
     } else {
@@ -230,7 +274,10 @@ export const selectFastPathSegments = (
         firstChosenLineStart - 1,
         80,
       );
-      if (introEnd >= 1 && leadHasContentBeyondHeading(introEnd)) {
+      // 审计 U7mU：无任何匹配章节（chosen 为空）时不产出 Overview 前导段——
+      // 否则首行说明文字 + 仅无关标题的布局会以前导段单独回答并跳过完整检索，
+      // 应返回空数组回落完整循环。与形态 (a) 的 chosen.size > 0 条件语义一致。
+      if (introEnd >= 1 && chosen.size > 0 && leadHasContentBeyondHeading(introEnd)) {
         lead = {
           lineStart: 1,
           lineEnd: introEnd,
@@ -257,10 +304,11 @@ export const selectFastPathSegments = (
   // （如 Installation 先于 Deployment 入选且完整覆盖它），输出前把覆盖者的行区间
   // 截断到被覆盖章节起始行之前，保证任意两段输出零重叠；截断后的 excerpt 同步
   // 重建（只含前缀正文）。选择阶段的 admits 已保证不会选出被包含方向的重叠组合，
-  // 且覆盖者的截断终点在入选时即已确定（后入章节只会被 contained 跳过），故此
-  // 处重算与选择阶段的前缀一致。
+  // 且覆盖者的截断终点在入选时即已确定（后入章节只会被 contained 跳过或经 U7mZ
+  // 有效区间判定入选），故此处重算与选择阶段的前缀一致。
   const chosenItems = Array.from(chosen);
-  const effectiveSegments = new Map<RankedItem, { lineStart: number; lineEnd: number; excerpt: string; label: string }>();
+  type OutputSegment = { lineStart: number; lineEnd: number; excerpt: string; label: string };
+  const effectiveSegments = new Map<RankedItem, OutputSegment>();
   for (const item of chosenItems) {
     const nestedLineStarts = chosenItems
       .filter((other) => other !== item
@@ -276,7 +324,93 @@ export const selectFastPathSegments = (
       label: item.segment.label,
     });
   }
-  const segments = ranked.filter((item) => chosen.has(item)).map((item) => effectiveSegments.get(item) ?? item.segment);
+  // 全局不变量（纯标题段不入证据）：截断后除标题行外无正文的段整体丢弃，不
+  // 输出纯标题段（与前导段截断的 UctX 下限一致）。
+  const outputEntries: Array<{ score: number; segment: OutputSegment }> = [];
+  for (const item of chosenItems) {
+    const segment = effectiveSegments.get(item) ?? item.segment;
+    if (!rangeHasBodyContent(segment.lineStart, segment.lineEnd)) continue;
+    outputEntries.push({ score: item.score, segment });
+  }
+  // 审计 U7mi：包含方向截断（父章节为嵌套已选章节让位、或开头章节作为形态 (a)
+  // 前导段让位）后，截断点之后、原区间之内、未被任何已选段覆盖的其余小节不得
+  // 静默丢弃。这些小节作为独立候选段补入名额（优先级：意图保留 > 前导段 >
+  // 填充 > 剩余小节），受 3 段上限与正文校验约束；行区间与全部已选段及相互
+  // 之间两两不重叠。
+  const leftoverScopes: Array<{ scanStart: number; scanEnd: number }> = [];
+  for (const item of chosenItems) {
+    const segment = effectiveSegments.get(item) ?? item.segment;
+    if (segment.lineEnd >= item.segment.lineEnd) continue;
+    leftoverScopes.push({ scanStart: segment.lineEnd + 1, scanEnd: item.segment.lineEnd });
+  }
+  if (lead && leadSourceOriginalEnd !== null) {
+    leftoverScopes.push({ scanStart: lead.lineEnd + 1, scanEnd: leadSourceOriginalEnd });
+  }
+  const isCovered = (line: number): boolean =>
+    outputEntries.some((entry) => line >= entry.segment.lineStart && line <= entry.segment.lineEnd);
+  // 未覆盖行段：已选章节原区间两两嵌套或不相交（sectionSegments 切章语义），
+  // 同一段未覆盖区间会被内层章节与其外层章节重复枚举——按起点排序后合并相交
+  // 行段，只保留最大行段。
+  const rawRuns: Array<{ lineStart: number; lineEnd: number }> = [];
+  for (const scope of leftoverScopes) {
+    let line = scope.scanStart;
+    while (line <= scope.scanEnd) {
+      if (isCovered(line)) {
+        line += 1;
+        continue;
+      }
+      let runEnd = line;
+      while (runEnd + 1 <= scope.scanEnd && !isCovered(runEnd + 1)) runEnd += 1;
+      rawRuns.push({ lineStart: line, lineEnd: runEnd });
+      line = runEnd + 1;
+    }
+  }
+  rawRuns.sort((left, right) => left.lineStart - right.lineStart);
+  const leftoverRuns: Array<{ lineStart: number; lineEnd: number }> = [];
+  for (const run of rawRuns) {
+    const last = leftoverRuns[leftoverRuns.length - 1];
+    if (last && run.lineStart <= last.lineEnd) {
+      last.lineEnd = Math.max(last.lineEnd, run.lineEnd);
+      continue;
+    }
+    leftoverRuns.push({ lineStart: run.lineStart, lineEnd: run.lineEnd });
+  }
+  // 每个最大未覆盖行段内按文档顺序枚举章节（切章边界与 sectionSegments 一致，
+  // 收敛到行段内；已被前一段覆盖的标题跳过），无正文的章节不入证据（全局
+  // 不变量：纯标题段一律不入证据）。
+  const leftoverCandidates: Array<{ score: number; segment: OutputSegment }> = [];
+  for (const run of leftoverRuns) {
+    for (const heading of document.headings) {
+      if (heading.lineStart < run.lineStart || heading.lineStart > run.lineEnd) continue;
+      const next = document.headings.find((candidate) => candidate.lineStart > heading.lineStart && candidate.level <= heading.level);
+      const sectionEnd = Math.max(heading.lineStart, (next?.lineStart ?? lines.length + 1) - 1);
+      const lineEnd = Math.min(sectionEnd, run.lineEnd);
+      if (lineEnd < heading.lineStart) continue;
+      const preceding = leftoverCandidates.filter((entry) => entry.segment.lineEnd >= heading.lineStart);
+      if (preceding.length > 0) continue;
+      if (!rangeHasBodyContent(heading.lineStart, lineEnd)) continue;
+      leftoverCandidates.push({
+        score: rankByTitle(heading.title),
+        segment: {
+          lineStart: heading.lineStart,
+          lineEnd,
+          excerpt: lines.slice(heading.lineStart - 1, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
+          label: heading.title,
+        },
+      });
+    }
+  }
+  // 名额分配：意图保留章节与前导段优先，剩余小节仅在名额有余时补足（3 段上限）。
+  let slotBudget = 3 - outputEntries.length - (lead ? 1 : 0);
+  for (const candidate of leftoverCandidates) {
+    if (slotBudget <= 0) break;
+    outputEntries.push(candidate);
+    slotBudget -= 1;
+  }
+  // 输出保持相关度排序（导语段固定在最前，其后得分降序、行号升序），剩余小节
+  // 候选按同一比较规则并入。
+  outputEntries.sort((left, right) => right.score - left.score || left.segment.lineStart - right.segment.lineStart);
+  const segments = outputEntries.map((entry) => entry.segment);
   return lead ? [lead, ...segments] : segments;
 };
 
