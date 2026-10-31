@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./aiService', () => ({
   AIService: class {
     generateChatText = mocks.generateChatText;
+    generateChatTextDetailed = async (...args: Parameters<typeof mocks.generateChatText>) => ({ text: await mocks.generateChatText(...args), finishReason: 'stop' });
     generateChatTextStream = mocks.generateChatTextStream;
     generateWithTools = mocks.generateWithTools;
   },
@@ -270,9 +271,10 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
       agentBudget: { maxTurns: 4, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
     });
 
-    expect(readPaths()).toEqual(['README.md']);
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(5);
-    expect(result.content).toContain('2 consecutive rounds');
+    // 重复目标被过滤后先读回退文档，随后没有剩余候选即停止，不足结果被保留。
+    expect(readPaths()).toEqual(['README.md', 'docs/configuration.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain('No relevant repository files remain');
   });
 
   it('keeps keyword evidence when the planner returns prose instead of a retrieval plan', async () => {
@@ -427,9 +429,8 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
       }))
       .mockResolvedValueOnce(plan(target('.github/workflows/build-release.yml', [], 'late unique term')))
       .mockImplementationOnce(async ({ user }: { user: string }) => {
-        const evidenceStart = user.indexOf('BEGIN UNTRUSTED REPOSITORY CONTENT');
-        expect(evidenceStart).toBeGreaterThanOrEqual(0);
-        expect(user.slice(evidenceStart)).toContain('late-unique-term');
+        // Gate 阶段的证据按设计截断到 3000 字符，不再携带完整原文，但来源引用仍在。
+        expect(user).toContain('SOURCE: /.github/workflows/build-release.yml - 237-261');
         return gate({
           sufficient: true,
           requirements: [requirement('late unique term', 'verified', ['/.github/workflows/build-release.yml - 237-261'])],
@@ -483,6 +484,68 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(readPaths()).toEqual([]);
     expect(events.some((event) => event.status === 'error' && event.detail?.includes('tool or read budget'))).toBe(true);
     expect(result.content).toContain('insufficient');
+  });
+
+  it('accepts the HAR R2 gate response with annotated evidence and ends the loop in that round', async () => {
+    // HAR R2 的 gate 原文把注释写进 evidence 数组；宽松提取后引用仍可核验，
+    // 且 gate 以高置信度判定可回答时直接结束循环，不再进入下一轮规划。
+    const harGateResponse = JSON.stringify({
+      sufficient: true,
+      confidence: 0.85,
+      reason: 'The README installation section directly answers the explicit requirement.',
+      requirements: [
+        { requirement_id: 'explicit-1', requirement: 'install the project', status: 'verified', evidence: ['/README.md - 9-11（## Install：Install dependencies with `pnpm install`。）'] },
+      ],
+      next_action: 'answer',
+      recommended_targets: [],
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ intent: 'usage', explicit_requirements: ['install the project'], necessary_requirements: [] }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Installation'], 'install the project')))
+      .mockResolvedValueOnce(harGateResponse)
+      .mockResolvedValueOnce(answer('Install dependencies with `pnpm install`.', installRef, 'Installation'));
+
+    const result = await runRepositoryChatTurn(turnInput('How do I install this project?'));
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).toContain(installRef);
+    expect(result.content).not.toContain('insufficient');
+  });
+
+  it('keeps researching when the gate approves but one explicit requirement is still missing', async () => {
+    // 采纳 gate 的整体判定必须复用逐项核验的阻断规则：存在 missing 的
+    // explicit 要求时，即使 gate 声称 sufficient 也不能结束检索。
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ explicit_requirements: ['install the project', 'configure the port'] }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Installation'], 'install the project')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [
+          requirement('install the project', 'verified', [installRef]),
+          requirement('configure the port', 'missing'),
+        ],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Quick Start'], 'configure the port')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [
+          requirement('install the project', 'verified', [installRef]),
+          requirement('configure the port', 'verified', [quickStartRef]),
+        ],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('Install with pnpm, then set APP_PORT.', installRef, quickStartRef));
+
+    const result = await runRepositoryChatTurn(turnInput('How do I install and configure this project?'));
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(result.content).toContain(quickStartRef);
   });
 
   it('answers vector-search usage after its explicit steps are evidenced and ignores optional tuning invented by the gate', async () => {
@@ -861,7 +924,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     // 文档停滞一轮后自动解锁代码取证，第二轮读到代码并完成回答。
     expect(events.some((event) => event.toolName === 'escalate_to_code')).toBe(true);
-    expect(readPaths()).toEqual(['README.md', 'src/engine.ts']);
+    expect(readPaths()).toEqual(['README.md', 'docs/configuration.md', 'src/engine.ts']);
     expect(result.content).toContain(codeRef);
   });
 
@@ -1034,26 +1097,36 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
   });
 
   it('lets the unlimited task-depth preset exceed the default budget clamps', async () => {
+    // 每轮计划都读取一个新章节（有进展），gate 始终判定缺口未补：预算差异
+    // 只能通过轮数上限体现（unlimited 8 轮 vs 默认档 4 轮）。
+    const sections = Array.from({ length: 8 }, (_, index) => `## Topic ${index + 1}\n\nDetail ${index + 1} lives here.`);
     configureTreeAndFiles({
-      'README.md': README,
+      'README.md': ['# Example Project', '', ...sections].join('\n'),
       'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
     });
-    mocks.generateChatText
-      .mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }));
-    // 按 plan → gate 交替注册 5 轮；unlimited 档 maxNoProgressRounds=4，应执行满 4 轮（默认档 2 轮即停）。
-    for (let round = 0; round < 5; round += 1) {
-      mocks.generateChatText.mockResolvedValueOnce(plan(target('README.md', ['Not a real heading'], 'recheck missing feature documentation')));
-      mocks.generateChatText.mockResolvedValueOnce(gate({
-        sufficient: false,
-        requirements: [requirement('missing feature documentation', 'missing')],
-        nextAction: 'retrieve_more',
-      }));
-    }
+    const queueRoundMocks = (): void => {
+      for (let round = 0; round < 8; round += 1) {
+        mocks.generateChatText.mockResolvedValueOnce(plan(target('README.md', [`Topic ${round + 1}`], 'missing feature documentation')));
+        mocks.generateChatText.mockResolvedValueOnce(gate({
+          sufficient: false,
+          requirements: [requirement('missing feature documentation', 'missing')],
+          nextAction: 'retrieve_more',
+        }));
+      }
+    };
 
+    mocks.generateChatText.mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }));
+    queueRoundMocks();
     const result = await runRepositoryChatTurn({ ...turnInput('Where is the missing feature documented?'), taskDepth: 'unlimited' });
-
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(9);
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(1 + 8 * 2);
     expect(result.content).toContain('insufficient');
+
+    const callsBeforeDefault = mocks.generateChatText.mock.calls.length;
+    mocks.generateChatText.mockResolvedValueOnce(understanding({ expected_answer: ['missing feature documentation'], target: 'missing feature' }));
+    queueRoundMocks();
+    const defaultResult = await runRepositoryChatTurn({ ...turnInput('Where is the missing feature documented?'), taskDepth: 'default' });
+    expect(mocks.generateChatText.mock.calls.length - callsBeforeDefault).toBe(1 + 4 * 2);
+    expect(defaultResult.content).toContain('insufficient');
   });
 });
 

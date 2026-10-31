@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolEvidence } from '../../types/repositoryChat';
-import { ensureVerifiableSources, hasCompleteSourceReferences, pruneUnverifiableSections } from './citations';
+import { ensureVerifiableSources, extractReferenceToken, hasCompleteSourceReferences, pruneUnverifiableSections } from './citations';
 
 const evidence = (path: string, lineStart: number, lineEnd: number): ToolEvidence => ({
   id: `evidence-${path}-${lineStart}`,
@@ -93,5 +93,20 @@ describe('ensureVerifiableSources', () => {
     const cleaned = ensureVerifiableSources(content, evidences, 'zh');
     expect(cleaned).toContain('`README.md`');
     expect(cleaned).not.toContain('missing.md');
+  });
+});
+
+describe('extractReferenceToken', () => {
+  it('extracts the reference from an annotated evidence string (HAR R2 shape)', () => {
+    expect(extractReferenceToken('/README.md - 94-119（## Install：Install dependencies with pnpm install）')).toBe('/README.md - 94-119');
+  });
+
+  it('strips wrapping backticks and tolerates annotations before the reference', () => {
+    expect(extractReferenceToken('`/docs/setup.md - 3-9`')).toBe('/docs/setup.md - 3-9');
+    expect(extractReferenceToken('See （## Usage：/docs/usage.md - 10-12）')).toBe('/docs/usage.md - 10-12');
+  });
+
+  it('passes plain references through unchanged', () => {
+    expect(extractReferenceToken('/README.md - 94-119')).toBe('/README.md - 94-119');
   });
 });

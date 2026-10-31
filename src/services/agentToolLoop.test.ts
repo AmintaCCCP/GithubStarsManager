@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./aiService', () => ({
   AIService: class {
     generateChatText = mocks.generateChatText;
+    generateChatTextDetailed = async (...args: Parameters<typeof mocks.generateChatText>) => ({ text: await mocks.generateChatText(...args), finishReason: 'stop' });
     generateChatTextStream = mocks.generateChatTextStream;
     generateWithTools = mocks.generateWithTools;
   },
