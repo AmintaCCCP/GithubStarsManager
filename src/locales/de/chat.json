@@ -110,7 +110,8 @@
     "depth-deep-desc": "Mehrere Forensik- und Code-Lesungsrunden, geeignet für Details und Vergleiche",
     "depth-unlimited": "Keine Begrenzung",
     "depth-unlimited-desc": "Lösen Sie alle Einschränkungen und achten Sie auf Zeitverbrauch und Kontingent",
-    "depth-with-budget": "{{label}} · {{turns}} Runden/{{seconds}}s"
+    "depth-with-budget": "{{label}} · {{turns}} Runden/{{seconds}}s",
+    "turn-metrics": "Turn-Metriken"
   },
   "citationBadge": {
     "open-source-path-linestart": "Quelle ansehen {{path}}:{{lineStart}}",

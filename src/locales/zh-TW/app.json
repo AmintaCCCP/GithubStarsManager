@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "自動翻譯儲存庫描述",
     "when-enabled-card-repository-description": "開啟後，儲存庫頁與探索頁卡片上的儲存庫原始描述會自動翻譯成目前介面語言顯示；已是介面語言的描述保持原文，翻譯失敗時也顯示原文。",
     "free-google-endpoint-no-configuration-needed-may": "Google 免費接口，無需配置；部分地區可能無法直連。",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "微軟 Edge 免費接口，無需配置，直連速度快。"
+    "free-microsoft-edge-endpoint-no-configuration-ne": "微軟 Edge 免費接口，無需配置，直連速度快。",
+    "readme-fast-path": "README 快速路徑",
+    "for-simple-usage-overview-or-deployment-questions-ans": "簡單的使用、簡介或部署問題直接讀根 README 作答，跳過多輪檢索；深入/不限檔位自動關閉。"
   },
   "backendPanel": {
     "auto": "智慧",

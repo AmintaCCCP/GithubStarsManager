@@ -177,7 +177,10 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     zh ? `所有读取固定在 ref=${input.session.sourceRefSha.slice(0, 7)}。` : `All reads are pinned to ref=${input.session.sourceRefSha.slice(0, 7)}.`,
     async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
   );
-  if (!treeResult.ok) return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  if (!treeResult.ok) {
+    ctx.emitTurnMetrics({ fastPath: false, endReason: 'tree_read_failed', rounds: 0 });
+    return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  }
 
   const focus = detectResearchFocus(input.question);
   const rankedPaths = rankedCandidatePaths(treeResult.value.entries, input.question, focus);
@@ -393,6 +396,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       () => controller.abort(new DOMException(zh ? '模型决策超时。' : 'Model decision timed out.', 'TimeoutError')),
       Math.min(TOOL_LOOP_MODEL_TIMEOUT_MS, ctx.remainingMs()),
     );
+    ctx.recordLlmCall();
     return ai.generateWithTools({ system: systemPrompt, messages, tools, temperature: 0, maxTokens: 1_200, signal: controller.signal })
       .finally(() => {
         globalThis.clearTimeout(timeoutId);
@@ -404,6 +408,8 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
   let nudges = 0;
   let loopTurns = 0;
   let retriedModelCall = false;
+  // §5.5 turnMetrics 的结束原因；while 条件自然耗尽时在循环后兜底。
+  let endReason = '';
   while (!ready && loopTurns < budget.maxTurns && ctx.hasTime() && conversationChars < TOOL_LOOP_MAX_CONVERSATION_CHARS) {
     loopTurns += 1;
     emit({
@@ -436,6 +442,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
           round: loopTurns,
           detail: (error instanceof Error ? error.message : String(error)).slice(0, 160),
         });
+        endReason = 'model_error';
         break;
       }
       throw error;
@@ -455,6 +462,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     if (result.toolCalls.length === 0) {
       nudges += 1;
       if (evidences.length > 0 || nudges >= 2) {
+        endReason = 'agent_no_tools';
         ready = true;
         break;
       }
@@ -476,6 +484,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
         const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
         conversationChars += confirmText.length;
         messages.push({ role: 'tool', toolCallId: call.id, content: confirmText });
+        endReason = 'agent_ready';
         ready = true;
         break;
       }
@@ -485,7 +494,10 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     }
   }
 
+  if (!endReason) endReason = ctx.hasTime() ? 'turn_budget' : 'time_budget';
+
   if (evidences.length === 0) {
+    ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'insufficient_evidence', rounds: loopTurns });
     return {
       content: evidenceAgentInsufficientResponse(
         input.language,
@@ -496,6 +508,16 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     };
   }
 
-  const content = await synthesizeVerifiedAnswer(ai, input, evidences, Math.max(1, loopTurns), answerMaxTokens, ctx.callModelWithRetry);
+  const content = await synthesizeVerifiedAnswer(
+    ai,
+    input,
+    evidences,
+    Math.max(1, loopTurns),
+    answerMaxTokens,
+    ctx.callModelWithRetry,
+    '',
+    { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+  );
+  ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'agent_ready', rounds: loopTurns });
   return { content, evidences };
 };

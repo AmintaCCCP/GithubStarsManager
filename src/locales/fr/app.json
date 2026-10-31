@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "Traduire automatiquement les descriptions de dépôts",
     "when-enabled-card-repository-description": "Une fois activé, les descriptions d’origine des dépôts sur les cartes des pages dépôts et découverte sont automatiquement traduites dans la langue de l’interface. Les descriptions déjà dans cette langue restent inchangées, et le texte d’origine s’affiche en cas d’échec de la traduction.",
     "free-google-endpoint-no-configuration-needed-may": "L'interface gratuite de Google ne nécessite aucune configuration ; certaines zones peuvent ne pas être directement connectées.",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Interface gratuite Microsoft Edge, aucune configuration requise, la vitesse de connexion directe est rapide."
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Interface gratuite Microsoft Edge, aucune configuration requise, la vitesse de connexion directe est rapide.",
+    "readme-fast-path": "Chemin rapide du README",
+    "for-simple-usage-overview-or-deployment-questions-ans": "Pour les questions simples d'utilisation, de présentation ou de déploiement, répond directement depuis le README racine et saute la recherche multi-passes ; désactivé automatiquement en mode approfondi/illimité."
   },
   "backendPanel": {
     "auto": "intelligent",

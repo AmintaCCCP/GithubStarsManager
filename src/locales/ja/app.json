@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "リポジトリの説明を自動翻訳",
     "when-enabled-card-repository-description": "有効にすると、リポジトリページとディスカバリーページのカードに表示されるリポジトリの元の説明が、自動的にインターフェースの言語に翻訳されます。すでにその言語の説明は元のまま表示され、翻訳に失敗した場合も元のテキストが表示されます。",
     "free-google-endpoint-no-configuration-needed-may": "Google の無料インターフェースは設定を必要としません。一部のエリアは直接接続できない場合があります。",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Microsoft Edgeの無料インターフェイス、設定不要、直接接続速度は高速です。"
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Microsoft Edgeの無料インターフェイス、設定不要、直接接続速度は高速です。",
+    "readme-fast-path": "README 高速パス",
+    "for-simple-usage-overview-or-deployment-questions-ans": "簡単な使い方・概要・デプロイに関する質問は、ルート README から直接回答し、複数ラウンドの検索をスキップします。深掘り/無制限モードでは自動的にオフになります。"
   },
   "backendPanel": {
     "auto": "知的",

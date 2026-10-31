@@ -110,7 +110,8 @@
     "depth-deep-desc": "Несколько раундов криминалистики и чтения кода, подходящие для деталей и сравнения",
     "depth-unlimited": "Без ограничений",
     "depth-unlimited-desc": "Снимите все ограничения и обратите внимание на потребление времени и квоту.",
-    "depth-with-budget": "{{label}} · {{turns}} раундов/{{seconds}} с"
+    "depth-with-budget": "{{label}} · {{turns}} раундов/{{seconds}} с",
+    "turn-metrics": "Метрики хода"
   },
   "citationBadge": {
     "open-source-path-linestart": "Посмотреть источник {{path}}:{{lineStart}}",

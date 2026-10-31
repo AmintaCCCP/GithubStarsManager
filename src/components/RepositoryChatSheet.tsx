@@ -3,7 +3,7 @@ import type { AppLanguage } from '../i18n/languages';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, ArrowDown, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDot, Copy, ExternalLink, Gauge, History, Loader2, MessageSquareText, Plus, RotateCcw, Send, Square } from 'lucide-react';
 import type { Repository } from '../types';
-import type { RepositoryChatMessage, RepositoryChatTaskDepth, RepositoryChatToolEvent, ToolEvidence } from '../types/repositoryChat';
+import type { RepositoryChatMessage, RepositoryChatTaskDepth, RepositoryChatToolEvent, RepositoryChatTurnMetrics, ToolEvidence } from '../types/repositoryChat';
 import { TASK_DEPTH_PRESETS } from '../types/repositoryChat';
 import { useAppStore } from '../store/useAppStore';
 import { useDialog } from '../hooks/useDialog';
@@ -39,6 +39,20 @@ const formatToolDuration = (durationMs?: number): string | null => {
   return durationMs >= 1000 ? `${(durationMs / 1000).toFixed(durationMs >= 10_000 ? 0 : 1)}s` : `${durationMs}ms`;
 };
 
+/** 解析 turn_metrics 汇总事件 detail 中的 JSON；非法或缺失时返回 null。 */
+const parseTurnMetrics = (detail: string | undefined): RepositoryChatTurnMetrics | null => {
+  if (!detail) return null;
+  try {
+    const parsed: unknown = JSON.parse(detail);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const metrics = parsed as Record<string, unknown>;
+    if (typeof metrics.llmCalls !== 'number' || typeof metrics.toolCalls !== 'number' || typeof metrics.totalMs !== 'number') return null;
+    return parsed as RepositoryChatTurnMetrics;
+  } catch {
+    return null;
+  }
+};
+
 const stageLabels = (stage: RepositoryChatToolEvent['stage'], language: AppLanguage): string => {
   const t = makeT(language, 'chat');
   const known: Record<string, string> = {
@@ -69,11 +83,14 @@ const depthMeta = (depth: RepositoryChatTaskDepth, language: AppLanguage): { lab
 
 const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language: AppLanguage; isRunning: boolean }> = ({ events, language, isRunning }) => {
   const t = useT('chat');
-  const completed = events.filter((event) => event.status === 'success').length;
-  const failed = events.filter((event) => event.status === 'error').length;
-  const runningEvent = [...events].reverse().find((event) => event.status === 'running' || event.status === 'pending');
-  const totalDuration = events.reduce((total, event) => total + (event.durationMs ?? 0), 0);
-  const grouped = events.reduce<Array<{ stage: RepositoryChatToolEvent['stage']; round?: number; events: RepositoryChatToolEvent[] }>>((groups, event) => {
+  // §5.5 turnMetrics 汇总事件不进入步骤列表，仅在开发模式于底部展示指标。
+  const timelineEvents = events.filter((event) => event.toolName !== 'turn_metrics');
+  const turnMetrics = parseTurnMetrics(events.filter((event) => event.toolName === 'turn_metrics').at(-1)?.detail);
+  const completed = timelineEvents.filter((event) => event.status === 'success').length;
+  const failed = timelineEvents.filter((event) => event.status === 'error').length;
+  const runningEvent = [...timelineEvents].reverse().find((event) => event.status === 'running' || event.status === 'pending');
+  const totalDuration = timelineEvents.reduce((total, event) => total + (event.durationMs ?? 0), 0);
+  const grouped = timelineEvents.reduce<Array<{ stage: RepositoryChatToolEvent['stage']; round?: number; events: RepositoryChatToolEvent[] }>>((groups, event) => {
     const previous = groups[groups.length - 1];
     if (previous && previous.stage === event.stage && previous.round === event.round) {
       previous.events.push(event);
@@ -90,7 +107,7 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
         <HeaderIcon className={`h-4 w-4 shrink-0 ${isRunning ? 'animate-spin text-primary' : failed > 0 ? 'text-destructive' : 'text-emerald-500'}`} aria-hidden="true" />
         <span className="shrink-0 font-semibold text-foreground">{t('repositoryChatSheet.this-turn-s-work')}</span>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {completed}/{events.length}
+          {completed}/{timelineEvents.length}
           {!isRunning && totalDuration > 0 ? ` · ${formatToolDuration(totalDuration)}` : ''}
           {failed > 0 ? ` · ${t('repositoryChatSheet.failed-attention', { failed: failed })}` : ''}
         </span>
@@ -136,6 +153,17 @@ const ExecutionTimeline: React.FC<{ events: RepositoryChatToolEvent[]; language:
             );
           })}
         </div>
+        {/* §5.5：开发模式下的 turnMetrics 展示，便于调参；生产环境仅持久化。 */}
+        {import.meta.env.DEV && turnMetrics ? (
+          <p className="mt-2 border-t border-border/70 pt-2 font-mono text-[11px] text-muted-foreground" data-testid="turn-metrics">
+            {t('repositoryChatSheet.turn-metrics')}
+            {` · llm:${turnMetrics.llmCalls} · tools:${turnMetrics.toolCalls} · rounds:${turnMetrics.rounds}`}
+            {turnMetrics.ttftMs !== undefined ? ` · ttft:${formatToolDuration(turnMetrics.ttftMs) ?? `${turnMetrics.ttftMs}ms`}` : ''}
+            {` · total:${formatToolDuration(turnMetrics.totalMs) ?? `${turnMetrics.totalMs}ms`}`}
+            {turnMetrics.fastPath ? ' · fast-path' : ''}
+            {` · ${turnMetrics.endReason}`}
+          </p>
+        ) : null}
       </div>
     </details>
   );
