@@ -30,16 +30,6 @@ function makeWindow({ minimized = true, destroyed = false } = {}) {
   };
 }
 
-function withPlatform(platform, run) {
-  const original = process.platform;
-  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
-  try {
-    run();
-  } finally {
-    Object.defineProperty(process, 'platform', { value: original, configurable: true });
-  }
-}
-
 describe('scheduleMinimizeToTray', () => {
   it('defers hide until after the native minimize dispatch', () => {
     const win = makeWindow();
@@ -116,43 +106,19 @@ describe('scheduleMinimizeToTray', () => {
     assert.equal(win.hidden, false);
   });
 
-  it('clears the minimized state before hiding', () => {
-    const calls = [];
-    const win = makeWindow();
-    win.restore = () => {
-      calls.push('restore');
-      assert.equal(win.minimized, true);
-      win.minimized = false;
-    };
-    win.hide = () => {
-      calls.push('hide');
-      assert.equal(win.minimized, false);
-      win.hidden = true;
-    };
-
-    withPlatform('win32', () => {
-      scheduleMinimizeToTray({
-        win,
-        shouldHide: () => true,
-        schedule: (callback) => callback(),
-      });
-    });
-
-    assert.deepEqual(calls, ['restore', 'hide']);
-  });
-
-  it('hides without restoring outside Windows', () => {
+  it('hides without restoring, leaving iconic cleanup to tray-show', () => {
     const calls = [];
     const win = makeWindow();
     win.restore = () => calls.push('restore');
-    win.hide = () => calls.push('hide');
+    win.hide = () => {
+      calls.push('hide');
+      win.hidden = true;
+    };
 
-    withPlatform('darwin', () => {
-      scheduleMinimizeToTray({
-        win,
-        shouldHide: () => true,
-        schedule: (callback) => callback(),
-      });
+    scheduleMinimizeToTray({
+      win,
+      shouldHide: () => true,
+      schedule: (callback) => callback(),
     });
 
     assert.deepEqual(calls, ['hide']);
@@ -191,6 +157,10 @@ describe('registerDidFinishLoadPaintProbe', () => {
       /^\s*app\.commandLine\.appendSwitch\('disable-features', 'CalculateNativeWinOcclusion'\)/m,
     );
     assert.ok(switchAt > 0 && switchAt < readyAt);
+    assert.match(
+      source,
+      /^if \(process\.platform === 'win32'\) \{\n\s*app\.commandLine\.appendSwitch\('disable-features', 'CalculateNativeWinOcclusion'\)/m,
+    );
   });
 });
 
