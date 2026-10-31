@@ -136,6 +136,21 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     expect(bodies[1].thinking).toBeUndefined();
   });
 
+  it('falls back to a plain request when the endpoint rejects only the thinking field', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'Unknown parameter: thinking' } }), { status: 400 }))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ apiType: 'openai-compatible' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'u', purpose: 'internal-json' });
+
+    expect(result.text).toBe('{"ok":true}');
+    const bodies = chatBodies();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].response_format).toBeUndefined();
+    expect(bodies[1].thinking).toBeUndefined();
+  });
+
   it('falls back to a plain request when the backend proxy wraps the 400 as a plain error', async () => {
     (window.fetch as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(Object.assign(new Error('AI proxy error: 400 - response_format is not supported'), { statusCode: 400 }))

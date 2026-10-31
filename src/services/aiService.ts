@@ -1261,12 +1261,12 @@ ${options.user}` : options.user;
       if (
         isInternalJson
         && status === 400
-        && /response_format|text\.format|json_object/i.test(message)
+        && /response_format|text\.format|json_object|thinking/i.test(message)
       ) {
-        // 仅当错误正文表明端点不支持 JSON 模式时，才降级为普通请求重试一次；
-        // 无效模型、超长上下文等其它 400 属于必然失败，不重复发送。
-        // 降级重试同时省略内部步骤新增的 thinking 字段，端点拒绝未知参数时
-        // 重试才能成功；DeepSeek/MiMo 原有的 thinking 行为不受影响。
+        // 仅当错误正文表明端点不支持 JSON 模式或拒绝 thinking 参数时，才降级为
+        // 普通请求重试一次；无效模型、超长上下文等其它 400 属于必然失败，
+        // 不重复发送。降级重试同时省略内部步骤新增的 thinking 字段，端点拒绝
+        // 未知参数时重试才能成功；DeepSeek/MiMo 原有的 thinking 行为不受影响。
         return await this.requestTextResult({
           system: options.system,
           user: options.user,
