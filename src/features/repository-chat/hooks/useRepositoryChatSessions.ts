@@ -110,6 +110,7 @@ export const useRepositoryChatSessions = ({
       const session: RepositoryChatSession = {
         id: createId(),
         repoId: repository.id,
+        accountLogin: useAppStore.getState().user?.login,
         repoFullName: repository.full_name,
         sourceRefSha,
         title: defaultTitle(language),

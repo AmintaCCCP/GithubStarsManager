@@ -5,8 +5,11 @@ import { repositoryChatStorage } from '../../../services/repositoryChatStorage';
 import type { Repository } from '../../../types';
 
 vi.mock('../../../store/useAppStore', () => ({
-  useAppStore: (selector: (state: { githubToken: string; repositoryChatSettings: { retainSessionDays: number } }) => unknown) =>
-    selector({ githubToken: 'test-token', repositoryChatSettings: { retainSessionDays: 90 } }),
+  useAppStore: Object.assign(
+    (selector: (state: { githubToken: string; repositoryChatSettings: { retainSessionDays: number } }) => unknown) =>
+      selector({ githubToken: 'test-token', repositoryChatSettings: { retainSessionDays: 90 } }),
+    { getState: () => ({ user: { login: 'test-user' } }) },
+  ),
 }));
 
 const repository = {

@@ -50,6 +50,13 @@ const dateGroupKey = (value: string, now: number): DateGroupKey => {
   return 'earlier';
 };
 
+const msUntilNextLocalMidnight = (): number => {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(24, 0, 0, 0);
+  return next.getTime() - now.getTime();
+};
+
 export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   isOpen,
   onClose,
@@ -57,18 +64,21 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
 }) => {
   const language = useAppStore((state) => state.language);
   const allRepositories = useAppStore((state) => state.repositories ?? []);
+  const user = useAppStore((state) => state.user);
   const t = useT('chat');
   const [sessions, setSessions] = useState<RepositoryChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [page, setPage] = useState(0);
+  const [dateNow, setDateNow] = useState(() => Date.now());
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [pendingDeletion, setPendingDeletion] = useState<RepositoryChatSession | null>(null);
   // 重叠刷新只允许最新请求提交，避免旧结果覆盖新状态。
   const requestIdRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // 分页偏移跟随已加载数量，删除会话后下一页仍从列表末尾继续。
+  const loadedCountRef = useRef(0);
 
   const repositoryById = useMemo(() => {
     const map = new Map<number, Repository>();
@@ -108,7 +118,6 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
       if (requestId !== requestIdRef.current) return;
       setHasMore(nextSessions.length > PAGE_SIZE);
       setSessions(nextSessions.slice(0, PAGE_SIZE));
-      setPage(0);
     } catch {
       if (requestId !== requestIdRef.current) return;
       setLoadError(t('globalChatHistorySheet.failed-to-load-history-please-retry'));
@@ -119,19 +128,31 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
+    const generation = requestIdRef.current;
     setIsLoadingMore(true);
     try {
-      const nextPage = page + 1;
-      const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1, nextPage * PAGE_SIZE);
+      const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1, loadedCountRef.current);
+      if (generation !== requestIdRef.current) return;
       setHasMore(nextSessions.length > PAGE_SIZE);
       setSessions((previous) => [...previous, ...nextSessions.slice(0, PAGE_SIZE)]);
-      setPage(nextPage);
     } catch {
+      if (generation !== requestIdRef.current) return;
       setLoadError(t('globalChatHistorySheet.failed-to-load-history-please-retry'));
     } finally {
-      setIsLoadingMore(false);
+      if (generation === requestIdRef.current) setIsLoadingMore(false);
     }
-  }, [hasMore, isLoadingMore, page, t]);
+  }, [hasMore, isLoadingMore, t]);
+
+  useEffect(() => {
+    loadedCountRef.current = sessions.length;
+  }, [sessions]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setDateNow(Date.now());
+    const timer = setTimeout(() => setDateNow(Date.now()), msUntilNextLocalMidnight());
+    return () => clearTimeout(timer);
+  }, [isOpen, dateNow]);
 
   useEffect(() => {
     if (isOpen) {
@@ -157,13 +178,17 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   }, []);
 
   const visibleSessions = useMemo(() => {
+    // 新会话带账号标记；旧会话无标记，为兼容继续展示。
+    const accountSessions = user?.login
+      ? sessions.filter((session) => !session.accountLogin || session.accountLogin === user.login)
+      : sessions.filter((session) => !session.accountLogin);
     const normalizedQuery = query.trim().toLocaleLowerCase();
-    if (!normalizedQuery) return sessions;
-    return sessions.filter((session) =>
+    if (!normalizedQuery) return accountSessions;
+    return accountSessions.filter((session) =>
       session.title.toLocaleLowerCase().includes(normalizedQuery) ||
       session.repoFullName.toLocaleLowerCase().includes(normalizedQuery),
     );
-  }, [query, sessions]);
+  }, [query, sessions, user]);
 
   const formatTime = useCallback((value: string) => {
     const date = new Date(value);
@@ -178,9 +203,8 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
 
   const groupedSessions = useMemo(() => {
     const groups = new Map<DateGroupKey, RepositoryChatSession[]>();
-    const now = Date.now();
     visibleSessions.forEach((session) => {
-      const key = dateGroupKey(session.updatedAt, now);
+      const key = dateGroupKey(session.updatedAt, dateNow);
       const group = groups.get(key);
       if (group) group.push(session);
       else groups.set(key, [session]);
@@ -188,7 +212,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     return DATE_GROUP_KEYS
       .filter((key) => groups.has(key))
       .map((key) => ({ key, sessions: groups.get(key) as RepositoryChatSession[] }));
-  }, [visibleSessions]);
+  }, [visibleSessions, dateNow]);
 
   const dateGroupLabel = useCallback((key: DateGroupKey) => t(`globalChatHistorySheet.group-${key}`), [t]);
 
@@ -244,6 +268,10 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
               <Button type="button" variant="secondary" size="sm" onClick={() => void refresh()}>
                 {t('globalChatHistorySheet.retry')}
               </Button>
+            </div>
+          ) : visibleSessions.length === 0 && sessions.length > 0 && hasMore ? (
+            <div ref={sentinelRef} className="py-3 text-center text-xs text-muted-foreground" role="status">
+              {isLoadingMore ? t('globalChatHistorySheet.loading-history') : ''}
             </div>
           ) : visibleSessions.length === 0 ? (
             <div className="flex min-h-28 flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 text-center text-xs text-muted-foreground">

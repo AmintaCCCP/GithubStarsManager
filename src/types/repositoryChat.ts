@@ -9,6 +9,7 @@ export interface RepositoryChatRepoSnapshot {
 export interface RepositoryChatSession {
   id: string;
   repoId: number;
+  accountLogin?: string;
   repoFullName: string;
   sourceRefSha: string;
   title: string;
