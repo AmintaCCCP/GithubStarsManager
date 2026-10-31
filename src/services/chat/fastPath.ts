@@ -62,7 +62,11 @@ const headingRelevance = (title: string, terms: string[]): number => {
  * - 每个命中的意图保留章节名额：未被已选章节覆盖的意图先取其得分最高的
  *   匹配章节（同一章节可覆盖多个意图，已覆盖的意图不占新名额），剩余名额
  *   按得分补足到 3 段，避免多意图问题只保留单一意图的章节；
- * - general 意图同时带上首个标题前的导语段。
+ * - general 意图同时带上首个标题前的导语段；导语段与意图保留章节一并参与
+ *   名额分配（名额有余直接入选并固定占据 segments[0]，名额已满只挤出排序
+ *   最低的填充章节）。截断优先级：意图保留章节 > 导语段 > 未被意图保留的
+ *   填充章节——已保留的意图章节不会被导语段或低分填充章节挤出；意图保留
+ *   章节占满 3 个名额的极端组合下导语段让位。
  */
 export const selectFastPathSegments = (
   document: CachedDocument,
@@ -79,33 +83,48 @@ export const selectFastPathSegments = (
   const ranked = sectionSegments(document, matchedTitles, rankByTitle)
     .map((segment) => ({ segment, score: rankByTitle(segment.label) }))
     .sort((left, right) => right.score - left.score || left.segment.lineStart - right.segment.lineStart);
-  // 先按意图保名额，再按得分补足到 3 段；输出保持相关度排序（得分降序、行号升序）。
-  const chosen = new Set<(typeof ranked)[number]>();
+  // 先按意图保名额，再按得分补足到 3 段；导语段的名额分配在补足之后进行，
+  // 只能挤占填充章节（见上方截断优先级），因此无需再对结果做 slice 截断。
+  // 输出保持相关度排序（导语段固定在最前，其后得分降序、行号升序）。
+  const reserved = new Set<(typeof ranked)[number]>();
   for (const intent of intents) {
-    const covered = Array.from(chosen).some((item) => FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
+    const covered = Array.from(reserved).some((item) => FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
     if (covered) continue;
-    const best = ranked.find((item) => !chosen.has(item) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
-    if (best) chosen.add(best);
+    const best = ranked.find((item) => !reserved.has(item) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
+    if (best) reserved.add(best);
   }
+  const chosen = new Set(reserved);
   for (const item of ranked) {
     if (chosen.size >= 3) break;
     chosen.add(item);
   }
-  const segments = ranked.filter((item) => chosen.has(item)).map((item) => item.segment);
+  let intro: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
   if (focus === 'general') {
     const lines = document.content.split('\n');
     const firstHeading = document.headings.find((heading) => heading.level <= 2 && heading.lineStart > 1);
     const introEnd = Math.min(lines.length, (firstHeading?.lineStart ?? lines.length + 1) - 1, 80);
-    if (introEnd >= 3 && !segments.some((segment) => segment.lineStart <= 3)) {
-      segments.unshift({
+    if (introEnd >= 3 && !Array.from(chosen).some((item) => item.segment.lineStart <= 3)) {
+      const introSegment = {
         lineStart: 1,
         lineEnd: introEnd,
         excerpt: lines.slice(0, introEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
         label: 'Overview',
-      });
+      };
+      if (chosen.size >= 3) {
+        // 名额已满：只牺牲排序最低的填充章节给导语段让位；填充章节为空
+        // （意图保留章节占满名额）时导语段让位，绝不挤占保留章节。
+        const fillerItems = ranked.filter((item) => chosen.has(item) && !reserved.has(item));
+        if (fillerItems.length > 0) {
+          chosen.delete(fillerItems[fillerItems.length - 1]);
+          intro = introSegment;
+        }
+      } else {
+        intro = introSegment;
+      }
     }
   }
-  return segments.slice(0, 3);
+  const segments = ranked.filter((item) => chosen.has(item)).map((item) => item.segment);
+  return intro ? [intro, ...segments] : segments;
 };
 
 /**

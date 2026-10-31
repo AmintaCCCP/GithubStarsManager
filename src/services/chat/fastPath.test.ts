@@ -296,6 +296,105 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Introduction', 'Features']);
   });
 
+  it('keeps reserved intent sections when the general intro and matches overflow the cap', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      'A documented example project for repository research.',
+      '',
+      '## Deployment',
+      'Deploy to production.',
+      '',
+      '## Installation and Deployment',
+      'Install locally, deploy anywhere.',
+      '',
+      '## About',
+      'What the project does.',
+    ].join('\n'));
+
+    // 问题同时命中 general（about）与 usage（install）、deployment（deploy）：
+    // “Installation and Deployment”覆盖 usage 与 deployment 两个意图，与 About
+    // （general）一并各占一个保留名额；多出的 Deployment 填充章节必须为导语段
+    // 让位，两个保留章节不得被导语段挤出。
+    const segments = selectFastPathSegments(document, 'general', 'What is this project about, how do I install it, and how do I deploy it?');
+    expect(segments).toHaveLength(3);
+    expect(segments[0]).toMatchObject({ lineStart: 1, label: 'Overview' });
+    expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Installation and Deployment', 'About']);
+  });
+
+  it('yields the intro slot when reserved intent sections already fill the cap', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      'A documented example project for repository research.',
+      '',
+      '## About',
+      'What the project does.',
+      '',
+      '## Install',
+      'Run `npx example install`.',
+      '',
+      '## Deployment',
+      'Deploy with Docker.',
+    ].join('\n'));
+
+    // 极端组合：general + usage + deployment 三个意图各有一个保留章节，占满
+    // 3 个名额。截断优先级为意图覆盖 > 导语段 > 未被意图保留的填充章节，
+    // 导语段让位，三个保留章节全部保留。
+    const segments = selectFastPathSegments(document, 'general', 'What is this project about, how do I install it, and how do I deploy it?');
+    expect(segments).toHaveLength(3);
+    expect(segments.map((segment) => segment.label)).toEqual(['About', 'Install', 'Deployment']);
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+  });
+
+  it('adds no intro when the README has no pre-heading introduction', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '## Features',
+      'Fast and small.',
+      '',
+      '## License',
+      'MIT.',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'general', 'What features does this project have?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Features']);
+  });
+
+  it('adds no intro for non-general foci even when the README has an introduction', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      'A documented example project for repository research.',
+      '',
+      '## Install',
+      'Run `npx example install`.',
+      '',
+      '## Requirements',
+      'Node.js 20+.',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Install', 'Requirements']);
+  });
+
+  it('keeps both intent sections and skips the intro for a non-general multi-intent question', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      'A documented example project for repository research.',
+      '',
+      '## Install',
+      'Run `npx example install`.',
+      '',
+      '## Deployment',
+      'Deploy with Docker.',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I install and deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Install', 'Deployment']);
+  });
+
   it('keeps unrelated sections out for a single-intent question', () => {
     const document = documentFrom([
       '# Example Project',
