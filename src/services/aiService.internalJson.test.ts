@@ -103,4 +103,50 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     expect(bodies[2].response_format).toBeUndefined();
     expect(bodies[2].max_tokens).toBe(900);
   });
+
+  it('sends reasoning effort none only for models that accept it', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>).mockImplementation(async () => okResponse('{"ok":true}'));
+    const gpt51 = new AIService(makeConfig({ model: 'gpt-5.1' }) as never, 'en');
+    await gpt51.generateChatTextDetailed({ system: 's', user: 'u', maxTokens: 800, purpose: 'internal-json' });
+
+    const gpt5 = new AIService(makeConfig({ model: 'gpt-5' }) as never, 'en');
+    await gpt5.generateChatTextDetailed({ system: 's', user: 'u', maxTokens: 800, purpose: 'internal-json' });
+
+    const gpt5WithEffort = new AIService(makeConfig({ model: 'gpt-5', reasoningEffort: 'low' }) as never, 'en');
+    await gpt5WithEffort.generateChatTextDetailed({ system: 's', user: 'u', maxTokens: 800, purpose: 'internal-json' });
+
+    const bodies = chatBodies();
+    expect(bodies[0].reasoning).toEqual({ effort: 'none' });
+    expect(bodies[1].reasoning).toBeUndefined();
+    expect(bodies[2].reasoning).toEqual({ effort: 'low' });
+  });
+
+  it('omits the internal thinking field on the JSON-mode 400 fallback retry', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'response_format and thinking are not supported' } }), { status: 400 }))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ apiType: 'openai-compatible' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'u', purpose: 'internal-json' });
+
+    expect(result.text).toBe('{"ok":true}');
+    const bodies = chatBodies();
+    expect(bodies[0].thinking).toEqual({ type: 'disabled' });
+    expect(bodies[1].response_format).toBeUndefined();
+    expect(bodies[1].thinking).toBeUndefined();
+  });
+
+  it('falls back to a plain request when the backend proxy wraps the 400 as a plain error', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(Object.assign(new Error('AI proxy error: 400 - response_format is not supported'), { statusCode: 400 }))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ apiType: 'openai-compatible' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'u', purpose: 'internal-json' });
+
+    expect(result.text).toBe('{"ok":true}');
+    const bodies = chatBodies();
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1].response_format).toBeUndefined();
+  });
 });

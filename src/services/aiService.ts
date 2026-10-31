@@ -499,6 +499,14 @@ export class AIService {
     return effort ? { effort } : undefined;
   }
 
+  /**
+   * reasoning.effort 'none' 只有 gpt-5.1 起的 OpenAI 推理模型接受；
+   * gpt-5、o 系列等会以 400 拒绝该值，此时应回退到用户配置的推理强度。
+   */
+  private supportsNoneReasoningEffort(): boolean {
+    return /^gpt-5\.[1-9]/i.test(this.config.model.trim());
+  }
+
   private isDeepSeekModel(): boolean {
     return this.getApiType() === 'deepseek';
   }
@@ -543,6 +551,8 @@ export class AIService {
     purpose?: AIChatTextPurpose;
     /** internal-json 默认携带 JSON response_format；端点 400 拒绝后由调用方以 false 重试。 */
     jsonMode?: boolean;
+    /** 降级重试时同时省略内部步骤新增的 thinking 禁用字段（DeepSeek/MiMo 原有行为不受影响）。 */
+    omitThinking?: boolean;
   }): Promise<AIChatTextResult> {
     this.requireSecureDirectEndpoint();
     const startTime = Date.now();
@@ -551,7 +561,11 @@ export class AIService {
     const configId = this.config.id;
     const isInternalJson = options.purpose === 'internal-json';
     const disableInternalThinking = isInternalJson && this.config.disableThinkingForInternalSteps !== false;
-    const reasoning = disableInternalThinking ? { effort: 'none' as const } : this.getOpenAIReasoningPayload();
+    // 仅对支持 effort:'none' 的模型发送该值；其余模型恢复用户配置的推理强度，
+    // 避免内部 JSON 步骤发送无效参数被端点 400 拒绝。
+    const reasoning = disableInternalThinking && this.supportsNoneReasoningEffort()
+      ? { effort: 'none' as const }
+      : this.getOpenAIReasoningPayload();
     const normalizeFinishReason = (raw: string | null | undefined): string | null => {
       if (!raw) return null;
       if (raw === 'max_tokens' || raw === 'MAX_TOKENS' || raw === 'max_output_tokens') return 'length';
@@ -587,7 +601,7 @@ export class AIService {
             ...(isInternalJson && (options.jsonMode ?? true) ? { response_format: { type: 'json_object' } } : {}),
             ...(!isDeepSeekReasoner ? { temperature: options.temperature } : {}),
             ...(!isDeepSeekReasoner && !isDeepSeekThinking && !isMiMoModel && reasoning && apiType !== 'openai-compatible' ? { reasoning } : {}),
-            ...(isMiMoModel || isDeepSeekThinking || (disableInternalThinking && (apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo')) ? { thinking: { type: 'disabled' } } : {}),
+            ...(isMiMoModel || isDeepSeekThinking || (disableInternalThinking && !options.omitThinking && (apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo')) ? { thinking: { type: 'disabled' } } : {}),
           };
 
       let data: Record<string, unknown>;
@@ -1238,14 +1252,21 @@ ${options.user}` : options.user;
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
+      // 后端代理会把上游 400 包装成携带 statusCode 的普通 Error（见
+      // backendAdapter.throwTranslatedError），这里不能只认 AIRequestError，
+      // 否则代理路径上的 JSON 模式拒绝不会降级重试。
+      const status = error instanceof AIRequestError
+        ? error.status
+        : (error as { statusCode?: number } | null)?.statusCode;
       if (
         isInternalJson
-        && error instanceof AIRequestError
-        && error.status === 400
+        && status === 400
         && /response_format|text\.format|json_object/i.test(message)
       ) {
         // 仅当错误正文表明端点不支持 JSON 模式时，才降级为普通请求重试一次；
         // 无效模型、超长上下文等其它 400 属于必然失败，不重复发送。
+        // 降级重试同时省略内部步骤新增的 thinking 字段，端点拒绝未知参数时
+        // 重试才能成功；DeepSeek/MiMo 原有的 thinking 行为不受影响。
         return await this.requestTextResult({
           system: options.system,
           user: options.user,
@@ -1254,6 +1275,7 @@ ${options.user}` : options.user;
           signal: options.signal,
           purpose,
           jsonMode: false,
+          omitThinking: true,
         });
       }
       throw error;
