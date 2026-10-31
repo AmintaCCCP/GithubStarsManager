@@ -103,13 +103,16 @@ export const selectFastPathSegments = (
   // 的区间完整落在外层章节区间内，候选与已选区间重叠时按双向语义处置（审计
   // Up04 + nitpick + U7mZ），让实现本身满足该不变量，而非依赖测试 oracle：
   // - 被包含方向（候选起始行落在某个已选章节行区间内，如已选 `## Features`
-  //   覆盖候选 `### Features detail`）：候选起点落在父章节截断后仍覆盖的有效
-  //   区间（excerpt 截断行与已入选嵌套章节前缀终点的较小值）内才跳过，不重复
-  //   输出父章节内容（nitpick 场景不回归）；落在截断点之后（父章节正文超
-  //   24,000 字符后 excerpt 截断、子章节内容在其后，审计 U7mZ）则照常参与名额
-  //   分配，输出阶段把父章节截断为该子章节之前的前缀——保留父前缀并纳入子
-  //   章节，两段零重叠。截断后前缀只剩标题行（除标题行外无正文）时父章节整体
-  //   丢弃，不输出纯标题段。
+  //   覆盖候选 `### Features detail`）：候选起点严格早于父章节截断后仍覆盖的
+  //   有效区间末行（excerpt 截断行与已入选嵌套章节前缀终点的较小值）才跳过，
+  //   不重复输出父章节内容（nitpick 场景不回归）；起点恰为末行（子章节标题是
+  //   父章节截断后 excerpt 覆盖的最后一行，审计 VWe7：子章节正文仍在截断点
+  //   之后、未出现在父章节可见摘录中）或落在末行之后（父章节正文超 24,000
+  //   字符后 excerpt 截断、子章节内容在其后，审计 U7mZ）时，子章节视为未覆盖
+  //   候选照常参与名额分配，输出阶段把父章节截断为该子章节之前的前缀——保留
+  //   父前缀并纳入子章节，两段零重叠。候选自身包含已入选嵌套章节时按包含方向
+  //   前缀处置（admits 按前缀可见范围校验正文），不浪费名额。截断后前缀只剩
+  //   标题行（除标题行外无正文）时父章节整体丢弃，不输出纯标题段。
   // - 包含方向（候选起始行早于某个已选章节起始行，如候选 `## Installation`
   //   覆盖已选 `### Deployment`）：候选截断为该已选章节起始行之前的前缀，前缀
   //   除标题行外无非空正文时整体跳过（不产出纯标题段），否则前缀作为证据段
@@ -126,14 +129,15 @@ export const selectFastPathSegments = (
   const rangeHasBodyContent = (lineStart: number, lineEnd: number): boolean =>
     lines.slice(lineStart - 1, lineEnd).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
   type RankedItem = (typeof ranked)[number];
-  // 章节 excerpt 按 MAX_EVIDENCE_EXCERPT_CHARS 截断后仍覆盖到的最后一行（审计
-  // U7mZ）：第 L 行在章节拼接文本中的起始偏移等于其前各行长度与换行符之和，
-  // 起始偏移小于上限的最后一行即 excerpt 实际覆盖到的行。章节正文超上限时，
-  // 截断点之后的行不出现在 excerpt 里，不能视作已被该章节的证据覆盖。
-  const excerptCoveredLineEnd = (item: RankedItem): number => {
+  // 行区间 [lineStart, lineEnd] 的拼接文本按 MAX_EVIDENCE_EXCERPT_CHARS 截断后
+  // 仍覆盖到的最后一行（审计 U7mZ）：第 L 行在拼接文本中的起始偏移等于其前各
+  // 行长度与换行符之和，起始偏移小于上限的最后一行即 excerpt 实际覆盖到的行。
+  // 正文超上限时，截断点之后的行不出现在 excerpt 里——既不能视作已被该章节的
+  // 证据覆盖，也不能作为“章节有可见正文”的依据（审计 VWfA，见 admits）。
+  const excerptCoveredLineEnd = (lineStart: number, lineEnd: number): number => {
     let offset = 0;
-    let coveredEnd = item.segment.lineStart;
-    for (let line = item.segment.lineStart; line <= item.segment.lineEnd; line += 1) {
+    let coveredEnd = lineStart;
+    for (let line = lineStart; line <= lineEnd; line += 1) {
       if (offset >= MAX_EVIDENCE_EXCERPT_CHARS) break;
       coveredEnd = line;
       offset += lines[line - 1].length + 1;
@@ -143,20 +147,25 @@ export const selectFastPathSegments = (
   // 处置结果：null 无有效重叠；'contained' 被包含方向（跳过）；prefixEnd 为包含
   // 方向前缀的末行（最早的被包含已选章节起始行之前，多个被包含章节取最早）。
   // 被包含方向的判定基准是父章节截断后仍覆盖的有效区间（审计 U7mZ）：取
-  // excerpt 截断覆盖行与已入选嵌套章节的前缀截断终点的较小值——候选起点落在
-  // 有效区间内才跳过；落在截断点之后（父章节正文超 24,000 字符后的嵌套子章节）
-  // 则照常参与名额分配，由输出阶段把父章节截断为该子章节之前的前缀。
+  // excerpt 截断覆盖行与已入选嵌套章节的前缀截断终点的较小值——候选起点严格
+  // 早于有效区间末行才跳过；起点恰为末行（子章节标题是父章节截断后摘录覆盖的
+  // 最后一行，审计 VWe7：其正文仍在截断点之后、未出现在父章节可见摘录里）或
+  // 落在末行之后（父章节正文超 24,000 字符后的嵌套子章节）时照常参与名额分配，
+  // 由输出阶段把父章节截断为该子章节之前的前缀（父章节的截断终点取含该子章节
+  // 在内的最早嵌套已选章节起始行之前，两段零重叠、不重复输出）。候选自身包含
+  // 已入选嵌套章节时落入包含方向前缀处置，admits 按前缀可见范围做正文校验，
+  // 前缀摘录不可见即拒绝，不浪费名额。
   const overlapDisposition = (candidate: RankedItem, pool: ReadonlySet<RankedItem>): null | 'contained' | { prefixEnd: number } => {
     let prefixEnd: number | null = null;
     for (const item of pool) {
       if (candidate.segment.lineStart > item.segment.lineStart && candidate.segment.lineStart <= item.segment.lineEnd) {
-        let effectiveEnd = excerptCoveredLineEnd(item);
+        let effectiveEnd = excerptCoveredLineEnd(item.segment.lineStart, item.segment.lineEnd);
         for (const nested of pool) {
           if (nested !== item && nested.segment.lineStart > item.segment.lineStart && nested.segment.lineStart <= item.segment.lineEnd) {
             effectiveEnd = Math.min(effectiveEnd, nested.segment.lineStart - 1);
           }
         }
-        if (candidate.segment.lineStart <= effectiveEnd) return 'contained';
+        if (candidate.segment.lineStart < effectiveEnd) return 'contained';
       }
       if (candidate.segment.lineStart < item.segment.lineStart && item.segment.lineStart <= candidate.segment.lineEnd) {
         prefixEnd = prefixEnd === null ? item.segment.lineStart - 1 : Math.min(prefixEnd, item.segment.lineStart - 1);
@@ -166,12 +175,16 @@ export const selectFastPathSegments = (
   };
   // 审计 U7mc：无重叠候选同样要求正文——纯标题章节（如紧跟同级标题、自身无
   // 正文的 `## Installation`）不得进入证据，否则快速路径会以空章节作答并通过
-  // 核验直接返回，不再执行完整检索。
+  // 核验直接返回，不再执行完整检索。审计 VWfA：正文校验以截断后仍可见的摘录
+  // 范围为准——正文完全落在 24,000 字符截断点之后的章节（可见摘录只剩标题与
+  // 空白）不得入选且不前导作答；包含方向前缀按同一可见范围校验，保证入选段的
+  // 摘录必含非标题正文。
   const admits = (candidate: RankedItem, pool: ReadonlySet<RankedItem>): boolean => {
     const disposition = overlapDisposition(candidate, pool);
-    if (disposition === null) return rangeHasBodyContent(candidate.segment.lineStart, candidate.segment.lineEnd);
+    const visibleEnd = Math.min(candidate.segment.lineEnd, excerptCoveredLineEnd(candidate.segment.lineStart, candidate.segment.lineEnd));
+    if (disposition === null) return rangeHasBodyContent(candidate.segment.lineStart, visibleEnd);
     if (disposition === 'contained') return false;
-    return rangeHasBodyContent(candidate.segment.lineStart, disposition.prefixEnd);
+    return rangeHasBodyContent(candidate.segment.lineStart, Math.min(disposition.prefixEnd, visibleEnd));
   };
   const reserved = new Set<RankedItem>();
   for (const intent of intents) {
@@ -231,9 +244,13 @@ export const selectFastPathSegments = (
     // 布局中仅含标题的导语段不得保留），与 rangeHasBodyContent 判定一致。
     // 首行不是标题时从第 1 行开始检查（Up06：首行说明文字紧接标题、或隔空行
     // 再接标题的布局不再因检查起点跳过首行而误判为空导语）；首行是标题（H1
-    // 或首章节标题）时照旧跳过第 1 行。
-    const leadHasContentBeyondHeading = (lineEnd: number): boolean =>
-      lines.slice(firstLineIsHeading ? 1 : 0, lineEnd).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
+    // 或首章节标题）时照旧跳过第 1 行。审计 VWfC：检查基于截断后的摘录——
+    // 说明文字前有超长空白行时，按 24,000 字符截断后的摘录只含标题与空白，
+    // 该前导段不得占名额；摘录构造与下方 excerpt 字段的实际输出完全一致。
+    const leadHasContentBeyondHeading = (lineEnd: number): boolean => {
+      const excerptLines = lines.slice(0, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS).split('\n');
+      return excerptLines.slice(firstLineIsHeading ? 1 : 0).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
+    };
     if (openingHeading && opensWithLowerLevelHeading) {
       const openingSection = sectionSegments(document, [openingHeading.title])
         .find((segment) => segment.lineStart === openingHeading.lineStart) ?? null;
@@ -377,18 +394,36 @@ export const selectFastPathSegments = (
   }
   // 每个最大未覆盖行段内按文档顺序枚举章节（切章边界与 sectionSegments 一致，
   // 收敛到行段内；已被前一段覆盖的标题跳过），无正文的章节不入证据（全局
-  // 不变量：纯标题段一律不入证据）。
+  // 不变量：纯标题段一律不入证据）。审计 VWfA：正文校验按同一可见摘录范围
+  // 执行——剩余小节摘录同样受 24,000 字符上限截断，可见范围内无正文的章节
+  // 不入证据。审计 VWfE（性能）：切章边界改由一次反向单调栈扫描预计算
+  // （headings 按行号严格递增，栈内自顶向底为行号递减、level 非降的序列，
+  // 弹出所有 level 更大的标题后栈顶即“下一个同级或更高级标题”，与逐标题从
+  // document.headings 头部 `.find` 的 O(H²/2) 结果完全等价）；preceding 覆盖
+  // 检查只比较最后一个候选——候选按行号递增加入且两两不重叠（新候选要求
+  // 之前无候选覆盖其起始行），更早候选的区间终点必然早于当前标题行，只有
+  // 最后一个候选可能覆盖当前标题。
+  const nextSameOrHigherLevelLineStart: number[] = new Array(document.headings.length);
+  const boundaryStack: Array<{ level: number; lineStart: number }> = [];
+  for (let index = document.headings.length - 1; index >= 0; index -= 1) {
+    const heading = document.headings[index];
+    while (boundaryStack.length > 0 && boundaryStack[boundaryStack.length - 1].level > heading.level) boundaryStack.pop();
+    nextSameOrHigherLevelLineStart[index] = boundaryStack.length > 0
+      ? boundaryStack[boundaryStack.length - 1].lineStart
+      : lines.length + 1;
+    boundaryStack.push({ level: heading.level, lineStart: heading.lineStart });
+  }
   const leftoverCandidates: Array<{ score: number; segment: OutputSegment }> = [];
   for (const run of leftoverRuns) {
-    for (const heading of document.headings) {
+    for (let headingIndex = 0; headingIndex < document.headings.length; headingIndex += 1) {
+      const heading = document.headings[headingIndex];
       if (heading.lineStart < run.lineStart || heading.lineStart > run.lineEnd) continue;
-      const next = document.headings.find((candidate) => candidate.lineStart > heading.lineStart && candidate.level <= heading.level);
-      const sectionEnd = Math.max(heading.lineStart, (next?.lineStart ?? lines.length + 1) - 1);
+      const sectionEnd = Math.max(heading.lineStart, nextSameOrHigherLevelLineStart[headingIndex] - 1);
       const lineEnd = Math.min(sectionEnd, run.lineEnd);
       if (lineEnd < heading.lineStart) continue;
-      const preceding = leftoverCandidates.filter((entry) => entry.segment.lineEnd >= heading.lineStart);
-      if (preceding.length > 0) continue;
-      if (!rangeHasBodyContent(heading.lineStart, lineEnd)) continue;
+      const lastLeftover = leftoverCandidates[leftoverCandidates.length - 1];
+      if (lastLeftover && lastLeftover.segment.lineEnd >= heading.lineStart) continue;
+      if (!rangeHasBodyContent(heading.lineStart, Math.min(lineEnd, excerptCoveredLineEnd(heading.lineStart, lineEnd)))) continue;
       leftoverCandidates.push({
         score: rankByTitle(heading.title),
         segment: {
@@ -401,8 +436,13 @@ export const selectFastPathSegments = (
     }
   }
   // 名额分配：意图保留章节与前导段优先，剩余小节仅在名额有余时补足（3 段上限）。
+  // 审计 VWfH：剩余小节先按得分降序（同分按行号升序）排列再分配名额——按文档
+  // 顺序分配会让零分章节挤掉与问题词重合的章节（如得分 0 的 `### Linux` 挤掉
+  // 问题提到 Windows 时的 `### Windows`），快速路径接受该回答且不回落完整循环，
+  // 高分说明因此缺失。得分排序与最终输出排序使用同一比较规则。
+  const rankedLeftovers = [...leftoverCandidates].sort((left, right) => right.score - left.score || left.segment.lineStart - right.segment.lineStart);
   let slotBudget = 3 - outputEntries.length - (lead ? 1 : 0);
-  for (const candidate of leftoverCandidates) {
+  for (const candidate of rankedLeftovers) {
     if (slotBudget <= 0) break;
     outputEntries.push(candidate);
     slotBudget -= 1;

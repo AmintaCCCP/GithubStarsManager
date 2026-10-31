@@ -840,4 +840,128 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Docker']);
     expect(segments[0]?.excerpt).toContain('Docker compose steps.');
   });
+
+  it('admits a nested child whose heading is the last line covered by the truncated excerpt', () => {
+    const padding = 'x'.repeat(23_960);
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      padding,
+      '### Docker',
+      'Docker compose steps.',
+    ].join('\n'));
+
+    // 审计 VWe7：父章节正文超 24,000 字符、子章节标题（Docker，第 4 行）恰好是
+    // 父章节截断后 excerpt 覆盖的最后一行（第 4 行起始偏移 23,995 < 24,000，
+    // 第 5 行起始偏移 24,006 ≥ 24,000）。子章节正文仍在截断点之后，不得按
+    // “被包含方向”跳过——应作为未覆盖候选参与名额分配，父章节截断为子章节
+    // 之前的前缀（1–3 行），子章节（4–5 行）独立入选，两段零重叠、不重复输出。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
+    expect(segments[0]?.excerpt).toContain('Deploy with Docker.');
+    expect(segments[0]?.excerpt).not.toContain('### Docker');
+    expect(segments[0]?.excerpt).not.toContain('Docker compose steps.');
+    expect(segments[1]).toMatchObject({ lineStart: 4, lineEnd: 5 });
+    expect(segments[1]?.excerpt).toContain('Docker compose steps.');
+    expect(segments[1]!.lineStart).toBeGreaterThan(segments[0]!.lineEnd);
+  });
+
+  it('excludes a section whose visible excerpt holds no body beyond the heading', () => {
+    const whitespace = ' '.repeat(23_983);
+    const document = documentFrom([
+      '## Installation',
+      whitespace,
+      'Install steps here.',
+    ].join('\n'));
+
+    // 审计 VWfA：正文完全落在 24,000 字符截断点之后的章节（可见摘录只剩标题与
+    // 空白：第 3 行起始偏移恰为 24,000）不得入选且不前导作答——无其他匹配章节时
+    // 返回空数组，让调用方回落完整检索循环。
+    expect(selectFastPathSegments(document, 'usage', 'How do I install this project?')).toEqual([]);
+  });
+
+  it('keeps the next matched section when the first match is truncated to heading and whitespace', () => {
+    const whitespace = ' '.repeat(23_983);
+    const document = documentFrom([
+      '## Installation',
+      whitespace,
+      'Install steps here.',
+      '## Setup',
+      'Prepare the environment.',
+    ].join('\n'));
+
+    // 审计 VWfA 补充：摘录不可见的 Installation 被排除后，名额让给摘录含正文的
+    // 下一匹配章节（Setup）；Installation 也不得经包含方向前缀路径以不可见摘录
+    // 混入证据。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Setup']);
+  });
+
+  it('drops the general intro whose truncated excerpt holds only whitespace', () => {
+    const blankRun = Array.from({ length: 78 }, () => ' '.repeat(320));
+    const document = documentFrom([
+      '# Example Project',
+      ...blankRun,
+      'A documented example project for repository research.',
+      '## Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 VWfC：说明文字前有 78 行超长空白（第 80 行）时，导语有效性检查基于
+    // 24,000 字符截断后的摘录（只覆盖到第 76 行附近、全为空白）——该前导段不得
+    // 生成、不得占名额，只有 Features 章节进入证据。
+    const segments = selectFastPathSegments(document, 'general', 'What does this project do?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Features']);
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+    expect(segments[0]).toMatchObject({ lineStart: 81, lineEnd: 82 });
+  });
+
+  it('keeps leftover enumeration behavior with precomputed heading boundaries on a large document', () => {
+    const subsections = Array.from({ length: 1_200 }, (_, index) => [`### Subsection ${index}`, `Subsection ${index} steps.`, '']);
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '',
+      ...subsections.flat(),
+    ].join('\n'));
+
+    // 审计 VWfE（性能）：剩余小节枚举不再逐标题从 document.headings 头部 `.find`
+    // 查找切章边界（O(H²/2)，位于同步聊天回合路径上），改为一次反向单调栈扫描
+    // 预计算。行为完全等价：父章节截断为前缀（1–3 行），Docker（4–5 行）经
+    // U7mZ 路径入选，1,200 个未命中小节按得分（并列 0 分）与行号竞争仅剩的
+    // 一个名额，Subsection 0（7–9 行）入选。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Subsection 0']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 3 });
+    expect(segments[1]).toMatchObject({ lineStart: 4, lineEnd: 6 });
+    expect(segments[2]).toMatchObject({ lineStart: 7, lineEnd: 9 });
+    expect(segments[2]?.excerpt).toContain('Subsection 0 steps.');
+  });
+
+  it('gives the last leftover slot to the higher-scoring remaining section', () => {
+    const padding = 'x'.repeat(25_000);
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      padding,
+      '### Docker',
+      'Docker compose steps.',
+      '### Linux',
+      'Linux install steps.',
+      '### Windows',
+      'Windows install steps.',
+    ].join('\n'));
+
+    // 审计 VWfH：剩余小节候选先按得分降序排列再分配名额——问题提到 Windows 时
+    // `### Windows`（得分 1）不得被文档顺序在前的零分 `### Linux` 挤掉。
+    const segments = selectFastPathSegments(document, 'deployment', 'Deploy this project on Windows?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Windows', 'Docker']);
+    expect(segments.some((segment) => segment.label === 'Linux')).toBe(false);
+    expect(segments[1]).toMatchObject({ lineStart: 8, lineEnd: 9 });
+    expect(segments[1]?.excerpt).toContain('Windows install steps.');
+  });
 });
