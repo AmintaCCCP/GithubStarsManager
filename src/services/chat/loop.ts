@@ -563,7 +563,23 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     undefined,
     'internal-json',
   );
-  const understanding = understandingRaw ? parseQueryUnderstanding(understandingRaw, fallbackUnderstanding, allPathsSet) : fallbackUnderstanding;
+  const parsedUnderstanding = understandingRaw
+    ? parseQueryUnderstanding(understandingRaw, fallbackUnderstanding, allPathsSet)
+    : fallbackUnderstanding;
+  // 理解失败或理解结果没有 explicit/necessary 要求时，立即补入一条阻断性的
+  // explicit 要求：规划提示、gate 提示、parseEvidenceGate 与缺失项计算共用
+  // 同一份 answerRequirements，缺证据的情况会被标为 missing，而不是空数组
+  // 直接采纳 gate 的 sufficient。
+  const understanding: QueryUnderstanding = parsedUnderstanding.answerRequirements.length > 0
+    ? parsedUnderstanding
+    : {
+        ...parsedUnderstanding,
+        answerRequirements: makeAnswerRequirements(
+          [input.language === 'zh' ? '直接回答用户提出的问题' : 'directly answer the user question'],
+          'explicit',
+          1,
+        ),
+      };
   // The LLM supplies a small concept expansion (for example vector search →
   // embeddings, semantic retrieval, topK). It only improves candidate ordering;
   // all later reads are still constrained to the pinned repository tree.
@@ -997,17 +1013,9 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       knownTargetKeys.add(key);
       return true;
     });
-    // 理解失败或理解结果没有 explicit/necessary 要求时，保留一条阻断性的
-    // explicit 要求，让 gateApprovesAnswer 能把缺证据的情况标为 missing，
-    // 而不是空数组直接采纳 gate 的 sufficient。
-    const assessedRequirements = understanding.answerRequirements.length > 0
-      ? understanding.answerRequirements
-      : makeAnswerRequirements(
-        [input.language === 'zh' ? '直接回答用户提出的问题' : 'directly answer the user question'],
-        'explicit',
-        1,
-      );
-    requirements = completeRequirementAssessments(assessedRequirements, gate.requirements);
+    // 兜底的阻断性要求已在 understanding 创建时统一补入（见 understanding
+    // 归一化），这里直接使用同一份 answerRequirements 与 gate 输出合并。
+    requirements = completeRequirementAssessments(understanding.answerRequirements, gate.requirements);
     missing = requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement);
     finalReason = gate.reason || finalReason;
     pendingTargets = gate.recommendedTargets.filter((target) => (target.scope !== 'code' || codeEligible) && (target.scope !== 'meta' || metaEligible));
