@@ -15,6 +15,8 @@ function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
 
   schedule(() => {
     if (!shouldHide() || win.isDestroyed() || !win.isMinimized()) return;
+    // hide() leaves the HWND iconic, but restoring here would briefly activate
+    // the window; restoreMainWindow() clears that state at tray-show time.
     win.hide();
   });
 }
@@ -27,7 +29,7 @@ function registerDidFinishLoadPaintProbe({ webContents, getWindow, scheduleProbe
 }
 
 const paintProbeStates = new WeakMap();
-const lastPaintReloads = new WeakMap();
+const lastWindowWakes = new WeakMap();
 const BUSY_RENDERER_CPU_PERCENT = 20;
 const BUSY_RENDERER_RETRY_LIMIT = 2;
 // Avoid beginFrameSubscription here: electron/electron#37412 can crash the GPU
@@ -38,10 +40,21 @@ const FRAME_PROBE_SCRIPT = `new Promise((resolve) => {
 })`;
 
 /**
+ * Ask Windows to drop a parked compositor by leaving and re-entering the
+ * visible state. Reloading the page keeps the same window and does not (#533).
+ */
+function wakeParkedWindow(win) {
+  if (win.isMinimized()) win.restore();
+  win.hide();
+  win.show();
+  win.focus();
+}
+
+/**
  * Windows can resume a visible window without resuming its compositor (#533).
- * Force one repaint, then verify requestAnimationFrame resumes. Reload only
- * when the window is still focused; an occluded window is expected to stop
- * producing frames and must not lose renderer state.
+ * Force one repaint, then verify requestAnimationFrame resumes. When the
+ * window is still focused and no frame arrives, wake the native window once
+ * per cooldown. An occluded window is expected to stop producing frames.
  */
 function probeWindowPaint({
   win,
@@ -181,7 +194,7 @@ function probeWindowPaint({
         record({
           level: 'info',
           module: 'electron.window',
-          message: 'Window reload suppressed by renderer activity',
+          message: 'Window wake suppressed by renderer activity',
           data: { reason: state.reason, cpuPercent, busyRetries: state.busyRetries },
         });
         state.arm();
@@ -191,34 +204,34 @@ function probeWindowPaint({
       state.busyRetries = 0;
     }
 
-    const lastReloadAt = lastPaintReloads.get(win);
-    const elapsedMs = lastReloadAt === undefined ? reloadCooldownMs : now() - lastReloadAt;
+    const lastWakeAt = lastWindowWakes.get(win);
+    const elapsedMs = lastWakeAt === undefined ? reloadCooldownMs : now() - lastWakeAt;
     const cooldownRemainingMs = elapsedMs < 0 ? 0 : reloadCooldownMs - elapsedMs;
     if (cooldownRemainingMs > 0) {
       record({
         level: 'info',
         module: 'electron.window',
-        message: 'Window reload suppressed by cooldown',
+        message: 'Window wake suppressed by cooldown',
         data: { reason: state.reason, cooldownRemainingMs },
       });
       return;
     }
 
     close();
-    lastPaintReloads.set(win, now());
+    lastWindowWakes.set(win, now());
     record({
       level: 'warn',
       module: 'electron.window',
-      message: 'Reloading window after frozen compositor',
+      message: 'Waking window after frozen compositor',
       data: { reason: state.reason },
     });
     try {
-      contents.reload();
+      wakeParkedWindow(win);
     } catch (error) {
       record({
         level: 'error',
         module: 'electron.window',
-        message: 'Window reload failed',
+        message: 'Window wake failed',
         data: { reason: state.reason, error: error instanceof Error ? error.message : String(error) },
       });
     }

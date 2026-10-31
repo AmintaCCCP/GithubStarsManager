@@ -1,4 +1,10 @@
 const { app, BrowserWindow, Menu, Tray, clipboard, nativeImage, nativeTheme, shell, globalShortcut, ipcMain, dialog, net, protocol, safeStorage, session, screen, powerMonitor } = require('electron');
+// Windows can leave a minimized or occluded window's compositor parked (#533).
+// A page reload keeps the same window, so it does not resume painting. This
+// must be set before ready.
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+}
 const path = require('path');
 const fs = require('fs');
 const os = require('os');

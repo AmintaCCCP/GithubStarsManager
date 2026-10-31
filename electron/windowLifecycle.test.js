@@ -15,6 +15,9 @@ function makeWindow({ minimized = true, destroyed = false } = {}) {
     hidden: false,
     minimized,
     destroyed,
+    restore() {
+      this.minimized = false;
+    },
     hide() {
       this.hidden = true;
     },
@@ -102,6 +105,24 @@ describe('scheduleMinimizeToTray', () => {
     callbacks[1]();
     assert.equal(win.hidden, false);
   });
+
+  it('hides without restoring, leaving iconic cleanup to tray-show', () => {
+    const calls = [];
+    const win = makeWindow();
+    win.restore = () => calls.push('restore');
+    win.hide = () => {
+      calls.push('hide');
+      win.hidden = true;
+    };
+
+    scheduleMinimizeToTray({
+      win,
+      shouldHide: () => true,
+      schedule: (callback) => callback(),
+    });
+
+    assert.deepEqual(calls, ['hide']);
+  });
 });
 
 describe('registerDidFinishLoadPaintProbe', () => {
@@ -128,6 +149,19 @@ describe('registerDidFinishLoadPaintProbe', () => {
     const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
     assert.match(source, /registerDidFinishLoadPaintProbe\(\{/);
   });
+
+  it('disables native window occlusion before the app is ready', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
+    const readyAt = source.indexOf('app.whenReady(');
+    const switchAt = source.search(
+      /^\s*app\.commandLine\.appendSwitch\('disable-features', 'CalculateNativeWinOcclusion'\)/m,
+    );
+    assert.ok(switchAt > 0 && switchAt < readyAt);
+    assert.match(
+      source,
+      /^if \(process\.platform === 'win32'\) \{\n\s*app\.commandLine\.appendSwitch\('disable-features', 'CalculateNativeWinOcclusion'\)/m,
+    );
+  });
 });
 
 function makeProbeWindow({
@@ -144,6 +178,8 @@ function makeProbeWindow({
   const scripts = [];
   let reloads = 0;
   let invalidations = 0;
+  let wakeError = null;
+  const wakeSteps = [];
   let resolveFrame;
   let rejectFrame;
   let focusedState = focused;
@@ -180,6 +216,23 @@ function makeProbeWindow({
     isVisible: () => visibleState,
     isMinimized: () => minimizedState,
     isFocused: () => focusedState,
+    restore() {
+      if (wakeError) throw wakeError;
+      wakeSteps.push('restore');
+      minimizedState = false;
+    },
+    hide() {
+      if (wakeError) throw wakeError;
+      wakeSteps.push('hide');
+    },
+    show() {
+      if (wakeError) throw wakeError;
+      wakeSteps.push('show');
+    },
+    focus() {
+      if (wakeError) throw wakeError;
+      wakeSteps.push('focus');
+    },
   };
 
   return {
@@ -197,6 +250,12 @@ function makeProbeWindow({
     },
     get reloads() {
       return reloads;
+    },
+    get wakeSteps() {
+      return wakeSteps;
+    },
+    set wakeError(value) {
+      wakeError = value;
     },
     get invalidations() {
       return invalidations;
@@ -324,7 +383,7 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.records[0].data.reason, 'display-metrics-changed');
   });
 
-  it('reloads a focused window when no frame arrives', () => {
+  it('wakes a focused window when no frame arrives', () => {
     const probe = makeProbeWindow();
     probeWindowPaint({
       win: probe.win,
@@ -336,14 +395,15 @@ describe('probeWindowPaint', () => {
 
     probe.runTimers();
 
-    assert.equal(probe.reloads, 1);
+    assert.equal(probe.reloads, 0);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
     assert.deepEqual(
       probe.records.map((entry) => entry.message),
-      ['Window paint probe timed out', 'Reloading window after frozen compositor'],
+      ['Window paint probe timed out', 'Waking window after frozen compositor'],
     );
   });
 
-  it('does not reload repeatedly during the cooldown window', () => {
+  it('does not wake repeatedly during the cooldown window', () => {
     const probe = makeProbeWindow();
     let currentTime = 1_000;
     const run = () => probeWindowPaint({
@@ -357,18 +417,18 @@ describe('probeWindowPaint', () => {
 
     run();
     probe.runTimers();
-    assert.equal(probe.reloads, 1);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
 
     currentTime += 1_000;
     run();
     probe.runTimers();
-    assert.equal(probe.reloads, 1);
-    assert.equal(probe.records.at(-1).message, 'Window reload suppressed by cooldown');
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
+    assert.equal(probe.records.at(-1).message, 'Window wake suppressed by cooldown');
 
     currentTime += 60_000;
     run();
     probe.runTimers();
-    assert.equal(probe.reloads, 2);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus', 'hide', 'show', 'focus']);
   });
 
   it('treats a backward clock jump as an expired cooldown', () => {
@@ -389,7 +449,8 @@ describe('probeWindowPaint', () => {
     run();
     probe.runTimers();
 
-    assert.equal(probe.reloads, 2);
+    assert.equal(probe.reloads, 0);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus', 'hide', 'show', 'focus']);
   });
 
   it('samples CPU at probe start to establish a baseline', () => {
@@ -412,7 +473,7 @@ describe('probeWindowPaint', () => {
     assert.equal(samples, 2);
   });
 
-  it('reloads after the renderer stays busy past the retry limit', () => {
+  it('wakes after the renderer stays busy past the retry limit', () => {
     const probe = makeProbeWindow();
     probe.cpuPercent = 75;
     const run = () => probeWindowPaint({
@@ -428,20 +489,22 @@ describe('probeWindowPaint', () => {
     probe.runTimers();
 
     assert.equal(probe.reloads, 0);
-    assert.equal(probe.records.at(-1).message, 'Window reload suppressed by renderer activity');
+    assert.deepEqual(probe.wakeSteps, []);
+    assert.equal(probe.records.at(-1).message, 'Window wake suppressed by renderer activity');
+
+    probe.runTimers();
+    assert.deepEqual(probe.wakeSteps, []);
 
     probe.runTimers();
     assert.equal(probe.reloads, 0);
-
-    probe.runTimers();
-    assert.equal(probe.reloads, 1);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
     assert.deepEqual(
       probe.records.slice(-2).map((entry) => entry.message),
-      ['Renderer busy retry limit reached', 'Reloading window after frozen compositor'],
+      ['Renderer busy retry limit reached', 'Waking window after frozen compositor'],
     );
   });
 
-  it('reloads when the renderer becomes idle before the retry limit', () => {
+  it('wakes when the renderer becomes idle before the retry limit', () => {
     const probe = makeProbeWindow();
     probe.cpuPercent = 75;
     const run = () => probeWindowPaint({
@@ -458,8 +521,9 @@ describe('probeWindowPaint', () => {
     probe.cpuPercent = 0;
     probe.runTimers();
 
-    assert.equal(probe.reloads, 1);
-    assert.equal(probe.records.at(-1).message, 'Reloading window after frozen compositor');
+    assert.equal(probe.reloads, 0);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
+    assert.equal(probe.records.at(-1).message, 'Waking window after frozen compositor');
   });
 
   it('records a failed renderer probe without throwing', async () => {
@@ -553,7 +617,8 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.timerCount, 1);
     probe.runTimers();
 
-    assert.equal(probe.reloads, 1);
+    assert.equal(probe.reloads, 0);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
     assert.equal(probe.scripts.length, 1);
   });
 
@@ -581,7 +646,8 @@ describe('probeWindowPaint', () => {
     assert.equal(probe.invalidations, 3);
     assert.equal(staleTimer, 1);
     probe.runTimers();
-    assert.equal(probe.reloads, 1);
+    assert.equal(probe.reloads, 0);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
   });
 
   it('caps repeated timeout restarts at the original probe deadline', () => {
@@ -627,11 +693,13 @@ describe('probeWindowPaint', () => {
     probe.setState({ loading: false });
     run();
     probe.runTimers();
-    assert.equal(probe.reloads, 1);
+    assert.equal(probe.reloads, 0);
+    assert.deepEqual(probe.wakeSteps, ['hide', 'show', 'focus']);
   });
 
-  it('records a failed reload instead of throwing from the timer', () => {
-    const probe = makeProbeWindow({ reloadError: new Error('reload failed') });
+  it('records a failed wake instead of throwing from the timer', () => {
+    const probe = makeProbeWindow();
+    probe.wakeError = new Error('wake failed');
     probeWindowPaint({
       win: probe.win,
       reason: 'focus',
@@ -641,6 +709,8 @@ describe('probeWindowPaint', () => {
     });
 
     assert.doesNotThrow(() => probe.runTimers());
-    assert.equal(probe.records.at(-1).message, 'Window reload failed');
+    assert.equal(probe.reloads, 0);
+    assert.equal(probe.records.at(-1).message, 'Window wake failed');
+    assert.equal(probe.records.at(-1).data.error, 'wake failed');
   });
 });
