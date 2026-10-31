@@ -87,7 +87,7 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
     // Keep commands and prose in code spans, but never present an unread source-like
     // path as evidence. The final answer may only cite a file-and-line reference
     // generated from ToolEvidence.
-    const looksLikeSourcePath = /(?:^|\/)[^\s`]+\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|json|ya?ml|toml|sh|py|go|rs|java|rb|php|cs|html|css|scss|sql)$/i.test(token);
+    const looksLikeSourcePath = /(?:^|\/)[^\s`]+\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|json|ya?ml|toml|sh|py|go|rs|java|rb|php|cs|html|css|scss|sql)(?:\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)?$/i.test(token);
     return looksLikeSourcePath ? '' : whole;
   });
 };
@@ -145,13 +145,48 @@ const hasAnyValidReference = (content: string, evidences: ToolEvidence[]): boole
   return false;
 };
 
-const hasCompleteSourceReferences = (content: string, evidences: ToolEvidence[]): boolean => {
+const LIST_ITEM_LINE_RE = /^(?:[-*+]|\d+[.)])\s+/;
+
+const isTableSeparatorRow = (line: string): boolean => {
+  const trimmed = line.trim();
+  return trimmed.startsWith('|') && /^[\s|:-]+$/.test(trimmed) && trimmed.includes('-');
+};
+
+/**
+ * 把小节拆成可核验单元：列表项逐项、表格逐行（排除表头与分隔行），
+ * 其余内容作为整体单元。标题不进入单元（由调用方按小节排除）。
+ */
+const checkableUnits = (section: string): string[] => {
+  const lines = section.split('\n');
+  const units: string[] = [];
+  const proseLines: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (isTableSeparatorRow(line)) continue;
+    if (line.trim().startsWith('|')) {
+      // 分隔行紧随其后的行是表头，不属于事实内容。
+      if (lines[i + 1] !== undefined && isTableSeparatorRow(lines[i + 1])) continue;
+      units.push(line);
+      continue;
+    }
+    if (LIST_ITEM_LINE_RE.test(line)) {
+      units.push(line);
+      continue;
+    }
+    proseLines.push(line);
+  }
+  if (proseLines.length > 0) units.push(proseLines.join('\n'));
+  return units;
+};
+
+export const hasCompleteSourceReferences = (content: string, evidences: ToolEvidence[]): boolean => {
   if (sourceReferences(evidences).length === 0) return false;
   const factualSections = content
     .split(/\n{2,}/)
     .map((section) => section.trim())
     .filter((section) => section.length > 0 && !isStandaloneHeading(section));
-  return factualSections.length > 0 && factualSections.every((section) => hasAnyValidReference(section, evidences));
+  if (factualSections.length === 0) return false;
+  return factualSections.every((section) => checkableUnits(section).every((unit) => hasAnyValidReference(unit, evidences)));
 };
 
 /**
@@ -236,10 +271,18 @@ export const pruneUnverifiableSections = (content: string, evidences: ToolEviden
       pendingHeadings.push(section);
       continue;
     }
-    if (hasAnyValidReference(section, evidences)) {
+    const units = checkableUnits(section);
+    const citedUnits = units.filter((unit) => hasAnyValidReference(unit, evidences));
+    const uncitedUnits = units.filter((unit) => !hasAnyValidReference(unit, evidences));
+    if (citedUnits.length === 0) {
+      unverified.push(...pendingHeadings, section);
+    } else if (uncitedUnits.length === 0) {
       kept.push(...pendingHeadings, section);
     } else {
-      unverified.push(...pendingHeadings, section);
+      // 混合小节按单元拆分：有引用的内容保留，未引用的列表项/表格行
+      // 移入未证实区块，避免整段好内容陪葬或未核验内容蒙混过关。
+      kept.push(...pendingHeadings, citedUnits.join('\n'));
+      unverified.push(uncitedUnits.join('\n'));
     }
     pendingHeadings = [];
   }

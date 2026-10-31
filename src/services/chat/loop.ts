@@ -333,12 +333,13 @@ export const synthesizeVerifiedAnswer = async (
   round: number,
   answerMaxTokens: number,
   callModelWithRetry: EvidenceToolbox['callModelWithRetry'],
+  extraUserNote = '',
 ): Promise<string> => {
   const emit = (event: ChatToolEventInput) => input.onToolEvent?.(event);
   // 统一的自由 Markdown 最终回答：创意与事实问题共用同一 prompt（引用规则/排版
   // 指令在系统提示词中），回答完成后仍走引用核验 → 修复 → digest 兜底链。
   const answerSystem = buildSystemPrompt(input.language, input.taskDepth ?? 'default');
-  const answerUser = buildUserPrompt(input, evidences);
+  const answerUser = `${buildUserPrompt(input, evidences)}${extraUserNote}`;
   // 校验阶梯：严格逐节核验（含脚注映射）→ 降级剪枝（保留有引用小节、未核验
   // 段落显式移入“未证实或缺失的信息”）。正确答案不因个别段落漏引用或模型使用
   // 脚注编号而被整体丢弃，同时不静默返回未核验内容。
@@ -351,7 +352,7 @@ export const synthesizeVerifiedAnswer = async (
   };
   const answerEventDetail = input.language === 'zh' ? '证据充分；现在仅依据已验证来源生成回答。' : 'Evidence is sufficient; generate the answer only from verified sources.';
   // 回答阶段统一截止时间：流式与阻塞降级共享同一窗口，降级只能使用剩余时长。
-  let answerDeadlineAt = Date.now() + ANSWER_STEP_TIMEOUT_MS;
+  const answerDeadlineAt = Date.now() + ANSWER_STEP_TIMEOUT_MS;
 
   let answerRaw: string | null = null;
   if (input.streaming && input.onAnswerChunk) {
@@ -392,9 +393,6 @@ export const synthesizeVerifiedAnswer = async (
       const retainedStream = validAnswer(streamed);
       answerRaw = retainedStream;
       if (!retainedStream) input.onAnswerChunk?.('');
-      // 失败的流式调用可能几乎耗尽共享窗口。保留一小段时间给阻塞降级，
-      // 否则已有证据仍会停在来源清单。
-      answerDeadlineAt = Math.max(answerDeadlineAt, Date.now() + 30_000);
       emit({
         toolName: 'synthesize_answer',
         status: 'error',
@@ -494,6 +492,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const knownTargetKeys = new Set<string>();
   const readPaths = new Set<string>();
   const codeReadPaths = new Set<string>();
+  const failedReadAttempts = new Map<string, number>();
+  const isRetryableRead = (path: string): boolean => (failedReadAttempts.get(path) ?? 0) < 2;
   const { emit, hasTime, invokeTool, callModelWithRetry, toolErrors } = ctx;
   const metaFetched = new Set<string>();
   let metaEligible = false;
@@ -513,6 +513,18 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
   );
   if (!treeResult.ok) return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  // GitHub 的 tree API 超限时会截断文件清单：继续用部分清单作答，但把
+  // 限制显式告知模型，未列出的文件按“无法核验”处理而不是臆测。
+  const treeTruncated = treeResult.value.truncated;
+  if (treeTruncated) {
+    emit({
+      toolName: 'read_repo_tree',
+      status: 'success',
+      paramSummary: input.language === 'zh' ? '读取固定 SHA 文件树（被 GitHub 截断）' : 'Read pinned-SHA file tree (truncated by GitHub)',
+      stage: 'context',
+      detail: input.language === 'zh' ? '文件清单超过 GitHub 限制被截断，未列出的文件无法读取。' : 'The file listing exceeded GitHub limits and was truncated; unlisted files cannot be read.',
+    });
+  }
 
   const allPaths = treeResult.value.entries.filter(isFileEntry).map((entry) => entry.path);
   const allPathsSet = new Set(allPaths);
@@ -585,7 +597,14 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
         }
       },
     );
-    if (!fileResult.ok) return null;
+    if (!fileResult.ok) {
+      // 失败的读取不占用读取预算，允许规划器稍后重试一次；
+      // 失败两次的目标不再进入未读候选，避免反复撞同一堵墙。
+      readPaths.delete(path);
+      if (scope === 'code') codeReadPaths.delete(path);
+      failedReadAttempts.set(path, (failedReadAttempts.get(path) ?? 0) + 1);
+      return null;
+    }
     const document: CachedDocument = {
       path: fileResult.value.path,
       content: fileResult.value.content,
@@ -813,8 +832,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
 
   while (turns < budget.maxTurns && hasTime()) {
     turns += 1;
-    const unreadDocumentation = documentationCandidates.filter((path) => !readPaths.has(path));
-    const unreadCode = codeCandidates.filter((path) => !readPaths.has(path));
+    const unreadDocumentation = documentationCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
+    const unreadCode = codeCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const planPrompt = buildRetrievalPlanPrompt(
       input,
       understanding,
@@ -891,7 +910,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     // 保证 README/docs 始终优先被读取。
     if (targets.length === 0) {
       const fallbackDoc = unreadDocumentation[0]
-        ?? documentationCandidates.find((path) => !readPaths.has(path));
+        ?? documentationCandidates.find((path) => !readPaths.has(path) && isRetryableRead(path));
       if (fallbackDoc) {
         targets = [{ path: fallbackDoc, sections: [], purpose: missing[0] || understanding.target, scope: 'documentation' }];
       }
@@ -913,8 +932,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       understanding,
       evidences,
       documents,
-      unreadDocumentation.filter((path) => !readPaths.has(path)),
-      unreadCode.filter((path) => !readPaths.has(path)),
+      unreadDocumentation.filter((path) => !readPaths.has(path) && isRetryableRead(path)),
+      unreadCode.filter((path) => !readPaths.has(path) && isRetryableRead(path)),
       missing,
       turns,
       codeEligible,
@@ -971,7 +990,14 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       canAnswer = true;
       break;
     }
-    if (gate.nextAction === 'stop') {
+    // meta 安全网要补拉 Release/Issue 时，先不要按 stop 结束：
+    // 最新版本类问题还缺 @meta 来源，直接作答会漏读关键证据。
+    const metaSafetyNetPending = gate.nextAction === 'stop' && !metaEligible
+      && metaIntentTargets.length > 0
+      && metaIntentTargets.some((path) => !metaFetched.has(path))
+      && turns + 1 <= budget.maxTurns
+      && hasTime();
+    if (gate.nextAction === 'stop' && !metaSafetyNetPending) {
       // A bounded “no reasonable source” decision can still yield a useful,
       // source-scoped answer that marks the unmet user request as unconfirmed.
       canAnswer = evidences.length > 0;
@@ -1023,7 +1049,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
         emit({ toolName: 'escalate_to_code', status: 'success', paramSummary: input.language === 'zh' ? '文档不足，补充实现细节' : 'Documentation insufficient; inspect implementation details', stage: 'escalation', round: turns, detail: finalReason || (input.language === 'zh' ? 'Evidence Gate 要求补充代码来源。' : 'Evidence Gate requested code sources.') });
       }
     }
-    if (added === 0 && unreadDocumentation.length === 0 && (!codeEligible || unreadCode.length === 0)) {
+    // 已排好 pendingTargets（如 meta 安全网）时不要在这里退出，先读完再判断。
+    if (pendingTargets.length === 0 && added === 0 && unreadDocumentation.length === 0 && (!codeEligible || unreadCode.length === 0)) {
       finalReason = input.language === 'zh' ? '没有更多可读取的相关章节或文件。' : 'No further relevant sections or files are available.';
       break;
     }
@@ -1033,6 +1060,11 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     return { content: evidenceAgentInsufficientResponse(input.language, finalReason || (input.language === 'zh' ? '未能完整覆盖回答要求。' : 'The answer requirements were not fully covered.'), toolErrors.length > 0), evidences };
   }
 
-  const content = await synthesizeVerifiedAnswer(ai, input, evidences, turns, answerMaxTokens, ctx.callModelWithRetry);
+  const truncatedNote = treeTruncated
+    ? (input.language === 'zh'
+      ? '\n\n注意：仓库文件清单超过 GitHub 限制被截断，未出现在清单中的文件本轮无法读取。回答时若涉及这些文件，必须说明“未在已读取文件中找到”，不得臆测。'
+      : '\n\nNote: the repository file listing was truncated by GitHub limits, so files absent from the listing could not be read this turn. If the answer would depend on them, state that they were not found in the files read instead of guessing.')
+    : '';
+  const content = await synthesizeVerifiedAnswer(ai, input, evidences, turns, answerMaxTokens, ctx.callModelWithRetry, truncatedNote);
   return { content, evidences };
 };
