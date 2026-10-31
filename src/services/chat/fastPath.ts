@@ -54,8 +54,12 @@ const headingRelevance = (title: string, terms: string[]): number => {
  * 从 README 大纲中挑选与高频意图直接匹配的章节，最多返回 3 段（方案 §1.1）：
  * - 主 focus 的标题模式之外，问题原话同时命中其他快速路径意图时一并纳入
  *   （如“如何安装并部署”同时取 Install 与 Deployment 章节，避免单一意图漏证据）；
- * - 命中章节按问题词与标题的重合度排序后再截取前三段（审计意见：仅按类别
- *   取前三段会让排在第四位的真正相关章节进不了证据）；
+ * - 命中章节按问题词与标题的重合度排序后再截取（审计意见：仅按类别取前三段
+ *   会让排在第四位的真正相关章节进不了证据），且排序先于 sectionSegments 的
+ *   6 段上限，文档顺序靠后的高相关章节不再被截取上限排除；
+ * - 每个命中的意图保留章节名额：未被已选章节覆盖的意图先取其得分最高的
+ *   匹配章节（同一章节可覆盖多个意图，已覆盖的意图不占新名额），剩余名额
+ *   按得分补足到 3 段，避免多意图问题只保留单一意图的章节；
  * - general 意图同时带上首个标题前的导语段。
  */
 export const selectFastPathSegments = (
@@ -63,17 +67,29 @@ export const selectFastPathSegments = (
   focus: FastPathFocus,
   question: string,
 ): Array<{ lineStart: number; lineEnd: number; excerpt: string; label: string }> => {
-  const extraFoci = FAST_PATH_FOCI.filter((candidate) => candidate !== focus && FAST_PATH_HEADING_PATTERNS[candidate].test(question));
-  const patterns = [FAST_PATH_HEADING_PATTERNS[focus], ...extraFoci.map((candidate) => FAST_PATH_HEADING_PATTERNS[candidate])];
+  const intents = [focus, ...FAST_PATH_FOCI.filter((candidate) => candidate !== focus && FAST_PATH_HEADING_PATTERNS[candidate].test(question))];
+  const patterns = intents.map((candidate) => FAST_PATH_HEADING_PATTERNS[candidate]);
   const matchedTitles = document.headings
     .filter((heading) => patterns.some((pattern) => pattern.test(heading.title)))
     .map((heading) => heading.title);
   const terms = questionTerms(question);
-  const segments = sectionSegments(document, matchedTitles)
-    .map((segment) => ({ segment, score: headingRelevance(segment.label, terms) }))
-    .sort((left, right) => right.score - left.score || left.segment.lineStart - right.segment.lineStart)
-    .slice(0, 3)
-    .map((item) => item.segment);
+  const rankByTitle = (title: string): number => headingRelevance(title, terms);
+  const ranked = sectionSegments(document, matchedTitles, rankByTitle)
+    .map((segment) => ({ segment, score: rankByTitle(segment.label) }))
+    .sort((left, right) => right.score - left.score || left.segment.lineStart - right.segment.lineStart);
+  // 先按意图保名额，再按得分补足到 3 段；输出保持相关度排序（得分降序、行号升序）。
+  const chosen = new Set<(typeof ranked)[number]>();
+  for (const intent of intents) {
+    const covered = Array.from(chosen).some((item) => FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
+    if (covered) continue;
+    const best = ranked.find((item) => !chosen.has(item) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
+    if (best) chosen.add(best);
+  }
+  for (const item of ranked) {
+    if (chosen.size >= 3) break;
+    chosen.add(item);
+  }
+  const segments = ranked.filter((item) => chosen.has(item)).map((item) => item.segment);
   if (focus === 'general') {
     const lines = document.content.split('\n');
     const firstHeading = document.headings.find((heading) => heading.level <= 2 && heading.lineStart > 1);

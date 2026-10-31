@@ -97,6 +97,38 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Setup', 'Usage']);
   });
 
+  it('ranks matched sections before the six-section cap so late sections stay selectable', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Setup',
+      'a',
+      '',
+      '## Quick start',
+      'b',
+      '',
+      '## Getting started',
+      'c',
+      '',
+      '## Usage',
+      'd',
+      '',
+      '## Requirements',
+      'e',
+      '',
+      '## Prerequisites',
+      'f',
+      '',
+      '## Installation',
+      'Run `npx example install`.',
+    ].join('\n'));
+
+    // 命中章节超过 6 段上限：相关度排序先于上限生效，排在文档最后但与问题词
+    // 重合度最高的 Installation 不再被文档顺序截取排除。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Setup', 'Quick start']);
+  });
+
   it('caps the matched sections at three', () => {
     const document = documentFrom([
       '# Example Project',
@@ -141,6 +173,52 @@ describe('selectFastPathSegments', () => {
     // 但问题原话同时命中 usage 意图：Install 章节必须一并进入证据。
     const segments = selectFastPathSegments(document, 'deployment', 'How do I install and deploy this project?');
     expect(segments.map((segment) => segment.label)).toEqual(['Install', 'Deployment']);
+  });
+
+  it('keeps a section for each uncovered requested intent', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Installation',
+      'a',
+      '',
+      '## Setup',
+      'b',
+      '',
+      '## Usage',
+      'c',
+      '',
+      '## Self-hosting',
+      'd',
+    ].join('\n'));
+
+    // 多意图问题（install + deploy）：每个命中意图都保留章节名额，
+    // Self-hosting（deployment）不因得分并列且靠后而被全局截取排除。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install and deploy?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Setup', 'Self-hosting']);
+  });
+
+  it('does not reserve an extra slot for an intent already covered by a chosen section', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Installation and Deployment',
+      'a',
+      '',
+      '## Setup',
+      'b',
+      '',
+      '## Usage',
+      'c',
+      '',
+      '## Self-hosting',
+      'd',
+    ].join('\n'));
+
+    // “Installation and Deployment”同时覆盖 usage 与 deployment 意图：
+    // 不再为 deployment 保留新名额，剩余名额按得分补足到三段。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install and deploy?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Installation and Deployment', 'Setup', 'Usage']);
   });
 
   it('adds the pre-heading introduction for general questions once', () => {
