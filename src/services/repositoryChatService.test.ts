@@ -1207,6 +1207,7 @@ describe('runRepositoryChatTurn meta sources (releases / issues)', () => {
 
   it('keeps round 1 documentation-only even when the planner proposes meta targets', async () => {
     const events: RepositoryChatToolEvent[] = [];
+    mocks.getRepositoryReleases.mockResolvedValue(releasesPayload);
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ entities: ['releases'], expected_answer: ['recent release notes'], target: 'recent updates' }))
       .mockResolvedValueOnce(plan(
@@ -1214,14 +1215,18 @@ describe('runRepositoryChatTurn meta sources (releases / issues)', () => {
         target('README.md', ['Overview'], 'project overview'),
       ))
       .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('recent release notes', 'verified', [overviewRef])], nextAction: 'answer' }))
+      .mockResolvedValueOnce(plan(target('@meta/releases', [], 'recent release notes', 'meta')))
+      .mockResolvedValueOnce(gate({ sufficient: true, requirements: [requirement('recent release notes', 'verified', [overviewRef])], nextAction: 'answer' }))
       .mockResolvedValueOnce(answer('The README overview documents the project scope.', overviewRef, 'Overview'));
 
     const result = await runRepositoryChatTurn({ ...turnInput('这个仓库最近更新了什么？'), onToolEvent: (event) => events.push(event as RepositoryChatToolEvent) });
 
-    // README 优先是硬规则：第 1 轮的 meta 目标被拒绝，回退到文档读取。
-    expect(mocks.getRepositoryReleases).not.toHaveBeenCalled();
-    expect(events.some((event) => event.toolName === 'escalate_to_meta')).toBe(false);
-    expect(readPaths()).toEqual(['README.md']);
+    // README 优先是硬规则：第 1 轮只读文档；meta 意图的 Release 来源在
+    // 第 2 轮补拉后再回答，避免沿用过期的 README 版本信息。
+    expect(readPaths()[0]).toBe('README.md');
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+    expect(events.some((event) => event.toolName === 'escalate_to_meta')).toBe(true);
+    expect(events.some((event) => event.toolName === 'read_releases' && event.status === 'success')).toBe(true);
     expect(result.content).toContain(overviewRef);
   });
 
