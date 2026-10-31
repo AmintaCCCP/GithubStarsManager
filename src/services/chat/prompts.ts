@@ -43,8 +43,8 @@ export const buildUserPrompt = (input: RepositoryChatTurnInput, evidences: ToolE
   const references = evidences.map(formatSourceReference).filter((reference): reference is string => Boolean(reference));
   const creativeInstruction = isCreativeRequest(input.question)
     ? (input.language === 'zh'
-      ? '这是创作交付任务。请直接交付完整文章，严格保留用户要求的标题、引言、小标题、篇幅和结尾结构；不要用“已证实的结论或步骤”或“未证实/缺失的信息”替代文章。只在文末添加一个简短“事实依据”小节，列出支撑文中事实的有效单行代码来源。'
-      : 'This is a creative deliverable. Return the complete requested article with its requested title, introduction, section structure, approximate length, and ending; do not replace it with “Verified conclusions or steps” or an evidence summary. Add only a compact “Factual basis” section at the end, listing valid inline-code sources that support factual claims.')
+      ? '这是创作交付任务。请直接交付完整文章，严格保留用户要求的标题、引言、小标题、篇幅和结尾结构；不要用“已证实的结论或步骤”或“未证实/缺失的信息”替代文章。正文中的事实性段落与表格仍须按系统提示逐段附上有效的单行代码来源，并在文末添加一个简短“事实依据”小节汇总来源。'
+      : 'This is a creative deliverable. Return the complete requested article with its requested title, introduction, section structure, approximate length, and ending; do not replace it with “Verified conclusions or steps” or an evidence summary. Factual paragraphs and tables in the body still need a valid inline-code source after each of them per the system prompt, plus a compact “Factual basis” section at the end summarizing the sources.')
     : (input.language === 'zh'
       ? '请只基于证据回答：先用 2-3 句话给出直接结论，再用 “## ” 小节展开；如存在已读取范围内未确认的内容，在末尾用 “## 未证实或缺失的信息” 小节逐项说明，并引用界定已读范围的来源。每一段落与小节都要紧跟至少一个有效的单行代码来源，不要使用脚注编号，也不要把引用集中到文末。'
       : 'Answer only from the evidence: open with a 2-3 sentence conclusion, then expand under “## ” section headings; if anything was not confirmed within the files read, list it item by item under “## Unverified or missing information” at the end, citing sources that bound the read scope. Every paragraph and section needs at least one valid inline-code source reference right after it — never footnote markers, never citations pooled at the end.');

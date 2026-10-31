@@ -171,7 +171,6 @@ export const rankedCandidatePaths = (entries: TreeEntry[], question: string, foc
     // when the user wording has no matching filename keywords.
     .filter((candidate) => candidate.score > 0 || isDocumentationFirstPath(candidate.path))
     .sort((left, right) => right.score - left.score || left.path.localeCompare(right.path))
-    .slice(0, 80)
     .map((candidate) => candidate.path);
 };
 
