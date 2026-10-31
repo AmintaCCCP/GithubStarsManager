@@ -1,14 +1,25 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRepositoryChatSessions } from './useRepositoryChatSessions';
+import { repositoryChatStorage } from '../../../services/repositoryChatStorage';
 import type { Repository } from '../../../types';
 
 vi.mock('../../../store/useAppStore', () => ({
-  useAppStore: (selector: (state: { githubToken: string; repositoryChatSettings: { retainSessionDays: number } }) => unknown) =>
-    selector({ githubToken: 'test-token', repositoryChatSettings: { retainSessionDays: 90 } }),
+  useAppStore: Object.assign(
+    (selector: (state: { githubToken: string; repositoryChatSettings: { retainSessionDays: number } }) => unknown) =>
+      selector({ githubToken: 'test-token', repositoryChatSettings: { retainSessionDays: 90 } }),
+    { getState: () => ({ user: { login: 'test-user' } }) },
+  ),
 }));
 
-const repository = { id: 1, full_name: 'owner/repo-one' } as unknown as Repository;
+const repository = {
+  id: 1,
+  full_name: 'owner/repo-one',
+  description: 'demo description',
+  html_url: 'https://github.com/owner/repo-one',
+  language: 'TypeScript',
+  owner: { login: 'owner', avatar_url: 'https://example.com/avatar.png' },
+} as unknown as Repository;
 
 describe('useRepositoryChatSessions global history notification', () => {
   beforeEach(() => {
@@ -28,13 +39,20 @@ describe('useRepositoryChatSessions global history notification', () => {
         }),
       );
 
-      let sessionId: string | null = null;
+      let sessionId = '';
       await act(async () => {
-        const session = await result.current.createSession();
-        sessionId = session?.id ?? null;
+        sessionId = (await result.current.createSession())?.id ?? '';
       });
 
       expect(sessionId).toBeTruthy();
+      const saved = await repositoryChatStorage.getSession(sessionId);
+      expect(saved?.repoSnapshot).toEqual({
+        ownerLogin: 'owner',
+        ownerAvatarUrl: 'https://example.com/avatar.png',
+        htmlUrl: 'https://github.com/owner/repo-one',
+        description: 'demo description',
+        language: 'TypeScript',
+      });
       expect(dispatchSpy).toHaveBeenCalled();
     } finally {
       window.removeEventListener('gsm:global-chat-history-changed', dispatchSpy);

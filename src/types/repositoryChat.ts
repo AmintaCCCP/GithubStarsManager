@@ -1,12 +1,22 @@
+export interface RepositoryChatRepoSnapshot {
+  ownerLogin: string;
+  ownerAvatarUrl: string;
+  htmlUrl: string;
+  description?: string;
+  language?: string;
+}
+
 export interface RepositoryChatSession {
   id: string;
   repoId: number;
+  accountLogin?: string;
   repoFullName: string;
   sourceRefSha: string;
   title: string;
   summary?: string;
   modelConfigId?: string | null;
   modelLabelAtTime?: string;
+  repoSnapshot?: RepositoryChatRepoSnapshot;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;

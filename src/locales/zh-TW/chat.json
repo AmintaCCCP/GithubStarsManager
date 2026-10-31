@@ -12,12 +12,18 @@
     "no-matching-conversations-found": "沒有匹配的會話。",
     "open-conversation-in-v1": "進入 {{v1}} 的會話",
     "the-repository-is-no-longer-in-the-list": "對應倉庫已不在清單中",
+    "unstarred-repository": "已移除 Star",
     "delete-conversation-v1": "刪除會話：{{v1}}",
     "delete-this-conversation": "刪除此會話？",
     "this-only-deletes-the-conversation-and-tool-trac": "僅刪除此裝置/帳號儲存的對話與工具軌跡，不會影響 GitHub 倉庫、Star、README 或既有向量索引。",
     "cancel": "取消",
     "delete-conversation": "刪除會話",
-    "failed-to-load-history-please-retry": "歷史加載失敗，請重試。"
+    "failed-to-load-history-please-retry": "歷史加載失敗，請重試。",
+    "group-today": "今日",
+    "group-yesterday": "昨日",
+    "group-last-7-days": "過去 7 天",
+    "group-last-30-days": "過去 30 天",
+    "group-earlier": "更早之前"
   },
   "repositoryChatHistoryPanel": {
     "today": "今天",

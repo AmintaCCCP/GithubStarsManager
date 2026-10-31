@@ -198,12 +198,13 @@ export const repositoryChatStorage = {
     }
   },
 
-  async listRecentSessions(limit = 50): Promise<RepositoryChatSession[]> {
+  async listRecentSessions(limit = 50, offset = 0): Promise<RepositoryChatSession[]> {
     const count = Math.max(1, Math.floor(limit));
+    const skip = Math.max(0, Math.floor(offset));
     const fallback = () => readFallback().sessions
       .filter((session) => !session.deletedAt)
       .sort(byUpdatedAtDescending)
-      .slice(0, count);
+      .slice(skip, skip + count);
     if (useFallbackStorage || !canUseIndexedDb()) {
       enableFallbackStorage();
       return fallback();
@@ -211,7 +212,7 @@ export const repositoryChatStorage = {
     try {
       return await withTimeout(runTransaction('sessions', 'readonly', async (stores) => {
         const records = await requestValue(stores.sessions.getAll()) as RepositoryChatSession[];
-        return records.filter((session) => !session.deletedAt).sort(byUpdatedAtDescending).slice(0, count);
+        return records.filter((session) => !session.deletedAt).sort(byUpdatedAtDescending).slice(skip, skip + count);
       }));
     } catch (error) {
       console.warn('[repository-chat] recent session list fell back to localStorage', error);

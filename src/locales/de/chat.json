@@ -12,12 +12,18 @@
     "no-matching-conversations-found": "Keine passenden Sitzungen.",
     "open-conversation-in-v1": "Nehmen Sie an der Sitzung von {{v1}} teil",
     "the-repository-is-no-longer-in-the-list": "Das entsprechende Lager ist nicht mehr in der Liste",
+    "unstarred-repository": "Stern entfernt",
     "delete-conversation-v1": "Sitzung löschen: {{v1}}",
     "delete-this-conversation": "Diese Konversation löschen?",
     "this-only-deletes-the-conversation-and-tool-trac": "Nur die von diesem Gerät/Konto gespeicherten Konversations- und Tool-Tracks werden gelöscht. Es hat keine Auswirkungen auf das GitHub-Repository, Star, README oder vorhandene Vektorindizes.",
     "cancel": "Stornieren",
     "delete-conversation": "Sitzung löschen",
-    "failed-to-load-history-please-retry": "Das Laden des Verlaufs ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+    "failed-to-load-history-please-retry": "Das Laden des Verlaufs ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "group-today": "Today",
+    "group-yesterday": "Yesterday",
+    "group-last-7-days": "Letzte 7 Tage",
+    "group-last-30-days": "Letzte 30 Tage",
+    "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {
     "today": "Heute",
