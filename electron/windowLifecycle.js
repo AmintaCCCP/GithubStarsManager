@@ -17,7 +17,8 @@ function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
     if (!shouldHide() || win.isDestroyed() || !win.isMinimized()) return;
     // hide() alone leaves the HWND iconic and parked off-screen, so the
     // taskbar button points at a minimized window that will not paint on restore.
-    win.restore();
+    // Only Windows parks the compositor that way; other platforms can hide directly.
+    if (process.platform === 'win32') win.restore();
     win.hide();
   });
 }

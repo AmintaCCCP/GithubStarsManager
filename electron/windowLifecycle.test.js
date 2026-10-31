@@ -30,6 +30,16 @@ function makeWindow({ minimized = true, destroyed = false } = {}) {
   };
 }
 
+function withPlatform(platform, run) {
+  const original = process.platform;
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+  try {
+    run();
+  } finally {
+    Object.defineProperty(process, 'platform', { value: original, configurable: true });
+  }
+}
+
 describe('scheduleMinimizeToTray', () => {
   it('defers hide until after the native minimize dispatch', () => {
     const win = makeWindow();
@@ -119,18 +129,33 @@ describe('scheduleMinimizeToTray', () => {
       assert.equal(win.minimized, false);
       win.hidden = true;
     };
-    let deferred;
 
-    scheduleMinimizeToTray({
-      win,
-      shouldHide: () => true,
-      schedule: (callback) => {
-        deferred = callback;
-      },
+    withPlatform('win32', () => {
+      scheduleMinimizeToTray({
+        win,
+        shouldHide: () => true,
+        schedule: (callback) => callback(),
+      });
     });
-    deferred();
 
     assert.deepEqual(calls, ['restore', 'hide']);
+  });
+
+  it('hides without restoring outside Windows', () => {
+    const calls = [];
+    const win = makeWindow();
+    win.restore = () => calls.push('restore');
+    win.hide = () => calls.push('hide');
+
+    withPlatform('darwin', () => {
+      scheduleMinimizeToTray({
+        win,
+        shouldHide: () => true,
+        schedule: (callback) => callback(),
+      });
+    });
+
+    assert.deepEqual(calls, ['hide']);
   });
 });
 
@@ -162,8 +187,8 @@ describe('registerDidFinishLoadPaintProbe', () => {
   it('disables native window occlusion before the app is ready', () => {
     const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
     const readyAt = source.indexOf('app.whenReady(');
-    const switchAt = source.indexOf(
-      "appendSwitch('disable-features', 'CalculateNativeWinOcclusion')",
+    const switchAt = source.search(
+      /^\s*app\.commandLine\.appendSwitch\('disable-features', 'CalculateNativeWinOcclusion'\)/m,
     );
     assert.ok(switchAt > 0 && switchAt < readyAt);
   });
