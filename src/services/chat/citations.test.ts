@@ -57,6 +57,16 @@ describe('hasCompleteSourceReferences', () => {
     ].join('\n');
     expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
   });
+
+  it('passes when every pipe-less table row is cited', () => {
+    const content = [
+      'Tool | Purpose',
+      '--- | ---',
+      `skills | install ${citation}`,
+      `ffmpeg | render ${citation}`,
+    ].join('\n');
+    expect(hasCompleteSourceReferences(content, evidences)).toBe(true);
+  });
 });
 
 describe('pruneUnverifiableSections', () => {
