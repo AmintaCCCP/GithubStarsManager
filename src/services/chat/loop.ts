@@ -56,6 +56,7 @@ import {
   isFileEntry,
   isRepositoryCodePath,
   linkedDocumentationPaths,
+  makeAnswerRequirements,
   makeMarkdownHeadings,
   parseQueryUnderstanding,
   parseRetrievalPlan,
@@ -667,12 +668,13 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => key.startsWith(`${encodeURIComponent(path)}:`));
   const isViableUnseenTarget = (target: RetrievalTarget): boolean => {
     if (target.scope === 'meta') return metaEligible && !metaFetched.has(target.path);
+    const document = documents.get(target.path);
     const permitted = target.scope === 'code'
       ? codeSet.has(target.path) && budget.maxCodeReads > 0
       : documentationSet.has(target.path);
-    if (!permitted || readPaths.size >= budget.maxReadFiles) return false;
-    const document = documents.get(target.path);
-    if (!document) return true;
+    if (!permitted) return false;
+    // 已缓存文档的未读章节不占读取预算；只有未缓存的新文件才受 maxReadFiles 限制。
+    if (!document) return readPaths.size < budget.maxReadFiles;
     if (target.scope === 'documentation') {
       return citableSegmentsForDocument(
         document,
@@ -850,7 +852,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       missing,
       turns,
       codeEligible,
-      readPaths,
+      readSegments,
     );
     const planRaw = await callModelWithRetry(
       turns === 1 ? 'plan_research' : 'replan_research',
@@ -923,13 +925,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       // 避免把预算浪费在重复读取上。
       .filter((target) => isViableUnseenTarget(target))
       .slice(0, 3);
-    if (targets.length === 0 && evidences.length > 0) {
-      finalReason = input.language === 'zh'
-        ? '计划目标均已读取或无新章节，改为直接基于现有证据回答。'
-        : 'All planned targets were already read or yielded no new sections; answering from the evidence gathered so far.';
-      canAnswer = true;
-      break;
-    }
+    // 空目标交给既有的 unread 候选兜底与后续 gate 判定，不在中间提前收口。
     // 规划器只提出了（尚不可用的）code 目标时，回退到未读的文档候选，
     // 保证 README/docs 始终优先被读取。
     if (targets.length === 0) {
@@ -1001,7 +997,17 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       knownTargetKeys.add(key);
       return true;
     });
-    requirements = completeRequirementAssessments(understanding.answerRequirements, gate.requirements);
+    // 理解失败或理解结果没有 explicit/necessary 要求时，保留一条阻断性的
+    // explicit 要求，让 gateApprovesAnswer 能把缺证据的情况标为 missing，
+    // 而不是空数组直接采纳 gate 的 sufficient。
+    const assessedRequirements = understanding.answerRequirements.length > 0
+      ? understanding.answerRequirements
+      : makeAnswerRequirements(
+        [input.language === 'zh' ? '直接回答用户提出的问题' : 'directly answer the user question'],
+        'explicit',
+        1,
+      );
+    requirements = completeRequirementAssessments(assessedRequirements, gate.requirements);
     missing = requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement);
     finalReason = gate.reason || finalReason;
     pendingTargets = gate.recommendedTargets.filter((target) => (target.scope !== 'code' || codeEligible) && (target.scope !== 'meta' || metaEligible));
@@ -1017,14 +1023,16 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     const allApplicableRequirementsVerified = requirements.length > 0 && requirements.every((requirement) => (
       requirement.status === 'verified' || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
     ));
-    const hasAnyVerifiedEvidence = requirements.some((requirement) => requirement.status === 'verified' && requirement.evidence.length > 0);
-    // 采纳 gate 的整体判定：evidence 宽松解析后带注释的引用已可核验，只要
-    // gate 以足够置信度判定可回答且至少一条要求带有效引用（或本轮没有阻断
-    // 要求），就不强制进入下一轮。
+    // gate 输出中未出现的要求按 missing 处理（completeRequirementAssessments
+    // 已补齐）。采纳整体判定时复用与逐项核验相同的阻断规则：explicit 必须全
+    // verified，necessary 允许 not_applicable；带注释的引用已由宽松提取核验。
     const gateApprovesAnswer = gate.sufficient
       && gate.nextAction === 'answer'
       && gate.confidence >= 0.7
-      && (requirements.length === 0 || hasAnyVerifiedEvidence);
+      && requirements.length > 0
+      && requirements.every((requirement) => (
+        requirement.status === 'verified' || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
+      ));
     consecutiveNoProgressRounds = added > 0 || discoveredViableTarget ? 0 : consecutiveNoProgressRounds + 1;
     // 最新版本类问题：文档即使已覆盖全部要求，若 Release/Issue 来源还没拉过，
     // 也先补拉再作答，避免沿用过期的 README 版本号。

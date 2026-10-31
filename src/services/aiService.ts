@@ -551,7 +551,7 @@ export class AIService {
     const configId = this.config.id;
     const isInternalJson = options.purpose === 'internal-json';
     const disableInternalThinking = isInternalJson && this.config.disableThinkingForInternalSteps !== false;
-    const reasoning = disableInternalThinking && this.config.reasoningEffort ? { effort: 'low' as const } : this.getOpenAIReasoningPayload();
+    const reasoning = disableInternalThinking ? { effort: 'none' as const } : this.getOpenAIReasoningPayload();
     const normalizeFinishReason = (raw: string | null | undefined): string | null => {
       if (!raw) return null;
       if (raw === 'max_tokens' || raw === 'MAX_TOKENS' || raw === 'max_output_tokens') return 'length';
@@ -576,6 +576,7 @@ export class AIService {
             input: messages,
             temperature: options.temperature,
             max_output_tokens: options.maxTokens,
+            ...(isInternalJson && (options.jsonMode ?? true) ? { text: { format: { type: 'json_object' } } } : {}),
             ...(reasoning ? { reasoning } : {}),
             ...(isMiMoModel || isDeepSeekThinking ? { thinking: { type: 'disabled' } } : {}),
           }
@@ -1190,7 +1191,9 @@ ${options.user}` : options.user;
     maxTokens?: number;
     signal?: AbortSignal;
   }): Promise<string> {
-    return (await this.generateChatTextDetailed(options)).text;
+    const result = await this.generateChatTextDetailed(options);
+    if (!result.text) throw new Error('No content received from AI service');
+    return result.text;
   }
 
   /**
@@ -1234,8 +1237,15 @@ ${options.user}` : options.user;
       }
       return result;
     } catch (error) {
-      if (isInternalJson && error instanceof AIRequestError && error.status === 400) {
-        // 端点不支持 response_format 时降级为普通请求重试一次。
+      const message = error instanceof Error ? error.message : '';
+      if (
+        isInternalJson
+        && error instanceof AIRequestError
+        && error.status === 400
+        && /response_format|text\.format|json_object/i.test(message)
+      ) {
+        // 仅当错误正文表明端点不支持 JSON 模式时，才降级为普通请求重试一次；
+        // 无效模型、超长上下文等其它 400 属于必然失败，不重复发送。
         return await this.requestTextResult({
           system: options.system,
           user: options.user,

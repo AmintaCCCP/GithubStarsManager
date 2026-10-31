@@ -77,4 +77,30 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     expect(retryMessages.at(-1)?.content).toContain('PLAN');
     expect(retryMessages.at(-1)?.content).toContain('直接输出 JSON，不要思考过程');
   });
+
+  it('does not retry plain requests when a non-JSON-mode 400 happens', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'context length exceeded' } }), { status: 400 }));
+    const service = new AIService(makeConfig({ apiType: 'openai-compatible' }) as never, 'en');
+
+    await expect(service.generateChatTextDetailed({ system: 's', user: 'u', purpose: 'internal-json' }))
+      .rejects.toThrow('AI API error: 400');
+    expect(chatBodies()).toHaveLength(1);
+  });
+
+  it('falls back to a plain request when the doubled length retry returns 400', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(okResponse('', 'length'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'response_format is not supported' } }), { status: 400 }))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig()) as unknown as AIService;
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 900, purpose: 'internal-json' });
+
+    expect(result.text).toBe('{"ok":true}');
+    const bodies = chatBodies();
+    expect(bodies).toHaveLength(3);
+    expect(bodies[2].response_format).toBeUndefined();
+    expect(bodies[2].max_tokens).toBe(900);
+  });
 });

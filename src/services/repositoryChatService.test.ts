@@ -513,6 +513,41 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).not.toContain('insufficient');
   });
 
+  it('keeps researching when the gate approves but one explicit requirement is still missing', async () => {
+    // 采纳 gate 的整体判定必须复用逐项核验的阻断规则：存在 missing 的
+    // explicit 要求时，即使 gate 声称 sufficient 也不能结束检索。
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/configuration.md': '# Environment\n\nUse APP_PORT for local configuration.',
+    });
+    mocks.generateChatText
+      .mockResolvedValueOnce(understanding({ explicit_requirements: ['install the project', 'configure the port'] }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Installation'], 'install the project')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [
+          requirement('install the project', 'verified', [installRef]),
+          requirement('configure the port', 'missing'),
+        ],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(plan(target('README.md', ['Quick Start'], 'configure the port')))
+      .mockResolvedValueOnce(gate({
+        sufficient: true,
+        requirements: [
+          requirement('install the project', 'verified', [installRef]),
+          requirement('configure the port', 'verified', [quickStartRef]),
+        ],
+        nextAction: 'answer',
+      }))
+      .mockResolvedValueOnce(answer('Install with pnpm, then set APP_PORT.', installRef, quickStartRef));
+
+    const result = await runRepositoryChatTurn(turnInput('How do I install and configure this project?'));
+
+    expect(readPaths()).toEqual(['README.md']);
+    expect(result.content).toContain(quickStartRef);
+  });
+
   it('answers vector-search usage after its explicit steps are evidenced and ignores optional tuning invented by the gate', async () => {
     configureTreeAndFiles({
       'README.md': [

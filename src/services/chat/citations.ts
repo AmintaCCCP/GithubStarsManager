@@ -103,7 +103,8 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
 export const extractReferenceToken = (raw: string): string => {
   const stripped = raw.trim().replace(/^`+|`+$/g, '').trim();
   // 线性时间匹配：目录前缀与文件名都是单义字符类，没有嵌套量词回溯。
-  const match = /(\/?[\w@.-]*(?:\/[.\w@-]+)*\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)/.exec(stripped);
+  // 分隔符前至少要有一个路径字符，避免把孤立的 “- 10” 当成引用。
+  const match = /(\/?[\w@.-]+(?:\/[.\w@-]+)*\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)/.exec(stripped);
   return (match?.[1] ?? stripped).trim();
 };
 
@@ -332,7 +333,10 @@ export const parseRequirementAssessments = (value: unknown, answerRequirements: 
       ?? (providedText ? byText.get(providedText.toLocaleLowerCase().replace(/\s+/g, ' ').trim()) : undefined);
     const status = candidate.status;
     if (!requirement || (status !== 'verified' && status !== 'missing' && status !== 'not_applicable')) continue;
-    const evidence = asStringArray(candidate.evidence, 4).map(extractReferenceToken).filter(isValidReference);
+    // 已是精确引用的原文直接保留，只有带注释的字符串才走宽松提取。
+    const evidence = asStringArray(candidate.evidence, 4)
+      .map((raw) => (isValidReference(raw) ? raw : extractReferenceToken(raw)))
+      .filter(isValidReference);
     assessments.set(requirement.id, {
       requirementId: requirement.id,
       requirement: requirement.text,
