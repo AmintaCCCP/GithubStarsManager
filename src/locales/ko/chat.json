@@ -12,7 +12,7 @@
     "no-matching-conversations-found": "일치하는 세션이 없습니다.",
     "open-conversation-in-v1": "{{v1}}님의 세션에 입장하세요",
     "the-repository-is-no-longer-in-the-list": "해당 창고가 더 이상 목록에 없습니다.",
-    "unstarred-repository": "Unstarred",
+    "unstarred-repository": "Star 해제됨",
     "delete-conversation-v1": "세션 삭제: {{v1}}",
     "delete-this-conversation": "이 대화를 삭제하시겠습니까?",
     "this-only-deletes-the-conversation-and-tool-trac": "이 장치/계정에 저장된 대화 및 도구 트랙만 삭제됩니다. GitHub 저장소, Star, README 또는 기존 벡터 인덱스에는 영향을 미치지 않습니다.",
@@ -21,8 +21,8 @@
     "failed-to-load-history-please-retry": "기록을 로드하지 못했습니다. 다시 시도해 주세요.",
     "group-today": "Today",
     "group-yesterday": "Yesterday",
-    "group-last-7-days": "Last 7 days",
-    "group-last-30-days": "Last 30 days",
+    "group-last-7-days": "최근 7일",
+    "group-last-30-days": "최근 30일",
     "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {

@@ -12,7 +12,7 @@
     "no-matching-conversations-found": "Nenhuma sessão correspondente.",
     "open-conversation-in-v1": "Entre na sessão de {{v1}}",
     "the-repository-is-no-longer-in-the-list": "O armazém correspondente não está mais na lista",
-    "unstarred-repository": "Unstarred",
+    "unstarred-repository": "Star removida",
     "delete-conversation-v1": "Excluir sessão: {{v1}}",
     "delete-this-conversation": "Excluir esta conversa?",
     "this-only-deletes-the-conversation-and-tool-trac": "Somente as conversas e trilhas de ferramentas salvas por este dispositivo/conta serão excluídas. Isso não afetará o repositório GitHub, Star, README ou índices vetoriais existentes.",
@@ -21,8 +21,8 @@
     "failed-to-load-history-please-retry": "Falha ao carregar o histórico. Tente novamente.",
     "group-today": "Today",
     "group-yesterday": "Yesterday",
-    "group-last-7-days": "Last 7 days",
-    "group-last-30-days": "Last 30 days",
+    "group-last-7-days": "Últimos 7 dias",
+    "group-last-30-days": "Últimos 30 dias",
     "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {

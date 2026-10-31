@@ -12,7 +12,7 @@
     "no-matching-conversations-found": "Нет соответствующих сеансов.",
     "open-conversation-in-v1": "Войдите в сеанс {{v1}}",
     "the-repository-is-no-longer-in-the-list": "Соответствующего склада больше нет в списке",
-    "unstarred-repository": "Unstarred",
+    "unstarred-repository": "Звезда снята",
     "delete-conversation-v1": "Удалить сеанс: {{v1}}",
     "delete-this-conversation": "Удалить этот разговор?",
     "this-only-deletes-the-conversation-and-tool-trac": "Будут удалены только записи разговоров и инструментов, сохраненные на этом устройстве/учетной записи. Это не повлияет на репозиторий GitHub, Star, README или существующие векторные индексы.",
@@ -21,8 +21,8 @@
     "failed-to-load-history-please-retry": "Не удалось загрузить историю. Повторите попытку.",
     "group-today": "Today",
     "group-yesterday": "Yesterday",
-    "group-last-7-days": "Last 7 days",
-    "group-last-30-days": "Last 30 days",
+    "group-last-7-days": "Последние 7 дней",
+    "group-last-30-days": "Последние 30 дней",
     "group-earlier": "Earlier"
   },
   "repositoryChatHistoryPanel": {
