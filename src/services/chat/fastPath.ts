@@ -99,7 +99,13 @@ export const selectFastPathSegments = (
     chosen.add(item);
   }
   let intro: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
-  if (focus === 'general') {
+  // README 首行即为二级或更低层级标题（如 `## License`）时，第 1 行已是章节起点，
+  // 其后内容属于该章节而非导语：不生成 Overview 导语段（首个行号 >1 的标题之前
+  // 不存在导语内容，不能把首个章节误标为导语）。首行为 H1（`# 标题`）或首个标题
+  // 不在第 1 行时保持原有导语逻辑。
+  const openingHeading = document.headings[0];
+  const opensWithLowerLevelHeading = openingHeading !== undefined && openingHeading.lineStart === 1 && openingHeading.level > 1;
+  if (focus === 'general' && !opensWithLowerLevelHeading) {
     const lines = document.content.split('\n');
     const firstHeading = document.headings.find((heading) => heading.level <= 2 && heading.lineStart > 1);
     const introEnd = Math.min(lines.length, (firstHeading?.lineStart ?? lines.length + 1) - 1, 80);

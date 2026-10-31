@@ -361,6 +361,25 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Features']);
   });
 
+  it('adds no intro when the README opens with a lower-level heading', () => {
+    const document = documentFrom([
+      '## License',
+      'MIT License.',
+      'Copyright 2024.',
+      '',
+      '## Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // README 第一行是二级标题（`## License`）：该章节从第 1 行开始，其后内容
+    // 属于章节而非导语。general 问题只返回 Features，不把 License 章节内容
+    // 误标为 Overview 导语段。
+    const segments = selectFastPathSegments(document, 'general', 'What features does this project have?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Features']);
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+    expect(segments[0]).toMatchObject({ lineStart: 5, lineEnd: 6 });
+  });
+
   it('adds no intro for non-general foci even when the README has an introduction', () => {
     const document = documentFrom([
       '# Example Project',
