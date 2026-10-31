@@ -113,6 +113,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setLoadError(null);
+    setIsLoadingMore(false);
     try {
       const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1);
       if (requestId !== requestIdRef.current) return;
@@ -177,18 +178,21 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     window.dispatchEvent(new CustomEvent(HISTORY_CHANGE_EVENT));
   }, []);
 
-  const visibleSessions = useMemo(() => {
+  const accountSessions = useMemo(() => {
     // 新会话带账号标记；旧会话无标记，为兼容继续展示。
-    const accountSessions = user?.login
+    return user?.login
       ? sessions.filter((session) => !session.accountLogin || session.accountLogin === user.login)
       : sessions.filter((session) => !session.accountLogin);
+  }, [sessions, user]);
+
+  const visibleSessions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
     if (!normalizedQuery) return accountSessions;
     return accountSessions.filter((session) =>
       session.title.toLocaleLowerCase().includes(normalizedQuery) ||
       session.repoFullName.toLocaleLowerCase().includes(normalizedQuery),
     );
-  }, [query, sessions, user]);
+  }, [query, accountSessions]);
 
   const formatTime = useCallback((value: string) => {
     const date = new Date(value);
@@ -231,7 +235,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
           <SheetTitle className="flex items-center gap-2 text-base">
             <History className="h-4 w-4 shrink-0" aria-hidden="true" />
             {t('globalChatHistorySheet.chat-history')}
-            {!isLoading && !loadError && <span className="text-sm font-normal text-muted-foreground">({sessions.length})</span>}
+            {!isLoading && !loadError && <span className="text-sm font-normal text-muted-foreground">({accountSessions.length})</span>}
           </SheetTitle>
           <SheetDescription>
             {t('globalChatHistorySheet.conversations-across-repositories-select-one-to')}

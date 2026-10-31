@@ -100,6 +100,7 @@ export const useRepositoryChatSessions = ({
     setIsLoading(true);
     setError(null);
     try {
+      const accountLogin = useAppStore.getState().user?.login;
       const resolveSha = resolveSourceRefSha ?? ((targetRepository: Repository) => {
         if (!githubToken) throw new Error(t('useRepositoryChatSessions.configure-a-github-token-before-starting-a-conve'));
         return resolveRepositoryChatHeadSha(targetRepository, githubToken);
@@ -110,7 +111,7 @@ export const useRepositoryChatSessions = ({
       const session: RepositoryChatSession = {
         id: createId(),
         repoId: repository.id,
-        accountLogin: useAppStore.getState().user?.login,
+        accountLogin,
         repoFullName: repository.full_name,
         sourceRefSha,
         title: defaultTitle(language),
