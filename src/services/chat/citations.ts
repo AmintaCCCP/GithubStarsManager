@@ -102,7 +102,8 @@ const normalizeEvidenceReferences = (content: string, evidences: ToolEvidence[])
  */
 export const extractReferenceToken = (raw: string): string => {
   const stripped = raw.trim().replace(/^`+|`+$/g, '').trim();
-  const match = /(\/?(?:@meta\/|[.\w@-]+\/)*[.\w@-]+\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)/.exec(stripped);
+  // 线性时间匹配：目录前缀与文件名都是单义字符类，没有嵌套量词回溯。
+  const match = /(\/?[\w@.-]*(?:\/[.\w@-]+)*\s*[-—–]\s*\d+(?:\s*-\s*\d+)?)/.exec(stripped);
   return (match?.[1] ?? stripped).trim();
 };
 
