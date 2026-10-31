@@ -612,4 +612,83 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Introduction', 'Features', 'Highlights']);
     expect(segments.every((segment) => segment.lineStart > 2)).toBe(true);
   });
+
+  it('keeps a one-line prose lead followed immediately by a heading', () => {
+    const document = documentFrom([
+      'A CLI for managing stars.',
+      '## Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 Up06 布局一：首行为说明文字、第 2 行紧接二级标题。introEnd 为 1，
+    // 导语下限放宽为 >= 1 后单行说明文字仍作为 Overview 导语进入证据。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Features']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 1 });
+    expect(segments[0]?.excerpt).toContain('A CLI for managing stars.');
+  });
+
+  it('keeps a prose lead followed by a blank line and a heading', () => {
+    const document = documentFrom([
+      'A CLI for managing stars.',
+      '',
+      '## Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 Up06 布局二：首行为说明文字、第 2 行为空行、第 3 行为二级标题。
+    // 有效性检查从第 1 行开始（首行不是标题），首行说明文字不再被跳过。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Overview', 'Features']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 2 });
+    expect(segments[0]?.excerpt).toContain('A CLI for managing stars.');
+  });
+
+  it('still excludes a heading-only lead', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '## Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 Up06 不回归（Ucta）：首行是标题时有效性检查照旧跳过第 1 行，
+    // 标题后没有非空内容的前导段仍被排除。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+  });
+
+  it('keeps the install instructions before a nested deployment section', () => {
+    const document = documentFrom([
+      '## Installation',
+      'Install with npm.',
+      '### Deployment',
+      'Deploy with Docker.',
+      'Deploy to production.',
+    ].join('\n'));
+
+    // 审计 Up04：`## Installation` 完整覆盖嵌套的 `### Deployment`。部署焦点 +
+    // 安装意图的问题不得只保留 Deployment——Installation 截断为 Deployment 起始
+    // 行之前的前缀（含安装正文）后与 Deployment 一并入选，安装说明不丢失。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I install and deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Installation', 'Deployment']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 2 });
+    expect(segments[0]?.excerpt).toContain('Install with npm.');
+    expect(segments[0]?.excerpt).not.toContain('Deploy with Docker.');
+    expect(segments[1]).toMatchObject({ lineStart: 3, lineEnd: 5 });
+  });
+
+  it('does not keep a nested child when its matched parent already covers it', () => {
+    const document = documentFrom([
+      '## Features',
+      'Fast and small.',
+      '### Features detail',
+      'Details.',
+    ].join('\n'));
+
+    // 审计 nitpick：父章节与嵌套子章节同时命中时，子章节起始行落在父章节区间
+    // 内（被包含方向）——跳过子章节，只返回父章节，行区间 1-4 不与子章节重叠。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Features']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 4 });
+  });
 });

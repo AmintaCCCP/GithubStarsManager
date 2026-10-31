@@ -94,28 +94,59 @@ export const selectFastPathSegments = (
   const ranked = sectionSegments(document, matchedTitles, rankByTitle)
     .map((segment) => ({ segment, score: rankByTitle(segment.label) }))
     .sort((left, right) => right.score - left.score || left.segment.lineStart - right.segment.lineStart);
+  const lines = document.content.split('\n');
   // 先按意图保名额，再按得分补足到 3 段；导语段的名额分配在补足之后进行，
   // 只能挤占填充章节（见上方截断优先级），因此无需再对结果做 slice 截断。
   // 输出保持相关度排序（导语段固定在最前，其后得分降序、行号升序）。
   // 全局不变量：任意两段输出的行号区间两两不重叠。sectionSegments 在同层级或
-  // 更高层级标题处切章，嵌套章节（如 `## License` 下的 `### Features`）的区间
-  // 完整落在外层章节区间内，两个嵌套章节同时命中时区间也可能部分重叠——入选
-  // 一律跳过与已选区间重叠的候选，让实现本身满足该不变量，而非依赖测试 oracle。
-  const overlapsChosen = (candidate: (typeof ranked)[number], pool: ReadonlySet<(typeof ranked)[number]>): boolean =>
-    Array.from(pool).some((item) =>
-      item.segment.lineStart <= candidate.segment.lineEnd && candidate.segment.lineStart <= item.segment.lineEnd,
-    );
-  const reserved = new Set<(typeof ranked)[number]>();
+  // 更高层级标题处切章，嵌套章节（如 `## Installation` 下的 `### Deployment`）
+  // 的区间完整落在外层章节区间内，候选与已选区间重叠时按双向语义处置（审计
+  // Up04 + nitpick），让实现本身满足该不变量，而非依赖测试 oracle：
+  // - 被包含方向（候选起始行落在某个已选章节行区间内，如已选 `## Features`
+  //   覆盖候选 `### Features detail`）：跳过该候选，不重复输出父章节内容；
+  // - 包含方向（候选起始行早于某个已选章节起始行，如候选 `## Installation`
+  //   覆盖已选 `### Deployment`）：候选截断为该已选章节起始行之前的前缀，前缀
+  //   除标题行外无非空正文时整体跳过（不产出纯标题段），否则前缀作为证据段
+  //   保留——label 仍为候选章节自身标题，安装说明等前缀正文不因子章节入选而
+  //   丢失。被包含方向优先：候选起点已落在已选区间内时，任何截断都无法避免
+  //   重叠，只能整体跳过。
+  const headingLinePattern = /^\s{0,3}#{1,6}\s/;
+  // 有效性下限（与导语段一致）：区间内除标题行外至少一行非空正文。
+  const rangeHasBodyContent = (lineStart: number, lineEnd: number): boolean =>
+    lines.slice(lineStart - 1, lineEnd).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
+  type RankedItem = (typeof ranked)[number];
+  // 处置结果：null 无重叠；'contained' 被包含方向（跳过）；prefixEnd 为包含
+  // 方向前缀的末行（最早的被包含已选章节起始行之前，多个被包含章节取最早）。
+  const overlapDisposition = (candidate: RankedItem, pool: ReadonlySet<RankedItem>): null | 'contained' | { prefixEnd: number } => {
+    let prefixEnd: number | null = null;
+    for (const item of pool) {
+      if (candidate.segment.lineStart > item.segment.lineStart && candidate.segment.lineStart <= item.segment.lineEnd) {
+        return 'contained';
+      }
+      if (candidate.segment.lineStart < item.segment.lineStart && item.segment.lineStart <= candidate.segment.lineEnd) {
+        prefixEnd = prefixEnd === null ? item.segment.lineStart - 1 : Math.min(prefixEnd, item.segment.lineStart - 1);
+      }
+    }
+    return prefixEnd === null ? null : { prefixEnd };
+  };
+  const admits = (candidate: RankedItem, pool: ReadonlySet<RankedItem>): boolean => {
+    const disposition = overlapDisposition(candidate, pool);
+    if (disposition === null) return true;
+    if (disposition === 'contained') return false;
+    return rangeHasBodyContent(candidate.segment.lineStart, disposition.prefixEnd);
+  };
+  const reserved = new Set<RankedItem>();
   for (const intent of intents) {
     const covered = Array.from(reserved).some((item) => FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
     if (covered) continue;
-    const best = ranked.find((item) => !reserved.has(item) && !overlapsChosen(item, reserved) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
+    const best = ranked.find((item) => !reserved.has(item) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label) && admits(item, reserved));
     if (best) reserved.add(best);
   }
-  const chosen = new Set(reserved);
+  const chosen = new Set<RankedItem>(reserved);
   for (const item of ranked) {
     if (chosen.size >= 3) break;
-    if (overlapsChosen(item, chosen)) continue;
+    if (chosen.has(item)) continue;
+    if (!admits(item, chosen)) continue;
     chosen.add(item);
   }
   // 前导段（导语位）：general 焦点证据的固定开头，两种形态按首个标题位置互斥。
@@ -139,8 +170,11 @@ export const selectFastPathSegments = (
   //     任意层级标题（审计 UVhp：不再限于 H1/H2，H1 后的 H3 章节内容不混入导语
   //     段、不与后续选中章节重复），且只截取到第一个已选章节之前（审计 UVht：
   //     第 2–3 行的三级标题不再使第 1–2 行的标题与描述被整体丢弃）。审计 Ucta：
-  //     下限不只是行数（introEnd >= 2）——标题行之后必须至少存在一行非空内容，
-  //     仅含标题与空行的导语段不生成，该名额不消耗，最低分填充章节不被挤掉。
+  //     下限不只是行数——标题行之后必须至少存在一行非空内容，仅含标题与空行的
+  //     导语段不生成，该名额不消耗，最低分填充章节不被挤掉；审计 Up06：导语下限
+  //     放宽为 introEnd >= 1（首行为说明文字、第 2 行紧接标题的布局导语只有 1 行），
+  //     且首行不是标题时有效性检查从第 1 行开始——首行说明文字 + 空行 + 标题的
+  //     布局不再因检查跳过首行而丢失导语。
   // 同一 README 只会命中其中一种形态，不会既出 Overview 导语又出首个章节的
   // 重复内容；两种形态的前导段都满足“与任意已选章节零重叠”与“标题行之外
   // 至少一行非空内容”的全局不变量。
@@ -148,11 +182,15 @@ export const selectFastPathSegments = (
   if (focus === 'general') {
     const openingHeading = document.headings[0];
     const opensWithLowerLevelHeading = openingHeading !== undefined && openingHeading.lineStart === 1 && openingHeading.level > 1;
-    const lines = document.content.split('\n');
-    // 前导段有效性下限（审计 Ucta）：除起始标题行（第 1 行）之外至少一行非空
-    // 内容；纯标题（可再含空行）的前导段不产出，不消耗名额。
+    // 首行是否为标题行（审计 Up06）：首行为普通说明文字时，第 1 行本身就是
+    // 导语内容，有效性下限不得把它排除在检查之外。
+    const firstLineIsHeading = openingHeading?.lineStart === 1;
+    // 前导段有效性下限（审计 Ucta）：除起始标题行之外至少一行非空内容；纯标题
+    // （可再含空行）的前导段不产出，不消耗名额。首行不是标题时从第 1 行开始
+    // 检查（Up06：首行说明文字紧接标题、或隔空行再接标题的布局不再因检查起点
+    // 跳过首行而误判为空导语）；首行是标题（H1 或首章节标题）时照旧跳过第 1 行。
     const leadHasContentBeyondHeading = (lineEnd: number): boolean =>
-      lines.slice(1, lineEnd).some((line) => line.trim() !== '');
+      lines.slice(firstLineIsHeading ? 1 : 0, lineEnd).some((line) => line.trim() !== '');
     if (openingHeading && opensWithLowerLevelHeading) {
       const openingSection = sectionSegments(document, [openingHeading.title])
         .find((segment) => segment.lineStart === openingHeading.lineStart) ?? null;
@@ -192,7 +230,7 @@ export const selectFastPathSegments = (
         firstChosenLineStart - 1,
         80,
       );
-      if (introEnd >= 2 && leadHasContentBeyondHeading(introEnd)) {
+      if (introEnd >= 1 && leadHasContentBeyondHeading(introEnd)) {
         lead = {
           lineStart: 1,
           lineEnd: introEnd,
@@ -215,7 +253,30 @@ export const selectFastPathSegments = (
       }
     }
   }
-  const segments = ranked.filter((item) => chosen.has(item)).map((item) => item.segment);
+  // 包含方向截断（审计 Up04）在此落地：已选章节可能覆盖更早入选的其他已选章节
+  // （如 Installation 先于 Deployment 入选且完整覆盖它），输出前把覆盖者的行区间
+  // 截断到被覆盖章节起始行之前，保证任意两段输出零重叠；截断后的 excerpt 同步
+  // 重建（只含前缀正文）。选择阶段的 admits 已保证不会选出被包含方向的重叠组合，
+  // 且覆盖者的截断终点在入选时即已确定（后入章节只会被 contained 跳过），故此
+  // 处重算与选择阶段的前缀一致。
+  const chosenItems = Array.from(chosen);
+  const effectiveSegments = new Map<RankedItem, { lineStart: number; lineEnd: number; excerpt: string; label: string }>();
+  for (const item of chosenItems) {
+    const nestedLineStarts = chosenItems
+      .filter((other) => other !== item
+        && other.segment.lineStart > item.segment.lineStart
+        && other.segment.lineStart <= item.segment.lineEnd)
+      .map((other) => other.segment.lineStart);
+    if (nestedLineStarts.length === 0) continue;
+    const lineEnd = Math.min(...nestedLineStarts) - 1;
+    effectiveSegments.set(item, {
+      lineStart: item.segment.lineStart,
+      lineEnd,
+      excerpt: lines.slice(item.segment.lineStart - 1, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
+      label: item.segment.label,
+    });
+  }
+  const segments = ranked.filter((item) => chosen.has(item)).map((item) => effectiveSegments.get(item) ?? item.segment);
   return lead ? [lead, ...segments] : segments;
 };
 
