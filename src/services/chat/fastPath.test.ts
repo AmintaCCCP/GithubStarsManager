@@ -550,4 +550,66 @@ describe('selectFastPathSegments', () => {
     expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 2 });
     expect(segments[0]?.excerpt).toContain('A documented example project');
   });
+
+  it('truncates the opening-section lead before a nested matched section', () => {
+    const document = documentFrom([
+      '## License',
+      'MIT License.',
+      'Copyright 2024.',
+      '',
+      '### Features',
+      'Fast and small.',
+      'Small and fast CLI.',
+    ].join('\n'));
+
+    // 审计 UctX：首行二级标题（License）的章节区间完整覆盖其下嵌套的 Features
+    // 章节（sectionSegments 只在同层级或更高层级标题处切章）。前导段必须截断
+    // 到嵌套已选章节（Features，第 5 行）起始行之前：License 自述内容保留、
+    // Features 内容不重复输出，任意两段行区间零重叠。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['License', 'Features']);
+    expect(segments[0]).toMatchObject({ lineStart: 1, lineEnd: 4 });
+    expect(segments[0]?.excerpt).toContain('MIT License.');
+    expect(segments[0]?.excerpt).not.toContain('Fast and small.');
+    expect(segments[1]).toMatchObject({ lineStart: 5, lineEnd: 7 });
+  });
+
+  it('skips the opening-section lead when truncation would leave only the heading', () => {
+    const document = documentFrom([
+      '## License',
+      '### Features',
+      'Fast and small.',
+    ].join('\n'));
+
+    // 审计 UctX 边界：嵌套章节紧跟开头标题（第 2 行），截断后前导段只剩标题行、
+    // 除标题行外无任何非空内容——前导段让位，不产出纯标题段。
+    const segments = selectFastPathSegments(document, 'general', 'What are the features of this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Features']);
+    expect(segments.some((segment) => segment.label === 'License')).toBe(false);
+    expect(segments[0]).toMatchObject({ lineStart: 2, lineEnd: 3 });
+  });
+
+  it('generates no pure-title Overview intro and keeps the lowest filler section', () => {
+    const document = documentFrom([
+      '# Example Project',
+      '',
+      '## Introduction',
+      'Introduces the project.',
+      '',
+      '## Features',
+      'Fast and small.',
+      '',
+      '## Highlights',
+      'Notable moments.',
+    ].join('\n'));
+
+    // 审计 Ucta：H1 + 空行 + 章节开头时 introEnd >= 2 的导语段只含标题行，不满足
+    // “标题行之外至少一行非空内容”——不生成纯标题 Overview 导语，该名额不消耗，
+    // 排序最低的填充章节（Highlights）不被挤掉，三个匹配章节全部保留。
+    const segments = selectFastPathSegments(document, 'general', 'What is the introduction and features and highlights of this project?');
+    expect(segments).toHaveLength(3);
+    expect(segments.some((segment) => segment.label === 'Overview')).toBe(false);
+    expect(segments.map((segment) => segment.label)).toEqual(['Introduction', 'Features', 'Highlights']);
+    expect(segments.every((segment) => segment.lineStart > 2)).toBe(true);
+  });
 });

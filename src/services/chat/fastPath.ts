@@ -74,7 +74,10 @@ const headingRelevance = (title: string, terms: string[]): number => {
  *   章节充当证据（快速路径回落完整检索循环），三个匹配章节占满名额时前导段
  *   让位，已匹配章节绝不被未命中的首章节挤出。Overview 导语段边界为首个
  *   位于第 1 行之后的任意层级标题（不限于 H1/H2），且只截取到第一个已选
- *   章节之前，导语内容不与已选章节重复，下限为标题行 + 至少一行导语内容。
+ *   章节之前，导语内容不与已选章节重复；有效性下限为标题行之外至少一行
+ *   非空内容（审计 Ucta：纯标题 + 空行的导语段不生成，该名额不消耗，最低分
+ *   填充章节不被挤掉）。首章节前导段截断到嵌套已选章节之前（审计 UctX），
+ *   任意两段输出行号区间两两不重叠。
  */
 export const selectFastPathSegments = (
   document: CachedDocument,
@@ -94,16 +97,25 @@ export const selectFastPathSegments = (
   // 先按意图保名额，再按得分补足到 3 段；导语段的名额分配在补足之后进行，
   // 只能挤占填充章节（见上方截断优先级），因此无需再对结果做 slice 截断。
   // 输出保持相关度排序（导语段固定在最前，其后得分降序、行号升序）。
+  // 全局不变量：任意两段输出的行号区间两两不重叠。sectionSegments 在同层级或
+  // 更高层级标题处切章，嵌套章节（如 `## License` 下的 `### Features`）的区间
+  // 完整落在外层章节区间内，两个嵌套章节同时命中时区间也可能部分重叠——入选
+  // 一律跳过与已选区间重叠的候选，让实现本身满足该不变量，而非依赖测试 oracle。
+  const overlapsChosen = (candidate: (typeof ranked)[number], pool: ReadonlySet<(typeof ranked)[number]>): boolean =>
+    Array.from(pool).some((item) =>
+      item.segment.lineStart <= candidate.segment.lineEnd && candidate.segment.lineStart <= item.segment.lineEnd,
+    );
   const reserved = new Set<(typeof ranked)[number]>();
   for (const intent of intents) {
     const covered = Array.from(reserved).some((item) => FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
     if (covered) continue;
-    const best = ranked.find((item) => !reserved.has(item) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
+    const best = ranked.find((item) => !reserved.has(item) && !overlapsChosen(item, reserved) && FAST_PATH_HEADING_PATTERNS[intent].test(item.segment.label));
     if (best) reserved.add(best);
   }
   const chosen = new Set(reserved);
   for (const item of ranked) {
     if (chosen.size >= 3) break;
+    if (overlapsChosen(item, chosen)) continue;
     chosen.add(item);
   }
   // 前导段（导语位）：general 焦点证据的固定开头，两种形态按首个标题位置互斥。
@@ -113,22 +125,34 @@ export const selectFastPathSegments = (
   //     自身标题（如 `License`、`Example Project`）作为 label（审计 UEIs：不得把
   //     章节内容误标为 Overview）。章节边界复用 sectionSegments 的切章语义，与其
   //     他证据段完全一致；首个章节本身已是选中章节（如 `## Features` 开头且被
-  //     命中）时不再重复入选。入选条件统一走名额模型：chosen 非空（审计 UVhl：
-  //     无匹配章节时不得以无关首章节如 License 充当证据跳过完整检索，应回落
-  //     完整循环）且 chosen < 3（审计 UVhx：三个匹配章节占满名额时前导段让位，
-  //     未命中的首章节绝不挤掉已匹配章节）。入选后总段数 ≤ 3，无需再让位。
+  //     命中）时不再重复入选。审计 UctX：已选章节还可能嵌套在开头章节内部
+  //     （sectionSegments 只在同层级或更高层级标题处切章，`## License` 段完整
+  //     覆盖其下 `### Features` 的行区间）——前导段截断到最早的嵌套已选章节
+  //     起始行之前，保证与任意已选章节零重叠；截断后除标题行外再无非空内容时
+  //     前导段让位（与 Overview 导语同一有效性下限）。入选条件统一走名额模型：
+  //     chosen 非空（审计 UVhl：无匹配章节时不得以无关首章节如 License 充当证据
+  //     跳过完整检索，应回落完整循环）且 chosen < 3（审计 UVhx：三个匹配章节
+  //     占满名额时前导段让位，未命中的首章节绝不挤掉已匹配章节）。入选后总段数
+  //     ≤ 3，无需再让位。
   // (b) 首行为 H1（`# 标题`）或首个标题不在第 1 行：首个标题之前的行是真正的
   //     导语，按原有逻辑生成 Overview 导语段。导语边界为首个位于第 1 行之后的
   //     任意层级标题（审计 UVhp：不再限于 H1/H2，H1 后的 H3 章节内容不混入导语
   //     段、不与后续选中章节重复），且只截取到第一个已选章节之前（审计 UVht：
-  //     第 2–3 行的三级标题不再使第 1–2 行的标题与描述被整体丢弃，下限放宽为
-  //     标题行 + 至少一行导语内容，即 introEnd >= 2）。
+  //     第 2–3 行的三级标题不再使第 1–2 行的标题与描述被整体丢弃）。审计 Ucta：
+  //     下限不只是行数（introEnd >= 2）——标题行之后必须至少存在一行非空内容，
+  //     仅含标题与空行的导语段不生成，该名额不消耗，最低分填充章节不被挤掉。
   // 同一 README 只会命中其中一种形态，不会既出 Overview 导语又出首个章节的
-  // 重复内容。
+  // 重复内容；两种形态的前导段都满足“与任意已选章节零重叠”与“标题行之外
+  // 至少一行非空内容”的全局不变量。
   let lead: { lineStart: number; lineEnd: number; excerpt: string; label: string } | null = null;
   if (focus === 'general') {
     const openingHeading = document.headings[0];
     const opensWithLowerLevelHeading = openingHeading !== undefined && openingHeading.lineStart === 1 && openingHeading.level > 1;
+    const lines = document.content.split('\n');
+    // 前导段有效性下限（审计 Ucta）：除起始标题行（第 1 行）之外至少一行非空
+    // 内容；纯标题（可再含空行）的前导段不产出，不消耗名额。
+    const leadHasContentBeyondHeading = (lineEnd: number): boolean =>
+      lines.slice(1, lineEnd).some((line) => line.trim() !== '');
     if (openingHeading && opensWithLowerLevelHeading) {
       const openingSection = sectionSegments(document, [openingHeading.title])
         .find((segment) => segment.lineStart === openingHeading.lineStart) ?? null;
@@ -138,10 +162,25 @@ export const selectFastPathSegments = (
         && chosen.size < 3
         && !Array.from(chosen).some((item) => item.segment.lineStart === openingHeading.lineStart)
       ) {
-        lead = openingSection;
+        // 审计 UctX：嵌套已选章节起始于开头章节行范围内时，前导段截断到该章节
+        // 起始行之前（而非整体跳过，保留嵌套章节之上的章节自述内容）。
+        const nestedChosenLineStart = Array.from(chosen).reduce(
+          (min, item) => (item.segment.lineStart > openingSection.lineStart && item.segment.lineStart <= openingSection.lineEnd
+            ? Math.min(min, item.segment.lineStart)
+            : min),
+          Number.POSITIVE_INFINITY,
+        );
+        const lineEnd = Math.min(openingSection.lineEnd, nestedChosenLineStart - 1);
+        if (leadHasContentBeyondHeading(lineEnd)) {
+          lead = {
+            lineStart: openingSection.lineStart,
+            lineEnd,
+            excerpt: lines.slice(0, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
+            label: openingSection.label,
+          };
+        }
       }
     } else {
-      const lines = document.content.split('\n');
       const firstHeading = document.headings.find((heading) => heading.lineStart > 1);
       const firstChosenLineStart = Array.from(chosen).reduce(
         (min, item) => Math.min(min, item.segment.lineStart),
@@ -153,7 +192,7 @@ export const selectFastPathSegments = (
         firstChosenLineStart - 1,
         80,
       );
-      if (introEnd >= 2) {
+      if (introEnd >= 2 && leadHasContentBeyondHeading(introEnd)) {
         lead = {
           lineStart: 1,
           lineEnd: introEnd,
