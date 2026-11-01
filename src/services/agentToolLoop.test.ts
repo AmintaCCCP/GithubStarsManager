@@ -85,6 +85,8 @@ const turnInput = (question: string) => ({
   aiConfig,
   language: 'en' as const,
   maxToolsPerTurn: 12,
+  // 本套件覆盖原生工具循环自身的决策行为；README 快速路径由 loop.fastPath.test.ts 覆盖。
+  fastPath: false,
   agentBudget: { maxTurns: 6, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
 });
 
@@ -178,6 +180,39 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     // 被拒绝的那一轮不得触发任何 Release 读取。
     expect(mocks.getRepositoryReleases).not.toHaveBeenCalled();
     expect(result.content).toContain('/README.md - 1-4');
+  });
+
+  it('keeps fast-path README evidence counted after falling back to the native tool loop', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Install',
+        'Run `npx example install`.',
+      ].join('\n'),
+      'src/engine.ts': 'export const switchProxy = () => "implementation detail";',
+    });
+    mocks.getRepositoryReleases.mockResolvedValue(releasesPayload);
+    mocks.generateChatText.mockImplementation(async (options: { user?: string }) => (
+      options.user?.includes('This turn used the fast path')
+        ? 'I cannot verify this draft.'
+        : '## Updates\n\nThe first release adds a dashboard. `/release-v1.0.0.md - 1-4`'
+    ));
+    mocks.generateWithTools
+      .mockImplementationOnce(async ({ messages }: { messages: Array<{ role: string; content?: unknown }> }) => {
+        expect(messages[0]?.role).toBe('user');
+        expect(String(messages[0]?.content)).toContain('Run `npx example install`.');
+        return modelTurn([toolCall('c1', 'read_recent_releases')]);
+      })
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: [] })]));
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('How do I install this project?'),
+      fastPath: true,
+    });
+
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+    expect(result.content).toContain('/release-v1.0.0.md - 1-4');
   });
 
   it('retries a failed release fetch when the model asks again after a tool error', async () => {

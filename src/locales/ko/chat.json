@@ -110,7 +110,8 @@
     "depth-deep-desc": "세부 사항 및 비교에 적합한 여러 차례의 포렌식 및 코드 판독",
     "depth-unlimited": "제한 없음",
     "depth-unlimited-desc": "모든 제한을 해제하고 시간 소비 및 할당량에 주의하세요.",
-    "depth-with-budget": "{{label}} · {{turns}} 라운드/{{seconds}}초"
+    "depth-with-budget": "{{label}} · {{turns}} 라운드/{{seconds}}초",
+    "turn-metrics": "이번 턴 지표"
   },
   "citationBadge": {
     "open-source-path-linestart": "소스 보기 {{path}}:{{lineStart}}",

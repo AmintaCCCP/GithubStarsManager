@@ -110,7 +110,8 @@
     "depth-deep-desc": "多輪取證並讀取程式碼，適合細節與對比",
     "depth-unlimited": "不限",
     "depth-unlimited-desc": "放開所有限制，注意耗時與額度",
-    "depth-with-budget": "{{label}} · {{turns}} 輪/{{seconds}}s"
+    "depth-with-budget": "{{label}} · {{turns}} 輪/{{seconds}}s",
+    "turn-metrics": "本輪指標"
   },
   "citationBadge": {
     "open-source-path-linestart": "看來源 {{path}}:{{lineStart}}",

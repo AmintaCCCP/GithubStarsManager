@@ -112,6 +112,30 @@ export const TASK_DEPTH_PRESETS: Record<Exclude<RepositoryChatTaskDepth, 'defaul
 /** 回答阶段默认的 max_tokens（'default' 档使用）。 */
 export const DEFAULT_ANSWER_MAX_TOKENS = 4_000;
 
+/**
+ * 可观测性（优化方案 §5.5）：单轮问答结束时的汇总指标，随 toolEvents 的
+ * `turn_metrics` 汇总事件持久化（detail 为本结构的 JSON）。
+ */
+export interface RepositoryChatTurnMetrics {
+  /** 本轮真实模型调用次数（理解/规划/校验/回答/修复，含流式回答）。 */
+  llmCalls: number;
+  toolCalls: number;
+  /** 取证循环轮数；README 快速路径为 0。 */
+  rounds: number;
+  /** 首个流式回答 token 的耗时（毫秒，自本轮开始计）；未走流式时缺省。 */
+  ttftMs?: number;
+  /** 本轮总耗时（毫秒）。 */
+  totalMs: number;
+  /** 供应商回传 usage 时才有值；当前 AIService 未透出，缺省。 */
+  promptTokens?: number;
+  /** 供应商回传 usage 时才有值；当前 AIService 未透出，缺省。 */
+  completionTokens?: number;
+  /** 最终回答是否由 README 快速路径直接生成。 */
+  fastPath: boolean;
+  /** 本轮结束原因（fast_path / requirements_verified / no_progress_limit / …）。 */
+  endReason: string;
+}
+
 export interface RepositoryChatSettings {
   enabled: boolean;
   chatConfigId: string | null;
@@ -119,6 +143,12 @@ export interface RepositoryChatSettings {
   taskDepth: RepositoryChatTaskDepth;
   enableWebTools: boolean;
   retainSessionDays: number;
+  /**
+   * README 快速路径（优化方案 §1.1）：简单 usage/general/deployment 首问直接
+   * 读取根 README 命中章节作答，跳过理解/规划/校验的 LLM 调用。默认开启；
+   * deep/unlimited 档位自动关闭。
+   */
+  fastPath: boolean;
   /**
    * 实验性：问答取证改用模型原生 function calling 的受控工具循环。
    * 仅当问答模型的 AI 配置勾选"支持工具调用"时实际生效，否则自动沿用
@@ -148,6 +178,7 @@ export const defaultRepositoryChatSettings: RepositoryChatSettings = {
   streamingMode: 'auto',
   taskDepth: 'default',
   enableWebTools: false,
+  fastPath: true,
   enableAgentToolLoop: false,
   retainSessionDays: 90,
   maxToolsPerTurn: defaultRepositoryChatAgentBudget.maxToolCalls,

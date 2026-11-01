@@ -1,5 +1,5 @@
 import type { AppLanguage } from '../i18n/languages';
-import type { ToolEvidence } from '../types/repositoryChat';
+import type { RepositoryChatAgentBudget, ToolEvidence } from '../types/repositoryChat';
 import { AIService, type AIToolCall, type AIToolDefinition, type AIToolLoopMessage } from './aiService';
 import { createGitHubApiService } from './githubApiFactory';
 import {
@@ -10,6 +10,7 @@ import {
   documentationCandidatesFrom,
   evidenceAgentInsufficientResponse,
   evidenceFromSegments,
+  isFileEntry,
   isRepositoryCodePath,
   isTransientAgentError,
   linkedDocumentationPaths,
@@ -23,6 +24,7 @@ import {
   evidenceSearchTerms,
   splitOwnerAndRepo,
   synthesizeVerifiedAnswer,
+  tryFastPathAnswer,
   untrustedEvidenceBlock,
   type CachedDocument,
   type RepositoryChatTurnInput,
@@ -152,18 +154,35 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
   if (!input.githubToken) throw new Error(input.language === 'zh' ? '请先配置 GitHub token。' : 'Configure a GitHub token before asking this repository.');
   if (!input.question.trim()) throw new Error(input.language === 'zh' ? '请输入问题。' : 'Enter a question.');
 
+  const { budget, answerMaxTokens } = resolveTurnLimits(input);
+  const ai = new AIService(input.aiConfig, input.language);
+  const ctx = createEvidenceToolbox(input, budget, ai);
+  const state = { rounds: 0 };
+  try {
+    return await runToolLoopEvidenceAgent(input, { ai, ctx, budget, answerMaxTokens, state });
+  } finally {
+    // §5.5：用户中止或模型/端点异常的轮次也记录汇总事件；正常结束已在出口
+    // 记录过（emitTurnMetrics 幂等）。端点拒绝回落编排式循环时，这里的汇总
+    // 保留失败尝试的调用计数与耗时，回退轮次的汇总由新工具箱单独记录。
+    ctx.emitTurnMetrics({ fastPath: false, endReason: input.signal?.aborted ? 'aborted' : 'error', rounds: state.rounds });
+  }
+};
+
+const runToolLoopEvidenceAgent = async (
+  input: RepositoryChatTurnInput,
+  deps: { ai: AIService; ctx: ReturnType<typeof createEvidenceToolbox>; budget: RepositoryChatAgentBudget; answerMaxTokens: number; state: { rounds: number } },
+): Promise<RepositoryChatTurnResult> => {
+  const { ai, ctx, budget, answerMaxTokens, state } = deps;
   const zh = input.language === 'zh';
   const [owner, repo] = splitOwnerAndRepo(input.repository.full_name);
   const github = createGitHubApiService(input.githubToken);
-  const ai = new AIService(input.aiConfig, input.language);
-  const { budget, answerMaxTokens } = resolveTurnLimits(input);
-  const ctx = createEvidenceToolbox(input, budget, ai);
   const { emit, invokeTool } = ctx;
 
   const evidences: ToolEvidence[] = [];
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
   const readPaths = new Set<string>();
+  const budgetedReadPaths = new Set<string>();
   const codeReadPaths = new Set<string>();
   const metaFetched = new Set<string>();
   let documentationEvidenceCount = 0;
@@ -177,7 +196,10 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     zh ? `所有读取固定在 ref=${input.session.sourceRefSha.slice(0, 7)}。` : `All reads are pinned to ref=${input.session.sourceRefSha.slice(0, 7)}.`,
     async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
   );
-  if (!treeResult.ok) return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  if (!treeResult.ok) {
+    ctx.emitTurnMetrics({ fastPath: false, endReason: 'tree_read_failed', rounds: 0 });
+    return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  }
 
   const focus = detectResearchFocus(input.question);
   const rankedPaths = rankedCandidatePaths(treeResult.value.entries, input.question, focus);
@@ -186,18 +208,50 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
   const documentationSet = new Set(documentationCandidates);
   const codeSet = new Set(codeCandidates);
 
+  // §1.1 README 快速路径：与编排式循环共享同一实现，简单首问在进入模型
+  // 工具循环前直接由根 README 作答；未命中或回答不可核验时继续工具循环
+  // （README 已种入 documents 缓存，且不占用 maxReadFiles 预算）。
+  const fastPathAnswer = await tryFastPathAnswer({
+    input,
+    github,
+    owner,
+    repo,
+    focus,
+    treePaths: treeResult.value.entries.filter(isFileEntry).map((entry) => entry.path),
+    budget,
+    ai,
+    answerMaxTokens,
+    evidences,
+    documentationCandidates,
+    documents,
+    readPaths,
+    budgetedReadPaths,
+    readSegments,
+    emit,
+    invokeTool,
+    callModelWithRetry: ctx.callModelWithRetry,
+    recordLlmCall: ctx.recordLlmCall,
+    recordFirstToken: ctx.recordFirstToken,
+    emitTurnMetrics: ctx.emitTurnMetrics,
+  });
+  if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
+  // 快速路径已种入的 README 证据也算已读文档，避免回落时 README-first 规则误拒其他来源。
+  documentationEvidenceCount += evidences.length;
+
   const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => MARKDOWN_EVIDENCE_PATH.test(path)
     ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, signal)
     : await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, signal);
 
   // 与编排式 loadDocument 相同的语义：已读路径直接复用缓存（同一文件的
   // 不同章节是合法的后续读取，不能被 invokeTool 的重复动作拦截挡住）。
+  // 预算按“计入预算的读取”计算：快速路径种入的 README 已读但不占预算。
   const loadToolLoopDocument = async (path: string, scope: 'documentation' | 'code', round: number): Promise<CachedDocument | null> => {
     const cached = documents.get(path);
     if (cached) return cached;
-    if (readPaths.size >= budget.maxReadFiles) return null;
+    if (budgetedReadPaths.size >= budget.maxReadFiles) return null;
     if (scope === 'code' && (budget.maxCodeReads <= 0 || codeReadPaths.size >= budget.maxCodeReads)) return null;
     readPaths.add(path);
+    budgetedReadPaths.add(path);
     if (scope === 'code') codeReadPaths.add(path);
     const fileResult = await invokeTool(
       'read_repo_file',
@@ -378,7 +432,15 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
 
   const systemPrompt = buildToolLoopSystemPrompt(input.language);
   const tools = buildToolLoopTools(input.language);
-  const firstUserContent = buildToolLoopUserPrompt(input, documentationCandidates, codeCandidates);
+  const prefetchedEvidence = evidences.length > 0 ? untrustedEvidenceBlock(evidences) : '';
+  const firstUserContent = [
+    buildToolLoopUserPrompt(input, documentationCandidates, codeCandidates),
+    prefetchedEvidence
+      ? `${zh
+        ? '以下 README 证据已由快速路径读取，可直接用于判断是否还需要补充来源：'
+        : 'The README evidence below was already read by the fast path and is available for deciding whether more sources are needed:'}\n\n${prefetchedEvidence}`
+      : '',
+  ].filter(Boolean).join('\n\n');
   const messages: AIToolLoopMessage[] = [
     { role: 'user', content: firstUserContent },
   ];
@@ -393,6 +455,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
       () => controller.abort(new DOMException(zh ? '模型决策超时。' : 'Model decision timed out.', 'TimeoutError')),
       Math.min(TOOL_LOOP_MODEL_TIMEOUT_MS, ctx.remainingMs()),
     );
+    ctx.recordLlmCall();
     return ai.generateWithTools({ system: systemPrompt, messages, tools, temperature: 0, maxTokens: 1_200, signal: controller.signal })
       .finally(() => {
         globalThis.clearTimeout(timeoutId);
@@ -404,8 +467,11 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
   let nudges = 0;
   let loopTurns = 0;
   let retriedModelCall = false;
+  // §5.5 turnMetrics 的结束原因；while 条件自然耗尽时在循环后兜底。
+  let endReason = '';
   while (!ready && loopTurns < budget.maxTurns && ctx.hasTime() && conversationChars < TOOL_LOOP_MAX_CONVERSATION_CHARS) {
     loopTurns += 1;
+    state.rounds = loopTurns;
     emit({
       toolName: 'plan_research',
       status: 'running',
@@ -436,6 +502,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
           round: loopTurns,
           detail: (error instanceof Error ? error.message : String(error)).slice(0, 160),
         });
+        endReason = 'model_error';
         break;
       }
       throw error;
@@ -455,6 +522,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     if (result.toolCalls.length === 0) {
       nudges += 1;
       if (evidences.length > 0 || nudges >= 2) {
+        endReason = 'agent_no_tools';
         ready = true;
         break;
       }
@@ -476,6 +544,7 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
         const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
         conversationChars += confirmText.length;
         messages.push({ role: 'tool', toolCallId: call.id, content: confirmText });
+        endReason = 'agent_ready';
         ready = true;
         break;
       }
@@ -485,7 +554,14 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     }
   }
 
+  if (!endReason) {
+    if (!ctx.hasTime()) endReason = 'time_budget';
+    else if (conversationChars >= TOOL_LOOP_MAX_CONVERSATION_CHARS) endReason = 'context_budget';
+    else endReason = 'turn_budget';
+  }
+
   if (evidences.length === 0) {
+    ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'insufficient_evidence', rounds: loopTurns });
     return {
       content: evidenceAgentInsufficientResponse(
         input.language,
@@ -496,6 +572,16 @@ export const runToolLoopRepositoryChatTurn = async (input: RepositoryChatTurnInp
     };
   }
 
-  const content = await synthesizeVerifiedAnswer(ai, input, evidences, Math.max(1, loopTurns), answerMaxTokens, ctx.callModelWithRetry);
+  const content = await synthesizeVerifiedAnswer(
+    ai,
+    input,
+    evidences,
+    Math.max(1, loopTurns),
+    answerMaxTokens,
+    ctx.callModelWithRetry,
+    '',
+    { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+  );
+  ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'agent_ready', rounds: loopTurns });
   return { content, evidences };
 };

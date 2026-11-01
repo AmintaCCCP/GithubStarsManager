@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Mantener sesiones locales (días)",
     "deleting-an-individual-conversation-always-takes": "La eliminación de una sola sesión siempre surte efecto inmediatamente.",
     "advanced-settings": "Configuraciones avanzadas",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Estos parámetros se utilizan cuando se selecciona \"Predeterminado\" para la profundidad de la tarea de la ventana de chat.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Parámetros avanzados que usa la ventana de chat con las profundidades predeterminada y rápida",
     "external-web-search-and-fetch": "Búsqueda y rastreo web externo",
     "disabled-by-default-the-current-version-does-not": "Desactivado de forma predeterminada; la versión actual no lo expone como herramienta.",
     "tool-loop-mode-experimental": "Modo de bucle de herramienta (experimental)",
@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "Traducir automáticamente las descripciones de repositorios",
     "when-enabled-card-repository-description": "Si se activa, las descripciones originales de los repositorios en las tarjetas de las páginas de repositorios y descubrimiento se traducen automáticamente al idioma de la interfaz. Las descripciones que ya están en ese idioma se muestran sin cambios, y se muestra el texto original si la traducción falla.",
     "free-google-endpoint-no-configuration-needed-may": "La interfaz gratuita de Google no requiere configuración; Es posible que algunas áreas no estén conectadas directamente.",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Interfaz gratuita de Microsoft Edge, no requiere configuración, la velocidad de conexión directa es rápida."
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Interfaz gratuita de Microsoft Edge, no requiere configuración, la velocidad de conexión directa es rápida.",
+    "readme-fast-path": "Ruta rápida del README",
+    "for-simple-usage-overview-or-deployment-questions-ans": "Para preguntas sencillas de uso, descripción general o despliegue, responde directamente desde el README raíz y omite la recuperación de varias rondas; se desactiva automáticamente en los niveles profundo/ilimitado."
   },
   "backendPanel": {
     "auto": "inteligente",

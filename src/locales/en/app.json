@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Retain local conversations (days)",
     "deleting-an-individual-conversation-always-takes": "Deleting an individual conversation always takes effect immediately.",
     "advanced-settings": "Advanced settings",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Used by the chat window when task depth is “Default”",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Advanced parameters used by the chat window for the default and quick task depths",
     "external-web-search-and-fetch": "External web search and fetch",
     "disabled-by-default-the-current-version-does-not": "Disabled by default; the current version does not expose it as a tool.",
     "tool-loop-mode-experimental": "Tool-loop mode (experimental)",
@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "Auto-translate repository descriptions",
     "when-enabled-card-repository-description": "When enabled, repository descriptions on the repositories and discovery cards are automatically translated into the interface language. Descriptions already in that language stay unchanged, and the original text is shown if translation fails.",
     "free-google-endpoint-no-configuration-needed-may": "Free Google endpoint, no configuration needed; may be unreachable in some regions.",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Free Microsoft Edge endpoint, no configuration needed, fast direct connection."
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Free Microsoft Edge endpoint, no configuration needed, fast direct connection.",
+    "readme-fast-path": "README fast path",
+    "for-simple-usage-overview-or-deployment-questions-ans": "For simple usage, overview, or deployment questions, answer directly from the root README and skip multi-round retrieval; automatically off for deep/unlimited depth."
   },
   "backendPanel": {
     "auto": "Auto",

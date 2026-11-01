@@ -110,7 +110,8 @@
     "depth-deep-desc": "Múltiples rondas de análisis forense y lectura de códigos, adecuadas para detalles y comparación.",
     "depth-unlimited": "Sin límite",
     "depth-unlimited-desc": "Libere todas las restricciones y preste atención al consumo de tiempo y la cuota.",
-    "depth-with-budget": "{{label}} · {{turns}} rondas/{{seconds}} s"
+    "depth-with-budget": "{{label}} · {{turns}} rondas/{{seconds}} s",
+    "turn-metrics": "Métricas del turno"
   },
   "citationBadge": {
     "open-source-path-linestart": "Ver fuente {{path}}:{{lineStart}}",

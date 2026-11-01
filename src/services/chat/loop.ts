@@ -7,6 +7,7 @@ import type {
   RepositoryChatSession,
   RepositoryChatTaskDepth,
   RepositoryChatToolEvent,
+  RepositoryChatTurnMetrics,
   ToolEvidence,
 } from '../../types/repositoryChat';
 import { TASK_DEPTH_PRESETS, DEFAULT_ANSWER_MAX_TOKENS } from '../../types/repositoryChat';
@@ -69,6 +70,13 @@ import {
   type RetrievalScope,
   type RetrievalTarget,
 } from './retrieval';
+import {
+  fastPathAnswerNote,
+  findRootReadmePath,
+  hasPriorAssistantTurn,
+  resolveFastPathEnabled,
+  selectFastPathSegments,
+} from './fastPath';
 
 /** 单次 GitHub 读取的工具级超时。 */
 const TOOL_CALL_TIMEOUT_MS = 20_000;
@@ -85,7 +93,8 @@ type ChatToolName =
   | 'replan_research'
   | 'escalate_to_code'
   | 'escalate_to_meta'
-  | 'synthesize_answer';
+  | 'synthesize_answer'
+  | 'turn_metrics';
 export interface ChatToolEventInput {
   toolName: ChatToolName;
   status: RepositoryChatToolEvent['status'];
@@ -110,6 +119,8 @@ export interface RepositoryChatTurnInput {
   agentBudget?: Partial<RepositoryChatAgentBudget>;
   /** 任务深度档位；缺省视为 'default'（完全沿用 agentBudget 设置）。 */
   taskDepth?: RepositoryChatTaskDepth;
+  /** README 快速路径开关（设置项 repositoryChatSettings.fastPath）；deep/unlimited 档位自动关闭。 */
+  fastPath?: boolean;
   /** 是否尝试流式生成最终回答（'auto' 语义：失败自动降级为阻塞调用）。 */
   streaming?: boolean;
   /** 实验性：使用模型原生 function calling 的受控工具循环执行本轮（需 AI 配置支持，失败自动落回编排式循环）。 */
@@ -207,6 +218,12 @@ interface EvidenceToolbox {
   failBudget: (summary: string, stage: RepositoryChatExecutionStage, round?: number) => AgentToolResult<never>;
   invokeTool: <T>(toolName: ChatToolName, params: unknown, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, action: (signal: AbortSignal) => Promise<T>) => Promise<AgentToolResult<T>>;
   callModelWithRetry: (toolName: ChatToolName, paramSummary: string, stage: RepositoryChatExecutionStage, round: number | undefined, detail: string, system: string, user: string, maxTokens: number, retryLimit: number, timeoutMs?: number, ignoreBudget?: boolean, deadlineAt?: number, purpose?: AIChatTextPurpose) => Promise<string | null>;
+  /** 统计一次真实模型调用；callModel 之外的直接调用（流式回答、工具循环决策）用它补记。 */
+  recordLlmCall: () => void;
+  /** 记录首个流式回答 token 的到达时刻（自本轮开始计，只记首次）。 */
+  recordFirstToken: () => void;
+  /** §5.5：轮次结束时把汇总指标写入 toolEvents（turn_metrics 汇总事件）。 */
+  emitTurnMetrics: (metrics: { fastPath: boolean; endReason: string; rounds: number }) => void;
 }
 
 export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: RepositoryChatAgentBudget, ai: AIService): EvidenceToolbox => {
@@ -215,10 +232,42 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
   const toolErrors: string[] = [];
   const emit = (event: ChatToolEventInput) => input.onToolEvent?.(event);
   let toolCalls = 0;
+  let llmCalls = 0;
+  let firstTokenMs: number | null = null;
 
   const elapsed = () => Date.now() - startedAt;
   const hasTime = () => elapsed() < budget.maxDurationMs;
   const remainingMs = () => Math.max(1_000, budget.maxDurationMs - elapsed());
+  const recordLlmCall = (): void => { llmCalls += 1; };
+  const recordFirstToken = (): void => {
+    if (firstTokenMs === null) firstTokenMs = elapsed();
+  };
+  // §5.5 turnMetrics：每轮结束（成功、证据不足或预算耗尽）都记录一次汇总事件。
+  // 指标同时以人读摘要（paramSummary）与机器可读 JSON（detail）持久化到 toolEvents。
+  // 幂等：正常出口显式记录后，外层 finally 的兜底记录（aborted / error）自动跳过。
+  let metricsEmitted = false;
+  const emitTurnMetrics = ({ fastPath, endReason, rounds }: { fastPath: boolean; endReason: string; rounds: number }): void => {
+    if (metricsEmitted) return;
+    metricsEmitted = true;
+    const metrics: RepositoryChatTurnMetrics = {
+      llmCalls,
+      toolCalls,
+      rounds,
+      ...(firstTokenMs !== null ? { ttftMs: firstTokenMs } : {}),
+      totalMs: elapsed(),
+      fastPath,
+      endReason,
+    };
+    const duration = (ms: number): string => (ms >= 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
+    emit({
+      toolName: 'turn_metrics',
+      status: 'success',
+      paramSummary: input.language === 'zh'
+        ? `模型调用 ${metrics.llmCalls} 次 · 工具 ${metrics.toolCalls} 次 · ${metrics.rounds} 轮${metrics.ttftMs !== undefined ? ` · 首 token ${duration(metrics.ttftMs)}` : ''} · 总耗时 ${duration(metrics.totalMs)}${fastPath ? ' · 快速路径' : ''} · ${endReason}`
+        : `${metrics.llmCalls} LLM call(s) · ${metrics.toolCalls} tool call(s) · ${metrics.rounds} round(s)${metrics.ttftMs !== undefined ? ` · TTFT ${duration(metrics.ttftMs)}` : ''} · total ${duration(metrics.totalMs)}${fastPath ? ' · fast path' : ''} · ${endReason}`,
+      detail: JSON.stringify(metrics),
+    });
+  };
   const failBudget = (summary: string, stage: RepositoryChatExecutionStage, round?: number): AgentToolResult<never> => {
     const message = !hasTime()
       ? (input.language === 'zh' ? '已达到本轮时间预算。' : 'The turn time budget was reached.')
@@ -279,6 +328,7 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
       ignoreBudget ? timeoutMs : Math.min(timeoutMs, remainingMs()),
     );
     try {
+      llmCalls += 1;
       const result = await ai.generateChatTextDetailed({ system, user, signal: controller.signal, temperature: 0, maxTokens, purpose });
       if (input.signal?.aborted) throw input.signal.reason ?? new DOMException('Repository chat request was aborted.', 'AbortError');
       return result.text;
@@ -318,9 +368,17 @@ export const createEvidenceToolbox = (input: RepositoryChatTurnInput, budget: Re
     return null;
   };
 
-  return { budget, toolErrors, emit, hasTime, remainingMs, failBudget, invokeTool, callModelWithRetry };
+  return { budget, toolErrors, emit, hasTime, remainingMs, failBudget, invokeTool, callModelWithRetry, recordLlmCall, recordFirstToken, emitTurnMetrics };
 };
 
+
+/** 回答阶段的可观测性钩子：流式调用不经 callModel，由调用方补记指标。 */
+export interface AnswerSynthesisHooks {
+  /** 统计一次真实模型调用（流式回答调用）。 */
+  recordLlmCall?: () => void;
+  /** 记录首个流式回答 token 的到达时刻。 */
+  recordFirstToken?: () => void;
+}
 
 /**
  * 最终回答阶段（两个执行循环共享）：统一的自由 Markdown prompt（引用规则/排版
@@ -335,6 +393,7 @@ export const synthesizeVerifiedAnswer = async (
   answerMaxTokens: number,
   callModelWithRetry: EvidenceToolbox['callModelWithRetry'],
   extraUserNote = '',
+  hooks: AnswerSynthesisHooks = {},
 ): Promise<string> => {
   const emit = (event: ChatToolEventInput) => input.onToolEvent?.(event);
   // 统一的自由 Markdown 最终回答：创意与事实问题共用同一 prompt（引用规则/排版
@@ -370,6 +429,7 @@ export const synthesizeVerifiedAnswer = async (
         Math.max(1_000, answerDeadlineAt - Date.now()),
       );
       try {
+        hooks.recordLlmCall?.();
         streamed = await ai.generateChatTextStream({
           system: answerSystem,
           user: answerUser,
@@ -377,6 +437,7 @@ export const synthesizeVerifiedAnswer = async (
           temperature: 0,
           maxTokens: answerMaxTokens,
           onChunk: (delta) => {
+            if (streamed.length === 0 && delta.length > 0) hooks.recordFirstToken?.();
             streamed += delta;
             input.onAnswerChunk?.(streamed);
           },
@@ -472,6 +533,127 @@ export const synthesizeVerifiedAnswer = async (
   return finalContent ?? sourceBoundEvidenceDigest(input, evidences);
 };
 
+/** 引用键：证据窗口的唯一标识（两个执行循环与快速路径共用同一格式）。 */
+const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
+
+/** 快速路径尝试所需的共享上下文：由当前执行循环持有并传入。 */
+export interface FastPathAttemptContext {
+  input: RepositoryChatTurnInput;
+  github: ReturnType<typeof createGitHubApiService>;
+  owner: string;
+  repo: string;
+  /** detectResearchFocus 的结果（快速路径只服务 usage/general/deployment）。 */
+  focus: string;
+  /** 固定 SHA 文件树中的文件路径（用于定位根 README）。 */
+  treePaths: string[];
+  budget: RepositoryChatAgentBudget;
+  ai: AIService;
+  answerMaxTokens: number;
+  evidences: ToolEvidence[];
+  /** 回落场景下 README 链接文档解析所用的候选集合。 */
+  documentationCandidates: string[];
+  documents: Map<string, CachedDocument>;
+  /** 已读路径（含快速路径种入的 README），用于“已读”过滤。 */
+  readPaths: Set<string>;
+  /** 计入 maxReadFiles 预算的读取；快速路径预读不占用回落流程的预算。 */
+  budgetedReadPaths: Set<string>;
+  readSegments: Set<string>;
+  emit: (event: ChatToolEventInput) => void;
+  invokeTool: EvidenceToolbox['invokeTool'];
+  callModelWithRetry: EvidenceToolbox['callModelWithRetry'];
+  recordLlmCall: () => void;
+  recordFirstToken: () => void;
+  emitTurnMetrics: EvidenceToolbox['emitTurnMetrics'];
+}
+
+/**
+ * §1.1 README 快速路径尝试（两个执行循环共享）：命中并完成可核验回答时返回
+ * 回答文本（调用方直接结束本轮）；未启用 / 追问 / 意图不符 / 无匹配章节 /
+ * 回答不可核验时返回 null，调用方继续完整循环（README 已种入缓存复用）。
+ */
+export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promise<string | null> => {
+  const { input } = fastPath;
+  if (!resolveFastPathEnabled(input) || hasPriorAssistantTurn(input.messages)) return null;
+  if (fastPath.focus !== 'usage' && fastPath.focus !== 'general' && fastPath.focus !== 'deployment') return null;
+  const rootReadmePath = findRootReadmePath(fastPath.treePaths);
+  if (!rootReadmePath) return null;
+
+  const fileResult = await fastPath.invokeTool(
+    'read_repo_file',
+    { path: rootReadmePath, ref: input.session.sourceRefSha },
+    rootReadmePath,
+    'retrieval',
+    undefined,
+    input.language === 'zh'
+      ? '快速路径：优先读取根 README，判断能否直接回答。'
+      : 'Fast path: read the root README first to try answering directly.',
+    async (signal) => {
+      const readFile = () => MARKDOWN_EVIDENCE_PATH.test(rootReadmePath)
+        ? fastPath.github.getRepositoryMarkdownEvidenceFile(fastPath.owner, fastPath.repo, rootReadmePath, input.session.sourceRefSha, signal)
+        : fastPath.github.getRepositoryFile(fastPath.owner, fastPath.repo, rootReadmePath, input.session.sourceRefSha, signal);
+      try {
+        return await readFile();
+      } catch (error) {
+        if (!isTransientAgentError(error)) throw error;
+        return await readFile();
+      }
+    },
+  );
+  if (!fileResult.ok) return null;
+  // 种入完整循环的共享缓存：快速路径未命中或回答不可核验回落时，README 不再
+  // 重复读取（也避免 invokeTool 的重复动作拦截误伤后续读取）。预读不占用
+  // maxReadFiles 预算（审计意见：回落流程要保留预算给真正需要的文档）。
+  const readmeDocument: CachedDocument = {
+    path: fileResult.value.path,
+    content: fileResult.value.content,
+    headings: makeMarkdownHeadings(fileResult.value.content),
+    // 快速路径先于完整 documentationSet 构建：链接解析使用调用方候选，
+    // 仅影响回落场景下规划器对 README 链接文档的感知。
+    linkedDocumentationPaths: linkedDocumentationPaths(fileResult.value.content, rootReadmePath, new Set(fastPath.documentationCandidates)),
+  };
+  fastPath.documents.set(readmeDocument.path, readmeDocument);
+  fastPath.readPaths.add(readmeDocument.path);
+  const segments = selectFastPathSegments(readmeDocument, fastPath.focus, input.question);
+  const newSegments = segments.filter((segment) => {
+    const key = segmentKey(readmeDocument.path, segment.lineStart, segment.lineEnd);
+    if (fastPath.readSegments.has(key)) return false;
+    fastPath.readSegments.add(key);
+    return true;
+  });
+  if (newSegments.length === 0) return null;
+  const fastPathEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, readmeDocument, newSegments);
+  fastPath.evidences.push(...fastPathEvidence);
+  fastPath.emit({
+    toolName: 'read_repo_file',
+    status: 'success',
+    paramSummary: `${readmeDocument.path} · ${segments.map((segment) => segment.label).filter(Boolean).join(' / ')}`,
+    stage: 'retrieval',
+    detail: input.language === 'zh'
+      ? 'README 快速路径命中相关章节，跳过检索规划直接生成回答。'
+      : 'The README fast path matched relevant sections; skipping planning to answer directly.',
+    resultSize: fastPathEvidence.reduce((size, evidence) => size + evidence.excerpt.length, 0),
+  });
+  // 快速路径回答：提示词允许模型声明“README 未覆盖 X”（§1.1）。
+  const fastPathAnswer = await synthesizeVerifiedAnswer(
+    fastPath.ai,
+    input,
+    fastPath.evidences,
+    // 快速路径不属于取证轮次：用 0 区分事件身份，避免回落后的最终回答事件覆盖本次尝试。
+    0,
+    fastPath.answerMaxTokens,
+    fastPath.callModelWithRetry,
+    fastPathAnswerNote(input.language),
+    { recordLlmCall: fastPath.recordLlmCall, recordFirstToken: fastPath.recordFirstToken },
+  );
+  if (fastPathAnswer && fastPathAnswer !== sourceBoundEvidenceDigest(input, fastPath.evidences)) {
+    fastPath.emitTurnMetrics({ fastPath: true, endReason: 'fast_path', rounds: 0 });
+    return fastPathAnswer;
+  }
+  // 回落完整循环前清空已流出的未核验快速路径回答，避免界面长期显示将被丢弃的内容。
+  if (input.streaming && input.onAnswerChunk) input.onAnswerChunk('');
+  return null;
+};
+
 /**
  * LLM-directed repository research loop. The model plans the next evidence
  * target; programmatic code constrains candidate paths, duplicate reads,
@@ -482,16 +664,32 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   if (!input.githubToken) throw new Error(input.language === 'zh' ? '请先配置 GitHub token。' : 'Configure a GitHub token before asking this repository.');
   if (!input.question.trim()) throw new Error(input.language === 'zh' ? '请输入问题。' : 'Enter a question.');
 
+  const { budget, answerMaxTokens } = resolveTurnLimits(input);
+  const ai = new AIService(input.aiConfig, input.language);
+  const ctx = createEvidenceToolbox(input, budget, ai);
+  const state = { rounds: 0 };
+  try {
+    return await runOrchestratedEvidenceLoop(input, { ai, ctx, budget, answerMaxTokens, state });
+  } finally {
+    // §5.5：用户中止或模型/工具异常的轮次也记录汇总事件；正常结束已在出口
+    // 记录过（emitTurnMetrics 幂等），这里只在缺失时补记 aborted / error。
+    ctx.emitTurnMetrics({ fastPath: false, endReason: input.signal?.aborted ? 'aborted' : 'error', rounds: state.rounds });
+  }
+};
+
+const runOrchestratedEvidenceLoop = async (
+  input: RepositoryChatTurnInput,
+  deps: { ai: AIService; ctx: EvidenceToolbox; budget: RepositoryChatAgentBudget; answerMaxTokens: number; state: { rounds: number } },
+): Promise<RepositoryChatTurnResult> => {
+  const { ai, ctx, budget, answerMaxTokens, state } = deps;
   const [owner, repo] = splitOwnerAndRepo(input.repository.full_name);
   const github = createGitHubApiService(input.githubToken);
-  const ai = new AIService(input.aiConfig, input.language);
-  const { budget, answerMaxTokens } = resolveTurnLimits(input);
-  const ctx = createEvidenceToolbox(input, budget, ai);
   const evidences: ToolEvidence[] = [];
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
   const knownTargetKeys = new Set<string>();
   const readPaths = new Set<string>();
+  const budgetedReadPaths = new Set<string>();
   const codeReadPaths = new Set<string>();
   const failedReadAttempts = new Map<string, number>();
   const isRetryableRead = (path: string): boolean => (failedReadAttempts.get(path) ?? 0) < 2;
@@ -513,7 +711,10 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     input.language === 'zh' ? `所有读取固定在 ref=${input.session.sourceRefSha.slice(0, 7)}。` : `All reads are pinned to ref=${input.session.sourceRefSha.slice(0, 7)}.`,
     async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
   );
-  if (!treeResult.ok) return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  if (!treeResult.ok) {
+    ctx.emitTurnMetrics({ fastPath: false, endReason: 'tree_read_failed', rounds: 0 });
+    return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
+  }
   // GitHub 的 tree API 超限时会截断文件清单：继续用部分清单作答，但把
   // 限制显式告知模型，未列出的文件按“无法核验”处理而不是臆测。
   const treeTruncated = treeResult.value.truncated;
@@ -532,6 +733,36 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const fallbackFocus = detectResearchFocus(input.question);
   const preliminaryRankedPaths = rankedCandidatePaths(treeResult.value.entries, input.question, fallbackFocus);
   const preliminaryDocumentationCandidates = documentationCandidatesFrom(preliminaryRankedPaths);
+
+  // ---- §1.1 README 快速路径：usage/general/deployment 首问在 understanding
+  // 之前用确定性规则匹配根 README 章节，命中即跳过 understanding/plan/gate
+  // 直接合成回答，把回答前的 LLM 调用压缩到 1 次。追问（已有助手回答）、
+  // deep/unlimited 档位与设置开关关闭时走完整循环；README 命中失败或回答
+  // 被判不可核验时同样回落完整循环（README 已种入缓存，取证可复用）。
+  const fastPathAnswer = await tryFastPathAnswer({
+    input,
+    github,
+    owner,
+    repo,
+    focus: fallbackFocus,
+    treePaths: allPaths,
+    budget,
+    ai,
+    answerMaxTokens,
+    evidences,
+    documentationCandidates: preliminaryDocumentationCandidates,
+    documents,
+    readPaths,
+    budgetedReadPaths,
+    readSegments,
+    emit,
+    invokeTool,
+    callModelWithRetry,
+    recordLlmCall: ctx.recordLlmCall,
+    recordFirstToken: ctx.recordFirstToken,
+    emitTurnMetrics: ctx.emitTurnMetrics,
+  });
+  if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
 
   const fallbackUnderstanding: QueryUnderstanding = {
     intent: 'general',
@@ -602,8 +833,11 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const documentInFlight = new Map<string, Promise<CachedDocument | null>>();
 
   const loadDocumentUncached = async (path: string, scope: RetrievalScope, round: number | undefined, summary: string, detail: string): Promise<CachedDocument | null> => {
-    if (readPaths.size >= budget.maxReadFiles || (scope === 'code' && codeReadPaths.size >= budget.maxCodeReads)) return null;
+    // 预算按“计入预算的读取”计算：快速路径种入的 README 已读但不占预算，
+    // 回落流程仍能用完整的 maxReadFiles 读取真正需要的文档。
+    if (budgetedReadPaths.size >= budget.maxReadFiles || (scope === 'code' && codeReadPaths.size >= budget.maxCodeReads)) return null;
     readPaths.add(path);
+    budgetedReadPaths.add(path);
     if (scope === 'code') codeReadPaths.add(path);
     const fileResult = await invokeTool(
       'read_repo_file',
@@ -625,6 +859,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       // 失败的读取不占用读取预算，允许规划器稍后重试一次；
       // 失败两次的目标不再进入未读候选，避免反复撞同一堵墙。
       readPaths.delete(path);
+      budgetedReadPaths.delete(path);
       if (scope === 'code') codeReadPaths.delete(path);
       failedReadAttempts.set(path, (failedReadAttempts.get(path) ?? 0) + 1);
       return null;
@@ -673,6 +908,8 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   let missing = understanding.answerRequirements.map((requirement) => requirement.text);
   let requirements: RequirementAssessment[] = [];
   let finalReason = '';
+  // §5.5 turnMetrics 的结束原因；在循环的每个收尾点赋值，循环自然耗尽时兜底。
+  let endReason = '';
   let canAnswer = false;
   let codeEligible = false;
   let pendingTargets: RetrievalTarget[] = [];
@@ -680,7 +917,6 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
   const validReferences = () => new Set(sourceReferences(evidences));
 
   const targetKey = (target: RetrievalTarget): string => `${target.scope}:${target.path}:${target.sections.map((section) => section.toLowerCase().trim()).sort().join('|')}`;
-  const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
   const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => key.startsWith(`${encodeURIComponent(path)}:`));
   const isViableUnseenTarget = (target: RetrievalTarget): boolean => {
     if (target.scope === 'meta') return metaEligible && !metaFetched.has(target.path);
@@ -690,7 +926,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       : documentationSet.has(target.path);
     if (!permitted) return false;
     // 已缓存文档的未读章节不占读取预算；只有未缓存的新文件才受 maxReadFiles 限制。
-    if (!document) return readPaths.size < budget.maxReadFiles;
+    if (!document) return budgetedReadPaths.size < budget.maxReadFiles;
     if (target.scope === 'documentation') {
       return citableSegmentsForDocument(
         document,
@@ -857,6 +1093,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
 
   while (turns < budget.maxTurns && hasTime()) {
     turns += 1;
+    state.rounds = turns;
     const unreadDocumentation = documentationCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const unreadCode = codeCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const planPrompt = buildRetrievalPlanPrompt(
@@ -961,6 +1198,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
         continue;
       }
       finalReason = input.language === 'zh' ? '没有剩余的相关文件可供检索。' : 'No relevant repository files remain to inspect.';
+      endReason = 'no_targets_remaining';
       canAnswer = evidences.length > 0;
       break;
     }
@@ -1059,6 +1297,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     // not by extra areas the gate might prefer to research.
     if ((allApplicableRequirementsVerified || gateApprovesAnswer) && evidences.length > 0) {
       if (unfetchedMetaTargets.length === 0 || !metaBudgetAvailable) {
+        endReason = 'requirements_verified';
         canAnswer = true;
         break;
       }
@@ -1070,6 +1309,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       if (unfetchedMetaTargets.length === 0 || !metaBudgetAvailable) {
         // A bounded “no reasonable source” decision can still yield a useful,
         // source-scoped answer that marks the unmet user request as unconfirmed.
+        endReason = 'gate_stop';
         canAnswer = evidences.length > 0;
         break;
       }
@@ -1111,6 +1351,7 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       finalReason = input.language === 'zh'
         ? `连续 ${consecutiveNoProgressRounds} 轮未获得新的可引用信息或可读目标，已停止重复检索。`
         : `Research stopped after ${consecutiveNoProgressRounds} consecutive rounds without new citable information or a viable next target.`;
+      endReason = 'no_progress_limit';
       canAnswer = evidences.length > 0;
       break;
     }
@@ -1124,11 +1365,16 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
     // 已排好 pendingTargets（如 meta 安全网）时不要在这里退出，先读完再判断。
     if (pendingTargets.length === 0 && added === 0 && unreadDocumentation.length === 0 && (!codeEligible || unreadCode.length === 0)) {
       finalReason = input.language === 'zh' ? '没有更多可读取的相关章节或文件。' : 'No further relevant sections or files are available.';
+      endReason = 'no_more_sources';
       break;
     }
   }
 
+  // 循环自然耗尽（轮次或时间预算）而非显式收尾时，补充对应的结束原因。
+  if (!endReason) endReason = hasTime() ? 'turn_budget' : 'time_budget';
+
   if (!canAnswer || evidences.length === 0) {
+    ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'insufficient_evidence', rounds: turns });
     return { content: evidenceAgentInsufficientResponse(input.language, finalReason || (input.language === 'zh' ? '未能完整覆盖回答要求。' : 'The answer requirements were not fully covered.'), toolErrors.length > 0), evidences };
   }
 
@@ -1137,6 +1383,16 @@ export const runEvidenceDrivenRepositoryChatTurn = async (input: RepositoryChatT
       ? '\n\n注意：仓库文件清单超过 GitHub 限制被截断，未出现在清单中的文件本轮无法读取。回答时若涉及这些文件，必须说明“未在已读取文件中找到”，不得臆测。'
       : '\n\nNote: the repository file listing was truncated by GitHub limits, so files absent from the listing could not be read this turn. If the answer would depend on them, state that they were not found in the files read instead of guessing.')
     : '';
-  const content = await synthesizeVerifiedAnswer(ai, input, evidences, turns, answerMaxTokens, ctx.callModelWithRetry, truncatedNote);
+  const content = await synthesizeVerifiedAnswer(
+    ai,
+    input,
+    evidences,
+    turns,
+    answerMaxTokens,
+    ctx.callModelWithRetry,
+    truncatedNote,
+    { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+  );
+  ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'answered', rounds: turns });
   return { content, evidences };
 };

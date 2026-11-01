@@ -110,7 +110,8 @@
     "depth-deep-desc": "More rounds, reads code too; best for details",
     "depth-unlimited": "Unlimited",
     "depth-unlimited-desc": "No limits; expect longer runs and higher usage",
-    "depth-with-budget": "{{label}} · {{turns}} rounds/{{seconds}}s"
+    "depth-with-budget": "{{label}} · {{turns}} rounds/{{seconds}}s",
+    "turn-metrics": "Turn metrics"
   },
   "citationBadge": {
     "open-source-path-linestart": "Open source {{path}}:{{lineStart}}",

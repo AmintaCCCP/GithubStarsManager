@@ -452,7 +452,11 @@ export const citableSegmentsForDocument = (
   return buildEvidenceWindows(document.content, 'implementation', searchTerms);
 };
 
-export const sectionSegments = (document: CachedDocument, requestedSections: string[]): Array<{ lineStart: number; lineEnd: number; excerpt: string; label: string }> => {
+export const sectionSegments = (
+  document: CachedDocument,
+  requestedSections: string[],
+  rankByTitle?: (title: string) => number,
+): Array<{ lineStart: number; lineEnd: number; excerpt: string; label: string }> => {
   const lines = document.content.split('\n');
   const normalizedRequested = requestedSections.map((section) => collapseHeadingText(section)).filter(Boolean);
   // 归一化容错匹配：大小写、空白与常见标点差异不再导致章节匹配失败。
@@ -461,8 +465,18 @@ export const sectionSegments = (document: CachedDocument, requestedSections: str
     const title = collapseHeadingText(heading.title);
     return normalizedRequested.some((requested) => title === requested || title.includes(requested) || requested.includes(title));
   });
-  const unique = Array.from(new Map(selected.map((heading) => [heading.lineStart, heading])).values()).slice(0, 6);
-  return unique.map((heading) => {
+  const unique = Array.from(new Map(selected.map((heading) => [heading.lineStart, heading])).values());
+  // 默认按文档顺序保留前 6 段；调用方提供 rankByTitle 时返回全量按得分
+  // （降序、行号升序）排序的段落，由调用方在这份排序结果上完成意图保留与
+  // 最终截断——任何上限都不得先于意图保留生效，否则多意图章节会在截取处
+  // 被丢弃且无法补救。
+  const ordered = rankByTitle
+    ? unique
+      .map((heading) => ({ heading, score: rankByTitle(heading.title) }))
+      .sort((left, right) => right.score - left.score || left.heading.lineStart - right.heading.lineStart)
+      .map((item) => item.heading)
+    : unique.slice(0, 6);
+  return ordered.map((heading) => {
     const next = document.headings.find((candidate) => candidate.lineStart > heading.lineStart && candidate.level <= heading.level);
     const lineEnd = Math.max(heading.lineStart, (next?.lineStart ?? lines.length + 1) - 1);
     return {

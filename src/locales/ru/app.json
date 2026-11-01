@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Сохранить локальные сеансы (дни)",
     "deleting-an-individual-conversation-always-takes": "Удаление одного сеанса всегда вступает в силу немедленно.",
     "advanced-settings": "Расширенные настройки",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Эти параметры используются, когда для глубины задачи окна чата выбрано «По умолчанию».",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Дополнительные параметры окна диалога для уровней «по умолчанию» и «быстрый»",
     "external-web-search-and-fetch": "Внешний веб-поиск и сканирование",
     "disabled-by-default-the-current-version-does-not": "По умолчанию выключено; текущая версия не представляет его как инструмент.",
     "tool-loop-mode-experimental": "Режим цикла инструмента (экспериментальный)",
@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "Автоматически переводить описания репозиториев",
     "when-enabled-card-repository-description": "Если включено, исходные описания репозиториев на карточках страниц репозиториев и обзора автоматически переводятся на язык интерфейса. Описания, уже написанные на этом языке, остаются без изменений, а при сбое перевода отображается исходный текст.",
     "free-google-endpoint-no-configuration-needed-may": "Бесплатный интерфейс Google не требует настройки; некоторые области могут быть не связаны напрямую.",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Бесплатный интерфейс Microsoft Edge, настройка не требуется, скорость прямого соединения высокая."
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Бесплатный интерфейс Microsoft Edge, настройка не требуется, скорость прямого соединения высокая.",
+    "readme-fast-path": "Быстрый путь по README",
+    "for-simple-usage-overview-or-deployment-questions-ans": "Для простых вопросов об использовании, обзоре или развёртывании отвечает напрямую по корневому README и пропускает многоэтапный поиск; автоматически отключается на уровнях «глубокий»/«без ограничений»."
   },
   "backendPanel": {
     "auto": "разумный",

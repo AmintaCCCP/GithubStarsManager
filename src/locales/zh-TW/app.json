@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "保留本機會話（天）",
     "deleting-an-individual-conversation-always-takes": "刪除單一會話始終立即生效。",
     "advanced-settings": "進階設定",
-    "used-by-the-chat-window-when-task-depth-is-defau": "聊天視窗任務深度選「預設」時使用這些參數",
+    "used-by-the-chat-window-when-task-depth-is-defau": "問答視窗在預設與快速檔位下使用的進階參數",
     "external-web-search-and-fetch": "外部網頁搜尋與抓取",
     "disabled-by-default-the-current-version-does-not": "預設為關閉；當前版本不會將其暴露為工具。",
     "tool-loop-mode-experimental": "工具循環模式（實驗性）",
@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "自動翻譯儲存庫描述",
     "when-enabled-card-repository-description": "開啟後，儲存庫頁與探索頁卡片上的儲存庫原始描述會自動翻譯成目前介面語言顯示；已是介面語言的描述保持原文，翻譯失敗時也顯示原文。",
     "free-google-endpoint-no-configuration-needed-may": "Google 免費接口，無需配置；部分地區可能無法直連。",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "微軟 Edge 免費接口，無需配置，直連速度快。"
+    "free-microsoft-edge-endpoint-no-configuration-ne": "微軟 Edge 免費接口，無需配置，直連速度快。",
+    "readme-fast-path": "README 快速路徑",
+    "for-simple-usage-overview-or-deployment-questions-ans": "簡單的使用、簡介或部署問題直接讀根 README 作答，跳過多輪檢索；深入/不限檔位自動關閉。"
   },
   "backendPanel": {
     "auto": "智慧",

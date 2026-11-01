@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "Manter sessões locais (dias)",
     "deleting-an-individual-conversation-always-takes": "A exclusão de uma única sessão sempre entra em vigor imediatamente.",
     "advanced-settings": "Configurações avançadas",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Esses parâmetros são usados ​​quando \"Padrão\" é selecionado para a profundidade da tarefa da janela de bate-papo.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Parâmetros avançados usados pela janela de conversa nas profundidades padrão e rápida",
     "external-web-search-and-fetch": "Pesquisa e rastreamento externos na web",
     "disabled-by-default-the-current-version-does-not": "Desativado por padrão; a versão atual não o expõe como uma ferramenta.",
     "tool-loop-mode-experimental": "Modo Loop de Ferramenta (Experimental)",
@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "Traduzir automaticamente as descrições de repositórios",
     "when-enabled-card-repository-description": "Quando ativado, as descrições originais dos repositórios nos cartões das páginas de repositórios e descoberta são traduzidas automaticamente para o idioma da interface. Descrições que já estão nesse idioma permanecem inalteradas, e o texto original é exibido se a tradução falhar.",
     "free-google-endpoint-no-configuration-needed-may": "A interface gratuita do Google não requer configuração; algumas áreas podem não estar diretamente conectadas.",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Interface gratuita do Microsoft Edge, sem necessidade de configuração, a velocidade de conexão direta é rápida."
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Interface gratuita do Microsoft Edge, sem necessidade de configuração, a velocidade de conexão direta é rápida.",
+    "readme-fast-path": "Caminho rápido do README",
+    "for-simple-usage-overview-or-deployment-questions-ans": "Para perguntas simples de uso, visão geral ou implantação, responde diretamente pelo README raiz e pula a recuperação em várias rodadas; desligado automaticamente nos níveis profundo/ilimitado."
   },
   "backendPanel": {
     "auto": "inteligente",

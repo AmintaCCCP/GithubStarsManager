@@ -110,7 +110,8 @@
     "depth-deep-desc": "詳細と比較に適した複数ラウンドのフォレンジックとコード読み取り",
     "depth-unlimited": "制限なし",
     "depth-unlimited-desc": "すべての制限を解除し、時間の消費と割り当てに注意してください",
-    "depth-with-budget": "{{label}} · {{turns}} ラウンド/{{seconds}} 秒"
+    "depth-with-budget": "{{label}} · {{turns}} ラウンド/{{seconds}} 秒",
+    "turn-metrics": "このターンの指標"
   },
   "citationBadge": {
     "open-source-path-linestart": "ソースを表示 {{path}}:{{lineStart}}",

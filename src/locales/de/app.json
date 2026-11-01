@@ -606,7 +606,7 @@
     "retain-local-conversations-days": "Lokale Sitzungen (Tage) beibehalten",
     "deleting-an-individual-conversation-always-takes": "Das Löschen einer einzelnen Sitzung wird immer sofort wirksam.",
     "advanced-settings": "Erweiterte Einstellungen",
-    "used-by-the-chat-window-when-task-depth-is-defau": "Diese Parameter werden verwendet, wenn „Standard“ für die Aufgabentiefe des Chatfensters ausgewählt ist.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "Erweiterte Parameter, die das Chat-Fenster bei den Tiefen „Standard“ und „schnell“ verwendet",
     "external-web-search-and-fetch": "Externe Websuche und Crawling",
     "disabled-by-default-the-current-version-does-not": "Standardmäßig deaktiviert; Die aktuelle Version stellt es nicht als Tool zur Verfügung.",
     "tool-loop-mode-experimental": "Werkzeugschleifenmodus (experimentell)",
@@ -634,7 +634,9 @@
     "when-enabled-card-repository-description": "Wenn aktiviert, werden die ursprünglichen Repository-Beschreibungen auf den Karten der Repository- und Discovery-Seiten automatisch in die Oberflächensprache übersetzt. Bereits in dieser Sprache vorliegende Beschreibungen bleiben unverändert; bei fehlgeschlagener Übersetzung wird der Originaltext angezeigt.",
     "free-google-endpoint-no-configuration-needed-may": "Die kostenlose Benutzeroberfläche von Google erfordert keine Konfiguration; Einige Bereiche sind möglicherweise nicht direkt miteinander verbunden.",
     "free-microsoft-edge-endpoint-no-configuration-ne": "Kostenlose Microsoft Edge-Schnittstelle, keine Konfiguration erforderlich, schnelle direkte Verbindungsgeschwindigkeit.",
-    "api-pay-as-you-go": "API (Pay-as-you-go)"
+    "api-pay-as-you-go": "API (Pay-as-you-go)",
+    "readme-fast-path": "README-Schnellpfad",
+    "for-simple-usage-overview-or-deployment-questions-ans": "Beantwortet einfache Fragen zu Nutzung, Überblick oder Bereitstellung direkt aus dem Root-README und überspringt die mehrstufige Suche; bei „tief“/„unbegrenzt“ automatisch deaktiviert."
   },
   "backendPanel": {
     "auto": "intelligent",

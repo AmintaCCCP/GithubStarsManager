@@ -76,6 +76,7 @@ const repositoryChatSettings = {
   retainSessionDays: 90,
   maxToolsPerTurn: 6,
   enableWebTools: false,
+  fastPath: true,
   streamingMode: 'off' as const,
 };
 

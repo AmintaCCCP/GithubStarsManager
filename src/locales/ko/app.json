@@ -607,7 +607,7 @@
     "retain-local-conversations-days": "로컬 세션 유지(일)",
     "deleting-an-individual-conversation-always-takes": "단일 세션을 삭제하면 항상 즉시 적용됩니다.",
     "advanced-settings": "고급 설정",
-    "used-by-the-chat-window-when-task-depth-is-defau": "이러한 매개변수는 채팅 창 작업 깊이에 대해 \"기본값\"이 선택된 경우 사용됩니다.",
+    "used-by-the-chat-window-when-task-depth-is-defau": "채팅 창이 기본 및 빠른 깊이에서 사용하는 고급 매개변수",
     "external-web-search-and-fetch": "외부 웹 검색 및 크롤링",
     "disabled-by-default-the-current-version-does-not": "기본적으로 꺼져 있습니다. 현재 버전에서는 이를 도구로 노출하지 않습니다.",
     "tool-loop-mode-experimental": "도구 루프 모드(실험적)",
@@ -634,7 +634,9 @@
     "auto-translate-repo-descriptions": "저장소 설명 자동 번역",
     "when-enabled-card-repository-description": "사용하면 저장소 페이지와 발견 페이지 카드의 저장소 원본 설명이 인터페이스 언어로 자동 번역되어 표시됩니다. 이미 해당 언어인 설명은 원본 그대로 표시되며, 번역에 실패하면 원본 텍스트가 표시됩니다.",
     "free-google-endpoint-no-configuration-needed-may": "Google의 무료 인터페이스에는 구성이 필요하지 않습니다. 일부 지역은 직접 연결되지 않을 수 있습니다.",
-    "free-microsoft-edge-endpoint-no-configuration-ne": "Microsoft Edge 무료 인터페이스, 구성이 필요하지 않으며 직접 연결 속도가 빠릅니다."
+    "free-microsoft-edge-endpoint-no-configuration-ne": "Microsoft Edge 무료 인터페이스, 구성이 필요하지 않으며 직접 연결 속도가 빠릅니다.",
+    "readme-fast-path": "README 빠른 경로",
+    "for-simple-usage-overview-or-deployment-questions-ans": "간단한 사용법, 개요 또는 배포 질문은 루트 README에서 바로 답변하고 다단계 검색을 건너뜁니다. 심층/무제한 모드에서는 자동으로 꺼집니다."
   },
   "backendPanel": {
     "auto": "지능적인",

@@ -240,6 +240,7 @@ export const useRepositoryChat = ({
           agentBudget: repositoryChatSettings.agentBudget,
           enableAgentToolLoop: repositoryChatSettings.enableAgentToolLoop,
           taskDepth: repositoryChatSettings.taskDepth,
+          fastPath: repositoryChatSettings.fastPath,
           streaming: repositoryChatSettings.streamingMode !== 'off',
           signal: controller.signal,
           onToolEvent: (event) => {
@@ -305,7 +306,7 @@ export const useRepositoryChat = ({
       abortControllerRef.current = null;
       setIsSending(false);
     }
-  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, session, unavailableReason, t]);
+  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.fastPath, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, session, unavailableReason, t]);
 
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();
