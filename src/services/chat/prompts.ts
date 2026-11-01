@@ -9,11 +9,13 @@ import type { RepositoryChatTurnInput } from './loop';
 const MAX_CONTEXT_CHARS = 96_000;
 /** Gate 阶段单条证据进入上下文的截断长度；完整原文只在最终回答时提供。 */
 
-type AnswerIntent = 'installation' | 'general' | 'architecture' | 'troubleshooting' | 'creative';
+type AnswerIntent = 'installation' | 'configuration' | 'deployment' | 'general' | 'architecture' | 'troubleshooting' | 'creative';
 
 const normalizeAnswerIntent = (intent: string): AnswerIntent => {
   const normalized = intent.toLowerCase().replace(/\s+/g, '_');
-  if (['installation', 'usage', 'deployment'].includes(normalized)) return 'installation';
+  if (['installation', 'usage'].includes(normalized)) return 'installation';
+  if (normalized === 'configuration') return 'configuration';
+  if (normalized === 'deployment') return 'deployment';
   if (['architecture', 'code_analysis', 'implementation', 'api', 'comparison'].includes(normalized)) return 'architecture';
   if (['troubleshooting', 'error', 'debugging'].includes(normalized)) return 'troubleshooting';
   if (normalized === 'creative') return 'creative';
@@ -25,6 +27,8 @@ export const ANSWER_FORMAT_DIRECTIVE = (language: AppLanguage, intent = 'general
   const structure = language === 'zh'
     ? {
         installation: '结构：第一句给结论；紧接着放最推荐的一条命令；其他方式最多 2 种，各用一行说明加代码；前置依赖用列表，最多 5 项。',
+        configuration: '结构：先给需要修改的配置项，再用列表说明作用与默认值，最后给最小配置示例。',
+        deployment: '结构：先给部署结论和目标环境，再列必要前置条件、推荐部署命令与关键配置；其他方式最多 2 种。',
         general: '结构：第一句给项目定位；随后用 3-6 条要点直接回答问题。',
         architecture: '结构：先用 1-2 句给结论，再用不超过 4 个 `###` 小节展开；只有确需图示时才用 mermaid。',
         troubleshooting: '结构：先给原因，再给解决步骤，最后在相关时给 Issue 线索。',
@@ -32,6 +36,8 @@ export const ANSWER_FORMAT_DIRECTIVE = (language: AppLanguage, intent = 'general
       }[answerIntent]
     : {
         installation: 'Structure: lead with the conclusion; put the single recommended command immediately after it; at most two alternatives, each with one line of prose plus code; list at most five prerequisites.',
+        configuration: 'Structure: name the settings to change, explain each value and default, then show a minimal configuration example.',
+        deployment: 'Structure: lead with the deployment conclusion and target environment, then prerequisites, the recommended command, and key configuration; at most two alternatives.',
         general: 'Structure: lead with what the project is, then answer directly in 3-6 bullets.',
         architecture: 'Structure: lead with a 1-2 sentence conclusion, then use at most four `###` sections; add mermaid only when a diagram is genuinely needed.',
         troubleshooting: 'Structure: cause first, then resolution steps, then relevant issue leads when available.',
@@ -42,7 +48,7 @@ export const ANSWER_FORMAT_DIRECTIVE = (language: AppLanguage, intent = 'general
         '回答风格与排版规则（严格执行）：',
         '1. **首句直给结论**：第一句话直接回答用户问题；安装/运行/使用类问题在首段直接给最推荐命令。禁止写“这个项目的安装本质上是……”“根据已读取的文档……”等铺垫。',
         '2. **只回答被问到的内容**：不要展开未询问的边缘场景；确有阻断性注意事项时只写一行 `> ⚠️ 注意：...`。',
-        '3. **标题克制**：少于 3 段时不用标题；需要标题时用 `###`，不用 `##`，最多 3 个（架构类最多 4 个）。不要写“## 结论”“## 未证实或缺失的信息”这类空标题。',
+        '3. **标题克制**：少于 3 段时不用标题；需要标题时用 `###`，不用 `##`，最多 3 个（架构类最多 4 个）。创作类请求按用户指定的标题和结构交付，不受本条限制。不要写“## 结论”“## 未证实或缺失的信息”这类空标题。',
         '4. **引用不堆砌**：每个事实段落或列表块末尾只放 1-2 个反引号来源，格式为 `/路径 - 起始行-结束行`；代码块和表格前后不要单独占一行放引用，把引用放在引出它们的句子末尾；同一段不要重复同一来源。',
         '5. **找不到核心答案时**：只在文末写一行 `> 未在已读取的文件中找到：X`，不要另起“未证实信息”小节。',
         '6. 代码必须使用带语言标注的围栏代码块；只有流程或架构确需图示时才用 mermaid。',
@@ -52,7 +58,7 @@ export const ANSWER_FORMAT_DIRECTIVE = (language: AppLanguage, intent = 'general
         'Answer style and formatting rules (strict):',
         '1. **Lead with the answer**: sentence one answers the question directly; for install/run/usage questions, put the single recommended command in the opening section. Never use throat-clearing preambles.',
         '2. **Only what was asked**: do not expand into unrequested edge cases. If a blocking caveat exists, use one `> ⚠️ Note: ...` line.',
-        '3. **Restrained headings**: use no headings for answers under three paragraphs; when needed use `###`, never `##`, with at most three headings (four for architecture). Never emit empty headings such as “## Conclusion” or “## Unverified or missing information”.',
+        '3. **Restrained headings**: use no headings for answers under three paragraphs; when needed use `###`, never `##`, with at most three headings (four for architecture). For creative requests, follow the user-specified headings and structure instead of this limit. Never emit empty headings such as “## Conclusion” or “## Unverified or missing information”.',
         '4. **Clean citations**: attach 1-2 backticked sources (`/path - startLine-endLine`) at the end of each factual paragraph or list block. Never place a citation on its own line before or after a code block or table; attach it to the sentence introducing that block. Never repeat the same source within one paragraph.',
         '5. **When the core answer is absent**: add one final line `> Not found in the files read: X`; do not create an “Unverified information” section.',
         '6. Use fenced code blocks with a language tag; use mermaid only when a process or architecture genuinely needs a diagram.',
@@ -60,10 +66,13 @@ export const ANSWER_FORMAT_DIRECTIVE = (language: AppLanguage, intent = 'general
       ].join('\n');
 };
 
+/** 篇幅按回答意图决定；taskDepth 只控制检索预算（plan §2.1）。 */
 export const ANSWER_LENGTH_DIRECTIVE = (language: AppLanguage, intent = 'general'): string => {
   const answerIntent = normalizeAnswerIntent(intent);
   const zh = {
     installation: '篇幅要求：安装/使用类正文控制在 250 字以内（约 900 字符，不含代码块）；其他方式最多 2 种，前置依赖最多 5 项。',
+    configuration: '篇幅要求：配置类正文控制在 500 字以内，只列出回答问题所需的配置项、默认值和最小示例。',
+    deployment: '篇幅要求：部署类正文控制在 500 字以内，只保留前置条件、部署步骤和阻断性注意事项。',
     general: '篇幅要求：总览/功能类控制在 300 字以内，优先用 3-6 条要点，不要写成长文。',
     architecture: '篇幅要求：架构/代码类控制在 800 字以内，最多 4 个 `###` 小节；只保留理解结论所需的关键细节。',
     troubleshooting: '篇幅要求：排查类控制在 400 字以内，按“原因 → 解决步骤 → 相关 Issue”组织。',
@@ -71,6 +80,8 @@ export const ANSWER_LENGTH_DIRECTIVE = (language: AppLanguage, intent = 'general
   }[answerIntent];
   const en = {
     installation: 'Length: keep installation/usage prose under 180 words (about 900 characters, excluding code blocks); at most two alternatives and five prerequisites.',
+    configuration: 'Length: keep configuration answers under 350 words; include only the settings, defaults, and minimal example needed to answer.',
+    deployment: 'Length: keep deployment answers under 350 words; retain only prerequisites, deployment steps, and blocking caveats.',
     general: 'Length: keep overview/feature answers under 220 words, preferably as 3-6 bullets.',
     architecture: 'Length: keep architecture/code answers under 550 words and at most four `###` sections; retain only details needed for the conclusion.',
     troubleshooting: 'Length: keep troubleshooting answers under 300 words, organized as cause → resolution steps → relevant issues.',

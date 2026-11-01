@@ -121,6 +121,10 @@ export const liftStandaloneCitationLines = (markdown: string): string => {
         target >= 0
         && (output[target]!.includes('|') || LIST_ITEM_RE.test(output[target]!) || output[target]!.trim() === '')
       ) target -= 1;
+      if (target === lastClosedFenceEnd) {
+        target = lastClosedFenceStart - 1;
+        while (target >= 0 && output[target]!.trim() === '') target -= 1;
+      }
     }
     if (target < 0 || /^\s{0,3}#{1,6}\s+/.test(output[target]!)) {
       output.push(line);

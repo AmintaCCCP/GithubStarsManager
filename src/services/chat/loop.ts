@@ -410,9 +410,17 @@ export const synthesizeVerifiedAnswer = async (
   const validAnswer = (raw: string | null): string | null => {
     if (!raw) return null;
     const footnoteMapped = mapFootnoteReferences(raw, evidences);
-    const cleaned = ensureVerifiableSources(footnoteMapped, evidences, input.language);
-    if (cleaned !== noVerifiedSummaryResponse(input.language)) return postprocessCitationLayout(cleaned);
-    const pruned = pruneUnverifiableSections(footnoteMapped, evidences, input.language);
+    // 先整理独立引用行，再核验覆盖率；否则代码块后的引用会把引出段和代码块误判为未引用。
+    const laidOut = postprocessCitationLayout(footnoteMapped);
+    const cleaned = ensureVerifiableSources(laidOut, evidences, input.language);
+    if (cleaned !== noVerifiedSummaryResponse(input.language)) {
+      // 创作成品不能被“未证实”分区重排；事实段落仍须通过上面的覆盖率门槛。
+      const pruned = answerIntent === 'creative'
+        ? cleaned
+        : pruneUnverifiableSections(cleaned, evidences, input.language);
+      return postprocessCitationLayout(pruned ?? cleaned);
+    }
+    const pruned = pruneUnverifiableSections(laidOut, evidences, input.language);
     return pruned ? postprocessCitationLayout(pruned) : null;
   };
   const answerEventDetail = input.language === 'zh' ? '证据充分；现在仅依据已验证来源生成回答。' : 'Evidence is sufficient; generate the answer only from verified sources.';

@@ -45,6 +45,17 @@ describe('hasCompleteSourceReferences', () => {
     const belowThreshold = [...sections.slice(0, 4), ...sections.slice(7, 9)].join('\n\n');
     expect(hasCompleteSourceReferences(belowThreshold, sectionEvidences)).toBe(false);
   });
+
+  it('counts ordinary prose claims and does not let one citation cover a whole section', () => {
+    const content = [
+      '## Runtime',
+      '',
+      `The service starts with Docker. ${citation}`,
+      '',
+      'This project stores data locally.',
+    ].join('\n');
+    expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
+  });
 });
 
 describe('groupMarkdownBlocks', () => {
@@ -90,6 +101,25 @@ describe('pruneUnverifiableSections', () => {
     const citedPart = pruned.split('未证实或缺失的信息')[0];
     expect(citedPart).toContain('Run the installer.');
     expect(citedPart).not.toContain('Version 2.0 has an uncited fact.');
+  });
+
+  it('demotes only the uncited factual paragraphs in a mixed section', () => {
+    const content = [
+      '## Runtime',
+      '',
+      `The service starts with Docker. ${citation}`,
+      '',
+      'This project stores data locally.',
+      '',
+      'Optional background:',
+    ].join('\n');
+    const pruned = pruneUnverifiableSections(content, evidences, 'en');
+    if (!pruned) throw new Error('expected a pruned answer');
+    const [verified, unverified] = pruned.split('## Unverified or missing information');
+    expect(verified).toContain('The service starts with Docker.');
+    expect(verified).toContain('Optional background:');
+    expect(unverified).toContain('This project stores data locally.');
+    expect(unverified).not.toContain('The service starts with Docker.');
   });
 });
 

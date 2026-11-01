@@ -208,11 +208,15 @@ const buildChatServiceFixtures = (language: 'zh' | 'en') => {
 
   result.ANSWER_FORMAT_DIRECTIVE = {
     installation: ANSWER_FORMAT_DIRECTIVE(language, 'installation'),
+    configuration: ANSWER_FORMAT_DIRECTIVE(language, 'configuration'),
+    deployment: ANSWER_FORMAT_DIRECTIVE(language, 'deployment'),
     general: ANSWER_FORMAT_DIRECTIVE(language, 'feature_overview'),
     architecture: ANSWER_FORMAT_DIRECTIVE(language, 'architecture'),
   };
   result.ANSWER_LENGTH_DIRECTIVE = {
     installation: ANSWER_LENGTH_DIRECTIVE(language, 'installation'),
+    configuration: ANSWER_LENGTH_DIRECTIVE(language, 'configuration'),
+    deployment: ANSWER_LENGTH_DIRECTIVE(language, 'deployment'),
     general: ANSWER_LENGTH_DIRECTIVE(language, 'feature_overview'),
     architecture: ANSWER_LENGTH_DIRECTIVE(language, 'architecture'),
     troubleshooting: ANSWER_LENGTH_DIRECTIVE(language, 'troubleshooting'),
@@ -220,6 +224,8 @@ const buildChatServiceFixtures = (language: 'zh' | 'en') => {
   };
   result.buildSystemPrompt = {
     installation: buildSystemPrompt(language, 'installation'),
+    configuration: buildSystemPrompt(language, 'configuration'),
+    deployment: buildSystemPrompt(language, 'deployment'),
     general: buildSystemPrompt(language, 'feature_overview'),
     architecture: buildSystemPrompt(language, 'architecture'),
     troubleshooting: buildSystemPrompt(language, 'troubleshooting'),

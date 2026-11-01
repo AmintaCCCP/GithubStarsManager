@@ -413,4 +413,51 @@ describe('synthesizeVerifiedAnswer answer intent', () => {
     expect(system).toContain('Structure: deliver the requested work');
     expect(system).not.toContain('Structure: lead with what the project is');
   });
+
+  it('keeps a 70%-covered answer but marks the remaining uncited facts', async () => {
+    const answer = Array.from({ length: 10 }, (_, index) => (
+      `Version ${index + 1} is documented.${index < 7 ? ` \`${INSTALL_SECTION_REFERENCE}\`` : ''}`
+    )).join('\n\n');
+    const callModelWithRetry = vi.fn().mockResolvedValue(answer);
+
+    const content = await synthesizeVerifiedAnswer(
+      {} as never,
+      turnInput('How do I install this project?'),
+      [installEvidence],
+      1,
+      2000,
+      callModelWithRetry,
+    );
+
+    expect(callModelWithRetry).toHaveBeenCalledTimes(1);
+    expect(content).toContain('Version 7 is documented.');
+    expect(content).toContain('Unverified or missing information');
+    expect(content).toContain('Version 10 is documented.');
+  });
+
+  it('lifts a standalone citation before validating the answer', async () => {
+    const answer = [
+      'Run this:',
+      '',
+      '```bash',
+      'npm install',
+      '```',
+      '',
+      `\`${INSTALL_SECTION_REFERENCE}\``,
+    ].join('\n');
+    const callModelWithRetry = vi.fn().mockResolvedValue(answer);
+
+    const content = await synthesizeVerifiedAnswer(
+      {} as never,
+      turnInput('How do I install this project?'),
+      [installEvidence],
+      1,
+      1000,
+      callModelWithRetry,
+    );
+
+    expect(content).toContain(`Run this: \`${INSTALL_SECTION_REFERENCE}\``);
+    expect(content).toContain('npm install');
+    expect(content).not.toContain('Unverified or missing information');
+  });
 });

@@ -10,7 +10,7 @@ const count = (value: string, token: string): number => value.split(token).lengt
 describe('liftStandaloneCitationLines', () => {
   it('moves a citation after a code block onto the introducing sentence', () => {
     const content = [
-      'Install with one command `/README.md - 94-119`:',
+      'Install with one command:',
       '',
       '```bash',
       'npx skills add owner/repo',
@@ -20,7 +20,7 @@ describe('liftStandaloneCitationLines', () => {
     ].join('\n');
     const result = liftStandaloneCitationLines(content);
     expect(result).toBe([
-      'Install with one command `/README.md - 94-119`:',
+      'Install with one command: `/README.md - 94-119`',
       '',
       '```bash',
       'npx skills add owner/repo',
@@ -43,6 +43,32 @@ describe('liftStandaloneCitationLines', () => {
     ].join('\n');
     const result = liftStandaloneCitationLines(content);
     expect(result.startsWith('Runtime requirements: `/README.md - 1-5`')).toBe(true);
+  });
+
+  it('does not append a citation to a closing fence before a list', () => {
+    const content = [
+      'Run this:',
+      '',
+      '```bash',
+      'npm install',
+      '```',
+      '',
+      '- Node.js',
+      '- ffmpeg',
+      '',
+      '`/README.md - 1-5`',
+    ].join('\n');
+    const result = liftStandaloneCitationLines(content);
+    expect(result).toBe([
+      'Run this: `/README.md - 1-5`',
+      '',
+      '```bash',
+      'npm install',
+      '```',
+      '',
+      '- Node.js',
+      '- ffmpeg',
+    ].join('\n'));
   });
 });
 

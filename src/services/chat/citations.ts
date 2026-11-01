@@ -271,15 +271,21 @@ const markdownSections = (content: string): MarkdownBlock[][] => {
   return sections;
 };
 
-const blockText = (blocks: MarkdownBlock[]): string => blocks.map((block) => block.text).join('\n\n');
-
-const isFactualBlock = (block: MarkdownBlock): boolean => block.kind !== 'heading' && (
-  /\d/.test(block.text)
-  || /[/\\]/.test(block.text)
-  || /`[^`\n]+`/.test(block.text)
-  || /\b(?:npm|pnpm|yarn|bun|npx|docker|git|node|python|pip|uv|ffmpeg|curl|make)\b/i.test(block.text)
-  || /\b[A-Z][A-Z0-9_]{2,}\b/.test(block.text)
-);
+const isFactualBlock = (block: MarkdownBlock): boolean => {
+  if (block.kind === 'heading') return false;
+  if (block.kind !== 'prose') return true;
+  const text = block.text.trim();
+  if (
+    /\d/.test(text)
+    || /[/\\]/.test(text)
+    || /`[^`\n]+`/.test(text)
+    || /\b(?:npm|pnpm|yarn|bun|npx|docker|git|node|python|pip|uv|ffmpeg|curl|make)\b/i.test(text)
+    || /\b[A-Z][A-Z0-9_]{2,}\b/.test(text)
+  ) return true;
+  const words = text.split(/\s+/).filter(Boolean).length;
+  const cjkChars = (text.match(/[\u3400-\u9fff]/g) ?? []).length;
+  return /[.!?。！？]["'”’)]*\s*$/.test(text) || words >= 5 || cjkChars >= 8;
+};
 
 export const hasCompleteSourceReferences = (content: string, evidences: ToolEvidence[]): boolean => {
   if (sourceReferences(evidences).length === 0) return false;
@@ -287,10 +293,9 @@ export const hasCompleteSourceReferences = (content: string, evidences: ToolEvid
   let factualBlocks = 0;
   let coveredBlocks = 0;
   for (const section of sections) {
-    const sectionCited = hasAnyValidReference(blockText(section), evidences);
     for (const block of section.filter(isFactualBlock)) {
       factualBlocks += 1;
-      if (sectionCited || hasAnyValidReference(block.text, evidences)) coveredBlocks += 1;
+      if (hasAnyValidReference(block.text, evidences)) coveredBlocks += 1;
     }
   }
   if (factualBlocks === 0) return hasAnyValidReference(content, evidences);
@@ -370,13 +375,17 @@ export const pruneUnverifiableSections = (content: string, evidences: ToolEviden
   const kept: string[] = [];
   const unverified: string[] = [];
   for (const section of markdownSections(cleaned)) {
-    const text = blockText(section);
-    const factualBlocks = section.filter(isFactualBlock);
-    if (factualBlocks.length === 0 || hasAnyValidReference(text, evidences)) {
-      kept.push(text);
-    } else {
-      unverified.push(text);
+    const headings = section.filter((block) => block.kind === 'heading').map((block) => block.text);
+    const content = section.filter((block) => block.kind !== 'heading');
+    if (content.length === 0) {
+      kept.push(...headings);
+      continue;
     }
+    const keptContent = content.filter((block) => !isFactualBlock(block) || hasAnyValidReference(block.text, evidences));
+    const unverifiedContent = content.filter((block) => !keptContent.includes(block));
+    if (keptContent.length > 0) kept.push(...headings, ...keptContent.map((block) => block.text));
+    else unverified.push(...headings);
+    unverified.push(...unverifiedContent.map((block) => block.text));
   }
   if (kept.filter((section) => !isStandaloneHeading(section)).length === 0) return null;
   if (unverified.length === 0) return kept.join('\n\n');
