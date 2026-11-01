@@ -74,7 +74,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
   };
 
   const handleCloseAutoFocus = (event: Event) => {
-    event.preventDefault();
+    // 打开按钮已不在文档中时保留 Radix 默认行为，再清空表单。
+    if (openerRef.current?.isConnected) event.preventDefault();
     handleClose();
   };
 
