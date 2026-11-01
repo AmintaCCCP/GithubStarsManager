@@ -1002,6 +1002,108 @@ describe('selectFastPathSegments', () => {
     expect(segments[2]?.excerpt).toContain('Deep steps.');
   });
 
+  it('admits a nested leftover section whose heading is inside the previous excerpt but body lies beyond it', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(23_900),
+      '#### Deep',
+      ...Array.from({ length: 81 }, () => ''),
+      'Deep steps.',
+    ].join('\n'));
+
+    // 第 13 轮审计：Big 的可见摘录覆盖到第 89 行（第 8 行 Deep 标题起始偏移
+    // 23,909 < 24,000 在摘录之内，第 9–89 行全为空白，第 90 行起始偏移 24,000
+    // 恰达截断点）——Deep 的标题在上一候选摘录之内，但其正文整体位于截断点
+    // 之后，摘录内其后只剩空白行。不得按“已覆盖”跳过：Deep 作为独立候选参选
+    // （摘录按自身 lineStart 起算、预算独立），正文 Deep steps. 进入证据；
+    // Big 截断到 Deep 之前，两段零重叠、正文不重复输出。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this deep project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Deep']);
+    expect(segments[2]).toMatchObject({ lineStart: 8, lineEnd: 90 });
+    expect(segments[2]?.excerpt).toContain('Deep steps.');
+    expect(segments.filter((segment) => segment.excerpt.includes('Deep steps.'))).toHaveLength(1);
+    for (let i = 0; i < segments.length; i += 1) {
+      for (let j = i + 1; j < segments.length; j += 1) {
+        expect(segments[j]!.lineStart).toBeGreaterThan(segments[i]!.lineEnd);
+      }
+    }
+  });
+
+  it('truncates the previous leftover candidate to before a nested heading whose body is beyond its excerpt', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(23_900),
+      '#### Deep',
+      ...Array.from({ length: 81 }, () => ''),
+      'Deep steps.',
+    ].join('\n'));
+
+    // 同一布局、问题不含 deep：Big 与 Deep 得分并列 0 分、按行号 Big（第 6 行）
+    // 先得名额——但 Big 必须已截断到嵌套标题 Deep 之前（6–7 行）：摘录重建后
+    // 不含 Deep 的标题行与其后任何内容，Deep 的正文不出现在 Big 的摘录中，
+    // 不与 Deep 自身候选重复。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Big']);
+    expect(segments[2]).toMatchObject({ lineStart: 6, lineEnd: 7 });
+    expect(segments[2]?.excerpt).not.toContain('Deep');
+    expect(segments[2]?.excerpt).toContain('x');
+  });
+
+  it('admits a nested leftover section whose body follows a whitespace-only excerpt prefix', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(23_900),
+      '#### Deep',
+      `${' '.repeat(90)}Deep steps.`,
+    ].join('\n'));
+
+    // 子标题正文行在父摘录内只有空白前缀：不得按子标题自身预算重新计算并
+    // 误判为正文可见；Deep 独立入选后，其自身摘录完整包含正文。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this deep project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Deep']);
+    expect(segments[2]?.excerpt).toContain('Deep steps.');
+    expect(segments.filter((segment) => segment.excerpt.includes('Deep steps.'))).toHaveLength(1);
+  });
+
+  it('skips a nested leftover section whose body is visible inside the previous excerpt', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(23_900),
+      '#### Deep',
+      'Deep steps.',
+    ].join('\n'));
+
+    // 对照组（第 13 轮审计）：Deep 的标题与其正文都在 Big 的可见摘录之内
+    // （第 9 行起始偏移 23,919 < 24,000）——Deep 按已覆盖跳过，正文经父候选
+    // 摘录可达，不重复输出独立段；Big 保留完整区间与完整摘录。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this deep project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Big']);
+    expect(segments[2]).toMatchObject({ lineStart: 6, lineEnd: 9 });
+    expect(segments[2]?.excerpt).toContain('#### Deep');
+    expect(segments[2]?.excerpt).toContain('Deep steps.');
+    expect(segments.some((segment) => segment.label === 'Deep')).toBe(false);
+  });
+
   it('drops the general intro whose truncated excerpt holds only whitespace', () => {
     const blankRun = Array.from({ length: 78 }, () => ' '.repeat(320));
     const document = documentFrom([

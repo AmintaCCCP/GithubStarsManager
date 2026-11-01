@@ -134,6 +134,8 @@ export const selectFastPathSegments = (
   const headingOrTruncatedFragmentPattern = /^\s{0,3}#{1,6}(?:\s|$)/;
   const isHeadingOrFragmentLine = (line: string): boolean =>
     line.trim() === '' || headingOrTruncatedFragmentPattern.test(line);
+  const hasBodyContent = (excerpt: string): boolean =>
+    excerpt.split('\n').some((line) => !isHeadingOrFragmentLine(line));
   // 有效性下限（与导语段一致）：区间内除标题行外至少一行非空正文。第 12 轮审计：
   // 正文判定只基于截断后的可见摘录——先把区间行拼接并限制在
   // MAX_EVIDENCE_EXCERPT_CHARS 内再按行检查（与 leadHasContentBeyondHeading 同一
@@ -141,8 +143,7 @@ export const selectFastPathSegments = (
   // 位于截断点之后、或摘录末尾只剩标题截断残段的行不计入正文，防止可见摘录
   // 只有标题与空白的章节入选并直接作答。
   const rangeHasBodyContent = (lineStart: number, lineEnd: number): boolean =>
-    lines.slice(lineStart - 1, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS).split('\n')
-      .some((line) => !isHeadingOrFragmentLine(line));
+    hasBodyContent(lines.slice(lineStart - 1, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS));
   type RankedItem = (typeof ranked)[number];
   // 行区间 [lineStart, lineEnd] 的拼接文本按 MAX_EVIDENCE_EXCERPT_CHARS 截断后
   // 仍覆盖到的最后一行（审计 U7mZ）：第 L 行在拼接文本中的起始偏移等于其前各
@@ -445,9 +446,15 @@ export const selectFastPathSegments = (
       const visibleEnd = excerptCoveredLineEnd(heading.lineStart, lineEnd);
       const lastLeftover = leftoverCandidates[leftoverCandidates.length - 1];
       if (lastLeftover && lastLeftover.segment.lineEnd >= heading.lineStart) {
-        // 上一候选覆盖该标题：仅当标题位于其可见摘录之内（起点严格早于摘录
-        // 覆盖末行）才跳过；起点恰为末行时其正文仍在截断点之后，照常独立参选。
-        if (heading.lineStart < lastLeftover.visibleEnd) continue;
+        // 上一候选覆盖该标题：仅当标题位于其可见摘录之内且摘录内确有正文时才
+        // 跳过；标题后只有空白、正文位于截断点之后时，该标题照常独立参选。
+        const headingOffset = lines
+          .slice(lastLeftover.segment.lineStart - 1, heading.lineStart - 1)
+          .reduce((offset, line) => offset + line.length + 1, 0);
+        if (
+          heading.lineStart < lastLeftover.visibleEnd
+          && hasBodyContent(lastLeftover.segment.excerpt.slice(headingOffset))
+        ) continue;
         // 标题在可见摘录之外：上一候选截断到该标题之前（输出层同一截断语义，
         // 重建 excerpt 与原摘录一致，不丢失已可见正文），该标题作为独立候选
         // 参与名额分配。visibleEnd 同步收敛到截断后的区间（重建摘录未再触达
