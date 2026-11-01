@@ -435,6 +435,26 @@ describe('synthesizeVerifiedAnswer answer intent', () => {
     expect(content).toContain('Version 10 is documented.');
   });
 
+  it('marks remaining uncited facts in a 70%-covered creative answer', async () => {
+    const answer = Array.from({ length: 10 }, (_, index) => (
+      `Version ${index + 1} is documented.${index < 7 ? ` \`${INSTALL_SECTION_REFERENCE}\`` : ''}`
+    )).join('\n\n');
+    const callModelWithRetry = vi.fn().mockResolvedValue(answer);
+
+    const content = await synthesizeVerifiedAnswer(
+      {} as never,
+      turnInput('Write an article about this project'),
+      [installEvidence],
+      1,
+      2000,
+      callModelWithRetry,
+    );
+
+    expect(content).toContain('Version 7 is documented.');
+    expect(content).toContain('Unverified or missing information');
+    expect(content).toContain('Version 10 is documented.');
+  });
+
   it('lifts a standalone citation before validating the answer', async () => {
     const answer = [
       'Run this:',

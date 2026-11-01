@@ -56,6 +56,17 @@ describe('hasCompleteSourceReferences', () => {
     ].join('\n');
     expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
   });
+
+  it('does not let a tab-indented fence hide later citations', () => {
+    const content = [
+      '\t```',
+      '',
+      'Facts:',
+      '',
+      `Version 2 is available. ${citation}`,
+    ].join('\n');
+    expect(hasCompleteSourceReferences(content, evidences)).toBe(true);
+  });
 });
 
 describe('groupMarkdownBlocks', () => {
@@ -120,6 +131,43 @@ describe('pruneUnverifiableSections', () => {
     expect(verified).toContain('Optional background:');
     expect(unverified).toContain('This project stores data locally.');
     expect(unverified).not.toContain('The service starts with Docker.');
+  });
+
+  it('demotes uncited short prose claims', () => {
+    const content = [
+      '## Security',
+      '',
+      `The service uses TLS. ${citation}`,
+      '',
+      'Data is encrypted',
+      '',
+      '数据已加密',
+    ].join('\n');
+    const pruned = pruneUnverifiableSections(content, evidences, 'en');
+    if (!pruned) throw new Error('expected a pruned answer');
+    const [verified, unverified] = pruned.split('## Unverified or missing information');
+    expect(verified).toContain('The service uses TLS.');
+    expect(unverified).toContain('Data is encrypted');
+    expect(unverified).toContain('数据已加密');
+  });
+
+  it('demotes a factual heading that has no body or citation', () => {
+    const content = [
+      '## Setup',
+      '',
+      `Run the installer. ${citation}`,
+      '',
+      '## Version 2.0 is available',
+      '',
+      '## Data is encrypted',
+    ].join('\n');
+    const pruned = pruneUnverifiableSections(content, evidences, 'en');
+    if (!pruned) throw new Error('expected a pruned answer');
+    const [verified, unverified] = pruned.split('## Unverified or missing information');
+    expect(verified).not.toContain('## Version 2.0 is available');
+    expect(verified).not.toContain('## Data is encrypted');
+    expect(unverified).toContain('## Version 2.0 is available');
+    expect(unverified).toContain('## Data is encrypted');
   });
 
   it('keeps the missing-answer note out of the unverified section', () => {

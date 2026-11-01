@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   collapseCitationRuns,
+  fenceMarker,
+  isClosingFence,
   liftStandaloneCitationLines,
   postprocessCitationLayout,
 } from './citationPostprocess';
@@ -70,6 +72,20 @@ describe('liftStandaloneCitationLines', () => {
     expect(result.startsWith('Runtime requirements: `/README.md - 1-5`')).toBe(true);
   });
 
+  it('moves citations after a table onto an introducing sentence containing a pipe', () => {
+    const content = [
+      'Compare a || b:',
+      '',
+      '| Left | Right |',
+      '| --- | --- |',
+      '| a | b |',
+      '',
+      '`/README.md - 1-5`',
+    ].join('\n');
+    const result = liftStandaloneCitationLines(content);
+    expect(result.startsWith('Compare a || b: `/README.md - 1-5`')).toBe(true);
+  });
+
   it('attaches a citation after a list to the list instead of the preceding fence', () => {
     const content = [
       'Run this:',
@@ -94,6 +110,14 @@ describe('liftStandaloneCitationLines', () => {
       '- Node.js',
       '- ffmpeg `/README.md - 1-5`',
     ].join('\n'));
+  });
+});
+
+describe('fence parsing', () => {
+  it('does not treat a tab-indented fence as a fenced code block', () => {
+    expect(fenceMarker('\t```')).toBeNull();
+    expect(isClosingFence('\t```', { char: '`', length: 3 })).toBe(false);
+    expect(fenceMarker('   ```')).toEqual({ char: '`', length: 3 });
   });
 });
 

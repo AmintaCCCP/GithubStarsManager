@@ -5,13 +5,30 @@ type InlineCode = { start: number; end: number; token: string; key: string };
 export type FenceMarker = { char: string; length: number };
 
 export const fenceMarker = (line: string): FenceMarker | null => {
-  const match = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+  const match = /^ {0,3}(`{3,}|~{3,})/.exec(line);
   return match?.[1] ? { char: match[1][0]!, length: match[1].length } : null;
 };
 
 export const isClosingFence = (line: string, fence: FenceMarker): boolean => {
-  const match = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(line);
+  const match = /^ {0,3}(`{3,}|~{3,})\s*$/.exec(line);
   return Boolean(match?.[1] && match[1][0] === fence.char && match[1].length >= fence.length);
+};
+
+const isTableSeparatorRow = (line: string): boolean => {
+  const trimmed = line.trim();
+  return trimmed.includes('|') && trimmed.includes('-') && /^[\s|:-]+$/.test(trimmed);
+};
+
+/** 返回以 end 结束的 Markdown 表格的表头行；普通含竖线正文不算表格。 */
+const tableHeaderStart = (lines: string[], end: number): number | null => {
+  if (end < 1 || !lines[end]?.includes('|')) return null;
+  let start = end;
+  while (start >= 0 && lines[start]?.trim() && lines[start]!.includes('|')) start -= 1;
+  start += 1;
+  for (let index = start + 1; index <= end; index += 1) {
+    if (isTableSeparatorRow(lines[index]!)) return index - 1;
+  }
+  return null;
 };
 
 const citationKey = (token: string): string | null => {
@@ -111,11 +128,9 @@ export const liftStandaloneCitationLines = (markdown: string): string => {
     let target = output.length - 1;
     for (;;) {
       while (target >= 0 && output[target]!.trim() === '') target -= 1;
-      if (target >= 0 && output[target]!.includes('|')) {
-        while (
-          target >= 0
-          && (output[target]!.includes('|') || output[target]!.trim() === '')
-        ) target -= 1;
+      const tableStart = tableHeaderStart(output, target);
+      if (tableStart !== null) {
+        target = tableStart - 1;
         continue;
       }
       const fenceStart = closedFenceStarts.get(target);

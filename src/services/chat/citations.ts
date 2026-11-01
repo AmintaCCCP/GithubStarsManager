@@ -260,20 +260,41 @@ const markdownSections = (content: string): MarkdownBlock[][] => {
   return sections;
 };
 
+const isTransitionalProse = (text: string): boolean => (
+  (/[:：]\s*$/.test(text) && text.length <= 80)
+  || /^(?:here(?:'s| is)|below is|the following)\b/i.test(text)
+  || /^(?:optional background|background|example|for example|for instance|notes?|details?|summary|overview|以下|下面|例如|说明|备注|背景|可选背景)(?:\s*[:：])?$/i.test(text)
+);
+
+const hasFactualSignal = (text: string): boolean => (
+  /\d/.test(text)
+  || /[/\\]/.test(text)
+  || /`[^`\n]+`/.test(text)
+  || /\b(?:npm|pnpm|yarn|bun|npx|docker|git|node|python|pip|uv|ffmpeg|curl|make)\b/i.test(text)
+  || /\b[A-Z][A-Z0-9_]{2,}\b/.test(text)
+);
+
+const hasFactualHeadingSignal = (text: string): boolean => (
+  hasFactualSignal(text)
+  || /\b(?:is|are|was|were|has|have|supports?|requires?|uses?|provides?|stores?|enables?)\b/i.test(text)
+  || /(?:已|支持|需要|使用|提供|存储|启用)/.test(text)
+);
+
 const isFactualBlock = (block: MarkdownBlock): boolean => {
   if (block.kind === 'heading') return false;
   if (block.kind !== 'prose') return true;
   const text = block.text.trim();
-  if (
-    /\d/.test(text)
-    || /[/\\]/.test(text)
-    || /`[^`\n]+`/.test(text)
-    || /\b(?:npm|pnpm|yarn|bun|npx|docker|git|node|python|pip|uv|ffmpeg|curl|make)\b/i.test(text)
-    || /\b[A-Z][A-Z0-9_]{2,}\b/.test(text)
-  ) return true;
+  if (isTransitionalProse(text)) return false;
+  if (hasFactualSignal(text)) return true;
   const words = text.split(/\s+/).filter(Boolean).length;
   const cjkChars = (text.match(/[\u3400-\u9fff]/g) ?? []).length;
-  return /[.!?。！？]["'”’)]*\s*$/.test(text) || words >= 5 || cjkChars >= 8;
+  return /[.!?。！？]["'”’)]*\s*$/.test(text) || words >= 3 || cjkChars >= 4;
+};
+
+const isFactualHeading = (heading: string): boolean => {
+  const text = heading.replace(/^#{1,6}\s+/, '').trim();
+  if (hasFactualHeadingSignal(text)) return true;
+  return /[.!?。！？]["'”’)]*\s*$/.test(text) || text.split(/\s+/).filter(Boolean).length >= 5;
 };
 
 const isMissingAnswerNote = (block: MarkdownBlock): boolean =>
@@ -370,7 +391,12 @@ export const pruneUnverifiableSections = (content: string, evidences: ToolEviden
     const headings = section.filter((block) => block.kind === 'heading').map((block) => block.text);
     const content = section.filter((block) => block.kind !== 'heading');
     if (content.length === 0) {
-      kept.push(...headings);
+      const keptHeadings = headings.filter((heading) => (
+        !isFactualHeading(heading)
+        || hasAnyValidReference(heading, evidences)
+      ));
+      kept.push(...keptHeadings);
+      unverified.push(...headings.filter((heading) => !keptHeadings.includes(heading)));
       continue;
     }
     const keptContent = content.filter((block) => (

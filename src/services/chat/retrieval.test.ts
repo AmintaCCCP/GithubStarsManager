@@ -41,12 +41,16 @@ describe('isCreativeRequest', () => {
   it('recognizes poem and compose requests without treating docker compose as creative', () => {
     expect(isCreativeRequest('Compose a poem about this project')).toBe(true);
     expect(isCreativeRequest('Write a story about the maintainers')).toBe(true);
+    expect(isCreativeRequest('讲个故事介绍这个项目')).toBe(true);
     expect(isCreativeRequest('写一首诗介绍这个项目')).toBe(true);
     expect(isCreativeRequest('创作一首诗介绍这个项目')).toBe(true);
+    expect(isCreativeRequest('写一篇关于用户故事的文章')).toBe(true);
     expect(isCreativeRequest('How do I use docker compose?')).toBe(false);
     expect(isCreativeRequest('How do I create postgres schema?')).toBe(false);
     expect(isCreativeRequest('How do I generate a post request using this API?')).toBe(false);
     expect(isCreativeRequest('generate copyright headers')).toBe(false);
-    expect(isCreativeRequest('How do I generate a post endpoint?')).toBe(true);
+    expect(isCreativeRequest('How do I generate a post endpoint?')).toBe(false);
+    expect(isCreativeRequest('How should the API store a user story?')).toBe(false);
+    expect(isCreativeRequest('如何存储用户故事？')).toBe(false);
   });
 });

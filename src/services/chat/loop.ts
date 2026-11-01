@@ -414,10 +414,7 @@ export const synthesizeVerifiedAnswer = async (
     const laidOut = postprocessCitationLayout(footnoteMapped);
     const cleaned = ensureVerifiableSources(laidOut, evidences, input.language);
     if (cleaned !== noVerifiedSummaryResponse(input.language)) {
-      // 创作成品不能被“未证实”分区重排；事实段落仍须通过上面的覆盖率门槛。
-      const pruned = answerIntent === 'creative'
-        ? cleaned
-        : pruneUnverifiableSections(cleaned, evidences, input.language);
+      const pruned = pruneUnverifiableSections(cleaned, evidences, input.language);
       return postprocessCitationLayout(pruned ?? cleaned);
     }
     const pruned = pruneUnverifiableSections(laidOut, evidences, input.language);
