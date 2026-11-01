@@ -432,7 +432,15 @@ const runToolLoopEvidenceAgent = async (
 
   const systemPrompt = buildToolLoopSystemPrompt(input.language);
   const tools = buildToolLoopTools(input.language);
-  const firstUserContent = buildToolLoopUserPrompt(input, documentationCandidates, codeCandidates);
+  const prefetchedEvidence = evidences.length > 0 ? untrustedEvidenceBlock(evidences) : '';
+  const firstUserContent = [
+    buildToolLoopUserPrompt(input, documentationCandidates, codeCandidates),
+    prefetchedEvidence
+      ? `${zh
+        ? '以下 README 证据已由快速路径读取，可直接用于判断是否还需要补充来源：'
+        : 'The README evidence below was already read by the fast path and is available for deciding whether more sources are needed:'}\n\n${prefetchedEvidence}`
+      : '',
+  ].filter(Boolean).join('\n\n');
   const messages: AIToolLoopMessage[] = [
     { role: 'user', content: firstUserContent },
   ];

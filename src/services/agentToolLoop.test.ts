@@ -199,7 +199,11 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
         : '## Updates\n\nThe first release adds a dashboard. `/release-v1.0.0.md - 1-4`'
     ));
     mocks.generateWithTools
-      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_recent_releases')]))
+      .mockImplementationOnce(async ({ messages }: { messages: Array<{ role: string; content?: unknown }> }) => {
+        expect(messages[0]?.role).toBe('user');
+        expect(String(messages[0]?.content)).toContain('Run `npx example install`.');
+        return modelTurn([toolCall('c1', 'read_recent_releases')]);
+      })
       .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: [] })]));
 
     const result = await runToolLoopRepositoryChatTurn({

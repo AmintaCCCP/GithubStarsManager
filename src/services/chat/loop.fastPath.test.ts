@@ -264,6 +264,11 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     expect(mocks.generateChatText.mock.calls[1]?.[0]?.system).toContain('Repository Copilot');
     expect(mocks.generateChatText.mock.calls[2]?.[0]?.system).toContain('Query Understanding');
     expect(result.content).toContain('npx example install');
+    const answerRounds = events
+      .filter((event) => event.toolName === 'synthesize_answer' && event.stage === 'answer')
+      .map((event) => event.round);
+    expect(answerRounds).toContain(0);
+    expect(answerRounds).toContain(1);
     const metrics = turnMetricsEvent(events);
     expect(metrics).toMatchObject({ fastPath: false });
     expect(metrics?.llmCalls).toBe(mocks.generateChatText.mock.calls.length);
@@ -292,6 +297,13 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     const clearedAt = streamed.indexOf('');
     expect(clearedAt).toBeGreaterThan(0);
     expect(streamed.slice(0, clearedAt)).toContain('Unverified fast-path draft.');
+    const understandingCallIndex = mocks.generateChatText.mock.calls.findIndex(
+      ([options]) => String((options as { system?: string })?.system).includes('Query Understanding'),
+    );
+    expect(understandingCallIndex).toBeGreaterThanOrEqual(0);
+    expect(onAnswerChunk.mock.invocationCallOrder[clearedAt]).toBeLessThan(
+      mocks.generateChatText.mock.invocationCallOrder[understandingCallIndex]!,
+    );
     expect(streamed.slice(clearedAt + 1).join('')).toContain('npx example install');
     expect(result.content).toContain('npx example install');
   });

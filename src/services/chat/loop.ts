@@ -638,7 +638,8 @@ export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promi
     fastPath.ai,
     input,
     fastPath.evidences,
-    1,
+    // 快速路径不属于取证轮次：用 0 区分事件身份，避免回落后的最终回答事件覆盖本次尝试。
+    0,
     fastPath.answerMaxTokens,
     fastPath.callModelWithRetry,
     fastPathAnswerNote(input.language),
