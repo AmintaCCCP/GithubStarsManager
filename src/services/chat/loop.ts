@@ -54,6 +54,7 @@ import {
   documentationCandidatesFrom,
   evidenceFromSegments,
   evidenceSearchTerms,
+  isCreativeRequest,
   isFileEntry,
   isRepositoryCodePath,
   linkedDocumentationPaths,
@@ -77,6 +78,7 @@ import {
   resolveFastPathEnabled,
   selectFastPathSegments,
 } from './fastPath';
+import { postprocessCitationLayout } from '../../utils/citationPostprocess';
 
 /** 单次 GitHub 读取的工具级超时。 */
 const TOOL_CALL_TIMEOUT_MS = 20_000;
@@ -394,12 +396,14 @@ export const synthesizeVerifiedAnswer = async (
   callModelWithRetry: EvidenceToolbox['callModelWithRetry'],
   extraUserNote = '',
   hooks: AnswerSynthesisHooks = {},
+  intent = 'general',
 ): Promise<string> => {
   const emit = (event: ChatToolEventInput) => input.onToolEvent?.(event);
   // 统一的自由 Markdown 最终回答：创意与事实问题共用同一 prompt（引用规则/排版
   // 指令在系统提示词中），回答完成后仍走引用核验 → 修复 → digest 兜底链。
-  const answerSystem = buildSystemPrompt(input.language, input.taskDepth ?? 'default');
-  const answerUser = `${buildUserPrompt(input, evidences)}${extraUserNote}`;
+  const answerIntent = isCreativeRequest(input.question) ? 'creative' : intent;
+  const answerSystem = buildSystemPrompt(input.language, answerIntent);
+  const answerUser = `${buildUserPrompt(input, evidences, answerIntent)}${extraUserNote}`;
   // 校验阶梯：严格逐节核验（含脚注映射）→ 降级剪枝（保留有引用小节、未核验
   // 段落显式移入“未证实或缺失的信息”）。正确答案不因个别段落漏引用或模型使用
   // 脚注编号而被整体丢弃，同时不静默返回未核验内容。
@@ -407,8 +411,9 @@ export const synthesizeVerifiedAnswer = async (
     if (!raw) return null;
     const footnoteMapped = mapFootnoteReferences(raw, evidences);
     const cleaned = ensureVerifiableSources(footnoteMapped, evidences, input.language);
-    if (cleaned !== noVerifiedSummaryResponse(input.language)) return cleaned;
-    return pruneUnverifiableSections(footnoteMapped, evidences, input.language);
+    if (cleaned !== noVerifiedSummaryResponse(input.language)) return postprocessCitationLayout(cleaned);
+    const pruned = pruneUnverifiableSections(footnoteMapped, evidences, input.language);
+    return pruned ? postprocessCitationLayout(pruned) : null;
   };
   const answerEventDetail = input.language === 'zh' ? '证据充分；现在仅依据已验证来源生成回答。' : 'Evidence is sufficient; generate the answer only from verified sources.';
   // 回答阶段统一截止时间：流式与阻塞降级共享同一窗口，降级只能使用剩余时长。
@@ -530,7 +535,7 @@ export const synthesizeVerifiedAnswer = async (
       });
     }
   }
-  return finalContent ?? sourceBoundEvidenceDigest(input, evidences);
+  return finalContent ?? postprocessCitationLayout(sourceBoundEvidenceDigest(input, evidences));
 };
 
 /** 引用键：证据窗口的唯一标识（两个执行循环与快速路径共用同一格式）。 */
@@ -644,8 +649,10 @@ export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promi
     fastPath.callModelWithRetry,
     fastPathAnswerNote(input.language),
     { recordLlmCall: fastPath.recordLlmCall, recordFirstToken: fastPath.recordFirstToken },
+    fastPath.focus,
   );
-  if (fastPathAnswer && fastPathAnswer !== sourceBoundEvidenceDigest(input, fastPath.evidences)) {
+  const fastPathDigest = sourceBoundEvidenceDigest(input, fastPath.evidences);
+  if (fastPathAnswer && fastPathAnswer !== fastPathDigest && fastPathAnswer !== postprocessCitationLayout(fastPathDigest)) {
     fastPath.emitTurnMetrics({ fastPath: true, endReason: 'fast_path', rounds: 0 });
     return fastPathAnswer;
   }
@@ -1392,6 +1399,7 @@ const runOrchestratedEvidenceLoop = async (
     ctx.callModelWithRetry,
     truncatedNote,
     { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+    understanding.intent,
   );
   ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'answered', rounds: turns });
   return { content, evidences };

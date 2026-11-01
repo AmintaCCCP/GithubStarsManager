@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ToolEvidence } from '../../types/repositoryChat';
-import { ensureVerifiableSources, extractReferenceToken, hasCompleteSourceReferences, pruneUnverifiableSections } from './citations';
+import { ensureVerifiableSources, extractReferenceToken, groupMarkdownBlocks, hasCompleteSourceReferences, pruneUnverifiableSections } from './citations';
 
 const evidence = (path: string, lineStart: number, lineEnd: number): ToolEvidence => ({
   id: `evidence-${path}-${lineStart}`,
@@ -15,75 +15,81 @@ const evidences = [evidence('README.md', 94, 119)];
 const citation = '`/README.md - 94-119`';
 
 describe('hasCompleteSourceReferences', () => {
-  it('fails when a list item lacks its own reference even if the section has one', () => {
+  it('groups code blocks, tables, and lists with the preceding cited paragraph', () => {
     const content = [
-      `- Node.js is required ${citation}`,
+      `Install with the package manager. ${citation}`,
+      '',
+      '```bash',
+      'npm install',
+      '```',
+      '',
+      '- Node.js is required',
       '- ffmpeg is optional',
-    ].join('\n');
-    expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
-  });
-
-  it('passes when every list item is cited', () => {
-    const content = [
-      `- Node.js is required ${citation}`,
-      `- ffmpeg is optional ${citation}`,
-    ].join('\n');
-    expect(hasCompleteSourceReferences(content, evidences)).toBe(true);
-  });
-
-  it('skips table header and separator rows', () => {
-    const content = [
+      '',
       '| Tool | Purpose |',
       '| --- | --- |',
-      `| skills | install ${citation} |`,
+      '| npm | install |',
     ].join('\n');
     expect(hasCompleteSourceReferences(content, evidences)).toBe(true);
   });
 
-  it('checks indented nested list items individually', () => {
-    const content = [
-      `- Node.js is required ${citation}`,
-      '  - ffmpeg is optional',
-    ].join('\n');
-    expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
+  it('requires at least 70% of factual blocks to be covered by their section', () => {
+    const sections = Array.from({ length: 10 }, (_, index) => {
+      const reference = index < 7 ? ` \`/README.md - ${index + 1}-${index + 1}\`` : '';
+      return `## Topic ${index + 1}\n\nVersion ${index + 1} is documented.${reference}`;
+    });
+    const sectionEvidences = Array.from({ length: 10 }, (_, index) => evidence('README.md', index + 1, index + 1));
+    expect(hasCompleteSourceReferences(sections.join('\n\n'), sectionEvidences)).toBe(true);
+    expect(hasCompleteSourceReferences(sections.slice(0, 9).join('\n\n'), sectionEvidences.slice(0, 9))).toBe(true);
+    expect(hasCompleteSourceReferences(sections.slice(0, 8).join('\n\n'), sectionEvidences.slice(0, 8))).toBe(true);
+    const belowThreshold = [...sections.slice(0, 4), ...sections.slice(7, 9)].join('\n\n');
+    expect(hasCompleteSourceReferences(belowThreshold, sectionEvidences)).toBe(false);
   });
+});
 
-  it('checks pipe-less table rows individually', () => {
-    const content = [
-      'Tool | Purpose',
-      '--- | ---',
-      `skills | install ${citation}`,
-      'ffmpeg | render',
-    ].join('\n');
-    expect(hasCompleteSourceReferences(content, evidences)).toBe(false);
-  });
-
-  it('passes when every pipe-less table row is cited', () => {
-    const content = [
-      'Tool | Purpose',
-      '--- | ---',
-      `skills | install ${citation}`,
-      `ffmpeg | render ${citation}`,
-    ].join('\n');
-    expect(hasCompleteSourceReferences(content, evidences)).toBe(true);
+describe('groupMarkdownBlocks', () => {
+  it('attaches fenced code and lists to the preceding prose block', () => {
+    const blocks = groupMarkdownBlocks([
+      'Install with npm.',
+      '',
+      '```bash',
+      'npm install',
+      '```',
+      '',
+      '- Node.js',
+    ].join('\n'));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.kind).toBe('prose');
+    expect(blocks[0]?.text).toContain('npm install');
+    expect(blocks[0]?.text).toContain('- Node.js');
   });
 });
 
 describe('pruneUnverifiableSections', () => {
-  it('moves only uncited list items into the unverified block', () => {
+  it('keeps cited sections with their code blocks and demotes uncited factual sections', () => {
     const content = [
-      `- Node.js is required ${citation}`,
-      '- ffmpeg is optional',
+      '## Setup',
+      '',
+      `Run the installer. ${citation}`,
+      '',
+      '```bash',
+      'npm install',
+      '```',
+      '',
+      '## Extra',
+      '',
+      'Version 2.0 has an uncited fact.',
     ].join('\n');
     const pruned = pruneUnverifiableSections(content, evidences, 'zh');
     if (!pruned) throw new Error('expected a pruned answer');
-    expect(pruned).toContain('Node.js is required');
-    expect(pruned).toContain('ffmpeg is optional');
+    expect(pruned).toContain('Run the installer.');
+    expect(pruned).toContain('npm install');
+    expect(pruned).toContain('Version 2.0 has an uncited fact.');
     expect(pruned).toContain('未证实或缺失的信息');
     expect(pruned).toContain(citation);
     const citedPart = pruned.split('未证实或缺失的信息')[0];
-    expect(citedPart).toContain('Node.js is required');
-    expect(citedPart).not.toContain('ffmpeg is optional');
+    expect(citedPart).toContain('Run the installer.');
+    expect(citedPart).not.toContain('Version 2.0 has an uncited fact.');
   });
 });
 

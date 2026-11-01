@@ -16,6 +16,7 @@ import { RepositoryChatHistoryPanel } from './RepositoryChatHistoryPanel';
 import MarkdownRenderer from './MarkdownRenderer';
 import { CitationBadge } from '../features/repository-chat/components/CitationBadge';
 import { resolveCitation, stripCitationsForCopy } from '../features/repository-chat/utils/citationUtils';
+import { postprocessCitationLayout } from '../utils/citationPostprocess';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
 import { Textarea } from './ui/textarea';
@@ -180,7 +181,7 @@ const AssistantMessageBody = React.memo<{ content: string; evidenceIds: string[]
     if (!resolved) return null;
     return <CitationBadge target={resolved} language={language} />;
   }, [evidenceIds, evidenceById, language]);
-  return <MarkdownRenderer content={content} shouldRender breaks fontSize="small" className="repository-chat-markdown" renderInlineCode={renderInlineCode} baseUrl={baseUrl} />;
+  return <MarkdownRenderer content={postprocessCitationLayout(content)} shouldRender breaks fontSize="small" className="repository-chat-markdown" renderInlineCode={renderInlineCode} baseUrl={baseUrl} />;
 });
 
 const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({

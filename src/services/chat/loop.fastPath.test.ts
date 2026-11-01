@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AIConfig, Repository } from '../../types';
-import type { RepositoryChatSession } from '../../types/repositoryChat';
+import type { RepositoryChatSession, ToolEvidence } from '../../types/repositoryChat';
 import type { ChatToolEventInput } from './loop';
 
 const mocks = vi.hoisted(() => ({
@@ -36,7 +36,7 @@ vi.mock('../githubApiFactory', () => ({
 }));
 
 import { runToolLoopRepositoryChatTurn } from '../agentToolLoop';
-import { runEvidenceDrivenRepositoryChatTurn, type RepositoryChatTurnInput } from './loop';
+import { runEvidenceDrivenRepositoryChatTurn, synthesizeVerifiedAnswer, type RepositoryChatTurnInput } from './loop';
 
 const repository: Repository = {
   id: 1,
@@ -101,6 +101,17 @@ const README_WITH_INSTALL = [
 const INSTALL_SECTION_REFERENCE = '/README.md - 3-5';
 
 const CITED_ANSWER = `Run \`npx example install\` to set up the CLI. \`${INSTALL_SECTION_REFERENCE}\``;
+const installEvidence: ToolEvidence = {
+  id: 'evidence-install',
+  source: 'github',
+  repoFullName: repository.full_name,
+  path: 'README.md',
+  lineStart: 3,
+  lineEnd: 5,
+  url: 'https://github.com/owner/example/blob/abcdef1234567890/README.md#L3-L5',
+  excerpt: 'Run npx example install to set up the CLI.',
+  retrievedAt: '2026-08-01T00:00:00.000Z',
+};
 
 const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryTree.mockResolvedValue({
@@ -154,6 +165,7 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     // 回答前 LLM 调用 1 次：understanding / plan / gate 全部跳过。
     expect(mocks.generateChatText).toHaveBeenCalledTimes(1);
     expect(mocks.generateChatText.mock.calls[0]?.[0]?.system).toContain('Repository Copilot');
+    expect(mocks.generateChatText.mock.calls[0]?.[0]?.system).toContain('Install with the skills CLI');
     expect(result.evidences).toHaveLength(1);
     expect(result.evidences[0]).toMatchObject({ path: 'README.md', lineStart: 3, lineEnd: 5 });
     expect(result.content).toContain('npx example install');
@@ -381,5 +393,24 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     }))).rejects.toThrow();
 
     expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false, endReason: 'aborted' });
+  });
+});
+
+describe('synthesizeVerifiedAnswer answer intent', () => {
+  it('uses creative formatting when the question asks for an article even if retrieval intent is general', async () => {
+    const callModelWithRetry = vi.fn().mockResolvedValue(`An article about the project. \`${INSTALL_SECTION_REFERENCE}\``);
+
+    await synthesizeVerifiedAnswer(
+      {} as never,
+      turnInput('Write an article about this project'),
+      [installEvidence],
+      1,
+      1000,
+      callModelWithRetry,
+    );
+
+    const system = callModelWithRetry.mock.calls[0]?.[5];
+    expect(system).toContain('Structure: deliver the requested work');
+    expect(system).not.toContain('Structure: lead with what the project is');
   });
 });

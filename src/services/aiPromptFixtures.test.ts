@@ -206,20 +206,26 @@ const buildChatServiceFixtures = (language: 'zh' | 'en') => {
   const evidences = [makeEvidenceForFixture(repo)];
   const result: Record<string, unknown> = {};
 
-  result.ANSWER_FORMAT_DIRECTIVE = ANSWER_FORMAT_DIRECTIVE(language);
+  result.ANSWER_FORMAT_DIRECTIVE = {
+    installation: ANSWER_FORMAT_DIRECTIVE(language, 'installation'),
+    general: ANSWER_FORMAT_DIRECTIVE(language, 'feature_overview'),
+    architecture: ANSWER_FORMAT_DIRECTIVE(language, 'architecture'),
+  };
   result.ANSWER_LENGTH_DIRECTIVE = {
-    quick: ANSWER_LENGTH_DIRECTIVE(language, 'quick'),
-    default: ANSWER_LENGTH_DIRECTIVE(language, 'default'),
-    deep: ANSWER_LENGTH_DIRECTIVE(language, 'deep'),
-    unlimited: ANSWER_LENGTH_DIRECTIVE(language, 'unlimited'),
+    installation: ANSWER_LENGTH_DIRECTIVE(language, 'installation'),
+    general: ANSWER_LENGTH_DIRECTIVE(language, 'feature_overview'),
+    architecture: ANSWER_LENGTH_DIRECTIVE(language, 'architecture'),
+    troubleshooting: ANSWER_LENGTH_DIRECTIVE(language, 'troubleshooting'),
+    creative: ANSWER_LENGTH_DIRECTIVE(language, 'creative'),
   };
   result.buildSystemPrompt = {
-    quick: buildSystemPrompt(language, 'quick'),
-    default: buildSystemPrompt(language, 'default'),
-    deep: buildSystemPrompt(language, 'deep'),
-    unlimited: buildSystemPrompt(language, 'unlimited'),
+    installation: buildSystemPrompt(language, 'installation'),
+    general: buildSystemPrompt(language, 'feature_overview'),
+    architecture: buildSystemPrompt(language, 'architecture'),
+    troubleshooting: buildSystemPrompt(language, 'troubleshooting'),
+    creative: buildSystemPrompt(language, 'creative'),
   };
-  result.buildUserPrompt = buildUserPrompt(chatInput, evidences);
+  result.buildUserPrompt = buildUserPrompt(chatInput, evidences, 'deployment');
   result.sourceBoundEvidenceDigest = sourceBoundEvidenceDigest(chatInput, evidences);
   result.noVerifiedSummaryResponse = noVerifiedSummaryResponse(language);
   result.pruneUnverifiableSections = pruneUnverifiableSections(
@@ -230,7 +236,7 @@ const buildChatServiceFixtures = (language: 'zh' | 'en') => {
       '',
       '## Extra',
       '',
-      'An uncited claim that should be pruned.',
+      'Version 2.0 is an uncited claim that should be pruned.',
     ].join('\n'),
     evidences,
     language,

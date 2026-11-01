@@ -150,66 +150,151 @@ export const referenceCoveredByEvidence = (token: string, evidences: ToolEvidenc
   return best;
 };
 
+const LIST_ITEM_LINE_RE = /^\s*(?:[-*+]|\d+[.)])\s+/;
+const HEADING_LINE_RE = /^\s{0,3}#{1,6}\s+/;
+type FenceMarker = { char: string; length: number };
+
+const fenceMarker = (line: string): FenceMarker | null => {
+  const match = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+  return match?.[1] ? { char: match[1][0]!, length: match[1].length } : null;
+};
+
+const isClosingFence = (line: string, fence: FenceMarker): boolean => {
+  const match = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(line);
+  return Boolean(match?.[1] && match[1][0] === fence.char && match[1].length >= fence.length);
+};
+
 const isStandaloneHeading = (section: string): boolean => /^#{1,6}\s+[^\n]+$/.test(section.trim());
 
 const hasAnyValidReference = (content: string, evidences: ToolEvidence[]): boolean => {
   const exactReferences = new Set(sourceReferences(evidences));
-  for (const match of content.matchAll(/`([^`\n]+)`/g)) {
-    const token = match[1].trim();
-    if (exactReferences.has(token) || referenceCoveredByEvidence(token, evidences)) return true;
+  let fence: FenceMarker | null = null;
+  for (const line of content.split('\n')) {
+    if (fence) {
+      if (isClosingFence(line, fence)) fence = null;
+      continue;
+    }
+    const opened = fenceMarker(line);
+    if (opened) {
+      fence = opened;
+      continue;
+    }
+    for (const match of line.matchAll(/`([^`\n]+)`/g)) {
+      const token = match[1].trim();
+      if (exactReferences.has(token) || referenceCoveredByEvidence(token, evidences)) return true;
+    }
   }
   return false;
 };
 
-const LIST_ITEM_LINE_RE = /^\s*(?:[-*+]|\d+[.)])\s+/;
-
-const isTableSeparatorRow = (line: string): boolean => {
-  const trimmed = line.trim();
-  return /^[\s|:-]+$/.test(trimmed) && trimmed.includes('-') && trimmed.includes('|');
-};
+type MarkdownBlockKind = 'heading' | 'prose' | 'fence' | 'table' | 'list';
+export type MarkdownBlock = { kind: MarkdownBlockKind; text: string };
 
 /**
- * 把小节拆成可核验单元：列表项逐项、表格逐行（排除表头与分隔行），
- * 其余内容作为整体单元。标题不进入单元（由调用方按小节排除）。
- * 表格不要求前导竖线：含 `|` 且与分隔行相邻成块的行都按表格行核验。
+ * 把 Markdown 拆成可核验块。代码块、表格与列表不单独承担引用要求，
+ * 而是并入它们前面最近的正文块，由引出它们的句子统一引用。
  */
-const checkableUnits = (section: string): string[] => {
-  const lines = section.split('\n');
-  const separatorAt = new Set(lines.map((line, index) => (isTableSeparatorRow(line) ? index : -1)).filter((index) => index >= 0));
-  const tableRowAt = new Set<number>();
-  for (let i = 0; i < lines.length; i += 1) {
-    if (separatorAt.has(i) || !lines[i].includes('|')) continue;
-    if (separatorAt.has(i + 1) || separatorAt.has(i - 1) || tableRowAt.has(i - 1)) tableRowAt.add(i);
-  }
-  const units: string[] = [];
-  const proseLines: string[] = [];
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (separatorAt.has(i)) continue;
-    // 分隔行紧邻其上的行是表头，不属于事实内容。
-    if (separatorAt.has(i + 1)) continue;
-    if (tableRowAt.has(i)) {
-      units.push(line);
+export const groupMarkdownBlocks = (content: string): MarkdownBlock[] => {
+  const lines = content.split('\n');
+  const blocks: MarkdownBlock[] = [];
+  let current: MarkdownBlock | null = null;
+  let fence: FenceMarker | null = null;
+  const flush = () => {
+    if (current?.text.trim()) blocks.push({ ...current, text: current.text.trimEnd() });
+    current = null;
+  };
+  const append = (kind: MarkdownBlockKind, line: string) => {
+    if (!current || current.kind !== kind) {
+      flush();
+      current = { kind, text: line };
+    } else {
+      current.text += `\n${line}`;
+    }
+  };
+
+  for (const line of lines) {
+    if (fence) {
+      append('fence', line);
+      if (isClosingFence(line, fence)) fence = null;
+      continue;
+    }
+    const opened = fenceMarker(line);
+    if (opened) {
+      append('fence', line);
+      fence = opened;
+      continue;
+    }
+    if (!line.trim()) {
+      flush();
+      continue;
+    }
+    if (HEADING_LINE_RE.test(line)) {
+      flush();
+      blocks.push({ kind: 'heading', text: line.trimEnd() });
       continue;
     }
     if (LIST_ITEM_LINE_RE.test(line)) {
-      units.push(line);
+      append('list', line);
       continue;
     }
-    proseLines.push(line);
+    if (line.includes('|')) {
+      append('table', line);
+      continue;
+    }
+    append('prose', line);
   }
-  if (proseLines.length > 0) units.push(proseLines.join('\n'));
-  return units;
+  flush();
+
+  const grouped: MarkdownBlock[] = [];
+  for (const block of blocks) {
+    const previous = grouped[grouped.length - 1];
+    if ((block.kind === 'fence' || block.kind === 'table' || block.kind === 'list') && previous && previous.kind !== 'heading') {
+      previous.text += `\n\n${block.text}`;
+    } else {
+      grouped.push(block);
+    }
+  }
+  return grouped;
 };
+
+const markdownSections = (content: string): MarkdownBlock[][] => {
+  const sections: MarkdownBlock[][] = [];
+  let current: MarkdownBlock[] = [];
+  for (const block of groupMarkdownBlocks(content)) {
+    if (block.kind === 'heading' && current.some((item) => item.kind !== 'heading')) {
+      sections.push(current);
+      current = [];
+    }
+    current.push(block);
+  }
+  if (current.length > 0) sections.push(current);
+  return sections;
+};
+
+const blockText = (blocks: MarkdownBlock[]): string => blocks.map((block) => block.text).join('\n\n');
+
+const isFactualBlock = (block: MarkdownBlock): boolean => block.kind !== 'heading' && (
+  /\d/.test(block.text)
+  || /[/\\]/.test(block.text)
+  || /`[^`\n]+`/.test(block.text)
+  || /\b(?:npm|pnpm|yarn|bun|npx|docker|git|node|python|pip|uv|ffmpeg|curl|make)\b/i.test(block.text)
+  || /\b[A-Z][A-Z0-9_]{2,}\b/.test(block.text)
+);
 
 export const hasCompleteSourceReferences = (content: string, evidences: ToolEvidence[]): boolean => {
   if (sourceReferences(evidences).length === 0) return false;
-  const factualSections = content
-    .split(/\n{2,}/)
-    .map((section) => section.trim())
-    .filter((section) => section.length > 0 && !isStandaloneHeading(section));
-  if (factualSections.length === 0) return false;
-  return factualSections.every((section) => checkableUnits(section).every((unit) => hasAnyValidReference(unit, evidences)));
+  const sections = markdownSections(content);
+  let factualBlocks = 0;
+  let coveredBlocks = 0;
+  for (const section of sections) {
+    const sectionCited = hasAnyValidReference(blockText(section), evidences);
+    for (const block of section.filter(isFactualBlock)) {
+      factualBlocks += 1;
+      if (sectionCited || hasAnyValidReference(block.text, evidences)) coveredBlocks += 1;
+    }
+  }
+  if (factualBlocks === 0) return hasAnyValidReference(content, evidences);
+  return coveredBlocks * 10 >= factualBlocks * 7;
 };
 
 /**
@@ -284,33 +369,15 @@ export const pruneUnverifiableSections = (content: string, evidences: ToolEviden
   if (!cleaned || evidences.length === 0 || !hasAnyValidReference(cleaned, evidences)) return null;
   const kept: string[] = [];
   const unverified: string[] = [];
-  // 标题暂存，跟随其后第一个内容小节归属：内容被降级时标题一起降级，
-  // 避免出现悬空的孤立标题。
-  let pendingHeadings: string[] = [];
-  for (const rawSection of cleaned.split(/\n{2,}/)) {
-    const section = rawSection.trim();
-    if (!section) continue;
-    if (isStandaloneHeading(section)) {
-      pendingHeadings.push(section);
-      continue;
-    }
-    const units = checkableUnits(section);
-    const citedUnits = units.filter((unit) => hasAnyValidReference(unit, evidences));
-    const uncitedUnits = units.filter((unit) => !hasAnyValidReference(unit, evidences));
-    if (citedUnits.length === 0) {
-      unverified.push(...pendingHeadings, section);
-    } else if (uncitedUnits.length === 0) {
-      kept.push(...pendingHeadings, section);
+  for (const section of markdownSections(cleaned)) {
+    const text = blockText(section);
+    const factualBlocks = section.filter(isFactualBlock);
+    if (factualBlocks.length === 0 || hasAnyValidReference(text, evidences)) {
+      kept.push(text);
     } else {
-      // 混合小节按单元拆分：有引用的内容保留，未引用的列表项/表格行
-      // 移入未证实区块，避免整段好内容陪葬或未核验内容蒙混过关。
-      kept.push(...pendingHeadings, citedUnits.join('\n'));
-      unverified.push(uncitedUnits.join('\n'));
+      unverified.push(text);
     }
-    pendingHeadings = [];
   }
-  // 末尾无内容的孤立标题保留原位。
-  kept.push(...pendingHeadings);
   if (kept.filter((section) => !isStandaloneHeading(section)).length === 0) return null;
   if (unverified.length === 0) return kept.join('\n\n');
   const t = makeT(language, 'chat');

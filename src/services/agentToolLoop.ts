@@ -581,6 +581,7 @@ const runToolLoopEvidenceAgent = async (
     ctx.callModelWithRetry,
     '',
     { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+    detectResearchFocus(input.question),
   );
   ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'agent_ready', rounds: loopTurns });
   return { content, evidences };
