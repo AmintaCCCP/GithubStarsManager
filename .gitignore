@@ -68,3 +68,9 @@ bi-site/
 cloudflare-worker/.deploy-config.json
 cloudflare-worker/.deploy-config.*.json
 cloudflare-worker/.deploy-config.json.*.tmp
+
+# Local Agent execution rules (never commit)
+Agent.md
+AGENTS.md
+CLAUDE.md
+
