@@ -398,6 +398,66 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(mocks.generateWithTools).toHaveBeenCalledTimes(4);
   });
 
+  it('refreshes rejected gaps before answering when later reads fill them', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Install',
+        'Run the installer.',
+        '',
+        '## Configuration',
+        'Set the configuration file.',
+      ].join('\n'),
+    });
+    let gateCalls = 0;
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('Evidence Gate')) {
+        gateCalls += 1;
+        return gateCalls === 1
+          ? JSON.stringify({
+            sufficient: false,
+            confidence: 0.9,
+            reason: 'Configuration is not covered yet.',
+            requirements: [{
+              requirement_id: 'explicit-1',
+              requirement: 'question',
+              status: 'missing',
+              evidence: [],
+            }],
+            next_action: 'retrieve_more',
+            recommended_targets: [{ path: 'README.md', sections: ['Configuration'], scope: 'documentation' }],
+          })
+          : JSON.stringify({
+            sufficient: true,
+            confidence: 0.95,
+            reason: 'Configuration is now covered.',
+            requirements: [{
+              requirement_id: 'explicit-1',
+              requirement: 'question',
+              status: 'verified',
+              evidence: ['/README.md - 6-7'],
+            }],
+            next_action: 'answer',
+          });
+      }
+      return '## Configuration\n\nSet the configuration file. `/README.md - 6-7`';
+    });
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md', sections: ['Install'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['configuration steps'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c3', 'read_documentation', { path: 'README.md', sections: ['Configuration'] })]));
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('How do I configure this project?'),
+      agentBudget: { maxTurns: 3, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+    });
+
+    expect(gateCalls).toBe(2);
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).not.toContain('Unmet answer requirements');
+    expect(result.content).toContain('/README.md - 6-7');
+  });
+
   it('rejects non-documentation reads before documentation evidence exists (README-first, enforced in code)', async () => {
     mocks.generateWithTools
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_recent_releases')]))

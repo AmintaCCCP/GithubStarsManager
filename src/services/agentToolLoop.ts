@@ -743,6 +743,39 @@ const runToolLoopEvidenceAgent = async (
     };
   }
 
+  if (!ready && answerGaps.length > 0) {
+    // A rejected gap list goes stale if later tool calls fill it and the loop
+    // ends on budget without another ready_to_answer call.
+    const coverage = await evaluateEvidenceCoverage(
+      researchInput,
+      question,
+      evidences,
+      documents,
+      documentationCandidates,
+      codeCandidates,
+      documentationSet,
+      codeSet,
+      metaSet,
+      ctx.callModelWithRetry,
+      Math.max(1, loopTurns),
+      focus,
+      true,
+      answerGaps,
+    );
+    if (coverage) {
+      const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
+      if (evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
+        answerGaps = [];
+      } else {
+        const refreshed = Array.from(new Set([
+          ...coverage.missing,
+          ...unfetchedMetaTargets.map((path) => (zh ? `拉取 ${path}` : `fetch ${path}`)),
+        ]));
+        if (refreshed.length > 0) answerGaps = refreshed;
+      }
+    }
+  }
+
   const content = await synthesizeVerifiedAnswer(
     ai,
     input,
