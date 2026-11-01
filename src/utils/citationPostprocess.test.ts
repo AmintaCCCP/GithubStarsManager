@@ -28,6 +28,34 @@ describe('liftStandaloneCitationLines', () => {
     ].join('\n'));
   });
 
+  it('moves a citation after consecutive code blocks onto the introducing sentence', () => {
+    const content = [
+      'Install with one command:',
+      '',
+      '```bash',
+      'npx skills add owner/repo',
+      '```',
+      '',
+      '```bash',
+      'npx skills list',
+      '```',
+      '',
+      '`/README.md - 94-119`',
+    ].join('\n');
+    const result = liftStandaloneCitationLines(content);
+    expect(result).toBe([
+      'Install with one command: `/README.md - 94-119`',
+      '',
+      '```bash',
+      'npx skills add owner/repo',
+      '```',
+      '',
+      '```bash',
+      'npx skills list',
+      '```',
+    ].join('\n'));
+  });
+
   it('moves citations after tables onto the introducing sentence', () => {
     const content = [
       'Runtime requirements:',

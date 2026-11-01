@@ -80,20 +80,18 @@ const standaloneTokens = (line: string): string[] => {
   return /^[\s,，、]*$/.test(line.slice(cursor)) ? matches.map((match) => match.token) : [];
 };
 
-/** 把代码块/表格后的独立引用行移到引出该块的正文末尾。 */
+/** 把代码块/表格后的独立引用行移到引出该块的正文末尾；列表后的引用落到列表末项。 */
 export const liftStandaloneCitationLines = (markdown: string): string => {
   const lines = markdown.split('\n');
   const output: string[] = [];
   let fence: FenceMarker | null = null;
   let currentFenceStart = -1;
-  let lastClosedFenceStart = -1;
-  let lastClosedFenceEnd = -1;
+  const closedFenceStarts = new Map<number, number>();
   for (const line of lines) {
     if (fence) {
       output.push(line);
       if (isClosingFence(line, fence)) {
-        lastClosedFenceStart = currentFenceStart;
-        lastClosedFenceEnd = output.length - 1;
+        closedFenceStarts.set(output.length - 1, currentFenceStart);
         fence = null;
       }
       continue;
@@ -111,19 +109,18 @@ export const liftStandaloneCitationLines = (markdown: string): string => {
       continue;
     }
     let target = output.length - 1;
-    while (target >= 0 && output[target]!.trim() === '') target -= 1;
-    if (target === lastClosedFenceEnd) {
-      target = lastClosedFenceStart - 1;
+    for (;;) {
       while (target >= 0 && output[target]!.trim() === '') target -= 1;
-    } else if (target >= 0 && output[target]!.includes('|')) {
-      while (
-        target >= 0
-        && (output[target]!.includes('|') || output[target]!.trim() === '')
-      ) target -= 1;
-      if (target === lastClosedFenceEnd) {
-        target = lastClosedFenceStart - 1;
-        while (target >= 0 && output[target]!.trim() === '') target -= 1;
+      if (target >= 0 && output[target]!.includes('|')) {
+        while (
+          target >= 0
+          && (output[target]!.includes('|') || output[target]!.trim() === '')
+        ) target -= 1;
+        continue;
       }
+      const fenceStart = closedFenceStarts.get(target);
+      if (fenceStart === undefined) break;
+      target = fenceStart - 1;
     }
     if (target < 0 || /^\s{0,3}#{1,6}\s+/.test(output[target]!)) {
       output.push(line);
