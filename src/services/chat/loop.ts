@@ -129,6 +129,8 @@ export interface RepositoryChatTurnInput {
   enableAgentToolLoop?: boolean;
   /** 流式回答的增量回调，参数为累计文本。 */
   onAnswerChunk?: (fullText: string) => void;
+  /** Newly retrieved evidence, emitted before answer synthesis so citations can render while streaming. */
+  onEvidence?: (evidences: ToolEvidence[]) => void;
   signal?: AbortSignal;
   onToolEvent?: (event: ChatToolEventInput) => void;
 }
@@ -633,6 +635,7 @@ export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promi
   if (newSegments.length === 0) return null;
   const fastPathEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, readmeDocument, newSegments);
   fastPath.evidences.push(...fastPathEvidence);
+  input.onEvidence?.(fastPathEvidence);
   fastPath.emit({
     toolName: 'read_repo_file',
     status: 'success',
@@ -977,6 +980,7 @@ const runOrchestratedEvidenceLoop = async (
         ? buildReleasesEvidence(input.repository, releasesResult.value)
         : [buildNoReleasesEvidence(input.repository, checkedAt)];
       evidences.push(...newEvidence);
+      input.onEvidence?.(newEvidence);
       emit({
         toolName: 'read_releases',
         status: 'success',
@@ -1030,6 +1034,7 @@ const runOrchestratedEvidenceLoop = async (
         ? buildIssuesEvidence(input.repository, issuesResult.value)
         : [buildNoIssuesEvidence(input.repository, keywords, checkedAt)];
       evidences.push(...newEvidence);
+      input.onEvidence?.(newEvidence);
       emit({
         toolName: 'search_issues',
         status: 'success',
@@ -1086,6 +1091,7 @@ const runOrchestratedEvidenceLoop = async (
     });
     const newEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, document, newSegments);
     evidences.push(...newEvidence);
+    input.onEvidence?.(newEvidence);
     if (newEvidence.length > 0) {
       const labels = target.sections.filter(Boolean);
       emit({

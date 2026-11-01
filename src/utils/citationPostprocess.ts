@@ -1,4 +1,4 @@
-const INLINE_CODE_RE = /`([^`\n]+)`/g;
+const INLINE_CODE_RE = /(?<!`)`([^`\n]+)`(?!`)/g;
 const CITATION_RE = /^\/?([^\s`]+)\s*[-—–]\s+(\d+)(?:\s*-\s*(\d+))?$/;
 
 type InlineCode = { start: number; end: number; token: string; key: string };

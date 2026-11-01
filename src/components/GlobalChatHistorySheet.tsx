@@ -6,6 +6,7 @@ import type { Repository } from '../types';
 import type { RepositoryChatSession } from '../types/repositoryChat';
 import { useAppStore } from '../store/useAppStore';
 import { repositoryChatStorage } from '../services/repositoryChatStorage';
+import { accountIdKey } from '../store/helpers/accountWorkspace';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet';
@@ -65,6 +66,12 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   const language = useAppStore((state) => state.language);
   const allRepositories = useAppStore((state) => state.repositories ?? []);
   const user = useAppStore((state) => state.user);
+  const accountId = accountIdKey(user);
+  const accountLogin = user?.login ?? null;
+  const scope = useMemo(() => ({
+    accountId,
+    accountLogin,
+  }), [accountId, accountLogin]);
   const t = useT('chat');
   const [sessions, setSessions] = useState<RepositoryChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -114,8 +121,16 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     setIsLoading(true);
     setLoadError(null);
     setIsLoadingMore(false);
+    setSessions([]);
+    setHasMore(false);
     try {
-      const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1);
+      try {
+        await repositoryChatStorage.purgeDeletedSessions(scope);
+        await repositoryChatStorage.purgeEmptySessions(scope);
+      } catch (cleanupError) {
+        console.warn('[repository-chat] history cleanup failed', cleanupError);
+      }
+      const nextSessions = await repositoryChatStorage.listRecentSessions(scope, PAGE_SIZE + 1);
       if (requestId !== requestIdRef.current) return;
       setHasMore(nextSessions.length > PAGE_SIZE);
       setSessions(nextSessions.slice(0, PAGE_SIZE));
@@ -125,14 +140,14 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, [t]);
+  }, [scope, t]);
 
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore) return;
     const generation = requestIdRef.current;
     setIsLoadingMore(true);
     try {
-      const nextSessions = await repositoryChatStorage.listRecentSessions(PAGE_SIZE + 1, loadedCountRef.current);
+      const nextSessions = await repositoryChatStorage.listRecentSessions(scope, PAGE_SIZE + 1, loadedCountRef.current);
       if (generation !== requestIdRef.current) return;
       setHasMore(nextSessions.length > PAGE_SIZE);
       setSessions((previous) => [...previous, ...nextSessions.slice(0, PAGE_SIZE)]);
@@ -142,7 +157,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
     } finally {
       if (generation === requestIdRef.current) setIsLoadingMore(false);
     }
-  }, [hasMore, isLoadingMore, t]);
+  }, [hasMore, isLoadingMore, scope, t]);
 
   useEffect(() => {
     loadedCountRef.current = sessions.length;
@@ -173,26 +188,19 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
   }, [hasMore, loadMore]);
 
   const handleDelete = useCallback(async (sessionId: string) => {
-    await repositoryChatStorage.permanentlyDeleteSession(sessionId);
+    await repositoryChatStorage.permanentlyDeleteSession(sessionId, scope);
     setSessions((previous) => previous.filter((session) => session.id !== sessionId));
     window.dispatchEvent(new CustomEvent(HISTORY_CHANGE_EVENT));
-  }, []);
-
-  const accountSessions = useMemo(() => {
-    // 新会话带账号标记；旧会话无标记，为兼容继续展示。
-    return user?.login
-      ? sessions.filter((session) => !session.accountLogin || session.accountLogin === user.login)
-      : sessions.filter((session) => !session.accountLogin);
-  }, [sessions, user]);
+  }, [scope]);
 
   const visibleSessions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
-    if (!normalizedQuery) return accountSessions;
-    return accountSessions.filter((session) =>
+    if (!normalizedQuery) return sessions;
+    return sessions.filter((session) =>
       session.title.toLocaleLowerCase().includes(normalizedQuery) ||
       session.repoFullName.toLocaleLowerCase().includes(normalizedQuery),
     );
-  }, [query, accountSessions]);
+  }, [query, sessions]);
 
   const formatTime = useCallback((value: string) => {
     const date = new Date(value);
@@ -235,7 +243,7 @@ export const GlobalChatHistorySheet: React.FC<GlobalChatHistorySheetProps> = ({
           <SheetTitle className="flex items-center gap-2 text-base">
             <History className="h-4 w-4 shrink-0" aria-hidden="true" />
             {t('globalChatHistorySheet.chat-history')}
-            {!isLoading && !loadError && <span className="text-sm font-normal text-muted-foreground">({accountSessions.length})</span>}
+            {!isLoading && !loadError && <span className="text-sm font-normal text-muted-foreground">({sessions.length})</span>}
           </SheetTitle>
           <SheetDescription>
             {t('globalChatHistorySheet.conversations-across-repositories-select-one-to')}

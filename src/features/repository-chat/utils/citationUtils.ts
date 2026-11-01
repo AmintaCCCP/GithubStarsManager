@@ -1,4 +1,10 @@
 import type { ToolEvidence } from '../../../types/repositoryChat';
+import {
+  fenceMarker,
+  isClosingFence,
+  postprocessCitationLayout,
+  type FenceMarker,
+} from '../../../utils/citationPostprocess';
 
 /**
  * 仓库问答引用的统一解析与展示工具。
@@ -15,6 +21,8 @@ export interface ParsedCitation {
 // 形式的补充区间（解析时忽略，Badge 只链接第一段）。
 const CITATION_DASH_PATTERN = /^(.+?)\s*[-—–]\s+(\d+)(?:\s*-\s*(\d+))?(?:\s*[、,]\s*\d+(?:\s*-\s*\d+)?)*$/;
 const CITATION_COLON_PATTERN = /^\/?([^\s`]+?):(\d+)(?:-(\d+))?$/;
+const CITATION_CODE_SPAN_RE = /(?<!`)`([^`\n]+)`(?!`)/g;
+const LIST_MARKER_RE = /^([ \t]*)(?:[-*+]|\d+[.)])([ \t]+)/;
 /** 常见源码/文档扩展名，用于把 file:line 与 host:port 区分开。 */
 const SOURCE_FILE_EXT = /\.(?:md|mdx|markdown|txt|ts|tsx|js|jsx|mjs|cjs|json|ya?ml|toml|sh|bash|zsh|py|go|rs|java|kt|rb|php|cs|html?|css|scss|less|sql|vue|svelte|c|cpp|cc|h|hpp|swift|dart|lua|scala|ex|exs|erl|clj|groovy|ini|cfg|conf|env|properties|gradle|lock)$/i;
 /** 无扩展名的仓库特殊文件。 */
@@ -62,6 +70,28 @@ export const parseCitationToken = (raw: string): ParsedCitation | null => {
 };
 
 const normalizeEvidencePath = (path: string): string => path.replace(/^\/+/, '');
+const indentationWidth = (text: string): number => [...text].reduce((width, char) => (
+  char === '\t' ? width + 4 : width + 1
+), 0);
+/** CommonMark 中列表项的四空格续行仍是正文；只有超过列表内容缩进四格才是代码块。 */
+const createIndentedCodeDetector = () => {
+  let listContentIndent: number | null = null;
+  return (line: string): boolean => {
+    if (!line.trim()) return false;
+    const listMarker = LIST_MARKER_RE.exec(line);
+    if (listMarker) {
+      listContentIndent = indentationWidth(listMarker[0]);
+      return false;
+    }
+    const indent = indentationWidth(/^[ \t]*/.exec(line)?.[0] ?? '');
+    if (listContentIndent !== null) {
+      if (indent >= listContentIndent + 4) return true;
+      if (indent >= listContentIndent) return false;
+      listContentIndent = null;
+    }
+    return indent >= 4;
+  };
+};
 
 /** resolveCitation 的结果：命中的证据 + 引用令牌自身的行范围（Badge 展示与跳转用它）。 */
 export interface ResolvedCitation {
@@ -70,6 +100,15 @@ export interface ResolvedCitation {
   lineStart: number;
   lineEnd: number;
 }
+
+export interface CitationSource extends ResolvedCitation {
+  key: string;
+  number: number;
+}
+
+export const citationSourceKey = (target: Pick<ResolvedCitation, 'path' | 'lineStart' | 'lineEnd'>): string => (
+  `${normalizeEvidencePath(target.path)}:${target.lineStart}-${target.lineEnd}`
+);
 
 /** 把行内引用匹配到本轮证据：路径精确 + 行区间重叠优先（取最精确区间），其次路径相同，再次路径后缀匹配。 */
 export const resolveCitation = (raw: string, evidences: ToolEvidence[]): ResolvedCitation | null => {
@@ -101,6 +140,37 @@ export const resolveCitation = (raw: string, evidences: ToolEvidence[]): Resolve
   if (!evidence) return null;
   // Badge 展示与跳转使用引用令牌自身的行范围，而不是证据窗口的范围。
   return { evidence, path: evidence.path, lineStart: parsed.lineStart, lineEnd: parsed.lineEnd };
+};
+
+/** Build the per-message citation numbering once; repeated source ranges reuse the number. */
+export const collectCitationSources = (content: string, evidences: ToolEvidence[]): CitationSource[] => {
+  if (!content || evidences.length === 0) return [];
+  const sources: CitationSource[] = [];
+  const numberByKey = new Map<string, number>();
+  let fence: FenceMarker | null = null;
+  const indentedCodeLine = createIndentedCodeDetector();
+  for (const line of content.split('\n')) {
+    if (fence) {
+      if (isClosingFence(line, fence)) fence = null;
+      continue;
+    }
+    const opened = fenceMarker(line);
+    if (opened) {
+      fence = opened;
+      continue;
+    }
+    if (indentedCodeLine(line)) continue;
+    for (const match of line.matchAll(CITATION_CODE_SPAN_RE)) {
+      const resolved = resolveCitation(match[1] ?? '', evidences);
+      if (!resolved) continue;
+      const key = citationSourceKey(resolved);
+      if (numberByKey.has(key)) continue;
+      const number = sources.length + 1;
+      numberByKey.set(key, number);
+      sources.push({ ...resolved, key, number });
+    }
+  }
+  return sources;
 };
 
 /** 引用 Badge 的展示文案：path:L12-L34（单行时省略区间）。 */
@@ -135,17 +205,55 @@ export const citationAnchorUrl = (evidence: ToolEvidence, lineStart?: number, li
 export const stripCitationsForCopy = (content: string): string => {
   const lines = content.split('\n');
   let inFence = false;
+  const indentedCodeLine = createIndentedCodeDetector();
   const cleaned = lines.map((line) => {
     if (/^\s{0,3}(?:```|~~~)/.test(line)) {
       inFence = !inFence;
       return line;
     }
     if (inFence) return line;
-    return line.replace(/([ \t]?)`([^`\n]+)`([ \t]?)/g, (whole, before: string, token: string, after: string) => {
+    if (indentedCodeLine(line)) return line;
+    return line.replace(/([ \t]?)(?<!`)`([^`\n]+)`(?!`)([ \t]?)/g, (whole, before: string, token: string, after: string) => {
       if (!parseCitationToken(token)) return whole;
       if (before && after) return ' ';
       return before || after || '';
     }).replace(/[ \t]+$/, '');
   });
   return cleaned.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+};
+
+/** Copy format used by ChatGPT-style source lists: inline `[n]` plus a numbered source footer. */
+export const formatAnswerForCopy = (
+  content: string,
+  evidences: ToolEvidence[],
+  sourcesHeading: string,
+): string => {
+  const processed = postprocessCitationLayout(content);
+  const sources = collectCitationSources(processed, evidences);
+  if (sources.length === 0) return processed.trim();
+  const numberByKey = new Map(sources.map((source) => [source.key, source.number]));
+  let fence: FenceMarker | null = null;
+  const indentedCodeLine = createIndentedCodeDetector();
+  const body = processed.split('\n').map((line) => {
+    if (fence) {
+      if (isClosingFence(line, fence)) fence = null;
+      return line;
+    }
+    const opened = fenceMarker(line);
+    if (opened) {
+      fence = opened;
+      return line;
+    }
+    if (indentedCodeLine(line)) return line;
+    return line.replace(CITATION_CODE_SPAN_RE, (whole, token: string) => {
+      const resolved = resolveCitation(token, evidences);
+      if (!resolved) return whole;
+      const number = numberByKey.get(citationSourceKey(resolved));
+      return number ? `[${number}]` : whole;
+    });
+  }).join('\n').replace(/[ \t]+$/gm, '').trim();
+  const footer = sources.map((source) => (
+    `${source.number}. ${source.path}:L${source.lineStart}${source.lineEnd > source.lineStart ? `-L${source.lineEnd}` : ''} - ${citationAnchorUrl(source.evidence, source.lineStart, source.lineEnd)}`
+  )).join('\n');
+  return `${body}\n\n${sourcesHeading}\n${footer}`;
 };

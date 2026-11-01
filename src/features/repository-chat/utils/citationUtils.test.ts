@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ToolEvidence } from '../../../types/repositoryChat';
 import {
   citationAnchorUrl,
+  collectCitationSources,
+  formatAnswerForCopy,
   parseCitationToken,
   resolveCitation,
   stripCitationsForCopy,
@@ -144,5 +146,64 @@ describe('citationAnchorUrl', () => {
     });
     expect(citationAnchorUrl(releaseEvidence)).toBe('https://github.com/owner/repo/releases/tag/v1.0.0');
     expect(citationAnchorUrl(releaseEvidence, 1, 3)).toBe('https://github.com/owner/repo/releases/tag/v1.0.0');
+  });
+});
+
+describe('numbered citation sources', () => {
+  it('reuses a number when the same path and range come from different evidence rows', () => {
+    const sources = collectCitationSources(
+      'Install with `pnpm add` `/README.md - 3-5`; see `/README.md - 3-5`.',
+      [evidence({ id: 'first' }), evidence({ id: 'second' })],
+    );
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatchObject({ path: 'README.md', lineStart: 3, lineEnd: 5, number: 1 });
+  });
+
+  it('copies the postprocessed citations with matching inline numbers and source footer', () => {
+    const copied = formatAnswerForCopy(
+      'First `/README.md - 3-5` then again `/README.md - 3-5`.\n\nConfig: `/src/config.ts - 10-12`.',
+      [evidence({}), evidence({ id: 'config', path: 'src/config.ts', lineStart: 10, lineEnd: 12 })],
+      'Sources',
+    );
+
+    expect(copied).toContain('First then again [1].');
+    expect(copied).toContain('Config: [2].');
+    expect(copied).toContain('1. README.md:L3-L5');
+    expect(copied).toContain('2. src/config.ts:L10-L12');
+    expect(copied).not.toContain('[3]');
+  });
+
+  it('ignores citation examples in four-space indented code blocks', () => {
+    const content = [
+      'Real `/README.md - 3-5`.',
+      '',
+      '    Example: `/README.md - 3-5`',
+    ].join('\n');
+
+    expect(collectCitationSources(content, [evidence({})])).toHaveLength(1);
+    expect(formatAnswerForCopy(content, [evidence({})], 'Sources')).toContain(
+      '    Example: `/README.md - 3-5`',
+    );
+  });
+
+  it('still scans four-space list continuations as paragraph text', () => {
+    const content = [
+      '- Installation',
+      '    Continue with `/README.md - 3-5`.',
+    ].join('\n');
+
+    expect(collectCitationSources(content, [evidence({})])).toHaveLength(1);
+    expect(formatAnswerForCopy(content, [evidence({})], 'Sources')).toContain(
+      '    Continue with [1].',
+    );
+  });
+
+  it('does not rewrite citations inside double-backtick code spans', () => {
+    const content = 'Example: ``/README.md - 3-5``';
+
+    expect(collectCitationSources(content, [evidence({})])).toHaveLength(0);
+    expect(stripCitationsForCopy(content)).toBe(content);
+    expect(formatAnswerForCopy(content, [evidence({})], 'Sources')).toBe(content);
   });
 });
