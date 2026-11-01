@@ -122,6 +122,8 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
             ${{ env.REGISTRY }}/${{ env.LEGACY_IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
             # tag push → "v1.2.3", "1.2.3", "1.2", "1"
             type=ref,event=tag

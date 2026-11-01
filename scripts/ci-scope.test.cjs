@@ -20,7 +20,7 @@ function git(cwd, args) {
 function createRepo(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-scope-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  git(root, ['init', '-q']);
+  git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'ci-scope@example.com']);
   git(root, ['config', 'user.name', 'CI Scope Test']);
   return root;
@@ -76,6 +76,23 @@ test('writes run=false for a docs-only pull request', (t) => {
   const head = commit(root, 'docs');
 
   assert.match(runScope(base, head, root), /^run=false$/m);
+});
+
+test('ignores code added to the base branch after a docs-only PR diverges', (t) => {
+  const root = createRepo(t);
+  fs.mkdirSync(path.join(root, 'src'));
+  fs.writeFileSync(path.join(root, 'src/App.tsx'), 'export const value = 1;\n');
+  commit(root, 'base');
+
+  git(root, ['checkout', '-qb', 'feature']);
+  fs.writeFileSync(path.join(root, 'README.md'), '# Updated docs\n');
+  const docsHead = commit(root, 'docs');
+
+  git(root, ['checkout', '-q', 'main']);
+  fs.writeFileSync(path.join(root, 'src/main-only.ts'), 'export const mainOnly = true;\n');
+  const mainHead = commit(root, 'main moves on');
+
+  assert.match(runScope(mainHead, docsHead, root), /^run=false$/m);
 });
 
 test('writes run=true for code and code-to-docs rename changes', (t) => {
