@@ -8,11 +8,11 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-# Tag builds must never be cancelled (each tag produces a release); branch and
-# PR runs supersede their own earlier runs instead of queueing behind them.
+# Only a newer pull request attempt may cancel an older one. Main commits and
+# release tags always finish so every shipped revision has a complete run.
 concurrency:
-  group: build-desktop-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  group: build-desktop-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Pull requests and ordinary builds receive only repository read access. The
 # release job elevates this explicitly when it creates a tagged GitHub release.
@@ -20,27 +20,72 @@ permissions:
   contents: read
 
 jobs:
-  verify-release-version:
-    name: Verify release tag matches client version
-    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
-    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+  web:
+    name: Build web bundle
     runs-on: ubuntu-24.04
-    # A checkout plus a single node script; generous headroom over any
-    # realistic slowdown, and the job fails long before GitHub's 6-hour
-    # default if the runner hangs.
-    timeout-minutes: 10
+    timeout-minutes: 15
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect docs-only pull request
+        id: scope
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci-scope.cjs
 
       - name: Verify tagged release version
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' && steps.scope.outputs.run == 'true'
         run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
 
+      - name: Setup Node.js
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: steps.scope.outputs.run == 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: Build web app
+        if: steps.scope.outputs.run == 'true'
+        run: npm run build
+
+      - name: Assert relative asset paths
+        if: steps.scope.outputs.run == 'true'
+        shell: bash
+        run: |
+          test -f dist/index.html
+          if grep -qE '(href|src)="/' dist/index.html; then
+            echo "dist/index.html contains absolute asset paths:"
+            grep -nE '(href|src)="/' dist/index.html | head -10
+            exit 1
+          fi
+
+      - name: Upload web bundle
+        if: steps.scope.outputs.run == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+
   build:
-    needs: verify-release-version
+    needs: web
+    if: needs.web.outputs.run == 'true'
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     # Desktop packaging legs have historically landed well under 30 minutes,
@@ -66,6 +111,18 @@ jobs:
       with:
         persist-credentials: false
 
+    - name: Cache Electron and electron-builder binaries
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        # Bump this key when Electron or electron-builder changes. Keeping the
+        # exact version in the key is what makes a newly downloaded toolchain
+        # persist instead of being masked by a permanent cache hit.
+        path: |
+          ${{ runner.os == 'Linux' && '~/.cache/electron' || runner.os == 'macOS' && '~/Library/Caches/electron' || '~/AppData/Local/electron/Cache' }}
+          ${{ runner.os == 'Linux' && '~/.cache/electron-builder' || runner.os == 'macOS' && '~/Library/Caches/electron-builder' || '~/AppData/Local/electron-builder/Cache' }}
+        key: electron-bin-${{ runner.os }}-electron45-eb26
+        restore-keys: electron-bin-${{ runner.os }}-
+
     - name: Setup Node.js
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
@@ -73,44 +130,17 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      run: npm ci --no-audit --no-fund
 
-    - name: Build web app
-      run: npm run build
-      # env:
-      #   VITE_BASE_PATH: './'
+    - name: Download web bundle
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: web-dist
+        path: dist
 
-    - name: Verify and fix web build
+    - name: Verify downloaded web bundle
       shell: bash
-      run: |
-        echo "Checking if dist directory exists and contains files:"
-        if [ -d "dist" ] && [ -f "dist/index.html" ]; then
-          echo "✓ dist directory and index.html found"
-          echo "Contents of dist directory:"
-          ls -la dist/ | head -10
-
-          # 检查 index.html 中的路径并修复
-          echo "Checking and fixing asset paths in index.html..."
-          if [ -f "dist/index.html" ]; then
-            # 确保所有资源路径都是相对路径
-            sed -i.bak 's|href="/|href="./|g' dist/index.html
-            sed -i.bak 's|src="/|src="./|g' dist/index.html
-            sed -i.bak 's|href="\([^"]*\)"|href="./\1"|g' dist/index.html
-            sed -i.bak 's|src="\([^"]*\)"|src="./\1"|g' dist/index.html
-            # 移除备份文件
-            rm -f dist/index.html.bak
-            echo "✓ Asset paths fixed in index.html"
-          fi
-        else
-          echo "Creating fallback dist directory and index.html"
-          mkdir -p dist
-          cp templates/fallback-index.html dist/index.html
-          echo "✓ Fallback index.html created from template"
-        fi
-
-        # 显示最终的 index.html 内容（前几行）
-        echo "Final index.html content (first 10 lines):"
-        head -10 dist/index.html || echo "Could not read index.html"
+      run: test -f dist/index.html
 
     - name: Prepare build resources
       shell: bash
@@ -166,38 +196,6 @@ jobs:
         echo "Electron sources OK (MCP wired):"
         ls -la electron/
 
-    - name: Debug before build
-      shell: bash
-      run: |
-        echo "=== Pre-Build Debug Information ==="
-        echo "Current directory contents:"
-        ls -la
-        echo ""
-        echo "Dist directory contents:"
-        ls -la dist/ || echo "No dist directory"
-        echo ""
-        echo "Electron directory contents:"
-        ls -la electron/ || echo "No electron directory"
-        echo ""
-        echo "Build directory contents:"
-        ls -la build/ || echo "No build directory"
-        echo ""
-        echo "Electron-builder config (electron-builder.yml):"
-        cat electron-builder.yml
-        echo ""
-        echo "Checking dist/index.html content:"
-        if [ -f "dist/index.html" ]; then
-          echo "First 20 lines of dist/index.html:"
-          head -20 dist/index.html
-        else
-          echo "dist/index.html not found"
-        fi
-        echo ""
-        echo "Setting proper permissions:"
-        chmod -R 755 dist/ || echo "Could not set dist permissions"
-        chmod -R 755 electron/ || echo "Could not set electron permissions"
-        chmod -R 755 build/ || echo "Could not set build permissions"
-
     - name: Configure macOS signing
       if: matrix.os == 'macos-latest'
       shell: bash
@@ -248,22 +246,26 @@ jobs:
         GH_TOKEN: ${{ github.ref_type == 'tag' && secrets.GITHUB_TOKEN || '' }}
         CI: true
 
-    - name: List build output
+    - name: Verify packaged artifact
       shell: bash
       run: |
-        echo "Build output directory contents:"
-        ls -la release/ || echo "Release directory not found"
-        echo ""
-        echo "Looking for build artifacts:"
-        find . -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" || echo "No build artifacts found"
-        echo ""
-        if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
-          echo "Linux specific checks:"
-          echo "AppImage files:"
-          find . -name "*.AppImage" -exec ls -la {} \; || echo "No AppImage files found"
-          echo "Checking AppImage permissions:"
-          find . -name "*.AppImage" -exec file {} \; || echo "No AppImage files to check"
+        case "${{ matrix.os }}" in
+          windows-*)
+            artifacts="$(find release -maxdepth 1 -type f \( -name '*.exe' -o -name '*.msi' \) -print -quit)"
+            ;;
+          macos-*)
+            artifacts="$(find release -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+            ;;
+          ubuntu-*)
+            artifacts="$(find release -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+            ;;
+        esac
+        if [ -z "$artifacts" ]; then
+          echo "No packaged artifact found for ${{ matrix.os }}"
+          ls -la release/ 2>/dev/null || true
+          exit 1
         fi
+        echo "Found packaged artifact: $artifacts"
 
     - name: Test Electron app (Linux only)
       if: startsWith(matrix.os, 'ubuntu')
@@ -281,7 +283,7 @@ jobs:
         timeout 10s xvfb-run -a npm run electron || echo "App test completed (timeout expected)"
 
     - name: Upload artifacts (Windows)
-      if: matrix.os == 'windows-latest' && success()
+      if: matrix.os == 'windows-latest' && github.ref_type == 'tag' && success()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: windows-app
@@ -289,25 +291,28 @@ jobs:
           release/*.exe
           release/*.msi
         if-no-files-found: ignore
+        retention-days: 1
 
     - name: Upload artifacts (macOS)
-      if: matrix.os == 'macos-latest' && success()
+      if: matrix.os == 'macos-latest' && github.ref_type == 'tag' && success()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: macos-app
         path: release/*.dmg
         if-no-files-found: ignore
+        retention-days: 1
 
     - name: Upload artifacts (Linux)
-      if: startsWith(matrix.os, 'ubuntu') && success()
+      if: startsWith(matrix.os, 'ubuntu') && github.ref_type == 'tag' && success()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: linux-app
         path: release/*.AppImage
         if-no-files-found: ignore
+        retention-days: 1
 
   release:
-    needs: [verify-release-version, build]
+    needs: [web, build]
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
@@ -330,13 +335,15 @@ jobs:
     # sets neither `body` nor `generate_release_notes` so it never overwrites
     # the hand-written notes (softprops' default update path replaces an
     # existing release's body whenever a workflow `body` is present).
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.verify-release-version.result == 'success'
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.web.result == 'success'
     permissions:
       contents: write
 
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        pattern: '*-app'
 
     - name: List downloaded files
       shell: bash
