@@ -898,6 +898,110 @@ describe('selectFastPathSegments', () => {
     expect(segments.map((segment) => segment.label)).toEqual(['Setup']);
   });
 
+  it('excludes a section whose body line shows only whitespace inside the visible excerpt', () => {
+    const document = documentFrom([
+      '## Installation',
+      `${' '.repeat(23_984)}Install steps here.`,
+    ].join('\n'));
+
+    // 第 12 轮审计：正文行的行首空白跨过 24,000 字符截断点（该行在摘录内的可见
+    // 前缀恰为 23,984 个空格，正文整体位于截断点之后）时，可见摘录只有标题与
+    // 空白——正文判定只基于截断后的可见摘录，该章节不得入选；无其他匹配章节时
+    // 返回空数组，让调用方回落完整检索循环。
+    expect(selectFastPathSegments(document, 'usage', 'How do I install this project?')).toEqual([]);
+  });
+
+  it('keeps the next matched section when a body line is whitespace-only inside the visible excerpt', () => {
+    const document = documentFrom([
+      '## Installation',
+      `${' '.repeat(23_984)}Install steps here.`,
+      '## Setup',
+      'Prepare the environment.',
+    ].join('\n'));
+
+    // 同一边界的名额流转：摘录内仅空白的 Installation 被排除后，名额让给摘录
+    // 含正文的下一匹配章节（Setup），Installation 不得以不可见摘录混入证据。
+    const segments = selectFastPathSegments(document, 'usage', 'How do I install this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Setup']);
+    expect(segments.some((segment) => segment.label === 'Installation')).toBe(false);
+  });
+
+  it('admits a nested leftover section whose heading lies beyond the previous candidate excerpt', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(25_000),
+      '#### Deep',
+      'Deep steps.',
+    ].join('\n'));
+
+    // 第 12 轮审计（剩余枚举）：上一候选 Big（6–9 行）正文超 24,000 字符后
+    // excerpt 截断（可见摘录只覆盖到第 7 行），嵌套标题 Deep（第 8 行）位于
+    // 摘录之外——不得按“上一候选覆盖”直接跳过：上一候选截断到 Deep 之前，
+    // Deep 作为独立候选参与名额分配，并凭问题词得分（deep）胜出；其正文
+    // （Deep steps.）不丢失，也不与任何段落重复输出。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this deep project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Deep']);
+    expect(segments[2]).toMatchObject({ lineStart: 8, lineEnd: 9 });
+    expect(segments[2]?.excerpt).toContain('Deep steps.');
+    expect(segments.filter((segment) => segment.excerpt.includes('Deep steps.'))).toHaveLength(1);
+    for (let i = 0; i < segments.length; i += 1) {
+      for (let j = i + 1; j < segments.length; j += 1) {
+        expect(segments[j]!.lineStart).toBeGreaterThan(segments[i]!.lineEnd);
+      }
+    }
+  });
+
+  it('truncates the previous leftover candidate to before a nested heading beyond its excerpt', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(25_000),
+      '#### Deep',
+      'Deep steps.',
+    ].join('\n'));
+
+    // 同一布局、问题不含 deep：Big 与 Deep 得分并列 0 分、按行号 Big（第 6 行）
+    // 先得名额——但 Big 必须已截断到嵌套标题 Deep 之前（6–7 行），不再保留
+    // 摘录之外的第 8–9 行区间，摘录重建后不含 Deep 的任何内容。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Big']);
+    expect(segments[2]).toMatchObject({ lineStart: 6, lineEnd: 7 });
+    expect(segments[2]?.excerpt).not.toContain('Deep');
+    expect(segments[2]?.excerpt).toContain('x');
+  });
+
+  it('admits a nested leftover section whose heading is the last line covered by the previous excerpt', () => {
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '### Big',
+      'x'.repeat(23_985),
+      '#### Deep',
+      'Deep steps.',
+    ].join('\n'));
+
+    // 边界（与被包含方向处置的 VWe7 语义一致）：Big 的摘录恰好覆盖到 Deep 的
+    // 标题行（第 8 行起始偏移 23,994 < 24,000，第 9 行起始偏移 24,004 ≥ 24,000），
+    // Deep 的正文仍在截断点之后——不视作已覆盖：Big 截断到 6–7 行，Deep
+    // （8–9 行）作为独立候选入选，正文不丢失。
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this deep project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Deep']);
+    expect(segments[2]).toMatchObject({ lineStart: 8, lineEnd: 9 });
+    expect(segments[2]?.excerpt).toContain('Deep steps.');
+  });
+
   it('drops the general intro whose truncated excerpt holds only whitespace', () => {
     const blankRun = Array.from({ length: 78 }, () => ' '.repeat(320));
     const document = documentFrom([
@@ -940,6 +1044,31 @@ describe('selectFastPathSegments', () => {
     expect(segments[1]).toMatchObject({ lineStart: 4, lineEnd: 6 });
     expect(segments[2]).toMatchObject({ lineStart: 7, lineEnd: 9 });
     expect(segments[2]?.excerpt).toContain('Subsection 0 steps.');
+  });
+
+  it('keeps heading boundary computation linear under a workload guard on a huge document', () => {
+    // 工作量守卫（第 12 轮 nitpick）：不测量墙钟时间、不设数值耗时阈值，判别
+    // 原理是确定性超时——切章边界若回退为逐标题从 document.headings 头部
+    // `.find` 查找（O(H²)，平均 H/2 次回调），H = 200,000 时约需 2×10¹⁰ 次回调；
+    // 实测 V8 对该扫描约 1ns/次回调，即 O(H²) 至少 ~10s 量级，即便按快 2–3 倍的
+    // CI 机器估算也 ≥ 6s，必然超出 vitest 默认 5s 单用例超时而失败；线性实现
+    // （一次反向单调栈预计算 + 单次 O(H) 枚举扫描）只有 ~10⁶ 量级次操作，实测
+    // 亚秒级，即便慢 4 倍的 CI 也远低于超时。两侧均有 ≥ 3 倍安全边际：复杂度
+    // 回退时该用例确定性失败，正确实现下稳定通过，不依赖机器速度。
+    const subsections = Array.from({ length: 200_000 }, (_, index) => [`### Subsection ${index}`, `Subsection ${index} steps.`, '']);
+    const document = documentFrom([
+      '## Deployment',
+      'Deploy with Docker.',
+      'x'.repeat(25_000),
+      '### Docker',
+      'Docker compose steps.',
+      '',
+      ...subsections.flat(),
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I deploy this project?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Deployment', 'Docker', 'Subsection 0']);
+    expect(segments[2]).toMatchObject({ lineStart: 7, lineEnd: 9 });
   });
 
   it('gives the last leftover slot to the higher-scoring remaining section', () => {

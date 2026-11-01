@@ -124,10 +124,25 @@ export const selectFastPathSegments = (
   //   路径也不会选中它们，而快速路径接受部分引用的回答、不回落完整流程——
   //   它们作为独立候选段补入名额（优先级：意图保留 > 前导段 > 填充 > 剩余
   //   小节），受 3 段上限与正文校验约束，行区间与全部已选段两两不重叠。
-  const headingLinePattern = /^\s{0,3}#{1,6}\s/;
-  // 有效性下限（与导语段一致）：区间内除标题行外至少一行非空正文。
+  //   剩余枚举内部亦然（第 12 轮审计）：上一剩余候选覆盖嵌套标题且该标题位于
+  //   其可见摘录之外时，上一候选截断到该标题之前、该标题作为独立候选参选，
+  //   内容不因“既不在摘录、也不成独立候选”而丢失。
+  // 标题行及其截断残段都不计入正文：完整标题行（'#' 后接空白或行尾）与摘录
+  // 截断在标题行的 '#' 序列与标题文字之间时的可见前缀（只剩空白与 '#'，如残段
+  // '#'、'##'——不满足“'#' 后接空白”的完整标题形态）都按标题处理；若残段按
+  // 普通文本处理会被误判为正文，使可见摘录只有标题与空白的章节通过校验。
+  const headingOrTruncatedFragmentPattern = /^\s{0,3}#{1,6}(?:\s|$)/;
+  const isHeadingOrFragmentLine = (line: string): boolean =>
+    line.trim() === '' || headingOrTruncatedFragmentPattern.test(line);
+  // 有效性下限（与导语段一致）：区间内除标题行外至少一行非空正文。第 12 轮审计：
+  // 正文判定只基于截断后的可见摘录——先把区间行拼接并限制在
+  // MAX_EVIDENCE_EXCERPT_CHARS 内再按行检查（与 leadHasContentBeyondHeading 同一
+  // 构造方式）。行首空白跨过截断点（该行在摘录内的可见前缀只有空白）、正文整体
+  // 位于截断点之后、或摘录末尾只剩标题截断残段的行不计入正文，防止可见摘录
+  // 只有标题与空白的章节入选并直接作答。
   const rangeHasBodyContent = (lineStart: number, lineEnd: number): boolean =>
-    lines.slice(lineStart - 1, lineEnd).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
+    lines.slice(lineStart - 1, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS).split('\n')
+      .some((line) => !isHeadingOrFragmentLine(line));
   type RankedItem = (typeof ranked)[number];
   // 行区间 [lineStart, lineEnd] 的拼接文本按 MAX_EVIDENCE_EXCERPT_CHARS 截断后
   // 仍覆盖到的最后一行（审计 U7mZ）：第 L 行在拼接文本中的起始偏移等于其前各
@@ -249,7 +264,7 @@ export const selectFastPathSegments = (
     // 该前导段不得占名额；摘录构造与下方 excerpt 字段的实际输出完全一致。
     const leadHasContentBeyondHeading = (lineEnd: number): boolean => {
       const excerptLines = lines.slice(0, lineEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS).split('\n');
-      return excerptLines.slice(firstLineIsHeading ? 1 : 0).some((line) => line.trim() !== '' && !headingLinePattern.test(line));
+      return excerptLines.slice(firstLineIsHeading ? 1 : 0).some((line) => !isHeadingOrFragmentLine(line));
     };
     if (openingHeading && opensWithLowerLevelHeading) {
       const openingSection = sectionSegments(document, [openingHeading.title])
@@ -402,7 +417,13 @@ export const selectFastPathSegments = (
   // document.headings 头部 `.find` 的 O(H²/2) 结果完全等价）；preceding 覆盖
   // 检查只比较最后一个候选——候选按行号递增加入且两两不重叠（新候选要求
   // 之前无候选覆盖其起始行），更早候选的区间终点必然早于当前标题行，只有
-  // 最后一个候选可能覆盖当前标题。
+  // 最后一个候选可能覆盖当前标题。第 12 轮审计（剩余枚举）：上一候选覆盖
+  // 当前标题时，只有该标题位于上一候选的可见摘录之内（起点严格早于摘录覆盖
+  // 末行，与被包含方向处置的 VWe7 边界一致）才沿用覆盖跳过；标题在摘录之外
+  // 时上一候选按输出层同一截断语义截断到该标题之前（重建 excerpt 不丢失任何
+  // 已可见正文），该标题作为独立候选参与名额分配——其内容不再“既不在任何
+  // 摘录中、也不成独立候选”而丢失。截断只缩小上一候选区间，候选仍按行号
+  // 递增且两两不重叠，与被包含/包含方向处置及 3 段上限协调、不重复输出。
   const nextSameOrHigherLevelLineStart: number[] = new Array(document.headings.length);
   const boundaryStack: Array<{ level: number; lineStart: number }> = [];
   for (let index = document.headings.length - 1; index >= 0; index -= 1) {
@@ -413,7 +434,7 @@ export const selectFastPathSegments = (
       : lines.length + 1;
     boundaryStack.push({ level: heading.level, lineStart: heading.lineStart });
   }
-  const leftoverCandidates: Array<{ score: number; segment: OutputSegment }> = [];
+  const leftoverCandidates: Array<{ score: number; visibleEnd: number; segment: OutputSegment }> = [];
   for (const run of leftoverRuns) {
     for (let headingIndex = 0; headingIndex < document.headings.length; headingIndex += 1) {
       const heading = document.headings[headingIndex];
@@ -421,11 +442,29 @@ export const selectFastPathSegments = (
       const sectionEnd = Math.max(heading.lineStart, nextSameOrHigherLevelLineStart[headingIndex] - 1);
       const lineEnd = Math.min(sectionEnd, run.lineEnd);
       if (lineEnd < heading.lineStart) continue;
+      const visibleEnd = excerptCoveredLineEnd(heading.lineStart, lineEnd);
       const lastLeftover = leftoverCandidates[leftoverCandidates.length - 1];
-      if (lastLeftover && lastLeftover.segment.lineEnd >= heading.lineStart) continue;
-      if (!rangeHasBodyContent(heading.lineStart, Math.min(lineEnd, excerptCoveredLineEnd(heading.lineStart, lineEnd)))) continue;
+      if (lastLeftover && lastLeftover.segment.lineEnd >= heading.lineStart) {
+        // 上一候选覆盖该标题：仅当标题位于其可见摘录之内（起点严格早于摘录
+        // 覆盖末行）才跳过；起点恰为末行时其正文仍在截断点之后，照常独立参选。
+        if (heading.lineStart < lastLeftover.visibleEnd) continue;
+        // 标题在可见摘录之外：上一候选截断到该标题之前（输出层同一截断语义，
+        // 重建 excerpt 与原摘录一致，不丢失已可见正文），该标题作为独立候选
+        // 参与名额分配。visibleEnd 同步收敛到截断后的区间（重建摘录未再触达
+        // 截断点时以更小者为准）。
+        const truncatedEnd = heading.lineStart - 1;
+        lastLeftover.segment = {
+          lineStart: lastLeftover.segment.lineStart,
+          lineEnd: truncatedEnd,
+          excerpt: lines.slice(lastLeftover.segment.lineStart - 1, truncatedEnd).join('\n').slice(0, MAX_EVIDENCE_EXCERPT_CHARS),
+          label: lastLeftover.segment.label,
+        };
+        lastLeftover.visibleEnd = Math.min(lastLeftover.visibleEnd, truncatedEnd);
+      }
+      if (!rangeHasBodyContent(heading.lineStart, visibleEnd)) continue;
       leftoverCandidates.push({
         score: rankByTitle(heading.title),
+        visibleEnd,
         segment: {
           lineStart: heading.lineStart,
           lineEnd,
