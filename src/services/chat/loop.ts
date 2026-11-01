@@ -1149,6 +1149,7 @@ const runOrchestratedEvidenceLoop = async (
   // §5.5 turnMetrics 的结束原因；在循环的每个收尾点赋值，循环自然耗尽时兜底。
   let endReason = '';
   let canAnswer = false;
+  let lastGateUnavailable = false;
   let codeEligible = false;
   let pendingTargets: RetrievalTarget[] = [];
 
@@ -1580,7 +1581,9 @@ const runOrchestratedEvidenceLoop = async (
       nextAction: (codeEligible) ? 'read_code' : 'retrieve_more',
       recommendedTargets: [],
     };
-    const gate = gateRaw ? parseEvidenceGate(gateRaw, documentationSet, codeSet, metaSet, fallbackScope, understanding.answerRequirements, (reference) => validReferences().has(reference) || Boolean(referenceCoveredByEvidence(reference, evidences))) ?? fallbackGate : fallbackGate;
+    const parsedGate = gateRaw ? parseEvidenceGate(gateRaw, documentationSet, codeSet, metaSet, fallbackScope, understanding.answerRequirements, (reference) => validReferences().has(reference) || Boolean(referenceCoveredByEvidence(reference, evidences))) : null;
+    lastGateUnavailable = !parsedGate;
+    const gate = parsedGate ?? fallbackGate;
     const discoveredViableTarget = gate.recommendedTargets.some((target) => {
       const key = targetKey(target);
       if (knownTargetKeys.has(key) || !isViableUnseenTarget(target)) return false;
@@ -1708,7 +1711,12 @@ const runOrchestratedEvidenceLoop = async (
   }
 
   // 循环自然耗尽（轮次或时间预算）而非显式收尾时，补充对应的结束原因。
-  if (!endReason) endReason = hasTime() ? 'turn_budget' : 'time_budget';
+  // 门控多次返回不可解析 JSON 时，本轮已成功读取的来源仍可生成带缺口标注的
+  // source-scoped 回答，不能因为没拿到 sufficient 就吞掉整轮证据。
+  if (!endReason) {
+    endReason = hasTime() ? 'turn_budget' : 'time_budget';
+    canAnswer = lastGateUnavailable && evidences.some((evidence) => turnEvidenceIds.has(evidence.id));
+  }
 
   if (!canAnswer || !hasAnswerableEvidence()) {
     ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'insufficient_evidence', rounds: turns });

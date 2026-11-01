@@ -257,6 +257,30 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     expect(metrics?.rounds).toBeGreaterThanOrEqual(1);
   });
 
+  it('answers from evidence read this turn when the gate output is invalid and the budget runs out', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL });
+    respondByPrompt({
+      plan: JSON.stringify({
+        rationale: 'Read the install section.',
+        targets: [{ path: 'README.md', sections: ['Install'], purpose: 'installation steps', scope: 'documentation' }],
+      }),
+      gate: '{}',
+      answer: () => CITED_ANSWER,
+    });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      fastPath: false,
+      agentBudget: { maxTurns: 1, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(result.content).toContain('npx example install');
+    expect(result.content).not.toContain('insufficient');
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Unmet answer requirements');
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false, endReason: 'turn_budget', rounds: 1 });
+  });
+
   it('runs the full loop for deep and unlimited depths', async () => {
     configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
     respondByPrompt({});
