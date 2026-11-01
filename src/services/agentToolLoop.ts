@@ -271,6 +271,35 @@ const runToolLoopEvidenceAgent = async (
   const codeCandidates = Array.from(new Set(rankedPaths.filter(isRepositoryCodePath)));
   const documentationSet = new Set(documentationCandidates);
   const codeSet = new Set(codeCandidates);
+  const targetHasUnreadSegments = (target: { path: string; sections: string[]; scope: 'documentation' | 'code' }): boolean => {
+    const document = documents.get(target.path);
+    if (!document) return true;
+    const searchTerms = evidenceSearchTerms(question, target.sections);
+    const segments = target.scope === 'code'
+      ? buildEvidenceWindows(document.content, focus, target.sections.length > 0 ? target.sections : searchTerms)
+      : (() => {
+        const planned = citableSegmentsForDocument(document, target.sections, searchTerms);
+        return planned.length > 0 ? planned : buildEvidenceWindows(document.content, focus, searchTerms);
+      })();
+    return segments.some((segment) => !readSegments.has(
+      `${encodeURIComponent(target.path)}:${segment.lineStart}-${segment.lineEnd}`,
+    ));
+  };
+  const fileReadBudgetLeft = (): boolean => budgetedReadPaths.size < budget.maxReadFiles;
+  const codeReadBudgetLeft = (): boolean => fileReadBudgetLeft() && budget.maxCodeReads > 0 && codeReadPaths.size < budget.maxCodeReads;
+  const isViableUnreadTarget = (target: { path: string; sections: string[]; scope: 'documentation' | 'code' | 'meta' }): boolean => {
+    const { path, sections, scope } = target;
+    if (scope === 'meta') return !metaFetched.has(path) && metaFetched.size < 2;
+    if (documents.has(path)) return targetHasUnreadSegments({ path, sections, scope });
+    if (!fileReadBudgetLeft()) return false;
+    if (scope === 'code' && !codeReadBudgetLeft()) return false;
+    return (scope === 'code' ? codeSet : documentationSet).has(path);
+  };
+  const hasUnreadCandidateSource = (): boolean => (
+    metaIntentTargets.some((path) => !metaFetched.has(path) && metaFetched.size < 2)
+    || documentationCandidates.some((path) => isViableUnreadTarget({ path, sections: [], scope: 'documentation' }))
+    || codeCandidates.some((path) => isViableUnreadTarget({ path, sections: [], scope: 'code' }))
+  );
 
   // §1.1 README 快速路径：与编排式循环共享同一实现，简单首问在进入模型
   // 工具循环前直接由根 README 作答；未命中或回答不可核验时继续工具循环
@@ -506,11 +535,7 @@ const runToolLoopEvidenceAgent = async (
       missingList,
     );
     const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
-    const viableUnreadTargets = (coverage?.gate.recommendedTargets ?? []).filter((target) => {
-      if (target.scope === 'meta') return !metaFetched.has(target.path);
-      if (target.scope === 'code') return codeSet.has(target.path) && !readPaths.has(target.path);
-      return documentationSet.has(target.path) && !readPaths.has(target.path);
-    });
+    const viableUnreadTargets = (coverage?.gate.recommendedTargets ?? []).filter(isViableUnreadTarget);
     if (coverage && evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
       emit({
         toolName: 'evidence_gate',
@@ -532,7 +557,10 @@ const runToolLoopEvidenceAgent = async (
     // The model may end with an explicit gap list once every usable target has
     // been read; otherwise a bounded "no reasonable source" turn would keep
     // rejecting ready_to_answer until the tool budget runs out.
-    if (missingList.length > 0 && unfetchedMetaTargets.length === 0 && viableUnreadTargets.length === 0) {
+    const canStopWithGaps = coverage
+      ? viableUnreadTargets.length === 0
+      : !hasUnreadCandidateSource();
+    if (missingList.length > 0 && unfetchedMetaTargets.length === 0 && canStopWithGaps) {
       return { ready: true, output: confirmText, gaps };
     }
     emit({
@@ -548,6 +576,7 @@ const runToolLoopEvidenceAgent = async (
       output: zh
         ? `未通过证据门控。仍需补齐：${gaps.join('；')}。请继续调用工具，或在没有合理来源时于 missing 中说明。`
         : `ready_to_answer was rejected by the evidence coverage gate. Still required: ${gaps.join('; ')}. Continue with the remaining tools, or list the unsupported items in missing when no reasonable source remains.`,
+      gaps,
     };
   };
 
@@ -682,8 +711,8 @@ const runToolLoopEvidenceAgent = async (
         const readiness = await confirmReadyToAnswer(parseJsonObject(call.arguments) ?? {}, loopTurns);
         conversationChars += readiness.output.length;
         messages.push({ role: 'tool', toolCallId: call.id, content: readiness.output });
+        answerGaps = readiness.gaps ?? [];
         if (readiness.ready) {
-          answerGaps = readiness.gaps ?? [];
           endReason = 'agent_ready';
           ready = true;
           break;

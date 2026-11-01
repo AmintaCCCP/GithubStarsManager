@@ -361,6 +361,48 @@ describe('useRepositoryChat persistence failures', () => {
     ]);
   });
 
+  it('keeps prior evidence ids when rewriting that evidence fails', async () => {
+    const priorEvidence = {
+      id: 'evidence-prior',
+      source: 'github' as const,
+      repoFullName: repository.full_name,
+      refSha: session.sourceRefSha,
+      path: 'README.md',
+      lineStart: 1,
+      lineEnd: 2,
+      url: 'https://github.com/owner/example/blob/abcdef/README.md#L1-L2',
+      excerpt: 'README',
+      retrievedAt: '2026-08-26T00:00:00.000Z',
+    };
+    const previousMessages: RepositoryChatMessage[] = [
+      { id: 'user-1', sessionId: session.id, role: 'user', content: 'How do I install this?', status: 'complete', evidenceIds: [], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'assistant-1', sessionId: session.id, role: 'assistant', content: 'Run the installer.', status: 'complete', evidenceIds: [priorEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+    ];
+    mocks.listEvidence.mockResolvedValue([priorEvidence]);
+    mocks.saveMessage.mockResolvedValue(undefined);
+    mocks.saveEvidence.mockRejectedValue(new Error('evidence store unavailable'));
+    mocks.runRepositoryChatTurn.mockResolvedValue({
+      content: 'Same answer. `/README.md - 1-2`',
+      evidences: [priorEvidence],
+    });
+    const { result } = renderHook(() => useRepositoryChat({
+      repository,
+      session,
+      messages: previousMessages,
+      onMessagesChange: vi.fn(),
+      onSessionChange: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    await act(async () => {
+      await result.current.send('Can you repeat that?', previousMessages);
+    });
+
+    expect(mocks.saveMessage).toHaveBeenCalledWith(expect.objectContaining({
+      role: 'assistant',
+      evidenceIds: [priorEvidence.id],
+    }));
+  });
+
   it('blocks a second send while prior evidence is still loading', async () => {
     let resolveEvidence!: (value: never[]) => void;
     mocks.listEvidence.mockReturnValue(new Promise((resolve) => {

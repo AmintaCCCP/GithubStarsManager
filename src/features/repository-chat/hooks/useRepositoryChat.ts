@@ -420,13 +420,23 @@ export const useRepositoryChat = ({
         if (failedEvidenceWrites.length > 0) {
           console.warn('[repository-chat] unable to persist evidence', failedEvidenceWrites);
         }
+        const messageEvidenceIds = Array.from(new Set([
+          ...priorEvidence.map((evidence) => evidence.id),
+          ...finalEvidences.map((evidence) => evidence.id),
+        ]));
         const completedAssistant: RepositoryChatMessage = {
           ...assistantMessage,
           content: result.content,
           status: 'complete',
-          evidenceIds: finalEvidences.map((evidence) => evidence.id),
+          evidenceIds: messageEvidenceIds,
         };
-        await repositoryChatStorage.saveMessage({ ...completedAssistant, evidenceIds: savedEvidenceIds });
+        // Prior evidence was loaded from storage, so preserve those IDs even when
+        // rewriting the same record fails during this turn.
+        const persistedEvidenceIds = Array.from(new Set([
+          ...priorEvidence.map((evidence) => evidence.id),
+          ...savedEvidenceIds,
+        ]));
+        await repositoryChatStorage.saveMessage({ ...completedAssistant, evidenceIds: persistedEvidenceIds });
         onMessagesChange([...baseMessages, userMessage, completedAssistant]);
         const latestSession = sessionRef.current?.id === activeSession.id
           ? sessionRef.current

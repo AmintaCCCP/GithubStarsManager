@@ -311,6 +311,92 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/README.md - 1-4');
   });
 
+  it('treats recommended targets as exhausted once the file-read budget is spent', async () => {
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/other.md': '# Other\n\nExtra notes.',
+    });
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? JSON.stringify({
+          sufficient: false,
+          confidence: 0.9,
+          reason: 'The Windows installer is not documented.',
+          requirements: [{
+            requirement_id: 'explicit-1',
+            requirement: 'question',
+            status: 'missing',
+            evidence: [],
+          }],
+          next_action: 'retrieve_more',
+          recommended_targets: [{ path: 'docs/other.md', sections: [], purpose: 'windows install' }],
+        })
+        : '## Install\n\nRun the documented installer. `/README.md - 1-4`'
+    ));
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['Windows-specific installer'] })]));
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('How do I install this project on Windows?'),
+      agentBudget: { maxTurns: 6, maxToolCalls: 12, maxReadFiles: 1, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+    });
+
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(2);
+    expect(mocks.getRepositoryFile.mock.calls.some((call: unknown[]) => call[2] === 'docs/other.md')).toBe(false);
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Windows-specific installer');
+    expect(result.content).toContain('/README.md - 1-4');
+  });
+
+  it('keeps an already-read document target viable while one of its requested sections is unread', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Overview',
+        'A documented example project.',
+        '',
+        '## Install',
+        'Run the installer.',
+        '',
+        '## Configuration',
+        'Set the configuration file.',
+      ].join('\n'),
+    });
+    let gateCalls = 0;
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('Evidence Gate')) {
+        gateCalls += 1;
+        return JSON.stringify({
+          sufficient: false,
+          confidence: 0.9,
+          reason: 'Configuration is not covered yet.',
+          requirements: [{
+            requirement_id: 'explicit-1',
+            requirement: 'question',
+            status: 'missing',
+            evidence: [],
+          }],
+          next_action: 'retrieve_more',
+          recommended_targets: gateCalls === 1
+            ? [{ path: 'README.md', sections: ['Configuration'], purpose: 'configuration', scope: 'documentation' }]
+            : [],
+        });
+      }
+      return '## Configuration\n\nSet the configuration file. `/README.md - 9-10`';
+    });
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md', sections: ['Install'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['configuration steps'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c3', 'read_documentation', { path: 'README.md', sections: ['Configuration'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c4', 'ready_to_answer', { missing: ['configuration steps'] })]));
+
+    await runToolLoopRepositoryChatTurn(turnInput('How do I configure this project?'));
+
+    expect(gateCalls).toBe(2);
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(4);
+  });
+
   it('rejects non-documentation reads before documentation evidence exists (README-first, enforced in code)', async () => {
     mocks.generateWithTools
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_recent_releases')]))
