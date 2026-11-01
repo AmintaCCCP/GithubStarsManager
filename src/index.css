@@ -1765,6 +1765,12 @@ select:focus {
   outline-offset: 2px;
 }
 
+/* The repository chat composer delegates its focus treatment to the rounded shell. */
+#repository-chat-draft:focus,
+#repository-chat-draft:focus-visible {
+  outline: none;
+}
+
 ::selection {
   color: var(--ui-selection-foreground);
   background: var(--ui-selection);
