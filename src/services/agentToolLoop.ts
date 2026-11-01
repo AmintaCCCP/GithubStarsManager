@@ -235,6 +235,8 @@ const runToolLoopEvidenceAgent = async (
     emitTurnMetrics: ctx.emitTurnMetrics,
   });
   if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
+  // 快速路径已种入的 README 证据也算已读文档，避免回落时 README-first 规则误拒其他来源。
+  documentationEvidenceCount += evidences.length;
 
   const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => MARKDOWN_EVIDENCE_PATH.test(path)
     ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, signal)

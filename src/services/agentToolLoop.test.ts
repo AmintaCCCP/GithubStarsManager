@@ -182,6 +182,35 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/README.md - 1-4');
   });
 
+  it('keeps fast-path README evidence counted after falling back to the native tool loop', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Install',
+        'Run `npx example install`.',
+      ].join('\n'),
+      'src/engine.ts': 'export const switchProxy = () => "implementation detail";',
+    });
+    mocks.getRepositoryReleases.mockResolvedValue(releasesPayload);
+    mocks.generateChatText.mockImplementation(async (options: { user?: string }) => (
+      options.user?.includes('This turn used the fast path')
+        ? 'I cannot verify this draft.'
+        : '## Updates\n\nThe first release adds a dashboard. `/release-v1.0.0.md - 1-4`'
+    ));
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_recent_releases')]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: [] })]));
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('How do I install this project?'),
+      fastPath: true,
+    });
+
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+    expect(result.content).toContain('/release-v1.0.0.md - 1-4');
+  });
+
   it('retries a failed release fetch when the model asks again after a tool error', async () => {
     // 工具失败会释放 actionHash 并回退 metaFetched 标记：相同的 read_recent_releases
     // 第二次调用必须真正重新请求 GitHub，而不是被当作重复动作拦截。

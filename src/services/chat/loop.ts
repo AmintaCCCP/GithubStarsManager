@@ -648,6 +648,8 @@ export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promi
     fastPath.emitTurnMetrics({ fastPath: true, endReason: 'fast_path', rounds: 0 });
     return fastPathAnswer;
   }
+  // 回落完整循环前清空已流出的未核验快速路径回答，避免界面长期显示将被丢弃的内容。
+  if (input.streaming && input.onAnswerChunk) input.onAnswerChunk('');
   return null;
 };
 

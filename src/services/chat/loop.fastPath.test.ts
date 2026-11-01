@@ -269,6 +269,33 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     expect(metrics?.llmCalls).toBe(mocks.generateChatText.mock.calls.length);
   });
 
+  it('clears an unverified streamed fast-path draft before falling back', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
+    respondByPrompt({ answer: () => 'I cannot verify any of this.' });
+    mocks.generateChatTextStream
+      .mockImplementationOnce(async (options: { onChunk?: (delta: string) => void }) => {
+        options.onChunk?.('Unverified fast-path draft.');
+        return 'Unverified fast-path draft.';
+      })
+      .mockImplementationOnce(async (options: { onChunk?: (delta: string) => void }) => {
+        options.onChunk?.(CITED_ANSWER);
+        return CITED_ANSWER;
+      });
+    const onAnswerChunk = vi.fn();
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      streaming: true,
+      onAnswerChunk,
+    }));
+
+    const streamed = onAnswerChunk.mock.calls.map((call) => String(call[0]));
+    const clearedAt = streamed.indexOf('');
+    expect(clearedAt).toBeGreaterThan(0);
+    expect(streamed.slice(0, clearedAt)).toContain('Unverified fast-path draft.');
+    expect(streamed.slice(clearedAt + 1).join('')).toContain('npx example install');
+    expect(result.content).toContain('npx example install');
+  });
+
   it('answers install and deployment questions with evidence from both matched sections', async () => {
     const readme = [
       '# Example Project',

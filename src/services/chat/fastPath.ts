@@ -134,8 +134,29 @@ export const selectFastPathSegments = (
   const headingOrTruncatedFragmentPattern = /^\s{0,3}#{1,6}(?:\s|$)/;
   const isHeadingOrFragmentLine = (line: string): boolean =>
     line.trim() === '' || headingOrTruncatedFragmentPattern.test(line);
-  const hasBodyContent = (excerpt: string): boolean =>
-    excerpt.split('\n').some((line) => !isHeadingOrFragmentLine(line));
+  const hasBodyContent = (excerpt: string): boolean => {
+    let lineStart = 0;
+    while (lineStart <= excerpt.length) {
+      const lineEnd = excerpt.indexOf('\n', lineStart);
+      const end = lineEnd === -1 ? excerpt.length : lineEnd;
+      if (!isHeadingOrFragmentLine(excerpt.slice(lineStart, end))) return true;
+      if (lineEnd === -1) break;
+      lineStart = lineEnd + 1;
+    }
+    return false;
+  };
+  let documentLineOffsets: number[] | null = null;
+  const documentLineOffset = (lineNumber: number): number => {
+    if (documentLineOffsets === null) {
+      documentLineOffsets = new Array(lines.length);
+      let offset = 0;
+      for (let index = 0; index < lines.length; index += 1) {
+        documentLineOffsets[index] = offset;
+        offset += lines[index].length + 1;
+      }
+    }
+    return documentLineOffsets[lineNumber - 1];
+  };
   // 有效性下限（与导语段一致）：区间内除标题行外至少一行非空正文。第 12 轮审计：
   // 正文判定只基于截断后的可见摘录——先把区间行拼接并限制在
   // MAX_EVIDENCE_EXCERPT_CHARS 内再按行检查（与 leadHasContentBeyondHeading 同一
@@ -448,9 +469,7 @@ export const selectFastPathSegments = (
       if (lastLeftover && lastLeftover.segment.lineEnd >= heading.lineStart) {
         // 上一候选覆盖该标题：仅当标题位于其可见摘录之内且摘录内确有正文时才
         // 跳过；标题后只有空白、正文位于截断点之后时，该标题照常独立参选。
-        const headingOffset = lines
-          .slice(lastLeftover.segment.lineStart - 1, heading.lineStart - 1)
-          .reduce((offset, line) => offset + line.length + 1, 0);
+        const headingOffset = documentLineOffset(heading.lineStart) - documentLineOffset(lastLeftover.segment.lineStart);
         if (
           heading.lineStart < lastLeftover.visibleEnd
           && hasBodyContent(lastLeftover.segment.excerpt.slice(headingOffset))
