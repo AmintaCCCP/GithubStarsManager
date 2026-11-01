@@ -27,6 +27,8 @@ const isSetextUnderline = (lines: string[], index: number): boolean => {
     && !/^\s*(?:[-*+]|\d+[.)])\s+/.test(previous);
 };
 
+const isThematicBreak = (line: string): boolean => /^ {0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line);
+
 /** 返回以 end 结束的 Markdown 表格的表头行；普通含竖线正文不算表格。 */
 const tableHeaderStart = (lines: string[], end: number): number | null => {
   if (end < 1 || !lines[end]?.includes('|')) return null;
@@ -137,6 +139,10 @@ export const liftStandaloneCitationLines = (markdown: string): string => {
     for (;;) {
       while (target >= 0 && output[target]!.trim() === '') target -= 1;
       if (isSetextUnderline(output, target)) {
+        target -= 1;
+        continue;
+      }
+      if (target >= 0 && isThematicBreak(output[target]!)) {
         target -= 1;
         continue;
       }

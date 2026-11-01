@@ -82,6 +82,30 @@ describe('liftStandaloneCitationLines', () => {
     }
   });
 
+  it('skips a thematic break when lifting a citation after a code block', () => {
+    const content = [
+      'Runtime requirements:',
+      '',
+      '---',
+      '',
+      '```bash',
+      'npx skills add owner/repo',
+      '```',
+      '',
+      '`/README.md - 94-119`',
+    ].join('\n');
+    const result = liftStandaloneCitationLines(content);
+    expect(result).toBe([
+      'Runtime requirements: `/README.md - 94-119`',
+      '',
+      '---',
+      '',
+      '```bash',
+      'npx skills add owner/repo',
+      '```',
+    ].join('\n'));
+  });
+
   it('moves citations after tables onto the introducing sentence', () => {
     const content = [
       'Runtime requirements:',
