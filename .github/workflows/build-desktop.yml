@@ -18,16 +18,15 @@ concurrency:
 # release job elevates this explicitly when it creates a tagged GitHub release.
 permissions:
   contents: read
+  actions: read
 
 jobs:
-  web:
-    name: Build web bundle
+  scope:
+    name: Desktop scope
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
       run: ${{ steps.scope.outputs.run }}
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
     steps:
       - name: Checkout code
@@ -44,27 +43,38 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node scripts/ci-scope.cjs
 
+  web:
+    name: Build web bundle
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Verify tagged release version
-        if: github.ref_type == 'tag' && steps.scope.outputs.run == 'true'
+        if: github.ref_type == 'tag'
         run: node scripts/check-release-version.cjs "$GITHUB_REF_NAME"
 
       - name: Setup Node.js
-        if: steps.scope.outputs.run == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: 'npm'
 
       - name: Install dependencies
-        if: steps.scope.outputs.run == 'true'
         run: npm ci --no-audit --no-fund
 
       - name: Build web app
-        if: steps.scope.outputs.run == 'true'
         run: npm run build
 
       - name: Assert relative asset paths
-        if: steps.scope.outputs.run == 'true'
         shell: bash
         run: |
           test -f dist/index.html
@@ -75,7 +85,6 @@ jobs:
           fi
 
       - name: Upload web bundle
-        if: steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web-dist
@@ -84,8 +93,8 @@ jobs:
           retention-days: 1
 
   build:
-    needs: web
-    if: needs.web.outputs.run == 'true'
+    needs: scope
+    if: needs.scope.outputs.run == 'true'
     runs-on: ${{ matrix.os }}
     continue-on-error: false
     # Desktop packaging legs have historically landed well under 30 minutes,
@@ -132,11 +141,22 @@ jobs:
     - name: Install dependencies
       run: npm ci --no-audit --no-fund
 
-    - name: Download web bundle
-      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-      with:
-        name: web-dist
-        path: dist
+    - name: Download web bundle when ready
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        # Start dependency installation alongside the single web build, then
+        # wait only for the artifact upload instead of the whole web job.
+        for _ in $(seq 1 60); do
+          if gh run download "$GITHUB_RUN_ID" --name web-dist --dir dist >/dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "::error::web-dist artifact was not available within 5 minutes"
+        exit 1
 
     - name: Verify downloaded web bundle
       shell: bash
@@ -305,7 +325,7 @@ jobs:
         retention-days: 1
 
   release:
-    needs: [web, build]
+    needs: [scope, web, build]
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
@@ -328,9 +348,10 @@ jobs:
     # sets neither `body` nor `generate_release_notes` so it never overwrites
     # the hand-written notes (softprops' default update path replaces an
     # existing release's body whenever a workflow `body` is present).
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.web.result == 'success'
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.scope.result == 'success' && needs.web.result == 'success'
     permissions:
       contents: write
+      actions: read
 
     steps:
     - name: Download all artifacts
