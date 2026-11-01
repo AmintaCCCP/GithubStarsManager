@@ -43,6 +43,8 @@ export const Composer: React.FC<{
 }) => {
   const t = useT('chat');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false);
+  const compositionEndedAtRef = useRef(0);
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -72,6 +74,13 @@ export const Composer: React.FC<{
           id="repository-chat-draft"
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onCompositionStart={() => {
+            isComposingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            isComposingRef.current = false;
+            compositionEndedAtRef.current = Date.now();
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && isSending) {
               event.preventDefault();
@@ -83,7 +92,18 @@ export const Composer: React.FC<{
               onEditLast();
               return;
             }
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            // Safari can dispatch compositionend before the Enter keydown that
+            // confirms an IME candidate. Suppress that immediate Enter too.
+            const justEndedComposition = compositionEndedAtRef.current > 0
+              && Date.now() - compositionEndedAtRef.current < 50;
+            if (
+              event.key === 'Enter'
+              && !event.shiftKey
+              && !event.nativeEvent.isComposing
+              && !isComposingRef.current
+              && event.keyCode !== 229
+              && !justEndedComposition
+            ) {
               event.preventDefault();
               if (canChat && value.trim() && !isSending) onSend();
             }

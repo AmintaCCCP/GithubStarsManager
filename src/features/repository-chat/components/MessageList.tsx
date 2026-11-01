@@ -118,6 +118,7 @@ interface MessageListProps {
   isSending: boolean;
   canRegenerate: boolean;
   errorMessage: string | null;
+  isAnswerCopyable: (message: RepositoryChatMessage) => boolean;
   onCopy: (message: RepositoryChatMessage) => void;
   onEdit: (message: RepositoryChatMessage) => void;
   onRegenerate: () => void;
@@ -135,6 +136,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   isSending,
   canRegenerate,
   errorMessage,
+  isAnswerCopyable,
   onCopy,
   onEdit,
   onRegenerate,
@@ -214,9 +216,11 @@ export const MessageList: React.FC<MessageListProps> = ({
             )}
             {message.status !== 'streaming' && !failed && message.content ? (
               <div className={`mt-1 flex items-center gap-0.5 transition-opacity ${isLastAssistant ? 'opacity-100' : 'opacity-0 group-hover/message:opacity-100 focus-within:opacity-100'}`}>
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => onCopy(message)} aria-label={t('repositoryChatSheet.copy-answer')} title={t('repositoryChatSheet.copy-answer-with-sources')}>
-                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                </Button>
+                {isAnswerCopyable(message) ? (
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => onCopy(message)} aria-label={t('repositoryChatSheet.copy-answer')} title={t('repositoryChatSheet.copy-answer-with-sources')}>
+                    <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                  </Button>
+                ) : null}
                 {isLastAssistant ? (
                   <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" disabled={!canRegenerate || isSending} onClick={onRegenerate} aria-label={t('repositoryChatSheet.regenerate')} title={t('repositoryChatSheet.regenerate-this-answer')}>
                     <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />

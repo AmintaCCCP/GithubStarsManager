@@ -13,7 +13,7 @@ import { useTurnStatusAnnouncement } from '../features/repository-chat/hooks/use
 import { ChatHeader } from '../features/repository-chat/components/ChatHeader';
 import { Composer } from '../features/repository-chat/components/Composer';
 import { EmptyState, MessageList } from '../features/repository-chat/components/MessageList';
-import { formatAnswerForCopy } from '../features/repository-chat/utils/citationUtils';
+import { formatAnswerForCopy, stripCitationsForCopy } from '../features/repository-chat/utils/citationUtils';
 import { RepositoryChatHistoryPanel } from './RepositoryChatHistoryPanel';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from './ui/sheet';
@@ -84,6 +84,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   const messageRegionRef = useRef<HTMLDivElement>(null);
   const shouldAnchorToUserRef = useRef(false);
   const undoTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const previousActiveSessionIdRef = useRef<string | null>(null);
 
   const {
     sessions,
@@ -132,6 +133,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     if (!isOpen) {
       setShowHistory(false);
       setEditingMessageId(null);
+      previousActiveSessionIdRef.current = null;
       return;
     }
     setShowHistory(window.matchMedia?.('(min-width: 900px)').matches ?? false);
@@ -189,7 +191,12 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     if (!isOpen) initialSessionAppliedRef.current = null;
   }, [isOpen]);
   useEffect(() => {
+    const nextSessionId = activeSession?.id ?? null;
+    const previousSessionId = previousActiveSessionIdRef.current;
+    previousActiveSessionIdRef.current = nextSessionId;
+    if (!previousSessionId || !nextSessionId || previousSessionId === nextSessionId) return;
     setEditingMessageId(null);
+    setDraft('');
   }, [activeSession?.id]);
   useEffect(() => {
     if (!isOpen || !initialSessionId || initialSessionAppliedRef.current === initialSessionId || isLoading) return;
@@ -274,11 +281,13 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
   };
 
   const handleCopyAnswer = async (message: RepositoryChatMessage) => {
-    const loadedEvidence = await loadEvidence(message.evidenceIds).catch(() => evidenceById);
-    const evidences = message.evidenceIds.map((id) => loadedEvidence[id]).filter(Boolean);
+    const loadedEvidence = await loadEvidence(message.evidenceIds).catch(() => null);
+    const evidences = loadedEvidence ? message.evidenceIds.map((id) => loadedEvidence[id]).filter(Boolean) : [];
     const content = message.role === 'user'
       ? message.content
-      : formatAnswerForCopy(message.content, evidences, t('repositoryChatSheet.sources'));
+      : loadedEvidence
+        ? formatAnswerForCopy(message.content, evidences, t('repositoryChatSheet.sources'))
+        : stripCitationsForCopy(message.content);
     const result = await safeWriteText(content);
     toast(
       result.success ? t('repositoryChatSheet.answer-copied') : (result.error || t('repositoryChatSheet.copy-failed')),
@@ -351,7 +360,10 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
           onCloseAutoFocus?.();
         }}
         onEscapeKeyDown={(event) => {
-          if (isSending) event.preventDefault();
+          if (isSending) {
+            event.preventDefault();
+            stop();
+          }
         }}
       >
         <SheetTitle className="sr-only">{repository.full_name}</SheetTitle>
@@ -442,8 +454,9 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
                   isSending={isSending}
                   canRegenerate={Boolean(lastMessage && lastMessage.role === 'assistant' && lastMessage === messages[messages.length - 1])}
                   errorMessage={chatError}
+                  isAnswerCopyable={isCopyable}
                   onCopy={(message) => {
-                    if (message.role === 'user' || isCopyable(message)) void handleCopyAnswer(message);
+                    void handleCopyAnswer(message);
                   }}
                   onEdit={handleEdit}
                   onRegenerate={() => void regenerate()}
@@ -494,7 +507,7 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
             }}
             editing={Boolean(editingMessageId)}
             isSending={isSending}
-            canChat={canChat && !isLoading}
+            canChat={canChat && !isLoading && !error}
             taskDepth={repositoryChatSettings.taskDepth}
             onDepthChange={(taskDepth) => setRepositoryChatSettings({ taskDepth })}
             language={language}
