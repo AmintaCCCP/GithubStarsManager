@@ -74,6 +74,7 @@ export const useRepositoryChat = ({
     repositoryChatSettings: state.repositoryChatSettings,
   })));
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
   const retryInFlightRef = useRef(false);
   const toolEventIdsRef = useRef<Map<string, { id: string; createdAt: string }>>(new Map());
   const toolEventWriteChainsRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -268,6 +269,20 @@ export const useRepositoryChat = ({
     }
   }, []);
 
+  const loadPriorEvidence = useCallback(async (sourceMessages: RepositoryChatMessage[]): Promise<ToolEvidence[]> => {
+    const ids = Array.from(new Set(sourceMessages
+      .filter((message) => message.role === 'assistant')
+      .slice(-2)
+      .flatMap((message) => message.evidenceIds)));
+    if (ids.length === 0) return [];
+    try {
+      return await repositoryChatStorage.listEvidence(ids);
+    } catch (readError) {
+      console.warn('[repository-chat] unable to load prior evidence', readError);
+      return [];
+    }
+  }, []);
+
   const send = useCallback(async (
     question: string,
     baseMessages = messages,
@@ -275,7 +290,7 @@ export const useRepositoryChat = ({
     sessionOverride?: RepositoryChatSession,
   ) => {
     const activeSession = sessionOverride ?? session;
-    if (!repository || !activeSession || !aiConfig || unavailableReason || isSending || (!isRetry && retryInFlightRef.current)) {
+    if (!repository || !activeSession || !aiConfig || unavailableReason || sendingRef.current || isSending || (!isRetry && retryInFlightRef.current)) {
       if (unavailableReason) setError(unavailableReason);
       return;
     }
@@ -284,10 +299,12 @@ export const useRepositoryChat = ({
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    sendingRef.current = true;
     setIsSending(true);
     setError(null);
     toolEventIdsRef.current.clear();
     toolEventWriteChainsRef.current.clear();
+    const priorEvidence = await loadPriorEvidence(baseMessages);
     const userCreatedAt = nextTimelineTimestamp();
     const assistantCreatedAt = nextTimelineTimestamp();
     const userMessage: RepositoryChatMessage = {
@@ -357,6 +374,7 @@ export const useRepositoryChat = ({
           fastPath: repositoryChatSettings.fastPath,
           streaming: repositoryChatSettings.streamingMode !== 'off',
           signal: controller.signal,
+          priorEvidence,
           onToolEvent: (event) => {
             void persistToolEvent(event, assistantMessage.id, activeSession);
           },
@@ -391,14 +409,34 @@ export const useRepositoryChat = ({
         const finalEvidences = Array.from(new Map(
           [...liveEvidence, ...result.evidences].map((evidence) => [evidence.id, evidence]),
         ).values());
-        await Promise.all(finalEvidences.map((evidence) => repositoryChatStorage.saveEvidence(evidence)));
+        // Evidence persistence is auxiliary; never downgrade a verified answer to an
+        // error, and only persist IDs that are actually readable after a reload.
+        const evidenceWrites = await Promise.allSettled(finalEvidences.map(async (evidence) => {
+          await repositoryChatStorage.saveEvidence(evidence);
+          return evidence.id;
+        }));
+        const savedEvidenceIds = evidenceWrites.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+        const failedEvidenceWrites = evidenceWrites.filter((result) => result.status === 'rejected');
+        if (failedEvidenceWrites.length > 0) {
+          console.warn('[repository-chat] unable to persist evidence', failedEvidenceWrites);
+        }
+        const messageEvidenceIds = Array.from(new Set([
+          ...priorEvidence.map((evidence) => evidence.id),
+          ...finalEvidences.map((evidence) => evidence.id),
+        ]));
         const completedAssistant: RepositoryChatMessage = {
           ...assistantMessage,
           content: result.content,
           status: 'complete',
-          evidenceIds: finalEvidences.map((evidence) => evidence.id),
+          evidenceIds: messageEvidenceIds,
         };
-        await repositoryChatStorage.saveMessage(completedAssistant);
+        // Prior evidence was loaded from storage, so preserve those IDs even when
+        // rewriting the same record fails during this turn.
+        const persistedEvidenceIds = Array.from(new Set([
+          ...priorEvidence.map((evidence) => evidence.id),
+          ...savedEvidenceIds,
+        ]));
+        await repositoryChatStorage.saveMessage({ ...completedAssistant, evidenceIds: persistedEvidenceIds });
         onMessagesChange([...baseMessages, userMessage, completedAssistant]);
         const latestSession = sessionRef.current?.id === activeSession.id
           ? sessionRef.current
@@ -466,9 +504,10 @@ export const useRepositoryChat = ({
       if (!aborted) setError(repositoryChatErrorMessage(unknownError, language));
     } finally {
       abortControllerRef.current = null;
+      sendingRef.current = false;
       setIsSending(false);
     }
-  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.fastPath, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, retainNewestSession, session, unavailableReason, t]);
+  }, [aiConfig, githubToken, isSending, language, loadPriorEvidence, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.fastPath, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, retainNewestSession, session, unavailableReason, t]);
 
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();

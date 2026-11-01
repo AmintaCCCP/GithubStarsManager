@@ -36,7 +36,7 @@ vi.mock('../githubApiFactory', () => ({
 }));
 
 import { runToolLoopRepositoryChatTurn } from '../agentToolLoop';
-import { runEvidenceDrivenRepositoryChatTurn, synthesizeVerifiedAnswer, type RepositoryChatTurnInput } from './loop';
+import { reusablePriorEvidence, runEvidenceDrivenRepositoryChatTurn, synthesizeVerifiedAnswer, type RepositoryChatTurnInput } from './loop';
 
 const repository: Repository = {
   id: 1,
@@ -101,10 +101,21 @@ const README_WITH_INSTALL = [
 const INSTALL_SECTION_REFERENCE = '/README.md - 3-5';
 
 const CITED_ANSWER = `Run \`npx example install\` to set up the CLI. \`${INSTALL_SECTION_REFERENCE}\``;
+const RELEASES = [{
+  id: 1,
+  tag_name: 'v2.0.0',
+  name: 'Second release',
+  body: 'Adds a desktop build.',
+  published_at: '2026-08-20T00:00:00.000Z',
+  html_url: 'https://github.com/owner/example/releases/tag/v2.0.0',
+  prerelease: false,
+  assets: [],
+}];
 const installEvidence: ToolEvidence = {
   id: 'evidence-install',
   source: 'github',
   repoFullName: repository.full_name,
+  refSha: session.sourceRefSha,
   path: 'README.md',
   lineStart: 3,
   lineEnd: 5,
@@ -128,6 +139,36 @@ const configureTreeAndFiles = (contents: Record<string, string>) => {
   }));
   mocks.getRepositoryMarkdownEvidenceFile.mockImplementation((...args: unknown[]) => mocks.getRepositoryFile(...args));
 };
+
+describe('reusablePriorEvidence (§5.1)', () => {
+  it('reuses only immutable GitHub file evidence from the same pinned SHA', () => {
+    const releaseEvidence: ToolEvidence = {
+      id: 'evidence-release',
+      source: 'github',
+      repoFullName: repository.full_name,
+      path: 'release-v1.0.0.md',
+      lineStart: 1,
+      lineEnd: 3,
+      url: 'https://github.com/owner/example/releases/tag/v1.0.0',
+      excerpt: 'Release v1.0.0',
+      retrievedAt: '2026-08-01T00:00:00.000Z',
+    };
+    const webEvidence: ToolEvidence = {
+      ...installEvidence,
+      id: 'evidence-web',
+      source: 'web',
+    };
+    const otherRepositoryEvidence: ToolEvidence = {
+      ...installEvidence,
+      id: 'evidence-other-repository',
+      repoFullName: 'owner/other',
+    };
+
+    expect(reusablePriorEvidence(turnInput('Can you repeat that?', {
+      priorEvidence: [installEvidence, releaseEvidence, webEvidence, otherRepositoryEvidence],
+    }))).toEqual([installEvidence]);
+  });
+});
 
 /** 按系统提示词路由模型响应：理解 / 规划 / 校验 / 回答各走各的 fixture。 */
 const respondByPrompt = (handlers: { understanding?: string; plan?: string; gate?: string; answer?: () => string }) => {
@@ -216,6 +257,30 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     expect(metrics?.rounds).toBeGreaterThanOrEqual(1);
   });
 
+  it('answers from evidence read this turn when the gate output is invalid and the budget runs out', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL });
+    respondByPrompt({
+      plan: JSON.stringify({
+        rationale: 'Read the install section.',
+        targets: [{ path: 'README.md', sections: ['Install'], purpose: 'installation steps', scope: 'documentation' }],
+      }),
+      gate: '{}',
+      answer: () => CITED_ANSWER,
+    });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      fastPath: false,
+      agentBudget: { maxTurns: 1, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(result.content).toContain('npx example install');
+    expect(result.content).not.toContain('insufficient');
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Unmet answer requirements');
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false, endReason: 'turn_budget', rounds: 1 });
+  });
+
   it('runs the full loop for deep and unlimited depths', async () => {
     configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
     respondByPrompt({});
@@ -240,6 +305,169 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', { messages: [...messages, messages[0]] }));
 
     expect(mocks.generateChatText.mock.calls[0]?.[0]?.system).toContain('Query Understanding');
+  });
+
+  it('uses the understanding standalone question for follow-up retrieval', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL });
+    respondByPrompt({
+      understanding: JSON.stringify({
+        standalone_question: 'How do I install this project on Windows?',
+        intent: 'installation',
+        explicit_requirements: ['Windows installation steps'],
+        initial_targets: ['README.md'],
+        target: 'Windows installation',
+      }),
+      plan: JSON.stringify({
+        rationale: 'Read the install section.',
+        targets: [{ path: 'README.md', sections: ['Install'], purpose: 'Windows installation steps', scope: 'documentation' }],
+      }),
+      gate: JSON.stringify({
+        sufficient: true,
+        confidence: 0.95,
+        reason: 'The install section answers the question.',
+        requirements: [{
+          requirement_id: 'explicit-1',
+          requirement: 'Windows installation steps',
+          status: 'verified',
+          evidence: [INSTALL_SECTION_REFERENCE],
+        }],
+        next_action: 'answer',
+      }),
+      answer: () => CITED_ANSWER,
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: `Run the installer. \`${INSTALL_SECTION_REFERENCE}\``, status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What about Windows?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    await runEvidenceDrivenRepositoryChatTurn(turnInput('What about Windows?', { messages }));
+
+    const planCall = mocks.generateChatText.mock.calls.find((call) => String(call[0]?.system).includes('retrieval planner'));
+    expect(planCall?.[0]?.user).toContain('Question: How do I install this project on Windows?');
+  });
+
+  it('answers from prior evidence before planning when the follow-up is already covered', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL });
+    mocks.getRepositoryTree.mockRejectedValue(new Error('tree unavailable'));
+    respondByPrompt({
+      understanding: JSON.stringify({
+        standalone_question: 'How do I install this project?',
+        intent: 'installation',
+        explicit_requirements: ['installation steps'],
+        initial_targets: ['README.md'],
+        target: 'installation',
+      }),
+      gate: JSON.stringify({
+        sufficient: true,
+        confidence: 0.95,
+        reason: 'Prior evidence already covers the follow-up.',
+        requirements: [{
+          requirement_id: 'explicit-1',
+          requirement: 'installation steps',
+          status: 'verified',
+          evidence: [INSTALL_SECTION_REFERENCE],
+        }],
+        next_action: 'answer',
+      }),
+      answer: () => CITED_ANSWER,
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: `Run the installer. \`${INSTALL_SECTION_REFERENCE}\``, status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'Can you repeat that?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('Can you repeat that?', {
+      messages,
+      priorEvidence: [installEvidence],
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(mocks.getRepositoryTree).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalled();
+    expect(result.content).toContain('npx example install');
+    expect(turnMetricsEvent(events)).toMatchObject({ endReason: 'prior_evidence', rounds: 0 });
+  });
+
+  it('does not answer from prior evidence that the follow-up gate did not verify', async () => {
+    configureTreeAndFiles({});
+    respondByPrompt({
+      understanding: JSON.stringify({
+        standalone_question: 'How do I configure the widget?',
+        intent: 'configuration',
+        explicit_requirements: ['configuration steps'],
+        initial_targets: [],
+        target: 'widget configuration',
+      }),
+      gate: JSON.stringify({
+        sufficient: false,
+        confidence: 0.9,
+        reason: 'The installation evidence does not cover configuration.',
+        requirements: [{
+          requirement_id: 'explicit-1',
+          requirement: 'configuration steps',
+          status: 'missing',
+          evidence: [],
+        }],
+        next_action: 'stop',
+      }),
+      answer: () => CITED_ANSWER,
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: CITED_ANSWER, status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What about configuration?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('What about configuration?', {
+      messages,
+      priorEvidence: [installEvidence],
+    }));
+
+    expect(result.content).not.toContain('npx example install');
+  });
+
+  it('fetches release metadata before answering a latest-version follow-up from prior evidence', async () => {
+    configureTreeAndFiles({});
+    mocks.getRepositoryReleases.mockResolvedValue(RELEASES);
+    respondByPrompt({
+      understanding: JSON.stringify({
+        standalone_question: 'What is the latest release?',
+        intent: 'feature_overview',
+        explicit_requirements: ['latest release'],
+        initial_targets: [],
+        target: 'latest release',
+      }),
+      gate: JSON.stringify({
+        sufficient: true,
+        confidence: 0.95,
+        reason: 'The release evidence covers the question.',
+        requirements: [{
+          requirement_id: 'explicit-1',
+          requirement: 'latest release',
+          status: 'verified',
+          evidence: ['/release-v2.0.0.md - 1-4'],
+        }],
+        next_action: 'answer',
+      }),
+      answer: () => 'The latest release adds a desktop build. `/release-v2.0.0.md - 1-4`',
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'What changed before?', status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: CITED_ANSWER, status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What is the latest release?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('What is the latest release?', {
+      messages,
+      priorEvidence: [installEvidence],
+    }));
+
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+    expect(result.content).toContain('/release-v2.0.0.md - 1-4');
   });
 
   it('falls back to the full loop when the README has no matching section', async () => {

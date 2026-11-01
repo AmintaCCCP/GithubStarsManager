@@ -19,7 +19,12 @@ import {
   normalizePath,
   parseJsonObject,
   rankedCandidatePaths,
+  reusablePriorEvidence,
+  evaluateEvidenceCoverage,
+  evidenceCoverageApproved,
+  rewriteStandaloneQuestion,
   resolveTurnLimits,
+  seedReadSegments,
   citableSegmentsForDocument,
   evidenceSearchTerms,
   splitOwnerAndRepo,
@@ -30,6 +35,7 @@ import {
   type RepositoryChatTurnInput,
   type RepositoryChatTurnResult,
 } from './repositoryChatService';
+import { readRepositoryFileWithCache, readRepositoryTreeWithCache } from './chat/cache';
 import {
   buildIssuesEvidence,
   buildNoIssuesEvidence,
@@ -37,6 +43,9 @@ import {
   buildReleasesEvidence,
   META_ISSUES_TARGET,
   META_RELEASES_TARGET,
+  META_TARGETS,
+  detectMetaIntent,
+  metaTargetForKind,
   type IssueComment,
   type IssueHitWithComments,
 } from './repositoryChatMetaSources';
@@ -66,6 +75,7 @@ export const buildToolLoopSystemPrompt = (language: AppLanguage): string => lang
 export const buildToolLoopUserPrompt = (input: RepositoryChatTurnInput, documentationCandidates: string[], codeCandidates: string[]): string => {
   const zh = input.language === 'zh';
   const history = input.messages
+    .slice(0, -1)
     .filter((message) => message.role !== 'system')
     .slice(-6)
     .map((message) => `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}`)
@@ -178,14 +188,69 @@ const runToolLoopEvidenceAgent = async (
   const github = createGitHubApiService(input.githubToken);
   const { emit, invokeTool } = ctx;
 
-  const evidences: ToolEvidence[] = [];
+  const priorEvidences = reusablePriorEvidence(input);
+  const evidences: ToolEvidence[] = [...priorEvidences];
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
+  seedReadSegments(readSegments, priorEvidences);
+  if (priorEvidences.length > 0) input.onEvidence?.(priorEvidences);
   const readPaths = new Set<string>();
   const budgetedReadPaths = new Set<string>();
   const codeReadPaths = new Set<string>();
   const metaFetched = new Set<string>();
-  let documentationEvidenceCount = 0;
+  let documentationEvidenceCount = priorEvidences.filter((evidence) => evidence.path && MARKDOWN_EVIDENCE_PATH.test(evidence.path)).length;
+
+  const researchQuestion = await rewriteStandaloneQuestion(input, ctx.callModelWithRetry);
+  const researchInput = researchQuestion === input.question ? input : { ...input, question: researchQuestion };
+  const question = researchInput.question;
+  const focus = detectResearchFocus(question);
+  const metaIntentTargets = Array.from(new Set([
+    ...detectMetaIntent(input.question),
+    ...detectMetaIntent(researchQuestion),
+  ])).map(metaTargetForKind);
+  const metaSet = new Set<string>(META_TARGETS);
+
+  if (priorEvidences.length > 0) {
+    const coverage = await evaluateEvidenceCoverage(
+      researchInput,
+      question,
+      evidences,
+      documents,
+      [],
+      [],
+      new Set(),
+      new Set(),
+      metaSet,
+      ctx.callModelWithRetry,
+      0,
+      focus,
+    );
+    if (coverage) {
+      emit({
+        toolName: 'evidence_gate',
+        status: 'success',
+        paramSummary: zh ? '复用上一轮证据评估回答条件' : 'Assess the follow-up against prior evidence',
+        stage: 'verification',
+        round: 0,
+        detail: coverage.gate.reason || coverage.missing.join('; ') || (zh ? '证据覆盖检查完成。' : 'Evidence coverage checked.'),
+      });
+      if (evidenceCoverageApproved(coverage) && metaIntentTargets.every((path) => metaFetched.has(path))) {
+        const content = await synthesizeVerifiedAnswer(
+          ai,
+          input,
+          evidences,
+          0,
+          answerMaxTokens,
+          ctx.callModelWithRetry,
+          '',
+          { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+          focus,
+        );
+        ctx.emitTurnMetrics({ fastPath: false, endReason: 'prior_evidence', rounds: 0 });
+        return { content, evidences };
+      }
+    }
+  }
 
   const treeResult = await invokeTool(
     'read_repo_tree',
@@ -194,19 +259,47 @@ const runToolLoopEvidenceAgent = async (
     'context',
     undefined,
     zh ? `所有读取固定在 ref=${input.session.sourceRefSha.slice(0, 7)}。` : `All reads are pinned to ref=${input.session.sourceRefSha.slice(0, 7)}.`,
-    async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
+    async (signal) => await readRepositoryTreeWithCache(github, input.repository.full_name, owner, repo, input.session.sourceRefSha, signal),
   );
   if (!treeResult.ok) {
     ctx.emitTurnMetrics({ fastPath: false, endReason: 'tree_read_failed', rounds: 0 });
     return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
   }
 
-  const focus = detectResearchFocus(input.question);
-  const rankedPaths = rankedCandidatePaths(treeResult.value.entries, input.question, focus);
+  const rankedPaths = rankedCandidatePaths(treeResult.value.entries, question, focus);
   const documentationCandidates = documentationCandidatesFrom(rankedPaths);
   const codeCandidates = Array.from(new Set(rankedPaths.filter(isRepositoryCodePath)));
   const documentationSet = new Set(documentationCandidates);
   const codeSet = new Set(codeCandidates);
+  const targetHasUnreadSegments = (target: { path: string; sections: string[]; scope: 'documentation' | 'code' }): boolean => {
+    const document = documents.get(target.path);
+    if (!document) return true;
+    const searchTerms = evidenceSearchTerms(question, target.sections);
+    const segments = target.scope === 'code'
+      ? buildEvidenceWindows(document.content, focus, target.sections.length > 0 ? target.sections : searchTerms)
+      : (() => {
+        const planned = citableSegmentsForDocument(document, target.sections, searchTerms);
+        return planned.length > 0 ? planned : buildEvidenceWindows(document.content, focus, searchTerms);
+      })();
+    return segments.some((segment) => !readSegments.has(
+      `${encodeURIComponent(target.path)}:${segment.lineStart}-${segment.lineEnd}`,
+    ));
+  };
+  const fileReadBudgetLeft = (): boolean => budgetedReadPaths.size < budget.maxReadFiles;
+  const codeReadBudgetLeft = (): boolean => fileReadBudgetLeft() && budget.maxCodeReads > 0 && codeReadPaths.size < budget.maxCodeReads;
+  const isViableUnreadTarget = (target: { path: string; sections: string[]; scope: 'documentation' | 'code' | 'meta' }): boolean => {
+    const { path, sections, scope } = target;
+    if (scope === 'meta') return !metaFetched.has(path) && metaFetched.size < 2;
+    if (documents.has(path)) return targetHasUnreadSegments({ path, sections, scope });
+    if (!fileReadBudgetLeft()) return false;
+    if (scope === 'code' && !codeReadBudgetLeft()) return false;
+    return (scope === 'code' ? codeSet : documentationSet).has(path);
+  };
+  const hasUnreadCandidateSource = (): boolean => (
+    metaIntentTargets.some((path) => !metaFetched.has(path) && metaFetched.size < 2)
+    || documentationCandidates.some((path) => isViableUnreadTarget({ path, sections: [], scope: 'documentation' }))
+    || codeCandidates.some((path) => isViableUnreadTarget({ path, sections: [], scope: 'code' }))
+  );
 
   // §1.1 README 快速路径：与编排式循环共享同一实现，简单首问在进入模型
   // 工具循环前直接由根 README 作答；未命中或回答不可核验时继续工具循环
@@ -236,11 +329,17 @@ const runToolLoopEvidenceAgent = async (
   });
   if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
   // 快速路径已种入的 README 证据也算已读文档，避免回落时 README-first 规则误拒其他来源。
-  documentationEvidenceCount += evidences.length;
+  documentationEvidenceCount = evidences.filter((evidence) => evidence.path && MARKDOWN_EVIDENCE_PATH.test(evidence.path)).length;
 
-  const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => MARKDOWN_EVIDENCE_PATH.test(path)
-    ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, signal)
-    : await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, signal);
+  const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => readRepositoryFileWithCache(
+    github,
+    input.repository.full_name,
+    owner,
+    repo,
+    path,
+    input.session.sourceRefSha,
+    signal,
+  );
 
   // 与编排式 loadDocument 相同的语义：已读路径直接复用缓存（同一文件的
   // 不同章节是合法的后续读取，不能被 invokeTool 的重复动作拦截挡住）。
@@ -296,7 +395,7 @@ const runToolLoopEvidenceAgent = async (
       return zh ? '已拒绝：读取失败、路径无效或读取预算已用尽。' : 'Rejected: the read failed, the path is invalid, or the read budget was exhausted.';
     }
     const sections = asStringArray(args.sections, 6);
-    const searchTerms = evidenceSearchTerms(input.question, sections);
+    const searchTerms = evidenceSearchTerms(question, sections);
     const plannedSegments = scope === 'documentation'
       ? citableSegmentsForDocument(document, sections, searchTerms)
       : buildEvidenceWindows(document.content, focus, sections.length > 0 ? sections : searchTerms);
@@ -370,7 +469,7 @@ const runToolLoopEvidenceAgent = async (
       round,
       zh ? '补充仓库元信息：已知问题与解决方案线索。' : 'Supplement repository metadata: known issues and resolution leads.',
       async (signal) => {
-        const searchKeywords = keywords.length > 0 ? keywords : [input.question.slice(0, 120)];
+        const searchKeywords = keywords.length > 0 ? keywords : [question.slice(0, 120)];
         const hits = await github.searchRepositoryIssues(owner, repo, searchKeywords, { signal });
         // 解决方案常在评论里：仅为前几条命中补充评论摘录，单条失败不阻断。
         const withComments: IssueHitWithComments[] = [];
@@ -402,14 +501,10 @@ const runToolLoopEvidenceAgent = async (
     return untrustedEvidenceBlock(newEvidence);
   };
 
-  const dispatchToolCall = async (call: AIToolCall, round: number): Promise<string> => {
-    const args = parseJsonObject(call.arguments) ?? {};
-    const docsMissing = zh
-      ? '已拒绝：必须先调用 read_documentation 阅读 README/docs，之后才能读取其他来源。'
-      : 'Rejected: call read_documentation on README/docs first; other sources are rejected until then.';
-
-    if (call.name === 'ready_to_answer') {
-      const missingList = asStringArray(args.missing, 6);
+  const confirmReadyToAnswer = async (args: Record<string, unknown>, round: number): Promise<{ ready: boolean; output: string; gaps?: string[] }> => {
+    const missingList = asStringArray(args.missing, 6);
+    const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
+    if (evidences.length === 0) {
       emit({
         toolName: 'evidence_gate',
         status: 'success',
@@ -420,8 +515,76 @@ const runToolLoopEvidenceAgent = async (
           ? (zh ? `模型承认仍有缺口：${missingList.join('；')}` : `Remaining gaps acknowledged: ${missingList.join('; ')}`)
           : (zh ? '模型认为必要证据已齐备。' : 'The model considers the necessary evidence complete.'),
       });
-      return zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
+      return { ready: true, output: confirmText };
     }
+
+    const coverage = await evaluateEvidenceCoverage(
+      researchInput,
+      question,
+      evidences,
+      documents,
+      documentationCandidates,
+      codeCandidates,
+      documentationSet,
+      codeSet,
+      metaSet,
+      ctx.callModelWithRetry,
+      round,
+      focus,
+      true,
+      missingList,
+    );
+    const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
+    const viableUnreadTargets = (coverage?.gate.recommendedTargets ?? []).filter(isViableUnreadTarget);
+    if (coverage && evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
+      emit({
+        toolName: 'evidence_gate',
+        status: 'success',
+        paramSummary: zh ? '证据已覆盖回答要求' : 'Evidence covers the answer requirements',
+        stage: 'verification',
+        round,
+        detail: coverage.gate.reason || confirmText,
+      });
+      return { ready: true, output: confirmText };
+    }
+
+    const gaps = Array.from(new Set([
+      ...(coverage?.missing ?? []),
+      ...missingList,
+      ...unfetchedMetaTargets.map((path) => (zh ? `拉取 ${path}` : `fetch ${path}`)),
+    ]));
+    if (gaps.length === 0) gaps.push(question);
+    // The model may end with an explicit gap list once every usable target has
+    // been read; otherwise a bounded "no reasonable source" turn would keep
+    // rejecting ready_to_answer until the tool budget runs out.
+    const canStopWithGaps = coverage
+      ? viableUnreadTargets.length === 0
+      : !hasUnreadCandidateSource();
+    if (missingList.length > 0 && unfetchedMetaTargets.length === 0 && canStopWithGaps) {
+      return { ready: true, output: confirmText, gaps };
+    }
+    emit({
+      toolName: 'evidence_gate',
+      status: 'error',
+      paramSummary: zh ? '证据尚未覆盖回答要求' : 'Evidence does not yet cover the answer requirements',
+      stage: 'verification',
+      round,
+      detail: gaps.join('; ').slice(0, 320),
+    });
+    return {
+      ready: false,
+      output: zh
+        ? `未通过证据门控。仍需补齐：${gaps.join('；')}。请继续调用工具，或在没有合理来源时于 missing 中说明。`
+        : `ready_to_answer was rejected by the evidence coverage gate. Still required: ${gaps.join('; ')}. Continue with the remaining tools, or list the unsupported items in missing when no reasonable source remains.`,
+      gaps,
+    };
+  };
+
+  const dispatchToolCall = async (call: AIToolCall, round: number): Promise<string> => {
+    const args = parseJsonObject(call.arguments) ?? {};
+    const docsMissing = zh
+      ? '已拒绝：必须先调用 read_documentation 阅读 README/docs，之后才能读取其他来源。'
+      : 'Rejected: call read_documentation on README/docs first; other sources are rejected until then.';
 
     // README 优先是代码级硬规则：未读到文档证据之前，调度器直接拒绝其他来源。
     if (documentationEvidenceCount === 0 && call.name !== 'read_documentation') return docsMissing;
@@ -437,11 +600,11 @@ const runToolLoopEvidenceAgent = async (
   const tools = buildToolLoopTools(input.language);
   const prefetchedEvidence = evidences.length > 0 ? untrustedEvidenceBlock(evidences) : '';
   const firstUserContent = [
-    buildToolLoopUserPrompt(input, documentationCandidates, codeCandidates),
+    buildToolLoopUserPrompt(researchInput, documentationCandidates, codeCandidates),
     prefetchedEvidence
       ? `${zh
-        ? '以下 README 证据已由快速路径读取，可直接用于判断是否还需要补充来源：'
-        : 'The README evidence below was already read by the fast path and is available for deciding whether more sources are needed:'}\n\n${prefetchedEvidence}`
+        ? '以下证据已在本次会话中读取或由快速路径读取，可直接用于判断是否还需要补充来源；若已能回答追问，立即调用 ready_to_answer：'
+        : 'The evidence below was already read in this session or by the fast path. Use it to decide whether more sources are needed; if it already answers the follow-up, call ready_to_answer immediately:'}\n\n${prefetchedEvidence}`
       : '',
   ].filter(Boolean).join('\n\n');
   const messages: AIToolLoopMessage[] = [
@@ -470,6 +633,7 @@ const runToolLoopEvidenceAgent = async (
   let nudges = 0;
   let loopTurns = 0;
   let retriedModelCall = false;
+  let answerGaps: string[] = [];
   // §5.5 turnMetrics 的结束原因；while 条件自然耗尽时在循环后兜底。
   let endReason = '';
   while (!ready && loopTurns < budget.maxTurns && ctx.hasTime() && conversationChars < TOOL_LOOP_MAX_CONVERSATION_CHARS) {
@@ -544,12 +708,16 @@ const runToolLoopEvidenceAgent = async (
     conversationChars += Math.max(64, result.content.length) + result.toolCalls.length * 48;
     for (const call of result.toolCalls) {
       if (call.name === 'ready_to_answer') {
-        const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
-        conversationChars += confirmText.length;
-        messages.push({ role: 'tool', toolCallId: call.id, content: confirmText });
-        endReason = 'agent_ready';
-        ready = true;
-        break;
+        const readiness = await confirmReadyToAnswer(parseJsonObject(call.arguments) ?? {}, loopTurns);
+        conversationChars += readiness.output.length;
+        messages.push({ role: 'tool', toolCallId: call.id, content: readiness.output });
+        answerGaps = readiness.gaps ?? [];
+        if (readiness.ready) {
+          endReason = 'agent_ready';
+          ready = true;
+          break;
+        }
+        continue;
       }
       const toolOutput = await dispatchToolCall(call, loopTurns);
       conversationChars += toolOutput.length;
@@ -575,6 +743,43 @@ const runToolLoopEvidenceAgent = async (
     };
   }
 
+  if (!ready && answerGaps.length > 0) {
+    // A rejected gap list goes stale if later tool calls fill it and the loop
+    // ends on budget without another ready_to_answer call.
+    const coverage = await evaluateEvidenceCoverage(
+      researchInput,
+      question,
+      evidences,
+      documents,
+      documentationCandidates,
+      codeCandidates,
+      documentationSet,
+      codeSet,
+      metaSet,
+      ctx.callModelWithRetry,
+      Math.max(1, loopTurns),
+      focus,
+      true,
+      answerGaps,
+    );
+    if (coverage) {
+      const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
+      if (evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
+        answerGaps = [];
+      } else {
+        answerGaps = Array.from(new Set([
+          ...coverage.requirements
+            .filter((requirement) => !(
+              requirement.status === 'verified'
+              || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
+            ))
+            .map((requirement) => requirement.requirement),
+          ...unfetchedMetaTargets.map((path) => (zh ? `拉取 ${path}` : `fetch ${path}`)),
+        ]));
+      }
+    }
+  }
+
   const content = await synthesizeVerifiedAnswer(
     ai,
     input,
@@ -582,9 +787,13 @@ const runToolLoopEvidenceAgent = async (
     Math.max(1, loopTurns),
     answerMaxTokens,
     ctx.callModelWithRetry,
-    '',
+    answerGaps.length > 0
+      ? (zh
+        ? `\n\n未满足的回答要求（不得当作事实）：${answerGaps.join('；')}。请明确标注仍未证实的内容。`
+        : `\n\nUnmet answer requirements (do not present as facts): ${answerGaps.join('; ')}. Explicitly mark what remains unverified.`)
+      : '',
     { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
-    detectResearchFocus(input.question),
+    detectResearchFocus(question),
   );
   ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'agent_ready', rounds: loopTurns });
   return { content, evidences };

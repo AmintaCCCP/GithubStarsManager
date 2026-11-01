@@ -234,6 +234,8 @@ export type AnswerRequirement = {
 
 export type QueryUnderstanding = {
   intent: string;
+  /** Follow-up rewritten as a self-contained question; falls back to the user's exact wording. */
+  standaloneQuestion: string;
   entities: string[];
   /** A small LLM-derived semantic expansion, not a mechanical keyword dump. */
   searchConcepts: string[];
@@ -321,6 +323,10 @@ export const cleanModelText = (value: unknown, maximum: number): string | null =
   typeof value === 'string' && value.trim() ? value.trim().slice(0, maximum) : null
 );
 
+const cleanStandaloneQuestion = (value: unknown): string | null => (
+  typeof value === 'string' && value.trim() ? value.trim() : null
+);
+
 export const asStringArray = (value: unknown, maximum: number): string[] => Array.isArray(value)
   ? value.map((item) => cleanModelText(item, 160)).filter((item): item is string => Boolean(item)).slice(0, maximum)
   : [];
@@ -365,6 +371,7 @@ export const parseQueryUnderstanding = (content: string, fallback: QueryUndersta
     : [];
   return {
     intent: cleanModelText(parsed.intent, 80) ?? fallback.intent,
+    standaloneQuestion: cleanStandaloneQuestion(parsed.standalone_question) ?? fallback.standaloneQuestion,
     entities: asStringArray(parsed.entities, 8),
     searchConcepts: asStringArray(parsed.search_concepts, 8),
     likelyDocumentTopics: asStringArray(parsed.likely_document_topics, 8),
@@ -374,6 +381,11 @@ export const parseQueryUnderstanding = (content: string, fallback: QueryUndersta
     initialTargets: initialTargets.length > 0 ? initialTargets : fallback.initialTargets,
     target: cleanModelText(parsed.target, 240) ?? fallback.target,
   };
+};
+
+export const parseStandaloneQuestion = (content: string, fallback: string): string => {
+  const parsed = parseJsonObject(content);
+  return cleanStandaloneQuestion(parsed?.standalone_question) ?? fallback;
 };
 
 const normalizeScope = (value: unknown, fallback: RetrievalScope): RetrievalScope => value === 'code' ? 'code' : value === 'documentation' ? 'documentation' : value === 'meta' ? 'meta' : fallback;

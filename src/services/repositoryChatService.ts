@@ -9,6 +9,7 @@ export {
   buildEvidenceGatePrompt,
   buildQueryUnderstandingPrompt,
   buildRetrievalPlanPrompt,
+  buildStandaloneQuestionPrompt,
   buildSystemPrompt,
   buildUserPrompt,
 } from './chat/prompts';
@@ -34,6 +35,7 @@ export {
   makeMarkdownHeadings,
   normalizePath,
   parseJsonObject,
+  parseStandaloneQuestion,
   rankedCandidatePaths,
   resolveRepositoryChatHeadSha,
   sectionSegments,
@@ -41,10 +43,15 @@ export {
 } from './chat/retrieval';
 export {
   createEvidenceToolbox,
+  evaluateEvidenceCoverage,
+  evidenceCoverageApproved,
   evidenceAgentInsufficientResponse,
   isTransientAgentError,
+  reusablePriorEvidence,
+  rewriteStandaloneQuestion,
   resolveTurnLimits,
   runEvidenceDrivenRepositoryChatTurn,
+  seedReadSegments,
   synthesizeVerifiedAnswer,
   tryFastPathAnswer,
 } from './chat/loop';

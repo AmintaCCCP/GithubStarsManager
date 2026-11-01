@@ -97,8 +97,33 @@ const README = [
   'A documented example project for repository research.',
 ].join('\n');
 
+const overviewEvidence = {
+  id: 'evidence-overview',
+  source: 'github' as const,
+  repoFullName: repository.full_name,
+  refSha: session.sourceRefSha,
+  path: 'README.md',
+  lineStart: 1,
+  lineEnd: 4,
+  url: `https://github.com/${repository.full_name}/blob/${session.sourceRefSha}/README.md#L1-L4`,
+  excerpt: 'A documented example project for repository research.',
+  retrievedAt: '2026-08-26T00:00:00.000Z',
+};
+
 const toolCall = (id: string, name: string, args: Record<string, unknown> = {}) => ({ id, name, arguments: JSON.stringify(args) });
 const modelTurn = (toolCalls: ReturnType<typeof toolCall>[]) => ({ content: '', toolCalls });
+const coverageGate = (reference = '/README.md - 1-4') => JSON.stringify({
+  sufficient: true,
+  confidence: 0.95,
+  reason: 'The evidence covers the question.',
+  requirements: [{
+    requirement_id: 'explicit-1',
+    requirement: 'question',
+    status: 'verified',
+    evidence: [reference],
+  }],
+  next_action: 'answer',
+});
 
 const configureTreeAndFiles = (contents: Record<string, string>) => {
   mocks.getRepositoryTree.mockResolvedValue({
@@ -150,9 +175,11 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
       .mockResolvedValueOnce(modelTurn([toolCall('c2', 'read_recent_releases')]))
       .mockResolvedValueOnce(modelTurn([toolCall('c3', 'ready_to_answer', { missing: [] })]));
-    mocks.generateChatText.mockResolvedValueOnce(
-      '## Updates\n\nThe first release adds a dashboard. `/README.md - 1-4`\n\nAssets ship for macOS. `/release-v1.0.0.md - 1-3`',
-    );
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? coverageGate()
+        : '## Updates\n\nThe first release adds a dashboard. `/README.md - 1-4`\n\nAssets ship for macOS. `/release-v1.0.0.md - 1-3`'
+    ));
 
     const result = await runToolLoopRepositoryChatTurn(turnInput('What changed recently?'));
 
@@ -161,6 +188,274 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/README.md - 1-4');
     expect(result.content).toContain('/release-v1.0.0.md - 1-3');
     expect(result.evidences.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rewrites a follow-up and can answer immediately from prior evidence', async () => {
+    mocks.getRepositoryTree.mockRejectedValue(new Error('tree unavailable'));
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('rewrite repository-chat follow-up')) {
+        return '{"standalone_question":"How do I install this project on Windows?"}';
+      }
+      if (options.system?.includes('Evidence Gate')) return coverageGate();
+      return 'A documented example project. `/README.md - 1-4`';
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [overviewEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: 'A documented example project. `/README.md - 1-4`', status: 'complete' as const, evidenceIds: [overviewEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What about Windows?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('What about Windows?'),
+      messages,
+      priorEvidence: [overviewEvidence],
+    });
+
+    expect(mocks.generateChatText.mock.calls[0]?.[0]?.system).toContain('rewrite repository-chat follow-up');
+    expect(mocks.generateWithTools).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryTree).not.toHaveBeenCalled();
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalled();
+    expect(result.content).toContain('/README.md - 1-4');
+  });
+
+  it('uses the complete rewritten follow-up in the tool-loop context', async () => {
+    const rewritten = `How do I install this project on Windows when the shell is PowerShell and the package registry uses a corporate proxy? ${'detail '.repeat(50)}`.trim();
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('rewrite repository-chat follow-up')) {
+        return JSON.stringify({ standalone_question: rewritten });
+      }
+      if (options.system?.includes('Evidence Gate')) return coverageGate();
+      return '## Install\n\nRun the documented installer. `/README.md - 1-4`';
+    });
+    mocks.generateWithTools
+      .mockImplementationOnce(async ({ messages }: { messages: Array<{ role: string; content?: unknown }> }) => {
+        expect(String(messages[0]?.content)).toContain(rewritten);
+        return modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]);
+      })
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: [] })]));
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: 'Run the installer.', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What about Windows?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    await runToolLoopRepositoryChatTurn({ ...turnInput('What about Windows?'), messages });
+
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects ready_to_answer until the evidence covers the required answer', async () => {
+    let gateCalls = 0;
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('Evidence Gate')) {
+        gateCalls += 1;
+        if (gateCalls === 1) {
+          return JSON.stringify({
+            sufficient: false,
+            confidence: 0.9,
+            reason: 'The overview does not cover installation.',
+            requirements: [{
+              requirement_id: 'explicit-1',
+              requirement: 'question',
+              status: 'missing',
+              evidence: [],
+            }],
+            next_action: 'retrieve_more',
+          });
+        }
+        return coverageGate();
+      }
+      return '## Install\n\nRun the documented installer. `/README.md - 1-4`';
+    });
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: [] })]))
+      .mockImplementationOnce(async ({ messages }: { messages: Array<{ role: string; content?: unknown }> }) => {
+        expect(String(messages.at(-1)?.content)).toContain('rejected by the evidence coverage gate');
+        return modelTurn([toolCall('c3', 'ready_to_answer', { missing: [] })]);
+      });
+
+    const result = await runToolLoopRepositoryChatTurn(turnInput('How do I install this project?'));
+
+    expect(gateCalls).toBe(2);
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(3);
+    expect(result.content).toContain('/README.md - 1-4');
+  });
+
+  it('allows ready_to_answer with explicit gaps once no usable targets remain', async () => {
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? JSON.stringify({
+          sufficient: false,
+          confidence: 0.9,
+          reason: 'Windows-specific installation is not documented.',
+          requirements: [{
+            requirement_id: 'explicit-1',
+            requirement: 'question',
+            status: 'missing',
+            evidence: [],
+          }],
+          next_action: 'retrieve_more',
+          recommended_targets: [],
+        })
+        : '## Install\n\nRun the documented installer. `/README.md - 1-4`'
+    ));
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['Windows-specific installer'] })]));
+
+    const result = await runToolLoopRepositoryChatTurn(turnInput('How do I install this project on Windows?'));
+
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(2);
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Windows-specific installer');
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Explicitly mark what remains unverified.');
+    expect(result.content).toContain('/README.md - 1-4');
+  });
+
+  it('treats recommended targets as exhausted once the file-read budget is spent', async () => {
+    configureTreeAndFiles({
+      'README.md': README,
+      'docs/other.md': '# Other\n\nExtra notes.',
+    });
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? JSON.stringify({
+          sufficient: false,
+          confidence: 0.9,
+          reason: 'The Windows installer is not documented.',
+          requirements: [{
+            requirement_id: 'explicit-1',
+            requirement: 'question',
+            status: 'missing',
+            evidence: [],
+          }],
+          next_action: 'retrieve_more',
+          recommended_targets: [{ path: 'docs/other.md', sections: [], purpose: 'windows install' }],
+        })
+        : '## Install\n\nRun the documented installer. `/README.md - 1-4`'
+    ));
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['Windows-specific installer'] })]));
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('How do I install this project on Windows?'),
+      agentBudget: { maxTurns: 6, maxToolCalls: 12, maxReadFiles: 1, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+    });
+
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(2);
+    expect(mocks.getRepositoryFile.mock.calls.some((call: unknown[]) => call[2] === 'docs/other.md')).toBe(false);
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Windows-specific installer');
+    expect(result.content).toContain('/README.md - 1-4');
+  });
+
+  it('keeps an already-read document target viable while one of its requested sections is unread', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Overview',
+        'A documented example project.',
+        '',
+        '## Install',
+        'Run the installer.',
+        '',
+        '## Configuration',
+        'Set the configuration file.',
+      ].join('\n'),
+    });
+    let gateCalls = 0;
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('Evidence Gate')) {
+        gateCalls += 1;
+        return JSON.stringify({
+          sufficient: false,
+          confidence: 0.9,
+          reason: 'Configuration is not covered yet.',
+          requirements: [{
+            requirement_id: 'explicit-1',
+            requirement: 'question',
+            status: 'missing',
+            evidence: [],
+          }],
+          next_action: 'retrieve_more',
+          recommended_targets: gateCalls === 1
+            ? [{ path: 'README.md', sections: ['Configuration'], purpose: 'configuration', scope: 'documentation' }]
+            : [],
+        });
+      }
+      return '## Configuration\n\nSet the configuration file. `/README.md - 9-10`';
+    });
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md', sections: ['Install'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['configuration steps'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c3', 'read_documentation', { path: 'README.md', sections: ['Configuration'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c4', 'ready_to_answer', { missing: ['configuration steps'] })]));
+
+    await runToolLoopRepositoryChatTurn(turnInput('How do I configure this project?'));
+
+    expect(gateCalls).toBe(2);
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(4);
+  });
+
+  it('refreshes rejected gaps before answering when later reads fill them', async () => {
+    configureTreeAndFiles({
+      'README.md': [
+        '# Example Project',
+        '',
+        '## Install',
+        'Run the installer.',
+        '',
+        '## Configuration',
+        'Set the configuration file.',
+      ].join('\n'),
+    });
+    let gateCalls = 0;
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => {
+      if (options.system?.includes('Evidence Gate')) {
+        gateCalls += 1;
+        return gateCalls === 1
+          ? JSON.stringify({
+            sufficient: false,
+            confidence: 0.9,
+            reason: 'Configuration is not covered yet.',
+            requirements: [{
+              requirement_id: 'explicit-1',
+              requirement: 'question',
+              status: 'missing',
+              evidence: [],
+            }],
+            next_action: 'retrieve_more',
+            recommended_targets: [{ path: 'README.md', sections: ['Configuration'], scope: 'documentation' }],
+          })
+          : JSON.stringify({
+            sufficient: true,
+            confidence: 0.95,
+            reason: 'Configuration is now covered.',
+            requirements: [{
+              requirement_id: 'explicit-1',
+              requirement: 'question',
+              status: 'verified',
+              evidence: ['/README.md - 6-7'],
+            }],
+            next_action: 'answer',
+          });
+      }
+      return '## Configuration\n\nSet the configuration file. `/README.md - 6-7`';
+    });
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md', sections: ['Install'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['configuration steps'] })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c3', 'read_documentation', { path: 'README.md', sections: ['Configuration'] })]));
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('How do I configure this project?'),
+      agentBudget: { maxTurns: 3, maxToolCalls: 12, maxReadFiles: 8, maxCodeReads: 3, maxNoProgressRounds: 2, maxDurationMs: 90_000 },
+    });
+
+    expect(gateCalls).toBe(2);
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).not.toContain('Unmet answer requirements');
+    expect(result.content).toContain('/README.md - 6-7');
   });
 
   it('rejects non-documentation reads before documentation evidence exists (README-first, enforced in code)', async () => {
@@ -173,7 +468,11 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
         return modelTurn([toolCall('c2', 'read_documentation', { path: 'README.md' })]);
       })
       .mockResolvedValueOnce(modelTurn([toolCall('c3', 'ready_to_answer', {})]));
-    mocks.generateChatText.mockResolvedValueOnce('## Overview\n\nA documented example project. `/README.md - 1-4`');
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? coverageGate()
+        : '## Overview\n\nA documented example project. `/README.md - 1-4`'
+    ));
 
     const result = await runToolLoopRepositoryChatTurn(turnInput('What is this project?'));
 
@@ -193,11 +492,12 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
       'src/engine.ts': 'export const switchProxy = () => "implementation detail";',
     });
     mocks.getRepositoryReleases.mockResolvedValue(releasesPayload);
-    mocks.generateChatText.mockImplementation(async (options: { user?: string }) => (
-      options.user?.includes('This turn used the fast path')
+    mocks.generateChatText.mockImplementation(async (options: { system?: string; user?: string }) => {
+      if (options.system?.includes('Evidence Gate')) return coverageGate();
+      return options.user?.includes('This turn used the fast path')
         ? 'I cannot verify this draft.'
-        : '## Updates\n\nThe first release adds a dashboard. `/release-v1.0.0.md - 1-4`'
-    ));
+        : '## Updates\n\nThe first release adds a dashboard. `/release-v1.0.0.md - 1-4`';
+    });
     mocks.generateWithTools
       .mockImplementationOnce(async ({ messages }: { messages: Array<{ role: string; content?: unknown }> }) => {
         expect(messages[0]?.role).toBe('user');
@@ -226,12 +526,16 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
       .mockResolvedValueOnce(modelTurn([toolCall('c2', 'read_recent_releases')]))
       .mockResolvedValueOnce(modelTurn([toolCall('c3', 'read_recent_releases')]))
       .mockResolvedValueOnce(modelTurn([toolCall('c4', 'ready_to_answer', {})]));
-    mocks.generateChatText.mockResolvedValueOnce('## Updates\n\nShips macOS builds. `/release-v1.0.0.md - 1-4`');
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? coverageGate()
+        : '## Updates\n\nShips macOS builds. `/release-v1.0.0.md - 1-11`'
+    ));
 
     const result = await runToolLoopRepositoryChatTurn(turnInput('What changed recently?'));
 
     expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(2);
-    expect(result.content).toContain('/release-v1.0.0.md - 1-4');
+    expect(result.content).toContain('/release-v1.0.0.md - 1-11');
   });
 
   it('keeps keyword windows from a headingless workflow when the requested section does not exist', async () => {
@@ -251,7 +555,11 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
       .mockResolvedValueOnce(modelTurn([toolCall('c2', 'read_documentation', { path: '.github/workflows/build-release.yml', sections: ['Build normal and offline apps'] })]))
       .mockResolvedValueOnce(modelTurn([toolCall('c3', 'ready_to_answer', { missing: [] })]));
-    mocks.generateChatText.mockResolvedValueOnce('## Release assets\n\nThe offline variant sets the OFFLINE compilation condition. `/.github/workflows/build-release.yml - 1-7`');
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? coverageGate()
+        : '## Release assets\n\nThe offline variant sets the OFFLINE compilation condition. `/.github/workflows/build-release.yml - 1-7`'
+    ));
 
     const result = await runToolLoopRepositoryChatTurn(turnInput('What is the difference between offline and non-offline release assets?'));
 
