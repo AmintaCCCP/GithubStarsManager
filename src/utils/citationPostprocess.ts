@@ -19,6 +19,14 @@ const isTableSeparatorRow = (line: string): boolean => {
   return trimmed.includes('|') && trimmed.includes('-') && /^[\s|:-]+$/.test(trimmed);
 };
 
+const isSetextUnderline = (lines: string[], index: number): boolean => {
+  if (index < 1 || !/^ {0,3}(?:=+|-+)\s*$/.test(lines[index] ?? '')) return false;
+  const previous = lines[index - 1] ?? '';
+  return Boolean(previous.trim())
+    && !/^ {0,3}#{1,6}\s+/.test(previous)
+    && !/^\s*(?:[-*+]|\d+[.)])\s+/.test(previous);
+};
+
 /** 返回以 end 结束的 Markdown 表格的表头行；普通含竖线正文不算表格。 */
 const tableHeaderStart = (lines: string[], end: number): number | null => {
   if (end < 1 || !lines[end]?.includes('|')) return null;
@@ -128,6 +136,10 @@ export const liftStandaloneCitationLines = (markdown: string): string => {
     let target = output.length - 1;
     for (;;) {
       while (target >= 0 && output[target]!.trim() === '') target -= 1;
+      if (isSetextUnderline(output, target)) {
+        target -= 1;
+        continue;
+      }
       const tableStart = tableHeaderStart(output, target);
       if (tableStart !== null) {
         target = tableStart - 1;

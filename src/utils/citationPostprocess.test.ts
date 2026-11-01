@@ -58,6 +58,30 @@ describe('liftStandaloneCitationLines', () => {
     ].join('\n'));
   });
 
+  it('keeps a Setext underline intact when lifting a citation after a code block', () => {
+    for (const underline of ['---', '===']) {
+      const content = [
+        'Installation',
+        underline,
+        '',
+        '```bash',
+        'npx skills add owner/repo',
+        '```',
+        '',
+        '`/README.md - 94-119`',
+      ].join('\n');
+      const result = liftStandaloneCitationLines(content);
+      expect(result).toBe([
+        'Installation `/README.md - 94-119`',
+        underline,
+        '',
+        '```bash',
+        'npx skills add owner/repo',
+        '```',
+      ].join('\n'));
+    }
+  });
+
   it('moves citations after tables onto the introducing sentence', () => {
     const content = [
       'Runtime requirements:',
