@@ -42,7 +42,16 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: node scripts/ci-scope.cjs
+          CI_SCOPE_ROOT: ${{ github.workspace }}
+        run: |
+          # Pull request code is untrusted; execute the scope logic from base.
+          script="$RUNNER_TEMP/ci-scope.cjs"
+          if git cat-file blob "${PR_BASE_SHA}:scripts/ci-scope.cjs" >"$script" 2>/dev/null; then
+            node "$script"
+          else
+            echo "::warning::Trusted ci-scope script unavailable; running full CI"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
 
   quality:
     name: Quality gates
