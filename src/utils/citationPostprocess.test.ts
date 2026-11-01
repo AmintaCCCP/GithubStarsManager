@@ -28,12 +28,9 @@ describe('liftStandaloneCitationLines', () => {
     ].join('\n'));
   });
 
-  it('moves citations after lists and tables onto the introducing sentence', () => {
+  it('moves citations after tables onto the introducing sentence', () => {
     const content = [
       'Runtime requirements:',
-      '',
-      '- Node.js',
-      '- ffmpeg',
       '',
       '| Tool | Purpose |',
       '| --- | --- |',
@@ -45,7 +42,7 @@ describe('liftStandaloneCitationLines', () => {
     expect(result.startsWith('Runtime requirements: `/README.md - 1-5`')).toBe(true);
   });
 
-  it('does not append a citation to a closing fence before a list', () => {
+  it('attaches a citation after a list to the list instead of the preceding fence', () => {
     const content = [
       'Run this:',
       '',
@@ -60,14 +57,14 @@ describe('liftStandaloneCitationLines', () => {
     ].join('\n');
     const result = liftStandaloneCitationLines(content);
     expect(result).toBe([
-      'Run this: `/README.md - 1-5`',
+      'Run this:',
       '',
       '```bash',
       'npm install',
       '```',
       '',
       '- Node.js',
-      '- ffmpeg',
+      '- ffmpeg `/README.md - 1-5`',
     ].join('\n'));
   });
 });

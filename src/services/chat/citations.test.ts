@@ -121,6 +121,23 @@ describe('pruneUnverifiableSections', () => {
     expect(unverified).toContain('This project stores data locally.');
     expect(unverified).not.toContain('The service starts with Docker.');
   });
+
+  it('keeps the missing-answer note out of the unverified section', () => {
+    const content = [
+      '## Setup',
+      '',
+      `Run the installer. ${citation}`,
+      '',
+      '## Missing',
+      '',
+      '> Not found in the files read: license terms',
+    ].join('\n');
+    const pruned = pruneUnverifiableSections(content, evidences, 'en');
+    if (!pruned) throw new Error('expected a pruned answer');
+    expect(pruned).toContain('## Missing');
+    expect(pruned).toContain('> Not found in the files read: license terms');
+    expect(pruned).not.toContain('Unverified or missing information');
+  });
 });
 
 describe('ensureVerifiableSources', () => {

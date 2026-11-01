@@ -11,7 +11,7 @@ export const MARKDOWN_EVIDENCE_PATH = /\.(?:md|mdx|markdown|txt)$/i;
 const DOCUMENTATION_MARKDOWN_PATH = /(?:^|\/)(?:docs?|guides?|examples?|architecture|design|reference|adr)(?:\/|$).*\.(?:md|mdx|markdown|txt)$/i;
 const LOW_SIGNAL_TEST_PATH = /(^|\/)(?:__tests__|__snapshots__|test|tests|fixtures)(?:\/|$)|\.(?:test|spec)\.[^.]+$|\.snap$/i;
 const COMMON_QUERY_TERMS = new Set(['this', 'that', 'with', 'from', 'what', 'how', 'the', 'and', 'for', 'are', 'is', 'repo', 'repository', 'project', 'readme', '实现', '项目', '仓库', '如何', '怎么', '这个', '那个', '一下', '详细']);
-export const isCreativeRequest = (question: string): boolean => /(?:公众号|推文|文章|文案|宣传稿|新闻稿|博客|故事|诗歌|(?:写|创作)(?:一篇|一首|个)?(?:文章|推文|文案|宣传稿|新闻稿|博客|故事|诗)|(?:write|draft|compose|create|generate)\s+(?:an?\s+|the\s+)?(?:article|post|blog|story|poem|essay|song|tweet|copy))/i.test(question);
+export const isCreativeRequest = (question: string): boolean => /(?:公众号|推文|文章|文案|宣传稿|新闻稿|博客|故事|诗歌|(?:写|创作)(?:一篇|一首|个)?(?:文章|推文|文案|宣传稿|新闻稿|博客|故事|诗)|\b(?:write|draft|compose|create|generate)\s+(?:an?\s+|the\s+)?(?:article|post(?!\s+requests?\b)|blog|story|poem|essay|song|tweet|copy)s?\b)/i.test(question);
 /**
  * Generates a unique identifier for repository chat turn events and messages.
  *

@@ -1,16 +1,15 @@
 const INLINE_CODE_RE = /`([^`\n]+)`/g;
-const LIST_ITEM_RE = /^\s*(?:[-*+]|\d+[.)])\s+/;
 const CITATION_RE = /^\/?([^\s`]+)\s*[-—–]\s+(\d+)(?:\s*-\s*(\d+))?$/;
 
 type InlineCode = { start: number; end: number; token: string; key: string };
-type FenceMarker = { char: string; length: number };
+export type FenceMarker = { char: string; length: number };
 
-const fenceMarker = (line: string): FenceMarker | null => {
+export const fenceMarker = (line: string): FenceMarker | null => {
   const match = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
   return match?.[1] ? { char: match[1][0]!, length: match[1].length } : null;
 };
 
-const isClosingFence = (line: string, fence: FenceMarker): boolean => {
+export const isClosingFence = (line: string, fence: FenceMarker): boolean => {
   const match = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(line);
   return Boolean(match?.[1] && match[1][0] === fence.char && match[1].length >= fence.length);
 };
@@ -116,10 +115,10 @@ export const liftStandaloneCitationLines = (markdown: string): string => {
     if (target === lastClosedFenceEnd) {
       target = lastClosedFenceStart - 1;
       while (target >= 0 && output[target]!.trim() === '') target -= 1;
-    } else if (target >= 0 && (output[target]!.includes('|') || LIST_ITEM_RE.test(output[target]!))) {
+    } else if (target >= 0 && output[target]!.includes('|')) {
       while (
         target >= 0
-        && (output[target]!.includes('|') || LIST_ITEM_RE.test(output[target]!) || output[target]!.trim() === '')
+        && (output[target]!.includes('|') || output[target]!.trim() === '')
       ) target -= 1;
       if (target === lastClosedFenceEnd) {
         target = lastClosedFenceStart - 1;

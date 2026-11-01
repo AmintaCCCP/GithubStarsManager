@@ -15,6 +15,7 @@ import {
   type RetrievalScope,
 } from './retrieval';
 import type { RepositoryChatTurnInput } from './loop';
+import { fenceMarker, isClosingFence, type FenceMarker } from '../../utils/citationPostprocess';
 
 /** 证据块（多条 excerpt 拼接）进入模型上下文时的总量上限。 */
 const MAX_EVIDENCE_BLOCK_CHARS = 96_000;
@@ -152,18 +153,6 @@ export const referenceCoveredByEvidence = (token: string, evidences: ToolEvidenc
 
 const LIST_ITEM_LINE_RE = /^\s*(?:[-*+]|\d+[.)])\s+/;
 const HEADING_LINE_RE = /^\s{0,3}#{1,6}\s+/;
-type FenceMarker = { char: string; length: number };
-
-const fenceMarker = (line: string): FenceMarker | null => {
-  const match = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
-  return match?.[1] ? { char: match[1][0]!, length: match[1].length } : null;
-};
-
-const isClosingFence = (line: string, fence: FenceMarker): boolean => {
-  const match = /^\s{0,3}(`{3,}|~{3,})\s*$/.exec(line);
-  return Boolean(match?.[1] && match[1][0] === fence.char && match[1].length >= fence.length);
-};
-
 const isStandaloneHeading = (section: string): boolean => /^#{1,6}\s+[^\n]+$/.test(section.trim());
 
 const hasAnyValidReference = (content: string, evidences: ToolEvidence[]): boolean => {
@@ -287,6 +276,9 @@ const isFactualBlock = (block: MarkdownBlock): boolean => {
   return /[.!?。！？]["'”’)]*\s*$/.test(text) || words >= 5 || cjkChars >= 8;
 };
 
+const isMissingAnswerNote = (block: MarkdownBlock): boolean =>
+  /^>\s*(?:Not found in the files read|未在已读取的文件中找到)\s*[:：]/.test(block.text.trim());
+
 export const hasCompleteSourceReferences = (content: string, evidences: ToolEvidence[]): boolean => {
   if (sourceReferences(evidences).length === 0) return false;
   const sections = markdownSections(content);
@@ -381,7 +373,11 @@ export const pruneUnverifiableSections = (content: string, evidences: ToolEviden
       kept.push(...headings);
       continue;
     }
-    const keptContent = content.filter((block) => !isFactualBlock(block) || hasAnyValidReference(block.text, evidences));
+    const keptContent = content.filter((block) => (
+      !isFactualBlock(block)
+      || isMissingAnswerNote(block)
+      || hasAnyValidReference(block.text, evidences)
+    ));
     const unverifiedContent = content.filter((block) => !keptContent.includes(block));
     if (keptContent.length > 0) kept.push(...headings, ...keptContent.map((block) => block.text));
     else unverified.push(...headings);

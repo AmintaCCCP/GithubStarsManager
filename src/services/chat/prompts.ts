@@ -70,7 +70,7 @@ export const ANSWER_FORMAT_DIRECTIVE = (language: AppLanguage, intent = 'general
 export const ANSWER_LENGTH_DIRECTIVE = (language: AppLanguage, intent = 'general'): string => {
   const answerIntent = normalizeAnswerIntent(intent);
   const zh = {
-    installation: '篇幅要求：安装/使用类正文控制在 250 字以内（约 900 字符，不含代码块）；其他方式最多 2 种，前置依赖最多 5 项。',
+    installation: '篇幅要求：安装/使用类正文控制在 250 字以内（不含代码块）；其他方式最多 2 种，前置依赖最多 5 项。',
     configuration: '篇幅要求：配置类正文控制在 500 字以内，只列出回答问题所需的配置项、默认值和最小示例。',
     deployment: '篇幅要求：部署类正文控制在 500 字以内，只保留前置条件、部署步骤和阻断性注意事项。',
     general: '篇幅要求：总览/功能类控制在 300 字以内，优先用 3-6 条要点，不要写成长文。',

@@ -44,5 +44,9 @@ describe('isCreativeRequest', () => {
     expect(isCreativeRequest('写一首诗介绍这个项目')).toBe(true);
     expect(isCreativeRequest('创作一首诗介绍这个项目')).toBe(true);
     expect(isCreativeRequest('How do I use docker compose?')).toBe(false);
+    expect(isCreativeRequest('How do I create postgres schema?')).toBe(false);
+    expect(isCreativeRequest('How do I generate a post request using this API?')).toBe(false);
+    expect(isCreativeRequest('generate copyright headers')).toBe(false);
+    expect(isCreativeRequest('How do I generate a post endpoint?')).toBe(true);
   });
 });
