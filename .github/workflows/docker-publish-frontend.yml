@@ -164,6 +164,7 @@ jobs:
             exit 0
           fi
           test -n "$DIGEST"
+          image="${REGISTRY}/${IMAGE_NAME,,}"
           docker buildx imagetools create \
-            --tag "${REGISTRY}/${IMAGE_NAME}:latest" \
-            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+            --tag "${image}:latest" \
+            "${image}@${DIGEST}"

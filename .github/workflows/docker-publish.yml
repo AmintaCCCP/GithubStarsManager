@@ -161,7 +161,9 @@ jobs:
             exit 0
           fi
           test -n "$DIGEST"
+          image="${REGISTRY}/${IMAGE_NAME,,}"
+          legacy="${REGISTRY}/${LEGACY_IMAGE_NAME,,}"
           docker buildx imagetools create \
-            --tag "${REGISTRY}/${IMAGE_NAME}:latest" \
-            --tag "${REGISTRY}/${LEGACY_IMAGE_NAME}:latest" \
-            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+            --tag "${image}:latest" \
+            --tag "${legacy}:latest" \
+            "${image}@${DIGEST}"
