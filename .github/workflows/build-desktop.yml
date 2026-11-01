@@ -161,7 +161,7 @@ jobs:
           /etc/apt/sources.list.d/microsoft-prod.list \
           /etc/apt/sources.list.d/microsoft-prod.list.save 2>/dev/null || true
         sudo apt-get update -o Acquire::Retries=3
-        sudo apt-get install -y libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
+        sudo apt-get install -y xvfb libnss3-dev libatk-bridge2.0-dev libdrm2 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libxss1 libasound2-dev
 
     - name: Verify committed Electron sources
       shell: bash
@@ -271,13 +271,6 @@ jobs:
       if: startsWith(matrix.os, 'ubuntu')
       shell: bash
       run: |
-        # Install xvfb for headless testing (same MS apt 403 guard as above)
-        sudo rm -f /etc/apt/sources.list.d/azure-cli.list \
-          /etc/apt/sources.list.d/microsoft-prod.list \
-          /etc/apt/sources.list.d/microsoft-prod.list.save 2>/dev/null || true
-        sudo apt-get update -o Acquire::Retries=3
-        sudo apt-get install -y xvfb
-
         # Test if the app can start (will exit quickly but should not crash)
         echo "Testing Electron app startup..."
         timeout 10s xvfb-run -a npm run electron || echo "App test completed (timeout expected)"

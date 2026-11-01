@@ -107,8 +107,27 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+  audit:
+    name: Dependency audit
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
       - name: Dependency audit (report-only baseline)
         # Advisory-only until the existing transitive backlog is cleared.
+        # npm audit reads the lockfile directly, so this job needs no install.
         run: npm audit --audit-level=high || true
 
   tests:
