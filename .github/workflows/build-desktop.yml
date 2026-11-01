@@ -141,27 +141,6 @@ jobs:
     - name: Install dependencies
       run: npm ci --no-audit --no-fund
 
-    - name: Download web bundle when ready
-      shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-        GH_REPO: ${{ github.repository }}
-      run: |
-        # Start dependency installation alongside the single web build, then
-        # wait only for the artifact upload instead of the whole web job.
-        for _ in $(seq 1 60); do
-          if gh run download "$GITHUB_RUN_ID" --name web-dist --dir dist >/dev/null 2>&1; then
-            exit 0
-          fi
-          sleep 5
-        done
-        echo "::error::web-dist artifact was not available within 5 minutes"
-        exit 1
-
-    - name: Verify downloaded web bundle
-      shell: bash
-      run: test -f dist/index.html
-
     - name: Prepare build resources
       shell: bash
       run: |
@@ -244,6 +223,27 @@ jobs:
         CSC_LINK_SECRET: ${{ secrets.CSC_LINK }}
         CSC_KEY_PASSWORD_SECRET: ${{ secrets.CSC_KEY_PASSWORD }}
 
+    - name: Download web bundle when ready
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        # Install dependencies and platform tooling while the single web build
+        # runs, then wait only for its artifact instead of the whole web job.
+        for _ in $(seq 1 60); do
+          if gh run download "$GITHUB_RUN_ID" --name web-dist --dir dist >/dev/null 2>&1; then
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "::error::web-dist artifact was not available within 5 minutes"
+        exit 1
+
+    - name: Verify downloaded web bundle
+      shell: bash
+      run: test -f dist/index.html
+
     - name: Build Electron app
       shell: bash
       run: |
@@ -304,7 +304,6 @@ jobs:
           release/*.exe
           release/*.msi
         if-no-files-found: ignore
-        retention-days: 1
 
     - name: Upload artifacts (macOS)
       if: matrix.os == 'macos-latest' && github.ref_type == 'tag' && success()
@@ -313,7 +312,6 @@ jobs:
         name: macos-app
         path: release/*.dmg
         if-no-files-found: ignore
-        retention-days: 1
 
     - name: Upload artifacts (Linux)
       if: startsWith(matrix.os, 'ubuntu') && github.ref_type == 'tag' && success()
@@ -322,7 +320,6 @@ jobs:
         name: linux-app
         path: release/*.AppImage
         if-no-files-found: ignore
-        retention-days: 1
 
   release:
     needs: [scope, web, build]

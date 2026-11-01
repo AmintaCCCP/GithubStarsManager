@@ -14,6 +14,7 @@ const path = require('node:path');
 
 const DEFAULT_ROOT = path.resolve(__dirname, '..');
 
+/** Return true when a repository-relative path is documentation. */
 function isDocsPath(filePath) {
   return filePath === 'README.md'
     || filePath === 'README_zh.md'
@@ -21,10 +22,12 @@ function isDocsPath(filePath) {
     || filePath.startsWith('docs/');
 }
 
+/** Return true only for a non-empty changeset containing documentation. */
 function docsOnly(files) {
   return files.length > 0 && files.every(isDocsPath);
 }
 
+/** List every path changed between two commits, including rename endpoints. */
 function changedFiles(root, base, head) {
   const result = spawnSync(
     'git',
@@ -40,6 +43,7 @@ function changedFiles(root, base, head) {
   return result.stdout.split('\0').filter(Boolean);
 }
 
+/** Publish the decision as a GitHub Actions step output. */
 function writeOutput(run) {
   const value = run ? 'true' : 'false';
   if (process.env.GITHUB_OUTPUT) {
@@ -48,6 +52,7 @@ function writeOutput(run) {
   console.log(`ci-scope: run=${value}`);
 }
 
+/** Classify the current event and decide whether full CI is required. */
 function run(env = process.env) {
   if (env.GITHUB_EVENT_NAME !== 'pull_request') {
     writeOutput(true);
