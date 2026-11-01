@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Composer } from './Composer';
 
@@ -60,7 +60,9 @@ describe('Composer', () => {
     expect(onSend).not.toHaveBeenCalled();
 
     fireEvent.compositionEnd(textarea);
-    fireEvent.keyDown(textarea, { key: 'Enter', keyCode: 13 });
+    const confirmEvent = createEvent.keyDown(textarea, { key: 'Enter', keyCode: 13 });
+    fireEvent(textarea, confirmEvent);
+    expect(confirmEvent.defaultPrevented).toBe(true);
     expect(onSend).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(51);

@@ -96,16 +96,19 @@ export const Composer: React.FC<{
             // confirms an IME candidate. Suppress that immediate Enter too.
             const justEndedComposition = compositionEndedAtRef.current > 0
               && Date.now() - compositionEndedAtRef.current < 50;
-            if (
-              event.key === 'Enter'
-              && !event.shiftKey
-              && !event.nativeEvent.isComposing
-              && !isComposingRef.current
-              && event.keyCode !== 229
-              && !justEndedComposition
-            ) {
+            if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
-              if (canChat && value.trim() && !isSending) onSend();
+              if (
+                !event.nativeEvent.isComposing
+                && !isComposingRef.current
+                && event.keyCode !== 229
+                && !justEndedComposition
+                && canChat
+                && value.trim()
+                && !isSending
+              ) {
+                onSend();
+              }
             }
           }}
           placeholder={t('repositoryChatSheet.ask-follow-up')}

@@ -5,6 +5,7 @@ import { DialogProvider } from '../hooks/useDialog';
 import { useAppStore } from '../store/useAppStore';
 import { useRepositoryChat } from '../features/repository-chat/hooks/useRepositoryChat';
 import { useRepositoryChatSessions } from '../features/repository-chat/hooks/useRepositoryChatSessions';
+import { noVerifiedSummaryResponse } from '../services/repositoryChatService';
 import type { Repository } from '../types';
 import type { RepositoryChatMessage, RepositoryChatSession } from '../types/repositoryChat';
 
@@ -138,6 +139,25 @@ describe('RepositoryChatSheet', () => {
     await waitFor(() => expect(screen.getByLabelText('问题')).toHaveValue(''));
   });
 
+  it('clears editing state when deleting the last active session', async () => {
+    mockHooks();
+    const view = renderSheet();
+
+    fireEvent.click(screen.getByLabelText('编辑问题'));
+    expect(screen.getByLabelText('取消编辑')).toBeInTheDocument();
+
+    activeSession = null;
+    messages = [];
+    mockHooks();
+    view.rerender(
+      <DialogProvider>
+        <RepositoryChatSheet isOpen onClose={vi.fn()} repository={repository} />
+      </DialogProvider>,
+    );
+
+    await waitFor(() => expect(screen.queryByLabelText('取消编辑')).not.toBeInTheDocument());
+  });
+
   it('keeps a draft restored when returning from settings', async () => {
     sessionStorage.setItem('gsm:repository-chat-return', JSON.stringify({
       repoId: repository.id,
@@ -180,5 +200,24 @@ describe('RepositoryChatSheet', () => {
     fireEvent.click(screen.getByLabelText('复制回答'));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('Answer'));
+  });
+
+  it('hides copy for the exact no-verified-summary fallback', () => {
+    messages = [{ ...answerMessage, content: noVerifiedSummaryResponse('zh') }];
+    mockHooks();
+    renderSheet();
+
+    expect(screen.queryByLabelText('复制回答')).not.toBeInTheDocument();
+  });
+
+  it('keeps copy when a valid answer mentions the fallback wording', () => {
+    messages = [{
+      ...answerMessage,
+      content: `The fallback wording is: ${noVerifiedSummaryResponse('zh')}`,
+    }];
+    mockHooks();
+    renderSheet();
+
+    expect(screen.getByLabelText('复制回答')).toBeInTheDocument();
   });
 });

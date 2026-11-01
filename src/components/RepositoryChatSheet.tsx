@@ -194,9 +194,9 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     const nextSessionId = activeSession?.id ?? null;
     const previousSessionId = previousActiveSessionIdRef.current;
     previousActiveSessionIdRef.current = nextSessionId;
-    if (!previousSessionId || !nextSessionId || previousSessionId === nextSessionId) return;
+    if (!previousSessionId || previousSessionId === nextSessionId) return;
     setEditingMessageId(null);
-    setDraft('');
+    if (nextSessionId) setDraft('');
   }, [activeSession?.id]);
   useEffect(() => {
     if (!isOpen || !initialSessionId || initialSessionAppliedRef.current === initialSessionId || isLoading) return;
@@ -342,8 +342,8 @@ const RepositoryChatSheet: React.FC<RepositoryChatSheetProps> = ({
     && message.status !== 'error'
     && message.status !== 'aborted'
     && message.content.length > 0
-    && !/未能生成可与精确来源核验的总结性结果|无法完成可验证的判断|did not produce a source-verifiable summary|a verifiable determination cannot be made/i.test(message.content)
-  ), []);
+    && message.content.trim() !== t('repositoryChatService.no-verified-summary')
+  ), [t]);
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
