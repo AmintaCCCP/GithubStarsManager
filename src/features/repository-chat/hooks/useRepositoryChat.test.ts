@@ -313,6 +313,88 @@ describe('useRepositoryChat persistence failures', () => {
     });
   });
 
+  it('keeps a verified answer complete when evidence persistence fails', async () => {
+    mocks.saveMessage.mockResolvedValue(undefined);
+    mocks.saveEvidence.mockRejectedValue(new Error('evidence store unavailable'));
+    const evidence = {
+      id: 'evidence-unpersisted',
+      source: 'github' as const,
+      repoFullName: repository.full_name,
+      refSha: session.sourceRefSha,
+      path: 'README.md',
+      lineStart: 1,
+      lineEnd: 2,
+      url: 'https://github.com/owner/example/blob/abcdef/README.md#L1-L2',
+      excerpt: 'README',
+      retrievedAt: '2026-08-26T00:00:00.000Z',
+    };
+    mocks.runRepositoryChatTurn.mockResolvedValue({
+      content: 'Verified answer. `/README.md - 1-2`',
+      evidences: [evidence],
+    });
+    const onMessagesChange = vi.fn();
+    const { result } = renderHook(() => useRepositoryChat({
+      repository,
+      session,
+      messages: emptyMessages,
+      onMessagesChange,
+      onSessionChange: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    await act(async () => {
+      await result.current.send('How do I use this project?');
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(onMessagesChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ role: 'user' }),
+      expect.objectContaining({
+        role: 'assistant',
+        status: 'complete',
+        content: 'Verified answer. `/README.md - 1-2`',
+        evidenceIds: [evidence.id],
+      }),
+    ]);
+  });
+
+  it('blocks a second send while prior evidence is still loading', async () => {
+    let resolveEvidence!: (value: never[]) => void;
+    mocks.listEvidence.mockReturnValue(new Promise((resolve) => {
+      resolveEvidence = resolve;
+    }));
+    mocks.saveMessage.mockResolvedValue(undefined);
+    mocks.saveEvidence.mockResolvedValue(undefined);
+    mocks.runRepositoryChatTurn.mockResolvedValue({ content: 'Verified answer.', evidences: [] });
+    const previousMessages: RepositoryChatMessage[] = [
+      { id: 'user-1', sessionId: session.id, role: 'user', content: 'How do I install this?', status: 'complete', evidenceIds: [], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'assistant-1', sessionId: session.id, role: 'assistant', content: 'Run the installer.', status: 'complete', evidenceIds: ['evidence-prior'], createdAt: '2026-08-26T00:00:02.000Z' },
+    ];
+    const { result } = renderHook(() => useRepositoryChat({
+      repository,
+      session,
+      messages: emptyMessages,
+      onMessagesChange: vi.fn(),
+      onSessionChange: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    let firstSend!: Promise<void>;
+    let secondSend!: Promise<void>;
+    act(() => {
+      firstSend = result.current.send('First question', previousMessages);
+      secondSend = result.current.send('Second question', previousMessages);
+    });
+    await waitFor(() => expect(result.current.isSending).toBe(true));
+    expect(mocks.listEvidence).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveEvidence([]);
+      await Promise.all([firstSend, secondSend]);
+    });
+
+    expect(mocks.runRepositoryChatTurn).toHaveBeenCalledTimes(1);
+    expect(mocks.runRepositoryChatTurn).toHaveBeenCalledWith(expect.objectContaining({ question: 'First question' }));
+  });
+
   it('does not overwrite a rename made while the answer is streaming', async () => {
     mocks.saveMessage.mockResolvedValue(undefined);
     mocks.saveToolEvent.mockResolvedValue(undefined);

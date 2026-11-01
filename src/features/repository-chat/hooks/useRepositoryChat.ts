@@ -74,6 +74,7 @@ export const useRepositoryChat = ({
     repositoryChatSettings: state.repositoryChatSettings,
   })));
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
   const retryInFlightRef = useRef(false);
   const toolEventIdsRef = useRef<Map<string, { id: string; createdAt: string }>>(new Map());
   const toolEventWriteChainsRef = useRef<Map<string, Promise<void>>>(new Map());
@@ -289,7 +290,7 @@ export const useRepositoryChat = ({
     sessionOverride?: RepositoryChatSession,
   ) => {
     const activeSession = sessionOverride ?? session;
-    if (!repository || !activeSession || !aiConfig || unavailableReason || isSending || (!isRetry && retryInFlightRef.current)) {
+    if (!repository || !activeSession || !aiConfig || unavailableReason || sendingRef.current || isSending || (!isRetry && retryInFlightRef.current)) {
       if (unavailableReason) setError(unavailableReason);
       return;
     }
@@ -298,6 +299,7 @@ export const useRepositoryChat = ({
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    sendingRef.current = true;
     setIsSending(true);
     setError(null);
     toolEventIdsRef.current.clear();
@@ -407,7 +409,12 @@ export const useRepositoryChat = ({
         const finalEvidences = Array.from(new Map(
           [...liveEvidence, ...result.evidences].map((evidence) => [evidence.id, evidence]),
         ).values());
-        await Promise.all(finalEvidences.map((evidence) => repositoryChatStorage.saveEvidence(evidence)));
+        try {
+          await Promise.all(finalEvidences.map((evidence) => repositoryChatStorage.saveEvidence(evidence)));
+        } catch (evidenceError) {
+          // Evidence persistence is auxiliary; never downgrade a verified answer to an error.
+          console.warn('[repository-chat] unable to persist evidence', evidenceError);
+        }
         const completedAssistant: RepositoryChatMessage = {
           ...assistantMessage,
           content: result.content,
@@ -482,6 +489,7 @@ export const useRepositoryChat = ({
       if (!aborted) setError(repositoryChatErrorMessage(unknownError, language));
     } finally {
       abortControllerRef.current = null;
+      sendingRef.current = false;
       setIsSending(false);
     }
   }, [aiConfig, githubToken, isSending, language, loadPriorEvidence, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.fastPath, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, retainNewestSession, session, unavailableReason, t]);

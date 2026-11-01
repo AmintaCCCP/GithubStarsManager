@@ -31,6 +31,7 @@ import {
   buildEvidenceGatePrompt,
   buildQueryUnderstandingPrompt,
   buildRetrievalPlanPrompt,
+  buildStandaloneQuestionPrompt,
   buildSystemPrompt,
   buildUserPrompt,
 } from './prompts';
@@ -62,6 +63,7 @@ import {
   makeMarkdownHeadings,
   parseQueryUnderstanding,
   parseRetrievalPlan,
+  parseStandaloneQuestion,
   rankedCandidatePaths,
   splitOwnerAndRepo,
   type CachedDocument,
@@ -216,7 +218,7 @@ const requirementStatusSummary = (requirements: RequirementAssessment[], languag
  * 重复动作拦截、工具级超时、事件上报与模型调用重试。两个循环必须经由同一
  * 份实现使用这些能力，任何一侧不得绕过。
  */
-interface EvidenceToolbox {
+export interface EvidenceToolbox {
   readonly budget: RepositoryChatAgentBudget;
   readonly toolErrors: string[];
   emit: (event: ChatToolEventInput) => void;
@@ -564,6 +566,124 @@ export const reusablePriorEvidence = (input: RepositoryChatTurnInput): ToolEvide
   });
 };
 
+const questionUnderstanding = (question: string, intent: string): QueryUnderstanding => ({
+  intent,
+  standaloneQuestion: question,
+  entities: [],
+  searchConcepts: [],
+  likelyDocumentTopics: [],
+  informationScope: 'both',
+  answerRequirements: [{ id: 'explicit-1', kind: 'explicit', text: question }],
+  optionalEnrichment: [],
+  initialTargets: [],
+  target: question,
+});
+
+export const rewriteStandaloneQuestion = async (
+  input: RepositoryChatTurnInput,
+  callModelWithRetry: EvidenceToolbox['callModelWithRetry'],
+): Promise<string> => {
+  if (!hasPriorAssistantTurn(input.messages)) return input.question;
+  const zh = input.language === 'zh';
+  const rewritePrompt = buildStandaloneQuestionPrompt(input);
+  const rewriteRaw = await callModelWithRetry(
+    'understand_query',
+    zh ? '把追问改写为独立问题' : 'Rewrite the follow-up as a standalone question',
+    'understanding',
+    undefined,
+    zh ? '结合最近两轮对话补全指代，供后续检索使用。' : 'Resolve references from the recent turns for retrieval.',
+    rewritePrompt.system,
+    rewritePrompt.user,
+    300,
+    0,
+    undefined,
+    undefined,
+    undefined,
+    'internal-json',
+  );
+  return rewriteRaw ? parseStandaloneQuestion(rewriteRaw, input.question) : input.question;
+};
+
+export type EvidenceCoverageResult = {
+  gate: EvidenceGate;
+  requirements: RequirementAssessment[];
+  missing: string[];
+};
+
+export const evaluateEvidenceCoverage = async (
+  input: RepositoryChatTurnInput,
+  question: string,
+  evidences: ToolEvidence[],
+  documents: Map<string, CachedDocument>,
+  documentationCandidates: string[],
+  codeCandidates: string[],
+  allowedDocumentation: Set<string>,
+  allowedCode: Set<string>,
+  allowedMeta: Set<string>,
+  callModelWithRetry: EvidenceToolbox['callModelWithRetry'],
+  round: number,
+  intent: string,
+  codeEligible = false,
+  priorMissing: string[] = [],
+): Promise<EvidenceCoverageResult | null> => {
+  const gateInput = question === input.question ? input : { ...input, question };
+  const understanding = questionUnderstanding(question, intent);
+  const prompt = buildEvidenceGatePrompt(
+    gateInput,
+    understanding,
+    evidences,
+    documents,
+    documentationCandidates,
+    codeCandidates,
+    priorMissing,
+    round,
+    codeEligible,
+  );
+  const raw = await callModelWithRetry(
+    'evidence_gate',
+    input.language === 'zh' ? '校验证据是否覆盖问题' : 'Verify evidence coverage',
+    'verification',
+    round,
+    input.language === 'zh' ? '检查证据门控给出的每一项目标是否被证据覆盖。' : 'Check whether every evidence-gated requirement is covered.',
+    prompt.system,
+    prompt.user,
+    1_000,
+    0,
+    undefined,
+    undefined,
+    undefined,
+    'internal-json',
+  );
+  const gate = raw
+    ? parseEvidenceGate(
+      raw,
+      allowedDocumentation,
+      allowedCode,
+      allowedMeta,
+      'documentation',
+      understanding.answerRequirements,
+      (reference) => sourceReferences(evidences).includes(reference) || Boolean(referenceCoveredByEvidence(reference, evidences)),
+    )
+    : null;
+  if (!gate) return null;
+  const requirements = completeRequirementAssessments(understanding.answerRequirements, gate.requirements);
+  return {
+    gate,
+    requirements,
+    missing: requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement),
+  };
+};
+
+export const evidenceCoverageApproved = (coverage: EvidenceCoverageResult): boolean => (
+  coverage.gate.sufficient
+  && coverage.gate.nextAction === 'answer'
+  && coverage.gate.confidence >= 0.7
+  && coverage.requirements.length > 0
+  && coverage.requirements.every((requirement) => (
+    requirement.status === 'verified' || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
+  ))
+);
+
 export const seedReadSegments = (segments: Set<string>, evidences: ToolEvidence[]): void => {
   for (const evidence of evidences) {
     if (evidence.path && evidence.lineStart) {
@@ -731,6 +851,24 @@ const runOrchestratedEvidenceLoop = async (
   const github = createGitHubApiService(input.githubToken);
   const priorEvidences = reusablePriorEvidence(input);
   const evidences: ToolEvidence[] = [...priorEvidences];
+  const turnEvidenceIds = new Set<string>();
+  const approvedEvidenceIds = new Set<string>();
+  const appendEvidence = (items: ToolEvidence[]): void => {
+    evidences.push(...items);
+    items.forEach((evidence) => turnEvidenceIds.add(evidence.id));
+    input.onEvidence?.(items);
+  };
+  const approveEvidence = (assessments: RequirementAssessment[]): void => {
+    const references = new Set(assessments.flatMap((assessment) => assessment.evidence));
+    evidences.forEach((evidence) => {
+      if (sourceReferences([evidence]).some((reference) => references.has(reference))) {
+        approvedEvidenceIds.add(evidence.id);
+      }
+    });
+  };
+  const hasAnswerableEvidence = (): boolean => evidences.some((evidence) => (
+    turnEvidenceIds.has(evidence.id) || approvedEvidenceIds.has(evidence.id)
+  ));
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
   seedReadSegments(readSegments, priorEvidences);
@@ -747,6 +885,55 @@ const runOrchestratedEvidenceLoop = async (
   const metaSet = new Set<string>(META_TARGETS);
   let turns = 0;
   let consecutiveNoProgressRounds = 0;
+
+  let preflightQuestion = input.question;
+  if (priorEvidences.length > 0) {
+    preflightQuestion = await rewriteStandaloneQuestion(input, callModelWithRetry);
+    const preflightMetaTargets = Array.from(new Set([
+      ...detectMetaIntent(input.question),
+      ...detectMetaIntent(preflightQuestion),
+    ])).map(metaTargetForKind);
+    const coverage = await evaluateEvidenceCoverage(
+      input,
+      preflightQuestion,
+      evidences,
+      documents,
+      [],
+      [],
+      new Set(),
+      new Set(),
+      metaSet,
+      callModelWithRetry,
+      0,
+      detectResearchFocus(preflightQuestion),
+    );
+    if (coverage) {
+      approveEvidence(coverage.requirements);
+      emit({
+        toolName: 'evidence_gate',
+        status: 'success',
+        paramSummary: input.language === 'zh' ? '检查上一轮证据能否回答追问' : 'Check whether prior evidence answers the follow-up',
+        stage: 'verification',
+        round: 0,
+        detail: requirementStatusSummary(coverage.requirements, input.language),
+      });
+      if (evidenceCoverageApproved(coverage) && preflightMetaTargets.every((path) => metaFetched.has(path))) {
+        const content = await synthesizeVerifiedAnswer(
+          ai,
+          input,
+          evidences,
+          0,
+          answerMaxTokens,
+          ctx.callModelWithRetry,
+          '',
+          { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+          detectResearchFocus(preflightQuestion),
+        );
+        ctx.emitTurnMetrics({ fastPath: false, endReason: 'prior_evidence', rounds: 0 });
+        return { content, evidences };
+      }
+    }
+  }
 
   const treeResult = await invokeTool(
     'read_repo_tree',
@@ -809,6 +996,10 @@ const runOrchestratedEvidenceLoop = async (
     emitTurnMetrics: ctx.emitTurnMetrics,
   });
   if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
+  const priorEvidenceIds = new Set(priorEvidences.map((evidence) => evidence.id));
+  evidences.forEach((evidence) => {
+    if (!priorEvidenceIds.has(evidence.id)) turnEvidenceIds.add(evidence.id);
+  });
 
   const fallbackUnderstanding: QueryUnderstanding = {
     intent: 'general',
@@ -860,7 +1051,10 @@ const runOrchestratedEvidenceLoop = async (
       };
   const researchQuestion = understanding.standaloneQuestion.trim() || input.question;
   const researchInput = researchQuestion === input.question ? input : { ...input, question: researchQuestion };
-  const metaIntents = detectMetaIntent(researchQuestion);
+  const metaIntents = Array.from(new Set([
+    ...detectMetaIntent(input.question),
+    ...detectMetaIntent(researchQuestion),
+  ]));
   const metaIntentTargets = metaIntents.map(metaTargetForKind);
   // The LLM supplies a small concept expansion (for example vector search →
   // embeddings, semantic retrieval, topK). It only improves candidate ordering;
@@ -1003,6 +1197,7 @@ const runOrchestratedEvidenceLoop = async (
       : null;
     if (priorGate) {
       requirements = completeRequirementAssessments(understanding.answerRequirements, priorGate.requirements);
+      approveEvidence(requirements);
       missing = requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement);
       finalReason = priorGate.reason || finalReason;
       emit({
@@ -1018,10 +1213,11 @@ const runOrchestratedEvidenceLoop = async (
         && priorGate.nextAction === 'answer'
         && priorGate.confidence >= 0.7
         && requirementsSatisfied(requirements)
+        && metaIntentTargets.every((path) => metaFetched.has(path))
       ) {
         const content = await synthesizeVerifiedAnswer(
           ai,
-          researchInput,
+          input,
           evidences,
           0,
           answerMaxTokens,
@@ -1100,8 +1296,7 @@ const runOrchestratedEvidenceLoop = async (
       const newEvidence = releasesResult.value.length > 0
         ? buildReleasesEvidence(input.repository, releasesResult.value)
         : [buildNoReleasesEvidence(input.repository, checkedAt)];
-      evidences.push(...newEvidence);
-      input.onEvidence?.(newEvidence);
+      appendEvidence(newEvidence);
       emit({
         toolName: 'read_releases',
         status: 'success',
@@ -1154,8 +1349,7 @@ const runOrchestratedEvidenceLoop = async (
       const newEvidence = issuesResult.value.length > 0
         ? buildIssuesEvidence(input.repository, issuesResult.value)
         : [buildNoIssuesEvidence(input.repository, keywords, checkedAt)];
-      evidences.push(...newEvidence);
-      input.onEvidence?.(newEvidence);
+      appendEvidence(newEvidence);
       emit({
         toolName: 'search_issues',
         status: 'success',
@@ -1211,8 +1405,7 @@ const runOrchestratedEvidenceLoop = async (
       return true;
     });
     const newEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, document, newSegments);
-    evidences.push(...newEvidence);
-    input.onEvidence?.(newEvidence);
+    appendEvidence(newEvidence);
     if (newEvidence.length > 0) {
       const labels = target.sections.filter(Boolean);
       emit({
@@ -1332,13 +1525,14 @@ const runOrchestratedEvidenceLoop = async (
     if (targets.length === 0) {
       // 候选耗尽时，若还有未拉取（含读取失败重试）的 meta 来源，先补拉再收尾。
       const unfetchedMeta = metaIntentTargets.filter((path) => !metaFetched.has(path));
-      if (metaEligible && unfetchedMeta.length > 0 && turns < budget.maxTurns && hasTime()) {
+      if (unfetchedMeta.length > 0 && turns < budget.maxTurns && hasTime()) {
+        metaEligible = true;
         pendingTargets = unfetchedMeta.map((path) => ({ path, sections: [], purpose: missing[0] || understanding.target, scope: 'meta' as const }));
         continue;
       }
       finalReason = input.language === 'zh' ? '没有剩余的相关文件可供检索。' : 'No relevant repository files remain to inspect.';
       endReason = 'no_targets_remaining';
-      canAnswer = evidences.length > 0;
+      canAnswer = hasAnswerableEvidence();
       break;
     }
 
@@ -1393,6 +1587,7 @@ const runOrchestratedEvidenceLoop = async (
     // 兜底的阻断性要求已在 understanding 创建时统一补入（见 understanding
     // 归一化），这里直接使用同一份 answerRequirements 与 gate 输出合并。
     requirements = completeRequirementAssessments(understanding.answerRequirements, gate.requirements);
+    approveEvidence(requirements);
     missing = requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement);
     finalReason = gate.reason || finalReason;
     pendingTargets = gate.recommendedTargets.filter((target) => (target.scope !== 'code' || codeEligible) && (target.scope !== 'meta' || metaEligible));
@@ -1437,7 +1632,7 @@ const runOrchestratedEvidenceLoop = async (
     if ((allApplicableRequirementsVerified || gateApprovesAnswer) && evidences.length > 0) {
       if (unfetchedMetaTargets.length === 0 || !metaBudgetAvailable) {
         endReason = 'requirements_verified';
-        canAnswer = true;
+        canAnswer = hasAnswerableEvidence();
         break;
       }
       schedulePendingMeta();
@@ -1449,7 +1644,7 @@ const runOrchestratedEvidenceLoop = async (
         // A bounded “no reasonable source” decision can still yield a useful,
         // source-scoped answer that marks the unmet user request as unconfirmed.
         endReason = 'gate_stop';
-        canAnswer = evidences.length > 0;
+        canAnswer = hasAnswerableEvidence();
         break;
       }
       schedulePendingMeta();
@@ -1491,7 +1686,7 @@ const runOrchestratedEvidenceLoop = async (
         ? `连续 ${consecutiveNoProgressRounds} 轮未获得新的可引用信息或可读目标，已停止重复检索。`
         : `Research stopped after ${consecutiveNoProgressRounds} consecutive rounds without new citable information or a viable next target.`;
       endReason = 'no_progress_limit';
-      canAnswer = evidences.length > 0;
+      canAnswer = hasAnswerableEvidence();
       break;
     }
     if (gate.nextAction === 'read_code' || gate.nextAction === 'expand_scope') {
@@ -1512,7 +1707,7 @@ const runOrchestratedEvidenceLoop = async (
   // 循环自然耗尽（轮次或时间预算）而非显式收尾时，补充对应的结束原因。
   if (!endReason) endReason = hasTime() ? 'turn_budget' : 'time_budget';
 
-  if (!canAnswer || evidences.length === 0) {
+  if (!canAnswer || !hasAnswerableEvidence()) {
     ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'insufficient_evidence', rounds: turns });
     return { content: evidenceAgentInsufficientResponse(input.language, finalReason || (input.language === 'zh' ? '未能完整覆盖回答要求。' : 'The answer requirements were not fully covered.'), toolErrors.length > 0), evidences };
   }
@@ -1524,7 +1719,7 @@ const runOrchestratedEvidenceLoop = async (
     : '';
   const content = await synthesizeVerifiedAnswer(
     ai,
-    researchInput,
+    input,
     evidences,
     turns,
     answerMaxTokens,

@@ -101,6 +101,16 @@ const README_WITH_INSTALL = [
 const INSTALL_SECTION_REFERENCE = '/README.md - 3-5';
 
 const CITED_ANSWER = `Run \`npx example install\` to set up the CLI. \`${INSTALL_SECTION_REFERENCE}\``;
+const RELEASES = [{
+  id: 1,
+  tag_name: 'v2.0.0',
+  name: 'Second release',
+  body: 'Adds a desktop build.',
+  published_at: '2026-08-20T00:00:00.000Z',
+  html_url: 'https://github.com/owner/example/releases/tag/v2.0.0',
+  prerelease: false,
+  assets: [],
+}];
 const installEvidence: ToolEvidence = {
   id: 'evidence-install',
   source: 'github',
@@ -148,9 +158,14 @@ describe('reusablePriorEvidence (§5.1)', () => {
       id: 'evidence-web',
       source: 'web',
     };
+    const otherRepositoryEvidence: ToolEvidence = {
+      ...installEvidence,
+      id: 'evidence-other-repository',
+      repoFullName: 'owner/other',
+    };
 
     expect(reusablePriorEvidence(turnInput('Can you repeat that?', {
-      priorEvidence: [installEvidence, releaseEvidence, webEvidence],
+      priorEvidence: [installEvidence, releaseEvidence, webEvidence, otherRepositoryEvidence],
     }))).toEqual([installEvidence]);
   });
 });
@@ -310,6 +325,7 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
 
   it('answers from prior evidence before planning when the follow-up is already covered', async () => {
     configureTreeAndFiles({ 'README.md': README_WITH_INSTALL });
+    mocks.getRepositoryTree.mockRejectedValue(new Error('tree unavailable'));
     respondByPrompt({
       understanding: JSON.stringify({
         standalone_question: 'How do I install this project?',
@@ -346,9 +362,88 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     }));
 
     expect(mocks.generateChatText).toHaveBeenCalledTimes(3);
+    expect(mocks.getRepositoryTree).not.toHaveBeenCalled();
     expect(mocks.getRepositoryFile).not.toHaveBeenCalled();
     expect(result.content).toContain('npx example install');
     expect(turnMetricsEvent(events)).toMatchObject({ endReason: 'prior_evidence', rounds: 0 });
+  });
+
+  it('does not answer from prior evidence that the follow-up gate did not verify', async () => {
+    configureTreeAndFiles({});
+    respondByPrompt({
+      understanding: JSON.stringify({
+        standalone_question: 'How do I configure the widget?',
+        intent: 'configuration',
+        explicit_requirements: ['configuration steps'],
+        initial_targets: [],
+        target: 'widget configuration',
+      }),
+      gate: JSON.stringify({
+        sufficient: false,
+        confidence: 0.9,
+        reason: 'The installation evidence does not cover configuration.',
+        requirements: [{
+          requirement_id: 'explicit-1',
+          requirement: 'configuration steps',
+          status: 'missing',
+          evidence: [],
+        }],
+        next_action: 'stop',
+      }),
+      answer: () => CITED_ANSWER,
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: CITED_ANSWER, status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What about configuration?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('What about configuration?', {
+      messages,
+      priorEvidence: [installEvidence],
+    }));
+
+    expect(result.content).not.toContain('npx example install');
+  });
+
+  it('fetches release metadata before answering a latest-version follow-up from prior evidence', async () => {
+    configureTreeAndFiles({});
+    mocks.getRepositoryReleases.mockResolvedValue(RELEASES);
+    respondByPrompt({
+      understanding: JSON.stringify({
+        standalone_question: 'What is the latest release?',
+        intent: 'feature_overview',
+        explicit_requirements: ['latest release'],
+        initial_targets: [],
+        target: 'latest release',
+      }),
+      gate: JSON.stringify({
+        sufficient: true,
+        confidence: 0.95,
+        reason: 'The release evidence covers the question.',
+        requirements: [{
+          requirement_id: 'explicit-1',
+          requirement: 'latest release',
+          status: 'verified',
+          evidence: ['/release-v2.0.0.md - 1-4'],
+        }],
+        next_action: 'answer',
+      }),
+      answer: () => 'The latest release adds a desktop build. `/release-v2.0.0.md - 1-4`',
+    });
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'What changed before?', status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: CITED_ANSWER, status: 'complete' as const, evidenceIds: [installEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What is the latest release?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('What is the latest release?', {
+      messages,
+      priorEvidence: [installEvidence],
+    }));
+
+    expect(mocks.getRepositoryReleases).toHaveBeenCalledTimes(1);
+    expect(result.content).toContain('/release-v2.0.0.md - 1-4');
   });
 
   it('falls back to the full loop when the README has no matching section', async () => {

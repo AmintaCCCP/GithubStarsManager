@@ -5,7 +5,6 @@ import { createGitHubApiService } from './githubApiFactory';
 import {
   asStringArray,
   buildEvidenceWindows,
-  buildStandaloneQuestionPrompt,
   createEvidenceToolbox,
   detectResearchFocus,
   documentationCandidatesFrom,
@@ -19,9 +18,11 @@ import {
   MARKDOWN_EVIDENCE_PATH,
   normalizePath,
   parseJsonObject,
-  parseStandaloneQuestion,
   rankedCandidatePaths,
   reusablePriorEvidence,
+  evaluateEvidenceCoverage,
+  evidenceCoverageApproved,
+  rewriteStandaloneQuestion,
   resolveTurnLimits,
   seedReadSegments,
   citableSegmentsForDocument,
@@ -34,7 +35,6 @@ import {
   type RepositoryChatTurnInput,
   type RepositoryChatTurnResult,
 } from './repositoryChatService';
-import { hasPriorAssistantTurn } from './chat/fastPath';
 import { readRepositoryFileWithCache, readRepositoryTreeWithCache } from './chat/cache';
 import {
   buildIssuesEvidence,
@@ -43,6 +43,9 @@ import {
   buildReleasesEvidence,
   META_ISSUES_TARGET,
   META_RELEASES_TARGET,
+  META_TARGETS,
+  detectMetaIntent,
+  metaTargetForKind,
   type IssueComment,
   type IssueHitWithComments,
 } from './repositoryChatMetaSources';
@@ -197,6 +200,58 @@ const runToolLoopEvidenceAgent = async (
   const metaFetched = new Set<string>();
   let documentationEvidenceCount = priorEvidences.filter((evidence) => evidence.path && MARKDOWN_EVIDENCE_PATH.test(evidence.path)).length;
 
+  const researchQuestion = await rewriteStandaloneQuestion(input, ctx.callModelWithRetry);
+  const researchInput = researchQuestion === input.question ? input : { ...input, question: researchQuestion };
+  const question = researchInput.question;
+  const focus = detectResearchFocus(question);
+  const metaIntentTargets = Array.from(new Set([
+    ...detectMetaIntent(input.question),
+    ...detectMetaIntent(researchQuestion),
+  ])).map(metaTargetForKind);
+  const metaSet = new Set<string>(META_TARGETS);
+
+  if (priorEvidences.length > 0) {
+    const coverage = await evaluateEvidenceCoverage(
+      researchInput,
+      question,
+      evidences,
+      documents,
+      [],
+      [],
+      new Set(),
+      new Set(),
+      metaSet,
+      ctx.callModelWithRetry,
+      0,
+      focus,
+    );
+    if (coverage) {
+      emit({
+        toolName: 'evidence_gate',
+        status: 'success',
+        paramSummary: zh ? '复用上一轮证据评估回答条件' : 'Assess the follow-up against prior evidence',
+        stage: 'verification',
+        round: 0,
+        detail: coverage.gate.reason || coverage.missing.join('; ') || (zh ? '证据覆盖检查完成。' : 'Evidence coverage checked.'),
+      });
+      if (evidenceCoverageApproved(coverage) && metaIntentTargets.every((path) => metaFetched.has(path))) {
+        const content = await synthesizeVerifiedAnswer(
+          ai,
+          input,
+          evidences,
+          0,
+          answerMaxTokens,
+          ctx.callModelWithRetry,
+          '',
+          { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+          focus,
+        );
+        ctx.emitTurnMetrics({ fastPath: false, endReason: 'prior_evidence', rounds: 0 });
+        return { content, evidences };
+      }
+    }
+  }
+
   const treeResult = await invokeTool(
     'read_repo_tree',
     { ref: input.session.sourceRefSha },
@@ -211,29 +266,6 @@ const runToolLoopEvidenceAgent = async (
     return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
   }
 
-  let researchInput = input;
-  if (hasPriorAssistantTurn(input.messages)) {
-    const rewritePrompt = buildStandaloneQuestionPrompt(input);
-    const rewriteRaw = await ctx.callModelWithRetry(
-      'understand_query',
-      zh ? '把追问改写为独立问题' : 'Rewrite the follow-up as a standalone question',
-      'understanding',
-      undefined,
-      zh ? '结合最近两轮对话补全指代，供后续检索使用。' : 'Resolve references from the recent turns for retrieval.',
-      rewritePrompt.system,
-      rewritePrompt.user,
-      300,
-      0,
-      undefined,
-      undefined,
-      undefined,
-      'internal-json',
-    );
-    const standaloneQuestion = rewriteRaw ? parseStandaloneQuestion(rewriteRaw, input.question) : input.question;
-    if (standaloneQuestion !== input.question) researchInput = { ...input, question: standaloneQuestion };
-  }
-  const question = researchInput.question;
-  const focus = detectResearchFocus(question);
   const rankedPaths = rankedCandidatePaths(treeResult.value.entries, question, focus);
   const documentationCandidates = documentationCandidatesFrom(rankedPaths);
   const codeCandidates = Array.from(new Set(rankedPaths.filter(isRepositoryCodePath)));
@@ -440,14 +472,10 @@ const runToolLoopEvidenceAgent = async (
     return untrustedEvidenceBlock(newEvidence);
   };
 
-  const dispatchToolCall = async (call: AIToolCall, round: number): Promise<string> => {
-    const args = parseJsonObject(call.arguments) ?? {};
-    const docsMissing = zh
-      ? '已拒绝：必须先调用 read_documentation 阅读 README/docs，之后才能读取其他来源。'
-      : 'Rejected: call read_documentation on README/docs first; other sources are rejected until then.';
-
-    if (call.name === 'ready_to_answer') {
-      const missingList = asStringArray(args.missing, 6);
+  const confirmReadyToAnswer = async (args: Record<string, unknown>, round: number): Promise<{ ready: boolean; output: string }> => {
+    const missingList = asStringArray(args.missing, 6);
+    const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
+    if (evidences.length === 0) {
       emit({
         toolName: 'evidence_gate',
         status: 'success',
@@ -458,8 +486,65 @@ const runToolLoopEvidenceAgent = async (
           ? (zh ? `模型承认仍有缺口：${missingList.join('；')}` : `Remaining gaps acknowledged: ${missingList.join('; ')}`)
           : (zh ? '模型认为必要证据已齐备。' : 'The model considers the necessary evidence complete.'),
       });
-      return zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
+      return { ready: true, output: confirmText };
     }
+
+    const coverage = await evaluateEvidenceCoverage(
+      researchInput,
+      question,
+      evidences,
+      documents,
+      documentationCandidates,
+      codeCandidates,
+      documentationSet,
+      codeSet,
+      metaSet,
+      ctx.callModelWithRetry,
+      round,
+      focus,
+      true,
+      missingList,
+    );
+    const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
+    if (coverage && evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
+      emit({
+        toolName: 'evidence_gate',
+        status: 'success',
+        paramSummary: zh ? '证据已覆盖回答要求' : 'Evidence covers the answer requirements',
+        stage: 'verification',
+        round,
+        detail: coverage.gate.reason || confirmText,
+      });
+      return { ready: true, output: confirmText };
+    }
+
+    const gaps = [
+      ...(coverage?.missing ?? []),
+      ...(coverage?.missing.length ? [] : missingList),
+      ...unfetchedMetaTargets.map((path) => (zh ? `拉取 ${path}` : `fetch ${path}`)),
+    ];
+    if (gaps.length === 0) gaps.push(question);
+    emit({
+      toolName: 'evidence_gate',
+      status: 'error',
+      paramSummary: zh ? '证据尚未覆盖回答要求' : 'Evidence does not yet cover the answer requirements',
+      stage: 'verification',
+      round,
+      detail: gaps.join('; ').slice(0, 320),
+    });
+    return {
+      ready: false,
+      output: zh
+        ? `未通过证据门控。仍需补齐：${gaps.join('；')}。请继续调用工具，或在没有合理来源时于 missing 中说明。`
+        : `ready_to_answer was rejected by the evidence coverage gate. Still required: ${gaps.join('; ')}. Continue with the remaining tools, or list the unsupported items in missing when no reasonable source remains.`,
+    };
+  };
+
+  const dispatchToolCall = async (call: AIToolCall, round: number): Promise<string> => {
+    const args = parseJsonObject(call.arguments) ?? {};
+    const docsMissing = zh
+      ? '已拒绝：必须先调用 read_documentation 阅读 README/docs，之后才能读取其他来源。'
+      : 'Rejected: call read_documentation on README/docs first; other sources are rejected until then.';
 
     // README 优先是代码级硬规则：未读到文档证据之前，调度器直接拒绝其他来源。
     if (documentationEvidenceCount === 0 && call.name !== 'read_documentation') return docsMissing;
@@ -582,12 +667,15 @@ const runToolLoopEvidenceAgent = async (
     conversationChars += Math.max(64, result.content.length) + result.toolCalls.length * 48;
     for (const call of result.toolCalls) {
       if (call.name === 'ready_to_answer') {
-        const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
-        conversationChars += confirmText.length;
-        messages.push({ role: 'tool', toolCallId: call.id, content: confirmText });
-        endReason = 'agent_ready';
-        ready = true;
-        break;
+        const readiness = await confirmReadyToAnswer(parseJsonObject(call.arguments) ?? {}, loopTurns);
+        conversationChars += readiness.output.length;
+        messages.push({ role: 'tool', toolCallId: call.id, content: readiness.output });
+        if (readiness.ready) {
+          endReason = 'agent_ready';
+          ready = true;
+          break;
+        }
+        continue;
       }
       const toolOutput = await dispatchToolCall(call, loopTurns);
       conversationChars += toolOutput.length;
@@ -615,7 +703,7 @@ const runToolLoopEvidenceAgent = async (
 
   const content = await synthesizeVerifiedAnswer(
     ai,
-    researchInput,
+    input,
     evidences,
     Math.max(1, loopTurns),
     answerMaxTokens,

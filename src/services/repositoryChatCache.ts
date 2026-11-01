@@ -1,9 +1,10 @@
 import type { RepositoryFileRead, RepositoryTreeRead } from './githubApi';
 
 const DB_NAME = 'gsm-repository-chat-cache-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const TREE_STORE = 'trees';
 const BLOB_STORE = 'blobs';
+const META_STORE = 'metadata';
 export const REPOSITORY_CHAT_CACHE_MAX_BYTES = 50 * 1024 * 1024;
 
 type CacheRecord<T> = {
@@ -17,6 +18,8 @@ type CacheRecord<T> = {
 
 type BlobCacheRecord = CacheRecord<RepositoryFileRead> & { path: string };
 type SizedCacheRecord = { key: string; accessedAt: number; size: number };
+type CacheStoreName = typeof TREE_STORE | typeof BLOB_STORE;
+type CacheMetadata = SizedCacheRecord & { dataKey: string; store: CacheStoreName };
 
 const treeKey = (repoFullName: string, sha: string): string => `${repoFullName}@${sha}:tree`;
 const blobKey = (repoFullName: string, sha: string, path: string): string => `${repoFullName}@${sha}:${path}`;
@@ -26,17 +29,41 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 
 const canUseIndexedDb = (): boolean => typeof window !== 'undefined' && typeof window.indexedDB !== 'undefined';
 
+const recordSize = (record: Omit<CacheRecord<unknown>, 'size'> & { size?: number }): number => encodedSize(JSON.stringify({ ...record, size: 0 }));
+
 const openDb = (): Promise<IDBDatabase> => {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
       if (!db.objectStoreNames.contains(TREE_STORE)) {
         db.createObjectStore(TREE_STORE, { keyPath: 'key' });
       }
       if (!db.objectStoreNames.contains(BLOB_STORE)) {
         db.createObjectStore(BLOB_STORE, { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains(META_STORE)) {
+        const metadata = db.createObjectStore(META_STORE, { keyPath: 'key' });
+        const transaction = request.transaction;
+        if (event.oldVersion > 0 && transaction) {
+          for (const storeName of [TREE_STORE, BLOB_STORE] as const) {
+            const cursorRequest = transaction.objectStore(storeName).openCursor();
+            cursorRequest.onsuccess = () => {
+              const cursor = cursorRequest.result;
+              if (!cursor) return;
+              const record = cursor.value as CacheRecord<unknown>;
+              metadata.put({
+                key: `${storeName}:${record.key}`,
+                dataKey: record.key,
+                store: storeName,
+                size: recordSize(record),
+                accessedAt: record.accessedAt,
+              });
+              cursor.continue();
+            };
+          }
+        }
       }
     };
     request.onsuccess = () => {
@@ -60,14 +87,14 @@ const requestValue = <T>(request: IDBRequest<T>): Promise<T> => new Promise((res
   request.onerror = () => reject(request.error ?? new Error('Repository chat cache request failed'));
 });
 
-const runStore = async <T>(
-  storeName: typeof TREE_STORE | typeof BLOB_STORE,
+const runStores = async <T>(
+  storeNames: Array<CacheStoreName | typeof META_STORE>,
   mode: IDBTransactionMode,
-  operation: (store: IDBObjectStore) => Promise<T>,
+  operation: (stores: IDBObjectStore[]) => Promise<T>,
 ): Promise<T> => {
   const db = await openDb();
-  const transaction = db.transaction(storeName, mode);
-  const value = await operation(transaction.objectStore(storeName));
+  const transaction = db.transaction(storeNames, mode);
+  const value = await operation(storeNames.map((storeName) => transaction.objectStore(storeName)));
   await new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error ?? new Error('Repository chat cache transaction failed'));
@@ -75,6 +102,12 @@ const runStore = async <T>(
   });
   return value;
 };
+
+const runStore = async <T>(
+  storeName: CacheStoreName | typeof META_STORE,
+  mode: IDBTransactionMode,
+  operation: (store: IDBObjectStore) => Promise<T>,
+): Promise<T> => await runStores([storeName], mode, async ([store]) => await operation(store));
 
 /** Oldest records are removed first; oversized records evict themselves. */
 export const selectCacheEvictions = (records: SizedCacheRecord[], maxBytes: number): string[] => {
@@ -89,40 +122,57 @@ export const selectCacheEvictions = (records: SizedCacheRecord[], maxBytes: numb
   return evicted;
 };
 
-const enforceLimit = async (): Promise<void> => {
-  const records = [
-    ...await runStore(TREE_STORE, 'readonly', async (store) => await requestValue(store.getAll()) as SizedCacheRecord[]),
-    ...await runStore(BLOB_STORE, 'readonly', async (store) => await requestValue(store.getAll()) as SizedCacheRecord[]),
-  ];
-  const evicted = selectCacheEvictions(records, REPOSITORY_CHAT_CACHE_MAX_BYTES);
+export const enforceCacheLimit = async (maxBytes = REPOSITORY_CHAT_CACHE_MAX_BYTES): Promise<void> => {
+  const records = await runStore(META_STORE, 'readonly', async (store) => await requestValue(store.getAll()) as CacheMetadata[]);
+  const evictedKeys = new Set(selectCacheEvictions(records, maxBytes));
+  const evicted = records.filter((record) => evictedKeys.has(record.key));
   if (evicted.length > 0) {
-    for (const storeName of [TREE_STORE, BLOB_STORE] as const) {
-      await runStore(storeName, 'readwrite', async (store) => {
-        await Promise.all(evicted.map((key) => requestValue(store.delete(key))));
-      });
-    }
+    await runStores([TREE_STORE, BLOB_STORE, META_STORE], 'readwrite', async (stores) => {
+      const [trees, blobs, metadata] = stores;
+      await Promise.all(evicted.flatMap((record) => {
+        const store = record.store === TREE_STORE ? trees : blobs;
+        return [requestValue(store.delete(record.dataKey)), requestValue(metadata.delete(record.key))];
+      }));
+    });
   }
 };
 
 const putRecord = async (
-  storeName: typeof TREE_STORE | typeof BLOB_STORE,
-  record: CacheRecord<unknown>,
+  storeName: CacheStoreName,
+  record: Omit<CacheRecord<unknown>, 'size'>,
 ): Promise<void> => {
-  await runStore(storeName, 'readwrite', async (store) => {
-    await requestValue(store.put(record));
+  const size = recordSize(record);
+  await runStores([storeName, META_STORE], 'readwrite', async ([store, metadata]) => {
+    await requestValue(store.put({ ...record, size }));
+    await requestValue(metadata.put({
+      key: `${storeName}:${record.key}`,
+      dataKey: record.key,
+      store: storeName,
+      size,
+      accessedAt: record.accessedAt,
+    }));
   });
-  await enforceLimit();
+  await enforceCacheLimit();
 };
 
 const getRecord = async <T>(
-  storeName: typeof TREE_STORE | typeof BLOB_STORE,
+  storeName: CacheStoreName,
   key: string,
 ): Promise<CacheRecord<T> | null> => {
-  const record = await runStore(storeName, 'readwrite', async (store) => {
+  const record = await runStores([storeName, META_STORE], 'readwrite', async ([store, metadata]) => {
     const found = await requestValue(store.get(key)) as CacheRecord<T> | undefined;
     if (!found) return null;
-    const accessed = { ...found, accessedAt: Date.now() };
+    const accessedAt = Date.now();
+    const size = recordSize(found);
+    const accessed = { ...found, accessedAt, size };
     await requestValue(store.put(accessed));
+    await requestValue(metadata.put({
+      key: `${storeName}:${key}`,
+      dataKey: key,
+      store: storeName,
+      size,
+      accessedAt,
+    }));
     return accessed;
   });
   return record;
@@ -150,7 +200,6 @@ export const repositoryChatCache = {
         repoFullName,
         sha,
         accessedAt: Date.now(),
-        size: encodedSize(JSON.stringify(value)),
         value,
       });
     }, undefined);
@@ -162,13 +211,12 @@ export const repositoryChatCache = {
 
   async putFile(repoFullName: string, sha: string, value: RepositoryFileRead): Promise<void> {
     await withCache(async () => {
-      const record: BlobCacheRecord = {
+      const record: Omit<BlobCacheRecord, 'size'> = {
         key: blobKey(repoFullName, sha, value.path),
         repoFullName,
         sha,
         path: value.path,
         accessedAt: Date.now(),
-        size: encodedSize(value.content) + encodedSize(value.path),
         value,
       };
       await putRecord(BLOB_STORE, record);
@@ -177,11 +225,9 @@ export const repositoryChatCache = {
 
   async clear(): Promise<void> {
     await withCache(async () => {
-      for (const storeName of [TREE_STORE, BLOB_STORE] as const) {
-        await runStore(storeName, 'readwrite', async (store) => {
-          await requestValue(store.clear());
-        });
-      }
+      await runStores([TREE_STORE, BLOB_STORE, META_STORE], 'readwrite', async (stores) => {
+        await Promise.all(stores.map((store) => requestValue(store.clear())));
+      });
     }, undefined);
   },
 };

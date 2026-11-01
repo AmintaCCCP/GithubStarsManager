@@ -43,9 +43,12 @@ export {
 } from './chat/retrieval';
 export {
   createEvidenceToolbox,
+  evaluateEvidenceCoverage,
+  evidenceCoverageApproved,
   evidenceAgentInsufficientResponse,
   isTransientAgentError,
   reusablePriorEvidence,
+  rewriteStandaloneQuestion,
   resolveTurnLimits,
   runEvidenceDrivenRepositoryChatTurn,
   seedReadSegments,

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { TreeEntry } from './retrieval';
-import { collapseCandidateDirectories, isCreativeRequest, rankedCandidatePaths } from './retrieval';
+import {
+  collapseCandidateDirectories,
+  isCreativeRequest,
+  parseQueryUnderstanding,
+  parseStandaloneQuestion,
+  rankedCandidatePaths,
+} from './retrieval';
 
 const treeEntry = (path: string): TreeEntry => ({ path, type: 'blob' } as TreeEntry);
 
@@ -52,5 +58,27 @@ describe('isCreativeRequest', () => {
     expect(isCreativeRequest('How do I generate a post endpoint?')).toBe(false);
     expect(isCreativeRequest('How should the API store a user story?')).toBe(false);
     expect(isCreativeRequest('如何存储用户故事？')).toBe(false);
+  });
+});
+
+describe('standalone question parsing', () => {
+  it('does not truncate rewritten follow-ups used for retrieval', () => {
+    const question = `How do I install this project on Windows? ${'Keep every detail. '.repeat(30)}`.trim();
+    const parsed = parseStandaloneQuestion(JSON.stringify({ standalone_question: question }), 'fallback');
+    const understanding = parseQueryUnderstanding(JSON.stringify({ standalone_question: question }), {
+      intent: 'general',
+      standaloneQuestion: 'fallback',
+      entities: [],
+      searchConcepts: [],
+      likelyDocumentTopics: [],
+      informationScope: 'both',
+      answerRequirements: [],
+      optionalEnrichment: [],
+      initialTargets: [],
+      target: '',
+    }, new Set());
+
+    expect(parsed).toBe(question);
+    expect(understanding.standaloneQuestion).toBe(question);
   });
 });
