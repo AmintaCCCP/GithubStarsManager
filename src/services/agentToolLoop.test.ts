@@ -308,6 +308,7 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
 
     expect(mocks.generateWithTools).toHaveBeenCalledTimes(2);
     expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Windows-specific installer');
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Explicitly mark what remains unverified.');
     expect(result.content).toContain('/README.md - 1-4');
   });
 

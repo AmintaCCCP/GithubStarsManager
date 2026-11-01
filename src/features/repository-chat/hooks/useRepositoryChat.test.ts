@@ -346,6 +346,7 @@ describe('useRepositoryChat persistence failures', () => {
     });
 
     expect(result.current.error).toBeNull();
+    expect(mocks.saveEvidence).toHaveBeenCalledWith(evidence);
     expect(mocks.saveMessage).toHaveBeenCalledWith(expect.objectContaining({
       role: 'assistant',
       evidenceIds: [],
