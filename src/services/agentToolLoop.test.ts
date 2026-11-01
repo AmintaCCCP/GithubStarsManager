@@ -97,6 +97,19 @@ const README = [
   'A documented example project for repository research.',
 ].join('\n');
 
+const overviewEvidence = {
+  id: 'evidence-overview',
+  source: 'github' as const,
+  repoFullName: repository.full_name,
+  refSha: session.sourceRefSha,
+  path: 'README.md',
+  lineStart: 1,
+  lineEnd: 4,
+  url: `https://github.com/${repository.full_name}/blob/${session.sourceRefSha}/README.md#L1-L4`,
+  excerpt: 'A documented example project for repository research.',
+  retrievedAt: '2026-08-26T00:00:00.000Z',
+};
+
 const toolCall = (id: string, name: string, args: Record<string, unknown> = {}) => ({ id, name, arguments: JSON.stringify(args) });
 const modelTurn = (toolCalls: ReturnType<typeof toolCall>[]) => ({ content: '', toolCalls });
 
@@ -161,6 +174,29 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/README.md - 1-4');
     expect(result.content).toContain('/release-v1.0.0.md - 1-3');
     expect(result.evidences.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rewrites a follow-up and can answer immediately from prior evidence', async () => {
+    mocks.generateChatText
+      .mockResolvedValueOnce('{"standalone_question":"How do I install this project on Windows?"}')
+      .mockResolvedValueOnce('A documented example project. `/README.md - 1-4`');
+    mocks.generateWithTools.mockResolvedValueOnce(modelTurn([toolCall('c1', 'ready_to_answer', { missing: [] })]));
+    const messages = [
+      { id: 'm1', sessionId: session.id, role: 'user' as const, content: 'How do I install this project?', status: 'complete' as const, evidenceIds: [overviewEvidence.id], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'm2', sessionId: session.id, role: 'assistant' as const, content: 'A documented example project. `/README.md - 1-4`', status: 'complete' as const, evidenceIds: [overviewEvidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+      { id: 'm3', sessionId: session.id, role: 'user' as const, content: 'What about Windows?', status: 'complete' as const, evidenceIds: [], createdAt: '2026-08-26T00:00:03.000Z' },
+    ];
+
+    const result = await runToolLoopRepositoryChatTurn({
+      ...turnInput('What about Windows?'),
+      messages,
+      priorEvidence: [overviewEvidence],
+    });
+
+    expect(mocks.generateChatText.mock.calls[0]?.[0]?.system).toContain('rewrite repository-chat follow-up');
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(1);
+    expect(mocks.getRepositoryFile).not.toHaveBeenCalled();
+    expect(result.content).toContain('/README.md - 1-4');
   });
 
   it('rejects non-documentation reads before documentation evidence exists (README-first, enforced in code)', async () => {

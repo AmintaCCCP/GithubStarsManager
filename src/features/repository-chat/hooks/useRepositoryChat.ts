@@ -268,6 +268,20 @@ export const useRepositoryChat = ({
     }
   }, []);
 
+  const loadPriorEvidence = useCallback(async (sourceMessages: RepositoryChatMessage[]): Promise<ToolEvidence[]> => {
+    const ids = Array.from(new Set(sourceMessages
+      .filter((message) => message.role === 'assistant')
+      .slice(-2)
+      .flatMap((message) => message.evidenceIds)));
+    if (ids.length === 0) return [];
+    try {
+      return await repositoryChatStorage.listEvidence(ids);
+    } catch (readError) {
+      console.warn('[repository-chat] unable to load prior evidence', readError);
+      return [];
+    }
+  }, []);
+
   const send = useCallback(async (
     question: string,
     baseMessages = messages,
@@ -288,6 +302,7 @@ export const useRepositoryChat = ({
     setError(null);
     toolEventIdsRef.current.clear();
     toolEventWriteChainsRef.current.clear();
+    const priorEvidence = await loadPriorEvidence(baseMessages);
     const userCreatedAt = nextTimelineTimestamp();
     const assistantCreatedAt = nextTimelineTimestamp();
     const userMessage: RepositoryChatMessage = {
@@ -357,6 +372,7 @@ export const useRepositoryChat = ({
           fastPath: repositoryChatSettings.fastPath,
           streaming: repositoryChatSettings.streamingMode !== 'off',
           signal: controller.signal,
+          priorEvidence,
           onToolEvent: (event) => {
             void persistToolEvent(event, assistantMessage.id, activeSession);
           },
@@ -468,7 +484,7 @@ export const useRepositoryChat = ({
       abortControllerRef.current = null;
       setIsSending(false);
     }
-  }, [aiConfig, githubToken, isSending, language, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.fastPath, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, retainNewestSession, session, unavailableReason, t]);
+  }, [aiConfig, githubToken, isSending, language, loadPriorEvidence, messages, onMessagesChange, onSessionChange, persistToolEvent, repository, repositoryChatSettings.agentBudget, repositoryChatSettings.enableAgentToolLoop, repositoryChatSettings.fastPath, repositoryChatSettings.maxToolsPerTurn, repositoryChatSettings.streamingMode, repositoryChatSettings.taskDepth, retainNewestSession, session, unavailableReason, t]);
 
   const stop = useCallback(() => {
     abortControllerRef.current?.abort();

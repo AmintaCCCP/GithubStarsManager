@@ -234,6 +234,8 @@ export type AnswerRequirement = {
 
 export type QueryUnderstanding = {
   intent: string;
+  /** Follow-up rewritten as a self-contained question; falls back to the user's exact wording. */
+  standaloneQuestion: string;
   entities: string[];
   /** A small LLM-derived semantic expansion, not a mechanical keyword dump. */
   searchConcepts: string[];
@@ -365,6 +367,7 @@ export const parseQueryUnderstanding = (content: string, fallback: QueryUndersta
     : [];
   return {
     intent: cleanModelText(parsed.intent, 80) ?? fallback.intent,
+    standaloneQuestion: cleanModelText(parsed.standalone_question, 240) ?? fallback.standaloneQuestion,
     entities: asStringArray(parsed.entities, 8),
     searchConcepts: asStringArray(parsed.search_concepts, 8),
     likelyDocumentTopics: asStringArray(parsed.likely_document_topics, 8),
@@ -374,6 +377,11 @@ export const parseQueryUnderstanding = (content: string, fallback: QueryUndersta
     initialTargets: initialTargets.length > 0 ? initialTargets : fallback.initialTargets,
     target: cleanModelText(parsed.target, 240) ?? fallback.target,
   };
+};
+
+export const parseStandaloneQuestion = (content: string, fallback: string): string => {
+  const parsed = parseJsonObject(content);
+  return cleanModelText(parsed?.standalone_question, 240) ?? fallback;
 };
 
 const normalizeScope = (value: unknown, fallback: RetrievalScope): RetrievalScope => value === 'code' ? 'code' : value === 'documentation' ? 'documentation' : value === 'meta' ? 'meta' : fallback;

@@ -169,6 +169,46 @@ describe('useRepositoryChat persistence failures', () => {
     expect(new Set(savedEvents.map((event) => event.id)).size).toBe(2);
   });
 
+  it('passes persisted evidence from the previous assistant turn into the next turn', async () => {
+    const evidence = {
+      id: 'evidence-prior',
+      source: 'github' as const,
+      repoFullName: repository.full_name,
+      refSha: session.sourceRefSha,
+      path: 'README.md',
+      lineStart: 1,
+      lineEnd: 2,
+      url: 'https://github.com/owner/example/blob/abcdef/README.md#L1-L2',
+      excerpt: 'README',
+      retrievedAt: '2026-08-26T00:00:00.000Z',
+    };
+    const previousMessages: RepositoryChatMessage[] = [
+      { id: 'user-1', sessionId: session.id, role: 'user', content: 'How do I install this?', status: 'complete', evidenceIds: [], createdAt: '2026-08-26T00:00:01.000Z' },
+      { id: 'assistant-1', sessionId: session.id, role: 'assistant', content: 'Run the installer. `/README.md - 1-2`', status: 'complete', evidenceIds: [evidence.id], createdAt: '2026-08-26T00:00:02.000Z' },
+    ];
+    mocks.listEvidence.mockResolvedValue([evidence]);
+    mocks.saveMessage.mockResolvedValue(undefined);
+    mocks.saveToolEvent.mockResolvedValue(undefined);
+    mocks.saveEvidence.mockResolvedValue(undefined);
+    mocks.runRepositoryChatTurn.mockResolvedValue({ content: 'Same answer. `/README.md - 1-2`', evidences: [] });
+    const { result } = renderHook(() => useRepositoryChat({
+      repository,
+      session,
+      messages: previousMessages,
+      onMessagesChange: vi.fn(),
+      onSessionChange: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    await act(async () => {
+      await result.current.send('Can you repeat that?', previousMessages);
+    });
+
+    expect(mocks.listEvidence).toHaveBeenCalledWith([evidence.id]);
+    expect(mocks.runRepositoryChatTurn).toHaveBeenCalledWith(expect.objectContaining({
+      priorEvidence: [evidence],
+    }));
+  });
+
   it('keeps completed activity visible while the next turn is running', async () => {
     const previousEvent = {
       id: 'previous-event',

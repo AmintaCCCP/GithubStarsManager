@@ -78,6 +78,7 @@ import {
   resolveFastPathEnabled,
   selectFastPathSegments,
 } from './fastPath';
+import { readRepositoryFileWithCache, readRepositoryTreeWithCache } from './cache';
 import { postprocessCitationLayout } from '../../utils/citationPostprocess';
 
 /** 单次 GitHub 读取的工具级超时。 */
@@ -131,6 +132,8 @@ export interface RepositoryChatTurnInput {
   onAnswerChunk?: (fullText: string) => void;
   /** Newly retrieved evidence, emitted before answer synthesis so citations can render while streaming. */
   onEvidence?: (evidences: ToolEvidence[]) => void;
+  /** Evidence already shown in this session. Reused verbatim when the pinned SHA and repository still match. */
+  priorEvidence?: ToolEvidence[];
   signal?: AbortSignal;
   onToolEvent?: (event: ChatToolEventInput) => void;
 }
@@ -548,6 +551,27 @@ export const synthesizeVerifiedAnswer = async (
 /** 引用键：证据窗口的唯一标识（两个执行循环与快速路径共用同一格式）。 */
 const segmentKey = (path: string, lineStart: number, lineEnd: number): string => `${encodeURIComponent(path)}:${lineStart}-${lineEnd}`;
 
+/** Reuse only immutable file evidence from the same repository and pinned commit. */
+export const reusablePriorEvidence = (input: RepositoryChatTurnInput): ToolEvidence[] => {
+  const seen = new Set<string>();
+  return (input.priorEvidence ?? []).filter((evidence) => {
+    if (evidence.source !== 'github') return false;
+    if (evidence.repoFullName !== input.repository.full_name) return false;
+    if (!evidence.refSha || evidence.refSha !== input.session.sourceRefSha) return false;
+    if (seen.has(evidence.id)) return false;
+    seen.add(evidence.id);
+    return true;
+  });
+};
+
+export const seedReadSegments = (segments: Set<string>, evidences: ToolEvidence[]): void => {
+  for (const evidence of evidences) {
+    if (evidence.path && evidence.lineStart) {
+      segments.add(segmentKey(evidence.path, evidence.lineStart, evidence.lineEnd ?? evidence.lineStart));
+    }
+  }
+};
+
 /** 快速路径尝试所需的共享上下文：由当前执行循环持有并传入。 */
 export interface FastPathAttemptContext {
   input: RepositoryChatTurnInput;
@@ -600,9 +624,15 @@ export const tryFastPathAnswer = async (fastPath: FastPathAttemptContext): Promi
       ? '快速路径：优先读取根 README，判断能否直接回答。'
       : 'Fast path: read the root README first to try answering directly.',
     async (signal) => {
-      const readFile = () => MARKDOWN_EVIDENCE_PATH.test(rootReadmePath)
-        ? fastPath.github.getRepositoryMarkdownEvidenceFile(fastPath.owner, fastPath.repo, rootReadmePath, input.session.sourceRefSha, signal)
-        : fastPath.github.getRepositoryFile(fastPath.owner, fastPath.repo, rootReadmePath, input.session.sourceRefSha, signal);
+      const readFile = () => readRepositoryFileWithCache(
+        fastPath.github,
+        input.repository.full_name,
+        fastPath.owner,
+        fastPath.repo,
+        rootReadmePath,
+        input.session.sourceRefSha,
+        signal,
+      );
       try {
         return await readFile();
       } catch (error) {
@@ -699,9 +729,12 @@ const runOrchestratedEvidenceLoop = async (
   const { ai, ctx, budget, answerMaxTokens, state } = deps;
   const [owner, repo] = splitOwnerAndRepo(input.repository.full_name);
   const github = createGitHubApiService(input.githubToken);
-  const evidences: ToolEvidence[] = [];
+  const priorEvidences = reusablePriorEvidence(input);
+  const evidences: ToolEvidence[] = [...priorEvidences];
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
+  seedReadSegments(readSegments, priorEvidences);
+  if (priorEvidences.length > 0) input.onEvidence?.(priorEvidences);
   const knownTargetKeys = new Set<string>();
   const readPaths = new Set<string>();
   const budgetedReadPaths = new Set<string>();
@@ -712,8 +745,6 @@ const runOrchestratedEvidenceLoop = async (
   const metaFetched = new Set<string>();
   let metaEligible = false;
   const metaSet = new Set<string>(META_TARGETS);
-  const metaIntents = detectMetaIntent(input.question);
-  const metaIntentTargets = metaIntents.map(metaTargetForKind);
   let turns = 0;
   let consecutiveNoProgressRounds = 0;
 
@@ -724,7 +755,7 @@ const runOrchestratedEvidenceLoop = async (
     'context',
     undefined,
     input.language === 'zh' ? `所有读取固定在 ref=${input.session.sourceRefSha.slice(0, 7)}。` : `All reads are pinned to ref=${input.session.sourceRefSha.slice(0, 7)}.`,
-    async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
+    async (signal) => await readRepositoryTreeWithCache(github, input.repository.full_name, owner, repo, input.session.sourceRefSha, signal),
   );
   if (!treeResult.ok) {
     ctx.emitTurnMetrics({ fastPath: false, endReason: 'tree_read_failed', rounds: 0 });
@@ -781,6 +812,7 @@ const runOrchestratedEvidenceLoop = async (
 
   const fallbackUnderstanding: QueryUnderstanding = {
     intent: 'general',
+    standaloneQuestion: input.question,
     entities: [],
     searchConcepts: [],
     likelyDocumentTopics: [],
@@ -826,24 +858,34 @@ const runOrchestratedEvidenceLoop = async (
           1,
         ),
       };
+  const researchQuestion = understanding.standaloneQuestion.trim() || input.question;
+  const researchInput = researchQuestion === input.question ? input : { ...input, question: researchQuestion };
+  const metaIntents = detectMetaIntent(researchQuestion);
+  const metaIntentTargets = metaIntents.map(metaTargetForKind);
   // The LLM supplies a small concept expansion (for example vector search →
   // embeddings, semantic retrieval, topK). It only improves candidate ordering;
   // all later reads are still constrained to the pinned repository tree.
   const semanticCandidateQuery = [
-    input.question,
+    researchQuestion,
     ...understanding.entities,
     ...understanding.searchConcepts,
     ...understanding.likelyDocumentTopics,
   ].filter(Boolean).join(' ');
-  const rankedPaths = rankedCandidatePaths(treeResult.value.entries, semanticCandidateQuery, fallbackFocus);
+  const rankedPaths = rankedCandidatePaths(treeResult.value.entries, semanticCandidateQuery, detectResearchFocus(researchQuestion));
   const documentationCandidates = documentationCandidatesFrom(rankedPaths);
   const codeCandidates = Array.from(new Set(rankedPaths.filter(isRepositoryCodePath)));
   const documentationSet = new Set(documentationCandidates);
   const codeSet = new Set(codeCandidates);
 
-  const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => MARKDOWN_EVIDENCE_PATH.test(path)
-    ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, signal)
-    : await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, signal);
+  const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => readRepositoryFileWithCache(
+    github,
+    input.repository.full_name,
+    owner,
+    repo,
+    path,
+    input.session.sourceRefSha,
+    signal,
+  );
 
   const documentInFlight = new Map<string, Promise<CachedDocument | null>>();
 
@@ -904,6 +946,96 @@ const runOrchestratedEvidenceLoop = async (
     }
   };
 
+  let missing = understanding.answerRequirements.map((requirement) => requirement.text);
+  let requirements: RequirementAssessment[] = [];
+  let finalReason = '';
+  // §5.5 turnMetrics 的结束原因；在循环的每个收尾点赋值，循环自然耗尽时兜底。
+  let endReason = '';
+  let canAnswer = false;
+  let codeEligible = false;
+  let pendingTargets: RetrievalTarget[] = [];
+
+  const validReferences = () => new Set(sourceReferences(evidences));
+  const requirementsSatisfied = (assessments: RequirementAssessment[]): boolean => assessments.length > 0
+    && assessments.every((requirement) => (
+      requirement.status === 'verified' || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
+    ));
+
+  // §5.1：追问先检查上一轮证据是否已能独立回答，避免为了“Windows 下呢”之类
+  // 的追问重新规划并重复读取相同章节。
+  if (priorEvidences.length > 0) {
+    const priorGatePrompt = buildEvidenceGatePrompt(
+      researchInput,
+      understanding,
+      evidences,
+      documents,
+      documentationCandidates,
+      codeCandidates,
+      missing,
+      0,
+      false,
+    );
+    const priorGateRaw = await callModelWithRetry(
+      'evidence_gate',
+      input.language === 'zh' ? '检查上一轮证据能否回答追问' : 'Check whether prior evidence answers the follow-up',
+      'verification',
+      0,
+      input.language === 'zh' ? '复用本会话已读证据，只有缺口存在时才继续检索。' : 'Reuse evidence already read in this session and retrieve only when a gap remains.',
+      priorGatePrompt.system,
+      priorGatePrompt.user,
+      1_000,
+      0,
+      undefined,
+      undefined,
+      undefined,
+      'internal-json',
+    );
+    const priorGate = priorGateRaw
+      ? parseEvidenceGate(
+        priorGateRaw,
+        documentationSet,
+        codeSet,
+        metaSet,
+        'documentation',
+        understanding.answerRequirements,
+        (reference) => validReferences().has(reference) || Boolean(referenceCoveredByEvidence(reference, evidences)),
+      )
+      : null;
+    if (priorGate) {
+      requirements = completeRequirementAssessments(understanding.answerRequirements, priorGate.requirements);
+      missing = requirements.filter((requirement) => requirement.status === 'missing').map((requirement) => requirement.requirement);
+      finalReason = priorGate.reason || finalReason;
+      emit({
+        toolName: 'evidence_gate',
+        status: 'success',
+        paramSummary: input.language === 'zh' ? '复用上一轮证据评估回答条件' : 'Assess the follow-up against prior evidence',
+        stage: 'verification',
+        round: 0,
+        detail: requirementStatusSummary(requirements, input.language),
+      });
+      if (
+        priorGate.sufficient
+        && priorGate.nextAction === 'answer'
+        && priorGate.confidence >= 0.7
+        && requirementsSatisfied(requirements)
+      ) {
+        const content = await synthesizeVerifiedAnswer(
+          ai,
+          researchInput,
+          evidences,
+          0,
+          answerMaxTokens,
+          ctx.callModelWithRetry,
+          '',
+          { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
+          understanding.intent,
+        );
+        ctx.emitTurnMetrics({ fastPath: false, endReason: 'prior_evidence', rounds: 0 });
+        return { content, evidences };
+      }
+    }
+  }
+
   // The LLM selects initial targets. Program logic merely loads their outline so
   // a subsequent LLM retrieval plan can name real document sections, not guessed
   // line ranges or a fixed first chunk.
@@ -920,17 +1052,6 @@ const runOrchestratedEvidenceLoop = async (
     input.language === 'zh' ? '建立文档章节导航，供后续检索计划选择相关内容。' : 'Build a document outline so the retrieval plan can choose relevant sections.',
   )));
 
-  let missing = understanding.answerRequirements.map((requirement) => requirement.text);
-  let requirements: RequirementAssessment[] = [];
-  let finalReason = '';
-  // §5.5 turnMetrics 的结束原因；在循环的每个收尾点赋值，循环自然耗尽时兜底。
-  let endReason = '';
-  let canAnswer = false;
-  let codeEligible = false;
-  let pendingTargets: RetrievalTarget[] = [];
-
-  const validReferences = () => new Set(sourceReferences(evidences));
-
   const targetKey = (target: RetrievalTarget): string => `${target.scope}:${target.path}:${target.sections.map((section) => section.toLowerCase().trim()).sort().join('|')}`;
   const hasCitableSegment = (path: string): boolean => Array.from(readSegments).some((key) => key.startsWith(`${encodeURIComponent(path)}:`));
   const isViableUnseenTarget = (target: RetrievalTarget): boolean => {
@@ -946,7 +1067,7 @@ const runOrchestratedEvidenceLoop = async (
       return citableSegmentsForDocument(
         document,
         target.sections,
-        evidenceSearchTerms(input.question, [...understanding.entities, ...understanding.searchConcepts, ...target.sections, target.purpose, understanding.target]),
+        evidenceSearchTerms(researchQuestion, [...understanding.entities, ...understanding.searchConcepts, ...target.sections, target.purpose, understanding.target]),
       ).some((segment) => !readSegments.has(segmentKey(target.path, segment.lineStart, segment.lineEnd)));
     }
     return buildEvidenceWindows(document.content, 'implementation', [...understanding.entities, ...target.sections, understanding.target])
@@ -1005,7 +1126,7 @@ const runOrchestratedEvidenceLoop = async (
         round,
         input.language === 'zh' ? '补充仓库元信息：已知问题与解决方案线索。' : 'Supplement repository metadata: known issues and resolution leads.',
         async (signal) => {
-          const searchKeywords = keywords.length > 0 ? keywords : [input.question.slice(0, 120)];
+          const searchKeywords = keywords.length > 0 ? keywords : [researchQuestion.slice(0, 120)];
           const hits = await github.searchRepositoryIssues(owner, repo, searchKeywords, { signal });
           // 疑难排查的解决方案常在评论里：仅为前几条命中补充评论摘录，
           // 单条评论抓取失败不阻断整体结果。
@@ -1061,7 +1182,7 @@ const runOrchestratedEvidenceLoop = async (
         : (input.language === 'zh' ? `按证据缺口读取与“${target.purpose || understanding.target}”相关的实现文件。` : `Read an implementation file planned for “${target.purpose || understanding.target}”.`),
     );
     if (!document) return 0;
-    const searchTerms = evidenceSearchTerms(input.question, [
+    const searchTerms = evidenceSearchTerms(researchQuestion, [
       ...understanding.entities,
       ...understanding.searchConcepts,
       ...target.sections,
@@ -1115,7 +1236,7 @@ const runOrchestratedEvidenceLoop = async (
     const unreadDocumentation = documentationCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const unreadCode = codeCandidates.filter((path) => !readPaths.has(path) && isRetryableRead(path));
     const planPrompt = buildRetrievalPlanPrompt(
-      input,
+      researchInput,
       understanding,
       documents,
       unreadDocumentation.length > 0 ? unreadDocumentation : documentationCandidates,
@@ -1226,7 +1347,7 @@ const runOrchestratedEvidenceLoop = async (
       .reduce((sum, count) => sum + count, 0);
 
     const gatePrompt = buildEvidenceGatePrompt(
-      input,
+      researchInput,
       understanding,
       evidences,
       documents,
@@ -1403,7 +1524,7 @@ const runOrchestratedEvidenceLoop = async (
     : '';
   const content = await synthesizeVerifiedAnswer(
     ai,
-    input,
+    researchInput,
     evidences,
     turns,
     answerMaxTokens,

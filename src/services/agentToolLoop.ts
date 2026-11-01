@@ -5,6 +5,7 @@ import { createGitHubApiService } from './githubApiFactory';
 import {
   asStringArray,
   buildEvidenceWindows,
+  buildStandaloneQuestionPrompt,
   createEvidenceToolbox,
   detectResearchFocus,
   documentationCandidatesFrom,
@@ -18,8 +19,11 @@ import {
   MARKDOWN_EVIDENCE_PATH,
   normalizePath,
   parseJsonObject,
+  parseStandaloneQuestion,
   rankedCandidatePaths,
+  reusablePriorEvidence,
   resolveTurnLimits,
+  seedReadSegments,
   citableSegmentsForDocument,
   evidenceSearchTerms,
   splitOwnerAndRepo,
@@ -30,6 +34,8 @@ import {
   type RepositoryChatTurnInput,
   type RepositoryChatTurnResult,
 } from './repositoryChatService';
+import { hasPriorAssistantTurn } from './chat/fastPath';
+import { readRepositoryFileWithCache, readRepositoryTreeWithCache } from './chat/cache';
 import {
   buildIssuesEvidence,
   buildNoIssuesEvidence,
@@ -66,6 +72,7 @@ export const buildToolLoopSystemPrompt = (language: AppLanguage): string => lang
 export const buildToolLoopUserPrompt = (input: RepositoryChatTurnInput, documentationCandidates: string[], codeCandidates: string[]): string => {
   const zh = input.language === 'zh';
   const history = input.messages
+    .slice(0, -1)
     .filter((message) => message.role !== 'system')
     .slice(-6)
     .map((message) => `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content}`)
@@ -178,14 +185,17 @@ const runToolLoopEvidenceAgent = async (
   const github = createGitHubApiService(input.githubToken);
   const { emit, invokeTool } = ctx;
 
-  const evidences: ToolEvidence[] = [];
+  const priorEvidences = reusablePriorEvidence(input);
+  const evidences: ToolEvidence[] = [...priorEvidences];
   const documents = new Map<string, CachedDocument>();
   const readSegments = new Set<string>();
+  seedReadSegments(readSegments, priorEvidences);
+  if (priorEvidences.length > 0) input.onEvidence?.(priorEvidences);
   const readPaths = new Set<string>();
   const budgetedReadPaths = new Set<string>();
   const codeReadPaths = new Set<string>();
   const metaFetched = new Set<string>();
-  let documentationEvidenceCount = 0;
+  let documentationEvidenceCount = priorEvidences.filter((evidence) => evidence.path && MARKDOWN_EVIDENCE_PATH.test(evidence.path)).length;
 
   const treeResult = await invokeTool(
     'read_repo_tree',
@@ -194,15 +204,37 @@ const runToolLoopEvidenceAgent = async (
     'context',
     undefined,
     zh ? `所有读取固定在 ref=${input.session.sourceRefSha.slice(0, 7)}。` : `All reads are pinned to ref=${input.session.sourceRefSha.slice(0, 7)}.`,
-    async (signal) => await github.getRepositoryTree(owner, repo, input.session.sourceRefSha, signal),
+    async (signal) => await readRepositoryTreeWithCache(github, input.repository.full_name, owner, repo, input.session.sourceRefSha, signal),
   );
   if (!treeResult.ok) {
     ctx.emitTurnMetrics({ fastPath: false, endReason: 'tree_read_failed', rounds: 0 });
     return { content: evidenceAgentInsufficientResponse(input.language, treeResult.message, true), evidences };
   }
 
-  const focus = detectResearchFocus(input.question);
-  const rankedPaths = rankedCandidatePaths(treeResult.value.entries, input.question, focus);
+  let researchInput = input;
+  if (hasPriorAssistantTurn(input.messages)) {
+    const rewritePrompt = buildStandaloneQuestionPrompt(input);
+    const rewriteRaw = await ctx.callModelWithRetry(
+      'understand_query',
+      zh ? '把追问改写为独立问题' : 'Rewrite the follow-up as a standalone question',
+      'understanding',
+      undefined,
+      zh ? '结合最近两轮对话补全指代，供后续检索使用。' : 'Resolve references from the recent turns for retrieval.',
+      rewritePrompt.system,
+      rewritePrompt.user,
+      300,
+      0,
+      undefined,
+      undefined,
+      undefined,
+      'internal-json',
+    );
+    const standaloneQuestion = rewriteRaw ? parseStandaloneQuestion(rewriteRaw, input.question) : input.question;
+    if (standaloneQuestion !== input.question) researchInput = { ...input, question: standaloneQuestion };
+  }
+  const question = researchInput.question;
+  const focus = detectResearchFocus(question);
+  const rankedPaths = rankedCandidatePaths(treeResult.value.entries, question, focus);
   const documentationCandidates = documentationCandidatesFrom(rankedPaths);
   const codeCandidates = Array.from(new Set(rankedPaths.filter(isRepositoryCodePath)));
   const documentationSet = new Set(documentationCandidates);
@@ -236,11 +268,17 @@ const runToolLoopEvidenceAgent = async (
   });
   if (fastPathAnswer !== null) return { content: fastPathAnswer, evidences };
   // 快速路径已种入的 README 证据也算已读文档，避免回落时 README-first 规则误拒其他来源。
-  documentationEvidenceCount += evidences.length;
+  documentationEvidenceCount = evidences.filter((evidence) => evidence.path && MARKDOWN_EVIDENCE_PATH.test(evidence.path)).length;
 
-  const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => MARKDOWN_EVIDENCE_PATH.test(path)
-    ? await github.getRepositoryMarkdownEvidenceFile(owner, repo, path, input.session.sourceRefSha, signal)
-    : await github.getRepositoryFile(owner, repo, path, input.session.sourceRefSha, signal);
+  const readEvidenceFile = async (path: string, signal: AbortSignal | undefined) => readRepositoryFileWithCache(
+    github,
+    input.repository.full_name,
+    owner,
+    repo,
+    path,
+    input.session.sourceRefSha,
+    signal,
+  );
 
   // 与编排式 loadDocument 相同的语义：已读路径直接复用缓存（同一文件的
   // 不同章节是合法的后续读取，不能被 invokeTool 的重复动作拦截挡住）。
@@ -296,7 +334,7 @@ const runToolLoopEvidenceAgent = async (
       return zh ? '已拒绝：读取失败、路径无效或读取预算已用尽。' : 'Rejected: the read failed, the path is invalid, or the read budget was exhausted.';
     }
     const sections = asStringArray(args.sections, 6);
-    const searchTerms = evidenceSearchTerms(input.question, sections);
+    const searchTerms = evidenceSearchTerms(question, sections);
     const plannedSegments = scope === 'documentation'
       ? citableSegmentsForDocument(document, sections, searchTerms)
       : buildEvidenceWindows(document.content, focus, sections.length > 0 ? sections : searchTerms);
@@ -370,7 +408,7 @@ const runToolLoopEvidenceAgent = async (
       round,
       zh ? '补充仓库元信息：已知问题与解决方案线索。' : 'Supplement repository metadata: known issues and resolution leads.',
       async (signal) => {
-        const searchKeywords = keywords.length > 0 ? keywords : [input.question.slice(0, 120)];
+        const searchKeywords = keywords.length > 0 ? keywords : [question.slice(0, 120)];
         const hits = await github.searchRepositoryIssues(owner, repo, searchKeywords, { signal });
         // 解决方案常在评论里：仅为前几条命中补充评论摘录，单条失败不阻断。
         const withComments: IssueHitWithComments[] = [];
@@ -437,11 +475,11 @@ const runToolLoopEvidenceAgent = async (
   const tools = buildToolLoopTools(input.language);
   const prefetchedEvidence = evidences.length > 0 ? untrustedEvidenceBlock(evidences) : '';
   const firstUserContent = [
-    buildToolLoopUserPrompt(input, documentationCandidates, codeCandidates),
+    buildToolLoopUserPrompt(researchInput, documentationCandidates, codeCandidates),
     prefetchedEvidence
       ? `${zh
-        ? '以下 README 证据已由快速路径读取，可直接用于判断是否还需要补充来源：'
-        : 'The README evidence below was already read by the fast path and is available for deciding whether more sources are needed:'}\n\n${prefetchedEvidence}`
+        ? '以下证据已在本次会话中读取或由快速路径读取，可直接用于判断是否还需要补充来源；若已能回答追问，立即调用 ready_to_answer：'
+        : 'The evidence below was already read in this session or by the fast path. Use it to decide whether more sources are needed; if it already answers the follow-up, call ready_to_answer immediately:'}\n\n${prefetchedEvidence}`
       : '',
   ].filter(Boolean).join('\n\n');
   const messages: AIToolLoopMessage[] = [
@@ -577,14 +615,14 @@ const runToolLoopEvidenceAgent = async (
 
   const content = await synthesizeVerifiedAnswer(
     ai,
-    input,
+    researchInput,
     evidences,
     Math.max(1, loopTurns),
     answerMaxTokens,
     ctx.callModelWithRetry,
     '',
     { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
-    detectResearchFocus(input.question),
+    detectResearchFocus(question),
   );
   ctx.emitTurnMetrics({ fastPath: false, endReason: endReason || 'agent_ready', rounds: loopTurns });
   return { content, evidences };
