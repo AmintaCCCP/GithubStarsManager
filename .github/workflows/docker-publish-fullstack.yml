@@ -20,13 +20,11 @@ on:
       - 'server/**'
   workflow_dispatch:
 
-# A semver publication updates shared tags (for example 1 and 1.2), so tag
-# releases use one group. Branches and pull requests remain independent.
+# Keep only the newest attempt for each PR. Non-PR runs get unique groups, and
+# the publish job below serializes registry writes without dropping revisions.
 concurrency:
-  group: fullstack-image-${{ github.ref_type == 'tag' && 'release' || github.ref }}
-  # Keep the newest branch/PR build, but finish every release tag in order so
-  # shared major/minor tags cannot race or leave an older version unpublished.
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  group: fullstack-image-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   REGISTRY: ghcr.io
@@ -56,6 +54,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cleanup: false
 
       - name: Validate full-stack multi-architecture image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -77,6 +77,11 @@ jobs:
     # branch, and a manual run elsewhere must neither publish images nor
     # overwrite the default branch's publish-branch cache scope.
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    # Keep every main/tag revision pending instead of replacing older runs.
+    concurrency:
+      group: fullstack-image-publish
+      cancel-in-progress: false
+      queue: max
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
@@ -101,6 +106,8 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cleanup: false
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -114,9 +121,9 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
-            # branch push → "latest"
-            type=raw,value=latest,enable={{is_default_branch}}
             # tag push → "v1.2.3", "1.2.3", "1.2", "1"
             type=ref,event=tag
             type=semver,pattern={{version}}
@@ -126,6 +133,7 @@ jobs:
             type=sha,prefix=sha-
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
@@ -139,3 +147,22 @@ jobs:
             type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},timeout=5m
             type=gha,scope=github-stars-manager-fullstack-publish-branch,timeout=5m
           cache-to: type=gha,scope=github-stars-manager-fullstack-publish-${{ github.ref_type }},mode=max,timeout=5m,ignore-error=true
+
+      - name: Move latest to this build when it is current main
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ github.sha }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          current_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$current_sha" != "$CANDIDATE_SHA" ]; then
+            echo "Skipping latest: $CANDIDATE_SHA is not the current main head ($current_sha)."
+            exit 0
+          fi
+          test -n "$DIGEST"
+          docker buildx imagetools create \
+            --tag "${REGISTRY}/${IMAGE_NAME}:latest" \
+            "${REGISTRY}/${IMAGE_NAME}@${DIGEST}"

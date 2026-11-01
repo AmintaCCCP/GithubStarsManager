@@ -6,29 +6,67 @@ on:
     branches:
       - main
 
+# Only supersede older PR attempts. Every main commit must finish its full run.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A unique group for every non-PR run is intentional: GitHub keeps only one
+  # pending run per group, so grouping main pushes would still drop commits.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # These jobs never launch the Electron binary. Skipping its ~100 MB
+  # postinstall keeps every dependency install small and cache-friendly.
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
 jobs:
-  quality:
-    name: Quality gates
-    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
-    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748), which
-    # would swap the toolchain (glibc, prebuilt deps) under every gate.
+  changes:
+    name: CI scope
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.scope.outputs.run }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # Always full history. Do not write `&& 0 || 1`: GitHub treats 0 as
-          # falsy, so that expression would force fetch-depth: 1 on PRs and
-          # `git diff base...head` would fail with "invalid symmetric difference".
+          fetch-depth: 0
+
+      - name: Detect docs-only pull request
+        id: scope
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CI_SCOPE_ROOT: ${{ github.workspace }}
+        run: |
+          # Pull request code is untrusted; execute the scope logic from base.
+          script="$RUNNER_TEMP/ci-scope.cjs"
+          if git cat-file blob "${PR_BASE_SHA}:scripts/ci-scope.cjs" >"$script" 2>/dev/null; then
+            node "$script"
+          else
+            echo "::warning::Trusted ci-scope script unavailable; running full CI"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  quality:
+    name: Quality gates
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The release-file and i18n PR gates diff against the base and need
+          # both endpoint objects available locally.
           fetch-depth: 0
 
       - name: Set up Node.js
@@ -38,7 +76,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Frontend layering boundaries
         run: node scripts/check-boundaries.cjs
@@ -55,9 +93,6 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          # The gate skips release-file checks only for the release-please bot
-          # (github-actions[bot]) whose automated PRs bump versions; every
-          # human or other bot author is still blocked.
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: node scripts/check-pr-release-files.cjs --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
 
@@ -81,28 +116,95 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Run tests
-        run: npm run test:run
+  audit:
+    name: Dependency audit
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Dependency audit (report-only baseline)
+        # Advisory-only until the existing transitive backlog is cleared.
+        # npm audit reads the lockfile directly, so this job needs no install.
+        run: npm audit --audit-level=high || true
+
+  tests:
+    name: Tests (${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run Vitest shard
+        run: npx vitest run --shard=${{ matrix.shard }}/3
+
+      # The node:test suites are fast; running them beside shard 1 avoids a
+      # fourth dependency install without extending the critical path.
+      - name: Run node test suites
+        if: matrix.shard == 1
+        run: npm run test:node
+
+  build:
+    name: Build
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Build
         run: npm run build
 
-      - name: Dependency audit (report-only baseline)
-        # Advisory-only until the dependency backlog is cleared: currently
-        # known-accepted high advisories (the braces and electron-builder
-        # transitive chains, both needing major toolchain upgrades) would fail
-        # this step, so the gate is report-only. Once the backlog is cleared,
-        # drop `|| true` to make the audit blocking.
-        run: npm audit --audit-level=high || true
-
   server:
     name: Server quality gates
-    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
-    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    permissions:
-      contents: read
 
     steps:
       - name: Checkout repository
@@ -118,7 +220,7 @@ jobs:
           cache-dependency-path: server/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
         working-directory: server
 
       - name: Typecheck
@@ -135,12 +237,10 @@ jobs:
 
   worker:
     name: Worker typecheck
-    # Pinned instead of `ubuntu-latest`: that label migrates to Ubuntu 26.04
-    # between 2026-10-19 and 2026-11-19 (actions/runner-images#14748).
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions:
-      contents: read
 
     steps:
       - name: Checkout repository
@@ -156,11 +256,9 @@ jobs:
           cache-dependency-path: cloudflare-worker/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
         working-directory: cloudflare-worker
 
       - name: Typecheck
-        # The worker ships no test suite yet (tracked separately); keep the
-        # TypeScript build honest until tests land and join this job.
         run: npx tsc --noEmit
         working-directory: cloudflare-worker

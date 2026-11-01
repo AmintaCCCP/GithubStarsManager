@@ -4,12 +4,13 @@
 FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /app
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
 # Copy source code
 COPY . .

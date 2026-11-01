@@ -3,23 +3,15 @@ name: CodeQL
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'LandingPage/**'
-      - 'bi-site/**'
   pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'LandingPage/**'
-      - 'bi-site/**'
   schedule:
     # Weekly full sweep on Monday ~03:37 UTC, off the top of the hour to
     # avoid GitHub's scheduled-run congestion.
     - cron: '37 3 * * 1'
 
 concurrency:
-  group: codeql-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: codeql-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -37,14 +29,35 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect docs-only pull request
+        id: scope
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CI_SCOPE_ROOT: ${{ github.workspace }}
+        run: |
+          # Pull request code is untrusted; execute the scope logic from base.
+          script="$RUNNER_TEMP/ci-scope.cjs"
+          if git cat-file blob "${PR_BASE_SHA}:scripts/ci-scope.cjs" >"$script" 2>/dev/null; then
+            node "$script"
+          else
+            echo "::warning::Trusted ci-scope script unavailable; running full CI"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Initialize CodeQL
+        if: github.event_name != 'pull_request' || steps.scope.outputs.run == 'true'
         uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: javascript-typescript
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Perform CodeQL Analysis
+        if: github.event_name != 'pull_request' || steps.scope.outputs.run == 'true'
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: '/language:javascript-typescript'

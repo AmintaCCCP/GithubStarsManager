@@ -10,8 +10,8 @@ on:
     - cron: '41 4 * * 1'
 
 concurrency:
-  group: gitleaks-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: gitleaks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
