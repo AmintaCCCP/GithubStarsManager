@@ -334,7 +334,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                 type="text"
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                 placeholder={t('categoryPanel.e-g-my-projects')}
               />
             </div>
@@ -353,7 +353,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                     setNewCategoryIcon(value);
                   }
                 }}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                 placeholder="📁"
               />
             </div>
@@ -367,7 +367,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
               type="text"
               value={newCategoryKeywords}
               onChange={(e) => setNewCategoryKeywords(e.target.value)}
-              className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+              className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
               placeholder={t('categoryPanel.comma-separated-keywords')}
             />
             <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -515,7 +515,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                                 setEditIcon(value);
                               }
                             }}
-                            className="w-14 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-center text-lg text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                            className="w-14 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-center text-lg text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                             placeholder="📁"
                           />
                           <Input
@@ -523,7 +523,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             aria-label={t('categoryPanel.edit-category-name')}
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                             placeholder={t('categoryPanel.category-name-2')}
                           />
                         </div>
@@ -533,7 +533,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                             aria-label={t('categoryPanel.edit-category-keywords')}
                             value={editKeywords}
                             onChange={(e) => setEditKeywords(e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                            className="flex-1 px-2 py-1.5 border border-border dark:border-border rounded bg-card dark:bg-muted/40 text-sm text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                             placeholder={t('categoryPanel.keywords-comma-separated')}
                           />
                           <Button

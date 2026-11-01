@@ -8,7 +8,7 @@ import { Checkbox } from '../ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Bot, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle, Languages } from 'lucide-react';
+import { Bot, Plus, Edit3, Trash2, Save, X, Plug, RefreshCw, MessageSquare, Eye, EyeOff, AlertCircle, Languages } from 'lucide-react';
 import { AIConfig, AIApiType, AIReasoningEffort, MiMoPlan, TranslationEngine } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -17,6 +17,7 @@ import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
 import { isToolCallCapableApiType } from '../../constants/aiCapabilities';
+import { Modal } from '../Modal';
 import type { RepositoryChatTaskDepth } from '../../types/repositoryChat';
 
 interface AIConfigPanelProps {
@@ -448,22 +449,48 @@ Repository information:
             {t('aIConfigPanel.ai-service-configuration')}
           </h3>
         </div>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{t('aIConfigPanel.add-ai-config')}</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {showForm && (
+            <Button variant="outline" onClick={resetForm}>
+              <X className="w-4 h-4" />
+              <span>{t('aIConfigPanel.cancel')}</span>
+            </Button>
+          )}
+          <Button variant="default" onClick={() => { resetForm(); setShowForm(true); }}>
+            <Plus className="w-4 h-4" />
+            <span>{t('aIConfigPanel.add-ai-config')}</span>
+          </Button>
+        </div>
       </div>
 
-      {showForm && (
-        <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <h4 className="font-medium text-foreground dark:text-foreground mb-4">
-            {editingId ? t('aIConfigPanel.edit-ai-configuration') : t('aIConfigPanel.add-ai-configuration')}
-          </h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <Modal
+        isOpen={showForm}
+        onClose={resetForm}
+        title={editingId ? t('aIConfigPanel.edit-ai-configuration') : t('aIConfigPanel.add-ai-configuration')}
+        maxWidth="max-w-3xl"
+        scrollable
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={resetForm}>
+              <X className="w-4 h-4" />
+              <span>{t('aIConfigPanel.cancel')}</span>
+            </Button>
+            <Button variant="outline" onClick={handleTestForm} disabled={testingForm}>
+              {testingForm ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Plug className="w-4 h-4" />
+              )}
+              <span>{t('aIConfigPanel.test-connection')}</span>
+            </Button>
+            <Button variant="default" onClick={handleSave}>
+              <Save className="w-4 h-4" />
+              <span>{t('aIConfigPanel.save')}</span>
+            </Button>
+          </div>
+        )}
+      >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label htmlFor="ai-config-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
                 {t('aIConfigPanel.configuration-name')} *
@@ -473,7 +500,7 @@ Repository information:
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                 placeholder={t('aIConfigPanel.e-g-openai-gpt-4')}
               />
             </div>
@@ -514,7 +541,7 @@ Repository information:
                 type="url"
                 value={form.baseUrl}
                 onChange={(e) => setForm(prev => ({ ...prev, baseUrl: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                 placeholder={getEndpointPlaceholder(form.apiType, form.mimoPlan)}
               />
               <p className="text-xs text-muted-foreground dark:text-muted-foreground mt-1">
@@ -539,7 +566,7 @@ Repository information:
                 type="password"
                 value={form.apiKey}
                 onChange={(e) => setForm(prev => ({ ...prev, apiKey: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                 placeholder={t('aIConfigPanel.enter-api-key')}
               />
             </div>
@@ -553,7 +580,7 @@ Repository information:
                 type="text"
                 value={form.model}
                 onChange={(e) => setForm(prev => ({ ...prev, model: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
                 placeholder="gpt-4"
               />
             </div>
@@ -700,43 +727,14 @@ Repository information:
                   value={form.customPrompt}
                   onChange={(e) => setForm(prev => ({ ...prev, customPrompt: e.target.value }))}
                   rows={10}
-                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-ring focus:border-transparent"
+                  className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground font-mono text-sm focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent"
                   placeholder={t('aIConfigPanel.enter-custom-prompt-here')}
                 />
               </div>
             )}
           </div>
+      </Modal>
 
-          <div className="flex space-x-3">
-            <Button
-              onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              <span>{t('aIConfigPanel.save')}</span>
-            </Button>
-            <Button
-              onClick={handleTestForm}
-              disabled={testingForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              {testingForm ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <TestTube className="w-4 h-4" />
-              )}
-              <span>{t('aIConfigPanel.test-connection')}</span>
-            </Button>
-            <Button
-              onClick={resetForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
-            >
-              <X className="w-4 h-4" />
-              <span>{t('aIConfigPanel.cancel')}</span>
-            </Button>
-          </div>
-        </div>
-      )}
 
       <h4 id="active-ai-config-heading" className="mb-3 text-sm font-medium text-foreground">
         {t('aIConfigPanel.active-ai-configuration')}
@@ -792,7 +790,7 @@ Repository information:
                   {testingId === config.id ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <TestTube className="w-4 h-4" />
+                    <Plug className="w-4 h-4" />
                   )}
                 </Button>
                 <Button

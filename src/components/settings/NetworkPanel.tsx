@@ -6,7 +6,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
 import { NumberInput } from '../ui/NumberInput';
 import React, { useEffect, useState } from 'react';
-import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Wifi, Download, Eye, EyeOff, Loader2, CheckCircle2, XCircle, Plug } from 'lucide-react';
 import type { ProxyType } from '../../types';
 import { useNetworkActions } from '../../features/settings/hooks/useNetworkActions';
 
@@ -81,7 +81,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   value={form.host}
                   onChange={(e) => setForm({ ...form, host: e.target.value })}
                   placeholder="127.0.0.1"
-                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -124,7 +124,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                       value={form.username || ''}
                       onChange={(e) => setForm({ ...form, username: e.target.value || undefined })}
                       placeholder={t('networkPanel.optional')}
-                      className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                      className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent outline-none"
                     />
                   </div>
                   <div>
@@ -138,7 +138,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                         value={form.password || ''}
                         onChange={(e) => setForm({ ...form, password: e.target.value || undefined })}
                         placeholder={t('networkPanel.optional')}
-                        className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                        className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent outline-none"
                       />
                       <Button
                         type="button"
@@ -169,7 +169,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                     <span>{t('networkPanel.testing')}</span>
                   </span>
                 ) : (
-                  t('networkPanel.test-connection')
+                  <span className="flex items-center space-x-2">
+                    <Plug className="w-4 h-4" />
+                    <span>{t('networkPanel.test-connection')}</span>
+                  </span>
                 )}
               </Button>
 
@@ -245,7 +248,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   value={rpcForm.host}
                   onChange={(e) => setRpcForm({ ...rpcForm, host: e.target.value })}
                   placeholder="127.0.0.1"
-                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent outline-none"
                 />
               </div>
               <div>
@@ -282,7 +285,7 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                   placeholder={hasStoredSecret
                     ? t('networkPanel.secret-saved-leave-blank-to-keep')
                     : t('networkPanel.optional-aria2-rpc-secret')}
-                  className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-ring focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 pr-10 bg-muted dark:bg-muted/40 border border-border dark:border-border rounded-lg text-foreground dark:text-foreground text-sm focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent outline-none"
                 />
                 <Button
                   type="button"
@@ -318,7 +321,10 @@ export const NetworkPanel: React.FC<NetworkPanelProps> = ({ t }) => {
                     <span>{t('networkPanel.testing')}</span>
                   </span>
                 ) : (
-                  t('networkPanel.test-connection')
+                  <span className="flex items-center space-x-2">
+                    <Plug className="w-4 h-4" />
+                    <span>{t('networkPanel.test-connection')}</span>
+                  </span>
                 )}
               </Button>
 

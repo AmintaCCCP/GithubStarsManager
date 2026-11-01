@@ -597,7 +597,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
             <Input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               aria-label={t('diagnosticLogsPanel.search-log-modules-or-messages')}
               placeholder={t('diagnosticLogsPanel.search-module-or-message')}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-border dark:border-border bg-muted dark:bg-muted/40 text-foreground dark:text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-(--ui-focus-ring)" />
           </div>
 
           {/* Level pills — debug pill always clickable */}
@@ -781,7 +781,7 @@ export const DiagnosticLogsPanel: React.FC<DiagnosticLogsPanelProps> = ({ t }) =
                       role={hasHttpDetail ? 'button' : undefined}
                       tabIndex={hasHttpDetail ? 0 : undefined}
                       aria-label={hasHttpDetail ? t('diagnosticLogsPanel.view-http-details-v1-v2', { v1: entry.module, v2: entry.message }) : undefined}
-                      className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset' : ''}`}
+                      className={`px-4 py-3 transition-colors ${hasHttpDetail ? 'cursor-pointer hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-inset' : ''}`}
                       onClick={hasHttpDetail ? () => setDetailEntry(entry) : undefined}
                       onKeyDown={hasHttpDetail ? (event) => {
                         if (event.key === 'Enter' || event.key === ' ') {

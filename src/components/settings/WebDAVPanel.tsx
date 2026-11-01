@@ -4,12 +4,13 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import React, { useState } from 'react';
-import { Cloud, Plus, Edit3, Trash2, Save, X, TestTube, RefreshCw } from 'lucide-react';
+import { Check, Cloud, Plus, Edit3, Trash2, X, Plug, RefreshCw } from 'lucide-react';
 import { WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useWebDAVActions } from '../../features/settings/hooks/useWebDAVActions';
 import { useDialog } from '../../hooks/useDialog';
+import { Modal } from '../Modal';
 
 interface WebDAVPanelProps {
   t: TranslateFn;
@@ -58,6 +59,11 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     if (save(form, editingId)) resetForm();
   };
 
+  const handleAdd = () => {
+    resetForm();
+    setShowForm(true);
+  };
+
   const handleEdit = (config: WebDAVConfig) => {
     setForm({
       name: config.name,
@@ -81,111 +87,111 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
             {t('webDAVPanel.webdav-configuration')}
           </h3>
         </div>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{t('webDAVPanel.add-webdav')}</span>
-        </Button>
-      </div>
-
-      {showForm && (
-        <div className="p-4 bg-background dark:bg-muted/40 rounded-lg border border-border dark:border-border">
-          <h4 className="font-medium text-foreground dark:text-foreground mb-4">
-            {editingId ? t('webDAVPanel.edit-webdav-configuration') : t('webDAVPanel.add-webdav-configuration')}
-          </h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label htmlFor="webdav-name" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('webDAVPanel.configuration-name')} *
-              </label>
-              <Input
-                id="webdav-name"
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('webDAVPanel.e-g-nutstore')}
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="webdav-url" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('webDAVPanel.webdav-url')} *
-              </label>
-              <Input
-                id="webdav-url"
-                type="url"
-                value={form.url}
-                onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder="https://dav.jianguoyun.com/dav/"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="webdav-username" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('webDAVPanel.username')} *
-              </label>
-              <Input
-                id="webdav-username"
-                type="text"
-                value={form.username}
-                onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('webDAVPanel.webdav-username')}
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="webdav-password" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('webDAVPanel.password')} *
-              </label>
-              <Input
-                id="webdav-password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder={t('webDAVPanel.webdav-password')}
-              />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label htmlFor="webdav-path" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-1">
-                {t('webDAVPanel.path')} *
-              </label>
-              <Input
-                id="webdav-path"
-                type="text"
-                value={form.path}
-                onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}
-                className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
-                placeholder="/github-stars-manager/"
-              />
-            </div>
-          </div>
-
-          <div className="flex space-x-3">
-            <Button
-              onClick={handleSave}
-              className="flex items-center space-x-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              <span>{t('webDAVPanel.save')}</span>
-            </Button>
-            <Button
-              onClick={resetForm}
-              className="flex items-center space-x-2 px-4 py-2 bg-muted hover:bg-accent dark:bg-muted/40 dark:hover:bg-accent text-foreground dark:text-foreground rounded-lg border border-border dark:border-border transition-colors"
-            >
+        <div className="flex items-center gap-2">
+          {showForm && (
+            <Button variant="outline" onClick={resetForm}>
               <X className="w-4 h-4" />
               <span>{t('webDAVPanel.cancel')}</span>
             </Button>
+          )}
+          <Button variant="default" onClick={handleAdd}>
+            <Plus className="w-4 h-4" />
+            <span>{t('webDAVPanel.add-webdav')}</span>
+          </Button>
+        </div>
+      </div>
+
+      <Modal
+        isOpen={showForm}
+        onClose={resetForm}
+        title={editingId ? t('webDAVPanel.edit-webdav-configuration') : t('webDAVPanel.add-webdav-configuration')}
+        maxWidth="max-w-2xl"
+        scrollable
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={resetForm}>
+              <X className="w-4 h-4" />
+              <span>{t('webDAVPanel.cancel')}</span>
+            </Button>
+            <Button variant="default" onClick={handleSave}>
+              <Check className="w-4 h-4" />
+              <span>{t('webDAVPanel.save')}</span>
+            </Button>
+          </div>
+        )}
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label htmlFor="webdav-name" className="mb-1 block text-sm font-medium text-foreground">
+              {t('webDAVPanel.configuration-name')} *
+            </label>
+            <Input
+              id="webdav-name"
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full"
+              placeholder={t('webDAVPanel.e-g-nutstore')}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="webdav-url" className="mb-1 block text-sm font-medium text-foreground">
+              {t('webDAVPanel.webdav-url')} *
+            </label>
+            <Input
+              id="webdav-url"
+              type="url"
+              value={form.url}
+              onChange={(e) => setForm(prev => ({ ...prev, url: e.target.value }))}
+              className="w-full"
+              placeholder="https://dav.jianguoyun.com/dav/"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="webdav-username" className="mb-1 block text-sm font-medium text-foreground">
+              {t('webDAVPanel.username')} *
+            </label>
+            <Input
+              id="webdav-username"
+              type="text"
+              value={form.username}
+              onChange={(e) => setForm(prev => ({ ...prev, username: e.target.value }))}
+              className="w-full"
+              placeholder={t('webDAVPanel.webdav-username')}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="webdav-password" className="mb-1 block text-sm font-medium text-foreground">
+              {t('webDAVPanel.password')} *
+            </label>
+            <Input
+              id="webdav-password"
+              type="password"
+              value={form.password}
+              onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
+              className="w-full"
+              placeholder={t('webDAVPanel.webdav-password')}
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label htmlFor="webdav-path" className="mb-1 block text-sm font-medium text-foreground">
+              {t('webDAVPanel.path')} *
+            </label>
+            <Input
+              id="webdav-path"
+              type="text"
+              value={form.path}
+              onChange={(e) => setForm(prev => ({ ...prev, path: e.target.value }))}
+              className="w-full"
+              placeholder="/github-stars-manager/"
+            />
           </div>
         </div>
-      )}
+      </Modal>
 
       <RadioGroup
         value={activeWebDAVConfig || ''}
@@ -233,7 +239,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   {testingId === config.id ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <TestTube className="w-4 h-4" />
+                    <Plug className="w-4 h-4" />
                   )}
                 </Button>
                 <Button

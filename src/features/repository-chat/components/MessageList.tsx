@@ -94,7 +94,7 @@ export const EmptyState: React.FC<{
           <button
             key={question}
             type="button"
-            className="group flex min-h-16 items-start gap-3 rounded-2xl border border-border/70 bg-background/50 p-3.5 text-left text-sm transition-colors hover:border-primary/30 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex min-h-16 items-start gap-3 rounded-2xl border border-border/70 bg-background/50 p-3.5 text-left text-sm transition-colors hover:border-primary/30 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring)"
             onClick={() => onAsk(question)}
           >
             <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground group-hover:text-foreground">

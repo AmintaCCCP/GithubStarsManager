@@ -358,7 +358,7 @@ html[data-animation='reduced'] *::after {
   }
 
   .input-base {
-    @apply bg-background text-foreground border border-input rounded-md px-[14px] py-[12px] focus:outline-none focus:border-ring focus:ring-2 focus:ring-ring/20 transition-all duration-200;
+    @apply bg-background text-foreground border border-input rounded-md px-[14px] py-[12px] focus:outline-none focus:border-ring focus:ring-2 focus:ring-(--ui-focus-ring/55) transition-all duration-200;
   }
   .input-search {
     @apply bg-transparent text-foreground focus:outline-none placeholder:text-muted-foreground;
@@ -504,7 +504,9 @@ html:has(body[data-scroll-locked]) {
   --border: 214.3 31.8% 91.4%;
   --border-strong: 214.3 25% 80%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  /* Focus ring is a neutral hairline-plus-halo, not the near-black primary
+     foreground the shadcn default used. */
+  --ring: 222.2 20% 62%;
   --radius: 0.5rem;
 
   /* Status fills use a dark foreground in every mode. The legacy white
@@ -549,6 +551,7 @@ html:has(body[data-scroll-locked]) {
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
   --ui-accent-ring: hsl(var(--ring));
+  --ui-focus-ring: hsl(var(--ring) / 0.42);
   /* Text-selection and search-hit fills. Accent/palettes cannot be trusted
      here (zen-inspired light accent ≈ card made ::selection invisible,
      issue #348), so each theme ships derived fills with guaranteed surface
@@ -973,6 +976,7 @@ html.dark {
   --ui-accent-hover: hsl(var(--primary) / 0.9);
   --ui-accent-soft: hsl(var(--accent));
   --ui-accent-ring: hsl(var(--ring));
+  --ui-focus-ring: hsl(var(--ring) / 0.34);
   --ui-success: hsl(var(--success));
   --ui-warning: hsl(var(--warning));
   --ui-danger: hsl(var(--destructive));
@@ -1017,7 +1021,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid hsl(var(--ring));
+  outline: 1px solid hsl(var(--ring));
   outline-offset: 2px;
 }
 
@@ -3603,6 +3607,27 @@ html.dark .release-card.is-expanded {
     var(--app-sidebar-action-size) * 2 + var(--app-sidebar-action-gap) +
       var(--app-sidebar-item-padding-inline)
   );
+}
+
+/* Built-in device filter is two lines (name + badge / device); the shared row
+   height would clip it. The toggle column also keeps the row actions' space
+   reserved so the text never runs under the hover-only buttons. */
+.app-side-filter-row > .app-side-item.app-side-multiline-label {
+  height: auto;
+  min-height: var(--app-sidebar-item-height);
+  padding-block: 0.25rem;
+}
+
+.app-side-multiline-label {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: var(--app-sidebar-item-gap);
+}
+
+.app-side-filter-row .app-side-item-label > svg {
+  flex: none;
 }
 
 .app-side-row-actions {

@@ -160,7 +160,7 @@ const RepoPickerPanel: React.FC<{
         placeholder={searchPlaceholder}
         aria-label={searchPlaceholder}
         autoFocus
-        className="w-full pl-8 pr-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
+        className="w-full pl-8 pr-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
       />
     </div>
 
@@ -349,7 +349,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     onClose();
   };
 
-  const keywordInputClass = 'flex-1 px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground';
+  const keywordInputClass = 'flex-1 px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground';
 
   const assetRuleCount = keywords.length + excludeKeywords.length;
   const repoRuleCount = includeRepos.length + alwaysExcludeRepos.length;
@@ -476,7 +476,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={tModal('name-placeholder')}
-            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
+            className="w-full px-3 py-2 border border-border dark:border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent bg-card dark:bg-muted/40 text-foreground dark:text-foreground"
           />
         </div>
 

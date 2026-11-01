@@ -236,7 +236,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               className={`
                 relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
                 transition-all duration-200 ease-out
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2
                 ${selectedChannel === channel.id
                   ? 'text-foreground dark:text-foreground '
                   : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground hover:bg-muted dark:hover:bg-accent'
