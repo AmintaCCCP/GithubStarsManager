@@ -767,11 +767,15 @@ const runToolLoopEvidenceAgent = async (
       if (evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
         answerGaps = [];
       } else {
-        const refreshed = Array.from(new Set([
-          ...coverage.missing,
+        answerGaps = Array.from(new Set([
+          ...coverage.requirements
+            .filter((requirement) => !(
+              requirement.status === 'verified'
+              || (requirement.kind === 'necessary' && requirement.status === 'not_applicable')
+            ))
+            .map((requirement) => requirement.requirement),
           ...unfetchedMetaTargets.map((path) => (zh ? `拉取 ${path}` : `fetch ${path}`)),
         ]));
-        if (refreshed.length > 0) answerGaps = refreshed;
       }
     }
   }
