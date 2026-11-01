@@ -90,7 +90,7 @@ jobs:
           name: web-dist
           path: dist
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
   build:
     needs: scope
@@ -231,13 +231,14 @@ jobs:
       run: |
         # Install dependencies and platform tooling while the single web build
         # runs, then wait only for its artifact instead of the whole web job.
-        for _ in $(seq 1 60); do
+        # Keep waiting past the web job's 15-minute timeout plus upload time.
+        for _ in $(seq 1 192); do
           if gh run download "$GITHUB_RUN_ID" --name web-dist --dir dist >/dev/null 2>&1; then
             exit 0
           fi
           sleep 5
         done
-        echo "::error::web-dist artifact was not available within 5 minutes"
+        echo "::error::web-dist artifact was not available within 16 minutes"
         exit 1
 
     - name: Verify downloaded web bundle
@@ -304,6 +305,7 @@ jobs:
           release/*.exe
           release/*.msi
         if-no-files-found: ignore
+        retention-days: 31
 
     - name: Upload artifacts (macOS)
       if: matrix.os == 'macos-latest' && github.ref_type == 'tag' && success()
@@ -312,6 +314,7 @@ jobs:
         name: macos-app
         path: release/*.dmg
         if-no-files-found: ignore
+        retention-days: 31
 
     - name: Upload artifacts (Linux)
       if: startsWith(matrix.os, 'ubuntu') && github.ref_type == 'tag' && success()
@@ -320,6 +323,7 @@ jobs:
         name: linux-app
         path: release/*.AppImage
         if-no-files-found: ignore
+        retention-days: 31
 
   release:
     needs: [scope, web, build]
