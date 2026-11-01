@@ -789,7 +789,7 @@ describe('ReleaseTimeline current-system built-in filter', () => {
     const deviceLine = within(firstRow).getByText(/macOS/);
 
     expect(deviceLine).toHaveClass('truncate');
-    expect(deviceLine.parentElement?.parentElement).toHaveClass('app-side-multiline-label');
+    expect(firstRow.querySelector('.app-side-item')).toHaveClass('app-side-multiline-label');
   });
 
   it('filters both releases and default assets by the detected device', async () => {

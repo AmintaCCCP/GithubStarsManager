@@ -3,7 +3,7 @@ import { TranslateFn } from '../../i18n/useT';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Check, Cloud, Plus, Edit3, Trash2, X, Plug, RefreshCw } from 'lucide-react';
 import { WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
@@ -34,6 +34,8 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 弹窗没有 DialogTrigger，Radix 会把焦点丢到 body；关闭时还给打开它的按钮。
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const [form, setForm] = useState({
     name: '',
@@ -59,12 +61,25 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     if (save(form, editingId)) resetForm();
   };
 
-  const handleAdd = () => {
+  const handleAdd = (opener: HTMLElement) => {
+    openerRef.current = opener;
     resetForm();
     setShowForm(true);
   };
 
-  const handleEdit = (config: WebDAVConfig) => {
+  const handleClose = () => {
+    const opener = openerRef.current;
+    if (opener?.isConnected) opener.focus();
+    resetForm();
+  };
+
+  const handleCloseAutoFocus = (event: Event) => {
+    event.preventDefault();
+    handleClose();
+  };
+
+  const handleEdit = (config: WebDAVConfig, opener: HTMLElement) => {
+    openerRef.current = opener;
     setForm({
       name: config.name,
       url: config.url,
@@ -89,12 +104,12 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
         </div>
         <div className="flex items-center gap-2">
           {showForm && (
-            <Button variant="outline" onClick={resetForm}>
+            <Button variant="outline" onClick={handleClose}>
               <X className="w-4 h-4" />
               <span>{t('webDAVPanel.cancel')}</span>
             </Button>
           )}
-          <Button variant="default" onClick={handleAdd}>
+          <Button variant="default" onClick={(event) => handleAdd(event.currentTarget)}>
             <Plus className="w-4 h-4" />
             <span>{t('webDAVPanel.add-webdav')}</span>
           </Button>
@@ -103,13 +118,14 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
 
       <Modal
         isOpen={showForm}
-        onClose={resetForm}
+        onClose={handleClose}
+        onCloseAutoFocus={handleCloseAutoFocus}
         title={editingId ? t('webDAVPanel.edit-webdav-configuration') : t('webDAVPanel.add-webdav-configuration')}
         maxWidth="max-w-2xl"
         scrollable
         footer={(
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={resetForm}>
+            <Button variant="outline" onClick={handleClose}>
               <X className="w-4 h-4" />
               <span>{t('webDAVPanel.cancel')}</span>
             </Button>
@@ -243,7 +259,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
                   )}
                 </Button>
                 <Button
-                  onClick={() => handleEdit(config)}
+                  onClick={(event) => handleEdit(config, event.currentTarget)}
                   className="p-2 rounded-lg bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground hover:bg-accent hover:text-foreground dark:hover:bg-accent dark:hover:text-foreground transition-colors"
                   aria-label={t('webDAVPanel.edit')}
                   title={t('webDAVPanel.edit')}

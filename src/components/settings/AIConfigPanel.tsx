@@ -128,6 +128,8 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 弹窗没有 DialogTrigger，Radix 会把焦点丢到 body；关闭时还给打开它的按钮。
+  const openerRef = useRef<HTMLElement | null>(null);
   const [showCustomPrompt, setShowCustomPrompt] = useState(false);
   const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
@@ -268,7 +270,19 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
     resetForm();
   };
 
-  const handleEdit = (config: AIConfig) => {
+  const handleClose = () => {
+    const opener = openerRef.current;
+    if (opener?.isConnected) opener.focus();
+    resetForm();
+  };
+
+  const handleCloseAutoFocus = (event: Event) => {
+    event.preventDefault();
+    handleClose();
+  };
+
+  const handleEdit = (config: AIConfig, opener: HTMLElement) => {
+    openerRef.current = opener;
     // Sync ref to prevent auto-fill effect from overwriting loaded config
     prevApiTypeRef.current = config.apiType || 'openai';
     prevMimoPlanRef.current = config.mimoPlan || 'api';
@@ -456,7 +470,14 @@ Repository information:
               <span>{t('aIConfigPanel.cancel')}</span>
             </Button>
           )}
-          <Button variant="default" onClick={() => { resetForm(); setShowForm(true); }}>
+          <Button
+            variant="default"
+            onClick={(event) => {
+              openerRef.current = event.currentTarget;
+              resetForm();
+              setShowForm(true);
+            }}
+          >
             <Plus className="w-4 h-4" />
             <span>{t('aIConfigPanel.add-ai-config')}</span>
           </Button>
@@ -465,7 +486,8 @@ Repository information:
 
       <Modal
         isOpen={showForm}
-        onClose={resetForm}
+        onClose={handleClose}
+        onCloseAutoFocus={handleCloseAutoFocus}
         title={editingId ? t('aIConfigPanel.edit-ai-configuration') : t('aIConfigPanel.add-ai-configuration')}
         maxWidth="max-w-3xl"
         scrollable
@@ -796,7 +818,7 @@ Repository information:
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleEdit(config)}
+                  onClick={(event) => handleEdit(config, event.currentTarget)}
                   className="h-9 w-9 rounded-lg bg-muted p-0 text-foreground dark:bg-accent dark:text-foreground hover:bg-accent dark:hover:bg-card/[0.12] border border-transparent dark:border-border transition-colors"
                   title={t('aIConfigPanel.edit')}
                 >

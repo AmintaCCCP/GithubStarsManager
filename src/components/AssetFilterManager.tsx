@@ -165,7 +165,7 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               variant="ghost"
               onClick={() => onFilterToggle(currentSystemFilter.id)}
               disabled={currentSystemUnsupported}
-              className="app-side-item justify-between"
+              className="app-side-item app-side-multiline-label justify-between"
               title={currentSystemUnsupported
                 ? t('assetFilterManager.builtin-ignored')
                 : t('assetFilterManager.builtin-tooltip', { device: currentSystemFilter.label })}

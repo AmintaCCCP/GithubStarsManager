@@ -505,8 +505,9 @@ html:has(body[data-scroll-locked]) {
   --border-strong: 214.3 25% 80%;
   --input: 214.3 31.8% 91.4%;
   /* Focus ring is a neutral hairline-plus-halo, not the near-black primary
-     foreground the shadcn default used. */
-  --ring: 222.2 20% 62%;
+     foreground the shadcn default used. 52% keeps the 1px UA outline at
+     ~4:1 on the canvas and on white (WCAG 1.4.11 needs 3:1). */
+  --ring: 222.2 20% 52%;
   --radius: 0.5rem;
 
   /* Status fills use a dark foreground in every mode. The legacy white
