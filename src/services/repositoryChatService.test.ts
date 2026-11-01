@@ -1067,7 +1067,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
         '',
         '## Extra notes',
         '',
-        'Uncited prose without any reference.',
+        'Version 2.0 is uncited prose without any reference.',
       ].join('\n'));
 
     const result = await runRepositoryChatTurn(turnInput());
@@ -1075,7 +1075,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     // 剪枝降级：有引用的小节保留，未引用段落显式移入“未证实”区块而不是丢弃。
     expect(result.content).toContain('A documented example for repository research.');
     expect(result.content).toContain(overviewRef);
-    expect(result.content).toContain('Uncited prose without any reference.');
+    expect(result.content).toContain('Version 2.0 is uncited prose without any reference.');
     expect(result.content).toContain('Unverified or missing information');
     expect(result.content).not.toContain('Verified sources');
     expect(result.content).not.toContain('insufficient');
