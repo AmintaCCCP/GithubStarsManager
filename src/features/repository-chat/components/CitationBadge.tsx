@@ -5,11 +5,10 @@
 import { useT } from '../../../i18n/useT';
 import type { AppLanguage } from '../../../i18n/languages';
 import { useMemo } from 'react';
-import { FileCode2 } from 'lucide-react';
 import hljs from 'highlight.js';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../../../components/ui/hover-card';
 import type { ToolEvidence } from '../../../types/repositoryChat';
-import { citationAnchorUrl, citationBadgeLabel, citationExcerptPreview } from '../utils/citationUtils';
+import { citationAnchorUrl, citationExcerptPreview } from '../utils/citationUtils';
 
 export interface CitationTarget {
   evidence: ToolEvidence;
@@ -21,6 +20,7 @@ export interface CitationTarget {
 interface CitationBadgeProps {
   target: CitationTarget;
   language: AppLanguage;
+  index: number;
 }
 
 const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
@@ -61,8 +61,8 @@ const languageFromPath = (path: string): string => {
  * 回答中 file:line 引用的 Badge：悬停浮出原文切片（带语法高亮），点击跳转到
  * 固定 SHA 的 GitHub blob 对应行。非模态 HoverCard，不触发滚动锁。
  */
-export const CitationBadge = ({ target }: CitationBadgeProps) => {
-    const t = useT('chat');
+export const CitationBadge = ({ target, index }: CitationBadgeProps) => {
+  const t = useT('chat');
   const { evidence, path, lineStart, lineEnd } = target;
   const href = citationAnchorUrl(evidence, lineStart, lineEnd);
   const previewText = useMemo(() => citationExcerptPreview(evidence.excerpt), [evidence.excerpt]);
@@ -86,16 +86,15 @@ export const CitationBadge = ({ target }: CitationBadgeProps) => {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className="mx-0.5 inline-flex max-w-full items-center gap-1 translate-y-[1px] rounded border border-border bg-muted/50 px-1.5 py-0 align-baseline font-mono text-[0.78em] leading-5 text-muted-foreground no-underline transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
+          className="mx-0.5 inline-flex h-4 min-w-4 translate-y-[-1px] items-center justify-center rounded-full bg-muted px-1 align-baseline text-[10px] font-medium leading-4 text-muted-foreground no-underline transition-colors hover:bg-primary/15 hover:text-foreground"
           aria-label={t('citationBadge.open-source-path-linestart', { path: path, lineStart: lineStart })}
         >
-          <FileCode2 className="h-3 w-3 shrink-0" aria-hidden="true" />
-          <span className="truncate">{citationBadgeLabel(path, lineStart, lineEnd)}</span>
+          [{index}]
         </a>
       </HoverCardTrigger>
       <HoverCardContent>
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="min-w-0 truncate font-mono text-foreground" title={`/${path}`}>/{path}</span>
+          <span className="min-w-0 truncate font-mono text-foreground" title={`/${path}`}>[{index}] /{path}</span>
           <span className="shrink-0 text-muted-foreground">
             L{lineStart}{lineEnd > lineStart ? `-L${lineEnd}` : ''}
           </span>

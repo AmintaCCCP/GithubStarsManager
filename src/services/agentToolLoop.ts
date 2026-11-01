@@ -324,6 +324,7 @@ const runToolLoopEvidenceAgent = async (
     }
     const newEvidence = evidenceFromSegments(input.repository, input.session.sourceRefSha, document, newSegments);
     evidences.push(...newEvidence);
+    input.onEvidence?.(newEvidence);
     if (scope === 'documentation') documentationEvidenceCount += newEvidence.length;
     return untrustedEvidenceBlock(newEvidence);
   };
@@ -351,6 +352,7 @@ const runToolLoopEvidenceAgent = async (
       ? buildReleasesEvidence(input.repository, releasesResult.value)
       : [buildNoReleasesEvidence(input.repository, new Date())];
     evidences.push(...newEvidence);
+    input.onEvidence?.(newEvidence);
     return untrustedEvidenceBlock(newEvidence);
   };
 
@@ -396,6 +398,7 @@ const runToolLoopEvidenceAgent = async (
       ? buildIssuesEvidence(input.repository, issuesResult.value)
       : [buildNoIssuesEvidence(input.repository, keywords, new Date())];
     evidences.push(...newEvidence);
+    input.onEvidence?.(newEvidence);
     return untrustedEvidenceBlock(newEvidence);
   };
 

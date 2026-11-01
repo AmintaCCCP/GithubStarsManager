@@ -54,4 +54,10 @@ describe('normalizeRepositoryChatSettings', () => {
     expect(normalizeRepositoryChatSettings({ fastPath: true }).fastPath).toBe(true);
     expect(normalizeRepositoryChatSettings({ fastPath: false }).fastPath).toBe(false);
   });
+
+  it('normalizes the thread layout preference', () => {
+    expect(normalizeRepositoryChatSettings({}).layout).toBe('sheet');
+    expect(normalizeRepositoryChatSettings({ layout: 'fullscreen' }).layout).toBe('fullscreen');
+    expect(normalizeRepositoryChatSettings({ layout: 'invalid' }).layout).toBe('sheet');
+  });
 });

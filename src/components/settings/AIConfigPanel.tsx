@@ -1,5 +1,6 @@
 
 import { TranslateFn } from '../../i18n/useT';
+import { i18n } from '../../i18n';
 import { Textarea } from '../ui/textarea';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -16,6 +17,7 @@ import { buildFinalApiUrl } from '../../utils/apiUrlBuilder';
 import { SliderInput } from '../ui/SliderInput';
 import { useDialog } from '../../hooks/useDialog';
 import { isToolCallCapableApiType } from '../../constants/aiCapabilities';
+import type { RepositoryChatTaskDepth } from '../../types/repositoryChat';
 
 interface AIConfigPanelProps {
   t: TranslateFn;
@@ -120,6 +122,7 @@ export const AIConfigPanel: React.FC<AIConfigPanelProps> = ({ t }) => {
   })));
 
   const { toast, confirm } = useDialog();
+  const tChat = i18n.getFixedT(language, 'chat');
   const { testingId, testingForm, testConfig, testDraft } = useAIConfigActions();
 
   const [showForm, setShowForm] = useState(false);
@@ -867,6 +870,19 @@ Repository information:
               setRepositoryChatSettings({ retainSessionDays: Number.isFinite(parsed) ? Math.min(365, Math.max(1, parsed)) : 90 });
             }} />
             <p className="mt-1 text-xs text-muted-foreground">{t('aIConfigPanel.deleting-an-individual-conversation-always-takes')}</p>
+          </div>
+          <div>
+            <label id="repository-chat-task-depth-label" className="mb-1 block text-sm font-medium text-foreground">{tChat('repositoryChatSheet.task-depth')}</label>
+            <Select value={repositoryChatSettings.taskDepth} onValueChange={(value) => setRepositoryChatSettings({ taskDepth: value as RepositoryChatTaskDepth })}>
+              <SelectTrigger aria-labelledby="repository-chat-task-depth-label" className="h-10 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="quick">{tChat('repositoryChatSheet.depth-quick')}</SelectItem>
+                <SelectItem value="default">{tChat('repositoryChatSheet.depth-default')}</SelectItem>
+                <SelectItem value="deep">{tChat('repositoryChatSheet.depth-deep')}</SelectItem>
+                <SelectItem value="unlimited">{tChat('repositoryChatSheet.depth-unlimited')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">{tChat('repositoryChatSheet.task-depth-controls-retrieval-rounds-and-read-sc')}</p>
           </div>
         </div>
         <details className="mt-4 rounded-md border border-border px-3 py-2">

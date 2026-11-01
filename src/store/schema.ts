@@ -186,6 +186,7 @@ export const normalizeRepositoryChatSettings = (value: unknown): RepositoryChatS
     enableWebTools: record.enableWebTools === true,
     fastPath: record.fastPath !== false,
     enableAgentToolLoop: record.enableAgentToolLoop === true,
+    layout: record.layout === 'fullscreen' ? 'fullscreen' : 'sheet',
     retainSessionDays,
     maxToolsPerTurn: maxToolCalls,
     agentBudget,

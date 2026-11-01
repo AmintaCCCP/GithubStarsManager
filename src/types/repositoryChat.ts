@@ -9,6 +9,8 @@ export interface RepositoryChatRepoSnapshot {
 export interface RepositoryChatSession {
   id: string;
   repoId: number;
+  /** Stable GitHub numeric account id. Legacy sessions may only have accountLogin. */
+  accountId?: string;
   accountLogin?: string;
   repoFullName: string;
   sourceRefSha: string;
@@ -56,6 +58,20 @@ export interface RepositoryChatToolEvent {
   resultSize?: number;
   evidenceId?: string;
   createdAt: string;
+}
+
+export interface RepositoryChatFeedback {
+  id: string;
+  messageId: string;
+  sessionId: string;
+  accountId: string;
+  rating: 'up' | 'down';
+  createdAt: string;
+}
+
+export interface RepositoryChatAccountScope {
+  accountId: string | null;
+  accountLogin?: string | null;
 }
 
 export interface ToolEvidence {
@@ -155,6 +171,8 @@ export interface RepositoryChatSettings {
    * 编排式循环。默认关闭。
    */
   enableAgentToolLoop: boolean;
+  /** Thread presentation preference; defaults to the resizable right sheet. */
+  layout: 'sheet' | 'fullscreen';
   /**
    * Kept for persisted configurations created before the evidence-driven loop.
    * New callers should use agentBudget.maxToolCalls.
@@ -180,6 +198,7 @@ export const defaultRepositoryChatSettings: RepositoryChatSettings = {
   enableWebTools: false,
   fastPath: true,
   enableAgentToolLoop: false,
+  layout: 'sheet',
   retainSessionDays: 90,
   maxToolsPerTurn: defaultRepositoryChatAgentBudget.maxToolCalls,
   agentBudget: { ...defaultRepositoryChatAgentBudget },
