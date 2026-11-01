@@ -859,6 +859,9 @@ const runOrchestratedEvidenceLoop = async (
     input.onEvidence?.(items);
   };
   const approveEvidence = (assessments: RequirementAssessment[]): void => {
+    // A gate only approves the evidence it cites for this round; never keep
+    // approvals from an earlier gate in the same turn.
+    approvedEvidenceIds.clear();
     const references = new Set(assessments.flatMap((assessment) => assessment.evidence));
     evidences.forEach((evidence) => {
       if (sourceReferences([evidence]).some((reference) => references.has(reference))) {
@@ -1717,6 +1720,11 @@ const runOrchestratedEvidenceLoop = async (
       ? '\n\n注意：仓库文件清单超过 GitHub 限制被截断，未出现在清单中的文件本轮无法读取。回答时若涉及这些文件，必须说明“未在已读取文件中找到”，不得臆测。'
       : '\n\nNote: the repository file listing was truncated by GitHub limits, so files absent from the listing could not be read this turn. If the answer would depend on them, state that they were not found in the files read instead of guessing.')
     : '';
+  const missingNote = missing.length > 0
+    ? (input.language === 'zh'
+      ? `\n\n未满足的回答要求（不得当作事实）：${missing.join('；')}。请明确标注仍未证实的内容。`
+      : `\n\nUnmet answer requirements (do not present as facts): ${missing.join('; ')}. Explicitly mark what remains unverified.`)
+    : '';
   const content = await synthesizeVerifiedAnswer(
     ai,
     input,
@@ -1724,7 +1732,7 @@ const runOrchestratedEvidenceLoop = async (
     turns,
     answerMaxTokens,
     ctx.callModelWithRetry,
-    truncatedNote,
+    `${truncatedNote}${missingNote}`,
     { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
     understanding.intent,
   );

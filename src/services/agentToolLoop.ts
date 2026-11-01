@@ -472,7 +472,7 @@ const runToolLoopEvidenceAgent = async (
     return untrustedEvidenceBlock(newEvidence);
   };
 
-  const confirmReadyToAnswer = async (args: Record<string, unknown>, round: number): Promise<{ ready: boolean; output: string }> => {
+  const confirmReadyToAnswer = async (args: Record<string, unknown>, round: number): Promise<{ ready: boolean; output: string; gaps?: string[] }> => {
     const missingList = asStringArray(args.missing, 6);
     const confirmText = zh ? '已确认。接下来基于已收集的证据生成最终回答。' : 'Confirmed. The final answer will now be generated from the gathered evidence.';
     if (evidences.length === 0) {
@@ -506,6 +506,11 @@ const runToolLoopEvidenceAgent = async (
       missingList,
     );
     const unfetchedMetaTargets = metaIntentTargets.filter((path) => !metaFetched.has(path));
+    const viableUnreadTargets = (coverage?.gate.recommendedTargets ?? []).filter((target) => {
+      if (target.scope === 'meta') return !metaFetched.has(target.path);
+      if (target.scope === 'code') return codeSet.has(target.path) && !readPaths.has(target.path);
+      return documentationSet.has(target.path) && !readPaths.has(target.path);
+    });
     if (coverage && evidenceCoverageApproved(coverage) && unfetchedMetaTargets.length === 0) {
       emit({
         toolName: 'evidence_gate',
@@ -518,12 +523,18 @@ const runToolLoopEvidenceAgent = async (
       return { ready: true, output: confirmText };
     }
 
-    const gaps = [
+    const gaps = Array.from(new Set([
       ...(coverage?.missing ?? []),
-      ...(coverage?.missing.length ? [] : missingList),
+      ...missingList,
       ...unfetchedMetaTargets.map((path) => (zh ? `拉取 ${path}` : `fetch ${path}`)),
-    ];
+    ]));
     if (gaps.length === 0) gaps.push(question);
+    // The model may end with an explicit gap list once every usable target has
+    // been read; otherwise a bounded "no reasonable source" turn would keep
+    // rejecting ready_to_answer until the tool budget runs out.
+    if (missingList.length > 0 && unfetchedMetaTargets.length === 0 && viableUnreadTargets.length === 0) {
+      return { ready: true, output: confirmText, gaps };
+    }
     emit({
       toolName: 'evidence_gate',
       status: 'error',
@@ -593,6 +604,7 @@ const runToolLoopEvidenceAgent = async (
   let nudges = 0;
   let loopTurns = 0;
   let retriedModelCall = false;
+  let answerGaps: string[] = [];
   // §5.5 turnMetrics 的结束原因；while 条件自然耗尽时在循环后兜底。
   let endReason = '';
   while (!ready && loopTurns < budget.maxTurns && ctx.hasTime() && conversationChars < TOOL_LOOP_MAX_CONVERSATION_CHARS) {
@@ -671,6 +683,7 @@ const runToolLoopEvidenceAgent = async (
         conversationChars += readiness.output.length;
         messages.push({ role: 'tool', toolCallId: call.id, content: readiness.output });
         if (readiness.ready) {
+          answerGaps = readiness.gaps ?? [];
           endReason = 'agent_ready';
           ready = true;
           break;
@@ -708,7 +721,11 @@ const runToolLoopEvidenceAgent = async (
     Math.max(1, loopTurns),
     answerMaxTokens,
     ctx.callModelWithRetry,
-    '',
+    answerGaps.length > 0
+      ? (zh
+        ? `\n\n未满足的回答要求（不得当作事实）：${answerGaps.join('；')}。请明确标注仍未证实的内容。`
+        : `\n\nUnmet answer requirements (do not present as facts): ${answerGaps.join('; ')}. Explicitly mark what remains unverified.`)
+      : '',
     { recordLlmCall: ctx.recordLlmCall, recordFirstToken: ctx.recordFirstToken },
     detectResearchFocus(question),
   );

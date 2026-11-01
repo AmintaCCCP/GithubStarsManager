@@ -282,6 +282,35 @@ describe('runToolLoopRepositoryChatTurn (native function-calling loop)', () => {
     expect(result.content).toContain('/README.md - 1-4');
   });
 
+  it('allows ready_to_answer with explicit gaps once no usable targets remain', async () => {
+    mocks.generateChatText.mockImplementation(async (options: { system?: string }) => (
+      options.system?.includes('Evidence Gate')
+        ? JSON.stringify({
+          sufficient: false,
+          confidence: 0.9,
+          reason: 'Windows-specific installation is not documented.',
+          requirements: [{
+            requirement_id: 'explicit-1',
+            requirement: 'question',
+            status: 'missing',
+            evidence: [],
+          }],
+          next_action: 'retrieve_more',
+          recommended_targets: [],
+        })
+        : '## Install\n\nRun the documented installer. `/README.md - 1-4`'
+    ));
+    mocks.generateWithTools
+      .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_documentation', { path: 'README.md' })]))
+      .mockResolvedValueOnce(modelTurn([toolCall('c2', 'ready_to_answer', { missing: ['Windows-specific installer'] })]));
+
+    const result = await runToolLoopRepositoryChatTurn(turnInput('How do I install this project on Windows?'));
+
+    expect(mocks.generateWithTools).toHaveBeenCalledTimes(2);
+    expect(mocks.generateChatText.mock.calls.at(-1)?.[0]?.user).toContain('Windows-specific installer');
+    expect(result.content).toContain('/README.md - 1-4');
+  });
+
   it('rejects non-documentation reads before documentation evidence exists (README-first, enforced in code)', async () => {
     mocks.generateWithTools
       .mockResolvedValueOnce(modelTurn([toolCall('c1', 'read_recent_releases')]))

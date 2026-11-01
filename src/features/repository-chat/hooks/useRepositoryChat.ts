@@ -409,11 +409,16 @@ export const useRepositoryChat = ({
         const finalEvidences = Array.from(new Map(
           [...liveEvidence, ...result.evidences].map((evidence) => [evidence.id, evidence]),
         ).values());
-        try {
-          await Promise.all(finalEvidences.map((evidence) => repositoryChatStorage.saveEvidence(evidence)));
-        } catch (evidenceError) {
-          // Evidence persistence is auxiliary; never downgrade a verified answer to an error.
-          console.warn('[repository-chat] unable to persist evidence', evidenceError);
+        // Evidence persistence is auxiliary; never downgrade a verified answer to an
+        // error, and only persist IDs that are actually readable after a reload.
+        const evidenceWrites = await Promise.allSettled(finalEvidences.map(async (evidence) => {
+          await repositoryChatStorage.saveEvidence(evidence);
+          return evidence.id;
+        }));
+        const savedEvidenceIds = evidenceWrites.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+        const failedEvidenceWrites = evidenceWrites.filter((result) => result.status === 'rejected');
+        if (failedEvidenceWrites.length > 0) {
+          console.warn('[repository-chat] unable to persist evidence', failedEvidenceWrites);
         }
         const completedAssistant: RepositoryChatMessage = {
           ...assistantMessage,
@@ -421,7 +426,7 @@ export const useRepositoryChat = ({
           status: 'complete',
           evidenceIds: finalEvidences.map((evidence) => evidence.id),
         };
-        await repositoryChatStorage.saveMessage(completedAssistant);
+        await repositoryChatStorage.saveMessage({ ...completedAssistant, evidenceIds: savedEvidenceIds });
         onMessagesChange([...baseMessages, userMessage, completedAssistant]);
         const latestSession = sessionRef.current?.id === activeSession.id
           ? sessionRef.current
