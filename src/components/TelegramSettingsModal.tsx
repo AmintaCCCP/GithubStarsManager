@@ -119,7 +119,7 @@ export const TelegramSettingsModal: React.FC<TelegramSettingsModalProps> = ({ is
                 if (event.key === 'Enter' && !event.nativeEvent.isComposing) handleAdd();
               }}
               placeholder="https://t.me/geekhub23 / @geekhub23 / geekhub23"
-              className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-ring"
+              className="min-w-0 flex-1 rounded-lg border border-border dark:border-border bg-card dark:bg-muted/40 px-3 py-2 text-sm text-foreground dark:text-foreground focus:border-transparent focus:ring-2 focus:ring-(--ui-focus-ring)"
             />
             <Button
               type="button"

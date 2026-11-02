@@ -24,6 +24,7 @@ interface ModalProps {
   contentClassName?: string;
   onPointerDownOutside?: DialogContentPointerDownOutsideHandler;
   onOverlayPointerDown?: React.PointerEventHandler<HTMLDivElement>;
+  onCloseAutoFocus?: React.ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
   closeLabel?: string;
 }
 
@@ -39,6 +40,7 @@ export const Modal: React.FC<ModalProps> = ({
   contentClassName,
   onPointerDownOutside,
   onOverlayPointerDown,
+  onCloseAutoFocus,
   closeLabel,
 }) => {
   const { isScrolling, handleScroll } = useScrollbarFlash(isOpen);
@@ -83,6 +85,7 @@ export const Modal: React.FC<ModalProps> = ({
         onClick={(event) => event.stopPropagation()}
         onPointerDownOutside={onPointerDownOutside}
         onOverlayPointerDown={onOverlayPointerDown}
+        onCloseAutoFocus={onCloseAutoFocus}
         closeLabel={closeLabel}
       >
         {content}

@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import React from 'react';
-import { Server, TestTube, RefreshCw, Upload, Download, CheckCircle, AlertCircle, Route } from 'lucide-react';
+import { Server, Plug, RefreshCw, Upload, Download, CheckCircle, AlertCircle, Route } from 'lucide-react';
 import { useBackendSettingsActions } from '../../features/settings/hooks/useBackendSettingsActions';
 import { useAppStore } from '../../store/useAppStore';
 import type { RouteMode } from '../../types';
@@ -152,7 +152,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
           type="url"
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
-          className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none mb-3"
+          className="w-full px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none mb-3"
           placeholder="https://example.com"
         />
         <label htmlFor="backend-api-secret" className="block text-sm font-medium text-foreground dark:text-muted-foreground mb-2">
@@ -164,7 +164,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             type="password"
             value={secretInput}
             onChange={(e) => setSecretInput(e.target.value)}
-            className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent focus:outline-none"
+            className="flex-1 px-3 py-2 border border-border dark:border-border rounded-lg bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent focus:outline-none"
             placeholder={t('backendPanel.enter-backend-api-secret-optional')}
           />
           <Button
@@ -175,7 +175,7 @@ export const BackendPanel: React.FC<BackendPanelProps> = ({ t }) => {
             {status === 'checking' ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <TestTube className="w-4 h-4" />
+              <Plug className="w-4 h-4" />
             )}
             <span>{t('backendPanel.test-connection')}</span>
           </Button>

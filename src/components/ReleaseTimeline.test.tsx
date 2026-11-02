@@ -782,6 +782,16 @@ describe('ReleaseTimeline current-system built-in filter', () => {
     expect(within(firstRow).queryByTitle('删除')).not.toBeInTheDocument();
   });
 
+  it('keeps the device line on its own row so the fixed-height row cannot clip it', () => {
+    deviceState.current = macDevice;
+    render(<ReleaseTimeline />);
+    const firstRow = document.querySelector('.app-side-filter-row') as HTMLElement;
+    const deviceLine = within(firstRow).getByText(/macOS/);
+
+    expect(deviceLine).toHaveClass('truncate');
+    expect(firstRow.querySelector('.app-side-item')).toHaveClass('app-side-multiline-label');
+  });
+
   it('filters both releases and default assets by the detected device', async () => {
     const user = userEvent.setup();
     deviceState.current = macDevice;

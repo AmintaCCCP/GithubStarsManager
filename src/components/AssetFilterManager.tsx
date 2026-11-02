@@ -165,23 +165,24 @@ export const AssetFilterManager: React.FC<AssetFilterManagerProps> = ({
               variant="ghost"
               onClick={() => onFilterToggle(currentSystemFilter.id)}
               disabled={currentSystemUnsupported}
-              className="app-side-item justify-between"
+              className="app-side-item app-side-multiline-label justify-between"
               title={currentSystemUnsupported
                 ? t('assetFilterManager.builtin-ignored')
                 : t('assetFilterManager.builtin-tooltip', { device: currentSystemFilter.label })}
               type="button"
               aria-pressed={currentSystemSelected}
             >
-              <span className="app-side-item-label min-w-0 flex-1 overflow-hidden">
+              {/* 两行布局：图标固定，一行放名称+徽标（徽标固定宽度），一行放设备；名称可截断。 */}
+              <span className="app-side-item-label app-side-multiline-label min-w-0 flex-1">
                 <CurrentSystemIcon aria-hidden="true" />
-                <span className="flex min-w-0 flex-1 flex-col items-start overflow-hidden">
-                  <span className="flex min-w-0 items-center gap-1.5">
+                <span className="flex min-w-0 flex-col items-start">
+                  <span className="flex w-full min-w-0 items-center gap-1.5">
                     <span className="truncate">{t('assetFilterManager.builtin-current-system')}</span>
-                    <Badge variant="secondary" className="h-4 shrink-0 px-1 text-[9px] font-medium">
+                    <Badge variant="secondary" className="h-4 shrink-0 whitespace-nowrap px-1.5 text-[9px] font-medium leading-none">
                       {t('assetFilterManager.builtin-badge')}
                     </Badge>
                   </span>
-                  <span className={`truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <span className={`w-full truncate text-[11px] ${currentSystemUnsupported ? 'text-destructive' : 'text-muted-foreground'}`}>
                     {currentSystemUnsupported
                       ? currentSystemSelected
                         ? t('assetFilterManager.builtin-ignored')

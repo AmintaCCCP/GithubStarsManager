@@ -367,7 +367,8 @@ export const LoginScreen: React.FC = () => {
         </Tooltip>
       </div>
 
-      <div className={cn('relative m-auto w-full max-w-md', showsTokenPermissions && 'lg:max-w-4xl')}>
+      {/* 语言/主题切换是 fixed 定位，窄屏会压住 logo，因此顶部留出它的高度。 */}
+      <div className={cn('relative m-auto w-full max-w-md pt-12 sm:pt-0', showsTokenPermissions && 'lg:max-w-4xl')}>
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-card shadow-md">
             <img src="./icon.png" alt="GitHub Stars Manager" className="h-full w-full object-cover" />

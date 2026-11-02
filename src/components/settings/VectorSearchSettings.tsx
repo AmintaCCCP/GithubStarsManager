@@ -295,7 +295,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'http://localhost:11434'
                 : 'https://api.example.com/v1/embeddings'
             }
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent"
           />
         </div>
 
@@ -311,7 +311,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formApiKey}
               onChange={(e) => setFormApiKey(e.target.value)}
               placeholder={formApiType === 'ollama' ? t('vectorSearchSettings.optional') : 'sk-xxx'}
-              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent"
             />
             <Button
               type="button"
@@ -349,7 +349,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
                 ? 'nomic-embed-text'
                 : 'model-name'
             }
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent"
           />
         </div>
 
@@ -441,7 +441,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             value={formWorkerUrl}
             onChange={(e) => setFormWorkerUrl(e.target.value)}
             placeholder="https://github-stars-vectorize.your-name.workers.dev"
-            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent"
           />
         </div>
 
@@ -457,7 +457,7 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
               value={formAuthToken}
               onChange={(e) => setFormAuthToken(e.target.value)}
               placeholder={t('vectorSearchSettings.worker-authentication-token')}
-              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
+              className="w-full px-3 py-2 pr-10 text-sm border border-input rounded-md bg-card dark:bg-card text-foreground dark:text-foreground focus:ring-2 focus:ring-(--ui-focus-ring) focus:border-transparent"
             />
             <Button
               type="button"

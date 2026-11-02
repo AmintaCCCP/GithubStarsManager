@@ -1723,7 +1723,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               <Input type="file" accept=".json" onChange={handleImportFile} className="peer sr-only" id="import-file-input" />
               <label
                 htmlFor="import-file-input"
-                className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
+                className="cursor-pointer px-4 py-2 bg-muted dark:bg-muted/40 hover:bg-accent dark:hover:bg-accent text-foreground dark:text-muted-foreground rounded-lg transition-colors inline-block peer-focus-visible:ring-2 peer-focus-visible:ring-(--ui-focus-ring) peer-focus-visible:ring-offset-2"
               >
                 {t('dataManagementPanel.select-file')}
               </label>
@@ -1950,7 +1950,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                       }))
                     }
                     placeholder={t('dataManagementPanel.enter-github-username')}
-                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-ring dark:bg-muted/40 dark:text-foreground"
+                    className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-(--ui-focus-ring) dark:bg-muted/40 dark:text-foreground"
                   />
                 </div>
               )}
