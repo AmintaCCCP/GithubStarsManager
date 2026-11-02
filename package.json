@@ -144,6 +144,7 @@
       "eslint": "$eslint"
     },
     "katex": "$katex",
+    "minimatch": "^11.0.4",
     "postcss-selector-parser": "^7.1.6"
   }
 }
