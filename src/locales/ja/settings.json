@@ -67,7 +67,7 @@
     "password-is-required": "パスワードが必要です",
     "path-is-required": "パスは必須です",
     "path-must-start-with": "パスは / で始まる必要があります",
-    "custom-user-agent-no-newline": "カスタム User-Agent に改行を含めることはできません",
+    "custom-user-agent-no-newline": "カスタム User-Agent に改行や制御文字を含めることはできません",
     "webdav-connection-successful": "WebDAV接続に成功しました！",
     "webdav-connection-failed-please-check-configurat": "WebDAV 接続に失敗しました。構成を確認してください。",
     "webdav-test-failed": "WebDAVテストに失敗しました"

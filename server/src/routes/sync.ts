@@ -5,9 +5,10 @@ import { config } from '../config.js';
 
 const router = Router();
 
-// 含换行符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
+// 含控制字符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
 const sanitizeUserAgent = (value: unknown): string | null =>
-  typeof value === 'string' && !/[\r\n]/.test(value) ? value : null;
+  // eslint-disable-next-line no-control-regex -- 有意匹配 C0 控制字符与 DEL
+  typeof value === 'string' && !/[\u0000-\u001f\u007f]/.test(value) ? value : null;
 
 /** 与前端 NOASSERTION_KEYS 对齐：空白 / NOASSERTION / Other / none 等落 null。 */
 const NO_LICENSE_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);

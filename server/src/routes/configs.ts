@@ -9,9 +9,10 @@ const router = Router();
 
 type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
 
-// 含换行符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
+// 含控制字符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
 function sanitizeUserAgent(value: unknown): string | null {
-  return typeof value === 'string' && !/[\r\n]/.test(value) ? value : null;
+  // eslint-disable-next-line no-control-regex -- 有意匹配 C0 控制字符与 DEL
+  return typeof value === 'string' && !/[\u0000-\u001f\u007f]/.test(value) ? value : null;
 }
 
 function getMaskedSecretResult(params: {
@@ -354,7 +355,7 @@ router.post('/api/configs/webdav', (req, res) => {
       path ?? '/', isActive ? 1 : 0, sanitizeUserAgent(customUserAgent)
     );
 
-    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive, customUserAgent: customUserAgent ?? null });
+    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive, customUserAgent: sanitizeUserAgent(customUserAgent) });
   } catch (err) {
     logger.errorFromError('configs.createWebDAV', 'POST /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to create WebDAV config', code: 'CREATE_WEBDAV_CONFIG_FAILED' });

@@ -186,10 +186,20 @@ describe('WebDAVService 自定义 User-Agent', () => {
     expect(params.headers.Authorization).toMatch(/^Basic /);
   });
 
-  it('validateConfig 拒绝包含换行符的自定义 User-Agent', () => {
+  it('validateConfig 拒绝包含换行符或控制字符的自定义 User-Agent', () => {
     const errors = WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0\r\nX-Evil: 1' });
-    expect(errors).toContain('自定义 User-Agent 不能包含换行符');
-    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0' })).not.toContain('自定义 User-Agent 不能包含换行符');
+    expect(errors).toContain('自定义 User-Agent 不能包含换行符或控制字符');
+    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'bad\x00ua' })).toContain('自定义 User-Agent 不能包含换行符或控制字符');
+    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0' })).not.toContain('自定义 User-Agent 不能包含换行符或控制字符');
+  });
+
+  it('请求侧遇含控制字符的 User-Agent 回退默认 UA 而不是发送非法头', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await new WebDAVService({ ...config, customUserAgent: 'bad\x00ua' }).downloadFile('data.json');
+
+    const [, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect(init?.headers).not.toHaveProperty('User-Agent');
   });
 });
 
