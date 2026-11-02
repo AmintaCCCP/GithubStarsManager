@@ -557,16 +557,21 @@ export const synthesizeVerifiedAnswer = async (
       }
     }
   }
-  // 方案 §2.3 / §7：用户可见回答不得包含“未证实”小节。两次修复仍失败时，
-  // 只保留已核验部分（同时清掉被剪空的尾部标题），而不是把该小节展示给用户。
-  if (finalContent?.includes(unverifiedHeading)) {
+  // 方案 §2.3 / §7：用户可见回答不得包含“未证实”小节。两个修复分支结束后都
+  // 走同一清理：只保留已核验部分（同时清掉被剪空的尾部标题），而不是把该小节
+  // 展示给用户。
+  const dropUnverifiedTail = (content: string): string | null => {
     // 未证实小节由 pruneUnverifiableSections 追加在末尾；用 lastIndexOf 避免回答
     // 正文里出现同名标题时从第一次出现处截断、丢掉其后已核验的内容。
-    const kept = finalContent.slice(0, finalContent.lastIndexOf(unverifiedHeading)).trimEnd().split('\n');
+    const kept = content.slice(0, content.lastIndexOf(unverifiedHeading)).trimEnd().split('\n');
     while (kept.length > 0 && (/^\s{0,3}#{1,6}\s/.test(kept[kept.length - 1]!) || /^\*\*[^*]+\*\*$/.test(kept[kept.length - 1]!.trim()) || kept[kept.length - 1]!.trim() === '')) kept.pop();
-    finalContent = kept.length > 0 ? kept.join('\n') : null;
+    return kept.length > 0 ? kept.join('\n') : null;
+  };
+  if (finalContent?.includes(unverifiedHeading)) {
     // 两次修复都没能补上引用：不要再拿同一份证据做第三次修复，直接回退来源清单。
-    if (!finalContent) return postprocessCitationLayout(sourceBoundEvidenceDigest(input, evidences));
+    const kept = dropUnverifiedTail(finalContent);
+    if (!kept) return postprocessCitationLayout(sourceBoundEvidenceDigest(input, evidences));
+    finalContent = kept;
   }
   if (!finalContent) {
     // 引用修复与主回答共享同一回答窗口：窗口已耗尽直接走 digest，未耗尽时只
@@ -599,6 +604,11 @@ export const synthesizeVerifiedAnswer = async (
         detail: input.language === 'zh' ? '回答窗口已耗尽，跳过引用修复。' : 'The answer window was exhausted; citation repair was skipped.',
       });
     }
+  }
+  if (finalContent?.includes(unverifiedHeading)) {
+    const kept = dropUnverifiedTail(finalContent);
+    if (!kept) return postprocessCitationLayout(sourceBoundEvidenceDigest(input, evidences));
+    finalContent = kept;
   }
   return finalContent ?? postprocessCitationLayout(sourceBoundEvidenceDigest(input, evidences));
 };

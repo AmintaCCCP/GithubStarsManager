@@ -1263,7 +1263,9 @@ ${options.user}` : options.user;
           system: options.system,
           user: `${options.user}\n\n直接输出 JSON，不要思考过程。`,
           temperature: options.temperature ?? 0.2,
-          maxTokens: Math.max(baseMaxTokens * 2, 4_000),
+          // 非推理模型只翻倍（跳到 4000 会被有输出上限的端点 400 拒绝）；
+          // 推理模型维持 4000 兜底，思考消耗仍可能吃掉翻倍后的配额。
+          maxTokens: reasoningModelFloor ? Math.max(baseMaxTokens * 2, 4_000) : baseMaxTokens * 2,
           signal: options.signal,
           purpose,
         });

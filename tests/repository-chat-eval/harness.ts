@@ -274,6 +274,9 @@ export const toMarkdownReport = (results: EvalResult[], meta: Record<string, str
   ];
   for (const result of results) {
     const metrics = result.metrics;
+    // 回答里通常有 ```bash 等围栏，外层围栏必须比其中最长的反引号序列更长，
+    // 否则会提前闭合，把后续标题吞进代码块。
+    const fence = '`'.repeat(Math.max(3, ...(result.content.match(/`+/g) ?? []).map((run) => run.length + 1)));
     lines.push(
       `## ${result.failures.length === 0 ? 'PASS' : 'FAIL'} ${result.caseId} (${result.repo})`,
       '',
@@ -283,9 +286,9 @@ export const toMarkdownReport = (results: EvalResult[], meta: Record<string, str
       `- answer chars: ${result.content.length} · citations: ${citationTokens(result.content).length}`,
       ...(result.failures.length > 0 ? ['', 'Failures:', ...result.failures.map((failure) => `- ${failure}`)] : []),
       '',
-      '```markdown',
+      `${fence}markdown`,
       result.content.slice(0, 4_000),
-      '```',
+      fence,
       '',
     );
   }

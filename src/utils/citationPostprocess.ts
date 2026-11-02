@@ -267,14 +267,16 @@ export const postprocessCitationLayout = (markdown: string): string => {
   if (!markdown.trim()) return markdown;
   const lifted = liftStandaloneCitationLines(markdown);
   const collapsed = dedupeAdjacentCitations(lifted);
-  // 模型偶尔把区间写成 `1-以24`；只修掉区间前缀的杂字符，保留其中的数字。
+  // 模型偶尔把区间写成 `1-以24`；只修掉引用令牌里区间前缀的杂字符，保留其中
+  // 的数字。要求 " - " 分隔符，普通行内代码里的 `/api/v1-1-rc2` 不会被误改。
   const repairedRanges = mapOutsideFences(collapsed, (line) => line.replace(
-    /(\/[^`\n]+?\s*[-—–]\s*\d+)-[^\d`\s]+(\d+)`/g,
+    /(\/[^`\n]+? - \d+)-[^\d`\s]+(\d+)`/g,
     '$1-$2`',
   ));
   // 被校验器移除的无效来源会留下空括号（`... on TTYs ()`），清掉这段残留。
-  // 行内代码里的空括号是调用语法（`initialize()`），必须原样保留。
-  const withoutEmptyParens = mapOutsideFences(repairedRanges, (line) => line.replace(/(`[^`\n]+`)|[ \t]*\(\s*\)/g, (_match, code: string | undefined) => code ?? ''));
+  // 行内代码里的空括号是调用语法（`initialize()`），链接目标里的空括号是地址
+  // 的一部分（`[API](https://example.com/run())`），都必须原样保留。
+  const withoutEmptyParens = mapOutsideFences(repairedRanges, (line) => line.replace(/(`[^`\n]+`)|(\]\([^)\n]*\))|[ \t]*\(\s*\)/g, (_match, code: string | undefined, link: string | undefined) => code ?? link ?? ''));
   return dedupeParagraphCitations(withoutEmptyParens)
     .replace(/^\n+|\n+$/g, '');
 };

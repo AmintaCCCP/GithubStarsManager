@@ -59,7 +59,8 @@ afterAll(() => {
 });
 
 describe.skipIf(!enabled)('repository chat live eval', () => {
-  it('has credentials', () => {
+  beforeAll(() => {
+    // 凭据不完整时在这里直接失败，阻止后续用例先消耗 GitHub 配额。
     expect(aiConfig.baseUrl, 'EVAL_AI_BASE_URL').not.toBe('');
     expect(aiConfig.apiKey, 'EVAL_AI_API_KEY').not.toBe('');
     expect(aiConfig.model, 'EVAL_AI_MODEL').not.toBe('');
@@ -68,7 +69,23 @@ describe.skipIf(!enabled)('repository chat live eval', () => {
 
   for (const evalCase of cases) {
     it(evalCase.id, async () => {
-      const result = await runEvalCase(evalCase, { githubToken, aiConfig });
+      let result: EvalResult;
+      try {
+        result = await runEvalCase(evalCase, { githubToken, aiConfig });
+      } catch (error) {
+        // 执行异常也要进报告：否则该用例从 Markdown 里消失，看起来像全过。
+        result = {
+          caseId: evalCase.id,
+          repo: evalCase.repo,
+          sha: '',
+          content: '',
+          evidences: [],
+          metrics: null,
+          toolEvents: [],
+          failures: [`error: ${error instanceof Error ? error.message : String(error)}`],
+          answers: [],
+        };
+      }
       results.push(result);
       if (process.env.EVAL_DEBUG) {
         console.log(JSON.stringify({

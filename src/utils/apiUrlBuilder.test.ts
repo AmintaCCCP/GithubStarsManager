@@ -12,6 +12,10 @@ describe('buildFinalApiUrl', () => {
       .toBe('https://api.example.com/v1/chat/completions');
     expect(buildFinalApiUrl('https://api.example.com/custom/invoke', 'openai-compatible'))
       .toBe('https://api.example.com/custom/invoke');
+    expect(buildFinalApiUrl('https://api.example.com/invoke/v1', 'openai-compatible'))
+      .toBe('https://api.example.com/invoke/v1');
+    expect(buildFinalApiUrl('https://api.example.com/api/v1', 'openai-compatible'))
+      .toBe('https://api.example.com/api/v1');
   });
 
   it('keeps query parameters when completing a version root', () => {

@@ -242,4 +242,16 @@ describe('postprocessCitationLayout', () => {
 
     expect(result).toBe('Call `initialize()` before use.');
   });
+
+  it('does not rewrite hyphenated paths inside inline code', () => {
+    const result = postprocessCitationLayout('Requests go to `/api/v1-1-rc2`.');
+
+    expect(result).toBe('Requests go to `/api/v1-1-rc2`.');
+  });
+
+  it('keeps empty parentheses inside markdown link targets', () => {
+    const result = postprocessCitationLayout('See [API](https://example.com/run()) docs.');
+
+    expect(result).toBe('See [API](https://example.com/run()) docs.');
+  });
 });

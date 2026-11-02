@@ -72,7 +72,7 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
     const bodies = chatBodies();
     expect(bodies[0].max_tokens).toBe(900);
-    expect(bodies[1].max_tokens).toBe(4000);
+    expect(bodies[1].max_tokens).toBe(1800);
     const retryMessages = bodies[1].messages as Array<{ role: string; content: string }>;
     expect(retryMessages.at(-1)?.content).toContain('PLAN');
     expect(retryMessages.at(-1)?.content).toContain('直接输出 JSON，不要思考过程');
@@ -97,7 +97,7 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 800, purpose: 'internal-json' });
 
     expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
-    expect(chatBodies().map((body) => body.max_tokens)).toEqual([800, 4000]);
+    expect(chatBodies().map((body) => body.max_tokens)).toEqual([800, 1600]);
   });
 
   it('keeps a complete JSON result that was reported as length-truncated', async () => {

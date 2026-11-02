@@ -37,7 +37,8 @@ vi.mock('../../src/services/githubApiFactory', () => ({
 }));
 
 import { runEvidenceDrivenRepositoryChatTurn } from '../../src/services/chat/loop';
-import { evaluateAnswer, malformedCitations } from './harness';
+import { evaluateAnswer, malformedCitations, toMarkdownReport } from './harness';
+import type { EvalResult } from './harness';
 
 interface Fixture {
   repo: string;
@@ -220,5 +221,26 @@ describe('repository chat fixture eval', () => {
     const metrics = metricsOf(events);
     expect(metrics?.fastPath).toBe(fixture.expect.fastPath);
     expect(metrics?.rounds).toBeGreaterThanOrEqual(fixture.expect.minRounds ?? 1);
+  });
+});
+
+describe('toMarkdownReport', () => {
+  it('uses an outer fence longer than any backtick run in the answer', () => {
+    const result: EvalResult = {
+      caseId: 'case',
+      repo: 'owner/repo',
+      sha: 'abc',
+      content: '# Title\n\n```bash\necho hi\n```\nDone',
+      evidences: [],
+      metrics: null,
+      toolEvents: [],
+      failures: [],
+      answers: [],
+    };
+
+    const report = toMarkdownReport([result], {});
+
+    expect(report).toContain('````markdown');
+    expect(report).toContain('```bash\necho hi\n```');
   });
 });

@@ -43,7 +43,10 @@ export function buildFinalApiUrl(baseUrl: string, apiType: AIApiType): string {
     try {
       const url = new URL(trimmed);
       const pathname = url.pathname.replace(/\/$/, '');
-      if (/\/v\d+(?:beta|alpha)?$/i.test(pathname)) {
+      // 仅当 baseUrl 正好是版本根地址（如 https://host/v1）时补全到
+      // /chat/completions；以 /v1 结尾的更长路径（/invoke/v1、/api/v1）视为
+      // 用户已给出的完整端点，保持原样。
+      if (/^\/v\d+(?:beta|alpha)?$/i.test(pathname)) {
         // 用 URL 拼接而不是字符串相加，避免 `?api-version=...` 之类的查询串
         // 被追加到路径后面。
         url.pathname = `${pathname}/chat/completions`;
