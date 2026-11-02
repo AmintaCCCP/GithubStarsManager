@@ -37,7 +37,9 @@ export function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
 
 export function buildFinalApiUrl(baseUrl: string, apiType: AIApiType): string {
   if (apiType === 'openai-compatible') {
-    const trimmed = baseUrl.replace(/\/+$/, '');
+    // `/\/+$/` 这类带量词的正则会被 CodeQL 判为对不可控输入的多项式回溯。
+    let trimmed = baseUrl;
+    while (trimmed.endsWith('/')) trimmed = trimmed.slice(0, -1);
     // 兼容用户直接粘贴 `https://host/v1` 的常见写法：只补全到版本号的根地址，
     // 已给出完整端点（.../chat/completions、自定义路径）时保持原样。
     try {

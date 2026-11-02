@@ -102,7 +102,9 @@ function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
 // 正好是版本根地址（https://host/v1）时补全 /chat/completions，更长路径视为
 // 完整端点保持原样，避免直连与代理请求不同地址。
 function completeOpenAiCompatibleUrl(baseUrl: string): string {
-  const trimmed = baseUrl.replace(/\/+$/, '');
+  // `/\/+$/` 这类带量词的正则会被 CodeQL 判为对不可控输入的多项式回溯。
+  let trimmed = baseUrl;
+  while (trimmed.endsWith('/')) trimmed = trimmed.slice(0, -1);
   try {
     const url = new URL(trimmed);
     const pathname = url.pathname.replace(/\/$/, '');
