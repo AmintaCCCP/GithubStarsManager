@@ -37,7 +37,7 @@ vi.mock('../../src/services/githubApiFactory', () => ({
 }));
 
 import { runEvidenceDrivenRepositoryChatTurn } from '../../src/services/chat/loop';
-import { malformedCitations } from './harness';
+import { evaluateAnswer, malformedCitations } from './harness';
 
 interface Fixture {
   repo: string;
@@ -171,6 +171,14 @@ describe('repository chat fixture eval', () => {
     expect(malformedCitations('See `/a.md - 1-24` and `/README.md - 1` .')).toEqual([]);
     expect(malformedCitations('See `/README.md - 1-以24`.')).toHaveLength(1);
     expect(malformedCitations('See `/README.md - 1-24abc`.')).toHaveLength(1);
+    expect(malformedCitations('See `/README.md - 1-24-extra`.')).toHaveLength(1);
+  });
+
+  it('checks forbidden patterns outside call syntax only', () => {
+    const base = { id: 'x', repo: 'a/b', question: 'q', language: 'en' as const, mustNotMatch: ['\\(\\s*\\)', 'download the binary'] };
+
+    expect(evaluateAnswer(base, 'Call `start()` first.')).toEqual([]);
+    expect(evaluateAnswer(base, 'Then run `download the binary` in the shell.')).toContain('unexpected /download the binary/');
   });
 
   beforeEach(() => {

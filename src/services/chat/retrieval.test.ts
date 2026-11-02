@@ -71,6 +71,13 @@ describe('sectionSegments', () => {
 
     expect(sectionSegments(document, ['API reference']).map((segment) => segment.label)).toEqual(['API', 'Reference']);
   });
+
+  it('selects a short heading when the request uses a hyphenated form', () => {
+    const content = ['# Docs', '', '## API', 'GET /items', '', '## Reference', 'Full list.'].join('\n');
+    const document = { path: 'docs.md', content, headings: makeMarkdownHeadings(content), linkedDocumentationPaths: [] };
+
+    expect(sectionSegments(document, ['API-reference']).map((segment) => segment.label)).toEqual(['API', 'Reference']);
+  });
 });
 
 describe('rankedCandidatePaths entry-file bonus', () => {
@@ -81,8 +88,9 @@ describe('rankedCandidatePaths entry-file bonus', () => {
     ];
 
     const paths = rankedCandidatePaths(entries, 'Where is the webhook signature verified?', 'implementation');
+    const firstUnmatchedEntry = paths.findIndex((path) => /packages\/pkg-\d+\/src\/index\.ts$/.test(path));
 
-    expect(paths.indexOf('src/webhook/signature.ts')).toBeLessThan(40);
+    expect(paths.indexOf('src/webhook/signature.ts')).toBeLessThan(firstUnmatchedEntry);
   });
 });
 

@@ -138,7 +138,12 @@ export const EVAL_CASES: EvalCase[] = [
     mustInclude: ['npm create astro'],
     maxChars: 1_400,
     maxCitationRepeats: 3,
-    followUps: [{ question: 'How do I install Astro manually?', mustInclude: ['npm install astro'] }],
+    followUps: [{
+      question: 'How do I install Astro manually?',
+      mustInclude: ['npm install astro'],
+      // 断言不能靠“不要使用 npm install astro”这类否定句通过。
+      mustNotMatch: ['(?:do not|don\'t|never|不要|禁止)[^\\n]{0,20}npm install astro'],
+    }],
   },
   {
     id: 'overview-zustand',

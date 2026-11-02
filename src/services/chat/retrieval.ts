@@ -117,10 +117,11 @@ const scorePath = (path: string, terms: string[], focus: ResearchFocus): number 
     : 0;
   // 实现/排查类问题往往落在 index.js、lib/*.js 这类路径名不含问题词的入口文件上，
   // 只按关键词打分会让 code 候选为空、规划器只能反复读文档。入口加分只在路径
-  // 本身没命中问题词时生效且幅度很小：monorepo 里 packages/*/src/index.ts 很多，
-  // 高分入口会把真正相关的文件挤出 codeCandidates 的 50/40 条截断之外。
+  // 本身没命中问题词时生效，且必须小于“命中词 + 目录/扩展名”的最低分（15），
+  // 否则 monorepo 里 packages/*/src/index.ts 会反过来压过真正相关的文件，把
+  // 后者挤出 codeCandidates 的 50/40 条截断之外。
   const codeEntryScore = focus === 'implementation' || focus === 'troubleshooting'
-    ? (keywordScore + focusScore === 0 && /(?:^|\/)(?:index|main|app|cli)\.[cm]?[jt]sx?$/i.test(normalized) ? 4 : 0)
+    ? (keywordScore + focusScore === 0 && /(?:^|\/)(?:index|main|app|cli)\.[cm]?[jt]sx?$/i.test(normalized) ? 1 : 0)
       + (/^(?:src|lib|server|packages|bin|scripts)\/.*\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(normalized) ? 8 : 0)
       + (/\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(normalized) ? 3 : 0)
     : 0;
@@ -493,6 +494,11 @@ export const sectionSegments = (
 ): Array<{ lineStart: number; lineEnd: number; excerpt: string; label: string }> => {
   const lines = document.content.split('\n');
   const normalizedRequested = requestedSections.map((section) => collapseHeadingText(section)).filter(Boolean);
+  // 独立词按原始请求切分：collapseHeadingText 会删掉连字符，`API-reference` 只剩
+  // `apireference`，无法再拆出 `api`。
+  const requestedWords = new Set(requestedSections.flatMap((section) => (
+    section.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+  )));
   // 归一化容错匹配：大小写、空白与常见标点差异不再导致章节匹配失败。
   const selected = document.headings.filter((heading) => {
     if (normalizedRequested.length === 0) return false;
@@ -503,7 +509,7 @@ export const sectionSegments = (
       // 短标题（如 H1 `# ora`）不应因为恰好是某个长标题的子串而选中整篇文档。
       || (title.length >= 4 && requested.includes(title))
       // 短标题仍应能匹配请求里的独立词：请求 “API reference” 时要选中 `## API`。
-      || (title.length >= 2 && requested.split(' ').includes(title))
+      || (title.length >= 2 && requestedWords.has(title))
     ));
   });
   const unique = Array.from(new Map(selected.map((heading) => [heading.lineStart, heading])).values());
