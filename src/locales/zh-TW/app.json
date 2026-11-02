@@ -1349,6 +1349,8 @@
     "password": "密碼",
     "webdav-password": "WebDAV密碼",
     "path": "路徑",
+    "custom-user-agent": "自訂 User-Agent",
+    "custom-user-agent-hint": "部分服務（如 CSTCloud 資料膠囊）會驗證用戶端 User-Agent，留空則使用預設值。",
     "save": "儲存",
     "cancel": "取消",
     "active-webdav-configuration": "目前 WebDAV 配置",

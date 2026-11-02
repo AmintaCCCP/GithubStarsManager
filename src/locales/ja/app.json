@@ -1349,6 +1349,8 @@
     "password": "パスワード",
     "webdav-password": "WebDAV のパスワード",
     "path": "パス",
+    "custom-user-agent": "カスタム User-Agent",
+    "custom-user-agent-hint": "一部のサービス（CSTCloud Data Capsule など）はクライアントの User-Agent を検証します。空欄の場合はデフォルトを使用します。",
     "save": "保存",
     "cancel": "キャンセル",
     "active-webdav-configuration": "現在の WebDAV 構成",

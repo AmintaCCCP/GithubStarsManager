@@ -79,6 +79,23 @@ describe('WebDAV proxy route', () => {
     expect(options.headers.Authorization).toBe(`Basic ${Buffer.from('alice:secret').toString('base64')}`);
   });
 
+  it('passes the client-supplied custom User-Agent through to the target server', async () => {
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/webdav')
+      .send({
+        configId: 'webdav-1',
+        method: 'PROPFIND',
+        path: '/backup/',
+        headers: { 'User-Agent': 'rclone/v1.68.0' },
+      })
+      .expect(200);
+
+    const options = proxyRequestMock.mock.calls[0][0];
+    expect(options.headers['User-Agent']).toBe('rclone/v1.68.0');
+  });
+
   it('passes PROPFIND XML through untouched so the client can parse it', async () => {
     const app = createTestApp();
     const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"><D:response><D:href>/backup/a.json</D:href></D:response></D:multistatus>';

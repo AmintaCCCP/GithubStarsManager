@@ -7,7 +7,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
 
-export type WebDAVForm = Pick<WebDAVConfig, 'name' | 'url' | 'username' | 'password' | 'path'>;
+export type WebDAVForm = Pick<WebDAVConfig, 'name' | 'url' | 'username' | 'password' | 'path' | 'customUserAgent'>;
 
 export interface WebDAVActions {
   testingId: string | null;
@@ -50,6 +50,7 @@ export const useWebDAVActions = (): WebDAVActions => {
       username: form.username,
       password: form.password,
       path: form.path,
+      customUserAgent: form.customUserAgent?.trim() || undefined,
       isActive: existingConfig?.isActive ?? false,
     };
 

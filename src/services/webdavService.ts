@@ -86,6 +86,11 @@ export class WebDAVService {
     return `Basic ${credentials}`;
   }
 
+  private getCustomUserAgentHeader(): Record<string, string> {
+    const userAgent = this.config.customUserAgent?.trim();
+    return userAgent ? { 'User-Agent': userAgent } : {};
+  }
+
   private getFullPath(filename: string): string {
     const basePath = this.config.path.endsWith('/') ? this.config.path : `${this.config.path}/`;
     return `${this.config.url}${basePath}${filename}`;
@@ -111,14 +116,18 @@ export class WebDAVService {
     init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<Response> {
     const targetUrl = `${this.config.url}${requestPath}`;
+    const userAgentHeaders = this.getCustomUserAgentHeader();
 
     if (window.electronAPI?.webdavRequest) {
-      return this.desktopDavFetch(method, targetUrl, init);
+      return this.desktopDavFetch(method, targetUrl, {
+        ...init,
+        headers: { ...userAgentHeaders, ...(init?.headers ?? {}) },
+      });
     }
 
     if (backend.isAvailable) {
       // Authorization 由后端依据配置生成，避免两份凭据冲突
-      const forwardHeaders: Record<string, string> = { ...(init?.headers ?? {}) };
+      const forwardHeaders: Record<string, string> = { ...userAgentHeaders, ...(init?.headers ?? {}) };
       delete forwardHeaders['Authorization'];
       return backend.proxyWebDAV(
         this.config.id,
@@ -132,9 +141,10 @@ export class WebDAVService {
       );
     }
 
+    // 浏览器直连时 Chrome 会静默丢弃自定义 User-Agent，该头仅桌面版与后端代理路径生效
     return fetch(targetUrl, {
       method,
-      headers: init?.headers,
+      headers: { ...userAgentHeaders, ...(init?.headers ?? {}) },
       body: init?.body,
       signal: init?.signal,
     });

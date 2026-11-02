@@ -350,12 +350,13 @@ router.post('/api/sync/import', (req, res) => {
           const existing = db.prepare('SELECT password_encrypted FROM webdav_configs WHERE id = ?').get(c.id) as Record<string, unknown> | undefined;
           const existingPwd = (existing?.password_encrypted as string) ?? null;
           db.prepare(`
-            INSERT OR REPLACE INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active, custom_user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             c.id, c.name ?? '', c.url ?? '', c.username ?? '',
             existingPwd,
-            c.path ?? '/', (c.is_active ?? c.isActive) ? 1 : 0
+            c.path ?? '/', (c.is_active ?? c.isActive) ? 1 : 0,
+            typeof c.custom_user_agent === 'string' ? c.custom_user_agent : typeof c.customUserAgent === 'string' ? c.customUserAgent : null
           );
         }
         counts.webdav_configs = webdavConfigs.length;

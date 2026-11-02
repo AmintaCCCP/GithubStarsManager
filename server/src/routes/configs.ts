@@ -230,6 +230,7 @@ router.get('/api/configs/ai', (req, res) => {
         apiKey: shouldDecrypt ? decryptedValue : maskApiKey(decryptedValue),
         apiKeyStatus: status,
         isActive: !!row.is_active,
+        customUserAgent: (row.custom_user_agent as string | undefined) ?? undefined,
         customPrompt: row.custom_prompt ?? null,
         useCustomPrompt: !!row.use_custom_prompt,
         concurrency: row.concurrency ?? 1,
@@ -337,18 +338,18 @@ router.get('/api/configs/webdav', (req, res) => {
 router.post('/api/configs/webdav', (req, res) => {
   try {
     const db = getDb();
-    const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
+    const { name, url, username, password, path, isActive, customUserAgent } = req.body as Record<string, unknown>;
 
     const encryptedPwd = password && typeof password === 'string' ? encrypt(password, config.encryptionKey) : null;
 
     const result = db.prepare(
-      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active, custom_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
       name ?? '', url ?? '', username ?? '', encryptedPwd,
-      path ?? '/', isActive ? 1 : 0
+      path ?? '/', isActive ? 1 : 0, typeof customUserAgent === 'string' ? customUserAgent : null
     );
 
-    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive });
+    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive, customUserAgent: customUserAgent ?? null });
   } catch (err) {
     logger.errorFromError('configs.createWebDAV', 'POST /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to create WebDAV config', code: 'CREATE_WEBDAV_CONFIG_FAILED' });
@@ -371,6 +372,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       password: string;
       path: string;
       isActive: boolean;
+      customUserAgent?: string;
     }>;
 
     if (!Array.isArray(configs)) {
@@ -389,8 +391,8 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       db.prepare('DELETE FROM webdav_configs').run();
 
       const stmt = db.prepare(`
-        INSERT INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active, custom_user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const c of configs) {
@@ -423,7 +425,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
 
         stmt.run(
           c.id, c.name ?? '', c.url ?? '', c.username ?? '',
-          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
+          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0, c.customUserAgent ?? null
         );
         syncResult.inserted++;
       }

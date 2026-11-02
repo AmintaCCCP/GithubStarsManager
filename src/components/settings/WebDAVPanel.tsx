@@ -43,6 +43,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
     username: '',
     password: '',
     path: '/',
+    customUserAgent: '',
   });
 
   const resetForm = () => {
@@ -52,6 +53,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       username: '',
       password: '',
       path: '/',
+      customUserAgent: '',
     });
     setShowForm(false);
     setEditingId(null);
@@ -87,6 +89,7 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
       username: config.username,
       password: config.password,
       path: config.path,
+      customUserAgent: config.customUserAgent ?? '',
     });
     setEditingId(config.id);
     setShowForm(true);
@@ -206,6 +209,23 @@ export const WebDAVPanel: React.FC<WebDAVPanelProps> = ({ t }) => {
               className="w-full"
               placeholder="/github-stars-manager/"
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label htmlFor="webdav-custom-user-agent" className="mb-1 block text-sm font-medium text-foreground">
+              {t('webDAVPanel.custom-user-agent')}
+            </label>
+            <Input
+              id="webdav-custom-user-agent"
+              type="text"
+              value={form.customUserAgent}
+              onChange={(e) => setForm(prev => ({ ...prev, customUserAgent: e.target.value }))}
+              className="w-full"
+              placeholder="rclone/v1.68.0"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('webDAVPanel.custom-user-agent-hint')}
+            </p>
           </div>
         </div>
       </Modal>

@@ -134,6 +134,59 @@ describe('WebDAVService 传输层选择', () => {
   });
 });
 
+describe('WebDAVService 自定义 User-Agent', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('未配置时浏览器直连不添加 User-Agent 头', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await davService().downloadFile('data.json');
+
+    const [, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect(init?.headers).not.toHaveProperty('User-Agent');
+  });
+
+  it('配置后浏览器直连携带去首尾空白的自定义 User-Agent', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await new WebDAVService({ ...config, customUserAgent: '  rclone/v1.68.0  ' }).downloadFile('data.json');
+
+    const [, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect((init?.headers as Record<string, string>)['User-Agent']).toBe('rclone/v1.68.0');
+  });
+
+  it('后端代理路径透传自定义 User-Agent 且不影响 Authorization 剥离', async () => {
+    vi.mocked(backend).isAvailable = true;
+    proxyWebDAV.mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await new WebDAVService({ ...config, customUserAgent: 'rclone/v1.67.0' }).downloadFile('data.json');
+
+    const [, , , , headers] = proxyWebDAV.mock.calls[0];
+    expect(headers?.['User-Agent']).toBe('rclone/v1.67.0');
+    expect(headers?.Authorization).toBeUndefined();
+  });
+
+  it('桌面版 IPC 路径携带自定义 User-Agent', async () => {
+    const webdavRequest = vi.fn().mockResolvedValue({ success: true, status: 200, statusText: 'OK', body: '' });
+    window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+    await new WebDAVService({ ...config, customUserAgent: 'rclone/v1.68.0' }).downloadFile('data.json');
+
+    const params = webdavRequest.mock.calls[0][0];
+    expect(params.headers['User-Agent']).toBe('rclone/v1.68.0');
+    expect(params.headers.Authorization).toMatch(/^Basic /);
+  });
+});
+
 describe('WebDAVService 错误提示', () => {
   beforeEach(() => {
     vi.mocked(backend).isAvailable = false;

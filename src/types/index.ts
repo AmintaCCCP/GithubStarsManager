@@ -362,6 +362,8 @@ export interface WebDAVConfig {
   password: string;
   path: string;
   isActive: boolean;
+  /** 部分服务（如 CSTCloud 数据胶囊）按 User-Agent 校验客户端，空值保持默认行为 */
+  customUserAgent?: string;
   passwordStatus?: SecretStatus;
 }
 
