@@ -148,7 +148,9 @@ const CITATION = /`(\/[^`\n]+? - \d+(?:\s*-\s*\d+)?)`/g;
 // 区间分隔符必须是独立的 " - "，否则 ADR-20260828-obtain… 这类路径会被误判。
 // 第二条备选规则抓结束行号后直接跟字母的引用（`/README.md - 1-24abc`），它既
 // 不被 CITATION 认成有效引用，也不会被第一条规则标记为错误。
-const MALFORMED_CITATION = /`\/[^`\n]*\s+-\s*\d+\s*-\s*[^\d\s`][^`\n]*`|`\/[^`\n]+? - \d+(?:\s*-\s*\d+)?(?:-\D|[^\d\s`-])[^`\n]*`/g;
+// 第三条规则单独抓三段行号（`1-24-3`）：若把 `-\d` 放进第二条的可选范围之后，
+// 正则会在 `1-68` 上回溯成“行号 1 + 尾随 -6”，把合法的连字符路径误判为错误。
+const MALFORMED_CITATION = /`\/[^`\n]*\s+-\s*\d+\s*-\s*[^\d\s`][^`\n]*`|`\/[^`\n]+? - \d+(?:\s*-\s*\d+)?(?:-\D|\s+[^\d\s`-]|[^\d\s`-])[^`\n]*`|`\/[^`\n]+? - \d+-\d+-\d+[^`\n]*`/g;
 
 export const citationTokens = (content: string): string[] => Array.from(content.matchAll(CITATION), (match) => match[1]);
 

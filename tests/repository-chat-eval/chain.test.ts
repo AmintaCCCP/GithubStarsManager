@@ -172,6 +172,9 @@ describe('repository chat fixture eval', () => {
     expect(malformedCitations('See `/README.md - 1-以24`.')).toHaveLength(1);
     expect(malformedCitations('See `/README.md - 1-24abc`.')).toHaveLength(1);
     expect(malformedCitations('See `/README.md - 1-24-extra`.')).toHaveLength(1);
+    expect(malformedCitations('See `/README.md - 1-24-3`.')).toHaveLength(1);
+    expect(malformedCitations('See `/README.md - 1-24 extra`.')).toHaveLength(1);
+    expect(malformedCitations('See `/a.md - 1 - 24`.')).toEqual([]);
   });
 
   it('checks forbidden patterns outside call syntax only', () => {
