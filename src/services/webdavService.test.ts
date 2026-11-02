@@ -185,6 +185,12 @@ describe('WebDAVService 自定义 User-Agent', () => {
     expect(params.headers['User-Agent']).toBe('rclone/v1.68.0');
     expect(params.headers.Authorization).toMatch(/^Basic /);
   });
+
+  it('validateConfig 拒绝包含换行符的自定义 User-Agent', () => {
+    const errors = WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0\r\nX-Evil: 1' });
+    expect(errors).toContain('自定义 User-Agent 不能包含换行符');
+    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0' })).not.toContain('自定义 User-Agent 不能包含换行符');
+  });
 });
 
 describe('WebDAVService 错误提示', () => {

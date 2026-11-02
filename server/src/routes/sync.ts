@@ -5,6 +5,10 @@ import { config } from '../config.js';
 
 const router = Router();
 
+// 含换行符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
+const sanitizeUserAgent = (value: unknown): string | null =>
+  typeof value === 'string' && !/[\r\n]/.test(value) ? value : null;
+
 /** 与前端 NOASSERTION_KEYS 对齐：空白 / NOASSERTION / Other / none 等落 null。 */
 const NO_LICENSE_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
 
@@ -356,7 +360,11 @@ router.post('/api/sync/import', (req, res) => {
             c.id, c.name ?? '', c.url ?? '', c.username ?? '',
             existingPwd,
             c.path ?? '/', (c.is_active ?? c.isActive) ? 1 : 0,
-            typeof c.custom_user_agent === 'string' ? c.custom_user_agent : typeof c.customUserAgent === 'string' ? c.customUserAgent : null
+            sanitizeUserAgent(
+              typeof c.custom_user_agent === 'string' ? c.custom_user_agent
+              : typeof c.customUserAgent === 'string' ? c.customUserAgent
+              : undefined
+            )
           );
         }
         counts.webdav_configs = webdavConfigs.length;

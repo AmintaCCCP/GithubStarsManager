@@ -1350,7 +1350,7 @@
     "webdav-password": "Mot de passe WebDAV",
     "path": "chemin",
     "custom-user-agent": "User-Agent personnalisé",
-    "custom-user-agent-hint": "Certains services (ex. CSTCloud Data Capsule) valident le User-Agent du client. Laissez vide pour utiliser la valeur par défaut.",
+    "custom-user-agent-hint": "Certains services (ex. CSTCloud Data Capsule) valident le User-Agent du client. Laissez vide pour utiliser la valeur par défaut. Les connexions directes depuis le navigateur ignorent cette valeur (Chromium) ; utilisez l'application de bureau ou le proxy backend.",
     "save": "sauvegarder",
     "cancel": "Annuler",
     "active-webdav-configuration": "Configuration WebDAV actuelle",

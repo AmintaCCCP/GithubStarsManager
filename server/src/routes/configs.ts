@@ -9,6 +9,11 @@ const router = Router();
 
 type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
 
+// 含换行符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
+function sanitizeUserAgent(value: unknown): string | null {
+  return typeof value === 'string' && !/[\r\n]/.test(value) ? value : null;
+}
+
 function getMaskedSecretResult(params: {
   encryptedValue: unknown;
   encryptionKey: string;
@@ -230,7 +235,6 @@ router.get('/api/configs/ai', (req, res) => {
         apiKey: shouldDecrypt ? decryptedValue : maskApiKey(decryptedValue),
         apiKeyStatus: status,
         isActive: !!row.is_active,
-        customUserAgent: (row.custom_user_agent as string | undefined) ?? undefined,
         customPrompt: row.custom_prompt ?? null,
         useCustomPrompt: !!row.use_custom_prompt,
         concurrency: row.concurrency ?? 1,
@@ -325,6 +329,7 @@ router.get('/api/configs/webdav', (req, res) => {
         passwordStatus: status,
         path: row.path,
         isActive: !!row.is_active,
+        customUserAgent: (row.custom_user_agent as string | undefined) ?? undefined,
       };
     });
     res.json(configs);
@@ -346,7 +351,7 @@ router.post('/api/configs/webdav', (req, res) => {
       'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active, custom_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
       name ?? '', url ?? '', username ?? '', encryptedPwd,
-      path ?? '/', isActive ? 1 : 0, typeof customUserAgent === 'string' ? customUserAgent : null
+      path ?? '/', isActive ? 1 : 0, sanitizeUserAgent(customUserAgent)
     );
 
     res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive, customUserAgent: customUserAgent ?? null });
@@ -425,7 +430,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
 
         stmt.run(
           c.id, c.name ?? '', c.url ?? '', c.username ?? '',
-          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0, c.customUserAgent ?? null
+          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0, sanitizeUserAgent(c.customUserAgent)
         );
         syncResult.inserted++;
       }

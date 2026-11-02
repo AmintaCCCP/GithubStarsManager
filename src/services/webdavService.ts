@@ -817,6 +817,10 @@ export class WebDAVService {
       errors.push('路径必须以 / 开头');
     }
 
+    if (config.customUserAgent && /[\r\n]/.test(config.customUserAgent)) {
+      errors.push('自定义 User-Agent 不能包含换行符');
+    }
+
     return errors;
   }
 
