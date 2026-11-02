@@ -336,10 +336,10 @@ jobs:
 
   release:
     needs: [scope, web, build]
-    # workflow_dispatch is how a release is re-cut by hand. Push events stay
-    # tag-only: after the tag run publishes, the next main merge used to
-    # re-run this job and softprops replaced the published release, wiping
-    # its installers.
+    # Tag-only. A main push must not re-run this job: softprops then replaced
+    # the already published release, wiping its installers. A manual dispatch
+    # on a branch is refused too — softprops would publish that branch's
+    # build under the branch name, on a tag that points elsewhere.
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
@@ -362,7 +362,7 @@ jobs:
     # sets neither `body` nor `generate_release_notes` so it never overwrites
     # the hand-written notes (softprops' default update path replaces an
     # existing release's body whenever a workflow `body` is present).
-    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && needs.scope.result == 'success' && needs.web.result == 'success'
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.scope.result == 'success' && needs.web.result == 'success'
     permissions:
       contents: write
       actions: read

@@ -3604,15 +3604,13 @@ html.dark .release-card.is-expanded {
 }
 
 .app-side-filter-row > .app-side-item {
-  padding-inline-end: calc(
-    var(--app-sidebar-action-size) * 2 + var(--app-sidebar-action-gap) +
-      var(--app-sidebar-item-padding-inline)
-  );
+  /* Actions are hover-only and sit on the icon side when they appear, so the
+     label keeps the whole row instead of losing ~3rem to nothing visible. */
+  padding-inline-end: var(--app-sidebar-item-padding-inline);
 }
 
 /* Built-in device filter is two lines (name + badge / device); the shared row
-   height would clip it. The toggle column also keeps the row actions' space
-   reserved so the text never runs under the hover-only buttons. */
+   height would clip it. */
 .app-side-filter-row > .app-side-item.app-side-multiline-label {
   height: auto;
   min-height: var(--app-sidebar-item-height);
@@ -3627,17 +3625,16 @@ html.dark .release-card.is-expanded {
   gap: var(--app-sidebar-item-gap);
 }
 
-.app-side-filter-row .app-side-item-label > svg {
-  flex: none;
-}
-
 .app-side-row-actions {
   position: absolute;
   inset-block: 0;
-  inset-inline-end: var(--app-sidebar-action-gap);
+  /* Overlay the icon slot instead of stealing label width; on hover the icon
+     is covered, not overlapped with text. */
+  inset-inline-start: var(--app-sidebar-item-padding-inline);
   display: flex;
   align-items: center;
   gap: var(--app-sidebar-action-gap);
+  border-radius: var(--ui-radius-xs);
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--app-motion-fast) ease;
@@ -3647,6 +3644,15 @@ html.dark .release-card.is-expanded {
 .app-side-filter-row:focus-within .app-side-row-actions {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* The row's own selected/hover surface is the backdrop behind the actions. */
+.app-side-filter-row > .app-side-item[aria-pressed='true'] + .app-side-row-actions {
+  background: var(--app-sidebar-active-surface);
+}
+
+.app-side-filter-row > .app-side-item:not([aria-pressed='true']) + .app-side-row-actions {
+  background: var(--app-hover-surface);
 }
 
 .app-side-filter-note {
