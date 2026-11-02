@@ -178,6 +178,7 @@ describe('repository chat fixture eval', () => {
     const base = { id: 'x', repo: 'a/b', question: 'q', language: 'en' as const, mustNotMatch: ['\\(\\s*\\)', 'download the binary'] };
 
     expect(evaluateAnswer(base, 'Call `start()` first.')).toEqual([]);
+    expect(evaluateAnswer(base, 'It erases with `#clearDisplay()` (or moves the cursor).')).toEqual([]);
     expect(evaluateAnswer(base, 'Then run `download the binary` in the shell.')).toContain('unexpected /download the binary/');
   });
 

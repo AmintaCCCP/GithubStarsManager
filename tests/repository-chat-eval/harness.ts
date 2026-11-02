@@ -171,8 +171,8 @@ export const evaluateAnswer = (evalCase: EvalCase, answer: string): string[] => 
   }
   // 行内代码是调用语法（`start()`），不是被清理掉的空引用括号；禁用词只在正文里
   // 匹配，代码片段替换成占位符（直接删掉会让 `(code)` 变成假的空括号）。
-  // 只遮蔽调用语法（`start()`）；自然语言包在反引号里也要照常检查。
-  const prose = answer.replace(/`[\p{L}\p{N}_.]*\([^`\n]*\)`/gu, 'CODE');
+  // 只遮蔽调用语法（`start()`、`#clearDisplay()`）；自然语言包在反引号里也要照常检查。
+  const prose = answer.replace(/`[\p{L}\p{N}_.#$-]*\([^`\n]*\)`/gu, 'CODE');
   for (const pattern of evalCase.mustNotMatch ?? []) {
     if (new RegExp(pattern, 'i').test(prose)) failures.push(`unexpected /${pattern}/`);
   }
