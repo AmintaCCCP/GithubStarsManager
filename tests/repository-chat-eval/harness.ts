@@ -20,6 +20,8 @@ export interface EvalCase {
   expectedSources?: string[];
   /** Keywords or commands that must appear in the answer. */
   mustInclude?: string[];
+  /** Commands that must appear inside a fenced code block, i.e. as a runnable step. */
+  mustIncludeInCode?: string[];
   /** Regexes that must not appear in the answer. */
   mustNotMatch?: string[];
   maxChars?: number;
@@ -30,7 +32,7 @@ export interface EvalCase {
   maxLlmCalls?: number;
   maxRounds?: number;
   /** Follow-up turns sent after the first answer in the same session. */
-  followUps?: Array<{ question: string; mustInclude?: string[]; mustNotMatch?: string[] }>;
+  followUps?: Array<{ question: string; mustInclude?: string[]; mustIncludeInCode?: string[]; mustNotMatch?: string[] }>;
 }
 
 export interface EvalResult {
@@ -150,7 +152,7 @@ const CITATION = /`(\/[^`\n]+? - \d+(?:\s*-\s*\d+)?)`/g;
 // 不被 CITATION 认成有效引用，也不会被第一条规则标记为错误。
 // 第三条规则单独抓三段行号（`1-24-3`）：若把 `-\d` 放进第二条的可选范围之后，
 // 正则会在 `1-68` 上回溯成“行号 1 + 尾随 -6”，把合法的连字符路径误判为错误。
-const MALFORMED_CITATION = /`\/[^`\n]*\s+-\s*\d+\s*-\s*[^\d\s`][^`\n]*`|`\/[^`\n]+? - \d+(?:\s*-\s*\d+)?(?:-\D|\s+[^\d\s`-]|[^\d\s`-])[^`\n]*`|`\/[^`\n]+? - \d+-\d+-\d+[^`\n]*`/g;
+const MALFORMED_CITATION = /`\/[^`\n]*\s+-\s*\d+\s*-\s*[^\d\s`][^`\n]*`|`\/[^`\n]+? - \d+(?:\s*-\s*\d+)?(?:-\D|\s+[^\d\s`-]|[^\d\s`-])[^`\n]*`|`\/[^`\n]+? - \d+-\d+-\d+[^`\n]*`|`\/[^`\n]+? - \d+(?:\s*-\s*\d+){2,}[^`\n]*`/g;
 
 export const citationTokens = (content: string): string[] => Array.from(content.matchAll(CITATION), (match) => match[1]);
 
@@ -171,10 +173,13 @@ export const evaluateAnswer = (evalCase: EvalCase, answer: string): string[] => 
   for (const keyword of evalCase.mustInclude ?? []) {
     if (!answer.toLowerCase().includes(keyword.toLowerCase())) failures.push(`missing "${keyword}"`);
   }
-  // 行内代码是调用语法（`start()`），不是被清理掉的空引用括号；禁用词只在正文里
-  // 匹配，代码片段替换成占位符（直接删掉会让 `(code)` 变成假的空括号）。
-  // 只遮蔽调用语法（`start()`、`#clearDisplay()`）；自然语言包在反引号里也要照常检查。
-  const prose = answer.replace(/`[\p{L}\p{N}_.#$-]*\([^`\n]*\)`/gu, 'CODE');
+  const code = Array.from(answer.matchAll(/```[^\n]*\n([\s\S]*?)```/g), (match) => match[1]).join('\n');
+  for (const keyword of evalCase.mustIncludeInCode ?? []) {
+    if (!code.includes(keyword)) failures.push(`"${keyword}" is not a runnable step`);
+  }
+  // 行内代码是调用语法（`start()`），不是被清理掉的空引用括号；只遮蔽空参调用，
+  // 带参数或自然语言的代码片段照常参与禁用词检查。
+  const prose = answer.replace(/`[\p{L}\p{N}_.#$-]*\(\s*\)`/gu, 'CODE');
   for (const pattern of evalCase.mustNotMatch ?? []) {
     if (new RegExp(pattern, 'i').test(prose)) failures.push(`unexpected /${pattern}/`);
   }
@@ -237,7 +242,13 @@ export const runEvalCase = async (
     for (const keyword of followUp.mustInclude ?? []) {
       if (!next.content.toLowerCase().includes(keyword.toLowerCase())) failures.push(`follow-up missing "${keyword}"`);
     }
-    failures.push(...evaluateAnswer({ ...evalCase, mustInclude: [], mustNotMatch: followUp.mustNotMatch, followUps: [] }, next.content));
+    failures.push(...evaluateAnswer({
+      ...evalCase,
+      mustInclude: [],
+      mustIncludeInCode: followUp.mustIncludeInCode,
+      mustNotMatch: followUp.mustNotMatch,
+      followUps: [],
+    }, next.content));
   }
   return {
     caseId: evalCase.id,

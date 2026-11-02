@@ -141,8 +141,8 @@ export const EVAL_CASES: EvalCase[] = [
     followUps: [{
       question: 'How do I install Astro manually?',
       mustInclude: ['npm install astro'],
-      // 断言不能靠“不要使用 npm install astro”这类否定句通过。
-      mustNotMatch: ['(?:do not|don\'t|never|avoid|instead of|不要|禁止|避免|而不是)[^\\n]{0,20}npm install astro'],
+      // 断言要求手动安装命令是可执行步骤，避免“不要使用/不受支持”这类句子通过。
+      mustIncludeInCode: ['npm install astro'],
     }],
   },
   {

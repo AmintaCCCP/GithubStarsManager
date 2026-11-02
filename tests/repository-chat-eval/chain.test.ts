@@ -174,6 +174,7 @@ describe('repository chat fixture eval', () => {
     expect(malformedCitations('See `/README.md - 1-24-extra`.')).toHaveLength(1);
     expect(malformedCitations('See `/README.md - 1-24-3`.')).toHaveLength(1);
     expect(malformedCitations('See `/README.md - 1-24 extra`.')).toHaveLength(1);
+    expect(malformedCitations('See `/README.md - 1 - 24 - 3`.')).toHaveLength(1);
     expect(malformedCitations('See `/a.md - 1 - 24`.')).toEqual([]);
   });
 
@@ -182,7 +183,15 @@ describe('repository chat fixture eval', () => {
 
     expect(evaluateAnswer(base, 'Call `start()` first.')).toEqual([]);
     expect(evaluateAnswer(base, 'It erases with `#clearDisplay()` (or moves the cursor).')).toEqual([]);
+    expect(evaluateAnswer(base, 'Then `run(download the binary)`.')).toContain('unexpected /download the binary/');
     expect(evaluateAnswer(base, 'Then run `download the binary` in the shell.')).toContain('unexpected /download the binary/');
+  });
+
+  it('requires asserted commands to be runnable steps', () => {
+    const base = { id: 'x', repo: 'a/b', question: 'q', language: 'en' as const, mustIncludeInCode: ['npm install astro'] };
+
+    expect(evaluateAnswer(base, 'Use `npm install astro` when needed.')).toEqual(['"npm install astro" is not a runnable step']);
+    expect(evaluateAnswer(base, '```bash\nnpm install astro\n```')).toEqual([]);
   });
 
   beforeEach(() => {
