@@ -267,6 +267,13 @@ export const postprocessCitationLayout = (markdown: string): string => {
   if (!markdown.trim()) return markdown;
   const lifted = liftStandaloneCitationLines(markdown);
   const collapsed = dedupeAdjacentCitations(lifted);
-  return dedupeParagraphCitations(collapsed)
+  // 模型偶尔把区间写成 `1-以24`；只修掉区间前缀的杂字符，保留其中的数字。
+  const repairedRanges = mapOutsideFences(collapsed, (line) => line.replace(
+    /(\/[^`\n]+?\s*[-—–]\s*\d+)-[^\d`\s]+(\d+)`/g,
+    '$1-$2`',
+  ));
+  // 被校验器移除的无效来源会留下空括号（`... on TTYs ()`），清掉这段残留。
+  const withoutEmptyParens = mapOutsideFences(repairedRanges, (line) => line.replace(/[ \t]*\(\s*\)/g, ''));
+  return dedupeParagraphCitations(withoutEmptyParens)
     .replace(/^\n+|\n+$/g, '');
 };

@@ -230,4 +230,10 @@ describe('postprocessCitationLayout', () => {
     expect(result).toContain('line  1\n\n\n`/README.md - 1`');
     expect(count(result, '`/README.md - 1`')).toBe(2);
   });
+
+  it('repairs a malformed citation range and removes an empty parenthesis', () => {
+    const result = postprocessCitationLayout('Runs on TTYs () and shipped in `/release.md - 1-以24`.');
+
+    expect(result).toBe('Runs on TTYs and shipped in `/release.md - 1-24`.');
+  });
 });

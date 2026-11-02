@@ -60,6 +60,7 @@ package-lock.json.*.tmp
 docs/wiki/
 # Locally generated reports (never commit)
 docs/reports/
+tests/repository-chat-eval/reports/
 # BI collector (local scripts and runtime data)
 scripts/bi/
 bi-site/

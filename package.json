@@ -26,6 +26,7 @@
     "test:deploy-vector": "node --test scripts/deploy-vector.test.mjs",
     "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs scripts/check-plugin-registry.test.cjs scripts/fullstack-compose-env.test.cjs scripts/ci-scope.test.cjs",
     "test:coverage": "vitest run --coverage",
+    "eval:live": "REPO_CHAT_EVAL_LIVE=1 vitest run --config vitest.eval.config.ts",
     "build:desktop": "node scripts/build-desktop.js",
     "electron": "electron electron/main.js",
     "electron:dev": "NODE_ENV=development electron electron/main.js",

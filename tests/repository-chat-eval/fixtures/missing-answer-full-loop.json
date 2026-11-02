@@ -1,0 +1,22 @@
+{
+  "repo": "example/package-only",
+  "sha": "2222222222222222222222222222222222222222",
+  "question": "Does this project ship a Windows ARM64 standalone binary?",
+  "language": "en",
+  "tree": ["README.md"],
+  "files": {
+    "README.md": "# Example\n\n## Overview\n\nA small npm package for formatting terminal messages.\n"
+  },
+  "responses": {
+    "understanding": "{\"standalone_question\":\"Does this project ship a Windows ARM64 standalone binary?\",\"intent\":\"general\",\"explicit_requirements\":[\"Windows ARM64 standalone binary\"],\"initial_targets\":[\"README.md\"],\"target\":\"Windows ARM64 standalone binary\"}",
+    "plan": "{\"rationale\":\"Check the README overview.\",\"targets\":[{\"path\":\"README.md\",\"sections\":[\"Overview\"],\"purpose\":\"Check for a standalone binary\",\"scope\":\"documentation\"}]}",
+    "gate": "{\"sufficient\":true,\"confidence\":0.95,\"reason\":\"The README describes an npm package.\",\"requirements\":[{\"requirement_id\":\"explicit-1\",\"requirement\":\"Windows ARM64 standalone binary\",\"status\":\"verified\",\"evidence\":[\"/README.md - 3-5\"]}],\"next_action\":\"answer\",\"recommended_targets\":[]}",
+    "answer": "No. The project is documented as an npm package and lists no standalone binary. `/README.md - 3-5`"
+  },
+  "expect": {
+    "mustInclude": ["npm package"],
+    "readPaths": ["README.md"],
+    "fastPath": false,
+    "minRounds": 1
+  }
+}

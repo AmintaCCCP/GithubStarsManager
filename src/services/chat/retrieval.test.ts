@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TreeEntry } from './retrieval';
 import {
   collapseCandidateDirectories,
+  detectResearchFocus,
   isCreativeRequest,
   parseQueryUnderstanding,
   parseStandaloneQuestion,
@@ -40,6 +41,19 @@ describe('collapseCandidateDirectories', () => {
   it('keeps groups at or below the threshold untouched and preserves order', () => {
     const paths = ['a.md', 'docs/one.md', 'docs/two.md'];
     expect(collapseCandidateDirectories(paths)).toEqual(paths);
+  });
+});
+
+describe('detectResearchFocus', () => {
+  it('treats project scaffolding questions as usage', () => {
+    expect(detectResearchFocus('How do I create a new Astro project?')).toBe('usage');
+    expect(detectResearchFocus('如何创建一个新项目？')).toBe('usage');
+  });
+
+  it('keeps implementation questions that happen to use “create” out of usage', () => {
+    expect(detectResearchFocus('How do I create a custom store module?')).toBe('implementation');
+    expect(detectResearchFocus('How do I create a plugin in code?')).toBe('implementation');
+    expect(detectResearchFocus('如何创建自定义插件？')).not.toBe('usage');
   });
 });
 

@@ -71,8 +71,8 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
 
     expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
     const bodies = chatBodies();
-    expect(bodies[0].max_tokens).toBe(900);
-    expect(bodies[1].max_tokens).toBe(1800);
+    expect(bodies[0].max_tokens).toBe(4000);
+    expect(bodies[1].max_tokens).toBe(8000);
     const retryMessages = bodies[1].messages as Array<{ role: string; content: string }>;
     expect(retryMessages.at(-1)?.content).toContain('PLAN');
     expect(retryMessages.at(-1)?.content).toContain('直接输出 JSON，不要思考过程');
@@ -88,6 +88,18 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     expect(chatBodies()).toHaveLength(1);
   });
 
+  it('retries when length truncation returns partial non-empty JSON', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(okResponse('{"standalone_question":"How is the', 'length'))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ model: 'IFM/K2-Horizon-375B-A23B' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 800, purpose: 'internal-json' });
+
+    expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
+    expect(chatBodies().map((body) => body.max_tokens)).toEqual([4000, 8000]);
+  });
+
   it('falls back to a plain request when the doubled length retry returns 400', async () => {
     (window.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(okResponse('', 'length'))
@@ -101,7 +113,7 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     const bodies = chatBodies();
     expect(bodies).toHaveLength(3);
     expect(bodies[2].response_format).toBeUndefined();
-    expect(bodies[2].max_tokens).toBe(900);
+    expect(bodies[2].max_tokens).toBe(4000);
   });
 
   it('sends reasoning effort none only for models that accept it', async () => {

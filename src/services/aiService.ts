@@ -1227,9 +1227,11 @@ ${options.user}` : options.user;
   }): Promise<AIChatTextResult> {
     const purpose = options.purpose ?? 'answer';
     const isInternalJson = purpose === 'internal-json';
-    const reasoningModelFloor = isInternalJson
-      && (this.config.reasoningEffort || /(?:r1|reason|think|glm-|qwen3|o\d|gpt-5|deepseek)/i.test(this.config.model));
-    const baseMaxTokens = reasoningModelFloor ? Math.max(options.maxTokens ?? 4_000, 4_000) : options.maxTokens ?? 4_000;
+    // 内部 JSON 步骤对推理模型常常先输出很长的思考再给 JSON；800 级别的上限
+    // 会在 JSON 中途截断（无法解析即等于整步失败），所以统一按 4000 兜底。
+    const baseMaxTokens = isInternalJson
+      ? Math.max(options.maxTokens ?? 4_000, 4_000)
+      : options.maxTokens ?? 4_000;
     try {
       const result = await this.requestTextResult({
         system: options.system,
@@ -1239,12 +1241,14 @@ ${options.user}` : options.user;
         signal: options.signal,
         purpose,
       });
-      if (isInternalJson && result.finishReason === 'length' && !result.text) {
+      // finishReason=length 表示输出被截断：即使有正文，JSON 也大概率不完整，
+      // 同样重试一次（内部步骤的截断正文没有可用价值）。
+      if (isInternalJson && result.finishReason === 'length') {
         return await this.requestTextResult({
           system: options.system,
           user: `${options.user}\n\n直接输出 JSON，不要思考过程。`,
           temperature: options.temperature ?? 0.2,
-          maxTokens: baseMaxTokens * 2,
+          maxTokens: Math.max(baseMaxTokens * 2, 4_000),
           signal: options.signal,
           purpose,
         });

@@ -20,7 +20,7 @@ export const isCreativeRequest = (question: string): boolean => /(?:公众号(?:
  */
 const createId = (prefix: string): string => createSecureId(prefix);
 
-type ResearchFocus = 'deployment' | 'usage' | 'architecture' | 'implementation' | 'creative' | 'general';
+type ResearchFocus = 'deployment' | 'usage' | 'architecture' | 'implementation' | 'troubleshooting' | 'creative' | 'general';
 export type TreeEntry = { path: string; type?: string };
 const contentHash = (content: string): string => {
   let hash = 2166136261;
@@ -67,13 +67,19 @@ const queryTerms = (question: string): string[] => {
 export const detectResearchFocus = (question: string): ResearchFocus => {
   const normalized = question.toLowerCase();
   if (isCreativeRequest(question)) return 'creative';
-  if (/(?:部署|发布|上线|生产|容器|docker|deploy|deployment|hosting|production|release|vercel|netlify|railway|render|cloudflare|fly(?:\.io)?|secrets?)/i.test(normalized)) return 'deployment';
+  // `render` 只在明确的托管商语境（render.com）算部署，避免把 “render the spinner” 误判为部署问题。
+  if (/(?:部署|发布|上线|生产|容器|docker|deploy|deployment|hosting|production|release|vercel|netlify|railway|render\.com|cloudflare|fly(?:\.io)?|secrets?)/i.test(normalized)) return 'deployment';
+  // 故障排查问题不能走 README 快速路径：答案往往需要源码/Issue，README 里的
+  // “未找到”会掩盖真正原因。
+  if (/(?:报错|错误|失败|无法|不生效|异常|崩溃|troubleshoot|not\s+working|doesn'?t\s+work|why\s+(?:does|is|do|are)\b[^?\n]*\b(?:not|fail|wrong|broken)|error|exception|crash)/i.test(normalized)) return 'troubleshooting';
   // Architecture requests often ask that each fact “uses” a source. Classify their
   // architecture/data-flow intent before the generic Chinese usage keyword so the
   // agent reads design docs and entrypoints rather than install or uninstall guides.
   if (/(?:架构|系统图|数据流|流程|组件|architecture|diagram|data[\s-]?flow|system|component)/i.test(normalized)) return 'architecture';
-  if (/(?:怎么用|使用|安装|开始|教程|运行|启动|usage|install|quickstart|get(?:ting)? started|run)/i.test(normalized)) return 'usage';
-  if (/(?:实现|代码|函数|模块|接口|how does|where is|implementation|code|function|module|api)/i.test(normalized)) return 'implementation';
+  // “create a new project / 创建项目”与安装同属上手路径；中英文都只匹配
+  // project/app，避免把 “create a store / 创建自定义插件” 误判为 usage。
+  if (/(?:怎么用|使用|安装|开始|教程|运行|启动|usage|install|quickstart|get(?:ting)? started|run|(?:create|start|scaffold|initialize|init)\s+(?:a\s+)?(?:new\s+)?(?:\w+\s+)?(?:project|app|application)|(?:创建|新建)[^，。？?\n]{0,12}(?:项目|应用|app))/i.test(normalized)) return 'usage';
+  if (/(?:实现|代码|函数|模块|接口|内部|原理|源码|how does|where is|implement(?:ed|s|ation)?|internals?|under the hood|code|function|module|api)/i.test(normalized)) return 'implementation';
   return 'general';
 };
 
@@ -82,6 +88,7 @@ const focusTerms = (focus: ResearchFocus): string[] => ({
   usage: ['install', 'usage', 'quickstart', 'getting started', 'run', 'start', '使用', '安装', '运行', '开始'],
   architecture: ['architecture', 'system', 'component', 'design', '架构', '系统', '组件', '设计'],
   implementation: ['implementation', 'api', 'config', 'service', '实现', '接口', '配置', '服务'],
+  troubleshooting: ['error', 'issue', 'troubleshoot', 'debug', '报错', '错误', '排查'],
   creative: ['overview', 'architecture', 'feature', 'capability', 'guide', 'readme', '介绍', '架构', '功能', '能力'],
   general: [],
 }[focus]);
@@ -105,6 +112,13 @@ const scorePath = (path: string, terms: string[], focus: ResearchFocus): number 
   const architectureScore = focus === 'architecture'
     ? (/(?:^|\/)(?:docs?|design)\/.*(?:architecture|design|system|overview)/i.test(path) ? 18 : 0)
     : 0;
+  // 实现/排查类问题往往落在 index.js、lib/*.js 这类路径名不含问题词的入口文件上，
+  // 只按关键词打分会让 code 候选为空、规划器只能反复读文档。
+  const codeEntryScore = focus === 'implementation' || focus === 'troubleshooting'
+    ? (/(?:^|\/)(?:index|main|app|cli)\.[cm]?[jt]sx?$/i.test(normalized) ? 18 : 0)
+      + (/^(?:src|lib|server|packages|bin|scripts)\/.*\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(normalized) ? 8 : 0)
+      + (/\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(normalized) ? 3 : 0)
+    : 0;
   const creativeScore = focus === 'creative'
     ? (/(?:^|\/)(?:docs?|guides?|examples?)\/.*(?:architecture|overview|feature|capabilit|guide|intro|a2a|routing)/i.test(path) ? 22 : 0)
       + (README_CANDIDATE.test(path) ? 10 : 0)
@@ -112,7 +126,7 @@ const scorePath = (path: string, terms: string[], focus: ResearchFocus): number 
   // Prefer canonical repository documentation over translated mirrors while keeping
   // mirrors available when they are the only relevant files.
   const translatedMirrorPenalty = /(?:^|\/)i18n\//i.test(normalized) ? -45 : 0;
-  return keywordScore + focusScore + readmeScore + rootReadmeScore + sourceScore + documentationScore + deploymentScore + usageScore + architectureScore + creativeScore + translatedMirrorPenalty;
+  return keywordScore + focusScore + readmeScore + rootReadmeScore + sourceScore + documentationScore + deploymentScore + usageScore + architectureScore + codeEntryScore + creativeScore + translatedMirrorPenalty;
 };
 
 export const isFileEntry = (entry: TreeEntry) => entry.type === 'blob' || entry.type === 'file' || (!entry.type && entry.path.includes('.'));
@@ -292,8 +306,11 @@ export type CachedDocument = {
   linkedDocumentationPaths: string[];
 };
 
-export const isRepositoryCodePath = (path: string): boolean => /^(?:src|app|server|packages|lib)\/.+\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(path)
-  && !LOW_SIGNAL_TEST_PATH.test(path);
+export const isRepositoryCodePath = (path: string): boolean => (
+  // 根目录源码文件（如 `index.js`）也是实现问题的关键入口，不能只认子目录。
+  /^(?:src|app|server|packages|lib|bin|scripts)\/.+\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(path)
+  || /^[^/]+\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(path)
+) && !LOW_SIGNAL_TEST_PATH.test(path);
 
 const isDocumentationFirstPath = (path: string): boolean => README_CANDIDATE.test(path)
   || MARKDOWN_EVIDENCE_PATH.test(path)
@@ -475,7 +492,12 @@ export const sectionSegments = (
   const selected = document.headings.filter((heading) => {
     if (normalizedRequested.length === 0) return false;
     const title = collapseHeadingText(heading.title);
-    return normalizedRequested.some((requested) => title === requested || title.includes(requested) || requested.includes(title));
+    return normalizedRequested.some((requested) => (
+      title === requested
+      || title.includes(requested)
+      // 短标题（如 H1 `# ora`）不应因为恰好是某个长标题的子串而选中整篇文档。
+      || (title.length >= 4 && requested.includes(title))
+    ));
   });
   const unique = Array.from(new Map(selected.map((heading) => [heading.lineStart, heading])).values());
   // 默认按文档顺序保留前 6 段；调用方提供 rankByTitle 时返回全量按得分
