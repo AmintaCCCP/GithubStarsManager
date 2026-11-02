@@ -236,4 +236,10 @@ describe('postprocessCitationLayout', () => {
 
     expect(result).toBe('Runs on TTYs and shipped in `/release.md - 1-24`.');
   });
+
+  it('keeps empty parentheses that are part of inline code', () => {
+    const result = postprocessCitationLayout('Call `initialize()` before use ().');
+
+    expect(result).toBe('Call `initialize()` before use.');
+  });
 });

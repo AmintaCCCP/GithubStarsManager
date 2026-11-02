@@ -78,7 +78,10 @@ export const detectResearchFocus = (question: string): ResearchFocus => {
   if (/(?:架构|系统图|数据流|流程|组件|architecture|diagram|data[\s-]?flow|system|component)/i.test(normalized)) return 'architecture';
   // “create a new project / 创建项目”与安装同属上手路径；中英文都只匹配
   // project/app，避免把 “create a store / 创建自定义插件” 误判为 usage。
-  if (/(?:怎么用|使用|安装|开始|教程|运行|启动|usage|install|quickstart|get(?:ting)? started|run|(?:create|start|scaffold|initialize|init)\s+(?:a\s+)?(?:new\s+)?(?:\w+\s+)?(?:project|app|application)|(?:创建|新建)[^，。？?\n]{0,12}(?:项目|应用|app))/i.test(normalized)) return 'usage';
+  // 同时问“内部实现”时是代码问题（如 “How does the create a new project API
+  // work internally?”），不能走只读根 README 的快速路径。
+  const implementationSignal = /(?:内部|原理|源码|实现|internally|under the hood|how does[^?\n]*\bwork\b)/i;
+  if (!implementationSignal.test(normalized) && /(?:怎么用|使用|安装|开始|教程|运行|启动|usage|install|quickstart|get(?:ting)? started|run|(?:create|start|scaffold|initialize|init)\s+(?:a\s+)?(?:new\s+)?(?:\w+\s+)?(?:project|app|application)|(?:创建|新建)[^，。？?\n]{0,12}(?:项目|应用|app))/i.test(normalized)) return 'usage';
   if (/(?:实现|代码|函数|模块|接口|内部|原理|源码|how does|where is|implement(?:ed|s|ation)?|internals?|under the hood|code|function|module|api)/i.test(normalized)) return 'implementation';
   return 'general';
 };
@@ -113,9 +116,11 @@ const scorePath = (path: string, terms: string[], focus: ResearchFocus): number 
     ? (/(?:^|\/)(?:docs?|design)\/.*(?:architecture|design|system|overview)/i.test(path) ? 18 : 0)
     : 0;
   // 实现/排查类问题往往落在 index.js、lib/*.js 这类路径名不含问题词的入口文件上，
-  // 只按关键词打分会让 code 候选为空、规划器只能反复读文档。
+  // 只按关键词打分会让 code 候选为空、规划器只能反复读文档。入口加分只在路径
+  // 本身没命中问题词时生效且幅度很小：monorepo 里 packages/*/src/index.ts 很多，
+  // 高分入口会把真正相关的文件挤出 codeCandidates 的 50/40 条截断之外。
   const codeEntryScore = focus === 'implementation' || focus === 'troubleshooting'
-    ? (/(?:^|\/)(?:index|main|app|cli)\.[cm]?[jt]sx?$/i.test(normalized) ? 18 : 0)
+    ? (keywordScore + focusScore === 0 && /(?:^|\/)(?:index|main|app|cli)\.[cm]?[jt]sx?$/i.test(normalized) ? 4 : 0)
       + (/^(?:src|lib|server|packages|bin|scripts)\/.*\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(normalized) ? 8 : 0)
       + (/\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|rb|php|cs)$/i.test(normalized) ? 3 : 0)
     : 0;
@@ -497,6 +502,8 @@ export const sectionSegments = (
       || title.includes(requested)
       // 短标题（如 H1 `# ora`）不应因为恰好是某个长标题的子串而选中整篇文档。
       || (title.length >= 4 && requested.includes(title))
+      // 短标题仍应能匹配请求里的独立词：请求 “API reference” 时要选中 `## API`。
+      || (title.length >= 2 && requested.split(' ').includes(title))
     ));
   });
   const unique = Array.from(new Map(selected.map((heading) => [heading.lineStart, heading])).values());

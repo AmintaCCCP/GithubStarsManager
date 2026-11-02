@@ -93,6 +93,20 @@ describe('selectFastPathSegments', () => {
     expect(segments[0].excerpt).toContain('docker run');
   });
 
+  it('does not let an H1 project name suppress the docker fallback', () => {
+    const document = documentFrom([
+      '# Open WebUI',
+      'Open WebUI is a self-hosted web interface.',
+      '',
+      '## Quick Start',
+      'docker run -p 3000:8080 ghcr.io/open-webui/open-webui:main',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I run Open WebUI with Docker?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Quick Start']);
+    expect(segments[0].excerpt).toContain('docker run');
+  });
+
   it('does not borrow quick-start headings for deployment questions without a container hint', () => {
     const document = documentFrom([
       '# n8n',

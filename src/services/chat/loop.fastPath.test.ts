@@ -260,6 +260,25 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false });
   });
 
+  it('falls back to the full loop when the “not found” note has no blockquote prefix', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
+    let answerCalls = 0;
+    respondByPrompt({
+      answer: () => {
+        answerCalls += 1;
+        return answerCalls <= 2 ? 'Not found in the files read: install steps' : CITED_ANSWER;
+      },
+    });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(result.content).toContain('npx example install');
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false });
+  });
+
   it('runs the full loop when the setting is disabled', async () => {
     configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
     const answerCalls = respondByPrompt({});
@@ -726,6 +745,7 @@ describe('synthesizeVerifiedAnswer answer intent', () => {
     expect(callModelWithRetry.mock.calls[1]?.[6]).toContain('PREVIOUS OUTPUT');
     expect(callModelWithRetry.mock.calls[1]?.[12]).toBe('internal-json');
     expect(content).toContain('Version 2 is documented.');
+    expect(content).toContain('Version 1 is documented.');
     expect(content).not.toContain('Unverified or missing information');
   });
 

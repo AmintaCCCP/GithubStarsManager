@@ -21,6 +21,9 @@ import { runEvalCase, toMarkdownReport, type EvalResult } from './harness';
 const enabled = process.env.REPO_CHAT_EVAL_LIVE === '1';
 const filter = (process.env.EVAL_CASES ?? '').split(',').map((value) => value.trim()).filter(Boolean);
 const cases = filter.length > 0 ? EVAL_CASES.filter((evalCase) => filter.includes(evalCase.id)) : EVAL_CASES;
+if (enabled && filter.length > 0 && cases.length === 0) {
+  throw new Error(`EVAL_CASES 没有匹配任何用例：${filter.join(', ')}`);
+}
 const reportPath = process.env.EVAL_REPORT_PATH
   ?? resolve(process.cwd(), `tests/repository-chat-eval/reports/live-${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
 

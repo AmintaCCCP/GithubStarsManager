@@ -273,7 +273,8 @@ export const postprocessCitationLayout = (markdown: string): string => {
     '$1-$2`',
   ));
   // 被校验器移除的无效来源会留下空括号（`... on TTYs ()`），清掉这段残留。
-  const withoutEmptyParens = mapOutsideFences(repairedRanges, (line) => line.replace(/[ \t]*\(\s*\)/g, ''));
+  // 行内代码里的空括号是调用语法（`initialize()`），必须原样保留。
+  const withoutEmptyParens = mapOutsideFences(repairedRanges, (line) => line.replace(/(`[^`\n]+`)|[ \t]*\(\s*\)/g, (_match, code: string | undefined) => code ?? ''));
   return dedupeParagraphCitations(withoutEmptyParens)
     .replace(/^\n+|\n+$/g, '');
 };

@@ -146,7 +146,9 @@ export const runEvalTurn = async (
 
 const CITATION = /`(\/[^`\n]+? - \d+(?:\s*-\s*\d+)?)`/g;
 // 区间分隔符必须是独立的 " - "，否则 ADR-20260828-obtain… 这类路径会被误判。
-const MALFORMED_CITATION = /`\/[^`\n]*\s+-\s*\d+\s*-\s*[^\d\s`][^`\n]*`/g;
+// 第二条备选规则抓结束行号后直接跟字母的引用（`/README.md - 1-24abc`），它既
+// 不被 CITATION 认成有效引用，也不会被第一条规则标记为错误。
+const MALFORMED_CITATION = /`\/[^`\n]*\s+-\s*\d+\s*-\s*[^\d\s`][^`\n]*`|`\/[^`\n]+? - \d+(?:\s*-\s*\d+)?[^\d\s`-][^`\n]*`/g;
 
 export const citationTokens = (content: string): string[] => Array.from(content.matchAll(CITATION), (match) => match[1]);
 
@@ -167,8 +169,11 @@ const evaluateAnswer = (evalCase: EvalCase, answer: string): string[] => {
   for (const keyword of evalCase.mustInclude ?? []) {
     if (!answer.toLowerCase().includes(keyword.toLowerCase())) failures.push(`missing "${keyword}"`);
   }
+  // 行内代码是调用语法（`start()`），不是被清理掉的空引用括号；禁用词只在正文里
+  // 匹配，代码片段替换成占位符（直接删掉会让 `(code)` 变成假的空括号）。
+  const prose = answer.replace(/`[^`\n]*`/g, 'CODE');
   for (const pattern of evalCase.mustNotMatch ?? []) {
-    if (new RegExp(pattern, 'i').test(answer)) failures.push(`unexpected /${pattern}/`);
+    if (new RegExp(pattern, 'i').test(prose)) failures.push(`unexpected /${pattern}/`);
   }
   if (evalCase.maxChars && answer.length > evalCase.maxChars) {
     failures.push(`answer too long: ${answer.length} > ${evalCase.maxChars}`);

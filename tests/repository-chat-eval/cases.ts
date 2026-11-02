@@ -138,7 +138,7 @@ export const EVAL_CASES: EvalCase[] = [
     mustInclude: ['npm create astro'],
     maxChars: 1_400,
     maxCitationRepeats: 3,
-    followUps: [{ question: 'What about installing Astro manually?', mustInclude: ['npm install astro'] }],
+    followUps: [{ question: 'How do I install Astro manually?', mustInclude: ['npm install astro'] }],
   },
   {
     id: 'overview-zustand',

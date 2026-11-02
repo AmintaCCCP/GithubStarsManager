@@ -168,7 +168,9 @@ const metricsOf = (events: RepositoryChatToolEvent[]) => {
 describe('repository chat fixture eval', () => {
   it('does not treat hyphenated paths as malformed citation ranges', () => {
     expect(malformedCitations('See `/packages/engine/ADR-20260828-obtain-output.md - 1-68`.')).toEqual([]);
+    expect(malformedCitations('See `/a.md - 1-24` and `/README.md - 1` .')).toEqual([]);
     expect(malformedCitations('See `/README.md - 1-以24`.')).toHaveLength(1);
+    expect(malformedCitations('See `/README.md - 1-24abc`.')).toHaveLength(1);
   });
 
   beforeEach(() => {

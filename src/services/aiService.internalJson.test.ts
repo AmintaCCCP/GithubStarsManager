@@ -71,8 +71,8 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
 
     expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
     const bodies = chatBodies();
-    expect(bodies[0].max_tokens).toBe(4000);
-    expect(bodies[1].max_tokens).toBe(8000);
+    expect(bodies[0].max_tokens).toBe(900);
+    expect(bodies[1].max_tokens).toBe(4000);
     const retryMessages = bodies[1].messages as Array<{ role: string; content: string }>;
     expect(retryMessages.at(-1)?.content).toContain('PLAN');
     expect(retryMessages.at(-1)?.content).toContain('直接输出 JSON，不要思考过程');
@@ -97,7 +97,30 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 800, purpose: 'internal-json' });
 
     expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
-    expect(chatBodies().map((body) => body.max_tokens)).toEqual([4000, 8000]);
+    expect(chatBodies().map((body) => body.max_tokens)).toEqual([800, 4000]);
+  });
+
+  it('keeps a complete JSON result that was reported as length-truncated', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(okResponse('{"standalone_question":"How is it built?"}', 'length'));
+    const service = new AIService(makeConfig()) as unknown as AIService;
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 800, purpose: 'internal-json' });
+
+    expect(result).toEqual({ text: '{"standalone_question":"How is it built?"}', finishReason: 'length' });
+    expect(chatBodies()).toHaveLength(1);
+  });
+
+  it('retries with the caller max tokens when the reasoning floor is rejected with 400', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'max_tokens must be <= 800' } }), { status: 400 }))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ model: 'deepseek-r1' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'u', maxTokens: 800, purpose: 'internal-json' });
+
+    expect(result.text).toBe('{"ok":true}');
+    expect(chatBodies().map((body) => body.max_tokens)).toEqual([4000, 800]);
   });
 
   it('falls back to a plain request when the doubled length retry returns 400', async () => {
@@ -113,7 +136,7 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     const bodies = chatBodies();
     expect(bodies).toHaveLength(3);
     expect(bodies[2].response_format).toBeUndefined();
-    expect(bodies[2].max_tokens).toBe(4000);
+    expect(bodies[2].max_tokens).toBe(900);
   });
 
   it('sends reasoning effort none only for models that accept it', async () => {
