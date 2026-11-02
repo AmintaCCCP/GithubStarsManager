@@ -518,6 +518,8 @@ export const synthesizeVerifiedAnswer = async (
   let finalContent = validAnswer(answerRaw);
   // 校验把未核验段落降级到“未证实”小节时，最多做两次只补引用的修复（不新增
   // 事实、不重新检索）。修复成功则返回干净回答；仍不干净时丢弃该小节（见下）。
+  // shortcut: 修复结果沿用“引用存在 + 覆盖率”核验，不判定引用范围是否语义支持
+  // 该句（与首次回答一致）；若需要语义级保证，改为逐句用模型判定支持关系。
   const unverifiedHeading = makeT(input.language, 'chat')('repositoryChatService.unverified-heading');
   if (finalContent?.includes(unverifiedHeading)) {
     for (let repairAttempt = 0; repairAttempt < 2 && finalContent?.includes(unverifiedHeading); repairAttempt += 1) {
