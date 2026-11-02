@@ -306,7 +306,7 @@ jobs:
         timeout 10s xvfb-run -a npm run electron || echo "App test completed (timeout expected)"
 
     - name: Upload artifacts (Windows)
-      if: matrix.os == 'windows-latest' && github.ref_type == 'tag' && success()
+      if: matrix.os == 'windows-latest' && success()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: windows-app
@@ -317,7 +317,7 @@ jobs:
         retention-days: 31
 
     - name: Upload artifacts (macOS)
-      if: matrix.os == 'macos-latest' && github.ref_type == 'tag' && success()
+      if: matrix.os == 'macos-latest' && success()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: macos-app
@@ -326,7 +326,7 @@ jobs:
         retention-days: 31
 
     - name: Upload artifacts (Linux)
-      if: startsWith(matrix.os, 'ubuntu') && github.ref_type == 'tag' && success()
+      if: startsWith(matrix.os, 'ubuntu') && success()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: linux-app
@@ -336,6 +336,10 @@ jobs:
 
   release:
     needs: [scope, web, build]
+    # workflow_dispatch is how a release is re-cut by hand. Push events stay
+    # tag-only: after the tag run publishes, the next main merge used to
+    # re-run this job and softprops replaced the published release, wiping
+    # its installers.
     # Pinned: `ubuntu-latest` migrates to Ubuntu 26.04 between 2026-10-19 and
     # 2026-11-19 (actions/runner-images#14748).
     runs-on: ubuntu-24.04
@@ -358,7 +362,7 @@ jobs:
     # sets neither `body` nor `generate_release_notes` so it never overwrites
     # the hand-written notes (softprops' default update path replaces an
     # existing release's body whenever a workflow `body` is present).
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.scope.result == 'success' && needs.web.result == 'success'
+    if: always() && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && needs.scope.result == 'success' && needs.web.result == 'success'
     permissions:
       contents: write
       actions: read
