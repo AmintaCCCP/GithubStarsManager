@@ -404,6 +404,19 @@ export class WebDAVService {
   }
 
   /**
+   * 配置 URL 自带的路径前缀（如 https://host/dav/alice 的 /dav/alice）。
+   * 多状态体里的 href 是服务器侧完整路径，比对目标时必须拼上它，
+   * 否则带前缀的 URL 永远匹配不到目标条目，只能靠"找不到→放行"兜底。
+   */
+  private getUrlPathPrefix(): string {
+    try {
+      return new URL(this.config.url).pathname.replace(/\/+$/, '');
+    } catch {
+      return ''; // 非法 URL 按无前缀处理
+    }
+  }
+
+  /**
    * RFC 4918：207 Multi-Status 的外层成功不代表目标资源本身成功——响应体可为
    * 目标 href 携带资源级失败状态（如 404）。解析多状态体并检查目标路径对应的
    * response 条目：无资源级 status（仅属性级 propstat 状态，个别属性 404 属
@@ -418,7 +431,7 @@ export class WebDAVService {
       const responses = Array.from(doc.getElementsByTagName('*')).filter((el) => el.localName === 'response');
       if (responses.length === 0) return true;
 
-      const normalizedTarget = `/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
+      const normalizedTarget = `${this.getUrlPathPrefix()}/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
       const match = responses.find((el) => {
         const hrefEl = Array.from(el.children).find((child) => child.localName === 'href');
         if (!hrefEl) return false;
@@ -446,20 +459,20 @@ export class WebDAVService {
   }
 
   /**
-   * 带客户端超时的目录探测请求。浏览器直连的 davFetch 只消费 signal 不消费
-   * timeoutMs，探测若不带 signal，服务器停滞时 uploadFile 会一直挂起。
+   * 带客户端超时的 MKCOL 请求。浏览器直连的 davFetch 只消费 signal 不消费
+   * timeoutMs，不带 signal 时服务器停滞会让 ensureDirectoryExists 一直挂起。
+   * （PROPFIND 探测在 directoryExists 中自带覆盖响应体读取的超时。）
    */
   private async probeDav(
-    method: 'MKCOL' | 'PROPFIND',
+    method: 'MKCOL',
     path: string,
-    extraHeaders: Record<string, string>,
     timeoutMs: number = 15000,
   ): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await this.davFetch(method, path, {
-        headers: { 'Authorization': this.getAuthHeader(), ...extraHeaders },
+        headers: { 'Authorization': this.getAuthHeader() },
         signal: controller.signal,
         timeoutMs,
       });
@@ -475,17 +488,30 @@ export class WebDAVService {
    * 被拒或网络异常时返回 null（无法判定），调用方应保持旧行为不误伤。
    */
   private async directoryExists(path: string): Promise<boolean | null> {
+    // 超时必须覆盖到响应体读取：fetch 的计时器只到响应头，207 响应体停滞时
+    // response.text() 同样会挂起；中止信号能让挂起的 body 读取一并结束
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await this.probeDav('PROPFIND', path, { 'Depth': '0' });
+      const res = await this.davFetch('PROPFIND', path, {
+        headers: { 'Authorization': this.getAuthHeader(), 'Depth': '0' },
+        signal: controller.signal,
+        timeoutMs: 15000,
+      });
       if (res.status === 207) {
-        // 207 外层成功不代表目标集合存在：多状态体可能为目标 href 携带资源级 404
-        return await this.multistatusTargetSucceeded(res, path);
+        // 207 外层成功不代表目标集合存在：多状态体可能为目标 href 携带资源级 404。
+        // multistatusTargetSucceeded 对读取/解析失败统一放行 true，若系超时中止
+        // 所致应按"无法判定"处理，不能当成存在
+        const succeeded = await this.multistatusTargetSucceeded(res, path);
+        return controller.signal.aborted ? null : succeeded;
       }
       if (res.ok) return true;
       if (res.status === 404) return false;
       return null;
     } catch {
       return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -612,7 +638,7 @@ export class WebDAVService {
       for (const seg of segments) {
         currentPath += `/${seg}`;
         try {
-          const res = await this.probeDav('MKCOL', currentPath, {});
+          const res = await this.probeDav('MKCOL', currentPath);
 
           // 201 Created（新建）视为成功
           if (res.ok) continue;

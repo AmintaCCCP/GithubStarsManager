@@ -502,6 +502,49 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
       vi.useRealTimers();
     }
   });
+
+  it('207 响应体停滞时超时同样生效，不会永久挂起上传', async () => {
+    // probeDav 的计时器只覆盖到响应头；text() 读取也要受同一 abort 约束
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      vi.mocked(window.fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+        .mockImplementationOnce((_input, init) => {
+          // 207 响应头立刻返回，但 body 永不到来，仅响应 abort
+          const stalled = {
+            status: 207,
+            ok: true,
+            text: () => new Promise<string>((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+            }),
+          } as unknown as Response;
+          return Promise.resolve(stalled);
+        })
+        .mockResolvedValueOnce(new Response(null, { status: 201 })); // PUT → 成功
+
+      const promise = davService().uploadFile('a.json', '{}');
+      await vi.advanceTimersByTimeAsync(15001);
+      // 响应体读取超时按"无法判定"处理（不误判为存在），上传继续
+      await expect(promise).resolves.toBe(true);
+      expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('带路径前缀的 WebDAV URL 也能匹配多状态体 href（前缀 + 目标路径）', async () => {
+    // href 是服务器侧完整路径 /dav/alice/backup：只拿 /backup 比对会匹配失败
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav/alice/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))   // PROPFIND → 目标条目 404
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/alice' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
 });
 
 describe('WebDAVService 连接测试探测顺序', () => {
