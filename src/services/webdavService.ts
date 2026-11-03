@@ -89,8 +89,8 @@ export class WebDAVService {
   private getCustomUserAgentHeader(): Record<string, string> {
     const userAgent = this.config.customUserAgent?.trim();
     // 含控制字符的头会被 undici/Chromium 拒绝（备份导入等旁路可能绕过表单校验），退回默认 UA 而不是让请求失败
-    // eslint-disable-next-line no-control-regex -- 有意匹配 C0 控制字符与 DEL
-    return userAgent && !/[\u0000-\u001f\u007f]/.test(userAgent) ? { 'User-Agent': userAgent } : {};
+    // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位（undici/Chromium 均拒绝）
+    return userAgent && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(userAgent) ? { 'User-Agent': userAgent } : {};
   }
 
   private getFullPath(filename: string): string {
@@ -819,9 +819,9 @@ export class WebDAVService {
       errors.push('路径必须以 / 开头');
     }
 
-    // eslint-disable-next-line no-control-regex -- 有意匹配 C0 控制字符与 DEL
-    if (config.customUserAgent && /[\u0000-\u001f\u007f]/.test(config.customUserAgent)) {
-      errors.push('自定义 User-Agent 不能包含换行符或控制字符');
+    // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位（undici/Chromium 均拒绝）
+    if (config.customUserAgent && /[^\u0020-\u007e\u00a0-\u00ff]/.test(config.customUserAgent)) {
+      errors.push('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
     }
 
     return errors;

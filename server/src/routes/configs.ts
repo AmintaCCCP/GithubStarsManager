@@ -9,10 +9,10 @@ const router = Router();
 
 type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
 
-// 含控制字符的 User-Agent 会被 undici 拒绝、被 Electron 丢弃，直接拒绝存储
+// 控制字符或 Latin-1 以外的码位会被 undici 拒绝，直接拒绝存储
 function sanitizeUserAgent(value: unknown): string | null {
-  // eslint-disable-next-line no-control-regex -- 有意匹配 C0 控制字符与 DEL
-  return typeof value === 'string' && !/[\u0000-\u001f\u007f]/.test(value) ? value : null;
+  // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位
+  return typeof value === 'string' && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(value) ? value : null;
 }
 
 function getMaskedSecretResult(params: {

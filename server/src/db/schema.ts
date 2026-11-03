@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+export function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!columns.some((col) => col.name === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);

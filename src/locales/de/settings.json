@@ -67,7 +67,7 @@
     "password-is-required": "Passwort ist erforderlich",
     "path-is-required": "Pfad ist erforderlich",
     "path-must-start-with": "Pfad muss mit / beginnen",
-    "custom-user-agent-no-newline": "Benutzerdefinierter User-Agent darf keine Zeilenumbrüche oder Steuerzeichen enthalten",
+    "custom-user-agent-invalid-chars": "Benutzerdefinierter User-Agent darf nur lateinische Zeichen (Latin-1) enthalten",
     "webdav-connection-successful": "WebDAV-Verbindung erfolgreich!",
     "webdav-connection-failed-please-check-configurat": "WebDAV-Verbindung fehlgeschlagen, bitte überprüfen Sie die Konfiguration.",
     "webdav-test-failed": "Der WebDAV-Test ist fehlgeschlagen"

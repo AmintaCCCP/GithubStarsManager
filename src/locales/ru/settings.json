@@ -67,7 +67,7 @@
     "password-is-required": "Требуется пароль",
     "path-is-required": "требуется путь",
     "path-must-start-with": "Путь должен начинаться с /",
-    "custom-user-agent-no-newline": "Пользовательский User-Agent не должен содержать переводы строк или управляющие символы",
+    "custom-user-agent-invalid-chars": "Пользовательский User-Agent может содержать только латинские символы (Latin-1)",
     "webdav-connection-successful": "Соединение WebDAV успешно!",
     "webdav-connection-failed-please-check-configurat": "Не удалось подключиться к WebDAV. Проверьте конфигурацию.",
     "webdav-test-failed": "Тест WebDAV не пройден"

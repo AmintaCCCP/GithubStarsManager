@@ -36,7 +36,7 @@ export const useWebDAVActions = (): WebDAVActions => {
         if (error === '密码是必需的') return t('useWebDAVActions.password-is-required');
         if (error === '路径是必需的') return t('useWebDAVActions.path-is-required');
         if (error === '路径必须以 / 开头') return t('useWebDAVActions.path-must-start-with');
-        if (error === '自定义 User-Agent 不能包含换行符或控制字符') return t('useWebDAVActions.custom-user-agent-no-newline');
+        if (error === '自定义 User-Agent 只能包含拉丁字符（Latin-1）') return t('useWebDAVActions.custom-user-agent-invalid-chars');
         return error;
       });
       toast(translated.join('\n'), 'error');
