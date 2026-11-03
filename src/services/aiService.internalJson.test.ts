@@ -88,6 +88,41 @@ describe('AIService.generateChatTextDetailed (internal JSON steps)', () => {
     expect(chatBodies()).toHaveLength(1);
   });
 
+  it('retries when length truncation returns partial non-empty JSON', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(okResponse('{"standalone_question":"How is the', 'length'))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ model: 'IFM/K2-Horizon-375B-A23B' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 800, purpose: 'internal-json' });
+
+    expect(result).toEqual({ text: '{"ok":true}', finishReason: 'stop' });
+    expect(chatBodies().map((body) => body.max_tokens)).toEqual([800, 1600]);
+  });
+
+  it('keeps a complete JSON result that was reported as length-truncated', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(okResponse('{"standalone_question":"How is it built?"}', 'length'));
+    const service = new AIService(makeConfig()) as unknown as AIService;
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'PLAN', maxTokens: 800, purpose: 'internal-json' });
+
+    expect(result).toEqual({ text: '{"standalone_question":"How is it built?"}', finishReason: 'length' });
+    expect(chatBodies()).toHaveLength(1);
+  });
+
+  it('retries with the caller max tokens when the reasoning floor is rejected with 400', async () => {
+    (window.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'max_tokens must be <= 800' } }), { status: 400 }))
+      .mockResolvedValueOnce(okResponse('{"ok":true}'));
+    const service = new AIService(makeConfig({ model: 'deepseek-r1' }) as never, 'en');
+
+    const result = await service.generateChatTextDetailed({ system: 's', user: 'u', maxTokens: 800, purpose: 'internal-json' });
+
+    expect(result.text).toBe('{"ok":true}');
+    expect(chatBodies().map((body) => body.max_tokens)).toEqual([4000, 800]);
+  });
+
   it('falls back to a plain request when the doubled length retry returns 400', async () => {
     (window.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(okResponse('', 'length'))

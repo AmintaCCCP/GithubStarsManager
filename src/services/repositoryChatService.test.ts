@@ -744,7 +744,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(result.content).toContain(codeRef);
   });
 
-  it('clearly reports missing repository evidence instead of making up an unsupported capability', async () => {
+  it('falls back to verified sources when every answer paragraph is unverified', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding({ expected_answer: ['Kubernetes automatic deployment'], target: 'Kubernetes automatic deployment' }))
       .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'deployment documentation')))
@@ -759,10 +759,12 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     const result = await runRepositoryChatTurn(turnInput('Does this project support automatic Kubernetes deployment?'));
 
-    expect(result.content).toContain('Automatic Kubernetes deployment was not confirmed');
+    expect(result.content).toContain('Verified sources');
     expect(result.content).toContain(overviewRef);
     expect(result.content).not.toContain('insufficient');
-    expect(mocks.generateChatText).toHaveBeenCalledTimes(4);
+    expect(result.content).not.toContain('Unverified or missing information');
+    // 原回答 + 两次“未核验段落补引用”的修复尝试；仍不干净时回退来源清单。
+    expect(mocks.generateChatText).toHaveBeenCalledTimes(6);
   });
 
   it('repairs invalid synthesis once without re-running retrieval', async () => {
@@ -1054,7 +1056,7 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
     expect(chunks.length).toBeGreaterThan(0);
   });
 
-  it('demotes uncited sections instead of discarding the whole answer', async () => {
+  it('drops uncited sections while keeping the verified content', async () => {
     mocks.generateChatText
       .mockResolvedValueOnce(understanding())
       .mockResolvedValueOnce(plan(target('README.md', ['Overview'], 'project overview')))
@@ -1072,11 +1074,11 @@ describe('runRepositoryChatTurn progressive evidence loop', () => {
 
     const result = await runRepositoryChatTurn(turnInput());
 
-    // 剪枝降级：有引用的小节保留，未引用段落显式移入“未证实”区块而不是丢弃。
+    // 方案 §2.3：不向用户展示“未证实”小节，只保留有引用的小节。
     expect(result.content).toContain('A documented example for repository research.');
     expect(result.content).toContain(overviewRef);
-    expect(result.content).toContain('Version 2.0 is uncited prose without any reference.');
-    expect(result.content).toContain('Unverified or missing information');
+    expect(result.content).not.toContain('Version 2.0 is uncited prose without any reference.');
+    expect(result.content).not.toContain('Unverified or missing information');
     expect(result.content).not.toContain('Verified sources');
     expect(result.content).not.toContain('insufficient');
   });

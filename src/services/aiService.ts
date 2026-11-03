@@ -108,6 +108,18 @@ export function isRateLimitedError(error: unknown): boolean {
 /** 明确表示限流已触发的错误短语；避免把恰好提到 rate_limit 的参数错误误判为限流。 */
 const THROTTLING_MESSAGE_PATTERN = /throttling|rate[\s-]limit (exceeded|reached)|too many requests/i;
 
+/** 内部 JSON 步骤判断首次结果是否已可用：容忍模型套一层 ```json 围栏。 */
+const isParseableJsonObject = (text: string): boolean => {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  if (!cleaned.startsWith('{')) return false;
+  try {
+    const parsed: unknown = JSON.parse(cleaned);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
+};
+
 function extractGatewayErrorFromData(data: unknown): { message: string; status: number } | null {
   if (!data || typeof data !== 'object') return null;
   const err = (data as { error?: unknown }).error;
@@ -1227,6 +1239,10 @@ ${options.user}` : options.user;
   }): Promise<AIChatTextResult> {
     const purpose = options.purpose ?? 'answer';
     const isInternalJson = purpose === 'internal-json';
+    // 内部 JSON 步骤对推理模型常常先输出很长的思考再给 JSON；800 级别的上限
+    // 会在 JSON 中途截断（无法解析即等于整步失败），所以只对推理模型按 4000
+    // 兜底。非推理模型保持调用方的上限——部分 OpenAI 兼容端点会拒绝超过该
+    // 模型输出上限的请求（HTTP 400），无条件抬高会让理解/规划/gate 步骤失败。
     const reasoningModelFloor = isInternalJson
       && (this.config.reasoningEffort || /(?:r1|reason|think|glm-|qwen3|o\d|gpt-5|deepseek)/i.test(this.config.model));
     const baseMaxTokens = reasoningModelFloor ? Math.max(options.maxTokens ?? 4_000, 4_000) : options.maxTokens ?? 4_000;
@@ -1239,12 +1255,17 @@ ${options.user}` : options.user;
         signal: options.signal,
         purpose,
       });
-      if (isInternalJson && result.finishReason === 'length' && !result.text) {
+      // finishReason=length 表示输出被截断。推理模型可能只是尾部思考被截断而
+      // JSON 已完整，此时保留首次结果（重试可能失败或返回更差的内容）；只有
+      // 正文为空或无法解析成 JSON 对象时才重试一次。
+      if (isInternalJson && result.finishReason === 'length' && !isParseableJsonObject(result.text)) {
         return await this.requestTextResult({
           system: options.system,
           user: `${options.user}\n\n直接输出 JSON，不要思考过程。`,
           temperature: options.temperature ?? 0.2,
-          maxTokens: baseMaxTokens * 2,
+          // 非推理模型只翻倍（跳到 4000 会被有输出上限的端点 400 拒绝）；
+          // 推理模型维持 4000 兜底，思考消耗仍可能吃掉翻倍后的配额。
+          maxTokens: reasoningModelFloor ? Math.max(baseMaxTokens * 2, 4_000) : baseMaxTokens * 2,
           signal: options.signal,
           purpose,
         });
@@ -1276,6 +1297,18 @@ ${options.user}` : options.user;
           purpose,
           jsonMode: false,
           omitThinking: true,
+        });
+      }
+      // 端点允许的 max_tokens 低于推理模型的 4000 兜底时也会 400；用调用方原始
+      // 上限重试一次，避免理解/规划/gate 步骤整体失败。
+      if (isInternalJson && status === 400 && options.maxTokens !== undefined && baseMaxTokens > options.maxTokens) {
+        return await this.requestTextResult({
+          system: options.system,
+          user: options.user,
+          temperature: options.temperature ?? 0.2,
+          maxTokens: options.maxTokens,
+          signal: options.signal,
+          purpose,
         });
       }
       throw error;

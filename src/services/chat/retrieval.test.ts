@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { TreeEntry } from './retrieval';
 import {
   collapseCandidateDirectories,
+  detectResearchFocus,
   isCreativeRequest,
+  makeMarkdownHeadings,
   parseQueryUnderstanding,
   parseStandaloneQuestion,
   rankedCandidatePaths,
+  sectionSegments,
 } from './retrieval';
 
 const treeEntry = (path: string): TreeEntry => ({ path, type: 'blob' } as TreeEntry);
@@ -40,6 +43,54 @@ describe('collapseCandidateDirectories', () => {
   it('keeps groups at or below the threshold untouched and preserves order', () => {
     const paths = ['a.md', 'docs/one.md', 'docs/two.md'];
     expect(collapseCandidateDirectories(paths)).toEqual(paths);
+  });
+});
+
+describe('detectResearchFocus', () => {
+  it('treats project scaffolding questions as usage', () => {
+    expect(detectResearchFocus('How do I create a new Astro project?')).toBe('usage');
+    expect(detectResearchFocus('如何创建一个新项目？')).toBe('usage');
+  });
+
+  it('keeps implementation questions that happen to use “create” out of usage', () => {
+    expect(detectResearchFocus('How do I create a custom store module?')).toBe('implementation');
+    expect(detectResearchFocus('How do I create a plugin in code?')).toBe('implementation');
+    expect(detectResearchFocus('如何创建自定义插件？')).not.toBe('usage');
+  });
+
+  it('prefers implementation when a scaffolding question also asks how it works internally', () => {
+    expect(detectResearchFocus('How does the create a new project API work internally?')).toBe('implementation');
+    expect(detectResearchFocus('创建项目时内部是如何实现的？')).toBe('implementation');
+  });
+});
+
+describe('sectionSegments', () => {
+  it('selects a short heading that appears as a standalone word in the request', () => {
+    const content = ['# Docs', '', '## API', 'GET /items', '', '## Reference', 'Full list.'].join('\n');
+    const document = { path: 'docs.md', content, headings: makeMarkdownHeadings(content), linkedDocumentationPaths: [] };
+
+    expect(sectionSegments(document, ['API reference']).map((segment) => segment.label)).toEqual(['API', 'Reference']);
+  });
+
+  it('selects a short heading when the request uses a hyphenated form', () => {
+    const content = ['# Docs', '', '## API', 'GET /items', '', '## Reference', 'Full list.'].join('\n');
+    const document = { path: 'docs.md', content, headings: makeMarkdownHeadings(content), linkedDocumentationPaths: [] };
+
+    expect(sectionSegments(document, ['API-reference']).map((segment) => segment.label)).toEqual(['API', 'Reference']);
+  });
+});
+
+describe('rankedCandidatePaths entry-file bonus', () => {
+  it('keeps a keyword-matched implementation file ahead of generic entry files', () => {
+    const entries = [
+      ...Array.from({ length: 60 }, (_, i) => treeEntry(`packages/pkg-${i}/src/index.ts`)),
+      treeEntry('src/webhook/signature.ts'),
+    ];
+
+    const paths = rankedCandidatePaths(entries, 'Where is the webhook signature verified?', 'implementation');
+    const firstUnmatchedEntry = paths.findIndex((path) => /packages\/pkg-\d+\/src\/index\.ts$/.test(path));
+
+    expect(paths.indexOf('src/webhook/signature.ts')).toBeLessThan(firstUnmatchedEntry);
   });
 });
 

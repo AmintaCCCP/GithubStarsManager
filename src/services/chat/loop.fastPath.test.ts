@@ -238,6 +238,47 @@ describe('runEvidenceDrivenRepositoryChatTurn fast path (§1.1)', () => {
     expect(metrics?.ttftMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('falls back to the full loop when the fast path only reports “not found”', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
+    let answerCalls = 0;
+    respondByPrompt({
+      answer: () => {
+        answerCalls += 1;
+        return answerCalls <= 2 ? '> Not found in the files read: install steps' : CITED_ANSWER;
+      },
+    });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(result.content).toContain('npx example install');
+    expect(mocks.generateChatText.mock.calls.some((call) => (
+      String((call[0] as { system?: string })?.system).includes('Query Understanding')
+    ))).toBe(true);
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false });
+  });
+
+  it('falls back to the full loop when the “not found” note has no blockquote prefix', async () => {
+    configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
+    let answerCalls = 0;
+    respondByPrompt({
+      answer: () => {
+        answerCalls += 1;
+        return answerCalls <= 2 ? 'Not found in the files read: install steps' : CITED_ANSWER;
+      },
+    });
+    const events: ChatToolEventInput[] = [];
+
+    const result = await runEvidenceDrivenRepositoryChatTurn(turnInput('How do I install this project?', {
+      onToolEvent: (event) => events.push(event),
+    }));
+
+    expect(result.content).toContain('npx example install');
+    expect(turnMetricsEvent(events)).toMatchObject({ fastPath: false });
+  });
+
   it('runs the full loop when the setting is disabled', async () => {
     configureTreeAndFiles({ 'README.md': README_WITH_INSTALL, 'docs/other.md': 'plain usage notes without headings' });
     const answerCalls = respondByPrompt({});
@@ -642,7 +683,7 @@ describe('synthesizeVerifiedAnswer answer intent', () => {
     expect(system).not.toContain('Structure: lead with what the project is');
   });
 
-  it('keeps a 70%-covered answer but marks the remaining uncited facts', async () => {
+  it('keeps a 70%-covered answer and drops the unverified tail', async () => {
     const answer = Array.from({ length: 10 }, (_, index) => (
       `Version ${index + 1} is documented.${index < 7 ? ` \`${INSTALL_SECTION_REFERENCE}\`` : ''}`
     )).join('\n\n');
@@ -657,13 +698,14 @@ describe('synthesizeVerifiedAnswer answer intent', () => {
       callModelWithRetry,
     );
 
-    expect(callModelWithRetry).toHaveBeenCalledTimes(1);
+    // 一次原回答 + 两次“未核验段落补引用”的修复尝试；仍不干净时只保留已核验部分。
+    expect(callModelWithRetry).toHaveBeenCalledTimes(3);
     expect(content).toContain('Version 7 is documented.');
-    expect(content).toContain('Unverified or missing information');
-    expect(content).toContain('Version 10 is documented.');
+    expect(content).not.toContain('Unverified or missing information');
+    expect(content).not.toContain('Version 10 is documented.');
   });
 
-  it('marks remaining uncited facts in a 70%-covered creative answer', async () => {
+  it('drops the unverified tail from a 70%-covered creative answer', async () => {
     const answer = Array.from({ length: 10 }, (_, index) => (
       `Version ${index + 1} is documented.${index < 7 ? ` \`${INSTALL_SECTION_REFERENCE}\`` : ''}`
     )).join('\n\n');
@@ -679,8 +721,32 @@ describe('synthesizeVerifiedAnswer answer intent', () => {
     );
 
     expect(content).toContain('Version 7 is documented.');
-    expect(content).toContain('Unverified or missing information');
-    expect(content).toContain('Version 10 is documented.');
+    expect(content).not.toContain('Unverified or missing information');
+    expect(content).not.toContain('Version 10 is documented.');
+  });
+
+  it('repairs a demoted answer by adding the missing exact references', async () => {
+    const demoted = `Version 1 is documented. \`${INSTALL_SECTION_REFERENCE}\`\n\nVersion 2 is documented.`;
+    const repaired = `Version 1 is documented. \`${INSTALL_SECTION_REFERENCE}\`\n\nVersion 2 is documented. \`${INSTALL_SECTION_REFERENCE}\``;
+    const callModelWithRetry = vi.fn()
+      .mockResolvedValueOnce(demoted)
+      .mockResolvedValueOnce(JSON.stringify({ answer: repaired }));
+
+    const content = await synthesizeVerifiedAnswer(
+      {} as never,
+      turnInput('How do I install this project?'),
+      [installEvidence],
+      1,
+      2000,
+      callModelWithRetry,
+    );
+
+    expect(callModelWithRetry).toHaveBeenCalledTimes(2);
+    expect(callModelWithRetry.mock.calls[1]?.[6]).toContain('PREVIOUS OUTPUT');
+    expect(callModelWithRetry.mock.calls[1]?.[12]).toBe('internal-json');
+    expect(content).toContain('Version 2 is documented.');
+    expect(content).toContain('Version 1 is documented.');
+    expect(content).not.toContain('Unverified or missing information');
   });
 
   it('lifts a standalone citation before validating the answer', async () => {

@@ -1,0 +1,20 @@
+{
+  "repo": "example/installable",
+  "sha": "1111111111111111111111111111111111111111",
+  "question": "How do I install this project?",
+  "language": "en",
+  "tree": ["README.md", "src/index.js"],
+  "files": {
+    "README.md": "# Example\n\n## Install\n\nRun `npm install example` to install.\n",
+    "src/index.js": "export const example = true;\n"
+  },
+  "responses": {
+    "answer": "Install with `npm install example`. `/README.md - 3-5`"
+  },
+  "expect": {
+    "mustInclude": ["npm install example"],
+    "readPaths": ["README.md"],
+    "fastPath": true,
+    "maxLlmCalls": 1
+  }
+}

@@ -74,6 +74,73 @@ describe('selectFastPathSegments', () => {
     expect(segments[0].excerpt).toContain('npx example install');
   });
 
+  it('falls back to quick-start headings for docker questions without a deployment heading', () => {
+    const document = documentFrom([
+      '# n8n',
+      '',
+      '## Key Capabilities',
+      'Workflow automation.',
+      '',
+      '## Quick Start',
+      'docker run -p 5678:5678 n8nio/n8n',
+      '',
+      '## License',
+      'Fair-code.',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I run n8n with Docker?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Quick Start']);
+    expect(segments[0].excerpt).toContain('docker run');
+  });
+
+  it('does not let an H1 project name suppress the docker fallback', () => {
+    const document = documentFrom([
+      '# Open WebUI',
+      'Open WebUI is a self-hosted web interface.',
+      '',
+      '## Quick Start',
+      'docker run -p 3000:8080 ghcr.io/open-webui/open-webui:main',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'deployment', 'How do I run Open WebUI with Docker?');
+    expect(segments.map((segment) => segment.label)).toEqual(['Quick Start']);
+    expect(segments[0].excerpt).toContain('docker run');
+  });
+
+  it('does not borrow quick-start headings for deployment questions without a container hint', () => {
+    const document = documentFrom([
+      '# n8n',
+      '',
+      '## Quick Start',
+      'docker run -p 5678:5678 n8nio/n8n',
+      '',
+      '## License',
+      'Fair-code.',
+    ].join('\n'));
+
+    expect(selectFastPathSegments(document, 'deployment', 'How do I deploy this to production?')).toEqual([]);
+  });
+
+  it('includes a multi-word heading quoted by the question', () => {
+    const document = documentFrom([
+      '# Open WebUI',
+      '',
+      '## Key Features',
+      'Runs entirely offline.',
+      '',
+      '## Offline Mode',
+      'Set `HF_HUB_OFFLINE=1` to prevent downloads.',
+      '',
+      '## Support',
+      'Join the community.',
+    ].join('\n'));
+
+    const segments = selectFastPathSegments(document, 'general', 'Does Open WebUI support offline mode?');
+    expect(segments.map((segment) => segment.label)).toContain('Offline Mode');
+    expect(segments.map((segment) => segment.label)).not.toContain('Support');
+    expect(segments.find((segment) => segment.label === 'Offline Mode')?.excerpt).toContain('HF_HUB_OFFLINE');
+  });
+
   it('ranks matched sections by question wording before taking the first three', () => {
     const document = documentFrom([
       '# Example Project',

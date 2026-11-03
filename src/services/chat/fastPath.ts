@@ -45,9 +45,22 @@ const questionTerms = (question: string): string[] => Array.from(new Set(
     .filter((term) => term.length >= 2),
 ));
 
+/** 问题词与标题的常见同源词（use → usage 等），补齐子串匹配漏掉的形态变化。 */
+const TERM_VARIANTS: Record<string, string[]> = {
+  use: ['usage', 'using'],
+  install: ['installation', 'installing'],
+  deploy: ['deployment', 'deploying'],
+  config: ['configuration'],
+  setup: ['setting'],
+  require: ['requirements'],
+  test: ['testing'],
+};
+
 const headingRelevance = (title: string, terms: string[]): number => {
   const collapsed = title.toLowerCase();
-  return terms.reduce((score, term) => score + (collapsed.includes(term) ? 1 : 0), 0);
+  return terms.reduce((score, term) => (
+    score + ([term, ...(TERM_VARIANTS[term] ?? [])].some((variant) => collapsed.includes(variant)) ? 1 : 0)
+  ), 0);
 };
 
 /**
@@ -86,10 +99,33 @@ export const selectFastPathSegments = (
 ): Array<{ lineStart: number; lineEnd: number; excerpt: string; label: string }> => {
   const intents = [focus, ...FAST_PATH_FOCI.filter((candidate) => candidate !== focus && FAST_PATH_HEADING_PATTERNS[candidate].test(question))];
   const patterns = intents.map((candidate) => FAST_PATH_HEADING_PATTERNS[candidate]);
-  const matchedTitles = document.headings
-    .filter((heading) => patterns.some((pattern) => pattern.test(heading.title)))
-    .map((heading) => heading.title);
   const terms = questionTerms(question);
+  const normalizedQuestion = question.toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
+  // 多词标题原样出现在问题里时直接入选（如 “offline mode” → `## Offline Mode`）。
+  // 只认两词及以上的完整短语，避免 “support” 这类动词把 `## Support` 链接区
+  // 误当作证据；一级标题是项目名（如 `# Open WebUI`），选中它会让
+  // matchedTitles 非空并跳过下面的 Docker 回退，只拿开头的项目介绍作答。
+  const phraseTitles = document.headings
+    .filter((heading) => {
+      if (heading.level <= 1) return false;
+      const title = heading.title.toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
+      return title.split(' ').length >= 2 && title.length >= 5 && normalizedQuestion.includes(title);
+    })
+    .map((heading) => heading.title);
+  let matchedTitles = Array.from(new Set([
+    ...document.headings
+    .filter((heading) => patterns.some((pattern) => pattern.test(heading.title)))
+    .map((heading) => heading.title),
+    ...phraseTitles,
+  ]));
+  // 有些 README 把 Docker 部署写在 Quick Start / Installation 里而不单列
+  // Deployment 标题（如 n8n）。仅当问题明确提到容器且没有部署标题时回落到
+  // usage 标题，避免让“如何部署到生产”误取通用安装章节。
+  if (matchedTitles.length === 0 && focus === 'deployment' && /docker|compose|容器/i.test(question)) {
+    matchedTitles = document.headings
+      .filter((heading) => FAST_PATH_HEADING_PATTERNS.usage.test(heading.title))
+      .map((heading) => heading.title);
+  }
   const rankByTitle = (title: string): number => headingRelevance(title, terms);
   const ranked = sectionSegments(document, matchedTitles, rankByTitle)
     .map((segment) => ({ segment, score: rankByTitle(segment.label) }))
@@ -524,5 +560,5 @@ export const selectFastPathSegments = (
  * 缺失而臆测（方案 §1.1）。追加在 buildUserPrompt 之后，随回答提示词下发。
  */
 export const fastPathAnswerNote = (language: AppLanguage): string => language === 'zh'
-  ? '\n\n本轮为快速路径：证据仅来自根 README 的相关章节。若 README 未覆盖用户问题的某个部分，直接说明“未在已读取文件中找到：X”即可；不要为了补全可选需求继续检索，也不得臆测。'
-  : '\n\nThis turn used the fast path: evidence comes only from the matched root README sections. If the README does not cover part of the question, state “not found in the files read: X” instead of retrieving further or guessing.';
+  ? '\n\n本轮为快速路径：证据仅来自根 README 的相关章节。回答必须直接给出用户所问的具体命令或步骤，不要只描述它在文档中的位置。若 README 未覆盖用户问题的某个部分，直接说明“未在已读取文件中找到：X”即可；不要为了补全可选需求继续检索，也不得臆测。'
+  : '\n\nThis turn used the fast path: evidence comes only from the matched root README sections. Answer with the concrete command or steps the user asked for; do not merely describe where they live in the docs. If the README does not cover part of the question, state “not found in the files read: X” instead of retrieving further or guessing.';

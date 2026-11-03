@@ -98,6 +98,26 @@ function buildApiUrl(baseUrl: string, pathWithVersion: string): string {
   }
 }
 
+// openai-compatible 与前端 buildFinalApiUrl 保持同一补全规则：仅当 baseUrl
+// 正好是版本根地址（https://host/v1）时补全 /chat/completions，更长路径视为
+// 完整端点保持原样，避免直连与代理请求不同地址。
+function completeOpenAiCompatibleUrl(baseUrl: string): string {
+  // `/\/+$/` 这类带量词的正则会被 CodeQL 判为对不可控输入的多项式回溯。
+  let trimmed = baseUrl;
+  while (trimmed.endsWith('/')) trimmed = trimmed.slice(0, -1);
+  try {
+    const url = new URL(trimmed);
+    const pathname = url.pathname.replace(/\/$/, '');
+    if (/^\/v\d+(?:beta|alpha)?$/i.test(pathname)) {
+      url.pathname = `${pathname}/chat/completions`;
+      return url.toString();
+    }
+  } catch {
+    // 非 URL 形式保持原样，由请求阶段报错。
+  }
+  return trimmed;
+}
+
 // POST /api/proxy/github/*
 router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
   try {
@@ -320,9 +340,9 @@ router.post('/api/proxy/ai', async (req, res) => {
     };
 
     if (apiType === 'openai' || apiType === 'openai-responses' || apiType === 'openai-compatible' || apiType === 'deepseek' || apiType === 'mimo') {
-      // openai-compatible 类型直接使用 baseUrl 作为完整地址
+      // openai-compatible 类型与前端使用同一套版本根地址补全规则
       targetUrl = apiType === 'openai-compatible'
-        ? baseUrl.replace(/\/$/, '')
+        ? completeOpenAiCompatibleUrl(baseUrl)
         : buildApiUrl(baseUrl, apiType === 'openai-responses' ? 'v1/responses' : 'v1/chat/completions');
       headers['Authorization'] = `Bearer ${apiKey}`;
     } else if (apiType === 'claude') {
