@@ -7,7 +7,6 @@ const router = Router();
 
 // 控制字符或 Latin-1 以外的码位会被 undici 拒绝，直接拒绝存储
 const sanitizeUserAgent = (value: unknown): string | null =>
-  // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位
   typeof value === 'string' && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(value) ? value : null;
 
 /** 与前端 NOASSERTION_KEYS 对齐：空白 / NOASSERTION / Other / none 等落 null。 */

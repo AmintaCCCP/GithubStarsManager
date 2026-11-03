@@ -382,6 +382,94 @@ describe('WebDAVService 上传重试策略', () => {
   });
 });
 
+describe('WebDAVService 目录创建与上传路径提示', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('MKCOL 405 + PROPFIND 404 判定目录缺失，PUT 403 时提示改路径而不是查权限', async () => {
+    // CSTCloud 等网关对禁用的 MKCOL 也返回 405：不能再把 405 当"目录已存在"
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /zotero
+      .mockResolvedValueOnce(new Response(null, { status: 207 }))  // PROPFIND /zotero → 存在
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /zotero/github
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    const svc = new WebDAVService({ ...config, path: '/zotero/github' });
+    const attempt = svc.uploadFile('github-stars-backup.json', '{}');
+    await expect(attempt).rejects.toThrow(/父目录 \/zotero\/github 不存在，且服务器不允许创建子目录/);
+    await expect(attempt).rejects.toThrow(/请将 WebDAV 路径改为已存在的目录/);
+
+    // 403 非瞬时错误，不做无谓重试
+    const puts = vi.mocked(window.fetch).mock.calls.filter(([, init]) => init?.method === 'PUT');
+    expect(puts.length).toBe(1);
+  });
+
+  it('PROPFIND 207 多状态体报告目标集合 404 时同样判定缺失', async () => {
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/zotero</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, path: '/zotero' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/zotero 不存在/);
+  });
+
+  it('MKCOL 405 + PROPFIND 207（已存在）视为目录存在，正常上传', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup
+      .mockResolvedValueOnce(new Response(null, { status: 207 }))  // PROPFIND → 存在
+      .mockResolvedValueOnce(new Response(null, { status: 201 })); // PUT → 成功
+
+    await expect(davService().uploadFile('a.json', '{}')).resolves.toBe(true);
+
+    const methods = vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method);
+    expect(methods).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+    // 复核请求用 PROPFIND Depth:0，避免拉全量集合
+    const propfindInit = vi.mocked(window.fetch).mock.calls[1][1];
+    expect(propfindInit?.headers).toMatchObject({ Depth: '0' });
+  });
+
+  it('MKCOL 405 + PROPFIND 也失败（无法判定）时保持旧行为继续上传', async () => {
+    // PROPFIND 被拒/网络异常按"未知"处理，不误伤可用连接
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+
+    await expect(davService().uploadFile('a.json', '{}')).resolves.toBe(true);
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+  });
+
+  it('目录确认缺失时 PUT 409/404 同样给出改路径提示', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
+      .mockResolvedValueOnce(new Response(null, { status: 409 })); // PUT → 409
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/HTTP状态码 409: 父目录 \/backup 不存在且服务器不允许创建子目录/);
+  });
+
+  it('目录正常创建（MKCOL 201）后 PUT 403 保留原有权限提示', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))  // MKCOL /backup → 新建
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow('访问被拒绝。请检查指定路径的权限。');
+  });
+});
+
 describe('WebDAVService 连接测试探测顺序', () => {
   beforeEach(() => {
     vi.mocked(backend).isAvailable = false;

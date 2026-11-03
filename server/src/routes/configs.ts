@@ -11,7 +11,6 @@ type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
 
 // 控制字符或 Latin-1 以外的码位会被 undici 拒绝，直接拒绝存储
 function sanitizeUserAgent(value: unknown): string | null {
-  // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位
   return typeof value === 'string' && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(value) ? value : null;
 }
 

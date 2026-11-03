@@ -89,7 +89,6 @@ export class WebDAVService {
   private getCustomUserAgentHeader(): Record<string, string> {
     const userAgent = this.config.customUserAgent?.trim();
     // 含控制字符的头会被 undici/Chromium 拒绝（备份导入等旁路可能绕过表单校验），退回默认 UA 而不是让请求失败
-    // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位（undici/Chromium 均拒绝）
     return userAgent && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(userAgent) ? { 'User-Agent': userAgent } : {};
   }
 
@@ -446,6 +445,33 @@ export class WebDAVService {
     }
   }
 
+  /**
+   * PROPFIND Depth:0 复核集合是否存在。仅在 MKCOL 返回 405/409 这类歧义状态时
+   * 用于消歧：按 RFC 4918，405 表示"集合已存在"，但部分网关（如 CSTCloud 的
+   * Zotero 型 WebDAV）对禁用的方法同样返回 405。返回 true/false；PROPFIND 也
+   * 被拒或网络异常时返回 null（无法判定），调用方应保持旧行为不误伤。
+   */
+  private async directoryExists(path: string): Promise<boolean | null> {
+    try {
+      const res = await this.davFetch('PROPFIND', path, {
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Depth': '0',
+        },
+        timeoutMs: 15000,
+      });
+      if (res.status === 207) {
+        // 207 外层成功不代表目标集合存在：多状态体可能为目标 href 携带资源级 404
+        return await this.multistatusTargetSucceeded(res, path);
+      }
+      if (res.ok) return true;
+      if (res.status === 404) return false;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async uploadFile(filename: string, content: string): Promise<boolean> {
     try {
       // 验证URL格式
@@ -463,8 +489,9 @@ export class WebDAVService {
 
       logger.info('webdav', '文件大小', { sizeKB: fileAnalysis.sizeKB, compressedKB: Math.round(compressedContent.length / 1024) });
 
-      // 确保目录存在
-      await this.ensureDirectoryExists();
+      // 确保目录存在；missingPath 记录"确认缺失且无法创建"的最深目录，
+      // 供 PUT 失败时给出可操作的提示（如禁止 MKCOL 的网关）
+      const dirState = await this.ensureDirectoryExists();
 
       // 动态计算超时时间：基于压缩后文件大小，最小60秒，最大300秒
       const finalSizeKB = Math.round(compressedContent.length / 1024);
@@ -499,10 +526,21 @@ export class WebDAVService {
               throw new Error('身份验证失败。请检查用户名和密码。');
             }
             if (response.status === 403) {
+              // MKCOL 被禁的网关会让 PUT 打在不存在的集合上被 403 拒绝，
+              // 此时提示应指向路径本身，而不是让用户去查权限
+              if (dirState.missingPath) {
+                throw new Error(`访问被拒绝：父目录 ${dirState.missingPath} 不存在，且服务器不允许创建子目录。请将 WebDAV 路径改为已存在的目录（例如 / 或 /zotero/）后重试。`);
+              }
               throw new Error('访问被拒绝。请检查指定路径的权限。');
             }
             if (response.status === 404) {
+              if (dirState.missingPath) {
+                throw new Error(`路径未找到：父目录 ${dirState.missingPath} 不存在，且服务器不允许创建子目录。请将 WebDAV 路径改为已存在的目录后重试。`);
+              }
               throw new Error('路径未找到。请验证WebDAV URL和路径是否正确。');
+            }
+            if (response.status === 409 && dirState.missingPath) {
+              throw new Error(`上传失败，HTTP状态码 409: 父目录 ${dirState.missingPath} 不存在且服务器不允许创建子目录。请将 WebDAV 路径改为已存在的目录后重试。`);
             }
             if (response.status === 507) {
               throw new Error('服务器存储空间不足。');
@@ -538,10 +576,14 @@ export class WebDAVService {
     }
   }
 
-  private async ensureDirectoryExists(): Promise<void> {
+  /**
+   * 逐级确保配置路径下的目录存在。返回缺失且无法创建的最深目录（若有），
+   * 供调用方在 PUT 失败时给出可操作的提示。
+   */
+  private async ensureDirectoryExists(): Promise<{ missingPath?: string }> {
     try {
       if (!this.config.path || this.config.path === '/') {
-        return; // 根目录总是存在
+        return {}; // 根目录总是存在
       }
 
       // 逐级创建目录，避免服务器因中间目录不存在而返回 409/403
@@ -557,22 +599,34 @@ export class WebDAVService {
             timeoutMs: 15000,
           });
 
-          // 201 Created（新建）或 405 Method Not Allowed（已存在）都视为成功
-          if (!res.ok && res.status !== 405) {
-            // 某些服务器对已存在目录返回 409 Conflict
-            if (res.status !== 409) {
-              logger.warn('webdav', '无法创建目录', { currentPath, status: res.status });
-              break; // 不再继续往下建
+          // 201 Created（新建）视为成功
+          if (res.ok) continue;
+
+          // 405/409 语义有歧义：可能是"集合已存在"，也可能是网关禁用了 MKCOL
+          // （如 CSTCloud 的 Zotero 型 WebDAV）或父目录缺失。用 PROPFIND 复核，
+          // 避免把不存在的目录误判为已存在——否则 PUT 会打在缺失集合上被
+          // 403/409 拒绝，且"访问被拒绝"的提示会误导用户去查权限。
+          if (res.status === 405 || res.status === 409) {
+            const exists = await this.directoryExists(currentPath);
+            if (exists === false) {
+              logger.warn('webdav', '服务器拒绝创建目录且目录不存在', { currentPath, status: res.status });
+              return { missingPath: currentPath };
             }
+            continue; // 已存在或无法判定：按旧行为继续尝试下一段
           }
+
+          logger.warn('webdav', '无法创建目录', { currentPath, status: res.status });
+          return {}; // 其他失败不标记缺失（可能只是临时网络问题），保持旧行为
         } catch (e) {
           logger.warn('webdav', '创建目录发生异常', { currentPath, error: e });
-          break;
+          return {};
         }
       }
+      return {};
     } catch (error) {
       logger.warn('webdav', '目录创建检查失败', error);
       // 不在这里抛出错误，因为目录可能已经存在
+      return {};
     }
   }
 
@@ -819,7 +873,6 @@ export class WebDAVService {
       errors.push('路径必须以 / 开头');
     }
 
-    // eslint-disable-next-line no-control-regex -- 有意排除控制字符与 Latin-1 以外的码位（undici/Chromium 均拒绝）
     if (config.customUserAgent && /[^\u0020-\u007e\u00a0-\u00ff]/.test(config.customUserAgent)) {
       errors.push('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
     }
