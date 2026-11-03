@@ -266,10 +266,13 @@ describe('registerDidFinishLoadPaintProbe', () => {
     // Scope the assertions to the function body so a stray mention elsewhere
     // in main.js cannot satisfy the wiring check.
     const fnBody = source.slice(fnStart, source.indexOf('\n}\n', fnStart));
-    // Assert the restore call sits at top level right after the guard block:
+    // Pin the whole guard block so the test verifies the recreate-on-destroyed
+    // branch and that the restore call stays unconditional at top level:
     // wrapping it in a conditional would leave a hidden window unpainted,
     // because probeWindowPaint returns early for invisible windows.
-    const restoreAt = fnBody.search(/^  \}\n  restoreWindowFromTray\(\{ win: mainWindow \}\);$/m);
+    const restoreAt = fnBody.search(
+      /^  if \(!mainWindow \|\| mainWindow\.isDestroyed\(\)\) \{\n    createWindow\(\);\n    return;\n  \}\n  restoreWindowFromTray\(\{ win: mainWindow \}\);$/m,
+    );
     const probeAt = fnBody.indexOf("scheduleWindowPaintProbe('restore-main-window')");
     assert.ok(restoreAt > 0, 'restoreMainWindow must call restoreWindowFromTray');
     assert.ok(probeAt > restoreAt, 'the paint probe must be armed after the restore');
