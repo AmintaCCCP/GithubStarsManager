@@ -573,6 +573,20 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
     const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/alice' });
     await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
   });
+
+  it('URL 含非法百分号编码时保留原文前缀与原始 href 比对', async () => {
+    // /dav%ZZ 无法解码：丢弃前缀会让资源级 404 匹配不到而被误放行
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav%ZZ/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav%ZZ' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
 });
 
 describe('WebDAVService 连接测试探测顺序', () => {

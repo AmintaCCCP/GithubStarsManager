@@ -409,13 +409,21 @@ export class WebDAVService {
    * 否则带前缀的 URL 永远匹配不到目标条目，只能靠"找不到→放行"兜底。
    */
   private getUrlPathPrefix(): string {
+    let pathname: string;
     try {
-      const pathname = new URL(this.config.url).pathname;
+      pathname = new URL(this.config.url).pathname;
+    } catch {
+      return ''; // 非法 URL 按无前缀处理
+    }
+    try {
       // href 比对前已 decodeURIComponent，前缀必须同样解码，否则含空格/非
       // ASCII 的路径（如 /dav%20space）永远匹配不上
       return decodeURIComponent(pathname).replace(/\/+$/, '');
     } catch {
-      return ''; // 非法 URL 或非法百分号编码按无前缀处理
+      // 非法百分号编码（如 /dav%ZZ）保留原文：服务器 href 大概率同样是原始
+      // 形态（multistatusTargetSucceeded 对 href 解码失败也按原文比对），
+      // 丢弃前缀会让资源级 404 匹配不到而被误放行
+      return pathname.replace(/\/+$/, '');
     }
   }
 
