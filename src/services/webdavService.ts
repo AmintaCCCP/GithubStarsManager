@@ -410,9 +410,12 @@ export class WebDAVService {
    */
   private getUrlPathPrefix(): string {
     try {
-      return new URL(this.config.url).pathname.replace(/\/+$/, '');
+      const pathname = new URL(this.config.url).pathname;
+      // href 比对前已 decodeURIComponent，前缀必须同样解码，否则含空格/非
+      // ASCII 的路径（如 /dav%20space）永远匹配不上
+      return decodeURIComponent(pathname).replace(/\/+$/, '');
     } catch {
-      return ''; // 非法 URL 按无前缀处理
+      return ''; // 非法 URL 或非法百分号编码按无前缀处理
     }
   }
 
@@ -431,7 +434,11 @@ export class WebDAVService {
       const responses = Array.from(doc.getElementsByTagName('*')).filter((el) => el.localName === 'response');
       if (responses.length === 0) return true;
 
-      const normalizedTarget = `${this.getUrlPathPrefix()}/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
+      const tail = `/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
+      const prefix = this.getUrlPathPrefix().toLowerCase();
+      // href 形态因服务器而异：标准实现返回含 URL 前缀的完整路径；反向代理可能
+      // 返回相对内部 DAV 根的裸路径。两种都参与匹配，避免资源级 404 被误放行。
+      const targets = prefix && prefix !== '/' ? [`${prefix}${tail}`, tail] : [tail];
       const match = responses.find((el) => {
         const hrefEl = Array.from(el.children).find((child) => child.localName === 'href');
         if (!hrefEl) return false;
@@ -442,8 +449,8 @@ export class WebDAVService {
         const path = href.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').replace(/\/+$/, '').toLowerCase();
         // 精确匹配：宽松的 endsWith 会让 /old/backup 误配 /backup，或让空路径
         // 选中任意条目——多状态体里先出现失败条目时会读错资源级状态。
-        if (path === '' && normalizedTarget === '/') return true;
-        return path === normalizedTarget;
+        if (path === '' && tail === '/') return true;
+        return targets.includes(path);
       });
       if (!match) return true;
 

@@ -545,6 +545,34 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
     const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/alice' });
     await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
   });
+
+  it('URL 前缀含百分号编码（空格）时先解码再与 href 比对', async () => {
+    // href 比对前已解码：/dav%20space 必须解码为 "/dav space" 才能匹配
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav space/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav%20space' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
+
+  it('反向代理返回相对内部 DAV 根的裸 href 时同样匹配（同时接受两种形态）', async () => {
+    // URL 带 /dav/alice 前缀，但反代回源的 href 可能是裸路径 /backup
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/alice' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
 });
 
 describe('WebDAVService 连接测试探测顺序', () => {
