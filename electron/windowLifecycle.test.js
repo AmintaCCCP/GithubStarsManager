@@ -261,8 +261,13 @@ describe('registerDidFinishLoadPaintProbe', () => {
 
   it('routes tray restore through restoreWindowFromTray', () => {
     const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
-    const restoreAt = source.indexOf('restoreWindowFromTray({ win: mainWindow })');
-    const probeAt = source.indexOf("scheduleWindowPaintProbe('restore-main-window')");
+    const fnStart = source.indexOf('function restoreMainWindow() {');
+    assert.ok(fnStart >= 0, 'restoreMainWindow must be defined');
+    // Scope the assertions to the function body so a stray mention elsewhere
+    // in main.js cannot satisfy the wiring check.
+    const fnBody = source.slice(fnStart, source.indexOf('\n}\n', fnStart));
+    const restoreAt = fnBody.indexOf('restoreWindowFromTray({ win: mainWindow })');
+    const probeAt = fnBody.indexOf("scheduleWindowPaintProbe('restore-main-window')");
     assert.ok(restoreAt > 0, 'restoreMainWindow must call restoreWindowFromTray');
     assert.ok(probeAt > restoreAt, 'the paint probe must be armed after the restore');
   });
