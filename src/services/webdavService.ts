@@ -446,6 +446,29 @@ export class WebDAVService {
   }
 
   /**
+   * 带客户端超时的目录探测请求。浏览器直连的 davFetch 只消费 signal 不消费
+   * timeoutMs，探测若不带 signal，服务器停滞时 uploadFile 会一直挂起。
+   */
+  private async probeDav(
+    method: 'MKCOL' | 'PROPFIND',
+    path: string,
+    extraHeaders: Record<string, string>,
+    timeoutMs: number = 15000,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await this.davFetch(method, path, {
+        headers: { 'Authorization': this.getAuthHeader(), ...extraHeaders },
+        signal: controller.signal,
+        timeoutMs,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
    * PROPFIND Depth:0 复核集合是否存在。仅在 MKCOL 返回 405/409 这类歧义状态时
    * 用于消歧：按 RFC 4918，405 表示"集合已存在"，但部分网关（如 CSTCloud 的
    * Zotero 型 WebDAV）对禁用的方法同样返回 405。返回 true/false；PROPFIND 也
@@ -453,13 +476,7 @@ export class WebDAVService {
    */
   private async directoryExists(path: string): Promise<boolean | null> {
     try {
-      const res = await this.davFetch('PROPFIND', path, {
-        headers: {
-          'Authorization': this.getAuthHeader(),
-          'Depth': '0',
-        },
-        timeoutMs: 15000,
-      });
+      const res = await this.probeDav('PROPFIND', path, { 'Depth': '0' });
       if (res.status === 207) {
         // 207 外层成功不代表目标集合存在：多状态体可能为目标 href 携带资源级 404
         return await this.multistatusTargetSucceeded(res, path);
@@ -526,21 +543,22 @@ export class WebDAVService {
               throw new Error('身份验证失败。请检查用户名和密码。');
             }
             if (response.status === 403) {
-              // MKCOL 被禁的网关会让 PUT 打在不存在的集合上被 403 拒绝，
-              // 此时提示应指向路径本身，而不是让用户去查权限
+              // MKCOL 被禁的网关（如 CSTCloud Zotero 型 WebDAV）会让 PUT 打在
+              // 探测不到的集合上被 403 拒绝。提示优先指向路径本身；但 PROPFIND
+              // 404 也可能是权限伪装，两种可能都要提及
               if (dirState.missingPath) {
-                throw new Error(`访问被拒绝：父目录 ${dirState.missingPath} 不存在，且服务器不允许创建子目录。请将 WebDAV 路径改为已存在的目录（例如 / 或 /zotero/）后重试。`);
+                throw new Error(`访问被拒绝：父目录 ${dirState.missingPath} 可能不存在（且服务器不允许创建子目录），也可能无访问权限。请将 WebDAV 路径改为已存在的目录（例如 / 或 /zotero/），或检查账号对该路径的权限。`);
               }
               throw new Error('访问被拒绝。请检查指定路径的权限。');
             }
             if (response.status === 404) {
               if (dirState.missingPath) {
-                throw new Error(`路径未找到：父目录 ${dirState.missingPath} 不存在，且服务器不允许创建子目录。请将 WebDAV 路径改为已存在的目录后重试。`);
+                throw new Error(`路径未找到：父目录 ${dirState.missingPath} 可能不存在（服务器不允许创建子目录），也可能无访问权限。请将 WebDAV 路径改为已存在的目录，或检查路径与权限。`);
               }
               throw new Error('路径未找到。请验证WebDAV URL和路径是否正确。');
             }
             if (response.status === 409 && dirState.missingPath) {
-              throw new Error(`上传失败，HTTP状态码 409: 父目录 ${dirState.missingPath} 不存在且服务器不允许创建子目录。请将 WebDAV 路径改为已存在的目录后重试。`);
+              throw new Error(`上传失败，HTTP状态码 409: 父目录 ${dirState.missingPath} 可能不存在（服务器不允许创建子目录），也可能无访问权限。请将 WebDAV 路径改为已存在的目录，或检查权限。`);
             }
             if (response.status === 507) {
               throw new Error('服务器存储空间不足。');
@@ -594,10 +612,7 @@ export class WebDAVService {
       for (const seg of segments) {
         currentPath += `/${seg}`;
         try {
-          const res = await this.davFetch('MKCOL', currentPath, {
-            headers: { 'Authorization': this.getAuthHeader() },
-            timeoutMs: 15000,
-          });
+          const res = await this.probeDav('MKCOL', currentPath, {});
 
           // 201 Created（新建）视为成功
           if (res.ok) continue;

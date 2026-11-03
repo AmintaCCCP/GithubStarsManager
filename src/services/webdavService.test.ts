@@ -405,8 +405,10 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
 
     const svc = new WebDAVService({ ...config, path: '/zotero/github' });
     const attempt = svc.uploadFile('github-stars-backup.json', '{}');
-    await expect(attempt).rejects.toThrow(/父目录 \/zotero\/github 不存在，且服务器不允许创建子目录/);
+    await expect(attempt).rejects.toThrow(/父目录 \/zotero\/github 可能不存在（且服务器不允许创建子目录）/);
     await expect(attempt).rejects.toThrow(/请将 WebDAV 路径改为已存在的目录/);
+    // PROPFIND 404 也可能是权限伪装，提示需保留权限检查建议
+    await expect(attempt).rejects.toThrow(/也可能无访问权限/);
 
     // 403 非瞬时错误，不做无谓重试
     const puts = vi.mocked(window.fetch).mock.calls.filter(([, init]) => init?.method === 'PUT');
@@ -423,7 +425,7 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
       .mockResolvedValueOnce(new Response(null, { status: 403 }));
 
     const svc = new WebDAVService({ ...config, path: '/zotero' });
-    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/zotero 不存在/);
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/zotero 可能不存在/);
   });
 
   it('MKCOL 405 + PROPFIND 207（已存在）视为目录存在，正常上传', async () => {
@@ -452,13 +454,22 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
     expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
   });
 
-  it('目录确认缺失时 PUT 409/404 同样给出改路径提示', async () => {
+  it('目录确认缺失时 PUT 409 同样给出改路径提示', async () => {
     vi.mocked(window.fetch)
       .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
       .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
       .mockResolvedValueOnce(new Response(null, { status: 409 })); // PUT → 409
 
-    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/HTTP状态码 409: 父目录 \/backup 不存在且服务器不允许创建子目录/);
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/HTTP状态码 409: 父目录 \/backup 可能不存在/);
+  });
+
+  it('目录确认缺失时 PUT 404 给出改路径提示（路径未找到分支）', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
+      .mockResolvedValueOnce(new Response(null, { status: 404 })); // PUT → 404
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/路径未找到：父目录 \/backup 可能不存在/);
   });
 
   it('目录正常创建（MKCOL 201）后 PUT 403 保留原有权限提示', async () => {
@@ -467,6 +478,29 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
       .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
 
     await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow('访问被拒绝。请检查指定路径的权限。');
+  });
+
+  it('浏览器直连时探测请求带 AbortSignal，PROPFIND 停滞会被 15s 超时中止而不阻塞上传', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      vi.mocked(window.fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+        // PROPFIND 停滞不返回，只响应 signal 中止
+        .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+        }))
+        .mockResolvedValueOnce(new Response(null, { status: 201 })); // PUT → 成功
+
+      const promise = davService().uploadFile('a.json', '{}');
+      await vi.advanceTimersByTimeAsync(15001);
+      // 探测超时按"无法判定"处理，上传继续
+      await expect(promise).resolves.toBe(true);
+      expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+      const probeInit = vi.mocked(window.fetch).mock.calls[1][1];
+      expect(probeInit?.signal).toBeInstanceOf(AbortSignal);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
