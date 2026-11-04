@@ -13,7 +13,13 @@ export function useSystemThemeSync(themeMode: ThemeMode): void {
       useAppStore.getState().setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
     };
     applySystemTheme();
-    mediaQuery.addEventListener('change', applySystemTheme);
-    return () => mediaQuery.removeEventListener('change', applySystemTheme);
+    // legacy 目标包含 Safari >= 12，Safari 13.1 之前的 MediaQueryList 只有
+    // addListener/removeListener，需按可用性回退，避免进入 ErrorBoundary。
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', applySystemTheme);
+      return () => mediaQuery.removeEventListener('change', applySystemTheme);
+    }
+    mediaQuery.addListener(applySystemTheme);
+    return () => mediaQuery.removeListener(applySystemTheme);
   }, [themeMode]);
 }

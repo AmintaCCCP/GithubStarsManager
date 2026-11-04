@@ -65,4 +65,20 @@ describe('useSystemThemeSync', () => {
     expect(stub.addEventListener).not.toHaveBeenCalled();
     expect(mocks.setSystemTheme).not.toHaveBeenCalled();
   });
+
+  it('falls back to addListener/removeListener on legacy MediaQueryList', () => {
+    const stub = {
+      matches: true,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    };
+    stubMatchMedia(stub as unknown as MediaQueryStub);
+
+    const { unmount } = renderHook(() => useSystemThemeSync('system'));
+    expect(mocks.setSystemTheme).toHaveBeenCalledWith('dark');
+    expect(stub.addListener).toHaveBeenCalledWith(expect.any(Function));
+
+    unmount();
+    expect(stub.removeListener).toHaveBeenCalledWith(expect.any(Function));
+  });
 });
