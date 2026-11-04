@@ -78,7 +78,13 @@ describe('useSystemThemeSync', () => {
     expect(mocks.setSystemTheme).toHaveBeenCalledWith('dark');
     expect(stub.addListener).toHaveBeenCalledWith(expect.any(Function));
 
+    stub.matches = false;
+    act(() => {
+      stub.addListener.mock.calls[0][0]();
+    });
+    expect(mocks.setSystemTheme).toHaveBeenLastCalledWith('light');
+
     unmount();
-    expect(stub.removeListener).toHaveBeenCalledWith(expect.any(Function));
+    expect(stub.removeListener).toHaveBeenCalledWith(stub.addListener.mock.calls[0][0]);
   });
 });
