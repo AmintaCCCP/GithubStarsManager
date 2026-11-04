@@ -109,14 +109,15 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     nextButton?.focus();
   }, [setEditPreset]);
 
-  // 编辑目标只有两项：方向键在浅色/深色间移动焦点，选定仍走点击/Enter，
-  // 与下方预设网格的 roving tabindex 语义保持一致。
+  // 编辑目标只有两项：radiogroup 语义下方向键直接切换选中项，
+  // 焦点、aria-checked 与 Tab 入口同步移动。
   const handleEditModeKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
     const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'End';
     const nextMode: 'light' | 'dark' = forward ? 'dark' : 'light';
     const nextButton = event.currentTarget.querySelector<HTMLButtonElement>(`[data-edit-mode='${nextMode}']`);
+    setEditMode(nextMode);
     nextButton?.focus();
     event.preventDefault();
   }, []);

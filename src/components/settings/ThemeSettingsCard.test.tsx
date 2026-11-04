@@ -164,6 +164,18 @@ describe('ThemeSettingsCard', () => {
     expect(mocks.state.themePresetDark).toBe('default');
   });
 
+  it('moves the preset edit target with arrow keys inside the mode radiogroup', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+    const editGroup = screen.getByRole('radiogroup', { name: '配色适用模式' });
+    const lightButton = within(editGroup).getByText('浅色');
+    lightButton.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(within(editGroup).getByText('深色').closest('button')).toHaveAttribute('aria-checked', 'true');
+    expect(lightButton.closest('button')).toHaveAttribute('aria-checked', 'false');
+  });
+
   it('writes theme tokens through the store action', async () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
