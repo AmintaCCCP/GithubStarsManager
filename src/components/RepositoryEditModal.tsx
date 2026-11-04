@@ -199,10 +199,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     let effectiveDescription = '';
     if (repo.custom_description !== undefined && repo.custom_description !== null) {
       effectiveDescription = repo.custom_description;
-    } else if (repo.description_display === 'ai' && repo.ai_summary && repo.ai_summary.trim() !== '') {
-      effectiveDescription = repo.ai_summary;
-    } else if (repo.description_display === 'original' && repo.description && repo.description.trim() !== '') {
-      effectiveDescription = repo.description;
+    } else if (repo.description_display === 'ai' && !repo.analysis_failed) {
+      // 固定显示AI总结：无AI总结时按卡片逻辑回退到原始描述
+      effectiveDescription = repo.ai_summary && repo.ai_summary.trim() !== '' ? repo.ai_summary : (repo.description ?? '');
+    } else if (repo.description_display === 'original') {
+      // 固定显示原始描述：为空就显示为空，不回退到AI总结
+      effectiveDescription = repo.description ?? '';
     } else if (listShowAI && !repo.analysis_failed && repo.ai_summary && repo.ai_summary.trim() !== '') {
       effectiveDescription = repo.ai_summary;
     } else if (repo.description && repo.description.trim() !== '') {
@@ -326,17 +328,21 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       default: {
         // 保持自定义：检查内容是否与原始来源一致
         const descTrimmed = (formData.description || '').trim();
+        // 与 RepositoryCard 的 preferAi 保持一致：卡片实际显示 AI 总结时为 true
+        const cardShowsAi = !!repository.ai_summary && !repository.analysis_failed
+          && ((updatedRepo.description_display ?? 'follow') === 'ai'
+            || ((updatedRepo.description_display ?? 'follow') === 'follow' && showAISummary));
 
         // 如果内容为空，视为清除
         if (descTrimmed === '') {
           updatedRepo.custom_description = '';
         }
         // 如果与AI总结一致，清除自定义描述（让显示逻辑回退到AI）
-        else if (descTrimmed === (repository.ai_summary || '').trim() && updatedRepo.description_display !== 'original') {
+        else if (descTrimmed === (repository.ai_summary || '').trim() && cardShowsAi) {
           updatedRepo.custom_description = undefined;
         }
         // 如果与原始描述一致，清除自定义描述（让显示逻辑回退到原始）
-        else if (descTrimmed === (repository.description || '').trim() && updatedRepo.description_display !== 'ai') {
+        else if (descTrimmed === (repository.description || '').trim() && !cardShowsAi) {
           updatedRepo.custom_description = undefined;
         }
         // 否则保存为自定义
@@ -381,6 +387,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         const aiTags = repository.ai_tags || [];
         const topics = repository.topics || [];
         const currentTags = formData.tags;
+        // 与 RepositoryCard 的 displayTags 保持一致：卡片实际显示 AI 标签时为 true
+        const cardShowsAiTags = !!repository.analyzed_at && !repository.analysis_failed
+          && aiTags.length > 0
+          && ((updatedRepo.tags_display ?? 'follow') === 'ai'
+            || ((updatedRepo.tags_display ?? 'follow') === 'follow' && showAISummary));
 
         // 如果标签数组为空，保存为空数组（明确清空）
         if (currentTags.length === 0) {
@@ -388,13 +399,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         }
         // 如果与AI标签完全一致，清除自定义标签
         else if (JSON.stringify([...currentTags].sort()) === JSON.stringify([...aiTags].sort())) {
-          // 固定显示Topics时这组标签不会展示，须保留为自定义标签
-          updatedRepo.custom_tags = updatedRepo.tags_display === 'topics' ? currentTags : undefined;
+          // 卡片不显示AI标签时（显示Topics），须保留为自定义标签
+          updatedRepo.custom_tags = cardShowsAiTags ? undefined : currentTags;
         }
         // 如果与Topics完全一致，清除自定义标签
         else if (JSON.stringify([...currentTags].sort()) === JSON.stringify([...topics].sort())) {
-          // 固定显示AI标签时这组标签不会展示，须保留为自定义标签
-          updatedRepo.custom_tags = updatedRepo.tags_display === 'ai' ? currentTags : undefined;
+          // 卡片显示AI标签时，与Topics一致的输入不会展示，须保留为自定义标签
+          updatedRepo.custom_tags = cardShowsAiTags ? currentTags : undefined;
         }
         // 否则保存为自定义
         else {
@@ -546,8 +557,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    */
   const followListSetting = () => {
     if (!repository) return;
-    const { effectiveDescription } = getEffectiveDisplayContent(repository, showAISummary);
-    setFormData(prev => ({ ...prev, description: effectiveDescription }));
+    // 预览跟随列表设置后的实际显示：忽略当前自定义与固定偏好
+    const followDescription = showAISummary && !repository.analysis_failed
+      && repository.ai_summary && repository.ai_summary.trim() !== ''
+      ? repository.ai_summary
+      : (repository.description ?? '');
+    setFormData(prev => ({ ...prev, description: followDescription }));
     setEditIntent(prev => ({ ...prev, description: 'follow' }));
   };
 
@@ -590,8 +605,12 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    */
   const followTagsListSetting = () => {
     if (!repository) return;
-    const { effectiveTags } = getEffectiveDisplayContent(repository, showAISummary);
-    setFormData(prev => ({ ...prev, tags: effectiveTags }));
+    const isAnalyzed = !!repository.analyzed_at && !repository.analysis_failed;
+    const aiTagsUsable = isAnalyzed && !!repository.ai_tags && repository.ai_tags.length > 0;
+    const followTags = showAISummary && aiTagsUsable && repository.ai_tags
+      ? repository.ai_tags
+      : (repository.topics ?? []);
+    setFormData(prev => ({ ...prev, tags: followTags }));
     setEditIntent(prev => ({ ...prev, tags: 'follow' }));
   };
 

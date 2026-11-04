@@ -60,11 +60,13 @@ function transformRepo(row: Record<string, unknown>) {
     analyzed_at: row.analyzed_at,
     analysis_failed: !!row.analysis_failed,
     custom_description: row.custom_description,
-    custom_tags: parseJsonColumn(row.custom_tags),
+    // null 表示「未自定义」；空数组才是「明确清空」。二者语义不同，缺省时不能返回 []。
+    custom_tags: row.custom_tags ? parseJsonColumn(row.custom_tags) : undefined,
     custom_category: row.custom_category ?? undefined,
     category_locked: !!row.category_locked,
-    description_display: row.description_display ?? undefined,
-    tags_display: row.tags_display ?? undefined,
+    // 显式返回 null（而非省略字段），让客户端把「已重置为跟随」同步给其他设备。
+    description_display: row.description_display ?? null,
+    tags_display: row.tags_display ?? null,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
     vector_indexed_at: row.vector_indexed_at ?? undefined,
