@@ -217,7 +217,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
     if (repo.custom_tags !== undefined) {
       // custom_tags 是数组（可能是空数组或包含标签）
       effectiveTags = repo.custom_tags;
-    } else if (repo.tags_display === 'ai' && repo.ai_tags && repo.ai_tags.length > 0) {
+    } else if (repo.tags_display === 'ai' && !!repo.analyzed_at && !repo.analysis_failed
+      && repo.ai_tags && repo.ai_tags.length > 0) {
       effectiveTags = repo.ai_tags;
     } else if (repo.tags_display === 'topics') {
       effectiveTags = repo.topics ?? [];
@@ -1193,7 +1194,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               <ListFilter className="w-3.5 h-3.5 mr-1.5" />
               <span>{t('repositoryEditModal.follow-list-setting')}</span>
             </Button>
-            {repository.ai_tags && repository.ai_tags.length > 0 && (
+            {repository.ai_tags && repository.ai_tags.length > 0
+              && !!repository.analyzed_at && !repository.analysis_failed && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();

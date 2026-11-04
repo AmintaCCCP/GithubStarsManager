@@ -207,7 +207,8 @@ router.post('/api/sync/import', (req, res) => {
             typeof r.ai_platforms === 'string' ? r.ai_platforms : JSON.stringify(r.ai_platforms ?? []),
             r.analyzed_at ?? null, r.analysis_failed ? 1 : 0,
             r.custom_description ?? null,
-            typeof r.custom_tags === 'string' ? r.custom_tags : JSON.stringify(r.custom_tags ?? []),
+            // NULL 表示「未自定义」，只有显式数组才写 '[]'（明确清空），避免恢复后隐藏标签。
+            typeof r.custom_tags === 'string' ? r.custom_tags : (r.custom_tags == null ? null : JSON.stringify(r.custom_tags)),
             r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
             r.subscribed_to_releases ? 1 : 0,
             r.vector_indexed_at ?? null,
