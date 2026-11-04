@@ -861,7 +861,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             : (isThemePresetId(importedData.themePreset) ? importedData.themePreset : null);
           const importedPresetDark = isThemePresetId(importedData.themePresetDark)
             ? importedData.themePresetDark
-            : importedPresetLight;
+            : (isThemePresetId(importedData.themePreset) ? importedData.themePreset : null);
           if (importedPresetLight) {
             useAppStore.getState().setThemePresetLight(importedPresetLight);
           }
@@ -1075,7 +1075,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             : (isThemePresetId(importedUiSettings.themePreset) ? importedUiSettings.themePreset : null);
           const importedPresetDark = isThemePresetId(importedUiSettings.themePresetDark)
             ? importedUiSettings.themePresetDark
-            : importedPresetLight;
+            : (isThemePresetId(importedUiSettings.themePreset) ? importedUiSettings.themePreset : null);
           useAppStore.setState({
             ...(importedMode
               ? { themeMode: importedMode }

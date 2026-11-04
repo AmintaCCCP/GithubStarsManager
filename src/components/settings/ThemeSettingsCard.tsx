@@ -70,6 +70,11 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
       setThemePresetLight(preset);
     }
   }, [editMode, setThemePresetDark, setThemePresetLight]);
+  // 显式选定深/浅（含头部快捷键切换）时，配色编辑目标同步跟随；
+  // 跟随系统时保持当前目标，不随系统翻动漂移。
+  React.useEffect(() => {
+    if (themeMode === 'light' || themeMode === 'dark') setEditMode(themeMode);
+  }, [themeMode]);
   const presetAccentColor = hslTripletToHex(
     (editMode === 'dark' ? activePreset.darkColors : activePreset.lightColors).primary,
   ) ?? '#2563eb';
@@ -104,6 +109,18 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     nextButton?.focus();
   }, [setEditPreset]);
 
+  // 编辑目标只有两项：方向键在浅色/深色间移动焦点，选定仍走点击/Enter，
+  // 与下方预设网格的 roving tabindex 语义保持一致。
+  const handleEditModeKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === 'End';
+    const nextMode: 'light' | 'dark' = forward ? 'dark' : 'light';
+    const nextButton = event.currentTarget.querySelector<HTMLButtonElement>(`[data-edit-mode='${nextMode}']`);
+    nextButton?.focus();
+    event.preventDefault();
+  }, []);
+
   return (
     <>
     <Card>
@@ -123,8 +140,6 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
             value={themeMode}
             onValueChange={(value) => {
               setThemeMode(value as 'light' | 'dark' | 'system');
-              // 显式选定深/浅时，配色编辑目标同步跟随，避免网格高亮另一模式的预设。
-              if (value === 'light' || value === 'dark') setEditMode(value);
             }}
             className="grid max-w-md grid-cols-3 gap-4"
           >
@@ -173,6 +188,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
               role="radiogroup"
               aria-label={t('themeSettingsCard.color-mode-target')}
               className="inline-flex overflow-hidden rounded-lg border border-border"
+              onKeyDown={handleEditModeKeyDown}
             >
               {(['light', 'dark'] as const).map((mode) => (
                 <button
@@ -180,6 +196,8 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                   type="button"
                   role="radio"
                   aria-checked={editMode === mode}
+                  tabIndex={editMode === mode ? 0 : -1}
+                  data-edit-mode={mode}
                   onClick={() => setEditMode(mode)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
                     editMode === mode

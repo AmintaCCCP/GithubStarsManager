@@ -12,6 +12,7 @@ import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
 import { useAppStore, getAllCategories } from './store/useAppStore';
+import { useSystemThemeSync } from './hooks/useSystemThemeSync';
 import { resolveTheme, selectAppShellState } from './store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { applyThemePreset } from './lib/themePresets';
@@ -221,17 +222,7 @@ function App() {
   useBackendLifecycle(hasHydrated);
 
   const theme = resolveTheme(themeMode, systemTheme);
-  // system 模式下监听操作系统深浅变化；其余模式无订阅。
-  useEffect(() => {
-    if (themeMode !== 'system' || typeof window.matchMedia !== 'function') return;
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const applySystemTheme = () => {
-      useAppStore.getState().setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
-    };
-    applySystemTheme();
-    mediaQuery.addEventListener('change', applySystemTheme);
-    return () => mediaQuery.removeEventListener('change', applySystemTheme);
-  }, [themeMode]);
+  useSystemThemeSync(themeMode);
 
   // Restore persisted frontend debug level at startup so capture is active
   // app-wide, not only after DiagnosticLogsPanel mounts.
@@ -290,7 +281,7 @@ function App() {
   // 预设的 --radius / --primary 自然重新生效。排在预设 effect 之后即可。
   useEffect(() => {
     applyThemeTokens(themeTokens);
-  }, [themeTokens, activeThemePreset]);
+  }, [themeTokens, theme, activeThemePreset]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
