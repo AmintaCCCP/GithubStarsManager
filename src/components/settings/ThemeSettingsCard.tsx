@@ -1,9 +1,10 @@
 
 import { useTPair, TranslateFn } from '../../i18n/useT';
 import React from 'react';
-import { Check, Moon, Palette, Sun } from 'lucide-react';
+import { Check, MonitorCog, Moon, Palette, Sun } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
+import { resolveTheme } from '../../store/selectors';
 import { getThemePreset, THEME_PRESETS } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
 import { getThemeSwatch } from '../../lib/themePresets';
@@ -32,28 +33,45 @@ interface ThemeSettingsCardProps {
 export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
   const tPair = useTPair();
   const {
-    theme,
-    setTheme,
-    themePreset,
-    setThemePreset,
+    themeMode,
+    systemTheme,
+    setThemeMode,
+    themePresetLight,
+    themePresetDark,
+    setThemePresetLight,
+    setThemePresetDark,
     themeTokens,
     updateThemeTokens,
     repositoryCardFields,
     setRepositoryCardField,
   } = useAppStore(useShallow((state) => ({
-    theme: state.theme,
-    setTheme: state.setTheme,
-    themePreset: state.themePreset,
-    setThemePreset: state.setThemePreset,
+    themeMode: state.themeMode,
+    systemTheme: state.systemTheme,
+    setThemeMode: state.setThemeMode,
+    themePresetLight: state.themePresetLight,
+    themePresetDark: state.themePresetDark,
+    setThemePresetLight: state.setThemePresetLight,
+    setThemePresetDark: state.setThemePresetDark,
     themeTokens: state.themeTokens,
     updateThemeTokens: state.updateThemeTokens,
     repositoryCardFields: state.repositoryCardFields,
     setRepositoryCardField: state.setRepositoryCardField,
   })));
-  const isDark = theme === 'dark';
-  const activePreset = getThemePreset(themePreset);
+  // 预设按深浅分别记忆；编辑目标用本地状态，默认落在当前实际模式上，
+  // 避免跟随系统时预设选择随系统翻动而漂移。
+  const theme = resolveTheme(themeMode, systemTheme);
+  const [editMode, setEditMode] = React.useState<'light' | 'dark'>(theme);
+  const editPresetId = editMode === 'dark' ? themePresetDark : themePresetLight;
+  const activePreset = getThemePreset(editPresetId);
+  const setEditPreset = React.useCallback((preset: ThemePresetId) => {
+    if (editMode === 'dark') {
+      setThemePresetDark(preset);
+    } else {
+      setThemePresetLight(preset);
+    }
+  }, [editMode, setThemePresetDark, setThemePresetLight]);
   const presetAccentColor = hslTripletToHex(
-    (isDark ? activePreset.darkColors : activePreset.lightColors).primary,
+    (editMode === 'dark' ? activePreset.darkColors : activePreset.lightColors).primary,
   ) ?? '#2563eb';
 
   // Roving tabindex: arrow keys move focus across preset options; selection
@@ -80,11 +98,11 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
     const nextButton = buttons[nextIndex];
     const nextPresetId = nextButton?.dataset.themePresetId;
     if (nextPresetId) {
-      setThemePreset(nextPresetId as ThemePresetId);
+      setEditPreset(nextPresetId as ThemePresetId);
     }
     event.preventDefault();
     nextButton?.focus();
-  }, [setThemePreset]);
+  }, [setEditPreset]);
 
   return (
     <>
@@ -102,9 +120,13 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
           </p>
           <RadioGroup
             aria-labelledby="theme-mode-label"
-            value={theme}
-            onValueChange={(value) => setTheme(value as 'light' | 'dark')}
-            className="grid max-w-md grid-cols-2 gap-4"
+            value={themeMode}
+            onValueChange={(value) => {
+              setThemeMode(value as 'light' | 'dark' | 'system');
+              // 显式选定深/浅时，配色编辑目标同步跟随，避免网格高亮另一模式的预设。
+              if (value === 'light' || value === 'dark') setEditMode(value);
+            }}
+            className="grid max-w-md grid-cols-3 gap-4"
           >
             <Label
               htmlFor="theme-mode-light"
@@ -126,6 +148,16 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                 {t('themeSettingsCard.dark')}
               </span>
             </Label>
+            <Label
+              htmlFor="theme-mode-system"
+              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
+            >
+              <RadioGroupItem value="system" id="theme-mode-system" aria-labelledby="theme-mode-system-label" />
+              <MonitorCog className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              <span id="theme-mode-system-label" className="text-base font-medium text-foreground">
+                {t('themeSettingsCard.system')}
+              </span>
+            </Label>
           </RadioGroup>
         </div>
 
@@ -136,6 +168,34 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
           <p className="mb-3 text-xs text-muted-foreground">
             {t('themeSettingsCard.switch-the-interface-color-scheme-instantly-chan')}
           </p>
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div
+              role="radiogroup"
+              aria-label={t('themeSettingsCard.color-mode-target')}
+              className="inline-flex overflow-hidden rounded-lg border border-border"
+            >
+              {(['light', 'dark'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={editMode === mode}
+                  onClick={() => setEditMode(mode)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${
+                    editMode === mode
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-background dark:hover:bg-card/[0.10]'
+                  }`}
+                >
+                  {mode === 'light'
+                    ? <Sun className="h-3.5 w-3.5" aria-hidden="true" />
+                    : <Moon className="h-3.5 w-3.5" aria-hidden="true" />}
+                  {t(mode === 'light' ? 'themeSettingsCard.light' : 'themeSettingsCard.dark')}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground">{t('themeSettingsCard.per-mode-hint')}</span>
+          </div>
           <div
             role="radiogroup"
             aria-labelledby="theme-preset-label"
@@ -144,8 +204,8 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
           >
             {THEME_PRESETS.map((preset) => {
 
-              const swatch = getThemeSwatch(preset, isDark);
-              const isActive = themePreset === preset.id;
+              const swatch = getThemeSwatch(preset, editMode === 'dark');
+              const isActive = editPresetId === preset.id;
               return (
                 <button
                   key={preset.id}
@@ -154,7 +214,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                   aria-checked={isActive}
                   tabIndex={isActive ? 0 : -1}
                   data-theme-preset-id={preset.id}
-                  onClick={() => setThemePreset(preset.id as ThemePresetId)}
+                  onClick={() => setEditPreset(preset.id as ThemePresetId)}
                   className={`group relative flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isActive
                       ? 'border-primary ring-2 ring-primary/30'

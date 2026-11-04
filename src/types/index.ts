@@ -9,6 +9,9 @@ import type { RepositoryChatSettings } from './repositoryChat';
 export type { RepositoryChatSettings } from './repositoryChat';
 import type { ThemeTokens } from './themeTokens';
 export type { ThemeTokens } from './themeTokens';
+
+/** 显示模式偏好：system = 跟随操作系统深浅设置 */
+export type ThemeMode = 'light' | 'dark' | 'system';
 import type { TrendingSnapshot } from './trendingSnapshot';
 export type { TrendingSnapshot } from './trendingSnapshot';
 export type {
@@ -565,9 +568,13 @@ export interface AppState {
   assetFilters: AssetFilter[]; // 新增：资源过滤器
   
   // UI
-  theme: 'light' | 'dark';
+  /** 显示模式偏好：跟随系统时由 systemTheme 解析出实际深浅 */
+  themeMode: ThemeMode;
+  /** 操作系统当前深浅偏好（不持久化，仅跟随 system 模式使用） */
+  systemTheme: 'light' | 'dark';
   /** 主题配色预设（默认 + 内置精选），见 constants/themePresets */
-  themePreset: ThemePresetId;
+  themePresetLight: ThemePresetId;
+  themePresetDark: ThemePresetId;
   currentView: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription';
   selectedCategory: string;
   language: AppLanguage;

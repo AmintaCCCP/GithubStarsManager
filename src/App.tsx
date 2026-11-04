@@ -12,7 +12,7 @@ import { BackToTop } from './components/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SyncModeChoiceModal } from './components/SyncModeChoiceModal';
 import { useAppStore, getAllCategories } from './store/useAppStore';
-import { selectAppShellState } from './store/selectors';
+import { resolveTheme, selectAppShellState } from './store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { applyThemePreset } from './lib/themePresets';
 import { applyThemeTokens } from './utils/themeTokens';
@@ -204,8 +204,10 @@ function App() {
     isAuthenticated,
     currentView,
     selectedCategory,
-    theme,
-    themePreset,
+    themeMode,
+    systemTheme,
+    themePresetLight,
+    themePresetDark,
     themeTokens,
     language,
     hasHydrated,
@@ -217,6 +219,19 @@ function App() {
 
   useAutoUpdateCheck();
   useBackendLifecycle(hasHydrated);
+
+  const theme = resolveTheme(themeMode, systemTheme);
+  // system 模式下监听操作系统深浅变化；其余模式无订阅。
+  useEffect(() => {
+    if (themeMode !== 'system' || typeof window.matchMedia !== 'function') return;
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const applySystemTheme = () => {
+      useAppStore.getState().setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+    };
+    applySystemTheme();
+    mediaQuery.addEventListener('change', applySystemTheme);
+    return () => mediaQuery.removeEventListener('change', applySystemTheme);
+  }, [themeMode]);
 
   // Restore persisted frontend debug level at startup so capture is active
   // app-wide, not only after DiagnosticLogsPanel mounts.
@@ -264,16 +279,18 @@ function App() {
     };
   }, [theme]);
 
-  // Theme preset (palette/radius/font/shadow skin) rides on data-theme.
+  // Theme preset (palette/radius/font/shadow skin) rides on data-theme;
+  // 深浅模式可分别配置，随解析出的主题切换生效。
+  const activeThemePreset = theme === 'dark' ? themePresetDark : themePresetLight;
   useEffect(() => {
-    applyThemePreset(themePreset);
-  }, [themePreset]);
+    applyThemePreset(activeThemePreset);
+  }, [activeThemePreset]);
 
   // Theme token（开发守则 §14）：内联 CSS 变量覆盖预设；恢复默认时删掉内联值，
   // 预设的 --radius / --primary 自然重新生效。排在预设 effect 之后即可。
   useEffect(() => {
     applyThemeTokens(themeTokens);
-  }, [themeTokens, theme, themePreset]);
+  }, [themeTokens, activeThemePreset]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });

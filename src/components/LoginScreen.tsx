@@ -3,6 +3,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Database, Key, Link, Loader2, Moon, Sun } from 'lucide-react';
 import { Github } from './ui/brand-icons';
 import { useAppStore } from '../store/useAppStore';
+import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
 import { safeReadText } from '../utils/clipboardUtils';
@@ -101,7 +102,7 @@ export const LoginScreen: React.FC = () => {
     repositories, gists, starredGists, releases, forks,
     customCategories, categoryOrder, hiddenDefaultCategoryIds,
     defaultCategoryOverrides, categoryListIdMap,
-    lastSync, accountWorkspaces, language, setLanguage, theme, setTheme,
+    lastSync, accountWorkspaces, language, setLanguage, themeMode, systemTheme, setThemeMode,
   } = useAppStore(useShallow((state) => ({
     setUser: state.setUser,
     setGitHubToken: state.setGitHubToken,
@@ -121,9 +122,11 @@ export const LoginScreen: React.FC = () => {
     accountWorkspaces: state.accountWorkspaces,
     language: state.language,
     setLanguage: state.setLanguage,
-    theme: state.theme,
-    setTheme: state.setTheme,
+    themeMode: state.themeMode,
+    systemTheme: state.systemTheme,
+    setThemeMode: state.setThemeMode,
   })));
+  const theme = resolveTheme(themeMode, systemTheme);
   const t = useT('login');
   const parkedWorkspaces = Object.values(accountWorkspaces ?? {});
   const cachedRepoCount = repositories.length > 0
@@ -359,7 +362,7 @@ export const LoginScreen: React.FC = () => {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card/80 shadow-sm backdrop-blur-sm" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} aria-label={t('loginScreen.toggle-theme')}>
+            <Button type="button" variant="ghost" size="icon" className="border border-border bg-card/80 shadow-sm backdrop-blur-sm" onClick={() => setThemeMode(theme === 'light' ? 'dark' : 'light')} aria-label={t('loginScreen.toggle-theme')}>
               {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
           </TooltipTrigger>

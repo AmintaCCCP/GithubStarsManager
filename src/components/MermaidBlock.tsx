@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { resolveTheme } from '../store/selectors';
 
 type MermaidModule = (typeof import('mermaid'))['default'];
 
@@ -22,7 +23,7 @@ let renderCounter = 0;
  * its own output), so injecting it via dangerouslySetInnerHTML is safe.
  */
 const MermaidBlock: React.FC<{ code: string }> = ({ code }) => {
-  const theme = useAppStore((state) => state.theme);
+  const theme = useAppStore((state) => resolveTheme(state.themeMode, state.systemTheme));
   const uiLanguage = useAppStore((state) => state.language);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

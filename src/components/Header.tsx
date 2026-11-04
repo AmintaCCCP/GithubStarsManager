@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useAppStore } from '../store/useAppStore';
+import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { HeaderMenuId, AppState } from '../types';
@@ -29,23 +30,26 @@ const MENU_META: Record<HeaderMenuId, {
 export const Header: React.FC = () => {
   const {
     user,
-    theme,
+    themeMode,
+    systemTheme,
     currentView,
     headerMenuConfig,
-    setTheme,
+    setThemeMode,
     setCurrentView,
     logout,
 
   } = useAppStore(useShallow((state) => ({
     user: state.user,
-    theme: state.theme,
+    themeMode: state.themeMode,
+    systemTheme: state.systemTheme,
     currentView: state.currentView,
     headerMenuConfig: state.headerMenuConfig,
-    setTheme: state.setTheme,
+    setThemeMode: state.setThemeMode,
     setCurrentView: state.setCurrentView,
     logout: state.logout,
     language: state.language,
   })));
+  const theme = resolveTheme(themeMode, systemTheme);
 
   const { confirm } = useDialog();
 
@@ -159,7 +163,7 @@ export const Header: React.FC = () => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                  onClick={() => setThemeMode(theme === 'light' ? 'dark' : 'light')}
                   aria-label={t('header.toggle-theme')}
                 >
                   {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}

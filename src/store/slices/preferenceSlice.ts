@@ -6,8 +6,10 @@ import { normalizeRepositoryCardFields } from '../../utils/repositoryCardFields'
 import { normalizeRepositoryCardActions } from '../../utils/repositoryCardActions';
 
 export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppActions,
-  | 'setTheme'
-  | 'setThemePreset'
+  | 'setThemeMode'
+  | 'setSystemTheme'
+  | 'setThemePresetLight'
+  | 'setThemePresetDark'
   | 'updateThemeTokens'
   | 'setCurrentView'
   | 'setSelectedCategory'
@@ -41,8 +43,10 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setIncludeKeysInBackup'
 >> = (set) => ({
       // UI actions
-      setTheme: (theme) => set({ theme }),
-      setThemePreset: (themePreset) => set({ themePreset }),
+      setThemeMode: (themeMode) => set({ themeMode }),
+      setSystemTheme: (systemTheme) => set({ systemTheme }),
+      setThemePresetLight: (themePresetLight) => set({ themePresetLight }),
+      setThemePresetDark: (themePresetDark) => set({ themePresetDark }),
       // Theme token 只存声明式偏好；写 CSS 变量的副作用在 App 的 effect 里。
       // 合并当前值后再 normalize，调用方传局部即可，脏值也进不了根节点。
       updateThemeTokens: (patch) => set((state) => ({

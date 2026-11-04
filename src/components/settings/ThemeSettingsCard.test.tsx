@@ -33,11 +33,16 @@ const t = makeT('zh', 'app');
 beforeEach(() => {
   Object.assign(mocks.state, {
     language: 'zh',
-    theme: 'dark',
-    themePreset: 'default',
-    setTheme: vi.fn((mode: 'light' | 'dark') => setStateTheme(mode)),
-    setThemePreset: vi.fn((preset: string) => {
-      mocks.state.themePreset = preset;
+    themeMode: 'dark',
+    systemTheme: 'light',
+    themePresetLight: 'default',
+    themePresetDark: 'default',
+    setThemeMode: vi.fn((mode: 'light' | 'dark' | 'system') => setStateTheme(mode)),
+    setThemePresetLight: vi.fn((preset: string) => {
+      mocks.state.themePresetLight = preset;
+    }),
+    setThemePresetDark: vi.fn((preset: string) => {
+      mocks.state.themePresetDark = preset;
     }),
     // Theme token（开发守则 §14）：局部更新，内部与当前值合并
     themeTokens: { accentColor: null, fontScale: 1, radius: 'default', animation: 'normal' },
@@ -55,8 +60,8 @@ beforeEach(() => {
   });
 });
 
-function setStateTheme(mode: 'light' | 'dark') {
-  mocks.state.theme = mode;
+function setStateTheme(mode: 'light' | 'dark' | 'system') {
+  mocks.state.themeMode = mode;
 }
 
 describe('ThemeSettingsCard', () => {
@@ -127,7 +132,7 @@ describe('ThemeSettingsCard', () => {
     const radios = within(presetGroup).getAllByRole('radio');
     radios[0].focus();
     await user.keyboard('{ArrowRight}');
-    expect(mocks.state.themePreset).toBe(THEME_PRESETS[1].id);
+    expect(mocks.state.themePresetDark).toBe(THEME_PRESETS[1].id);
   });
 
   it('marks exactly one preset active by default', () => {
@@ -143,15 +148,16 @@ describe('ThemeSettingsCard', () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
     await user.click(screen.getByRole('radio', { name: /深邃紫/ }));
-    expect(mocks.state.themePreset).toBe('deep-purple');
-    expect(mocks.state.theme).toBe('dark');
+    expect(mocks.state.themePresetDark).toBe('deep-purple');
+    expect(mocks.state.themeMode).toBe('dark');
   });
 
   it('switches display mode through the mode radio group', async () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
-    await user.click(screen.getByText('浅色'));
-    expect(mocks.state.theme).toBe('light');
+    const modeGroup = screen.getByRole('radiogroup', { name: '显示模式' });
+    await user.click(within(modeGroup).getByText('浅色'));
+    expect(mocks.state.themeMode).toBe('light');
   });
 
   it('writes theme tokens through the store action', async () => {

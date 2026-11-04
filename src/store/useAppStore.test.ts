@@ -1084,30 +1084,40 @@ describe('useAppStore repository view mode', () => {
 });
 
 describe('useAppStore theme preset', () => {
-  it('defaults the theme preset for legacy persisted state', () => {
+  it('defaults the theme mode and presets for legacy persisted state', () => {
     const normalized = normalizePersistedState({}, useAppStore.getState());
 
-    expect(normalized.themePreset).toBe('default');
+    expect(normalized.themeMode).toBe('dark');
+    expect(normalized.themePresetLight).toBe('default');
+    expect(normalized.themePresetDark).toBe('default');
   });
 
-  it('falls back to the default preset for unknown persisted values', () => {
+  it('falls back to the default presets for unknown persisted values', () => {
     const normalized = normalizePersistedState(
-      { themePreset: 'does-not-exist' as never },
+      { themePresetLight: 'does-not-exist' as never, themePresetDark: 'does-not-exist' as never },
       useAppStore.getState(),
     );
 
-    expect(normalized.themePreset).toBe('default');
+    expect(normalized.themePresetLight).toBe('default');
+    expect(normalized.themePresetDark).toBe('default');
   });
 
-  it('restores a known persisted preset and switches it at runtime', () => {
-    const normalized = normalizePersistedState({ themePreset: 'deep-purple' }, useAppStore.getState());
-    expect(normalized.themePreset).toBe('deep-purple');
+  it('migrates legacy theme/themePreset into the new mode-aware fields', () => {
+    const normalized = normalizePersistedState(
+      { theme: 'light', themePreset: 'deep-purple' } as never,
+      useAppStore.getState(),
+    );
+    expect(normalized.themeMode).toBe('light');
+    expect(normalized.themePresetLight).toBe('deep-purple');
+    expect(normalized.themePresetDark).toBe('deep-purple');
+  });
 
-    useAppStore.setState({ themePreset: 'default' });
-    const themeBeforeSwitch = useAppStore.getState().theme;
-    useAppStore.getState().setThemePreset('deep-purple');
-    expect(useAppStore.getState().themePreset).toBe('deep-purple');
-    expect(useAppStore.getState().theme).toBe(themeBeforeSwitch);
+  it('keeps light and dark presets independent at runtime', () => {
+    useAppStore.setState({ themePresetLight: 'default', themePresetDark: 'default' });
+    useAppStore.getState().setThemePresetLight('deep-purple');
+    useAppStore.getState().setThemePresetDark('zen-inspired');
+    expect(useAppStore.getState().themePresetLight).toBe('deep-purple');
+    expect(useAppStore.getState().themePresetDark).toBe('zen-inspired');
   });
 });
 

@@ -1,6 +1,14 @@
 import type { AppStoreState } from './types';
 
 /**
+ * 将显示模式偏好解析为实际深浅主题：system 跟随操作系统，其余直接生效。
+ */
+export const resolveTheme = (
+  themeMode: AppStoreState['themeMode'],
+  systemTheme: AppStoreState['systemTheme'],
+): 'light' | 'dark' => (themeMode === 'system' ? systemTheme : themeMode);
+
+/**
  * Domain selectors intentionally return only the state and actions a caller
  * renders or invokes. Consumers must wrap aggregate selectors with
  * `useShallow` so unrelated Store changes retain the previous selection.
@@ -9,8 +17,10 @@ export const selectAppShellState = (state: AppStoreState) => ({
   isAuthenticated: state.isAuthenticated,
   currentView: state.currentView,
   selectedCategory: state.selectedCategory,
-  theme: state.theme,
-  themePreset: state.themePreset,
+  themeMode: state.themeMode,
+  systemTheme: state.systemTheme,
+  themePresetLight: state.themePresetLight,
+  themePresetDark: state.themePresetDark,
   themeTokens: state.themeTokens,
   language: state.language,
   hasHydrated: state.hasHydrated,
@@ -38,8 +48,8 @@ export const selectRepositoryListState = (state: AppStoreState) => ({
 
 export const selectPreferenceState = (state: AppStoreState) => ({
   language: state.language,
-  theme: state.theme,
-  themePreset: state.themePreset,
+  themeMode: state.themeMode,
+  systemTheme: state.systemTheme,
   currentView: state.currentView,
   selectedCategory: state.selectedCategory,
   isSidebarCollapsed: state.isSidebarCollapsed,
