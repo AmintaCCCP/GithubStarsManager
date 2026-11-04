@@ -6,26 +6,57 @@ const { EventEmitter } = require('node:events');
 
 const {
   scheduleMinimizeToTray,
+  hideWindowToTray,
+  restoreWindowFromTray,
   registerDidFinishLoadPaintProbe,
   probeWindowPaint,
 } = require('./windowLifecycle');
 
-function makeWindow({ minimized = true, destroyed = false } = {}) {
+function withPlatform(platform, run) {
+  const original = process.platform;
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+  try {
+    run();
+  } finally {
+    Object.defineProperty(process, 'platform', { value: original, configurable: true });
+  }
+}
+
+function makeWindow({ minimized = true, destroyed = false, visible = false } = {}) {
   return {
     hidden: false,
     minimized,
     destroyed,
+    visible,
+    focused: false,
+    calls: [],
     restore() {
+      this.calls.push('restore');
       this.minimized = false;
     },
     hide() {
+      this.calls.push('hide');
       this.hidden = true;
+    },
+    show() {
+      this.calls.push('show');
+      this.visible = true;
+    },
+    focus() {
+      this.calls.push('focus');
+      this.focused = true;
     },
     isDestroyed() {
       return this.destroyed;
     },
     isMinimized() {
       return this.minimized;
+    },
+    isVisible() {
+      return this.visible;
+    },
+    isFocused() {
+      return this.focused;
     },
   };
 }
@@ -106,22 +137,100 @@ describe('scheduleMinimizeToTray', () => {
     assert.equal(win.hidden, false);
   });
 
-  it('hides without restoring, leaving iconic cleanup to tray-show', () => {
-    const calls = [];
+  it('clears the iconic state before hiding on Windows', () => {
     const win = makeWindow();
-    win.restore = () => calls.push('restore');
-    win.hide = () => {
-      calls.push('hide');
-      win.hidden = true;
-    };
 
-    scheduleMinimizeToTray({
-      win,
-      shouldHide: () => true,
-      schedule: (callback) => callback(),
+    withPlatform('win32', () => {
+      scheduleMinimizeToTray({
+        win,
+        shouldHide: () => true,
+        schedule: (callback) => callback(),
+      });
     });
 
-    assert.deepEqual(calls, ['hide']);
+    // A window hidden while iconic parks its compositor and defeats the later
+    // tray-show restore (#551); the parked window must only ever be hidden.
+    assert.deepEqual(win.calls, ['restore', 'hide']);
+    assert.equal(win.minimized, false);
+    assert.equal(win.hidden, true);
+  });
+
+  it('hides directly without restoring outside Windows', () => {
+    const win = makeWindow();
+
+    withPlatform('darwin', () => {
+      scheduleMinimizeToTray({
+        win,
+        shouldHide: () => true,
+        schedule: (callback) => callback(),
+      });
+    });
+
+    assert.deepEqual(win.calls, ['hide']);
+    assert.equal(win.hidden, true);
+  });
+});
+
+describe('hideWindowToTray', () => {
+  it('clears the iconic state before hiding on Windows', () => {
+    const win = makeWindow({ minimized: true });
+
+    withPlatform('win32', () => hideWindowToTray({ win }));
+
+    assert.deepEqual(win.calls, ['restore', 'hide']);
+    assert.equal(win.minimized, false);
+    assert.equal(win.hidden, true);
+  });
+
+  it('hides an already normal window on Windows without restoring', () => {
+    const win = makeWindow({ minimized: false });
+
+    withPlatform('win32', () => hideWindowToTray({ win }));
+
+    assert.deepEqual(win.calls, ['hide']);
+    assert.equal(win.hidden, true);
+  });
+
+  it('hides directly outside Windows', () => {
+    const win = makeWindow({ minimized: true });
+
+    withPlatform('darwin', () => hideWindowToTray({ win }));
+
+    assert.deepEqual(win.calls, ['hide']);
+    assert.equal(win.hidden, true);
+  });
+});
+
+describe('restoreWindowFromTray', () => {
+  it('restores, then always re-runs show and focus', () => {
+    const win = makeWindow({ minimized: true });
+
+    restoreWindowFromTray({ win });
+
+    assert.deepEqual(win.calls, ['restore', 'show', 'focus']);
+    assert.equal(win.minimized, false);
+    assert.equal(win.visible, true);
+  });
+
+  it('shows a hidden non-minimized window without restoring', () => {
+    const win = makeWindow({ minimized: false, visible: false });
+
+    restoreWindowFromTray({ win });
+
+    assert.deepEqual(win.calls, ['show', 'focus']);
+    assert.equal(win.visible, true);
+  });
+
+  it('re-runs show even when the window already reports itself visible', () => {
+    // Regression: a window hidden while iconic can be surfaced by restore()'s
+    // SC_RESTORE without the content show path, so it reports visible while its
+    // compositor stays parked and clicks never land (#551). Only an
+    // unconditional show() repairs that state.
+    const win = makeWindow({ minimized: false, visible: true });
+
+    restoreWindowFromTray({ win });
+
+    assert.deepEqual(win.calls, ['show', 'focus']);
   });
 });
 
@@ -148,6 +257,25 @@ describe('registerDidFinishLoadPaintProbe', () => {
   it('is wired into the Electron main process', () => {
     const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
     assert.match(source, /registerDidFinishLoadPaintProbe\(\{/);
+  });
+
+  it('routes tray restore through restoreWindowFromTray', () => {
+    const source = fs.readFileSync(path.join(__dirname, 'main.js'), 'utf8');
+    const fnStart = source.indexOf('function restoreMainWindow() {');
+    assert.ok(fnStart >= 0, 'restoreMainWindow must be defined');
+    // Scope the assertions to the function body so a stray mention elsewhere
+    // in main.js cannot satisfy the wiring check.
+    const fnBody = source.slice(fnStart, source.indexOf('\n}\n', fnStart));
+    // Pin the whole guard block so the test verifies the recreate-on-destroyed
+    // branch and that the restore call stays unconditional at top level:
+    // wrapping it in a conditional would leave a hidden window unpainted,
+    // because probeWindowPaint returns early for invisible windows.
+    const restoreAt = fnBody.search(
+      /^  if \(!mainWindow \|\| mainWindow\.isDestroyed\(\)\) \{\n    createWindow\(\);\n    return;\n  \}\n  restoreWindowFromTray\(\{ win: mainWindow \}\);$/m,
+    );
+    const probeAt = fnBody.indexOf("scheduleWindowPaintProbe('restore-main-window')");
+    assert.ok(restoreAt > 0, 'restoreMainWindow must call restoreWindowFromTray');
+    assert.ok(probeAt > restoreAt, 'the paint probe must be armed after the restore');
   });
 
   it('disables native window occlusion before the app is ready', () => {

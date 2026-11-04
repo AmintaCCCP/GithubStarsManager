@@ -10,15 +10,47 @@ const { performance } = require('node:perf_hooks');
  * A restore can arrive before the scheduled callback runs, so re-check both
  * the preference and window state before hiding.
  */
+/**
+ * Park a window in the tray.
+ *
+ * Windows parks the compositor of a window hidden while iconic: the later
+ * tray-show restore() (WM_SYSCOMMAND/SC_RESTORE) can surface that HWND without
+ * re-running the content show path, leaving it visible but without frames or
+ * input, and focus() cannot activate it (#551). Clear the iconic state before
+ * hiding so a tray-parked window is only ever hidden, never iconic.
+ */
+function hideWindowToTray({ win }) {
+  // The minimize path parks the window right after the user clicked its
+  // minimize button, so it is still foreground and the restore cannot steal
+  // focus. A close-to-tray hide only reaches this with the window iconic via
+  // taskbar close, where the same brief restore is harmless.
+  if (process.platform === 'win32' && win.isMinimized()) win.restore();
+  win.hide();
+}
+
 function scheduleMinimizeToTray({ win, shouldHide, schedule = setImmediate }) {
   if (!shouldHide()) return;
 
   schedule(() => {
+    // Re-check the state: a restore can arrive before this callback runs.
     if (!shouldHide() || win.isDestroyed() || !win.isMinimized()) return;
-    // hide() leaves the HWND iconic, but restoring here would briefly activate
-    // the window; restoreMainWindow() clears that state at tray-show time.
-    win.hide();
+    hideWindowToTray({ win });
   });
+}
+
+/**
+ * Bring a tray-parked window back to an interactive state (#551).
+ *
+ * On Windows, restore() maps to WM_SYSCOMMAND/SC_RESTORE, which can surface a
+ * hidden window without re-running the full content show path: the window
+ * becomes visible while its compositor stays parked and clicks never reach the
+ * page. show() always re-runs that path (content show plus activation), so run
+ * it unconditionally instead of only when the window reports itself invisible.
+ */
+function restoreWindowFromTray({ win }) {
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
 }
 
 function registerDidFinishLoadPaintProbe({ webContents, getWindow, scheduleProbe }) {
@@ -280,6 +312,8 @@ function probeWindowPaint({
 
 module.exports = {
   scheduleMinimizeToTray,
+  hideWindowToTray,
+  restoreWindowFromTray,
   registerDidFinishLoadPaintProbe,
   probeWindowPaint,
 };
