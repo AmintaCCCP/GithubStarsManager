@@ -2,6 +2,16 @@ import { WebDAVConfig } from '../types';
 import { logger } from './logger';
 import { backend } from './backendAdapter';
 
+/**
+ * 剥掉字符串末尾的全部斜杠。`/\/+$/` 这类带量词的锚定正则会被 CodeQL 判为
+ * 对不可控输入的多项式回溯，统一用线性扫描替代（见 server 端同款处理）。
+ */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* / */) end -= 1;
+  return value.slice(0, end);
+}
+
 export class WebDAVService {
   private config: WebDAVConfig;
 
@@ -86,6 +96,12 @@ export class WebDAVService {
     return `Basic ${credentials}`;
   }
 
+  private getCustomUserAgentHeader(): Record<string, string> {
+    const userAgent = this.config.customUserAgent?.trim();
+    // 含控制字符的头会被 undici/Chromium 拒绝（备份导入等旁路可能绕过表单校验），退回默认 UA 而不是让请求失败
+    return userAgent && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(userAgent) ? { 'User-Agent': userAgent } : {};
+  }
+
   private getFullPath(filename: string): string {
     const basePath = this.config.path.endsWith('/') ? this.config.path : `${this.config.path}/`;
     return `${this.config.url}${basePath}${filename}`;
@@ -110,15 +126,22 @@ export class WebDAVService {
     requestPath: string,
     init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<Response> {
-    const targetUrl = `${this.config.url}${requestPath}`;
+    // requestPath 恒以 / 开头：拼接前剥掉 config.url 的尾斜杠，避免 URL 带
+    // 尾斜杠的配置（如备份导入）产生 /dav//backup 这样的双斜杠请求——
+    // 服务器按原样返回 href 时 multistatusTargetSucceeded 会匹配不到目标条目
+    const targetUrl = `${stripTrailingSlashes(this.config.url)}${requestPath}`;
+    const userAgentHeaders = this.getCustomUserAgentHeader();
 
     if (window.electronAPI?.webdavRequest) {
-      return this.desktopDavFetch(method, targetUrl, init);
+      return this.desktopDavFetch(method, targetUrl, {
+        ...init,
+        headers: { ...userAgentHeaders, ...(init?.headers ?? {}) },
+      });
     }
 
     if (backend.isAvailable) {
       // Authorization 由后端依据配置生成，避免两份凭据冲突
-      const forwardHeaders: Record<string, string> = { ...(init?.headers ?? {}) };
+      const forwardHeaders: Record<string, string> = { ...userAgentHeaders, ...(init?.headers ?? {}) };
       delete forwardHeaders['Authorization'];
       return backend.proxyWebDAV(
         this.config.id,
@@ -132,9 +155,10 @@ export class WebDAVService {
       );
     }
 
+    // 浏览器直连时 Chrome 会静默丢弃自定义 User-Agent，该头仅桌面版与后端代理路径生效
     return fetch(targetUrl, {
       method,
-      headers: init?.headers,
+      headers: { ...userAgentHeaders, ...(init?.headers ?? {}) },
       body: init?.body,
       signal: init?.signal,
     });
@@ -393,6 +417,30 @@ export class WebDAVService {
   }
 
   /**
+   * 配置 URL 自带的路径前缀（如 https://host/dav/alice 的 /dav/alice）。
+   * 多状态体里的 href 是服务器侧完整路径，比对目标时必须拼上它，
+   * 否则带前缀的 URL 永远匹配不到目标条目，只能靠"找不到→放行"兜底。
+   */
+  private getUrlPathPrefix(): string {
+    let pathname: string;
+    try {
+      pathname = new URL(this.config.url).pathname;
+    } catch {
+      return ''; // 非法 URL 按无前缀处理
+    }
+    try {
+      // href 比对前已 decodeURIComponent，前缀必须同样解码，否则含空格/非
+      // ASCII 的路径（如 /dav%20space）永远匹配不上
+      return stripTrailingSlashes(decodeURIComponent(pathname));
+    } catch {
+      // 非法百分号编码（如 /dav%ZZ）保留原文：服务器 href 大概率同样是原始
+      // 形态（multistatusTargetSucceeded 对 href 解码失败也按原文比对），
+      // 丢弃前缀会让资源级 404 匹配不到而被误放行
+      return stripTrailingSlashes(pathname);
+    }
+  }
+
+  /**
    * RFC 4918：207 Multi-Status 的外层成功不代表目标资源本身成功——响应体可为
    * 目标 href 携带资源级失败状态（如 404）。解析多状态体并检查目标路径对应的
    * response 条目：无资源级 status（仅属性级 propstat 状态，个别属性 404 属
@@ -407,7 +455,11 @@ export class WebDAVService {
       const responses = Array.from(doc.getElementsByTagName('*')).filter((el) => el.localName === 'response');
       if (responses.length === 0) return true;
 
-      const normalizedTarget = `/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
+      const tail = `/${targetPath.replace(/^\/+|\/+$/g, '')}`.toLowerCase();
+      const prefix = this.getUrlPathPrefix().toLowerCase();
+      // href 形态因服务器而异：标准实现返回含 URL 前缀的完整路径；反向代理可能
+      // 返回相对内部 DAV 根的裸路径。两种都参与匹配，避免资源级 404 被误放行。
+      const targets = prefix && prefix !== '/' ? [`${prefix}${tail}`, tail] : [tail];
       const match = responses.find((el) => {
         const hrefEl = Array.from(el.children).find((child) => child.localName === 'href');
         if (!hrefEl) return false;
@@ -418,8 +470,8 @@ export class WebDAVService {
         const path = href.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').replace(/\/+$/, '').toLowerCase();
         // 精确匹配：宽松的 endsWith 会让 /old/backup 误配 /backup，或让空路径
         // 选中任意条目——多状态体里先出现失败条目时会读错资源级状态。
-        if (path === '' && normalizedTarget === '/') return true;
-        return path === normalizedTarget;
+        if (path === '' && tail === '/') return true;
+        return targets.includes(path);
       });
       if (!match) return true;
 
@@ -431,6 +483,63 @@ export class WebDAVService {
       return code === 0 ? true : code >= 200 && code < 300;
     } catch {
       return true; // 解析失败按外层 207 放行，不误伤可用连接
+    }
+  }
+
+  /**
+   * 带客户端超时的 MKCOL 请求。浏览器直连的 davFetch 只消费 signal 不消费
+   * timeoutMs，不带 signal 时服务器停滞会让 ensureDirectoryExists 一直挂起。
+   * （PROPFIND 探测在 directoryExists 中自带覆盖响应体读取的超时。）
+   */
+  private async probeDav(
+    method: 'MKCOL',
+    path: string,
+    timeoutMs: number = 15000,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await this.davFetch(method, path, {
+        headers: { 'Authorization': this.getAuthHeader() },
+        signal: controller.signal,
+        timeoutMs,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * PROPFIND Depth:0 复核集合是否存在。仅在 MKCOL 返回 405/409 这类歧义状态时
+   * 用于消歧：按 RFC 4918，405 表示"集合已存在"，但部分网关（如 CSTCloud 的
+   * Zotero 型 WebDAV）对禁用的方法同样返回 405。返回 true/false；PROPFIND 也
+   * 被拒或网络异常时返回 null（无法判定），调用方应保持旧行为不误伤。
+   */
+  private async directoryExists(path: string): Promise<boolean | null> {
+    // 超时必须覆盖到响应体读取：fetch 的计时器只到响应头，207 响应体停滞时
+    // response.text() 同样会挂起；中止信号能让挂起的 body 读取一并结束
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await this.davFetch('PROPFIND', path, {
+        headers: { 'Authorization': this.getAuthHeader(), 'Depth': '0' },
+        signal: controller.signal,
+        timeoutMs: 15000,
+      });
+      if (res.status === 207) {
+        // 207 外层成功不代表目标集合存在：多状态体可能为目标 href 携带资源级 404。
+        // multistatusTargetSucceeded 对读取/解析失败统一放行 true，若系超时中止
+        // 所致应按"无法判定"处理，不能当成存在
+        const succeeded = await this.multistatusTargetSucceeded(res, path);
+        return controller.signal.aborted ? null : succeeded;
+      }
+      if (res.ok) return true;
+      if (res.status === 404) return false;
+      return null;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -451,8 +560,9 @@ export class WebDAVService {
 
       logger.info('webdav', '文件大小', { sizeKB: fileAnalysis.sizeKB, compressedKB: Math.round(compressedContent.length / 1024) });
 
-      // 确保目录存在
-      await this.ensureDirectoryExists();
+      // 确保目录存在；missingPath 记录"确认缺失且无法创建"的最深目录，
+      // 供 PUT 失败时给出可操作的提示（如禁止 MKCOL 的网关）
+      const dirState = await this.ensureDirectoryExists();
 
       // 动态计算超时时间：基于压缩后文件大小，最小60秒，最大300秒
       const finalSizeKB = Math.round(compressedContent.length / 1024);
@@ -487,10 +597,22 @@ export class WebDAVService {
               throw new Error('身份验证失败。请检查用户名和密码。');
             }
             if (response.status === 403) {
+              // MKCOL 被禁的网关（如 CSTCloud Zotero 型 WebDAV）会让 PUT 打在
+              // 探测不到的集合上被 403 拒绝。提示优先指向路径本身；但 PROPFIND
+              // 404 也可能是权限伪装，两种可能都要提及
+              if (dirState.missingPath) {
+                throw new Error(`访问被拒绝：父目录 ${dirState.missingPath} 可能不存在（且服务器不允许创建子目录），也可能无访问权限。请将 WebDAV 路径改为已存在的目录（例如 / 或 /zotero/），或检查账号对该路径的权限。`);
+              }
               throw new Error('访问被拒绝。请检查指定路径的权限。');
             }
             if (response.status === 404) {
+              if (dirState.missingPath) {
+                throw new Error(`路径未找到：父目录 ${dirState.missingPath} 可能不存在（服务器不允许创建子目录），也可能无访问权限。请将 WebDAV 路径改为已存在的目录，或检查路径与权限。`);
+              }
               throw new Error('路径未找到。请验证WebDAV URL和路径是否正确。');
+            }
+            if (response.status === 409 && dirState.missingPath) {
+              throw new Error(`上传失败，HTTP状态码 409: 父目录 ${dirState.missingPath} 可能不存在（服务器不允许创建子目录），也可能无访问权限。请将 WebDAV 路径改为已存在的目录，或检查权限。`);
             }
             if (response.status === 507) {
               throw new Error('服务器存储空间不足。');
@@ -526,10 +648,14 @@ export class WebDAVService {
     }
   }
 
-  private async ensureDirectoryExists(): Promise<void> {
+  /**
+   * 逐级确保配置路径下的目录存在。返回缺失且无法创建的最深目录（若有），
+   * 供调用方在 PUT 失败时给出可操作的提示。
+   */
+  private async ensureDirectoryExists(): Promise<{ missingPath?: string }> {
     try {
       if (!this.config.path || this.config.path === '/') {
-        return; // 根目录总是存在
+        return {}; // 根目录总是存在
       }
 
       // 逐级创建目录，避免服务器因中间目录不存在而返回 409/403
@@ -540,27 +666,36 @@ export class WebDAVService {
       for (const seg of segments) {
         currentPath += `/${seg}`;
         try {
-          const res = await this.davFetch('MKCOL', currentPath, {
-            headers: { 'Authorization': this.getAuthHeader() },
-            timeoutMs: 15000,
-          });
+          const res = await this.probeDav('MKCOL', currentPath);
 
-          // 201 Created（新建）或 405 Method Not Allowed（已存在）都视为成功
-          if (!res.ok && res.status !== 405) {
-            // 某些服务器对已存在目录返回 409 Conflict
-            if (res.status !== 409) {
-              logger.warn('webdav', '无法创建目录', { currentPath, status: res.status });
-              break; // 不再继续往下建
+          // 201 Created（新建）视为成功
+          if (res.ok) continue;
+
+          // 405/409 语义有歧义：可能是"集合已存在"，也可能是网关禁用了 MKCOL
+          // （如 CSTCloud 的 Zotero 型 WebDAV）或父目录缺失。用 PROPFIND 复核，
+          // 避免把不存在的目录误判为已存在——否则 PUT 会打在缺失集合上被
+          // 403/409 拒绝，且"访问被拒绝"的提示会误导用户去查权限。
+          if (res.status === 405 || res.status === 409) {
+            const exists = await this.directoryExists(currentPath);
+            if (exists === false) {
+              logger.warn('webdav', '服务器拒绝创建目录且目录不存在', { currentPath, status: res.status });
+              return { missingPath: currentPath };
             }
+            continue; // 已存在或无法判定：按旧行为继续尝试下一段
           }
+
+          logger.warn('webdav', '无法创建目录', { currentPath, status: res.status });
+          return {}; // 其他失败不标记缺失（可能只是临时网络问题），保持旧行为
         } catch (e) {
           logger.warn('webdav', '创建目录发生异常', { currentPath, error: e });
-          break;
+          return {};
         }
       }
+      return {};
     } catch (error) {
       logger.warn('webdav', '目录创建检查失败', error);
       // 不在这里抛出错误，因为目录可能已经存在
+      return {};
     }
   }
 
@@ -805,6 +940,10 @@ export class WebDAVService {
       errors.push('路径是必需的');
     } else if (!config.path.startsWith('/')) {
       errors.push('路径必须以 / 开头');
+    }
+
+    if (config.customUserAgent && /[^\u0020-\u007e\u00a0-\u00ff]/.test(config.customUserAgent)) {
+      errors.push('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
     }
 
     return errors;

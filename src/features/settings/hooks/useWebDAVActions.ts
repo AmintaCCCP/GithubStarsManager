@@ -7,7 +7,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
 
-export type WebDAVForm = Pick<WebDAVConfig, 'name' | 'url' | 'username' | 'password' | 'path'>;
+export type WebDAVForm = Pick<WebDAVConfig, 'name' | 'url' | 'username' | 'password' | 'path' | 'customUserAgent'>;
 
 export interface WebDAVActions {
   testingId: string | null;
@@ -36,6 +36,7 @@ export const useWebDAVActions = (): WebDAVActions => {
         if (error === '密码是必需的') return t('useWebDAVActions.password-is-required');
         if (error === '路径是必需的') return t('useWebDAVActions.path-is-required');
         if (error === '路径必须以 / 开头') return t('useWebDAVActions.path-must-start-with');
+        if (error === '自定义 User-Agent 只能包含拉丁字符（Latin-1）') return t('useWebDAVActions.custom-user-agent-invalid-chars');
         return error;
       });
       toast(translated.join('\n'), 'error');
@@ -50,6 +51,7 @@ export const useWebDAVActions = (): WebDAVActions => {
       username: form.username,
       password: form.password,
       path: form.path,
+      customUserAgent: form.customUserAgent?.trim() || undefined,
       isActive: existingConfig?.isActive ?? false,
     };
 

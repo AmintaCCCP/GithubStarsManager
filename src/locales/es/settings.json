@@ -67,6 +67,7 @@
     "password-is-required": "Se requiere contraseña",
     "path-is-required": "Se requiere camino",
     "path-must-start-with": "La ruta debe comenzar con /",
+    "custom-user-agent-invalid-chars": "El User-Agent personalizado solo puede contener caracteres latinos (Latin-1)",
     "webdav-connection-successful": "¡Conexión WebDAV exitosa!",
     "webdav-connection-failed-please-check-configurat": "La conexión WebDAV falló, verifique la configuración.",
     "webdav-test-failed": "La prueba WebDAV falló"

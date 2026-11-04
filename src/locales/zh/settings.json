@@ -67,6 +67,7 @@
     "password-is-required": "密码是必需的",
     "path-is-required": "路径是必需的",
     "path-must-start-with": "路径必须以 / 开头",
+    "custom-user-agent-invalid-chars": "自定义 User-Agent 只能包含拉丁字符（Latin-1）",
     "webdav-connection-successful": "WebDAV连接成功！",
     "webdav-connection-failed-please-check-configurat": "WebDAV连接失败，请检查配置。",
     "webdav-test-failed": "WebDAV测试失败"

@@ -1,10 +1,13 @@
 import type Database from 'better-sqlite3';
-import { initializeSchema } from './schema.js';
+import { initializeSchema, addColumnIfMissing } from './schema.js';
 import { logger } from '../services/logger.js';
 
 const migrations: Record<number, (db: Database.Database) => void> = {
   1: (db) => {
     initializeSchema(db);
+  },
+  2: (db) => {
+    addColumnIfMissing(db, 'webdav_configs', 'custom_user_agent', 'TEXT');
   },
 };
 

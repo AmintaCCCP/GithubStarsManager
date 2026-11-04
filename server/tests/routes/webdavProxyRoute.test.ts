@@ -79,6 +79,23 @@ describe('WebDAV proxy route', () => {
     expect(options.headers.Authorization).toBe(`Basic ${Buffer.from('alice:secret').toString('base64')}`);
   });
 
+  it('passes the client-supplied custom User-Agent through to the target server', async () => {
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/webdav')
+      .send({
+        configId: 'webdav-1',
+        method: 'PROPFIND',
+        path: '/backup/',
+        headers: { 'User-Agent': 'rclone/v1.68.0' },
+      })
+      .expect(200);
+
+    const options = proxyRequestMock.mock.calls[0][0];
+    expect(options.headers['User-Agent']).toBe('rclone/v1.68.0');
+  });
+
   it('passes PROPFIND XML through untouched so the client can parse it', async () => {
     const app = createTestApp();
     const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:"><D:response><D:href>/backup/a.json</D:href></D:response></D:multistatus>';
@@ -177,5 +194,24 @@ describe('WebDAV proxy route', () => {
     const options = proxyRequestMock.mock.calls[0][0];
     expect(options.url).toBe('https://dav.example.com/backup.json');
     expect(options.headers.Authorization).toBe(`Basic ${Buffer.from('bob:pw').toString('base64')}`);
+  });
+
+  it('strips trailing slashes from the base URL before appending the request path', async () => {
+    // 双斜杠请求会让服务器按原样返回 href，前端的多状态体比对匹配不到目标条目
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/webdav')
+      .send({
+        configId: 'not-synced-yet',
+        method: 'PROPFIND',
+        path: '/backup/',
+        inlineUrl: 'https://dav.example.com/dav/',
+        inlineUsername: 'bob',
+        inlinePassword: 'pw',
+      })
+      .expect(200);
+
+    expect(proxyRequestMock.mock.calls[0][0].url).toBe('https://dav.example.com/dav/backup/');
   });
 });

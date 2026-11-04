@@ -9,6 +9,11 @@ const router = Router();
 
 type SecretStatus = 'ok' | 'empty' | 'decrypt_failed';
 
+// 控制字符或 Latin-1 以外的码位会被 undici 拒绝，直接拒绝存储
+function sanitizeUserAgent(value: unknown): string | null {
+  return typeof value === 'string' && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(value) ? value : null;
+}
+
 function getMaskedSecretResult(params: {
   encryptedValue: unknown;
   encryptionKey: string;
@@ -324,6 +329,7 @@ router.get('/api/configs/webdav', (req, res) => {
         passwordStatus: status,
         path: row.path,
         isActive: !!row.is_active,
+        customUserAgent: (row.custom_user_agent as string | undefined) ?? undefined,
       };
     });
     res.json(configs);
@@ -337,18 +343,18 @@ router.get('/api/configs/webdav', (req, res) => {
 router.post('/api/configs/webdav', (req, res) => {
   try {
     const db = getDb();
-    const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
+    const { name, url, username, password, path, isActive, customUserAgent } = req.body as Record<string, unknown>;
 
     const encryptedPwd = password && typeof password === 'string' ? encrypt(password, config.encryptionKey) : null;
 
     const result = db.prepare(
-      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO webdav_configs (name, url, username, password_encrypted, path, is_active, custom_user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
       name ?? '', url ?? '', username ?? '', encryptedPwd,
-      path ?? '/', isActive ? 1 : 0
+      path ?? '/', isActive ? 1 : 0, sanitizeUserAgent(customUserAgent)
     );
 
-    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive });
+    res.status(201).json({ id: result.lastInsertRowid, name, url, username, password: maskPassword(password as string), path, isActive: !!isActive, customUserAgent: sanitizeUserAgent(customUserAgent) });
   } catch (err) {
     logger.errorFromError('configs.createWebDAV', 'POST /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to create WebDAV config', code: 'CREATE_WEBDAV_CONFIG_FAILED' });
@@ -371,6 +377,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       password: string;
       path: string;
       isActive: boolean;
+      customUserAgent?: string;
     }>;
 
     if (!Array.isArray(configs)) {
@@ -389,8 +396,8 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
       db.prepare('DELETE FROM webdav_configs').run();
 
       const stmt = db.prepare(`
-        INSERT INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active, custom_user_agent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       for (const c of configs) {
@@ -423,7 +430,7 @@ router.put('/api/configs/webdav/bulk', (req, res) => {
 
         stmt.run(
           c.id, c.name ?? '', c.url ?? '', c.username ?? '',
-          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0
+          encryptedPwd, c.path ?? '/', c.isActive ? 1 : 0, sanitizeUserAgent(c.customUserAgent)
         );
         syncResult.inserted++;
       }
@@ -462,7 +469,7 @@ router.put('/api/configs/webdav/:id', (req, res) => {
   try {
     const db = getDb();
     const id = req.params.id;
-    const { name, url, username, password, path, isActive } = req.body as Record<string, unknown>;
+    const { name, url, username, password, path, isActive, customUserAgent } = req.body as Record<string, unknown>;
 
     let encryptedPwd: string | null = null;
     if (password && typeof password === 'string' && !password.startsWith('***')) {
@@ -473,8 +480,8 @@ router.put('/api/configs/webdav/:id', (req, res) => {
     }
 
     const result = db.prepare(
-      'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_active = ? WHERE id = ?'
-    ).run(name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', isActive ? 1 : 0, id);
+      'UPDATE webdav_configs SET name = ?, url = ?, username = ?, password_encrypted = ?, path = ?, is_active = ?, custom_user_agent = ? WHERE id = ?'
+    ).run(name ?? '', url ?? '', username ?? '', encryptedPwd, path ?? '/', isActive ? 1 : 0, sanitizeUserAgent(customUserAgent), id);
 
     if (result.changes === 0) {
       res.status(404).json({ error: 'WebDAV config not found', code: 'WEBDAV_CONFIG_NOT_FOUND' });
@@ -485,7 +492,7 @@ router.put('/api/configs/webdav/:id', (req, res) => {
       try { maskedPwd = maskPassword(decrypt(encryptedPwd, config.encryptionKey)); } catch { maskedPwd = '****'; }
     }
 
-    res.json({ id, name, url, username, password: maskedPwd, path, isActive: !!isActive });
+    res.json({ id, name, url, username, password: maskedPwd, path, isActive: !!isActive, customUserAgent: sanitizeUserAgent(customUserAgent) });
   } catch (err) {
     logger.errorFromError('configs.updateWebDAV', 'PUT /api/configs/webdav error', err);
     res.status(500).json({ error: 'Failed to update WebDAV config', code: 'UPDATE_WEBDAV_CONFIG_FAILED' });

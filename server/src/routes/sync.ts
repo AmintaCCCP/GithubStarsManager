@@ -5,6 +5,10 @@ import { config } from '../config.js';
 
 const router = Router();
 
+// 控制字符或 Latin-1 以外的码位会被 undici 拒绝，直接拒绝存储
+const sanitizeUserAgent = (value: unknown): string | null =>
+  typeof value === 'string' && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(value) ? value : null;
+
 /** 与前端 NOASSERTION_KEYS 对齐：空白 / NOASSERTION / Other / none 等落 null。 */
 const NO_LICENSE_KEYS = new Set(['', 'noassertion', 'other', 'none', 'no-license']);
 
@@ -350,12 +354,17 @@ router.post('/api/sync/import', (req, res) => {
           const existing = db.prepare('SELECT password_encrypted FROM webdav_configs WHERE id = ?').get(c.id) as Record<string, unknown> | undefined;
           const existingPwd = (existing?.password_encrypted as string) ?? null;
           db.prepare(`
-            INSERT OR REPLACE INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO webdav_configs (id, name, url, username, password_encrypted, path, is_active, custom_user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             c.id, c.name ?? '', c.url ?? '', c.username ?? '',
             existingPwd,
-            c.path ?? '/', (c.is_active ?? c.isActive) ? 1 : 0
+            c.path ?? '/', (c.is_active ?? c.isActive) ? 1 : 0,
+            sanitizeUserAgent(
+              typeof c.custom_user_agent === 'string' ? c.custom_user_agent
+              : typeof c.customUserAgent === 'string' ? c.customUserAgent
+              : undefined
+            )
           );
         }
         counts.webdav_configs = webdavConfigs.length;

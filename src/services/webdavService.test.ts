@@ -134,6 +134,78 @@ describe('WebDAVService 传输层选择', () => {
   });
 });
 
+describe('WebDAVService 自定义 User-Agent', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('未配置时浏览器直连不添加 User-Agent 头', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await davService().downloadFile('data.json');
+
+    const [, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect(init?.headers).not.toHaveProperty('User-Agent');
+  });
+
+  it('配置后浏览器直连携带去首尾空白的自定义 User-Agent', async () => {
+    vi.mocked(window.fetch).mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await new WebDAVService({ ...config, customUserAgent: '  rclone/v1.68.0  ' }).downloadFile('data.json');
+
+    const [, init] = vi.mocked(window.fetch).mock.calls[0];
+    expect((init?.headers as Record<string, string>)['User-Agent']).toBe('rclone/v1.68.0');
+  });
+
+  it('后端代理路径透传自定义 User-Agent 且不影响 Authorization 剥离', async () => {
+    vi.mocked(backend).isAvailable = true;
+    proxyWebDAV.mockResolvedValue(new Response('{}', { status: 200 }));
+
+    await new WebDAVService({ ...config, customUserAgent: 'rclone/v1.67.0' }).downloadFile('data.json');
+
+    const [, , , , headers] = proxyWebDAV.mock.calls[0];
+    expect(headers?.['User-Agent']).toBe('rclone/v1.67.0');
+    expect(headers?.Authorization).toBeUndefined();
+  });
+
+  it('桌面版 IPC 路径携带自定义 User-Agent', async () => {
+    const webdavRequest = vi.fn().mockResolvedValue({ success: true, status: 200, statusText: 'OK', body: '' });
+    window.electronAPI = { webdavRequest } as unknown as Window['electronAPI'];
+
+    await new WebDAVService({ ...config, customUserAgent: 'rclone/v1.68.0' }).downloadFile('data.json');
+
+    const params = webdavRequest.mock.calls[0][0];
+    expect(params.headers['User-Agent']).toBe('rclone/v1.68.0');
+    expect(params.headers.Authorization).toMatch(/^Basic /);
+  });
+
+  it('validateConfig 拒绝包含控制字符或非 Latin-1 字符的自定义 User-Agent', () => {
+    const errors = WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0\r\nX-Evil: 1' });
+    expect(errors).toContain('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
+    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'bad\x00ua' })).toContain('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
+    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/中文' })).toContain('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
+    expect(WebDAVService.validateConfig({ ...config, customUserAgent: 'rclone/v1.68.0' })).not.toContain('自定义 User-Agent 只能包含拉丁字符（Latin-1）');
+  });
+
+  it('请求侧遇无效 User-Agent 回退默认 UA 而不是发送非法头', async () => {
+    vi.mocked(window.fetch).mockImplementation(async () => new Response('{}', { status: 200 }));
+
+    await new WebDAVService({ ...config, customUserAgent: 'bad\x00ua' }).downloadFile('data.json');
+    await new WebDAVService({ ...config, customUserAgent: 'rclone/中文' }).downloadFile('data.json');
+
+    expect(vi.mocked(window.fetch).mock.calls[0][1]?.headers).not.toHaveProperty('User-Agent');
+    const [, init] = vi.mocked(window.fetch).mock.calls[1];
+    expect(init?.headers).not.toHaveProperty('User-Agent');
+  });
+});
+
 describe('WebDAVService 错误提示', () => {
   beforeEach(() => {
     vi.mocked(backend).isAvailable = false;
@@ -307,6 +379,230 @@ describe('WebDAVService 上传重试策略', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('WebDAVService 目录创建与上传路径提示', () => {
+  beforeEach(() => {
+    vi.mocked(backend).isAvailable = false;
+    proxyWebDAV.mockReset();
+    vi.mocked(window.fetch).mockReset();
+    delete window.electronAPI;
+  });
+
+  afterEach(() => {
+    delete window.electronAPI;
+  });
+
+  it('MKCOL 405 + PROPFIND 404 判定目录缺失，PUT 403 时提示改路径而不是查权限', async () => {
+    // CSTCloud 等网关对禁用的 MKCOL 也返回 405：不能再把 405 当"目录已存在"
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /zotero
+      .mockResolvedValueOnce(new Response(null, { status: 207 }))  // PROPFIND /zotero → 存在
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /zotero/github
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    const svc = new WebDAVService({ ...config, path: '/zotero/github' });
+    const attempt = svc.uploadFile('github-stars-backup.json', '{}');
+    await expect(attempt).rejects.toThrow(/父目录 \/zotero\/github 可能不存在（且服务器不允许创建子目录）/);
+    await expect(attempt).rejects.toThrow(/请将 WebDAV 路径改为已存在的目录/);
+    // PROPFIND 404 也可能是权限伪装，提示需保留权限检查建议
+    await expect(attempt).rejects.toThrow(/也可能无访问权限/);
+
+    // 403 非瞬时错误，不做无谓重试
+    const puts = vi.mocked(window.fetch).mock.calls.filter(([, init]) => init?.method === 'PUT');
+    expect(puts.length).toBe(1);
+  });
+
+  it('PROPFIND 207 多状态体报告目标集合 404 时同样判定缺失', async () => {
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/zotero</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, path: '/zotero' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/zotero 可能不存在/);
+  });
+
+  it('MKCOL 405 + PROPFIND 207（已存在）视为目录存在，正常上传', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup
+      .mockResolvedValueOnce(new Response(null, { status: 207 }))  // PROPFIND → 存在
+      .mockResolvedValueOnce(new Response(null, { status: 201 })); // PUT → 成功
+
+    await expect(davService().uploadFile('a.json', '{}')).resolves.toBe(true);
+
+    const methods = vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method);
+    expect(methods).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+    // 复核请求用 PROPFIND Depth:0，避免拉全量集合
+    const propfindInit = vi.mocked(window.fetch).mock.calls[1][1];
+    expect(propfindInit?.headers).toMatchObject({ Depth: '0' });
+  });
+
+  it('MKCOL 405 + PROPFIND 也失败（无法判定）时保持旧行为继续上传', async () => {
+    // PROPFIND 被拒/网络异常按"未知"处理，不误伤可用连接
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+
+    await expect(davService().uploadFile('a.json', '{}')).resolves.toBe(true);
+    expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+  });
+
+  it('目录确认缺失时 PUT 409 同样给出改路径提示', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
+      .mockResolvedValueOnce(new Response(null, { status: 409 })); // PUT → 409
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/HTTP状态码 409: 父目录 \/backup 可能不存在/);
+  });
+
+  it('目录确认缺失时 PUT 404 给出改路径提示（路径未找到分支）', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))  // PROPFIND → 缺失
+      .mockResolvedValueOnce(new Response(null, { status: 404 })); // PUT → 404
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow(/路径未找到：父目录 \/backup 可能不存在/);
+  });
+
+  it('目录正常创建（MKCOL 201）后 PUT 403 保留原有权限提示', async () => {
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))  // MKCOL /backup → 新建
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    await expect(davService().uploadFile('a.json', '{}')).rejects.toThrow('访问被拒绝。请检查指定路径的权限。');
+  });
+
+  it('浏览器直连时探测请求带 AbortSignal，PROPFIND 停滞会被 15s 超时中止而不阻塞上传', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      vi.mocked(window.fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+        // PROPFIND 停滞不返回，只响应 signal 中止
+        .mockImplementationOnce((_input, init) => new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+        }))
+        .mockResolvedValueOnce(new Response(null, { status: 201 })); // PUT → 成功
+
+      const promise = davService().uploadFile('a.json', '{}');
+      await vi.advanceTimersByTimeAsync(15001);
+      // 探测超时按"无法判定"处理，上传继续
+      await expect(promise).resolves.toBe(true);
+      expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+      const probeInit = vi.mocked(window.fetch).mock.calls[1][1];
+      expect(probeInit?.signal).toBeInstanceOf(AbortSignal);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('207 响应体停滞时超时同样生效，不会永久挂起上传', async () => {
+    // probeDav 的计时器只覆盖到响应头；text() 读取也要受同一 abort 约束
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      vi.mocked(window.fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+        .mockImplementationOnce((_input, init) => {
+          // 207 响应头立刻返回，但 body 永不到来，仅响应 abort
+          const stalled = {
+            status: 207,
+            ok: true,
+            text: () => new Promise<string>((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted', 'AbortError')));
+            }),
+          } as unknown as Response;
+          return Promise.resolve(stalled);
+        })
+        .mockResolvedValueOnce(new Response(null, { status: 201 })); // PUT → 成功
+
+      const promise = davService().uploadFile('a.json', '{}');
+      await vi.advanceTimersByTimeAsync(15001);
+      // 响应体读取超时按"无法判定"处理（不误判为存在），上传继续
+      await expect(promise).resolves.toBe(true);
+      expect(vi.mocked(window.fetch).mock.calls.map(([, init]) => init?.method)).toEqual(['MKCOL', 'PROPFIND', 'PUT']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('带路径前缀的 WebDAV URL 也能匹配多状态体 href（前缀 + 目标路径）', async () => {
+    // href 是服务器侧完整路径 /dav/alice/backup：只拿 /backup 比对会匹配失败
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav/alice/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))   // PROPFIND → 目标条目 404
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/alice' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
+
+  it('URL 前缀含百分号编码（空格）时先解码再与 href 比对', async () => {
+    // href 比对前已解码：/dav%20space 必须解码为 "/dav space" 才能匹配
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav space/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav%20space' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
+
+  it('反向代理返回相对内部 DAV 根的裸 href 时同样匹配（同时接受两种形态）', async () => {
+    // URL 带 /dav/alice 前缀，但反代回源的 href 可能是裸路径 /backup
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/alice' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
+
+  it('URL 含非法百分号编码时保留原文前缀与原始 href 比对', async () => {
+    // /dav%ZZ 无法解码：丢弃前缀会让资源级 404 匹配不到而被误放行
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav%ZZ/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav%ZZ' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+  });
+
+  it('配置 URL 带尾斜杠时拼接请求不带双斜杠，多状态体比对仍生效', async () => {
+    // 备份导入等旁路可能存入带尾斜杠的 URL：/dav/ + /backup 不得拼成 /dav//backup，
+    // 否则服务器按原样返回 href 时资源级 404 会匹配不到而被误放行
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))   // PROPFIND → 目标条目 404
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/', path: '/backup' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+
+    expect(vi.mocked(window.fetch).mock.calls[0][0]).toBe('https://dav.example.com/dav/backup');
   });
 });
 

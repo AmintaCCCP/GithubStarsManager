@@ -1349,6 +1349,8 @@
     "password": "密码",
     "webdav-password": "WebDAV密码",
     "path": "路径",
+    "custom-user-agent": "自定义 User-Agent",
+    "custom-user-agent-hint": "部分服务（如 CSTCloud 数据胶囊）会校验客户端 User-Agent，留空则使用默认值。浏览器直连时 Chromium 会忽略该值，请使用桌面版或后端代理。",
     "save": "保存",
     "cancel": "取消",
     "active-webdav-configuration": "当前 WebDAV 配置",

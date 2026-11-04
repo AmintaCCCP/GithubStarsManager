@@ -67,6 +67,7 @@
     "password-is-required": "비밀번호가 필요합니다",
     "path-is-required": "경로는 필수입니다",
     "path-must-start-with": "경로는 /로 시작해야 합니다.",
+    "custom-user-agent-invalid-chars": "사용자 지정 User-Agent에는 라틴 문자(Latin-1)만 사용할 수 있습니다.",
     "webdav-connection-successful": "WebDAV 연결이 성공했습니다!",
     "webdav-connection-failed-please-check-configurat": "WebDAV 연결에 실패했습니다. 구성을 확인하십시오.",
     "webdav-test-failed": "WebDAV 테스트 실패"

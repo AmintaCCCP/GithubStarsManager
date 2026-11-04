@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 
-function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+export function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (!columns.some((col) => col.name === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
@@ -163,6 +163,7 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'vector_search_configs', 'embedding_format_version', 'INTEGER');
   addColumnIfMissing(db, 'repositories', 'vector_indexed_at', 'TEXT');
   addColumnIfMissing(db, 'repositories', 'license', 'TEXT');
+  addColumnIfMissing(db, 'webdav_configs', 'custom_user_agent', 'TEXT');
   // 上一次向量索引时采用的 license 值（SPDX id / null）。用于增量谓词判断 license 是否
   // 变化：当期 license 与此值不一致时需重新索引，保证 license 变更能使向量元数据失效。
   addColumnIfMissing(db, 'repositories', 'vector_indexed_license', 'TEXT');

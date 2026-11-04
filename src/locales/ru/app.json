@@ -1349,6 +1349,8 @@
     "password": "пароль",
     "webdav-password": "Пароль WebDAV",
     "path": "путь",
+    "custom-user-agent": "Пользовательский User-Agent",
+    "custom-user-agent-hint": "Некоторые сервисы (например, CSTCloud Data Capsule) проверяют User-Agent клиента. Оставьте пустым, чтобы использовать значение по умолчанию. При прямом подключении из браузера Chromium игнорирует это значение; используйте десктоп-приложение или прокси бэкенда.",
     "save": "сохранять",
     "cancel": "Отмена",
     "active-webdav-configuration": "Текущая конфигурация WebDAV",
