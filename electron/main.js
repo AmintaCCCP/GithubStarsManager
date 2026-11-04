@@ -66,6 +66,8 @@ const {
 } = require('./xAuthStorage');
 const {
   scheduleMinimizeToTray,
+  hideWindowToTray,
+  restoreWindowFromTray,
   registerDidFinishLoadPaintProbe,
   probeWindowPaint,
 } = require('./windowLifecycle');
@@ -396,7 +398,7 @@ function createWindow() {
     // #345: 关闭默认常驻托盘（设置-通用可改）。真退出只走 isQuitting 路径。
     if (!isQuitting && desktopPrefs.closeToTray) {
       event.preventDefault();
-      mainWindow.hide();
+      hideWindowToTray({ win: mainWindow });
     }
   });
 
@@ -1059,9 +1061,7 @@ function restoreMainWindow() {
     createWindow();
     return;
   }
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  if (!mainWindow.isVisible()) mainWindow.show();
-  mainWindow.focus();
+  restoreWindowFromTray({ win: mainWindow });
   scheduleWindowPaintProbe('restore-main-window');
 }
 
