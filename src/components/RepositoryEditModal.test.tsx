@@ -107,6 +107,28 @@ describe("RepositoryEditModal", () => {
     expect(saved.custom_tags).toBeUndefined();
   });
 
+  it("keeps typed AI-summary text as custom when the repo is pinned to original", async () => {
+    render(
+      <RepositoryEditModal
+        isOpen
+        onClose={vi.fn()}
+        repository={{
+          ...repository,
+          ai_summary: "AI summary",
+          description_display: "original",
+        }}
+      />,
+    );
+
+    const description = screen.getByLabelText("自定义描述");
+    fireEvent.change(description, { target: { value: "AI summary" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(storeState.updateRepository).toHaveBeenCalled());
+    const saved = storeState.updateRepository.mock.calls[0][0] as Repository;
+    expect(saved.custom_description).toBe("AI summary");
+  });
+
   it("preserves an in-progress draft when polling replaces the repository object", () => {
     const onClose = vi.fn();
     const { rerender } = render(

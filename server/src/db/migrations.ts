@@ -9,6 +9,10 @@ const migrations: Record<number, (db: Database.Database) => void> = {
   2: (db) => {
     addColumnIfMissing(db, 'webdav_configs', 'custom_user_agent', 'TEXT');
   },
+  3: (db) => {
+    addColumnIfMissing(db, 'repositories', 'description_display', 'TEXT');
+    addColumnIfMissing(db, 'repositories', 'tags_display', 'TEXT');
+  },
 };
 
 export function runMigrations(db: Database.Database): void {

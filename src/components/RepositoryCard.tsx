@@ -1429,6 +1429,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           onClose={() => setEditModalOpen(false)}
           onOutsideDismiss={handleEditModalOutsideDismiss}
           repository={repository}
+          showAISummary={showAISummary}
         />,
         document.body
       )}
@@ -1502,6 +1503,8 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.repository.ai_platforms === nextProps.repository.ai_platforms &&
     prevProps.repository.custom_description === nextProps.repository.custom_description &&
     prevProps.repository.custom_tags === nextProps.repository.custom_tags &&
+    prevProps.repository.description_display === nextProps.repository.description_display &&
+    prevProps.repository.tags_display === nextProps.repository.tags_display &&
     prevProps.repository.custom_category === nextProps.repository.custom_category &&
     prevProps.repository.category_locked === nextProps.repository.category_locked &&
     prevProps.repository.description === nextProps.repository.description &&

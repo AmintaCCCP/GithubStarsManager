@@ -20,6 +20,8 @@ interface RepositoryEditModalProps {
   onClose: () => void;
   onOutsideDismiss?: () => void;
   repository: Repository | null;
+  /** 列表页"显示内容"开关状态：follow 偏好的回退显示需与卡片保持一致 */
+  showAISummary?: boolean;
 }
 
 /**
@@ -64,7 +66,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   isOpen,
   onClose,
   onOutsideDismiss,
-  repository
+  repository,
+  showAISummary = true
 }) => {
   const { updateRepository, language, customCategories, hiddenDefaultCategoryIds, defaultCategoryOverrides } = useAppStore(useShallow((state) => ({
     updateRepository: state.updateRepository,
@@ -189,7 +192,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   /**
    * 获取当前实际显示的内容（与 RepositoryCard 显示逻辑保持一致）
    */
-  const getEffectiveDisplayContent = useCallback((repo: Repository) => {
+  const getEffectiveDisplayContent = useCallback((repo: Repository, listShowAI: boolean) => {
     // 描述：优先级 custom_description(非undefined) > ai_summary > description
     // custom_description === '' 表示用户明确清空，表单中显示为空
     // custom_description === undefined 表示无自定义，回退到AI/原始
@@ -200,7 +203,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       effectiveDescription = repo.ai_summary;
     } else if (repo.description_display === 'original' && repo.description && repo.description.trim() !== '') {
       effectiveDescription = repo.description;
-    } else if (repo.ai_summary && repo.ai_summary.trim() !== '') {
+    } else if (listShowAI && !repo.analysis_failed && repo.ai_summary && repo.ai_summary.trim() !== '') {
       effectiveDescription = repo.ai_summary;
     } else if (repo.description && repo.description.trim() !== '') {
       effectiveDescription = repo.description;
@@ -216,10 +219,10 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       effectiveTags = repo.ai_tags;
     } else if (repo.tags_display === 'topics') {
       effectiveTags = repo.topics ?? [];
-    } else if (repo.ai_tags && repo.ai_tags.length > 0) {
-      effectiveTags = repo.ai_tags;
-    } else if (repo.topics && repo.topics.length > 0) {
-      effectiveTags = repo.topics;
+    } else {
+      const isAnalyzed = !!repo.analyzed_at && !repo.analysis_failed;
+      const aiTagsUsable = isAnalyzed && !!repo.ai_tags && repo.ai_tags.length > 0;
+      effectiveTags = listShowAI && aiTagsUsable && repo.ai_tags ? repo.ai_tags : (repo.topics ?? []);
     }
 
     return { effectiveDescription, effectiveTags };
@@ -244,7 +247,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
       const source = determineSource(repository);
 
       // 获取当前实际显示的内容
-      const { effectiveDescription, effectiveTags } = getEffectiveDisplayContent(repository);
+      const { effectiveDescription, effectiveTags } = getEffectiveDisplayContent(repository, showAISummary);
 
       /**
        * 确定初始编辑意图
@@ -252,11 +255,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
        */
       const initialIntent: EditIntent = {
         description: source.description === 'custom' ? 'keep-custom' :
-                     source.description === 'none' ? 'clear' :
+                     source.description === 'none' && repository.custom_description === '' ? 'clear' :
                      repository.description_display === 'ai' ? 'reset-to-ai' :
                      repository.description_display === 'original' ? 'reset-to-original' : 'follow',
         tags: source.tags === 'custom' ? 'keep-custom' :
-              source.tags === 'none' ? 'clear' :
+              source.tags === 'none' && repository.custom_tags !== undefined ? 'clear' :
               repository.tags_display === 'ai' ? 'reset-to-ai' :
               repository.tags_display === 'topics' ? 'reset-to-original' : 'follow',
         category: source.category === 'custom' ? 'keep-custom' :
@@ -276,7 +279,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
 
       setFormData(initialData);
       initialDataRef.current = JSON.parse(JSON.stringify(initialData));
-  }, [repository, isOpen, allCategories, determineSource, getEffectiveDisplayContent, getCurrentCategory]);
+  }, [repository, isOpen, showAISummary, allCategories, determineSource, getEffectiveDisplayContent, getCurrentCategory]);
 
   /**
    * 保存处理 - 根据编辑意图决定如何保存
@@ -329,11 +332,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           updatedRepo.custom_description = '';
         }
         // 如果与AI总结一致，清除自定义描述（让显示逻辑回退到AI）
-        else if (descTrimmed === (repository.ai_summary || '').trim()) {
+        else if (descTrimmed === (repository.ai_summary || '').trim() && updatedRepo.description_display !== 'original') {
           updatedRepo.custom_description = undefined;
         }
         // 如果与原始描述一致，清除自定义描述（让显示逻辑回退到原始）
-        else if (descTrimmed === (repository.description || '').trim()) {
+        else if (descTrimmed === (repository.description || '').trim() && updatedRepo.description_display !== 'ai') {
           updatedRepo.custom_description = undefined;
         }
         // 否则保存为自定义
@@ -385,11 +388,13 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         }
         // 如果与AI标签完全一致，清除自定义标签
         else if (JSON.stringify([...currentTags].sort()) === JSON.stringify([...aiTags].sort())) {
-          updatedRepo.custom_tags = undefined;
+          // 固定显示Topics时这组标签不会展示，须保留为自定义标签
+          updatedRepo.custom_tags = updatedRepo.tags_display === 'topics' ? currentTags : undefined;
         }
         // 如果与Topics完全一致，清除自定义标签
         else if (JSON.stringify([...currentTags].sort()) === JSON.stringify([...topics].sort())) {
-          updatedRepo.custom_tags = undefined;
+          // 固定显示AI标签时这组标签不会展示，须保留为自定义标签
+          updatedRepo.custom_tags = updatedRepo.tags_display === 'ai' ? currentTags : undefined;
         }
         // 否则保存为自定义
         else {
@@ -541,7 +546,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    */
   const followListSetting = () => {
     if (!repository) return;
-    const { effectiveDescription } = getEffectiveDisplayContent(repository);
+    const { effectiveDescription } = getEffectiveDisplayContent(repository, showAISummary);
     setFormData(prev => ({ ...prev, description: effectiveDescription }));
     setEditIntent(prev => ({ ...prev, description: 'follow' }));
   };
@@ -585,7 +590,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    */
   const followTagsListSetting = () => {
     if (!repository) return;
-    const { effectiveTags } = getEffectiveDisplayContent(repository);
+    const { effectiveTags } = getEffectiveDisplayContent(repository, showAISummary);
     setFormData(prev => ({ ...prev, tags: effectiveTags }));
     setEditIntent(prev => ({ ...prev, tags: 'follow' }));
   };

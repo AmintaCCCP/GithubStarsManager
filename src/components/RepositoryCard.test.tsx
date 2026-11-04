@@ -791,4 +791,24 @@ describe('RepositoryCard display preferences (issue #565)', () => {
     renderPrefCard({ ...prefRepo, tags_display: 'ai' }, false);
     expect(screen.getByText('ai-tag')).toBeInTheDocument();
   });
+
+  it('re-renders when a display preference changes on the same repository object fields', () => {
+    const { rerender } = renderPrefCard(prefRepo, true);
+    expect(screen.getByText('AI summary text')).toBeInTheDocument();
+
+    rerender(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard
+            repository={{ ...prefRepo, description_display: 'original' }}
+            allCategories={[]}
+            viewMode="grid"
+            showAISummary={true}
+          />
+        </TooltipProvider>
+      </DialogProvider>
+    );
+    expect(screen.getByText('Original description text')).toBeInTheDocument();
+    expect(screen.queryByText('AI summary text')).not.toBeInTheDocument();
+  });
 });

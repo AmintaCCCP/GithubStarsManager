@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { toDisplayPref, DESCRIPTION_DISPLAY_VALUES, TAGS_DISPLAY_VALUES } from './repositories.js';
 
 const router = Router();
 
@@ -214,8 +215,8 @@ router.post('/api/sync/import', (req, res) => {
             // INSERT OR REPLACE 会整行替换，故备份无此列时落 null（影响：增量谓词会
             // 触发一次重索引回填指纹），合预期。
             vectorIndexedLicense
-            , typeof r.description_display === 'string' ? r.description_display : null
-            , typeof r.tags_display === 'string' ? r.tags_display : null
+            , toDisplayPref(r.description_display, DESCRIPTION_DISPLAY_VALUES)
+            , toDisplayPref(r.tags_display, TAGS_DISPLAY_VALUES)
           );
         }
         counts.repositories = repos.length;
