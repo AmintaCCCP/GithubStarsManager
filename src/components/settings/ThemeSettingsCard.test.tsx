@@ -169,9 +169,13 @@ describe('ThemeSettingsCard', () => {
     render(<ThemeSettingsCard t={t} />);
     const editGroup = screen.getByRole('radiogroup', { name: '配色适用模式' });
     const lightButton = within(editGroup).getByText('浅色');
+    expect(within(editGroup).getByText('深色').closest('button')).toHaveAttribute('aria-checked', 'true');
     lightButton.focus();
     await user.keyboard('{ArrowRight}');
 
+    expect(lightButton.closest('button')).toHaveAttribute('aria-checked', 'true');
+
+    await user.keyboard('{ArrowRight}');
     expect(within(editGroup).getByText('深色').closest('button')).toHaveAttribute('aria-checked', 'true');
     expect(lightButton.closest('button')).toHaveAttribute('aria-checked', 'false');
   });
