@@ -450,8 +450,12 @@ router.post('/api/proxy/webdav', async (req, res) => {
 
     // path 恒以 / 开头：拼接前剥掉 baseUrl 的尾斜杠，避免 URL 带尾斜杠的配置
     // （如备份导入）产生 /dav//backup 这样的双斜杠请求，服务器按原样返回
-    // href 时前端的多状态体比对会匹配不到目标条目
-    const targetUrl = `${baseUrl.replace(/\/+$/, '')}${path}`;
+    // href 时前端的多状态体比对会匹配不到目标条目。
+    // `/\/+$/` 这类带量词的正则会被 CodeQL 判为对不可控输入的多项式回溯，
+    // 与 completeOpenAiCompatibleUrl 一致改用线性扫描。
+    let trimmedBaseUrl = baseUrl;
+    while (trimmedBaseUrl.endsWith('/')) trimmedBaseUrl = trimmedBaseUrl.slice(0, -1);
+    const targetUrl = `${trimmedBaseUrl}${path}`;
     const credentials = Buffer.from(`${username}:${password}`).toString('base64');
 
     const safeHeaders = { ...(extraHeaders || {}) };

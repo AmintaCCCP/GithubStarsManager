@@ -2,6 +2,16 @@ import { WebDAVConfig } from '../types';
 import { logger } from './logger';
 import { backend } from './backendAdapter';
 
+/**
+ * 剥掉字符串末尾的全部斜杠。`/\/+$/` 这类带量词的锚定正则会被 CodeQL 判为
+ * 对不可控输入的多项式回溯，统一用线性扫描替代（见 server 端同款处理）。
+ */
+function stripTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* / */) end -= 1;
+  return value.slice(0, end);
+}
+
 export class WebDAVService {
   private config: WebDAVConfig;
 
@@ -119,7 +129,7 @@ export class WebDAVService {
     // requestPath 恒以 / 开头：拼接前剥掉 config.url 的尾斜杠，避免 URL 带
     // 尾斜杠的配置（如备份导入）产生 /dav//backup 这样的双斜杠请求——
     // 服务器按原样返回 href 时 multistatusTargetSucceeded 会匹配不到目标条目
-    const targetUrl = `${this.config.url.replace(/\/+$/, '')}${requestPath}`;
+    const targetUrl = `${stripTrailingSlashes(this.config.url)}${requestPath}`;
     const userAgentHeaders = this.getCustomUserAgentHeader();
 
     if (window.electronAPI?.webdavRequest) {
@@ -421,12 +431,12 @@ export class WebDAVService {
     try {
       // href 比对前已 decodeURIComponent，前缀必须同样解码，否则含空格/非
       // ASCII 的路径（如 /dav%20space）永远匹配不上
-      return decodeURIComponent(pathname).replace(/\/+$/, '');
+      return stripTrailingSlashes(decodeURIComponent(pathname));
     } catch {
       // 非法百分号编码（如 /dav%ZZ）保留原文：服务器 href 大概率同样是原始
       // 形态（multistatusTargetSucceeded 对 href 解码失败也按原文比对），
       // 丢弃前缀会让资源级 404 匹配不到而被误放行
-      return pathname.replace(/\/+$/, '');
+      return stripTrailingSlashes(pathname);
     }
   }
 
