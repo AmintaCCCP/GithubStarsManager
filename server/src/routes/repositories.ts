@@ -30,6 +30,11 @@ function toLicenseSpdxId(license: unknown): string | null {
   return null;
 }
 
+/** Normalize a per-repo display preference: only known enum values are stored, anything else means "follow". */
+function toDisplayPref(value: unknown): string | null {
+  return typeof value === 'string' && ['follow', 'ai', 'original', 'topics'].includes(value) ? value : null;
+}
+
 /** Transform a database row into the API response shape, parsing JSON columns. */
 function transformRepo(row: Record<string, unknown>) {
   return {
@@ -55,6 +60,8 @@ function transformRepo(row: Record<string, unknown>) {
     custom_tags: parseJsonColumn(row.custom_tags),
     custom_category: row.custom_category ?? undefined,
     category_locked: !!row.category_locked,
+    description_display: row.description_display ?? undefined,
+    tags_display: row.tags_display ?? undefined,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
     vector_indexed_at: row.vector_indexed_at ?? undefined,
@@ -154,8 +161,9 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
+        description_display, tags_display
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
@@ -179,6 +187,8 @@ router.put('/api/repositories', (req, res) => {
         custom_tags = CASE WHEN excluded.custom_tags IS NOT NULL AND excluded.custom_tags != '[]' THEN excluded.custom_tags ELSE repositories.custom_tags END,
         custom_category = excluded.custom_category,
         category_locked = excluded.category_locked,
+        description_display = excluded.description_display,
+        tags_display = excluded.tags_display,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
         subscribed_to_releases = excluded.subscribed_to_releases,
         vector_indexed_at = excluded.vector_indexed_at,
@@ -243,6 +253,8 @@ router.put('/api/repositories', (req, res) => {
           // 备份中 vector_indexed_license 已是规范化的 SPDX id 字符串或 null；
           // 非 string 一律清空，避免奇怪类型破坏增量谓词的字符串比较。
           typeof repo.vector_indexed_license === 'string' ? repo.vector_indexed_license || null : null,
+          toDisplayPref(repo.description_display),
+          toDisplayPref(repo.tags_display),
           { licenseProvided }
         );
         count++;
@@ -275,6 +287,8 @@ router.patch('/api/repositories/:id', (req, res) => {
       custom_tags: (v) => JSON.stringify(Array.isArray(v) ? v : []),
       custom_category: (v) => v,
       category_locked: (v) => (v === true || v === 1) ? 1 : 0,
+      description_display: (v) => toDisplayPref(v),
+      tags_display: (v) => toDisplayPref(v),
       last_edited: (v) => v,
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
       // 规范化：null/undefined/空字符串 → null；仅接受字符串（ISO 时间戳）

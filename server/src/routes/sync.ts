@@ -166,8 +166,9 @@ router.post('/api/sync/import', (req, res) => {
             owner_login, owner_avatar_url, topics,
             ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
             custom_description, custom_tags, custom_category, category_locked, last_edited,
-            subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
+            description_display, tags_display
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
           // 验证必需的字段
@@ -213,6 +214,8 @@ router.post('/api/sync/import', (req, res) => {
             // INSERT OR REPLACE 会整行替换，故备份无此列时落 null（影响：增量谓词会
             // 触发一次重索引回填指纹），合预期。
             vectorIndexedLicense
+            , typeof r.description_display === 'string' ? r.description_display : null
+            , typeof r.tags_display === 'string' ? r.tags_display : null
           );
         }
         counts.repositories = repos.length;

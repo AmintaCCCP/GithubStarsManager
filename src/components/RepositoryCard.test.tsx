@@ -746,3 +746,49 @@ describe('RepositoryCard rapid touch drags (CodeRabbit round 2)', () => {
     }
   });
 });
+
+describe('RepositoryCard display preferences (issue #565)', () => {
+  const prefRepo: Repository = {
+    ...repository,
+    description: 'Original description text',
+    ai_summary: 'AI summary text',
+    ai_tags: ['ai-tag'],
+    topics: ['topic-tag'],
+    analyzed_at: '2026-01-04T00:00:00.000Z',
+  };
+
+  const renderPrefCard = (repo: Repository, showAISummary = true) => render(
+    <DialogProvider>
+      <TooltipProvider>
+        <RepositoryCard repository={repo} allCategories={[]} viewMode="grid" showAISummary={showAISummary} />
+      </TooltipProvider>
+    </DialogProvider>
+  );
+
+  it('follows the list display switch when no per-repo preference is set', () => {
+    renderPrefCard(prefRepo);
+    expect(screen.getByText('AI summary text')).toBeInTheDocument();
+    cleanup();
+    renderPrefCard(prefRepo, false);
+    expect(screen.getByText('Original description text')).toBeInTheDocument();
+    expect(screen.queryByText('AI summary text')).not.toBeInTheDocument();
+  });
+
+  it('pins AI summary or original description when per-repo preference is set', () => {
+    renderPrefCard({ ...prefRepo, description_display: 'original' }, true);
+    expect(screen.getByText('Original description text')).toBeInTheDocument();
+    expect(screen.queryByText('AI summary text')).not.toBeInTheDocument();
+    cleanup();
+    renderPrefCard({ ...prefRepo, description_display: 'ai' }, false);
+    expect(screen.getByText('AI summary text')).toBeInTheDocument();
+  });
+
+  it('pins AI tags or Topics when per-repo tag preference is set', () => {
+    renderPrefCard({ ...prefRepo, tags_display: 'topics' }, true);
+    expect(screen.getByText('topic-tag')).toBeInTheDocument();
+    expect(screen.queryByText('ai-tag')).not.toBeInTheDocument();
+    cleanup();
+    renderPrefCard({ ...prefRepo, tags_display: 'ai' }, false);
+    expect(screen.getByText('ai-tag')).toBeInTheDocument();
+  });
+});

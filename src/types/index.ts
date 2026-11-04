@@ -68,6 +68,10 @@ export interface Repository {
   custom_tags?: string[];
   custom_category?: string;
   category_locked?: boolean;
+  /** 描述显示偏好：follow=跟随列表页"显示内容"开关（默认），ai=固定显示AI总结，original=固定显示原始描述 */
+  description_display?: 'follow' | 'ai' | 'original';
+  /** 标签显示偏好：follow=跟随列表页"显示内容"开关（默认），ai=固定显示AI标签，topics=固定显示Topics */
+  tags_display?: 'follow' | 'ai' | 'topics';
   last_edited?: string;
   vector_indexed_at?: string;  // ISO timestamp of last successful vector indexing
   /** 上次向量索引时采用的 license（SPDX id / null）。增量谓词据此判断 license 是否变化以触发重索引。 */

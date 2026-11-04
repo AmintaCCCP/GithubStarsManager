@@ -14,6 +14,8 @@ const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
   'custom_tags',
   'custom_category',
   'category_locked',
+  'description_display',
+  'tags_display',
   'last_edited',
   'vector_indexed_at',
   // GitHub 原生状态字段：后端不存储，但 Repository Health / 筛选依赖它们。

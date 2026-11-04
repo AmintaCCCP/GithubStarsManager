@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RepositoryEditModal } from "./RepositoryEditModal";
 import { deferOutsideDismiss } from "./modalDismiss";
@@ -53,6 +53,60 @@ beforeEach(() => {
 });
 
 describe("RepositoryEditModal", () => {
+  it("pins the original description when 显示原始描述 is saved (issue #565)", async () => {
+    render(
+      <RepositoryEditModal
+        isOpen
+        onClose={vi.fn()}
+        repository={{ ...repository, ai_summary: "AI summary" }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "显示原始描述" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(storeState.updateRepository).toHaveBeenCalled());
+    const saved = storeState.updateRepository.mock.calls[0][0] as Repository;
+    expect(saved.description_display).toBe("original");
+    expect(saved.custom_description).toBeUndefined();
+  });
+
+  it("returns to following the list setting when 跟随列表设置 is saved", async () => {
+    render(
+      <RepositoryEditModal
+        isOpen
+        onClose={vi.fn()}
+        repository={{ ...repository, description_display: "original", custom_description: "My text" }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "跟随列表设置" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(storeState.updateRepository).toHaveBeenCalled());
+    const saved = storeState.updateRepository.mock.calls[0][0] as Repository;
+    expect(saved.description_display).toBeUndefined();
+    expect(saved.custom_description).toBeUndefined();
+  });
+
+  it("pins Topics when 显示Topics is saved", async () => {
+    render(
+      <RepositoryEditModal
+        isOpen
+        onClose={vi.fn()}
+        repository={{ ...repository, ai_tags: ["ai-tag"] }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "显示Topics" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(storeState.updateRepository).toHaveBeenCalled());
+    const saved = storeState.updateRepository.mock.calls[0][0] as Repository;
+    expect(saved.tags_display).toBe("topics");
+    expect(saved.custom_tags).toBeUndefined();
+  });
+
   it("preserves an in-progress draft when polling replaces the repository object", () => {
     const onClose = vi.fn();
     const { rerender } = render(
