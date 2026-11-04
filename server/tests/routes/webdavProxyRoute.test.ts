@@ -195,4 +195,23 @@ describe('WebDAV proxy route', () => {
     expect(options.url).toBe('https://dav.example.com/backup.json');
     expect(options.headers.Authorization).toBe(`Basic ${Buffer.from('bob:pw').toString('base64')}`);
   });
+
+  it('strips trailing slashes from the base URL before appending the request path', async () => {
+    // 双斜杠请求会让服务器按原样返回 href，前端的多状态体比对匹配不到目标条目
+    const app = createTestApp();
+
+    await request(app)
+      .post('/api/proxy/webdav')
+      .send({
+        configId: 'not-synced-yet',
+        method: 'PROPFIND',
+        path: '/backup/',
+        inlineUrl: 'https://dav.example.com/dav/',
+        inlineUsername: 'bob',
+        inlinePassword: 'pw',
+      })
+      .expect(200);
+
+    expect(proxyRequestMock.mock.calls[0][0].url).toBe('https://dav.example.com/dav/backup/');
+  });
 });

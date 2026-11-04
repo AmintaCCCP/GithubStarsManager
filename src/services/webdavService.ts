@@ -116,7 +116,10 @@ export class WebDAVService {
     requestPath: string,
     init?: { headers?: Record<string, string>; body?: string; signal?: AbortSignal; timeoutMs?: number },
   ): Promise<Response> {
-    const targetUrl = `${this.config.url}${requestPath}`;
+    // requestPath 恒以 / 开头：拼接前剥掉 config.url 的尾斜杠，避免 URL 带
+    // 尾斜杠的配置（如备份导入）产生 /dav//backup 这样的双斜杠请求——
+    // 服务器按原样返回 href 时 multistatusTargetSucceeded 会匹配不到目标条目
+    const targetUrl = `${this.config.url.replace(/\/+$/, '')}${requestPath}`;
     const userAgentHeaders = this.getCustomUserAgentHeader();
 
     if (window.electronAPI?.webdavRequest) {

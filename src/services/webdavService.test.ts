@@ -587,6 +587,23 @@ describe('WebDAVService 目录创建与上传路径提示', () => {
     const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav%ZZ' });
     await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
   });
+
+  it('配置 URL 带尾斜杠时拼接请求不带双斜杠，多状态体比对仍生效', async () => {
+    // 备份导入等旁路可能存入带尾斜杠的 URL：/dav/ + /backup 不得拼成 /dav//backup，
+    // 否则服务器按原样返回 href 时资源级 404 会匹配不到而被误放行
+    const xml = '<?xml version="1.0"?><D:multistatus xmlns:D="DAV:">' +
+      '<D:response><D:href>/dav/backup</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>' +
+      '</D:multistatus>';
+    vi.mocked(window.fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))  // MKCOL /backup → 歧义
+      .mockResolvedValueOnce(new Response(xml, { status: 207 }))   // PROPFIND → 目标条目 404
+      .mockResolvedValueOnce(new Response(null, { status: 403 })); // PUT → 403
+
+    const svc = new WebDAVService({ ...config, url: 'https://dav.example.com/dav/', path: '/backup' });
+    await expect(svc.uploadFile('a.json', '{}')).rejects.toThrow(/父目录 \/backup 可能不存在/);
+
+    expect(vi.mocked(window.fetch).mock.calls[0][0]).toBe('https://dav.example.com/dav/backup');
+  });
 });
 
 describe('WebDAVService 连接测试探测顺序', () => {
