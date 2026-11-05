@@ -148,35 +148,35 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
             onValueChange={(value) => {
               setThemeMode(value as 'light' | 'dark' | 'system');
             }}
-            className="grid max-w-md grid-cols-3 gap-4"
+            className="grid max-w-xl grid-cols-[repeat(auto-fit,minmax(min(100%,10.5rem),1fr))] gap-3"
           >
             <Label
               htmlFor="theme-mode-light"
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
             >
               <RadioGroupItem value="light" id="theme-mode-light" aria-labelledby="theme-mode-light-label" />
               <Sun className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span id="theme-mode-light-label" className="text-base font-medium text-foreground">
+              <span id="theme-mode-light-label" className="whitespace-nowrap text-sm font-medium text-foreground">
                 {t('themeSettingsCard.light')}
               </span>
             </Label>
             <Label
               htmlFor="theme-mode-dark"
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
             >
               <RadioGroupItem value="dark" id="theme-mode-dark" aria-labelledby="theme-mode-dark-label" />
               <Moon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span id="theme-mode-dark-label" className="text-base font-medium text-foreground">
+              <span id="theme-mode-dark-label" className="whitespace-nowrap text-sm font-medium text-foreground">
                 {t('themeSettingsCard.dark')}
               </span>
             </Label>
             <Label
               htmlFor="theme-mode-system"
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-border p-3 transition-colors hover:bg-background dark:border-border dark:hover:bg-card/[0.10]"
             >
               <RadioGroupItem value="system" id="theme-mode-system" aria-labelledby="theme-mode-system-label" />
               <MonitorCog className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span id="theme-mode-system-label" className="text-base font-medium text-foreground">
+              <span id="theme-mode-system-label" className="whitespace-nowrap text-sm font-medium text-foreground">
                 {t('themeSettingsCard.system')}
               </span>
             </Label>
