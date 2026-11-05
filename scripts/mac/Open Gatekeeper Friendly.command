@@ -105,8 +105,16 @@ elif [ -d "$SCRIPT_DIR/$APP_NAME" ] && [ -f "$SCRIPT_DIR/$APP_NAME/Contents/Info
             TARGET_APP="/Applications/$APP_NAME"
         else
             echo -e "${YELLOW}!${NC} Administrator privileges required to copy to /Applications."
-            sudo cp -R "$SCRIPT_DIR/$APP_NAME" /Applications/
-            TARGET_APP="/Applications/$APP_NAME"
+            if sudo cp -R "$SCRIPT_DIR/$APP_NAME" /Applications/; then
+                TARGET_APP="/Applications/$APP_NAME"
+            else
+                echo -e "${RED}✗${NC} Failed to copy $APP_NAME to /Applications."
+                if [ "$NON_INTERACTIVE" -eq 0 ]; then
+                    read -n 1 -s -r -p "Press any key to exit..."
+                    echo ""
+                fi
+                exit 1
+            fi
         fi
         echo -e "${GREEN}✓${NC} Copied to $TARGET_APP"
     else
@@ -127,12 +135,21 @@ if [ -z "$TARGET_APP" ] || [ ! -d "$TARGET_APP" ]; then
     if [ "$NON_INTERACTIVE" -eq 0 ]; then
         echo "Please drag and drop your installed $APP_NAME into this window, then press Enter:"
         read -r USER_PATH
-        # Strip outer quotes and whitespace
-        USER_PATH="${USER_PATH%\"}"
-        USER_PATH="${USER_PATH#\"}"
-        USER_PATH="${USER_PATH%\'}"
-        USER_PATH="${USER_PATH#\'}"
-        USER_PATH="$(echo "$USER_PATH" | xargs 2>/dev/null || echo "$USER_PATH")"
+        # Strip leading/trailing whitespace
+        USER_PATH="$(echo "$USER_PATH" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        # Strip outer matching quotes without compressing multiple internal spaces
+        if [[ "$USER_PATH" =~ ^\"(.*)\"$ ]]; then
+            USER_PATH="${BASH_REMATCH[1]}"
+        elif [[ "$USER_PATH" =~ ^\'(.*)\'$ ]]; then
+            USER_PATH="${BASH_REMATCH[1]}"
+        fi
+        # Handle drag-and-drop backslash-escaped spaces if original path does not exist
+        if [ ! -e "$USER_PATH" ]; then
+            UNESCAPED_PATH="${USER_PATH//\\ / }"
+            if [ -e "$UNESCAPED_PATH" ]; then
+                USER_PATH="$UNESCAPED_PATH"
+            fi
+        fi
 
         if [ -n "$USER_PATH" ] && [ -d "$USER_PATH" ] && [ -f "$USER_PATH/Contents/Info.plist" ]; then
             TARGET_APP="$USER_PATH"
@@ -158,7 +175,7 @@ echo -e "${BLUE}→${NC} Removing quarantine and extended attributes from: ${BOL
 NEED_SUDO=0
 if ! xattr -cr "$TARGET_APP" 2>/dev/null; then
     NEED_SUDO=1
-elif xattr -p com.apple.quarantine "$TARGET_APP" 2>/dev/null; then
+elif xattr -r -p com.apple.quarantine "$TARGET_APP" 2>/dev/null | grep -q com.apple.quarantine; then
     NEED_SUDO=1
 fi
 
@@ -173,23 +190,45 @@ else
 fi
 
 # Re-sign ad-hoc on Apple Silicon / macOS to ensure valid code directory seal
+SIGN_FAILED=0
 if command -v codesign &>/dev/null; then
     echo -e "${BLUE}→${NC} Verifying code signature seal..."
     if [ "$NEED_SUDO" -eq 1 ]; then
-        sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || true
+        if ! sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+            SIGN_FAILED=1
+        fi
     else
-        codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null || true
+        if ! codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+            if ! sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+                SIGN_FAILED=1
+            fi
+        fi
     fi
 fi
 
 echo ""
-# Verification check
-if xattr -p com.apple.quarantine "$TARGET_APP" 2>/dev/null; then
-    echo -e "${RED}✗${NC} Quarantine attribute is still present. Please run manually in Terminal:"
+HAS_ERROR=0
+
+# Recursive verification check across entire app bundle
+if xattr -r -p com.apple.quarantine "$TARGET_APP" 2>/dev/null | grep -q com.apple.quarantine; then
+    echo -e "${RED}✗${NC} Quarantine attribute is still present on one or more files in the app bundle."
+    echo "Please run manually in Terminal:"
     echo "  sudo xattr -cr \"$TARGET_APP\""
+    HAS_ERROR=1
+elif [ "$SIGN_FAILED" -eq 1 ]; then
+    echo -e "${RED}✗${NC} Ad-hoc code re-signing failed. The app signature seal could not be refreshed."
+    HAS_ERROR=1
 else
     echo -e "${GREEN}✓ [SUCCESS] Quarantine removed successfully!${NC}"
     echo "GitHub Stars Manager is now ready to run."
+fi
+
+if [ "$HAS_ERROR" -eq 1 ]; then
+    if [ "$NON_INTERACTIVE" -eq 0 ]; then
+        read -n 1 -s -r -p "Press any key to exit..."
+        echo ""
+    fi
+    exit 1
 fi
 
 echo ""
