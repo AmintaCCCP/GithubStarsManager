@@ -71,8 +71,14 @@ export const createInitialState = (): AppState => ({
       collapsedSidebarCategoryCount: 20,
       categoryMatchMode: 'effective',
       assetFilters: defaultPresetFilters,
-      theme: 'dark',
-      themePreset: DEFAULT_THEME_PRESET_ID,
+      themeMode: 'dark',
+      systemTheme:
+        typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+          && window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light',
+      themePresetLight: DEFAULT_THEME_PRESET_ID,
+      themePresetDark: DEFAULT_THEME_PRESET_ID,
       hasHydrated: false,
       currentView: 'repositories',
       selectedCategory: 'all',

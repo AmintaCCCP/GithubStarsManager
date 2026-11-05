@@ -79,7 +79,9 @@ const buildState = (): Record<string, unknown> => ({
   // 以 createInitialState 为底：partialize 会直读全部持久化字段（如
   // state.gistSearchFilters.sortBy），手写的稀疏对象会让它抛错。
   ...(createInitialState() as unknown as Record<string, unknown>),
-  theme: 'dark',
+  themeMode: 'dark',
+  themePresetLight: 'default',
+  themePresetDark: 'default',
   language: 'zh',
   repositories: [{ id: 1, name: 'repo-one' }],
   lastSync: '2026-01-01T00:00:00.000Z',
@@ -163,7 +165,7 @@ beforeEach(async () => {
 describe('persistence shard layout', () => {
   it('assigns fields to the expected shards and falls back to core for unknown fields', () => {
     const views = buildShardViews({
-      theme: 'dark',
+      themeMode: 'dark',
       repositories: [{ id: 1 }],
       lastSync: '2026-01-01T00:00:00.000Z',
       gists: [],
@@ -175,7 +177,7 @@ describe('persistence shard layout', () => {
       someFutureField: 'kept-in-core',
     });
 
-    expect(Object.keys(views.core)).toEqual(['theme', 'lastSync', 'someFutureField']);
+    expect(Object.keys(views.core)).toEqual(['themeMode', 'lastSync', 'someFutureField']);
     expect(views.repositories).toEqual({ repositories: [{ id: 1 }] });
     expect(Object.keys(views.gists)).toEqual(['gists', 'starredGists']);
     expect(Object.keys(views.releases)).toEqual(['releases']);
@@ -224,7 +226,7 @@ describe('persistence shard dirty detection', () => {
   it('marks only the shard whose field reference changed', () => {
     const state = buildState();
     const baseline = viewsOf(state);
-    const next = viewsOf({ ...state, theme: 'light' });
+    const next = viewsOf({ ...state, themeMode: 'light' });
 
     expect(findDirtyShards(next, baseline)).toEqual(['core']);
   });
@@ -270,7 +272,7 @@ describe('persistence shard dirty detection', () => {
 
     expect(findDirtyShards(viewsOf(second as Record<string, unknown>), baseline)).toEqual([]);
 
-    const changed = appPersistenceOptions.partialize!({ ...state, theme: 'light' } as never);
+    const changed = appPersistenceOptions.partialize!({ ...state, themeMode: 'light' } as never);
     expect(findDirtyShards(viewsOf(changed as Record<string, unknown>), baseline)).toEqual(['core']);
   });
 });
@@ -295,7 +297,7 @@ describe('sharded persist storage', () => {
     const repositoriesShard = await readShardState('repositories');
     expect(repositoriesShard.repositories).toEqual([{ id: 1, name: 'repo-one' }]);
     const coreShard = await readShardState('core');
-    expect(coreShard.theme).toBe('dark');
+    expect(coreShard.themeMode).toBe('dark');
     expect(coreShard.lastSync).toBe('2026-01-01T00:00:00.000Z');
 
     // 旧单键快照在完整迁移提交后退役
@@ -377,8 +379,8 @@ describe('sharded persist storage', () => {
     debouncedPersistStorage.setItem(KEY, { state, version: 16 });
     await flushPendingPersistSnapshot();
 
-    const stateLight = { ...state, theme: 'light' };
-    const stateDark = { ...state, theme: 'dark' };
+    const stateLight = { ...state, themeMode: 'light' };
+    const stateDark = { ...state, themeMode: 'dark' };
     commitGate.arm();
     debouncedPersistStorage.setItem(KEY, { state: stateLight, version: 16 });
     const flushInFlight = flushPendingPersistSnapshot();
@@ -389,9 +391,9 @@ describe('sharded persist storage', () => {
     await flushInFlight;
     await flushAfterDark;
 
-    expect((await readShardState('core')).theme).toBe('dark');
+    expect((await readShardState('core')).themeMode).toBe('dark');
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
-    expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'zh' });
+    expect(rehydrated?.state).toMatchObject({ themeMode: 'dark', language: 'zh' });
   });
 
   it('rebuilds the full shard set when removeItem follows a write still in flight', async () => {
@@ -410,7 +412,7 @@ describe('sharded persist storage', () => {
 
     // 删除后的首个写入必须全量重建：meta 与全部分片一致，不存在缺失分片
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
-    expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'en' });
+    expect(rehydrated?.state).toMatchObject({ themeMode: 'dark', language: 'en' });
     expect(await readMeta()).not.toBeNull();
     expect(await readShardState('gists')).toMatchObject({ gists: [{ id: 'gist-1' }] });
     expect(await readShardState('repositories')).toMatchObject({
@@ -420,16 +422,16 @@ describe('sharded persist storage', () => {
 
   it('merges persisted shards with the legacy snapshot when some shards are missing, then converges', async () => {
     // 模拟迁移中途崩溃：meta + 部分分片已提交，旧单键快照仍在
-    const legacyState = { ...buildState(), gists: [{ id: 'legacy-gist' }], theme: 'light' };
+    const legacyState = { ...buildState(), gists: [{ id: 'legacy-gist' }], themeMode: 'light' };
     await indexedDBStorage.setItem(KEY, JSON.stringify({ state: legacyState, version: 16 }));
     await setStorageEntries(KEY, [
       [metaKeyFor(KEY), JSON.stringify({ format: 1, version: 16, shards: [...PERSISTENCE_SHARD_NAMES], savedAt: 't0' })],
-      [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { theme: 'dark', language: 'zh' } })],
+      [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { themeMode: 'dark', language: 'zh' } })],
     ]);
 
     const hydrated = await debouncedPersistStorage.getItem(KEY);
     // 存在的分片内容（更新）覆盖旧快照，缺失分片回退旧快照
-    expect(hydrated?.state).toMatchObject({ theme: 'dark', language: 'zh', gists: [{ id: 'legacy-gist' }] });
+    expect(hydrated?.state).toMatchObject({ themeMode: 'dark', language: 'zh', gists: [{ id: 'legacy-gist' }] });
 
     // 下一次写入强制提交全部分片并退役旧键（收敛迁移）
     debouncedPersistStorage.setItem(KEY, { state: buildState(), version: 16 });
@@ -438,7 +440,7 @@ describe('sharded persist storage', () => {
     expect(await readRaw(KEY)).toBeNull();
     expect(await readShardState('gists')).toMatchObject({ gists: [{ id: 'gist-1' }] });
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
-    expect(rehydrated?.state).toMatchObject({ theme: 'dark', gists: [{ id: 'gist-1' }] });
+    expect(rehydrated?.state).toMatchObject({ themeMode: 'dark', gists: [{ id: 'gist-1' }] });
   });
 
   it('assembles a full shard set and retires a leftover legacy key on read', async () => {
@@ -469,19 +471,19 @@ describe('sharded persist storage', () => {
     // H2 回归：格式合法但只列出部分分片的 meta 不得绕过恢复路径，
     // 也不得退役唯一可兜底的 legacy 单键快照。
     const legacyValue: StorageValue<unknown> = {
-      state: { theme: 'light', repositories: [{ id: 1 }], gists: [{ id: 'keep' }] },
+      state: { themeMode: 'light', repositories: [{ id: 1 }], gists: [{ id: 'keep' }] },
       version: 16,
     };
     await indexedDBStorage.setItem(KEY, JSON.stringify(legacyValue));
     for (const shards of [['core'], ['core', 'core'], [...PERSISTENCE_SHARD_NAMES.slice(0, -1)], ['core', 'unknown-shard']]) {
       await setStorageEntries(KEY, [
         [metaKeyFor(KEY), JSON.stringify({ format: 1, version: 16, shards, savedAt: 't0' })],
-        [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { theme: 'dark' } })],
+        [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { themeMode: 'dark' } })],
       ]);
       await indexedDBStorage.setItem(KEY, JSON.stringify(legacyValue));
 
       const hydrated = await debouncedPersistStorage.getItem(KEY);
-      expect(hydrated?.state).toMatchObject({ theme: 'light', gists: [{ id: 'keep' }] });
+      expect(hydrated?.state).toMatchObject({ themeMode: 'light', gists: [{ id: 'keep' }] });
       await tick();
       expect(await readRaw(KEY), `legacy must survive invalid meta ${JSON.stringify(shards)}`).not.toBeNull();
     }
@@ -489,12 +491,12 @@ describe('sharded persist storage', () => {
 
   it('salvages readable orphaned shards when meta and legacy are both gone', async () => {
     await setStorageEntries(KEY, [
-      [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { theme: 'dark', language: 'zh' } })],
+      [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { themeMode: 'dark', language: 'zh' } })],
       [shardKeyFor(KEY, 'repositories'), JSON.stringify({ format: 1, version: 16, state: { repositories: [{ id: 7 }] } })],
     ]);
 
     const hydrated = await debouncedPersistStorage.getItem(KEY);
-    expect(hydrated?.state).toMatchObject({ theme: 'dark', repositories: [{ id: 7 }] });
+    expect(hydrated?.state).toMatchObject({ themeMode: 'dark', repositories: [{ id: 7 }] });
 
     // 打捞后的首次写入以空基准全量重建（含 meta 自愈）
     debouncedPersistStorage.setItem(KEY, { state: buildState(), version: 16 });
@@ -518,12 +520,12 @@ describe('sharded persist storage', () => {
   it('hydrates best-effort from readable shards when nothing else is available', async () => {
     await setStorageEntries(KEY, [
       [metaKeyFor(KEY), JSON.stringify({ format: 1, version: 16, shards: [...PERSISTENCE_SHARD_NAMES], savedAt: 't0' })],
-      [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { theme: 'dark' } })],
+      [shardKeyFor(KEY, 'core'), JSON.stringify({ format: 1, version: 16, state: { themeMode: 'dark' } })],
     ]);
 
     const hydrated = await debouncedPersistStorage.getItem(KEY);
     expect(hydrated?.version).toBe(16);
-    expect(hydrated?.state).toEqual({ theme: 'dark' });
+    expect(hydrated?.state).toEqual({ themeMode: 'dark' });
   });
 
   it('keeps the fallback authority marker while localStorage still holds shard keys', async () => {
@@ -537,7 +539,7 @@ describe('sharded persist storage', () => {
 
     // 兜底插曲：仅 core 经兜底路径写入 localStorage；模拟兜底期间的 IDB 删除
     // 失败（IDB 刚出过故障，这并不罕见），旧 core 留在 IndexedDB
-    const fallbackCore = JSON.stringify({ format: 1, version: 16, state: { theme: 'light', language: 'en' } });
+    const fallbackCore = JSON.stringify({ format: 1, version: 16, state: { themeMode: 'light', language: 'en' } });
     const originalDelete = IDBObjectStore.prototype.delete;
     IDBObjectStore.prototype.delete = function () { throw new Error('simulated delete failure'); };
     try {
@@ -558,7 +560,7 @@ describe('sharded persist storage', () => {
     // 水合读到 localStorage 里的新 core，而不是 IndexedDB 里的旧 core
     const hydrated = await debouncedPersistStorage.getItem(KEY);
     expect(hydrated?.state).toMatchObject({
-      theme: 'light',
+      themeMode: 'light',
       language: 'en',
       releases: [{ id: 202 }],
       gists: [{ id: 'gist-1' }],
@@ -566,7 +568,7 @@ describe('sharded persist storage', () => {
 
     // 自愈：当批写入覆盖 core 且经 IDB 成功后，LS 镜像被清、不再有派生键残留，
     // 标记这才清除；之后的读取回到 IDB 优先
-    const healedCore = JSON.stringify({ format: 1, version: 16, state: { theme: 'dark', language: 'zh' } });
+    const healedCore = JSON.stringify({ format: 1, version: 16, state: { themeMode: 'dark', language: 'zh' } });
     await setStorageEntries(KEY, [[shardKeyFor(KEY, 'core'), healedCore]]);
     expect(window.localStorage.getItem(`${KEY}#fallback`)).toBeNull();
     expect(await readStrict(shardKeyFor(KEY, 'core'))).toBe(healedCore);
@@ -599,7 +601,7 @@ describe('sharded persist storage', () => {
 
     // 读取恢复后写入重新可用
     const recovered = await debouncedPersistStorage.getItem(KEY);
-    expect(recovered?.state).toMatchObject({ theme: 'dark' });
+    expect(recovered?.state).toMatchObject({ themeMode: 'dark' });
     debouncedPersistStorage.setItem(KEY, { state: { ...state, language: 'en' }, version: 16 });
     await flushPendingPersistSnapshot();
     expect((await readShardState('core')).language).toBe('en');
@@ -661,7 +663,7 @@ describe('sharded persist storage', () => {
     await flushPendingPersistSnapshot();
     expect((await readShardState('core')).language).toBe('en');
     const rehydrated = await debouncedPersistStorage.getItem(KEY);
-    expect(rehydrated?.state).toMatchObject({ theme: 'dark', language: 'en' });
+    expect(rehydrated?.state).toMatchObject({ themeMode: 'dark', language: 'en' });
   });
 });
 
@@ -720,7 +722,7 @@ describe('idle 大分片写入节流', () => {
     // 冷却期内第 2 次写入：与第 1 次合并，定时器重新对齐到冷却期末
     const releasesV3 = [{ id: 3, blob: bigBlob('z') }];
     debouncedPersistStorage.setItem(KEY, {
-      state: { ...baseState, releases: releasesV3, theme: 'light' },
+      state: { ...baseState, releases: releasesV3, themeMode: 'light' },
       version: 16,
     });
     await realWait(60);
@@ -728,7 +730,7 @@ describe('idle 大分片写入节流', () => {
 
     // 冷却到期（距上次成功写入 300ms）：定时器触发一次最终写，内容为最新值
     await settleUntil(() => diskReleasesEquals(releasesV3), '冷却到期后应落盘最新值 v3');
-    expect((await readShardState('core')).theme).toBe('light');
+    expect((await readShardState('core')).themeMode).toBe('light');
     expect((await readMeta())?.savedAt).not.toBe(savedAtAfterFirst);
   });
 
@@ -761,9 +763,9 @@ describe('idle 大分片写入节流', () => {
     debouncedPersistStorage.setItem(KEY, { state: baseState, version: 16 });
     await flushPendingPersistSnapshot();
 
-    // releases 引用未变（仅 core 的 theme 变化）：不落入大分片冷却，防抖后立即写入
-    debouncedPersistStorage.setItem(KEY, { state: { ...baseState, theme: 'light' }, version: 16 });
-    await settleUntil(async () => (await readShardState('core')).theme === 'light', '仅小分片变化应立即落盘');
+    // releases 引用未变（仅 core 的 themeMode 变化）：不落入大分片冷却，防抖后立即写入
+    debouncedPersistStorage.setItem(KEY, { state: { ...baseState, themeMode: 'light' }, version: 16 });
+    await settleUntil(async () => (await readShardState('core')).themeMode === 'light', '仅小分片变化应立即落盘');
     expect((await readShardState('releases')).releases).toEqual(bigReleases);
   });
 
@@ -775,10 +777,10 @@ describe('idle 大分片写入节流', () => {
     // releases（大分片，冷却中）与 core 同时变化：core 立即写，releases 推迟
     const releasesV2 = [{ id: 2, blob: bigBlob('y') }];
     debouncedPersistStorage.setItem(KEY, {
-      state: { ...baseState, releases: releasesV2, theme: 'light' },
+      state: { ...baseState, releases: releasesV2, themeMode: 'light' },
       version: 16,
     });
-    await settleUntil(async () => (await readShardState('core')).theme === 'light', 'core 变更不应被大分片冷却拖住');
+    await settleUntil(async () => (await readShardState('core')).themeMode === 'light', 'core 变更不应被大分片冷却拖住');
     expect(await diskReleasesEquals(bigReleases)).toBe(true); // 冷却期内 releases 未落盘
 
     await settleUntil(() => diskReleasesEquals(releasesV2), '冷却到期后 releases 应落盘 v2');

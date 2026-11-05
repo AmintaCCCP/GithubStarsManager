@@ -99,8 +99,9 @@ sortOrder: state.gistSearchFilters.sortOrder,
   trendingSnapshots: state.trendingSnapshots,
 
   // 持久化UI设置
-  theme: state.theme,
-  themePreset: state.themePreset,
+  themeMode: state.themeMode,
+  themePresetLight: state.themePresetLight,
+  themePresetDark: state.themePresetDark,
   currentView: state.currentView,
   selectedCategory: state.selectedCategory,
   language: state.language,

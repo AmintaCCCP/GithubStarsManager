@@ -5,6 +5,7 @@ import type {
   Gist,
   GistCategoryId,
   GistSearchFilters,
+  ThemeMode,
   Repository,
   Release,
   ForkRepo,
@@ -173,8 +174,10 @@ export interface AppActions {
   deleteAssetFilter: (id: string) => void;
 
   // UI actions
-  setTheme: (theme: 'light' | 'dark') => void;
-  setThemePreset: (preset: ThemePresetId) => void;
+  setThemeMode: (mode: ThemeMode) => void;
+  setSystemTheme: (systemTheme: 'light' | 'dark') => void;
+  setThemePresetLight: (preset: ThemePresetId) => void;
+  setThemePresetDark: (preset: ThemePresetId) => void;
   setCurrentView: (view: 'repositories' | 'gists' | 'releases' | 'forks' | 'settings' | 'subscription') => void;
   setSelectedCategory: (category: string) => void;
   setLanguage: (language: AppLanguage) => void;
