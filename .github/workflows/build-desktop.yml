@@ -157,8 +157,10 @@ jobs:
         mkdir -p build
         cp assets/icon.png build/icon.png
         cp assets/icon.png build/icon-512x512.png
-        if [ -f "scripts/mac/Open Gatekeeper Friendly.command" ]; then
-          chmod +x "scripts/mac/Open Gatekeeper Friendly.command"
+        cp assets/dmg-background.png build/background.png
+        cp assets/dmg-background@2x.png build/background@2x.png
+        if [ -f "scripts/mac/Fix Damaged App.command" ]; then
+          chmod +x "scripts/mac/Fix Damaged App.command"
         fi
         echo "Build resources prepared:"
         ls -la build/
@@ -293,8 +295,8 @@ jobs:
                 echo "Verifying DMG contents for $dmg..."
                 mount_point="$(mktemp -d)"
                 hdiutil attach "$dmg" -mountpoint "$mount_point" -nobrowse -quiet
-                if [ ! -x "$mount_point/Open Gatekeeper Friendly.command" ]; then
-                  echo "::error::$dmg is missing executable Open Gatekeeper Friendly.command"
+                if [ ! -x "$mount_point/Fix Damaged App.command" ]; then
+                  echo "::error::$dmg is missing executable Fix Damaged App.command"
                   hdiutil detach "$mount_point" -quiet 2>/dev/null || true
                   exit 1
                 fi
@@ -311,7 +313,7 @@ jobs:
                   exit 1
                 fi
                 hdiutil detach "$mount_point" -quiet 2>/dev/null || true
-                echo "✓ Verified $dmg includes executable Open Gatekeeper Friendly.command and passes strict codesign verification"
+                echo "✓ Verified $dmg includes executable Fix Damaged App.command and passes strict codesign verification"
               done
             fi
             ;;

@@ -77,18 +77,24 @@ mac:
 dmg:
   title: GitHub Stars Manager
   icon: build/icon.png
+  background: assets/dmg-background.png
+  iconSize: 80
+  iconTextSize: 12
+  window:
+    width: 660
+    height: 500
   contents:
-    - x: 130
-      y: 220
+    - x: 175
+      y: 130
       type: file
-    - x: 410
-      y: 220
+    - x: 485
+      y: 130
       type: link
       path: /Applications
-    - x: 270
-      y: 320
+    - x: 515
+      y: 276
       type: file
-      path: scripts/mac/Open Gatekeeper Friendly.command
+      path: scripts/mac/Fix Damaged App.command
 
 # Linux 配置
 linux:

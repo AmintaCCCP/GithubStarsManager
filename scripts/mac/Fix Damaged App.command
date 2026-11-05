@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Open Gatekeeper Friendly.command
+# Fix Damaged App.command
 #
 # Fix "GitHub Stars Manager is damaged and can't be opened" on macOS.
 # Removes the com.apple.quarantine attribute and refreshes local ad-hoc signatures.
@@ -235,7 +235,9 @@ if command -v codesign &>/dev/null; then
         SUDO_CODESIGN="sudo -n"
     fi
 
-    if [ "$NEED_SUDO" -eq 1 ]; then
+    if codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null; then
+        :
+    elif [ "$NEED_SUDO" -eq 1 ]; then
         if ! $SUDO_CODESIGN codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$TARGET_APP" 2>/dev/null; then
             SIGN_FAILED=1
         else

@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -33,7 +33,7 @@ module.exports = async function afterPack(context) {
 
   // Check if app bundle already satisfies strict code signature verification
   try {
-    execSync(`codesign --verify --deep --strict "${appPath}"`, { stdio: 'pipe' });
+    execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'pipe' });
     console.log(`[afterPack] App bundle already satisfies strict code signature verification: ${path.basename(appPath)}`);
     return;
   } catch {
@@ -42,8 +42,12 @@ module.exports = async function afterPack(context) {
 
   console.log(`[afterPack] Applying complete ad-hoc code signature seal to ${path.basename(appPath)}...`);
   try {
-    execSync(`codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "${appPath}"`, { stdio: 'inherit' });
-    execSync(`codesign --verify --deep --strict "${appPath}"`, { stdio: 'pipe' });
+    execFileSync(
+      'codesign',
+      ['--force', '--deep', '--preserve-metadata=entitlements,requirements,flags,runtime', '--sign', '-', appPath],
+      { stdio: 'inherit' }
+    );
+    execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], { stdio: 'pipe' });
     console.log(`[afterPack] ✓ Verified complete ad-hoc code signature seal on ${path.basename(appPath)}`);
   } catch (err) {
     console.error(`[afterPack] ❌ Failed to apply or verify ad-hoc code signature on ${appPath}: ${err.message}`);

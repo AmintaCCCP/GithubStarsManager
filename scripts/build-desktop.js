@@ -54,10 +54,22 @@ if (!fs.existsSync(iconSource)) {
 fs.copyFileSync(iconSource, path.join(buildDir, 'icon.png'));
 fs.copyFileSync(iconSource, path.join(buildDir, 'icon-512x512.png'));
 
-// 2.6 macOS Gatekeeper 隔离移除脚本与打包后签名钩子（#569）
-const gatekeeperScript = path.join(__dirname, 'mac/Open Gatekeeper Friendly.command');
+// 2.6 macOS DMG 安装包背景图、已损坏修复脚本与打包后签名钩子（#569）
+for (const [srcName, destName] of [
+  ['dmg-background.png', 'background.png'],
+  ['dmg-background@2x.png', 'background@2x.png'],
+]) {
+  const bgSource = path.join(__dirname, '../assets', srcName);
+  if (!fs.existsSync(bgSource)) {
+    console.error(`❌ Missing macOS DMG background asset: assets/${srcName}`);
+    process.exit(1);
+  }
+  fs.copyFileSync(bgSource, path.join(buildDir, destName));
+}
+
+const gatekeeperScript = path.join(__dirname, 'mac/Fix Damaged App.command');
 if (!fs.existsSync(gatekeeperScript)) {
-  console.error('❌ Missing macOS Gatekeeper fix script: scripts/mac/Open Gatekeeper Friendly.command');
+  console.error('❌ Missing macOS Gatekeeper fix script: scripts/mac/Fix Damaged App.command');
   process.exit(1);
 }
 try {

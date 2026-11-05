@@ -7,10 +7,12 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const SCRIPT_PATH = path.join(REPO_ROOT, 'scripts/mac/Open Gatekeeper Friendly.command');
+const SCRIPT_PATH = path.join(REPO_ROOT, 'scripts/mac/Fix Damaged App.command');
 const BUILDER_CONFIG_PATH = path.join(REPO_ROOT, 'electron-builder.yml');
+const DMG_BG_1X_PATH = path.join(REPO_ROOT, 'assets/dmg-background.png');
+const DMG_BG_2X_PATH = path.join(REPO_ROOT, 'assets/dmg-background@2x.png');
 
-test('Open Gatekeeper Friendly script file exists and is executable', (t) => {
+test('Fix Damaged App script file exists and is executable', (t) => {
   assert.ok(fs.existsSync(SCRIPT_PATH), 'script file should exist');
   if (process.platform === 'win32') {
     t.skip('Windows fs.stat does not report POSIX execute bits');
@@ -22,7 +24,7 @@ test('Open Gatekeeper Friendly script file exists and is executable', (t) => {
   assert.ok(isExecutable, 'script file should be executable');
 });
 
-test('Open Gatekeeper Friendly script has valid bash syntax', (t) => {
+test('Fix Damaged App script has valid bash syntax', (t) => {
   const result = spawnSync('bash', ['-n', SCRIPT_PATH], { encoding: 'utf8' });
   if (result.error && result.error.code === 'ENOENT') {
     t.skip('bash not found in environment');
@@ -31,7 +33,7 @@ test('Open Gatekeeper Friendly script has valid bash syntax', (t) => {
   assert.equal(result.status, 0, `bash -n failed: ${result.stderr}`);
 });
 
-test('Open Gatekeeper Friendly script responds to --help', (t) => {
+test('Fix Damaged App script responds to --help', (t) => {
   const result = spawnSync('bash', [SCRIPT_PATH, '--help'], { encoding: 'utf8' });
   if (result.error && result.error.code === 'ENOENT') {
     t.skip('bash not found in environment');
@@ -42,7 +44,7 @@ test('Open Gatekeeper Friendly script responds to --help', (t) => {
   assert.match(result.stdout, /quarantine/i);
 });
 
-test('Open Gatekeeper Friendly script rejects non-application directories', (t) => {
+test('Fix Damaged App script rejects non-application directories', (t) => {
   const tmpDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'non-app-test-'));
   try {
     const result = spawnSync('bash', [SCRIPT_PATH, '--non-interactive', tmpDir], { encoding: 'utf8' });
@@ -57,10 +59,13 @@ test('Open Gatekeeper Friendly script rejects non-application directories', (t) 
   }
 });
 
-test('electron-builder.yml specifies afterPack hook and Open Gatekeeper Friendly.command in dmg.contents', () => {
+test('electron-builder.yml specifies afterPack hook, custom DMG background, and Fix Damaged App.command in dmg.contents', () => {
   assert.ok(fs.existsSync(BUILDER_CONFIG_PATH), 'electron-builder.yml should exist');
+  assert.ok(fs.existsSync(DMG_BG_1X_PATH), 'assets/dmg-background.png should exist');
+  assert.ok(fs.existsSync(DMG_BG_2X_PATH), 'assets/dmg-background@2x.png should exist');
   const content = fs.readFileSync(BUILDER_CONFIG_PATH, 'utf8');
-  assert.match(content, /scripts\/mac\/Open Gatekeeper Friendly\.command/);
+  assert.match(content, /scripts\/mac\/Fix Damaged App\.command/);
+  assert.match(content, /background:\s*assets\/dmg-background\.png/);
   assert.match(content, /dmg:\s*\n[\s\S]*contents:/);
   assert.match(content, /afterPack:\s*scripts\/mac\/after-pack\.cjs/);
 });
