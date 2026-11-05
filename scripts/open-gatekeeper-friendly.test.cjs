@@ -57,11 +57,48 @@ test('Open Gatekeeper Friendly script rejects non-application directories', (t) 
   }
 });
 
-test('electron-builder.yml specifies Open Gatekeeper Friendly.command in dmg.contents', () => {
+test('electron-builder.yml specifies afterPack hook and Open Gatekeeper Friendly.command in dmg.contents', () => {
   assert.ok(fs.existsSync(BUILDER_CONFIG_PATH), 'electron-builder.yml should exist');
   const content = fs.readFileSync(BUILDER_CONFIG_PATH, 'utf8');
   assert.match(content, /scripts\/mac\/Open Gatekeeper Friendly\.command/);
   assert.match(content, /dmg:\s*\n[\s\S]*contents:/);
+  assert.match(content, /afterPack:\s*scripts\/mac\/after-pack\.cjs/);
+});
+
+test('afterPack hook signs and strictly verifies macOS app bundle', async (t) => {
+  const afterPackScript = path.join(REPO_ROOT, 'scripts/mac/after-pack.cjs');
+  assert.ok(fs.existsSync(afterPackScript), 'scripts/mac/after-pack.cjs should exist');
+
+  if (process.platform !== 'darwin') {
+    t.skip('afterPack codesign execution only runs on macOS');
+    return;
+  }
+
+  const afterPack = require(afterPackScript);
+  const tmpDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'after-pack-test-'));
+  const appDir = path.join(tmpDir, 'TestProduct.app');
+  const macOsDir = path.join(appDir, 'Contents', 'MacOS');
+  fs.mkdirSync(macOsDir, { recursive: true });
+  fs.writeFileSync(path.join(macOsDir, 'TestProduct'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(appDir, 'Contents', 'Info.plist'), '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleExecutable</key><string>TestProduct</string></dict></plist>');
+
+  try {
+    await afterPack({
+      electronPlatformName: 'darwin',
+      appOutDir: tmpDir,
+      packager: {
+        appInfo: {
+          productFilename: 'TestProduct',
+        },
+      },
+    });
+
+    // Verify strict codesign
+    const verify = spawnSync('codesign', ['--verify', '--deep', '--strict', appDir], { encoding: 'utf8' });
+    assert.equal(verify.status, 0, `codesign --verify --deep --strict failed: ${verify.stderr}`);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('Open Gatekeeper Friendly removes quarantine attribute on macOS', (t) => {

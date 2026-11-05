@@ -298,8 +298,20 @@ jobs:
                   hdiutil detach "$mount_point" -quiet 2>/dev/null || true
                   exit 1
                 fi
+                app_bundle="$(find "$mount_point" -maxdepth 1 -name '*.app' -print -quit)"
+                if [ -z "$app_bundle" ]; then
+                  echo "::error::$dmg is missing .app bundle"
+                  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                  exit 1
+                fi
+                echo "Verifying code signature on $app_bundle with codesign --verify --deep --strict..."
+                if ! codesign --verify --deep --strict "$app_bundle"; then
+                  echo "::error::$app_bundle failed codesign --verify --deep --strict"
+                  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                  exit 1
+                fi
                 hdiutil detach "$mount_point" -quiet 2>/dev/null || true
-                echo "✓ Verified $dmg includes executable Open Gatekeeper Friendly.command"
+                echo "✓ Verified $dmg includes executable Open Gatekeeper Friendly.command and passes strict codesign verification"
               done
             fi
             ;;
