@@ -178,7 +178,11 @@ check_quarantine_remaining() {
     local output
     local rc
     if [ "$use_sudo" -eq 1 ]; then
-        output="$(sudo xattr -r "$target" 2>&1)"
+        if [ "$NON_INTERACTIVE" -eq 1 ]; then
+            output="$(sudo -n xattr -r "$target" 2>&1)"
+        else
+            output="$(sudo xattr -r "$target" 2>&1)"
+        fi
         rc=$?
     else
         output="$(xattr -r "$target" 2>&1)"
@@ -206,31 +210,41 @@ else
 fi
 
 if [ "$NEED_SUDO" -eq 1 ]; then
-    echo -e "${YELLOW}!${NC} Administrator privileges required to clear extended attributes."
-    echo "Please enter your macOS user password when prompted (characters will not display):"
-    sudo xattr -r -d com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
-    sudo xattr -cr "$TARGET_APP" 2>/dev/null || true
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+        sudo -n xattr -r -d com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
+        sudo -n xattr -cr "$TARGET_APP" 2>/dev/null || true
+    else
+        echo -e "${YELLOW}!${NC} Administrator privileges required to clear extended attributes."
+        echo "Please enter your macOS user password when prompted (characters will not display):"
+        sudo xattr -r -d com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
+        sudo xattr -cr "$TARGET_APP" 2>/dev/null || true
+    fi
 else
     xattr -r -d com.apple.quarantine "$TARGET_APP" 2>/dev/null || true
     xattr -cr "$TARGET_APP" 2>/dev/null || true
 fi
 
-# Re-sign ad-hoc on Apple Silicon / macOS to ensure valid code directory seal
+# Re-sign ad-hoc on Apple Silicon / macOS to ensure valid code directory seal while preserving metadata
 SIGN_FAILED=0
 SIGN_VERIFY_FAILED=0
 SIGN_VERIFY_WITH_SUDO=0
 if command -v codesign &>/dev/null; then
     echo -e "${BLUE}→${NC} Verifying code signature seal..."
+    SUDO_CODESIGN="sudo"
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+        SUDO_CODESIGN="sudo -n"
+    fi
+
     if [ "$NEED_SUDO" -eq 1 ]; then
-        if ! sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+        if ! $SUDO_CODESIGN codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$TARGET_APP" 2>/dev/null; then
             SIGN_FAILED=1
         else
             SIGN_VERIFY_WITH_SUDO=1
         fi
     else
-        if codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+        if codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$TARGET_APP" 2>/dev/null; then
             :
-        elif sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+        elif $SUDO_CODESIGN codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "$TARGET_APP" 2>/dev/null; then
             SIGN_VERIFY_WITH_SUDO=1
         else
             SIGN_FAILED=1
@@ -239,7 +253,7 @@ if command -v codesign &>/dev/null; then
 
     if [ "$SIGN_FAILED" -eq 0 ]; then
         if [ "$SIGN_VERIFY_WITH_SUDO" -eq 1 ]; then
-            if ! sudo codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null; then
+            if ! $SUDO_CODESIGN codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null; then
                 SIGN_VERIFY_FAILED=1
             fi
         elif ! codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null; then

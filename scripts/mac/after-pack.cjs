@@ -42,7 +42,7 @@ module.exports = async function afterPack(context) {
 
   console.log(`[afterPack] Applying complete ad-hoc code signature seal to ${path.basename(appPath)}...`);
   try {
-    execSync(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
+    execSync(`codesign --force --deep --preserve-metadata=entitlements,requirements,flags,runtime --sign - "${appPath}"`, { stdio: 'inherit' });
     execSync(`codesign --verify --deep --strict "${appPath}"`, { stdio: 'pipe' });
     console.log(`[afterPack] ✓ Verified complete ad-hoc code signature seal on ${path.basename(appPath)}`);
   } catch (err) {
