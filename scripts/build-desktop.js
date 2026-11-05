@@ -54,6 +54,18 @@ if (!fs.existsSync(iconSource)) {
 fs.copyFileSync(iconSource, path.join(buildDir, 'icon.png'));
 fs.copyFileSync(iconSource, path.join(buildDir, 'icon-512x512.png'));
 
+// 2.6 macOS Gatekeeper 隔离移除脚本（用于非签名包在 macOS 提示"已损坏"时一键修复）
+const gatekeeperScript = path.join(__dirname, 'mac/Open Gatekeeper Friendly.command');
+if (!fs.existsSync(gatekeeperScript)) {
+  console.error('❌ Missing macOS Gatekeeper fix script: scripts/mac/Open Gatekeeper Friendly.command');
+  process.exit(1);
+}
+try {
+  fs.chmodSync(gatekeeperScript, 0o755);
+} catch (e) {
+  // ignore if host filesystem does not support chmod
+}
+
 // 3. electron / electron-builder 已固定在 devDependencies（与 CI 共用
 // electron-builder.yml 配置），确认工具链就绪即可。
 if (!fs.existsSync(path.join(__dirname, '../node_modules/electron-builder/package.json'))) {

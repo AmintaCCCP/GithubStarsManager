@@ -157,6 +157,9 @@ jobs:
         mkdir -p build
         cp assets/icon.png build/icon.png
         cp assets/icon.png build/icon-512x512.png
+        if [ -f "scripts/mac/Open Gatekeeper Friendly.command" ]; then
+          chmod +x "scripts/mac/Open Gatekeeper Friendly.command"
+        fi
         echo "Build resources prepared:"
         ls -la build/
 
@@ -285,6 +288,20 @@ jobs:
             ;;
           macos-*)
             artifacts="$(find release -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+            if [ -n "$artifacts" ]; then
+              for dmg in release/*.dmg; do
+                echo "Verifying DMG contents for $dmg..."
+                mount_point="$(mktemp -d)"
+                hdiutil attach "$dmg" -mountpoint "$mount_point" -nobrowse -quiet
+                if [ ! -x "$mount_point/Open Gatekeeper Friendly.command" ]; then
+                  echo "::error::$dmg is missing executable Open Gatekeeper Friendly.command"
+                  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                  exit 1
+                fi
+                hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                echo "✓ Verified $dmg includes executable Open Gatekeeper Friendly.command"
+              done
+            fi
             ;;
           ubuntu-*)
             artifacts="$(find release -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
