@@ -125,6 +125,25 @@ describe("RepositoryEditModal", () => {
     expect(saved.custom_tags).toBeUndefined();
   });
 
+  it("lets tags return to following the list setting after pinning Topics", async () => {
+    render(
+      <RepositoryEditModal
+        isOpen
+        onClose={vi.fn()}
+        repository={{ ...repository, tags_display: "topics" }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "显示Topics" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "跟随列表设置" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(storeState.updateRepository).toHaveBeenCalled());
+    const saved = storeState.updateRepository.mock.calls[0][0] as Repository;
+    expect(saved.tags_display).toBeUndefined();
+    expect(saved.custom_tags).toBeUndefined();
+  });
+
   it("keeps typed AI-summary text as custom when the repo is pinned to original", async () => {
     render(
       <RepositoryEditModal

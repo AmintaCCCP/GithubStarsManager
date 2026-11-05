@@ -601,6 +601,21 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   };
 
   /**
+   * 跟随列表设置（标签）
+   * 设置编辑意图为 'follow'，保存时会清除自定义标签与显示偏好
+   */
+  const followTagsListSetting = () => {
+    if (!repository) return;
+    const isAnalyzed = !!repository.analyzed_at && !repository.analysis_failed;
+    const aiTagsUsable = isAnalyzed && !!repository.ai_tags && repository.ai_tags.length > 0;
+    const followTags = showAISummary && aiTagsUsable && repository.ai_tags
+      ? repository.ai_tags
+      : (repository.topics ?? []);
+    setFormData(prev => ({ ...prev, tags: followTags }));
+    setEditIntent(prev => ({ ...prev, tags: 'follow' }));
+  };
+
+  /**
    * 显示AI标签
    * 设置编辑意图为 'reset-to-ai'，保存时会清除 custom_tags
    */
@@ -1194,6 +1209,20 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 <span>{t('repositoryEditModal.show-ai-tags')}</span>
               </Button>
             )}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                followTagsListSetting();
+              }}
+              className={`${buttonSecondaryClass} ${
+                editIntent.tags === 'follow'
+                  ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5 mr-1.5" />
+              <span>{t('repositoryEditModal.follow-list-setting')}</span>
+            </Button>
             <Button
               onClick={(e) => {
                 e.stopPropagation();
