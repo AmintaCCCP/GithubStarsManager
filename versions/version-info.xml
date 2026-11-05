@@ -766,4 +766,20 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.8.9</downloadUrl>
   </version>
+  <version>
+    <number>0.9.0</number>
+    <releaseDate>2026-11-05</releaseDate>
+    <changelog>
+      <item>feat: 全面重构仓库问答助手（Repository Chat），引入 README/文档快速路径、意图自动改写、证据闸门与 50MB 本地快照缓存，大幅提升回答速度与准确率。(PR #538, #540, #541, #542, #543, #544, #545, #550)</item>
+      <item>note: ⚠️ 仓库问答历史数据不兼容说明：由于问答架构与数据模型全面升级，旧版本问答历史数据无法向下兼容，请按需自行备份历史记录。</item>
+      <item>feat: 显示模式支持跟随系统，并支持浅色与深色模式分别独立设置和记忆主题配色。(PR #568)</item>
+      <item>fix: 修复 Windows 窗口最小化或遮挡恢复后画面假死、按钮无法点击的问题。(PR #537 感谢 @wynxing 贡献, PR #553)</item>
+      <item>fix: macOS DMG 安装包全新设计 Retina 双步骤指引图，并内置 Fix Damaged App 一键修复 Gatekeeper 损坏提示与代码签名。(PR #572)</item>
+      <item>feat: 仓库详情新增显示偏好配置，修复重置为原始描述或 Topics 后保存不生效的问题。(PR #567)</item>
+      <item>feat: WebDAV 服务配置支持自定义 User-Agent 请求头，完美兼容特定存储平台。(PR #552)</item>
+      <item>fix: UI 细节打磨，聚焦光圈微调、AI 与 WebDAV 配置改用弹窗、拓宽 Release 过滤面板。(PR #548)</item>
+      <item>build: 优化 CI 流水线测试并行度降低耗时，修复 Docker 镜像自动发布，升级依赖并修复 follow-redirects 与 minimatch 安全告警。(PR #546, #547, #549, #554-#571)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.9.0</downloadUrl>
+  </version>
 </versions>
