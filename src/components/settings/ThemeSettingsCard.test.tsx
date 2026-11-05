@@ -10,17 +10,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const mocks = vi.hoisted(() => {
   const state: Record<string, unknown> = {};
+  const listeners = new Set<() => void>();
   const setState = (partial: Record<string, unknown> | ((s: Record<string, unknown>) => Record<string, unknown>)) => {
     Object.assign(state, typeof partial === 'function' ? partial(state) : partial);
+    listeners.forEach((listener) => listener());
   };
-  const useAppStore = Object.assign(
-    (selector?: (s: Record<string, unknown>) => unknown) => (selector ? selector(state) : state),
-    { getState: () => state, setState },
-  );
-  return { state, useAppStore };
+  return { state, listeners, setState };
 });
 
-vi.mock('../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
+vi.mock('../../store/useAppStore', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const { state, listeners } = mocks;
+  const subscribe = (listener: () => void) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+  const useAppStore = (selector?: (s: Record<string, unknown>) => unknown) =>
+    useSyncExternalStore(subscribe, () => (selector ? selector(state) : state));
+  return { useAppStore: Object.assign(useAppStore, { getState: () => state, setState: mocks.setState }) };
+});
 
 import { makeT } from '../../i18n/useT';
 import { ThemeSettingsCard } from './ThemeSettingsCard';
@@ -33,31 +43,26 @@ const t = makeT('zh', 'app');
 beforeEach(() => {
   Object.assign(mocks.state, {
     language: 'zh',
-    theme: 'dark',
-    themePreset: 'default',
-    setTheme: vi.fn((mode: 'light' | 'dark') => setStateTheme(mode)),
-    setThemePreset: vi.fn((preset: string) => {
-      mocks.state.themePreset = preset;
-    }),
+    themeMode: 'dark',
+    systemTheme: 'light',
+    themePresetLight: 'default',
+    themePresetDark: 'default',
+    setThemeMode: vi.fn((mode: 'light' | 'dark' | 'system') => mocks.setState({ themeMode: mode })),
+    setThemePresetLight: vi.fn((preset: string) => mocks.setState({ themePresetLight: preset })),
+    setThemePresetDark: vi.fn((preset: string) => mocks.setState({ themePresetDark: preset })),
     // Theme token（开发守则 §14）：局部更新，内部与当前值合并
     themeTokens: { accentColor: null, fontScale: 1, radius: 'default', animation: 'normal' },
-    updateThemeTokens: vi.fn((patch: Record<string, unknown>) => {
-      mocks.state.themeTokens = { ...(mocks.state.themeTokens as Record<string, unknown>), ...patch };
-    }),
+    updateThemeTokens: vi.fn((patch: Record<string, unknown>) => mocks.setState({
+      themeTokens: { ...(mocks.state.themeTokens as Record<string, unknown>), ...patch },
+    })),
     repositoryCardFields: { ...DEFAULT_REPOSITORY_CARD_FIELDS },
-    setRepositoryCardField: vi.fn((id: string, visible: boolean) => {
-      mocks.state.repositoryCardFields = { ...(mocks.state.repositoryCardFields as Record<string, boolean>), [id]: visible };
-    }),
+    setRepositoryCardField: vi.fn((id: string, visible: boolean) => mocks.setState({
+      repositoryCardFields: { ...(mocks.state.repositoryCardFields as Record<string, boolean>), [id]: visible },
+    })),
     repositoryCardActions: DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item })),
-    setRepositoryCardActions: vi.fn((actions: unknown) => {
-      mocks.state.repositoryCardActions = actions;
-    }),
+    setRepositoryCardActions: vi.fn((actions: unknown) => mocks.setState({ repositoryCardActions: actions })),
   });
 });
-
-function setStateTheme(mode: 'light' | 'dark') {
-  mocks.state.theme = mode;
-}
 
 describe('ThemeSettingsCard', () => {
   it('keeps fine-tuning collapsed by default while card fields remain visible', async () => {
@@ -127,7 +132,7 @@ describe('ThemeSettingsCard', () => {
     const radios = within(presetGroup).getAllByRole('radio');
     radios[0].focus();
     await user.keyboard('{ArrowRight}');
-    expect(mocks.state.themePreset).toBe(THEME_PRESETS[1].id);
+    expect(mocks.state.themePresetDark).toBe(THEME_PRESETS[1].id);
   });
 
   it('marks exactly one preset active by default', () => {
@@ -143,15 +148,36 @@ describe('ThemeSettingsCard', () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
     await user.click(screen.getByRole('radio', { name: /深邃紫/ }));
-    expect(mocks.state.themePreset).toBe('deep-purple');
-    expect(mocks.state.theme).toBe('dark');
+    expect(mocks.state.themePresetDark).toBe('deep-purple');
+    expect(mocks.state.themeMode).toBe('dark');
   });
 
   it('switches display mode through the mode radio group', async () => {
     const user = userEvent.setup();
     render(<ThemeSettingsCard t={t} />);
-    await user.click(screen.getByText('浅色'));
-    expect(mocks.state.theme).toBe('light');
+    const modeGroup = screen.getByRole('radiogroup', { name: '显示模式' });
+    await user.click(within(modeGroup).getByText('浅色'));
+    expect(mocks.state.themeMode).toBe('light');
+
+    await user.click(screen.getByRole('radio', { name: /深邃紫/ }));
+    expect(mocks.state.themePresetLight).toBe('deep-purple');
+    expect(mocks.state.themePresetDark).toBe('default');
+  });
+
+  it('moves the preset edit target with arrow keys inside the mode radiogroup', async () => {
+    const user = userEvent.setup();
+    render(<ThemeSettingsCard t={t} />);
+    const editGroup = screen.getByRole('radiogroup', { name: '配色适用模式' });
+    const lightButton = within(editGroup).getByText('浅色');
+    expect(within(editGroup).getByText('深色').closest('button')).toHaveAttribute('aria-checked', 'true');
+    lightButton.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(lightButton.closest('button')).toHaveAttribute('aria-checked', 'true');
+
+    await user.keyboard('{ArrowRight}');
+    expect(within(editGroup).getByText('深色').closest('button')).toHaveAttribute('aria-checked', 'true');
+    expect(lightButton.closest('button')).toHaveAttribute('aria-checked', 'false');
   });
 
   it('writes theme tokens through the store action', async () => {

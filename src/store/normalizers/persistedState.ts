@@ -41,6 +41,23 @@ export const normalizePersistedState = (
   currentState: AppStoreState
 ): Partial<AppStoreState> => {
   const safePersisted = persisted ?? {};
+  // 旧版持久化只有 theme/themePreset 单值；新契约是 themeMode +
+  // 按深浅分开的 themePresetLight/themePresetDark。旧键在此消费，
+  // 不再进入水合后的状态（避免残留僵尸字段）。
+  const { theme: legacyTheme, themePreset: legacyThemePreset, ...persistedRest } = safePersisted as
+    PersistedAppState & { theme?: unknown; themePreset?: unknown };
+  const resolvedLegacyTheme = legacyTheme === 'light' || legacyTheme === 'dark' ? legacyTheme : null;
+  const themeMode: AppStoreState['themeMode'] =
+    safePersisted.themeMode === 'light' || safePersisted.themeMode === 'dark' || safePersisted.themeMode === 'system'
+      ? safePersisted.themeMode
+      : (resolvedLegacyTheme ?? 'dark');
+  const legacyPreset = isThemePresetId(legacyThemePreset) ? legacyThemePreset : DEFAULT_THEME_PRESET_ID;
+  const themePresetLight = isThemePresetId(safePersisted.themePresetLight)
+    ? safePersisted.themePresetLight
+    : legacyPreset;
+  const themePresetDark = isThemePresetId(safePersisted.themePresetDark)
+    ? safePersisted.themePresetDark
+    : legacyPreset;
   const persistedDiscoveryChannels = (safePersisted as Record<string, unknown>).discoveryChannels;
   const normalizedDiscoveryChannels = [...defaultDiscoveryChannels.map((defaultChannel) => {
     const persistedChannel = Array.isArray(persistedDiscoveryChannels)
@@ -122,7 +139,7 @@ export const normalizePersistedState = (
 
   return {
     ...currentState,
-    ...safePersisted,
+    ...persistedRest,
     // Auth fallback: if the IndexedDB snapshot is missing the login credentials
     // (e.g. async unload write never completed), restore from the synchronous
     // localStorage mirror. Persisted values always win over the mirror.
@@ -132,13 +149,9 @@ export const normalizePersistedState = (
     accountWorkspaces: normalizeAccountWorkspaces(
       (safePersisted as Record<string, unknown>).accountWorkspaces,
     ),
-    theme:
-      safePersisted.theme === 'light' || safePersisted.theme === 'dark'
-        ? safePersisted.theme
-        : 'dark',
-    themePreset: isThemePresetId(safePersisted.themePreset)
-      ? safePersisted.themePreset
-      : DEFAULT_THEME_PRESET_ID,
+    themeMode,
+    themePresetLight,
+    themePresetDark,
     themeTokens: normalizeThemeTokens((safePersisted as Record<string, unknown>).themeTokens),
     repositories: migratedRepositories,
     gists,

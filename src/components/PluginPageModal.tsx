@@ -3,6 +3,7 @@ import { TranslateFn } from '../i18n/useT';
 import React from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../store/useAppStore';
+import { resolveTheme } from '../store/selectors';
 import { usePluginPageReadme } from '../features/plugins/hooks/usePluginPageReadme';
 import { Modal } from './Modal';
 import { PluginPageViewer } from './PluginPageViewer';
@@ -59,7 +60,7 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
   pluginId, pluginName, pageId, pageTitle, repository, onClose, t,
 }) => {
   const language = useAppStore(useShallow((state) => state.language));
-  const theme = useAppStore(useShallow((state) => state.theme));
+  const theme = useAppStore((state) => resolveTheme(state.themeMode, state.systemTheme));
   const { readme } = usePluginPageReadme(repository);
 
   return (
