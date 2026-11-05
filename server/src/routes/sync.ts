@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
+import { toDisplayPref, DESCRIPTION_DISPLAY_VALUES, TAGS_DISPLAY_VALUES } from './repositories.js';
 
 const router = Router();
 
@@ -166,8 +167,9 @@ router.post('/api/sync/import', (req, res) => {
             owner_login, owner_avatar_url, topics,
             ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
             custom_description, custom_tags, custom_category, category_locked, last_edited,
-            subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
+            description_display, tags_display
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
           // 验证必需的字段
@@ -205,7 +207,8 @@ router.post('/api/sync/import', (req, res) => {
             typeof r.ai_platforms === 'string' ? r.ai_platforms : JSON.stringify(r.ai_platforms ?? []),
             r.analyzed_at ?? null, r.analysis_failed ? 1 : 0,
             r.custom_description ?? null,
-            typeof r.custom_tags === 'string' ? r.custom_tags : JSON.stringify(r.custom_tags ?? []),
+            // NULL 表示「未自定义」，只有显式数组才写 '[]'（明确清空），避免恢复后隐藏标签。
+            typeof r.custom_tags === 'string' ? r.custom_tags : (r.custom_tags == null ? null : JSON.stringify(r.custom_tags)),
             r.custom_category ?? null, (r.category_locked === true || r.category_locked === 1) ? 1 : 0, r.last_edited ?? null,
             r.subscribed_to_releases ? 1 : 0,
             r.vector_indexed_at ?? null,
@@ -213,6 +216,8 @@ router.post('/api/sync/import', (req, res) => {
             // INSERT OR REPLACE 会整行替换，故备份无此列时落 null（影响：增量谓词会
             // 触发一次重索引回填指纹），合预期。
             vectorIndexedLicense
+            , toDisplayPref(r.description_display, DESCRIPTION_DISPLAY_VALUES)
+            , toDisplayPref(r.tags_display, TAGS_DISPLAY_VALUES)
           );
         }
         counts.repositories = repos.length;

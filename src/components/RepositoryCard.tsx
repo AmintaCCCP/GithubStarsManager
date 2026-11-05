@@ -487,11 +487,17 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const showDescription = isRepositoryCardFieldVisible(cardFields, 'description');
   // 「自动翻译仓库描述」：仅当卡片实际展示原始描述时才翻译
   // （字段开关关闭 / 自定义描述 / AI 总结优先级更高时不发起翻译），翻译中/失败回退原文。
+  const descriptionDisplay = repository.description_display ?? 'follow';
+  const showsAiDescription =
+    !!repository.ai_summary &&
+    !repository.analysis_failed &&
+    (descriptionDisplay === 'ai' ||
+      (descriptionDisplay === 'follow' && showAISummary));
   const showsOriginalDescription =
     showDescription &&
     !!repository.description &&
     repository.custom_description === undefined &&
-    !(showAISummary && repository.ai_summary && !repository.analysis_failed);
+    !showsAiDescription;
   const translatedDescription = useTranslatedDescription(
     showsOriginalDescription ? repository.description : null
   );
@@ -656,6 +662,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
     let content: string;
     let contentSource: 'custom' | 'ai' | 'original' | 'empty';
 
+    // 每仓库显示偏好：follow=跟随列表页"显示内容"开关；ai/original=固定显示对应来源
+    const descriptionDisplay = repository.description_display ?? 'follow';
+    const aiAvailable = !!repository.ai_summary && !repository.analysis_failed;
+    const preferAi =
+      aiAvailable &&
+      (descriptionDisplay === 'ai' ||
+        (descriptionDisplay === 'follow' && showAISummary));
+
     // 检查是否有明确的自定义描述（包括空标记）
     const hasExplicitCustomDesc = repository.custom_description !== undefined;
     const isExplicitlyCleared = repository.custom_description === '';
@@ -668,9 +682,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       // 有自定义描述
       content = repository.custom_description;
       contentSource = 'custom';
-    } else if (showAISummary && repository.ai_summary) {
+    } else if (preferAi) {
       // 显示AI总结
-      content = repository.ai_summary;
+      content = repository.ai_summary!;
       contentSource = 'ai';
     } else if (repository.description) {
       // 显示原始描述（开启自动翻译时为译文，未完成/失败回退原文）
@@ -680,22 +694,6 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       // 无可用描述
       content = t('repositoryCard.no-description-available');
       contentSource = 'empty';
-    }
-
-    if (showAISummary && repository.analysis_failed) {
-      if (isExplicitlyCleared) {
-        content = t('repositoryCard.no-description');
-        contentSource = 'empty';
-      } else if (repository.custom_description) {
-        content = repository.custom_description;
-        contentSource = 'custom';
-      } else if (repository.description) {
-        content = translatedDescription ?? repository.description;
-        contentSource = 'original';
-      } else {
-        content = t('repositoryCard.no-description-available');
-        contentSource = 'empty';
-      }
     }
 
     // 判断仓库是否有任何自定义行为（与筛选器逻辑一致）
@@ -744,6 +742,14 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   // 使用 useMemo 缓存标签计算
   // 逻辑：优先显示自定义标签，如果没有则按AI分析状态显示AI标签或Topics
   const displayTags = useMemo(() => {
+    // 每仓库标签显示偏好：follow=跟随列表页"显示内容"开关；ai/topics=固定显示对应来源
+    const tagsDisplay = repository.tags_display ?? 'follow';
+    const isAnalyzed = !!repository.analyzed_at && !repository.analysis_failed;
+    const aiTagsUsable = isAnalyzed && !!repository.ai_tags && repository.ai_tags.length > 0;
+    const preferAiTags =
+      aiTagsUsable &&
+      (tagsDisplay === 'ai' || (tagsDisplay === 'follow' && showAISummary));
+
     // 检查是否有明确的自定义标签设置（包括空数组）
     const hasExplicitCustomTags = repository.custom_tags !== undefined;
     const isExplicitlyCleared = hasExplicitCustomTags && repository.custom_tags!.length === 0;
@@ -768,9 +774,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
       };
     }
 
-    // 没有自定义标签时，按AI分析状态显示
-    const isAnalyzed = !!repository.analyzed_at && !repository.analysis_failed;
-    if (isAnalyzed && repository.ai_tags && repository.ai_tags.length > 0) {
+    // 没有自定义标签时，按显示偏好决定AI标签或Topics
+    if (preferAiTags && repository.ai_tags) {
       return {
         tags: repository.ai_tags.map(tag => ({ tag, source: 'ai' as const })),
         tagType: 'ai' as const,
@@ -786,7 +791,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
         isExplicitlyCleared
       };
     }
-  }, [repository.custom_tags, repository.analyzed_at, repository.analysis_failed, repository.ai_tags, repository.topics]);
+  }, [repository.custom_tags, repository.tags_display, repository.analyzed_at, repository.analysis_failed, repository.ai_tags, repository.topics, showAISummary]);
 
   // 使用 useMemo 缓存AI分析按钮提示文本
   const aiButtonTitle = useMemo(() => {
@@ -1424,6 +1429,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           onClose={() => setEditModalOpen(false)}
           onOutsideDismiss={handleEditModalOutsideDismiss}
           repository={repository}
+          showAISummary={showAISummary}
         />,
         document.body
       )}
@@ -1497,6 +1503,8 @@ export const RepositoryCard = React.memo(RepositoryCardComponent, (prevProps, ne
     prevProps.repository.ai_platforms === nextProps.repository.ai_platforms &&
     prevProps.repository.custom_description === nextProps.repository.custom_description &&
     prevProps.repository.custom_tags === nextProps.repository.custom_tags &&
+    prevProps.repository.description_display === nextProps.repository.description_display &&
+    prevProps.repository.tags_display === nextProps.repository.tags_display &&
     prevProps.repository.custom_category === nextProps.repository.custom_category &&
     prevProps.repository.category_locked === nextProps.repository.category_locked &&
     prevProps.repository.description === nextProps.repository.description &&

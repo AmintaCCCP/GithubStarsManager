@@ -14,6 +14,8 @@ const LOCAL_REPOSITORY_FIELDS: Array<keyof Repository> = [
   'custom_tags',
   'custom_category',
   'category_locked',
+  'description_display',
+  'tags_display',
   'last_edited',
   'vector_indexed_at',
   // GitHub 原生状态字段：后端不存储，但 Repository Health / 筛选依赖它们。
@@ -81,6 +83,15 @@ export function mergeRepositoriesPreservingLocalMetadata(
       if (localValue !== undefined) {
         (mergedRepository as Record<keyof Repository, unknown>)[field] = localValue;
       }
+    }
+
+    // 显示偏好以同步源提供的新值为准，保证其他设备修改的偏好能传播；
+    // 同步源未提供（GitHub 拉取 / 旧后端）时保留上面合并的本地值。
+    if (incomingRepository.description_display !== undefined) {
+      mergedRepository.description_display = incomingRepository.description_display;
+    }
+    if (incomingRepository.tags_display !== undefined) {
+      mergedRepository.tags_display = incomingRepository.tags_display;
     }
 
     return mergedRepository;

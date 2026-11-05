@@ -30,6 +30,14 @@ function toLicenseSpdxId(license: unknown): string | null {
   return null;
 }
 
+export const DESCRIPTION_DISPLAY_VALUES: readonly string[] = ['follow', 'ai', 'original'];
+export const TAGS_DISPLAY_VALUES: readonly string[] = ['follow', 'ai', 'topics'];
+
+/** Normalize a per-repo display preference: only values allowed for the field are stored, anything else means "follow". */
+export function toDisplayPref(value: unknown, allowed: readonly string[]): string | null {
+  return typeof value === 'string' && allowed.includes(value) ? value : null;
+}
+
 /** Transform a database row into the API response shape, parsing JSON columns. */
 function transformRepo(row: Record<string, unknown>) {
   return {
@@ -52,9 +60,13 @@ function transformRepo(row: Record<string, unknown>) {
     analyzed_at: row.analyzed_at,
     analysis_failed: !!row.analysis_failed,
     custom_description: row.custom_description,
-    custom_tags: parseJsonColumn(row.custom_tags),
+    // null 表示「未自定义」；空数组才是「明确清空」。二者语义不同，缺省时不能返回 []。
+    custom_tags: row.custom_tags ? parseJsonColumn(row.custom_tags) : undefined,
     custom_category: row.custom_category ?? undefined,
     category_locked: !!row.category_locked,
+    // 显式返回 null（而非省略字段），让客户端把「已重置为跟随」同步给其他设备。
+    description_display: row.description_display ?? null,
+    tags_display: row.tags_display ?? null,
     last_edited: row.last_edited,
     subscribed_to_releases: !!row.subscribed_to_releases,
     vector_indexed_at: row.vector_indexed_at ?? undefined,
@@ -154,8 +166,9 @@ router.put('/api/repositories', (req, res) => {
         owner_login, owner_avatar_url, topics,
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
-        subscribed_to_releases, vector_indexed_at, license, vector_indexed_license
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
+        description_display, tags_display
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
@@ -175,10 +188,14 @@ router.put('/api/repositories', (req, res) => {
         ai_platforms = CASE WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN excluded.ai_platforms ELSE repositories.ai_platforms END,
         analyzed_at = CASE WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at ELSE repositories.analyzed_at END,
         analysis_failed = excluded.analysis_failed,
-        custom_description = CASE WHEN excluded.custom_description IS NOT NULL AND excluded.custom_description != '' THEN excluded.custom_description ELSE repositories.custom_description END,
-        custom_tags = CASE WHEN excluded.custom_tags IS NOT NULL AND excluded.custom_tags != '[]' THEN excluded.custom_tags ELSE repositories.custom_tags END,
+        -- 同步只接收整仓快照：字段缺省即表示客户端已无自定义内容，须照实覆盖，
+        -- 否则「跟随列表设置/显示AI」保存后的清空无法同步到后端（#565）。
+        custom_description = excluded.custom_description,
+        custom_tags = excluded.custom_tags,
         custom_category = excluded.custom_category,
         category_locked = excluded.category_locked,
+        description_display = excluded.description_display,
+        tags_display = excluded.tags_display,
         last_edited = CASE WHEN excluded.last_edited IS NOT NULL AND excluded.last_edited != '' THEN excluded.last_edited ELSE repositories.last_edited END,
         subscribed_to_releases = excluded.subscribed_to_releases,
         vector_indexed_at = excluded.vector_indexed_at,
@@ -243,6 +260,8 @@ router.put('/api/repositories', (req, res) => {
           // 备份中 vector_indexed_license 已是规范化的 SPDX id 字符串或 null；
           // 非 string 一律清空，避免奇怪类型破坏增量谓词的字符串比较。
           typeof repo.vector_indexed_license === 'string' ? repo.vector_indexed_license || null : null,
+          toDisplayPref(repo.description_display, DESCRIPTION_DISPLAY_VALUES),
+          toDisplayPref(repo.tags_display, TAGS_DISPLAY_VALUES),
           { licenseProvided }
         );
         count++;
@@ -275,6 +294,8 @@ router.patch('/api/repositories/:id', (req, res) => {
       custom_tags: (v) => JSON.stringify(Array.isArray(v) ? v : []),
       custom_category: (v) => v,
       category_locked: (v) => (v === true || v === 1) ? 1 : 0,
+      description_display: (v) => toDisplayPref(v, DESCRIPTION_DISPLAY_VALUES),
+      tags_display: (v) => toDisplayPref(v, TAGS_DISPLAY_VALUES),
       last_edited: (v) => v,
       subscribed_to_releases: (v) => (v === true || v === 1) ? 1 : 0,
       // 规范化：null/undefined/空字符串 → null；仅接受字符串（ISO 时间戳）

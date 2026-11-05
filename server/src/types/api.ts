@@ -22,6 +22,8 @@ export interface RepositoryRow {
   custom_tags: string | null;
   custom_category: string | null;
   category_locked: number;
+  description_display: string | null;
+  tags_display: string | null;
   last_edited: string | null;
   subscribed_to_releases: number;
 }
