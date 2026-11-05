@@ -24,7 +24,7 @@
     "test:electron:plugins": "node --test electron/plugins/*.test.js",
     "test:update-version": "node --test scripts/update-version.test.cjs",
     "test:deploy-vector": "node --test scripts/deploy-vector.test.mjs",
-    "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs scripts/check-plugin-registry.test.cjs scripts/fullstack-compose-env.test.cjs scripts/ci-scope.test.cjs",
+    "test:ci-gates": "node --test scripts/check-pr-release-files.test.cjs scripts/check-i18n.test.cjs scripts/check-plugin-registry.test.cjs scripts/fullstack-compose-env.test.cjs scripts/ci-scope.test.cjs scripts/open-gatekeeper-friendly.test.cjs",
     "test:coverage": "vitest run --coverage",
     "eval:live": "cross-env REPO_CHAT_EVAL_LIVE=1 vitest run --config vitest.eval.config.ts",
     "build:desktop": "node scripts/build-desktop.js",

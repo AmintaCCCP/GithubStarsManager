@@ -54,6 +54,36 @@ if (!fs.existsSync(iconSource)) {
 fs.copyFileSync(iconSource, path.join(buildDir, 'icon.png'));
 fs.copyFileSync(iconSource, path.join(buildDir, 'icon-512x512.png'));
 
+// 2.6 macOS DMG 安装包背景图、已损坏修复脚本与打包后签名钩子（#569）
+for (const [srcName, destName] of [
+  ['dmg-background.png', 'background.png'],
+  ['dmg-background@2x.png', 'background@2x.png'],
+]) {
+  const bgSource = path.join(__dirname, '../assets', srcName);
+  if (!fs.existsSync(bgSource)) {
+    console.error(`❌ Missing macOS DMG background asset: assets/${srcName}`);
+    process.exit(1);
+  }
+  fs.copyFileSync(bgSource, path.join(buildDir, destName));
+}
+
+const gatekeeperScript = path.join(__dirname, 'mac/Fix Damaged App.command');
+if (!fs.existsSync(gatekeeperScript)) {
+  console.error('❌ Missing macOS Gatekeeper fix script: scripts/mac/Fix Damaged App.command');
+  process.exit(1);
+}
+try {
+  fs.chmodSync(gatekeeperScript, 0o755);
+} catch (e) {
+  // ignore if host filesystem does not support chmod
+}
+
+const afterPackHook = path.join(__dirname, 'mac/after-pack.cjs');
+if (!fs.existsSync(afterPackHook)) {
+  console.error('❌ Missing macOS afterPack hook: scripts/mac/after-pack.cjs');
+  process.exit(1);
+}
+
 // 3. electron / electron-builder 已固定在 devDependencies（与 CI 共用
 // electron-builder.yml 配置），确认工具链就绪即可。
 if (!fs.existsSync(path.join(__dirname, '../node_modules/electron-builder/package.json'))) {

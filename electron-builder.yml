@@ -38,6 +38,9 @@ asar: true
 # --publish=never，双重保证 electron-builder 不会尝试自行发布。
 publish: null
 
+# 打包后钩子：在未配置开发者证书时对 macOS .app 补全完整的 ad-hoc 签名封条（#569）
+afterPack: scripts/mac/after-pack.cjs
+
 # 目标矩阵与 0.8.4 起实际发布的产物一致（Setup.exe / dmg x64+arm64 / AppImage）。
 # 旧版 yml 中的 win.ia32 与 linux.deb/rpm 从未生效：CI 一直用运行时注入的
 # package.json build 字段（已由 `loaded configuration file=package.json` 日志证实），
@@ -74,6 +77,24 @@ mac:
 dmg:
   title: GitHub Stars Manager
   icon: build/icon.png
+  background: assets/dmg-background.png
+  iconSize: 80
+  iconTextSize: 12
+  window:
+    width: 660
+    height: 500
+  contents:
+    - x: 175
+      y: 130
+      type: file
+    - x: 485
+      y: 130
+      type: link
+      path: /Applications
+    - x: 515
+      y: 276
+      type: file
+      path: scripts/mac/Fix Damaged App.command
 
 # Linux 配置
 linux:

@@ -157,6 +157,11 @@ jobs:
         mkdir -p build
         cp assets/icon.png build/icon.png
         cp assets/icon.png build/icon-512x512.png
+        cp assets/dmg-background.png build/background.png
+        cp assets/dmg-background@2x.png build/background@2x.png
+        if [ -f "scripts/mac/Fix Damaged App.command" ]; then
+          chmod +x "scripts/mac/Fix Damaged App.command"
+        fi
         echo "Build resources prepared:"
         ls -la build/
 
@@ -285,6 +290,32 @@ jobs:
             ;;
           macos-*)
             artifacts="$(find release -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+            if [ -n "$artifacts" ]; then
+              for dmg in release/*.dmg; do
+                echo "Verifying DMG contents for $dmg..."
+                mount_point="$(mktemp -d)"
+                hdiutil attach "$dmg" -mountpoint "$mount_point" -nobrowse -quiet
+                if [ ! -x "$mount_point/Fix Damaged App.command" ]; then
+                  echo "::error::$dmg is missing executable Fix Damaged App.command"
+                  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                  exit 1
+                fi
+                app_bundle="$(find "$mount_point" -maxdepth 1 -name '*.app' -print -quit)"
+                if [ -z "$app_bundle" ]; then
+                  echo "::error::$dmg is missing .app bundle"
+                  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                  exit 1
+                fi
+                echo "Verifying code signature on $app_bundle with codesign --verify --deep --strict..."
+                if ! codesign --verify --deep --strict "$app_bundle"; then
+                  echo "::error::$app_bundle failed codesign --verify --deep --strict"
+                  hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                  exit 1
+                fi
+                hdiutil detach "$mount_point" -quiet 2>/dev/null || true
+                echo "✓ Verified $dmg includes executable Fix Damaged App.command and passes strict codesign verification"
+              done
+            fi
             ;;
           ubuntu-*)
             artifacts="$(find release -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
