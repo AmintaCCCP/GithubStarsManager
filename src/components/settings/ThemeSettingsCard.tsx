@@ -148,7 +148,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
             onValueChange={(value) => {
               setThemeMode(value as 'light' | 'dark' | 'system');
             }}
-            className="grid max-w-xl grid-cols-[repeat(auto-fit,minmax(min(100%,10.5rem),1fr))] gap-3"
+            className="grid max-w-2xl grid-cols-[repeat(auto-fit,minmax(min(100%,12.5rem),1fr))] gap-3"
           >
             <Label
               htmlFor="theme-mode-light"
