@@ -107,6 +107,24 @@ describe("RepositoryEditModal", () => {
     expect(saved.custom_tags).toBeUndefined();
   });
 
+  it("offers 显示Topics even when the repository has no Topics", async () => {
+    render(
+      <RepositoryEditModal
+        isOpen
+        onClose={vi.fn()}
+        repository={{ ...repository, topics: [] }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "显示Topics" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(storeState.updateRepository).toHaveBeenCalled());
+    const saved = storeState.updateRepository.mock.calls[0][0] as Repository;
+    expect(saved.tags_display).toBe("topics");
+    expect(saved.custom_tags).toBeUndefined();
+  });
+
   it("keeps typed AI-summary text as custom when the repo is pinned to original", async () => {
     render(
       <RepositoryEditModal

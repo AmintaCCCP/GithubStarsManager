@@ -601,21 +601,6 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   };
 
   /**
-   * 跟随列表设置（标签）
-   * 设置编辑意图为 'follow'，保存时会清除自定义标签与显示偏好
-   */
-  const followTagsListSetting = () => {
-    if (!repository) return;
-    const isAnalyzed = !!repository.analyzed_at && !repository.analysis_failed;
-    const aiTagsUsable = isAnalyzed && !!repository.ai_tags && repository.ai_tags.length > 0;
-    const followTags = showAISummary && aiTagsUsable && repository.ai_tags
-      ? repository.ai_tags
-      : (repository.topics ?? []);
-    setFormData(prev => ({ ...prev, tags: followTags }));
-    setEditIntent(prev => ({ ...prev, tags: 'follow' }));
-  };
-
-  /**
    * 显示AI标签
    * 设置编辑意图为 'reset-to-ai'，保存时会清除 custom_tags
    */
@@ -633,10 +618,8 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
    */
   const resetTagsToTopics = () => {
     if (!repository) return;
-    if (repository.topics && repository.topics.length > 0) {
-      setFormData(prev => ({ ...prev, tags: repository.topics! }));
-      setEditIntent(prev => ({ ...prev, tags: 'reset-to-original' }));
-    }
+    setFormData(prev => ({ ...prev, tags: repository.topics ?? [] }));
+    setEditIntent(prev => ({ ...prev, tags: 'reset-to-original' }));
   };
 
   /**
@@ -718,7 +701,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         <div className="flex justify-end space-x-3">
           <Button
             onClick={handleCloseWithConfirm}
-            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent dark:hover:bg-accent border border-border dark:border-border transition-all duration-200 shadow-sm"
+            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent dark:hover:text-foreground border border-border dark:border-border transition-all duration-200 shadow-sm"
           >
             <X className="w-4 h-4" />
             <span className="font-medium">{t('repositoryEditModal.cancel')}</span>
@@ -900,7 +883,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.description === 'follow'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <ListFilter className="w-3.5 h-3.5 mr-1.5" />
@@ -915,7 +898,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-ai'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -931,7 +914,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.description === 'reset-to-original'
                     ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-border'
-                    : 'bg-card text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -946,7 +929,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.description === 'clear'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -1012,7 +995,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-ai'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -1028,7 +1011,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.category === 'reset-to-original'
                     ? 'bg-muted text-foreground border-border dark:bg-accent dark:text-foreground dark:border-border'
-                    : 'bg-card text-muted-foreground border-border hover:bg-background dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-muted/40 dark:text-muted-foreground dark:border-border dark:hover:bg-accent dark:hover:text-foreground'
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
@@ -1043,7 +1026,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.category === 'clear'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
@@ -1183,16 +1166,16 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
             <Button
               onClick={(e) => {
                 e.stopPropagation();
-                followTagsListSetting();
+                resetTagsToTopics();
               }}
               className={`${buttonSecondaryClass} ${
-                editIntent.tags === 'follow'
+                editIntent.tags === 'reset-to-original'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
-              <ListFilter className="w-3.5 h-3.5 mr-1.5" />
-              <span>{t('repositoryEditModal.follow-list-setting')}</span>
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              <span>{t('repositoryEditModal.show-topics')}</span>
             </Button>
             {repository.ai_tags && repository.ai_tags.length > 0
               && !!repository.analyzed_at && !repository.analysis_failed && (
@@ -1204,27 +1187,11 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
                 className={`${buttonSecondaryClass} ${
                   editIntent.tags === 'reset-to-ai'
                     ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                    : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
                 }`}
               >
                 <Bot className="w-3.5 h-3.5 mr-1.5" />
                 <span>{t('repositoryEditModal.show-ai-tags')}</span>
-              </Button>
-            )}
-            {repository.topics && repository.topics.length > 0 && (
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  resetTagsToTopics();
-                }}
-                className={`${buttonSecondaryClass} ${
-                  editIntent.tags === 'reset-to-original'
-                    ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                    : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 mr-1.5" />
-                <span>{t('repositoryEditModal.show-topics')}</span>
               </Button>
             )}
             <Button
@@ -1235,7 +1202,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
               className={`${buttonSecondaryClass} ${
                 editIntent.tags === 'clear'
                   ? 'bg-muted text-foreground border-transparent dark:bg-accent dark:text-foreground dark:border-transparent'
-                  : 'bg-card text-muted-foreground border-border hover:bg-accent dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
+                  : 'bg-card text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:text-muted-foreground dark:border-border dark:hover:bg-card dark:hover:text-foreground'
               }`}
             >
               <X className="w-3.5 h-3.5 mr-1.5" />
