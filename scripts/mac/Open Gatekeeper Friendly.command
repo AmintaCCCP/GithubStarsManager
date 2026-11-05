@@ -217,17 +217,33 @@ fi
 
 # Re-sign ad-hoc on Apple Silicon / macOS to ensure valid code directory seal
 SIGN_FAILED=0
+SIGN_VERIFY_FAILED=0
+SIGN_VERIFY_WITH_SUDO=0
 if command -v codesign &>/dev/null; then
     echo -e "${BLUE}→${NC} Verifying code signature seal..."
     if [ "$NEED_SUDO" -eq 1 ]; then
         if ! sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
             SIGN_FAILED=1
+        else
+            SIGN_VERIFY_WITH_SUDO=1
         fi
     else
-        if ! codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
-            if ! sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
-                SIGN_FAILED=1
+        if codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+            :
+        elif sudo codesign --force --deep --sign - "$TARGET_APP" 2>/dev/null; then
+            SIGN_VERIFY_WITH_SUDO=1
+        else
+            SIGN_FAILED=1
+        fi
+    fi
+
+    if [ "$SIGN_FAILED" -eq 0 ]; then
+        if [ "$SIGN_VERIFY_WITH_SUDO" -eq 1 ]; then
+            if ! sudo codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null; then
+                SIGN_VERIFY_FAILED=1
             fi
+        elif ! codesign --verify --deep --strict "$TARGET_APP" 2>/dev/null; then
+            SIGN_VERIFY_FAILED=1
         fi
     fi
 fi
@@ -251,6 +267,9 @@ elif [ "$QUARANTINE_STATUS" -eq 2 ]; then
     HAS_ERROR=1
 elif [ "$SIGN_FAILED" -eq 1 ]; then
     echo -e "${RED}✗${NC} Ad-hoc code re-signing failed. The app signature seal could not be refreshed."
+    HAS_ERROR=1
+elif [ "$SIGN_VERIFY_FAILED" -eq 1 ]; then
+    echo -e "${RED}✗${NC} Strict code signature verification failed. The app code seal is invalid."
     HAS_ERROR=1
 else
     echo -e "${GREEN}✓ [SUCCESS] Quarantine removed successfully!${NC}"
