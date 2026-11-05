@@ -10,8 +10,12 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const SCRIPT_PATH = path.join(REPO_ROOT, 'scripts/mac/Open Gatekeeper Friendly.command');
 const BUILDER_CONFIG_PATH = path.join(REPO_ROOT, 'electron-builder.yml');
 
-test('Open Gatekeeper Friendly script file exists and is executable', () => {
+test('Open Gatekeeper Friendly script file exists and is executable', (t) => {
   assert.ok(fs.existsSync(SCRIPT_PATH), 'script file should exist');
+  if (process.platform === 'win32') {
+    t.skip('Windows fs.stat does not report POSIX execute bits');
+    return;
+  }
   const stat = fs.statSync(SCRIPT_PATH);
   // Verify user executable bit
   const isExecutable = (stat.mode & 0o111) !== 0;
@@ -38,6 +42,21 @@ test('Open Gatekeeper Friendly script responds to --help', (t) => {
   assert.match(result.stdout, /quarantine/i);
 });
 
+test('Open Gatekeeper Friendly script rejects non-application directories', (t) => {
+  const tmpDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'non-app-test-'));
+  try {
+    const result = spawnSync('bash', [SCRIPT_PATH, '--non-interactive', tmpDir], { encoding: 'utf8' });
+    if (result.error && result.error.code === 'ENOENT') {
+      t.skip('bash not found in environment');
+      return;
+    }
+    assert.notEqual(result.status, 0, 'script should fail when target is not a macOS app bundle');
+    assert.match(result.stdout, /missing Contents\/Info\.plist/);
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('electron-builder.yml specifies Open Gatekeeper Friendly.command in dmg.contents', () => {
   assert.ok(fs.existsSync(BUILDER_CONFIG_PATH), 'electron-builder.yml should exist');
   const content = fs.readFileSync(BUILDER_CONFIG_PATH, 'utf8');
@@ -51,7 +70,7 @@ test('Open Gatekeeper Friendly removes quarantine attribute on macOS', (t) => {
     return;
   }
 
-  // Create mock app bundle in temp dir
+  // Create mock app bundle in temp dir with valid macOS app bundle layout
   const tmpDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'gatekeeper-test-'));
   const mockAppDir = path.join(tmpDir, 'MockTest.app');
   const macOsDir = path.join(mockAppDir, 'Contents', 'MacOS');
@@ -59,6 +78,9 @@ test('Open Gatekeeper Friendly removes quarantine attribute on macOS', (t) => {
 
   const dummyBin = path.join(macOsDir, 'dummy');
   fs.writeFileSync(dummyBin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+  const infoPlist = path.join(mockAppDir, 'Contents', 'Info.plist');
+  fs.writeFileSync(infoPlist, '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict></dict></plist>');
 
   try {
     // Set quarantine attribute

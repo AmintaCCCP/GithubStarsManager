@@ -67,20 +67,29 @@ echo ""
 # Find target app
 TARGET_APP=""
 
-# 1. Argument passed directly
-if [ -n "$TARGET_ARG" ] && [ -d "$TARGET_ARG" ]; then
-    TARGET_APP="$TARGET_ARG"
-    echo -e "${BLUE}ℹ${NC} Using specified application: ${BOLD}$TARGET_APP${NC}"
+# 1. Argument passed directly - validate it is an app bundle with Contents/Info.plist
+if [ -n "$TARGET_ARG" ]; then
+    if [ -d "$TARGET_ARG" ] && [ -f "$TARGET_ARG/Contents/Info.plist" ]; then
+        TARGET_APP="$TARGET_ARG"
+        echo -e "${BLUE}ℹ${NC} Using specified application: ${BOLD}$TARGET_APP${NC}"
+    else
+        echo -e "${RED}✗${NC} Target '$TARGET_ARG' is not a valid macOS application bundle (missing Contents/Info.plist)."
+        if [ "$NON_INTERACTIVE" -eq 0 ]; then
+            read -n 1 -s -r -p "Press any key to exit..."
+            echo ""
+        fi
+        exit 1
+    fi
 # 2. Installed in /Applications
-elif [ -d "/Applications/$APP_NAME" ]; then
+elif [ -d "/Applications/$APP_NAME" ] && [ -f "/Applications/$APP_NAME/Contents/Info.plist" ]; then
     TARGET_APP="/Applications/$APP_NAME"
     echo -e "${BLUE}ℹ${NC} Found application at: ${BOLD}$TARGET_APP${NC}"
 # 3. Installed in ~/Applications
-elif [ -d "$HOME/Applications/$APP_NAME" ]; then
+elif [ -d "$HOME/Applications/$APP_NAME" ] && [ -f "$HOME/Applications/$APP_NAME/Contents/Info.plist" ]; then
     TARGET_APP="$HOME/Applications/$APP_NAME"
     echo -e "${BLUE}ℹ${NC} Found application at: ${BOLD}$TARGET_APP${NC}"
 # 4. Present next to the script (e.g. inside the mounted DMG)
-elif [ -d "$SCRIPT_DIR/$APP_NAME" ]; then
+elif [ -d "$SCRIPT_DIR/$APP_NAME" ] && [ -f "$SCRIPT_DIR/$APP_NAME/Contents/Info.plist" ]; then
     echo -e "${YELLOW}!${NC} GitHub Stars Manager has not been copied to /Applications yet."
     echo ""
     copy_choice="Y"
@@ -125,14 +134,16 @@ if [ -z "$TARGET_APP" ] || [ ! -d "$TARGET_APP" ]; then
         USER_PATH="${USER_PATH#\'}"
         USER_PATH="$(echo "$USER_PATH" | xargs 2>/dev/null || echo "$USER_PATH")"
 
-        if [ -n "$USER_PATH" ] && [ -d "$USER_PATH" ]; then
+        if [ -n "$USER_PATH" ] && [ -d "$USER_PATH" ] && [ -f "$USER_PATH/Contents/Info.plist" ]; then
             TARGET_APP="$USER_PATH"
+        elif [ -n "$USER_PATH" ]; then
+            echo -e "${RED}✗${NC} The path '$USER_PATH' is not a valid macOS application bundle (missing Contents/Info.plist)."
         fi
     fi
 fi
 
 if [ -z "$TARGET_APP" ] || [ ! -d "$TARGET_APP" ]; then
-    echo -e "${RED}✗${NC} Could not find $APP_NAME."
+    echo -e "${RED}✗${NC} Could not find a valid $APP_NAME bundle."
     if [ "$NON_INTERACTIVE" -eq 0 ]; then
         read -n 1 -s -r -p "Press any key to exit..."
         echo ""
