@@ -171,12 +171,38 @@ fi
 echo ""
 echo -e "${BLUE}→${NC} Removing quarantine and extended attributes from: ${BOLD}$TARGET_APP${NC}"
 
+# Helper to recursively inspect quarantine attribute names and detect command errors
+check_quarantine_remaining() {
+    local target="$1"
+    local use_sudo="${2:-0}"
+    local output
+    local rc
+    if [ "$use_sudo" -eq 1 ]; then
+        output="$(sudo xattr -r "$target" 2>&1)"
+        rc=$?
+    else
+        output="$(xattr -r "$target" 2>&1)"
+        rc=$?
+    fi
+    if echo "$output" | grep -q "com\.apple\.quarantine"; then
+        return 1 # quarantine attribute present
+    elif [ "$rc" -ne 0 ]; then
+        return 2 # xattr command error
+    else
+        return 0 # clean
+    fi
+}
+
 # Attempt without sudo first; escalate to sudo only if needed
 NEED_SUDO=0
 if ! xattr -cr "$TARGET_APP" 2>/dev/null; then
     NEED_SUDO=1
-elif xattr -r -p com.apple.quarantine "$TARGET_APP" 2>/dev/null | grep -q com.apple.quarantine; then
-    NEED_SUDO=1
+else
+    check_quarantine_remaining "$TARGET_APP" 0
+    CHECK_STATUS=$?
+    if [ "$CHECK_STATUS" -ne 0 ]; then
+        NEED_SUDO=1
+    fi
 fi
 
 if [ "$NEED_SUDO" -eq 1 ]; then
@@ -210,8 +236,16 @@ echo ""
 HAS_ERROR=0
 
 # Recursive verification check across entire app bundle
-if xattr -r -p com.apple.quarantine "$TARGET_APP" 2>/dev/null | grep -q com.apple.quarantine; then
+check_quarantine_remaining "$TARGET_APP" "$NEED_SUDO"
+QUARANTINE_STATUS=$?
+
+if [ "$QUARANTINE_STATUS" -eq 1 ]; then
     echo -e "${RED}✗${NC} Quarantine attribute is still present on one or more files in the app bundle."
+    echo "Please run manually in Terminal:"
+    echo "  sudo xattr -cr \"$TARGET_APP\""
+    HAS_ERROR=1
+elif [ "$QUARANTINE_STATUS" -eq 2 ]; then
+    echo -e "${RED}✗${NC} Failed to inspect extended attributes on the app bundle (inspection error)."
     echo "Please run manually in Terminal:"
     echo "  sudo xattr -cr \"$TARGET_APP\""
     HAS_ERROR=1

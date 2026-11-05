@@ -83,16 +83,19 @@ test('Open Gatekeeper Friendly removes quarantine attribute on macOS', (t) => {
   fs.writeFileSync(infoPlist, '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict></dict></plist>');
 
   try {
-    // Set quarantine attribute
+    // Set quarantine attribute on both bundle root and nested binary
     const setXattr = spawnSync('xattr', ['-w', 'com.apple.quarantine', '0081;test;Chrome;', mockAppDir]);
     if (setXattr.status !== 0) {
       t.skip('xattr not supported on current filesystem');
       return;
     }
+    spawnSync('xattr', ['-w', 'com.apple.quarantine', '0081;test;Chrome;', dummyBin]);
 
     // Verify attribute was set
     const verifyBefore = spawnSync('xattr', ['-p', 'com.apple.quarantine', mockAppDir], { encoding: 'utf8' });
     assert.equal(verifyBefore.status, 0, 'quarantine attribute should be set initially');
+    const verifyNestedBefore = spawnSync('xattr', ['-p', 'com.apple.quarantine', dummyBin], { encoding: 'utf8' });
+    assert.equal(verifyNestedBefore.status, 0, 'nested quarantine attribute should be set initially');
 
     // Run the fix script in non-interactive mode
     const runScript = spawnSync('bash', [SCRIPT_PATH, '--non-interactive', mockAppDir], {
@@ -101,9 +104,11 @@ test('Open Gatekeeper Friendly removes quarantine attribute on macOS', (t) => {
     });
     assert.equal(runScript.status, 0, `script failed: ${runScript.stderr || runScript.stdout}`);
 
-    // Verify quarantine attribute is removed
+    // Verify quarantine attribute is removed from both bundle root and nested binary
     const verifyAfter = spawnSync('xattr', ['-p', 'com.apple.quarantine', mockAppDir], { encoding: 'utf8' });
-    assert.notEqual(verifyAfter.status, 0, 'quarantine attribute should no longer exist');
+    assert.notEqual(verifyAfter.status, 0, 'quarantine attribute should no longer exist on root');
+    const verifyNestedAfter = spawnSync('xattr', ['-p', 'com.apple.quarantine', dummyBin], { encoding: 'utf8' });
+    assert.notEqual(verifyNestedAfter.status, 0, 'nested quarantine attribute should no longer exist');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
