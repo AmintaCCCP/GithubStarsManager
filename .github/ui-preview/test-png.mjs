@@ -39,6 +39,22 @@ const buildPng = ({ width = 1, height = 1, colorType = 6, bitDepth = 8 } = {}) =
   return Buffer.concat([PNG_MAGIC, chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 };
 
+/** Return the png with IHDR data mutated by `mutate` and a FRESH CRC, so a
+ *  negative result exercises the IHDR validation branch and not the CRC one. */
+const withIhdr = (png, mutate) => {
+  const chunks = [];
+  let offset = 8;
+  while (offset + 12 <= png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.subarray(offset + 4, offset + 8).toString('latin1');
+    chunks.push({ type, data: Buffer.from(png.subarray(offset + 8, offset + 8 + length)) });
+    offset += 12 + length;
+    if (type === 'IEND') break;
+  }
+  mutate(chunks.find((c) => c.type === 'IHDR').data);
+  return Buffer.concat([PNG_MAGIC, ...chunks.map((c) => chunk(c.type, c.data))]);
+};
+
 let failures = 0;
 const check = (name, actual, expected) => {
   if (actual !== expected) {
@@ -57,19 +73,18 @@ check('signature + garbage rejected', isWellFormedPng(Buffer.concat([PNG_MAGIC, 
 check('truncated rejected', isWellFormedPng(good.subarray(0, Math.floor(good.length / 2))), false);
 check('trailing bytes rejected', isWellFormedPng(Buffer.concat([good, Buffer.from([0x00])])), false);
 
+// IHDR chunk layout: 8-byte signature, 4-byte length, 4-byte type, 13-byte
+// data, 4-byte CRC -> the CRC lives at offsets 29..32.
 const badCrc = Buffer.from(good);
-badCrc[8 + 8 + 13 + 4] ^= 0xff; // IHDR CRC byte
+badCrc[8 + 8 + 13] ^= 0xff; // first IHDR CRC byte
 check('corrupted CRC rejected', isWellFormedPng(badCrc), false);
 
-const zeroWidth = Buffer.from(good);
-zeroWidth[19] = 0; // IHDR width low byte: 1 -> 0
-check('zero width rejected', isWellFormedPng(zeroWidth), false);
+check('zero width rejected', isWellFormedPng(withIhdr(good, (d) => d.writeUInt32BE(0, 0))), false);
+check('zero height rejected', isWellFormedPng(withIhdr(good, (d) => d.writeUInt32BE(0, 4))), false);
+check('invalid color type rejected', isWellFormedPng(withIhdr(good, (d) => { d[9] = 5; })), false);
+check('invalid bit depth rejected', isWellFormedPng(withIhdr(good, (d) => { d[8] = 3; })), false);
 
-const badColorType = buildPng();
-badColorType[8 + 8 + 9] = 5; // colorType 5 is not a valid PNG color type
-check('invalid color type rejected (CRC now stale)', isWellFormedPng(badColorType), false);
-
-const twoIhdr = Buffer.concat([chunk('IHDR', Buffer.alloc(13)), good.subarray(8)]);
-check('duplicate IHDR rejected', isWellFormedPng(twoIhdr), false);
+const duplicatedIhdr = Buffer.concat([chunk('IHDR', good.subarray(16, 29)), good.subarray(8)]);
+check('duplicate IHDR rejected', isWellFormedPng(duplicatedIhdr), false);
 
 process.exit(failures ? 1 : 0);
