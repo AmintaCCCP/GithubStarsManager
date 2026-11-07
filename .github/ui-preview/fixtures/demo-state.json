@@ -1,0 +1,1042 @@
+{
+  "user": {
+    "id": 900001,
+    "login": "demo-reviewer",
+    "name": "Demo Reviewer",
+    "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+    "email": null
+  },
+  "isAuthenticated": true,
+  "githubToken": "demo-token-not-a-real-credential",
+  "syncMode": "stars",
+  "syncModeConfigured": true,
+  "lastSync": "2026-11-01T08:30:00.000Z",
+  "repositories": [
+    {
+      "id": 101001,
+      "name": "ollama",
+      "full_name": "ollama/ollama",
+      "description": "Get up and running with large language models locally.",
+      "html_url": "https://github.com/ollama/ollama",
+      "stargazers_count": 142300,
+      "forks_count": 11400,
+      "forks": 11400,
+      "language": "Go",
+      "created_at": "2023-06-26T18:43:21Z",
+      "updated_at": "2026-10-30T12:11:40Z",
+      "pushed_at": "2026-10-31T09:02:15Z",
+      "starred_at": "2026-09-14T10:22:31Z",
+      "owner": {
+        "login": "ollama",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%230ea5e9'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "llm",
+        "local-inference",
+        "golang",
+        "ai"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 1420,
+      "default_branch": "main",
+      "ai_summary": "本地大模型运行时，支持一键拉取并运行 Llama、Qwen、DeepSeek 等主流开源模型，提供 OpenAI 兼容 API 与模型管理 CLI，是本地推理场景的事实标准。",
+      "ai_tags": [
+        "AI 推理",
+        "本地部署",
+        "开发者工具"
+      ],
+      "ai_platforms": [
+        "macOS",
+        "Linux",
+        "Windows"
+      ],
+      "analyzed_at": "2026-10-02T14:30:00Z",
+      "license": "MIT"
+    },
+    {
+      "id": 101002,
+      "name": "vite",
+      "full_name": "vitejs/vite",
+      "description": "Next generation frontend tooling. It's fast!",
+      "html_url": "https://github.com/vitejs/vite",
+      "stargazers_count": 78900,
+      "forks_count": 7100,
+      "forks": 7100,
+      "language": "TypeScript",
+      "created_at": "2020-04-21T09:11:08Z",
+      "updated_at": "2026-10-31T08:55:02Z",
+      "pushed_at": "2026-10-31T10:40:19Z",
+      "starred_at": "2026-08-02T09:15:00Z",
+      "owner": {
+        "login": "vitejs",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23a855f7'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "frontend",
+        "bundler",
+        "dev-server",
+        "esm"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 780,
+      "default_branch": "main",
+      "ai_summary": "新一代前端构建工具，基于原生 ESM 的秒级冷启动开发服务器，配合 Rollup 生产构建，插件生态覆盖主流框架。",
+      "ai_tags": [
+        "构建工具",
+        "前端工程化"
+      ],
+      "ai_platforms": [
+        "Web"
+      ],
+      "analyzed_at": "2026-09-20T11:02:00Z",
+      "license": "MIT"
+    },
+    {
+      "id": 101003,
+      "name": "playwright",
+      "full_name": "microsoft/playwright",
+      "description": "Playwright is a framework for Web Testing and Automation.",
+      "html_url": "https://github.com/microsoft/playwright",
+      "stargazers_count": 73200,
+      "forks_count": 4200,
+      "forks": 4200,
+      "language": "TypeScript",
+      "created_at": "2019-11-20T08:12:44Z",
+      "updated_at": "2026-10-30T22:41:10Z",
+      "pushed_at": "2026-10-31T06:18:33Z",
+      "starred_at": "2026-10-05T16:48:12Z",
+      "owner": {
+        "login": "microsoft",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%232563eb'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "testing",
+        "e2e",
+        "automation",
+        "browser"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 640,
+      "default_branch": "main",
+      "ai_summary": "微软出品的端到端测试与自动化框架，跨 Chromium/Firefox/WebKit 三引擎，提供自动等待、追踪与代码生成，CI 集成成熟。",
+      "ai_tags": [
+        "自动化测试",
+        "浏览器自动化",
+        "CI/CD"
+      ],
+      "ai_platforms": [
+        "macOS",
+        "Linux",
+        "Windows"
+      ],
+      "analyzed_at": "2026-10-06T09:40:00Z",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": 101004,
+      "name": "ripgrep",
+      "full_name": "BurntSushi/ripgrep",
+      "description": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+      "html_url": "https://github.com/BurntSushi/ripgrep",
+      "stargazers_count": 51800,
+      "forks_count": 2100,
+      "forks": 2100,
+      "language": "Rust",
+      "created_at": "2016-02-14T22:01:38Z",
+      "updated_at": "2026-10-29T18:20:44Z",
+      "pushed_at": "2026-10-28T03:55:47Z",
+      "starred_at": "2026-07-19T13:05:26Z",
+      "owner": {
+        "login": "BurntSushi",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23f59e0b'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "search",
+        "cli",
+        "regex",
+        "rust"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 96,
+      "default_branch": "master",
+      "license": "MIT"
+    },
+    {
+      "id": 101005,
+      "name": "tailwindcss",
+      "full_name": "tailwindlabs/tailwindcss",
+      "description": "A utility-first CSS framework for rapid UI development.",
+      "html_url": "https://github.com/tailwindlabs/tailwindcss",
+      "stargazers_count": 91400,
+      "forks_count": 4700,
+      "forks": 4700,
+      "language": "TypeScript",
+      "created_at": "2013-11-24T20:10:15Z",
+      "updated_at": "2026-10-31T07:30:58Z",
+      "pushed_at": "2026-10-31T04:22:11Z",
+      "starred_at": "2026-06-11T08:44:03Z",
+      "owner": {
+        "login": "tailwindlabs",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%2306b6d4'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "css",
+        "design-system",
+        "utility-first"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 210,
+      "default_branch": "main",
+      "ai_summary": "原子化 CSS 框架，以工具类组合替代语义类名，v4 引擎改为编译期按需生成，与主流框架深度集成。",
+      "ai_tags": [
+        "CSS",
+        "UI 开发"
+      ],
+      "ai_platforms": [
+        "Web"
+      ],
+      "analyzed_at": "2026-08-30T15:12:00Z",
+      "license": "MIT"
+    },
+    {
+      "id": 101006,
+      "name": "lazygit",
+      "full_name": "jesseduffield/lazygit",
+      "description": "simple terminal UI for git commands",
+      "html_url": "https://github.com/jesseduffield/lazygit",
+      "stargazers_count": 62400,
+      "forks_count": 2200,
+      "forks": 2200,
+      "language": "Go",
+      "created_at": "2018-05-19T08:10:02Z",
+      "updated_at": "2026-10-30T14:02:37Z",
+      "pushed_at": "2026-10-30T21:47:05Z",
+      "starred_at": "2026-10-12T19:30:44Z",
+      "owner": {
+        "login": "jesseduffield",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%2310b981'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "git",
+        "tui",
+        "terminal",
+        "golang"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 810,
+      "default_branch": "master",
+      "license": "MIT"
+    },
+    {
+      "id": 101007,
+      "name": "zed",
+      "full_name": "zed-industries/zed",
+      "description": "Multiplayer code editor from the creators of Atom and Tree-sitter.",
+      "html_url": "https://github.com/zed-industries/zed",
+      "stargazers_count": 68900,
+      "forks_count": 5300,
+      "forks": 5300,
+      "language": "Rust",
+      "created_at": "2021-01-31T16:44:39Z",
+      "updated_at": "2026-10-31T09:58:20Z",
+      "pushed_at": "2026-10-31T11:05:52Z",
+      "starred_at": "2026-09-28T07:12:19Z",
+      "owner": {
+        "login": "zed-industries",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23ef4444'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "editor",
+        "ide",
+        "rust",
+        "collaboration"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 3200,
+      "default_branch": "main",
+      "ai_summary": "高性能协作代码编辑器，Rust + GPU 渲染实现极低延迟，内置 LSP、AI 辅助与多人实时协作。",
+      "ai_tags": [
+        "编辑器",
+        "开发工具"
+      ],
+      "ai_platforms": [
+        "macOS",
+        "Linux"
+      ],
+      "analyzed_at": "2026-10-15T10:00:00Z",
+      "license": "GPL-3.0"
+    },
+    {
+      "id": 101008,
+      "name": "react",
+      "full_name": "facebook/react",
+      "description": "The library for web and native user interfaces.",
+      "html_url": "https://github.com/facebook/react",
+      "stargazers_count": 241000,
+      "forks_count": 49000,
+      "forks": 49000,
+      "language": "JavaScript",
+      "created_at": "2013-05-24T16:15:54Z",
+      "updated_at": "2026-10-31T10:12:00Z",
+      "pushed_at": "2026-10-31T08:03:44Z",
+      "starred_at": "2026-05-22T11:26:09Z",
+      "owner": {
+        "login": "facebook",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%233b82f6'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "ui",
+        "frontend",
+        "javascript",
+        "react"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 980,
+      "default_branch": "main",
+      "license": "MIT"
+    },
+    {
+      "id": 101009,
+      "name": "lobe-chat",
+      "full_name": "lobehub/lobe-chat",
+      "description": "An open-source, modern-design AI chat framework.",
+      "html_url": "https://github.com/lobehub/lobe-chat",
+      "stargazers_count": 63500,
+      "forks_count": 13200,
+      "forks": 13200,
+      "language": "TypeScript",
+      "created_at": "2023-06-20T07:33:27Z",
+      "updated_at": "2026-10-31T06:44:51Z",
+      "pushed_at": "2026-10-31T09:20:37Z",
+      "starred_at": "2026-10-01T21:14:55Z",
+      "owner": {
+        "login": "lobehub",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%238b5cf6'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "chatbot",
+        "ai",
+        "nextjs",
+        "agents"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 1800,
+      "default_branch": "main",
+      "ai_summary": "开源 AI 对话框架，支持多模型聚合、插件市场、知识库与 Agent 编排，界面设计现代，适合自建 AI 助手平台。",
+      "ai_tags": [
+        "AI 应用",
+        "聊天机器人",
+        "知识库"
+      ],
+      "ai_platforms": [
+        "Web",
+        "Docker"
+      ],
+      "analyzed_at": "2026-10-20T13:45:00Z",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": 101010,
+      "name": "excalidraw",
+      "full_name": "excalidraw/excalidraw",
+      "description": "Virtual whiteboard for sketching hand-drawn like diagrams",
+      "html_url": "https://github.com/excalidraw/excalidraw",
+      "stargazers_count": 103000,
+      "forks_count": 9800,
+      "forks": 9800,
+      "language": "TypeScript",
+      "created_at": "2020-01-04T10:30:20Z",
+      "updated_at": "2026-10-30T20:33:14Z",
+      "pushed_at": "2026-10-31T05:51:26Z",
+      "starred_at": "2026-07-04T14:02:38Z",
+      "owner": {
+        "login": "excalidraw",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23f472b6'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "whiteboard",
+        "diagrams",
+        "canvas",
+        "react"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 1500,
+      "default_branch": "master",
+      "ai_summary": "手绘风格虚拟白板，支持协作编辑、端到端加密分享与多种导出格式，可嵌入第三方应用。",
+      "ai_tags": [
+        "绘图工具",
+        "协作",
+        "白板"
+      ],
+      "ai_platforms": [
+        "Web"
+      ],
+      "analyzed_at": "2026-09-05T17:20:00Z",
+      "license": "MIT"
+    },
+    {
+      "id": 101011,
+      "name": "fzf",
+      "full_name": "junegunn/fzf",
+      "description": "A command-line fuzzy finder",
+      "html_url": "https://github.com/junegunn/fzf",
+      "stargazers_count": 72100,
+      "forks_count": 2900,
+      "forks": 2900,
+      "language": "Go",
+      "created_at": "2013-10-23T06:52:19Z",
+      "updated_at": "2026-10-31T02:15:33Z",
+      "pushed_at": "2026-10-30T16:40:58Z",
+      "starred_at": "2026-08-25T10:55:41Z",
+      "owner": {
+        "login": "junegunn",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%2314b8a6'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "cli",
+        "fuzzy-search",
+        "terminal"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 320,
+      "default_branch": "master",
+      "license": "MIT"
+    },
+    {
+      "id": 101012,
+      "name": "supabase",
+      "full_name": "supabase/supabase",
+      "description": "The Postgres development platform.",
+      "html_url": "https://github.com/supabase/supabase",
+      "stargazers_count": 88700,
+      "forks_count": 8400,
+      "forks": 8400,
+      "language": "TypeScript",
+      "created_at": "2020-04-16T09:20:04Z",
+      "updated_at": "2026-10-31T08:02:47Z",
+      "pushed_at": "2026-10-31T10:58:12Z",
+      "starred_at": "2026-09-08T09:41:27Z",
+      "owner": {
+        "login": "supabase",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%233ecf8e'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "postgres",
+        "database",
+        "backend",
+        "firebase"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 2400,
+      "default_branch": "master",
+      "ai_summary": "开源 Postgres 开发平台，提供数据库、认证、存储、实时订阅与边缘函数的一体化后端服务，可自托管。",
+      "ai_tags": [
+        "数据库",
+        "后端服务",
+        "BaaS"
+      ],
+      "ai_platforms": [
+        "Web",
+        "Docker"
+      ],
+      "analyzed_at": "2026-10-25T08:30:00Z",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": 101013,
+      "name": "wireguard-go",
+      "full_name": "wireguard/wireguard-go",
+      "description": "Mirror only. Official repository is at https://git.zx2c4.com/wireguard-go",
+      "html_url": "https://github.com/wireguard/wireguard-go",
+      "stargazers_count": 3400,
+      "forks_count": 620,
+      "forks": 620,
+      "language": "Go",
+      "created_at": "2017-07-10T10:22:31Z",
+      "updated_at": "2026-10-20T11:33:09Z",
+      "pushed_at": "2026-10-18T07:14:52Z",
+      "starred_at": "2026-04-17T18:22:10Z",
+      "owner": {
+        "login": "wireguard",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23888198'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "vpn",
+        "networking",
+        "encryption"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 45,
+      "default_branch": "master",
+      "license": "MIT"
+    },
+    {
+      "id": 101014,
+      "name": "shadcn-ui",
+      "full_name": "shadcn-ui/ui",
+      "description": "A set of beautifully-designed, accessible components and a code distribution platform.",
+      "html_url": "https://github.com/shadcn-ui/ui",
+      "stargazers_count": 89300,
+      "forks_count": 6100,
+      "forks": 6100,
+      "language": "TypeScript",
+      "created_at": "2022-11-29T20:10:33Z",
+      "updated_at": "2026-10-31T07:55:41Z",
+      "pushed_at": "2026-10-31T03:36:29Z",
+      "starred_at": "2026-06-30T15:08:52Z",
+      "owner": {
+        "login": "shadcn-ui",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23221c35'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "components",
+        "react",
+        "radix-ui",
+        "design-system"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 1900,
+      "default_branch": "main",
+      "ai_summary": "基于 Radix UI 与 Tailwind 的组件分发模式，代码直接复制进项目而非依赖安装，可深度定制，已成 React 组件事实标准之一。",
+      "ai_tags": [
+        "组件库",
+        "React",
+        "设计系统"
+      ],
+      "ai_platforms": [
+        "Web"
+      ],
+      "analyzed_at": "2026-10-10T12:15:00Z",
+      "license": "MIT"
+    },
+    {
+      "id": 101015,
+      "name": "windmill",
+      "full_name": "windmill-labs/windmill",
+      "description": "Turn scripts into workflows and UIs. Open-source developer platform for internal tools.",
+      "html_url": "https://github.com/windmill-labs/windmill",
+      "stargazers_count": 13400,
+      "forks_count": 690,
+      "forks": 690,
+      "language": "TypeScript",
+      "created_at": "2021-11-05T09:00:41Z",
+      "updated_at": "2026-10-30T19:12:26Z",
+      "pushed_at": "2026-10-31T08:41:03Z",
+      "starred_at": "2026-10-22T13:31:18Z",
+      "owner": {
+        "login": "windmill-labs",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%2306b6d4'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "workflow",
+        "automation",
+        "internal-tools",
+        "low-code"
+      ],
+      "archived": false,
+      "fork": false,
+      "open_issues_count": 420,
+      "default_branch": "main",
+      "license": "AGPL-3.0"
+    },
+    {
+      "id": 101016,
+      "name": "archived-project-nova",
+      "full_name": "demo-labs/nova-search",
+      "description": "[Archived] Legacy vector search prototype, superseded by windmill indexing.",
+      "html_url": "https://github.com/demo-labs/nova-search",
+      "stargazers_count": 890,
+      "forks_count": 64,
+      "forks": 64,
+      "language": "Python",
+      "created_at": "2022-03-12T14:44:09Z",
+      "updated_at": "2025-12-01T10:00:00Z",
+      "pushed_at": "2025-11-28T16:20:33Z",
+      "starred_at": "2026-02-14T09:10:22Z",
+      "owner": {
+        "login": "demo-labs",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%2394a3b8'/%3E%3C/svg%3E"
+      },
+      "topics": [
+        "vector-search",
+        "prototype"
+      ],
+      "archived": true,
+      "fork": false,
+      "open_issues_count": 0,
+      "default_branch": "main",
+      "analysis_failed": false,
+      "license": null
+    }
+  ],
+  "gists": [
+    {
+      "id": "gist101",
+      "description": "zsh 快捷别名集合：git / docker / k8s 常用命令",
+      "public": true,
+      "html_url": "https://gist.github.com/demo-reviewer/gist101",
+      "created_at": "2026-08-15T10:20:00Z",
+      "updated_at": "2026-10-28T09:12:44Z",
+      "comments": 2,
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+        "html_url": "https://gist.github.com/demo-reviewer"
+      },
+      "files": {
+        "aliases.zsh": {
+          "filename": "aliases.zsh",
+          "type": "application/x-sh",
+          "language": "Shell",
+          "size": 2048
+        }
+      },
+      "ai_summary": "整理了 git、docker、kubectl 的高频命令别名，含分支清理与日志着色配置，适合终端重度用户。",
+      "analyzed_at": "2026-09-30T11:00:00Z"
+    },
+    {
+      "id": "gist102",
+      "description": "Tailwind dark mode toggling snippets (class strategy)",
+      "public": true,
+      "html_url": "https://gist.github.com/demo-reviewer/gist102",
+      "created_at": "2026-09-02T16:40:00Z",
+      "updated_at": "2026-10-15T14:02:10Z",
+      "comments": 0,
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+        "html_url": "https://gist.github.com/demo-reviewer"
+      },
+      "files": {
+        "theme-toggle.tsx": {
+          "filename": "theme-toggle.tsx",
+          "type": "text/plain",
+          "language": "TypeScript",
+          "size": 1420
+        },
+        "tailwind.config.js": {
+          "filename": "tailwind.config.js",
+          "type": "application/javascript",
+          "language": "JavaScript",
+          "size": 380
+        }
+      },
+      "starred": true
+    },
+    {
+      "id": "gist103",
+      "description": "Playwright 等待策略速查表：networkidle / load / custom selector",
+      "public": false,
+      "html_url": "https://gist.github.com/demo-reviewer/gist103",
+      "created_at": "2026-10-08T08:05:00Z",
+      "updated_at": "2026-10-30T18:44:31Z",
+      "comments": 1,
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+        "html_url": "https://gist.github.com/demo-reviewer"
+      },
+      "files": {
+        "waits.md": {
+          "filename": "waits.md",
+          "type": "text/markdown",
+          "language": "Markdown",
+          "size": 3100
+        }
+      },
+      "starred": true
+    },
+    {
+      "id": "gist104",
+      "description": "IndexedDB 封装模板：严格读写 + 超时降级",
+      "public": true,
+      "html_url": "https://gist.github.com/demo-reviewer/gist104",
+      "created_at": "2026-06-21T12:30:00Z",
+      "updated_at": "2026-07-19T10:22:05Z",
+      "comments": 0,
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+        "html_url": "https://gist.github.com/demo-reviewer"
+      },
+      "files": {
+        "idb-wrapper.ts": {
+          "filename": "idb-wrapper.ts",
+          "type": "text/plain",
+          "language": "TypeScript",
+          "size": 2870
+        }
+      }
+    }
+  ],
+  "starredGists": [
+    {
+      "id": "gist102",
+      "description": "Tailwind dark mode toggling snippets (class strategy)",
+      "public": true,
+      "html_url": "https://gist.github.com/demo-reviewer/gist102",
+      "created_at": "2026-09-02T16:40:00Z",
+      "updated_at": "2026-10-15T14:02:10Z",
+      "comments": 0,
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+        "html_url": "https://gist.github.com/demo-reviewer"
+      },
+      "files": {
+        "theme-toggle.tsx": {
+          "filename": "theme-toggle.tsx",
+          "type": "text/plain",
+          "language": "TypeScript",
+          "size": 1420
+        },
+        "tailwind.config.js": {
+          "filename": "tailwind.config.js",
+          "type": "application/javascript",
+          "language": "JavaScript",
+          "size": 380
+        }
+      },
+      "starred": true
+    },
+    {
+      "id": "gist103",
+      "description": "Playwright 等待策略速查表：networkidle / load / custom selector",
+      "public": false,
+      "html_url": "https://gist.github.com/demo-reviewer/gist103",
+      "created_at": "2026-10-08T08:05:00Z",
+      "updated_at": "2026-10-30T18:44:31Z",
+      "comments": 1,
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E",
+        "html_url": "https://gist.github.com/demo-reviewer"
+      },
+      "files": {
+        "waits.md": {
+          "filename": "waits.md",
+          "type": "text/markdown",
+          "language": "Markdown",
+          "size": 3100
+        }
+      },
+      "starred": true
+    }
+  ],
+  "releases": [
+    {
+      "id": 501001,
+      "tag_name": "v0.14.2",
+      "name": "v0.14.2",
+      "body": "### Bug fixes\n\n- Fix model pull retry loop on flaky networks\n- Reduce memory usage during batch embedding\n\n### New\n\n- Add `ollama ps --json` output",
+      "published_at": "2026-10-28T09:15:00Z",
+      "html_url": "https://github.com/ollama/ollama/releases/tag/v0.14.2",
+      "assets": [
+        {
+          "id": 601001,
+          "name": "ollama-darwin-arm64.tgz",
+          "size": 198000000,
+          "browser_download_url": "https://github.com/ollama/ollama/releases/download/v0.14.2/ollama-darwin-arm64.tgz"
+        },
+        {
+          "id": 601002,
+          "name": "ollama-linux-amd64.tgz",
+          "size": 215000000,
+          "browser_download_url": "https://github.com/ollama/ollama/releases/download/v0.14.2/ollama-linux-amd64.tgz"
+        }
+      ],
+      "prerelease": false,
+      "repository": {
+        "id": 101001,
+        "full_name": "ollama/ollama",
+        "name": "ollama"
+      },
+      "is_read": false
+    },
+    {
+      "id": 501002,
+      "tag_name": "v0.14.1",
+      "name": "v0.14.1",
+      "body": "Hotfix release: restore compatibility with older GPU drivers.",
+      "published_at": "2026-10-21T14:40:00Z",
+      "html_url": "https://github.com/ollama/ollama/releases/tag/v0.14.1",
+      "assets": [
+        {
+          "id": 601003,
+          "name": "ollama-darwin-arm64.tgz",
+          "size": 197000000,
+          "browser_download_url": "https://github.com/ollama/ollama/releases/download/v0.14.1/ollama-darwin-arm64.tgz"
+        }
+      ],
+      "prerelease": false,
+      "repository": {
+        "id": 101001,
+        "full_name": "ollama/ollama",
+        "name": "ollama"
+      },
+      "is_read": true
+    },
+    {
+      "id": 501003,
+      "tag_name": "v7.4.0",
+      "name": "v7.4.0",
+      "body": "### Features\n\n- Environment API (experimental)\n- Rolldown-vite becomes the default bundler on new scaffolds",
+      "published_at": "2026-10-26T08:00:00Z",
+      "html_url": "https://github.com/vitejs/vite/releases/tag/v7.4.0",
+      "assets": [],
+      "prerelease": false,
+      "repository": {
+        "id": 101002,
+        "full_name": "vitejs/vite",
+        "name": "vite"
+      },
+      "is_read": false
+    },
+    {
+      "id": 501004,
+      "tag_name": "v1.58.0",
+      "name": "v1.58.0",
+      "body": "### Highlights\n\n- Trace viewer performance improvements\n- New `expect.toHaveAccessibleDescription` matcher",
+      "published_at": "2026-10-30T16:20:00Z",
+      "html_url": "https://github.com/microsoft/playwright/releases/tag/v1.58.0",
+      "assets": [],
+      "prerelease": false,
+      "repository": {
+        "id": 101003,
+        "full_name": "microsoft/playwright",
+        "name": "playwright"
+      },
+      "is_read": false
+    },
+    {
+      "id": 501005,
+      "tag_name": "v1.57.0-beta.3",
+      "name": "v1.57.0-beta.3",
+      "body": "Beta channel: early support for shadow-DOM deep queries.",
+      "published_at": "2026-10-24T11:05:00Z",
+      "html_url": "https://github.com/microsoft/playwright/releases/tag/v1.57.0-beta.3",
+      "assets": [],
+      "prerelease": true,
+      "repository": {
+        "id": 101003,
+        "full_name": "microsoft/playwright",
+        "name": "playwright"
+      },
+      "is_read": true
+    },
+    {
+      "id": 501006,
+      "tag_name": "v4.2.1",
+      "name": "v4.2.1",
+      "body": "Patch release: fix `@source` directive regression with pnpm workspaces.",
+      "published_at": "2026-10-18T07:30:00Z",
+      "html_url": "https://github.com/tailwindlabs/tailwindcss/releases/tag/v4.2.1",
+      "assets": [],
+      "prerelease": false,
+      "repository": {
+        "id": 101005,
+        "full_name": "tailwindlabs/tailwindcss",
+        "name": "tailwindcss"
+      },
+      "is_read": false
+    }
+  ],
+  "releaseSubscriptions": [
+    101001,
+    101002,
+    101003,
+    101005
+  ],
+  "readReleases": [
+    501002,
+    501005
+  ],
+  "forks": [
+    {
+      "id": 201001,
+      "name": "vite",
+      "fork": true,
+      "full_name": "demo-reviewer/vite",
+      "description": "Next generation frontend tooling. It's fast! (demo fork with custom presets)",
+      "html_url": "https://github.com/demo-reviewer/vite",
+      "stargazers_count": 12,
+      "forks_count": 1,
+      "forks": 1,
+      "language": "TypeScript",
+      "created_at": "2026-09-12T10:00:00Z",
+      "updated_at": "2026-10-29T09:30:00Z",
+      "pushed_at": "2026-10-20T14:12:00Z",
+      "default_branch": "main",
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E"
+      },
+      "source": {
+        "id": 101002,
+        "full_name": "vitejs/vite",
+        "name": "vite",
+        "description": "Next generation frontend tooling. It's fast!",
+        "html_url": "https://github.com/vitejs/vite",
+        "stargazers_count": 78900,
+        "forks_count": 7100,
+        "updated_at": "2026-10-31T08:55:02Z",
+        "owner": {
+          "login": "vitejs",
+          "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23a855f7'/%3E%3C/svg%3E"
+        }
+      },
+      "parent": {
+        "id": 101002,
+        "full_name": "vitejs/vite",
+        "name": "vite",
+        "html_url": "https://github.com/vitejs/vite"
+      },
+      "has_unread": true,
+      "upstream_updated_at": "2026-10-31T08:55:02Z"
+    },
+    {
+      "id": 201002,
+      "name": "react",
+      "fork": true,
+      "full_name": "demo-reviewer/react",
+      "description": "The library for web and native user interfaces. (demo fork)",
+      "html_url": "https://github.com/demo-reviewer/react",
+      "stargazers_count": 3,
+      "forks_count": 0,
+      "forks": 0,
+      "language": "JavaScript",
+      "created_at": "2026-07-02T08:20:00Z",
+      "updated_at": "2026-10-25T16:40:00Z",
+      "pushed_at": "2026-10-25T16:40:00Z",
+      "default_branch": "main",
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E"
+      },
+      "source": {
+        "id": 101008,
+        "full_name": "facebook/react",
+        "name": "react",
+        "description": "The library for web and native user interfaces.",
+        "html_url": "https://github.com/facebook/react",
+        "stargazers_count": 241000,
+        "forks_count": 49000,
+        "updated_at": "2026-10-31T10:12:00Z",
+        "owner": {
+          "login": "facebook",
+          "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%233b82f6'/%3E%3C/svg%3E"
+        }
+      },
+      "parent": {
+        "id": 101008,
+        "full_name": "facebook/react",
+        "name": "react",
+        "html_url": "https://github.com/facebook/react"
+      },
+      "has_unread": false,
+      "upstream_updated_at": "2026-10-31T10:12:00Z"
+    },
+    {
+      "id": 201003,
+      "name": "zed",
+      "fork": true,
+      "full_name": "demo-reviewer/zed",
+      "description": "Multiplayer code editor from the creators of Atom and Tree-sitter. (demo fork)",
+      "html_url": "https://github.com/demo-reviewer/zed",
+      "stargazers_count": 27,
+      "forks_count": 2,
+      "forks": 2,
+      "language": "Rust",
+      "created_at": "2026-05-19T12:00:00Z",
+      "updated_at": "2026-10-27T11:05:00Z",
+      "pushed_at": "2026-10-27T11:05:00Z",
+      "default_branch": "main",
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E"
+      },
+      "source": {
+        "id": 101007,
+        "full_name": "zed-industries/zed",
+        "name": "zed",
+        "description": "Multiplayer code editor from the creators of Atom and Tree-sitter.",
+        "html_url": "https://github.com/zed-industries/zed",
+        "stargazers_count": 68900,
+        "forks_count": 5300,
+        "updated_at": "2026-10-31T09:58:20Z",
+        "owner": {
+          "login": "zed-industries",
+          "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%23ef4444'/%3E%3C/svg%3E"
+        }
+      },
+      "parent": {
+        "id": 101007,
+        "full_name": "zed-industries/zed",
+        "name": "zed",
+        "html_url": "https://github.com/zed-industries/zed"
+      },
+      "has_unread": true,
+      "upstream_updated_at": "2026-10-31T09:58:20Z"
+    },
+    {
+      "id": 201004,
+      "name": "lobe-chat",
+      "fork": true,
+      "full_name": "demo-reviewer/lobe-chat",
+      "description": "An open-source, modern-design AI chat framework. (demo fork)",
+      "html_url": "https://github.com/demo-reviewer/lobe-chat",
+      "stargazers_count": 5,
+      "forks_count": 0,
+      "forks": 0,
+      "language": "TypeScript",
+      "created_at": "2026-08-30T09:45:00Z",
+      "updated_at": "2026-10-22T18:20:00Z",
+      "pushed_at": "2026-10-22T18:20:00Z",
+      "default_branch": "main",
+      "owner": {
+        "login": "demo-reviewer",
+        "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%236366f1'/%3E%3C/svg%3E"
+      },
+      "source": {
+        "id": 101009,
+        "full_name": "lobehub/lobe-chat",
+        "name": "lobe-chat",
+        "description": "An open-source, modern-design AI chat framework.",
+        "html_url": "https://github.com/lobehub/lobe-chat",
+        "stargazers_count": 63500,
+        "forks_count": 13200,
+        "updated_at": "2026-10-31T06:44:51Z",
+        "owner": {
+          "login": "lobehub",
+          "avatar_url": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='32'%20fill='%238b5cf6'/%3E%3C/svg%3E"
+        }
+      },
+      "parent": {
+        "id": 101009,
+        "full_name": "lobehub/lobe-chat",
+        "name": "lobe-chat",
+        "html_url": "https://github.com/lobehub/lobe-chat"
+      },
+      "has_unread": false,
+      "upstream_updated_at": "2026-10-31T06:44:51Z"
+    }
+  ],
+  "currentView": "repositories",
+  "selectedCategory": "all",
+  "themeMode": "light",
+  "language": "zh"
+}
