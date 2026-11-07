@@ -274,11 +274,12 @@ function sceneLabel(filename) {
 function buildSuccessBody({ repo, branch, pr, sha, runUrl, shots }) {
   const shaShort = sha.slice(0, 7);
   const rawBase = `https://raw.githubusercontent.com/${repo}/${branch}/pr-${pr}/${sha}`;
+  const source = runUrl ? `[ui-preview 工作流](${runUrl})` : 'ui-preview 工作流';
   const lines = [
     MARKER_BEGIN,
     '## 📸 UI 预览',
     '',
-    `\`${shaShort}\` 的界面截图，由 [ui-preview 工作流](${runUrl ?? 'the ui-preview workflow'}) 自动生成（内置演示数据，无真实凭据）：`,
+    `\`${shaShort}\` 的界面截图，由 ${source} 自动生成（内置演示数据，无真实凭据）：`,
     '',
   ];
   for (const shot of shots) {
