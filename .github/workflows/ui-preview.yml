@@ -1,0 +1,244 @@
+name: UI preview
+
+# A pull request that touches the UI gets screenshots of the real app built
+# from it, posted as (and updated in) a single fixed comment. Runs again on
+# every new commit, so reviewers see the UI of the latest push.
+# See .github/ui-preview/README.md.
+#
+# Fork PRs are covered by pull_request_target, with the scripts always taken
+# from the default branch. The build job runs the PR's code and therefore
+# holds no secrets and no write permissions; the shoot job never runs PR
+# code, and the publish job can write but only runs default-branch scripts.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+
+concurrency:
+  # Label events for labels other than ui-preview must not cancel (and not be
+  # replaced by) an in-progress recording: they run in a per-run group and
+  # their detect job skips immediately.
+  group: >-
+    ${{
+      github.event.action == 'labeled' && github.event.label.name != 'ui-preview'
+      && format('ignored-{0}', github.run_id)
+      || github.event.pull_request.number || inputs.pr
+    }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  # Same rationale as ci.yml: no job here launches Electron, so skip its
+  # postinstall download entirely.
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+jobs:
+  detect:
+    name: Detect UI change
+    # The label gate only fires for the labeled action; every other event
+    # re-runs the detection so new UI commits refresh the previews.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.action != 'labeled' ||
+      github.event.label.name == 'ui-preview'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ui: ${{ steps.detect.outputs.ui }}
+      sha: ${{ steps.detect.outputs.sha }}
+      number: ${{ steps.detect.outputs.number }}
+    steps:
+      - name: Checkout repository (default branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/ui-preview
+          persist-credentials: false
+
+      # GITHUB_OUTPUT is provided by the runner; detect.mjs only reads it.
+      - name: Detect UI paths in pull request
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || inputs.pr }}
+        run: node .github/ui-preview/detect.mjs
+
+  build:
+    name: Build PR
+    needs: detect
+    if: needs.detect.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Untrusted code (npm ci, vite build) runs here: no secrets, no write
+    # access, nothing to steal. Its only output is the static web bundle.
+    permissions: {}
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.detect.outputs.sha }}
+          persist-credentials: false
+          # Fork PR heads are refused on pull_request_target by default; this
+          # job exists to run PR code and holds no secrets and no write
+          # permissions, so the opt-in is the intended usage.
+          allow-unsafe-pr-checkout: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npx vite build
+
+      - name: Upload web bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-preview-dist
+          path: dist
+          retention-days: 7
+          if-no-files-found: error
+
+  shoot:
+    name: Shoot screenshots
+    needs: [detect, build]
+    if: needs.detect.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Filesystem and process isolation from the build job: nothing here
+    # executes PR code — the tools come from the default branch and the web
+    # bundle is a static artifact — so PR scripts cannot touch the recorder,
+    # its browser, or the screenshots it produces.
+    permissions: {}
+    steps:
+      - name: Checkout ui-preview tools (default branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: ui-preview-tools
+          sparse-checkout: .github/ui-preview
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Install CJK fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+
+      - name: Install Playwright Chromium
+        working-directory: ui-preview-tools/.github/ui-preview
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
+        run: |
+          npm ci
+          npx playwright install chromium
+
+      - name: Download web bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ui-preview-dist
+          path: dist
+
+      - name: Start preview server
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then
+              echo "Preview server is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Preview server did not start within 30s"
+          exit 1
+
+      - name: Take screenshots
+        working-directory: ui-preview-tools/.github/ui-preview
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
+        run: |
+          node shoot.mjs \
+            --url http://127.0.0.1:4173 \
+            --out "$RUNNER_TEMP/shots"
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-preview-shots
+          path: ${{ runner.temp }}/shots
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PR
+    needs: [detect, shoot]
+    if: always() && needs.detect.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout ui-preview tools (default branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          sparse-checkout: .github/ui-preview
+          persist-credentials: false
+
+      - name: Download screenshots
+        if: needs.shoot.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ui-preview-shots
+          path: shots
+
+      - name: Push screenshots to ui-previews branch
+        id: push
+        if: needs.shoot.result == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >-
+          node .github/ui-preview/publish.mjs commit
+          --pr "${{ needs.detect.outputs.number }}"
+          --sha "${{ needs.detect.outputs.sha }}"
+          --dir shots
+
+      - name: Post preview comment
+        if: needs.shoot.result == 'success' && steps.push.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >-
+          node .github/ui-preview/publish.mjs comment
+          --pr "${{ needs.detect.outputs.number }}"
+          --sha "${{ needs.detect.outputs.sha }}"
+          --dir shots
+          --run-url "$RUN_URL"
+
+      - name: Post failure notice
+        if: ${{ !cancelled() && (needs.shoot.result != 'success' || steps.push.outcome != 'success') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: >-
+          node .github/ui-preview/publish.mjs comment
+          --pr "${{ needs.detect.outputs.number }}"
+          --failed
+          --run-url "$RUN_URL"

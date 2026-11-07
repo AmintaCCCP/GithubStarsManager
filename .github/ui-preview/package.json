@@ -1,0 +1,9 @@
+{
+  "name": "gsm-ui-preview",
+  "private": true,
+  "type": "module",
+  "description": "Standalone tooling for the ui-preview workflow (screenshot pipeline only; never installed from the app root).",
+  "devDependencies": {
+    "playwright": "^1.58.0"
+  }
+}
