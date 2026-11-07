@@ -7,10 +7,12 @@ carries the `ui-preview` label, the workflow:
 
 1. **detect** decides whether the PR is a UI change (reads the PR's changed
    files; the scripts run from the default branch, never from the PR).
-2. **record** checks out the PR, builds it with `npx vite build`, serves the
-   static build with `vite preview`, and runs `shoot.mjs` — Playwright loads
-   each scene in a fresh browser context seeded with the demo data in
-   `fixtures/demo-state.json` and takes a 2x screenshot.
+2. **build** checks out the PR and builds it with `npx vite build`; the
+   static bundle is uploaded as an artifact. **shoot** then runs on a clean
+   runner with zero PR code: it serves the downloaded bundle and runs
+   `shoot.mjs` — Playwright loads each scene in a fresh browser context
+   seeded with the demo data in `fixtures/demo-state.json` and takes a 2x
+   screenshot.
 3. **publish** pushes the screenshots to the `ui-previews` branch under
    `pr-<n>/<sha>/` and upserts a single PR comment (located by the
    `<!-- ui-preview:begin -->` marker) embedding them. New commits replace the
@@ -52,15 +54,19 @@ never leaves the browser.
 ## Security model
 
 - `pull_request_target` is required to cover fork PRs, so the pipeline is
-  split: **record** runs the PR's code (`npm ci`, `vite build`, `vite preview`)
-  and therefore holds no secrets and no write permissions; **publish** can
-  write but only ever runs scripts from the default branch. Checking out the
-  fork head needs `allow-unsafe-pr-checkout: true` (actions/checkout ≥ v7
-  refuses it otherwise); it is safe here precisely because the record job has
-  nothing to steal and nothing it could modify.
-- The shots directory is recreated empty on every run and `publish.mjs` only
-  accepts file names shoot.mjs produces, so PR code sharing `$RUNNER_TEMP`
-  cannot inject files into the comment or the `ui-previews` branch.
+  split three ways: **build** runs the PR's code (`npm ci`, `vite build`) and
+  holds no secrets and no write permissions — its only output is the static
+  web bundle; **shoot** never executes PR code (tools from the default
+  branch, bundle from an artifact), so PR scripts cannot touch the recorder,
+  its browser, or the screenshots; **publish** can write but only ever runs
+  scripts from the default branch. Checking out the fork head needs
+  `allow-unsafe-pr-checkout: true` (actions/checkout ≥ v7 refuses it
+  otherwise); it is safe here precisely because the build job has nothing to
+  steal and nothing it could modify.
+- The shots directory is recreated empty on every run and `publish.mjs`
+  accepts only file names shoot.mjs produces, verifies the complete PNG
+  structure (chunk chain, CRCs, sane IHDR, IEND) and enforces per-file and
+  total size limits before anything is committed or embedded in a comment.
 - Screenshots live on the `ui-previews` branch (per PR only the latest
   commit's directory survives) and are referenced from the comment via
   `raw.githubusercontent.com`. Note the branch's git history still grows by

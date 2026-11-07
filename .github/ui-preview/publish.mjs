@@ -17,9 +17,10 @@
  * the repo and the PR. PR code is never executed here.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readdir, rm, mkdir, copyFile, readFile, stat, open } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, mkdir, copyFile, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const MARKER_BEGIN = '<!-- ui-preview:begin -->';
 const MARKER_END = '<!-- ui-preview:end -->';
@@ -82,15 +83,61 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const MAX_SHOT_BYTES = 100 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 
-async function isPng(file) {
-  const handle = await open(file, 'r');
-  try {
-    const { buffer, bytesRead } = await handle.read(Buffer.alloc(PNG_MAGIC.length), 0, PNG_MAGIC.length, 0);
-    return bytesRead === PNG_MAGIC.length && buffer.equals(PNG_MAGIC);
-  } finally {
-    await handle.close();
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    table[n] = c >>> 0;
   }
+  return table;
+})();
+
+const crc32 = (buffer) => {
+  let c = 0xffffffff;
+  for (let i = 0; i < buffer.length; i += 1) c = CRC32_TABLE[(c ^ buffer[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+
+/**
+ * Validate the complete PNG structure: signature, a chunk chain with intact
+ * CRCs, a sane IHDR, and an IEND terminator with no trailing bytes. A file
+ * that merely carries the PNG signature but holds arbitrary content fails.
+ */
+function isWellFormedPng(buffer) {
+  if (buffer.length < 8 + 12 || !buffer.subarray(0, 8).equals(PNG_MAGIC)) return false;
+  const allowedBitDepths = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+  let offset = 8;
+  let sawIhdr = false;
+  let sawIend = false;
+  while (offset + 12 <= buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.subarray(offset + 4, offset + 8).toString('latin1');
+    if (offset + 12 + length > buffer.length) return false;
+    if (crc32(buffer.subarray(offset + 4, offset + 8 + length)) !== buffer.readUInt32BE(offset + 8 + length)) return false;
+    if (type === 'IHDR') {
+      if (sawIhdr) return false;
+      sawIhdr = true;
+      const width = buffer.readUInt32BE(offset + 8);
+      const height = buffer.readUInt32BE(offset + 12);
+      const bitDepth = buffer[offset + 16];
+      const colorType = buffer[offset + 17];
+      if (width === 0 || height === 0 || !(colorType in allowedBitDepths) || !allowedBitDepths[colorType].includes(bitDepth)) return false;
+    }
+    offset += 12 + length;
+    if (type === 'IEND') {
+      sawIend = true;
+      break;
+    }
+  }
+  return sawIhdr && sawIend && offset === buffer.length;
 }
+
+async function isPng(file) {
+  return isWellFormedPng(await readFile(file));
+}
+
+export { isWellFormedPng };
 
 async function listShotFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -349,7 +396,11 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+// Only act as a CLI when run directly; importing the module (tests) must not
+// trigger the command-line entry point.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

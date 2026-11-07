@@ -6,9 +6,9 @@ name: UI preview
 # See .github/ui-preview/README.md.
 #
 # Fork PRs are covered by pull_request_target, with the scripts always taken
-# from the default branch. The record job builds and runs the PR's code and
-# therefore holds no secrets and no write permissions; the publish job can
-# write but never runs PR code.
+# from the default branch. The build job runs the PR's code and therefore
+# holds no secrets and no write permissions; the shoot job never runs PR
+# code, and the publish job can write but only runs default-branch scripts.
 
 on:
   pull_request_target:
@@ -71,14 +71,14 @@ jobs:
           PR: ${{ github.event.pull_request.number || inputs.pr }}
         run: node .github/ui-preview/detect.mjs
 
-  record:
-    name: Build and shoot
+  build:
+    name: Build PR
     needs: detect
     if: needs.detect.outputs.ui == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
-    # Untrusted code (npm ci, vite build, vite preview) runs here: no
-    # secrets, no write access, nothing to steal.
+    timeout-minutes: 15
+    # Untrusted code (npm ci, vite build) runs here: no secrets, no write
+    # access, nothing to steal. Its only output is the static web bundle.
     permissions: {}
     steps:
       - name: Checkout pull request
@@ -91,24 +91,6 @@ jobs:
           # permissions, so the opt-in is the intended usage.
           allow-unsafe-pr-checkout: true
 
-      # The recording pipeline always comes from the default branch, never
-      # from the PR, so a PR cannot change what the recorder does.
-      - name: Checkout ui-preview tools (default branch)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          path: ui-preview-tools
-          sparse-checkout: .github/ui-preview
-          persist-credentials: false
-
-      # PR code (npm lifecycle scripts) runs later in this job and could
-      # tamper with the tools directory; the checksum lets the shoot step
-      # verify the scripts are still the default-branch versions.
-      - name: Checksum ui-preview tools
-        run: |
-          cd ui-preview-tools/.github/ui-preview
-          sha256sum seed.mjs shoot.mjs publish.mjs detect.mjs package.json > "$RUNNER_TEMP/tools.sha256"
-
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -120,6 +102,39 @@ jobs:
 
       - name: Build app
         run: npx vite build
+
+      - name: Upload web bundle
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-preview-dist
+          path: dist
+          retention-days: 7
+          if-no-files-found: error
+
+  shoot:
+    name: Shoot screenshots
+    needs: [detect, build]
+    if: needs.detect.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Filesystem and process isolation from the build job: nothing here
+    # executes PR code — the tools come from the default branch and the web
+    # bundle is a static artifact — so PR scripts cannot touch the recorder,
+    # its browser, or the screenshots it produces.
+    permissions: {}
+    steps:
+      - name: Checkout ui-preview tools (default branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: ui-preview-tools
+          sparse-checkout: .github/ui-preview
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
 
       - name: Install CJK fonts
         run: |
@@ -134,9 +149,15 @@ jobs:
           npm ci
           npx playwright install chromium
 
+      - name: Download web bundle
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ui-preview-dist
+          path: dist
+
       - name: Start preview server
         run: |
-          npx vite preview --host 127.0.0.1 --port 4173 --strictPort &
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist &
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:4173/ > /dev/null; then
               echo "Preview server is up"
@@ -148,11 +169,11 @@ jobs:
           exit 1
 
       - name: Take screenshots
+        working-directory: ui-preview-tools/.github/ui-preview
         env:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
         run: |
-          (cd ui-preview-tools/.github/ui-preview && sha256sum -c "$RUNNER_TEMP/tools.sha256" --quiet)
-          node ui-preview-tools/.github/ui-preview/shoot.mjs \
+          node shoot.mjs \
             --url http://127.0.0.1:4173 \
             --out "$RUNNER_TEMP/shots"
 
@@ -166,7 +187,7 @@ jobs:
 
   publish:
     name: Publish to PR
-    needs: [detect, record]
+    needs: [detect, shoot]
     if: always() && needs.detect.outputs.ui == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -182,7 +203,7 @@ jobs:
           persist-credentials: false
 
       - name: Download screenshots
-        if: needs.record.result == 'success'
+        if: needs.shoot.result == 'success'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ui-preview-shots
@@ -190,7 +211,7 @@ jobs:
 
       - name: Push screenshots to ui-previews branch
         id: push
-        if: needs.record.result == 'success'
+        if: needs.shoot.result == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: >-
@@ -200,7 +221,7 @@ jobs:
           --dir shots
 
       - name: Post preview comment
-        if: needs.record.result == 'success' && steps.push.outcome == 'success'
+        if: needs.shoot.result == 'success' && steps.push.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -212,7 +233,7 @@ jobs:
           --run-url "$RUN_URL"
 
       - name: Post failure notice
-        if: ${{ !cancelled() && (needs.record.result != 'success' || steps.push.outcome != 'success') }}
+        if: ${{ !cancelled() && (needs.shoot.result != 'success' || steps.push.outcome != 'success') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
