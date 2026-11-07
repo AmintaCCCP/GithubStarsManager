@@ -20,7 +20,15 @@ on:
         required: true
 
 concurrency:
-  group: ui-preview-${{ github.event.pull_request.number || inputs.pr }}
+  # Label events for labels other than ui-preview must not cancel (and not be
+  # replaced by) an in-progress recording: they run in a per-run group and
+  # their detect job skips immediately.
+  group: >-
+    ${{
+      github.event.action == 'labeled' && github.event.label.name != 'ui-preview'
+      && format('ignored-{0}', github.run_id)
+      || github.event.pull_request.number || inputs.pr
+    }}
   cancel-in-progress: true
 
 permissions: {}
@@ -72,14 +80,16 @@ jobs:
     # Untrusted code (npm ci, vite build, vite preview) runs here: no
     # secrets, no write access, nothing to steal.
     permissions: {}
-    env:
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
     steps:
       - name: Checkout pull request
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.detect.outputs.sha }}
           persist-credentials: false
+          # Fork PR heads are refused on pull_request_target by default; this
+          # job exists to run PR code and holds no secrets and no write
+          # permissions, so the opt-in is the intended usage.
+          allow-unsafe-pr-checkout: true
 
       # The recording pipeline always comes from the default branch, never
       # from the PR, so a PR cannot change what the recorder does.
@@ -90,6 +100,14 @@ jobs:
           path: ui-preview-tools
           sparse-checkout: .github/ui-preview
           persist-credentials: false
+
+      # PR code (npm lifecycle scripts) runs later in this job and could
+      # tamper with the tools directory; the checksum lets the shoot step
+      # verify the scripts are still the default-branch versions.
+      - name: Checksum ui-preview tools
+        run: |
+          cd ui-preview-tools/.github/ui-preview
+          sha256sum seed.mjs shoot.mjs publish.mjs detect.mjs package.json > "$RUNNER_TEMP/tools.sha256"
 
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -110,6 +128,8 @@ jobs:
 
       - name: Install Playwright Chromium
         working-directory: ui-preview-tools/.github/ui-preview
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
         run: |
           npm ci
           npx playwright install chromium
@@ -128,7 +148,10 @@ jobs:
           exit 1
 
       - name: Take screenshots
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
         run: |
+          (cd ui-preview-tools/.github/ui-preview && sha256sum -c "$RUNNER_TEMP/tools.sha256" --quiet)
           node ui-preview-tools/.github/ui-preview/shoot.mjs \
             --url http://127.0.0.1:4173 \
             --out "$RUNNER_TEMP/shots"
@@ -189,7 +212,7 @@ jobs:
           --run-url "$RUN_URL"
 
       - name: Post failure notice
-        if: needs.record.result != 'success' || steps.push.outcome == 'failure'
+        if: ${{ !cancelled() && (needs.record.result != 'success' || steps.push.outcome != 'success') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

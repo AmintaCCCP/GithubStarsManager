@@ -17,7 +17,7 @@
  * the repo and the PR. PR code is never executed here.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readdir, rm, mkdir, copyFile, readFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, mkdir, copyFile, readFile, stat, open } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -46,14 +46,14 @@ function requireArg(args, name) {
 }
 
 /** The PR number is interpolated into paths and comment bodies: only accept
- *  positive integers, whoever supplied it (it is workflow_dispatch input). */
+ *  plain positive integers, whoever supplied it (it is workflow_dispatch input). */
 function requirePr(args) {
-  const pr = Number.parseInt(requireArg(args, 'pr'), 10);
-  if (!Number.isSafeInteger(pr) || pr <= 0) {
-    console.error('publish: --pr must be a positive integer');
+  const raw = String(requireArg(args, 'pr')).trim();
+  if (!/^\d{1,9}$/.test(raw)) {
+    console.error(`publish: --pr must be a positive integer, got ${JSON.stringify(raw)}`);
     process.exit(1);
   }
-  return pr;
+  return Number(raw);
 }
 
 function requireEnv(name) {
@@ -76,6 +76,21 @@ function git(cwd, ...args) {
 
 /** Scene file names look like `repositories-light.png`; nothing else ships. */
 const SHOT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*\.png$/;
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+/** GitHub rejects pushes with files over 100 MiB; keep both bounds explicit
+ *  so a runaway screenshot cannot wedge the publish job or bloat history. */
+const MAX_SHOT_BYTES = 100 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+
+async function isPng(file) {
+  const handle = await open(file, 'r');
+  try {
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(PNG_MAGIC.length), 0, PNG_MAGIC.length, 0);
+    return bytesRead === PNG_MAGIC.length && buffer.equals(PNG_MAGIC);
+  } finally {
+    await handle.close();
+  }
+}
 
 async function listShotFiles(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -90,11 +105,32 @@ async function listShotFiles(dir) {
   } catch {
     // scenes.json is optional; the name pattern below still applies.
   }
-  const shots = entries
+  const candidates = entries
     .filter((entry) => entry.isFile() && SHOT_NAME_PATTERN.test(entry.name))
     .filter((entry) => !allowed || allowed.has(entry.name))
     .map((entry) => entry.name)
     .sort();
+
+  const shots = [];
+  let totalBytes = 0;
+  for (const name of candidates) {
+    const file = path.join(dir, name);
+    const { size } = await stat(file);
+    if (size > MAX_SHOT_BYTES) {
+      console.error(`publish: ${name} is ${size} bytes (limit ${MAX_SHOT_BYTES}); refusing to publish`);
+      process.exit(1);
+    }
+    if (!(await isPng(file))) {
+      console.warn(`publish: skipping ${name}: not a PNG file`);
+      continue;
+    }
+    totalBytes += size;
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      console.error(`publish: screenshots exceed ${MAX_TOTAL_BYTES} bytes in total; refusing to publish`);
+      process.exit(1);
+    }
+    shots.push(name);
+  }
   if (shots.length === 0) {
     console.error(`publish: no .png screenshots found in ${dir}`);
     process.exit(1);
@@ -166,19 +202,31 @@ async function commitShots(args) {
       return;
     }
     git(workdir, 'commit', '-q', '-m', `ui-preview: screenshots for PR #${pr} @ ${sha.slice(0, 7)}`);
+    const previewCommit = git(workdir, 'rev-parse', 'HEAD').trim();
 
-    // Push with one rebase retry: concurrency groups cancel same-PR runs, but
-    // two different PRs can still race on the shared branch.
+    // Push with one retry: concurrency groups cancel same-PR runs, but two
+    // different PRs can still race on the shared branch. On a moved branch,
+    // rebase onto the fresh head and cherry-pick ONLY this run's commit —
+    // never the fetched baseline, or deleted sha directories could resurface.
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        execFileSync('git', ['push', '-q', 'origin', `HEAD:refs/heads/${branch}`], { cwd: workdir, encoding: 'utf8' });
+        execFileSync('git', ['push', '-q', 'origin', `HEAD:refs/heads/${branch}`], {
+          cwd: workdir,
+          encoding: 'utf8',
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+        });
         console.log(`publish: pushed ${shots.length} screenshot(s) to ${branch} under pr-${pr}/${sha}`);
         return;
       } catch (error) {
         if (attempt === 2) throw error;
-        console.warn('publish: push rejected (branch moved); rebasing and retrying');
-        execFileSync('git', ['fetch', '-q', '--depth', '1', 'origin', branch], { cwd: workdir, encoding: 'utf8' });
-        git(workdir, 'rebase', 'FETCH_HEAD');
+        console.warn('publish: push rejected (branch moved); replaying only this run\'s commit');
+        execFileSync('git', ['fetch', '-q', '--depth', '1', 'origin', branch], {
+          cwd: workdir,
+          encoding: 'utf8',
+          env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+        });
+        git(workdir, 'checkout', '-q', '-B', branch, 'FETCH_HEAD');
+        git(workdir, 'cherry-pick', previewCommit);
       }
     }
   } finally {
@@ -204,18 +252,19 @@ const api = async (repo, token, pathName, init) => {
   return response.json();
 };
 
-async function listAllComments(repo, token, pr) {
-  const comments = [];
-  let page = 1;
-  // Guard the loop with a hard page cap so a paging bug can never spin.
-  while (page <= 20) {
+async function findPreviewComment(repo, token, pr) {
+  // Walk every page until the marker comment shows up or the list is
+  // exhausted; a fixed cap could miss it and create duplicates forever.
+  const MAX_PAGES = 100; // 10k comments; a runaway guard, not an expected hit
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
     const batch = await api(repo, token, `issues/${pr}/comments?per_page=100&page=${page}`);
-    comments.push(...batch);
-    if (batch.length < 100) return comments;
-    page += 1;
+    const existing = batch.find((comment) =>
+      comment.body?.includes(MARKER_BEGIN) && comment.user?.login === 'github-actions[bot]');
+    if (existing) return existing;
+    if (batch.length < 100) return null;
   }
   console.warn('publish: comment listing hit the page cap; an older preview comment may exist beyond it');
-  return comments;
+  return null;
 }
 
 function sceneLabel(filename) {
@@ -275,8 +324,7 @@ async function upsertComment(args) {
     body = buildSuccessBody({ repo, branch, pr, sha, runUrl, shots });
   }
 
-  const existing = (await listAllComments(repo, token, pr)).find((comment) =>
-    comment.body?.includes(MARKER_BEGIN) && comment.user?.login === 'github-actions[bot]');
+  const existing = await findPreviewComment(repo, token, pr);
   if (existing) {
     await api(repo, token, `issues/comments/${existing.id}`, { method: 'PATCH', body: JSON.stringify({ body }) });
     console.log(`publish: updated existing preview comment ${existing.id} on PR #${pr}`);

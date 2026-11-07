@@ -122,20 +122,17 @@ function parseArgs(argv) {
 
 /**
  * Phase 1 of scene setup: load the app's document with every other request
- * aborted. The page ends up on the preview origin with the app never running,
- * so the seed write below cannot race the app's own hydration read.
+ * aborted. The routes stay armed until the caller finishes seeding, so a
+ * late-discovered app script can never boot and write default state shards
+ * before the demo snapshot exists.
  */
 async function gotoForSeeding(page, url) {
   await page.route('**/*', (route) => {
     if (route.request().resourceType() === 'document') return route.continue();
     return route.abort();
   });
-  try {
-    await page.goto(url, { waitUntil: 'commit' });
-    await page.waitForFunction(() => document.readyState !== 'uninitialized');
-  } finally {
-    await page.unroute('**/*');
-  }
+  await page.goto(url, { waitUntil: 'commit' });
+  await page.waitForFunction(() => document.readyState !== 'uninitialized');
 }
 
 async function shootScene(browser, baseState, scene, url, outDir) {
@@ -157,6 +154,8 @@ async function shootScene(browser, baseState, scene, url, outDir) {
     if (!seeded.indexedDB) {
       console.warn(`  (${scene.name}) IndexedDB unavailable; seeded via localStorage fallback`);
     }
+    // Seed is durable now; release the phase-1 blocking routes.
+    await page.unroute('**/*');
     // App phase: serve same-origin (preview server) requests, answer GitHub
     // API calls from the demo fixture, and abort everything else so no real
     // network call can influence the screenshots.
@@ -173,11 +172,17 @@ async function shootScene(browser, baseState, scene, url, outDir) {
     });
     await page.reload({ waitUntil: 'load', timeout: 60_000 });
 
-    // The app shell renders only after hydration; wait for it, then for the
-    // lazy view content and fonts so screenshots never catch a loading frame.
+    // The app shell renders only after hydration; wait for it, then for real
+    // view content: no Suspense fallback ([role="status"] "Loading..." frame)
+    // may remain. A timeout fails the run instead of shipping a loading shot.
     await page.waitForSelector('.ui-shell', { timeout: 60_000 });
+    await page.waitForSelector('main.app-main', { timeout: 30_000 });
+    await page.waitForFunction(() => {
+      const main = document.querySelector('main.app-main');
+      return !!main && (main.innerText ?? '').trim().length > 0 && !main.querySelector('[role="status"]');
+    }, null, { timeout: 45_000, polling: 250 });
     await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 15_000 });
-    await page.waitForTimeout(scene.settleMs ?? 1200);
+    await page.waitForTimeout(scene.settleMs ?? 800);
 
     await page.screenshot({ path: shotPath, fullPage: true });
     console.log(`  ✓ ${scene.name} -> ${shotPath}`);

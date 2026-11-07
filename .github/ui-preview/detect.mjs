@@ -9,8 +9,6 @@
  *   number the PR number
  *
  * Environment: GH_TOKEN (read), GITHUB_REPOSITORY, PR (number), GITHUB_OUTPUT.
- * `--reason` prints the matched paths for debugging; it is always printed on
- * stdout when ui=true.
  */
 import { execFileSync } from 'node:child_process';
 
@@ -25,8 +23,12 @@ const UI_PREFIXES = [
   'vite.config.ts',
 ];
 
+const FILES_PER_PAGE = 100;
+/** Safety bound: 100 pages = 10k changed files; real UI PRs stay far below. */
+const MAX_PAGES = 100;
+
 function gh(args) {
-  return execFileSync('gh', args, { encoding: 'utf8' });
+  return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
 }
 
 function requireEnv(name) {
@@ -40,12 +42,13 @@ function requireEnv(name) {
 
 const repo = requireEnv('GITHUB_REPOSITORY');
 // PR arrives via env from the workflow (number for PR events, free text for
-// workflow_dispatch); never trust it beyond a positive integer.
-const pr = Number.parseInt(process.env.PR ?? '', 10);
-if (!Number.isSafeInteger(pr) || pr <= 0) {
-  console.error('detect: PR must be a positive integer');
+// workflow_dispatch): only a plain positive integer is ever accepted.
+const prRaw = (process.env.PR ?? '').trim();
+if (!/^\d{1,9}$/.test(prRaw)) {
+  console.error(`detect: PR must be a positive integer, got ${JSON.stringify(process.env.PR)}`);
   process.exit(1);
 }
+const pr = Number(prRaw);
 const output = requireEnv('GITHUB_OUTPUT');
 
 const writeOutput = (pairs) => {
@@ -62,23 +65,34 @@ if (pull.state !== 'open') {
   process.exit(0);
 }
 
-const filenames = (() => {
-  // gh's --slurp and --jq are mutually exclusive, so fetch the raw paged JSON
-  // and flatten it here instead of shaping it with jq.
-  const pages = JSON.parse(gh([
-    'api',
-    '--paginate',
-    '--slurp',
-    `repos/${repo}/pulls/${pr}/files?per_page=100`,
-  ]));
-  return [...new Set(pages.flat().map((file) => file?.filename).filter(Boolean))];
-})();
+/**
+ * Collect changed paths page by page, extracting only the names with jq so a
+ * patch-heavy response never has to be buffered whole. Renames contribute both
+ * their previous and current path: a file moved out of src/ is still a UI
+ * change worth re-shooting.
+ */
+const collectChangedPaths = () => {
+  const paths = new Set();
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const url = `repos/${repo}/pulls/${pr}/files?per_page=${FILES_PER_PAGE}&page=${page}`;
+    const count = Number(gh(['api', url, '--jq', 'length']));
+    if (count === 0) break;
+    for (const name of gh(['api', url, '--jq', '.[] | .filename, (.previous_filename // empty)']).split('\n')) {
+      const trimmed = name.trim();
+      if (trimmed) paths.add(trimmed);
+    }
+    if (count < FILES_PER_PAGE) return [...paths];
+  }
+  console.warn(`detect: PR #${pr} has more than ${MAX_PAGES * FILES_PER_PAGE} changed files; result may be incomplete`);
+  return [...paths];
+};
 
+const filenames = collectChangedPaths();
 const uiPaths = filenames.filter((name) => UI_PREFIXES.some((prefix) => name === prefix || name.startsWith(prefix)));
 const forcedByLabel = (pull.labels ?? []).some((label) => label?.name === 'ui-preview');
 
 if (uiPaths.length === 0 && !forcedByLabel) {
-  console.log(`detect: PR #${pr} (${filenames.length} files) does not touch the UI and carries no ui-preview label`);
+  console.log(`detect: PR #${pr} (${filenames.length} changed paths) does not touch the UI and carries no ui-preview label`);
   writeOutput({ ui: 'false', sha: pull.head.sha, number: pr });
   process.exit(0);
 }

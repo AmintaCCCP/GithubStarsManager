@@ -54,7 +54,10 @@ never leaves the browser.
 - `pull_request_target` is required to cover fork PRs, so the pipeline is
   split: **record** runs the PR's code (`npm ci`, `vite build`, `vite preview`)
   and therefore holds no secrets and no write permissions; **publish** can
-  write but only ever runs scripts from the default branch.
+  write but only ever runs scripts from the default branch. Checking out the
+  fork head needs `allow-unsafe-pr-checkout: true` (actions/checkout ≥ v7
+  refuses it otherwise); it is safe here precisely because the record job has
+  nothing to steal and nothing it could modify.
 - The shots directory is recreated empty on every run and `publish.mjs` only
   accepts file names shoot.mjs produces, so PR code sharing `$RUNNER_TEMP`
   cannot inject files into the comment or the `ui-previews` branch.
