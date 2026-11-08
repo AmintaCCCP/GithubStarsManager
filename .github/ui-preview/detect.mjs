@@ -28,6 +28,9 @@ const ALL_SCENES = [
   'forks',
   'discovery',
   'settings',
+  'plugin-repo-custom-fields',
+  'plugin-repo-info-card',
+  'plugin-repo-insights',
 ];
 
 /**
@@ -41,6 +44,9 @@ const VIEW_TO_SCENES = {
   forks: ['forks'],
   discovery: ['discovery'],
   settings: ['settings'],
+  'plugin-repo-custom-fields': ['plugin-repo-custom-fields'],
+  'plugin-repo-info-card': ['plugin-repo-info-card'],
+  'plugin-repo-insights': ['plugin-repo-insights'],
 };
 
 /**
@@ -167,7 +173,16 @@ export function classifyPath(filePath) {
     return 'discovery';
   }
 
-  // 5. Plugin UI changes touch both repositories (card popup / action) and settings (plugins panel)
+  // 5. Plugin UI changes touch individual example plugin views or settings
+  if (/^examples\/plugins\/repo-custom-fields\/ui\//.test(path)) {
+    return 'plugin-repo-custom-fields';
+  }
+  if (/^examples\/plugins\/repo-info-card\/ui\//.test(path)) {
+    return 'plugin-repo-info-card';
+  }
+  if (/^examples\/plugins\/repo-insights\/ui\//.test(path)) {
+    return 'plugin-repo-insights';
+  }
   if (
     path.startsWith('src/features/plugins/') ||
     path.startsWith('src/plugins/') ||
@@ -176,7 +191,7 @@ export function classifyPath(filePath) {
     /^src\/components\/settings\/Plugin/i.test(path) ||
     /^src\/locales\/[^/]+\/plugins\.json$/.test(path)
   ) {
-    return ['repositories', 'settings'];
+    return ['settings', 'plugin-repo-custom-fields', 'plugin-repo-info-card', 'plugin-repo-insights'];
   }
 
   // 6. Settings view
@@ -207,7 +222,6 @@ export function classifyPath(filePath) {
     /^src\/components\/ContextSidebarBody\./.test(path) ||
     /^src\/components\/SyncModeChoiceModal\./.test(path) ||
     /^src\/components\/GlobalChatHistorySheet\./.test(path) ||
-    /^src\/components\/WorkspacePageHeader\./.test(path) ||
     /^src\/locales\/[^/]+\/(repositories|chat|search)\.json$/.test(path) ||
     path === 'src/store/slices/repositorySlice.ts' ||
     path === 'src/store/slices/categorySlice.ts' ||
@@ -228,7 +242,9 @@ export function classifyPath(filePath) {
     path === 'src/index.css' ||
     path.startsWith('src/styles/') ||
     /^src\/components\/Header\./.test(path) ||
+    /^src\/components\/WorkspacePageHeader\./.test(path) ||
     path.startsWith('src/components/ui/') ||
+    path.startsWith('src/lib/') ||
     /^src\/components\/Modal\./.test(path) ||
     /^src\/components\/ErrorBoundary\./.test(path) ||
     /^src\/components\/LoginScreen\./.test(path) ||
@@ -267,6 +283,41 @@ export function classifyPath(filePath) {
 }
 
 /**
+ * Parse output from GitHub API files queries (handles raw JSON or newline-separated filenames).
+ * If the compare output indicates branch divergence (force push) or truncation (>= 300 files),
+ * returns ['*'] to conservatively trigger all preview scenes.
+ * @param {string} raw - Output string from executor.
+ * @returns {string[]} List of changed file paths or wildcard ['*'].
+ */
+export function parseFileList(raw) {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const data = JSON.parse(trimmed);
+      if (Array.isArray(data)) {
+        return data.flatMap((f) => [f.filename, f.previous_filename].filter(Boolean));
+      }
+      if (data && typeof data === 'object') {
+        // If git comparison diverged (e.g. force-push tree rebase), conservative fallback to all scenes
+        if (data.status === 'diverged') {
+          return ['*'];
+        }
+        const files = Array.isArray(data.files) ? data.files : [];
+        // GitHub Compare API caps at 300 files without pagination; if at cap, results may be truncated
+        if (files.length >= 300) {
+          return ['*'];
+        }
+        return files.flatMap((f) => [f.filename, f.previous_filename].filter(Boolean));
+      }
+    } catch {
+      // Fall through to plain text splitting if JSON parse fails
+    }
+  }
+  return trimmed.split('\n').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
  * Given an array of changed file paths, determine which scenes to capture.
  * Returns an array of scene names in canonical order. Empty array if no UI changes.
  * @param {string[]} paths - Changed file paths.
@@ -276,6 +327,10 @@ export function mapPathsToScenes(paths) {
   const views = new Set();
 
   for (const path of paths) {
+    if (path === '*' || path === '__ALL__') {
+      views.add('global');
+      continue;
+    }
     const classification = classifyPath(path);
     if (!classification) continue;
     if (Array.isArray(classification)) {
@@ -332,7 +387,9 @@ function requireEnv(name) {
 
 /**
  * Collect changed paths from GitHub API.
- * - When action is 'synchronize', inspects the commit/push range (BEFORE_SHA...HEAD_SHA) or HEAD_SHA.
+ * - When action is 'synchronize', inspects the commit/push range (BEFORE_SHA...HEAD_SHA).
+ *   If the range diverged or is truncated, conservatively returns ['*'] for all scenes.
+ *   If the compare query fails, falls back directly to PR changed files.
  * - Otherwise (opened, reopened, labeled, dispatch), inspects all changed files of the pull request.
  * @param {object} params
  * @param {string} params.repo - Repository in "owner/repo" format.
@@ -346,33 +403,18 @@ function requireEnv(name) {
 export function collectChangedPaths({ repo, pr, action, beforeSha, headSha, executor = gh }) {
   const isSha = (s) => typeof s === 'string' && /^[0-9a-f]{40}$/i.test(s.trim()) && !/^0+$/.test(s.trim());
 
-  if (action === 'synchronize') {
-    if (isSha(beforeSha) && isSha(headSha)) {
-      try {
-        console.log(`detect: comparing push range ${beforeSha.slice(0, 7)}...${headSha.slice(0, 7)}`);
-        const url = `repos/${repo}/compare/${beforeSha.trim()}...${headSha.trim()}`;
-        const output = executor(['api', url, '--jq', '.files[] | .filename, (.previous_filename // empty)']);
-        const paths = new Set(output.split('\n').map((s) => s.trim()).filter(Boolean));
-        if (paths.size > 0) {
-          return [...paths];
-        }
-      } catch (err) {
-        console.warn(`detect: compare failed (${err.message}); falling back to head commit`);
+  if (action === 'synchronize' && isSha(beforeSha) && isSha(headSha)) {
+    try {
+      console.log(`detect: comparing push range ${beforeSha.slice(0, 7)}...${headSha.slice(0, 7)}`);
+      const url = `repos/${repo}/compare/${beforeSha.trim()}...${headSha.trim()}`;
+      const output = executor(['api', url]);
+      const filePaths = parseFileList(output);
+      const paths = new Set(filePaths);
+      if (paths.size > 0) {
+        return [...paths];
       }
-    }
-
-    if (isSha(headSha)) {
-      try {
-        console.log(`detect: reading files for head commit ${headSha.slice(0, 7)}`);
-        const url = `repos/${repo}/commits/${headSha.trim()}`;
-        const output = executor(['api', url, '--jq', '.files[] | .filename, (.previous_filename // empty)']);
-        const paths = new Set(output.split('\n').map((s) => s.trim()).filter(Boolean));
-        if (paths.size > 0) {
-          return [...paths];
-        }
-      } catch (err) {
-        console.warn(`detect: head commit query failed (${err.message}); falling back to PR files`);
-      }
+    } catch (err) {
+      console.warn(`detect: compare failed (${err.message}); falling back to PR files`);
     }
   }
 
@@ -380,13 +422,11 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha, exec
   const paths = new Set();
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     const url = `repos/${repo}/pulls/${pr}/files?per_page=${FILES_PER_PAGE}&page=${page}`;
-    const count = Number(executor(['api', url, '--jq', 'length']));
-    if (count === 0) break;
-    for (const name of executor(['api', url, '--jq', '.[] | .filename, (.previous_filename // empty)']).split('\n')) {
-      const trimmed = name.trim();
-      if (trimmed) paths.add(trimmed);
-    }
-    if (count < FILES_PER_PAGE) return [...paths];
+    const output = executor(['api', url]);
+    const filePaths = parseFileList(output);
+    if (filePaths.length === 0) break;
+    for (const name of filePaths) paths.add(name);
+    if (filePaths.length < FILES_PER_PAGE) break;
   }
   return [...paths];
 }

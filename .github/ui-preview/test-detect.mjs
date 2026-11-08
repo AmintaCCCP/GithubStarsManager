@@ -91,12 +91,42 @@ check('repositories locale', classifyPath('src/locales/zh/repositories.json'), '
 check('repositories search helper', classifyPath('src/utils/repoSearch.ts'), 'repositories');
 check('repositories category helper', classifyPath('src/utils/categoryUtils.ts'), 'repositories');
 
-check('plugin modal touches repositories and settings', classifyPath('src/components/PluginPageModal.tsx'), ['repositories', 'settings']);
-check('plugin settings panel touches repositories and settings', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), ['repositories', 'settings']);
-check('plugin example UI touches repositories and settings', classifyPath('examples/plugins/repo-custom-fields/ui/index.js'), ['repositories', 'settings']);
-check('plugin example manifest touches repositories and settings', classifyPath('examples/plugins/repo-custom-fields/manifest.json'), ['repositories', 'settings']);
-check('plugin feature touches repositories and settings', classifyPath('src/features/plugins/hooks/usePluginAI.ts'), ['repositories', 'settings']);
-check('plugin locale touches repositories and settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings']);
+check('WorkspacePageHeader is global', classifyPath('src/components/WorkspacePageHeader.tsx'), 'global');
+check('src/lib/utils.ts is global', classifyPath('src/lib/utils.ts'), 'global');
+
+check('plugin modal touches settings and plugin views', classifyPath('src/components/PluginPageModal.tsx'), [
+  'settings',
+  'plugin-repo-custom-fields',
+  'plugin-repo-info-card',
+  'plugin-repo-insights',
+]);
+check('plugin settings panel touches settings and plugin views', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), [
+  'settings',
+  'plugin-repo-custom-fields',
+  'plugin-repo-info-card',
+  'plugin-repo-insights',
+]);
+check('repo-custom-fields UI touches custom fields scene', classifyPath('examples/plugins/repo-custom-fields/ui/index.js'), 'plugin-repo-custom-fields');
+check('repo-info-card UI touches info card scene', classifyPath('examples/plugins/repo-info-card/ui/index.html'), 'plugin-repo-info-card');
+check('repo-insights UI touches insights scene', classifyPath('examples/plugins/repo-insights/ui/style.css'), 'plugin-repo-insights');
+check('plugin example manifest touches settings and plugin views', classifyPath('examples/plugins/repo-custom-fields/manifest.json'), [
+  'settings',
+  'plugin-repo-custom-fields',
+  'plugin-repo-info-card',
+  'plugin-repo-insights',
+]);
+check('plugin feature touches settings and plugin views', classifyPath('src/features/plugins/hooks/usePluginAI.ts'), [
+  'settings',
+  'plugin-repo-custom-fields',
+  'plugin-repo-info-card',
+  'plugin-repo-insights',
+]);
+check('plugin locale touches settings and plugin views', classifyPath('src/locales/zh/plugins.json'), [
+  'settings',
+  'plugin-repo-custom-fields',
+  'plugin-repo-info-card',
+  'plugin-repo-insights',
+]);
 
 check('timelineSlice touches releases and forks', classifyPath('src/store/slices/timelineSlice.ts'), ['releases', 'forks']);
 
@@ -162,15 +192,19 @@ check('repoSearch helper change maps to repositories-light and repositories-dark
   'src/utils/repoSearch.ts',
 ]), ['repositories-light', 'repositories-dark']);
 
-check('plugin UI change maps to repositories-light, repositories-dark, and settings', mapPathsToScenes([
+check('repo-custom-fields UI change maps to plugin-repo-custom-fields', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/ui/index.js',
-]), ['repositories-light', 'repositories-dark', 'settings']);
+]), ['plugin-repo-custom-fields']);
 
-check('plugin UI change with worker and readme still maps to repositories and settings', mapPathsToScenes([
+check('plugin UI change with worker and readme still maps to custom fields scene', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/ui/style.css',
   'examples/plugins/markdown-exporter/worker.js',
   'examples/plugins/repo-custom-fields/README.md',
-]), ['repositories-light', 'repositories-dark', 'settings']);
+]), ['plugin-repo-custom-fields']);
+
+check('general plugin UI change maps to settings and all plugin scenes', mapPathsToScenes([
+  'src/components/PluginPageModal.tsx',
+]), ['settings', 'plugin-repo-custom-fields', 'plugin-repo-info-card', 'plugin-repo-insights']);
 
 check('multiple views touched maps to the union of their scenes', mapPathsToScenes([
   'src/components/GistView.tsx',
@@ -275,6 +309,65 @@ check('synchronize with repoSearch change maps to repositories scenes', mapPaths
   'repositories-light',
   'repositories-dark',
 ]);
+
+// Scenario D: synchronize push where compare diverged (force push)
+const mockGhSyncDiverged = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    return JSON.stringify({ status: 'diverged', files: [] });
+  }
+  return '';
+};
+const syncDivergedPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncDiverged,
+});
+check('synchronize with diverged compare triggers all scenes', mapPathsToScenes(syncDivergedPaths), ALL_SCENES);
+
+// Scenario E: synchronize push where compare list is truncated (>= 300 files)
+const mockGhSyncTruncated = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    const dummyFiles = Array.from({ length: 300 }, (_, i) => ({ filename: `file${i}.ts` }));
+    return JSON.stringify({ status: 'ahead', files: dummyFiles });
+  }
+  return '';
+};
+const syncTruncatedPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncTruncated,
+});
+check('synchronize with truncated compare triggers all scenes', mapPathsToScenes(syncTruncatedPaths), ALL_SCENES);
+
+// Scenario F: synchronize push where compare fails completely, falls back directly to PR files
+const mockGhSyncCompareFails = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    throw new Error('compare endpoint error');
+  }
+  if (url.startsWith('repos/owner/repo/pulls/123/files')) {
+    return JSON.stringify([{ filename: 'src/components/GistView.tsx' }]);
+  }
+  return '';
+};
+const syncFallbackPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncCompareFails,
+});
+check('synchronize falling back to PR files on compare failure', syncFallbackPaths, ['src/components/GistView.tsx']);
+check('synchronize fallback to PR files maps to gist scene', mapPathsToScenes(syncFallbackPaths), ['gists']);
 
 console.log(`\nTest result: ${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures ? 1 : 0);

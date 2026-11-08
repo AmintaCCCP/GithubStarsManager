@@ -33,6 +33,24 @@ const SCENES = [
   { name: 'forks', currentView: 'forks', themeMode: 'light' },
   { name: 'discovery', currentView: 'subscription', themeMode: 'light', selectedDiscoveryChannel: 'trending', settleMs: 4000 },
   { name: 'settings', currentView: 'settings', themeMode: 'light' },
+  {
+    name: 'plugin-repo-custom-fields',
+    pluginUrl: '/plugins/repo-custom-fields/ui/index.html',
+    pluginId: 'com.githubstarsmanager.repo-custom-fields',
+    pageId: 'fields',
+  },
+  {
+    name: 'plugin-repo-info-card',
+    pluginUrl: '/plugins/repo-info-card/ui/index.html',
+    pluginId: 'com.githubstarsmanager.repo-info-card',
+    pageId: 'card',
+  },
+  {
+    name: 'plugin-repo-insights',
+    pluginUrl: '/plugins/repo-insights/ui/index.html',
+    pluginId: 'com.githubstarsmanager.repo-insights',
+    pageId: 'insights',
+  },
 ];
 
 /**
@@ -162,11 +180,48 @@ async function shootScene(browser, baseState, scene, url, outDir) {
     deviceScaleFactor: 2,
     locale: 'zh-CN',
     timezoneId: 'Asia/Shanghai',
-    colorScheme: scene.themeMode,
+    colorScheme: scene.themeMode ?? 'light',
   });
   const page = await context.newPage();
   const shotPath = path.join(outDir, `${scene.name}.png`);
   try {
+    if (scene.pluginUrl) {
+      const origin = new URL(url).origin;
+      const targetUrl = new URL(scene.pluginUrl, url).href;
+      await page.route('**/*', (route) => {
+        const reqUrl = route.request().url();
+        if (reqUrl.startsWith(origin)) return route.continue();
+        return route.abort();
+      });
+      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30_000 });
+      const demoRepo = baseState.repositories?.[0] ?? {
+        id: 1,
+        name: 'GithubStarsManager',
+        full_name: 'AmintaCCCP/GithubStarsManager',
+        description: 'GitHub Stars Manager demo repository',
+        stargazers_count: 1234,
+        forks_count: 56,
+        language: 'TypeScript',
+      };
+      await page.evaluate(({ pluginId, pageId, repo }) => {
+        window.postMessage({
+          type: 'plugin-page:init',
+          pluginId,
+          pageId,
+          token: 'preview-token',
+          context: {
+            repository: repo,
+            language: 'zh',
+            theme: 'light',
+          },
+        }, '*');
+      }, { pluginId: scene.pluginId, pageId: scene.pageId, repo: demoRepo });
+      await page.waitForTimeout(scene.settleMs ?? 1000);
+      await page.screenshot({ path: shotPath, fullPage: true });
+      console.log(`  ✓ ${scene.name} -> ${shotPath}`);
+      return { scene: scene.name, path: shotPath };
+    }
+
     await gotoForSeeding(page, url);
     const seeded = await page.evaluate(
       seedPersistedState,

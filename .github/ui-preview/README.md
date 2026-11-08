@@ -12,11 +12,12 @@ label), the workflow:
    - On `synchronize` (new push), `detect` inspects the commit/push diff so
      commits that don't adjust the UI don't trigger unnecessary runs.
    - Modified UI files are mapped to the affected views/scenes (`gists`,
-     `releases`, `forks`, `discovery`, `settings`, plugin UI in `examples/plugins/**/ui/**` /
-     `manifest.json` to `repositories-light`, `repositories-dark`, and `settings`).
-     Changes to global elements (`App.tsx`, `Header.tsx`, global styles, primitives,
+     `releases`, `forks`, `discovery`, `settings`, or specific example plugin
+     scenes `plugin-repo-custom-fields`, `plugin-repo-info-card`, and `plugin-repo-insights`).
+     Changes to global elements (`App.tsx`, `Header.tsx`, `WorkspacePageHeader.tsx`,
+     shared UI primitives under `src/components/ui/`, `src/lib/utils.ts`,
      or styling/bundling configs like `tailwind.config.js`, `postcss.config.js`,
-     and `vite.config.ts`) trigger all seven scenes.
+     and `vite.config.ts`) trigger all scenes.
 2. **build** checks out the PR and builds it with `npx vite build`; the
    static bundle is uploaded as an artifact. **shoot** then runs on a clean
    runner with zero PR code: it serves the downloaded bundle and runs
@@ -47,6 +48,9 @@ const SCENES = [
   { name: 'forks', currentView: 'forks', themeMode: 'light' },
   { name: 'discovery', currentView: 'subscription', themeMode: 'light', selectedDiscoveryChannel: 'trending', settleMs: 4000 },
   { name: 'settings', currentView: 'settings', themeMode: 'light' },
+  { name: 'plugin-repo-custom-fields', pluginUrl: '/plugins/repo-custom-fields/ui/index.html', ... },
+  { name: 'plugin-repo-info-card', pluginUrl: '/plugins/repo-info-card/ui/index.html', ... },
+  { name: 'plugin-repo-insights', pluginUrl: '/plugins/repo-insights/ui/index.html', ... },
 ];
 ```
 
