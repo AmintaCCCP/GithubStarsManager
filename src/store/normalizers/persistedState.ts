@@ -36,7 +36,7 @@ import {
   REQUIRED_HEADER_MENU_IDS,
 } from '../schema';
 
-const normalizePluginCustomIcons = (value: unknown): Record<string, string> => {
+export const normalizePluginCustomIcons = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const result: Record<string, string> = {};
   for (const [k, v] of Object.entries(value)) {
