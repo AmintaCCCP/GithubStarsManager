@@ -47,7 +47,7 @@ describe('pluginIcons', () => {
       return selector ? selector(state) : state;
     }) as unknown as typeof useAppStore);
 
-    const { container } = render(<PluginIcon pluginId={pluginId} data-testid="plugin-icon" />);
+    const { container } = render(<PluginIcon pluginId={pluginId} icon="bot" data-testid="plugin-icon" />);
     expect(container.querySelector('.lucide-rocket')).toBeInTheDocument();
   });
 

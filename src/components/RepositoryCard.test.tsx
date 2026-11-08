@@ -74,12 +74,14 @@ vi.mock('./PluginPageModal', () => ({
 
 const pluginClientMocks = vi.hoisted(() => ({
   list: vi.fn(),
+  runAction: vi.fn(),
 }));
 
 vi.mock('../plugins/pluginClient', () => ({
   pluginClient: {
     isSupported: () => true,
     list: pluginClientMocks.list,
+    runAction: pluginClientMocks.runAction,
   },
 }));
 
@@ -733,6 +735,68 @@ describe('RepositoryCard view modes', () => {
 
     await user.click(pluginButton);
     expect(await screen.findByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
+  });
+
+  it('executes worker action when plugin action has no opensPage', async () => {
+    const user = userEvent.setup();
+    const mockRunAction = vi.fn().mockResolvedValue({
+      success: true,
+      result: { type: 'copy', text: 'card markdown' },
+    });
+    pluginClientMocks.runAction.mockImplementation(mockRunAction);
+
+    storeState.repositoryCardActions = [
+      { id: 'plugin:com.example.worker:export-card', visible: true },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+    ];
+
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [
+        {
+          directoryName: 'repo-worker',
+          manifest: {
+            manifestVersion: 1,
+            id: 'com.example.worker',
+            name: 'Worker Plugin',
+            version: '1.0.0',
+            apiVersion: '1',
+            permissions: [],
+            contributes: {
+              repositoryActions: [
+                {
+                  id: 'export-card',
+                  title: '导出卡片',
+                  placement: 'repository-card',
+                  icon: 'file-text',
+                },
+              ],
+            },
+          },
+          enabled: true,
+          status: 'active',
+          grantedPermissions: [],
+        },
+      ],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    const pluginButton = await screen.findByRole('button', { name: '导出卡片' });
+    expect(pluginButton).toBeInTheDocument();
+
+    await user.click(pluginButton);
+    expect(mockRunAction).toHaveBeenCalledWith({
+      pluginId: 'com.example.worker',
+      actionId: 'export-card',
+      repositories: [repository],
+    });
   });
 });
 
