@@ -26,6 +26,8 @@
       loadFailed: '读取失败：{message}',
       saveFailed: '保存失败：{message}',
       saved: '已保存',
+      loadingFields: '正在读取字段…',
+      retry: '重试读取',
       pickerHint: '此入口没有携带仓库上下文（例如从「设置 → 插件 → 打开页面」进入）。搜索并选择一个已加载的仓库：',
       search: '搜索',
       searching: '搜索中…',
@@ -63,6 +65,8 @@
       loadFailed: 'Failed to load: {message}',
       saveFailed: 'Failed to save: {message}',
       saved: 'Saved',
+      loadingFields: 'Loading fields…',
+      retry: 'Retry',
       pickerHint: 'This entry carries no repository context (for example opened from Settings → Plugins → Open page). Search and pick a loaded repository:',
       search: 'Search',
       searching: 'Searching…',
@@ -131,6 +135,10 @@
     drafts: [],
     mode: 'view', // 'view' | 'edit'
     searchSeq: 0,
+    // 读取完成前禁止编辑：草稿是空数组，基于它保存会覆盖已存字段。
+    loadState: 'idle', // 'idle' | 'loading' | 'ready' | 'failed'
+    // 保存请求在途时禁止继续编辑/取消：旧请求成功后会用旧草稿覆盖新改动。
+    saving: false,
   };
 
   function str() { return state.language === 'zh' ? STR.zh : STR.en; }
@@ -151,6 +159,7 @@
     remove: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+    retry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
   };
 
   /* ── 初始化 ───────────────────────────────────────────────────────── */
@@ -162,6 +171,8 @@
 
   function handleInit(context) {
     applyLanguage(context.language);
+    // 标签必须在应用语言之后刷新：首次以英文初始化时，默认中文标签会残留。
+    applyAddButtonLabels();
     document.body.dataset.theme = context.theme === 'light' ? 'light' : 'dark';
     const repository = context.repository;
     const nextRepository = repository && typeof repository.full_name === 'string' && Number.isSafeInteger(repository.id)
@@ -224,30 +235,57 @@
   async function loadDoc() {
     // 在选择器里快速换仓库时，旧请求可能后到：用发起时的键比对，过期响应丢弃。
     const key = state.repoKey;
+    state.loadState = 'loading';
+    refreshControls();
+    setStatus(str().loadingFields);
     try {
       const raw = await request('storage.get', { key });
       if (key !== state.repoKey) return;
       state.doc = M.sanitizeDoc(raw);
-      // 读取成功后按文档内容刷新当前视图；预览态直接重渲染。
-      if (state.mode === 'view') renderView();
+      state.loadState = 'ready';
+      setStatus('');
     } catch (error) {
       if (key !== state.repoKey) return;
       state.doc = M.emptyDoc();
+      // 读取失败时保持 edit 不可用：此时草稿不可信，保存会覆盖磁盘上的数据。
+      state.loadState = 'failed';
       setStatus(fmt(str().loadFailed, { message: error.message || error.code || 'unknown' }), true);
-      if (state.mode === 'view') renderView();
+    }
+    // 读取成功后按文档内容刷新当前视图；预览态直接重渲染。
+    if (state.mode === 'view') renderView();
+    refreshControls();
+  }
+
+  async function retryLoad() {
+    if (state.loadState === 'loading' || state.saving) return;
+    await loadDoc();
+  }
+
+  /** 统一收敛工具条状态：读取未完成时不给编辑入口，保存途中锁住编辑与取消。 */
+  function refreshControls() {
+    const ready = state.loadState === 'ready' && !state.saving;
+    $('btn-edit').hidden = state.mode !== 'view' || !ready;
+    $('btn-retry').hidden = state.mode !== 'view' || state.loadState !== 'failed';
+    $('btn-save').hidden = state.mode !== 'edit';
+    $('btn-cancel').hidden = state.mode !== 'edit';
+    $('btn-save').disabled = state.saving;
+    $('btn-cancel').disabled = state.saving;
+    if (state.mode === 'edit') {
+      $('edit').querySelectorAll('input, textarea, button').forEach((node) => {
+        node.disabled = state.saving;
+      });
     }
   }
 
   /* ── 预览视图 ─────────────────────────────────────────────────────── */
 
   function enterView() {
+    if (state.saving) return;
     state.mode = 'view';
     state.drafts = [];
     $('edit').hidden = true;
     $('view').hidden = false;
-    $('btn-edit').hidden = false;
-    $('btn-save').hidden = true;
-    $('btn-cancel').hidden = true;
+    refreshControls();
     setStatus('');
     renderView();
   }
@@ -265,14 +303,17 @@
 
       const label = document.createElement('div');
       label.className = 'label';
-      const name = document.createElement('span');
-      name.textContent = field.name || str().typeText;
       const badge = document.createElement('span');
       badge.className = 'type-badge';
       badge.textContent = field.type === 'note'
         ? (field.format === 'code' ? str().formatCode : str().formatMarkdown)
         : str()[`type${field.type.charAt(0).toUpperCase()}${field.type.slice(1)}`];
-      label.append(name, badge);
+      if (field.name) {
+        const name = document.createElement('span');
+        name.textContent = field.name;
+        label.append(name);
+      }
+      label.append(badge);
       li.append(label);
 
       const value = document.createElement('div');
@@ -312,13 +353,13 @@
   }
 
   function enterEdit() {
+    // 读取未完成（或失败）时不进编辑：空草稿保存会覆盖已存字段。
+    if (state.loadState !== 'ready' || state.saving) return;
     state.mode = 'edit';
     state.drafts = state.doc.fields.map((field) => ({ ...field }));
     $('view').hidden = true;
     $('edit').hidden = false;
-    $('btn-edit').hidden = true;
-    $('btn-save').hidden = false;
-    $('btn-cancel').hidden = false;
+    refreshControls();
     setStatus('');
     renderEdit();
   }
@@ -400,7 +441,11 @@
       li.append(actions);
 
       list.append(li);
+      // 拖拽事件必须在渲染时就绑好：等到 pointerdown 才绑定，当前事件已经
+      // 冒泡过把手，首次按压不会启用 draggable，源行与目标行都无法排序。
+      bindDragHandlers(li, index);
     });
+    refreshControls();
   }
 
   function buildFormatSwitch(draft) {
@@ -498,17 +543,24 @@
   /* ── 保存 ─────────────────────────────────────────────────────────── */
 
   async function saveEdits() {
+    // 读取未完成或已有保存在途时直接忽略：草稿可能不完整，或旧响应会覆盖新改动。
+    if (state.loadState !== 'ready' || state.saving) return;
     const result = M.draftToDoc(state.drafts);
     if (!result.ok) {
       markProblems(result.problems);
       return;
     }
+    state.saving = true;
+    refreshControls();
     try {
       await request('storage.set', { key: state.repoKey, value: result.doc });
       state.doc = result.doc;
+      state.saving = false;
       enterView();
       setStatus(str().saved);
     } catch (error) {
+      state.saving = false;
+      refreshControls();
       setStatus(fmt(str().saveFailed, { message: error.message || error.code || 'unknown' }), true);
     }
   }
@@ -631,10 +683,7 @@
         rows[rows.length - 1]?.querySelector('.name-input')?.focus();
       });
     });
-    $('edit-list').addEventListener('pointerdown', (event) => {
-      const row = event.target instanceof Element ? event.target.closest('.edit-row') : null;
-      if (row) bindDragHandlers(row, Number(row.dataset.index));
-    });
+    $('btn-retry').addEventListener('click', () => void retryLoad());
   }
 
   function applyAddButtonLabels() {

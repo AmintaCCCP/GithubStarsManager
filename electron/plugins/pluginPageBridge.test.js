@@ -169,6 +169,18 @@ test('network requests accept only allowlisted hosts, metric paths and paginatio
   }
 });
 
+test('shell.openExternal still allows public IPv6 and ordinary private IPv4 (V1.6)', () => {
+  for (const url of ['https://[2001:4860:4860::8888]/', 'http://192.168.1.1/', 'https://openai.com/a?b=1']) {
+    assert.deepEqual(validatePageCapabilityRequest({
+      pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal',
+      args: { url },
+    }), {
+      pluginId: 'com.example.page', pageId: 'fields', capability: 'shell', operation: 'openExternal',
+      args: { url },
+    });
+  }
+});
+
 test('shell.openExternal accepts only bounded http/https URLs (V1.6)', () => {
   assert.deepEqual(validatePageCapabilityRequest({
     pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal',
@@ -192,6 +204,13 @@ test('shell.openExternal accepts only bounded http/https URLs (V1.6)', () => {
     { url: 'http://127.0.0.1:8080/' },
     { url: 'http://[::1]/' },
     { url: 'http://169.254.169.254/latest/meta-data' },
+    { url: 'http://[::]/' },
+    { url: 'http://[fe80::1]/' },
+    { url: 'http://[febf::1]/' },
+    { url: 'http://[fc00::1]/' },
+    { url: 'http://[fd12:3456::1]/' },
+    { url: 'http://[::ffff:127.0.0.1]/' },
+    { url: 'http://[::ffff:169.254.169.254]/' },
   ]) {
     assert.throws(() => validatePageCapabilityRequest({
       pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal', args,

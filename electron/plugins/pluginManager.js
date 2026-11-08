@@ -3,7 +3,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { MAX_MANIFEST_BYTES, validateManifest } = require('./manifestSchema');
-const { isOpenExternalUrlAllowed } = require('./pluginPageBridge');
 const { createPluginRuntime } = require('./pluginRuntime');
 const {
   validateRunActionRequest,
@@ -770,14 +769,6 @@ function createPluginManager({
           return {
             success: false,
             error: { code: 'PLUGIN_PERMISSION_DENIED', message: "Permission 'external:open' is required" },
-          };
-        }
-        // 与页面 Bridge 的 shell.openExternal 同一套 http/https 白名单：Worker 返回的
-        // URL 同样不允许 javascript:/file: 等协议。
-        if (result.type === 'open-external' && !isOpenExternalUrlAllowed(result.url)) {
-          return {
-            success: false,
-            error: { code: 'PLUGIN_OPEN_EXTERNAL_URL_INVALID', message: 'Open-external URL is invalid' },
           };
         }
         if (

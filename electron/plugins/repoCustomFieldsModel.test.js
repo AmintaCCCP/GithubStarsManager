@@ -62,6 +62,13 @@ test('draftToDoc validates names, links and value budgets', () => {
 
   assert.deepEqual(model.draftToDoc([{ id: 'a', type: 'text', name: '   ', value: 'x' }]),
     { ok: false, problems: [{ index: 0, kind: 'name' }] });
+  // 链接字段可以不填名称（issue #574：无自定义名时显示链接）。
+  const unnamedLink = model.draftToDoc([{ id: 'a', type: 'link', name: '', value: 'https://openai.com' }]);
+  assert.equal(unnamedLink.ok, true);
+  assert.deepEqual(unnamedLink.doc.fields, [{ id: 'a', type: 'link', name: '', value: 'https://openai.com' }]);
+  // 但链接值本身不能为空。
+  assert.deepEqual(model.draftToDoc([{ id: 'a', type: 'link', name: '', value: '  ' }]),
+    { ok: false, problems: [{ index: 0, kind: 'value' }] });
   assert.deepEqual(model.draftToDoc([{ id: 'a', type: 'link', name: 'L', value: 'ftp://x' }]),
     { ok: false, problems: [{ index: 0, kind: 'value' }] });
   assert.deepEqual(model.draftToDoc([{ id: 'a', type: 'link', name: 'L', value: 'javascript:alert(1)' }]),
@@ -102,6 +109,14 @@ test('isExternalUrl mirrors the host shell.openExternal whitelist', () => {
   assert.equal(model.isExternalUrl('http://0.0.0.0/'), false);
   assert.equal(model.isExternalUrl('http://169.254.169.254/latest/meta-data'), false);
   assert.equal(model.isExternalUrl('http://app.localhost/'), false);
+  assert.equal(model.isExternalUrl('http://[::]/'), false);
+  assert.equal(model.isExternalUrl('http://[fe80::1]/'), false);
+  assert.equal(model.isExternalUrl('http://[fd12:3456::1]/'), false);
+  assert.equal(model.isExternalUrl('http://[::ffff:127.0.0.1]/'), false);
+  assert.equal(model.isExternalUrl('http://[::ffff:169.254.169.254]/'), false);
+  assert.equal(model.isExternalUrl('http://[2001:4860:4860::8888]/'), true);
+  // 普通内网地址仍允许（外链交给系统浏览器，不是宿主代请求）。
+  assert.equal(model.isExternalUrl('http://192.168.1.1/'), true);
 });
 
 test('renderMarkdown escapes everything and only emits whitelisted tags', () => {
@@ -131,6 +146,16 @@ test('renderMarkdown escapes everything and only emits whitelisted tags', () => 
   assert.equal(html.includes('<blockquote>'), true);
   assert.equal(html.includes('md-code'), true);
   assert.equal(html.includes('tok-keyword'), true);
+});
+
+test('renderMarkdown emits blockquote content instead of dropping it', () => {
+  const html = model.renderMarkdown('> 第一行\n> 第二行\n\n正文');
+  assert.equal(html.includes('<blockquote>'), true);
+  assert.equal(html.includes('第一行'), true);
+  assert.equal(html.includes('第二行'), true);
+  assert.match(html, /<blockquote>[^<]*第一行<br>第二行[^<]*<\/blockquote>/);
+  // 引用结束后必须回到普通段落，不能吞掉后文。
+  assert.equal(html.includes('<p>正文</p>'), true);
 });
 
 test('renderMarkdown links bare URLs and keeps trailing punctuation outside', () => {

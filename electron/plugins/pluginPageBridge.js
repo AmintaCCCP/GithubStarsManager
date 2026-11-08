@@ -23,13 +23,31 @@ const METHODS = {
 
 const MAX_OPEN_EXTERNAL_URL_CHARS = 2048;
 
-/** 回环与链路本地目标一律拒绝：与 network:<host> 权限禁 localhost 的口径一致，
- *  外链只应指向公网资源。 */
+/** 回环、链路本地与 IPv6 唯一本地地址一律拒绝：与 network:<host> 权限禁
+ *  localhost 的口径一致，页面外链只应指向公网资源。IPv4 映射的 IPv6 形式
+ *  （::ffff:127.0.0.1 等）同样要还原后判定，不能只按字符串前缀匹配。 */
 function isLoopbackOrLinkLocalHost(hostname) {
   const host = String(hostname).toLowerCase().replace(/^\[/, '').replace(/\]$/, '').replace(/\.$/, '');
   if (host === 'localhost' || host.endsWith('.localhost')) return true;
   if (host === '::1' || host === '::' || host === '0.0.0.0') return true;
-  return /^127\./.test(host) || /^169\.254\./.test(host);
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    return a === 127 || a === 0 || (a === 169 && b === 254);
+  }
+
+  // IPv4 映射/兼容的 IPv6：::ffff:7f00:1 → 127.0.0.1，::ffff:a9fe:a9fe → 169.254.169.254。
+  const mapped = /^::(?:ffff:)?([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+  if (mapped) {
+    const first = Number.parseInt(mapped[1], 16);
+    const a = first >>> 8;
+    const b = first & 0xff;
+    if (a === 127 || a === 0 || (a === 169 && b === 254)) return true;
+  }
+
+  // IPv6 链路本地 fe80::/10 与唯一本地 fc00::/7。
+  return /^fe[89ab][0-9a-f]{0,2}:/.test(host) || /^f[cd][0-9a-f]{2}:/.test(host);
 }
 
 /** 只放行 http/https 绝对 URL：拒绝 javascript:、file:、插件页 scheme 等一切

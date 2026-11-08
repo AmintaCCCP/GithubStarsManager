@@ -48,12 +48,30 @@
     return typeof value === 'string' ? value.slice(0, max) : '';
   }
 
-  /** 回环与链路本地目标：与宿主 shell.openExternal 白名单一致，一律不放行。 */
+  /** 回环、链路本地与 IPv6 唯一本地地址：与宿主 shell.openExternal 白名单一致。 */
   function isLoopbackOrLinkLocalHost(hostname) {
     const host = String(hostname).toLowerCase().replace(/^\[/, '').replace(/\]$/, '').replace(/\.$/, '');
     if (host === 'localhost' || host.endsWith('.localhost')) return true;
     if (host === '::1' || host === '::' || host === '0.0.0.0') return true;
-    return /^127\./.test(host) || /^169\.254\./.test(host);
+
+    const ipv4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(host);
+    if (ipv4) {
+      const a = Number(ipv4[1]);
+      const b = Number(ipv4[2]);
+      return a === 127 || a === 0 || (a === 169 && b === 254);
+    }
+
+    // IPv4 映射的 IPv6：::ffff:7f00:1 → 127.0.0.1
+    const mapped = /^::(?:ffff:)?([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+    if (mapped) {
+      const first = Number.parseInt(mapped[1], 16);
+      const a = first >>> 8;
+      const b = first & 0xff;
+      if (a === 127 || a === 0 || (a === 169 && b === 254)) return true;
+    }
+
+    // IPv6 链路本地 fe80::/10 与唯一本地 fc00::/7。
+    return /^fe[89ab][0-9a-f]{0,2}:/.test(host) || /^f[cd][0-9a-f]{2}:/.test(host);
   }
 
   /** http/https 绝对 URL（与宿主 shell.openExternal 桥的白名单一致）。 */
@@ -136,7 +154,9 @@
       }
       const name = draft.name.trim();
       const value = typeof draft.value === 'string' ? draft.value : '';
-      if (!name || name.length > MAX_NAME_CHARS) {
+      // 链接字段允许不填名称：预览时以 URL 本身作标签（issue #574 的明确要求）。
+      const nameOptional = draft.type === 'link';
+      if ((!name && !nameOptional) || name.length > MAX_NAME_CHARS) {
         problems.push({ index, kind: 'name' });
         return;
       }
@@ -144,8 +164,8 @@
         problems.push({ index, kind: 'value' });
         return;
       }
-      // link 值必须是可以交给系统浏览器打开的 http/https URL。
-      if (draft.type === 'link' && !isExternalUrl(value.trim())) {
+      // 链接值不能为空，且必须是可以交给系统浏览器打开的 http/https URL。
+      if (draft.type === 'link' && (!value.trim() || !isExternalUrl(value.trim()))) {
         problems.push({ index, kind: 'value' });
         return;
       }
@@ -255,7 +275,11 @@
       if (list) { out.push(`</${list.tag}>`); list = null; }
     }
     function flushQuote() {
-      if (quote) { out.push('</blockquote>'); quote = null; }
+      if (quote) {
+        // 引用块内容此前只被收集、从未输出：必须在这里连同 </blockquote> 一起写回。
+        out.push(`<blockquote>${quote.join('<br>')}</blockquote>`);
+        quote = null;
+      }
     }
     function flushAll() {
       flushParagraph(); flushList(); flushQuote();
@@ -308,7 +332,7 @@
       const quoted = /^\s*>\s?(.*)$/.exec(rawLine);
       if (quoted) {
         flushParagraph(); flushList();
-        if (!quote) { out.push('<blockquote>'); quote = []; }
+        if (!quote) quote = [];
         quote.push(renderInline(quoted[1]));
         continue;
       }
