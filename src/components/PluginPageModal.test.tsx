@@ -71,5 +71,8 @@ describe('PluginPageModal display modes', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog.className).not.toContain('app-dialog-fullscreen');
     expect(dialog.textContent).toContain('Example · Custom Fields');
+    // 弹窗比默认 max-w-md 更宽；弹窗本身不滚动，滚动交给页面 iframe。
+    expect(dialog.className).toContain('max-w-2xl');
+    expect(dialog.className).toContain('overflow-hidden');
   });
 });

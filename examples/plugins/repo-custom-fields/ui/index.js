@@ -59,6 +59,9 @@
       addText: '单行文本', addNote: '多行文本', addLink: '链接',
       moveUp: '上移（Alt+↑）', moveDown: '下移（Alt+↓）',
       openLinkTitle: '在浏览器中打开',
+      copyTitle: '复制内容',
+      copied: '已复制',
+      copyFailed: '复制失败：{message}',
     },
     en: {
       bridgeNotReady: 'Host bridge is not ready',
@@ -99,6 +102,9 @@
       addText: 'Single-line text', addNote: 'Multi-line text', addLink: 'Link',
       moveUp: 'Move up (Alt+↑)', moveDown: 'Move down (Alt+↓)',
       openLinkTitle: 'Open in browser',
+      copyTitle: 'Copy content',
+      copied: 'Copied',
+      copyFailed: 'Copy failed: {message}',
     },
   };
 
@@ -169,6 +175,8 @@
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
     external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
     retry: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+    copied: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
   };
 
   /* ── 初始化 ───────────────────────────────────────────────────────── */
@@ -319,7 +327,8 @@
     renderView();
   }
 
-  /** 渲染预览列表：文本/说明显示标签行，链接以名称（无名称时用 URL）作为链接文字。 */
+  /** 渲染预览列表：文本/说明显示标签行，链接以名称（无名称时用 URL）作为链接文字。
+   *  每个字段右上角都有复制按钮，复制的是保存的原始值（链接复制 URL，说明复制源码）。 */
   function renderView() {
     renderSubtitle();
     const list = $('field-list');
@@ -331,23 +340,24 @@
       const li = document.createElement('li');
       li.className = 'field';
 
-      // 链接字段的名称就是链接文字，单独的标签行会重复显示，因此不渲染。
-      if (field.type !== 'link') {
-        const label = document.createElement('div');
-        label.className = 'label';
-        const badge = document.createElement('span');
-        badge.className = 'type-badge';
-        badge.textContent = field.type === 'note'
-          ? (field.format === 'code' ? str().formatCode : str().formatMarkdown)
-          : str().typeText;
-        if (field.name) {
-          const name = document.createElement('span');
-          name.textContent = field.name;
-          label.append(name);
-        }
-        label.append(badge);
-        li.append(label);
+      const head = document.createElement('div');
+      head.className = 'field-head';
+      // 链接字段的名称就是链接文字，标签行只保留类型徽标，避免名称重复显示。
+      const label = document.createElement('div');
+      label.className = 'label';
+      const badge = document.createElement('span');
+      badge.className = 'type-badge';
+      badge.textContent = field.type === 'note'
+        ? (field.format === 'code' ? str().formatCode : str().formatMarkdown)
+        : field.type === 'link' ? str().typeLink : str().typeText;
+      if (field.name && field.type !== 'link') {
+        const name = document.createElement('span');
+        name.textContent = field.name;
+        label.append(name);
       }
+      label.append(badge);
+      head.append(label, buildCopyButton(field));
+      li.append(head);
 
       const value = document.createElement('div');
       value.className = 'value';
@@ -491,6 +501,34 @@
   /** 构建说明字段的 Markdown / 代码 二选一切换控件。
    * @param {object} draft 当前行草稿
    * @returns {HTMLDivElement} */
+  /** 构建预览里的复制按钮：复制字段保存的原始值，成功后短暂切成对勾。
+   * @param {object} field 字段文档
+   * @returns {HTMLButtonElement} */
+  function buildCopyButton(field) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-btn';
+    button.title = str().copyTitle;
+    button.setAttribute('aria-label', `${str().copyTitle} · ${field.name || field.value.slice(0, 40)}`);
+    button.innerHTML = ICONS.copy;
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      try {
+        await request('clipboard.write', { text: field.value });
+        button.innerHTML = ICONS.copied;
+        button.classList.add('copied');
+        setStatus(str().copied);
+        window.setTimeout(() => {
+          button.innerHTML = ICONS.copy;
+          button.classList.remove('copied');
+        }, 1200);
+      } catch (error) {
+        setStatus(fmt(str().copyFailed, { message: error.message || error.code || 'unknown' }), true);
+      }
+    });
+    return button;
+  }
+
   function buildFormatSwitch(draft) {
     const wrap = document.createElement('div');
     wrap.className = 'format-switch';

@@ -76,9 +76,11 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
       title={`${pluginName} · ${pageTitle}`}
       fullscreen={!popup}
       scrollable={!popup}
-      // popup：固定高度的小弹窗，页面自身滚动；README 等上下文对这类轻量页面
-      // 没有意义，但 init 契约保持不变，页面按需忽略。
-      contentClassName={popup ? 'h-[min(70vh,620px)]' : 'flex flex-col'}
+      // popup：固定高度的小弹窗，比默认的 max-w-md 更宽以容纳字段表单；弹窗本身
+      // 不滚动，交给页面 iframe 自己滚。
+      maxWidth={popup ? 'max-w-2xl' : undefined}
+      dialogClassName={popup ? 'overflow-hidden' : undefined}
+      contentClassName={popup ? 'flex h-[min(72vh,640px)] flex-col' : 'flex flex-col'}
       closeLabel={t('pluginPageViewer.close')}
     >
       <PluginPageViewer

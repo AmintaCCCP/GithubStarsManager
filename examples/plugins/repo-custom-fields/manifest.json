@@ -9,6 +9,7 @@
   "permissions": [
     "repositories:read",
     "storage",
+    "clipboard:write",
     "external:open"
   ],
   "contributes": {

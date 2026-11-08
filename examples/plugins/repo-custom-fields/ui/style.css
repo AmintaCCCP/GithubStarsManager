@@ -93,6 +93,8 @@ body {
   padding: 8px 12px;
   min-width: 0;
 }
+.field-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.field-head .label { flex: 1; min-width: 0; }
 .field .label {
   display: flex; align-items: center; gap: 6px;
   color: var(--field-label);
@@ -113,7 +115,9 @@ body {
 .field .value {
   margin-top: 3px;
   overflow-wrap: anywhere;
+  /* 单行文本里也可能有很长的 URL 或没有空格的串：预览一律软换行，不横向滚动。 */
   white-space: pre-wrap;
+  word-break: break-word;
 }
 .field .value.link-value {
   display: inline-flex; align-items: center; gap: 6px;
@@ -128,8 +132,26 @@ body {
 .field .value.link-value:hover { text-decoration: underline; }
 .field .value.link-value svg { width: 12px; height: 12px; flex-shrink: 0; }
 
+/* 每个字段右上角的复制按钮 */
+.copy-btn {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tx2);
+  cursor: pointer;
+  padding: 0;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.copy-btn:hover { background: var(--hover); color: var(--tx); border-color: var(--line); }
+.copy-btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.copy-btn.copied { color: var(--ok); border-color: transparent; }
+.copy-btn svg { width: 13px; height: 13px; }
+
 /* 多行文本：markdown 渲染容器 */
-.md-body { margin-top: 3px; min-width: 0; overflow-wrap: anywhere; }
+.md-body { margin-top: 3px; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .md-body > :first-child { margin-top: 0; }
 .md-body > :last-child { margin-bottom: 0; }
 .md-body h1, .md-body h2, .md-body h3, .md-body h4, .md-body h5, .md-body h6 {
@@ -159,11 +181,16 @@ body {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
-  overflow-x: auto;
+  /* 代码块按需求自动换行：长行折行显示，不出现横向滚动条。 */
+  overflow-x: hidden;
+  min-width: 0;
 }
 .md-code code {
   background: none; padding: 0; border-radius: 0;
-  font-size: 12px; line-height: 1.5; white-space: pre;
+  font-size: 12px; line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .md-link {
   color: var(--badge-tx);
