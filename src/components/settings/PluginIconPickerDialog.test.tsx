@@ -264,6 +264,30 @@ describe('PluginIconPickerDialog', () => {
     expect(screen.getByRole('button', { name: 'Reset icon' })).toBeInTheDocument();
   });
 
+  it('treats an empty normalized icon key as the Plug fallback', () => {
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        language: 'en',
+        pluginCustomIcons: { 'com.example.test-plugin': 'lucide:' },
+        setPluginCustomIcon: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText('Default icon')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Plug')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Plug' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Reset icon' })).toBeInTheDocument();
+  });
+
   it('shows no selected icon when no custom icon is configured', () => {
     mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
       const state = {

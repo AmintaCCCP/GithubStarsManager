@@ -41,7 +41,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
   const normalizedCurrent = normalizePluginIconKey(currentIconKey);
 
   const defaultChoice = PLUGIN_ICON_CHOICES[0];
-  const currentChoice = normalizedCurrent
+  const currentChoice = currentIconKey
     ? (PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent) ?? defaultChoice)
     : null;
   const selectedIconKey = currentChoice?.key ?? null;
