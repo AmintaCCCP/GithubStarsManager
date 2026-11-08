@@ -418,8 +418,9 @@ http/https URL 交给宿主用系统浏览器打开。
 http/https、必须有主机名、长度 ≤ 2048，`javascript:` / `file:` / `data:` 与
 回环/链路本地目标（localhost、127.0.0.0/8、0.0.0.0、169.254.0.0/16、::1、::、
 fe80::/10、fc00::/7 以及它们的 IPv4 映射形式）一律拒绝，与 `network:<host>`
-权限禁 localhost 的口径一致。能力路由只有页面侧注入宿主操作，Worker 侧调用
-始终不可用。
+权限禁 localhost 的口径一致。该判断只看 URL 字面主机名，**不解析 DNS**：解析到
+回环地址的域名（如 `127.0.0.1.nip.io`）不会被拦下，因为外链最终由系统浏览器
+打开、宿主不代为请求。能力路由只有页面侧注入宿主操作，Worker 侧调用始终不可用。
 
 Worker 动作的 `open-external` 返回值沿用 V1.1 起的结果协议：仅 https、不含
 凭据，由 `validatePluginActionResult` 校验并规范化 URL；本版本不改变这条既有
