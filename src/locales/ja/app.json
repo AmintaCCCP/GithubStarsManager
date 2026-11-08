@@ -1169,6 +1169,7 @@
     "customize-icon": "アイコンをカスタマイズ",
     "customize-icon-title": "プラグインアイコンのカスタマイズ: {{name}}",
     "select-icon": "アイコンを選択",
+    "default-icon": "デフォルトアイコン",
     "search-icons": "アイコンを検索…",
     "reset-icon": "デフォルトアイコンに戻す",
     "no-icons-found": "一致するアイコンが見つかりません"

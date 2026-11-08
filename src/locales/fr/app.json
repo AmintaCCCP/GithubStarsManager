@@ -1169,6 +1169,7 @@
     "customize-icon": "Personnaliser l'icône",
     "customize-icon-title": "Personnaliser l'icône du plugin : {{name}}",
     "select-icon": "Sélectionner une icône",
+    "default-icon": "Icône par défaut",
     "search-icons": "Rechercher des icônes…",
     "reset-icon": "Rétablir l'icône par défaut",
     "no-icons-found": "Aucune icône correspondante trouvée"

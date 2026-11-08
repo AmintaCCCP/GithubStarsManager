@@ -1169,6 +1169,7 @@
     "customize-icon": "Symbol anpassen",
     "customize-icon-title": "Plug-in-Symbol anpassen: {{name}}",
     "select-icon": "Symbol auswählen",
+    "default-icon": "Standardsymbol",
     "search-icons": "Symbole suchen…",
     "reset-icon": "Standardsymbol wiederherstellen",
     "no-icons-found": "Keine passenden Symbole gefunden"

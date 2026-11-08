@@ -29,6 +29,7 @@ describe('PluginIconPickerDialog', () => {
     if (key === 'pluginSettingsPanel.customize-icon-title') return `Custom Icon: ${params?.name}`;
     if (key === 'pluginSettingsPanel.search-icons') return 'Search icons…';
     if (key === 'pluginSettingsPanel.select-icon') return 'Select icon';
+    if (key === 'pluginSettingsPanel.default-icon') return 'Default icon';
     if (key === 'pluginSettingsPanel.reset-icon') return 'Reset icon';
     if (key === 'pluginSettingsPanel.no-icons-found') return 'No matching icons found';
     return key;
@@ -261,6 +262,32 @@ describe('PluginIconPickerDialog', () => {
       .find((node) => node.closest('button') === null);
     expect(previewLabel?.parentElement?.querySelector('.lucide-plug')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset icon' })).toBeInTheDocument();
+  });
+
+  it('shows no selected icon when no custom icon is configured', () => {
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        language: 'en',
+        pluginCustomIcons: {},
+        setPluginCustomIcon: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Default icon')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Plug' })).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.getAllByRole('button').filter((button) => button.getAttribute('aria-pressed') === 'true'),
+    ).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Reset icon' })).not.toBeInTheDocument();
   });
 
   it('displays full Chinese labels and localized preview when language is zh', () => {

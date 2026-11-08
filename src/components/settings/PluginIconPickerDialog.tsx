@@ -41,11 +41,13 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
   const normalizedCurrent = normalizePluginIconKey(currentIconKey);
 
   const defaultChoice = PLUGIN_ICON_CHOICES[0];
-  const currentChoice =
-    PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent) ??
-    (currentIconKey ? defaultChoice : null);
-  const selectedIconKey = currentChoice?.key ?? defaultChoice.key;
-  const previewIconLabel = getPluginIconLabel(currentChoice ?? defaultChoice, language);
+  const currentChoice = normalizedCurrent
+    ? (PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent) ?? defaultChoice)
+    : null;
+  const selectedIconKey = currentChoice?.key ?? null;
+  const previewIconLabel = currentChoice
+    ? getPluginIconLabel(currentChoice, language)
+    : t('pluginSettingsPanel.default-icon');
 
   const filteredIcons = useMemo(() => {
     const query = search.trim().toLowerCase();

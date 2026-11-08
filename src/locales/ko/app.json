@@ -1169,6 +1169,7 @@
     "customize-icon": "아이콘 맞춤 설정",
     "customize-icon-title": "플러그인 아이콘 맞춤 설정: {{name}}",
     "select-icon": "아이콘 선택",
+    "default-icon": "기본 아이콘",
     "search-icons": "아이콘 검색…",
     "reset-icon": "기본 아이콘으로 복원",
     "no-icons-found": "일치하는 아이콘을 찾을 수 없습니다"

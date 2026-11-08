@@ -1169,6 +1169,7 @@
     "customize-icon": "Personalizar ícone",
     "customize-icon-title": "Personalizar ícone do plug-in: {{name}}",
     "select-icon": "Selecionar ícone",
+    "default-icon": "Ícone padrão",
     "search-icons": "Buscar ícones…",
     "reset-icon": "Restaurar ícone padrão",
     "no-icons-found": "Nenhum ícone correspondente encontrado"

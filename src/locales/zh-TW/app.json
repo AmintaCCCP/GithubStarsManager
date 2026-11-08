@@ -1169,6 +1169,7 @@
     "customize-icon": "自訂圖示",
     "customize-icon-title": "自訂插件圖示：{{name}}",
     "select-icon": "選擇圖示",
+    "default-icon": "預設圖示",
     "search-icons": "搜尋圖示…",
     "reset-icon": "恢復預設圖示",
     "no-icons-found": "找不到相符的圖示"

@@ -1169,6 +1169,7 @@
     "customize-icon": "Customize icon",
     "customize-icon-title": "Customize plugin icon: {{name}}",
     "select-icon": "Select icon",
+    "default-icon": "Default icon",
     "search-icons": "Search icons…",
     "reset-icon": "Restore default icon",
     "no-icons-found": "No matching icons found"

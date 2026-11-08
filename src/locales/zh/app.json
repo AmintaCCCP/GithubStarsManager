@@ -1169,6 +1169,7 @@
     "customize-icon": "自定义图标",
     "customize-icon-title": "自定义插件图标：{{name}}",
     "select-icon": "选择图标",
+    "default-icon": "默认图标",
     "search-icons": "搜索图标…",
     "reset-icon": "恢复默认图标",
     "no-icons-found": "未找到匹配的图标"

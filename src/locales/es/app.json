@@ -1169,6 +1169,7 @@
     "customize-icon": "Personalizar icono",
     "customize-icon-title": "Personalizar icono del complemento: {{name}}",
     "select-icon": "Seleccionar icono",
+    "default-icon": "Icono predeterminado",
     "search-icons": "Buscar iconos…",
     "reset-icon": "Restaurar icono predeterminado",
     "no-icons-found": "No se encontraron iconos coincidentes"
