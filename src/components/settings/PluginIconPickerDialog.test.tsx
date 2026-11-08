@@ -284,6 +284,10 @@ describe('PluginIconPickerDialog', () => {
 
     expect(screen.queryByText('Default icon')).not.toBeInTheDocument();
     expect(screen.getAllByText('Plug')).toHaveLength(2);
+    const previewLabel = screen
+      .getAllByText('Plug')
+      .find((node) => node.closest('button') === null);
+    expect(previewLabel?.parentElement?.querySelector('.lucide-plug')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Plug' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Reset icon' })).toBeInTheDocument();
   });
