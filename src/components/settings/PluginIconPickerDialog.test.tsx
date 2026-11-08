@@ -182,8 +182,39 @@ describe('PluginIconPickerDialog', () => {
 
     const rocketBtn = screen.getByRole('button', { name: /Rocket/i });
     expect(rocketBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(rocketBtn).toHaveTextContent('Rocket');
 
     const plugBtn = screen.getByRole('button', { name: /Plug/i });
     expect(plugBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(plugBtn).toHaveTextContent('Plug');
+
+    // Both the preview and the grid button label display 'Rocket'
+    expect(screen.getAllByText('Rocket')).toHaveLength(2);
+  });
+
+  it('displays full Chinese labels and localized preview when language is zh', () => {
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        language: 'zh',
+        pluginCustomIcons: { 'com.example.test-plugin': 'rocket' },
+        setPluginCustomIcon: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={vi.fn()}
+      />
+    );
+
+    const rocketBtn = screen.getByRole('button', { name: /火箭 \/ 发布/i });
+    expect(rocketBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(rocketBtn).toHaveTextContent('火箭 / 发布');
+
+    // Both the preview and the grid button label display '火箭 / 发布'
+    expect(screen.getAllByText('火箭 / 发布')).toHaveLength(2);
   });
 });

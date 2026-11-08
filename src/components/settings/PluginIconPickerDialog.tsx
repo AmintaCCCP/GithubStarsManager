@@ -40,6 +40,13 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
   const currentIconKey = pluginId ? customIcons[pluginId] : undefined;
   const normalizedCurrent = normalizePluginIconKey(currentIconKey);
 
+  const currentChoice = normalizedCurrent
+    ? PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent)
+    : null;
+  const previewIconLabel = currentChoice
+    ? (isZh ? currentChoice.labelZh : currentChoice.label)
+    : currentIconKey || (isZh ? 'plug (默认)' : 'plug (default)');
+
   const filteredIcons = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return PLUGIN_ICON_CHOICES;
@@ -107,7 +114,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
           <span className="text-xs text-muted-foreground">{t('pluginSettingsPanel.select-icon')}:</span>
           <div className="flex items-center gap-2 font-medium">
             <PluginIcon pluginId={pluginId} className="h-4 w-4 text-primary" />
-            <span>{currentIconKey || (isZh ? 'plug (默认)' : 'plug (default)')}</span>
+            <span>{previewIconLabel}</span>
           </div>
         </div>
 
@@ -116,7 +123,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
           {filteredIcons.map((choice) => {
             const isSelected = normalizedCurrent === choice.key || (!normalizedCurrent && choice.key === 'plug');
             const IconComp = choice.icon;
-            const choiceLabel = isZh ? choice.labelZh.split(' ')[0] : choice.label;
+            const choiceLabel = isZh ? choice.labelZh : choice.label;
             const choiceTitle = isZh ? `${choice.labelZh} (${choice.label})` : `${choice.label} (${choice.labelZh})`;
             return (
               <button
@@ -126,14 +133,14 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
                 onClick={() => handleSelect(choice.key)}
                 title={choiceTitle}
                 aria-label={choiceTitle}
-                className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border p-2 text-center transition-all hover:bg-accent hover:text-accent-foreground ${
+                className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border p-1.5 text-center transition-all hover:bg-accent hover:text-accent-foreground ${
                   isSelected
                     ? 'border-primary bg-primary/10 text-primary shadow-xs'
                     : 'border-border/60 bg-card text-foreground'
                 }`}
               >
                 <IconComp className="h-5 w-5 shrink-0" />
-                <span className="w-full truncate text-[11px] leading-tight text-muted-foreground">
+                <span className="w-full break-words text-[11px] leading-tight text-muted-foreground">
                   {choiceLabel}
                 </span>
               </button>
