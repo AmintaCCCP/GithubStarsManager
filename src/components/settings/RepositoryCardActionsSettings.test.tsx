@@ -124,4 +124,22 @@ describe('RepositoryCardActionsSettings', () => {
       { id: 'plugin:com.example.insights:view-insights', visible: false },
     ]);
   });
+
+  it('preserves the original positions of inactive plugin actions when modifying active actions', async () => {
+    const user = userEvent.setup();
+    state.repositoryCardActions = [
+      { id: 'plugin:com.inactive.plugin:inactive-action', visible: true },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+    ];
+    renderComponent();
+
+    const switches = screen.getAllByRole('switch');
+    await user.click(switches[0]);
+
+    expect(setRepositoryCardActions).toHaveBeenCalled();
+    const savedActions = setRepositoryCardActions.mock.calls[0][0] as RepositoryCardActionPreference[];
+    expect(savedActions[0].id).toBe('plugin:com.inactive.plugin:inactive-action');
+    expect(savedActions[1].id).toBe(DEFAULT_REPOSITORY_CARD_ACTIONS[0].id);
+    expect(savedActions[1].visible).toBe(!DEFAULT_REPOSITORY_CARD_ACTIONS[0].visible);
+  });
 });

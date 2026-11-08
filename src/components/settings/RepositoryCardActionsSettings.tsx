@@ -22,6 +22,7 @@ import {
   isPluginActionId,
   makePluginActionId,
   type BuiltinRepositoryCardActionId,
+  type RepositoryCardActionPreference,
 } from '../../types/repositoryCardActions';
 import { normalizeRepositoryCardActions } from '../../utils/repositoryCardActions';
 import { Button } from '../ui/button';
@@ -88,9 +89,25 @@ export const RepositoryCardActionsSettings: React.FC<RepositoryCardActionsSettin
   );
 
   const saveWithInactive = (next: typeof displayedActions) => {
-    const activeIds = new Set(displayedActions.map((a) => a.id));
-    const inactiveSaved = actions.filter((a) => !activeIds.has(a.id));
-    setActions([...next, ...inactiveSaved]);
+    const nextMap = new Map(next.map((a) => [a.id, a]));
+    const nextRemaining = [...next];
+    const result: RepositoryCardActionPreference[] = [];
+
+    for (const saved of actions) {
+      if (nextMap.has(saved.id)) {
+        if (nextRemaining.length > 0) {
+          result.push(nextRemaining.shift()!);
+        }
+      } else {
+        result.push(saved);
+      }
+    }
+
+    while (nextRemaining.length > 0) {
+      result.push(nextRemaining.shift()!);
+    }
+
+    setActions(result);
   };
 
   const move = (index: number, delta: -1 | 1) => {

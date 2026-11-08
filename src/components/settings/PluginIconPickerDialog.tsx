@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RotateCcw, Search as SearchIcon } from 'lucide-react';
 import type { TranslateFn } from '../../i18n/useT';
 import type { InstalledPlugin } from '../../plugins/types';
@@ -24,6 +24,13 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
   onClose,
 }) => {
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (target) {
+      setSearch('');
+    }
+  }, [target]);
+
   const customIcons = useAppStore((state) => state.pluginCustomIcons);
   const setPluginCustomIcon = useAppStore((state) => state.setPluginCustomIcon);
 

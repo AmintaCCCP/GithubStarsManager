@@ -121,4 +121,44 @@ describe('PluginIconPickerDialog', () => {
     expect(setPluginCustomIcon).toHaveBeenCalledWith('com.example.test-plugin', null);
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('resets search query when target changes', async () => {
+    const user = userEvent.setup();
+    const setPluginCustomIcon = vi.fn();
+    const onClose = vi.fn();
+
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        pluginCustomIcons: {},
+        setPluginCustomIcon,
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    const { rerender } = render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={onClose}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/search icons/i);
+    await user.type(searchInput, 'rocket');
+    expect(searchInput).toHaveValue('rocket');
+
+    const anotherPlugin: InstalledPlugin = {
+      ...dummyPlugin,
+      manifest: { ...dummyPlugin.manifest, id: 'com.example.another' },
+    };
+    rerender(
+      <PluginIconPickerDialog
+        target={anotherPlugin}
+        t={t}
+        onClose={onClose}
+      />
+    );
+
+    expect(screen.getByPlaceholderText(/search icons/i)).toHaveValue('');
+  });
 });
