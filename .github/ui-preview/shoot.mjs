@@ -33,6 +33,27 @@ const SCENES = [
   { name: 'forks', currentView: 'forks', themeMode: 'light' },
   { name: 'discovery', currentView: 'subscription', themeMode: 'light', selectedDiscoveryChannel: 'trending', settleMs: 4000 },
   { name: 'settings', currentView: 'settings', themeMode: 'light' },
+  {
+    name: 'plugin-repo-custom-fields',
+    pluginUrl: '/plugins/repo-custom-fields/ui/index.html',
+    pluginId: 'com.githubstarsmanager.repo-custom-fields',
+    pageId: 'fields',
+    readySelector: '#head:not([hidden])',
+  },
+  {
+    name: 'plugin-repo-info-card',
+    pluginUrl: '/plugins/repo-info-card/ui/index.html',
+    pluginId: 'com.githubstarsmanager.repo-info-card',
+    pageId: 'info-card',
+    readySelector: '.style-grid > [role="radio"]',
+  },
+  {
+    name: 'plugin-repo-insights',
+    pluginUrl: '/plugins/repo-insights/ui/index.html',
+    pluginId: 'com.githubstarsmanager.repo-insights',
+    pageId: 'insights',
+    readySelector: '#head:not([hidden])',
+  },
 ];
 
 /**
@@ -99,13 +120,25 @@ function buildGitHubApiMock(baseState) {
   };
 }
 
+/**
+ * Parse and validate CLI arguments for the screenshot runner.
+ * @param {string[]} argv - Command line argument array (without node or script path).
+ * @returns {{ url: string, out: string, only: string[] | null } | null}
+ */
 function parseArgs(argv) {
   const args = { url: 'http://127.0.0.1:4173', out: path.join(SCRIPT_DIR, '.shots'), only: null };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--url') args.url = argv[++i];
     else if (flag === '--out') args.out = argv[++i];
-    else if (flag === '--only') args.only = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
+    else if (flag === '--only') {
+      args.only = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (args.only.length === 0) {
+        console.error('--only requires at least one scene');
+        process.exitCode = 2;
+        return null;
+      }
+    }
     else {
       console.error(`Unknown argument: ${flag}`);
       process.exitCode = 2;
@@ -135,17 +168,71 @@ async function gotoForSeeding(page, url) {
   await page.waitForFunction(() => document.readyState !== 'uninitialized');
 }
 
+/**
+ * Take a screenshot for a single scene inside a hermetic browser context.
+ * @param {import('playwright').Browser} browser - Active Playwright browser instance.
+ * @param {object} baseState - Base demo state fixture.
+ * @param {object} scene - Scene configuration describing views and store overrides.
+ * @param {string} url - Base preview server URL.
+ * @param {string} outDir - Directory where the screenshot PNG will be saved.
+ * @returns {Promise<{ scene: string, path: string }>} Resulting screenshot record.
+ */
 async function shootScene(browser, baseState, scene, url, outDir) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 2,
     locale: 'zh-CN',
     timezoneId: 'Asia/Shanghai',
-    colorScheme: scene.themeMode,
+    colorScheme: scene.themeMode ?? 'light',
   });
   const page = await context.newPage();
   const shotPath = path.join(outDir, `${scene.name}.png`);
   try {
+    if (scene.pluginUrl) {
+      const origin = new URL(url).origin;
+      const targetUrl = new URL(scene.pluginUrl, url).href;
+      await page.route('**/*', (route) => {
+        const reqUrl = route.request().url();
+        if (reqUrl.startsWith(origin)) return route.continue();
+        return route.abort();
+      });
+      const response = await page.goto(targetUrl, { waitUntil: 'load', timeout: 30_000 });
+      if (!response || !response.ok()) {
+        console.warn(`  ⚠ ${scene.name} skipped: plugin asset not available at ${scene.pluginUrl} (${response?.status() ?? 'no response'})`);
+        return null;
+      }
+      const demoRepo = baseState.repositories?.[0] ?? {
+        id: 1,
+        name: 'GithubStarsManager',
+        full_name: 'AmintaCCCP/GithubStarsManager',
+        description: 'GitHub Stars Manager demo repository',
+        stargazers_count: 1234,
+        forks_count: 56,
+        language: 'TypeScript',
+      };
+      await page.evaluate(({ pluginId, pageId, repo }) => {
+        window.postMessage({
+          type: 'plugin-page:init',
+          pluginId,
+          pageId,
+          token: 'preview-token',
+          context: {
+            repository: repo,
+            language: 'zh',
+            theme: 'light',
+          },
+        }, '*');
+      }, { pluginId: scene.pluginId, pageId: scene.pageId, repo: demoRepo });
+      if (scene.readySelector) {
+        await page.waitForSelector(scene.readySelector, { timeout: 15_000 });
+      }
+      await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(scene.settleMs ?? 600);
+      await page.screenshot({ path: shotPath, fullPage: true });
+      console.log(`  ✓ ${scene.name} -> ${shotPath}`);
+      return { scene: scene.name, path: shotPath };
+    }
+
     await gotoForSeeding(page, url);
     const seeded = await page.evaluate(
       seedPersistedState,
@@ -192,12 +279,15 @@ async function shootScene(browser, baseState, scene, url, outDir) {
   }
 }
 
+/**
+ * Main entry point for the screenshot recording runner.
+ */
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args) return;
 
   let scenes = SCENES;
-  if (args.only) {
+  if (args.only && args.only.length > 0 && !args.only.includes('all')) {
     const known = new Set(SCENES.map((s) => s.name));
     const unknown = args.only.filter((name) => !known.has(name));
     if (unknown.length > 0) {
@@ -219,7 +309,8 @@ async function main() {
   const results = [];
   try {
     for (const scene of scenes) {
-      results.push(await shootScene(browser, baseState, scene, args.url, args.out));
+      const result = await shootScene(browser, baseState, scene, args.url, args.out);
+      if (result) results.push(result);
     }
   } finally {
     await browser.close();

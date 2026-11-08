@@ -55,6 +55,7 @@ jobs:
       ui: ${{ steps.detect.outputs.ui }}
       sha: ${{ steps.detect.outputs.sha }}
       number: ${{ steps.detect.outputs.number }}
+      scenes: ${{ steps.detect.outputs.scenes }}
     steps:
       - name: Checkout repository (default branch)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -69,6 +70,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number || inputs.pr }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node .github/ui-preview/detect.mjs
 
   build:
@@ -101,7 +105,12 @@ jobs:
         run: npm ci
 
       - name: Build app
-        run: npx vite build
+        run: |
+          npx vite build
+          if [ -d examples/plugins ]; then
+            mkdir -p dist/plugins
+            cp -r examples/plugins/. dist/plugins/
+          fi
 
       - name: Upload web bundle
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -175,7 +184,8 @@ jobs:
         run: |
           node shoot.mjs \
             --url http://127.0.0.1:4173 \
-            --out "$RUNNER_TEMP/shots"
+            --out "$RUNNER_TEMP/shots" \
+            --only "${{ needs.detect.outputs.scenes }}"
 
       - name: Upload screenshots
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
