@@ -68,7 +68,7 @@ export const Modal: React.FC<ModalProps> = ({
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
-      <div className="min-w-0">{children}</div>
+      <div className={cn('min-w-0', contentClassName)}>{children}</div>
     </>
   );
 

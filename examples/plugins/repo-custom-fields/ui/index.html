@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Repo Custom Fields</title>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./model.js" defer></script>
+    <script src="./index.js" defer></script>
+  </head>
+  <body data-theme="dark">
+    <main id="app">
+      <!-- 仓库头 + 视图切换（预览 ⇄ 编辑）工具条 -->
+      <header class="head" id="head" hidden>
+        <div class="head-main">
+          <h1><span class="owner" id="repo-owner"></span><span id="repo-name"></span></h1>
+          <p id="repo-subtitle" class="muted small"></p>
+        </div>
+        <div class="toolbar">
+          <button id="btn-edit" type="button" class="icon-btn" hidden aria-haspopup="dialog"></button>
+          <button id="btn-save" type="button" class="icon-btn primary" hidden></button>
+          <button id="btn-cancel" type="button" class="icon-btn" hidden></button>
+        </div>
+      </header>
+
+      <!-- 预览视图：字段按保存顺序展示 -->
+      <section id="view" hidden>
+        <ul class="field-list" id="field-list"></ul>
+        <p class="empty" id="view-empty" hidden></p>
+      </section>
+
+      <!-- 编辑视图：增删改 + 拖拽排序 -->
+      <section id="edit" hidden>
+        <ul class="edit-list" id="edit-list"></ul>
+        <p class="empty" id="edit-limit" hidden></p>
+        <div class="add-row" id="add-row" hidden>
+          <button type="button" class="add-btn" data-add="text"></button>
+          <button type="button" class="add-btn" data-add="note"></button>
+          <button type="button" class="add-btn" data-add="link"></button>
+        </div>
+      </section>
+
+      <!-- 无仓库上下文时的选择器（设置 → 插件 → 打开页面 入口） -->
+      <section id="picker" hidden>
+        <p class="muted" id="picker-hint"></p>
+        <div class="search-row">
+          <input id="picker-query" type="search" maxlength="200">
+          <button id="picker-search" type="button" class="btn"></button>
+        </div>
+        <ul id="picker-results"></ul>
+      </section>
+
+      <p id="status" role="status" class="muted small"></p>
+    </main>
+  </body>
+</html>

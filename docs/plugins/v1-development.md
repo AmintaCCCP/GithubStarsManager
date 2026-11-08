@@ -332,6 +332,7 @@ GitHub 身份标签），供页面在绘制任何本地缓存之前完成账号�
 | `clipboard.write` | `{ text }` | `clipboard:write` | 主进程把文本写入系统剪贴板 |
 | `clipboard.writeImage` | `{ dataBase64 }`（PNG） | `clipboard:write` | 主进程解码并写入剪贴板图像 |
 | `downloads.saveFile` | `{ fileName, dataBase64 }` | `downloads:create` | 弹出宿主原生保存对话框，用户确认后写入 |
+| `shell.openExternal` | `{ url }`（V1.6） | `external:open` | 宿主用系统浏览器打开 http/https URL；沙箱 iframe 里的普通 `<a>` 导航会被宿主与 CSP 拦截，这是页面打开外链的唯一通道 |
 
 参数上限：`clipboard.writeImage` 与 `downloads.saveFile` 的 base64 载荷放宽到
 10 MiB（其余方法仍为 1 MiB）；`fileName` 不允许路径分隔符或前导点。保存位置
@@ -383,3 +384,41 @@ args: {
 完整可安装示例见 `examples/plugins/repo-insights`（仓库洞察看板：仓库体检——摘要、
 作者与贡献者及客观事实，提交活动、代码变更、贡献者、语言、发布节奏、社区健康、
 安全公告、星标趋势与健康度评分，图表使用随插件打包的本地 Chart.js）。
+
+## V1.6 弹窗形态（display）与外链能力（shell.openExternal）
+
+V1.4 的弹窗动作默认全屏。轻量页面（如给仓库附加自定义字段的表单）用全屏弹窗
+显得笨重，因此 `repositoryActions` 新增可选 `display` 字段声明弹窗形态：
+
+```json
+{
+  "contributes": {
+    "repositoryActions": [
+      {
+        "id": "custom-fields",
+        "title": "仓库自定义信息",
+        "placement": "repository-card",
+        "opensPage": "fields",
+        "display": "popup"
+      }
+    ]
+  }
+}
+```
+
+- `display` 只接受 `"fullscreen"`（缺省值，行为与既有插件完全一致）或
+  `"popup"`（非全屏小弹窗：固定宽度、约 70vh 高度，页面自身滚动）。
+- `display` 仅在动作声明了 `opensPage` 时合法；普通 Worker 动作带它会被拒绝安装。
+- `popup` 只是宿主容器的形态差异：init 上下文、能力桥、权限校验与全屏弹窗完全一致。
+
+外链能力：页面 Bridge 新增 `shell.openExternal`（权限 `external:open`），页面把
+http/https URL 交给宿主用系统浏览器打开。主进程在 page bridge、能力路由、宿主
+操作与 Worker 动作返回值四处对 URL 做同一套白名单校验：仅 http/https、必须有
+主机名、长度 ≤ 2048，`javascript:` / `file:` / `data:` 与回环/链路本地目标
+（localhost、127.0.0.0/8、::1、0.0.0.0、169.254.0.0/16）一律拒绝，与
+`network:<host>` 权限禁 localhost 的口径一致。能力路由只有页面侧注入宿主操作，
+Worker 侧调用始终不可用。
+
+完整可安装示例见 `examples/plugins/repo-custom-fields`（仓库自定义信息：每个仓库
+一组自定义字段——单行文本、Markdown/代码说明与可点击链接，预览 ⇄ 编辑两态，
+编辑视图支持增删改与拖拽排序，数据按仓库存于插件 storage）。

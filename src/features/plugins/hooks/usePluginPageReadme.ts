@@ -12,12 +12,14 @@ export interface PluginPageRepositoryContext {
 /**
  * 弹窗动作（V1.4 opensPage）打开时抓取仓库 README，随 plugin-page:init 一次性
  * 下发给插件页面。抓取失败返回 null，插件必须能只依赖元数据工作。
+ * `repository` 为 null 时（如 V1.6 popup 形态的轻量页面不需要 README）不发起请求。
  */
-export function usePluginPageReadme(repository: Repository): PluginPageRepositoryContext {
+export function usePluginPageReadme(repository: Repository | null): PluginPageRepositoryContext {
   const githubToken = useAppStore(useShallow((state) => state.githubToken));
   const [readme, setReadme] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!repository) return;
     let disposed = false;
     const controller = new AbortController();
     setReadme(null);
@@ -33,7 +35,7 @@ export function usePluginPageReadme(repository: Repository): PluginPageRepositor
       disposed = true;
       controller.abort();
     };
-  }, [githubToken, repository.id, repository.owner.login, repository.name]);
+  }, [githubToken, repository]);
 
   return { readme };
 }

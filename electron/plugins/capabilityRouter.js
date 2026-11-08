@@ -1,6 +1,7 @@
 'use strict';
 
 const { protocolError } = require('./pluginProtocol');
+const { isOpenExternalUrlAllowed } = require('./pluginPageBridge');
 
 // 页面 Bridge 的系统输出操作（剪贴板、宿主下载）由宿主注入实现；路由器只做
 // 权限检查与参数解码。Worker 侧的 router 不注入 hostOperations，因此这些
@@ -97,6 +98,19 @@ function createCapabilityRouter({ storage, logger, catalog, hostOperations = nul
           return catalog.searchRepositories(request.args?.query, request.args?.limit);
         }
         throw protocolError('PLUGIN_CAPABILITY_UNKNOWN', `Unknown GitHub operation '${request.operation}'`);
+      }
+      if (request.capability === 'shell') {
+        if (request.operation !== 'openExternal') {
+          throw protocolError('PLUGIN_CAPABILITY_UNKNOWN', `Unknown shell operation '${request.operation}'`);
+        }
+        if (!permissions.includes('external:open')) {
+          throw protocolError('PLUGIN_PERMISSION_DENIED', "Permission 'external:open' is required");
+        }
+        // 与 page bridge 同一套 http/https 白名单；主进程宿主操作是最后一道复核。
+        if (!isOpenExternalUrlAllowed(request.args?.url)) {
+          throw protocolError('PLUGIN_CAPABILITY_REQUEST_INVALID', 'Open-external URL is invalid');
+        }
+        return requireHostOperation('shell', 'openExternal')({ url: request.args.url });
       }
       if (request.capability !== 'storage') {
         throw protocolError('PLUGIN_CAPABILITY_UNKNOWN', `Unknown capability '${request.capability}'`);
