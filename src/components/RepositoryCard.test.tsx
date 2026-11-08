@@ -872,6 +872,63 @@ describe('RepositoryCard view modes', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:plugin-output');
     anchorClick.mockRestore();
   });
+
+  it('ignores repeated plugin action submissions while one is in flight', async () => {
+    let resolveRun: (value: unknown) => void = () => {};
+    pluginClientMocks.runAction.mockImplementation(() => new Promise((resolve) => {
+      resolveRun = resolve;
+    }));
+    storeState.repositoryCardActions = [
+      { id: 'plugin:com.example.dupe:export-card', visible: true },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+    ];
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-dupe',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.example.dupe',
+          name: 'Duplicate Plugin',
+          version: '1.0.0',
+          apiVersion: '1',
+          permissions: [],
+          contributes: {
+            repositoryActions: [{
+              id: 'export-card',
+              title: '导出卡片',
+              placement: 'repository-card',
+              icon: 'file-text',
+            }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: [],
+      }],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    const pluginButton = await screen.findByRole('button', { name: '导出卡片' });
+    fireEvent.click(pluginButton);
+    fireEvent.click(pluginButton);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRun({ success: true, result: { type: 'notice', level: 'info', message: 'done' } });
+      await Promise.resolve();
+    });
+
+    fireEvent.click(pluginButton);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('RepositoryCard interactive-element click exemption (issue #353)', () => {

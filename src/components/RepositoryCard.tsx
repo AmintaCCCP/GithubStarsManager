@@ -283,6 +283,7 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
     }
     return map;
   }, [pluginActions]);
+  const inFlightPluginActionsRef = useRef(new Set<string>());
 
   const runPluginAction = async (action: RegisteredPluginAction) => {
     if (action.opensPage) {
@@ -296,6 +297,9 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
       });
       return;
     }
+    const actionId = makePluginActionId(action.pluginId, action.id);
+    if (inFlightPluginActionsRef.current.has(actionId)) return;
+    inFlightPluginActionsRef.current.add(actionId);
     try {
       const operation = await pluginClient.runAction({
         pluginId: action.pluginId,
@@ -311,6 +315,8 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
       }
     } catch {
       toast?.(t('repositoryCard.failed-to-apply-plugin-result'), 'error');
+    } finally {
+      inFlightPluginActionsRef.current.delete(actionId);
     }
   };
 
