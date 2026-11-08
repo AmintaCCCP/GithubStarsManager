@@ -952,6 +952,12 @@ describe('RepositoryCard view modes', () => {
       await Promise.resolve();
     });
     expect(writeText).not.toHaveBeenCalled();
+
+    // The late first run must not clear the retry's lock.
+    const stillRunningButton = screen.getByRole('button', { name: '导出卡片' });
+    expect(stillRunningButton).toBeDisabled();
+    fireEvent.click(stillRunningButton);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(2);
   });
 
   it('clears pending plugin action timers when the card unmounts', async () => {
