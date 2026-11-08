@@ -40,12 +40,12 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
   const currentIconKey = pluginId ? customIcons[pluginId] : undefined;
   const normalizedCurrent = normalizePluginIconKey(currentIconKey);
 
-  const currentChoice = normalizedCurrent
-    ? PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent)
-    : null;
-  const previewIconLabel = currentChoice
-    ? getPluginIconLabel(currentChoice, language)
-    : currentIconKey || getPluginIconLabel(PLUGIN_ICON_CHOICES[0], language);
+  const defaultChoice = PLUGIN_ICON_CHOICES[0];
+  const currentChoice =
+    PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent) ??
+    (currentIconKey ? defaultChoice : null);
+  const selectedIconKey = currentChoice?.key ?? defaultChoice.key;
+  const previewIconLabel = getPluginIconLabel(currentChoice ?? defaultChoice, language);
 
   const filteredIcons = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -120,7 +120,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
         {/* Icon Grid */}
         <div className="grid max-h-[360px] grid-cols-4 gap-2 overflow-y-auto p-1 sm:grid-cols-6 md:grid-cols-7">
           {filteredIcons.map((choice) => {
-            const isSelected = normalizedCurrent === choice.key || (!normalizedCurrent && choice.key === 'plug');
+            const isSelected = selectedIconKey === choice.key;
             const IconComp = choice.icon;
             const choiceLabel = getPluginIconLabel(choice, language);
             const choiceTitle = language === 'en' ? choiceLabel : `${choiceLabel} (${choice.labels.en})`;

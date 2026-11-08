@@ -232,6 +232,37 @@ describe('PluginIconPickerDialog', () => {
     expect(screen.queryByRole('button', { name: /^Bot/i })).not.toBeInTheDocument();
   });
 
+  it('uses the Plug fallback label and selection for unknown icon keys', () => {
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        language: 'en',
+        pluginCustomIcons: { 'com.example.test-plugin': 'lucide:unknown-icon' },
+        setPluginCustomIcon: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/lucide:unknown-icon/)).not.toBeInTheDocument();
+    expect(screen.getAllByText('Plug')).toHaveLength(2);
+
+    const plugBtn = screen.getByRole('button', { name: 'Plug' });
+    expect(plugBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(plugBtn.querySelector('.lucide-plug')).toBeInTheDocument();
+    const previewLabel = screen
+      .getAllByText('Plug')
+      .find((node) => node.closest('button') === null);
+    expect(previewLabel?.parentElement?.querySelector('.lucide-plug')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset icon' })).toBeInTheDocument();
+  });
+
   it('displays full Chinese labels and localized preview when language is zh', () => {
     mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
       const state = {
