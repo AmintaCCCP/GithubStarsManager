@@ -115,6 +115,10 @@ test('isExternalUrl mirrors the host shell.openExternal whitelist', () => {
   assert.equal(model.isExternalUrl('http://[::ffff:127.0.0.1]/'), false);
   assert.equal(model.isExternalUrl('http://[::ffff:169.254.169.254]/'), false);
   assert.equal(model.isExternalUrl('http://[2001:4860:4860::8888]/'), true);
+  // 网段边界按完整 hextet 判断：fe8::1（= 0fe8::1）不是链路本地。
+  assert.equal(model.isExternalUrl('http://[fe8::1]/'), true);
+  assert.equal(model.isExternalUrl('http://[fe00::1]/'), true);
+  assert.equal(model.isExternalUrl('http://[fec0::1]/'), true);
   // 普通内网地址仍允许（外链交给系统浏览器，不是宿主代请求）。
   assert.equal(model.isExternalUrl('http://192.168.1.1/'), true);
 });

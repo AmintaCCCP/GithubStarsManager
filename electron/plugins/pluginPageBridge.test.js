@@ -170,7 +170,15 @@ test('network requests accept only allowlisted hosts, metric paths and paginatio
 });
 
 test('shell.openExternal still allows public IPv6 and ordinary private IPv4 (V1.6)', () => {
-  for (const url of ['https://[2001:4860:4860::8888]/', 'http://192.168.1.1/', 'https://openai.com/a?b=1']) {
+  for (const url of [
+    'https://[2001:4860:4860::8888]/',
+    'http://192.168.1.1/',
+    'https://openai.com/a?b=1',
+    // fe8::1 压缩后是 0fe8::1，不在 fe80::/10 内；只做前缀匹配会误判。
+    'http://[fe8::1]/',
+    'http://[fe00::1]/',
+    'http://[fec0::1]/',
+  ]) {
     assert.deepEqual(validatePageCapabilityRequest({
       pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal',
       args: { url },

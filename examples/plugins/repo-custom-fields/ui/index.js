@@ -223,6 +223,11 @@
     $('btn-cancel').innerHTML = ICONS.cancel;
     $('btn-cancel').title = str().cancelTitle;
     $('btn-cancel').setAttribute('aria-label', str().cancelTitle);
+    // 重试按钮只在读取失败时出现，但图标与名称必须就绪，否则用户看到空按钮、
+    // 辅助技术也读不出它的作用。
+    $('btn-retry').innerHTML = ICONS.retry;
+    $('btn-retry').title = str().retry;
+    $('btn-retry').setAttribute('aria-label', str().retry);
   }
 
   function renderSubtitle() {
@@ -301,20 +306,23 @@
       const li = document.createElement('li');
       li.className = 'field';
 
-      const label = document.createElement('div');
-      label.className = 'label';
-      const badge = document.createElement('span');
-      badge.className = 'type-badge';
-      badge.textContent = field.type === 'note'
-        ? (field.format === 'code' ? str().formatCode : str().formatMarkdown)
-        : str()[`type${field.type.charAt(0).toUpperCase()}${field.type.slice(1)}`];
-      if (field.name) {
-        const name = document.createElement('span');
-        name.textContent = field.name;
-        label.append(name);
+      // 链接字段的名称就是链接文字，单独的标签行会重复显示，因此不渲染。
+      if (field.type !== 'link') {
+        const label = document.createElement('div');
+        label.className = 'label';
+        const badge = document.createElement('span');
+        badge.className = 'type-badge';
+        badge.textContent = field.type === 'note'
+          ? (field.format === 'code' ? str().formatCode : str().formatMarkdown)
+          : str().typeText;
+        if (field.name) {
+          const name = document.createElement('span');
+          name.textContent = field.name;
+          label.append(name);
+        }
+        label.append(badge);
+        li.append(label);
       }
-      label.append(badge);
-      li.append(label);
 
       const value = document.createElement('div');
       value.className = 'value';
@@ -326,7 +334,9 @@
           value.dataset.url = field.value;
           value.title = `${field.value} · ${str().openLinkTitle}`;
           value.innerHTML = `${ICONS.external}<span></span>`;
-          value.lastElementChild.textContent = field.value;
+          // 有自定义名时显示名称，没有时显示 URL 本身（issue #574 的要求）；
+          // 打开目标始终是保存的 URL。
+          value.lastElementChild.textContent = field.name || field.value;
         } else {
           // 历史数据里的坏链接：降级为纯文本，不给可点击外观。
           value.textContent = field.value;

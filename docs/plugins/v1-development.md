@@ -412,13 +412,18 @@ V1.4 的弹窗动作默认全屏。轻量页面（如给仓库附加自定义字
 - `popup` 只是宿主容器的形态差异：init 上下文、能力桥、权限校验与全屏弹窗完全一致。
 
 外链能力：页面 Bridge 新增 `shell.openExternal`（权限 `external:open`），页面把
-http/https URL 交给宿主用系统浏览器打开。主进程在 page bridge、能力路由、宿主
-操作与 Worker 动作返回值四处对 URL 做同一套白名单校验：仅 http/https、必须有
-主机名、长度 ≤ 2048，`javascript:` / `file:` / `data:` 与回环/链路本地目标
-（localhost、127.0.0.0/8、0.0.0.0、169.254.0.0/16、::1、::、fe80::/10、
-fc00::/7 以及它们的 IPv4 映射形式）一律拒绝，与
-`network:<host>` 权限禁 localhost 的口径一致。能力路由只有页面侧注入宿主操作，
-Worker 侧调用始终不可用。
+http/https URL 交给宿主用系统浏览器打开。
+
+页面侧的 URL 在 page bridge、能力路由与宿主操作三处按同一套白名单校验：仅
+http/https、必须有主机名、长度 ≤ 2048，`javascript:` / `file:` / `data:` 与
+回环/链路本地目标（localhost、127.0.0.0/8、0.0.0.0、169.254.0.0/16、::1、::、
+fe80::/10、fc00::/7 以及它们的 IPv4 映射形式）一律拒绝，与 `network:<host>`
+权限禁 localhost 的口径一致。能力路由只有页面侧注入宿主操作，Worker 侧调用
+始终不可用。
+
+Worker 动作的 `open-external` 返回值沿用 V1.1 起的结果协议：仅 https、不含
+凭据，由 `validatePluginActionResult` 校验并规范化 URL；本版本不改变这条既有
+契约（Worker 本身就是拥有完整 Node 权限的本地代码）。
 
 完整可安装示例见 `examples/plugins/repo-custom-fields`（仓库自定义信息：每个仓库
 一组自定义字段——单行文本、Markdown/代码说明与可点击链接，预览 ⇄ 编辑两态，

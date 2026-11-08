@@ -70,8 +70,15 @@
       if (a === 127 || a === 0 || (a === 169 && b === 254)) return true;
     }
 
-    // IPv6 链路本地 fe80::/10 与唯一本地 fc00::/7。
-    return /^fe[89ab][0-9a-f]{0,2}:/.test(host) || /^f[cd][0-9a-f]{2}:/.test(host);
+    // 首个 hextet 决定网段：fe80::/10 是 fe80–febf，fc00::/7 是 fc00–fdff。
+    // 按完整 hextet 数值判断，避免把 fe8::1（压缩后是 0fe8::1）误判为链路本地。
+    const firstHextet = /^([0-9a-f]{1,4}):/.exec(host);
+    if (firstHextet) {
+      const value = Number.parseInt(firstHextet[1], 16);
+      if (value >= 0xfe80 && value <= 0xfebf) return true;
+      if (value >= 0xfc00 && value <= 0xfdff) return true;
+    }
+    return false;
   }
 
   /** http/https 绝对 URL（与宿主 shell.openExternal 桥的白名单一致）。 */
