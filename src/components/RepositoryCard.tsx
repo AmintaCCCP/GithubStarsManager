@@ -189,6 +189,7 @@ const PluginRepositoryActionItems: React.FC<{
           pageId: action.opensPage,
           pageTitle: action.title,
           repository,
+          display: action.display,
         })
         : void run(action))}
     >

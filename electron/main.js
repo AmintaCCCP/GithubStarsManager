@@ -51,6 +51,7 @@ const { createPluginMarketplace } = require('./plugins/pluginMarketplace');
 const { downloadReleaseAsset } = require('./plugins/releaseDownload');
 const { loadPluginRegistry } = require('./plugins/pluginRegistryFeed');
 const { PAGE_SCHEME, pageCsp } = require('./plugins/pluginPage');
+const { isOpenExternalUrlAllowed } = require('./plugins/pluginPageBridge');
 const {
   DEFAULT_DESKTOP_PREFS,
   normalizeDesktopPrefs,
@@ -1293,6 +1294,15 @@ let pluginMarketplace = null;
 const pluginHostOperations = {
   clipboardWrite({ text }) {
     clipboard.writeText(text);
+    return null;
+  },
+  // 页面 Bridge 的外链操作（V1.6）：把 http/https URL 交给系统浏览器。page
+  // bridge 与 capabilityRouter 已各复核过一次，这里再做最后一道防御性校验。
+  async openExternal({ url }) {
+    if (!isOpenExternalUrlAllowed(url)) {
+      throw Object.assign(new Error('Open-external URL is invalid'), { code: 'PLUGIN_PAGE_REQUEST_INVALID' });
+    }
+    await shell.openExternal(url);
     return null;
   },
   clipboardWriteImage({ buffer }) {

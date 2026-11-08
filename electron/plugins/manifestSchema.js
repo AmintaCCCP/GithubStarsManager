@@ -16,7 +16,10 @@ const TOP_LEVEL_FIELDS = new Set([
   'contributes',
 ]);
 const CONTRIBUTION_FIELDS = new Set(['repositoryActions', 'repositoryProcessors', 'releaseProcessors', 'exporters', 'pages']);
-const REPOSITORY_ACTION_FIELDS = new Set(['id', 'title', 'icon', 'placement', 'opensPage']);
+const REPOSITORY_ACTION_FIELDS = new Set(['id', 'title', 'icon', 'placement', 'opensPage', 'display']);
+// V1.6 弹窗动作展示形态：popup 是非全屏的小弹窗，fullscreen 是既有全屏弹窗；
+// 缺省一律按 fullscreen 处理，旧插件无需改动。
+const ACTION_DISPLAY_MODES = new Set(['fullscreen', 'popup']);
 const PROCESSOR_FIELDS = new Set(['id', 'title']);
 const EXPORTER_FIELDS = new Set(['id', 'title', 'fileExtension', 'mimeType']);
 const PAGE_FIELDS = new Set(['id', 'title', 'entry']);
@@ -107,6 +110,15 @@ function validateRepositoryActions(actions) {
       }
       if (action.placement !== 'repository-card') {
         return failure('MANIFEST_FIELD_INVALID', `Manifest field '${prefix}.opensPage' requires placement 'repository-card'`);
+      }
+    }
+    if ('display' in action) {
+      if (!ACTION_DISPLAY_MODES.has(action.display)) {
+        return failure('MANIFEST_FIELD_INVALID', `Manifest field '${prefix}.display' must be 'fullscreen' or 'popup'`);
+      }
+      // display 只对弹窗动作有意义：普通动作（运行 Worker）不接受它。
+      if (!('opensPage' in action)) {
+        return failure('MANIFEST_FIELD_INVALID', `Manifest field '${prefix}.display' requires 'opensPage'`);
       }
     }
   }

@@ -168,3 +168,60 @@ test('network requests accept only allowlisted hosts, metric paths and paginatio
       { code: 'PLUGIN_PAGE_REQUEST_INVALID' }, `should reject ${label}`);
   }
 });
+
+test('shell.openExternal still allows public IPv6 and ordinary private IPv4 (V1.6)', () => {
+  for (const url of [
+    'https://[2001:4860:4860::8888]/',
+    'http://192.168.1.1/',
+    'https://openai.com/a?b=1',
+    // fe8::1 压缩后是 0fe8::1，不在 fe80::/10 内；只做前缀匹配会误判。
+    'http://[fe8::1]/',
+    'http://[fe00::1]/',
+    'http://[fec0::1]/',
+  ]) {
+    assert.deepEqual(validatePageCapabilityRequest({
+      pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal',
+      args: { url },
+    }), {
+      pluginId: 'com.example.page', pageId: 'fields', capability: 'shell', operation: 'openExternal',
+      args: { url },
+    });
+  }
+});
+
+test('shell.openExternal accepts only bounded http/https URLs (V1.6)', () => {
+  assert.deepEqual(validatePageCapabilityRequest({
+    pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal',
+    args: { url: 'https://openai.com' },
+  }), {
+    pluginId: 'com.example.page', pageId: 'fields', capability: 'shell', operation: 'openExternal',
+    args: { url: 'https://openai.com' },
+  });
+  for (const args of [
+    { url: 'javascript:alert(1)' },
+    { url: 'file:///etc/passwd' },
+    { url: 'plugin-page://com.example.page/fields/index.html' },
+    { url: 'data:text/html,hello' },
+    { url: '//example.com/no-scheme' },
+    { url: 'not a url' },
+    { url: '' },
+    { url: `https://example.com/${'a'.repeat(2100)}` },
+    { url: 'https://example.com', extra: true },
+    // 回环与链路本地目标与 network:<host> 权限禁 localhost 的口径一致。
+    { url: 'http://localhost:3000' },
+    { url: 'http://127.0.0.1:8080/' },
+    { url: 'http://[::1]/' },
+    { url: 'http://169.254.169.254/latest/meta-data' },
+    { url: 'http://[::]/' },
+    { url: 'http://[fe80::1]/' },
+    { url: 'http://[febf::1]/' },
+    { url: 'http://[fc00::1]/' },
+    { url: 'http://[fd12:3456::1]/' },
+    { url: 'http://[::ffff:127.0.0.1]/' },
+    { url: 'http://[::ffff:169.254.169.254]/' },
+  ]) {
+    assert.throws(() => validatePageCapabilityRequest({
+      pluginId: 'com.example.page', pageId: 'fields', method: 'shell.openExternal', args,
+    }), { code: 'PLUGIN_PAGE_REQUEST_INVALID' });
+  }
+});

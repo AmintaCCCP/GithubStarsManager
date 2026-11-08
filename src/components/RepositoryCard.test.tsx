@@ -67,8 +67,8 @@ vi.mock('./RepositoryReleaseSheet', () => ({
 }));
 
 vi.mock('./PluginPageModal', () => ({
-  PluginPageModal: ({ pageTitle }: { pageTitle: string }) => (
-    <div role="dialog" aria-label={pageTitle} />
+  PluginPageModal: ({ pageTitle, display }: { pageTitle: string; display?: string }) => (
+    <div role="dialog" aria-label={pageTitle} data-display={display ?? 'fullscreen'} />
   ),
 }));
 
@@ -588,6 +588,50 @@ describe('RepositoryCard view modes', () => {
     unmount();
     render(<PluginPageHost />);
     expect(screen.getByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
+  });
+
+  it('opens a non-fullscreen popup when the plugin action declares display:popup (V1.6)', async () => {
+    const user = userEvent.setup();
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-custom-fields',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.githubstarsmanager.repo-custom-fields',
+          name: '仓库自定义信息',
+          version: '0.1.0',
+          apiVersion: '1',
+          permissions: ['repositories:read', 'storage', 'external:open'],
+          contributes: {
+            repositoryActions: [{
+              id: 'custom-fields',
+              title: '仓库自定义信息',
+              placement: 'repository-card',
+              opensPage: 'fields',
+              display: 'popup',
+            }],
+            pages: [{ id: 'fields', title: 'Custom Fields', entry: 'ui/index.html' }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: ['repositories:read', 'storage', 'external:open'],
+      }],
+      invalidPlugins: [],
+    });
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+          <PluginPageHost />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    await user.click(await screen.findByRole('menuitem', { name: '仓库自定义信息' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '仓库自定义信息' });
+    expect(dialog).toHaveAttribute('data-display', 'popup');
   });
 });
 

@@ -22,6 +22,8 @@ interface ModalProps {
   footer?: React.ReactNode;
   scrollable?: boolean;
   contentClassName?: string;
+  /** 追加到 DialogContent 的类名（如弹窗内页面自己滚动的 overflow-hidden）。 */
+  dialogClassName?: string;
   onPointerDownOutside?: DialogContentPointerDownOutsideHandler;
   onOverlayPointerDown?: React.PointerEventHandler<HTMLDivElement>;
   onCloseAutoFocus?: React.ComponentProps<typeof DialogContent>['onCloseAutoFocus'];
@@ -38,6 +40,7 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   scrollable = false,
   contentClassName,
+  dialogClassName,
   onPointerDownOutside,
   onOverlayPointerDown,
   onCloseAutoFocus,
@@ -68,7 +71,7 @@ export const Modal: React.FC<ModalProps> = ({
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
-      <div className="min-w-0">{children}</div>
+      <div className={cn('min-w-0', contentClassName)}>{children}</div>
     </>
   );
 
@@ -80,6 +83,7 @@ export const Modal: React.FC<ModalProps> = ({
         className={cn(
           scrollable && 'flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0',
           !fullscreen && maxWidth,
+          dialogClassName,
         )}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}

@@ -237,3 +237,42 @@ test('still requires main when a manifest mixes opensPage and Worker actions', (
   assert.equal(result.success, false);
   assert.equal(result.code, 'MANIFEST_FIELD_REQUIRED');
 });
+
+test('accepts display mode on opensPage actions and defaults to fullscreen (V1.6)', () => {
+  const input = manifest({
+    contributes: {
+      repositoryActions: [
+        { id: 'open-fields', title: 'Custom fields', placement: 'repository-card', opensPage: 'fields', display: 'popup' },
+        { id: 'open-dashboard', title: 'Dashboard', placement: 'repository-card', opensPage: 'dashboard', display: 'fullscreen' },
+      ],
+      pages: [
+        { id: 'fields', title: 'Fields', entry: 'ui/index.html' },
+        { id: 'dashboard', title: 'Dashboard', entry: 'ui/index.html' },
+      ],
+    },
+  });
+  delete input.main;
+
+  const result = validateManifest(input);
+  assert.equal(result.success, true);
+  assert.equal(result.data.contributes.repositoryActions[0].display, 'popup');
+  assert.equal(result.data.contributes.repositoryActions[1].display, 'fullscreen');
+});
+
+test('rejects an unknown display mode', () => {
+  const input = manifest({
+    contributes: {
+      repositoryActions: [
+        { id: 'open-fields', title: 'Custom fields', placement: 'repository-card', opensPage: 'fields', display: 'sidebar' },
+      ],
+      pages: [{ id: 'fields', title: 'Fields', entry: 'ui/index.html' }],
+    },
+  });
+  assert.equal(validateManifest(input).code, 'MANIFEST_FIELD_INVALID');
+});
+
+test('rejects display on actions without opensPage', () => {
+  const input = manifest();
+  input.contributes.repositoryActions[0].display = 'popup';
+  assert.equal(validateManifest(input).code, 'MANIFEST_FIELD_INVALID');
+});

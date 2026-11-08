@@ -2,6 +2,9 @@ import type { Release, Repository } from '../types';
 
 export type PluginPlacement = 'repository-card' | 'bulk-toolbar';
 
+/** V1.6：opensPage 动作的弹窗形态。popup 是非全屏小弹窗；缺省一律全屏。 */
+export type PluginPageDisplay = 'fullscreen' | 'popup';
+
 export interface PluginRepositoryAction {
   id: string;
   title: string;
@@ -9,6 +12,8 @@ export interface PluginRepositoryAction {
   placement: PluginPlacement;
   /** V1.4：指向本插件 contributes.pages 的页面 id。点击动作时宿主在弹窗中打开该页面，而非运行 Worker。 */
   opensPage?: string;
+  /** V1.6：弹窗展示形态，缺省 fullscreen，保持既有插件行为不变。 */
+  display?: PluginPageDisplay;
 }
 
 export interface PluginManifest {

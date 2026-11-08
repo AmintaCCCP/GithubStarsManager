@@ -147,3 +147,32 @@ test('network requests authorize per host and only through the page bridge shape
     capability: 'network', operation: 'request', args: { host: 'api.github.com', path: '/repos/o/r' },
   }), null);
 });
+
+test('routes shell.openExternal through the host operation with external:open permission', async () => {
+  const opened = [];
+  const router = createCapabilityRouter({
+    storage: {}, logger: { log() {} },
+    hostOperations: {
+      openExternal: ({ url }) => { opened.push(url); return null; },
+    },
+  });
+  await router.handle(['external:open'], {
+    capability: 'shell', operation: 'openExternal', args: { url: 'https://openai.com' },
+  });
+  assert.deepEqual(opened, ['https://openai.com']);
+
+  await assert.rejects(router.handle([], {
+    capability: 'shell', operation: 'openExternal', args: { url: 'https://openai.com' },
+  }), { code: 'PLUGIN_PERMISSION_DENIED' });
+  await assert.rejects(router.handle(['external:open'], {
+    capability: 'shell', operation: 'openExternal', args: { url: 'javascript:alert(1)' },
+  }), { code: 'PLUGIN_CAPABILITY_REQUEST_INVALID' });
+  await assert.rejects(router.handle(['external:open'], {
+    capability: 'shell', operation: 'open', args: { url: 'https://openai.com' },
+  }), { code: 'PLUGIN_CAPABILITY_UNKNOWN' });
+  // Worker 侧 router 不注入 hostOperations：即使有权限也拿不到该操作。
+  const workerRouter = createCapabilityRouter({ storage: {}, logger: { log() {} } });
+  await assert.rejects(workerRouter.handle(['external:open'], {
+    capability: 'shell', operation: 'openExternal', args: { url: 'https://openai.com' },
+  }), { code: 'PLUGIN_CAPABILITY_UNAVAILABLE' });
+});

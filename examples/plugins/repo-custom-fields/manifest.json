@@ -1,0 +1,33 @@
+{
+  "manifestVersion": 1,
+  "id": "com.githubstarsmanager.repo-custom-fields",
+  "name": "Repo Custom Fields",
+  "version": "0.1.0",
+  "description": "Attaches custom fields (single-line text, markdown/code notes and clickable URLs) to each repository, edited and previewed in a compact popup instead of a fullscreen page.",
+  "author": "GithubStarsManager",
+  "apiVersion": "1",
+  "permissions": [
+    "repositories:read",
+    "storage",
+    "clipboard:write",
+    "external:open"
+  ],
+  "contributes": {
+    "repositoryActions": [
+      {
+        "id": "custom-fields",
+        "title": "仓库自定义信息",
+        "placement": "repository-card",
+        "opensPage": "fields",
+        "display": "popup"
+      }
+    ],
+    "pages": [
+      {
+        "id": "fields",
+        "title": "Custom Fields",
+        "entry": "ui/index.html"
+      }
+    ]
+  }
+}

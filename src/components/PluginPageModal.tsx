@@ -47,6 +47,8 @@ interface PluginPageModalProps {
   pageId: string;
   pageTitle: string;
   repository: Repository;
+  /** V1.6：popup 用非全屏小弹窗承载页面；fullscreen（缺省）行为与既有插件一致。 */
+  display?: 'fullscreen' | 'popup';
   onClose: () => void;
   t: TranslateFn;
 }
@@ -55,22 +57,30 @@ interface PluginPageModalProps {
  * V1.4 弹窗动作（opensPage）的宿主容器：把插件页面装进弹窗，并随
  * plugin-page:init 一次性下发所点击仓库的元数据与 README 正文。上下文由
  * 宿主主动提供，不经过能力桥；页面访问宿主能力仍只能走受权限约束的桥方法。
+ * V1.6 起 manifest 可用 `display: "popup"` 声明非全屏小弹窗，供轻量页面
+ * （如自定义信息字段）使用；未声明的动作保持全屏弹窗不变。
  */
 export const PluginPageModal: React.FC<PluginPageModalProps> = ({
-  pluginId, pluginName, pageId, pageTitle, repository, onClose, t,
+  pluginId, pluginName, pageId, pageTitle, repository, display = 'fullscreen', onClose, t,
 }) => {
   const language = useAppStore(useShallow((state) => state.language));
   const theme = useAppStore((state) => resolveTheme(state.themeMode, state.systemTheme));
-  const { readme } = usePluginPageReadme(repository);
+  const popup = display === 'popup';
+  // popup 形态不抓取 README：轻量页面用不到，省一次 GitHub 请求。
+  const { readme } = usePluginPageReadme(popup ? null : repository);
 
   return (
     <Modal
       isOpen
       onClose={onClose}
       title={`${pluginName} · ${pageTitle}`}
-      fullscreen
-      scrollable
-      contentClassName="flex flex-col"
+      fullscreen={!popup}
+      scrollable={!popup}
+      // popup：固定高度的小弹窗，比默认的 max-w-md 更宽以容纳字段表单；弹窗本身
+      // 不滚动，交给页面 iframe 自己滚。
+      maxWidth={popup ? 'max-w-2xl' : undefined}
+      dialogClassName={popup ? 'overflow-hidden' : undefined}
+      contentClassName={popup ? 'flex h-[min(72vh,640px)] flex-col' : 'flex flex-col'}
       closeLabel={t('pluginPageViewer.close')}
     >
       <PluginPageViewer
@@ -81,7 +91,11 @@ export const PluginPageModal: React.FC<PluginPageModalProps> = ({
         pageTitle={pageTitle}
         onClose={onClose}
         t={t}
-        initContext={{ repository: repositoryContext(repository), readme, language, theme }}
+        // popup 面向轻量表单页，README 上下文没有意义：不抓取也不下发，避免
+        // 每次点开都产生一次 GitHub 请求与一次 init 重发。
+        initContext={popup
+          ? { repository: repositoryContext(repository), language, theme }
+          : { repository: repositoryContext(repository), readme, language, theme }}
       />
     </Modal>
   );

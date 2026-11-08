@@ -15,7 +15,59 @@ const METHODS = {
   'clipboard.write': { capability: 'clipboard', operation: 'write', fields: ['text'] },
   'clipboard.writeImage': { capability: 'clipboard', operation: 'writeImage', fields: ['dataBase64'] },
   'downloads.saveFile': { capability: 'downloads', operation: 'saveFile', fields: ['fileName', 'dataBase64'] },
+  // V1.6 页面外链：插件页面里的链接（如自定义字段插件的 URL 字段）交给宿主
+  // 用系统浏览器打开。沙箱 iframe 的普通 <a> 导航会被宿主与 CSP 拦截，页面
+  // 没有 allow-popups，因此这是页面打开外链的唯一通道，权限为 external:open。
+  'shell.openExternal': { capability: 'shell', operation: 'openExternal', fields: ['url'] },
 };
+
+const MAX_OPEN_EXTERNAL_URL_CHARS = 2048;
+
+/** 回环、链路本地与 IPv6 唯一本地地址一律拒绝：与 network:<host> 权限禁
+ *  localhost 的口径一致，页面外链只应指向公网资源。IPv4 映射的 IPv6 形式
+ *  （::ffff:127.0.0.1 等）同样要还原后判定，不能只按字符串前缀匹配。 */
+function isLoopbackOrLinkLocalHost(hostname) {
+  const host = String(hostname).toLowerCase().replace(/^\[/, '').replace(/\]$/, '').replace(/\.$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1' || host === '::' || host === '0.0.0.0') return true;
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    return a === 127 || a === 0 || (a === 169 && b === 254);
+  }
+
+  // IPv4 映射/兼容的 IPv6：::ffff:7f00:1 → 127.0.0.1，::ffff:a9fe:a9fe → 169.254.169.254。
+  const mapped = /^::(?:ffff:)?([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(host);
+  if (mapped) {
+    const first = Number.parseInt(mapped[1], 16);
+    const a = first >>> 8;
+    const b = first & 0xff;
+    if (a === 127 || a === 0 || (a === 169 && b === 254)) return true;
+  }
+
+  // 首个 hextet 决定网段：fe80::/10 是 fe80–febf，fc00::/7 是 fc00–fdff。
+  // 必须按完整 hextet 数值判断：`fe8::1` 压缩后是 0fe8::1，不属于链路本地，
+  // 只做前缀匹配会把合法公网地址误判为本地目标。
+  const firstHextet = /^([0-9a-f]{1,4}):/.exec(host);
+  if (firstHextet) {
+    const value = Number.parseInt(firstHextet[1], 16);
+    if (value >= 0xfe80 && value <= 0xfebf) return true;
+    if (value >= 0xfc00 && value <= 0xfdff) return true;
+  }
+  return false;
+}
+
+/** 只放行 http/https 绝对 URL：拒绝 javascript:、file:、插件页 scheme 等一切
+ *  非 Web 协议与回环目标，主进程 openExternal 宿主操作会再做一次同样的复核。 */
+function isOpenExternalUrlAllowed(value) {
+  if (typeof value !== 'string' || !value || value.length > MAX_OPEN_EXTERNAL_URL_CHARS) return false;
+  let url;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+  if (!url.hostname || isLoopbackOrLinkLocalHost(url.hostname)) return false;
+  return true;
+}
 
 // V1.5 页面网络能力：宿主按 `network:<host>` 权限代理只读 GET 请求。目标主机
 // 与路径模式在这里白名单化；渲染端执行前用同一份清单复核（见
@@ -143,6 +195,9 @@ function validatePageCapabilityRequest(input) {
     (typeof args.text !== 'string' || args.text.length === 0 || args.text.length > MAX_CLIPBOARD_TEXT_CHARS)) {
     throw protocolError('PLUGIN_PAGE_REQUEST_INVALID', 'Clipboard text arguments are invalid');
   }
+  if (method === 'shell.openExternal' && !isOpenExternalUrlAllowed(args.url)) {
+    throw protocolError('PLUGIN_PAGE_REQUEST_INVALID', 'Open-external URL arguments are invalid');
+  }
   if (method === 'clipboard.writeImage' || method === 'downloads.saveFile') {
     if (typeof args.dataBase64 !== 'string' || args.dataBase64.length === 0 ||
       !BASE64_RE.test(args.dataBase64) || Buffer.from(args.dataBase64, 'base64').length === 0) {
@@ -162,4 +217,5 @@ module.exports = {
   NETWORK_ALLOWED_HOSTS,
   NETWORK_ALLOWED_REPO_PATHS,
   NETWORK_ALLOWED_USER_PATHS,
+  isOpenExternalUrlAllowed,
 };
