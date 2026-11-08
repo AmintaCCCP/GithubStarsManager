@@ -161,8 +161,9 @@ interface RepositoryCardProps {
 }
 
 const MAX_CACHE_SIZE = 500;
-const ACTION_SLOT_WIDTH = 32;
-const ACTION_SLOT_GAP = 6;
+// Must match --app-card-action-size (1.75rem) + --app-sidebar-action-gap (0.125rem) in index.css.
+const ACTION_SLOT_WIDTH = 28;
+const ACTION_SLOT_GAP = 2;
 const ACTION_SLOT_STRIDE = ACTION_SLOT_WIDTH + ACTION_SLOT_GAP;
 
 const highlightCache = new Map<string, React.ReactNode>();

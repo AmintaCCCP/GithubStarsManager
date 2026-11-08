@@ -238,7 +238,7 @@ describe('RepositoryCard view modes', () => {
     ]);
     await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent?.trim())).toEqual([
-      '查看 Release', '取消订阅 Release', '在 Zread 中查看', '取消 Star',
+      '取消订阅 Release', '在 Zread 中查看', '取消 Star',
     ]);
   });
 
@@ -510,6 +510,20 @@ describe('RepositoryCard view modes', () => {
       window.dispatchEvent(new Event('resize'));
     });
     expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
+  });
+
+  it('fits all quick actions at the compact slot size before folding them', async () => {
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('grid-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 250 });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(screen.getByTitle('在Zread中查看')).toBeInTheDocument();
+    expect(screen.getByTitle('在GitHub上查看')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
   });
 
   it('collapses trailing list actions into a more-actions menu when the row is narrow', async () => {
