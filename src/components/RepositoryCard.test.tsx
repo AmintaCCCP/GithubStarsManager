@@ -74,12 +74,14 @@ vi.mock('./PluginPageModal', () => ({
 
 const pluginClientMocks = vi.hoisted(() => ({
   list: vi.fn(),
+  runAction: vi.fn(),
 }));
 
 vi.mock('../plugins/pluginClient', () => ({
   pluginClient: {
     isSupported: () => true,
     list: pluginClientMocks.list,
+    runAction: pluginClientMocks.runAction,
   },
 }));
 
@@ -115,6 +117,7 @@ const storeState = {
   // 卡片可见字段（开发守则 §14）：默认全开，单个用例里按需改
   repositoryCardFields: { description: true, tags: true, language: true, stars: true, license: true, lastUpdated: true },
   repositoryCardActions: DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item })),
+  pluginCustomIcons: {} as Record<string, string>,
   updateRepository: vi.fn(),
   deleteRepository: vi.fn(),
   vectorSearchConfig: {
@@ -155,6 +158,38 @@ const renderRepositoryCard = (
   </DialogProvider>
 );
 
+const mockPluginAction = (actionId: string, title: string) => {
+  storeState.repositoryCardActions = [
+    { id: `plugin:com.example.dupe:${actionId}`, visible: true },
+    ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+  ];
+  pluginClientMocks.list.mockResolvedValue({
+    plugins: [{
+      directoryName: 'repo-dupe',
+      manifest: {
+        manifestVersion: 1,
+        id: 'com.example.dupe',
+        name: 'Duplicate Plugin',
+        version: '1.0.0',
+        apiVersion: '1',
+        permissions: [],
+        contributes: {
+          repositoryActions: [{
+            id: actionId,
+            title,
+            placement: 'repository-card',
+            icon: 'file-text',
+          }],
+        },
+      },
+      enabled: true,
+      status: 'active',
+      grantedPermissions: [],
+    }],
+    invalidPlugins: [],
+  });
+};
+
 beforeEach(() => {
   cleanup();
   document.body.innerHTML = '';
@@ -174,6 +209,7 @@ beforeEach(() => {
     lastUpdated: true,
   };
   storeState.repositoryCardActions = DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item }));
+  storeState.pluginCustomIcons = {};
   storeState.vectorSearchConfig.enabled = true;
   Object.assign(actionMocks.actions, {
     isSubscribed: true,
@@ -190,6 +226,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   document.body.innerHTML = '';
+  document.documentElement.style.removeProperty('font-size');
+  vi.useRealTimers();
   actionMocks.releaseSheet.suspend = null;
 });
 
@@ -234,7 +272,7 @@ describe('RepositoryCard view modes', () => {
     ]);
     await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent?.trim())).toEqual([
-      '查看 Release', '取消订阅 Release', '在 Zread 中查看', '取消 Star',
+      '取消订阅 Release', '在 Zread 中查看', '取消 Star',
     ]);
   });
 
@@ -508,6 +546,44 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByRole('menuitem', { name: '问答此仓库' })).toBeInTheDocument();
   });
 
+  it('fits all quick actions at the compact slot size before folding them', async () => {
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('grid-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 250 });
+
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    expect(screen.getByTitle('在Zread中查看')).toBeInTheDocument();
+    expect(screen.getByTitle('在GitHub上查看')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
+  });
+
+  it('scales action slots with the root font size and re-measures when it changes', async () => {
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('grid-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 250 });
+
+    document.documentElement.style.fontSize = '20px';
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // 250px at a 20px root fits 6 slots, so one slot stays reserved for More.
+    expect(screen.getByTitle('查看 Release')).toBeInTheDocument();
+    expect(screen.queryByTitle('在Zread中查看')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('在GitHub上查看')).not.toBeInTheDocument();
+
+    document.documentElement.style.fontSize = '16px';
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTitle('在Zread中查看')).toBeInTheDocument();
+    expect(screen.getByTitle('在GitHub上查看')).toBeInTheDocument();
+  });
+
   it('collapses trailing list actions into a more-actions menu when the row is narrow', async () => {
     const user = userEvent.setup();
     renderRepositoryCard('list', { onAskRepository: vi.fn() });
@@ -632,6 +708,326 @@ describe('RepositoryCard view modes', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '仓库自定义信息' });
     expect(dialog).toHaveAttribute('data-display', 'popup');
+  });
+
+  it('renders customized icon for plugin action in more actions menu', async () => {
+    const user = userEvent.setup();
+    storeState.pluginCustomIcons = {
+      'com.githubstarsmanager.repo-info-card': 'rocket',
+    };
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-info-card',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.githubstarsmanager.repo-info-card',
+          name: '仓库信息卡',
+          version: '0.1.0',
+          apiVersion: '1',
+          permissions: ['repositories:read'],
+          contributes: {
+            repositoryActions: [{
+              id: 'generate-info-card',
+              title: '生成仓库信息卡',
+              placement: 'repository-card',
+              opensPage: 'info-card',
+            }],
+            pages: [{ id: 'info-card', title: 'Repository Info Card', entry: 'ui/index.html' }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: ['repositories:read'],
+      }],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    const menuItem = await screen.findByRole('menuitem', { name: '生成仓库信息卡' });
+    expect(menuItem).toBeInTheDocument();
+    expect(menuItem.querySelector('.lucide-rocket')).toBeInTheDocument();
+  });
+
+  it('renders plugin action directly on the card row when configured visible', async () => {
+    const user = userEvent.setup();
+    storeState.pluginCustomIcons = {
+      'com.githubstarsmanager.repo-info-card': 'rocket',
+    };
+    storeState.repositoryCardActions = [
+      { id: 'plugin:com.githubstarsmanager.repo-info-card:generate-info-card', visible: true },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+    ];
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-info-card',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.githubstarsmanager.repo-info-card',
+          name: '仓库信息卡',
+          version: '0.1.0',
+          apiVersion: '1',
+          permissions: ['repositories:read'],
+          contributes: {
+            repositoryActions: [{
+              id: 'generate-info-card',
+              title: '生成仓库信息卡',
+              placement: 'repository-card',
+              opensPage: 'info-card',
+            }],
+            pages: [{ id: 'info-card', title: 'Repository Info Card', entry: 'ui/index.html' }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: ['repositories:read'],
+      }],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+          <PluginPageHost />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    const pluginButton = await screen.findByRole('button', { name: '生成仓库信息卡' });
+    expect(pluginButton).toBeInTheDocument();
+    expect(pluginButton.querySelector('.lucide-rocket')).toBeInTheDocument();
+
+    await user.click(pluginButton);
+    expect(await screen.findByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
+  });
+
+  it('executes worker action when plugin action has no opensPage', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const createObjectURL = vi.fn(() => 'blob:plugin-output');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const mockRunAction = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        result: { type: 'text', content: 'card markdown', suggestedAction: 'copy' },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        result: { type: 'text', content: 'card markdown', suggestedAction: 'save' },
+      });
+    pluginClientMocks.runAction.mockImplementation(mockRunAction);
+
+    storeState.repositoryCardActions = [
+      { id: 'plugin:com.example.worker:export-card', visible: true },
+      { id: 'plugin:com.example.worker:save-card', visible: true },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+    ];
+
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [
+        {
+          directoryName: 'repo-worker',
+          manifest: {
+            manifestVersion: 1,
+            id: 'com.example.worker',
+            name: 'Worker Plugin',
+            version: '1.0.0',
+            apiVersion: '1',
+            permissions: [],
+            contributes: {
+              repositoryActions: [
+                {
+                  id: 'export-card',
+                  title: '导出卡片',
+                  placement: 'repository-card',
+                  icon: 'file-text',
+                },
+                {
+                  id: 'save-card',
+                  title: '保存卡片',
+                  placement: 'repository-card',
+                  icon: 'download',
+                },
+              ],
+            },
+          },
+          enabled: true,
+          status: 'active',
+          grantedPermissions: [],
+        },
+      ],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    const pluginButton = await screen.findByRole('button', { name: '导出卡片' });
+    expect(pluginButton).toBeInTheDocument();
+
+    await user.click(pluginButton);
+    expect(mockRunAction).toHaveBeenCalledWith({
+      pluginId: 'com.example.worker',
+      actionId: 'export-card',
+      repositories: [repository],
+    });
+    expect(writeText).toHaveBeenCalledWith('card markdown');
+
+    await user.click(screen.getByRole('button', { name: '保存卡片' }));
+    expect(mockRunAction).toHaveBeenLastCalledWith({
+      pluginId: 'com.example.worker',
+      actionId: 'save-card',
+      repositories: [repository],
+    });
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:plugin-output');
+    anchorClick.mockRestore();
+  });
+
+  it('keeps plugin action submissions deduplicated across row remounts and recovers after a timeout', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const resolvers: Array<(value: unknown) => void> = [];
+    pluginClientMocks.runAction.mockImplementation(() => new Promise((resolve) => {
+      resolvers.push(resolve);
+    }));
+    mockPluginAction('export-card', '导出卡片');
+
+    const renderCard = (viewMode: 'list' | 'grid') => (
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} />
+        </TooltipProvider>
+      </DialogProvider>
+    );
+
+    const { rerender } = render(renderCard('list'));
+    const pluginButton = await screen.findByRole('button', { name: '导出卡片' });
+    vi.useFakeTimers();
+    fireEvent.click(pluginButton);
+    fireEvent.click(pluginButton);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+    expect(pluginButton).toBeDisabled();
+
+    // The lock lives on the card, so switching views remounts the row without resetting it.
+    rerender(renderCard('grid'));
+    fireEvent.click(screen.getByRole('button', { name: '导出卡片' }));
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+
+    // A hung IPC call must release the lock so the user can retry.
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    const retryButton = screen.getByRole('button', { name: '导出卡片' });
+    expect(retryButton).toBeEnabled();
+    fireEvent.click(retryButton);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(2);
+
+    // The first run resolving after its timeout must not apply a late result.
+    await act(async () => {
+      resolvers[0]({ success: true, result: { type: 'text', content: 'late', suggestedAction: 'copy' } });
+      await Promise.resolve();
+    });
+    expect(writeText).not.toHaveBeenCalled();
+
+    // The late first run must not clear the retry's lock.
+    const stillRunningButton = screen.getByRole('button', { name: '导出卡片' });
+    expect(stillRunningButton).toBeDisabled();
+    fireEvent.click(stillRunningButton);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears pending plugin action timers when the card unmounts', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const resolvers: Array<(value: unknown) => void> = [];
+    pluginClientMocks.runAction.mockImplementation(() => new Promise((resolve) => {
+      resolvers.push(resolve);
+    }));
+    mockPluginAction('unmount-card', '卸载卡片');
+
+    const Harness = ({ show }: { show: boolean }) => (
+      <DialogProvider>
+        <TooltipProvider>
+          {show ? <RepositoryCard repository={repository} allCategories={[]} viewMode="list" /> : null}
+        </TooltipProvider>
+      </DialogProvider>
+    );
+    const { rerender } = render(<Harness show />);
+    const button = await screen.findByRole('button', { name: '卸载卡片' });
+    vi.useFakeTimers();
+    fireEvent.click(button);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+
+    rerender(<Harness show={false} />);
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('插件操作超时')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolvers[0]({ success: true, result: { type: 'text', content: 'late', suggestedAction: 'copy' } });
+      await Promise.resolve();
+    });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('does not show stale clipboard success after a plugin action times out', async () => {
+    let resolveClipboard: () => void = () => {};
+    const writeText = vi.fn(() => new Promise<void>((resolve) => {
+      resolveClipboard = resolve;
+    }));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    pluginClientMocks.runAction.mockResolvedValue({
+      success: true,
+      result: { type: 'text', content: 'copy me', suggestedAction: 'copy' },
+    });
+    mockPluginAction('copy-card', '复制卡片');
+
+    renderRepositoryCard('list');
+    const button = await screen.findByRole('button', { name: '复制卡片' });
+    vi.useFakeTimers();
+    fireEvent.click(button);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(screen.getByText('插件操作超时')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveClipboard();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('插件结果已复制')).not.toBeInTheDocument();
   });
 });
 

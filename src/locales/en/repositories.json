@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Failed to apply plugin result",
+    "plugin-action-timed-out": "Plugin action timed out",
     "no-description": "(No description)",
     "no-description-available": "No description available",
     "analysis-failed-on-analyzetime-click-to-retry": "Analysis failed on {{analyzeTime}}, click to retry",

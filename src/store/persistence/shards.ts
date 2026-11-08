@@ -79,6 +79,7 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'assetFilters',
     'repositoryCardFields',
     'repositoryCardActions',
+    'pluginCustomIcons',
     'lastSync',
     'themeMode',
     'themePresetLight',

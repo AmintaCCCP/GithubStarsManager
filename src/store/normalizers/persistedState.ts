@@ -36,6 +36,17 @@ import {
   REQUIRED_HEADER_MENU_IDS,
 } from '../schema';
 
+export const normalizePluginCustomIcons = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const result: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof k === 'string' && k.trim() && typeof v === 'string' && v.trim()) {
+      result[k.trim()] = v.trim();
+    }
+  }
+  return result;
+};
+
 export const normalizePersistedState = (
   persisted: PersistedAppState | undefined,
   currentState: AppStoreState
@@ -236,6 +247,7 @@ export const normalizePersistedState = (
     // 卡片可见字段（开发守则 §14）：逐项校验，非法值按默认（显示）处理
     repositoryCardFields: normalizeRepositoryCardFields((safePersisted as Record<string, unknown>).repositoryCardFields),
     repositoryCardActions: normalizeRepositoryCardActions((safePersisted as Record<string, unknown>).repositoryCardActions),
+    pluginCustomIcons: normalizePluginCustomIcons((safePersisted as Record<string, unknown>).pluginCustomIcons),
     language: isAppLanguage(safePersisted.language) ? safePersisted.language : currentState.language,
     translationEngine: safePersisted.translationEngine === 'google' || safePersisted.translationEngine === 'ai'
       ? safePersisted.translationEngine

@@ -58,7 +58,7 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
         'warn',
-        { allowConstantExport: true, allowExportNames: ['useDialog'] },
+        { allowConstantExport: true, allowExportNames: ['useDialog', 'useOptionalDialog'] },
       ],
       'preserve-caught-error': 'off',
       'no-useless-assignment': 'off',

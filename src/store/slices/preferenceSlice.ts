@@ -29,6 +29,7 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setRepositoryViewMode'
   | 'setRepositoryCardField'
   | 'setRepositoryCardActions'
+  | 'setPluginCustomIcon'
   | 'setReleaseViewMode'
   | 'setReleaseShowMode'
   | 'setReleaseLatestMode'
@@ -86,6 +87,15 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
         repositoryCardFields: normalizeRepositoryCardFields({ ...state.repositoryCardFields, [id]: visible }),
       })),
       setRepositoryCardActions: (actions) => set({ repositoryCardActions: normalizeRepositoryCardActions(actions) }),
+      setPluginCustomIcon: (pluginId, icon) => set((state) => {
+        const next = { ...state.pluginCustomIcons };
+        if (!icon) {
+          delete next[pluginId];
+        } else {
+          next[pluginId] = icon;
+        }
+        return { pluginCustomIcons: next };
+      }),
       setRepositoryViewMode: (repositoryViewMode) => set({ repositoryViewMode }),
 
       // Release Timeline View actions

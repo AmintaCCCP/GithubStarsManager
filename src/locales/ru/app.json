@@ -1165,7 +1165,14 @@
     "marketplace-error-blocked": "Эта версия заблокирована официальным реестром; установка и обновление невозможны.",
     "marketplace-error-changed": "Плагин изменился в источнике во время установки; обновите список и повторите попытку.",
     "marketplace-update-success-still-enabled-v1": "«{{v1}}» обновлён; плагин остаётся включённым.",
-    "marketplace-orphaned-revoked-title": "Отозванные установленные плагины"
+    "marketplace-orphaned-revoked-title": "Отозванные установленные плагины",
+    "customize-icon": "Настроить значок",
+    "customize-icon-title": "Настройка значка плагина: {{name}}",
+    "select-icon": "Выбрать значок",
+    "default-icon": "Значок по умолчанию",
+    "search-icons": "Поиск значков…",
+    "reset-icon": "Восстановить значок по умолчанию",
+    "no-icons-found": "Совпадающих значков не найдено"
   },
   "pushCategoriesModal": {
     "push-selected-categories": "Отправить выбранные категории",

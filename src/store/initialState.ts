@@ -97,6 +97,7 @@ export const createInitialState = (): AppState => ({
       // 卡片可见字段默认全开（开发守则 §14）
       repositoryCardFields: { ...DEFAULT_REPOSITORY_CARD_FIELDS },
       repositoryCardActions: DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item })),
+      pluginCustomIcons: {},
       releaseViewMode: 'timeline',
       releaseShowMode: 'all',
       releaseLatestMode: 'all',

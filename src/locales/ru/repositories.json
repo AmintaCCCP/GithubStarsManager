@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Невозможно применить результаты плагина",
+    "plugin-action-timed-out": "Время ожидания действия плагина истекло",
     "no-description": "(без описания)",
     "no-description-available": "Описания пока нет",
     "analysis-failed-on-analyzetime-click-to-retry": "Не удалось выполнить анализ {{analyzeTime}}. Нажмите, чтобы повторить анализ.",

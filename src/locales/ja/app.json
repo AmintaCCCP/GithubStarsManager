@@ -1165,7 +1165,14 @@
     "marketplace-error-blocked": "このバージョンは公式レジストリでブロックされているため、インストール・更新できません。",
     "marketplace-error-changed": "インストール中にソース上のプラグインが変わりました。更新してから再試行してください。",
     "marketplace-update-success-still-enabled-v1": "{{v1}} を更新しました。プラグインは有効のままです。",
-    "marketplace-orphaned-revoked-title": "取り消し済みのインストール済みプラグイン"
+    "marketplace-orphaned-revoked-title": "取り消し済みのインストール済みプラグイン",
+    "customize-icon": "アイコンをカスタマイズ",
+    "customize-icon-title": "プラグインアイコンのカスタマイズ: {{name}}",
+    "select-icon": "アイコンを選択",
+    "default-icon": "デフォルトアイコン",
+    "search-icons": "アイコンを検索…",
+    "reset-icon": "デフォルトアイコンに戻す",
+    "no-icons-found": "一致するアイコンが見つかりません"
   },
   "pushCategoriesModal": {
     "push-selected-categories": "選択したカテゴリを書き戻す",

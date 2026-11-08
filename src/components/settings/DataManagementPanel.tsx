@@ -56,6 +56,7 @@ import {
 import { Github } from '../ui/brand-icons';
 import { useAppStore } from '../../store/useAppStore';
 import { removePersistedSnapshot } from '../../store/persistence/storage';
+import { normalizePluginCustomIcons } from '../../store/normalizers/persistedState';
 import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
@@ -147,6 +148,7 @@ interface ExportData {
     releaseSelectedFilters?: string[];
     releaseSearchQuery?: string;
     releaseExpandedRepositories?: number[];
+    pluginCustomIcons?: Record<string, string>;
     proxyConfig?: ProxyConfig;
     rpcDownloadConfig?: RpcDownloadConfig;
     backendApiSecret?: string | null;
@@ -194,6 +196,7 @@ const UI_SETTINGS_DATA_KEYS = [
   'releaseSelectedFilters',
   'releaseSearchQuery',
   'releaseExpandedRepositories',
+  'pluginCustomIcons',
   'proxyConfig',
   'rpcDownloadConfig',
   'backendApiSecret',
@@ -694,6 +697,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         exportDataObj.data.releaseSelectedFilters = store.releaseSelectedFilters;
         exportDataObj.data.releaseSearchQuery = store.releaseSearchQuery;
         exportDataObj.data.releaseExpandedRepositories = Array.from(store.releaseExpandedRepositories);
+        exportDataObj.data.pluginCustomIcons = store.pluginCustomIcons;
       }
 
       // Export special configs (proxy, RPC, backend secret) only when uiSettings is selected
@@ -885,6 +889,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
           if (importedData.releaseExpandedRepositories) {
             useAppStore.setState({ releaseExpandedRepositories: new Set(importedData.releaseExpandedRepositories) });
+          }
+          if (importedData.pluginCustomIcons !== undefined) {
+            useAppStore.setState({
+              pluginCustomIcons: normalizePluginCustomIcons(importedData.pluginCustomIcons),
+            });
           }
         }
 
@@ -1101,6 +1110,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               : {}),
             ...(importedUiSettings.releaseExpandedRepositories
               ? { releaseExpandedRepositories: new Set(importedUiSettings.releaseExpandedRepositories) }
+              : {}),
+            ...(importedUiSettings.pluginCustomIcons !== undefined
+              ? {
+                  pluginCustomIcons: {
+                    ...currentStore.pluginCustomIcons,
+                    ...normalizePluginCustomIcons(importedUiSettings.pluginCustomIcons),
+                  },
+                }
               : {}),
           });
           if (importedUiSettings.proxyConfig) {

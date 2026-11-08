@@ -1165,7 +1165,14 @@
     "marketplace-error-blocked": "该版本已被官方注册表拉黑，无法安装或更新。",
     "marketplace-error-changed": "安装过程中源上的插件发生了变化，请刷新后重试。",
     "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持启用状态。",
-    "marketplace-orphaned-revoked-title": "已撤销的已安装插件"
+    "marketplace-orphaned-revoked-title": "已撤销的已安装插件",
+    "customize-icon": "自定义图标",
+    "customize-icon-title": "自定义插件图标：{{name}}",
+    "select-icon": "选择图标",
+    "default-icon": "默认图标",
+    "search-icons": "搜索图标…",
+    "reset-icon": "恢复默认图标",
+    "no-icons-found": "未找到匹配的图标"
   },
   "pushCategoriesModal": {
     "push-selected-categories": "推送所选分类",

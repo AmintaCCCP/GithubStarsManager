@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "No se pueden aplicar los resultados del complemento",
+    "plugin-action-timed-out": "Se agotó el tiempo de espera de la acción del complemento",
     "no-description": "(sin descripción)",
     "no-description-available": "Aún no hay descripción",
     "analysis-failed-on-analyzetime-click-to-retry": "El análisis falló en {{analyzeTime}}, haga clic para volver a analizar",

@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "プラグインの結果を適用できません",
+    "plugin-action-timed-out": "プラグイン操作がタイムアウトしました",
     "no-description": "(説明なし)",
     "no-description-available": "まだ説明がありません",
     "analysis-failed-on-analyzetime-click-to-retry": "{{analyzeTime}} で分析が失敗しました。再分析するにはクリックしてください",

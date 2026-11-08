@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Impossible d'appliquer les résultats du plugin",
+    "plugin-action-timed-out": "L'action du plugin a expiré",
     "no-description": "(pas de description)",
     "no-description-available": "Pas encore de description",
     "analysis-failed-on-analyzetime-click-to-retry": "L'analyse a échoué le {{analyzeTime}}, cliquez pour réanalyser",

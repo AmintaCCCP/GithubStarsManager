@@ -94,6 +94,7 @@ sortOrder: state.gistSearchFilters.sortOrder,
   // 卡片可见字段（开发守则 §14）
   repositoryCardFields: state.repositoryCardFields,
   repositoryCardActions: state.repositoryCardActions,
+  pluginCustomIcons: state.pluginCustomIcons,
 
   // Trending 快照（开发守则 §7）：本地榜单历史，不参与任何远端同步
   trendingSnapshots: state.trendingSnapshots,
