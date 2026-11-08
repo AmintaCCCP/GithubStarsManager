@@ -161,4 +161,29 @@ describe('PluginIconPickerDialog', () => {
 
     expect(screen.getByPlaceholderText(/search icons/i)).toHaveValue('');
   });
+
+  it('indicates selected icon via aria-pressed and adapts label according to language', () => {
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        language: 'en',
+        pluginCustomIcons: { 'com.example.test-plugin': 'rocket' },
+        setPluginCustomIcon: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={vi.fn()}
+      />
+    );
+
+    const rocketBtn = screen.getByRole('button', { name: /Rocket/i });
+    expect(rocketBtn).toHaveAttribute('aria-pressed', 'true');
+
+    const plugBtn = screen.getByRole('button', { name: /Plug/i });
+    expect(plugBtn).toHaveAttribute('aria-pressed', 'false');
+  });
 });

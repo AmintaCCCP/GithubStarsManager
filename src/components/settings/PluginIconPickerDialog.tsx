@@ -33,6 +33,8 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
 
   const customIcons = useAppStore((state) => state.pluginCustomIcons);
   const setPluginCustomIcon = useAppStore((state) => state.setPluginCustomIcon);
+  const language = useAppStore((state) => state.language);
+  const isZh = language === 'zh' || language === 'zh-TW';
 
   const pluginId = target?.manifest.id;
   const currentIconKey = pluginId ? customIcons[pluginId] : undefined;
@@ -105,7 +107,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
           <span className="text-xs text-muted-foreground">{t('pluginSettingsPanel.select-icon')}:</span>
           <div className="flex items-center gap-2 font-medium">
             <PluginIcon pluginId={pluginId} className="h-4 w-4 text-primary" />
-            <span>{currentIconKey || 'plug (default)'}</span>
+            <span>{currentIconKey || (isZh ? 'plug (默认)' : 'plug (default)')}</span>
           </div>
         </div>
 
@@ -114,13 +116,16 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
           {filteredIcons.map((choice) => {
             const isSelected = normalizedCurrent === choice.key || (!normalizedCurrent && choice.key === 'plug');
             const IconComp = choice.icon;
+            const choiceLabel = isZh ? choice.labelZh.split(' ')[0] : choice.label;
+            const choiceTitle = isZh ? `${choice.labelZh} (${choice.label})` : `${choice.label} (${choice.labelZh})`;
             return (
               <button
                 key={choice.key}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => handleSelect(choice.key)}
-                title={`${choice.labelZh} (${choice.label})`}
-                aria-label={`${choice.labelZh} (${choice.label})`}
+                title={choiceTitle}
+                aria-label={choiceTitle}
                 className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border p-2 text-center transition-all hover:bg-accent hover:text-accent-foreground ${
                   isSelected
                     ? 'border-primary bg-primary/10 text-primary shadow-xs'
@@ -129,7 +134,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
               >
                 <IconComp className="h-5 w-5 shrink-0" />
                 <span className="w-full truncate text-[11px] leading-tight text-muted-foreground">
-                  {choice.labelZh.split(' ')[0]}
+                  {choiceLabel}
                 </span>
               </button>
             );
