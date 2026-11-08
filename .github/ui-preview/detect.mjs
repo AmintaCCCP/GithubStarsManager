@@ -299,8 +299,8 @@ export function parseFileList(raw) {
         return data.flatMap((f) => [f.filename, f.previous_filename].filter(Boolean));
       }
       if (data && typeof data === 'object') {
-        // If git comparison diverged (e.g. force-push tree rebase), conservative fallback to all scenes
-        if (data.status === 'diverged') {
+        // If git comparison diverged or rewound (e.g. force-push tree rebase/reset), conservative fallback to all scenes
+        if (data.status === 'diverged' || data.status === 'behind') {
           return ['*'];
         }
         const files = Array.isArray(data.files) ? data.files : [];
@@ -410,9 +410,7 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha, exec
       const output = executor(['api', url]);
       const filePaths = parseFileList(output);
       const paths = new Set(filePaths);
-      if (paths.size > 0) {
-        return [...paths];
-      }
+      return [...paths];
     } catch (err) {
       console.warn(`detect: compare failed (${err.message}); falling back to PR files`);
     }

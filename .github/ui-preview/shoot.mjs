@@ -38,18 +38,21 @@ const SCENES = [
     pluginUrl: '/plugins/repo-custom-fields/ui/index.html',
     pluginId: 'com.githubstarsmanager.repo-custom-fields',
     pageId: 'fields',
+    readySelector: '#head:not([hidden])',
   },
   {
     name: 'plugin-repo-info-card',
     pluginUrl: '/plugins/repo-info-card/ui/index.html',
     pluginId: 'com.githubstarsmanager.repo-info-card',
-    pageId: 'card',
+    pageId: 'info-card',
+    readySelector: '.style-grid > [role="radio"]',
   },
   {
     name: 'plugin-repo-insights',
     pluginUrl: '/plugins/repo-insights/ui/index.html',
     pluginId: 'com.githubstarsmanager.repo-insights',
     pageId: 'insights',
+    readySelector: '#head:not([hidden])',
   },
 ];
 
@@ -216,7 +219,11 @@ async function shootScene(browser, baseState, scene, url, outDir) {
           },
         }, '*');
       }, { pluginId: scene.pluginId, pageId: scene.pageId, repo: demoRepo });
-      await page.waitForTimeout(scene.settleMs ?? 1000);
+      if (scene.readySelector) {
+        await page.waitForSelector(scene.readySelector, { timeout: 15_000 });
+      }
+      await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 10_000 }).catch(() => {});
+      await page.waitForTimeout(scene.settleMs ?? 600);
       await page.screenshot({ path: shotPath, fullPage: true });
       console.log(`  ✓ ${scene.name} -> ${shotPath}`);
       return { scene: scene.name, path: shotPath };

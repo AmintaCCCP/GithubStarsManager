@@ -328,6 +328,47 @@ const syncDivergedPaths = collectChangedPaths({
 });
 check('synchronize with diverged compare triggers all scenes', mapPathsToScenes(syncDivergedPaths), ALL_SCENES);
 
+// Scenario D2: synchronize push where compare status is behind (rewind)
+const mockGhSyncBehind = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    return JSON.stringify({ status: 'behind', files: [] });
+  }
+  return '';
+};
+const syncBehindPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncBehind,
+});
+check('synchronize with behind compare triggers all scenes', mapPathsToScenes(syncBehindPaths), ALL_SCENES);
+
+// Scenario G: synchronize push where compare succeeds with 0 file changes
+const mockGhSyncEmptyCompare = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    return JSON.stringify({ status: 'identical', files: [] });
+  }
+  if (url.startsWith('repos/owner/repo/pulls/123/files')) {
+    // Should NOT be called
+    return JSON.stringify([{ filename: 'src/components/GistView.tsx' }]);
+  }
+  return '';
+};
+const syncEmptyPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncEmptyCompare,
+});
+check('synchronize with empty compare yields empty files without fallback', syncEmptyPaths, []);
+check('synchronize with empty compare yields no UI scenes', mapPathsToScenes(syncEmptyPaths), []);
+
 // Scenario E: synchronize push where compare list is truncated (>= 300 files)
 const mockGhSyncTruncated = (args) => {
   const url = args[1];
