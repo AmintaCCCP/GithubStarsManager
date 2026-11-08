@@ -166,6 +166,7 @@ const MAX_CACHE_SIZE = 500;
 const DEFAULT_ROOT_FONT_SIZE = 16;
 const ACTION_SLOT_WIDTH_REM = 1.75;
 const ACTION_SLOT_GAP_REM = 0.125;
+const PLUGIN_ACTION_TIMEOUT_MS = 30_000;
 
 const resolveActionSlotMetrics = () => {
   const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
@@ -225,6 +226,9 @@ interface OverflowActionRowProps {
   onFindSimilar?: () => void;
   persistFindSimilarInMenu?: boolean;
   pluginActions: RegisteredPluginAction[];
+  pluginActionRunsRef: React.MutableRefObject<Map<string, symbol>>;
+  runningPluginActionIds: Set<string>;
+  setRunningPluginActionIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   isActionsMenuOpen?: boolean;
   onActionsMenuOpenChange?: (open: boolean) => void;
   onAnalyze: () => void;
@@ -261,6 +265,9 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
   onFindSimilar,
   persistFindSimilarInMenu = false,
   pluginActions,
+  pluginActionRunsRef,
+  runningPluginActionIds,
+  setRunningPluginActionIds,
   isActionsMenuOpen,
   onActionsMenuOpenChange,
   onAnalyze,
@@ -283,8 +290,6 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
     }
     return map;
   }, [pluginActions]);
-  const inFlightPluginActionsRef = useRef(new Set<string>());
-
   const runPluginAction = async (action: RegisteredPluginAction) => {
     if (action.opensPage) {
       pluginPageSession.open({
@@ -298,14 +303,28 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
       return;
     }
     const actionId = makePluginActionId(action.pluginId, action.id);
-    if (inFlightPluginActionsRef.current.has(actionId)) return;
-    inFlightPluginActionsRef.current.add(actionId);
+    if (pluginActionRunsRef.current.has(actionId)) return;
+    const runToken = Symbol(actionId);
+    pluginActionRunsRef.current.set(actionId, runToken);
+    setRunningPluginActionIds((previous) => new Set(previous).add(actionId));
+    const isCurrentRun = () => pluginActionRunsRef.current.get(actionId) === runToken;
+    const timeout = window.setTimeout(() => {
+      if (!isCurrentRun()) return;
+      pluginActionRunsRef.current.delete(actionId);
+      setRunningPluginActionIds((previous) => {
+        const next = new Set(previous);
+        next.delete(actionId);
+        return next;
+      });
+      toast?.(t('repositoryCard.plugin-action-timed-out'), 'error');
+    }, PLUGIN_ACTION_TIMEOUT_MS);
     try {
       const operation = await pluginClient.runAction({
         pluginId: action.pluginId,
         actionId: action.id,
         repositories: [repository],
       });
+      if (!isCurrentRun()) return;
       if (!operation.success) {
         toast?.(operation.error.message, 'error');
         return;
@@ -314,9 +333,17 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
         await applyPluginActionResult(operation.result, toast, language);
       }
     } catch {
-      toast?.(t('repositoryCard.failed-to-apply-plugin-result'), 'error');
+      if (isCurrentRun()) toast?.(t('repositoryCard.failed-to-apply-plugin-result'), 'error');
     } finally {
-      inFlightPluginActionsRef.current.delete(actionId);
+      clearTimeout(timeout);
+      if (isCurrentRun()) {
+        pluginActionRunsRef.current.delete(actionId);
+        setRunningPluginActionIds((previous) => {
+          const next = new Set(previous);
+          next.delete(actionId);
+          return next;
+        });
+      }
     }
   };
 
@@ -435,16 +462,21 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
     if (isPluginActionId(id)) {
       const action = pluginActionMap.get(id);
       if (!action) return null;
+      const isRunning = runningPluginActionIds.has(id);
       return (
         <SelectionAwareButton
           key={id}
           onClick={() => void runPluginAction(action)}
+          disabled={isRunning}
+          aria-busy={isRunning}
           selectionMode={selectionMode}
           className={mutedIconButtonClass}
           title={action.title}
           aria-label={action.title}
         >
-          <PluginIcon pluginId={action.pluginId} icon={action.icon} className="w-4 h-4" />
+          {isRunning
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <PluginIcon pluginId={action.pluginId} icon={action.icon} className="w-4 h-4" />}
         </SelectionAwareButton>
       );
     }
@@ -455,12 +487,16 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
     if (isPluginActionId(id)) {
       const action = pluginActionMap.get(id);
       if (!action) return null;
+      const isRunning = runningPluginActionIds.has(id);
       return (
         <DropdownMenuItem
           key={id}
+          disabled={isRunning}
           onSelect={() => void runPluginAction(action)}
         >
-          <PluginIcon pluginId={action.pluginId} icon={action.icon} className="mr-2 h-3.5 w-3.5" />
+          {isRunning
+            ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            : <PluginIcon pluginId={action.pluginId} icon={action.icon} className="mr-2 h-3.5 w-3.5" />}
           {action.title}
         </DropdownMenuItem>
       );
@@ -575,6 +611,8 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const pluginActionRunsRef = useRef(new Map<string, symbol>());
+  const [runningPluginActionIds, setRunningPluginActionIds] = useState<Set<string>>(new Set());
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
   const releaseSheetOutsideDismissedAtRef = useRef<number | null>(null);
@@ -1174,6 +1212,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
                 onFindSimilar={handleFindSimilar}
                 persistFindSimilarInMenu
                 pluginActions={pluginActions.actions}
+                pluginActionRunsRef={pluginActionRunsRef}
+                runningPluginActionIds={runningPluginActionIds}
+                setRunningPluginActionIds={setRunningPluginActionIds}
                 isActionsMenuOpen={isActionsMenuOpen}
                 onActionsMenuOpenChange={setIsActionsMenuOpen}
                 onAnalyze={handleAIAnalyze}
@@ -1265,6 +1306,9 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
           isSubscribed={isSubscribed}
           unstarring={unstarring}
           pluginActions={pluginActions.actions}
+          pluginActionRunsRef={pluginActionRunsRef}
+          runningPluginActionIds={runningPluginActionIds}
+          setRunningPluginActionIds={setRunningPluginActionIds}
           isActionsMenuOpen={isActionsMenuOpen}
           onActionsMenuOpenChange={setIsActionsMenuOpen}
           onAnalyze={handleAIAnalyze}

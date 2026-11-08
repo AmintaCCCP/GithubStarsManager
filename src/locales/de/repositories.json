@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "Plugin-Ergebnisse können nicht angewendet werden",
+    "plugin-action-timed-out": "Zeitüberschreitung bei der Plugin-Aktion",
     "no-description": "(keine Beschreibung)",
     "no-description-available": "Noch keine Beschreibung",
     "analysis-failed-on-analyzetime-click-to-retry": "Die Analyse ist am {{analyzeTime}} fehlgeschlagen. Klicken Sie zum erneuten Analysieren",

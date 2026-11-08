@@ -195,6 +195,7 @@ afterEach(() => {
   cleanup();
   document.body.innerHTML = '';
   document.documentElement.style.removeProperty('font-size');
+  vi.useRealTimers();
   actionMocks.releaseSheet.suspend = null;
 });
 
@@ -873,10 +874,12 @@ describe('RepositoryCard view modes', () => {
     anchorClick.mockRestore();
   });
 
-  it('ignores repeated plugin action submissions while one is in flight', async () => {
-    let resolveRun: (value: unknown) => void = () => {};
+  it('keeps plugin action submissions deduplicated across row remounts and recovers after a timeout', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const resolvers: Array<(value: unknown) => void> = [];
     pluginClientMocks.runAction.mockImplementation(() => new Promise((resolve) => {
-      resolveRun = resolve;
+      resolvers.push(resolve);
     }));
     storeState.repositoryCardActions = [
       { id: 'plugin:com.example.dupe:export-card', visible: true },
@@ -908,26 +911,43 @@ describe('RepositoryCard view modes', () => {
       invalidPlugins: [],
     });
 
-    render(
+    const renderCard = (viewMode: 'list' | 'grid') => (
       <DialogProvider>
         <TooltipProvider>
-          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+          <RepositoryCard repository={repository} allCategories={[]} viewMode={viewMode} />
         </TooltipProvider>
-      </DialogProvider>,
+      </DialogProvider>
     );
 
+    const { rerender } = render(renderCard('list'));
     const pluginButton = await screen.findByRole('button', { name: '导出卡片' });
+    vi.useFakeTimers();
     fireEvent.click(pluginButton);
     fireEvent.click(pluginButton);
     expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+    expect(pluginButton).toBeDisabled();
 
+    // The lock lives on the card, so switching views remounts the row without resetting it.
+    rerender(renderCard('grid'));
+    fireEvent.click(screen.getByRole('button', { name: '导出卡片' }));
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+
+    // A hung IPC call must release the lock so the user can retry.
     await act(async () => {
-      resolveRun({ success: true, result: { type: 'notice', level: 'info', message: 'done' } });
+      vi.advanceTimersByTime(30_000);
       await Promise.resolve();
     });
-
-    fireEvent.click(pluginButton);
+    const retryButton = screen.getByRole('button', { name: '导出卡片' });
+    expect(retryButton).toBeEnabled();
+    fireEvent.click(retryButton);
     expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(2);
+
+    // The first run resolving after its timeout must not apply a late result.
+    await act(async () => {
+      resolvers[0]({ success: true, result: { type: 'text', content: 'late', suggestedAction: 'copy' } });
+      await Promise.resolve();
+    });
+    expect(writeText).not.toHaveBeenCalled();
   });
 });
 

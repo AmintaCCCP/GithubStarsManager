@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "플러그인 결과를 적용할 수 없습니다.",
+    "plugin-action-timed-out": "플러그인 작업 시간이 초과되었습니다",
     "no-description": "(설명 없음)",
     "no-description-available": "아직 설명이 없습니다",
     "analysis-failed-on-analyzetime-click-to-retry": "{{analyzeTime}} 분석에 실패했습니다. 다시 분석하려면 클릭하세요.",

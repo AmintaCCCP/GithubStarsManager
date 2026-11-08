@@ -45,6 +45,7 @@
   },
   "repositoryCard": {
     "failed-to-apply-plugin-result": "無法應用插件結果",
+    "plugin-action-timed-out": "外掛操作逾時",
     "no-description": "（無描述）",
     "no-description-available": "暫無描述",
     "analysis-failed-on-analyzetime-click-to-retry": "分析失敗於 {{analyzeTime}}，點選重新分析",
