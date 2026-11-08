@@ -105,7 +105,7 @@ function parseArgs(argv) {
     const flag = argv[i];
     if (flag === '--url') args.url = argv[++i];
     else if (flag === '--out') args.out = argv[++i];
-    else if (flag === '--only') args.only = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
+    else if (flag === '--only') args.only = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     else {
       console.error(`Unknown argument: ${flag}`);
       process.exitCode = 2;
@@ -197,7 +197,7 @@ async function main() {
   if (!args) return;
 
   let scenes = SCENES;
-  if (args.only) {
+  if (args.only && args.only.length > 0 && !args.only.includes('all')) {
     const known = new Set(SCENES.map((s) => s.name));
     const unknown = args.only.filter((name) => !known.has(name));
     if (unknown.length > 0) {

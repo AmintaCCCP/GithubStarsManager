@@ -1,26 +1,35 @@
 # UI preview
 
 `.github/workflows/ui-preview.yml` shows reviewers what a pull request does to
-the UI. When a PR touches UI code (`src/`, `public/`, `LandingPage/`, root
-`index.html`, `tailwind.config.js`, `postcss.config.js`, `vite.config.ts`) or
-carries the `ui-preview` label, the workflow:
+the UI. When a commit touches UI code (or the PR carries the `ui-preview`
+label), the workflow:
 
-1. **detect** decides whether the PR is a UI change (reads the PR's changed
-   files; the scripts run from the default branch, never from the PR).
+1. **detect** decides whether the commit has UI adjustments and maps them to
+   specific scenes.
+   - Non-UI paths (tests, docs, backend services, store persistence, types,
+     utils, and build configs) are ignored. If no UI adjustments exist, `ui` is
+     set to `false` and subsequent jobs are skipped.
+   - On `synchronize` (new push), `detect` inspects the commit/push diff so
+     commits that don't adjust the UI don't trigger unnecessary runs.
+   - Modified UI files are mapped to the affected views/scenes (`gists`,
+     `releases`, `forks`, `discovery`, `settings`, plugin UI in `examples/plugins/**/ui/**` /
+     `manifest.json` to `repositories-light`, `repositories-dark`, and `settings`).
+     Changes to global elements (`App.tsx`, `Header.tsx`, global styles, primitives)
+     trigger all scenes.
 2. **build** checks out the PR and builds it with `npx vite build`; the
    static bundle is uploaded as an artifact. **shoot** then runs on a clean
    runner with zero PR code: it serves the downloaded bundle and runs
-   `shoot.mjs` — Playwright loads each scene in a fresh browser context
-   seeded with the demo data in `fixtures/demo-state.json` and takes a 2x
-   screenshot.
+   `shoot.mjs` with `--only <scenes>` — Playwright loads only the affected
+   scenes in fresh browser contexts seeded with demo data from
+   `fixtures/demo-state.json` and takes 2x screenshots.
 3. **publish** pushes the screenshots to the `ui-previews` branch under
    `pr-<n>/<sha>/` and upserts a single PR comment (located by the
    `<!-- ui-preview:begin -->` marker) embedding them. New commits replace the
    screenshots and refresh the same comment; a failed run updates the comment
    with a failure notice instead.
 
-Every new commit that touches the UI re-runs the whole pipeline, so the
-comment always shows the latest pushed state.
+Every new commit that touches the UI re-runs only for the affected pages,
+keeping comments concise and CI fast.
 
 ## Scenes
 

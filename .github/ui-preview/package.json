@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Standalone tooling for the ui-preview workflow (screenshot pipeline only; never installed from the app root).",
+  "scripts": {
+    "test": "node test-detect.mjs && node test-png.mjs"
+  },
   "devDependencies": {
     "playwright": "^1.58.0"
   }
