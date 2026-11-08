@@ -5,6 +5,7 @@ import type { InstalledPlugin } from '../../plugins/types';
 import {
   PLUGIN_ICON_CHOICES,
   PluginIcon,
+  getPluginIconLabel,
   normalizePluginIconKey,
 } from '../../plugins/pluginIcons';
 import { useAppStore } from '../../store/useAppStore';
@@ -34,7 +35,6 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
   const customIcons = useAppStore((state) => state.pluginCustomIcons);
   const setPluginCustomIcon = useAppStore((state) => state.setPluginCustomIcon);
   const language = useAppStore((state) => state.language);
-  const isZh = language === 'zh' || language === 'zh-TW';
 
   const pluginId = target?.manifest.id;
   const currentIconKey = pluginId ? customIcons[pluginId] : undefined;
@@ -44,8 +44,8 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
     ? PLUGIN_ICON_CHOICES.find((choice) => choice.key === normalizedCurrent)
     : null;
   const previewIconLabel = currentChoice
-    ? (isZh ? currentChoice.labelZh : currentChoice.label)
-    : currentIconKey || (isZh ? 'plug (默认)' : 'plug (default)');
+    ? getPluginIconLabel(currentChoice, language)
+    : currentIconKey || getPluginIconLabel(PLUGIN_ICON_CHOICES[0], language);
 
   const filteredIcons = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -53,8 +53,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
     return PLUGIN_ICON_CHOICES.filter(
       (choice) =>
         choice.key.toLowerCase().includes(query) ||
-        choice.label.toLowerCase().includes(query) ||
-        choice.labelZh.toLowerCase().includes(query) ||
+        Object.values(choice.labels).some((label) => label.toLowerCase().includes(query)) ||
         choice.keywords.toLowerCase().includes(query),
     );
   }, [search]);
@@ -123,8 +122,8 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
           {filteredIcons.map((choice) => {
             const isSelected = normalizedCurrent === choice.key || (!normalizedCurrent && choice.key === 'plug');
             const IconComp = choice.icon;
-            const choiceLabel = isZh ? choice.labelZh : choice.label;
-            const choiceTitle = isZh ? `${choice.labelZh} (${choice.label})` : `${choice.label} (${choice.labelZh})`;
+            const choiceLabel = getPluginIconLabel(choice, language);
+            const choiceTitle = language === 'en' ? choiceLabel : `${choiceLabel} (${choice.labels.en})`;
             return (
               <button
                 key={choice.key}

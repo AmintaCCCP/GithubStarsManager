@@ -739,14 +739,31 @@ describe('RepositoryCard view modes', () => {
 
   it('executes worker action when plugin action has no opensPage', async () => {
     const user = userEvent.setup();
-    const mockRunAction = vi.fn().mockResolvedValue({
-      success: true,
-      result: { type: 'copy', text: 'card markdown' },
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
     });
+    const createObjectURL = vi.fn(() => 'blob:plugin-output');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const mockRunAction = vi
+      .fn()
+      .mockResolvedValueOnce({
+        success: true,
+        result: { type: 'text', content: 'card markdown', suggestedAction: 'copy' },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        result: { type: 'text', content: 'card markdown', suggestedAction: 'save' },
+      });
     pluginClientMocks.runAction.mockImplementation(mockRunAction);
 
     storeState.repositoryCardActions = [
       { id: 'plugin:com.example.worker:export-card', visible: true },
+      { id: 'plugin:com.example.worker:save-card', visible: true },
       ...DEFAULT_REPOSITORY_CARD_ACTIONS,
     ];
 
@@ -768,6 +785,12 @@ describe('RepositoryCard view modes', () => {
                   title: '导出卡片',
                   placement: 'repository-card',
                   icon: 'file-text',
+                },
+                {
+                  id: 'save-card',
+                  title: '保存卡片',
+                  placement: 'repository-card',
+                  icon: 'download',
                 },
               ],
             },
@@ -797,6 +820,18 @@ describe('RepositoryCard view modes', () => {
       actionId: 'export-card',
       repositories: [repository],
     });
+    expect(writeText).toHaveBeenCalledWith('card markdown');
+
+    await user.click(screen.getByRole('button', { name: '保存卡片' }));
+    expect(mockRunAction).toHaveBeenLastCalledWith({
+      pluginId: 'com.example.worker',
+      actionId: 'save-card',
+      repositories: [repository],
+    });
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:plugin-output');
+    anchorClick.mockRestore();
   });
 });
 

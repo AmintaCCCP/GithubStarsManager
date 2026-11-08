@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PluginIconPickerDialog } from './PluginIconPickerDialog';
 import { useAppStore } from '../../store/useAppStore';
@@ -41,6 +41,7 @@ describe('PluginIconPickerDialog', () => {
 
     mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
       const state = {
+        language: 'zh',
         pluginCustomIcons: {},
         setPluginCustomIcon,
       };
@@ -72,6 +73,7 @@ describe('PluginIconPickerDialog', () => {
 
     mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
       const state = {
+        language: 'zh',
         pluginCustomIcons: {},
         setPluginCustomIcon: vi.fn(),
       };
@@ -100,6 +102,7 @@ describe('PluginIconPickerDialog', () => {
 
     mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
       const state = {
+        language: 'zh',
         pluginCustomIcons: { 'com.example.test-plugin': 'rocket' },
         setPluginCustomIcon,
       };
@@ -129,6 +132,7 @@ describe('PluginIconPickerDialog', () => {
 
     mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
       const state = {
+        language: 'zh',
         pluginCustomIcons: {},
         setPluginCustomIcon,
       };
@@ -160,6 +164,11 @@ describe('PluginIconPickerDialog', () => {
     );
 
     expect(screen.getByPlaceholderText(/search icons/i)).toHaveValue('');
+
+    await user.type(screen.getByPlaceholderText(/search icons/i), 'rocket');
+    rerender(<PluginIconPickerDialog target={null} t={t} onClose={onClose} />);
+    rerender(<PluginIconPickerDialog target={dummyPlugin} t={t} onClose={onClose} />);
+    expect(screen.getByPlaceholderText(/search icons/i)).toHaveValue('');
   });
 
   it('indicates selected icon via aria-pressed and adapts label according to language', () => {
@@ -190,6 +199,37 @@ describe('PluginIconPickerDialog', () => {
 
     // Both the preview and the grid button label display 'Rocket'
     expect(screen.getAllByText('Rocket')).toHaveLength(2);
+    const previewLabel = screen
+      .getAllByText('Rocket')
+      .find((node) => node.closest('button') === null);
+    expect(previewLabel?.parentElement?.querySelector('.lucide-rocket')).toBeInTheDocument();
+  });
+
+  it('displays and searches localized Spanish icon names', () => {
+    mockUseAppStore.mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = {
+        language: 'es',
+        pluginCustomIcons: { 'com.example.test-plugin': 'rocket' },
+        setPluginCustomIcon: vi.fn(),
+      };
+      return selector ? selector(state) : state;
+    }) as unknown as typeof useAppStore);
+
+    render(
+      <PluginIconPickerDialog
+        target={dummyPlugin}
+        t={t}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText('Cohete / Publicación')).toHaveLength(2);
+
+    const searchInput = screen.getByPlaceholderText('Search icons…');
+    fireEvent.change(searchInput, { target: { value: 'cohete' } });
+
+    expect(screen.getByRole('button', { name: /Cohete/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Bot/i })).not.toBeInTheDocument();
   });
 
   it('displays full Chinese labels and localized preview when language is zh', () => {
