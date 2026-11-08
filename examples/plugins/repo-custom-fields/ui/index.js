@@ -46,6 +46,7 @@
       dragTitle: '拖动排序',
       removeTitle: '删除字段',
       namePlaceholder: '字段名称（必填）',
+      namePlaceholderLink: '名称（可留空，留空时显示链接本身）',
       valuePlaceholderText: '内容',
       valuePlaceholderNote: '支持 Markdown 或代码（按下方格式渲染）',
       valuePlaceholderLink: 'https://example.com',
@@ -85,6 +86,7 @@
       dragTitle: 'Drag to reorder',
       removeTitle: 'Remove field',
       namePlaceholder: 'Field name (required)',
+      namePlaceholderLink: 'Name (optional; the URL is shown when empty)',
       valuePlaceholderText: 'Content',
       valuePlaceholderNote: 'Markdown or code, rendered with the format below',
       valuePlaceholderLink: 'https://example.com',
@@ -110,6 +112,10 @@
   const pending = new Map();
   let nextRequestId = 0;
 
+  /** 向宿主发送一条 plugin-page 能力请求，返回解析后的响应 Promise。
+   * @param {string} method 桥方法名
+   * @param {object} args 方法参数
+   * @returns {Promise<unknown>} */
   function request(method, args) {
     if (!token) return Promise.reject(new Error(str().bridgeNotReady));
     const requestId = String(++nextRequestId);
@@ -143,6 +149,9 @@
 
   function str() { return state.language === 'zh' ? STR.zh : STR.en; }
 
+  /** 更新底部状态栏文案与错误态。
+   * @param {string} message 可空，空串表示清空
+   * @param {boolean} isError 是否以错误色显示 */
   function setStatus(message, isError = false) {
     const node = $('status');
     node.textContent = message || '';
@@ -164,11 +173,17 @@
 
   /* ── 初始化 ───────────────────────────────────────────────────────── */
 
+  /** 按宿主下发的界面语言切换文案语言，并同步 html lang。
+   *  仅中文（zh*）与英文两套文案，其余语言回落到英文。
+   * @param {unknown} language */
   function applyLanguage(language) {
     state.language = String(language || 'en').toLowerCase().startsWith('zh') ? 'zh' : 'en';
     document.documentElement.lang = state.language === 'zh' ? 'zh' : 'en';
   }
 
+  /** 处理 host 的 plugin-page:init：应用语言/主题、解析仓库上下文、加载字段。
+   *  编辑途中收到同仓库的重复 init（README 就位后宿主补发）时保持页面不变。
+   * @param {object} context { repository?, readme?, language, theme } */
   function handleInit(context) {
     applyLanguage(context.language);
     // 标签必须在应用语言之后刷新：首次以英文初始化时，默认中文标签会残留。
@@ -209,6 +224,7 @@
     }
   }
 
+  /** 渲染仓库标题行与工具条按钮的图标、标题和无障碍名称。 */
   function renderHead() {
     const [owner, name = ''] = String(state.repository.full_name).split('/');
     $('repo-owner').textContent = owner ? `${owner}/` : '';
@@ -230,6 +246,7 @@
     $('btn-retry').setAttribute('aria-label', str().retry);
   }
 
+  /** 渲染副标题：字段数量提示。 */
   function renderSubtitle() {
     const count = state.doc.fields.length;
     $('repo-subtitle').textContent = count > 0
@@ -237,6 +254,9 @@
       : str().subtitleEmpty;
   }
 
+  /** 读取当前仓库的字段文档。失败时置 failed 并保留错误提示，
+   *  由重试按钮再次触发；读取未完成前编辑入口不可用。
+   *  过期响应（期间切换了仓库）按 repoKey 比对后丢弃。 */
   async function loadDoc() {
     // 在选择器里快速换仓库时，旧请求可能后到：用发起时的键比对，过期响应丢弃。
     const key = state.repoKey;
@@ -261,12 +281,15 @@
     refreshControls();
   }
 
+  /** 重试读取：仅在非加载中、非保存中时可用。 */
   async function retryLoad() {
     if (state.loadState === 'loading' || state.saving) return;
     await loadDoc();
   }
 
   /** 统一收敛工具条状态：读取未完成时不给编辑入口，保存途中锁住编辑与取消。 */
+  /** 收敛工具条与编辑控件的可用状态。
+   *  统一处理：读取未完成不给编辑入口、保存途中锁定编辑与取消。 */
   function refreshControls() {
     const ready = state.loadState === 'ready' && !state.saving;
     $('btn-edit').hidden = state.mode !== 'view' || !ready;
@@ -284,6 +307,7 @@
 
   /* ── 预览视图 ─────────────────────────────────────────────────────── */
 
+  /** 进入预览视图：丢弃草稿，按已保存文档渲染。 */
   function enterView() {
     if (state.saving) return;
     state.mode = 'view';
@@ -295,6 +319,7 @@
     renderView();
   }
 
+  /** 渲染预览列表：文本/说明显示标签行，链接以名称（无名称时用 URL）作为链接文字。 */
   function renderView() {
     renderSubtitle();
     const list = $('field-list');
@@ -356,12 +381,16 @@
 
   /* ── 编辑视图 ─────────────────────────────────────────────────────── */
 
+  /** 创建一条空草稿。
+   * @param {'text'|'note'|'link'} type
+   * @returns {object} */
   function newDraft(type) {
     const draft = { id: `f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`, type, name: '', value: '' };
     if (type === 'note') draft.format = 'markdown';
     return draft;
   }
 
+  /** 进入编辑视图：以已保存文档的浅拷贝作为草稿，读取未完成时拒绝进入。 */
   function enterEdit() {
     // 读取未完成（或失败）时不进编辑：空草稿保存会覆盖已存字段。
     if (state.loadState !== 'ready' || state.saving) return;
@@ -374,6 +403,7 @@
     renderEdit();
   }
 
+  /** 渲染编辑列表：名称、值编辑器、格式切换、删除与拖拽把手，并绑定拖拽事件。 */
   function renderEdit() {
     const list = $('edit-list');
     list.textContent = '';
@@ -424,7 +454,7 @@
       nameInput.type = 'text';
       nameInput.className = 'name-input';
       nameInput.maxLength = M.MAX_NAME_CHARS;
-      nameInput.placeholder = str().namePlaceholder;
+      nameInput.placeholder = draft.type === 'link' ? str().namePlaceholderLink : str().namePlaceholder;
       nameInput.value = draft.name;
       nameInput.dataset.role = 'name';
       nameInput.addEventListener('input', () => { draft.name = nameInput.value; });
@@ -458,6 +488,9 @@
     refreshControls();
   }
 
+  /** 构建说明字段的 Markdown / 代码 二选一切换控件。
+   * @param {object} draft 当前行草稿
+   * @returns {HTMLDivElement} */
   function buildFormatSwitch(draft) {
     const wrap = document.createElement('div');
     wrap.className = 'format-switch';
@@ -476,6 +509,9 @@
     return wrap;
   }
 
+  /** 按字段类型构建值编辑器：链接用 url 输入框，说明用 textarea，文本用单行输入框。
+   * @param {object} draft 当前行草稿
+   * @returns {HTMLInputElement|HTMLTextAreaElement} */
   function buildValueEditor(draft) {
     const editor = draft.type === 'note'
       ? document.createElement('textarea')
@@ -498,6 +534,9 @@
   const dragBound = new WeakSet();
 
   /** 把 from 行移动到 to 位置（越界忽略），并按键盘焦点恢复焦点位置。 */
+  /** 把 from 行移动到 to 位置并恢复焦点；越界或原位移动直接忽略。
+   * @param {number} from
+   * @param {number} to */
   function moveRow(from, to) {
     if (to < 0 || to >= state.drafts.length || from === to) return;
     const [moved] = state.drafts.splice(from, 1);
@@ -507,6 +546,10 @@
     rows[to]?.querySelector('.drag-handle')?.focus();
   }
 
+  /** 为一行绑定 HTML5 拖拽：只有按下把手才进入可拖拽状态，落点在行中线上/下
+   *  决定插到前面还是后面。必须在渲染时绑定，否则首次按压收不到 pointerdown。
+   * @param {HTMLElement} row 行元素
+   * @param {number} index 该行在草稿数组中的下标 */
   function bindDragHandlers(row, index) {
     if (dragBound.has(row)) return;
     const handle = row.querySelector('.drag-handle');
@@ -552,6 +595,8 @@
 
   /* ── 保存 ─────────────────────────────────────────────────────────── */
 
+  /** 校验草稿并写入插件 storage。
+   *  校验失败在对应行标注原因，文档超限写入状态栏；保存途中禁止改动与取消。 */
   async function saveEdits() {
     // 读取未完成或已有保存在途时直接忽略：草稿可能不完整，或旧响应会覆盖新改动。
     if (state.loadState !== 'ready' || state.saving) return;
@@ -575,6 +620,9 @@
     }
   }
 
+  /** 标注校验问题：先清掉上一轮标记，再按行号高亮并给出原因。
+   *  index < 0 表示文档整体超限，提示写入状态栏。
+   * @param {Array<{index:number, kind:string}>} problems */
   function markProblems(problems) {
     // 连续保存校验失败时先清掉上一轮的错误标记，避免消息重复或残留在别的行上。
     $('edit-list').querySelectorAll('.edit-row.invalid').forEach((row) => {
@@ -601,6 +649,8 @@
 
   /* ── 外链：统一经 shell.openExternal 桥打开 ───────────────────────── */
 
+  /** 经宿主 shell.openExternal 桥用系统浏览器打开外链。
+   * @param {string} url 已通过本地白名单校验的地址 */
   async function openExternal(url) {
     if (!M.isExternalUrl(url)) return;
     try {
@@ -625,6 +675,8 @@
 
   /* ── 仓库选择器（无上下文入口）────────────────────────────────────── */
 
+  /** 无仓库上下文入口的搜索：通过 repositories.search 找仓库并载入其字段。
+   *  用递增序号丢弃过期响应。 */
   async function runPickerSearch() {
     const query = $('picker-query').value.trim();
     const results = $('picker-results');
@@ -673,6 +725,7 @@
 
   /* ── 事件绑定与启动 ───────────────────────────────────────────────── */
 
+  /** 绑定工具条、添加按钮与选择器的一次性事件监听。 */
   function bindEvents() {
     $('btn-edit').addEventListener('click', enterEdit);
     $('btn-save').addEventListener('click', () => void saveEdits());
@@ -696,6 +749,7 @@
     $('btn-retry').addEventListener('click', () => void retryLoad());
   }
 
+  /** 按当前语言刷新添加按钮的文字（须在 applyLanguage 之后调用）。 */
   function applyAddButtonLabels() {
     const labels = { text: str().addText, note: str().addNote, link: str().addLink };
     document.querySelectorAll('.add-btn').forEach((button) => {

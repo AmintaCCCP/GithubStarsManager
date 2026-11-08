@@ -40,15 +40,26 @@
 
   /* ── 工具 ─────────────────────────────────────────────────────────── */
 
+  /** 是否为普通对象（排除 null 与数组），用于 JSON 数据的形状判定。
+   * @param {unknown} value
+   * @returns {boolean} */
   function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
+  /** 非字符串一律视为空串，并截断到给定上限。
+   * @param {unknown} value
+   * @param {number} max 最大保留字符数
+   * @returns {string} */
   function clampString(value, max) {
     return typeof value === 'string' ? value.slice(0, max) : '';
   }
 
   /** 回环、链路本地与 IPv6 唯一本地地址：与宿主 shell.openExternal 白名单一致。 */
+  /** 判断主机名是否属于回环、链路本地或 IPv6 唯一本地网段。
+   *  只看字面主机名，不解析 DNS。
+   * @param {string} hostname URL.hostname（IPv6 可能带方括号）
+   * @returns {boolean} */
   function isLoopbackOrLinkLocalHost(hostname) {
     const host = String(hostname).toLowerCase().replace(/^\[/, '').replace(/\]$/, '').replace(/\.$/, '');
     if (host === 'localhost' || host.endsWith('.localhost')) return true;
@@ -91,6 +102,9 @@
     return true;
   }
 
+  /** HTML 实体转义（& < > " '），所有动态文本拼接前的必经步骤。
+   * @param {unknown} value
+   * @returns {string} */
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, (c) => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -99,6 +113,8 @@
 
   /* ── 文档读取与规整 ────────────────────────────────────────────────── */
 
+  /** 空文档：新仓库或读取失败时的初始值。
+   * @returns {{ schema: number, fields: Array<object> }} */
   function emptyDoc() {
     return { schema: SCHEMA, fields: [] };
   }
@@ -207,6 +223,11 @@
   const INLINE_TOKEN_RE =
     /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*)|(~~[^~\n]+~~)|(\[[^\]\n]*\]\([^()\s]+\))|(https?:\/\/[^\s<>]+)/g;
 
+  /** 行内标记单遍分词器：在原始文本上定位标记，再逐段转义输出。
+   *  覆盖行内代码、粗体、斜体、删除线、[文本](url) 与裸 URL；
+   *  链接只生成 data-url，由页面统一经外链桥打开。
+   * @param {string} text
+   * @returns {string} 安全 HTML */
   function renderInlineSegment(text) {
     let out = '';
     let cursor = 0;
@@ -256,6 +277,9 @@
     return out;
   }
 
+  /** 把单个行内片段渲染成安全 HTML（文档内的行内标记入口）。
+   * @param {unknown} text
+   * @returns {string} */
   function renderInline(text) {
     return renderInlineSegment(String(text));
   }
