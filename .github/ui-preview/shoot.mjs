@@ -99,13 +99,25 @@ function buildGitHubApiMock(baseState) {
   };
 }
 
+/**
+ * Parse and validate CLI arguments for the screenshot runner.
+ * @param {string[]} argv - Command line argument array (without node or script path).
+ * @returns {{ url: string, out: string, only: string[] | null } | null}
+ */
 function parseArgs(argv) {
   const args = { url: 'http://127.0.0.1:4173', out: path.join(SCRIPT_DIR, '.shots'), only: null };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--url') args.url = argv[++i];
     else if (flag === '--out') args.out = argv[++i];
-    else if (flag === '--only') args.only = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    else if (flag === '--only') {
+      args.only = (argv[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (args.only.length === 0) {
+        console.error('--only requires at least one scene');
+        process.exitCode = 2;
+        return null;
+      }
+    }
     else {
       console.error(`Unknown argument: ${flag}`);
       process.exitCode = 2;
@@ -135,6 +147,15 @@ async function gotoForSeeding(page, url) {
   await page.waitForFunction(() => document.readyState !== 'uninitialized');
 }
 
+/**
+ * Take a screenshot for a single scene inside a hermetic browser context.
+ * @param {import('playwright').Browser} browser - Active Playwright browser instance.
+ * @param {object} baseState - Base demo state fixture.
+ * @param {object} scene - Scene configuration describing views and store overrides.
+ * @param {string} url - Base preview server URL.
+ * @param {string} outDir - Directory where the screenshot PNG will be saved.
+ * @returns {Promise<{ scene: string, path: string }>} Resulting screenshot record.
+ */
 async function shootScene(browser, baseState, scene, url, outDir) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -192,6 +213,9 @@ async function shootScene(browser, baseState, scene, url, outDir) {
   }
 }
 
+/**
+ * Main entry point for the screenshot recording runner.
+ */
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args) return;

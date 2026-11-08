@@ -7,15 +7,16 @@ label), the workflow:
 1. **detect** decides whether the commit has UI adjustments and maps them to
    specific scenes.
    - Non-UI paths (tests, docs, backend services, store persistence, types,
-     utils, and build configs) are ignored. If no UI adjustments exist, `ui` is
-     set to `false` and subsequent jobs are skipped.
+     non-UI utilities, and tooling configs such as `tsconfig.json`) are ignored.
+     If no UI adjustments exist, `ui` is set to `false` and subsequent jobs are skipped.
    - On `synchronize` (new push), `detect` inspects the commit/push diff so
      commits that don't adjust the UI don't trigger unnecessary runs.
    - Modified UI files are mapped to the affected views/scenes (`gists`,
      `releases`, `forks`, `discovery`, `settings`, plugin UI in `examples/plugins/**/ui/**` /
      `manifest.json` to `repositories-light`, `repositories-dark`, and `settings`).
-     Changes to global elements (`App.tsx`, `Header.tsx`, global styles, primitives)
-     trigger all scenes.
+     Changes to global elements (`App.tsx`, `Header.tsx`, global styles, primitives,
+     or styling/bundling configs like `tailwind.config.js`, `postcss.config.js`,
+     and `vite.config.ts`) trigger all seven scenes.
 2. **build** checks out the PR and builds it with `npx vite build`; the
    static bundle is uploaded as an artifact. **shoot** then runs on a clean
    runner with zero PR code: it serves the downloaded bundle and runs

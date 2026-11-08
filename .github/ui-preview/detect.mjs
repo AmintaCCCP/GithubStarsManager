@@ -16,6 +16,10 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+/**
+ * All recognized UI preview scenes in canonical recording order.
+ * @type {string[]}
+ */
 const ALL_SCENES = [
   'repositories-light',
   'repositories-dark',
@@ -26,6 +30,10 @@ const ALL_SCENES = [
   'settings',
 ];
 
+/**
+ * Mapping from high-level view identifier to the preview scene names it renders.
+ * @type {Record<string, string[]>}
+ */
 const VIEW_TO_SCENES = {
   repositories: ['repositories-light', 'repositories-dark'],
   gists: ['gists'],
@@ -38,9 +46,12 @@ const VIEW_TO_SCENES = {
 /**
  * Patterns for files that do NOT constitute UI changes.
  * Changes touching only files matching these patterns will result in ui=false.
+ * Note: build/styling configs like tailwind.config.js, postcss.config.js, and vite.config.ts
+ * are intentionally NOT ignored; they trigger all scenes.
+ * @type {RegExp[]}
  */
 const IGNORED_PATTERNS = [
-  // Test suites and fixtures
+  // Test suites, unit tests, and fixtures
   /\.(test|spec)\.[jt]sx?$/,
   /(?:^|\/)__tests__\//,
   /^src\/test\//,
@@ -50,7 +61,7 @@ const IGNORED_PATTERNS = [
   /^docs\//,
   /^(LICENSE|LICENCE|\.gitignore|\.gitattributes|version-info\.xml)$/i,
 
-  // CI, IDE, linters, tooling configs
+  // CI, IDE, linters, tooling configs (excluding UI styling configs)
   /^\.github\//,
   /^\.vscode\//,
   /^\.editorconfig$/,
@@ -68,28 +79,37 @@ const IGNORED_PATTERNS = [
   // Landing page website (separate static site, not in the app bundle / preview)
   /^LandingPage\//,
 
-  // Non-UI application logic (services, storage, types, utils)
+  // Non-UI application logic (services, persistence storage, normalizers, helpers)
   /^src\/services\//,
   /^src\/store\/persistence\//,
   /^src\/store\/normalizers\//,
   /^src\/store\/helpers\//,
   /^src\/types\/(?!themeTokens\b)/,
-  /^src\/utils\/(?!themeTokens\b)/,
   /^src\/polyfills\.ts$/,
   /^src\/vite-env\.d\.ts$/,
+
+  // Non-UI utility modules (network, crypto, encoding, platform, logging)
+  /^src\/utils\/(lanAddress|cryptoRandom|abortUtils|domTextScanner|logSanitizer|backendErrors|apiUrlBuilder|backendUrl|deviceTarget|formatBytes|sanitizeSchema|textLanguage|clipboardUtils|licenseFilter|logEventTypes)\.[jt]s$/,
 
   // Package manifests
   /^package(-lock)?\.json$/,
 ];
 
+/**
+ * Check whether a file path is non-UI and should be ignored during UI change detection.
+ * @param {string} filePath - Path of the file relative to repository root.
+ * @returns {boolean} True if the path is non-UI and should be ignored.
+ */
 export function isIgnoredPath(filePath) {
   const normalized = filePath.replace(/\\/g, '/');
   return IGNORED_PATTERNS.some((pattern) => pattern.test(normalized));
 }
 
 /**
- * Classify a changed path to its affected view:
- * 'repositories' | 'gists' | 'releases' | 'forks' | 'discovery' | 'settings' | 'global' | Array | null
+ * Classify a changed path to its affected view identifier or list of view identifiers.
+ * Returns null if the file is ignored or does not affect UI.
+ * @param {string} filePath - Path of the file relative to repository root.
+ * @returns {'repositories' | 'gists' | 'releases' | 'forks' | 'discovery' | 'settings' | 'global' | string[] | null}
  */
 export function classifyPath(filePath) {
   const path = filePath.replace(/\\/g, '/');
@@ -102,7 +122,8 @@ export function classifyPath(filePath) {
     path.startsWith('src/features/gists/') ||
     /^src\/components\/Gist/i.test(path) ||
     /^src\/locales\/[^/]+\/gists\.json$/.test(path) ||
-    path === 'src/store/slices/gistSlice.ts'
+    path === 'src/store/slices/gistSlice.ts' ||
+    path === 'src/utils/gistUtils.ts'
   ) {
     return 'gists';
   }
@@ -115,7 +136,8 @@ export function classifyPath(filePath) {
     /^src\/components\/InstallableAssetRecommendation\./.test(path) ||
     /^src\/components\/SiWindows\./.test(path) ||
     /^src\/hooks\/useReleaseArtifactActions\./.test(path) ||
-    /^src\/locales\/[^/]+\/releases\.json$/.test(path)
+    /^src\/locales\/[^/]+\/releases\.json$/.test(path) ||
+    /^src\/utils\/(releaseAssets|assetFilters|assetCompatibility|installableAssets|releaseDownloadLinks|releaseSources)\.[jt]s$/.test(path)
   ) {
     return 'releases';
   }
@@ -139,7 +161,8 @@ export function classifyPath(filePath) {
     /^src\/components\/XTweetModal\./.test(path) ||
     /^src\/components\/WeeklyIssueModal\./.test(path) ||
     /^src\/locales\/[^/]+\/discovery\.json$/.test(path) ||
-    path === 'src/store/slices/discoverySlice.ts'
+    path === 'src/store/slices/discoverySlice.ts' ||
+    /^src\/utils\/(discoveryFeeds|discoveryRss|trendingSnapshots|telegramFollows|xTweetFollows)\.[jt]s$/.test(path)
   ) {
     return 'discovery';
   }
@@ -187,7 +210,8 @@ export function classifyPath(filePath) {
     /^src\/components\/WorkspacePageHeader\./.test(path) ||
     /^src\/locales\/[^/]+\/(repositories|chat|search)\.json$/.test(path) ||
     path === 'src/store/slices/repositorySlice.ts' ||
-    path === 'src/store/slices/categorySlice.ts'
+    path === 'src/store/slices/categorySlice.ts' ||
+    /^src\/utils\/(repoSearch|categoryUtils|repositoryCardFields|repositoryCardActions|repositoryHealth|repositoryIdentity|repositoryMerge)\.[jt]s$/.test(path)
   ) {
     return 'repositories';
   }
@@ -221,6 +245,7 @@ export function classifyPath(filePath) {
     /^src\/components\/SortAlgorithmTooltip\./.test(path) ||
     /^src\/constants\/themePresets\./.test(path) ||
     /^src\/(types|utils)\/themeTokens\./.test(path) ||
+    /^src\/utils\/(markdownUtils|markdownSplitter|citationPostprocess)\.[jt]s$/.test(path) ||
     /^src\/lib\/themePresets\./.test(path) ||
     /^src\/locales\/[^/]+\/(common|app|login)\.json$/.test(path) ||
     path === 'src/store/slices/preferenceSlice.ts' ||
@@ -243,7 +268,9 @@ export function classifyPath(filePath) {
 
 /**
  * Given an array of changed file paths, determine which scenes to capture.
- * Returns an array of scene names (e.g. ['gists'], or all scenes). Empty array if no UI changes.
+ * Returns an array of scene names in canonical order. Empty array if no UI changes.
+ * @param {string[]} paths - Changed file paths.
+ * @returns {string[]} Selected scene names.
  */
 export function mapPathsToScenes(paths) {
   const views = new Set();
@@ -280,10 +307,20 @@ export function mapPathsToScenes(paths) {
 const FILES_PER_PAGE = 100;
 const MAX_PAGES = 100;
 
+/**
+ * Execute the GitHub CLI with the specified arguments.
+ * @param {string[]} args - CLI arguments to pass to `gh`.
+ * @returns {string} Output string from the CLI command.
+ */
 function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
 }
 
+/**
+ * Ensure an environment variable is present and return its trimmed value.
+ * @param {string} name - Name of the environment variable.
+ * @returns {string} The non-empty environment variable value.
+ */
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -297,8 +334,16 @@ function requireEnv(name) {
  * Collect changed paths from GitHub API.
  * - When action is 'synchronize', inspects the commit/push range (BEFORE_SHA...HEAD_SHA) or HEAD_SHA.
  * - Otherwise (opened, reopened, labeled, dispatch), inspects all changed files of the pull request.
+ * @param {object} params
+ * @param {string} params.repo - Repository in "owner/repo" format.
+ * @param {number} params.pr - Pull request number.
+ * @param {string} [params.action] - GitHub event action (e.g. 'synchronize', 'opened').
+ * @param {string} [params.beforeSha] - Previous head SHA for synchronize events.
+ * @param {string} [params.headSha] - Current head commit SHA.
+ * @param {Function} [params.executor] - Command execution function (defaults to gh).
+ * @returns {string[]} Array of unique changed file paths.
  */
-export function collectChangedPaths({ repo, pr, action, beforeSha, headSha }) {
+export function collectChangedPaths({ repo, pr, action, beforeSha, headSha, executor = gh }) {
   const isSha = (s) => typeof s === 'string' && /^[0-9a-f]{40}$/i.test(s.trim()) && !/^0+$/.test(s.trim());
 
   if (action === 'synchronize') {
@@ -306,7 +351,7 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha }) {
       try {
         console.log(`detect: comparing push range ${beforeSha.slice(0, 7)}...${headSha.slice(0, 7)}`);
         const url = `repos/${repo}/compare/${beforeSha.trim()}...${headSha.trim()}`;
-        const output = gh(['api', url, '--jq', '.files[] | .filename, (.previous_filename // empty)']);
+        const output = executor(['api', url, '--jq', '.files[] | .filename, (.previous_filename // empty)']);
         const paths = new Set(output.split('\n').map((s) => s.trim()).filter(Boolean));
         if (paths.size > 0) {
           return [...paths];
@@ -320,7 +365,7 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha }) {
       try {
         console.log(`detect: reading files for head commit ${headSha.slice(0, 7)}`);
         const url = `repos/${repo}/commits/${headSha.trim()}`;
-        const output = gh(['api', url, '--jq', '.files[] | .filename, (.previous_filename // empty)']);
+        const output = executor(['api', url, '--jq', '.files[] | .filename, (.previous_filename // empty)']);
         const paths = new Set(output.split('\n').map((s) => s.trim()).filter(Boolean));
         if (paths.size > 0) {
           return [...paths];
@@ -335,9 +380,9 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha }) {
   const paths = new Set();
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     const url = `repos/${repo}/pulls/${pr}/files?per_page=${FILES_PER_PAGE}&page=${page}`;
-    const count = Number(gh(['api', url, '--jq', 'length']));
+    const count = Number(executor(['api', url, '--jq', 'length']));
     if (count === 0) break;
-    for (const name of gh(['api', url, '--jq', '.[] | .filename, (.previous_filename // empty)']).split('\n')) {
+    for (const name of executor(['api', url, '--jq', '.[] | .filename, (.previous_filename // empty)']).split('\n')) {
       const trimmed = name.trim();
       if (trimmed) paths.add(trimmed);
     }
@@ -346,6 +391,11 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha }) {
   return [...paths];
 }
 
+/**
+ * Append key-value pairs to the GitHub Actions output file.
+ * @param {string} outputPath - File path pointed by GITHUB_OUTPUT.
+ * @param {Record<string, string | number>} pairs - Key-value output parameters.
+ */
 export function writeOutput(outputPath, pairs) {
   const body = Object.entries(pairs)
     .map(([key, value]) => `${key}=${value}`)
@@ -353,6 +403,9 @@ export function writeOutput(outputPath, pairs) {
   appendFileSync(outputPath, `${body}\n`, 'utf8');
 }
 
+/**
+ * Main entry point for detect script execution in CI.
+ */
 export async function main() {
   const repo = requireEnv('GITHUB_REPOSITORY');
   const prRaw = (process.env.PR ?? '').trim();

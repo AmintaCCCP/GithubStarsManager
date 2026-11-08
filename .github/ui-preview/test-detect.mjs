@@ -4,6 +4,7 @@ import {
   isIgnoredPath,
   classifyPath,
   mapPathsToScenes,
+  collectChangedPaths,
   ALL_SCENES,
 } from './detect.mjs';
 
@@ -39,12 +40,14 @@ check('LandingPage is ignored', isIgnoredPath('LandingPage/index.html'), true);
 check('backend service is ignored', isIgnoredPath('src/services/logger.ts'), true);
 check('store persistence is ignored', isIgnoredPath('src/store/persistence/shardStorage.ts'), true);
 check('types are ignored', isIgnoredPath('src/types/index.ts'), true);
-check('utils are ignored', isIgnoredPath('src/utils/lanAddress.ts'), true);
+check('non-UI utils are ignored', isIgnoredPath('src/utils/lanAddress.ts'), true);
+check('crypto utils are ignored', isIgnoredPath('src/utils/cryptoRandom.ts'), true);
 check('polyfills is ignored', isIgnoredPath('src/polyfills.ts'), true);
 check('package.json is ignored', isIgnoredPath('package.json'), true);
 check('package-lock.json is ignored', isIgnoredPath('package-lock.json'), true);
 
 check('UI component is not ignored', isIgnoredPath('src/components/GistView.tsx'), false);
+check('UI helper repoSearch is not ignored', isIgnoredPath('src/utils/repoSearch.ts'), false);
 check('plugin UI index.js is not ignored', isIgnoredPath('examples/plugins/repo-custom-fields/ui/index.js'), false);
 check('plugin UI style.css is not ignored', isIgnoredPath('examples/plugins/repo-custom-fields/ui/style.css'), false);
 check('plugin UI index.html is not ignored', isIgnoredPath('examples/plugins/repo-custom-fields/ui/index.html'), false);
@@ -58,11 +61,13 @@ check('gists component', classifyPath('src/components/GistView.tsx'), 'gists');
 check('gists feature', classifyPath('src/features/gists/hooks/useGist.ts'), 'gists');
 check('gists locale', classifyPath('src/locales/zh/gists.json'), 'gists');
 check('gists slice', classifyPath('src/store/slices/gistSlice.ts'), 'gists');
+check('gists helper', classifyPath('src/utils/gistUtils.ts'), 'gists');
 
 check('releases component', classifyPath('src/components/ReleaseTimeline.tsx'), 'releases');
 check('releases asset filter', classifyPath('src/components/AssetFilterManager.tsx'), 'releases');
 check('releases feature', classifyPath('src/features/releases/hooks/useReleases.ts'), 'releases');
 check('releases locale', classifyPath('src/locales/en/releases.json'), 'releases');
+check('releases asset helper', classifyPath('src/utils/releaseAssets.ts'), 'releases');
 
 check('forks component', classifyPath('src/components/ForkTimeline.tsx'), 'forks');
 check('forks feature', classifyPath('src/features/forks/hooks/useForks.ts'), 'forks');
@@ -72,6 +77,7 @@ check('discovery component', classifyPath('src/components/DiscoveryView.tsx'), '
 check('discovery subscription card', classifyPath('src/components/SubscriptionRepoCard.tsx'), 'discovery');
 check('discovery feature', classifyPath('src/features/discovery/hooks/useDiscovery.ts'), 'discovery');
 check('discovery locale', classifyPath('src/locales/zh/discovery.json'), 'discovery');
+check('discovery helper', classifyPath('src/utils/discoveryFeeds.ts'), 'discovery');
 
 check('settings component', classifyPath('src/components/SettingsPanel.tsx'), 'settings');
 check('settings subcomponent', classifyPath('src/components/settings/DataManagementSettings.tsx'), 'settings');
@@ -82,6 +88,8 @@ check('repositories list', classifyPath('src/components/RepositoryList.tsx'), 'r
 check('repositories card', classifyPath('src/components/RepositoryCard.tsx'), 'repositories');
 check('repositories chat feature', classifyPath('src/features/repository-chat/components/ChatSheet.tsx'), 'repositories');
 check('repositories locale', classifyPath('src/locales/zh/repositories.json'), 'repositories');
+check('repositories search helper', classifyPath('src/utils/repoSearch.ts'), 'repositories');
+check('repositories category helper', classifyPath('src/utils/categoryUtils.ts'), 'repositories');
 
 check('plugin modal touches repositories and settings', classifyPath('src/components/PluginPageModal.tsx'), ['repositories', 'settings']);
 check('plugin settings panel touches repositories and settings', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), ['repositories', 'settings']);
@@ -100,6 +108,7 @@ check('Modal.tsx is global', classifyPath('src/components/Modal.tsx'), 'global')
 check('ui button is global', classifyPath('src/components/ui/button.tsx'), 'global');
 check('tailwind.config.js is global', classifyPath('tailwind.config.js'), 'global');
 check('themeTokens.ts is global', classifyPath('src/types/themeTokens.ts'), 'global');
+check('markdownUtils.ts is global', classifyPath('src/utils/markdownUtils.ts'), 'global');
 
 // 3. mapPathsToScenes tests
 check('empty paths produces empty scenes', mapPathsToScenes([]), []);
@@ -149,6 +158,10 @@ check('repositories change maps to repositories-light and repositories-dark', ma
   'src/components/RepositoryList.tsx',
 ]), ['repositories-light', 'repositories-dark']);
 
+check('repoSearch helper change maps to repositories-light and repositories-dark', mapPathsToScenes([
+  'src/utils/repoSearch.ts',
+]), ['repositories-light', 'repositories-dark']);
+
 check('plugin UI change maps to repositories-light, repositories-dark, and settings', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/ui/index.js',
 ]), ['repositories-light', 'repositories-dark', 'settings']);
@@ -191,6 +204,77 @@ check('PR 575 commit cfd97a2d (docs only) maps to empty scenes', mapPathsToScene
 check('timelineSlice maps to releases and forks', mapPathsToScenes([
   'src/store/slices/timelineSlice.ts',
 ]), ['releases', 'forks']);
+
+// 4. collectChangedPaths request selection tests (synchronize vs opened)
+const beforeSha = '1111111111111111111111111111111111111111';
+const headSha = '2222222222222222222222222222222222222222';
+
+// Scenario A: PR has older UI commits, but the new push diff is docs only
+const mockGhSyncDocsOnly = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    return 'README.md\n';
+  }
+  if (url.startsWith('repos/owner/repo/pulls/123/files')) {
+    // If PR files were incorrectly called instead of compare, it would return the older UI commit
+    return 'src/components/GistView.tsx\nREADME.md\n';
+  }
+  return '';
+};
+
+const syncDocsPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncDocsOnly,
+});
+check('synchronize selects push diff instead of cumulative PR files', syncDocsPaths, ['README.md']);
+check('synchronize with docs-only push yields no UI scenes', mapPathsToScenes(syncDocsPaths), []);
+
+// Scenario B: PR opened event uses full PR file listing
+const mockGhOpened = (args) => {
+  const url = args[1];
+  if (url.includes('length')) return '2';
+  if (url.startsWith('repos/owner/repo/pulls/123/files')) {
+    return 'src/components/GistView.tsx\nREADME.md\n';
+  }
+  return '';
+};
+
+const openedPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'opened',
+  beforeSha: '',
+  headSha,
+  executor: mockGhOpened,
+});
+check('opened event selects PR file list', openedPaths, ['src/components/GistView.tsx', 'README.md']);
+check('opened event maps to relevant scene', mapPathsToScenes(openedPaths), ['gists']);
+
+// Scenario C: synchronize push diff touching repoSearch UI helper
+const mockGhSyncRepoSearch = (args) => {
+  const url = args[1];
+  if (url.startsWith(`repos/owner/repo/compare/${beforeSha}...${headSha}`)) {
+    return 'src/utils/repoSearch.ts\n';
+  }
+  return '';
+};
+
+const syncRepoSearchPaths = collectChangedPaths({
+  repo: 'owner/repo',
+  pr: 123,
+  action: 'synchronize',
+  beforeSha,
+  headSha,
+  executor: mockGhSyncRepoSearch,
+});
+check('synchronize with repoSearch change maps to repositories scenes', mapPathsToScenes(syncRepoSearchPaths), [
+  'repositories-light',
+  'repositories-dark',
+]);
 
 console.log(`\nTest result: ${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures ? 1 : 0);
