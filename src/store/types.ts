@@ -286,6 +286,7 @@ export interface AppActions {
   /** 切换某个字段的显示；未提供的字段沿用当前值。 */
   setRepositoryCardField: (id: RepositoryCardFieldId, visible: boolean) => void;
   setRepositoryCardActions: (actions: RepositoryCardActionPreference[]) => void;
+  setPluginCustomIcon: (pluginId: string, icon: string | null) => void;
 }
 
 export type AppStoreState = AppState & AppActions;

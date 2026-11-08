@@ -83,6 +83,7 @@ const currentPersistedKeys = [
   'assetFilters',
   'repositoryCardFields',
   'repositoryCardActions',
+  'pluginCustomIcons',
   'trendingSnapshots',
   'themeMode',
   'themePresetLight',

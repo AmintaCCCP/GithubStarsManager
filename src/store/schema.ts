@@ -84,6 +84,7 @@ export type PersistedAppState = Partial<
     | 'trendingSnapshots'
     | 'repositoryCardFields'
     | 'repositoryCardActions'
+    | 'pluginCustomIcons'
     | 'themeMode'
     | 'themePresetLight'
     | 'themePresetDark'

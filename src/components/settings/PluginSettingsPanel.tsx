@@ -1,12 +1,14 @@
 
 import { TranslateFn } from '../../i18n/useT';
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { AlertTriangle, FolderPlus, Loader2, Plug, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
+import { AlertTriangle, FolderPlus, Loader2, Palette, Plug, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react';
 import { useDialog } from '../../hooks/useDialog';
 import { pluginClient } from '../../plugins/pluginClient';
 import { pluginRegistry } from '../../plugins/pluginRegistry';
 import { buildPluginEnablePrompt } from '../../plugins/pluginEnablePrompt';
+import { PluginIcon } from '../../plugins/pluginIcons';
 import { PluginPageViewer } from '../PluginPageViewer';
+import { PluginIconPickerDialog } from './PluginIconPickerDialog';
 import { PluginMarketplaceDialog } from './PluginMarketplaceDialog';
 import { PluginRegistrySection } from './PluginRegistrySection';
 import { PluginUninstallDialog } from './PluginUninstallDialog';
@@ -29,6 +31,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
   const [busyPluginId, setBusyPluginId] = useState<string | null>(null);
   const [selectedPage, setSelectedPage] = useState<{ pluginId: string; pageId: string } | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<InstalledPlugin | null>(null);
+  const [iconPickerTarget, setIconPickerTarget] = useState<InstalledPlugin | null>(null);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [marketplaceReloadSignal, setMarketplaceReloadSignal] = useState(0);
   const [searchEndpoint, setSearchEndpoint] = useState('');
@@ -231,6 +234,7 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
+                      <PluginIcon pluginId={plugin.manifest.id} className="h-5 w-5 shrink-0 text-muted-foreground" />
                       <h4 className="font-medium">{plugin.manifest.name}</h4>
                       <span className="text-xs text-muted-foreground">v{plugin.manifest.version}</span>
                       <span className={`rounded-full px-2 py-0.5 text-xs ${
@@ -242,6 +246,18 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
                       }`}>
                         {plugin.status === 'active' ? t('pluginSettingsPanel.active') : plugin.status === 'error' ? t('pluginSettingsPanel.error') : t('pluginSettingsPanel.disabled')}
                       </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIconPickerTarget(plugin)}
+                        className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        aria-label={t('pluginSettingsPanel.customize-icon')}
+                        title={t('pluginSettingsPanel.customize-icon')}
+                      >
+                        <Palette className="mr-1 h-3.5 w-3.5" />
+                        {t('pluginSettingsPanel.customize-icon')}
+                      </Button>
                     </div>
                     <p className="mt-1 break-all text-xs text-muted-foreground">{plugin.manifest.id}</p>
                     {plugin.manifest.description && <p className="mt-2 text-sm text-muted-foreground">{plugin.manifest.description}</p>}
@@ -316,6 +332,12 @@ export const PluginSettingsPanel: React.FC<PluginSettingsPanelProps> = ({ t }) =
         onUninstall={(removePluginData) => {
           if (uninstallTarget) void removePlugin(uninstallTarget, removePluginData);
         }}
+      />
+
+      <PluginIconPickerDialog
+        target={iconPickerTarget}
+        t={t}
+        onClose={() => setIconPickerTarget(null)}
       />
 
       <PluginMarketplaceDialog

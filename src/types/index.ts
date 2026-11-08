@@ -4,7 +4,16 @@ import type { AppLanguage } from '../i18n/languages';
 import type { RepositoryCardFields } from './repositoryCardFields';
 export type { RepositoryCardFieldId, RepositoryCardFields } from './repositoryCardFields';
 import type { RepositoryCardActionPreference } from './repositoryCardActions';
-export type { RepositoryCardActionId, RepositoryCardActionPreference } from './repositoryCardActions';
+export type {
+  BuiltinRepositoryCardActionId,
+  RepositoryCardActionId,
+  RepositoryCardActionPreference,
+} from './repositoryCardActions';
+export {
+  isPluginActionId,
+  makePluginActionId,
+  parsePluginActionId,
+} from './repositoryCardActions';
 import type { RepositoryChatSettings } from './repositoryChat';
 export type { RepositoryChatSettings } from './repositoryChat';
 import type { ThemeTokens } from './themeTokens';
@@ -516,6 +525,8 @@ export interface AppState {
   repositoryCardFields: RepositoryCardFields;
   /** Quick-action order and toolbar visibility; hidden actions remain in the menu. */
   repositoryCardActions: RepositoryCardActionPreference[];
+  /** Custom icons for plugins: mapping pluginId to built-in icon key. */
+  pluginCustomIcons: Record<string, string>;
 
   // Theme tokens（开发守则 §14）：声明式外观偏好，落到 <html> 的 CSS 变量上
   themeTokens: ThemeTokens;

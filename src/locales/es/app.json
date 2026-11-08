@@ -1165,7 +1165,13 @@
     "marketplace-error-blocked": "Esta versión fue bloqueada por el registro oficial; no se puede instalar ni actualizar.",
     "marketplace-error-changed": "El plugin cambió en la fuente durante la instalación; actualiza e inténtalo de nuevo.",
     "marketplace-update-success-still-enabled-v1": "{{v1}} actualizado; el plugin permanece activado.",
-    "marketplace-orphaned-revoked-title": "Plugins instalados revocados"
+    "marketplace-orphaned-revoked-title": "Plugins instalados revocados",
+    "customize-icon": "Personalizar icono",
+    "customize-icon-title": "Personalizar icono del complemento: {{name}}",
+    "select-icon": "Seleccionar icono",
+    "search-icons": "Buscar iconos…",
+    "reset-icon": "Restaurar icono predeterminado",
+    "no-icons-found": "No se encontraron iconos coincidentes"
   },
   "pushCategoriesModal": {
     "push-selected-categories": "Enviar categorías seleccionadas",

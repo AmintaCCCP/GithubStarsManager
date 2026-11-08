@@ -115,6 +115,7 @@ const storeState = {
   // 卡片可见字段（开发守则 §14）：默认全开，单个用例里按需改
   repositoryCardFields: { description: true, tags: true, language: true, stars: true, license: true, lastUpdated: true },
   repositoryCardActions: DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item })),
+  pluginCustomIcons: {} as Record<string, string>,
   updateRepository: vi.fn(),
   deleteRepository: vi.fn(),
   vectorSearchConfig: {
@@ -174,6 +175,7 @@ beforeEach(() => {
     lastUpdated: true,
   };
   storeState.repositoryCardActions = DEFAULT_REPOSITORY_CARD_ACTIONS.map((item) => ({ ...item }));
+  storeState.pluginCustomIcons = {};
   storeState.vectorSearchConfig.enabled = true;
   Object.assign(actionMocks.actions, {
     isSubscribed: true,
@@ -632,6 +634,105 @@ describe('RepositoryCard view modes', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '仓库自定义信息' });
     expect(dialog).toHaveAttribute('data-display', 'popup');
+  });
+
+  it('renders customized icon for plugin action in more actions menu', async () => {
+    const user = userEvent.setup();
+    storeState.pluginCustomIcons = {
+      'com.githubstarsmanager.repo-info-card': 'rocket',
+    };
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-info-card',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.githubstarsmanager.repo-info-card',
+          name: '仓库信息卡',
+          version: '0.1.0',
+          apiVersion: '1',
+          permissions: ['repositories:read'],
+          contributes: {
+            repositoryActions: [{
+              id: 'generate-info-card',
+              title: '生成仓库信息卡',
+              placement: 'repository-card',
+              opensPage: 'info-card',
+            }],
+            pages: [{ id: 'info-card', title: 'Repository Info Card', entry: 'ui/index.html' }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: ['repositories:read'],
+      }],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: '更多仓库操作' }));
+    const menuItem = await screen.findByRole('menuitem', { name: '生成仓库信息卡' });
+    expect(menuItem).toBeInTheDocument();
+    expect(menuItem.querySelector('.lucide-rocket')).toBeInTheDocument();
+  });
+
+  it('renders plugin action directly on the card row when configured visible', async () => {
+    const user = userEvent.setup();
+    storeState.pluginCustomIcons = {
+      'com.githubstarsmanager.repo-info-card': 'rocket',
+    };
+    storeState.repositoryCardActions = [
+      { id: 'plugin:com.githubstarsmanager.repo-info-card:generate-info-card', visible: true },
+      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+    ];
+    pluginClientMocks.list.mockResolvedValue({
+      plugins: [{
+        directoryName: 'repo-info-card',
+        manifest: {
+          manifestVersion: 1,
+          id: 'com.githubstarsmanager.repo-info-card',
+          name: '仓库信息卡',
+          version: '0.1.0',
+          apiVersion: '1',
+          permissions: ['repositories:read'],
+          contributes: {
+            repositoryActions: [{
+              id: 'generate-info-card',
+              title: '生成仓库信息卡',
+              placement: 'repository-card',
+              opensPage: 'info-card',
+            }],
+            pages: [{ id: 'info-card', title: 'Repository Info Card', entry: 'ui/index.html' }],
+          },
+        },
+        enabled: true,
+        status: 'active',
+        grantedPermissions: ['repositories:read'],
+      }],
+      invalidPlugins: [],
+    });
+
+    render(
+      <DialogProvider>
+        <TooltipProvider>
+          <RepositoryCard repository={repository} allCategories={[]} viewMode="list" />
+          <PluginPageHost />
+        </TooltipProvider>
+      </DialogProvider>,
+    );
+
+    const pluginButton = await screen.findByRole('button', { name: '生成仓库信息卡' });
+    expect(pluginButton).toBeInTheDocument();
+    expect(pluginButton.querySelector('.lucide-rocket')).toBeInTheDocument();
+
+    await user.click(pluginButton);
+    expect(await screen.findByRole('dialog', { name: '生成仓库信息卡' })).toBeInTheDocument();
   });
 });
 

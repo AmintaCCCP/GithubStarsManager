@@ -12,6 +12,7 @@ import { applyPluginActionResult } from '../plugins/applyPluginActionResult';
 import { useDialog } from '../hooks/useDialog';
 import { usePluginExporters } from '../plugins/hooks/usePluginExporters';
 import { pluginClient } from '../plugins/pluginClient';
+import { PluginIcon } from '../plugins/pluginIcons';
 import type { RegisteredPluginAction } from '../plugins/types';
 
 interface BulkActionToolbarProps {
@@ -108,7 +109,7 @@ const PluginBulkMenu: React.FC<{
       <DropdownMenuContent align="end">
         {actions.map((action) => (
           <DropdownMenuItem key={`${action.pluginId}:${action.id}`} onSelect={() => void runAction(action)}>
-            <Plug className="mr-2 h-4 w-4" />
+            <PluginIcon pluginId={action.pluginId} icon={action.icon} className="mr-2 h-4 w-4" />
             {action.title}
           </DropdownMenuItem>
         ))}

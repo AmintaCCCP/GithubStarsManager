@@ -42,6 +42,10 @@ export const useDialog = (): DialogContextValue => {
   return context;
 };
 
+export const useOptionalDialog = (): DialogContextValue | null => {
+  return useContext(DialogContext);
+};
+
 interface DialogProviderProps {
   children: ReactNode;
 }

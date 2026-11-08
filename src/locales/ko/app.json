@@ -1165,7 +1165,13 @@
     "marketplace-error-blocked": "이 버전은 공식 레지스트리에서 차단되어 설치하거나 업데이트할 수 없습니다.",
     "marketplace-error-changed": "설치 중에 소스의 플러그인이 변경되었습니다. 새로 고친 후 다시 시도해 주세요.",
     "marketplace-update-success-still-enabled-v1": "{{v1}}을(를) 업데이트했습니다. 플러그인은 계속 활성화 상태입니다.",
-    "marketplace-orphaned-revoked-title": "취소된 설치된 플러그인"
+    "marketplace-orphaned-revoked-title": "취소된 설치된 플러그인",
+    "customize-icon": "아이콘 맞춤 설정",
+    "customize-icon-title": "플러그인 아이콘 맞춤 설정: {{name}}",
+    "select-icon": "아이콘 선택",
+    "search-icons": "아이콘 검색…",
+    "reset-icon": "기본 아이콘으로 복원",
+    "no-icons-found": "일치하는 아이콘을 찾을 수 없습니다"
   },
   "pushCategoriesModal": {
     "push-selected-categories": "선택한 카테고리 푸시",

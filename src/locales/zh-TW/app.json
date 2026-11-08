@@ -1165,7 +1165,13 @@
     "marketplace-error-blocked": "該版本已被官方註冊表封鎖，無法安裝或更新。",
     "marketplace-error-changed": "安裝過程中來源上的插件發生了變化，請重新整理後再試。",
     "marketplace-update-success-still-enabled-v1": "已更新 {{v1}}，插件保持啟用狀態。",
-    "marketplace-orphaned-revoked-title": "已撤銷的已安裝插件"
+    "marketplace-orphaned-revoked-title": "已撤銷的已安裝插件",
+    "customize-icon": "自訂圖示",
+    "customize-icon-title": "自訂插件圖示：{{name}}",
+    "select-icon": "選擇圖示",
+    "search-icons": "搜尋圖示…",
+    "reset-icon": "恢復預設圖示",
+    "no-icons-found": "找不到相符的圖示"
   },
   "pushCategoriesModal": {
     "push-selected-categories": "推送所選分類",
