@@ -194,6 +194,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   document.body.innerHTML = '';
+  document.documentElement.style.removeProperty('font-size');
   actionMocks.releaseSheet.suspend = null;
 });
 
@@ -524,6 +525,30 @@ describe('RepositoryCard view modes', () => {
     expect(screen.getByTitle('在Zread中查看')).toBeInTheDocument();
     expect(screen.getByTitle('在GitHub上查看')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '更多仓库操作' })).toBeInTheDocument();
+  });
+
+  it('scales action slots with the root font size and re-measures when it changes', async () => {
+    renderRepositoryCard('grid', { onAskRepository: vi.fn() });
+    const actionRow = screen.getByTestId('grid-action-row');
+    Object.defineProperty(actionRow, 'clientWidth', { configurable: true, value: 250 });
+
+    document.documentElement.style.fontSize = '20px';
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // 250px at a 20px root fits 6 slots, so one slot stays reserved for More.
+    expect(screen.getByTitle('查看 Release')).toBeInTheDocument();
+    expect(screen.queryByTitle('在Zread中查看')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('在GitHub上查看')).not.toBeInTheDocument();
+
+    document.documentElement.style.fontSize = '16px';
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTitle('在Zread中查看')).toBeInTheDocument();
+    expect(screen.getByTitle('在GitHub上查看')).toBeInTheDocument();
   });
 
   it('collapses trailing list actions into a more-actions menu when the row is narrow', async () => {
