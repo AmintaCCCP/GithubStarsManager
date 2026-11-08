@@ -196,7 +196,11 @@ async function shootScene(browser, baseState, scene, url, outDir) {
         if (reqUrl.startsWith(origin)) return route.continue();
         return route.abort();
       });
-      await page.goto(targetUrl, { waitUntil: 'load', timeout: 30_000 });
+      const response = await page.goto(targetUrl, { waitUntil: 'load', timeout: 30_000 });
+      if (!response || !response.ok()) {
+        console.warn(`  ⚠ ${scene.name} skipped: plugin asset not available at ${scene.pluginUrl} (${response?.status() ?? 'no response'})`);
+        return null;
+      }
       const demoRepo = baseState.repositories?.[0] ?? {
         id: 1,
         name: 'GithubStarsManager',
@@ -305,7 +309,8 @@ async function main() {
   const results = [];
   try {
     for (const scene of scenes) {
-      results.push(await shootScene(browser, baseState, scene, args.url, args.out));
+      const result = await shootScene(browser, baseState, scene, args.url, args.out);
+      if (result) results.push(result);
     }
   } finally {
     await browser.close();

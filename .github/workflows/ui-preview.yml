@@ -108,7 +108,8 @@ jobs:
         run: |
           npx vite build
           if [ -d examples/plugins ]; then
-            cp -r examples/plugins dist/plugins
+            mkdir -p dist/plugins
+            cp -r examples/plugins/. dist/plugins/
           fi
 
       - name: Upload web bundle
