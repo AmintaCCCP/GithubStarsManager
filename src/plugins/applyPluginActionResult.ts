@@ -11,8 +11,10 @@ type Toast = (message: string, type?: 'success' | 'error' | 'info' | 'warning') 
 export async function applyPluginActionResult(
   result: PluginActionResult,
   toast: Toast,
-  language: AppLanguage
+  language: AppLanguage,
+  isStale?: () => boolean,
 ): Promise<void> {
+  if (isStale?.()) return;
   const t = makeT(language, 'plugins');
   if (result.type === 'notice') {
     toast(result.message, result.level);
@@ -24,6 +26,7 @@ export async function applyPluginActionResult(
   }
   if (result.suggestedAction === 'copy') {
     await navigator.clipboard.writeText(result.content);
+    if (isStale?.()) return;
     toast(t('applyPluginActionResult.plugin-result-copied'), 'success');
     return;
   }

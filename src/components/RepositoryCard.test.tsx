@@ -158,6 +158,38 @@ const renderRepositoryCard = (
   </DialogProvider>
 );
 
+const mockPluginAction = (actionId: string, title: string) => {
+  storeState.repositoryCardActions = [
+    { id: `plugin:com.example.dupe:${actionId}`, visible: true },
+    ...DEFAULT_REPOSITORY_CARD_ACTIONS,
+  ];
+  pluginClientMocks.list.mockResolvedValue({
+    plugins: [{
+      directoryName: 'repo-dupe',
+      manifest: {
+        manifestVersion: 1,
+        id: 'com.example.dupe',
+        name: 'Duplicate Plugin',
+        version: '1.0.0',
+        apiVersion: '1',
+        permissions: [],
+        contributes: {
+          repositoryActions: [{
+            id: actionId,
+            title,
+            placement: 'repository-card',
+            icon: 'file-text',
+          }],
+        },
+      },
+      enabled: true,
+      status: 'active',
+      grantedPermissions: [],
+    }],
+    invalidPlugins: [],
+  });
+};
+
 beforeEach(() => {
   cleanup();
   document.body.innerHTML = '';
@@ -881,35 +913,7 @@ describe('RepositoryCard view modes', () => {
     pluginClientMocks.runAction.mockImplementation(() => new Promise((resolve) => {
       resolvers.push(resolve);
     }));
-    storeState.repositoryCardActions = [
-      { id: 'plugin:com.example.dupe:export-card', visible: true },
-      ...DEFAULT_REPOSITORY_CARD_ACTIONS,
-    ];
-    pluginClientMocks.list.mockResolvedValue({
-      plugins: [{
-        directoryName: 'repo-dupe',
-        manifest: {
-          manifestVersion: 1,
-          id: 'com.example.dupe',
-          name: 'Duplicate Plugin',
-          version: '1.0.0',
-          apiVersion: '1',
-          permissions: [],
-          contributes: {
-            repositoryActions: [{
-              id: 'export-card',
-              title: '导出卡片',
-              placement: 'repository-card',
-              icon: 'file-text',
-            }],
-          },
-        },
-        enabled: true,
-        status: 'active',
-        grantedPermissions: [],
-      }],
-      invalidPlugins: [],
-    });
+    mockPluginAction('export-card', '导出卡片');
 
     const renderCard = (viewMode: 'list' | 'grid') => (
       <DialogProvider>
@@ -948,6 +952,76 @@ describe('RepositoryCard view modes', () => {
       await Promise.resolve();
     });
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('clears pending plugin action timers when the card unmounts', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const resolvers: Array<(value: unknown) => void> = [];
+    pluginClientMocks.runAction.mockImplementation(() => new Promise((resolve) => {
+      resolvers.push(resolve);
+    }));
+    mockPluginAction('unmount-card', '卸载卡片');
+
+    const Harness = ({ show }: { show: boolean }) => (
+      <DialogProvider>
+        <TooltipProvider>
+          {show ? <RepositoryCard repository={repository} allCategories={[]} viewMode="list" /> : null}
+        </TooltipProvider>
+      </DialogProvider>
+    );
+    const { rerender } = render(<Harness show />);
+    const button = await screen.findByRole('button', { name: '卸载卡片' });
+    vi.useFakeTimers();
+    fireEvent.click(button);
+    expect(pluginClientMocks.runAction).toHaveBeenCalledTimes(1);
+
+    rerender(<Harness show={false} />);
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('插件操作超时')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolvers[0]({ success: true, result: { type: 'text', content: 'late', suggestedAction: 'copy' } });
+      await Promise.resolve();
+    });
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it('does not show stale clipboard success after a plugin action times out', async () => {
+    let resolveClipboard: () => void = () => {};
+    const writeText = vi.fn(() => new Promise<void>((resolve) => {
+      resolveClipboard = resolve;
+    }));
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    pluginClientMocks.runAction.mockResolvedValue({
+      success: true,
+      result: { type: 'text', content: 'copy me', suggestedAction: 'copy' },
+    });
+    mockPluginAction('copy-card', '复制卡片');
+
+    renderRepositoryCard('list');
+    const button = await screen.findByRole('button', { name: '复制卡片' });
+    vi.useFakeTimers();
+    fireEvent.click(button);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(writeText).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+    expect(screen.getByText('插件操作超时')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveClipboard();
+      await Promise.resolve();
+    });
+    expect(screen.queryByText('插件结果已复制')).not.toBeInTheDocument();
   });
 });
 

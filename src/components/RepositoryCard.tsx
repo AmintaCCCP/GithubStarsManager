@@ -168,6 +168,11 @@ const ACTION_SLOT_WIDTH_REM = 1.75;
 const ACTION_SLOT_GAP_REM = 0.125;
 const PLUGIN_ACTION_TIMEOUT_MS = 30_000;
 
+interface PluginActionRun {
+  token: symbol;
+  timeoutId: number;
+}
+
 const resolveActionSlotMetrics = () => {
   const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
     || DEFAULT_ROOT_FONT_SIZE;
@@ -226,7 +231,7 @@ interface OverflowActionRowProps {
   onFindSimilar?: () => void;
   persistFindSimilarInMenu?: boolean;
   pluginActions: RegisteredPluginAction[];
-  pluginActionRunsRef: React.MutableRefObject<Map<string, symbol>>;
+  pluginActionRunsRef: React.MutableRefObject<Map<string, PluginActionRun>>;
   runningPluginActionIds: Set<string>;
   setRunningPluginActionIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   isActionsMenuOpen?: boolean;
@@ -305,10 +310,9 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
     const actionId = makePluginActionId(action.pluginId, action.id);
     if (pluginActionRunsRef.current.has(actionId)) return;
     const runToken = Symbol(actionId);
-    pluginActionRunsRef.current.set(actionId, runToken);
     setRunningPluginActionIds((previous) => new Set(previous).add(actionId));
-    const isCurrentRun = () => pluginActionRunsRef.current.get(actionId) === runToken;
-    const timeout = window.setTimeout(() => {
+    const isCurrentRun = () => pluginActionRunsRef.current.get(actionId)?.token === runToken;
+    const timeoutId = window.setTimeout(() => {
       if (!isCurrentRun()) return;
       pluginActionRunsRef.current.delete(actionId);
       setRunningPluginActionIds((previous) => {
@@ -318,6 +322,7 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
       });
       toast?.(t('repositoryCard.plugin-action-timed-out'), 'error');
     }, PLUGIN_ACTION_TIMEOUT_MS);
+    pluginActionRunsRef.current.set(actionId, { token: runToken, timeoutId });
     try {
       const operation = await pluginClient.runAction({
         pluginId: action.pluginId,
@@ -330,12 +335,12 @@ const OverflowActionRow: React.FC<OverflowActionRowProps> = ({
         return;
       }
       if (toast) {
-        await applyPluginActionResult(operation.result, toast, language);
+        await applyPluginActionResult(operation.result, toast, language, () => !isCurrentRun());
       }
     } catch {
       if (isCurrentRun()) toast?.(t('repositoryCard.failed-to-apply-plugin-result'), 'error');
     } finally {
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
       if (isCurrentRun()) {
         pluginActionRunsRef.current.delete(actionId);
         setRunningPluginActionIds((previous) => {
@@ -611,7 +616,7 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
   const [showDragHint, setShowDragHint] = useState(false);
   const dragHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
-  const pluginActionRunsRef = useRef(new Map<string, symbol>());
+  const pluginActionRunsRef = useRef(new Map<string, PluginActionRun>());
   const [runningPluginActionIds, setRunningPluginActionIds] = useState<Set<string>>(new Set());
   const cardRef = useRef<HTMLDivElement>(null);
   const menuDismissedByPointerDownRef = useRef(false);
@@ -624,6 +629,13 @@ const RepositoryCardComponent: React.FC<RepositoryCardProps> = ({
 
   const restoreReadmeTriggerFocus = useCallback(() => {
     cardRef.current?.focus();
+  }, []);
+
+  useEffect(() => () => {
+    for (const run of pluginActionRunsRef.current.values()) {
+      window.clearTimeout(run.timeoutId);
+    }
+    pluginActionRunsRef.current.clear();
   }, []);
 
   useEffect(() => {
