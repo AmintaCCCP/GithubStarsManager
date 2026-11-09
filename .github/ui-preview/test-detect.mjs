@@ -379,6 +379,16 @@ check('deferred i18n plus plugin spec escalates to global', mapPathsToScenes([
   'examples/plugins/repo-insights/ui/index.html',
 ]), [...ALL_SCENES, 'plugin:repo-insights']);
 
+check('deferred i18n plus plugin manifest escalates to global', mapPathsToScenes([
+  'src/i18n/useT.ts',
+  'examples/plugins/repo-info-card/manifest.json',
+]), [...ALL_SCENES, 'plugin:repo-info-card']);
+
+check('deferred i18n beside a real plugin panel follows the component', mapPathsToScenes([
+  'src/i18n/useT.ts',
+  'src/components/settings/PluginSettingsPanel.tsx',
+]), ['settings-plugins']);
+
 // 12. mapPathsToScenes — locale key-level diffing
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
   ['src/locales/zh/app.json'],

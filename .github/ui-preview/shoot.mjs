@@ -461,16 +461,23 @@ function installPluginHostResponder({ repositories, releasesByRepositoryId, stor
     return { success: true, value: { status: 202, body: null, acct } };
   };
 
-  // Bridge-activity timestamps expose a generic readiness signal: a page is
-  // settled once no new bridge request arrived for a quiet window.
-  window.__pluginHostInstalledAt = Date.now();
-  window.__pluginHostLastRequestAt = 0;
+  // Readiness signal: track when the LAST NEW request signature appeared.
+  // A page still fetching fresh metrics/keys during initial load keeps
+  // producing new signatures; a page that repeats identical background
+  // requests forever (polling) stops producing them, so it still settles.
+  const seenSignatures = new Set();
+  window.__pluginHostLastNewRequestAt = Date.now();
 
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (!data || typeof data !== 'object' || data.type !== 'plugin-page:request') return;
     if (event.source !== window.parent) return;
-    window.__pluginHostLastRequestAt = Date.now();
+    const a = data.args ?? {};
+    const sig = `${data.method}:${a.key ?? a.path ?? a.query ?? ''}`;
+    if (!seenSignatures.has(sig)) {
+      seenSignatures.add(sig);
+      window.__pluginHostLastNewRequestAt = Date.now();
+    }
     const reply = (payload) => {
       window.parent.postMessage({
         type: 'plugin-page:response',
@@ -596,12 +603,14 @@ async function shootScene(browser, baseState, scene, url, outDir) {
         await page.waitForFunction(() => !!document.body && document.body.innerText.trim().length > 0, null, { timeout: 15_000 });
       }
       // Explicit readiness beyond the shell: a static title would pass the
-      // checks above while bridge data is still loading. Wait until the host
-      // bridge has been quiet for a moment (all requests answered, follow-up
-      // fetches done); a page that keeps requesting fails the scene instead
-      // of publishing an unfinished screenshot.
+      // checks above while bridge data is still loading. Wait until no NEW
+      // request signature has appeared for a moment — fresh fetches keep the
+      // signature set growing (initial load ongoing), while a page that
+      // repeats identical background requests settles. A page that keeps
+      // producing new signatures fails the scene instead of publishing an
+      // unfinished screenshot.
       await page.waitForFunction(() => {
-        const last = window.__pluginHostLastRequestAt || window.__pluginHostInstalledAt || 0;
+        const last = window.__pluginHostLastNewRequestAt || 0;
         return last > 0 && Date.now() - last >= 1500;
       }, null, { timeout: 45_000, polling: 250 });
       await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 10_000 }).catch(() => {});

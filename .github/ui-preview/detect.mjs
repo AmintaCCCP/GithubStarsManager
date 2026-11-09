@@ -673,6 +673,10 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   const tokens = new Set();
   let hasGlobal = false;
   let hasDeferred = false;
+  // Static scenes that exist only because a plugin manifest changed (the
+  // manifest feeds the Settings › Plugins list). They do not confirm that an
+  // accompanying deferred change's blast radius is covered.
+  const manifestOnlyScenes = new Set();
 
   for (const path of paths) {
     if (path === '*' || path === '__ALL__') {
@@ -687,10 +691,17 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
     }
     if (!classification) continue;
     const list = Array.isArray(classification) ? classification : [classification];
+    const fromManifest = Array.isArray(classification)
+      && classification.length === 2
+      && classification[0] === 'settings-plugins'
+      && classification[1]?.startsWith('plugin:');
     for (const token of list) {
       if (token === 'global') hasGlobal = true;
       else if (token === 'deferred') hasDeferred = true;
-      else tokens.add(token);
+      else {
+        tokens.add(token);
+        if (fromManifest) manifestOnlyScenes.add(token);
+      }
     }
   }
 
@@ -715,9 +726,11 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   for (const token of tokens) expandToken(token);
 
   // State/infra changes have unconfirmed blast radius: escalate to global
-  // unless concrete static scenes were found in the same diff. Plugin specs
-  // alone do not cover the rest of the app a translation change could touch.
-  if (hasDeferred && selectedScenes.size === 0) {
+  // unless concrete app-component scenes were found in the same diff. Scenes
+  // that exist only through a plugin manifest (and plugin specs alone) do not
+  // cover the rest of the app a translation or state change could touch.
+  const appCoveredScenes = [...selectedScenes].filter((scene) => !manifestOnlyScenes.has(scene));
+  if (hasDeferred && appCoveredScenes.length === 0) {
     hasGlobal = true;
   }
 
