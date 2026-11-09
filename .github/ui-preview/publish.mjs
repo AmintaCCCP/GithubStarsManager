@@ -314,8 +314,38 @@ async function findPreviewComment(repo, token, pr) {
   return null;
 }
 
+/** Human-readable labels for the static scenes; dynamic plugin scenes
+ *  (`plugin-<slug>-<pageId>`) are rendered from their name below. */
+const STATIC_SCENE_LABELS = {
+  'repositories-light': '仓库列表 · 亮色',
+  'repositories-dark': '仓库列表 · 暗色',
+  gists: 'Gist',
+  releases: 'Releases',
+  forks: 'Forks',
+  discovery: '发现',
+  'settings-general': '设置 · 通用',
+  'settings-appearance': '设置 · 外观',
+  'settings-star-sync': '设置 · Star 同步',
+  'settings-ai': '设置 · AI 配置',
+  'settings-webdav': '设置 · WebDAV',
+  'settings-backup': '设置 · 备份',
+  'settings-backend': '设置 · 后端',
+  'settings-category': '设置 · 分类',
+  'settings-menu': '设置 · 菜单',
+  'settings-data': '设置 · 数据管理',
+  'settings-logs': '设置 · 诊断日志',
+  'settings-network': '设置 · 网络',
+  'settings-plugins': '设置 · 插件',
+  'settings-vector-search': '设置 · 向量搜索',
+  'settings-mcp': '设置 · MCP 服务器',
+};
+
 function sceneLabel(filename) {
-  return path.basename(filename, '.png').replaceAll('-', ' ');
+  const name = path.basename(filename, '.png');
+  if (STATIC_SCENE_LABELS[name]) return STATIC_SCENE_LABELS[name];
+  const pluginMatch = name.match(/^plugin-([a-z0-9._-]+?)-([a-z0-9._-]+)$/);
+  if (pluginMatch) return `插件 ${pluginMatch[1]} · ${pluginMatch[2]}`;
+  return name.replaceAll('-', ' ');
 }
 
 function buildSuccessBody({ repo, branch, pr, sha, runUrl, shots }) {

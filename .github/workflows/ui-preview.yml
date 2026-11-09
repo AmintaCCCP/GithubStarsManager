@@ -110,6 +110,16 @@ jobs:
           if [ -d examples/plugins ]; then
             mkdir -p dist/plugins
             cp -r examples/plugins/. dist/plugins/
+            # Emit the plugin directory list so shoot.mjs can populate the
+            # Settings › Plugins registry stub without guessing slugs.
+            node -e "
+              const fs = require('node:fs');
+              const slugs = fs.readdirSync('examples/plugins', { withFileTypes: true })
+                .filter((d) => d.isDirectory())
+                .map((d) => d.name)
+                .sort();
+              fs.writeFileSync('dist/plugins/index.json', JSON.stringify(slugs) + '\n');
+            "
           fi
 
       - name: Upload web bundle

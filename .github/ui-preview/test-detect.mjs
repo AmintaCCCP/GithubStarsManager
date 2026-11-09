@@ -3,9 +3,16 @@
 import {
   isIgnoredPath,
   classifyPath,
+  classifyLocaleKeys,
+  classifyLocaleFile,
   mapPathsToScenes,
   collectChangedPaths,
+  diffTopLevelKeys,
+  diffLocaleKeys,
   ALL_SCENES,
+  VIEW_SCENES,
+  SETTINGS_TABS,
+  VIEW_TO_SCENES,
 } from './detect.mjs';
 
 let failures = 0;
@@ -20,6 +27,11 @@ const check = (name, actual, expected) => {
   }
 };
 
+// 0. Scene catalog invariants
+check('all settings tabs have unique scene names', new Set(SETTINGS_TABS.map((t) => t.scene)).size, SETTINGS_TABS.length);
+check('ALL_SCENES is views plus settings tabs', ALL_SCENES, [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)]);
+check('settings view expands to every settings scene', VIEW_TO_SCENES.settings, SETTINGS_TABS.map((t) => t.scene));
+
 // 1. isIgnoredPath tests
 check('test file in src is ignored', isIgnoredPath('src/App.contextSidebar.test.tsx'), true);
 check('test file with spec is ignored', isIgnoredPath('src/components/foo.spec.ts'), true);
@@ -29,6 +41,7 @@ check('markdown file is ignored', isIgnoredPath('README.md'), true);
 check('nested markdown is ignored', isIgnoredPath('docs/plugins/v1-development.md'), true);
 check('plugin readme is ignored', isIgnoredPath('examples/plugins/repo-custom-fields/README.md'), true);
 check('plugin worker is ignored', isIgnoredPath('examples/plugins/markdown-exporter/worker.js'), true);
+check('plugin ui readme is ignored', isIgnoredPath('examples/plugins/repo-custom-fields/ui/README.md'), true);
 check('version-info.xml is ignored', isIgnoredPath('version-info.xml'), true);
 check('LICENSE is ignored', isIgnoredPath('LICENSE'), true);
 check('workflow is ignored', isIgnoredPath('.github/workflows/ci.yml'), true);
@@ -39,9 +52,12 @@ check('electron preload is ignored', isIgnoredPath('electron/preload.js'), true)
 check('LandingPage is ignored', isIgnoredPath('LandingPage/index.html'), true);
 check('backend service is ignored', isIgnoredPath('src/services/logger.ts'), true);
 check('store persistence is ignored', isIgnoredPath('src/store/persistence/shardStorage.ts'), true);
+check('store normalizers is ignored', isIgnoredPath('src/store/normalizers/persistedState.ts'), true);
 check('types are ignored', isIgnoredPath('src/types/index.ts'), true);
+check('store types are ignored', isIgnoredPath('src/store/types.ts'), false);
 check('non-UI utils are ignored', isIgnoredPath('src/utils/lanAddress.ts'), true);
 check('crypto utils are ignored', isIgnoredPath('src/utils/cryptoRandom.ts'), true);
+check('clipboard utils are ignored', isIgnoredPath('src/utils/clipboardUtils.ts'), true);
 check('polyfills is ignored', isIgnoredPath('src/polyfills.ts'), true);
 check('package.json is ignored', isIgnoredPath('package.json'), true);
 check('package-lock.json is ignored', isIgnoredPath('package-lock.json'), true);
@@ -56,79 +72,99 @@ check('index.css is not ignored', isIgnoredPath('src/index.css'), false);
 check('themeTokens is not ignored', isIgnoredPath('src/types/themeTokens.ts'), false);
 check('tailwind config is not ignored', isIgnoredPath('tailwind.config.js'), false);
 
-// 2. classifyPath tests
+// 2. classifyPath tests — top-level views
 check('gists component', classifyPath('src/components/GistView.tsx'), 'gists');
 check('gists feature', classifyPath('src/features/gists/hooks/useGist.ts'), 'gists');
-check('gists locale', classifyPath('src/locales/zh/gists.json'), 'gists');
 check('gists slice', classifyPath('src/store/slices/gistSlice.ts'), 'gists');
 check('gists helper', classifyPath('src/utils/gistUtils.ts'), 'gists');
 
 check('releases component', classifyPath('src/components/ReleaseTimeline.tsx'), 'releases');
 check('releases asset filter', classifyPath('src/components/AssetFilterManager.tsx'), 'releases');
 check('releases feature', classifyPath('src/features/releases/hooks/useReleases.ts'), 'releases');
-check('releases locale', classifyPath('src/locales/en/releases.json'), 'releases');
 check('releases asset helper', classifyPath('src/utils/releaseAssets.ts'), 'releases');
 
 check('forks component', classifyPath('src/components/ForkTimeline.tsx'), 'forks');
 check('forks feature', classifyPath('src/features/forks/hooks/useForks.ts'), 'forks');
-check('forks locale', classifyPath('src/locales/ja/forks.json'), 'forks');
 
 check('discovery component', classifyPath('src/components/DiscoveryView.tsx'), 'discovery');
 check('discovery subscription card', classifyPath('src/components/SubscriptionRepoCard.tsx'), 'discovery');
+check('discovery feed modal', classifyPath('src/components/TelegramMessageModal.tsx'), 'discovery');
+check('discovery feed settings modal', classifyPath('src/components/XTweetSettingsModal.tsx'), 'discovery');
 check('discovery feature', classifyPath('src/features/discovery/hooks/useDiscovery.ts'), 'discovery');
-check('discovery locale', classifyPath('src/locales/zh/discovery.json'), 'discovery');
 check('discovery helper', classifyPath('src/utils/discoveryFeeds.ts'), 'discovery');
-
-check('settings component', classifyPath('src/components/SettingsPanel.tsx'), 'settings');
-check('settings subcomponent', classifyPath('src/components/settings/DataManagementSettings.tsx'), 'settings');
-check('settings feature', classifyPath('src/features/settings/hooks/useSettings.ts'), 'settings');
-check('settings locale', classifyPath('src/locales/zh/settings.json'), 'settings');
 
 check('repositories list', classifyPath('src/components/RepositoryList.tsx'), 'repositories');
 check('repositories card', classifyPath('src/components/RepositoryCard.tsx'), 'repositories');
+check('repositories bulk toolbar', classifyPath('src/components/BulkActionToolbar.tsx'), 'repositories');
 check('repositories chat feature', classifyPath('src/features/repository-chat/components/ChatSheet.tsx'), 'repositories');
-check('repositories locale', classifyPath('src/locales/zh/repositories.json'), 'repositories');
 check('repositories search helper', classifyPath('src/utils/repoSearch.ts'), 'repositories');
+check('repositories card actions helper', classifyPath('src/utils/repositoryCardActions.ts'), 'repositories');
 check('repositories category helper', classifyPath('src/utils/categoryUtils.ts'), 'repositories');
 
-check('WorkspacePageHeader is global', classifyPath('src/components/WorkspacePageHeader.tsx'), 'global');
-check('src/lib/utils.ts is global', classifyPath('src/lib/utils.ts'), 'global');
+// 3. classifyPath — Settings tabs map panel-by-panel
+check('settings shell maps to whole settings view', classifyPath('src/components/SettingsPanel.tsx'), 'settings');
+check('settings feature hook maps to whole settings view', classifyPath('src/features/settings/hooks/useSettings.ts'), 'settings');
+check('configuration slice maps to settings', classifyPath('src/store/slices/configurationSlice.ts'), 'settings');
+check('general panel maps to general scene', classifyPath('src/components/settings/GeneralPanel.tsx'), ['settings-general']);
+check('appearance panel maps to appearance scene', classifyPath('src/components/settings/AppearancePanel.tsx'), ['settings-appearance']);
+check('theme settings card maps to appearance scene', classifyPath('src/components/settings/ThemeSettingsCard.tsx'), ['settings-appearance']);
+check('repository card actions maps to appearance scene', classifyPath('src/components/settings/RepositoryCardActionsSettings.tsx'), ['settings-appearance']);
+check('star sync panel maps to star-sync scene', classifyPath('src/components/settings/StarSyncPanel.tsx'), ['settings-star-sync']);
+check('ai config panel maps to ai scene', classifyPath('src/components/settings/AIConfigPanel.tsx'), ['settings-ai']);
+check('webdav panel maps to webdav scene', classifyPath('src/components/settings/WebDAVPanel.tsx'), ['settings-webdav']);
+check('backup panel maps to backup scene', classifyPath('src/components/settings/BackupPanel.tsx'), ['settings-backup']);
+check('backend panel maps to backend scene', classifyPath('src/components/settings/BackendPanel.tsx'), ['settings-backend']);
+check('category panel maps to category scene', classifyPath('src/components/settings/CategoryPanel.tsx'), ['settings-category']);
+check('menu panel maps to menu scene', classifyPath('src/components/settings/MenuManagementPanel.tsx'), ['settings-menu']);
+check('data panel maps to data scene', classifyPath('src/components/settings/DataManagementPanel.tsx'), ['settings-data']);
+check('logs panel maps to logs scene', classifyPath('src/components/settings/DiagnosticLogsPanel.tsx'), ['settings-logs']);
+check('network panel maps to network scene', classifyPath('src/components/settings/NetworkPanel.tsx'), ['settings-network']);
+check('mcp panel maps to mcp scene', classifyPath('src/components/settings/McpSettingsPanel.tsx'), ['settings-mcp']);
+check('vector search maps to vector-search scene', classifyPath('src/components/settings/VectorSearchSettings.tsx'), ['settings-vector-search']);
+check('plugin settings panel maps to plugins scene', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), ['settings-plugins']);
+check('plugin icon picker maps to plugins scene', classifyPath('src/components/settings/PluginIconPickerDialog.tsx'), ['settings-plugins']);
+check('plugin marketplace maps to plugins scene', classifyPath('src/components/settings/PluginMarketplaceDialog.tsx'), ['settings-plugins']);
+check('push categories modal maps to star-sync scene', classifyPath('src/components/settings/PushCategoriesModal.tsx'), ['settings-star-sync']);
+check('include keys toggle spans backup and data scenes', classifyPath('src/components/settings/IncludeKeysToggle.tsx'), ['settings-backup', 'settings-data']);
+check('unknown settings component falls back to whole settings view', classifyPath('src/components/settings/SomeFuturePanel.tsx'), ['settings']);
 
-check('plugin modal touches settings and plugin views', classifyPath('src/components/PluginPageModal.tsx'), [
-  'settings',
-  'plugin-repo-custom-fields',
-  'plugin-repo-info-card',
-  'plugin-repo-insights',
-]);
-check('plugin settings panel touches settings and plugin views', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), [
-  'settings',
-  'plugin-repo-custom-fields',
-  'plugin-repo-info-card',
-  'plugin-repo-insights',
-]);
-check('repo-custom-fields UI touches custom fields scene', classifyPath('examples/plugins/repo-custom-fields/ui/index.js'), 'plugin-repo-custom-fields');
-check('repo-info-card UI touches info card scene', classifyPath('examples/plugins/repo-info-card/ui/index.html'), 'plugin-repo-info-card');
-check('repo-insights UI touches insights scene', classifyPath('examples/plugins/repo-insights/ui/style.css'), 'plugin-repo-insights');
-check('plugin example manifest touches settings and plugin views', classifyPath('examples/plugins/repo-custom-fields/manifest.json'), [
-  'settings',
-  'plugin-repo-custom-fields',
-  'plugin-repo-info-card',
-  'plugin-repo-insights',
-]);
-check('plugin feature touches settings and plugin views', classifyPath('src/features/plugins/hooks/usePluginAI.ts'), [
-  'settings',
-  'plugin-repo-custom-fields',
-  'plugin-repo-info-card',
-  'plugin-repo-insights',
-]);
-check('plugin locale touches settings and plugin views', classifyPath('src/locales/zh/plugins.json'), [
-  'settings',
-  'plugin-repo-custom-fields',
-  'plugin-repo-info-card',
-  'plugin-repo-insights',
-]);
+// 4. classifyPath — plugin host code vs. individual plugin pages
+check('plugin infra touches repositories and plugins settings', classifyPath('src/plugins/pluginIcons.ts'), ['repositories', 'settings-plugins']);
+check('plugin client touches repositories and plugins settings', classifyPath('src/plugins/pluginClient.ts'), ['repositories', 'settings-plugins']);
+check('plugin feature touches repositories and plugins settings', classifyPath('src/features/plugins/hooks/usePluginAI.ts'), ['repositories', 'settings-plugins']);
+check('plugin page viewer touches repositories and plugins settings', classifyPath('src/components/PluginPageViewer.tsx'), ['repositories', 'settings-plugins']);
+check('plugin page modal touches repositories and plugins settings', classifyPath('src/components/PluginPageModal.tsx'), ['repositories', 'settings-plugins']);
 
-check('timelineSlice touches releases and forks', classifyPath('src/store/slices/timelineSlice.ts'), ['releases', 'forks']);
+check('known plugin ui maps to its own spec', classifyPath('examples/plugins/repo-custom-fields/ui/index.js'), 'plugin:repo-custom-fields');
+check('known plugin manifest maps to spec plus plugins settings', classifyPath('examples/plugins/repo-custom-fields/manifest.json'), ['settings-plugins', 'plugin:repo-custom-fields']);
+check('another plugin ui maps to its own spec', classifyPath('examples/plugins/repo-info-card/ui/index.html'), 'plugin:repo-info-card');
+check('third plugin ui maps to its own spec', classifyPath('examples/plugins/repo-insights/ui/style.css'), 'plugin:repo-insights');
+check('newly added plugin ui maps to its own spec', classifyPath('examples/plugins/brand-new-plugin/ui/index.html'), 'plugin:brand-new-plugin');
+check('newly added plugin manifest maps to spec plus plugins settings', classifyPath('examples/plugins/brand-new-plugin/manifest.json'), ['settings-plugins', 'plugin:brand-new-plugin']);
+check('plugin nested ui file maps to its own spec', classifyPath('examples/plugins/repo-custom-fields/ui/lib/widget.js'), 'plugin:repo-custom-fields');
+check('plugin non-ui file is ignored by classifier', classifyPath('examples/plugins/repo-custom-fields/scripts/build.js'), null);
+
+// 5. classifyPath — locales fall back to namespace scope without a key diff
+check('repositories locale', classifyPath('src/locales/zh/repositories.json'), ['repositories']);
+check('gists locale', classifyPath('src/locales/zh/gists.json'), ['gists']);
+check('releases locale', classifyPath('src/locales/en/releases.json'), ['releases']);
+check('forks locale', classifyPath('src/locales/ja/forks.json'), ['forks']);
+check('discovery locale', classifyPath('src/locales/zh/discovery.json'), ['discovery']);
+check('settings locale', classifyPath('src/locales/zh/settings.json'), ['settings']);
+check('chat locale', classifyPath('src/locales/zh/chat.json'), ['repositories']);
+check('search locale', classifyPath('src/locales/zh/search.json'), ['repositories']);
+check('plugins locale mixes repositories and plugins settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings-plugins']);
+check('app locale is conservative global', classifyPath('src/locales/zh/app.json'), ['global']);
+check('common locale is global', classifyPath('src/locales/zh/common.json'), ['global']);
+check('login locale is global', classifyPath('src/locales/zh/login.json'), ['global']);
+
+// 6. classifyPath — state containers are deferred, global chrome is global
+check('preference slice is deferred', classifyPath('src/store/slices/preferenceSlice.ts'), 'deferred');
+check('auth slice is deferred', classifyPath('src/store/slices/authSlice.ts'), 'deferred');
+check('unknown slice is deferred', classifyPath('src/store/slices/futureSlice.ts'), 'deferred');
+check('initial state is deferred', classifyPath('src/store/initialState.ts'), 'deferred');
+check('schema is deferred', classifyPath('src/store/schema.ts'), 'deferred');
+check('timeline slice touches releases and forks', classifyPath('src/store/slices/timelineSlice.ts'), ['releases', 'forks']);
 
 check('App.tsx is global', classifyPath('src/App.tsx'), 'global');
 check('main.tsx is global', classifyPath('src/main.tsx'), 'global');
@@ -137,10 +173,75 @@ check('Header.tsx is global', classifyPath('src/components/Header.tsx'), 'global
 check('Modal.tsx is global', classifyPath('src/components/Modal.tsx'), 'global');
 check('ui button is global', classifyPath('src/components/ui/button.tsx'), 'global');
 check('tailwind.config.js is global', classifyPath('tailwind.config.js'), 'global');
+check('vite.config.ts is global', classifyPath('vite.config.ts'), 'global');
 check('themeTokens.ts is global', classifyPath('src/types/themeTokens.ts'), 'global');
 check('markdownUtils.ts is global', classifyPath('src/utils/markdownUtils.ts'), 'global');
+check('WorkspacePageHeader is global', classifyPath('src/components/WorkspacePageHeader.tsx'), 'global');
+check('src/lib/utils.ts is global', classifyPath('src/lib/utils.ts'), 'global');
+check('public asset is global', classifyPath('public/icon.svg'), 'global');
+check('unclassified component falls back to global', classifyPath('src/components/FutureWidget.tsx'), 'global');
+check('unclassified feature falls back to global', classifyPath('src/features/future/Foo.tsx'), 'global');
+check('i18n infra is deferred', classifyPath('src/i18n/useT.ts'), 'deferred');
+check('unmapped hook is deferred', classifyPath('src/hooks/useDialog.tsx'), 'deferred');
+check('unmapped util is deferred', classifyPath('src/utils/repoUtils.ts'), 'deferred');
+check('store wiring is deferred', classifyPath('src/store/useAppStore.ts'), 'deferred');
+check('mapped release hook keeps its precise scene', classifyPath('src/hooks/useReleaseArtifactActions.ts'), 'releases');
+check('state-only i18n diff falls back to all scenes', mapPathsToScenes(['src/i18n/useT.ts']), ALL_SCENES);
 
-// 3. mapPathsToScenes tests
+// 7. classifyLocaleKeys — key-level mapping within a namespace
+check('app key maps to its panel scene', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins']);
+check('app data panel key maps to data scene', classifyLocaleKeys('app', ['dataManagementPanel']), ['settings-data']);
+check('app theme key maps to appearance scene', classifyLocaleKeys('app', ['themeSettingsCard']), ['settings-appearance']);
+check('app general panel key spans general and appearance', classifyLocaleKeys('app', ['generalPanel']), ['settings-general', 'settings-appearance']);
+check('app menu panel key spans menu and appearance', classifyLocaleKeys('app', ['menuManagementPanel']), ['settings-menu', 'settings-appearance']);
+check('app category utils key spans repositories and category tab', classifyLocaleKeys('app', ['categoryUtils']), ['repositories', 'settings-category']);
+check('app asset filter key spans releases and repositories', classifyLocaleKeys('app', ['assetFilterManager']), ['releases', 'repositories']);
+check('app plugin page viewer key spans repositories and plugins settings', classifyLocaleKeys('app', ['pluginPageViewer']), ['repositories', 'settings-plugins']);
+check('app shell key maps to the settings view', classifyLocaleKeys('app', ['settingsPanel']), ['settings']);
+check('app header key is global', classifyLocaleKeys('app', ['header']), ['global']);
+check('app markdown keys span their consumers', classifyLocaleKeys('app', ['markdownRenderer']), ['repositories', 'releases', 'discovery']);
+check('unknown app key escalates to global', classifyLocaleKeys('app', ['somethingBrandNew']), ['global']);
+check('mixed known and unknown app keys escalate to global', classifyLocaleKeys('app', ['dataManagementPanel', 'somethingBrandNew']), ['settings-data', 'global']);
+check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginSettingsPanel', 'generalPanel']), ['settings-plugins', 'settings-general', 'settings-appearance']);
+check('settings hook key maps to its tab', classifyLocaleKeys('settings', ['useMcpActions']), ['settings-mcp']);
+check('star sync hook key spans its tab and repositories', classifyLocaleKeys('settings', ['useStarSyncActions']), ['settings-star-sync', 'repositories']);
+check('unknown settings key escalates to the settings view', classifyLocaleKeys('settings', ['futureHook']), ['settings']);
+check('plugins telegram key maps to discovery', classifyLocaleKeys('plugins', ['telegramMessageModal']), ['discovery']);
+check('plugins action key maps to repositories and plugins settings', classifyLocaleKeys('plugins', ['applyPluginActionResult']), ['repositories', 'settings-plugins']);
+check('chat key maps to repositories', classifyLocaleKeys('chat', ['repositoryChatSheet']), ['repositories']);
+check('namespace without table falls back to its scope', classifyLocaleKeys('gists', ['gistViewAnything']), ['gists']);
+check('common namespace falls back to global', classifyLocaleKeys('common', ['anything']), ['global']);
+check('releases fork keys map to forks', classifyLocaleKeys('releases', ['forkCard', 'forkTimeline']), ['forks']);
+check('releases subscription key maps to discovery', classifyLocaleKeys('releases', ['subscriptionRepoCard']), ['discovery']);
+check('releases sheet key spans releases and repositories', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories']);
+check('releases panel keys stay in releases', classifyLocaleKeys('releases', ['releaseCard']), ['releases']);
+check('repositories card key spans repositories and appearance', classifyLocaleKeys('repositories', ['repositoryCard']), ['repositories', 'settings-appearance']);
+check('repositories other keys stay in repositories', classifyLocaleKeys('repositories', ['batchStar']), ['repositories']);
+check('common fork timeline key maps to forks', classifyLocaleKeys('common', ['useForkTimelineActions']), ['forks']);
+
+// 8. classifyLocaleFile — key diff available, empty, or unavailable
+check('locale file with key diff maps precisely', classifyLocaleFile('src/locales/zh/app.json', ['pluginSettingsPanel']), ['settings-plugins']);
+check('locale file whose keys did not change maps to nothing', classifyLocaleFile('src/locales/zh/app.json', []), []);
+check('locale file without key diff uses namespace fallback', classifyLocaleFile('src/locales/zh/app.json'), ['global']);
+check('gists locale with unknown keys stays in gists', classifyLocaleFile('src/locales/zh/gists.json', ['newKey']), ['gists']);
+check('non-locale path classifies to nothing', classifyLocaleFile('src/components/GistView.tsx'), []);
+
+// 9. diffTopLevelKeys
+check('detects added and changed keys', diffTopLevelKeys(
+  JSON.stringify({ a: 1, b: { x: 1 } }),
+  JSON.stringify({ a: 1, b: { x: 2 }, c: 3 }),
+), ['b', 'c']);
+check('detects removed keys', diffTopLevelKeys(
+  JSON.stringify({ a: 1, gone: 2 }),
+  JSON.stringify({ a: 1 }),
+), ['gone']);
+check('formatting-only change yields no keys', diffTopLevelKeys(
+  '{\n  "a": 1\n}',
+  '{"a":1}',
+), []);
+check('invalid json is treated conservatively', diffTopLevelKeys('not json', '{"a":1}'), ['a']);
+
+// 10. mapPathsToScenes — precision and expansion
 check('empty paths produces empty scenes', mapPathsToScenes([]), []);
 check('pure documentation produces empty scenes', mapPathsToScenes([
   'README.md',
@@ -180,31 +281,41 @@ check('discovery change maps only to discovery', mapPathsToScenes([
   'src/locales/zh/discovery.json',
 ]), ['discovery']);
 
-check('settings change maps only to settings', mapPathsToScenes([
+check('one settings panel maps to one tab scene', mapPathsToScenes([
+  'src/components/settings/DataManagementPanel.tsx',
+]), ['settings-data']);
+
+check('two settings panels map to their two tab scenes', mapPathsToScenes([
+  'src/components/settings/AIConfigPanel.tsx',
+  'src/components/settings/NetworkPanel.tsx',
+]), ['settings-ai', 'settings-network']);
+
+check('settings shell maps to every settings tab', mapPathsToScenes([
   'src/components/SettingsPanel.tsx',
-]), ['settings']);
+]), [...SETTINGS_TABS.map((t) => t.scene)]);
 
 check('repositories change maps to repositories-light and repositories-dark', mapPathsToScenes([
   'src/components/RepositoryList.tsx',
 ]), ['repositories-light', 'repositories-dark']);
 
-check('repoSearch helper change maps to repositories-light and repositories-dark', mapPathsToScenes([
-  'src/utils/repoSearch.ts',
-]), ['repositories-light', 'repositories-dark']);
-
-check('repo-custom-fields UI change maps to plugin-repo-custom-fields', mapPathsToScenes([
+check('plugin ui change maps only to that plugin', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/ui/index.js',
-]), ['plugin-repo-custom-fields']);
+]), ['plugin:repo-custom-fields']);
 
-check('plugin UI change with worker and readme still maps to custom fields scene', mapPathsToScenes([
+check('plugin ui change with worker and readme still maps to its own scene', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/ui/style.css',
   'examples/plugins/markdown-exporter/worker.js',
   'examples/plugins/repo-custom-fields/README.md',
-]), ['plugin-repo-custom-fields']);
+]), ['plugin:repo-custom-fields']);
 
-check('general plugin UI change maps to settings and all plugin scenes', mapPathsToScenes([
+check('new plugin addition maps to its pages plus plugins settings', mapPathsToScenes([
+  'examples/plugins/brand-new-plugin/manifest.json',
+  'examples/plugins/brand-new-plugin/ui/index.html',
+]), ['settings-plugins', 'plugin:brand-new-plugin']);
+
+check('plugin host change maps to repositories and plugins settings', mapPathsToScenes([
   'src/components/PluginPageModal.tsx',
-]), ['settings', 'plugin-repo-custom-fields', 'plugin-repo-info-card', 'plugin-repo-insights']);
+]), ['repositories-light', 'repositories-dark', 'settings-plugins']);
 
 check('multiple views touched maps to the union of their scenes', mapPathsToScenes([
   'src/components/GistView.tsx',
@@ -220,7 +331,12 @@ check('view change combined with global UI maps to ALL_SCENES', mapPathsToScenes
   'src/index.css',
 ]), ALL_SCENES);
 
-check('PR 575 commit 8f2fbc18 (with Modal.tsx) maps to ALL_SCENES', mapPathsToScenes([
+check('global change still includes plugin specs from the same diff', mapPathsToScenes([
+  'src/components/Header.tsx',
+  'examples/plugins/repo-insights/ui/index.html',
+]), [...ALL_SCENES, 'plugin:repo-insights']);
+
+check('PR 575 commit 8f2fbc18 (with Modal.tsx) maps to ALL_SCENES plus the plugin', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/README.md',
   'examples/plugins/repo-custom-fields/manifest.json',
   'examples/plugins/repo-custom-fields/ui/index.js',
@@ -228,18 +344,132 @@ check('PR 575 commit 8f2fbc18 (with Modal.tsx) maps to ALL_SCENES', mapPathsToSc
   'src/components/Modal.tsx',
   'src/components/PluginPageModal.test.tsx',
   'src/components/PluginPageModal.tsx',
-]), ALL_SCENES);
+]), [...ALL_SCENES, 'plugin:repo-custom-fields']);
 
 check('PR 575 commit cfd97a2d (docs only) maps to empty scenes', mapPathsToScenes([
   'docs/plugins/v1-development.md',
   'examples/plugins/repo-custom-fields/README.md',
 ]), []);
 
-check('timelineSlice maps to releases and forks', mapPathsToScenes([
-  'src/store/slices/timelineSlice.ts',
-]), ['releases', 'forks']);
+// 11. mapPathsToScenes — deferred state containers
+check('state-only diff falls back to all scenes', mapPathsToScenes([
+  'src/store/slices/preferenceSlice.ts',
+]), ALL_SCENES);
 
-// 4. collectChangedPaths request selection tests (synchronize vs opened)
+check('state diff alongside components follows the components', mapPathsToScenes([
+  'src/store/slices/preferenceSlice.ts',
+  'src/components/settings/PluginSettingsPanel.tsx',
+]), ['settings-plugins']);
+
+check('state diff alongside view components follows the views', mapPathsToScenes([
+  'src/store/schema.ts',
+  'src/components/RepositoryCard.tsx',
+]), ['repositories-light', 'repositories-dark']);
+
+check('deferred plus plugin spec keeps the plugin spec', mapPathsToScenes([
+  'src/store/initialState.ts',
+  'examples/plugins/repo-info-card/ui/index.html',
+]), ['plugin:repo-info-card']);
+
+// 12. mapPathsToScenes — locale key-level diffing
+check('locale key diff maps only the affected settings tab', mapPathsToScenes(
+  ['src/locales/zh/app.json'],
+  { 'src/locales/zh/app.json': ['pluginSettingsPanel'] },
+), ['settings-plugins']);
+
+check('locale file with no visible key change maps to nothing', mapPathsToScenes(
+  ['src/locales/zh/app.json'],
+  { 'src/locales/zh/app.json': [] },
+), []);
+
+check('locale key diff for global keys still expands to all scenes', mapPathsToScenes(
+  ['src/locales/zh/app.json'],
+  { 'src/locales/zh/app.json': ['header'] },
+), ALL_SCENES);
+
+check('locale file without a key diff stays conservative', mapPathsToScenes(
+  ['src/locales/zh/app.json'],
+  {},
+), ALL_SCENES);
+
+check('view locale key diffs stay in their view', mapPathsToScenes(
+  ['src/locales/zh/gists.json'],
+  { 'src/locales/zh/gists.json': ['brandNewKey'] },
+), ['gists']);
+
+check('plugins locale keys map telegram to discovery only', mapPathsToScenes(
+  ['src/locales/zh/plugins.json'],
+  { 'src/locales/zh/plugins.json': ['telegramMessageModal'] },
+), ['discovery']);
+
+check('PR 577 zh/app.json icon-picker keys map to the plugins settings tab', mapPathsToScenes(
+  ['src/locales/zh/app.json'],
+  { 'src/locales/zh/app.json': ['pluginSettingsPanel'] },
+), ['settings-plugins']);
+
+// 13. mapPathsToScenes — the full PR 577 file list (simulated audit case)
+const pr577Files = [
+  'eslint.config.js',
+  'src/components/BulkActionToolbar.tsx',
+  'src/components/RepositoryCard.test.tsx',
+  'src/components/RepositoryCard.tsx',
+  'src/components/settings/DataManagementPanel.tsx',
+  'src/components/settings/PluginIconPickerDialog.test.tsx',
+  'src/components/settings/PluginIconPickerDialog.tsx',
+  'src/components/settings/PluginSettingsPanel.tsx',
+  'src/components/settings/RepositoryCardActionsSettings.test.tsx',
+  'src/components/settings/RepositoryCardActionsSettings.tsx',
+  'src/hooks/useDialog.tsx',
+  'src/locales/de/app.json',
+  'src/locales/de/repositories.json',
+  'src/locales/en/app.json',
+  'src/locales/en/repositories.json',
+  'src/locales/es/app.json',
+  'src/locales/es/repositories.json',
+  'src/locales/fr/app.json',
+  'src/locales/fr/repositories.json',
+  'src/locales/ja/app.json',
+  'src/locales/ja/repositories.json',
+  'src/locales/ko/app.json',
+  'src/locales/ko/repositories.json',
+  'src/locales/pt-BR/app.json',
+  'src/locales/pt-BR/repositories.json',
+  'src/locales/ru/app.json',
+  'src/locales/ru/repositories.json',
+  'src/locales/zh-TW/app.json',
+  'src/locales/zh-TW/repositories.json',
+  'src/locales/zh/app.json',
+  'src/locales/zh/repositories.json',
+  'src/plugins/PluginIcon.tsx',
+  'src/plugins/applyPluginActionResult.ts',
+  'src/plugins/pluginIcons.test.tsx',
+  'src/plugins/pluginIcons.ts',
+  'src/store/initialState.ts',
+  'src/store/normalizers/persistedState.ts',
+  'src/store/persistence/options.ts',
+  'src/store/schema.ts',
+  'src/store/slices/preferenceSlice.ts',
+  'src/store/types.ts',
+  'src/types/index.ts',
+  'src/types/repositoryCardActions.ts',
+  'src/utils/repositoryCardActions.ts',
+];
+const pr577LocaleKeys = Object.fromEntries(
+  pr577Files
+    .filter((p) => p.endsWith('/app.json') || p.endsWith('/repositories.json'))
+    .map((p) => [p, p.endsWith('/app.json') ? ['pluginSettingsPanel'] : ['repositoryCardActions']]),
+);
+check('PR 577 full diff maps to exactly the changed pages', mapPathsToScenes(pr577Files, pr577LocaleKeys), [
+  'repositories-light',
+  'repositories-dark',
+  'settings-appearance',
+  'settings-data',
+  'settings-plugins',
+]);
+
+check('PR 577 diff without locale key diffs stays conservative', mapPathsToScenes(pr577Files), ALL_SCENES);
+
+// 14. collectChangedPaths request selection tests (synchronize vs opened)
 const beforeSha = '1111111111111111111111111111111111111111';
 const headSha = '2222222222222222222222222222222222222222';
 
@@ -409,6 +639,67 @@ const syncFallbackPaths = collectChangedPaths({
 });
 check('synchronize falling back to PR files on compare failure', syncFallbackPaths, ['src/components/GistView.tsx']);
 check('synchronize fallback to PR files maps to gist scene', mapPathsToScenes(syncFallbackPaths), ['gists']);
+
+// 15. diffLocaleKeys — key-level diffing over the contents API
+const baseAppJson = JSON.stringify({
+  settingsPanel: { general: '通用' },
+  pluginSettingsPanel: { 'customize-icon': '自定义图标' },
+  header: { settings: '设置' },
+});
+const headAppJson = JSON.stringify({
+  settingsPanel: { general: '通用' },
+  pluginSettingsPanel: { 'customize-icon': '自定义图标', 'reset-icon': '恢复默认图标' },
+  header: { settings: '设置' },
+});
+const baseGistsJson = JSON.stringify({ gistView: { title: 'Gist' } });
+const headGistsJson = baseGistsJson;
+
+const mockContentExecutor = (args) => {
+  const url = args[1];
+  const ref = (args.find((a) => a.startsWith('ref=')) ?? '').slice(4);
+  if (url.includes('src%2Flocales%2Fzh%2Fapp.json') || url.includes('src/locales/zh/app.json')) {
+    return ref === beforeSha ? baseAppJson : headAppJson;
+  }
+  if (url.includes('src/locales/zh/gists.json') || url.includes('src%2Flocales%2Fzh%2Fgists.json')) {
+    return ref === beforeSha ? baseGistsJson : headGistsJson;
+  }
+  throw new Error(`unexpected api call: ${url}`);
+};
+
+const localeKeys = await diffLocaleKeys({
+  repo: 'owner/repo',
+  paths: ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
+  baseRef: beforeSha,
+  headRef: headSha,
+  executor: mockContentExecutor,
+});
+check('locale key diff returns changed keys per file', localeKeys, {
+  'src/locales/zh/app.json': ['pluginSettingsPanel'],
+  'src/locales/zh/gists.json': [],
+});
+check('locale key diff integrates with scene mapping', mapPathsToScenes(
+  ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
+  localeKeys,
+), ['settings-plugins']);
+
+const mockFailingContentExecutor = (args) => {
+  const url = args[1];
+  const ref = (args.find((a) => a.startsWith('ref=')) ?? '').slice(4);
+  if (url.includes('gists.json') || url.includes('gists%2F')) throw new Error('contents api down');
+  return ref === beforeSha ? baseAppJson : headAppJson;
+};
+const partialKeys = await diffLocaleKeys({
+  repo: 'owner/repo',
+  paths: ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
+  baseRef: beforeSha,
+  headRef: headSha,
+  executor: mockFailingContentExecutor,
+});
+check('unreadable locale files are omitted for file-level fallback', Object.keys(partialKeys), ['src/locales/zh/app.json']);
+check('omitted locale files fall back conservatively in scene mapping', mapPathsToScenes(
+  ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
+  partialKeys,
+), ['gists', 'settings-plugins']);
 
 console.log(`\nTest result: ${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures ? 1 : 0);
