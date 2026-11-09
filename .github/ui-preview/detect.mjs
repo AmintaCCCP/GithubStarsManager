@@ -673,10 +673,11 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   const tokens = new Set();
   let hasGlobal = false;
   let hasDeferred = false;
-  // Static scenes that exist only because a plugin manifest changed (the
-  // manifest feeds the Settings › Plugins list). They do not confirm that an
-  // accompanying deferred change's blast radius is covered.
-  const manifestOnlyScenes = new Set();
+  // Provenance per static scene: a scene confirms coverage for an
+  // accompanying deferred change only when some app component (not a plugin
+  // manifest) provided it.
+  const appScenes = new Set();
+  const manifestScenes = new Set();
 
   for (const path of paths) {
     if (path === '*' || path === '__ALL__') {
@@ -700,7 +701,8 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
       else if (token === 'deferred') hasDeferred = true;
       else {
         tokens.add(token);
-        if (fromManifest) manifestOnlyScenes.add(token);
+        if (fromManifest) manifestScenes.add(token);
+        else if (!token.startsWith('plugin:')) appScenes.add(token);
       }
     }
   }
@@ -729,8 +731,7 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   // unless concrete app-component scenes were found in the same diff. Scenes
   // that exist only through a plugin manifest (and plugin specs alone) do not
   // cover the rest of the app a translation or state change could touch.
-  const appCoveredScenes = [...selectedScenes].filter((scene) => !manifestOnlyScenes.has(scene));
-  if (hasDeferred && appCoveredScenes.length === 0) {
+  if (hasDeferred && appScenes.size === 0) {
     hasGlobal = true;
   }
 

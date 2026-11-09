@@ -389,6 +389,12 @@ check('deferred i18n beside a real plugin panel follows the component', mapPaths
   'src/components/settings/PluginSettingsPanel.tsx',
 ]), ['settings-plugins']);
 
+check('deferred i18n with manifest and real panel keeps the panel coverage', mapPathsToScenes([
+  'src/i18n/useT.ts',
+  'examples/plugins/repo-info-card/manifest.json',
+  'src/components/settings/PluginSettingsPanel.tsx',
+]), ['settings-plugins', 'plugin:repo-info-card']);
+
 // 12. mapPathsToScenes — locale key-level diffing
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
   ['src/locales/zh/app.json'],
