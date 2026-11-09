@@ -550,6 +550,7 @@ export function classifyPath(filePath) {
     path === 'src/main.tsx' ||
     path === 'src/index.css' ||
     path.startsWith('src/styles/') ||
+    path.startsWith('src/i18n/') ||
     /^src\/components\/Header\./.test(path) ||
     /^src\/components\/WorkspacePageHeader\./.test(path) ||
     path.startsWith('src/components/ui/') ||
@@ -587,13 +588,13 @@ export function classifyPath(filePath) {
     return 'global';
   }
 
-  // UI-adjacent infrastructure (hooks, i18n, remaining utils/store files)
+  // UI-adjacent infrastructure (hooks, remaining utils/store files)
   // can render on any page: defer like state containers, so a diff touching
   // only these still falls back to global instead of silently capturing
-  // nothing.
+  // nothing. i18n modules are NOT deferred: every page renders translated
+  // strings, so they classify as global above.
   if (
     path.startsWith('src/hooks/') ||
-    path.startsWith('src/i18n/') ||
     path.startsWith('src/utils/') ||
     path.startsWith('src/store/')
   ) {

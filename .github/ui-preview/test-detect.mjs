@@ -181,12 +181,13 @@ check('src/lib/utils.ts is global', classifyPath('src/lib/utils.ts'), 'global');
 check('public asset is global', classifyPath('public/icon.svg'), 'global');
 check('unclassified component falls back to global', classifyPath('src/components/FutureWidget.tsx'), 'global');
 check('unclassified feature falls back to global', classifyPath('src/features/future/Foo.tsx'), 'global');
-check('i18n infra is deferred', classifyPath('src/i18n/useT.ts'), 'deferred');
+check('i18n infra is global (every page renders translations)', classifyPath('src/i18n/useT.ts'), 'global');
 check('unmapped hook is deferred', classifyPath('src/hooks/useDialog.tsx'), 'deferred');
 check('unmapped util is deferred', classifyPath('src/utils/repoUtils.ts'), 'deferred');
 check('store wiring is deferred', classifyPath('src/store/useAppStore.ts'), 'deferred');
 check('mapped release hook keeps its precise scene', classifyPath('src/hooks/useReleaseArtifactActions.ts'), 'releases');
-check('state-only i18n diff falls back to all scenes', mapPathsToScenes(['src/i18n/useT.ts']), ALL_SCENES);
+check('i18n diff maps to all scenes', mapPathsToScenes(['src/i18n/useT.ts']), ALL_SCENES);
+check('i18n diff beside panels stays global', mapPathsToScenes(['src/i18n/useT.ts', 'src/components/GistView.tsx']), ALL_SCENES);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app key maps to its panel scene', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins']);
@@ -374,26 +375,15 @@ check('deferred plus plugin spec escalates to global so no page is missed', mapP
   'examples/plugins/repo-info-card/ui/index.html',
 ]), [...ALL_SCENES, 'plugin:repo-info-card']);
 
-check('deferred i18n plus plugin spec escalates to global', mapPathsToScenes([
+check('global i18n diff keeps plugin specs from the same diff', mapPathsToScenes([
   'src/i18n/useT.ts',
   'examples/plugins/repo-insights/ui/index.html',
 ]), [...ALL_SCENES, 'plugin:repo-insights']);
 
-check('deferred i18n plus plugin manifest escalates to global', mapPathsToScenes([
+check('global i18n diff keeps plugin manifest specs', mapPathsToScenes([
   'src/i18n/useT.ts',
   'examples/plugins/repo-info-card/manifest.json',
 ]), [...ALL_SCENES, 'plugin:repo-info-card']);
-
-check('deferred i18n beside a real plugin panel follows the component', mapPathsToScenes([
-  'src/i18n/useT.ts',
-  'src/components/settings/PluginSettingsPanel.tsx',
-]), ['settings-plugins']);
-
-check('deferred i18n with manifest and real panel keeps the panel coverage', mapPathsToScenes([
-  'src/i18n/useT.ts',
-  'examples/plugins/repo-info-card/manifest.json',
-  'src/components/settings/PluginSettingsPanel.tsx',
-]), ['settings-plugins', 'plugin:repo-info-card']);
 
 // 12. mapPathsToScenes — locale key-level diffing
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
