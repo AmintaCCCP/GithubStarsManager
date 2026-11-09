@@ -145,15 +145,15 @@ check('plugin nested ui file maps to its own spec', classifyPath('examples/plugi
 check('plugin non-ui file is ignored by classifier', classifyPath('examples/plugins/repo-custom-fields/scripts/build.js'), null);
 
 // 5. classifyPath — locales fall back to namespace scope without a key diff
-check('repositories locale', classifyPath('src/locales/zh/repositories.json'), ['repositories']);
+check('repositories locale fallback covers appearance consumers', classifyPath('src/locales/zh/repositories.json'), ['repositories', 'settings-appearance']);
 check('gists locale', classifyPath('src/locales/zh/gists.json'), ['gists']);
-check('releases locale', classifyPath('src/locales/en/releases.json'), ['releases']);
+check('releases locale fallback covers cross-view consumers', classifyPath('src/locales/en/releases.json'), ['releases', 'repositories', 'forks', 'discovery']);
 check('forks locale', classifyPath('src/locales/ja/forks.json'), ['forks']);
 check('discovery locale', classifyPath('src/locales/zh/discovery.json'), ['discovery']);
-check('settings locale', classifyPath('src/locales/zh/settings.json'), ['settings']);
+check('settings locale', classifyPath('src/locales/zh/settings.json'), ['repositories', 'settings']);
 check('chat locale', classifyPath('src/locales/zh/chat.json'), ['repositories']);
 check('search locale', classifyPath('src/locales/zh/search.json'), ['repositories']);
-check('plugins locale mixes repositories and plugins settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings-plugins']);
+check('plugins locale mixes repositories and plugins settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings-plugins', 'discovery']);
 check('app locale is conservative global', classifyPath('src/locales/zh/app.json'), ['global']);
 check('common locale is global', classifyPath('src/locales/zh/common.json'), ['global']);
 check('login locale is global', classifyPath('src/locales/zh/login.json'), ['global']);
@@ -205,7 +205,10 @@ check('mixed known and unknown app keys escalate to global', classifyLocaleKeys(
 check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginSettingsPanel', 'generalPanel']), ['settings-plugins', 'settings-general', 'settings-appearance']);
 check('settings hook key maps to its tab', classifyLocaleKeys('settings', ['useMcpActions']), ['settings-mcp']);
 check('star sync hook key spans its tab and repositories', classifyLocaleKeys('settings', ['useStarSyncActions']), ['settings-star-sync', 'repositories']);
-check('unknown settings key escalates to the settings view', classifyLocaleKeys('settings', ['futureHook']), ['settings']);
+check('unknown settings key escalates to the settings view', classifyLocaleKeys('settings', ['futureHook']), ['repositories', 'settings']);
+check('unknown releases key covers every consumer view', classifyLocaleKeys('releases', ['releaseCard']), ['releases', 'repositories', 'forks', 'discovery']);
+check('unknown repositories key covers appearance consumers', classifyLocaleKeys('repositories', ['futureKey']), ['repositories', 'settings-appearance']);
+check('unknown plugins key covers discovery consumers', classifyLocaleKeys('plugins', ['futureKey']), ['repositories', 'settings-plugins', 'discovery']);
 check('plugins telegram key maps to discovery', classifyLocaleKeys('plugins', ['telegramMessageModal']), ['discovery']);
 check('plugins action key maps to repositories and plugins settings', classifyLocaleKeys('plugins', ['applyPluginActionResult']), ['repositories', 'settings-plugins']);
 check('chat key maps to repositories', classifyLocaleKeys('chat', ['repositoryChatSheet']), ['repositories']);
@@ -214,9 +217,9 @@ check('common namespace falls back to global', classifyLocaleKeys('common', ['an
 check('releases fork keys map to forks', classifyLocaleKeys('releases', ['forkCard', 'forkTimeline']), ['forks']);
 check('releases subscription key maps to discovery', classifyLocaleKeys('releases', ['subscriptionRepoCard']), ['discovery']);
 check('releases sheet key spans releases and repositories', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories']);
-check('releases panel keys stay in releases', classifyLocaleKeys('releases', ['releaseCard']), ['releases']);
+check('releases keys outside the table use the namespace fallback', classifyLocaleKeys('releases', ['useReleaseTimelineActions']), ['releases', 'repositories', 'forks', 'discovery']);
 check('repositories card key spans repositories and appearance', classifyLocaleKeys('repositories', ['repositoryCard']), ['repositories', 'settings-appearance']);
-check('repositories other keys stay in repositories', classifyLocaleKeys('repositories', ['batchStar']), ['repositories']);
+check('repositories keys outside the table use the namespace fallback', classifyLocaleKeys('repositories', ['batchStar']), ['repositories', 'settings-appearance']);
 check('common fork timeline key maps to forks', classifyLocaleKeys('common', ['useForkTimelineActions']), ['forks']);
 
 // 8. classifyLocaleFile — key diff available, empty, or unavailable
@@ -366,10 +369,15 @@ check('state diff alongside view components follows the views', mapPathsToScenes
   'src/components/RepositoryCard.tsx',
 ]), ['repositories-light', 'repositories-dark']);
 
-check('deferred plus plugin spec keeps the plugin spec', mapPathsToScenes([
+check('deferred plus plugin spec escalates to global so no page is missed', mapPathsToScenes([
   'src/store/initialState.ts',
   'examples/plugins/repo-info-card/ui/index.html',
-]), ['plugin:repo-info-card']);
+]), [...ALL_SCENES, 'plugin:repo-info-card']);
+
+check('deferred i18n plus plugin spec escalates to global', mapPathsToScenes([
+  'src/i18n/useT.ts',
+  'examples/plugins/repo-insights/ui/index.html',
+]), [...ALL_SCENES, 'plugin:repo-insights']);
 
 // 12. mapPathsToScenes — locale key-level diffing
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
@@ -656,11 +664,11 @@ const headGistsJson = baseGistsJson;
 
 const mockContentExecutor = (args) => {
   const url = args[1];
-  const ref = (args.find((a) => a.startsWith('ref=')) ?? '').slice(4);
-  if (url.includes('src%2Flocales%2Fzh%2Fapp.json') || url.includes('src/locales/zh/app.json')) {
+  const ref = decodeURIComponent((url.match(/[?&]ref=([^&]+)$/) ?? [])[1] ?? '');
+  if (url.includes('src/locales/zh/app.json')) {
     return ref === beforeSha ? baseAppJson : headAppJson;
   }
-  if (url.includes('src/locales/zh/gists.json') || url.includes('src%2Flocales%2Fzh%2Fgists.json')) {
+  if (url.includes('src/locales/zh/gists.json')) {
     return ref === beforeSha ? baseGistsJson : headGistsJson;
   }
   throw new Error(`unexpected api call: ${url}`);
@@ -684,8 +692,8 @@ check('locale key diff integrates with scene mapping', mapPathsToScenes(
 
 const mockFailingContentExecutor = (args) => {
   const url = args[1];
-  const ref = (args.find((a) => a.startsWith('ref=')) ?? '').slice(4);
-  if (url.includes('gists.json') || url.includes('gists%2F')) throw new Error('contents api down');
+  const ref = decodeURIComponent((url.match(/[?&]ref=([^&]+)$/) ?? [])[1] ?? '');
+  if (url.includes('gists.json')) throw new Error('contents api down');
   return ref === beforeSha ? baseAppJson : headAppJson;
 };
 const partialKeys = await diffLocaleKeys({

@@ -97,16 +97,41 @@ async function listBundledPlugins(url) {
   return Array.isArray(index) ? index.filter((slug) => typeof slug === 'string') : [];
 }
 
+/** Scene names must survive publish.mjs's allow-list (`^[a-z0-9][a-z0-9-]*\.png$`)
+ *  and must not escape the output directory, so slugs and page ids from PR
+ *  manifests are validated and re-encoded into a publish-compatible form. */
+const SAFE_MANIFEST_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * Re-encode a slug or page id into a filename-safe, publish-compatible
+ * segment (lowercase, only [a-z0-9-], non-empty).
+ * @param {string} value - Raw manifest segment.
+ * @param {string} fallback - Name to use when nothing survives the encoding.
+ * @returns {string} Sanitized segment.
+ */
+const nameSegment = (value, fallback) => {
+  const clean = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return clean || fallback;
+};
+
 /**
  * Expand `plugin:<slug>` specs into concrete page scenes by reading each
- * plugin's manifest from the built bundle.
+ * plugin's manifest from the built bundle. Manifest-supplied slugs and page
+ * ids are validated (no traversal, sane charset) and encoded so the produced
+ * file names are always accepted by publish.mjs; distinct ids that encode to
+ * the same segment get a numeric suffix instead of colliding.
  * @param {string} url - Base preview server URL.
  * @param {string[]} slugs - Plugin directory names requested for capture.
  * @returns {Promise<Array<object>>} Scene definitions for every contributed page.
  */
 async function resolvePluginScenes(url, slugs) {
   const scenes = [];
+  const usedNames = new Set();
   for (const slug of slugs) {
+    if (!SAFE_MANIFEST_SEGMENT.test(slug) || slug.includes('..')) {
+      console.warn(`  ⚠ plugin:${slug} skipped: unsafe plugin directory name`);
+      continue;
+    }
     const manifest = await fetchJson(new URL(`/plugins/${encodeURIComponent(slug)}/manifest.json`, url).href);
     if (!manifest || typeof manifest !== 'object') {
       console.warn(`  ⚠ plugin:${slug} skipped: manifest not available at /plugins/${slug}/manifest.json`);
@@ -119,13 +144,22 @@ async function resolvePluginScenes(url, slugs) {
     }
     for (const page of pages) {
       if (!page?.id || !page?.entry) continue;
+      const pageId = String(page.id);
+      if (!SAFE_MANIFEST_SEGMENT.test(pageId) || pageId.includes('..')) {
+        console.warn(`  ⚠ plugin:${slug} page ${JSON.stringify(pageId)} skipped: unsafe page id`);
+        continue;
+      }
       const entry = String(page.entry).replace(/^\//, '');
+      let name = `plugin-${nameSegment(slug, 'plugin')}-${nameSegment(pageId, 'page')}`;
+      for (let n = 2; usedNames.has(name); n += 1) name = `${name}-${n}`;
+      usedNames.add(name);
       scenes.push({
-        name: `plugin-${slug}-${page.id}`,
+        name,
         pluginUrl: `/plugins/${encodeURIComponent(slug)}/${entry.split('/').map(encodeURIComponent).join('/')}`,
         pluginId: manifest.id ?? `com.githubstarsmanager.${slug}`,
-        pageId: page.id,
-        readySelector: PLUGIN_READY_SELECTORS[`${slug}/${page.id}`] ?? null,
+        pluginSlug: slug,
+        pageId,
+        readySelector: PLUGIN_READY_SELECTORS[`${slug}/${pageId}`] ?? null,
       });
     }
   }
@@ -382,48 +416,61 @@ function installPluginHostResponder({ repositories, releasesByRepositoryId, stor
 
   const respondNetwork = (args) => {
     const path = String(args?.path ?? '/');
+    const httpError = (status) => ({
+      success: false,
+      error: { code: 'PLUGIN_NETWORK_HTTP_ERROR', message: `GitHub API returned ${status} for ${path}` },
+    });
     const repoMatch = path.match(/^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/);
     if (repoMatch) {
       const fullName = `${repoMatch[1]}/${repoMatch[2]}`;
       const rest = repoMatch[3] ?? '';
       if (!rest) {
+        // The real host normalizes 4xx/5xx to a success:false bridge error;
+        // plugins branch on `success`, so a 404 must not look like data.
         const repo = reposByFullName.get(fullName);
-        return repo
-          ? { status: 200, body: repo, acct }
-          : { status: 404, body: { message: 'Not Found' }, acct };
+        return repo ? { success: true, value: { status: 200, body: repo, acct } } : httpError(404);
       }
       if (rest === '/releases') {
         const repo = reposByFullName.get(fullName);
-        return { status: 200, body: repo ? (releasesByRepositoryId[repo.id] ?? []) : [], acct };
+        return { success: true, value: { status: 200, body: repo ? (releasesByRepositoryId[repo.id] ?? []) : [], acct } };
       }
       if (rest === '/pulls' || rest.startsWith('/pulls?')) {
-        return { status: 200, body: [], acct };
+        return { success: true, value: { status: 200, body: [], acct } };
       }
-      if (rest === '/stats/commit_activity') return { status: 200, body: commitActivity, acct };
-      if (rest === '/stats/code_frequency') return { status: 200, body: codeFrequency, acct };
-      if (rest === '/contributors') return { status: 200, body: contributors, acct };
-      if (rest === '/languages') return { status: 200, body: languages, acct };
-      if (rest === '/community/profile') return { status: 200, body: communityProfile, acct };
-      if (rest === '/security-advisories') return { status: 200, body: [], acct };
+      if (rest === '/stats/commit_activity') return { success: true, value: { status: 200, body: commitActivity, acct } };
+      if (rest === '/stats/code_frequency') return { success: true, value: { status: 200, body: codeFrequency, acct } };
+      if (rest === '/contributors') return { success: true, value: { status: 200, body: contributors, acct } };
+      if (rest === '/languages') return { success: true, value: { status: 200, body: languages, acct } };
+      if (rest === '/community/profile') return { success: true, value: { status: 200, body: communityProfile, acct } };
+      if (rest === '/security-advisories') return { success: true, value: { status: 200, body: [], acct } };
       // Anything else: GitHub answers 202 while computing; the pages render
       // that as a computing state instead of hanging or erroring.
-      return { status: 202, body: null, acct };
+      return { success: true, value: { status: 202, body: null, acct } };
     }
     const userMatch = path.match(/^\/users\/([^/]+)$/);
     if (userMatch) {
       return {
-        status: 200,
-        body: { login: userMatch[1], html_url: `https://github.com/${userMatch[1]}`, avatar_url: userAvatar },
-        acct,
+        success: true,
+        value: {
+          status: 200,
+          body: { login: userMatch[1], html_url: `https://github.com/${userMatch[1]}`, avatar_url: userAvatar },
+          acct,
+        },
       };
     }
-    return { status: 202, body: null, acct };
+    return { success: true, value: { status: 202, body: null, acct } };
   };
+
+  // Bridge-activity timestamps expose a generic readiness signal: a page is
+  // settled once no new bridge request arrived for a quiet window.
+  window.__pluginHostInstalledAt = Date.now();
+  window.__pluginHostLastRequestAt = 0;
 
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (!data || typeof data !== 'object' || data.type !== 'plugin-page:request') return;
     if (event.source !== window.parent) return;
+    window.__pluginHostLastRequestAt = Date.now();
     const reply = (payload) => {
       window.parent.postMessage({
         type: 'plugin-page:response',
@@ -448,7 +495,7 @@ function installPluginHostResponder({ repositories, releasesByRepositoryId, stor
       if (method === 'clipboard.write' || method === 'clipboard.writeImage') {
         return reply({ success: true, value: { ok: true } });
       }
-      if (method === 'network.request') return reply({ success: true, value: respondNetwork(args) });
+      if (method === 'network.request') return reply(respondNetwork(args));
       if (method === 'repositories.search') {
         const query = String(args?.query ?? '').toLowerCase();
         const limit = Number(args?.limit ?? 20);
@@ -548,11 +595,24 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       } else {
         await page.waitForFunction(() => !!document.body && document.body.innerText.trim().length > 0, null, { timeout: 15_000 });
       }
+      // Explicit readiness beyond the shell: a static title would pass the
+      // checks above while bridge data is still loading. Wait until the host
+      // bridge has been quiet for a moment (all requests answered, follow-up
+      // fetches done); a page that keeps requesting fails the scene instead
+      // of publishing an unfinished screenshot.
+      await page.waitForFunction(() => {
+        const last = window.__pluginHostLastRequestAt || window.__pluginHostInstalledAt || 0;
+        return last > 0 && Date.now() - last >= 1500;
+      }, null, { timeout: 45_000, polling: 250 });
       await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 10_000 }).catch(() => {});
       await page.waitForTimeout(scene.settleMs ?? 600);
       await page.screenshot({ path: shotPath, fullPage: true });
       console.log(`  ✓ ${scene.name} -> ${shotPath}`);
-      return { scene: scene.name, path: shotPath };
+      return {
+        scene: scene.name,
+        path: shotPath,
+        ...(scene.pluginSlug ? { pluginSlug: scene.pluginSlug, pageId: scene.pageId } : {}),
+      };
     }
 
     if (scene.electronStub) {

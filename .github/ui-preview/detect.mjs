@@ -315,18 +315,25 @@ const LOCALE_KEY_SCENES = {
 
 /**
  * Conservative fallback when a locale file cannot be key-diffed, or when a
- * changed top-level key is not in the key table. Keys are namespace names
- * ('common' covers common.json etc.).
+ * changed top-level key is not in the key table. Each fallback is the union
+ * of every scene that namespace's keys can render in (verified against the
+ * app source), so a failed content read never under-captures cross-page
+ * consumers. Keys are namespace names ('common' covers common.json etc.).
  * @type {Record<string, string | string[]>}
  */
 const LOCALE_NS_FALLBACK = {
   app: 'global',
-  settings: 'settings',
-  plugins: ['repositories', 'settings-plugins'],
+  // settings.json hook toasts surface in the settings tabs and, through
+  // useStarSyncActions in CategoryEditModal, the repositories view.
+  settings: ['repositories', 'settings'],
+  plugins: ['repositories', 'settings-plugins', 'discovery'],
   chat: 'repositories',
-  repositories: 'repositories',
+  // repositoryCard strings also feed the card-action settings in 外观.
+  repositories: ['repositories', 'settings-appearance'],
+  // releases.json keys render in forks (fork cards/timeline), discovery
+  // (subscription card) and repositories (release sheet inside repo cards).
+  releases: ['releases', 'repositories', 'forks', 'discovery'],
   gists: 'gists',
-  releases: 'releases',
   forks: 'forks',
   discovery: 'discovery',
   // shared namespaces can render on any page
@@ -687,12 +694,6 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
     }
   }
 
-  // State-only diffs (no component changed alongside) could affect anything
-  // visible: conservatively shoot every static scene.
-  if (hasDeferred && tokens.size === 0) {
-    hasGlobal = true;
-  }
-
   const selectedScenes = new Set();
   const pluginSpecs = new Set();
 
@@ -712,6 +713,13 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   };
 
   for (const token of tokens) expandToken(token);
+
+  // State/infra changes have unconfirmed blast radius: escalate to global
+  // unless concrete static scenes were found in the same diff. Plugin specs
+  // alone do not cover the rest of the app a translation change could touch.
+  if (hasDeferred && selectedScenes.size === 0) {
+    hasGlobal = true;
+  }
 
   if (hasGlobal) {
     // Global chrome re-renders on every view and settings tab. Plugin pages
@@ -796,6 +804,9 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha, exec
 
 /**
  * Fetch a file's raw content at a given ref through the GitHub contents API.
+ * The ref goes into the URL query string: `gh api -f` does not populate query
+ * parameters for GET requests (the contents endpoint then 404s), so passing
+ * it as a field would make every locale content read silently fail.
  * @param {object} params
  * @param {string} params.repo - Repository in "owner/repo" format.
  * @param {string} params.path - File path relative to the repository root.
@@ -808,11 +819,9 @@ function fetchContentAt({ repo, path, ref, executor = gh }) {
     const encoded = path.split('/').map(encodeURIComponent).join('/');
     return executor([
       'api',
-      `repos/${repo}/contents/${encoded}`,
+      `repos/${repo}/contents/${encoded}?ref=${encodeURIComponent(ref)}`,
       '-H',
       'Accept: application/vnd.github.raw+json',
-      '-f',
-      `ref=${ref}`,
     ]);
   } catch (err) {
     console.warn(`detect: could not read ${path} at ${ref.slice(0, 7)} (${err.message.split('\n')[0]})`);
