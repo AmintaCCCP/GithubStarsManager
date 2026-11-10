@@ -587,7 +587,7 @@ npm run dev
 
 #### 已有部署升级说明（安全加固）
 作为安全加固措施，后端在 `API_SECRET` 未设置时不再以关闭认证的方式运行。如果你正在升级一个从未设置过 `API_SECRET` 的已有部署：
-1. 首次启动时后端会自动生成安全随机密钥并保存到 `data/.api-secret`（位于数据卷内），密钥值不会写入日志。可通过 `docker compose exec backend cat /app/data/.api-secret`（或直接读取数据卷中的该文件）获取一次；若该文件不可用，需在服务端显式设置 `API_SECRET` 环境变量。
+1. 首次启动时后端会自动生成安全随机密钥并保存到 `data/.api-secret`（位于数据卷内），密钥值不会写入日志。可通过 `docker compose exec backend cat /app/data/.api-secret`（Compose 部署）或 `docker exec <后端容器> cat /app/data/.api-secret`（独立容器部署）获取，也可直接读取数据卷中的该文件；若该文件不可用，需在服务端显式设置 `API_SECRET` 环境变量。
 2. 在 Web UI（登录页或设置 → 后端服务器）中把这个密钥填入「API Secret」输入框一次即可。已有加密数据不受影响。
 3. 可选：在 `.env` 文件中显式设置 `API_SECRET` 来固定密钥；显式配置的密钥始终优先。本地零配置开发可设置 `ALLOW_INSECURE_NO_AUTH=1`（`npm run dev` 脚本已自动带上）。
 4. 如果你依赖自动生成的 `data/.encryption-key`，请备份该文件：加密数据与密钥存放在同一个数据卷中——数据卷一旦丢失，所有已存储的密钥（GitHub Token、AI Key、WebDAV 密码）将无法恢复。
