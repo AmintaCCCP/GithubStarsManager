@@ -397,7 +397,7 @@ npm run dev
 
 #### Upgrading an existing deployment (security hardening)
 As a security hardening measure, the backend no longer runs with authentication disabled when `API_SECRET` is unset. If you are upgrading an existing deployment that never set `API_SECRET`:
-1. On first start the backend generates a secure random secret and stores it in `data/.api-secret` (inside the data volume). It is also printed once to the startup logs — retrieve it with `docker compose logs backend` or `docker compose exec backend cat /app/data/.api-secret`.
+1. On first start the backend generates a secure random secret and stores it in `data/.api-secret` (inside the data volume) — the secret value is never written to logs. Retrieve it once with `docker compose exec backend cat /app/data/.api-secret` (or read the file directly from the volume); if the file is unavailable, set the `API_SECRET` environment variable explicitly on the server.
 2. Enter this secret once as the "API Secret" in the web UI (login screen or Settings → Backend Server). Existing encrypted data is unaffected.
 3. Optionally pin the secret by setting `API_SECRET` explicitly in your `.env` file; an explicitly configured secret always takes precedence. For zero-config local development, set `ALLOW_INSECURE_NO_AUTH=1` (the `npm run dev` script does this for you).
 4. If you rely on the auto-generated `data/.encryption-key`, back it up: your encrypted data and this key live on the same volume — if the volume is lost, all stored secrets (GitHub token, AI keys, WebDAV passwords) are unrecoverable.
@@ -405,7 +405,7 @@ As a security hardening measure, the backend no longer runs with authentication 
 #### Connecting Frontend to Backend
 1. Open Settings panel in the app
 2. Find "Backend Server" section
-3. Enter API Secret (the auto-generated one from the backend logs / `data/.api-secret`, or your own `API_SECRET`)
+3. Enter API Secret (the auto-generated one from `data/.api-secret`, or your own `API_SECRET`)
 4. Click "Test Connection" — green indicator means connected
 5. Use "Sync to Backend" / "Sync from Backend" to transfer data
 

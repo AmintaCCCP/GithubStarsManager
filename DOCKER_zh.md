@@ -204,7 +204,7 @@ docker compose up -d
 
 | 变量 | 分离部署 | 全栈部署 | 说明 |
 |---|---:|---:|---|
-| `API_SECRET` | 可选（未设置时自动生成） | 全栈 Compose 必填 | 后端 API 的 Bearer Token。分离部署未设置时，会在首次启动自动生成安全随机密钥并保存到数据卷的 `data/.api-secret`，此后所有 `/api` 请求都要求以它作为 Bearer 令牌认证；可通过 `docker logs <后端容器>` 或 `docker exec <后端容器> cat /app/data/.api-secret` 取回一次，再填入客户端 API Secret 输入框。全栈 Compose 必须显式设置，以避免新服务无认证启动。 |
+| `API_SECRET` | 可选（未设置时自动生成） | 全栈 Compose 必填 | 后端 API 的 Bearer Token。分离部署未设置时，会在首次启动自动生成安全随机密钥并保存到数据卷的 `data/.api-secret`，此后所有 `/api` 请求都要求以它作为 Bearer 令牌认证；可通过 `docker exec <后端容器> cat /app/data/.api-secret` 取回一次（密钥值不会写入日志），再填入客户端 API Secret 输入框；若该文件不可用，需在容器上显式设置 `API_SECRET` 环境变量。全栈 Compose 必须显式设置，以避免新服务无认证启动。 |
 | `ALLOW_INSECURE_NO_AUTH` | 可选 | 不适用 | 设为 `1` 或 `true` 可在 `API_SECRET` 未设置时恢复旧的零配置开发模式：`/api` 接受未认证请求，同时服务器会输出醒目警告。切勿在公网可达的部署上开启。 |
 | `ENCRYPTION_KEY` | 可选 | 可选 | 用于加密服务端保存的密钥；未设置时生成并保存至数据卷。 |
 | `DB_PATH` | 可选 | 可选 | SQLite 文件路径，默认位于 `data/data.db`。 |
