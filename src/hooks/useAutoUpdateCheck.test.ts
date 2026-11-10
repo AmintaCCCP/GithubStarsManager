@@ -102,4 +102,45 @@ describe('useAutoUpdateCheck', () => {
 
     expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
   });
+
+  it('reads the preferences at timer-fire time, not at mount time', async () => {
+    // 用户在启动后 3 秒延迟内（水合完成/切换开关）关闭了自动检查：
+    // 触发时必须以最新偏好为准，而不是挂载时的快照
+    renderHook(() => useAutoUpdateCheck());
+    mocks.storeState.autoUpdateCheckEnabled = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(mocks.checkForUpdates).not.toHaveBeenCalled();
+    expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
+
+  it('respects a dismissed version recorded after mount but before the check fires', async () => {
+    mocks.checkForUpdates.mockResolvedValue({ hasUpdate: true, currentVersion: '1.0.0', latestVersion });
+    renderHook(() => useAutoUpdateCheck());
+    mocks.storeState.updatePromptDismissedVersion = '1.2.0';
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(mocks.checkForUpdates).toHaveBeenCalledOnce();
+    expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
+
+  it('swallows check failures without notifying', async () => {
+    mocks.checkForUpdates.mockRejectedValue(new Error('network down'));
+
+    await runCheck();
+
+    expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not notify when hasUpdate is true without a latest version', async () => {
+    mocks.checkForUpdates.mockResolvedValue({ hasUpdate: true, currentVersion: '1.0.0' });
+
+    await runCheck();
+
+    expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
 });
