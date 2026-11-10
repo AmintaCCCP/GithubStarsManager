@@ -32,6 +32,7 @@ release
 # Backend server data
 server/data/*.db
 server/data/.encryption-key
+server/data/.api-secret
 server/dist/
 
  # Orchestrator internal files
