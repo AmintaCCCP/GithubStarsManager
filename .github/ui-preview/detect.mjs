@@ -177,7 +177,6 @@ const SETTINGS_COMPONENT_SCENES = {
   'BackupPanel.tsx': 'settings-backup',
   'BackendPanel.tsx': 'settings-backend',
   'CategoryPanel.tsx': 'settings-category',
-  'PushCategoriesModal.tsx': 'settings-category',
   'MenuManagementPanel.tsx': 'settings-menu',
   'DataManagementPanel.tsx': 'settings-data',
   'DiagnosticLogsPanel.tsx': 'settings-logs',
@@ -387,6 +386,13 @@ export function classifyLocaleKeys(ns, changedKeys) {
   return [...out];
 }
 
+/** Plugin slugs travel into the `scenes` workflow output and from there onto
+ *  a shell command line (shoot.mjs --only) and into file paths, so only
+ *  unambiguous safe directory names may become specs. Mirrors
+ *  SAFE_MANIFEST_SEGMENT in shoot.mjs: shell metacharacters, whitespace and
+ *  traversal segments are rejected outright. */
+const SAFE_PLUGIN_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
 /**
  * Classify a changed path to its affected view identifier, scene name, scene
  * spec, or list of them. Returns null if the file is ignored or does not
@@ -464,11 +470,15 @@ export function classifyPath(filePath) {
     return 'discovery';
   }
 
-  // 5. Example plugin UI: shoot exactly that plugin's pages.
+  // 5. Example plugin UI: shoot exactly that plugin's pages. Unsafe slugs
+  // (shell metacharacters, traversal) never become specs.
   const pluginMatch = path.match(/^examples\/plugins\/([^/]+)\/(.*)$/);
   if (pluginMatch) {
     const slug = pluginMatch[1];
     const rest = pluginMatch[2];
+    if (!SAFE_PLUGIN_SLUG.test(slug) || slug.includes('..')) {
+      return null;
+    }
     if (/^(ui\/|manifest\.json$)/.test(rest)) {
       // manifest.json also feeds the plugin list in Settings › Plugins.
       return rest === 'manifest.json'

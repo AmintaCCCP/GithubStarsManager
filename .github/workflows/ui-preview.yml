@@ -191,11 +191,15 @@ jobs:
         working-directory: ui-preview-tools/.github/ui-preview
         env:
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/.pw
+          # Interpolating the scene list directly into the run script would
+          # let a hostile plugin directory name inject shell commands; env
+          # values are passed to the process verbatim instead.
+          UI_PREVIEW_SCENES: ${{ needs.detect.outputs.scenes }}
         run: |
           node shoot.mjs \
             --url http://127.0.0.1:4173 \
             --out "$RUNNER_TEMP/shots" \
-            --only "${{ needs.detect.outputs.scenes }}"
+            --only "$UI_PREVIEW_SCENES"
 
       - name: Upload screenshots
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
