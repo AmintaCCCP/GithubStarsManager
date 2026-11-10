@@ -145,7 +145,7 @@ FRONTEND_IMAGE_TAG=0.8.4
 The backend image is published to GHCR and can be run standalone. New standalone deployments should use the canonical `-backend` image. The legacy `-server` image remains published with identical tags exclusively for existing `docker-compose.yml` and direct deployments, so no current user must change an image reference.
 
 ```bash
-# Basic — no auth, port 3000, data persisted in volume
+# Basic — auto-generated API secret, port 3000, data persisted in volume
 docker run -d \
   --name github-stars-backend \
   -v github-stars-data:/app/data \
@@ -174,7 +174,8 @@ docker run -d \
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `API_SECRET` | Optional for standalone backend | `null` (auth disabled) | Bearer token for API authentication. It is required by `docker-compose.fullstack.yml` so the new single-container web service cannot start unauthenticated. |
+| `API_SECRET` | Optional for standalone backend | Auto-generated (saved to `data/.api-secret`) | Bearer token for API authentication. If unset, a secure random secret is generated on first start and persisted to `data/.api-secret`; all `/api` requests then require it as a Bearer token. Retrieve it once via `docker logs <backend-container>` or `docker exec <backend-container> cat /app/data/.api-secret`, then enter it as the client API Secret. Required by `docker-compose.fullstack.yml` so the new single-container web service cannot start unauthenticated. |
+| `ALLOW_INSECURE_NO_AUTH` | No | unset | Set to `1` or `true` to restore the legacy zero-config dev mode when `API_SECRET` is unset: `/api` accepts unauthenticated requests and the server logs a loud warning. Never enable this on a publicly reachable deployment. |
 | `ENCRYPTION_KEY` | No | Auto-generated (saved to `data/.encryption-key`) | AES-256 key for encrypting stored secrets. Accepts any format — 64-char hex, shorter hex, base64, or plain text (all normalized via SHA-256) |
 | `PORT` | No | `3000` | Server listening port |
 | `DB_PATH` | No | `data/data.db` | Path to SQLite database file |
