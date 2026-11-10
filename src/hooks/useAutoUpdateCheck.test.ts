@@ -141,6 +141,48 @@ describe('useAutoUpdateCheck', () => {
     expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
   });
 
+  it('re-reads the dismissed version after the in-flight request resolves', async () => {
+    // 请求在途：模拟启动检查已发出但尚未返回
+    let resolveCheck: (value: { hasUpdate: boolean; currentVersion: string }) => void = () => {};
+    mocks.checkForUpdates.mockImplementation(
+      () => new Promise((resolve) => { resolveCheck = resolve; }),
+    );
+    renderHook(() => useAutoUpdateCheck());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(mocks.checkForUpdates).toHaveBeenCalledOnce();
+
+    // 在途期间用户通过手动检查选择了"不再提示"
+    mocks.storeState.updatePromptDismissedVersion = '1.2.0';
+
+    await act(async () => {
+      resolveCheck({ hasUpdate: true, currentVersion: '1.0.0' });
+    });
+
+    expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the enabled flag after the in-flight request resolves', async () => {
+    let resolveCheck: (value: { hasUpdate: boolean; currentVersion: string }) => void = () => {};
+    mocks.checkForUpdates.mockImplementation(
+      () => new Promise((resolve) => { resolveCheck = resolve; }),
+    );
+    renderHook(() => useAutoUpdateCheck());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    // 在途期间用户关闭了自动检查
+    mocks.storeState.autoUpdateCheckEnabled = false;
+
+    await act(async () => {
+      resolveCheck({ hasUpdate: true, currentVersion: '1.0.0' });
+    });
+
+    expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
+
   it('does not notify when hasUpdate is true without a latest version', async () => {
     mocks.checkForUpdates.mockResolvedValue({ hasUpdate: true, currentVersion: '1.0.0' });
 

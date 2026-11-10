@@ -12,14 +12,16 @@ export const useAutoUpdateCheck = () => {
 
     const checkUpdatesOnStartup = async () => {
       // 定时器在水合完成后才启动，触发时读取到的已是真实持久化偏好
-      const { autoUpdateCheckEnabled, updatePromptDismissedVersion, setUpdateNotification } =
-        useAppStore.getState();
-
-      // 用户关闭了自动检查更新
-      if (!autoUpdateCheckEnabled) return;
+      if (!useAppStore.getState().autoUpdateCheckEnabled) return;
 
       try {
         const result = await UpdateService.checkForUpdates();
+        // 请求在途期间偏好可能已变化（用户手动"不再提示"该版本，或直接关闭了
+        // 自动检查）：落地前以最新偏好为准，避免覆盖用户刚做出的选择
+        const { autoUpdateCheckEnabled, updatePromptDismissedVersion, setUpdateNotification } =
+          useAppStore.getState();
+        if (!autoUpdateCheckEnabled) return;
+
         if (result.hasUpdate && result.latestVersion) {
           // 该版本已被用户"不再提示"；最新版再次变化（出更新版本）后正常提示
           if (result.latestVersion.number === updatePromptDismissedVersion) return;
