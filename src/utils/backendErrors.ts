@@ -3,6 +3,7 @@ import { isAppLanguage, type AppLanguage } from '../i18n/languages';
 const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   // Auth
   UNAUTHORIZED: { zh: '未授权，请检查 API Secret', en: 'Unauthorized, please check API Secret' },
+  AUTH_NOT_CONFIGURED: { zh: '后端已自动生成 API Secret（安全加固）：请从后端日志或 data/.api-secret 文件获取，填入客户端 API Secret 输入框', en: 'The backend generated its own API secret (security hardening): retrieve it from the backend logs or data/.api-secret, then enter it as the client API Secret' },
   // Proxy
   GITHUB_TOKEN_NOT_CONFIGURED: { zh: 'GitHub Token 未配置', en: 'GitHub token not configured' },
   GITHUB_TOKEN_DECRYPT_FAILED: { zh: 'GitHub Token 解密失败', en: 'Failed to decrypt GitHub token' },

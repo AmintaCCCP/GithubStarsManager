@@ -976,7 +976,8 @@
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "バックアップ/エクスポート時にキーを含める",
-    "includes-keys-for-ai-configs-webdav-proxy-remote": "AI 構成、WebDAV、プロキシ、リモート ダウンロード、バックエンド サーバーのキーが含まれています"
+    "includes-keys-for-ai-configs-webdav-proxy-remote": "AI 構成、WebDAV、プロキシ、リモート ダウンロード、バックエンド サーバーのキーが含まれています",
+    "warning-backup-file-contains-plaintext-keys": "有効にすると、バックアップファイルに平文のキーが含まれます。バックアップファイルは安全に保管してください。"
   },
   "mcpSettingsPanel": {
     "copied": "コピーされました",

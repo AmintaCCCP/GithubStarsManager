@@ -1,6 +1,6 @@
 
 import { TranslateFn } from '../../i18n/useT';
-import { Key } from 'lucide-react';
+import { Key, ShieldAlert } from 'lucide-react';
 import type { FC } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -29,6 +29,12 @@ export const IncludeKeysToggle: FC<IncludeKeysToggleProps> = ({ t }) => {
         </div>
         <Switch checked={includeKeysInBackup} onCheckedChange={setIncludeKeysInBackup} aria-label={label} />
       </div>
+      {includeKeysInBackup && (
+        <p className="mt-3 flex items-start gap-1.5 text-sm text-amber-600 dark:text-amber-500">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{t('includeKeysToggle.warning-backup-file-contains-plaintext-keys')}</span>
+        </p>
+      )}
     </div>
   );
 };
