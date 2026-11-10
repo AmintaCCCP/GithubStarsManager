@@ -178,8 +178,42 @@ describe('useAutoUpdateCheck', () => {
     expect(mocks.checkForUpdates).toHaveBeenCalledOnce();
   });
 
-  it('unsubscribes the hydration listener when already hydrated at mount', () => {
-    renderHook(() => useAutoUpdateCheck());
+  it('does not subscribe to the store when already hydrated at mount', () => {
+    const { unmount } = renderHook(() => useAutoUpdateCheck());
+    unmount();
     expect(mocks.useAppStore.subscribe).not.toHaveBeenCalled();
+  });
+
+  it('unsubscribes the hydration listener on unmount before hydration completes', () => {
+    const unsubscribe = vi.fn();
+    const listeners: Array<(state: { hasHydrated: boolean }) => void> = [];
+    mocks.useAppStore.subscribe.mockImplementation((listener: (typeof listeners)[number]) => {
+      listeners.push(listener);
+      return unsubscribe;
+    });
+    mocks.storeState.hasHydrated = false;
+
+    const { unmount } = renderHook(() => useAutoUpdateCheck());
+    unmount();
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('unsubscribes the hydration listener once hydration completes', async () => {
+    const unsubscribe = vi.fn();
+    const listeners: Array<(state: { hasHydrated: boolean }) => void> = [];
+    mocks.useAppStore.subscribe.mockImplementation((listener: (typeof listeners)[number]) => {
+      listeners.push(listener);
+      return unsubscribe;
+    });
+    mocks.storeState.hasHydrated = false;
+
+    renderHook(() => useAutoUpdateCheck());
+    await act(async () => {
+      mocks.storeState.hasHydrated = true;
+      for (const listener of listeners) listener(mocks.storeState);
+    });
+
+    expect(unsubscribe).toHaveBeenCalledOnce();
   });
 });
