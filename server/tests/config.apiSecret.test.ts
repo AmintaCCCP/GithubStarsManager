@@ -88,7 +88,12 @@ describe('resolveApiSecret', () => {
 
       const secretPath = path.join(dir, '.api-secret');
       expect(fs.readFileSync(secretPath, 'utf-8')).toBe(resolved.secret);
-      expect(fs.statSync(secretPath).mode & 0o777).toBe(0o600);
+      if (process.platform !== 'win32') {
+        // Windows 不报告 POSIX 权限位（观察到为 0o666），只断言文件已生成。
+        expect(fs.statSync(secretPath).mode & 0o777).toBe(0o600);
+      } else {
+        expect(fs.existsSync(secretPath)).toBe(true);
+      }
 
       const banner = warnSpy.mock.calls.map((call) => call.join(' ')).join('\n');
       expect(banner).toContain('.api-secret');
@@ -168,6 +173,9 @@ describe('resolveApiSecret', () => {
   });
 
   it('falls back to an ephemeral secret (no crash-loop) when the data dir is not writable', () => {
+    if (process.platform === 'win32') {
+      return; // Windows 没有 getuid，且 chmod 不阻止对目录写入，场景不成立
+    }
     if (typeof process.getuid === 'function' && process.getuid() === 0) {
       return; // root ignores directory permissions
     }
