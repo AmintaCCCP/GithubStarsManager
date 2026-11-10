@@ -3,7 +3,7 @@ import { isAppLanguage, type AppLanguage } from '../i18n/languages';
 const ERROR_MESSAGES: Record<string, { zh: string; en: string }> = {
   // Auth
   UNAUTHORIZED: { zh: '未授权，请检查 API Secret', en: 'Unauthorized, please check API Secret' },
-  AUTH_NOT_CONFIGURED: { zh: '后端已自动生成 API Secret（安全加固）：请从后端日志或 data/.api-secret 文件获取，填入客户端 API Secret 输入框', en: 'The backend generated its own API secret (security hardening): retrieve it from the backend logs or data/.api-secret, then enter it as the client API Secret' },
+  AUTH_NOT_CONFIGURED: { zh: '后端已自动生成 API Secret（安全加固）：请在服务端执行 docker compose exec backend cat /app/data/.api-secret（或直接读取数据卷中的 data/.api-secret 文件）获取，填入客户端 API Secret 输入框；若该文件不可用，需在服务端显式设置 API_SECRET 环境变量', en: 'The backend generated its own API secret (security hardening): retrieve it by running docker compose exec backend cat /app/data/.api-secret on the server (or read the data/.api-secret file in the data volume), then enter it as the client API Secret; if the file is unavailable, explicitly set the API_SECRET environment variable on the server' },
   // Proxy
   GITHUB_TOKEN_NOT_CONFIGURED: { zh: 'GitHub Token 未配置', en: 'GitHub token not configured' },
   GITHUB_TOKEN_DECRYPT_FAILED: { zh: 'GitHub Token 解密失败', en: 'Failed to decrypt GitHub token' },
