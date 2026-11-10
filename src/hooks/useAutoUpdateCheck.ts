@@ -7,8 +7,11 @@ import { useAppStore } from '../store/useAppStore';
 // 该版本仍为最新时不再提示，出新版本后自动恢复提示。
 export const useAutoUpdateCheck = () => {
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let unsubscribe: (() => void) | undefined;
+
     const checkUpdatesOnStartup = async () => {
-      // 触发时再读取：持久化水合（IndexedDB 异步）此时已完成，拿到的是真实偏好
+      // 定时器在水合完成后才启动，触发时读取到的已是真实持久化偏好
       const { autoUpdateCheckEnabled, updatePromptDismissedVersion, setUpdateNotification } =
         useAppStore.getState();
 
@@ -37,8 +40,27 @@ export const useAutoUpdateCheck = () => {
       }
     };
 
-    // 延迟3秒后检查更新，避免影响应用启动速度
-    const timer = setTimeout(checkUpdatesOnStartup, 3000);
-    return () => clearTimeout(timer);
+    // 水合前 store 里是默认偏好，不能据此替用户做"检查/不检查"的决定：
+    // 必须等 hasHydrated 后再启动检查定时器。
+    const scheduleCheck = () => {
+      // 延迟3秒后检查更新，避免影响应用启动速度
+      timer = setTimeout(checkUpdatesOnStartup, 3000);
+    };
+
+    if (useAppStore.getState().hasHydrated) {
+      scheduleCheck();
+    } else {
+      unsubscribe = useAppStore.subscribe((state) => {
+        if (!state.hasHydrated) return;
+        unsubscribe?.();
+        unsubscribe = undefined;
+        scheduleCheck();
+      });
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe?.();
+    };
   }, []);
 };

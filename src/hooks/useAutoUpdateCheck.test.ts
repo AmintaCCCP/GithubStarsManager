@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => {
   const storeState = {
+    hasHydrated: true,
     autoUpdateCheckEnabled: true,
     updatePromptDismissedVersion: null as string | null,
     setUpdateNotification: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => {
     checkForUpdates: vi.fn(),
     useAppStore: {
       getState: () => mocks.storeState,
+      subscribe: vi.fn(),
     },
   };
 });
@@ -33,10 +35,13 @@ const latestVersion = {
 describe('useAutoUpdateCheck', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mocks.storeState.hasHydrated = true;
     mocks.storeState.autoUpdateCheckEnabled = true;
     mocks.storeState.updatePromptDismissedVersion = null;
     mocks.storeState.setUpdateNotification.mockClear();
     mocks.checkForUpdates.mockReset();
+    mocks.useAppStore.subscribe.mockReset();
+    mocks.useAppStore.subscribe.mockImplementation(() => () => {});
   });
 
   afterEach(() => {
@@ -142,5 +147,39 @@ describe('useAutoUpdateCheck', () => {
     await runCheck();
 
     expect(mocks.storeState.setUpdateNotification).not.toHaveBeenCalled();
+  });
+
+  it('schedules the check only after the store finishes hydrating', async () => {
+    const listeners: Array<(state: { hasHydrated: boolean }) => void> = [];
+    mocks.useAppStore.subscribe.mockReset();
+    mocks.useAppStore.subscribe.mockImplementation((listener: (typeof listeners)[number]) => {
+      listeners.push(listener);
+      return () => {};
+    });
+    mocks.storeState.hasHydrated = false;
+
+    renderHook(() => useAutoUpdateCheck());
+
+    // 水合完成前：即使过了定时阈值也不得启动检查
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    expect(mocks.checkForUpdates).not.toHaveBeenCalled();
+    expect(mocks.useAppStore.subscribe).toHaveBeenCalledOnce();
+
+    // 水合完成（hasHydrated 置位）→ 启动 3s 定时器 → 执行检查
+    await act(async () => {
+      mocks.storeState.hasHydrated = true;
+      for (const listener of listeners) listener(mocks.storeState);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    expect(mocks.checkForUpdates).toHaveBeenCalledOnce();
+  });
+
+  it('unsubscribes the hydration listener when already hydrated at mount', () => {
+    renderHook(() => useAutoUpdateCheck());
+    expect(mocks.useAppStore.subscribe).not.toHaveBeenCalled();
   });
 });
