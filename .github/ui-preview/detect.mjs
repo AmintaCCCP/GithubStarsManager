@@ -1,13 +1,35 @@
 #!/usr/bin/env node
 /**
- * Decide whether a pull request touches the UI, for the detect job.
+ * Decide whether a pull request touches the UI — and exactly WHICH pages — for
+ * the detect job.
  *
  * Runs on a checkout of the default branch (never PR code) and only reads the
  * PR / commit diff through the API. Outputs (to $GITHUB_OUTPUT):
  *   ui     true|false
  *   sha    the PR head commit to record
  *   number the PR number
- *   scenes comma-separated list of scene names to shoot (e.g. "gists,releases")
+ *   scenes comma-separated scene specs to shoot, e.g. "settings-plugins,plugin:repo-info-card"
+ *
+ * Scene model (fine-grained — only pages the diff can render differently):
+ *   repositories-light|repositories-dark   the repository list, per theme
+ *   gists|releases|forks|discovery         the other top-level views
+ *   settings-<tab>                         one scene per Settings tab
+ *                                          (general, appearance, star-sync, ai,
+ *                                          webdav, backup, backend, category,
+ *                                          menu, data, logs, network, plugins,
+ *                                          vector-search, mcp)
+ *   plugin:<slug>                          every page contributed by the example
+ *                                          plugin in examples/plugins/<slug>;
+ *                                          shoot.mjs expands it into one
+ *                                          plugin-<slug>-<pageId> shot per page
+ *                                          by reading the plugin manifest from
+ *                                          the built bundle.
+ *
+ * `global` (shared chrome: App shell, header, ui primitives, theme tokens,
+ * styling configs, common locales) expands to ALL view + settings scenes.
+ * Plugin pages are standalone HTML documents and do not re-render app chrome,
+ * so they are only shot when the diff touches that plugin (or plugin infra
+ * used by their host views).
  *
  * Environment: GH_TOKEN (read), GITHUB_REPOSITORY, PR (number), GITHUB_OUTPUT,
  *              EVENT_ACTION (optional), BEFORE_SHA (optional), HEAD_SHA (optional).
@@ -17,36 +39,63 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 /**
- * All recognized UI preview scenes in canonical recording order.
+ * The Settings tabs, in the order SettingsPanel.tsx renders them.
+ * `tab` is the SettingsTab id used by `gsm:pending-settings-tab`; `scene` is
+ * the preview scene name. electron-only tabs (network, plugins, mcp) are
+ * flagged so shoot.mjs can stub the Electron bridge.
+ * @type {Array<{scene: string, tab: string, electronOnly?: boolean}>}
+ */
+export const SETTINGS_TABS = [
+  { scene: 'settings-general', tab: 'general' },
+  { scene: 'settings-appearance', tab: 'appearance' },
+  { scene: 'settings-star-sync', tab: 'starSync' },
+  { scene: 'settings-ai', tab: 'ai' },
+  { scene: 'settings-webdav', tab: 'webdav' },
+  { scene: 'settings-backup', tab: 'backup' },
+  { scene: 'settings-backend', tab: 'backend' },
+  { scene: 'settings-category', tab: 'category' },
+  { scene: 'settings-menu', tab: 'menu' },
+  { scene: 'settings-data', tab: 'data' },
+  { scene: 'settings-logs', tab: 'logs' },
+  { scene: 'settings-network', tab: 'network', electronOnly: true },
+  { scene: 'settings-plugins', tab: 'plugins', electronOnly: true },
+  { scene: 'settings-vector-search', tab: 'vectorSearch' },
+  { scene: 'settings-mcp', tab: 'mcp', electronOnly: true },
+];
+
+/**
+ * View-level scenes in canonical recording order.
  * @type {string[]}
  */
-const ALL_SCENES = [
+export const VIEW_SCENES = [
   'repositories-light',
   'repositories-dark',
   'gists',
   'releases',
   'forks',
   'discovery',
-  'settings',
-  'plugin-repo-custom-fields',
-  'plugin-repo-info-card',
-  'plugin-repo-insights',
 ];
+
+/**
+ * All static scenes in canonical order (views + settings tabs). Plugin page
+ * scenes are dynamic and never part of this list.
+ * @type {string[]}
+ */
+export const ALL_SCENES = [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)];
+
+const SETTINGS_SCENE_NAMES = new Set(SETTINGS_TABS.map((t) => t.scene));
 
 /**
  * Mapping from high-level view identifier to the preview scene names it renders.
  * @type {Record<string, string[]>}
  */
-const VIEW_TO_SCENES = {
+export const VIEW_TO_SCENES = {
   repositories: ['repositories-light', 'repositories-dark'],
   gists: ['gists'],
   releases: ['releases'],
   forks: ['forks'],
   discovery: ['discovery'],
-  settings: ['settings'],
-  'plugin-repo-custom-fields': ['plugin-repo-custom-fields'],
-  'plugin-repo-info-card': ['plugin-repo-info-card'],
-  'plugin-repo-insights': ['plugin-repo-insights'],
+  settings: [...SETTINGS_TABS.map((t) => t.scene)],
 };
 
 /**
@@ -112,10 +161,253 @@ export function isIgnoredPath(filePath) {
 }
 
 /**
- * Classify a changed path to its affected view identifier or list of view identifiers.
- * Returns null if the file is ignored or does not affect UI.
+ * Settings panel components mapped to the single Settings tab that renders
+ * them. Keys are exact file names under src/components/settings/. Anything not
+ * listed here falls back to the whole Settings view (all tabs).
+ * @type {Record<string, string>}
+ */
+const SETTINGS_COMPONENT_SCENES = {
+  'GeneralPanel.tsx': 'settings-general',
+  'AppearancePanel.tsx': 'settings-appearance',
+  'ThemeSettingsCard.tsx': 'settings-appearance',
+  'RepositoryCardActionsSettings.tsx': 'settings-appearance',
+  'StarSyncPanel.tsx': 'settings-star-sync',
+  'AIConfigPanel.tsx': 'settings-ai',
+  'WebDAVPanel.tsx': 'settings-webdav',
+  'BackupPanel.tsx': 'settings-backup',
+  'BackendPanel.tsx': 'settings-backend',
+  'CategoryPanel.tsx': 'settings-category',
+  'MenuManagementPanel.tsx': 'settings-menu',
+  'DataManagementPanel.tsx': 'settings-data',
+  'DiagnosticLogsPanel.tsx': 'settings-logs',
+  'NetworkPanel.tsx': 'settings-network',
+  'McpSettingsPanel.tsx': 'settings-mcp',
+  'VectorSearchSettings.tsx': 'settings-vector-search',
+  'PluginSettingsPanel.tsx': 'settings-plugins',
+  'PluginRegistrySection.tsx': 'settings-plugins',
+  'PluginMarketplaceDialog.tsx': 'settings-plugins',
+  'PluginSourcesDialog.tsx': 'settings-plugins',
+  'PluginUninstallDialog.tsx': 'settings-plugins',
+  'PluginIconPickerDialog.tsx': 'settings-plugins',
+  // Rendered by StarSyncPanel, not CategoryPanel.
+  'PushCategoriesModal.tsx': 'settings-star-sync',
+  // Shared by BackupPanel and DataManagementPanel.
+  'IncludeKeysToggle.tsx': 'settings-backup settings-data',
+};
+
+/**
+ * Locale top-level keys mapped to the scenes that render them. Only locales
+ * that get key-level diffing are listed; keys missing from a table fall back
+ * to the namespace default in LOCALE_NS_FALLBACK (conservative: a key we
+ * cannot place might render anywhere that namespace does).
+ * @type {Record<string, Record<string, string>>}
+ */
+const LOCALE_KEY_SCENES = {
+  // app.json carries every Settings panel's strings, view chrome and shared widgets.
+  app: {
+    settingsPanel: 'settings',
+    // The language-settings card renders in 外观, not only 通用.
+    generalPanel: 'settings-general settings-appearance',
+    themeSettingsCard: 'settings-appearance',
+    starSyncPanel: 'settings-star-sync',
+    aIConfigPanel: 'settings-ai',
+    webDAVPanel: 'settings-webdav',
+    backupPanel: 'settings-backup',
+    includeKeysToggle: 'settings-backup settings-data',
+    backendPanel: 'settings-backend',
+    categoryPanel: 'settings-category',
+    pushCategoriesModal: 'settings-star-sync',
+    // ThemeSettingsCard reuses the menu panel's reorder strings in 外观.
+    menuManagementPanel: 'settings-menu settings-appearance',
+    dataManagementPanel: 'settings-data',
+    diagnosticLogsPanel: 'settings-logs',
+    networkPanel: 'settings-network',
+    mcpSettingsPanel: 'settings-mcp',
+    vectorSearchSettings: 'settings-vector-search',
+    pluginSettingsPanel: 'settings-plugins',
+    // Viewer/modal strings surface over the repositories view too (repo-card plugin actions).
+    pluginPageViewer: 'repositories settings-plugins',
+    repositorySlice: 'repositories',
+    // CategoryPanel reuses the empty-name validation string in 分类管理.
+    categoryUtils: 'repositories settings-category',
+    categorySidebar: 'repositories',
+    categoryEditModal: 'repositories',
+    repositoryEditModal: 'repositories',
+    searchBar: 'repositories',
+    searchDemo: 'repositories',
+    searchResultStats: 'repositories',
+    searchShortcutsHelp: 'repositories',
+    codeSearchView: 'repositories',
+    similarViewBanner: 'repositories',
+    syncModeChoiceModal: 'repositories',
+    bulkActionToolbar: 'repositories',
+    bulkCategorizeModal: 'repositories',
+    bulkRestoreModal: 'repositories',
+    sortAlgorithmTooltip: 'repositories',
+    listsPushIndicator: 'repositories',
+    backToTop: 'repositories',
+    scrollToBottom: 'repositories',
+
+    // FilterModal renders the asset-filter strings inside the repositories view.
+    assetFilterManager: 'releases repositories',
+    useReleaseArtifactActions: 'releases',
+    installableAssetRecommendation: 'releases',
+
+    forkCard: 'forks',
+    discoverySidebar: 'discovery',
+
+    markdownRenderer: 'repositories releases discovery',
+    bilingualMarkdownRenderer: 'repositories releases discovery',
+    readmeModal: 'repositories',
+    useReadmeFetch: 'repositories',
+  },
+  // settings.json carries the settings hooks' toasts/errors.
+  settings: {
+    useAIConfigActions: 'settings-ai',
+    useBackendSettingsActions: 'settings-backend',
+    useBackupActions: 'settings-backup',
+    useWebDAVActions: 'settings-webdav',
+    useNetworkActions: 'settings-network',
+    useMcpActions: 'settings-mcp',
+    // CategoryEditModal (repositories view) drives star-sync pushes through this hook.
+    useStarSyncActions: 'settings-star-sync repositories',
+    useDesktopActions: 'settings-general',
+    useGitHubTokenActions: 'settings-general',
+    generalPanel: 'settings-general',
+  },
+  // plugins.json mixes discovery feed modals with plugin action strings.
+  plugins: {
+    telegramMessageModal: 'discovery',
+    telegramSettingsModal: 'discovery',
+    xTweetModal: 'discovery',
+    xTweetSettingsModal: 'discovery',
+    applyPluginActionResult: 'repositories settings-plugins',
+    usePluginAI: 'repositories settings-plugins',
+    usePluginWebSearch: 'repositories settings-plugins',
+  },
+  chat: {
+    globalChatHistorySheet: 'repositories',
+    repositoryChatHistoryPanel: 'repositories',
+    repositoryChatSheet: 'repositories',
+    citationBadge: 'repositories',
+    useRepositoryChat: 'repositories',
+    useRepositoryChatSessions: 'repositories',
+    repositoryChatService: 'repositories',
+  },
+  // releases.json strings are consumed across views: fork cards render in the
+  // forks timeline, the subscription card in discovery, and the release sheet
+  // inside repository cards.
+  releases: {
+    forkCard: 'forks',
+    forkTimeline: 'forks',
+    subscriptionRepoCard: 'discovery',
+    repositoryReleaseSheet: 'releases repositories',
+  },
+  // repository card strings also feed the card-action settings in 外观.
+  repositories: {
+    repositoryCard: 'repositories settings-appearance',
+  },
+  common: {
+    useForkTimelineActions: 'forks',
+  },
+};
+
+/**
+ * Conservative fallback when a locale file cannot be key-diffed, or when a
+ * changed top-level key is not in the key table. Each fallback is the union
+ * of every scene that namespace's keys can render in (verified against the
+ * app source), so a failed content read never under-captures cross-page
+ * consumers. Keys are namespace names ('common' covers common.json etc.).
+ * @type {Record<string, string | string[]>}
+ */
+const LOCALE_NS_FALLBACK = {
+  app: 'global',
+  // settings.json hook toasts surface in the settings tabs and, through
+  // useStarSyncActions in CategoryEditModal, the repositories view.
+  settings: ['repositories', 'settings'],
+  plugins: ['repositories', 'settings-plugins', 'discovery'],
+  chat: 'repositories',
+  // repositoryCard strings also feed the card-action settings in 外观.
+  repositories: ['repositories', 'settings-appearance'],
+  // releases.json keys render in forks (fork cards/timeline), discovery
+  // (subscription card) and repositories (release sheet inside repo cards).
+  releases: ['releases', 'repositories', 'forks', 'discovery'],
+  gists: 'gists',
+  forks: 'forks',
+  discovery: 'discovery',
+  // shared namespaces can render on any page
+  common: 'global',
+  errors: 'global',
+  login: 'global',
+  ai: 'global',
+  services: 'global',
+  search: 'repositories',
+};
+
+/** Matches src/locales/<lang>/<ns>.json */
+const LOCALE_FILE_PATTERN = /^src\/locales\/[^/]+\/([a-zA-Z]+)\.json$/;
+
+/**
+ * Split a space-separated scene list from the tables above.
+ * @param {string} spec - Space separated scene/view tokens.
+ * @returns {string[]} Tokens.
+ */
+const splitSpec = (spec) => spec.split(/\s+/).filter(Boolean);
+
+/**
+ * Classify changed top-level keys of one locale namespace into scene/view
+ * tokens. Unknown keys escalate to the namespace fallback so nothing that can
+ * render is missed.
+ * @param {string} ns - Locale namespace (file base name).
+ * @param {string[]} changedKeys - Top-level keys whose value changed.
+ * @returns {string[]} Scene/view tokens (may include 'global').
+ */
+export function classifyLocaleKeys(ns, changedKeys) {
+  const table = LOCALE_KEY_SCENES[ns];
+  const fallback = LOCALE_NS_FALLBACK[ns] ?? 'global';
+  if (!table) {
+    return splitSpec(typeof fallback === 'string' ? fallback : fallback.join(' '));
+  }
+  const out = new Set();
+  let unknown = false;
+  for (const key of changedKeys) {
+    const spec = table[key];
+    if (spec) {
+      for (const token of splitSpec(spec)) out.add(token);
+    } else {
+      unknown = true;
+    }
+  }
+  if (unknown) {
+    for (const token of splitSpec(typeof fallback === 'string' ? fallback : fallback.join(' '))) {
+      out.add(token);
+    }
+  }
+  return [...out];
+}
+
+/** Plugin slugs travel into the `scenes` workflow output and from there onto
+ *  a shell command line (shoot.mjs --only) and into file paths, so only
+ *  unambiguous safe directory names may become specs. Mirrors
+ *  SAFE_MANIFEST_SEGMENT in shoot.mjs: shell metacharacters, whitespace and
+ *  traversal segments are rejected outright. */
+const SAFE_PLUGIN_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * Classify a changed path to its affected view identifier, scene name, scene
+ * spec, or list of them. Returns null if the file is ignored or does not
+ * affect UI.
+ *
+ * Returned tokens are one of:
+ *   - view ids resolved via VIEW_TO_SCENES ('repositories', 'settings', 'gists', …)
+ *   - concrete scene names ('settings-data')
+ *   - dynamic plugin specs ('plugin:<slug>')
+ *   - 'global' (all static scenes)
+ *   - 'deferred' (state containers whose visible effect ships through the
+ *     components changed in the same PR; expanded to global only when no
+ *     concrete scene was found)
  * @param {string} filePath - Path of the file relative to repository root.
- * @returns {'repositories' | 'gists' | 'releases' | 'forks' | 'discovery' | 'settings' | 'global' | string[] | null}
+ * @returns {string | string[] | null}
  */
 export function classifyPath(filePath) {
   const path = filePath.replace(/\\/g, '/');
@@ -123,11 +415,16 @@ export function classifyPath(filePath) {
     return null;
   }
 
+  // 0. Locale files classify at namespace level here; mapPathsToScenes
+  // overrides this with the key-level diff when one is available.
+  if (LOCALE_FILE_PATTERN.test(path)) {
+    return classifyLocaleFile(path, null);
+  }
+
   // 1. Gists view
   if (
     path.startsWith('src/features/gists/') ||
     /^src\/components\/Gist/i.test(path) ||
-    /^src\/locales\/[^/]+\/gists\.json$/.test(path) ||
     path === 'src/store/slices/gistSlice.ts' ||
     path === 'src/utils/gistUtils.ts'
   ) {
@@ -142,7 +439,6 @@ export function classifyPath(filePath) {
     /^src\/components\/InstallableAssetRecommendation\./.test(path) ||
     /^src\/components\/SiWindows\./.test(path) ||
     /^src\/hooks\/useReleaseArtifactActions\./.test(path) ||
-    /^src\/locales\/[^/]+\/releases\.json$/.test(path) ||
     /^src\/utils\/(releaseAssets|assetFilters|assetCompatibility|installableAssets|releaseDownloadLinks|releaseSources)\.[jt]s$/.test(path)
   ) {
     return 'releases';
@@ -164,49 +460,63 @@ export function classifyPath(filePath) {
     /^src\/components\/SubscriptionRepoCard\./.test(path) ||
     /^src\/components\/ExternalDiscoveryFeedsModal\./.test(path) ||
     /^src\/components\/TelegramMessageModal\./.test(path) ||
+    /^src\/components\/TelegramSettingsModal\./.test(path) ||
     /^src\/components\/XTweetModal\./.test(path) ||
+    /^src\/components\/XTweetSettingsModal\./.test(path) ||
     /^src\/components\/WeeklyIssueModal\./.test(path) ||
-    /^src\/locales\/[^/]+\/discovery\.json$/.test(path) ||
     path === 'src/store/slices/discoverySlice.ts' ||
     /^src\/utils\/(discoveryFeeds|discoveryRss|trendingSnapshots|telegramFollows|xTweetFollows)\.[jt]s$/.test(path)
   ) {
     return 'discovery';
   }
 
-  // 5. Plugin UI changes touch individual example plugin views or settings
-  if (/^examples\/plugins\/repo-custom-fields\/ui\//.test(path)) {
-    return 'plugin-repo-custom-fields';
+  // 5. Example plugin UI: shoot exactly that plugin's pages. Unsafe slugs
+  // (shell metacharacters, traversal) never become specs.
+  const pluginMatch = path.match(/^examples\/plugins\/([^/]+)\/(.*)$/);
+  if (pluginMatch) {
+    const slug = pluginMatch[1];
+    const rest = pluginMatch[2];
+    if (!SAFE_PLUGIN_SLUG.test(slug) || slug.includes('..')) {
+      return null;
+    }
+    if (/^(ui\/|manifest\.json$)/.test(rest)) {
+      // manifest.json also feeds the plugin list in Settings › Plugins.
+      return rest === 'manifest.json'
+        ? ['settings-plugins', `plugin:${slug}`]
+        : `plugin:${slug}`;
+    }
+    return null; // worker.js, README.md, other non-UI plugin files
   }
-  if (/^examples\/plugins\/repo-info-card\/ui\//.test(path)) {
-    return 'plugin-repo-info-card';
-  }
-  if (/^examples\/plugins\/repo-insights\/ui\//.test(path)) {
-    return 'plugin-repo-insights';
-  }
+
+  // 6. Plugin host UI: the Settings › Plugins tab renders the registry and
+  // embedded pages; repository cards render plugin actions. Standalone plugin
+  // pages are unaffected (they never import src/plugins).
   if (
     path.startsWith('src/features/plugins/') ||
     path.startsWith('src/plugins/') ||
-    /^examples\/plugins\/[^/]+\/(ui\/|manifest\.json$)/.test(path) ||
-    /^src\/components\/PluginPage/i.test(path) ||
-    /^src\/components\/settings\/Plugin/i.test(path) ||
-    /^src\/locales\/[^/]+\/plugins\.json$/.test(path)
+    /^src\/components\/PluginPage(Viewer|Modal)\./.test(path)
   ) {
-    return ['settings', 'plugin-repo-custom-fields', 'plugin-repo-info-card', 'plugin-repo-insights'];
+    return ['repositories', 'settings-plugins'];
   }
 
-  // 6. Settings view
+  // 7. Settings: map each panel to its own tab scene (some panels render in
+  // several tabs, hence the space-separated split).
+  if (/^src\/components\/settings\/[^/]+\.tsx?$/.test(path)) {
+    const base = path.split('/').pop();
+    return splitSpec(SETTINGS_COMPONENT_SCENES[base] ?? 'settings');
+  }
   if (
+    path === 'src/components/SettingsPanel.tsx' ||
     path.startsWith('src/features/settings/') ||
-    /^src\/components\/Settings/i.test(path) ||
-    path.startsWith('src/components/settings/') ||
-    /^src\/components\/(Telegram|XTweet)SettingsModal\./.test(path) ||
-    /^src\/locales\/[^/]+\/settings\.json$/.test(path) ||
-    path === 'src/store/slices/configurationSlice.ts'
+    /^src\/components\/settings\//.test(path)
   ) {
     return 'settings';
   }
+  if (path === 'src/store/slices/configurationSlice.ts') {
+    return 'settings';
+  }
 
-  // 7. Repositories view (the primary stars/repos manager view)
+  // 8. Repositories view (the primary stars/repos manager view)
   if (
     path.startsWith('src/features/repositories/') ||
     path.startsWith('src/features/repository-chat/') ||
@@ -222,7 +532,6 @@ export function classifyPath(filePath) {
     /^src\/components\/ContextSidebarBody\./.test(path) ||
     /^src\/components\/SyncModeChoiceModal\./.test(path) ||
     /^src\/components\/GlobalChatHistorySheet\./.test(path) ||
-    /^src\/locales\/[^/]+\/(repositories|chat|search)\.json$/.test(path) ||
     path === 'src/store/slices/repositorySlice.ts' ||
     path === 'src/store/slices/categorySlice.ts' ||
     /^src\/utils\/(repoSearch|categoryUtils|repositoryCardFields|repositoryCardActions|repositoryHealth|repositoryIdentity|repositoryMerge)\.[jt]s$/.test(path)
@@ -230,17 +539,28 @@ export function classifyPath(filePath) {
     return 'repositories';
   }
 
-  // 8. Timeline slice touches both releases and forks
+  // 9. Timeline slice touches both releases and forks
   if (path === 'src/store/slices/timelineSlice.ts') {
     return ['releases', 'forks'];
   }
 
-  // 9. Global UI elements (affect all scenes)
+  // 10. State containers: their visible effect ships through the components
+  // changed in the same PR. If a PR changes ONLY these, fall back to global.
+  if (
+    path.startsWith('src/store/slices/') ||
+    path === 'src/store/initialState.ts' ||
+    path === 'src/store/schema.ts'
+  ) {
+    return 'deferred';
+  }
+
+  // 11. Global UI elements (affect all static scenes)
   if (
     path === 'src/App.tsx' ||
     path === 'src/main.tsx' ||
     path === 'src/index.css' ||
     path.startsWith('src/styles/') ||
+    path.startsWith('src/i18n/') ||
     /^src\/components\/Header\./.test(path) ||
     /^src\/components\/WorkspacePageHeader\./.test(path) ||
     path.startsWith('src/components/ui/') ||
@@ -263,8 +583,7 @@ export function classifyPath(filePath) {
     /^src\/(types|utils)\/themeTokens\./.test(path) ||
     /^src\/utils\/(markdownUtils|markdownSplitter|citationPostprocess)\.[jt]s$/.test(path) ||
     /^src\/lib\/themePresets\./.test(path) ||
-    /^src\/locales\/[^/]+\/(common|app|login)\.json$/.test(path) ||
-    path === 'src/store/slices/preferenceSlice.ts' ||
+    /^src\/locales\/[^/]+\/(common|login)\.json$/.test(path) ||
     path === 'index.html' ||
     path === 'tailwind.config.js' ||
     path === 'postcss.config.js' ||
@@ -279,7 +598,40 @@ export function classifyPath(filePath) {
     return 'global';
   }
 
+  // UI-adjacent infrastructure (hooks, remaining utils/store files)
+  // can render on any page: defer like state containers, so a diff touching
+  // only these still falls back to global instead of silently capturing
+  // nothing. i18n modules are NOT deferred: every page renders translated
+  // strings, so they classify as global above.
+  if (
+    path.startsWith('src/hooks/') ||
+    path.startsWith('src/utils/') ||
+    path.startsWith('src/store/')
+  ) {
+    return 'deferred';
+  }
+
   return null;
+}
+
+/**
+ * Classify a locale file. Uses the key-level diff when available (precise),
+ * otherwise the conservative per-namespace fallback.
+ * @param {string} filePath - Path of the changed locale file.
+ * @param {string[] | null} [changedKeys] - Top-level keys changed in this file,
+ *   or null when the key diff is unavailable.
+ * @returns {string[]} Scene/view tokens.
+ */
+export function classifyLocaleFile(filePath, changedKeys = null) {
+  const match = filePath.replace(/\\/g, '/').match(LOCALE_FILE_PATTERN);
+  if (!match) return [];
+  const ns = match[1];
+  if (changedKeys && changedKeys.length > 0) {
+    return classifyLocaleKeys(ns, changedKeys);
+  }
+  if (changedKeys) return []; // diffed, but nothing visible changed (formatting only)
+  const fallback = LOCALE_NS_FALLBACK[ns] ?? 'global';
+  return splitSpec(typeof fallback === 'string' ? fallback : fallback.join(' '));
 }
 
 /**
@@ -319,44 +671,90 @@ export function parseFileList(raw) {
 
 /**
  * Given an array of changed file paths, determine which scenes to capture.
- * Returns an array of scene names in canonical order. Empty array if no UI changes.
+ * Returns an array of scene names / plugin specs in canonical order. Empty
+ * array if no UI changes.
  * @param {string[]} paths - Changed file paths.
- * @returns {string[]} Selected scene names.
+ * @param {Record<string, string[]>} [localeKeysByPath] - Optional map from
+ *   locale file path to its diffed top-level keys. Entries with an empty key
+ *   array mean "diffed, nothing visible changed"; missing entries fall back to
+ *   the file-level namespace mapping.
+ * @returns {string[]} Selected scene names / specs.
  */
-export function mapPathsToScenes(paths) {
-  const views = new Set();
+export function mapPathsToScenes(paths, localeKeysByPath = {}) {
+  const tokens = new Set();
+  let hasGlobal = false;
+  let hasDeferred = false;
+  // Provenance per static scene: a scene confirms coverage for an
+  // accompanying deferred change only when some app component (not a plugin
+  // manifest) provided it.
+  const appScenes = new Set();
+  const manifestScenes = new Set();
 
   for (const path of paths) {
     if (path === '*' || path === '__ALL__') {
-      views.add('global');
+      hasGlobal = true;
       continue;
     }
-    const classification = classifyPath(path);
-    if (!classification) continue;
-    if (Array.isArray(classification)) {
-      for (const view of classification) views.add(view);
+    let classification;
+    if (LOCALE_FILE_PATTERN.test(path.replace(/\\/g, '/')) && Object.prototype.hasOwnProperty.call(localeKeysByPath, path)) {
+      classification = classifyLocaleFile(path, localeKeysByPath[path]);
     } else {
-      views.add(classification);
+      classification = classifyPath(path);
     }
-  }
-
-  if (views.size === 0) {
-    return [];
-  }
-
-  if (views.has('global')) {
-    return [...ALL_SCENES];
+    if (!classification) continue;
+    const list = Array.isArray(classification) ? classification : [classification];
+    const fromManifest = Array.isArray(classification)
+      && classification.length === 2
+      && classification[0] === 'settings-plugins'
+      && classification[1]?.startsWith('plugin:');
+    for (const token of list) {
+      if (token === 'global') hasGlobal = true;
+      else if (token === 'deferred') hasDeferred = true;
+      else {
+        tokens.add(token);
+        if (fromManifest) manifestScenes.add(token);
+        else if (!token.startsWith('plugin:')) appScenes.add(token);
+      }
+    }
   }
 
   const selectedScenes = new Set();
-  for (const view of views) {
-    const scenes = VIEW_TO_SCENES[view];
+  const pluginSpecs = new Set();
+
+  const expandToken = (token) => {
+    if (token.startsWith('plugin:')) {
+      pluginSpecs.add(token);
+      return;
+    }
+    if (SETTINGS_SCENE_NAMES.has(token) || VIEW_SCENES.includes(token)) {
+      selectedScenes.add(token);
+      return;
+    }
+    const scenes = VIEW_TO_SCENES[token];
     if (scenes) {
       for (const scene of scenes) selectedScenes.add(scene);
     }
+  };
+
+  for (const token of tokens) expandToken(token);
+
+  // State/infra changes have unconfirmed blast radius: escalate to global
+  // unless concrete app-component scenes were found in the same diff. Scenes
+  // that exist only through a plugin manifest (and plugin specs alone) do not
+  // cover the rest of the app a translation or state change could touch.
+  if (hasDeferred && appScenes.size === 0) {
+    hasGlobal = true;
   }
 
-  return ALL_SCENES.filter((scene) => selectedScenes.has(scene));
+  if (hasGlobal) {
+    // Global chrome re-renders on every view and settings tab. Plugin pages
+    // are standalone documents and only depend on their own files, which are
+    // classified separately — so only plugin specs from this same diff join in.
+    for (const scene of ALL_SCENES) selectedScenes.add(scene);
+  }
+
+  const ordered = ALL_SCENES.filter((scene) => selectedScenes.has(scene));
+  return [...ordered, ...[...pluginSpecs].sort()];
 }
 
 const FILES_PER_PAGE = 100;
@@ -373,7 +771,7 @@ function gh(args) {
 
 /**
  * Ensure an environment variable is present and return its trimmed value.
- * @param {string} name - Name of the environment variable.
+ * @param {string} name - Name of the environment variable value to return.
  * @returns {string} The non-empty environment variable value.
  */
 function requireEnv(name) {
@@ -430,6 +828,88 @@ export function collectChangedPaths({ repo, pr, action, beforeSha, headSha, exec
 }
 
 /**
+ * Fetch a file's raw content at a given ref through the GitHub contents API.
+ * The ref goes into the URL query string: `gh api -f` does not populate query
+ * parameters for GET requests (the contents endpoint then 404s), so passing
+ * it as a field would make every locale content read silently fail.
+ * @param {object} params
+ * @param {string} params.repo - Repository in "owner/repo" format.
+ * @param {string} params.path - File path relative to the repository root.
+ * @param {string} params.ref - Commit sha or ref to read from.
+ * @param {Function} [params.executor] - Command execution function (defaults to gh).
+ * @returns {string | null} Raw file content, or null if it cannot be read.
+ */
+function fetchContentAt({ repo, path, ref, executor = gh }) {
+  try {
+    const encoded = path.split('/').map(encodeURIComponent).join('/');
+    return executor([
+      'api',
+      `repos/${repo}/contents/${encoded}?ref=${encodeURIComponent(ref)}`,
+      '-H',
+      'Accept: application/vnd.github.raw+json',
+    ]);
+  } catch (err) {
+    console.warn(`detect: could not read ${path} at ${ref.slice(0, 7)} (${err.message.split('\n')[0]})`);
+    return null;
+  }
+}
+
+/**
+ * Diff the top-level keys of a JSON object.
+ * @param {string} baseRaw - Base version content.
+ * @param {string} headRaw - Head version content.
+ * @returns {string[]} Keys that were added, removed or whose value changed.
+ */
+export function diffTopLevelKeys(baseRaw, headRaw) {
+  const parse = (raw) => {
+    try {
+      const data = JSON.parse(raw);
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    } catch {
+      return {};
+    }
+  };
+  const base = parse(baseRaw);
+  const head = parse(headRaw);
+  const changed = [];
+  for (const key of Object.keys(head)) {
+    if (!(key in base) || JSON.stringify(base[key]) !== JSON.stringify(head[key])) {
+      changed.push(key);
+    }
+  }
+  for (const key of Object.keys(base)) {
+    if (!(key in head)) changed.push(key);
+  }
+  return changed;
+}
+
+/**
+ * For every changed locale file, diff its top-level keys between the two refs
+ * so scene mapping can be done per key instead of per file. Unreadable files
+ * are simply absent from the result (callers fall back to file-level mapping).
+ * @param {object} params
+ * @param {string} params.repo - Repository in "owner/repo" format.
+ * @param {string[]} params.paths - All changed file paths.
+ * @param {string} params.baseRef - Base commit sha (push base or PR base).
+ * @param {string} params.headRef - Head commit sha.
+ * @param {Function} [params.executor] - Command execution function (defaults to gh).
+ * @returns {Promise<Record<string, string[]>>} Map from locale file path to changed keys.
+ */
+export async function diffLocaleKeys({ repo, paths, baseRef, headRef, executor = gh }) {
+  const localeFiles = [...new Set(paths)].filter((p) => LOCALE_FILE_PATTERN.test(p.replace(/\\/g, '/')));
+  const result = {};
+  for (const file of localeFiles) {
+    const [baseRaw, headRaw] = await Promise.all([
+      fetchContentAt({ repo, path: file, ref: baseRef, executor }),
+      fetchContentAt({ repo, path: file, ref: headRef, executor }),
+    ]);
+    if (baseRaw === null || headRaw === null) continue;
+    result[file] = diffTopLevelKeys(baseRaw, headRaw);
+  }
+  return result;
+}
+
+/**
  * Append key-value pairs to the GitHub Actions output file.
  * @param {string} outputPath - File path pointed by GITHUB_OUTPUT.
  * @param {Record<string, string | number>} pairs - Key-value output parameters.
@@ -473,8 +953,20 @@ export async function main() {
     headSha: effectiveHeadSha,
   });
 
+  // Key-level locale diffing: only the strings that actually changed map to
+  // scenes, instead of the whole namespace going global.
+  let localeKeysByPath = {};
+  if (!filenames.includes('*')) {
+    const baseRef = action === 'synchronize' && /^[0-9a-f]{40}$/i.test(beforeSha) && !/^0+$/.test(beforeSha)
+      ? beforeSha.trim()
+      : pull.base?.sha;
+    if (baseRef) {
+      localeKeysByPath = await diffLocaleKeys({ repo, paths: filenames, baseRef, headRef: effectiveHeadSha });
+    }
+  }
+
   const forcedByLabel = (pull.labels ?? []).some((label) => label?.name === 'ui-preview');
-  let scenes = mapPathsToScenes(filenames);
+  let scenes = mapPathsToScenes(filenames, localeKeysByPath);
 
   if (scenes.length === 0 && forcedByLabel) {
     console.log(`detect: forced by ui-preview label; capturing all scenes`);
@@ -495,8 +987,6 @@ export async function main() {
     scenes: scenes.join(','),
   });
 }
-
-export { ALL_SCENES, VIEW_TO_SCENES };
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   main().catch((error) => {

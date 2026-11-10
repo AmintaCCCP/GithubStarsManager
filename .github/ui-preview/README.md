@@ -5,19 +5,34 @@ the UI. When a commit touches UI code (or the PR carries the `ui-preview`
 label), the workflow:
 
 1. **detect** decides whether the commit has UI adjustments and maps them to
-   specific scenes.
+   the exact affected pages.
    - Non-UI paths (tests, docs, backend services, store persistence, types,
      non-UI utilities, and tooling configs such as `tsconfig.json`) are ignored.
      If no UI adjustments exist, `ui` is set to `false` and subsequent jobs are skipped.
    - On `synchronize` (new push), `detect` inspects the commit/push diff so
      commits that don't adjust the UI don't trigger unnecessary runs.
-   - Modified UI files are mapped to the affected views/scenes (`gists`,
-     `releases`, `forks`, `discovery`, `settings`, or specific example plugin
-     scenes `plugin-repo-custom-fields`, `plugin-repo-info-card`, and `plugin-repo-insights`).
-     Changes to global elements (`App.tsx`, `Header.tsx`, `WorkspacePageHeader.tsx`,
-     shared UI primitives under `src/components/ui/`, `src/lib/utils.ts`,
-     or styling/bundling configs like `tailwind.config.js`, `postcss.config.js`,
-     and `vite.config.ts`) trigger all scenes.
+   - Changed files are mapped to the affected scenes with page granularity:
+     - each Settings panel component maps to its own Settings tab scene
+       (`settings-general`, `settings-appearance`, `settings-plugins`, … — one
+       scene per tab, 15 in total);
+     - example plugin UI/manifest changes map to that plugin only
+       (`plugin:<slug>`, expanded by shoot.mjs into one screenshot per
+       contributed page); plugin host code (`src/plugins/`,
+       `src/features/plugins/`) maps to the Plugins settings tab plus the
+       repository list where plugin actions render;
+     - changed locale files are content-diffed between base and head: only the
+       top-level keys that actually changed are mapped, so a string addition
+       for one panel no longer shoots every view. Keys that cannot be placed
+       fall back conservatively to their namespace's scope;
+     - changes to global elements (`App.tsx`, `Header.tsx`,
+       `WorkspacePageHeader.tsx`, shared UI primitives under
+       `src/components/ui/`, `src/lib/utils.ts`, theme tokens, or
+       styling/bundling configs like `tailwind.config.js`, `postcss.config.js`,
+       and `vite.config.ts`) trigger all view + settings scenes. Plugin pages
+       are standalone documents and are only shot when their own files changed;
+     - store slices / state containers are "deferred": when components change
+       in the same PR the components decide the scenes; a state-only diff
+       falls back to all scenes.
 2. **build** checks out the PR and builds it with `npx vite build`; the
    static bundle is uploaded as an artifact. **shoot** then runs on a clean
    runner with zero PR code: it serves the downloaded bundle and runs
@@ -37,21 +52,25 @@ keeping comments concise and CI fast.
 
 `shoot.mjs` renders one browser context per scene from the same base fixture,
 overriding persisted store fields (`currentView`, `themeMode`, …). Every app
-view has a scene; adding a screenshot is usually one line in `SCENES`:
+view has a scene, every Settings tab has its own scene (navigated via the
+`gsm:pending-settings-tab` sessionStorage key the panel reads on mount), and
+every example plugin page can be shot through the `plugin:<slug>` spec, which
+shoot.mjs resolves against the plugin manifest in the built bundle:
 
 ```js
-const SCENES = [
+const VIEW_SCENES = [
   { name: 'repositories-light', currentView: 'repositories', themeMode: 'light' },
   { name: 'repositories-dark', currentView: 'repositories', themeMode: 'dark' },
   { name: 'gists', currentView: 'gists', themeMode: 'light' },
   { name: 'releases', currentView: 'releases', themeMode: 'light' },
   { name: 'forks', currentView: 'forks', themeMode: 'light' },
   { name: 'discovery', currentView: 'subscription', themeMode: 'light', selectedDiscoveryChannel: 'trending', settleMs: 4000 },
-  { name: 'settings', currentView: 'settings', themeMode: 'light' },
-  { name: 'plugin-repo-custom-fields', pluginUrl: '/plugins/repo-custom-fields/ui/index.html', ... },
-  { name: 'plugin-repo-info-card', pluginUrl: '/plugins/repo-info-card/ui/index.html', ... },
-  { name: 'plugin-repo-insights', pluginUrl: '/plugins/repo-insights/ui/index.html', ... },
 ];
+// Settings scenes are generated from SETTINGS_TABS in detect.mjs: one scene
+// per tab (settings-general, settings-appearance, …, settings-mcp). The
+// Electron-only tabs (network, plugins, mcp) render behind a minimal
+// window.electronAPI stub whose plugin registry is built from the manifests
+// in the served bundle (dist/plugins/index.json, emitted by the build job).
 ```
 
 To change what the previews show, edit `fixtures/demo-state.json` — a plain
@@ -107,12 +126,16 @@ gh label create ui-preview --description "Force the UI preview workflow" --color
 ```sh
 # 1. Build and serve the app (from the repo root)
 npx vite build
+if [ -d examples/plugins ]; then
+  mkdir -p dist/plugins && cp -r examples/plugins/. dist/plugins/
+  node -e "const fs=require('node:fs');fs.writeFileSync('dist/plugins/index.json',JSON.stringify(fs.readdirSync('examples/plugins',{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name).sort())+'\n')"
+fi
 npx vite preview --host 127.0.0.1 --port 4173 &
 
 # 2. Install the pipeline deps (from this directory)
 cd .github/ui-preview && npm ci && npx playwright install chromium
 
-# 3. Shoot (add --only gists,releases to limit scenes)
+# 3. Shoot (add --only settings-plugins,plugin:repo-info-card to limit scenes)
 node shoot.mjs --url http://127.0.0.1:4173 --out /tmp/ui-shots
 ```
 

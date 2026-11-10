@@ -137,6 +137,27 @@ async function isPng(file) {
   return isWellFormedPng(await readFile(file));
 }
 
+/** Read the display labels shoot.mjs records in scenes.json. Plugin scenes
+ *  carry their slug and page id separately, because a file name alone is
+ *  ambiguous (slugs and page ids both contain hyphens). */
+async function readSceneLabels(dir) {
+  const labels = new Map();
+  try {
+    const scenes = JSON.parse(await readFile(path.join(dir, 'scenes.json'), 'utf8'));
+    if (Array.isArray(scenes)) {
+      for (const entry of scenes) {
+        const name = path.basename(String(entry?.path ?? ''));
+        if (entry?.pluginSlug && entry?.pageId && name) {
+          labels.set(name, `插件 ${entry.pluginSlug} · ${entry.pageId}`);
+        }
+      }
+    }
+  } catch {
+    // scenes.json is optional; sceneLabel's name-based fallbacks still apply.
+  }
+  return labels;
+}
+
 export { isWellFormedPng };
 
 async function listShotFiles(dir) {
@@ -314,11 +335,43 @@ async function findPreviewComment(repo, token, pr) {
   return null;
 }
 
-function sceneLabel(filename) {
-  return path.basename(filename, '.png').replaceAll('-', ' ');
+/** Human-readable labels for the static scenes; dynamic plugin scenes
+ *  (`plugin-<slug>-<pageId>`) are rendered from their name below. */
+const STATIC_SCENE_LABELS = {
+  'repositories-light': '仓库列表 · 亮色',
+  'repositories-dark': '仓库列表 · 暗色',
+  gists: 'Gist',
+  releases: 'Releases',
+  forks: 'Forks',
+  discovery: '发现',
+  'settings-general': '设置 · 通用',
+  'settings-appearance': '设置 · 外观',
+  'settings-star-sync': '设置 · Star 同步',
+  'settings-ai': '设置 · AI 配置',
+  'settings-webdav': '设置 · WebDAV',
+  'settings-backup': '设置 · 备份',
+  'settings-backend': '设置 · 后端',
+  'settings-category': '设置 · 分类',
+  'settings-menu': '设置 · 菜单',
+  'settings-data': '设置 · 数据管理',
+  'settings-logs': '设置 · 诊断日志',
+  'settings-network': '设置 · 网络',
+  'settings-plugins': '设置 · 插件',
+  'settings-vector-search': '设置 · 向量搜索',
+  'settings-mcp': '设置 · MCP 服务器',
+};
+
+function sceneLabel(filename, labels = null) {
+  const name = path.basename(filename, '.png');
+  const labeled = labels?.get(path.basename(filename));
+  if (labeled) return labeled;
+  if (STATIC_SCENE_LABELS[name]) return STATIC_SCENE_LABELS[name];
+  const pluginMatch = name.match(/^plugin-([a-z0-9._-]+?)-([a-z0-9._-]+)$/);
+  if (pluginMatch) return `插件 ${pluginMatch[1]} · ${pluginMatch[2]}`;
+  return name.replaceAll('-', ' ');
 }
 
-function buildSuccessBody({ repo, branch, pr, sha, runUrl, shots }) {
+function buildSuccessBody({ repo, branch, pr, sha, runUrl, shots, labels = null }) {
   const shaShort = sha.slice(0, 7);
   const rawBase = `https://raw.githubusercontent.com/${repo}/${branch}/pr-${pr}/${sha}`;
   const source = runUrl ? `[ui-preview 工作流](${runUrl})` : 'ui-preview 工作流';
@@ -330,8 +383,8 @@ function buildSuccessBody({ repo, branch, pr, sha, runUrl, shots }) {
     '',
   ];
   for (const shot of shots) {
-    lines.push(`### ${sceneLabel(shot)}`);
-    lines.push(`![${sceneLabel(shot)}](${rawBase}/${encodeURIComponent(shot)})`);
+    lines.push(`### ${sceneLabel(shot, labels)}`);
+    lines.push(`![${sceneLabel(shot, labels)}](${rawBase}/${encodeURIComponent(shot)})`);
     lines.push('');
   }
   lines.push(...[
@@ -369,7 +422,8 @@ async function upsertComment(args) {
   } else {
     const branch = process.env.UI_PREVIEW_BRANCH ?? DEFAULT_BRANCH;
     const shots = await listShotFiles(shotsDir);
-    body = buildSuccessBody({ repo, branch, pr, sha, runUrl, shots });
+    const labels = await readSceneLabels(shotsDir);
+    body = buildSuccessBody({ repo, branch, pr, sha, runUrl, shots, labels });
   }
 
   const existing = await findPreviewComment(repo, token, pr);
