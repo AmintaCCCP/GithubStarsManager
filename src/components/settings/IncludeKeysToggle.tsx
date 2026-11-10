@@ -37,8 +37,10 @@ export const IncludeKeysToggle: FC<IncludeKeysToggleProps> = ({ t }) => {
           aria-describedby={includeKeysInBackup ? warningId : undefined}
         />
       </div>
-      {/* 实时通知区域必须常驻挂载：若随开关条件卸载，读屏会漏播状态变化；改为在固定节点内切换内容。 */}
-      <div role="status" aria-live="polite">
+      {/* 实时通知区域必须常驻挂载：若随开关条件卸载，读屏会漏播状态变化；改为在固定节点内切换内容。
+        刻意不用 role="status"（裸 aria-live="polite" 播报行为一致）：.github/ui-preview/shoot.mjs
+        把 main.app-main 内的 [role="status"] 视为未完成的 Suspense Loading 帧，会判截图就绪失败。 */}
+      <div aria-live="polite">
         {includeKeysInBackup && (
           <p id={warningId} className="mt-3 flex items-start gap-1.5 text-sm text-amber-600 dark:text-amber-500">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
