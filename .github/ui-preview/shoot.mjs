@@ -41,6 +41,9 @@ const VIEW_SCENES = [
   { name: 'releases', currentView: 'releases', themeMode: 'light' },
   { name: 'forks', currentView: 'forks', themeMode: 'light' },
   { name: 'discovery', currentView: 'subscription', themeMode: 'light', selectedDiscoveryChannel: 'trending', settleMs: 4000 },
+  // Login page: rendered instead of the app shell when logged out. Not part
+  // of ALL_SCENES — global chrome never reaches it.
+  { name: 'login', loginScreen: true, themeMode: 'light' },
 ];
 
 const SETTINGS_SCENES = SETTINGS_TABS.map((tab) => ({
@@ -628,9 +631,16 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       await page.addInitScript(installElectronStub, scene.plugins ?? []);
     }
     await gotoForSeeding(page, url);
+    const seedState = { ...baseState, ...scene, currentView: scene.currentView, themeMode: scene.themeMode };
+    if (scene.loginScreen) {
+      // Log out: the app then renders the LoginScreen instead of the shell.
+      seedState.isAuthenticated = false;
+      seedState.githubToken = '';
+      seedState.user = null;
+    }
     const seeded = await page.evaluate(
       seedPersistedState,
-      { state: { ...baseState, ...scene, currentView: scene.currentView, themeMode: scene.themeMode }, version: PERSIST_VERSION },
+      { state: seedState, version: PERSIST_VERSION },
     );
     if (!seeded.indexedDB) {
       console.warn(`  (${scene.name}) IndexedDB unavailable; seeded via localStorage fallback`);
@@ -657,6 +667,20 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       return route.abort();
     });
     await page.reload({ waitUntil: 'load', timeout: 60_000 });
+
+    if (scene.loginScreen) {
+      // The login page replaces the whole shell — wait for its own content
+      // instead of .ui-shell / main.app-main.
+      await page.waitForFunction(() => {
+        const root = document.querySelector('#root');
+        return !!root && (root.innerText ?? '').trim().length > 0;
+      }, null, { timeout: 60_000, polling: 250 });
+      await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 15_000 }).catch(() => {});
+      await page.waitForTimeout(scene.settleMs ?? 800);
+      await page.screenshot({ path: shotPath, fullPage: true });
+      console.log(`  ✓ ${scene.name} -> ${shotPath}`);
+      return { scene: scene.name, path: shotPath };
+    }
 
     // The app shell renders only after hydration; wait for it, then for real
     // view content: no Suspense fallback ([role="status"] "Loading..." frame)

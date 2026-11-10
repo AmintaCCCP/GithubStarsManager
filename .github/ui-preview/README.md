@@ -32,7 +32,15 @@ label), the workflow:
        are standalone documents and are only shot when their own files changed;
      - store slices / state containers are "deferred": when components change
        in the same PR the components decide the scenes; a state-only diff
-       falls back to all scenes.
+       falls back to all scenes. The same policy governs conditional overlays
+       (update dialogs/banners, dialog shells, error boundaries, hover
+       tooltips, scroll affordances, markdown renderers) — they render only on
+       runtime state the demo never provides, so a default-page screenshot
+       would show no difference. Settings feature hooks are deferred too: a
+       hook follows the panel that invokes it.
+     - the login page has its own scene (`login`, seeded logged out); it
+       renders instead of the app shell, so global chrome changes do not
+       reach it and it is only shot when login-specific files change.
 2. **build** checks out the PR and builds it with `npx vite build`; the
    static bundle is uploaded as an artifact. **shoot** then runs on a clean
    runner with zero PR code: it serves the downloaded bundle and runs
@@ -138,6 +146,21 @@ cd .github/ui-preview && npm ci && npx playwright install chromium
 # 3. Shoot (add --only settings-plugins,plugin:repo-info-card to limit scenes)
 node shoot.mjs --url http://127.0.0.1:4173 --out /tmp/ui-shots
 ```
+
+## Mapping experiments
+
+`experiment.mjs` probes the mapping the way a reviewer would: it applies a
+minimal synthetic change to EVERY UI-relevant file (and to every top-level
+locale key, one at a time) in the working tree, runs the real detect pipeline
+on each probe, and compares the resulting scene set with the consumers of the
+changed file/key. Use it to validate new mapping rules before shipping them:
+
+```sh
+node experiment.mjs                 # full matrix (file probes + locale key probes)
+node experiment.mjs --only Update   # only targets matching the filter
+```
+
+The probe changes are reverted automatically; run it on a clean tree.
 
 Screenshots land in `/tmp/ui-shots/<scene>.png`.
 
