@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import crypto from 'node:crypto';
-import { normalizeEncryptionKey } from '../../src/config.js';
+
+// config.js 在 import 时即执行 loadConfig()（会在 data 目录生成密钥文件）。
+// 先通过 env 提供显式值再动态 import，避免测试运行污染 server/data。
+process.env.ENCRYPTION_KEY = 'f'.repeat(64);
+process.env.API_SECRET = 'test-only-env-secret';
+
+const { normalizeEncryptionKey } = await import('../../src/config.js');
 
 describe('normalizeEncryptionKey', () => {
   it('should pass through a valid 64-char hex key unchanged', () => {
