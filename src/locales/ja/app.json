@@ -498,7 +498,8 @@
     "release-date": "発売日：",
     "what-s-new": "更新情報:",
     "download-now": "今すぐダウンロード",
-    "later": "後でリマインダー"
+    "later": "後でリマインダー",
+    "dont-remind-again": "今後表示しない"
   },
   "updateNotificationBanner": {
     "new-version-available": "新しいバージョンが見つかりました",
@@ -967,6 +968,8 @@
     "check-for-updates": "アップデートをチェックする",
     "current-version-v-version": "現在のバージョン: v{{version}}",
     "check-if-a-new-version-is-available": "新しいバージョンが利用可能かどうかを確認する",
+    "auto-update-check": "自動アップデート確認",
+    "auto-update-check-hint": "起動時に新しいバージョンを自動的に確認します。オフにしても手動で確認できます",
     "contact-information": "連絡先",
     "if-you-encounter-any-issues-or-have-suggestions": "使用中に問題が発生したり、提案がある場合は、次の方法でご連絡ください。",
     "github": "GitHub",
