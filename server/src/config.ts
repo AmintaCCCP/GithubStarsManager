@@ -153,15 +153,18 @@ export function resolveApiSecret(dataDir: string): ResolvedApiSecret {
     return { secret: crypto.randomBytes(32).toString('hex'), source: 'generated' };
   }
 
+  // The secret VALUE is never printed to logs; the banner only points at the
+  // file so operators retrieve it through the data volume.
   console.warn('──────────────────────────────────────────────────────────────────');
   console.warn('🔒 API_SECRET was not set — a secure random secret has been generated (security hardening).');
   console.warn(`   Saved to: ${secretFilePath}`);
   console.warn('   All /api requests now require this secret as a Bearer token.');
-  console.warn('   Retrieve it: cat ' + secretFilePath);
-  console.warn('   (Docker deployments: docker compose exec backend cat /app/data/.api-secret —');
-  console.warn('    this banner is also visible again via docker compose logs backend)');
+  console.warn(`   Retrieve it: cat ${secretFilePath}`);
+  console.warn('   (Docker deployments: docker compose exec backend cat /app/data/.api-secret,');
+  console.warn('    or read that file directly from the mounted data volume)');
   console.warn('   The Web UI will ask for this API Secret once when connecting.');
-  console.warn('   To choose your own secret instead, set API_SECRET in your .env / compose environment.');
+  console.warn('   Alternatively, set API_SECRET explicitly on the server');
+  console.warn('   (e.g. in the .env / compose environment) and restart.');
   console.warn('──────────────────────────────────────────────────────────────────');
   return { secret: generated, source: 'generated' };
 }

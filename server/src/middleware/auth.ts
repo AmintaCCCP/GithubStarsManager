@@ -6,8 +6,9 @@ let warnedOnce = false;
 
 // 与前端 src/utils/backendErrors.ts 的 AUTH_NOT_CONFIGURED 双语文案对应；
 // error 字段仅是非更新客户端看到的英文兜底，前端按 code 显示双语提示。
+// 取回指引只指向数据卷文件（密钥值不写入日志），并给出显式设置 API_SECRET 的兜底。
 const AUTH_NOT_CONFIGURED_MESSAGE =
-  'The server generated its own API secret (security hardening). Retrieve it from the backend logs or data/.api-secret, then enter it as the client API Secret.';
+  'The server generated its own API secret (security hardening). Retrieve it with docker compose exec backend cat /app/data/.api-secret (or read the data/.api-secret file in the data volume), then enter it as the client API Secret. If the file is unavailable, set the API_SECRET environment variable explicitly on the server.';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Skip auth for health check

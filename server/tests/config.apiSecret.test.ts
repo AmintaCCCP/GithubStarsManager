@@ -92,7 +92,9 @@ describe('resolveApiSecret', () => {
 
       const banner = warnSpy.mock.calls.map((call) => call.join(' ')).join('\n');
       expect(banner).toContain('.api-secret');
-      expect(banner).toContain('docker compose logs backend');
+      // 取回指引只指向数据卷文件（密钥值不写入日志），不得再指向 docker logs。
+      expect(banner).toContain('docker compose exec backend');
+      expect(banner).not.toContain('logs backend');
       expect(banner).toContain('API Secret');
     } finally {
       warnSpy.mockRestore();
