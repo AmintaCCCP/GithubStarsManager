@@ -363,7 +363,7 @@ FRONTEND_IMAGE_TAG=0.8.4  # pin frontend image version (default: latest)
 
 #### Backend only (docker run)
 ```bash
-# Basic — no auth, port 3000
+# Basic — auto-generated API secret, port 3000
 docker run -d --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 3000:3000 \
@@ -388,16 +388,24 @@ npm run dev
 #### Environment Variables
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `API_SECRET` | No | Bearer token for API authentication. If unset, auth is disabled. |
+| `API_SECRET` | No | Bearer token for API authentication. If unset, a secure random secret is generated on first start and persisted to `data/.api-secret`; all `/api` requests then require it as a Bearer token. |
+| `ALLOW_INSECURE_NO_AUTH` | No | Set to `1` or `true` to restore the legacy zero-config dev mode when `API_SECRET` is unset: `/api` accepts unauthenticated requests and the server logs a loud warning. Never enable this on a publicly reachable deployment. |
 | `ENCRYPTION_KEY` | No | AES-256 key for encrypting stored secrets. Auto-generated if unset. |
 | `PORT` | No | Server port (default: 3000) |
 | `CSP_CONNECT_SRC` | No | Comma-separated extra origins appended to the `connect-src` CSP directive, for custom AI provider / vector-search worker endpoints called directly from the browser (e.g. `https://ai.example.com,https://worker.example.org`). |
 | `CSP_UPGRADE_INSECURE_REQUESTS` | No | Defaults to on, which sends `upgrade-insecure-requests`. Set to `false` when the full-stack image is served over plain HTTP (e.g. `http://<lan-ip>:3000`); otherwise the browser rewrites the SPA's own assets to `https://` and the page stays blank. Only disable it for HTTP deployments you do not intend to put behind TLS. |
 
+#### Upgrading an existing deployment (security hardening)
+As a security hardening measure, the backend no longer runs with authentication disabled when `API_SECRET` is unset. If you are upgrading an existing deployment that never set `API_SECRET`:
+1. On first start the backend generates a secure random secret and stores it in `data/.api-secret` (inside the data volume). It is also printed once to the startup logs — retrieve it with `docker compose logs backend` or `docker compose exec backend cat /app/data/.api-secret`.
+2. Enter this secret once as the "API Secret" in the web UI (login screen or Settings → Backend Server). Existing encrypted data is unaffected.
+3. Optionally pin the secret by setting `API_SECRET` explicitly in your `.env` file; an explicitly configured secret always takes precedence. For zero-config local development, set `ALLOW_INSECURE_NO_AUTH=1` (the `npm run dev` script does this for you).
+4. If you rely on the auto-generated `data/.encryption-key`, back it up: your encrypted data and this key live on the same volume — if the volume is lost, all stored secrets (GitHub token, AI keys, WebDAV passwords) are unrecoverable.
+
 #### Connecting Frontend to Backend
 1. Open Settings panel in the app
 2. Find "Backend Server" section
-3. Enter API Secret (if configured)
+3. Enter API Secret (the auto-generated one from the backend logs / `data/.api-secret`, or your own `API_SECRET`)
 4. Click "Test Connection" — green indicator means connected
 5. Use "Sync to Backend" / "Sync from Backend" to transfer data
 

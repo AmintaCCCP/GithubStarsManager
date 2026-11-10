@@ -553,7 +553,7 @@ FRONTEND_IMAGE_TAG=0.8.4  # 固定前端版本（默认：latest）
 
 #### 仅后端（docker run）
 ```bash
-# 基础运行 — 无认证，端口 3000
+# 基础运行 — 自动生成 API Secret，端口 3000
 docker run -d --name github-stars-backend \
   -v github-stars-data:/app/data \
   -p 3000:3000 \
@@ -578,16 +578,24 @@ npm run dev
 #### 环境变量
 | 变量 | 必填 | 说明 |
 |----------|----------|-------------|
-| `API_SECRET` | 否 | API 认证令牌。未设置时禁用认证。 |
+| `API_SECRET` | 否 | API 认证令牌。未设置时会在首次启动自动生成安全随机密钥并保存到 `data/.api-secret`，此后所有 `/api` 请求都要求以它作为 Bearer 令牌认证。 |
+| `ALLOW_INSECURE_NO_AUTH` | 否 | 设为 `1` 或 `true` 可在 `API_SECRET` 未设置时恢复旧的零配置开发模式：`/api` 接受未认证请求，同时服务器会输出醒目警告。切勿在公网可达的部署上开启。 |
 | `ENCRYPTION_KEY` | 否 | 用于加密存储密钥的 AES-256 密钥。未设置时自动生成。 |
 | `PORT` | 否 | 服务器端口（默认：3000） |
 | `CSP_CONNECT_SRC` | 否 | 追加到 `connect-src` CSP 指令的额外来源（逗号分隔），用于浏览器直接访问的自定义 AI 服务商 / 向量搜索 worker 端点（如 `https://ai.example.com,https://worker.example.org`）。 |
 | `CSP_UPGRADE_INSECURE_REQUESTS` | 否 | 默认开启，会发送 `upgrade-insecure-requests`。当 fullstack 镜像通过纯 HTTP 提供服务（如 `http://<内网 IP>:3000`）时设为 `false`；否则浏览器会把 SPA 自身资源改写为 `https://`，页面保持空白。仅对不打算接入 TLS 的 HTTP 部署关闭。 |
 
+#### 已有部署升级说明（安全加固）
+作为安全加固措施，后端在 `API_SECRET` 未设置时不再以关闭认证的方式运行。如果你正在升级一个从未设置过 `API_SECRET` 的已有部署：
+1. 首次启动时后端会自动生成安全随机密钥并保存到 `data/.api-secret`（位于数据卷内），同时会在启动日志中输出一次。可通过 `docker compose logs backend` 或 `docker compose exec backend cat /app/data/.api-secret` 获取。
+2. 在 Web UI（登录页或设置 → 后端服务器）中把这个密钥填入「API Secret」输入框一次即可。已有加密数据不受影响。
+3. 可选：在 `.env` 文件中显式设置 `API_SECRET` 来固定密钥；显式配置的密钥始终优先。本地零配置开发可设置 `ALLOW_INSECURE_NO_AUTH=1`（`npm run dev` 脚本已自动带上）。
+4. 如果你依赖自动生成的 `data/.encryption-key`，请备份该文件：加密数据与密钥存放在同一个数据卷中——数据卷一旦丢失，所有已存储的密钥（GitHub Token、AI Key、WebDAV 密码）将无法恢复。
+
 #### 前端连接后端
 1. 打开应用中的设置面板
 2. 找到「后端服务器」部分
-3. 输入 API Secret（如已配置）
+3. 输入 API Secret（后端日志 / `data/.api-secret` 中自动生成的密钥，或你自己的 `API_SECRET`）
 4. 点击「测试连接」，绿色指示灯表示连接成功
 5. 使用「同步到后端」/「从后端同步」来传输数据
 
