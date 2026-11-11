@@ -13,9 +13,12 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(new URL('..', import.meta.url).pathname);
-const UIP = path.join(ROOT, '.github', 'ui-preview');
+/** Run from the repo root: node .github/ui-preview/experiment.mjs [--only <filter>] */
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(SCRIPT_DIR, '..', '..');
+const UIP = SCRIPT_DIR;
 
 const detect = await import(`file://${UIP}/detect.mjs`);
 
@@ -105,17 +108,27 @@ function enumerateLocaleKeys() {
 
 const isTestPath = (p) => /\.(test|spec)\.[jt]sx?$/.test(p) || p.includes('__tests__') || p.startsWith('src/test/') || / \d+\.(tsx?|json|css)$/.test(p);
 
-/** Apply a minimal synthetic change to a file; returns a revert function. */
+/** Extensions the probe knows how to modify safely; anything else
+ *  (PNG/ICO/fonts under public/) is skipped — round-tripping binary bytes
+ *  through a UTF-8 string would corrupt them beyond repair. */
+const TEXT_PROBE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.css', '.html', '.json', '.svg']);
+
+/** Apply a minimal synthetic change to a file; returns a revert function, or
+ *  null when the file is binary and must not be probed. The original bytes
+ *  are kept as a Buffer so the revert is byte-exact. */
 function modifyFile(relPath) {
   const abs = path.join(ROOT, relPath);
-  const original = readFileSync(abs, 'utf8');
+  if (!TEXT_PROBE_EXTENSIONS.has(path.extname(relPath))) {
+    return null;
+  }
+  const original = readFileSync(abs);
   let modified;
   if (relPath.endsWith('.json')) {
-    const data = JSON.parse(original);
+    const data = JSON.parse(original.toString('utf8'));
     data.__ui_preview_probe__ = true;
     modified = `${JSON.stringify(data, null, 2)}\n`;
   } else {
-    modified = `${original}\n/* ui-preview-probe */\n`;
+    modified = `${original.toString('utf8')}\n/* ui-preview-probe */\n`;
   }
   writeFileSync(abs, modified);
   return () => writeFileSync(abs, original);
@@ -175,6 +188,7 @@ for (const target of enumerateTargets()) {
   const file = typeof target === 'string' ? target : target.path;
   if (only && !file.includes(only)) continue;
   const revert = modifyFile(file);
+  if (!revert) continue; // binary file, not probeable
   try {
     let scenes;
     if (file.endsWith('.json') && file.startsWith('src/locales/')) {

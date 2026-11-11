@@ -609,26 +609,34 @@ export function classifyPath(filePath) {
     return ['settings-general', 'login'];
   }
 
-  // 14. Global UI elements (affect all static scenes)
+  // 14. Global style/theme/primitive layers render on every app page AND on
+  // the login page (which uses ui primitives, translations, theme presets and
+  // the public logo), so they trigger the login scene as well.
   if (
-    path === 'src/App.tsx' ||
-    path === 'src/main.tsx' ||
     path === 'src/index.css' ||
     path.startsWith('src/styles/') ||
     path.startsWith('src/i18n/') ||
-    /^src\/components\/Header\./.test(path) ||
-    /^src\/components\/WorkspacePageHeader\./.test(path) ||
     path.startsWith('src/components/ui/') ||
-    path.startsWith('src/lib/') ||
-    /^src\/constants\/themePresets\./.test(path) ||
-    /^src\/(types|utils)\/themeTokens\./.test(path) ||
-    /^src\/lib\/themePresets\./.test(path) ||
-    /^src\/locales\/[^/]+\/common\.json$/.test(path) ||
-    path === 'index.html' ||
     path === 'tailwind.config.js' ||
     path === 'postcss.config.js' ||
-    path === 'vite.config.ts' ||
-    path.startsWith('public/')
+    path.startsWith('public/') ||
+    path === 'index.html' ||
+    /^src\/(types|utils)\/themeTokens\./.test(path) ||
+    /^src\/constants\/themePresets\./.test(path) ||
+    /^src\/lib\/themePresets\./.test(path)
+  ) {
+    return ['global', 'login'];
+  }
+
+  // 15. App shell chrome: every app scene, but not the standalone login page.
+  if (
+    path === 'src/App.tsx' ||
+    path === 'src/main.tsx' ||
+    /^src\/components\/Header\./.test(path) ||
+    /^src\/components\/WorkspacePageHeader\./.test(path) ||
+    path.startsWith('src/lib/') ||
+    /^src\/locales\/[^/]+\/common\.json$/.test(path) ||
+    path === 'vite.config.ts'
   ) {
     return 'global';
   }

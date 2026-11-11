@@ -670,11 +670,10 @@ async function shootScene(browser, baseState, scene, url, outDir) {
 
     if (scene.loginScreen) {
       // The login page replaces the whole shell — wait for its own content
-      // instead of .ui-shell / main.app-main.
-      await page.waitForFunction(() => {
-        const root = document.querySelector('#root');
-        return !!root && (root.innerText ?? '').trim().length > 0;
-      }, null, { timeout: 60_000, polling: 250 });
+      // instead of .ui-shell / main.app-main. The token input only exists
+      // once the real form has hydrated; a Suspense "Loading..." frame would
+      // satisfy a text-based check.
+      await page.waitForSelector('#root input', { timeout: 60_000 });
       await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 15_000 }).catch(() => {});
       await page.waitForTimeout(scene.settleMs ?? 800);
       await page.screenshot({ path: shotPath, fullPage: true });
