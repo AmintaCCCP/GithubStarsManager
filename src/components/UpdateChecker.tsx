@@ -16,9 +16,10 @@ interface UpdateCheckerProps {
 }
 
 export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable }) => {
-  const { language, setUpdateNotification } = useAppStore(useShallow((state) => ({
+  const { language, setUpdateNotification, setUpdatePromptDismissedVersion } = useAppStore(useShallow((state) => ({
     language: state.language,
     setUpdateNotification: state.setUpdateNotification,
+    setUpdatePromptDismissedVersion: state.setUpdatePromptDismissedVersion,
   })));
   const { toast } = useDialog();
   const { checkForUpdates: checkForUpdatesRemote, openDownloadUrl } = useUpdateActions();
@@ -66,6 +67,17 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
     }
   };
 
+  // 不再提示当前版本：记录版本号后，自动检查在该版本仍为最新时不再弹提示；
+  // 最新版再次变化（发布更新版本）后自动恢复提示。
+  const handleDontRemind = () => {
+    if (updateInfo) {
+      setUpdatePromptDismissedVersion(updateInfo.number);
+      // 同步移除本次会话可能存在的顶部横幅，避免与"不再提示"自相矛盾
+      setUpdateNotification(null);
+    }
+    setShowUpdateDialog(false);
+  };
+
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString(getIntlLocale(language));
@@ -107,6 +119,7 @@ export const UpdateChecker: React.FC<UpdateCheckerProps> = ({ onUpdateAvailable 
             </div>
           )}
           <DialogFooter className="shrink-0 border-t border-border px-6 py-4">
+            <Button type="button" variant="ghost" onClick={handleDontRemind}>{t('updateChecker.dont-remind-again')}</Button>
             <Button type="button" onClick={handleDownload} className="gap-2"><ExternalLink className="h-4 w-4" /><span>{t('updateChecker.download-now')}</span></Button>
             <Button type="button" variant="outline" onClick={() => setShowUpdateDialog(false)}>{t('updateChecker.later')}</Button>
           </DialogFooter>

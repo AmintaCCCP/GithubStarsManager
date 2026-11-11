@@ -498,7 +498,8 @@
     "release-date": "Veröffentlichungsdatum:",
     "what-s-new": "Aktualisierungen:",
     "download-now": "Jetzt herunterladen",
-    "later": "Erinnerung später"
+    "later": "Erinnerung später",
+    "dont-remind-again": "Nicht mehr daran erinnern"
   },
   "updateNotificationBanner": {
     "new-version-available": "neue Version gefunden",
@@ -967,6 +968,8 @@
     "check-for-updates": "Suchen Sie nach Updates",
     "current-version-v-version": "Aktuelle Version: v{{version}}",
     "check-if-a-new-version-is-available": "Prüfen Sie, ob eine neue Version verfügbar ist",
+    "auto-update-check": "Automatische Update-Suche",
+    "auto-update-check-hint": "Beim Start automatisch nach neuen Versionen suchen; die manuelle Suche bleibt verfügbar",
     "contact-information": "Kontaktinformationen",
     "if-you-encounter-any-issues-or-have-suggestions": "Wenn Sie während der Nutzung auf Probleme stoßen oder Vorschläge haben, kontaktieren Sie mich bitte über die folgenden Methoden:",
     "github": "GitHub",
