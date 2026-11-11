@@ -22,6 +22,8 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
   | 'setHasHydrated'
   | 'setUpdateNotification'
   | 'dismissUpdateNotification'
+  | 'setAutoUpdateCheckEnabled'
+  | 'setUpdatePromptDismissedVersion'
   | 'setAnalysisProgress'
   | 'setProxyConfig'
   | 'setRouteMode'
@@ -72,6 +74,8 @@ export const createPreferenceSlice: AppStoreSlice<Pick<import('../types').AppAct
       // Update actions
       setUpdateNotification: (notification) => set({ updateNotification: notification }),
       dismissUpdateNotification: () => set({ updateNotification: null }),
+      setAutoUpdateCheckEnabled: (autoUpdateCheckEnabled) => set({ autoUpdateCheckEnabled }),
+      setUpdatePromptDismissedVersion: (updatePromptDismissedVersion) => set({ updatePromptDismissedVersion }),
       setAnalysisProgress: (newProgress) => set({ analysisProgress: newProgress }),
       setProxyConfig: (updates) => set((state) => ({
         proxyConfig: { ...state.proxyConfig, ...updates }
