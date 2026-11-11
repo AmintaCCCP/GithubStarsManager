@@ -100,7 +100,7 @@ export interface ResolvedApiSecret {
 
 /**
  * Resolve the API auth secret:
- * 1. API_SECRET env var set (non-blank) → use it (trimmed).
+ * 1. API_SECRET env var set (non-blank) → use it unchanged.
  * 2. ALLOW_INSECURE_NO_AUTH=1/true → return null (dev mode: auth middleware
  *    allows all requests after a loud warning).
  * 3. Otherwise auto-generate a per-deployment secret, persisted as
@@ -114,7 +114,10 @@ export interface ResolvedApiSecret {
 export function resolveApiSecret(dataDir: string): ResolvedApiSecret {
   const envSecret = process.env.API_SECRET;
   if (envSecret && envSecret.trim()) {
-    return { secret: envSecret.trim(), source: 'env' };
+    // Whitespace is significant: a legacy deployment whose API_SECRET contains
+    // leading/trailing spaces must keep authenticating with the original value,
+    // so trim() is only used to test blankness, never to normalize the secret.
+    return { secret: envSecret, source: 'env' };
   }
 
   // Explicit dev escape hatch — auth middleware will warn loudly.
@@ -138,19 +141,28 @@ export function resolveApiSecret(dataDir: string): ResolvedApiSecret {
   }
 
   const generated = crypto.randomBytes(32).toString('hex');
+  // Publish atomically: write the complete secret to a private temp file in the
+  // same directory, then link() it into place. link() never clobbers an existing
+  // file, and the published inode is always fully written — a concurrent start
+  // can therefore never observe a partial .api-secret and silently fall back to
+  // a mismatched ephemeral secret until restart.
+  const tmpPath = path.join(dataDir, `.api-secret.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
   try {
-    // flag 'wx' — never clobber a file that appeared concurrently.
-    fs.writeFileSync(secretFilePath, generated, { mode: 0o600, flag: 'wx' });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-      // A concurrent startup created the file first — its secret wins.
-      try {
-        const existing = fs.readFileSync(secretFilePath, 'utf-8').trim();
-        if (existing) return { secret: existing, source: 'generated' };
-      } catch { /* fall through to ephemeral below */ }
+    fs.writeFileSync(tmpPath, generated, { mode: 0o600, flag: 'wx' });
+    try {
+      fs.linkSync(tmpPath, secretFilePath);
+    } catch (publishError) {
+      if ((publishError as NodeJS.ErrnoException).code !== 'EEXIST') throw publishError;
+      // A concurrent startup published its secret first — the winner wins.
+      const winner = fs.readFileSync(secretFilePath, 'utf-8').trim();
+      if (winner) return { secret: winner, source: 'generated' };
+      throw publishError; // unreadable/empty winner file → ephemeral below
     }
+  } catch (error) {
     console.error(`[config] Failed to persist data/.api-secret: ${(error as Error).message}. Using a temporary in-memory secret for this run (it changes on every restart); set the API_SECRET environment variable, or make the data directory writable, to avoid this.`);
     return { secret: crypto.randomBytes(32).toString('hex'), source: 'generated' };
+  } finally {
+    try { fs.unlinkSync(tmpPath); } catch { /* best-effort cleanup; nothing to remove */ }
   }
 
   // The secret VALUE is never printed to logs; the banner only points at the
