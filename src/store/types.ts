@@ -193,6 +193,8 @@ export interface AppActions {
   // Update actions
   setUpdateNotification: (notification: UpdateNotification | null) => void;
   dismissUpdateNotification: () => void;
+  setAutoUpdateCheckEnabled: (enabled: boolean) => void;
+  setUpdatePromptDismissedVersion: (version: string | null) => void;
 
   // Update Analysis Progress
   setAnalysisProgress: (newProgress: AnalysisProgress) => void;
