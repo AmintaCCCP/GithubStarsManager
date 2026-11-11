@@ -86,6 +86,8 @@ export const createInitialState = (): AppState => ({
       translationEngine: 'microsoft',
       autoTranslateRepoDescription: false,
       updateNotification: null,
+      autoUpdateCheckEnabled: true,
+      updatePromptDismissedVersion: null,
       analysisProgress: { current: 0, total: 0 },
       backendApiSecret: readSessionBackendSecret(),
       proxyConfig: { enabled: false, type: 'http', host: '', port: 7890 },

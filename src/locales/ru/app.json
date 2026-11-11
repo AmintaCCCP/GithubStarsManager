@@ -498,7 +498,8 @@
     "release-date": "Дата выпуска:",
     "what-s-new": "Обновления:",
     "download-now": "Скачать сейчас",
-    "later": "напоминание позже"
+    "later": "напоминание позже",
+    "dont-remind-again": "Больше не напоминать"
   },
   "updateNotificationBanner": {
     "new-version-available": "найдена новая версия",
@@ -967,6 +968,8 @@
     "check-for-updates": "Проверьте наличие обновлений",
     "current-version-v-version": "Текущая версия: v{{version}}",
     "check-if-a-new-version-is-available": "Проверьте, доступна ли новая версия",
+    "auto-update-check": "Автоматическая проверка обновлений",
+    "auto-update-check-hint": "Автоматически проверять новые версии при запуске; ручная проверка останется доступной",
     "contact-information": "Контактная информация",
     "if-you-encounter-any-issues-or-have-suggestions": "Если у вас возникнут какие-либо проблемы или у вас есть предложения во время использования, свяжитесь со мной следующими способами:",
     "github": "GitHub",
