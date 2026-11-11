@@ -977,7 +977,7 @@
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Incluir chaves ao fazer backup/exportar",
     "includes-keys-for-ai-configs-webdav-proxy-remote": "Contém chaves para configuração de IA, WebDAV, proxy, download remoto e servidor backend",
-    "warning-backup-file-contains-plaintext-keys": "Ao ativar, o arquivo de backup conterá chaves em texto plano. Guarde o arquivo de backup em local seguro."
+    "warning-backup-file-contains-plaintext-keys": "Ao ativar, os arquivos de backup e de exportação conterão chaves em texto plano. Guarde esses arquivos em local seguro."
   },
   "mcpSettingsPanel": {
     "copied": "Copiado",

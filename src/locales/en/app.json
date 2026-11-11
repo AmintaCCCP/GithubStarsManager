@@ -977,7 +977,7 @@
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Include keys in backup/export",
     "includes-keys-for-ai-configs-webdav-proxy-remote": "Includes keys for AI configs, WebDAV, proxy, remote download, and backend server",
-    "warning-backup-file-contains-plaintext-keys": "When enabled, the backup file contains plaintext keys. Keep the backup file safe."
+    "warning-backup-file-contains-plaintext-keys": "When enabled, backup and export files contain plaintext keys. Keep them safe."
   },
   "mcpSettingsPanel": {
     "copied": "Copied",

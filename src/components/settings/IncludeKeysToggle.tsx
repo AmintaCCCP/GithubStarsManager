@@ -42,7 +42,7 @@ export const IncludeKeysToggle: FC<IncludeKeysToggleProps> = ({ t }) => {
         把 main.app-main 内的 [role="status"] 视为未完成的 Suspense Loading 帧，会判截图就绪失败。 */}
       <div aria-live="polite">
         {includeKeysInBackup && (
-          <p id={warningId} className="mt-3 flex items-start gap-1.5 text-sm text-amber-600 dark:text-amber-500">
+          <p id={warningId} className="mt-3 flex items-start gap-1.5 text-sm text-amber-700 dark:text-amber-500">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('includeKeysToggle.warning-backup-file-contains-plaintext-keys')}</span>
           </p>
