@@ -93,6 +93,8 @@ export type PersistedAppState = Partial<
     | 'language'
     | 'translationEngine'
     | 'autoTranslateRepoDescription'
+    | 'autoUpdateCheckEnabled'
+    | 'updatePromptDismissedVersion'
     | 'searchFilters'
     | 'isSidebarCollapsed'
     | 'repositoryViewMode'

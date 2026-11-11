@@ -603,6 +603,10 @@ export interface AppState {
   
   // Update
   updateNotification: UpdateNotification | null;
+  /** 启动时自动检查更新（设置-通用-检查更新 中可关闭；关闭后仍可手动检查） */
+  autoUpdateCheckEnabled: boolean;
+  /** 用户选择"不再提示"的版本号：该版本仍为最新时不再自动提示，出新版本后自动失效 */
+  updatePromptDismissedVersion: string | null;
 
   // Analysis Progress
   analysisProgress: AnalysisProgress

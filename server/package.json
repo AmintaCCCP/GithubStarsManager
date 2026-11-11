@@ -29,7 +29,7 @@
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.9",
     "@types/supertest": "^7.2.1",
-    "supertest": "^7.3.1",
+    "supertest": "^7.3.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

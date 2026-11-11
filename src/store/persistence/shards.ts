@@ -89,6 +89,8 @@ export const PERSISTENCE_SHARD_FIELDS: Record<PersistenceShardName, readonly str
     'language',
     'translationEngine',
     'autoTranslateRepoDescription',
+    'autoUpdateCheckEnabled',
+    'updatePromptDismissedVersion',
     'isSidebarCollapsed',
     'headerMenuConfig',
     'backendApiSecret',
