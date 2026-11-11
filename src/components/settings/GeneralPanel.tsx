@@ -23,8 +23,10 @@ interface GeneralPanelProps {
 }
 
 export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
-  const { user } = useAppStore(useShallow((state) => ({
+  const { user, autoUpdateCheckEnabled, setAutoUpdateCheckEnabled } = useAppStore(useShallow((state) => ({
     user: state.user,
+    autoUpdateCheckEnabled: state.autoUpdateCheckEnabled,
+    setAutoUpdateCheckEnabled: state.setAutoUpdateCheckEnabled,
   })));
   const desktop = useDesktopActions();
   const githubToken = useGitHubTokenActions();
@@ -44,12 +46,25 @@ export const GeneralPanel: React.FC<GeneralPanelProps> = ({ t }) => {
             <CardTitle>{t('generalPanel.check-for-updates')}</CardTitle>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="mb-1 text-sm text-muted-foreground dark:text-muted-foreground">{t('generalPanel.current-version-v-version', { version: version })}</p>
-            <p className="text-xs text-muted-foreground dark:text-muted-foreground">{t('generalPanel.check-if-a-new-version-is-available')}</p>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-foreground dark:text-foreground">{t('generalPanel.auto-update-check')}</p>
+              <p className="mt-1 text-xs text-muted-foreground dark:text-muted-foreground">{t('generalPanel.auto-update-check-hint')}</p>
+            </div>
+            <Switch
+              aria-label={t('generalPanel.auto-update-check')}
+              checked={autoUpdateCheckEnabled}
+              onCheckedChange={setAutoUpdateCheckEnabled}
+            />
           </div>
-          <UpdateChecker />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="mb-1 text-sm text-muted-foreground dark:text-muted-foreground">{t('generalPanel.current-version-v-version', { version: version })}</p>
+              <p className="text-xs text-muted-foreground dark:text-muted-foreground">{t('generalPanel.check-if-a-new-version-is-available')}</p>
+            </div>
+            <UpdateChecker />
+          </div>
         </CardContent>
       </Card>
 

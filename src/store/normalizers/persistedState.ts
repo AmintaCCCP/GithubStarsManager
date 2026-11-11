@@ -255,6 +255,13 @@ export const normalizePersistedState = (
     autoTranslateRepoDescription: typeof safePersisted.autoTranslateRepoDescription === 'boolean'
       ? safePersisted.autoTranslateRepoDescription
       : false,
+    // 更新检查偏好：自动检查开关默认开启；"不再提示"版本须为非空字符串
+    autoUpdateCheckEnabled: typeof safePersisted.autoUpdateCheckEnabled === 'boolean'
+      ? safePersisted.autoUpdateCheckEnabled
+      : true,
+    updatePromptDismissedVersion: typeof safePersisted.updatePromptDismissedVersion === 'string' && safePersisted.updatePromptDismissedVersion
+      ? safePersisted.updatePromptDismissedVersion
+      : null,
     isAuthenticated: !!(resolvedUser && resolvedGithubToken),
     releaseViewMode: safePersisted.releaseViewMode || 'timeline',
     releaseShowMode: safePersisted.releaseShowMode === 'unread' ? 'unread' : 'all',
