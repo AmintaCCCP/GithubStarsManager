@@ -421,6 +421,20 @@ const WIRING_STRING_BRACE_MOVED = [
 ].join('\n');
 check('a brace inside a comment cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_COMMENT_GUARD_BASE, WIRING_COMMENT_GUARD_MOVED), false);
 check('a brace inside a string cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_STRING_BRACE_BASE, WIRING_STRING_BRACE_MOVED), false);
+const WIRING_REGEX_GUARD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void /[}]/.test(language);',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_REGEX_GUARD_ABSORB = WIRING_REGEX_GUARD_BASE.replace(
+  '}\ndocument.documentElement.lang = language;',
+  'document.documentElement.lang = language;\n}',
+);
+check('a brace inside a regex literal cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_REGEX_GUARD_BASE, WIRING_REGEX_GUARD_ABSORB), false);
+check('the regex absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_REGEX_GUARD_ABSORB, WIRING_REGEX_GUARD_BASE), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

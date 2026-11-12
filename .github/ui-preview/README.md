@@ -30,8 +30,9 @@ label), the workflow:
        web-inert. Bridge syntax means `desktopBridge`/`electronProxy`
        imports, bridge call statements with side-effect-free arguments, the
        `isSupported()` guard (transparent only when it wraps nothing but
-       bridge statements, with boundaries derived from a comment/string-aware
-       brace scan), and bare braces. The web bundle's `desktopBridge` no-ops
+       bridge statements, with boundaries derived from a brace scan that
+       skips comments, string/template literals and regex literals), and
+       bare braces. The web bundle's `desktopBridge` no-ops
        every method outside Electron, so such a diff renders nothing (a
        desktop-only tray/language sync change shoots nothing instead of every
        page). Any other wiring change still triggers all scenes, because

@@ -838,50 +838,95 @@ const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\
  * @param {string} raw - File content.
  * @returns {number[] | null} Net brace delta per line, or null.
  */
+/** Keywords after which a `/` starts a regex literal instead of division. */
+const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'case', 'do', 'else', 'yield', 'await', 'throw']);
+
 function braceDeltasPerLine(raw) {
   const lines = raw.split('\n');
-  const deltas = [];
+  const deltas = new Array(lines.length).fill(0);
   let state = 'code';
-  for (const line of lines) {
-    let delta = 0;
-    let i = 0;
-    while (i < line.length) {
-      const ch = line[i];
-      if (state === 'code') {
-        if (ch === '/' && line[i + 1] === '/') break;
-        if (ch === '/' && line[i + 1] === '*') {
-          state = 'block';
-          i += 2;
-          continue;
+  let regexClass = false;
+  let line = 0;
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === '\n') {
+      line += 1;
+      i += 1;
+      continue;
+    }
+    if (state === 'code') {
+      if (ch === '/' && raw[i + 1] === '/') {
+        while (i < raw.length && raw[i] !== '\n') i += 1;
+        continue;
+      }
+      if (ch === '/' && raw[i + 1] === '*') {
+        state = 'block';
+        i += 2;
+        continue;
+      }
+      if (ch === "'" || ch === '"' || ch === '`') {
+        state = ch === "'" ? 'single' : ch === '"' ? 'double' : 'template';
+        i += 1;
+        continue;
+      }
+      if (ch === '/') {
+        // Regex or division: a regex is started when the previous significant
+        // token is an operator/opening bracket or a regex-allowing keyword.
+        // Misjudging division as regex would SKIP code braces, so the
+        // heuristic errs toward division (braces stay counted; any resulting
+        // imbalance degrades conservatively downstream).
+        let k = i - 1;
+        while (k >= 0 && (raw[k] === '\n' || raw[k] === ' ' || raw[k] === '\t' || raw[k] === '\r')) k -= 1;
+        const prev = k >= 0 ? raw[k] : '';
+        let word = '';
+        let w = k;
+        while (w >= 0 && /[A-Za-z_$0-9]/.test(raw[w])) {
+          word = raw[w] + word;
+          w -= 1;
         }
-        if (ch === "'" || ch === '"' || ch === '`') {
-          state = ch === "'" ? 'single' : ch === '"' ? 'double' : 'template';
+        if (prev === '' || '([{,;=:!&|?+-*%~^>'.includes(prev) || REGEX_KEYWORDS.has(word)) {
+          state = 'regex';
+          regexClass = false;
           i += 1;
           continue;
         }
-        if (ch === '{') delta += 1;
-        else if (ch === '}') delta -= 1;
         i += 1;
-      } else if (state === 'block') {
-        if (ch === '*' && line[i + 1] === '/') {
-          state = 'code';
-          i += 2;
-        } else {
-          i += 1;
-        }
-      } else if (state === 'single' || state === 'double') {
-        // Regular strings do not span lines in JS; an unterminated one is a
-        // syntax error the build would catch. Stop the scan for this line.
-        if (ch === '\\') i += 2;
-        else if (ch === (state === 'single' ? "'" : '"')) state = 'code';
-        i += 1;
+        continue;
+      }
+      if (ch === '{') deltas[line] += 1;
+      else if (ch === '}') deltas[line] -= 1;
+      i += 1;
+    } else if (state === 'block') {
+      if (ch === '*' && raw[i + 1] === '/') {
+        state = 'code';
+        i += 2;
       } else {
-        if (ch === '\\') i += 2;
-        else if (ch === '`') state = 'code';
         i += 1;
       }
+    } else if (state === 'single' || state === 'double') {
+      // Regular strings do not span lines in JS; an unterminated one is a
+      // syntax error the build would catch. Stop the scan for this line.
+      if (ch === '\\') i += 2;
+      else {
+        if (ch === (state === 'single' ? "'" : '"')) state = 'code';
+        i += 1;
+        if (ch === '\n') {
+          line += 1;
+          state = 'code';
+        }
+      }
+    } else if (state === 'regex') {
+      if (ch === '\\') i += 2;
+      else if (ch === '[') regexClass = true;
+      else if (ch === ']') regexClass = false;
+      else if (ch === '/' && !regexClass) state = 'code';
+      i += 1;
+    } else {
+      if (ch === '\\') i += 2;
+      else if (ch === '`') state = 'code';
+      i += 1;
     }
-    deltas.push(delta);
   }
   if (state !== 'code') return null;
   return deltas;
