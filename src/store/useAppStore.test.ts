@@ -1121,6 +1121,44 @@ describe('useAppStore theme preset', () => {
   });
 });
 
+describe('useAppStore update-check preferences', () => {
+  it('defaults auto check to enabled and no dismissed version for legacy persisted state', () => {
+    const normalized = normalizePersistedState({}, useAppStore.getState());
+
+    expect(normalized.autoUpdateCheckEnabled).toBe(true);
+    expect(normalized.updatePromptDismissedVersion).toBeNull();
+  });
+
+  it('restores the persisted update-check preferences', () => {
+    const normalized = normalizePersistedState(
+      { autoUpdateCheckEnabled: false, updatePromptDismissedVersion: '1.2.0' },
+      useAppStore.getState(),
+    );
+
+    expect(normalized.autoUpdateCheckEnabled).toBe(false);
+    expect(normalized.updatePromptDismissedVersion).toBe('1.2.0');
+  });
+
+  it('falls back to defaults for garbage persisted values', () => {
+    const normalized = normalizePersistedState(
+      { autoUpdateCheckEnabled: 'yes' as never, updatePromptDismissedVersion: 0 as never },
+      useAppStore.getState(),
+    );
+
+    expect(normalized.autoUpdateCheckEnabled).toBe(true);
+    expect(normalized.updatePromptDismissedVersion).toBeNull();
+  });
+
+  it('treats an empty dismissed version as unset', () => {
+    const normalized = normalizePersistedState(
+      { updatePromptDismissedVersion: '' },
+      useAppStore.getState(),
+    );
+
+    expect(normalized.updatePromptDismissedVersion).toBeNull();
+  });
+});
+
 type PersistenceOptions = {
   partialize: (state: typeof useAppStore extends never ? never : ReturnType<typeof useAppStore.getState>) => PersistedSnapshot;
   migrate: (snapshot: PersistedSnapshot, version: number) => PersistedSnapshot | Promise<PersistedSnapshot>;

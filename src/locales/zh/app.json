@@ -498,7 +498,8 @@
     "release-date": "发布日期:",
     "what-s-new": "更新内容:",
     "download-now": "立即下载",
-    "later": "稍后提醒"
+    "later": "稍后提醒",
+    "dont-remind-again": "不再提示"
   },
   "updateNotificationBanner": {
     "new-version-available": "发现新版本",
@@ -967,6 +968,8 @@
     "check-for-updates": "检查更新",
     "current-version-v-version": "当前版本: v{{version}}",
     "check-if-a-new-version-is-available": "检查是否有新版本可用",
+    "auto-update-check": "自动检查更新",
+    "auto-update-check-hint": "启动时自动检查新版本；关闭后仍可手动检查更新",
     "contact-information": "联系方式",
     "if-you-encounter-any-issues-or-have-suggestions": "如果您在使用过程中遇到任何问题或有建议，欢迎通过以下方式联系我：",
     "github": "GitHub",

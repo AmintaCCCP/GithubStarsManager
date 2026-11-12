@@ -344,6 +344,7 @@ const STATIC_SCENE_LABELS = {
   releases: 'Releases',
   forks: 'Forks',
   discovery: '发现',
+  login: '登录页',
   'settings-general': '设置 · 通用',
   'settings-appearance': '设置 · 外观',
   'settings-star-sync': '设置 · Star 同步',

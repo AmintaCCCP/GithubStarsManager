@@ -498,7 +498,8 @@
     "release-date": "發佈日期:",
     "what-s-new": "更新內容:",
     "download-now": "立即下載",
-    "later": "稍後提醒"
+    "later": "稍後提醒",
+    "dont-remind-again": "不再顯示"
   },
   "updateNotificationBanner": {
     "new-version-available": "發現新版本",
@@ -967,6 +968,8 @@
     "check-for-updates": "檢查更新",
     "current-version-v-version": "目前版本: v{{version}}",
     "check-if-a-new-version-is-available": "檢查是否有新版本可用",
+    "auto-update-check": "自動檢查更新",
+    "auto-update-check-hint": "啟動時自動檢查新版本；關閉後仍可手動檢查更新",
     "contact-information": "聯絡方式",
     "if-you-encounter-any-issues-or-have-suggestions": "如果您在使用過程中遇到任何問題或有建議，歡迎透過以下方式與我聯絡：",
     "github": "GitHub",

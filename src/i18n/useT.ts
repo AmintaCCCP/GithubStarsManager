@@ -27,7 +27,7 @@ export function useT(namespace?: I18nNamespace): TranslateFn {
   }, []);
   return useMemo(
     () => (key: string, params?: Record<string, unknown>) =>
-      i18n.getFixedT(language, namespace ?? 'common')(key, params) as string,
+      i18n.getFixedT(language, namespace ?? 'common')(key, params ?? {}) as string,
     [language, namespace],
   );
 }
@@ -38,7 +38,7 @@ export function useT(namespace?: I18nNamespace): TranslateFn {
  */
 export function makeT(language: string, namespace?: I18nNamespace): TranslateFn {
   return (key: string, params?: Record<string, unknown>) =>
-    i18n.getFixedT(language, namespace ?? 'common')(key, params) as string;
+    i18n.getFixedT(language, namespace ?? 'common')(key, params ?? {}) as string;
 }
 
 export type PairTranslateFn = (zh: string, en: string) => string;

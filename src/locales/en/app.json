@@ -498,7 +498,8 @@
     "release-date": "Release Date:",
     "what-s-new": "What's New:",
     "download-now": "Download Now",
-    "later": "Later"
+    "later": "Later",
+    "dont-remind-again": "Don't Remind Again"
   },
   "updateNotificationBanner": {
     "new-version-available": "New Version Available",
@@ -967,6 +968,8 @@
     "check-for-updates": "Check for Updates",
     "current-version-v-version": "Current Version: v{{version}}",
     "check-if-a-new-version-is-available": "Check if a new version is available",
+    "auto-update-check": "Automatic Update Check",
+    "auto-update-check-hint": "Automatically check for new versions on startup; you can still check manually",
     "contact-information": "Contact Information",
     "if-you-encounter-any-issues-or-have-suggestions": "If you encounter any issues or have suggestions while using the app, feel free to contact me through:",
     "github": "GitHub",

@@ -498,7 +498,8 @@
     "release-date": "출시일:",
     "what-s-new": "업데이트:",
     "download-now": "지금 다운로드",
-    "later": "나중에 알림"
+    "later": "나중에 알림",
+    "dont-remind-again": "다시 표시 안 함"
   },
   "updateNotificationBanner": {
     "new-version-available": "새 버전이 발견되었습니다",
@@ -967,6 +968,8 @@
     "check-for-updates": "업데이트 확인",
     "current-version-v-version": "현재 버전: v{{version}}",
     "check-if-a-new-version-is-available": "새 버전이 있는지 확인하세요.",
+    "auto-update-check": "자동 업데이트 확인",
+    "auto-update-check-hint": "시작 시 새 버전을 자동으로 확인합니다. 꺼도 수동으로 확인할 수 있습니다",
     "contact-information": "연락처 정보",
     "if-you-encounter-any-issues-or-have-suggestions": "사용 중 문제가 발생하거나 제안 사항이 있는 경우 다음 방법을 통해 저에게 연락해 주세요.",
     "github": "GitHub",
