@@ -275,8 +275,42 @@ check('wiring diff touching web-rendered lines is not inert', isDesktopBridgeOnl
 check('unrelated wiring diff is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace("import i18next from 'i18next';", "import i18next, { type i18n as I18nInstance } from 'i18next';")), false);
 check('unreadable wiring content is not inert', isDesktopBridgeOnlyDiff(null, WIRING_DESKTOP), false);
 check('identical wiring content is inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE), true);
+check('a pure line swap between different contents is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace(
+  '  await i18next.changeLanguage(language);\n  document.documentElement.lang = language;',
+  '  document.documentElement.lang = language;\n  await i18next.changeLanguage(language);',
+)), false);
 check('inert i18n wiring diff maps to no scenes', mapPathsToScenes(['src/i18n/index.ts'], {}, new Set(['src/i18n/index.ts'])), []);
 check('inert i18n wiring diff beside a panel keeps the panel scene', mapPathsToScenes(['src/i18n/index.ts', 'src/components/GistView.tsx'], {}, new Set(['src/i18n/index.ts'])), ['gists']);
+const WIRING_SWAPPED = [
+  "import i18next from 'i18next';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  "  let finalLanguage = language;",
+  "  finalLanguage = 'zh';",
+  '  document.documentElement.lang = finalLanguage;',
+  "  finalLanguage = language;",
+  '}',
+].join('\n');
+const WIRING_REORDER = [
+  "import i18next from 'i18next';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  "  let finalLanguage = language;",
+  "  finalLanguage = language;",
+  "  finalLanguage = 'zh';",
+  '  document.documentElement.lang = finalLanguage;',
+  '}',
+].join('\n');
+const WIRING_WEB_FALLBACK = [
+  "import i18next from 'i18next';",
+  '',
+  'export function resolveLanguage(desktopBridge) {',
+  "  return desktopBridge ? 'zh' : 'en';",
+  '}',
+].join('\n');
+const WIRING_WEB_FALLBACK_CHANGED = WIRING_WEB_FALLBACK.replace("'en'", "'fr'");
+check('a pure line reorder between different contents is not inert', isDesktopBridgeOnlyDiff(WIRING_SWAPPED, WIRING_REORDER), false);
+check('a bridge ternary with web fallback values is not inert', isDesktopBridgeOnlyDiff(WIRING_WEB_FALLBACK, WIRING_WEB_FALLBACK_CHANGED), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

@@ -365,7 +365,9 @@ async function shootVariant(page, variantSpec, baseState, url, outDir) {
     if (action.readyLocaleKey) {
       const title = await resolveLocaleText(url, action.readyLocaleKey);
       if (!title) throw new Error(`locale text for ${action.readyLocaleKey} not found in the built bundle`);
-      readySelector = `[role="dialog"]:has-text("${title.replace(/"/g, '\\"')}")`;
+      // Escape backslashes AND quotes: escaping only quotes lets a title
+      // backslash escape the escape character and break the selector string.
+      readySelector = `[role="dialog"]:has-text("${title.replace(/[\\"]/g, '\\$&')}")`;
     }
     if (readySelector) {
       await page.waitForSelector(readySelector, { state: 'visible', timeout: 15_000 });

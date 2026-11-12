@@ -808,8 +808,9 @@ export function classifyLocaleFile(filePath, changedKeys = null) {
 }
 
 /** Multiset line diff: lines whose occurrence count differs between the two
- *  versions. Reordering identical lines is not reported — sufficient for the
- *  wiring-diff question ("WHICH code changed", not where). */
+ *  versions, split into additions and removals. Reordering identical lines is
+ *  not reported by the multiset itself; isDesktopBridgeOnlyDiff detects that
+ *  case separately (byte-identical vs reorder-only). */
 const diffChangedLines = (baseRaw, headRaw) => {
   const counts = (raw) => {
     const map = new Map();
@@ -818,33 +819,52 @@ const diffChangedLines = (baseRaw, headRaw) => {
   };
   const base = counts(baseRaw);
   const head = counts(headRaw);
-  const changed = [];
+  const added = [];
+  const removed = [];
   for (const [line, n] of head) {
-    for (let i = 0; i < n - (base.get(line) ?? 0); i += 1) changed.push(line);
+    for (let i = 0; i < n - (base.get(line) ?? 0); i += 1) added.push(line);
   }
   for (const [line, n] of base) {
-    for (let i = 0; i < n - (head.get(line) ?? 0); i += 1) changed.push(line);
+    for (let i = 0; i < n - (head.get(line) ?? 0); i += 1) removed.push(line);
   }
-  return changed;
+  return { added, removed };
 };
 
 const BRACE_ONLY_LINE = /^\s*[{}()]*\s*$/;
 
+/** Line shapes that cannot affect web rendering: importing the bridge module,
+ *  calling a bridge method as a statement (optionally `void`-prefixed), and
+ *  the bridge-support guard's opening. Anything that ASSIGNS from the bridge,
+ *  branches on it for a non-bridge value, or mixes in web-relevant literals
+ *  (e.g. ternary fallbacks) deliberately does NOT match and keeps the file
+ *  non-inert. */
+const BRIDGE_LINE_SHAPES = [
+  /^\s*import\s+.*electronProxy[^;]*;\s*$/,
+  /^\s*(?:void\s+)?desktopBridge\.[A-Za-z_$][\w$]*\(.*\);\s*$/,
+  /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\{\s*$/,
+];
+const isBridgeOrStructuralLine = (line) => BRACE_ONLY_LINE.test(line) || BRIDGE_LINE_SHAPES.some((shape) => shape.test(line));
+
 /**
- * Whether a file's diff can only affect the Electron desktop surface: every
- * changed line references the desktop bridge (or its electronProxy module) or
- * is bare syntax. The web bundle's desktopBridge no-ops every method outside
- * Electron (see src/services/electronProxy.ts), so such a diff renders no web
- * difference and the file is ignored instead of triggering every scene.
+ * Whether a file's diff can only affect the Electron desktop surface: the two
+ * versions are byte-identical, or every added/removed line is bare syntax or
+ * one of the BRIDGE_LINE_SHAPES. The web bundle's desktopBridge no-ops every
+ * method outside Electron (see src/services/electronProxy.ts), so such a diff
+ * renders no web difference and the file is ignored instead of triggering
+ * every scene. A multiset-empty diff between DIFFERENT contents is a pure
+ * reorder — order can change behavior (e.g. swapped assignments), so it stays
+ * non-inert. Any non-bridge-shaped change (assignments from the bridge, web
+ * fallback values in ternaries, shared logic) also keeps the file non-inert.
  * @param {string} baseRaw - Base version content (null when unreadable).
  * @param {string} headRaw - Head version content (null when unreadable).
- * @returns {boolean} True when every changed line is desktop-bridge-only.
+ * @returns {boolean} True when the diff is provably web-inert.
  */
 export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
   if (baseRaw === null || headRaw === null) return false;
-  const changed = diffChangedLines(baseRaw, headRaw);
-  if (changed.length === 0) return true;
-  return changed.every((line) => BRACE_ONLY_LINE.test(line) || /desktopBridge|electronProxy/.test(line));
+  if (baseRaw === headRaw) return true;
+  const { added, removed } = diffChangedLines(baseRaw, headRaw);
+  if (added.length === 0 && removed.length === 0) return false;
+  return added.every(isBridgeOrStructuralLine) && removed.every(isBridgeOrStructuralLine);
 }
 
 /** i18n module wiring (non-locale, non-test): the i18next runtime and its
