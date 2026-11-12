@@ -6,6 +6,8 @@
  * entry builder so they can be unit-tested without Electron.
  */
 
+const { DEFAULT_LANGUAGE, normalizeLanguage } = require('./trayMenuI18n');
+
 const APP_SLUG = 'github-stars-manager';
 const PREFS_FILENAME = 'desktop-prefs.json';
 const LINUX_DESKTOP_FILENAME = `${APP_SLUG}.desktop`;
@@ -15,15 +17,17 @@ const DEFAULT_DESKTOP_PREFS = Object.freeze({
   autoLaunch: false,
   closeToTray: true,
   minimizeToTray: true,
+  language: DEFAULT_LANGUAGE,
 });
 
 /**
  * Normalize unknown persisted input into a valid prefs object.
  * Unknown/missing keys fall back to defaults; never throws.
  * @param {unknown} raw
- * @returns {{ autoLaunch: boolean, closeToTray: boolean, minimizeToTray: boolean }}
+ * @param {string} [fallbackLanguage]
+ * @returns {{ autoLaunch: boolean, closeToTray: boolean, minimizeToTray: boolean, language: string }}
  */
-function normalizeDesktopPrefs(raw) {
+function normalizeDesktopPrefs(raw, fallbackLanguage = DEFAULT_DESKTOP_PREFS.language) {
   const source = raw && typeof raw === 'object' ? raw : {};
   return {
     autoLaunch:
@@ -38,6 +42,10 @@ function normalizeDesktopPrefs(raw) {
       typeof source.minimizeToTray === 'boolean'
         ? source.minimizeToTray
         : DEFAULT_DESKTOP_PREFS.minimizeToTray,
+    language:
+      typeof source.language === 'string'
+        ? normalizeLanguage(source.language)
+        : normalizeLanguage(fallbackLanguage),
   };
 }
 
@@ -51,15 +59,16 @@ function getPrefsPath(userDataPath, pathModule) {
 
 /**
  * Load prefs from disk. Missing/corrupt files yield defaults (never throws).
+ * @param {{ fs: any, pathModule: any, userDataPath: string, fallbackLanguage?: string }} options
  */
-function loadDesktopPrefs({ fs, pathModule, userDataPath }) {
+function loadDesktopPrefs({ fs, pathModule, userDataPath, fallbackLanguage }) {
   try {
     const prefsPath = getPrefsPath(userDataPath, pathModule);
-    if (!fs.existsSync(prefsPath)) return { ...DEFAULT_DESKTOP_PREFS };
+    if (!fs.existsSync(prefsPath)) return normalizeDesktopPrefs({}, fallbackLanguage);
     const raw = JSON.parse(fs.readFileSync(prefsPath, 'utf-8'));
-    return normalizeDesktopPrefs(raw);
+    return normalizeDesktopPrefs(raw, fallbackLanguage);
   } catch {
-    return { ...DEFAULT_DESKTOP_PREFS };
+    return normalizeDesktopPrefs({}, fallbackLanguage);
   }
 }
 

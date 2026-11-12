@@ -61,6 +61,10 @@ const {
   buildLinuxDesktopEntry,
 } = require('./desktopPrefs');
 const {
+  getTrayMenuLabels,
+  normalizeLanguage,
+} = require('./trayMenuI18n');
+const {
   saveEncryptedXAuth,
   loadEncryptedXAuth,
   clearEncryptedXAuth,
@@ -982,7 +986,21 @@ function getDesktopUserDataPath() {
 }
 
 function reloadDesktopPrefs() {
-  desktopPrefs = loadDesktopPrefs({ fs, pathModule: path, userDataPath: getDesktopUserDataPath() });
+  let fallbackLanguage = DEFAULT_DESKTOP_PREFS.language;
+  try {
+    const systemLocale = app.getLocale();
+    if (systemLocale) {
+      fallbackLanguage = normalizeLanguage(systemLocale);
+    }
+  } catch {
+    // Ignore app.getLocale errors before ready
+  }
+  desktopPrefs = loadDesktopPrefs({
+    fs,
+    pathModule: path,
+    userDataPath: getDesktopUserDataPath(),
+    fallbackLanguage,
+  });
   return desktopPrefs;
 }
 
@@ -1098,14 +1116,15 @@ function scheduleWindowPaintProbe(reason) {
 
 function refreshTrayMenu() {
   if (!tray || tray.isDestroyed()) return;
+  const labels = getTrayMenuLabels(desktopPrefs.language);
   const template = [
     {
-      label: '显示主窗口',
+      label: labels.showMainWindow,
       click: () => restoreMainWindow(),
     },
     { type: 'separator' },
     {
-      label: '开机自动启动',
+      label: labels.autoLaunch,
       type: 'checkbox',
       checked: desktopPrefs.autoLaunch,
       click: async (item) => {
@@ -1114,7 +1133,7 @@ function refreshTrayMenu() {
       },
     },
     {
-      label: '关闭时最小化到托盘',
+      label: labels.closeToTray,
       type: 'checkbox',
       checked: desktopPrefs.closeToTray,
       click: (item) => {
@@ -1124,7 +1143,7 @@ function refreshTrayMenu() {
     },
     { type: 'separator' },
     {
-      label: '重启应用',
+      label: labels.restartApp,
       click: () => {
         // relaunch 后再正常 quit：让渲染进程的 pagehide flush 跑完再退出，
         // 不能用 app.exit 硬退，避免丢未持久化的分片数据。
@@ -1134,7 +1153,7 @@ function refreshTrayMenu() {
       },
     },
     {
-      label: '退出',
+      label: labels.quit,
       click: () => {
         isQuitting = true;
         app.quit();
@@ -1218,6 +1237,12 @@ ipcMain.handle('desktop:setCloseToTray', (_e, enabled) => {
 
 ipcMain.handle('desktop:setMinimizeToTray', (_e, enabled) => {
   const prefs = persistDesktopPrefs({ minimizeToTray: !!enabled });
+  refreshTrayMenu();
+  return { success: true, prefs: { ...prefs } };
+});
+
+ipcMain.handle('desktop:setLanguage', (_e, language) => {
+  const prefs = persistDesktopPrefs({ language: normalizeLanguage(language) });
   refreshTrayMenu();
   return { success: true, prefs: { ...prefs } };
 });

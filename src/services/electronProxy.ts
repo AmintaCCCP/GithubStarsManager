@@ -92,6 +92,7 @@ export interface DesktopPrefs {
   autoLaunch: boolean;
   closeToTray: boolean;
   minimizeToTray: boolean;
+  language?: string;
 }
 
 export type DesktopPrefsResult = { success: boolean; prefs?: DesktopPrefs; error?: string };
@@ -101,6 +102,7 @@ export interface DesktopElectronAPI {
   setAutoLaunch: (enabled: boolean) => Promise<DesktopPrefsResult>;
   setCloseToTray: (enabled: boolean) => Promise<DesktopPrefsResult>;
   setMinimizeToTray: (enabled: boolean) => Promise<DesktopPrefsResult>;
+  setLanguage: (language: string) => Promise<DesktopPrefsResult>;
   show: () => Promise<{ success: boolean }>;
 }
 
@@ -267,6 +269,7 @@ export const DEFAULT_DESKTOP_PREFS: DesktopPrefs = {
   autoLaunch: false,
   closeToTray: true,
   minimizeToTray: true,
+  language: 'zh',
 };
 
 /** Desktop (auto-launch + tray) bridge. No-op when not in the Electron client. */
@@ -303,6 +306,17 @@ export const desktopBridge = {
       return { success: false, error: 'Not running in Electron' };
     }
     return window.electronAPI.desktop.setMinimizeToTray(enabled);
+  },
+
+  async setLanguage(language: string): Promise<DesktopPrefsResult> {
+    if (!window.electronAPI?.desktop?.setLanguage) {
+      return { success: false, error: 'Not running in Electron' };
+    }
+    try {
+      return await window.electronAPI.desktop.setLanguage(language);
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
   },
 
   async show(): Promise<{ success: boolean }> {

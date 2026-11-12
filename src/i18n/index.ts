@@ -1,4 +1,5 @@
 import i18next, { type i18n as I18nInstance } from 'i18next';
+import { desktopBridge } from '../services/electronProxy';
 import {
   APP_LANGUAGES,
   FALLBACK_LANGUAGE,
@@ -80,6 +81,9 @@ export async function changeAppLanguage(language: AppLanguage): Promise<void> {
   await i18next.changeLanguage(language);
   if (requestId !== languageSwitchSeq) return;
   document.documentElement.lang = languageDefinition(language).intlLocale;
+  if (desktopBridge.isSupported()) {
+    void desktopBridge.setLanguage(language);
+  }
 }
 
 export const i18n: I18nInstance = i18next;

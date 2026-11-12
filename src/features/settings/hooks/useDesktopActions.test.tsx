@@ -8,16 +8,18 @@ const mocks = vi.hoisted(() => ({
   setAutoLaunch: vi.fn(),
   setCloseToTray: vi.fn(),
   setMinimizeToTray: vi.fn(),
+  setLanguage: vi.fn(),
 }));
 
 vi.mock('../../../services/electronProxy', () => ({
-  DEFAULT_DESKTOP_PREFS: { autoLaunch: false, closeToTray: true, minimizeToTray: true },
+  DEFAULT_DESKTOP_PREFS: { autoLaunch: false, closeToTray: true, minimizeToTray: true, language: 'zh' },
   desktopBridge: {
     isSupported: mocks.isSupported,
     getPrefs: mocks.getPrefs,
     setAutoLaunch: mocks.setAutoLaunch,
     setCloseToTray: mocks.setCloseToTray,
     setMinimizeToTray: mocks.setMinimizeToTray,
+    setLanguage: mocks.setLanguage,
   },
 }));
 
@@ -32,7 +34,7 @@ describe('useDesktopActions', () => {
     const { result } = renderHook(() => useDesktopActions());
     expect(result.current.supported).toBe(false);
     expect(result.current.loading).toBe(false);
-    expect(result.current.prefs).toEqual({ autoLaunch: false, closeToTray: true, minimizeToTray: true });
+    expect(result.current.prefs).toEqual({ autoLaunch: false, closeToTray: true, minimizeToTray: true, language: 'zh' });
     expect(mocks.getPrefs).not.toHaveBeenCalled();
   });
 
