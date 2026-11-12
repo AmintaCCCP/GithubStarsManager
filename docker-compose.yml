@@ -20,6 +20,11 @@ services:
     expose:
       - "3000"
     environment:
+      # Security hardening: leaving API_SECRET empty no longer disables auth.
+      # The backend then generates a random secret on first start and stores it
+      # in the data volume (data/.api-secret). Retrieve it with:
+      #   docker compose exec backend cat /app/data/.api-secret
+      # Explicitly setting API_SECRET (e.g. in a root .env file) is recommended.
       - API_SECRET=${API_SECRET:-}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
       - TRUST_PROXY=1

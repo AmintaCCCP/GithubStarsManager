@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "cross-env ALLOW_INSECURE_NO_AUTH=1 tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
@@ -29,6 +29,7 @@
     "@types/express": "^5.0.6",
     "@types/morgan": "^1.9.9",
     "@types/supertest": "^7.2.1",
+    "cross-env": "^10.1.0",
     "supertest": "^7.3.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

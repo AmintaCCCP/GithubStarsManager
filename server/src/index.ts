@@ -246,7 +246,7 @@ function startServer(): void {
   const server = app.listen(config.port, () => {
     logger.info('server.start', `Server running on port ${config.port}`);
     if (!config.apiSecret) {
-      logger.warn('server.auth', 'Running without API_SECRET — auth is disabled');
+      logger.warn('server.auth', 'Running without API_SECRET and ALLOW_INSECURE_NO_AUTH is enabled — auth is disabled (dev mode)');
     }
   });
 

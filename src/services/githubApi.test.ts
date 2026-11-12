@@ -417,6 +417,18 @@ describe('GitHubApiService 401 来源区分', () => {
     expect(window.fetch).toHaveBeenCalledWith('http://localhost:3000/api/proxy/github/user', expect.anything());
   });
 
+  it('代理 401（code=AUTH_NOT_CONFIGURED）映射为指向 API Secret 的双语文案，而不是 GitHub token 无效', async () => {
+    const service = new GitHubApiService('token');
+    setBackendProxy(service);
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse(401, { error: 'The server generated its own API secret (security hardening).', code: 'AUTH_NOT_CONFIGURED' }));
+
+    const error: unknown = await service.getCurrentUser().catch((e: unknown) => e);
+    // 关键断言：不得落入 GITHUB_TOKEN_INVALID_ERROR（否则会误导用户去重置 GitHub Token）
+    expect((error as Error).message).not.toBe(GITHUB_TOKEN_INVALID_ERROR);
+    // 双语注册表文案（zh/en）均包含 "API Secret" 指引
+    expect((error as Error).message).toContain('API Secret');
+  });
+
   it('代理转发的 GitHub 401（无 code 标记）仍映射为 GITHUB_TOKEN_INVALID_ERROR', async () => {
     const service = new GitHubApiService('token');
     setBackendProxy(service);

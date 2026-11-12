@@ -4,6 +4,12 @@ import { config } from '../config.js';
 
 let warnedOnce = false;
 
+// 与前端 src/utils/backendErrors.ts 的 AUTH_NOT_CONFIGURED 双语文案对应；
+// error 字段仅是非更新客户端看到的英文兜底，前端按 code 显示双语提示。
+// 取回指引只指向数据卷文件（密钥值不写入日志），并给出显式设置 API_SECRET 的兜底。
+const AUTH_NOT_CONFIGURED_MESSAGE =
+  'The server generated its own API secret (security hardening). Retrieve it with docker compose exec backend cat /app/data/.api-secret (or read the data/.api-secret file in the data volume), then enter it as the client API Secret. If the file is unavailable, set the API_SECRET environment variable explicitly on the server.';
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // Skip auth for health check
   if (req.method === 'GET' && req.path === '/health') {
@@ -11,18 +17,36 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  // Dev mode: no API_SECRET set
+  // No API_SECRET available. Fail closed by default (security hardening): an
+  // unauthenticated deployment must not serve /api wide open. resolveApiSecret()
+  // normally guarantees a secret (env or auto-generated data/.api-secret), so
+  // this branch only fires in the explicit ALLOW_INSECURE_NO_AUTH dev mode.
   if (!config.apiSecret) {
-    if (!warnedOnce) {
-      console.warn('⚠️  API_SECRET not set — auth disabled (dev mode)');
-      warnedOnce = true;
+    if (config.allowInsecureNoAuth) {
+      if (!warnedOnce) {
+        console.warn('⚠️  API_SECRET not set and ALLOW_INSECURE_NO_AUTH is enabled — auth is DISABLED (dev mode). Never expose this server to untrusted networks.');
+        warnedOnce = true;
+      }
+      next();
+      return;
     }
-    next();
+
+    // Defensive: a null secret without the dev flag is not reachable via
+    // loadConfig(); stay fail-closed if it ever happens.
+    res.status(401).json({ error: AUTH_NOT_CONFIGURED_MESSAGE, code: 'AUTH_NOT_CONFIGURED' });
     return;
   }
 
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Missing credentials (as opposed to a wrong token): when the secret was
+    // generated server-side, the client simply does not know it yet — return an
+    // actionable code instead of a generic Unauthorized. With an operator-set
+    // API_SECRET the client was told the secret, so keep the plain message.
+    if (config.apiSecretSource === 'generated') {
+      res.status(401).json({ error: AUTH_NOT_CONFIGURED_MESSAGE, code: 'AUTH_NOT_CONFIGURED' });
+      return;
+    }
     res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
     return;
   }

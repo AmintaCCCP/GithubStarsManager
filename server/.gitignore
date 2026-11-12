@@ -2,3 +2,4 @@ dist/
 node_modules/
 data/*.db
 data/.encryption-key
+data/.api-secret

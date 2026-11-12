@@ -26,6 +26,7 @@ import { redactInline } from '../utils/logSanitizer';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 import { secureRandomString } from '../utils/cryptoRandom';
 import { createCombinedAbortController } from '../utils/abortUtils';
+import { translateBackendError } from '../utils/backendErrors';
 
 // 单次 fetch 尝试的超时：断网/睡眠时挂起的连接不会自行 reject，
 // 没有超时会让上层同步流程永远等待，刷新按钮一直处于禁用状态。
@@ -645,8 +646,11 @@ export class GitHubApiService {
         logger.warn('githubApi', 'API request failed: unauthorized', { method, endpoint, status: response.status, durationMs });
         if (viaProxy) {
           // The proxy forwards upstream GitHub bodies verbatim, while the
-          // backend's own auth middleware marks its 401s with code
-          // 'UNAUTHORIZED'. Only the latter is a backend API key problem.
+          // backend's own auth middleware marks its 401s with a code:
+          // 'UNAUTHORIZED' (a rejected operator-set API_SECRET) or
+          // 'AUTH_NOT_CONFIGURED' (server-generated secret the client has not
+          // entered yet). Only those two are backend API key problems —
+          // anything else is a dead GitHub token forwarded from upstream.
           let body: { code?: string } | null = null;
           try {
             body = await response.json() as { code?: string } | null;
@@ -656,6 +660,13 @@ export class GitHubApiService {
           }
           if (body?.code === 'UNAUTHORIZED') {
             throw new Error(BACKEND_PROXY_UNAUTHORIZED_ERROR);
+          }
+          // AUTH_NOT_CONFIGURED 指向"填写后端 API Secret"而非"重置 GitHub
+          // Token"：零配置升级用户首次遇到该错误时，GitHub Token 本身是好的。
+          // 优先走双语错误码注册表（src/utils/backendErrors.ts）取当前语言的
+          // 可操作文案。
+          if (body?.code === 'AUTH_NOT_CONFIGURED') {
+            throw new Error(translateBackendError(body.code, BACKEND_PROXY_UNAUTHORIZED_ERROR));
           }
         }
         throw new Error(GITHUB_TOKEN_INVALID_ERROR);

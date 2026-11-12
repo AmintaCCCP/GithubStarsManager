@@ -979,7 +979,8 @@
   },
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Beziehen Sie beim Sichern/Exportieren Schlüssel mit ein",
-    "includes-keys-for-ai-configs-webdav-proxy-remote": "Enthält Schlüssel für AI-Konfiguration, WebDAV, Proxy, Remote-Download und Backend-Server"
+    "includes-keys-for-ai-configs-webdav-proxy-remote": "Enthält Schlüssel für AI-Konfiguration, WebDAV, Proxy, Remote-Download und Backend-Server",
+    "warning-backup-file-contains-plaintext-keys": "Bei Aktivierung enthalten Backup- und Exportdateien Schlüssel, Passwörter und andere Zugangsdaten im Klartext. Bewahren Sie diese Dateien sicher auf."
   },
   "mcpSettingsPanel": {
     "copied": "Kopiert",
