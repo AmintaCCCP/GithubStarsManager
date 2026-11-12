@@ -21,7 +21,7 @@
     "morgan": "^1.12.1",
     "parse5": "^8.0.1",
     "socks-proxy-agent": "^10.1.0",
-    "zod": "^4.6.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
