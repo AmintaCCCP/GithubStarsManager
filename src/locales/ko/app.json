@@ -977,7 +977,7 @@
   "includeKeysToggle": {
     "include-keys-in-backup-export": "백업/내보내기 시 키 포함",
     "includes-keys-for-ai-configs-webdav-proxy-remote": "AI 구성, WebDAV, 프록시, 원격 다운로드 및 백엔드 서버에 대한 키가 포함되어 있습니다.",
-    "warning-backup-file-contains-plaintext-keys": "활성화하면 백업 및 내보내기 파일에 일반 텍스트 키가 포함됩니다. 이러한 파일을 안전하게 보관하십시오."
+    "warning-backup-file-contains-plaintext-keys": "활성화하면 백업 및 내보내기 파일에 일반 텍스트 키, 비밀번호 및 기타 자격 증명이 포함됩니다. 이러한 파일을 안전하게 보관하십시오."
   },
   "mcpSettingsPanel": {
     "copied": "복사됨",

@@ -977,7 +977,7 @@
   "includeKeysToggle": {
     "include-keys-in-backup-export": "備份/匯出時包含金鑰",
     "includes-keys-for-ai-configs-webdav-proxy-remote": "包含 AI 設定、WebDAV、代理、遠端下載和後端伺服器的金鑰",
-    "warning-backup-file-contains-plaintext-keys": "勾選後，備份與匯出檔案內含明文金鑰，請妥善保管這些檔案"
+    "warning-backup-file-contains-plaintext-keys": "勾選後，備份與匯出檔案內含明文金鑰、密碼及其他憑證，請妥善保管這些檔案"
   },
   "mcpSettingsPanel": {
     "copied": "已複製",

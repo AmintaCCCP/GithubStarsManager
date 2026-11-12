@@ -977,7 +977,7 @@
   "includeKeysToggle": {
     "include-keys-in-backup-export": "Включить ключи при резервном копировании/экспорте",
     "includes-keys-for-ai-configs-webdav-proxy-remote": "Содержит ключи для настройки AI, WebDAV, прокси, удаленной загрузки и внутреннего сервера.",
-    "warning-backup-file-contains-plaintext-keys": "Если включено, файлы резервных копий и экспорта содержат ключи в открытом виде. Храните эти файлы в безопасном месте."
+    "warning-backup-file-contains-plaintext-keys": "Если включено, файлы резервных копий и экспорта содержат ключи, пароли и другие учётные данные в открытом виде. Храните эти файлы в безопасном месте."
   },
   "mcpSettingsPanel": {
     "copied": "Скопировано",
