@@ -149,9 +149,8 @@ function getDirectAgents(allowPrivate: boolean): { httpAgent: HttpAgent; httpsAg
 }
 
 export interface ValidateUrlOptions {
-  /** 宽松模式：放行回环地址与私有网段。仅用于「用户主动提供的自有配置」所来源的 URL
-   *  （已保存的 AI / WebDAV 配置、WebDAV 测试连接的内联地址、下载目标），
-   *  不应作用于任意或半可信的输入（如 AI 内联 config）。 */
+  /** 宽松模式：放行回环地址与私有网段。用于「用户主动提供的自有配置」所来源的 URL
+   *  （已保存或测试连接的 AI / WebDAV 配置、下载目标）。 */
   allowPrivate?: boolean;
 }
 
