@@ -450,6 +450,30 @@ const WIRING_AMBIGUOUS_ABSORB = WIRING_AMBIGUOUS_BASE.replace(
 check('a slash after a closing paren is ambiguous and stays non-inert', isDesktopBridgeOnlyDiff(WIRING_AMBIGUOUS_BASE, WIRING_AMBIGUOUS_ABSORB), false);
 check('the ambiguous absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_AMBIGUOUS_ABSORB, WIRING_AMBIGUOUS_BASE), false);
 check('a plain division in the diff keeps the file non-inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace('  await i18next.changeLanguage(language);', '  await i18next.changeLanguage(language);\n  const half = total / 2;')), false);
+const WIRING_POSTINC_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    counter++ / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other++ / 2;',
+  '}',
+].join('\n');
+const WIRING_POSTINC_ABSORB = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    counter++ / 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other++ / 2;',
+  '}',
+].join('\n');
+check('a slash after ++ stays ambiguous and non-inert', isDesktopBridgeOnlyDiff(WIRING_POSTINC_BASE, WIRING_POSTINC_ABSORB), false);
+check('the post-increment absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_POSTINC_ABSORB, WIRING_POSTINC_BASE), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

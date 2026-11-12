@@ -890,7 +890,11 @@ function braceDeltasPerLine(raw) {
           word = raw[w] + word;
           w -= 1;
         }
-        if (prev === '' || '([{,;=:!&|?+-*%~^>'.includes(prev) || REGEX_KEYWORDS.has(word)) {
+        // Only token boundaries where a regex is the ONLY valid continuation
+        // (division after `++`/`**`/`~` etc. is impossible to rule out from
+        // the previous character alone) allow the regex scan; every other
+        // slash is flagged ambiguous below.
+        if (prev === '' || '([{,;=:!&|?>'.includes(prev) || REGEX_KEYWORDS.has(word)) {
           state = 'regex';
           regexClass = false;
           i += 1;
