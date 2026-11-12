@@ -544,6 +544,28 @@ const WIRING_COMMENTDOT_ABSORB = [
 ].join('\n');
 check('a line comment before the keyword keeps the property slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_COMMENTDOT_BASE, WIRING_COMMENTDOT_ABSORB), false);
 check('the comment-property absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_COMMENTDOT_ABSORB, WIRING_COMMENTDOT_BASE), false);
+const WIRING_PAREN_DIV_BASE = [
+  'function apply(language: string) {',
+  '  const counter = 2, other = 2;',
+  '  if (desktopBridge.isSupported()) {',
+  '    void (counter / 2);',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  void (other / 2);',
+  '}',
+].join('\n');
+const WIRING_PAREN_DIV_ABSORB = [
+  'function apply(language: string) {',
+  '  const counter = 2, other = 2;',
+  '  if (desktopBridge.isSupported()) {',
+  '    void (counter / 2);',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  void (other / 2);',
+  '}',
+].join('\n');
+check('a division after an identifier scans code braces normally', isDesktopBridgeOnlyDiff(WIRING_PAREN_DIV_BASE, WIRING_PAREN_DIV_ABSORB), false);
+check('the identifier-division absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PAREN_DIV_ABSORB, WIRING_PAREN_DIV_BASE), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

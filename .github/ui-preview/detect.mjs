@@ -915,6 +915,7 @@ function analyzeCode(raw) {
         const wordStart = tokenBefore(raw, mask, i - 1);
         let word = '';
         let beforeWord = '';
+        let isIdentifier = false;
         if (wordStart >= 0 && /[A-Za-z_$0-9]/.test(raw[wordStart])) {
           let w = wordStart;
           while (w >= 0 && mask[w] === 1 && /[A-Za-z_$0-9]/.test(raw[w])) {
@@ -922,13 +923,31 @@ function analyzeCode(raw) {
             w -= 1;
           }
           const before = tokenBefore(raw, mask, w);
-          beforeWord = before >= 0 ? raw[before] : '';
+          if (before < 0) {
+            ambiguous = true;
+            mask[i] = 1;
+            i += 1;
+            continue;
+          }
+          beforeWord = raw[before];
+          // A plain identifier (not a keyword, not a property) before the
+          // slash: the JS grammar makes a regex literal impossible there, so
+          // this is division — keep counting braces in code state instead of
+          // skipping a regex body.
+          isIdentifier = beforeWord !== '.' && !REGEX_KEYWORDS.has(word);
         } else {
           beforeWord = wordStart >= 0 ? raw[wordStart] : '';
         }
-        const isRegexStart = beforeWord === ''
-          || '([{,;=:!&|?>'.includes(beforeWord)
-          || (beforeWord !== '.' && REGEX_KEYWORDS.has(word));
+        if (beforeWord === '.') {
+          // Property chain (state.return): the name after the dot may look
+          // like a keyword but is a property; treat as ambiguous.
+          ambiguous = true;
+          mask[i] = 1;
+          i += 1;
+          continue;
+        }
+        const isRegexStart = !isIdentifier
+          && (beforeWord === '' || '([{,;=:!&|?>'.includes(beforeWord));
         if (!isRegexStart) {
           ambiguous = true;
           mask[i] = 1;
