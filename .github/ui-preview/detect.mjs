@@ -890,6 +890,14 @@ function braceDeltasPerLine(raw) {
           word = raw[w] + word;
           w -= 1;
         }
+        // A keyword reached through member access (state.return) is a
+        // property name, not the operator — that slash is ambiguous.
+        const beforeWord = w >= 0 ? raw[w] : '';
+        if (word !== '' && beforeWord === '.') {
+          ambiguous = true;
+          i += 1;
+          continue;
+        }
         // Only token boundaries where a regex is the ONLY valid continuation
         // (division after `++`/`**`/`~` etc. is impossible to rule out from
         // the previous character alone) allow the regex scan; every other
