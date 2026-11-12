@@ -498,6 +498,30 @@ const WIRING_PROPKEYWORD_ABSORB = [
 ].join('\n');
 check('a keyword-named property keeps the slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_PROPKEYWORD_BASE, WIRING_PROPKEYWORD_ABSORB), false);
 check('the property-keyword absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PROPKEYWORD_ABSORB, WIRING_PROPKEYWORD_BASE), false);
+const WIRING_PROPSPACE_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    other. return / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other. return / 2;',
+  '}',
+].join('\n');
+const WIRING_PROPSPACE_ABSORB = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    other. return / 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other. return / 2;',
+  '}',
+].join('\n');
+check('whitespace between the dot and a keyword keeps the slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_PROPSPACE_BASE, WIRING_PROPSPACE_ABSORB), false);
+check('the dot-whitespace absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PROPSPACE_ABSORB, WIRING_PROPSPACE_BASE), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

@@ -829,6 +829,40 @@ const COMMENT_ONLY_LINE = /^\s*\/\//;
 const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\{\s*$/;
 
 /**
+ * Resolve the source token immediately before `index`, skipping whitespace
+ * and comments. Returns the token's last character (word tokens report their
+ * final character; callers re-collect the full word backward), whether it
+ * resolved, and the index to continue collecting a word from.
+ * @param {string} raw - File content.
+ * @param {number} index - Exclusive start index for the backward scan.
+ * @returns {{ char: string, index: number, resolved: boolean }}
+ */
+function tokenBefore(raw, index) {
+  let k = index;
+  while (k >= 0) {
+    const c = raw[k];
+    if (c === '\n' || c === ' ' || c === '\t' || c === '\r') {
+      k -= 1;
+      continue;
+    }
+    if (c === '/' && k > 0 && raw[k - 1] === '/') {
+      const nl = raw.lastIndexOf('\n', k - 1);
+      if (nl === -1) return { char: '', index: -1, resolved: false };
+      k = nl;
+      continue;
+    }
+    if (c === '/' && k > 0 && raw[k - 1] === '*') {
+      const open = raw.lastIndexOf('/*', k - 1);
+      if (open === -1) return { char: '', index: -1, resolved: false };
+      k = open - 1;
+      continue;
+    }
+    return { char: c, index: k, resolved: true };
+  }
+  return { char: '', index: -1, resolved: true };
+}
+
+/**
  * Per-line net brace delta counting ONLY code braces: line comments, block
  * comments and string/template literals are skipped, so a `}` inside a
  * comment or a string cannot close a guard block on the scanner's behalf.
@@ -876,42 +910,53 @@ function braceDeltasPerLine(raw) {
         continue;
       }
       if (ch === '/') {
-        // Regex or division: a regex is started when the previous significant
-        // token is an operator/opening bracket or a regex-allowing keyword.
-        // Misjudging division as regex would SKIP code braces, so the
-        // heuristic errs toward division (braces stay counted; any resulting
-        // imbalance degrades conservatively downstream).
-        let k = i - 1;
-        while (k >= 0 && (raw[k] === '\n' || raw[k] === ' ' || raw[k] === '\t' || raw[k] === '\r')) k -= 1;
-        const prev = k >= 0 ? raw[k] : '';
-        let word = '';
-        let w = k;
-        while (w >= 0 && /[A-Za-z_$0-9]/.test(raw[w])) {
-          word = raw[w] + word;
-          w -= 1;
-        }
-        // A keyword reached through member access (state.return) is a
-        // property name, not the operator — that slash is ambiguous.
-        const beforeWord = w >= 0 ? raw[w] : '';
-        if (word !== '' && beforeWord === '.') {
+        // Regex or division, decided from the previous significant token
+        // (skipping whitespace and comments):
+        //   - a regex-allowing keyword (return, void, typeof, …) as a
+        //     standalone token starts a regex — but the same name after `.`
+        //     is a property access (state.return), which is ambiguous;
+        //   - punctuation where a regex is the only valid continuation
+        //     ('(', '[', '{', ',', ';', '=', ':', '!', '&', '|', '?', '>',
+        //     start of file) starts a regex;
+        //   - anything else (identifier, ')', ']', '}', string end — a
+        //     braceless `if (x) /re/.test(y);` proves division is not
+        //     decidable from the previous token alone) is ambiguous.
+        // Ambiguity flags the file: the caller keeps the scene classification
+        // instead of proving web-inertness.
+        const wordToken = tokenBefore(raw, i - 1);
+        if (!wordToken.resolved) {
           ambiguous = true;
           i += 1;
           continue;
         }
-        // Only token boundaries where a regex is the ONLY valid continuation
-        // (division after `++`/`**`/`~` etc. is impossible to rule out from
-        // the previous character alone) allow the regex scan; every other
-        // slash is flagged ambiguous below.
-        if (prev === '' || '([{,;=:!&|?>'.includes(prev) || REGEX_KEYWORDS.has(word)) {
-          state = 'regex';
-          regexClass = false;
+        let word = '';
+        let beforeWord = '';
+        if (/[A-Za-z_$0-9]/.test(wordToken.char)) {
+          let w = wordToken.index;
+          while (w >= 0 && /[A-Za-z_$0-9]/.test(raw[w])) {
+            word = raw[w] + word;
+            w -= 1;
+          }
+          const before = tokenBefore(raw, w);
+          if (!before.resolved) {
+            ambiguous = true;
+            i += 1;
+            continue;
+          }
+          beforeWord = before.char;
+        } else {
+          beforeWord = wordToken.char;
+        }
+        const isRegexStart = beforeWord === ''
+          || '([{,;=:!&|?>'.includes(beforeWord)
+          || (beforeWord !== '.' && REGEX_KEYWORDS.has(word));
+        if (!isRegexStart) {
+          ambiguous = true;
           i += 1;
           continue;
         }
-        // Identifier/`)`/`]` before the slash: most likely division, but a
-        // braceless `if (x) /re/.test(y);` proves it is not decidable from
-        // the previous token alone — flag the file as ambiguous.
-        ambiguous = true;
+        state = 'regex';
+        regexClass = false;
         i += 1;
         continue;
       }
