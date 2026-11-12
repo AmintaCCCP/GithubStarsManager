@@ -837,50 +837,43 @@ const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\
  * @param {number} index - Exclusive start index for the backward scan.
  * @returns {{ char: string, index: number, resolved: boolean }}
  */
-function tokenBefore(raw, index) {
+const tokenBefore = (mask, index) => {
   let k = index;
-  while (k >= 0) {
-    const c = raw[k];
-    if (c === '\n' || c === ' ' || c === '\t' || c === '\r') {
-      k -= 1;
-      continue;
-    }
-    if (c === '/' && k > 0 && raw[k - 1] === '/') {
-      const nl = raw.lastIndexOf('\n', k - 1);
-      if (nl === -1) return { char: '', index: -1, resolved: false };
-      k = nl;
-      continue;
-    }
-    if (c === '/' && k > 0 && raw[k - 1] === '*') {
-      const open = raw.lastIndexOf('/*', k - 1);
-      if (open === -1) return { char: '', index: -1, resolved: false };
-      k = open - 1;
-      continue;
-    }
-    return { char: c, index: k, resolved: true };
-  }
-  return { char: '', index: -1, resolved: true };
-}
+  while (k >= 0 && mask[k] === 0) k -= 1;
+  return k;
+};
 
-/**
- * Per-line net brace delta counting ONLY code braces: line comments, block
- * comments and string/template literals are skipped, so a `}` inside a
- * comment or a string cannot close a guard block on the scanner's behalf.
- * Block comments and template literals carry scanner state across lines.
- * Regex-vs-division is decided by the previous significant token; an
- * ambiguous slash (after an identifier, `)` or `]`) is reported via the
- * boolean flag rather than guessed — the caller must then treat the file as
- * unanalyzable. Returns null when the file ends inside an unterminated
- * construct (same conservative treatment).
- * @param {string} raw - File content.
- * @returns {{ deltas: number[] | null, ambiguous: boolean }} Net brace delta
- *   per line plus the ambiguous-slash flag.
- */
 /** Keywords after which a `/` starts a regex literal instead of division. */
 const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'case', 'do', 'else', 'yield', 'await', 'throw']);
 
-function braceDeltasPerLine(raw) {
+/**
+ * Single forward pass over the file producing everything the wiring-diff
+ * analysis needs: the per-character code mask (1 = actual JavaScript code;
+ * comment, string and template-literal contents are unmarked), the per-line
+ * net brace delta (masked characters contribute nothing), and the
+ * ambiguous-slash flag. Regex-vs-division is decided from the previous
+ * significant token (backward scans consult the mask, so comment and string
+ * contents cannot masquerade as tokens):
+ *   - a regex-allowing keyword (return, void, typeof, …) as a standalone
+ *     token starts a regex — but the same name after `.` is a property
+ *     access (state.return), which is ambiguous, with whitespace and
+ *     comments between the dot and the keyword handled by the mask;
+ *   - punctuation where a regex is the only valid continuation ('(', '[',
+ *     '{', ',', ';', '=', ':', '!', '&', '|', '?', '>', start of file)
+ *     starts a regex;
+ *   - anything else (identifier, ')', ']', '}', string end — a braceless
+ *     `if (x) /re/.test(y);` proves division is not decidable from the
+ *     previous token alone) is ambiguous.
+ * Template literals skip their contents including `${}` interpolations (a
+ * conservative approximation). The ambiguous flag and an unterminated
+ * construct at EOF both mean "unanalyzable": callers must treat the file as
+ * non-inert.
+ * @param {string} raw - File content.
+ * @returns {{ mask: Uint8Array, deltas: number[], ambiguous: boolean }}
+ */
+function analyzeCode(raw) {
   const lines = raw.split('\n');
+  const mask = new Uint8Array(raw.length);
   const deltas = new Array(lines.length).fill(0);
   let state = 'code';
   let regexClass = false;
@@ -890,13 +883,17 @@ function braceDeltasPerLine(raw) {
   while (i < raw.length) {
     const ch = raw[i];
     if (ch === '\n') {
+      // A line comment ends at the newline; block comments and template
+      // literals span it.
+      if (state === 'line') state = 'code';
       line += 1;
       i += 1;
       continue;
     }
     if (state === 'code') {
       if (ch === '/' && raw[i + 1] === '/') {
-        while (i < raw.length && raw[i] !== '\n') i += 1;
+        state = 'line';
+        i += 2;
         continue;
       }
       if (ch === '/' && raw[i + 1] === '*') {
@@ -906,52 +903,31 @@ function braceDeltasPerLine(raw) {
       }
       if (ch === "'" || ch === '"' || ch === '`') {
         state = ch === "'" ? 'single' : ch === '"' ? 'double' : 'template';
+        mask[i] = 1;
         i += 1;
         continue;
       }
       if (ch === '/') {
-        // Regex or division, decided from the previous significant token
-        // (skipping whitespace and comments):
-        //   - a regex-allowing keyword (return, void, typeof, …) as a
-        //     standalone token starts a regex — but the same name after `.`
-        //     is a property access (state.return), which is ambiguous;
-        //   - punctuation where a regex is the only valid continuation
-        //     ('(', '[', '{', ',', ';', '=', ':', '!', '&', '|', '?', '>',
-        //     start of file) starts a regex;
-        //   - anything else (identifier, ')', ']', '}', string end — a
-        //     braceless `if (x) /re/.test(y);` proves division is not
-        //     decidable from the previous token alone) is ambiguous.
-        // Ambiguity flags the file: the caller keeps the scene classification
-        // instead of proving web-inertness.
-        const wordToken = tokenBefore(raw, i - 1);
-        if (!wordToken.resolved) {
-          ambiguous = true;
-          i += 1;
-          continue;
-        }
+        const wordStart = tokenBefore(mask, i - 1);
         let word = '';
         let beforeWord = '';
-        if (/[A-Za-z_$0-9]/.test(wordToken.char)) {
-          let w = wordToken.index;
-          while (w >= 0 && /[A-Za-z_$0-9]/.test(raw[w])) {
+        if (wordStart >= 0 && /[A-Za-z_$0-9]/.test(raw[wordStart])) {
+          let w = wordStart;
+          while (w >= 0 && mask[w] === 1 && /[A-Za-z_$0-9]/.test(raw[w])) {
             word = raw[w] + word;
             w -= 1;
           }
-          const before = tokenBefore(raw, w);
-          if (!before.resolved) {
-            ambiguous = true;
-            i += 1;
-            continue;
-          }
-          beforeWord = before.char;
+          const before = tokenBefore(mask, w);
+          beforeWord = before >= 0 ? raw[before] : '';
         } else {
-          beforeWord = wordToken.char;
+          beforeWord = wordStart >= 0 ? raw[wordStart] : '';
         }
         const isRegexStart = beforeWord === ''
           || '([{,;=:!&|?>'.includes(beforeWord)
           || (beforeWord !== '.' && REGEX_KEYWORDS.has(word));
         if (!isRegexStart) {
           ambiguous = true;
+          mask[i] = 1;
           i += 1;
           continue;
         }
@@ -960,8 +936,15 @@ function braceDeltasPerLine(raw) {
         i += 1;
         continue;
       }
+      mask[i] = 1;
       if (ch === '{') deltas[line] += 1;
       else if (ch === '}') deltas[line] -= 1;
+      i += 1;
+    } else if (state === 'line') {
+      if (ch === '\n') {
+        state = 'code';
+        line += 1;
+      }
       i += 1;
     } else if (state === 'block') {
       if (ch === '*' && raw[i + 1] === '/') {
@@ -972,15 +955,12 @@ function braceDeltasPerLine(raw) {
       }
     } else if (state === 'single' || state === 'double') {
       // Regular strings do not span lines in JS; an unterminated one is a
-      // syntax error the build would catch. Stop the scan for this line.
+      // syntax error the build would catch (the run to EOF marks the file
+      // ambiguous below).
       if (ch === '\\') i += 2;
       else {
         if (ch === (state === 'single' ? "'" : '"')) state = 'code';
         i += 1;
-        if (ch === '\n') {
-          line += 1;
-          state = 'code';
-        }
       }
     } else if (state === 'regex') {
       if (ch === '\\') i += 2;
@@ -994,8 +974,8 @@ function braceDeltasPerLine(raw) {
       i += 1;
     }
   }
-  if (state !== 'code') return { deltas: null, ambiguous };
-  return { deltas, ambiguous };
+  if (state !== 'code') ambiguous = true;
+  return { mask, deltas, ambiguous };
 }
 
 /**
@@ -1063,9 +1043,8 @@ function projectRange(lines, deltas, start, end) {
 export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
   if (baseRaw === null || headRaw === null) return false;
   if (baseRaw === headRaw) return true;
-  const baseScan = braceDeltasPerLine(baseRaw);
-  const headScan = braceDeltasPerLine(headRaw);
-  if (baseScan === null || headScan === null) return false;
+  const baseScan = analyzeCode(baseRaw);
+  const headScan = analyzeCode(headRaw);
   if (baseScan.ambiguous || headScan.ambiguous) return false;
   const baseDeltas = baseScan.deltas;
   const headDeltas = headScan.deltas;
