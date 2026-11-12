@@ -946,8 +946,14 @@ function analyzeCode(raw) {
           i += 1;
           continue;
         }
-        const isRegexStart = !isIdentifier
-          && (beforeWord === '' || '([{,;=:!&|?>'.includes(beforeWord));
+        if (isIdentifier) {
+          // Division: the slash does not start a regex body, so scanning
+          // continues in code state and braces keep counting.
+          mask[i] = 1;
+          i += 1;
+          continue;
+        }
+        const isRegexStart = beforeWord === '' || '([{,;=:!&|?>'.includes(beforeWord);
         if (!isRegexStart) {
           ambiguous = true;
           mask[i] = 1;

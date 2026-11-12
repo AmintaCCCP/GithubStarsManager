@@ -566,6 +566,26 @@ const WIRING_PAREN_DIV_ABSORB = [
 ].join('\n');
 check('a division after an identifier scans code braces normally', isDesktopBridgeOnlyDiff(WIRING_PAREN_DIV_BASE, WIRING_PAREN_DIV_ABSORB), false);
 check('the identifier-division absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PAREN_DIV_ABSORB, WIRING_PAREN_DIV_BASE), false);
+const WIRING_DIV_BRIDGE_BASE = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    void desktopBridge.setLanguage(language);',
+  '    const half = total / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_DIV_BRIDGE_HEAD = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    void desktopBridge.setLanguage(language);',
+  '    const half = total / 2;',
+  '    void desktopBridge.setLanguage(fallback);',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+check('a pure bridge diff containing a plain division stays inert', isDesktopBridgeOnlyDiff(WIRING_DIV_BRIDGE_BASE, WIRING_DIV_BRIDGE_HEAD), true);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
