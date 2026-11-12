@@ -652,7 +652,9 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       const response = await page.goto(targetUrl, { waitUntil: 'load', timeout: 30_000 });
       if (!response || !response.ok()) {
         console.warn(`  ⚠ ${scene.name} skipped: plugin asset not available at ${scene.pluginUrl} (${response?.status() ?? 'no response'})`);
-        return null;
+        // Array contract: an empty record list skips the scene while main's
+        // per-record loop keeps processing the remaining scenes.
+        return [];
       }
       const demoRepo = baseState.repositories?.[0] ?? {
         id: 1,
