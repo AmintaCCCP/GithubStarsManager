@@ -1,5 +1,5 @@
 import React, { useId, useRef, useState } from 'react';
-import { FileText, GitFork, Info, KeyRound, List, ShieldCheck, Star, Workflow } from 'lucide-react';
+import { AlertTriangle, ArrowRight, FileText, GitFork, Info, KeyRound, List, ShieldCheck, Star, Workflow } from 'lucide-react';
 import { useT } from '../i18n/useT';
 import { cn } from '../lib/utils';
 
@@ -7,9 +7,13 @@ const CODE_SPAN_RE = /`([^`]+)`/g;
 
 type TokenMode = 'fine-grained' | 'classic';
 
+const CLASSIC_TOKEN_URL =
+  'https://github.com/settings/tokens/new?description=GithubStarsManager&scopes=public_repo,gist,user';
+const FINE_GRAINED_TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new';
+
 const MODE_TABS: Array<{ mode: TokenMode; labelKey: string }> = [
-  { mode: 'fine-grained', labelKey: 'loginScreen.token-permissions-tab-finegrained' },
   { mode: 'classic', labelKey: 'loginScreen.token-permissions-tab-classic' },
+  { mode: 'fine-grained', labelKey: 'loginScreen.token-permissions-tab-finegrained' },
 ];
 
 const FINE_GRAINED_ROWS = [
@@ -45,7 +49,7 @@ function renderWithHighlights(text: string): React.ReactNode[] {
 export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }) {
   const t = useT('login');
   const baseId = useId();
-  const [mode, setMode] = useState<TokenMode>('fine-grained');
+  const [mode, setMode] = useState<TokenMode>('classic');
   const tabRefs = useRef<Partial<Record<TokenMode, HTMLButtonElement | null>>>({});
 
   const tabId = (tabMode: TokenMode) => `${baseId}-tab-${tabMode}`;
@@ -109,6 +113,33 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
           hidden={mode !== tabMode}
           tabIndex={0}
         >
+          {tabMode === 'fine-grained' && (
+            <div className="mb-3.5 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs leading-relaxed text-foreground">
+              <div className="flex items-center gap-1.5 font-medium text-warning">
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                <span>{t('loginScreen.token-permissions-fine-warning-title')}</span>
+              </div>
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-muted-foreground">
+                <li>{t('loginScreen.token-permissions-fine-warning-star')}</li>
+                <li>{t('loginScreen.token-permissions-fine-warning-lists')}</li>
+              </ul>
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-warning/20 pt-2 text-muted-foreground">
+                <span>{t('loginScreen.token-permissions-fine-warning-recommend')}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('classic');
+                    tabRefs.current.classic?.focus();
+                  }}
+                  className="inline-flex items-center gap-1 font-semibold text-primary underline underline-offset-2 hover:text-primary/80"
+                >
+                  {t('loginScreen.token-permissions-switch-to-classic')}
+                  <ArrowRight className="h-3 w-3" aria-hidden />
+                </button>
+              </div>
+            </div>
+          )}
+
           <ul className="space-y-2.5">
             {rowsFor(tabMode).map(({ icon: Icon, featureKey, valueKey }) => (
               <li key={featureKey + valueKey} className="flex gap-2.5">
@@ -133,7 +164,7 @@ export function GitHubTokenPermissions({ heading = true }: { heading?: boolean }
       </div>
 
       <a
-        href="https://github.com/settings/tokens"
+        href={mode === 'fine-grained' ? FINE_GRAINED_TOKEN_URL : CLASSIC_TOKEN_URL}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-4 inline-block font-medium text-primary hover:underline"
