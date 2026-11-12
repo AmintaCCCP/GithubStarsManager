@@ -19,6 +19,7 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     setAutoLaunch: (enabled) => ipcRenderer.invoke('desktop:setAutoLaunch', enabled),
     setCloseToTray: (enabled) => ipcRenderer.invoke('desktop:setCloseToTray', enabled),
     setMinimizeToTray: (enabled) => ipcRenderer.invoke('desktop:setMinimizeToTray', enabled),
+    setLanguage: (language) => ipcRenderer.invoke('desktop:setLanguage', language),
     show: () => ipcRenderer.invoke('desktop:show'),
   },
   // 诊断日志桥：批量追加（invoke）与卸载前冲刷（send 单向，不 await）

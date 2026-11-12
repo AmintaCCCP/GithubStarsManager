@@ -21,13 +21,14 @@ const mocks = vi.hoisted(() => {
 
 vi.mock('../../store/useAppStore', () => ({ useAppStore: mocks.useAppStore }));
 vi.mock('../../services/electronProxy', () => ({
-  DEFAULT_DESKTOP_PREFS: { autoLaunch: false, closeToTray: true, minimizeToTray: true },
+  DEFAULT_DESKTOP_PREFS: { autoLaunch: false, closeToTray: true, minimizeToTray: true, language: 'zh' },
   desktopBridge: {
     isSupported: mocks.isSupported,
     getPrefs: mocks.getPrefs,
     setAutoLaunch: vi.fn(),
     setCloseToTray: vi.fn(),
     setMinimizeToTray: vi.fn(),
+    setLanguage: vi.fn(),
   },
 }));
 vi.mock('../UpdateChecker', () => ({ UpdateChecker: () => null }));
