@@ -383,6 +383,44 @@ const WIRING_GUARD_RELEASE = [
 check('moving a closing brace to absorb a web line into the guard is not inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_BASE, WIRING_GUARD_ABSORB), false);
 check('moving a closing brace to release a web line from the guard is not inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_RELEASE, WIRING_GUARD_BASE), false);
 check('a pre-existing web-wrapping guard left unchanged stays inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_RELEASE, WIRING_GUARD_RELEASE + '\nvoid desktopBridge.setLanguage(language);'), true);
+const WIRING_COMMENT_GUARD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '  // }',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_COMMENT_GUARD_MOVED = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '  // }',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_STRING_BRACE_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '}',
+  "const marker = '}' || fallbackMarker;",
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_STRING_BRACE_MOVED = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  "  const marker = '}' || fallbackMarker;",
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+check('a brace inside a comment cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_COMMENT_GUARD_BASE, WIRING_COMMENT_GUARD_MOVED), false);
+check('a brace inside a string cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_STRING_BRACE_BASE, WIRING_STRING_BRACE_MOVED), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

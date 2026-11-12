@@ -24,13 +24,18 @@ label), the workflow:
        top-level keys that actually changed are mapped, so a string addition
        for one panel no longer shoots every view. Keys that cannot be placed
        fall back conservatively to their namespace's scope;
-     - i18n module wiring (`src/i18n/*.ts`) is content-diffed too: a change
-       confined to desktop-bridge lines (`desktopBridge`/`electronProxy`,
-       bare braces) renders nothing in the web preview — the web bundle's
-       `desktopBridge` no-ops every method outside Electron — so such a diff
-       is inert (a desktop-only tray/language sync change shoots nothing
-       instead of every page). Any other wiring change still triggers all
-       scenes, because boot-time language resolution could re-render anything;
+     - i18n module wiring (`src/i18n/*.ts`) is content-diffed too: the two
+       versions' web projections — the in-order sequence of lines that are
+       not desktop-bridge syntax — must be identical for the diff to count as
+       web-inert. Bridge syntax means `desktopBridge`/`electronProxy`
+       imports, bridge call statements with side-effect-free arguments, the
+       `isSupported()` guard (transparent only when it wraps nothing but
+       bridge statements, with boundaries derived from a comment/string-aware
+       brace scan), and bare braces. The web bundle's `desktopBridge` no-ops
+       every method outside Electron, so such a diff renders nothing (a
+       desktop-only tray/language sync change shoots nothing instead of every
+       page). Any other wiring change still triggers all scenes, because
+       boot-time language resolution could re-render anything;
      - changes to global elements (`App.tsx`, `Header.tsx`,
        `WorkspacePageHeader.tsx`, shared UI primitives under
        `src/components/ui/`, `src/lib/utils.ts`, theme tokens, or

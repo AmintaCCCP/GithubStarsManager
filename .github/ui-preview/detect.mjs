@@ -819,39 +819,101 @@ const BRIDGE_LINE_SHAPES = [
   /^\s*import\s+.*electronProxy[^;]*;\s*$/,
   /^\s*(?:void\s+)?desktopBridge\.[A-Za-z_$][\w$]*\((?:[^()={}\\]|\\.)*\)\s*;\s*$/,
 ];
-const isBridgeOrStructuralLine = (line) => BRACE_ONLY_LINE.test(line) || BRIDGE_LINE_SHAPES.some((shape) => shape.test(line));
+const isBridgeOrStructuralLine = (line) => BRACE_ONLY_LINE.test(line) || COMMENT_ONLY_LINE.test(line) || BRIDGE_LINE_SHAPES.some((shape) => shape.test(line));
+
+/** Comment-only lines carry no behavior: line comments (block comments that
+ *  span lines degrade conservatively in the projection below). */
+const COMMENT_ONLY_LINE = /^\s*\/\//;
 
 /** The desktop-bridge guard's opening line. */
 const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\{\s*$/;
 
 /**
+ * Per-line net brace delta counting ONLY code braces: line comments, block
+ * comments and string/template literals are skipped, so a `}` inside a
+ * comment or a string cannot close a guard block on the scanner's behalf.
+ * Block comments and template literals carry scanner state across lines.
+ * Returns null when the file ends inside an unterminated construct
+ * (conservative: callers must treat the file as unanalyzable).
+ * @param {string} raw - File content.
+ * @returns {number[] | null} Net brace delta per line, or null.
+ */
+function braceDeltasPerLine(raw) {
+  const lines = raw.split('\n');
+  const deltas = [];
+  let state = 'code';
+  for (const line of lines) {
+    let delta = 0;
+    let i = 0;
+    while (i < line.length) {
+      const ch = line[i];
+      if (state === 'code') {
+        if (ch === '/' && line[i + 1] === '/') break;
+        if (ch === '/' && line[i + 1] === '*') {
+          state = 'block';
+          i += 2;
+          continue;
+        }
+        if (ch === "'" || ch === '"' || ch === '`') {
+          state = ch === "'" ? 'single' : ch === '"' ? 'double' : 'template';
+          i += 1;
+          continue;
+        }
+        if (ch === '{') delta += 1;
+        else if (ch === '}') delta -= 1;
+        i += 1;
+      } else if (state === 'block') {
+        if (ch === '*' && line[i + 1] === '/') {
+          state = 'code';
+          i += 2;
+        } else {
+          i += 1;
+        }
+      } else if (state === 'single' || state === 'double') {
+        // Regular strings do not span lines in JS; an unterminated one is a
+        // syntax error the build would catch. Stop the scan for this line.
+        if (ch === '\\') i += 2;
+        else if (ch === (state === 'single' ? "'" : '"')) state = 'code';
+        i += 1;
+      } else {
+        if (ch === '\\') i += 2;
+        else if (ch === '`') state = 'code';
+        i += 1;
+      }
+    }
+    deltas.push(delta);
+  }
+  if (state !== 'code') return null;
+  return deltas;
+}
+
+/**
  * The web-relevant projection of a line range: the in-order sequence of lines
- * that can change web rendering. Bridge-shaped and bare-syntax lines are
- * omitted. A desktop-bridge guard block is omitted too (transparent) when its
- * own projection is empty — wrapping nothing but bridge statements cannot
- * change web behavior; otherwise the block is emitted as a `guard{…}` token,
- * so wrapping, unwrapping or moving the block boundary around web statements
- * changes the projection. Unbalanced braces degrade conservatively: the whole
- * remaining range is emitted raw.
+ * that can change web rendering. Bridge-shaped, bare-syntax and comment-only
+ * lines are omitted. A desktop-bridge guard block is omitted too (transparent)
+ * when its own projection is empty — wrapping nothing but bridge statements
+ * cannot change web behavior; otherwise the block is emitted as a `guard{…}`
+ * token, so wrapping, unwrapping or moving the block boundary around web
+ * statements changes the projection. Guard boundaries come from
+ * braceDeltasPerLine, so comment/string braces are ignored. An unbalanced
+ * range degrades conservatively: the whole remaining range is emitted raw.
  * @param {string[]} lines - File lines.
+ * @param {number[]} deltas - Per-line brace deltas (braceDeltasPerLine).
  * @param {number} start - Inclusive start index.
  * @param {number} end - Exclusive end index.
  * @returns {string[]} Projection tokens.
  */
-function projectRange(lines, start, end) {
+function projectRange(lines, deltas, start, end) {
   const tokens = [];
   let i = start;
   while (i < end) {
     const line = lines[i];
     if (BRIDGE_GUARD_LINE.test(line)) {
-      let balance = 0;
+      let balance = deltas[i];
       let close = -1;
-      for (let j = i; j < end; j += 1) {
-        for (const ch of lines[j]) {
-          if (ch === '{') balance += 1;
-          else if (ch === '}') balance -= 1;
-        }
-        if (j > i && balance <= 0) {
+      for (let j = i + 1; j < end; j += 1) {
+        balance += deltas[j];
+        if (balance === 0) {
           close = j;
           break;
         }
@@ -861,7 +923,7 @@ function projectRange(lines, start, end) {
         tokens.push(...lines.slice(i + 1, end));
         break;
       }
-      const inner = projectRange(lines, i + 1, close);
+      const inner = projectRange(lines, deltas, i + 1, close);
       if (inner.length > 0) tokens.push(`guard{${inner.join('\n')}}`);
       i = close + 1;
     } else {
@@ -878,9 +940,11 @@ function projectRange(lines, start, end) {
  * src/services/electronProxy.ts), so a diff is web-inert exactly when the two
  * versions' web projections (projectRange) are identical: every changed,
  * added, removed or reordered line must be bridge syntax, and guards must
- * only ever wrap bridge statements. Byte-identical contents are trivially
- * inert; unreadable or ambiguous diffs stay non-inert (conservative: more
- * screenshots, never fewer).
+ * only ever wrap bridge statements — with guard boundaries derived from a
+ * comment/string-aware brace scan, so a `}` inside a comment or string
+ * cannot close a block on the scanner's behalf. Byte-identical contents are
+ * trivially inert; unreadable or ambiguous diffs stay non-inert
+ * (conservative: more screenshots, never fewer).
  * @param {string} baseRaw - Base version content (null when unreadable).
  * @param {string} headRaw - Head version content (null when unreadable).
  * @returns {boolean} True when the diff is provably web-inert.
@@ -888,8 +952,13 @@ function projectRange(lines, start, end) {
 export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
   if (baseRaw === null || headRaw === null) return false;
   if (baseRaw === headRaw) return true;
-  return JSON.stringify(projectRange(baseRaw.split('\n'), 0, baseRaw.split('\n').length))
-    === JSON.stringify(projectRange(headRaw.split('\n'), 0, headRaw.split('\n').length));
+  const baseDeltas = braceDeltasPerLine(baseRaw);
+  const headDeltas = braceDeltasPerLine(headRaw);
+  if (baseDeltas === null || headDeltas === null) return false;
+  const baseLines = baseRaw.split('\n');
+  const headLines = headRaw.split('\n');
+  return JSON.stringify(projectRange(baseLines, baseDeltas, 0, baseLines.length))
+    === JSON.stringify(projectRange(headLines, headDeltas, 0, headLines.length));
 }
 
 /** i18n module wiring (non-locale, non-test): the i18next runtime and its
