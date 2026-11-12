@@ -172,15 +172,20 @@ function localExecutor(worktreeOverrides) {
 }
 
 const SCENE_ORDER = detect.ALL_SCENES;
+// Interaction-variant specs are component-file-driven extras; the consumer-
+// derived ground truth below never includes them, so strip them on both
+// sides before comparing.
+const VARIANT_SPECS = new Set(detect.SCENE_VARIANTS.map((v) => v.spec));
 const fmt = (scenes) => {
-  // Unknown static scene names (interaction variants) sort deterministically
-  // after the known catalog so actual/expected stay comparable.
+  const kept = scenes.filter((s) => !VARIANT_SPECS.has(s));
+  // Unknown static scene names sort deterministically after the known catalog
+  // so actual/expected stay comparable.
   const rank = (s) => {
     const i = SCENE_ORDER.indexOf(s);
     return i === -1 ? SCENE_ORDER.length : i;
   };
-  const statics = scenes.filter((s) => !s.startsWith('plugin:')).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
-  const specs = scenes.filter((s) => s.startsWith('plugin:')).sort();
+  const statics = kept.filter((s) => !s.startsWith('plugin:')).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  const specs = kept.filter((s) => s.startsWith('plugin:')).sort();
   return [...statics, ...specs];
 };
 

@@ -61,16 +61,22 @@ const SCENES = [...VIEW_SCENES, ...SETTINGS_SCENES];
 
 /** Behavior for each interaction variant from detect.mjs's SCENE_VARIANTS,
  *  applied in the base scene's browser context right after its screenshot:
- *  one click, a readiness wait, then the shot. `clickLocaleKey` resolves the
- *  click target's accessible name from the built bundle's zh locale (the
- *  preview renders zh), so renamed UI strings keep working without tool-side
- *  changes. A variant that cannot reach its state is skipped with a warning —
- *  the base screenshot still publishes. */
+ *  one or more click steps, a readiness wait, then the shot.
+ *  - `clickLocaleKey` ("ns:dotted.key") resolves the click target's accessible
+ *    name from the built bundle's zh locale (the preview renders zh), so
+ *    renamed UI strings keep working without tool-side changes; the first
+ *    match is clicked (per-card/per-row triggers). `role` overrides the ARIA
+ *    role (tab triggers are role=tab, not button).
+ *  - `clickSelector` clicks the first element matching a CSS selector.
+ *  - `clickRepoCard` clicks the repository card at the fixture index (the
+ *    card's accessible name is its full_name).
+ * A variant that cannot reach its state is skipped with a warning — the base
+ * screenshot still publishes. */
 const VARIANT_ACTIONS = {
   // General settings' token-guide dialog: GitHubTokenPermissions renders
   // inside a Dialog, opened by the card's guide button.
   'settings-general-token-guide': {
-    clickLocaleKey: 'app:generalPanel.token-permission-guide',
+    steps: [{ clickLocaleKey: 'app:generalPanel.token-permission-guide' }],
     readySelector: '[role="dialog"]',
     fullPage: false,
   },
@@ -79,9 +85,127 @@ const VARIANT_ACTIONS = {
   // selectors key on the component's aria ids (`${useId}-panel-fine-grained`),
   // not on tab order or locale text.
   'login-token-finegrained': {
-    clickSelector: '[role="tab"][aria-controls$="-panel-fine-grained"]',
+    steps: [{ clickSelector: '[role="tab"][aria-controls$="-panel-fine-grained"]' }],
     readySelector: '[role="tabpanel"][id$="-panel-fine-grained"]',
     fullPage: true,
+  },
+
+  // Settings dialogs: opened by deterministic buttons in their panels. The
+  // sources dialog is chained on top of the open marketplace dialog; the
+  // vector-search tabs sit inside a collapsible deploy guide.
+  'settings-plugins-marketplace': {
+    steps: [{ clickLocaleKey: 'app:pluginSettingsPanel.browse-plugins' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'settings-plugins-sources': {
+    steps: [
+      { clickLocaleKey: 'app:pluginSettingsPanel.browse-plugins' },
+      { clickLocaleKey: 'app:pluginSettingsPanel.marketplace-manage-sources' },
+    ],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'settings-plugins-icon-picker': {
+    steps: [{ clickLocaleKey: 'app:pluginSettingsPanel.customize-icon' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'settings-star-sync-push-modal': {
+    steps: [{ clickLocaleKey: 'app:starSyncPanel.push-selected-categories' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'settings-ai-config-form': {
+    steps: [{ clickLocaleKey: 'app:aIConfigPanel.add-ai-config' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'settings-webdav-config-form': {
+    steps: [{ clickLocaleKey: 'app:webDAVPanel.add-webdav' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'settings-vector-search-deploy-guide': {
+    steps: [
+      // The toggle's accessible name is its aria-label (切换部署指南), not the
+      // visible 部署指南 text.
+      { clickLocaleKey: 'app:vectorSearchSettings.toggle-deploy-guide' },
+      { clickLocaleKey: 'app:vectorSearchSettings.deploy-tab-manual', role: 'tab' },
+    ],
+    readySelector: '[role="tabpanel"][aria-labelledby$="-trigger-manual"]',
+    fullPage: false,
+  },
+
+  // Repositories-view dialogs and sheets (per-card icon buttons / toolbar).
+  'repositories-edit-modal': {
+    steps: [{ clickLocaleKey: 'repositories:repositoryCard.edit-repository-info' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'repositories-release-sheet': {
+    // A card without releases renders an empty sheet, and cards render in
+    // list order (sorted by stars), not fixture order — click the release
+    // button inside the first fixture card that actually has releases.
+    steps: [{ clickLocaleKey: 'repositories:repositoryCard.view-releases', withinRepoCard: { withReleases: true } }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'repositories-release-sheet-notes': {
+    steps: [
+      { clickLocaleKey: 'repositories:repositoryCard.view-releases', withinRepoCard: { withReleases: true } },
+      { clickReleaseAccordion: 0 },
+      { clickLocaleKey: 'releases:repositoryReleaseSheet.notes', role: 'tab' },
+    ],
+    readySelector: '[role="tabpanel"][aria-labelledby$="-trigger-notes"]',
+    fullPage: false,
+  },
+  'repositories-chat-sheet': {
+    steps: [{ clickLocaleKey: 'repositories:repositoryCard.ask-this-repository' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'repositories-chat-history-sheet': {
+    steps: [{ clickLocaleKey: 'app:searchBar.chat-history' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'repositories-readme-modal': {
+    steps: [{ clickRepoCard: 0 }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'repositories-category-edit-modal': {
+    steps: [{ clickLocaleKey: 'app:categorySidebar.add-category' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'repositories-batch-star-import': {
+    steps: [{ clickLocaleKey: 'repositories:batchStar.title' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+
+  // Other views: gist cards open their detail modal by card click.
+  'gists-gist-detail': {
+    steps: [{ clickSelector: 'main.app-main article.app-list-row' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'gists-new-gist': {
+    steps: [{ clickLocaleKey: 'gists:gistView.new' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'releases-filter-modal': {
+    steps: [{ clickLocaleKey: 'app:assetFilterManager.new-filter' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  'releases-source-settings': {
+    steps: [{ clickLocaleKey: 'releases:releaseTimeline.release-source-settings' }],
+    readySelector: '[role="dialog"]',
+    fullPage: false,
   },
 };
 
@@ -118,6 +242,13 @@ async function fetchJson(url) {
 }
 
 /**
+ * Escape a string for literal use inside a RegExp.
+ * @param {string} value - Raw text.
+ * @returns {string} Regex-safe text.
+ */
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
  * Resolve a click target's accessible name from the built bundle's zh locale
  * (the preview renders zh). Key format: "<ns>:<dotted.key.path>". The build
  * job copies src/locales next to the bundle (import.meta.glob ships locale
@@ -136,6 +267,109 @@ async function resolveLocaleText(url, nsKey) {
   let node = data;
   for (const key of keyPath) node = node?.[key];
   return typeof node === 'string' && node.trim() ? node : null;
+}
+
+/**
+ * Resolve the fixture repository a card-anchored step targets. A number picks
+ * the repository at that fixture index; `{ withReleases: true }` picks the
+ * first fixture repository that has release entries (a release sheet opened
+ * for a repository without releases renders an empty state).
+ * @param {object} baseState - Base demo fixture.
+ * @param {number | { withReleases: boolean }} selector - Card selector.
+ * @returns {object} The fixture repository record.
+ */
+function resolveFixtureRepo(baseState, selector) {
+  let repo;
+  if (typeof selector === 'number') {
+    repo = baseState.repositories?.[selector];
+    if (!repo?.full_name) throw new Error(`fixture repository #${selector} missing`);
+    return repo;
+  }
+  const withReleases = new Set((baseState.releases ?? []).map((r) => r.repository?.full_name).filter(Boolean));
+  repo = (baseState.repositories ?? []).find((r) => withReleases.has(r.full_name));
+  if (!repo?.full_name) throw new Error('fixture has no repository with releases');
+  return repo;
+}
+
+/**
+ * Perform one variant click step.
+ * @param {import('playwright').Page} page - The base scene's settled page.
+ * @param {object} step - A click step from VARIANT_ACTIONS.
+ * @param {object} baseState - Base demo fixture (for fixture-indexed steps).
+ * @param {string} url - Base preview server URL (for locale text resolution).
+ */
+async function runVariantStep(page, step, baseState, url) {
+  if (step.clickLocaleKey) {
+    const text = await resolveLocaleText(url, step.clickLocaleKey);
+    if (!text) throw new Error(`locale text for ${step.clickLocaleKey} not found in the built bundle`);
+    let scope = page;
+    if (step.withinRepoCard) {
+      // Cards render in list order (sorted by stars etc.), not fixture order —
+      // anchor on the card whose accessible name carries the full_name of the
+      // requested fixture repository. The card itself is role=button; scoping
+      // keeps per-card action buttons out of unrelated cards' matches.
+      const repo = resolveFixtureRepo(baseState, step.withinRepoCard);
+      scope = page.getByRole('button', { name: new RegExp(`^${escapeRegExp(repo.full_name)}`) }).first();
+    }
+    // Per-card/per-row triggers repeat: the first match is the demo's first
+    // card/plugin, which the fixture guarantees to exist.
+    await scope.getByRole(step.role ?? 'button', { name: text }).first().click({ timeout: 10_000 });
+  } else if (step.clickSelector) {
+    await page.locator(step.clickSelector).first().click({ timeout: 10_000 });
+  } else if (typeof step.clickReleaseAccordion === 'number') {
+    // The release sheet lists releases as accordion items; the per-release
+    // assets/notes/summary tabs render only inside the expanded item.
+    const repo = resolveFixtureRepo(baseState, { withReleases: true });
+    const releases = (baseState.releases ?? []).filter((r) => r.repository?.full_name === repo.full_name);
+    const tag = releases[step.clickReleaseAccordion]?.tag_name;
+    if (!tag) throw new Error(`fixture release #${step.clickReleaseAccordion} missing for ${repo.full_name}`);
+    await page.getByRole('button', { name: new RegExp(`^${escapeRegExp(tag)}`) }).first().click({ timeout: 10_000 });
+  } else if (step.clickRepoCard !== undefined) {
+    const repo = resolveFixtureRepo(baseState, step.clickRepoCard);
+    // The card's accessible name is "<full_name> - <description>"; anchor on
+    // the full name instead of trusting the description suffix.
+    const card = page.getByRole('button', { name: new RegExp(`^${escapeRegExp(repo.full_name)}`) }).first();
+    await card.click({ timeout: 10_000 });
+  } else {
+    throw new Error('step has no supported click target');
+  }
+}
+
+/**
+ * Run one interaction variant in the base scene's settled page and take its
+ * screenshot. The click/readiness steps describe states the default render
+ * never shows (an open dialog, a switched tab); a variant that cannot reach
+ * its state is skipped with a warning instead of failing the run — the base
+ * screenshot already stands.
+ * @param {import('playwright').Page} page - The base scene's settled page.
+ * @param {string} variantSpec - The variant's full scene spec.
+ * @param {object} baseState - Base demo fixture (for fixture-indexed steps).
+ * @param {string} url - Base preview server URL (for locale text resolution).
+ * @param {string} outDir - Directory where the screenshot PNG will be saved.
+ * @returns {Promise<{ scene: string, path: string } | null>} Shot record, or null when skipped.
+ */
+async function shootVariant(page, variantSpec, baseState, url, outDir) {
+  const action = VARIANT_ACTIONS[variantSpec];
+  const shotPath = path.join(outDir, `${variantSpec}.png`);
+  if (!action) {
+    console.warn(`  ⚠ ${variantSpec} skipped: no VARIANT_ACTIONS entry`);
+    return null;
+  }
+  try {
+    for (const step of action.steps ?? []) {
+      await runVariantStep(page, step, baseState, url);
+    }
+    if (action.readySelector) {
+      await page.waitForSelector(action.readySelector, { state: 'visible', timeout: 15_000 });
+    }
+    await page.waitForTimeout(action.settleMs ?? 500);
+    await page.screenshot({ path: shotPath, fullPage: action.fullPage ?? true });
+    console.log(`  ✓ ${variantSpec} -> ${shotPath}`);
+    return { scene: variantSpec, path: shotPath };
+  } catch (error) {
+    console.warn(`  ⚠ ${variantSpec} skipped: ${error.message.split('\n')[0]}`);
+    return null;
+  }
 }
 
 /**
@@ -582,46 +816,6 @@ function installPluginHostResponder({ repositories, releasesByRepositoryId, stor
 }
 
 /**
- * Run one interaction variant in the base scene's settled page and take its
- * screenshot. The click/readiness selectors describe states the default
- * render never shows (an open dialog, a switched tab); a variant that cannot
- * reach its state is skipped with a warning instead of failing the run — the
- * base screenshot already stands.
- * @param {import('playwright').Page} page - The base scene's settled page.
- * @param {string} variantSpec - The variant's full scene spec.
- * @param {string} url - Base preview server URL (for locale text resolution).
- * @param {string} outDir - Directory where the screenshot PNG will be saved.
- * @returns {Promise<{ scene: string, path: string } | null>} Shot record, or null when skipped.
- */
-async function shootVariant(page, variantSpec, url, outDir) {
-  const action = VARIANT_ACTIONS[variantSpec];
-  const shotPath = path.join(outDir, `${variantSpec}.png`);
-  if (!action) {
-    console.warn(`  ⚠ ${variantSpec} skipped: no VARIANT_ACTIONS entry`);
-    return null;
-  }
-  try {
-    if (action.clickLocaleKey) {
-      const text = await resolveLocaleText(url, action.clickLocaleKey);
-      if (!text) throw new Error(`locale text for ${action.clickLocaleKey} not found in the built bundle`);
-      await page.getByRole('button', { name: text }).click({ timeout: 10_000 });
-    } else if (action.clickSelector) {
-      await page.locator(action.clickSelector).first().click({ timeout: 10_000 });
-    }
-    if (action.readySelector) {
-      await page.waitForSelector(action.readySelector, { state: 'visible', timeout: 15_000 });
-    }
-    await page.waitForTimeout(action.settleMs ?? 500);
-    await page.screenshot({ path: shotPath, fullPage: action.fullPage ?? true });
-    console.log(`  ✓ ${variantSpec} -> ${shotPath}`);
-    return { scene: variantSpec, path: shotPath };
-  } catch (error) {
-    console.warn(`  ⚠ ${variantSpec} skipped: ${error.message.split('\n')[0]}`);
-    return null;
-  }
-}
-
-/**
  * Take a screenshot for a single scene inside a hermetic browser context.
  * @param {import('playwright').Browser} browser - Active Playwright browser instance.
  * @param {object} baseState - Base demo state fixture.
@@ -779,7 +973,7 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       await page.waitForTimeout(scene.settleMs ?? 800);
       await page.screenshot({ path: shotPath, fullPage: true });
       console.log(`  ✓ ${scene.name} -> ${shotPath}`);
-      return await finishScene(page, scene, [{ scene: scene.name, path: shotPath }], url, outDir);
+      return await finishScene(page, scene, [{ scene: scene.name, path: shotPath }], baseState, url, outDir);
     }
 
     // The app shell renders only after hydration; wait for it, then for real
@@ -810,26 +1004,65 @@ async function shootScene(browser, baseState, scene, url, outDir) {
 
     await page.screenshot({ path: shotPath, fullPage: true });
     console.log(`  ✓ ${scene.name} -> ${shotPath}`);
-    return await finishScene(page, scene, [{ scene: scene.name, path: shotPath }], url, outDir);
+    return await finishScene(page, scene, [{ scene: scene.name, path: shotPath }], baseState, url, outDir);
   } finally {
     await context.close();
   }
 }
 
 /**
+ * Bring the base scene's page back to its settled state between variants.
+ * Variants run sequentially in one browser context, and an open dialog traps
+ * focus and blocks every later variant's clicks — reload the document (routes
+ * and the seeded IndexedDB persist) and repeat the base scene's readiness
+ * waits so each variant starts from the default render.
+ * @param {import('playwright').Page} page - The base scene's page.
+ * @param {object} scene - The base scene configuration.
+ */
+async function resetPageForVariant(page, scene) {
+  if (scene.settingsTab) {
+    await page.evaluate((tab) => sessionStorage.setItem('gsm:pending-settings-tab', tab), scene.settingsTab);
+  }
+  await page.reload({ waitUntil: 'load', timeout: 60_000 });
+  if (scene.loginScreen) {
+    await page.waitForSelector('#root input', { timeout: 60_000 });
+    await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 15_000 }).catch(() => {});
+  } else {
+    await page.waitForSelector('.ui-shell', { timeout: 60_000 });
+    await page.waitForSelector('main.app-main', { timeout: 30_000 });
+    await page.waitForFunction(() => {
+      const main = document.querySelector('main.app-main');
+      return !!main && (main.innerText ?? '').trim().length > 0 && !main.querySelector('[role="status"]');
+    }, null, { timeout: 45_000, polling: 250 });
+    if (scene.settingsTab) {
+      const expected = `settings-tabpanel-${scene.settingsTab}`;
+      await page.waitForFunction((want) => {
+        const panel = document.querySelector('[data-settings-sections]');
+        return (panel?.getAttribute('id') ?? '') === want;
+      }, expected, { timeout: 15_000, polling: 100 });
+    }
+    await page.waitForFunction(() => document.fonts.status === 'loaded', null, { timeout: 15_000 });
+  }
+  await page.waitForTimeout(scene.settleMs ?? 800);
+}
+
+/**
  * Append a scene's interaction variant shots (if any) to its base record.
- * Runs in the same settled browser context, so the variant captures the page
- * exactly as the base screenshot left it, with only the click applied.
+ * Each variant runs from a freshly reloaded default render (see
+ * resetPageForVariant) so an earlier variant's open dialog cannot block the
+ * next one's clicks.
  * @param {import('playwright').Page} page - The base scene's settled page.
  * @param {object} scene - Scene configuration, possibly carrying `variants`.
  * @param {Array<{ scene: string, path: string }>} results - Base shot records.
+ * @param {object} baseState - Base demo fixture (for fixture-indexed steps).
  * @param {string} url - Base preview server URL.
  * @param {string} outDir - Directory where variant PNGs will be saved.
  * @returns {Promise<Array<{ scene: string, path: string }>>} All shot records.
  */
-async function finishScene(page, scene, results, url, outDir) {
+async function finishScene(page, scene, results, baseState, url, outDir) {
   for (const variant of scene.variants ?? []) {
-    const variantResult = await shootVariant(page, variant.spec, url, outDir);
+    await resetPageForVariant(page, scene);
+    const variantResult = await shootVariant(page, variant.spec, baseState, url, outDir);
     if (variantResult) results.push(variantResult);
   }
   return results;

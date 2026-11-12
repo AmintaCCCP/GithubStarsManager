@@ -92,11 +92,11 @@ export const ALL_SCENES = [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)]
 
 /**
  * Interaction variants: extra screenshots of one base scene in a state the
- * default render never shows — an open dialog or a switched tab. Each spec
- * (`<baseScene>-<name>`) is a valid shoot.mjs scene; the click/readiness
- * behavior lives in shoot.mjs's VARIANT_ACTIONS. detect emits a variant only
- * for diffs whose visible change lives inside that state (the component
- * rendered there), never through `global` expansion.
+ * default render never shows — an open dialog/sheet or a switched tab. Each
+ * spec (`<baseScene>-<name>`) is a valid shoot.mjs scene; the open recipe
+ * lives in shoot.mjs's VARIANT_ACTIONS. detect emits a variant only for diffs
+ * whose visible change lives inside that state (the component rendered there,
+ * via COMPONENT_VARIANTS below), never through `global` expansion.
  * @type {Array<{spec: string, baseScene: string}>}
  */
 export const SCENE_VARIANTS = [
@@ -106,7 +106,78 @@ export const SCENE_VARIANTS = [
   // The same component's fine-grained tab: its warning box only renders after
   // switching tabs, which no default screenshot does.
   { spec: 'login-token-finegrained', baseScene: 'login' },
+
+  // Settings dialogs (opened by deterministic buttons in their panels).
+  { spec: 'settings-plugins-marketplace', baseScene: 'settings-plugins' },
+  // The sources dialog is chained on top of the open marketplace dialog.
+  { spec: 'settings-plugins-sources', baseScene: 'settings-plugins' },
+  { spec: 'settings-plugins-icon-picker', baseScene: 'settings-plugins' },
+  { spec: 'settings-star-sync-push-modal', baseScene: 'settings-star-sync' },
+  { spec: 'settings-ai-config-form', baseScene: 'settings-ai' },
+  { spec: 'settings-webdav-config-form', baseScene: 'settings-webdav' },
+  // Deploy-guide collapsible + its manual-deployment tab (tabs are hidden
+  // until the guide is expanded).
+  { spec: 'settings-vector-search-deploy-guide', baseScene: 'settings-vector-search' },
+
+  // Repositories-view dialogs and sheets (per-card buttons, toolbar buttons).
+  { spec: 'repositories-edit-modal', baseScene: 'repositories-light' },
+  { spec: 'repositories-release-sheet', baseScene: 'repositories-light' },
+  // Release sheet's notes tab (assets tab is the default sheet render).
+  { spec: 'repositories-release-sheet-notes', baseScene: 'repositories-light' },
+  { spec: 'repositories-chat-sheet', baseScene: 'repositories-light' },
+  { spec: 'repositories-chat-history-sheet', baseScene: 'repositories-light' },
+  { spec: 'repositories-readme-modal', baseScene: 'repositories-light' },
+  { spec: 'repositories-category-edit-modal', baseScene: 'repositories-light' },
+  { spec: 'repositories-batch-star-import', baseScene: 'repositories-light' },
+
+  // Other views.
+  { spec: 'gists-gist-detail', baseScene: 'gists' },
+  { spec: 'gists-new-gist', baseScene: 'gists' },
+  { spec: 'releases-filter-modal', baseScene: 'releases' },
+  { spec: 'releases-source-settings', baseScene: 'releases' },
 ];
+
+/**
+ * Dialog/sheet/tab components that render ONLY inside an interaction variant.
+ * Keys are exact file names; values are space-separated SCENE_VARIANTS specs
+ * appended to the component's base-scene classification. A change to one of
+ * these files is invisible in the default render, so its variants are
+ * mandatory to show the change. Deliberately NOT listed: destructive
+ * confirmation dialogs (uninstall, data deletion, unstar — their shells are
+ * generic and their triggers interpolated/stateful), state-gated overlays
+ * (update dialog, sync-mode choice, login conflict, import preview),
+ * selection-gated bulk modals, and discovery channel-gated settings (their
+ * triggers only render on non-default channels the demo never selects).
+ * @type {Record<string, string>}
+ */
+const COMPONENT_VARIANTS = {
+  // Token permission helper: the guide dialog in settings-general and the
+  // fine-grained tab on the login page are closed/inactive by default.
+  'GitHubTokenPermissions.tsx': 'settings-general-token-guide login-token-finegrained',
+  'PluginMarketplaceDialog.tsx': 'settings-plugins-marketplace settings-plugins-sources',
+  'PluginSourcesDialog.tsx': 'settings-plugins-sources',
+  'PluginIconPickerDialog.tsx': 'settings-plugins-icon-picker',
+  'PushCategoriesModal.tsx': 'settings-star-sync-push-modal',
+  // The add/edit AI provider form is Modal-hosted inside the panel.
+  'AIConfigPanel.tsx': 'settings-ai-config-form',
+  'WebDAVPanel.tsx': 'settings-webdav-config-form',
+  // The deploy-guide collapsible hosts the deployment Tabs.
+  'VectorSearchSettings.tsx': 'settings-vector-search-deploy-guide',
+  'RepositoryEditModal.tsx': 'repositories-edit-modal',
+  // The release sheet's notes tab is its non-default content state.
+  'RepositoryReleaseSheet.tsx': 'repositories-release-sheet repositories-release-sheet-notes',
+  'RepositoryChatSheet.tsx': 'repositories-chat-sheet',
+  'GlobalChatHistorySheet.tsx': 'repositories-chat-history-sheet',
+  // The readme modal opens from the repository card body click.
+  'ReadmeModal.tsx': 'repositories-readme-modal',
+  'CategoryEditModal.tsx': 'repositories-category-edit-modal',
+  'BatchStarImportDialog.tsx': 'repositories-batch-star-import',
+  'GistDetailModal.tsx': 'gists-gist-detail',
+  'GistEditorModal.tsx': 'gists-new-gist',
+  // FilterModal renders only in the releases view's filter manager.
+  'FilterModal.tsx': 'releases-filter-modal',
+  'ReleaseSourceSettingsModal.tsx': 'releases-source-settings',
+};
 
 const SETTINGS_SCENE_NAMES = new Set(SETTINGS_TABS.map((t) => t.scene));
 
@@ -287,8 +358,8 @@ const LOCALE_KEY_SCENES = {
     backToTop: 'repositories',
     scrollToBottom: 'repositories',
 
-    // FilterModal renders the asset-filter strings inside the repositories view.
-    assetFilterManager: 'releases repositories',
+    // FilterModal renders only in the releases view (release timeline sidebar).
+    assetFilterManager: 'releases',
     useReleaseArtifactActions: 'releases',
     installableAssetRecommendation: 'releases',
 
@@ -453,13 +524,15 @@ const SAFE_PLUGIN_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /**
  * Classify a changed path to its affected view identifier, scene name, scene
- * spec, or list of them. Returns null if the file is ignored or does not
- * affect UI.
+ * spec, or list of them. Returns the base scenes for the path plus any
+ * interaction-variant scenes (COMPONENT_VARIANTS) the path renders only in.
+ * Returns null if the file is ignored or does not affect UI.
  *
  * Returned tokens are one of:
  *   - view ids resolved via VIEW_TO_SCENES ('repositories', 'settings', 'gists', …)
  *   - concrete scene names ('settings-data')
  *   - dynamic plugin specs ('plugin:<slug>')
+ *   - interaction variant specs ('settings-plugins-marketplace', …)
  *   - 'global' (all static scenes)
  *   - 'deferred' (state containers whose visible effect ships through the
  *     components changed in the same PR; expanded to global only when no
@@ -472,7 +545,21 @@ export function classifyPath(filePath) {
   if (isIgnoredPath(path)) {
     return null;
   }
+  const base = classifyBasePath(path);
+  const variantSpecs = splitSpec(COMPONENT_VARIANTS[path.split('/').pop()] ?? '');
+  if (variantSpecs.length === 0) return base;
+  if (!base) return variantSpecs;
+  return [...(Array.isArray(base) ? base : [base]), ...variantSpecs];
+}
 
+/**
+ * Base-scene classification shared by every non-ignored path (the rules that
+ * existed before interaction variants). Returns null when the path affects no
+ * base scene; classifyPath unions the result with COMPONENT_VARIANTS.
+ * @param {string} path - Normalized (forward-slash) repository-relative path.
+ * @returns {string | string[] | null}
+ */
+function classifyBasePath(path) {
   // 0. Locale files classify at namespace level here; mapPathsToScenes
   // overrides this with the key-level diff when one is available.
   if (LOCALE_FILE_PATTERN.test(path)) {
@@ -489,11 +576,12 @@ export function classifyPath(filePath) {
     return 'gists';
   }
 
-  // 2. Releases view
+  // 2. Releases view. FilterModal belongs here: it is instantiated by the
+  // AssetFilterManager in the releases view's context sidebar only.
   if (
     path.startsWith('src/features/releases/') ||
     /^src\/components\/Release/i.test(path) ||
-    /^src\/components\/Asset(FilterManager|LeadingIcon)\./.test(path) ||
+    /^src\/components\/(AssetFilterManager|AssetLeadingIcon|FilterModal)\./.test(path) ||
     /^src\/components\/InstallableAssetRecommendation\./.test(path) ||
     /^src\/components\/SiWindows\./.test(path) ||
     /^src\/hooks\/useReleaseArtifactActions\./.test(path) ||
@@ -581,7 +669,6 @@ export function classifyPath(filePath) {
     /^src\/components\/Repository/i.test(path) ||
     /^src\/components\/Category/i.test(path) ||
     /^src\/components\/Search/i.test(path) ||
-    /^src\/components\/FilterModal\./.test(path) ||
     /^src\/components\/BatchStarImportDialog\./.test(path) ||
     /^src\/components\/Bulk/i.test(path) ||
     /^src\/components\/SimilarViewBanner\./.test(path) ||
@@ -634,11 +721,10 @@ export function classifyPath(filePath) {
   }
 
   // 13. Token permission helper renders inline on the login page and inside
-  // the General settings tab's token-guide dialog. The dialog stays closed
-  // and the component's own fine-grained tab inactive in default renders, so
-  // its variant scenes are required to show this component's changes.
+  // the General settings tab's token-guide dialog; its interaction variants
+  // are declared in COMPONENT_VARIANTS.
   if (/^src\/components\/GitHubTokenPermissions\./.test(path)) {
-    return ['settings-general', 'login', 'settings-general-token-guide', 'login-token-finegrained'];
+    return ['settings-general', 'login'];
   }
 
   // 14. Global style/theme/primitive layers render on every app page AND on

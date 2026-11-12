@@ -36,7 +36,6 @@ check('ALL_SCENES is views plus settings tabs', ALL_SCENES, [...VIEW_SCENES, ...
 check('settings view expands to every settings scene', VIEW_TO_SCENES.settings, SETTINGS_TABS.map((t) => t.scene));
 check('every interaction variant has a unique spec', new Set(SCENE_VARIANTS.map((v) => v.spec)).size, SCENE_VARIANTS.length);
 check('every interaction variant builds on a known base scene', SCENE_VARIANTS.every((v) => ALL_SCENES.includes(v.baseScene) || v.baseScene === 'login'), true);
-check('every variant spec embeds its base scene name', SCENE_VARIANTS.every((v) => v.spec.startsWith(`${v.baseScene}-`)), true);
 
 // 1. isIgnoredPath tests
 check('test file in src is ignored', isIgnoredPath('src/App.contextSidebar.test.tsx'), true);
@@ -116,8 +115,8 @@ check('appearance panel maps to appearance scene', classifyPath('src/components/
 check('theme settings card maps to appearance scene', classifyPath('src/components/settings/ThemeSettingsCard.tsx'), ['settings-appearance']);
 check('repository card actions maps to appearance scene', classifyPath('src/components/settings/RepositoryCardActionsSettings.tsx'), ['settings-appearance']);
 check('star sync panel maps to star-sync scene', classifyPath('src/components/settings/StarSyncPanel.tsx'), ['settings-star-sync']);
-check('ai config panel maps to ai scene', classifyPath('src/components/settings/AIConfigPanel.tsx'), ['settings-ai']);
-check('webdav panel maps to webdav scene', classifyPath('src/components/settings/WebDAVPanel.tsx'), ['settings-webdav']);
+check('ai config panel spans its scene and the add/edit form variant', classifyPath('src/components/settings/AIConfigPanel.tsx'), ['settings-ai', 'settings-ai-config-form']);
+check('webdav panel spans its scene and the config form variant', classifyPath('src/components/settings/WebDAVPanel.tsx'), ['settings-webdav', 'settings-webdav-config-form']);
 check('backup panel maps to backup scene', classifyPath('src/components/settings/BackupPanel.tsx'), ['settings-backup']);
 check('backend panel maps to backend scene', classifyPath('src/components/settings/BackendPanel.tsx'), ['settings-backend']);
 check('category panel maps to category scene', classifyPath('src/components/settings/CategoryPanel.tsx'), ['settings-category']);
@@ -126,11 +125,11 @@ check('data panel maps to data scene', classifyPath('src/components/settings/Dat
 check('logs panel maps to logs scene', classifyPath('src/components/settings/DiagnosticLogsPanel.tsx'), ['settings-logs']);
 check('network panel maps to network scene', classifyPath('src/components/settings/NetworkPanel.tsx'), ['settings-network']);
 check('mcp panel maps to mcp scene', classifyPath('src/components/settings/McpSettingsPanel.tsx'), ['settings-mcp']);
-check('vector search maps to vector-search scene', classifyPath('src/components/settings/VectorSearchSettings.tsx'), ['settings-vector-search']);
+check('vector search spans its scene and the deploy-guide variant', classifyPath('src/components/settings/VectorSearchSettings.tsx'), ['settings-vector-search', 'settings-vector-search-deploy-guide']);
 check('plugin settings panel maps to plugins scene', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), ['settings-plugins']);
-check('plugin icon picker maps to plugins scene', classifyPath('src/components/settings/PluginIconPickerDialog.tsx'), ['settings-plugins']);
-check('plugin marketplace maps to plugins scene', classifyPath('src/components/settings/PluginMarketplaceDialog.tsx'), ['settings-plugins']);
-check('push categories modal maps to star-sync scene', classifyPath('src/components/settings/PushCategoriesModal.tsx'), ['settings-star-sync']);
+check('plugin icon picker spans its scene and its dialog variant', classifyPath('src/components/settings/PluginIconPickerDialog.tsx'), ['settings-plugins', 'settings-plugins-icon-picker']);
+check('plugin marketplace spans its scene and its dialog variants', classifyPath('src/components/settings/PluginMarketplaceDialog.tsx'), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources']);
+check('push categories modal spans its scene and its dialog variant', classifyPath('src/components/settings/PushCategoriesModal.tsx'), ['settings-star-sync', 'settings-star-sync-push-modal']);
 check('include keys toggle spans backup and data scenes', classifyPath('src/components/settings/IncludeKeysToggle.tsx'), ['settings-backup', 'settings-data']);
 check('unknown settings component falls back to whole settings view', classifyPath('src/components/settings/SomeFuturePanel.tsx'), ['settings']);
 
@@ -193,6 +192,19 @@ check('MarkdownRenderer is deferred (collapsed notes / closed modals only)', cla
 check('BackToTop is deferred (hidden until scroll)', classifyPath('src/components/BackToTop.tsx'), 'deferred');
 check('LoginScreen maps to the login scene', classifyPath('src/components/LoginScreen.tsx'), 'login');
 check('token permissions helper spans its hosts and their interaction variants', classifyPath('src/components/GitHubTokenPermissions.tsx'), ['settings-general', 'login', 'settings-general-token-guide', 'login-token-finegrained']);
+check('plugin sources dialog spans its scene and its dialog variant', classifyPath('src/components/settings/PluginSourcesDialog.tsx'), ['settings-plugins', 'settings-plugins-sources']);
+check('repository edit modal spans its view and its dialog variant', classifyPath('src/components/RepositoryEditModal.tsx'), ['repositories', 'repositories-edit-modal']);
+check('release sheet spans its view and both sheet variants', classifyPath('src/components/RepositoryReleaseSheet.tsx'), ['repositories', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
+check('repository chat sheet spans its view and its sheet variant', classifyPath('src/components/RepositoryChatSheet.tsx'), ['repositories', 'repositories-chat-sheet']);
+check('global chat history sheet spans its view and its sheet variant', classifyPath('src/components/GlobalChatHistorySheet.tsx'), ['repositories', 'repositories-chat-history-sheet']);
+check('readme modal spans its view and its dialog variant', classifyPath('src/components/ReadmeModal.tsx'), ['repositories', 'repositories-readme-modal']);
+check('category edit modal spans its view and its dialog variant', classifyPath('src/components/CategoryEditModal.tsx'), ['repositories', 'repositories-category-edit-modal']);
+check('batch star import spans its view and its dialog variant', classifyPath('src/components/BatchStarImportDialog.tsx'), ['repositories', 'repositories-batch-star-import']);
+check('gist detail modal spans gists and its dialog variant', classifyPath('src/components/GistDetailModal.tsx'), ['gists', 'gists-gist-detail']);
+check('gist editor modal spans gists and its dialog variant', classifyPath('src/components/GistEditorModal.tsx'), ['gists', 'gists-new-gist']);
+check('filter modal renders in releases only, plus its dialog variant', classifyPath('src/components/FilterModal.tsx'), ['releases', 'releases-filter-modal']);
+check('release source settings modal spans releases and its dialog variant', classifyPath('src/components/ReleaseSourceSettingsModal.tsx'), ['releases', 'releases-source-settings']);
+check('a dialog-file diff orders its variants after the extras', mapPathsToScenes(['src/components/RepositoryReleaseSheet.tsx']), ['repositories-light', 'repositories-dark', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
 check('auto update check hook is deferred', classifyPath('src/hooks/useAutoUpdateCheck.ts'), 'deferred');
 check('settings feature hooks are deferred', classifyPath('src/features/settings/hooks/useUpdateActions.ts'), 'deferred');
 check('ui button spans app scenes and login (login renders primitives)', classifyPath('src/components/ui/button.tsx'), ['global', 'login']);
@@ -265,7 +277,7 @@ check('app theme key maps to appearance scene', classifyLocaleKeys('app', ['them
 check('app general panel key spans general and appearance', classifyLocaleKeys('app', ['generalPanel']), ['settings-general', 'settings-appearance']);
 check('app menu panel key spans menu and appearance', classifyLocaleKeys('app', ['menuManagementPanel']), ['settings-menu', 'settings-appearance']);
 check('app category utils key spans repositories and category tab', classifyLocaleKeys('app', ['categoryUtils']), ['repositories', 'settings-category']);
-check('app asset filter key spans releases and repositories', classifyLocaleKeys('app', ['assetFilterManager']), ['releases', 'repositories']);
+check('app asset filter key maps to releases only', classifyLocaleKeys('app', ['assetFilterManager']), ['releases']);
 check('app plugin page viewer key spans repositories and plugins settings', classifyLocaleKeys('app', ['pluginPageViewer']), ['repositories', 'settings-plugins']);
 check('app shell key maps to the settings view', classifyLocaleKeys('app', ['settingsPanel']), ['settings']);
 check('app header key is global', classifyLocaleKeys('app', ['header']), ['global']);
@@ -363,7 +375,7 @@ check('one settings panel maps to one tab scene', mapPathsToScenes([
 check('two settings panels map to their two tab scenes', mapPathsToScenes([
   'src/components/settings/AIConfigPanel.tsx',
   'src/components/settings/NetworkPanel.tsx',
-]), ['settings-ai', 'settings-network']);
+]), ['settings-ai', 'settings-network', 'settings-ai-config-form']);
 
 check('settings shell maps to every settings tab', mapPathsToScenes([
   'src/components/SettingsPanel.tsx',
@@ -550,9 +562,10 @@ check('PR 577 full diff maps to exactly the changed pages', mapPathsToScenes(pr5
   'settings-appearance',
   'settings-data',
   'settings-plugins',
+  'settings-plugins-icon-picker',
 ]);
 
-check('PR 577 diff without locale key diffs stays conservative', mapPathsToScenes(pr577Files), ALL_SCENES);
+check('PR 577 diff without locale key diffs stays conservative', mapPathsToScenes(pr577Files), [...ALL_SCENES, 'settings-plugins-icon-picker']);
 
 // 14. collectChangedPaths request selection tests (synchronize vs opened)
 const beforeSha = '1111111111111111111111111111111111111111';

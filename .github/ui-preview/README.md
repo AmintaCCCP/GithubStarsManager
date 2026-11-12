@@ -93,19 +93,53 @@ const VIEW_SCENES = [
 
 ### Interaction variants
 
-Some changed UI is invisible in a default render: dialogs are closed, tabs sit
-on their default selection. `SCENE_VARIANTS` in detect.mjs (behavior in
-`VARIANT_ACTIONS` in shoot.mjs) names such states as extra scene specs
-(`<baseScene>-<name>`); detect emits them only for files whose visible change
-lives inside that state (e.g. `GitHubTokenPermissions.tsx`, which renders
-inside the General settings' token-guide dialog and owns the
-classic/fine-grained tab switch on the login page). After the base scene's
-screenshot, shoot.mjs applies the variant's single click in the same browser
-context — the click target is resolved from the built bundle's zh locale where
-possible, so renamed strings keep working — waits for the state, and takes one
-more shot (`settings-general-token-guide.png`, `login-token-finegrained.png`).
-A variant that cannot reach its state is skipped with a warning; the base
-screenshot still publishes. Variants never trigger through `global` expansion.
+Some changed UI is invisible in a default render: dialogs and sheets are
+closed, tabs sit on their default selection. `SCENE_VARIANTS` in detect.mjs
+names such states as extra scene specs (`<scene>-<name>`); `COMPONENT_VARIANTS`
+maps the components that render only inside those states to their specs, and
+`VARIANT_ACTIONS` in shoot.mjs holds the open recipe (one or more clicks, a
+readiness wait). After the base scene's screenshot, shoot.mjs applies the
+recipe in the same browser context and takes one more shot. Variants never
+trigger through `global` expansion, and a variant that cannot reach its state
+is skipped with a warning while the base screenshot still publishes.
+
+Covered states (the click target is resolved from the built bundle's zh locale
+where possible, so renamed strings keep working):
+
+| Variant spec | State |
+|---|---|
+| `settings-general-token-guide` | Token-guide dialog (General tab) |
+| `login-token-finegrained` | Token permissions' fine-grained tab (login) |
+| `settings-plugins-marketplace` | Plugin marketplace dialog |
+| `settings-plugins-sources` | Plugin sources dialog (chained on the open marketplace) |
+| `settings-plugins-icon-picker` | Plugin icon picker (first installed plugin) |
+| `settings-star-sync-push-modal` | Push-categories modal |
+| `settings-ai-config-form` | AI provider add/edit form |
+| `settings-webdav-config-form` | WebDAV add/edit form |
+| `settings-vector-search-deploy-guide` | Deploy guide expanded + manual tab |
+| `repositories-edit-modal` | Edit-repository modal (first card) |
+| `repositories-release-sheet` | Release sheet (first card) |
+| `repositories-release-sheet-notes` | Release sheet's notes tab |
+| `repositories-chat-sheet` | Repository chat sheet (first card) |
+| `repositories-chat-history-sheet` | Global chat history sheet |
+| `repositories-readme-modal` | Readme modal (first card body click) |
+| `repositories-category-edit-modal` | Add-category modal (sidebar) |
+| `repositories-batch-star-import` | Batch star import dialog |
+| `gists-gist-detail` | Gist detail modal (first gist card) |
+| `gists-new-gist` | New-gist editor |
+| `releases-filter-modal` | Asset filter modal (new filter) |
+| `releases-source-settings` | Release source settings modal |
+
+Deliberately NOT covered, and why: destructive confirmations (plugin
+uninstall, data deletion, WebDAV/category deletes, unstar, plugin enable —
+generic shells with interpolated or gated triggers; their confirm buttons are
+never auto-clicked); state-gated overlays (update dialog, sync-mode choice,
+login conflict, import preview — they open only on runtime state the demo
+never provides, consistent with the deferred policy); selection-gated bulk
+modals (need multi-select plus a double-click-to-confirm toolbar);
+discovery channel-gated settings and feed-item modals (triggers render only
+on non-default channels); the diagnostic-log detail modal (the fixture has no
+log entries); `SearchShortcutsHelp` (dead code, no instantiation).
 
 To change what the previews show, edit `fixtures/demo-state.json` — a plain
 snapshot of the app's persisted state shape (repositories, gists, releases,
