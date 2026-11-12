@@ -110,7 +110,7 @@
     "github-markdown-css": "^5.9.0",
     "globals": "^17.14.0",
     "highlight.js": "^11.11.1",
-    "i18next": "^26.7.1",
+    "i18next": "^27.0.1",
     "jsdom": "^31.0.0",
     "katex": "^0.19.1",
     "lucide-react": "^1.70.0",
