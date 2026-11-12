@@ -103,7 +103,7 @@ check('repositories category helper', classifyPath('src/utils/categoryUtils.ts')
 
 // 3. classifyPath — Settings tabs map panel-by-panel
 check('settings shell maps to whole settings view', classifyPath('src/components/SettingsPanel.tsx'), 'settings');
-check('settings feature hook maps to whole settings view', classifyPath('src/features/settings/hooks/useSettings.ts'), 'settings');
+check('settings feature hook is deferred (follows the panels)', classifyPath('src/features/settings/hooks/useSettings.ts'), 'deferred');
 check('configuration slice maps to settings', classifyPath('src/store/slices/configurationSlice.ts'), 'settings');
 check('general panel maps to general scene', classifyPath('src/components/settings/GeneralPanel.tsx'), ['settings-general']);
 check('appearance panel maps to appearance scene', classifyPath('src/components/settings/AppearancePanel.tsx'), ['settings-appearance']);
@@ -165,7 +165,7 @@ check('search locale', classifyPath('src/locales/zh/search.json'), ['repositorie
 check('plugins locale mixes repositories and plugins settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings-plugins', 'discovery']);
 check('app locale is conservative global', classifyPath('src/locales/zh/app.json'), ['global']);
 check('common locale is global', classifyPath('src/locales/zh/common.json'), ['global']);
-check('login locale is global', classifyPath('src/locales/zh/login.json'), ['global']);
+check('login locale maps to the login scene', classifyPath('src/locales/zh/login.json'), ['login']);
 
 // 6. classifyPath — state containers are deferred, global chrome is global
 check('preference slice is deferred', classifyPath('src/store/slices/preferenceSlice.ts'), 'deferred');
@@ -177,26 +177,36 @@ check('timeline slice touches releases and forks', classifyPath('src/store/slice
 
 check('App.tsx is global', classifyPath('src/App.tsx'), 'global');
 check('main.tsx is global', classifyPath('src/main.tsx'), 'global');
-check('index.css is global', classifyPath('src/index.css'), 'global');
+check('index.css spans app scenes and login', classifyPath('src/index.css'), ['global', 'login']);
 check('Header.tsx is global', classifyPath('src/components/Header.tsx'), 'global');
-check('Modal.tsx is global', classifyPath('src/components/Modal.tsx'), 'global');
-check('ui button is global', classifyPath('src/components/ui/button.tsx'), 'global');
-check('tailwind.config.js is global', classifyPath('tailwind.config.js'), 'global');
+check('Modal.tsx is deferred (dialog shell, closed in demo)', classifyPath('src/components/Modal.tsx'), 'deferred');
+check('UpdateChecker.tsx is deferred (update dialog, never open in demo)', classifyPath('src/components/UpdateChecker.tsx'), 'deferred');
+check('UpdateNotificationBanner is deferred', classifyPath('src/components/UpdateNotificationBanner.tsx'), 'deferred');
+check('DebugModeIndicator is deferred', classifyPath('src/components/DebugModeIndicator.tsx'), 'deferred');
+check('MarkdownRenderer is deferred (collapsed notes / closed modals only)', classifyPath('src/components/MarkdownRenderer.tsx'), 'deferred');
+check('BackToTop is deferred (hidden until scroll)', classifyPath('src/components/BackToTop.tsx'), 'deferred');
+check('LoginScreen maps to the login scene', classifyPath('src/components/LoginScreen.tsx'), 'login');
+check('login locale maps to the login scene', classifyPath('src/locales/zh/login.json'), ['login']);
+check('token permissions helper spans settings-general and login', classifyPath('src/components/GitHubTokenPermissions.tsx'), ['settings-general', 'login']);
+check('auto update check hook is deferred', classifyPath('src/hooks/useAutoUpdateCheck.ts'), 'deferred');
+check('settings feature hooks are deferred', classifyPath('src/features/settings/hooks/useUpdateActions.ts'), 'deferred');
+check('ui button spans app scenes and login (login renders primitives)', classifyPath('src/components/ui/button.tsx'), ['global', 'login']);
+check('tailwind.config.js spans app scenes and login', classifyPath('tailwind.config.js'), ['global', 'login']);
 check('vite.config.ts is global', classifyPath('vite.config.ts'), 'global');
-check('themeTokens.ts is global', classifyPath('src/types/themeTokens.ts'), 'global');
-check('markdownUtils.ts is global', classifyPath('src/utils/markdownUtils.ts'), 'global');
+check('themeTokens.ts spans app scenes and login', classifyPath('src/types/themeTokens.ts'), ['global', 'login']);
+check('markdownUtils.ts is deferred (conditional markdown surfaces)', classifyPath('src/utils/markdownUtils.ts'), 'deferred');
 check('WorkspacePageHeader is global', classifyPath('src/components/WorkspacePageHeader.tsx'), 'global');
 check('src/lib/utils.ts is global', classifyPath('src/lib/utils.ts'), 'global');
-check('public asset is global', classifyPath('public/icon.svg'), 'global');
+check('public asset spans app scenes and login (login shows the logo)', classifyPath('public/icon.svg'), ['global', 'login']);
 check('unclassified component falls back to global', classifyPath('src/components/FutureWidget.tsx'), 'global');
 check('unclassified feature falls back to global', classifyPath('src/features/future/Foo.tsx'), 'global');
-check('i18n infra is global (every page renders translations)', classifyPath('src/i18n/useT.ts'), 'global');
+check('i18n infra spans app scenes and login', classifyPath('src/i18n/useT.ts'), ['global', 'login']);
 check('unmapped hook is deferred', classifyPath('src/hooks/useDialog.tsx'), 'deferred');
 check('unmapped util is deferred', classifyPath('src/utils/repoUtils.ts'), 'deferred');
 check('store wiring is deferred', classifyPath('src/store/useAppStore.ts'), 'deferred');
 check('mapped release hook keeps its precise scene', classifyPath('src/hooks/useReleaseArtifactActions.ts'), 'releases');
-check('i18n diff maps to all scenes', mapPathsToScenes(['src/i18n/useT.ts']), ALL_SCENES);
-check('i18n diff beside panels stays global', mapPathsToScenes(['src/i18n/useT.ts', 'src/components/GistView.tsx']), ALL_SCENES);
+check('i18n diff maps to all scenes plus login', mapPathsToScenes(['src/i18n/useT.ts']), [...ALL_SCENES, 'login']);
+check('i18n diff beside panels maps to all scenes plus login', mapPathsToScenes(['src/i18n/useT.ts', 'src/components/GistView.tsx']), [...ALL_SCENES, 'login']);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app key maps to its panel scene', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins']);
@@ -216,7 +226,9 @@ check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginS
 check('settings hook key maps to its tab', classifyLocaleKeys('settings', ['useMcpActions']), ['settings-mcp']);
 check('star sync hook key spans its tab and repositories', classifyLocaleKeys('settings', ['useStarSyncActions']), ['settings-star-sync', 'repositories']);
 check('unknown settings key escalates to the settings view', classifyLocaleKeys('settings', ['futureHook']), ['repositories', 'settings']);
-check('unknown releases key covers every consumer view', classifyLocaleKeys('releases', ['releaseCard']), ['releases', 'repositories', 'forks', 'discovery']);
+check('unknown releases key covers every consumer view', classifyLocaleKeys('releases', ['brandNewKey']), ['releases', 'repositories', 'forks', 'discovery']);
+check('releaseCard key maps to releases', classifyLocaleKeys('releases', ['releaseCard']), ['releases']);
+check('releaseTimeline key maps to releases', classifyLocaleKeys('releases', ['releaseTimeline']), ['releases']);
 check('unknown repositories key covers appearance consumers', classifyLocaleKeys('repositories', ['futureKey']), ['repositories', 'settings-appearance']);
 check('unknown plugins key covers discovery consumers', classifyLocaleKeys('plugins', ['futureKey']), ['repositories', 'settings-plugins', 'discovery']);
 check('plugins telegram key maps to discovery', classifyLocaleKeys('plugins', ['telegramMessageModal']), ['discovery']);
@@ -227,9 +239,9 @@ check('common namespace falls back to global', classifyLocaleKeys('common', ['an
 check('releases fork keys map to forks', classifyLocaleKeys('releases', ['forkCard', 'forkTimeline']), ['forks']);
 check('releases subscription key maps to discovery', classifyLocaleKeys('releases', ['subscriptionRepoCard']), ['discovery']);
 check('releases sheet key spans releases and repositories', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories']);
-check('releases keys outside the table use the namespace fallback', classifyLocaleKeys('releases', ['useReleaseTimelineActions']), ['releases', 'repositories', 'forks', 'discovery']);
+check('repositories card-action hook key maps to repositories', classifyLocaleKeys('repositories', ['useRepositoryCardActions']), ['repositories']);
 check('repositories card key spans repositories and appearance', classifyLocaleKeys('repositories', ['repositoryCard']), ['repositories', 'settings-appearance']);
-check('repositories keys outside the table use the namespace fallback', classifyLocaleKeys('repositories', ['batchStar']), ['repositories', 'settings-appearance']);
+check('repositories keys outside the table use the namespace fallback', classifyLocaleKeys('repositories', ['brandNewKey']), ['repositories', 'settings-appearance']);
 check('common fork timeline key maps to forks', classifyLocaleKeys('common', ['useForkTimelineActions']), ['forks']);
 
 // 8. classifyLocaleFile — key diff available, empty, or unavailable
@@ -339,17 +351,17 @@ check('global UI change maps to ALL_SCENES', mapPathsToScenes([
   'src/components/Header.tsx',
 ]), ALL_SCENES);
 
-check('view change combined with global UI maps to ALL_SCENES', mapPathsToScenes([
+check('view change combined with global UI maps to ALL_SCENES plus login', mapPathsToScenes([
   'src/components/GistView.tsx',
   'src/index.css',
-]), ALL_SCENES);
+]), [...ALL_SCENES, 'login']);
 
 check('global change still includes plugin specs from the same diff', mapPathsToScenes([
   'src/components/Header.tsx',
   'examples/plugins/repo-insights/ui/index.html',
 ]), [...ALL_SCENES, 'plugin:repo-insights']);
 
-check('PR 575 commit 8f2fbc18 (with Modal.tsx) maps to ALL_SCENES plus the plugin', mapPathsToScenes([
+check('PR 575 commit 8f2fbc18 (with Modal.tsx) follows the concrete components', mapPathsToScenes([
   'examples/plugins/repo-custom-fields/README.md',
   'examples/plugins/repo-custom-fields/manifest.json',
   'examples/plugins/repo-custom-fields/ui/index.js',
@@ -357,7 +369,7 @@ check('PR 575 commit 8f2fbc18 (with Modal.tsx) maps to ALL_SCENES plus the plugi
   'src/components/Modal.tsx',
   'src/components/PluginPageModal.test.tsx',
   'src/components/PluginPageModal.tsx',
-]), [...ALL_SCENES, 'plugin:repo-custom-fields']);
+]), ['repositories-light', 'repositories-dark', 'settings-plugins', 'plugin:repo-custom-fields']);
 
 check('PR 575 commit cfd97a2d (docs only) maps to empty scenes', mapPathsToScenes([
   'docs/plugins/v1-development.md',
@@ -387,12 +399,12 @@ check('deferred plus plugin spec escalates to global so no page is missed', mapP
 check('global i18n diff keeps plugin specs from the same diff', mapPathsToScenes([
   'src/i18n/useT.ts',
   'examples/plugins/repo-insights/ui/index.html',
-]), [...ALL_SCENES, 'plugin:repo-insights']);
+]), [...ALL_SCENES, 'login', 'plugin:repo-insights']);
 
 check('global i18n diff keeps plugin manifest specs', mapPathsToScenes([
   'src/i18n/useT.ts',
   'examples/plugins/repo-info-card/manifest.json',
-]), [...ALL_SCENES, 'plugin:repo-info-card']);
+]), [...ALL_SCENES, 'login', 'plugin:repo-info-card']);
 
 // 12. mapPathsToScenes — locale key-level diffing
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
@@ -726,3 +738,34 @@ check('omitted locale files fall back conservatively in scene mapping', mapPaths
 
 console.log(`\nTest result: ${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures ? 1 : 0);
+
+// 16. PR 579 simulation: auto-update settings only
+check('PR 579 app.json updateChecker key maps to settings-general', classifyLocaleKeys('app', ['updateChecker']), ['settings-general']);
+check('PR 579 app.json updateNotificationBanner key is deferred', classifyLocaleKeys('app', ['updateNotificationBanner']), ['deferred']);
+check('PR 579 full diff maps to exactly the visible pages', mapPathsToScenes(
+  [
+    'src/components/UpdateChecker.test.tsx',
+    'src/components/UpdateChecker.tsx',
+    'src/components/settings/AppearancePanel.test.tsx',
+    'src/components/settings/GeneralPanel.tsx',
+    'src/hooks/useAutoUpdateCheck.test.ts',
+    'src/hooks/useAutoUpdateCheck.ts',
+    'src/locales/de/app.json',
+    'src/locales/en/app.json',
+    'src/locales/zh/app.json',
+    'src/store/initialState.ts',
+    'src/store/schema.ts',
+    'src/store/slices/preferenceSlice.ts',
+    'src/store/types.ts',
+    'src/types/index.ts',
+  ],
+  {
+    'src/locales/de/app.json': ['updateChecker', 'generalPanel'],
+    'src/locales/en/app.json': ['updateChecker', 'generalPanel'],
+    'src/locales/zh/app.json': ['updateChecker', 'generalPanel'],
+  },
+), ['settings-general', 'settings-appearance']);
+
+check('PR 579 update-dialog-only change stays conservative', mapPathsToScenes(
+  ['src/components/UpdateChecker.tsx'],
+), ALL_SCENES);

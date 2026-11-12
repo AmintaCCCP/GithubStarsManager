@@ -85,6 +85,11 @@ export const ALL_SCENES = [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)]
 
 const SETTINGS_SCENE_NAMES = new Set(SETTINGS_TABS.map((t) => t.scene));
 
+/** Standalone scene names outside ALL_SCENES: the login page renders instead
+ *  of the app shell, so global chrome never reaches it and it is only shot
+ *  when login-specific files change. */
+const EXTRA_SCENE_NAMES = new Set(['login']);
+
 /**
  * Mapping from high-level view identifier to the preview scene names it renders.
  * @type {Record<string, string[]>}
@@ -227,6 +232,14 @@ const LOCALE_KEY_SCENES = {
     pluginSettingsPanel: 'settings-plugins',
     // Viewer/modal strings surface over the repositories view too (repo-card plugin actions).
     pluginPageViewer: 'repositories settings-plugins',
+    // Update dialog strings: the check button and dialog live in 通用, the
+    // per-version banner strings only render when an update is available.
+    updateChecker: 'settings-general',
+    updateNotificationBanner: 'deferred',
+    // Toast/confirm strings surface wherever the next action fails — not
+    // tied to any default page.
+    useDialog: 'deferred',
+    clipboardUtils: 'deferred',
     repositorySlice: 'repositories',
     // CategoryPanel reuses the empty-name validation string in 分类管理.
     categoryUtils: 'repositories settings-category',
@@ -302,10 +315,25 @@ const LOCALE_KEY_SCENES = {
     forkTimeline: 'forks',
     subscriptionRepoCard: 'discovery',
     repositoryReleaseSheet: 'releases repositories',
+    releaseCard: 'releases',
+    releasePluginRecommendations: 'releases',
+    releaseSourceSettingsModal: 'releases',
+    releaseTimeline: 'releases',
+    useReleaseTimelineActions: 'releases',
+    useWatchedSourcesSync: 'releases',
   },
   // repository card strings also feed the card-action settings in 外观.
   repositories: {
     repositoryCard: 'repositories settings-appearance',
+    batchStar: 'repositories',
+    repositoryEditModal: 'repositories',
+    repositoryList: 'repositories',
+    repositoryHealthPanel: 'repositories',
+    useBulkRepositoryActions: 'repositories',
+    useRepositoryAnalysisJob: 'repositories',
+    useRepositoryCardActions: 'repositories',
+    useRepositoryReleaseSheet: 'repositories',
+    useSearchActions: 'repositories',
   },
   common: {
     useForkTimelineActions: 'forks',
@@ -338,7 +366,7 @@ const LOCALE_NS_FALLBACK = {
   // shared namespaces can render on any page
   common: 'global',
   errors: 'global',
-  login: 'global',
+  login: 'login',
   ai: 'global',
   services: 'global',
   search: 'repositories',
@@ -507,7 +535,7 @@ export function classifyPath(filePath) {
   }
   if (
     path === 'src/components/SettingsPanel.tsx' ||
-    path.startsWith('src/features/settings/') ||
+    (path.startsWith('src/features/settings/') && !path.startsWith('src/features/settings/hooks/')) ||
     /^src\/components\/settings\//.test(path)
   ) {
     return 'settings';
@@ -554,41 +582,61 @@ export function classifyPath(filePath) {
     return 'deferred';
   }
 
-  // 11. Global UI elements (affect all static scenes)
+  // 11. Conditional overlays: they render only on runtime state the demo
+  // preview never provides (update dialogs/banners, open dialogs, error
+  // states, hover tooltips, scroll affordances, collapsed release notes), so
+  // a screenshot of any default page would show no difference. They follow
+  // the components changed in the same PR; a diff touching only these falls
+  // back to global.
   if (
-    path === 'src/App.tsx' ||
-    path === 'src/main.tsx' ||
+    /^src\/components\/(Update|Modal\.|ErrorBoundary\.|DebugModeIndicator\.|ListsPushIndicator\.|BackToTop\.|ScrollToBottom\.|FloatingTooltip\.|SortAlgorithmTooltip\.|MarkdownRenderer\.|BilingualMarkdownRenderer\.|MermaidBlock\.|PluginPageHost\.|lazyKatexCss|modalDismiss\.|platformMeta\.)/.test(path) ||
+    /^src\/utils\/(markdownUtils|markdownSplitter|citationPostprocess)\.[jt]s$/.test(path) ||
+    path.startsWith('src/features/settings/hooks/') ||
+    path.startsWith('src/features/lifecycle/')
+  ) {
+    return 'deferred';
+  }
+
+  // 12. Login page: rendered instead of the app shell when logged out, so
+  // global chrome changes do not reach it.
+  if (/^src\/components\/LoginScreen\./.test(path) || /^src\/locales\/[^/]+\/login\.json$/.test(path)) {
+    return 'login';
+  }
+
+  // 13. Token permission helper renders inside the General settings tab and
+  // on the login page.
+  if (/^src\/components\/GitHubTokenPermissions\./.test(path)) {
+    return ['settings-general', 'login'];
+  }
+
+  // 14. Global style/theme/primitive layers render on every app page AND on
+  // the login page (which uses ui primitives, translations, theme presets and
+  // the public logo), so they trigger the login scene as well.
+  if (
     path === 'src/index.css' ||
     path.startsWith('src/styles/') ||
     path.startsWith('src/i18n/') ||
-    /^src\/components\/Header\./.test(path) ||
-    /^src\/components\/WorkspacePageHeader\./.test(path) ||
     path.startsWith('src/components/ui/') ||
-    path.startsWith('src/lib/') ||
-    /^src\/components\/Modal\./.test(path) ||
-    /^src\/components\/ErrorBoundary\./.test(path) ||
-    /^src\/components\/LoginScreen\./.test(path) ||
-    /^src\/components\/Update/i.test(path) ||
-    /^src\/components\/ListsPushIndicator\./.test(path) ||
-    /^src\/components\/BackToTop\./.test(path) ||
-    /^src\/components\/ScrollToBottom\./.test(path) ||
-    /^src\/components\/MarkdownRenderer\./.test(path) ||
-    /^src\/components\/BilingualMarkdownRenderer\./.test(path) ||
-    /^src\/components\/MermaidBlock\./.test(path) ||
-    /^src\/components\/FloatingTooltip\./.test(path) ||
-    /^src\/components\/DebugModeIndicator\./.test(path) ||
-    /^src\/components\/GitHubTokenPermissions\./.test(path) ||
-    /^src\/components\/SortAlgorithmTooltip\./.test(path) ||
-    /^src\/constants\/themePresets\./.test(path) ||
-    /^src\/(types|utils)\/themeTokens\./.test(path) ||
-    /^src\/utils\/(markdownUtils|markdownSplitter|citationPostprocess)\.[jt]s$/.test(path) ||
-    /^src\/lib\/themePresets\./.test(path) ||
-    /^src\/locales\/[^/]+\/(common|login)\.json$/.test(path) ||
-    path === 'index.html' ||
     path === 'tailwind.config.js' ||
     path === 'postcss.config.js' ||
-    path === 'vite.config.ts' ||
-    path.startsWith('public/')
+    path.startsWith('public/') ||
+    path === 'index.html' ||
+    /^src\/(types|utils)\/themeTokens\./.test(path) ||
+    /^src\/constants\/themePresets\./.test(path) ||
+    /^src\/lib\/themePresets\./.test(path)
+  ) {
+    return ['global', 'login'];
+  }
+
+  // 15. App shell chrome: every app scene, but not the standalone login page.
+  if (
+    path === 'src/App.tsx' ||
+    path === 'src/main.tsx' ||
+    /^src\/components\/Header\./.test(path) ||
+    /^src\/components\/WorkspacePageHeader\./.test(path) ||
+    path.startsWith('src/lib/') ||
+    /^src\/locales\/[^/]+\/common\.json$/.test(path) ||
+    path === 'vite.config.ts'
   ) {
     return 'global';
   }
@@ -726,7 +774,7 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
       pluginSpecs.add(token);
       return;
     }
-    if (SETTINGS_SCENE_NAMES.has(token) || VIEW_SCENES.includes(token)) {
+    if (EXTRA_SCENE_NAMES.has(token) || SETTINGS_SCENE_NAMES.has(token) || VIEW_SCENES.includes(token)) {
       selectedScenes.add(token);
       return;
     }
@@ -754,7 +802,8 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   }
 
   const ordered = ALL_SCENES.filter((scene) => selectedScenes.has(scene));
-  return [...ordered, ...[...pluginSpecs].sort()];
+  const extras = [...EXTRA_SCENE_NAMES].filter((scene) => selectedScenes.has(scene)).sort();
+  return [...ordered, ...extras, ...[...pluginSpecs].sort()];
 }
 
 const FILES_PER_PAGE = 100;
