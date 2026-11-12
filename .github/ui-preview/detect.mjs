@@ -837,9 +837,13 @@ const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\
  * @param {number} index - Exclusive start index for the backward scan.
  * @returns {{ char: string, index: number, resolved: boolean }}
  */
-const tokenBefore = (mask, index) => {
+const tokenBefore = (raw, mask, index) => {
   let k = index;
-  while (k >= 0 && mask[k] === 0) k -= 1;
+  // Skip non-code characters (comments, strings, template contents) AND code
+  // whitespace: the previous SIGNIFICANT token decides regex-vs-division,
+  // and `state. // note\n return` must resolve to the property dot across
+  // both kinds of filler.
+  while (k >= 0 && (mask[k] === 0 || /[\s]/.test(raw[k]))) k -= 1;
   return k;
 };
 
@@ -908,7 +912,7 @@ function analyzeCode(raw) {
         continue;
       }
       if (ch === '/') {
-        const wordStart = tokenBefore(mask, i - 1);
+        const wordStart = tokenBefore(raw, mask, i - 1);
         let word = '';
         let beforeWord = '';
         if (wordStart >= 0 && /[A-Za-z_$0-9]/.test(raw[wordStart])) {
@@ -917,7 +921,7 @@ function analyzeCode(raw) {
             word = raw[w] + word;
             w -= 1;
           }
-          const before = tokenBefore(mask, w);
+          const before = tokenBefore(raw, mask, w);
           beforeWord = before >= 0 ? raw[before] : '';
         } else {
           beforeWord = wordStart >= 0 ? raw[wordStart] : '';

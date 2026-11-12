@@ -522,6 +522,28 @@ const WIRING_PROPSPACE_ABSORB = [
 ].join('\n');
 check('whitespace between the dot and a keyword keeps the slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_PROPSPACE_BASE, WIRING_PROPSPACE_ABSORB), false);
 check('the dot-whitespace absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PROPSPACE_ABSORB, WIRING_PROPSPACE_BASE), false);
+const WIRING_COMMENTDOT_BASE = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    state. // note',
+  '      return/ 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other.return/ 2;',
+  '}',
+].join('\n');
+const WIRING_COMMENTDOT_ABSORB = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    state. // note',
+  '      return/ 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other.return/ 2;',
+  '}',
+].join('\n');
+check('a line comment before the keyword keeps the property slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_COMMENTDOT_BASE, WIRING_COMMENTDOT_ABSORB), false);
+check('the comment-property absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_COMMENTDOT_ABSORB, WIRING_COMMENTDOT_BASE), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
