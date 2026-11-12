@@ -11,7 +11,10 @@
  *
  * Specs are the scene names listed in SCENES below, plus dynamic plugin specs
  * `plugin:<slug>` (every page contributed by examples/plugins/<slug>, resolved
- * from the built bundle at run time) and `all` for every static scene.
+ * from the built bundle at run time), interaction variant specs from detect's
+ * SCENE_VARIANTS (e.g. `settings-general-token-guide`: the base scene's page
+ * driven into an open-dialog / switched-tab state before the shot), and `all`
+ * for every static scene.
  *
  * Settings scenes navigate to one specific Settings tab through
  * `gsm:pending-settings-tab` (sessionStorage), so a change to a single panel
@@ -24,7 +27,7 @@ import { readFile, mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { seedPersistedState, PERSIST_VERSION } from './seed.mjs';
-import { SETTINGS_TABS } from './detect.mjs';
+import { SETTINGS_TABS, SCENE_VARIANTS } from './detect.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +59,32 @@ const SETTINGS_SCENES = SETTINGS_TABS.map((tab) => ({
 
 const SCENES = [...VIEW_SCENES, ...SETTINGS_SCENES];
 
+/** Behavior for each interaction variant from detect.mjs's SCENE_VARIANTS,
+ *  applied in the base scene's browser context right after its screenshot:
+ *  one click, a readiness wait, then the shot. `clickLocaleKey` resolves the
+ *  click target's accessible name from the built bundle's zh locale (the
+ *  preview renders zh), so renamed UI strings keep working without tool-side
+ *  changes. A variant that cannot reach its state is skipped with a warning —
+ *  the base screenshot still publishes. */
+const VARIANT_ACTIONS = {
+  // General settings' token-guide dialog: GitHubTokenPermissions renders
+  // inside a Dialog, opened by the card's guide button.
+  'settings-general-token-guide': {
+    clickLocaleKey: 'app:generalPanel.token-permission-guide',
+    readySelector: '[role="dialog"]',
+    fullPage: false,
+  },
+  // Login page token permissions: switch to the fine-grained tab, whose
+  // warning box is invisible in the default (classic-tab) screenshot. The
+  // selectors key on the component's aria ids (`${useId}-panel-fine-grained`),
+  // not on tab order or locale text.
+  'login-token-finegrained': {
+    clickSelector: '[role="tab"][aria-controls$="-panel-fine-grained"]',
+    readySelector: '[role="tabpanel"][id$="-panel-fine-grained"]',
+    fullPage: true,
+  },
+};
+
 /** Scene names from before plugin scenes became dynamic; kept so a stale
  *  workflow output still resolves. */
 const LEGACY_PLUGIN_SCENES = {
@@ -86,6 +115,27 @@ async function fetchJson(url) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Resolve a click target's accessible name from the built bundle's zh locale
+ * (the preview renders zh). Key format: "<ns>:<dotted.key.path>". The build
+ * job copies src/locales next to the bundle (import.meta.glob ships locale
+ * JSONs only as JS chunks), so the raw files are statically served at
+ * /locales/<lang>/<ns>.json; a missing key or file skips the variant.
+ * @param {string} url - Base preview server URL.
+ * @param {string} nsKey - Namespace-qualified locale key.
+ * @returns {Promise<string | null>} The translated text, or null when missing.
+ */
+async function resolveLocaleText(url, nsKey) {
+  const sep = nsKey.indexOf(':');
+  if (sep < 0) return null;
+  const ns = nsKey.slice(0, sep);
+  const keyPath = nsKey.slice(sep + 1).split('.');
+  const data = await fetchJson(new URL(`/locales/zh/${encodeURIComponent(ns)}.json`, url).href);
+  let node = data;
+  for (const key of keyPath) node = node?.[key];
+  return typeof node === 'string' && node.trim() ? node : null;
 }
 
 /**
@@ -267,15 +317,18 @@ function parseArgs(argv) {
 }
 
 /**
- * Split a --only list into static scene names and plugin specs. Legacy plugin
- * scene names are translated to their `plugin:<slug>` spec.
+ * Split a --only list into static scene names, plugin specs and interaction
+ * variant specs. Legacy plugin scene names are translated to their
+ * `plugin:<slug>` spec.
  * @param {string[]} only - Raw spec list.
- * @returns {{ staticNames: string[], pluginSlugs: string[], wantsAll: boolean }}
+ * @returns {{ staticNames: string[], pluginSlugs: string[], variantSpecs: string[], wantsAll: boolean }}
  */
 function splitOnlySpecs(only) {
   const known = new Set(SCENES.map((s) => s.name));
+  const variantSpecs = new Set(SCENE_VARIANTS.map((v) => v.spec));
   const staticNames = [];
   const pluginSlugs = [];
+  const variants = [];
   for (const spec of only) {
     if (spec === 'all') continue;
     if (spec.startsWith('plugin:')) {
@@ -286,14 +339,18 @@ function splitOnlySpecs(only) {
       pluginSlugs.push(LEGACY_PLUGIN_SCENES[spec]);
       continue;
     }
+    if (variantSpecs.has(spec)) {
+      variants.push(spec);
+      continue;
+    }
     if (!known.has(spec)) {
-      console.error(`Unknown scene: ${spec}. Known: ${[...known].join(', ')}; plugin specs: plugin:<slug>; "all" for every static scene`);
+      console.error(`Unknown scene: ${spec}. Known: ${[...known].join(', ')}; plugin specs: plugin:<slug>; variant specs: ${[...variantSpecs].join(', ')}; "all" for every static scene`);
       process.exitCode = 2;
       return null;
     }
     staticNames.push(spec);
   }
-  return { staticNames, pluginSlugs, wantsAll: only.includes('all') };
+  return { staticNames, pluginSlugs, variantSpecs: variants, wantsAll: only.includes('all') };
 }
 
 /**
@@ -525,13 +582,53 @@ function installPluginHostResponder({ repositories, releasesByRepositoryId, stor
 }
 
 /**
+ * Run one interaction variant in the base scene's settled page and take its
+ * screenshot. The click/readiness selectors describe states the default
+ * render never shows (an open dialog, a switched tab); a variant that cannot
+ * reach its state is skipped with a warning instead of failing the run — the
+ * base screenshot already stands.
+ * @param {import('playwright').Page} page - The base scene's settled page.
+ * @param {string} variantSpec - The variant's full scene spec.
+ * @param {string} url - Base preview server URL (for locale text resolution).
+ * @param {string} outDir - Directory where the screenshot PNG will be saved.
+ * @returns {Promise<{ scene: string, path: string } | null>} Shot record, or null when skipped.
+ */
+async function shootVariant(page, variantSpec, url, outDir) {
+  const action = VARIANT_ACTIONS[variantSpec];
+  const shotPath = path.join(outDir, `${variantSpec}.png`);
+  if (!action) {
+    console.warn(`  ⚠ ${variantSpec} skipped: no VARIANT_ACTIONS entry`);
+    return null;
+  }
+  try {
+    if (action.clickLocaleKey) {
+      const text = await resolveLocaleText(url, action.clickLocaleKey);
+      if (!text) throw new Error(`locale text for ${action.clickLocaleKey} not found in the built bundle`);
+      await page.getByRole('button', { name: text }).click({ timeout: 10_000 });
+    } else if (action.clickSelector) {
+      await page.locator(action.clickSelector).first().click({ timeout: 10_000 });
+    }
+    if (action.readySelector) {
+      await page.waitForSelector(action.readySelector, { state: 'visible', timeout: 15_000 });
+    }
+    await page.waitForTimeout(action.settleMs ?? 500);
+    await page.screenshot({ path: shotPath, fullPage: action.fullPage ?? true });
+    console.log(`  ✓ ${variantSpec} -> ${shotPath}`);
+    return { scene: variantSpec, path: shotPath };
+  } catch (error) {
+    console.warn(`  ⚠ ${variantSpec} skipped: ${error.message.split('\n')[0]}`);
+    return null;
+  }
+}
+
+/**
  * Take a screenshot for a single scene inside a hermetic browser context.
  * @param {import('playwright').Browser} browser - Active Playwright browser instance.
  * @param {object} baseState - Base demo state fixture.
  * @param {object} scene - Scene configuration describing views and store overrides.
  * @param {string} url - Base preview server URL.
  * @param {string} outDir - Directory where the screenshot PNG will be saved.
- * @returns {Promise<{ scene: string, path: string } | null>} Resulting screenshot record, or null when skipped.
+ * @returns {Promise<Array<{ scene: string, path: string }>>} Screenshot records: the base scene, then any interaction variants (skipped ones omitted).
  */
 async function shootScene(browser, baseState, scene, url, outDir) {
   const context = await browser.newContext({
@@ -620,11 +717,13 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       await page.waitForTimeout(scene.settleMs ?? 600);
       await page.screenshot({ path: shotPath, fullPage: true });
       console.log(`  ✓ ${scene.name} -> ${shotPath}`);
-      return {
+      // Plugin pages are standalone documents; no interaction variants exist
+      // for them.
+      return [{
         scene: scene.name,
         path: shotPath,
         ...(scene.pluginSlug ? { pluginSlug: scene.pluginSlug, pageId: scene.pageId } : {}),
-      };
+      }];
     }
 
     if (scene.electronStub) {
@@ -678,7 +777,7 @@ async function shootScene(browser, baseState, scene, url, outDir) {
       await page.waitForTimeout(scene.settleMs ?? 800);
       await page.screenshot({ path: shotPath, fullPage: true });
       console.log(`  ✓ ${scene.name} -> ${shotPath}`);
-      return { scene: scene.name, path: shotPath };
+      return await finishScene(page, scene, [{ scene: scene.name, path: shotPath }], url, outDir);
     }
 
     // The app shell renders only after hydration; wait for it, then for real
@@ -709,10 +808,29 @@ async function shootScene(browser, baseState, scene, url, outDir) {
 
     await page.screenshot({ path: shotPath, fullPage: true });
     console.log(`  ✓ ${scene.name} -> ${shotPath}`);
-    return { scene: scene.name, path: shotPath };
+    return await finishScene(page, scene, [{ scene: scene.name, path: shotPath }], url, outDir);
   } finally {
     await context.close();
   }
+}
+
+/**
+ * Append a scene's interaction variant shots (if any) to its base record.
+ * Runs in the same settled browser context, so the variant captures the page
+ * exactly as the base screenshot left it, with only the click applied.
+ * @param {import('playwright').Page} page - The base scene's settled page.
+ * @param {object} scene - Scene configuration, possibly carrying `variants`.
+ * @param {Array<{ scene: string, path: string }>} results - Base shot records.
+ * @param {string} url - Base preview server URL.
+ * @param {string} outDir - Directory where variant PNGs will be saved.
+ * @returns {Promise<Array<{ scene: string, path: string }>>} All shot records.
+ */
+async function finishScene(page, scene, results, url, outDir) {
+  for (const variant of scene.variants ?? []) {
+    const variantResult = await shootVariant(page, variant.spec, url, outDir);
+    if (variantResult) results.push(variantResult);
+  }
+  return results;
 }
 
 /**
@@ -730,10 +848,25 @@ async function main() {
     pluginSlugs = split.pluginSlugs;
     // With `all` every static scene runs; otherwise only the requested ones —
     // a spec list of just plugin:<slug> specs must not fall back to shooting
-    // everything.
+    // everything. A requested variant implies its base scene (the variant is
+    // shot in the base's browser context after the base screenshot).
     if (!split.wantsAll) {
       const selected = new Set(split.staticNames);
+      for (const spec of split.variantSpecs) {
+        const variant = SCENE_VARIANTS.find((v) => v.spec === spec);
+        if (variant) selected.add(variant.baseScene);
+      }
       staticScenes = SCENES.filter((s) => selected.has(s.name));
+    }
+    // Variants only run when explicitly requested: `all` and global-chrome
+    // expansion shoot the default renders; detect attaches variants per
+    // changed file, not per page.
+    const wantedVariants = split.wantsAll
+      ? []
+      : SCENE_VARIANTS.filter((v) => split.variantSpecs.includes(v.spec));
+    for (const scene of staticScenes) {
+      const sceneVariants = wantedVariants.filter((v) => v.baseScene === scene.name);
+      if (sceneVariants.length > 0) scene.variants = sceneVariants;
     }
   }
 
@@ -776,8 +909,9 @@ async function main() {
   const results = [];
   try {
     for (const scene of [...staticScenes, ...pluginScenes]) {
-      const result = await shootScene(browser, baseState, scene, args.url, args.out);
-      if (result) results.push(result);
+      for (const result of await shootScene(browser, baseState, scene, args.url, args.out)) {
+        if (result) results.push(result);
+      }
     }
   } finally {
     await browser.close();

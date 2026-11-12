@@ -2,6 +2,8 @@
  * Run: node test-detect.mjs */
 import {
   isIgnoredPath,
+  isI18nWiringPath,
+  isDesktopBridgeOnlyDiff,
   classifyPath,
   classifyLocaleKeys,
   classifyLocaleFile,
@@ -13,6 +15,7 @@ import {
   VIEW_SCENES,
   SETTINGS_TABS,
   VIEW_TO_SCENES,
+  SCENE_VARIANTS,
 } from './detect.mjs';
 
 let failures = 0;
@@ -31,6 +34,9 @@ const check = (name, actual, expected) => {
 check('all settings tabs have unique scene names', new Set(SETTINGS_TABS.map((t) => t.scene)).size, SETTINGS_TABS.length);
 check('ALL_SCENES is views plus settings tabs', ALL_SCENES, [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)]);
 check('settings view expands to every settings scene', VIEW_TO_SCENES.settings, SETTINGS_TABS.map((t) => t.scene));
+check('every interaction variant has a unique spec', new Set(SCENE_VARIANTS.map((v) => v.spec)).size, SCENE_VARIANTS.length);
+check('every interaction variant builds on a known base scene', SCENE_VARIANTS.every((v) => ALL_SCENES.includes(v.baseScene) || v.baseScene === 'login'), true);
+check('every variant spec embeds its base scene name', SCENE_VARIANTS.every((v) => v.spec.startsWith(`${v.baseScene}-`)), true);
 
 // 1. isIgnoredPath tests
 check('test file in src is ignored', isIgnoredPath('src/App.contextSidebar.test.tsx'), true);
@@ -165,7 +171,7 @@ check('search locale', classifyPath('src/locales/zh/search.json'), ['repositorie
 check('plugins locale mixes repositories and plugins settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings-plugins', 'discovery']);
 check('app locale is conservative global', classifyPath('src/locales/zh/app.json'), ['global']);
 check('common locale is global', classifyPath('src/locales/zh/common.json'), ['global']);
-check('login locale maps to the login scene', classifyPath('src/locales/zh/login.json'), ['login']);
+check('login locale spans the login scene, the settings dialog and its variants', classifyPath('src/locales/zh/login.json'), ['login', 'settings-general', 'login-token-finegrained', 'settings-general-token-guide']);
 
 // 6. classifyPath — state containers are deferred, global chrome is global
 check('preference slice is deferred', classifyPath('src/store/slices/preferenceSlice.ts'), 'deferred');
@@ -186,8 +192,7 @@ check('DebugModeIndicator is deferred', classifyPath('src/components/DebugModeIn
 check('MarkdownRenderer is deferred (collapsed notes / closed modals only)', classifyPath('src/components/MarkdownRenderer.tsx'), 'deferred');
 check('BackToTop is deferred (hidden until scroll)', classifyPath('src/components/BackToTop.tsx'), 'deferred');
 check('LoginScreen maps to the login scene', classifyPath('src/components/LoginScreen.tsx'), 'login');
-check('login locale maps to the login scene', classifyPath('src/locales/zh/login.json'), ['login']);
-check('token permissions helper spans settings-general and login', classifyPath('src/components/GitHubTokenPermissions.tsx'), ['settings-general', 'login']);
+check('token permissions helper spans its hosts and their interaction variants', classifyPath('src/components/GitHubTokenPermissions.tsx'), ['settings-general', 'login', 'settings-general-token-guide', 'login-token-finegrained']);
 check('auto update check hook is deferred', classifyPath('src/hooks/useAutoUpdateCheck.ts'), 'deferred');
 check('settings feature hooks are deferred', classifyPath('src/features/settings/hooks/useUpdateActions.ts'), 'deferred');
 check('ui button spans app scenes and login (login renders primitives)', classifyPath('src/components/ui/button.tsx'), ['global', 'login']);
@@ -207,6 +212,51 @@ check('store wiring is deferred', classifyPath('src/store/useAppStore.ts'), 'def
 check('mapped release hook keeps its precise scene', classifyPath('src/hooks/useReleaseArtifactActions.ts'), 'releases');
 check('i18n diff maps to all scenes plus login', mapPathsToScenes(['src/i18n/useT.ts']), [...ALL_SCENES, 'login']);
 check('i18n diff beside panels maps to all scenes plus login', mapPathsToScenes(['src/i18n/useT.ts', 'src/components/GistView.tsx']), [...ALL_SCENES, 'login']);
+
+// 6b. Interaction variants: states a default render never shows
+check('token permissions diff orders its variants after the extras', mapPathsToScenes(['src/components/GitHubTokenPermissions.tsx']), ['settings-general', 'login', 'login-token-finegrained', 'settings-general-token-guide']);
+check('global chrome diff does not trigger interaction variants', mapPathsToScenes(['src/App.tsx']), [...ALL_SCENES]);
+check('token helper diff beside global chrome adds variants once', mapPathsToScenes(['src/App.tsx', 'src/components/GitHubTokenPermissions.tsx']), [...ALL_SCENES, 'login', 'login-token-finegrained', 'settings-general-token-guide']);
+check('login.json key diff keeps the variants', mapPathsToScenes(['src/locales/zh/login.json'], { 'src/locales/zh/login.json': ['loginScreen'] }), ['settings-general', 'login', 'login-token-finegrained', 'settings-general-token-guide']);
+
+// 6c. i18n wiring content diff: desktop-bridge-only changes render nothing in web
+check('i18n wiring path matches module files', isI18nWiringPath('src/i18n/index.ts'), true);
+check('i18n wiring path matches language definitions', isI18nWiringPath('src/i18n/languages.ts'), true);
+check('i18n wiring path skips tests', isI18nWiringPath('src/i18n/traySync.test.ts'), false);
+check('i18n wiring path skips locale json', isI18nWiringPath('src/locales/zh/app.json'), false);
+check('i18n wiring path skips nested paths', isI18nWiringPath('src/i18n/sub/dir/index.ts'), false);
+
+const WIRING_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  '  await i18next.changeLanguage(language);',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_DESKTOP = [
+  "import i18next from 'i18next';",
+  "import { desktopBridge } from '../services/electronProxy';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  '  await i18next.changeLanguage(language);',
+  '  document.documentElement.lang = language;',
+  '  if (desktopBridge.isSupported()) {',
+  '    void desktopBridge.setLanguage(language);',
+  '  }',
+  '}',
+].join('\n');
+const WIRING_WEB = WIRING_BASE.replace(
+  '  document.documentElement.lang = language;',
+  "  document.documentElement.lang = language === 'zh' ? 'zh-CN' : language;",
+);
+check('desktop-bridge-only wiring diff is inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_DESKTOP), true);
+check('wiring diff touching web-rendered lines is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_WEB), false);
+check('unrelated wiring diff is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace("import i18next from 'i18next';", "import i18next, { type i18n as I18nInstance } from 'i18next';")), false);
+check('unreadable wiring content is not inert', isDesktopBridgeOnlyDiff(null, WIRING_DESKTOP), false);
+check('identical wiring content is inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE), true);
+check('inert i18n wiring diff maps to no scenes', mapPathsToScenes(['src/i18n/index.ts'], {}, new Set(['src/i18n/index.ts'])), []);
+check('inert i18n wiring diff beside a panel keeps the panel scene', mapPathsToScenes(['src/i18n/index.ts', 'src/components/GistView.tsx'], {}, new Set(['src/i18n/index.ts'])), ['gists']);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app key maps to its panel scene', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins']);

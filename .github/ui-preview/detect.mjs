@@ -24,6 +24,13 @@
  *                                          plugin-<slug>-<pageId> shot per page
  *                                          by reading the plugin manifest from
  *                                          the built bundle.
+ *   <scene>-<variant>                      an interaction variant of one base
+ *                                          scene (SCENE_VARIANTS below): a
+ *                                          state the default render never
+ *                                          shows, e.g. an open dialog or a
+ *                                          switched tab. shoot.mjs applies the
+ *                                          variant's clicks right after the
+ *                                          base scene's screenshot.
  *
  * `global` (shared chrome: App shell, header, ui primitives, theme tokens,
  * styling configs, common locales) expands to ALL view + settings scenes.
@@ -83,12 +90,31 @@ export const VIEW_SCENES = [
  */
 export const ALL_SCENES = [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)];
 
+/**
+ * Interaction variants: extra screenshots of one base scene in a state the
+ * default render never shows — an open dialog or a switched tab. Each spec
+ * (`<baseScene>-<name>`) is a valid shoot.mjs scene; the click/readiness
+ * behavior lives in shoot.mjs's VARIANT_ACTIONS. detect emits a variant only
+ * for diffs whose visible change lives inside that state (the component
+ * rendered there), never through `global` expansion.
+ * @type {Array<{spec: string, baseScene: string}>}
+ */
+export const SCENE_VARIANTS = [
+  // Token permission guide dialog: GitHubTokenPermissions renders inside a
+  // Dialog in the General settings tab, closed in the default screenshot.
+  { spec: 'settings-general-token-guide', baseScene: 'settings-general' },
+  // The same component's fine-grained tab: its warning box only renders after
+  // switching tabs, which no default screenshot does.
+  { spec: 'login-token-finegrained', baseScene: 'login' },
+];
+
 const SETTINGS_SCENE_NAMES = new Set(SETTINGS_TABS.map((t) => t.scene));
 
 /** Standalone scene names outside ALL_SCENES: the login page renders instead
  *  of the app shell, so global chrome never reaches it and it is only shot
- *  when login-specific files change. */
-const EXTRA_SCENE_NAMES = new Set(['login']);
+ *  when login-specific files change. Interaction variant specs join them —
+ *  they are extras shot on top of their base scene. */
+const EXTRA_SCENE_NAMES = new Set(['login', ...SCENE_VARIANTS.map((v) => v.spec)]);
 
 /**
  * Mapping from high-level view identifier to the preview scene names it renders.
@@ -366,7 +392,11 @@ const LOCALE_NS_FALLBACK = {
   // shared namespaces can render on any page
   common: 'global',
   errors: 'global',
-  login: 'login',
+  // login.json strings render on the login page AND inside the settings
+  // token-guide dialog (GitHubTokenPermissions reads the login namespace in
+  // both hosts). The dialog and the component's fine-grained tab only show
+  // through their variant scenes.
+  login: ['login', 'settings-general', 'login-token-finegrained', 'settings-general-token-guide'],
   ai: 'global',
   services: 'global',
   search: 'repositories',
@@ -603,10 +633,12 @@ export function classifyPath(filePath) {
     return 'login';
   }
 
-  // 13. Token permission helper renders inside the General settings tab and
-  // on the login page.
+  // 13. Token permission helper renders inline on the login page and inside
+  // the General settings tab's token-guide dialog. The dialog stays closed
+  // and the component's own fine-grained tab inactive in default renders, so
+  // its variant scenes are required to show this component's changes.
   if (/^src\/components\/GitHubTokenPermissions\./.test(path)) {
-    return ['settings-general', 'login'];
+    return ['settings-general', 'login', 'settings-general-token-guide', 'login-token-finegrained'];
   }
 
   // 14. Global style/theme/primitive layers render on every app page AND on
@@ -682,6 +714,58 @@ export function classifyLocaleFile(filePath, changedKeys = null) {
   return splitSpec(typeof fallback === 'string' ? fallback : fallback.join(' '));
 }
 
+/** Multiset line diff: lines whose occurrence count differs between the two
+ *  versions. Reordering identical lines is not reported — sufficient for the
+ *  wiring-diff question ("WHICH code changed", not where). */
+const diffChangedLines = (baseRaw, headRaw) => {
+  const counts = (raw) => {
+    const map = new Map();
+    for (const line of (raw ?? '').split('\n')) map.set(line, (map.get(line) ?? 0) + 1);
+    return map;
+  };
+  const base = counts(baseRaw);
+  const head = counts(headRaw);
+  const changed = [];
+  for (const [line, n] of head) {
+    for (let i = 0; i < n - (base.get(line) ?? 0); i += 1) changed.push(line);
+  }
+  for (const [line, n] of base) {
+    for (let i = 0; i < n - (head.get(line) ?? 0); i += 1) changed.push(line);
+  }
+  return changed;
+};
+
+const BRACE_ONLY_LINE = /^\s*[{}()]*\s*$/;
+
+/**
+ * Whether a file's diff can only affect the Electron desktop surface: every
+ * changed line references the desktop bridge (or its electronProxy module) or
+ * is bare syntax. The web bundle's desktopBridge no-ops every method outside
+ * Electron (see src/services/electronProxy.ts), so such a diff renders no web
+ * difference and the file is ignored instead of triggering every scene.
+ * @param {string} baseRaw - Base version content (null when unreadable).
+ * @param {string} headRaw - Head version content (null when unreadable).
+ * @returns {boolean} True when every changed line is desktop-bridge-only.
+ */
+export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
+  if (baseRaw === null || headRaw === null) return false;
+  const changed = diffChangedLines(baseRaw, headRaw);
+  if (changed.length === 0) return true;
+  return changed.every((line) => BRACE_ONLY_LINE.test(line) || /desktopBridge|electronProxy/.test(line));
+}
+
+/** i18n module wiring (non-locale, non-test): the i18next runtime and its
+ *  side effects. Such a diff usually renders nothing by itself, but CAN (boot
+ *  language resolution), so it classifies as global — unless the content diff
+ *  proves it desktop-bridge-only (see isDesktopBridgeOnlyDiff).
+ * @param {string} filePath - Path relative to the repository root.
+ * @returns {boolean} True for changed src/i18n module files worth diffing.
+ */
+export function isI18nWiringPath(filePath) {
+  const path = filePath.replace(/\\/g, '/');
+  return /^src\/i18n\/[^/]+\.ts$/.test(path) && !/\.(test|spec)\.[jt]sx?$/.test(path);
+}
+
 /**
  * Parse output from GitHub API files queries (handles raw JSON or newline-separated filenames).
  * If the compare output indicates branch divergence (force push) or truncation (>= 300 files),
@@ -726,9 +810,12 @@ export function parseFileList(raw) {
  *   locale file path to its diffed top-level keys. Entries with an empty key
  *   array mean "diffed, nothing visible changed"; missing entries fall back to
  *   the file-level namespace mapping.
+ * @param {Set<string>} [inertPaths] - Paths whose content diff proves they
+ *   render no web difference (desktop-bridge-only i18n wiring changes); they
+ *   are skipped like ignored paths.
  * @returns {string[]} Selected scene names / specs.
  */
-export function mapPathsToScenes(paths, localeKeysByPath = {}) {
+export function mapPathsToScenes(paths, localeKeysByPath = {}, inertPaths = new Set()) {
   const tokens = new Set();
   let hasGlobal = false;
   let hasDeferred = false;
@@ -741,6 +828,9 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   for (const path of paths) {
     if (path === '*' || path === '__ALL__') {
       hasGlobal = true;
+      continue;
+    }
+    if (inertPaths.has(path)) {
       continue;
     }
     let classification;
@@ -1002,20 +1092,34 @@ export async function main() {
     headSha: effectiveHeadSha,
   });
 
-  // Key-level locale diffing: only the strings that actually changed map to
-  // scenes, instead of the whole namespace going global.
+  // Content-level diffing against the base ref, for two purposes:
+  // - locale files: key-level diffing so only the strings that actually
+  //   changed map to scenes, instead of the whole namespace going global;
+  // - i18n module wiring: a diff confined to desktop-bridge lines cannot
+  //   render in the web preview and must not trigger every scene.
   let localeKeysByPath = {};
+  const inertPaths = new Set();
   if (!filenames.includes('*')) {
     const baseRef = action === 'synchronize' && /^[0-9a-f]{40}$/i.test(beforeSha) && !/^0+$/.test(beforeSha)
       ? beforeSha.trim()
       : pull.base?.sha;
     if (baseRef) {
       localeKeysByPath = await diffLocaleKeys({ repo, paths: filenames, baseRef, headRef: effectiveHeadSha });
+      for (const wiringPath of filenames.filter(isI18nWiringPath)) {
+        const [baseRaw, headRaw] = await Promise.all([
+          fetchContentAt({ repo, path: wiringPath, ref: baseRef }),
+          fetchContentAt({ repo, path: wiringPath, ref: effectiveHeadSha }),
+        ]);
+        if (isDesktopBridgeOnlyDiff(baseRaw, headRaw)) {
+          console.log(`detect: ${wiringPath} diff is desktop-bridge-only; renders no web change`);
+          inertPaths.add(wiringPath);
+        }
+      }
     }
   }
 
   const forcedByLabel = (pull.labels ?? []).some((label) => label?.name === 'ui-preview');
-  let scenes = mapPathsToScenes(filenames, localeKeysByPath);
+  let scenes = mapPathsToScenes(filenames, localeKeysByPath, inertPaths);
 
   if (scenes.length === 0 && forcedByLabel) {
     console.log(`detect: forced by ui-preview label; capturing all scenes`);

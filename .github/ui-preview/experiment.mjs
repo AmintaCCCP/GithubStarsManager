@@ -173,7 +173,13 @@ function localExecutor(worktreeOverrides) {
 
 const SCENE_ORDER = detect.ALL_SCENES;
 const fmt = (scenes) => {
-  const statics = scenes.filter((s) => !s.startsWith('plugin:')).sort((a, b) => SCENE_ORDER.indexOf(a) - SCENE_ORDER.indexOf(b));
+  // Unknown static scene names (interaction variants) sort deterministically
+  // after the known catalog so actual/expected stay comparable.
+  const rank = (s) => {
+    const i = SCENE_ORDER.indexOf(s);
+    return i === -1 ? SCENE_ORDER.length : i;
+  };
+  const statics = scenes.filter((s) => !s.startsWith('plugin:')).sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
   const specs = scenes.filter((s) => s.startsWith('plugin:')).sort();
   return [...statics, ...specs];
 };

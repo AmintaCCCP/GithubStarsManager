@@ -24,6 +24,13 @@ label), the workflow:
        top-level keys that actually changed are mapped, so a string addition
        for one panel no longer shoots every view. Keys that cannot be placed
        fall back conservatively to their namespace's scope;
+     - i18n module wiring (`src/i18n/*.ts`) is content-diffed too: a change
+       confined to desktop-bridge lines (`desktopBridge`/`electronProxy`,
+       bare braces) renders nothing in the web preview — the web bundle's
+       `desktopBridge` no-ops every method outside Electron — so such a diff
+       is inert (a desktop-only tray/language sync change shoots nothing
+       instead of every page). Any other wiring change still triggers all
+       scenes, because boot-time language resolution could re-render anything;
      - changes to global elements (`App.tsx`, `Header.tsx`,
        `WorkspacePageHeader.tsx`, shared UI primitives under
        `src/components/ui/`, `src/lib/utils.ts`, theme tokens, or
@@ -40,7 +47,10 @@ label), the workflow:
        hook follows the panel that invokes it.
      - the login page has its own scene (`login`, seeded logged out); it
        renders instead of the app shell, so global chrome changes do not
-       reach it and it is only shot when login-specific files change.
+       reach it and it is only shot when login-specific files change. Because
+       `GitHubTokenPermissions` reads the `login` namespace in both hosts,
+       `login.json` changes also map to the settings token-guide dialog and
+       both interaction variants.
 2. **build** checks out the PR and builds it with `npx vite build`; the
    static bundle is uploaded as an artifact. **shoot** then runs on a clean
    runner with zero PR code: it serves the downloaded bundle and runs
@@ -80,6 +90,22 @@ const VIEW_SCENES = [
 // window.electronAPI stub whose plugin registry is built from the manifests
 // in the served bundle (dist/plugins/index.json, emitted by the build job).
 ```
+
+### Interaction variants
+
+Some changed UI is invisible in a default render: dialogs are closed, tabs sit
+on their default selection. `SCENE_VARIANTS` in detect.mjs (behavior in
+`VARIANT_ACTIONS` in shoot.mjs) names such states as extra scene specs
+(`<baseScene>-<name>`); detect emits them only for files whose visible change
+lives inside that state (e.g. `GitHubTokenPermissions.tsx`, which renders
+inside the General settings' token-guide dialog and owns the
+classic/fine-grained tab switch on the login page). After the base scene's
+screenshot, shoot.mjs applies the variant's single click in the same browser
+context — the click target is resolved from the built bundle's zh locale where
+possible, so renamed strings keep working — waits for the state, and takes one
+more shot (`settings-general-token-guide.png`, `login-token-finegrained.png`).
+A variant that cannot reach its state is skipped with a warning; the base
+screenshot still publishes. Variants never trigger through `global` expansion.
 
 To change what the previews show, edit `fixtures/demo-state.json` — a plain
 snapshot of the app's persisted state shape (repositories, gists, releases,
@@ -134,6 +160,7 @@ gh label create ui-preview --description "Force the UI preview workflow" --color
 ```sh
 # 1. Build and serve the app (from the repo root)
 npx vite build
+cp -r src/locales dist/locales
 if [ -d examples/plugins ]; then
   mkdir -p dist/plugins && cp -r examples/plugins/. dist/plugins/
   node -e "const fs=require('node:fs');fs.writeFileSync('dist/plugins/index.json',JSON.stringify(fs.readdirSync('examples/plugins',{withFileTypes:true}).filter(d=>d.isDirectory()).map(d=>d.name).sort())+'\n')"
@@ -143,7 +170,9 @@ npx vite preview --host 127.0.0.1 --port 4173 &
 # 2. Install the pipeline deps (from this directory)
 cd .github/ui-preview && npm ci && npx playwright install chromium
 
-# 3. Shoot (add --only settings-plugins,plugin:repo-info-card to limit scenes)
+# 3. Shoot (add --only settings-plugins,plugin:repo-info-card to limit scenes;
+#    variant specs like settings-general-token-guide shoot their base scene
+#    plus the driven state)
 node shoot.mjs --url http://127.0.0.1:4173 --out /tmp/ui-shots
 ```
 
