@@ -70,12 +70,37 @@ const enterBackendMode = async () => {
 };
 
 describe('LoginScreen token guidance', () => {
-  it('explains Star permissions before sign-in', () => {
+  it('explains Star permissions before sign-in and defaults to classic token', () => {
     render(<TooltipProvider><LoginScreen /></TooltipProvider>);
     expect(screen.getByText('GitHub Token 权限')).toBeVisible();
-    expect(screen.getByText('Starring')).toBeVisible();
-    fireEvent.click(screen.getByRole('tab', { name: '经典 Token' }));
+    expect(screen.getByRole('tab', { name: '经典 Token' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('public_repo')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('tab', { name: '细粒度 Token' }));
+    expect(screen.getByText('Starring')).toBeVisible();
+  });
+
+  it('shows limitation warning on fine-grained tab and allows switching to classic', () => {
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    fireEvent.click(screen.getByRole('tab', { name: '细粒度 Token' }));
+    expect(screen.getByText('细粒度 Token 限制说明')).toBeVisible();
+    expect(screen.getByText(/无法稳定跨组织\/他人仓库 Star 或取消 Star/)).toBeVisible();
+    expect(screen.getByText(/不支持 Star 列表（Lists）双向同步/)).toBeVisible();
+
+    const switchBtn = screen.getByRole('button', { name: /经典 Token（点击切换）/ });
+    fireEvent.click(switchBtn);
+
+    expect(screen.getByRole('tab', { name: '经典 Token' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('public_repo')).toBeVisible();
+  });
+
+  it('adapts GitHub token creation link to the active mode', () => {
+    render(<TooltipProvider><LoginScreen /></TooltipProvider>);
+    const link = screen.getByRole('link', { name: '在GitHub上创建token →' });
+    expect(link).toHaveAttribute('href', 'https://github.com/settings/tokens/new?description=GithubStarsManager&scopes=public_repo,gist,user');
+
+    fireEvent.click(screen.getByRole('tab', { name: '细粒度 Token' }));
+    expect(link).toHaveAttribute('href', 'https://github.com/settings/personal-access-tokens/new');
   });
 });
 
