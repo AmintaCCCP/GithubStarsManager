@@ -311,6 +311,55 @@ const WIRING_WEB_FALLBACK = [
 const WIRING_WEB_FALLBACK_CHANGED = WIRING_WEB_FALLBACK.replace("'en'", "'fr'");
 check('a pure line reorder between different contents is not inert', isDesktopBridgeOnlyDiff(WIRING_SWAPPED, WIRING_REORDER), false);
 check('a bridge ternary with web fallback values is not inert', isDesktopBridgeOnlyDiff(WIRING_WEB_FALLBACK, WIRING_WEB_FALLBACK_CHANGED), false);
+const WIRING_WRAP_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_WRAP_HEAD = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  'document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_REORDER_PLUS_BRIDGE_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'let finalLanguage = language;',
+  "finalLanguage = 'zh';",
+  'document.documentElement.lang = finalLanguage;',
+].join('\n');
+const WIRING_REORDER_PLUS_BRIDGE_HEAD = [
+  "import i18next from 'i18next';",
+  '',
+  'let finalLanguage = language;',
+  'document.documentElement.lang = finalLanguage;',
+  "finalLanguage = 'zh';",
+  "void desktopBridge.setLanguage(finalLanguage);",
+].join('\n');
+const WIRING_BRIDGE_CALL_ARG_SIDE_EFFECT = [
+  "import i18next from 'i18next';",
+  '',
+  "void desktopBridge.setLanguage((window.lang = 'fr'));",
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_BRIDGE_CALL_PLAIN = [
+  "import i18next from 'i18next';",
+  '',
+  'void desktopBridge.setLanguage(language);',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_PLAIN_CALL_ONLY = [
+  "import i18next from 'i18next';",
+  '',
+  'document.documentElement.lang = language;',
+].join('\n');
+check('wrapping an unchanged web statement in an added guard is not inert', isDesktopBridgeOnlyDiff(WIRING_WRAP_BASE, WIRING_WRAP_HEAD), false);
+check('unwrapping a web statement from a removed guard is not inert', isDesktopBridgeOnlyDiff(WIRING_WRAP_HEAD, WIRING_WRAP_BASE), false);
+check('a web reorder mixed with an added bridge call is not inert', isDesktopBridgeOnlyDiff(WIRING_REORDER_PLUS_BRIDGE_BASE, WIRING_REORDER_PLUS_BRIDGE_HEAD), false);
+check('a bridge call with an assignment argument is not inert', isDesktopBridgeOnlyDiff(WIRING_PLAIN_CALL_ONLY, WIRING_BRIDGE_CALL_ARG_SIDE_EFFECT), false);
+check('adding a plain bridge call beside unchanged web lines is inert', isDesktopBridgeOnlyDiff(WIRING_PLAIN_CALL_ONLY, WIRING_BRIDGE_CALL_PLAIN), true);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

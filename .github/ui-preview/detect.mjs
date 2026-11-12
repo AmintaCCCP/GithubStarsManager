@@ -808,9 +808,8 @@ export function classifyLocaleFile(filePath, changedKeys = null) {
 }
 
 /** Multiset line diff: lines whose occurrence count differs between the two
- *  versions, split into additions and removals. Reordering identical lines is
- *  not reported by the multiset itself; isDesktopBridgeOnlyDiff detects that
- *  case separately (byte-identical vs reorder-only). */
+ *  versions, split into additions and removals. Positional information is
+ *  reconstructed separately by occurrenceFlags. */
 const diffChangedLines = (baseRaw, headRaw) => {
   const counts = (raw) => {
     const map = new Map();
@@ -830,31 +829,78 @@ const diffChangedLines = (baseRaw, headRaw) => {
   return { added, removed };
 };
 
+const counts = (raw) => {
+  const map = new Map();
+  for (const line of (raw ?? '').split('\n')) map.set(line, (map.get(line) ?? 0) + 1);
+  return map;
+};
+
 const BRACE_ONLY_LINE = /^\s*[{}()]*\s*$/;
 
-/** Line shapes that cannot affect web rendering: importing the bridge module,
- *  calling a bridge method as a statement (optionally `void`-prefixed), and
- *  the bridge-support guard's opening. Anything that ASSIGNS from the bridge,
- *  branches on it for a non-bridge value, or mixes in web-relevant literals
- *  (e.g. ternary fallbacks) deliberately does NOT match and keeps the file
- *  non-inert. */
+/** Line shapes that carry no web behavior on their own: importing the bridge
+ *  module, calling a bridge method as a statement (optionally `void`-prefixed,
+ *  arguments restricted to side-effect-free expressions — no nested calls,
+ *  assignments or braces), and the bridge-support guard's opening line.
+ *  Anything that ASSIGNS from the bridge, branches on it for a non-bridge
+ *  value, nests calls in its arguments, or mixes in web-relevant literals
+ *  deliberately does NOT match and keeps the file non-inert. */
 const BRIDGE_LINE_SHAPES = [
   /^\s*import\s+.*electronProxy[^;]*;\s*$/,
-  /^\s*(?:void\s+)?desktopBridge\.[A-Za-z_$][\w$]*\(.*\);\s*$/,
+  /^\s*(?:void\s+)?desktopBridge\.[A-Za-z_$][\w$]*\((?:[^()={}\\]|\\.)*\)\s*;\s*$/,
   /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\{\s*$/,
 ];
 const isBridgeOrStructuralLine = (line) => BRACE_ONLY_LINE.test(line) || BRIDGE_LINE_SHAPES.some((shape) => shape.test(line));
 
+/** The web-relevant projection of a file: every line that is neither
+ *  bridge-shaped nor bare syntax, in order. Two versions render the web app
+ *  identically only if this sequence is unchanged — content edits AND pure
+ *  reorders of web statements both show up here. */
+const webProjection = (lines) => lines.filter((line) => !isBridgeOrStructuralLine(line));
+
+/** Per-line flags marking which occurrences of each line are additions
+ *  (occurrence index beyond the base count) or removals (beyond the head
+ *  count). Multiset counts alone cannot locate changes positionally; this
+ *  scans occurrences left to right. */
+function occurrenceFlags(lines, otherCounts) {
+  const seen = new Map();
+  return lines.map((line) => {
+    const index = seen.get(line) ?? 0;
+    seen.set(line, index + 1);
+    return index >= (otherCounts.get(line) ?? 0);
+  });
+}
+
+/** Whether the guard block opened at guardIndex contains only bridge-shaped
+ *  or bare-syntax lines. A guard wrapping unchanged web statements makes them
+ *  conditional on the desktop bridge — a web-visible change no line-level
+ *  multiset can see. Unbalanced braces fail conservatively. */
+function guardBlockIsBridgeOnly(lines, guardIndex) {
+  let balance = 0;
+  for (let i = guardIndex; i < lines.length; i += 1) {
+    for (const ch of lines[i]) {
+      if (ch === '{') balance += 1;
+      else if (ch === '}') balance -= 1;
+    }
+    if (balance === 0) return i > guardIndex && lines.slice(guardIndex + 1, i).every(isBridgeOrStructuralLine);
+    if (balance < 0) return false;
+  }
+  return false;
+}
+
 /**
- * Whether a file's diff can only affect the Electron desktop surface: the two
- * versions are byte-identical, or every added/removed line is bare syntax or
- * one of the BRIDGE_LINE_SHAPES. The web bundle's desktopBridge no-ops every
- * method outside Electron (see src/services/electronProxy.ts), so such a diff
- * renders no web difference and the file is ignored instead of triggering
- * every scene. A multiset-empty diff between DIFFERENT contents is a pure
- * reorder — order can change behavior (e.g. swapped assignments), so it stays
- * non-inert. Any non-bridge-shaped change (assignments from the bridge, web
- * fallback values in ternaries, shared logic) also keeps the file non-inert.
+ * Whether a file's diff can only affect the Electron desktop surface. The web
+ * bundle's desktopBridge no-ops every method outside Electron (see
+ * src/services/electronProxy.ts), so a diff is web-inert exactly when:
+ *   - every added line is bridge-shaped or bare syntax (a changed/reordered/
+ *     added web line fails this);
+ *   - the web projection (non-bridge lines in order) is identical in both
+ *     versions — this catches pure web reorders that the multiset cannot see,
+ *     including reorders mixed with additive bridge calls;
+ *   - every ADDED `if (desktopBridge.isSupported())` block and every REMOVED
+ *     one (unwrapping) contains only bridge statements — wrapping or
+ *     unwrapping web statements changes their conditional execution in web.
+ * Byte-identical contents are trivially inert; anything unreadable or
+ * ambiguous stays non-inert (conservative: more screenshots, never fewer).
  * @param {string} baseRaw - Base version content (null when unreadable).
  * @param {string} headRaw - Head version content (null when unreadable).
  * @returns {boolean} True when the diff is provably web-inert.
@@ -862,9 +908,22 @@ const isBridgeOrStructuralLine = (line) => BRACE_ONLY_LINE.test(line) || BRIDGE_
 export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
   if (baseRaw === null || headRaw === null) return false;
   if (baseRaw === headRaw) return true;
+  const baseLines = baseRaw.split('\n');
+  const headLines = headRaw.split('\n');
   const { added, removed } = diffChangedLines(baseRaw, headRaw);
-  if (added.length === 0 && removed.length === 0) return false;
-  return added.every(isBridgeOrStructuralLine) && removed.every(isBridgeOrStructuralLine);
+  if (!added.every(isBridgeOrStructuralLine)) return false;
+  const baseCounts = counts(baseRaw);
+  const headCounts = counts(headRaw);
+  if (JSON.stringify(webProjection(baseLines)) !== JSON.stringify(webProjection(headLines))) return false;
+  const headAdded = occurrenceFlags(headLines, baseCounts);
+  for (let i = 0; i < headLines.length; i += 1) {
+    if (headAdded[i] && BRIDGE_LINE_SHAPES[2].test(headLines[i]) && !guardBlockIsBridgeOnly(headLines, i)) return false;
+  }
+  const baseRemoved = occurrenceFlags(baseLines, headCounts);
+  for (let i = 0; i < baseLines.length; i += 1) {
+    if (baseRemoved[i] && BRIDGE_LINE_SHAPES[2].test(baseLines[i]) && !guardBlockIsBridgeOnly(baseLines, i)) return false;
+  }
+  return true;
 }
 
 /** i18n module wiring (non-locale, non-test): the i18next runtime and its
