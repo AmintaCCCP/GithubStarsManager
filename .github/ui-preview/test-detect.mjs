@@ -360,6 +360,29 @@ check('unwrapping a web statement from a removed guard is not inert', isDesktopB
 check('a web reorder mixed with an added bridge call is not inert', isDesktopBridgeOnlyDiff(WIRING_REORDER_PLUS_BRIDGE_BASE, WIRING_REORDER_PLUS_BRIDGE_HEAD), false);
 check('a bridge call with an assignment argument is not inert', isDesktopBridgeOnlyDiff(WIRING_PLAIN_CALL_ONLY, WIRING_BRIDGE_CALL_ARG_SIDE_EFFECT), false);
 check('adding a plain bridge call beside unchanged web lines is inert', isDesktopBridgeOnlyDiff(WIRING_PLAIN_CALL_ONLY, WIRING_BRIDGE_CALL_PLAIN), true);
+const WIRING_GUARD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_GUARD_ABSORB = WIRING_GUARD_BASE.replace(
+  '}\ndocument.documentElement.lang = language;',
+  'document.documentElement.lang = language;\n}',
+);
+const WIRING_GUARD_RELEASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  'document.documentElement.lang = language;',
+  '}',
+].join('\n');
+check('moving a closing brace to absorb a web line into the guard is not inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_BASE, WIRING_GUARD_ABSORB), false);
+check('moving a closing brace to release a web line from the guard is not inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_RELEASE, WIRING_GUARD_BASE), false);
+check('a pre-existing web-wrapping guard left unchanged stays inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_RELEASE, WIRING_GUARD_RELEASE + '\nvoid desktopBridge.setLanguage(language);'), true);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
