@@ -205,6 +205,14 @@ check('gist editor modal spans gists and its dialog variant', classifyPath('src/
 check('filter modal renders in releases only, plus its dialog variant', classifyPath('src/components/FilterModal.tsx'), ['releases', 'releases-filter-modal']);
 check('release source settings modal spans releases and its dialog variant', classifyPath('src/components/ReleaseSourceSettingsModal.tsx'), ['releases', 'releases-source-settings']);
 check('a dialog-file diff orders its variants after the extras', mapPathsToScenes(['src/components/RepositoryReleaseSheet.tsx']), ['repositories-light', 'repositories-dark', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
+check('app readme modal key carries its dialog variant', classifyLocaleKeys('app', ['readmeModal']), ['repositories', 'repositories-readme-modal']);
+check('app category edit modal key carries its dialog variant', classifyLocaleKeys('app', ['categoryEditModal']), ['repositories', 'repositories-category-edit-modal']);
+check('app push categories key carries its dialog variant', classifyLocaleKeys('app', ['pushCategoriesModal']), ['settings-star-sync', 'settings-star-sync-push-modal']);
+check('app ai/webdav/vector keys carry their form variants', classifyLocaleKeys('app', ['aIConfigPanel', 'webDAVPanel', 'vectorSearchSettings']), ['settings-ai', 'settings-ai-config-form', 'settings-webdav', 'settings-webdav-config-form', 'settings-vector-search', 'settings-vector-search-deploy-guide']);
+check('repositories edit modal and batch star keys carry their variants', classifyLocaleKeys('repositories', ['repositoryEditModal', 'batchStar']), ['repositories', 'repositories-edit-modal', 'repositories-batch-star-import']);
+check('gists modal keys carry their editor/detail variants', classifyLocaleKeys('gists', ['gistEditorModal', 'gistDetailModal']), ['gists', 'gists-new-gist', 'gists-gist-detail']);
+check('gists list keys stay on the base scene', classifyLocaleKeys('gists', ['gistView']), ['gists']);
+check('releases source settings key carries its dialog variant', classifyLocaleKeys('releases', ['releaseSourceSettingsModal']), ['releases', 'releases-source-settings']);
 check('auto update check hook is deferred', classifyPath('src/hooks/useAutoUpdateCheck.ts'), 'deferred');
 check('settings feature hooks are deferred', classifyPath('src/features/settings/hooks/useUpdateActions.ts'), 'deferred');
 check('ui button spans app scenes and login (login renders primitives)', classifyPath('src/components/ui/button.tsx'), ['global', 'login']);
@@ -271,20 +279,20 @@ check('inert i18n wiring diff maps to no scenes', mapPathsToScenes(['src/i18n/in
 check('inert i18n wiring diff beside a panel keeps the panel scene', mapPathsToScenes(['src/i18n/index.ts', 'src/components/GistView.tsx'], {}, new Set(['src/i18n/index.ts'])), ['gists']);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
-check('app key maps to its panel scene', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins']);
+check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
 check('app data panel key maps to data scene', classifyLocaleKeys('app', ['dataManagementPanel']), ['settings-data']);
 check('app theme key maps to appearance scene', classifyLocaleKeys('app', ['themeSettingsCard']), ['settings-appearance']);
 check('app general panel key spans general and appearance', classifyLocaleKeys('app', ['generalPanel']), ['settings-general', 'settings-appearance']);
 check('app menu panel key spans menu and appearance', classifyLocaleKeys('app', ['menuManagementPanel']), ['settings-menu', 'settings-appearance']);
 check('app category utils key spans repositories and category tab', classifyLocaleKeys('app', ['categoryUtils']), ['repositories', 'settings-category']);
-check('app asset filter key maps to releases only', classifyLocaleKeys('app', ['assetFilterManager']), ['releases']);
+check('app asset filter key spans releases and its filter modal variant', classifyLocaleKeys('app', ['assetFilterManager']), ['releases', 'releases-filter-modal']);
 check('app plugin page viewer key spans repositories and plugins settings', classifyLocaleKeys('app', ['pluginPageViewer']), ['repositories', 'settings-plugins']);
 check('app shell key maps to the settings view', classifyLocaleKeys('app', ['settingsPanel']), ['settings']);
 check('app header key is global', classifyLocaleKeys('app', ['header']), ['global']);
 check('app markdown keys span their consumers', classifyLocaleKeys('app', ['markdownRenderer']), ['repositories', 'releases', 'discovery']);
 check('unknown app key escalates to global', classifyLocaleKeys('app', ['somethingBrandNew']), ['global']);
 check('mixed known and unknown app keys escalate to global', classifyLocaleKeys('app', ['dataManagementPanel', 'somethingBrandNew']), ['settings-data', 'global']);
-check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginSettingsPanel', 'generalPanel']), ['settings-plugins', 'settings-general', 'settings-appearance']);
+check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginSettingsPanel', 'generalPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker', 'settings-general', 'settings-appearance']);
 check('settings hook key maps to its tab', classifyLocaleKeys('settings', ['useMcpActions']), ['settings-mcp']);
 check('star sync hook key spans its tab and repositories', classifyLocaleKeys('settings', ['useStarSyncActions']), ['settings-star-sync', 'repositories']);
 check('unknown settings key escalates to the settings view', classifyLocaleKeys('settings', ['futureHook']), ['repositories', 'settings']);
@@ -295,19 +303,20 @@ check('unknown repositories key covers appearance consumers', classifyLocaleKeys
 check('unknown plugins key covers discovery consumers', classifyLocaleKeys('plugins', ['futureKey']), ['repositories', 'settings-plugins', 'discovery']);
 check('plugins telegram key maps to discovery', classifyLocaleKeys('plugins', ['telegramMessageModal']), ['discovery']);
 check('plugins action key maps to repositories and plugins settings', classifyLocaleKeys('plugins', ['applyPluginActionResult']), ['repositories', 'settings-plugins']);
-check('chat key maps to repositories', classifyLocaleKeys('chat', ['repositoryChatSheet']), ['repositories']);
+check('chat repository chat sheet key carries its sheet variant', classifyLocaleKeys('chat', ['repositoryChatSheet']), ['repositories', 'repositories-chat-sheet']);
+check('chat global history sheet key carries its sheet variant', classifyLocaleKeys('chat', ['globalChatHistorySheet']), ['repositories', 'repositories-chat-history-sheet']);
 check('namespace without table falls back to its scope', classifyLocaleKeys('gists', ['gistViewAnything']), ['gists']);
 check('common namespace falls back to global', classifyLocaleKeys('common', ['anything']), ['global']);
 check('releases fork keys map to forks', classifyLocaleKeys('releases', ['forkCard', 'forkTimeline']), ['forks']);
 check('releases subscription key maps to discovery', classifyLocaleKeys('releases', ['subscriptionRepoCard']), ['discovery']);
-check('releases sheet key spans releases and repositories', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories']);
+check('release sheet key spans its scenes and both sheet variants', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
 check('repositories card-action hook key maps to repositories', classifyLocaleKeys('repositories', ['useRepositoryCardActions']), ['repositories']);
 check('repositories card key spans repositories and appearance', classifyLocaleKeys('repositories', ['repositoryCard']), ['repositories', 'settings-appearance']);
 check('repositories keys outside the table use the namespace fallback', classifyLocaleKeys('repositories', ['brandNewKey']), ['repositories', 'settings-appearance']);
 check('common fork timeline key maps to forks', classifyLocaleKeys('common', ['useForkTimelineActions']), ['forks']);
 
 // 8. classifyLocaleFile — key diff available, empty, or unavailable
-check('locale file with key diff maps precisely', classifyLocaleFile('src/locales/zh/app.json', ['pluginSettingsPanel']), ['settings-plugins']);
+check('locale file with key diff maps precisely', classifyLocaleFile('src/locales/zh/app.json', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
 check('locale file whose keys did not change maps to nothing', classifyLocaleFile('src/locales/zh/app.json', []), []);
 check('locale file without key diff uses namespace fallback', classifyLocaleFile('src/locales/zh/app.json'), ['global']);
 check('gists locale with unknown keys stays in gists', classifyLocaleFile('src/locales/zh/gists.json', ['newKey']), ['gists']);
@@ -472,7 +481,7 @@ check('global i18n diff keeps plugin manifest specs', mapPathsToScenes([
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
   ['src/locales/zh/app.json'],
   { 'src/locales/zh/app.json': ['pluginSettingsPanel'] },
-), ['settings-plugins']);
+), ['settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 check('locale file with no visible key change maps to nothing', mapPathsToScenes(
   ['src/locales/zh/app.json'],
@@ -502,7 +511,7 @@ check('plugins locale keys map telegram to discovery only', mapPathsToScenes(
 check('PR 577 zh/app.json icon-picker keys map to the plugins settings tab', mapPathsToScenes(
   ['src/locales/zh/app.json'],
   { 'src/locales/zh/app.json': ['pluginSettingsPanel'] },
-), ['settings-plugins']);
+), ['settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 // 13. mapPathsToScenes — the full PR 577 file list (simulated audit case)
 const pr577Files = [
@@ -563,6 +572,8 @@ check('PR 577 full diff maps to exactly the changed pages', mapPathsToScenes(pr5
   'settings-data',
   'settings-plugins',
   'settings-plugins-icon-picker',
+  'settings-plugins-marketplace',
+  'settings-plugins-sources',
 ]);
 
 check('PR 577 diff without locale key diffs stays conservative', mapPathsToScenes(pr577Files), [...ALL_SCENES, 'settings-plugins-icon-picker']);
@@ -778,7 +789,7 @@ check('locale key diff returns changed keys per file', localeKeys, {
 check('locale key diff integrates with scene mapping', mapPathsToScenes(
   ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
   localeKeys,
-), ['settings-plugins']);
+), ['settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 const mockFailingContentExecutor = (args) => {
   const url = args[1];
@@ -797,7 +808,7 @@ check('unreadable locale files are omitted for file-level fallback', Object.keys
 check('omitted locale files fall back conservatively in scene mapping', mapPathsToScenes(
   ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
   partialKeys,
-), ['gists', 'settings-plugins']);
+), ['gists', 'settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 console.log(`\nTest result: ${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures ? 1 : 0);

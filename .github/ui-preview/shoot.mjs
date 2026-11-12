@@ -103,7 +103,9 @@ const VARIANT_ACTIONS = {
       { clickLocaleKey: 'app:pluginSettingsPanel.browse-plugins' },
       { clickLocaleKey: 'app:pluginSettingsPanel.marketplace-manage-sources' },
     ],
-    readySelector: '[role="dialog"]',
+    // The marketplace dialog stays mounted underneath; readiness must be the
+    // sources dialog's own title text, not any open dialog.
+    readyLocaleKey: 'app:pluginSettingsPanel.sources-title',
     fullPage: false,
   },
   'settings-plugins-icon-picker': {
@@ -359,8 +361,14 @@ async function shootVariant(page, variantSpec, baseState, url, outDir) {
     for (const step of action.steps ?? []) {
       await runVariantStep(page, step, baseState, url);
     }
-    if (action.readySelector) {
-      await page.waitForSelector(action.readySelector, { state: 'visible', timeout: 15_000 });
+    let readySelector = action.readySelector ?? null;
+    if (action.readyLocaleKey) {
+      const title = await resolveLocaleText(url, action.readyLocaleKey);
+      if (!title) throw new Error(`locale text for ${action.readyLocaleKey} not found in the built bundle`);
+      readySelector = `[role="dialog"]:has-text("${title.replace(/"/g, '\\"')}")`;
+    }
+    if (readySelector) {
+      await page.waitForSelector(readySelector, { state: 'visible', timeout: 15_000 });
     }
     await page.waitForTimeout(action.settleMs ?? 500);
     await page.screenshot({ path: shotPath, fullPage: action.fullPage ?? true });
@@ -1061,7 +1069,15 @@ async function resetPageForVariant(page, scene) {
  */
 async function finishScene(page, scene, results, baseState, url, outDir) {
   for (const variant of scene.variants ?? []) {
-    await resetPageForVariant(page, scene);
+    try {
+      await resetPageForVariant(page, scene);
+    } catch (error) {
+      // A failed reset (reload/ready timeout) must not abort the run: skip
+      // this variant, keep the base screenshot, and let the next variant
+      // attempt its own reset.
+      console.warn(`  ⚠ ${variant.spec} skipped: variant reset failed: ${error.message.split('\n')[0]}`);
+      continue;
+    }
     const variantResult = await shootVariant(page, variant.spec, baseState, url, outDir);
     if (variantResult) results.push(variantResult);
   }

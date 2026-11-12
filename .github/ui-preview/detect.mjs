@@ -312,21 +312,23 @@ const LOCALE_KEY_SCENES = {
     generalPanel: 'settings-general settings-appearance',
     themeSettingsCard: 'settings-appearance',
     starSyncPanel: 'settings-star-sync',
-    aIConfigPanel: 'settings-ai',
-    webDAVPanel: 'settings-webdav',
+    aIConfigPanel: 'settings-ai settings-ai-config-form',
+    webDAVPanel: 'settings-webdav settings-webdav-config-form',
     backupPanel: 'settings-backup',
     includeKeysToggle: 'settings-backup settings-data',
     backendPanel: 'settings-backend',
     categoryPanel: 'settings-category',
-    pushCategoriesModal: 'settings-star-sync',
+    pushCategoriesModal: 'settings-star-sync settings-star-sync-push-modal',
     // ThemeSettingsCard reuses the menu panel's reorder strings in 外观.
     menuManagementPanel: 'settings-menu settings-appearance',
     dataManagementPanel: 'settings-data',
     diagnosticLogsPanel: 'settings-logs',
     networkPanel: 'settings-network',
     mcpSettingsPanel: 'settings-mcp',
-    vectorSearchSettings: 'settings-vector-search',
-    pluginSettingsPanel: 'settings-plugins',
+    vectorSearchSettings: 'settings-vector-search settings-vector-search-deploy-guide',
+    // The marketplace/sources/icon-picker dialogs render only in their
+    // variants; their strings share this top-level key with the panel.
+    pluginSettingsPanel: 'settings-plugins settings-plugins-marketplace settings-plugins-sources settings-plugins-icon-picker',
     // Viewer/modal strings surface over the repositories view too (repo-card plugin actions).
     pluginPageViewer: 'repositories settings-plugins',
     // Update dialog strings: the check button and dialog live in 通用, the
@@ -341,8 +343,8 @@ const LOCALE_KEY_SCENES = {
     // CategoryPanel reuses the empty-name validation string in 分类管理.
     categoryUtils: 'repositories settings-category',
     categorySidebar: 'repositories',
-    categoryEditModal: 'repositories',
-    repositoryEditModal: 'repositories',
+    categoryEditModal: 'repositories repositories-category-edit-modal',
+    repositoryEditModal: 'repositories repositories-edit-modal',
     searchBar: 'repositories',
     searchDemo: 'repositories',
     searchResultStats: 'repositories',
@@ -359,7 +361,7 @@ const LOCALE_KEY_SCENES = {
     scrollToBottom: 'repositories',
 
     // FilterModal renders only in the releases view (release timeline sidebar).
-    assetFilterManager: 'releases',
+    assetFilterManager: 'releases releases-filter-modal',
     useReleaseArtifactActions: 'releases',
     installableAssetRecommendation: 'releases',
 
@@ -368,8 +370,8 @@ const LOCALE_KEY_SCENES = {
 
     markdownRenderer: 'repositories releases discovery',
     bilingualMarkdownRenderer: 'repositories releases discovery',
-    readmeModal: 'repositories',
-    useReadmeFetch: 'repositories',
+    readmeModal: 'repositories repositories-readme-modal',
+    useReadmeFetch: 'repositories repositories-readme-modal',
   },
   // settings.json carries the settings hooks' toasts/errors.
   settings: {
@@ -396,13 +398,18 @@ const LOCALE_KEY_SCENES = {
     usePluginWebSearch: 'repositories settings-plugins',
   },
   chat: {
-    globalChatHistorySheet: 'repositories',
+    globalChatHistorySheet: 'repositories repositories-chat-history-sheet',
     repositoryChatHistoryPanel: 'repositories',
-    repositoryChatSheet: 'repositories',
+    repositoryChatSheet: 'repositories repositories-chat-sheet',
     citationBadge: 'repositories',
     useRepositoryChat: 'repositories',
     useRepositoryChatSessions: 'repositories',
     repositoryChatService: 'repositories',
+  },
+  // gists.json modal strings only render in their interaction variants.
+  gists: {
+    gistDetailModal: 'gists gists-gist-detail',
+    gistEditorModal: 'gists gists-new-gist',
   },
   // releases.json strings are consumed across views: fork cards render in the
   // forks timeline, the subscription card in discovery, and the release sheet
@@ -411,10 +418,10 @@ const LOCALE_KEY_SCENES = {
     forkCard: 'forks',
     forkTimeline: 'forks',
     subscriptionRepoCard: 'discovery',
-    repositoryReleaseSheet: 'releases repositories',
+    repositoryReleaseSheet: 'releases repositories repositories-release-sheet repositories-release-sheet-notes',
     releaseCard: 'releases',
     releasePluginRecommendations: 'releases',
-    releaseSourceSettingsModal: 'releases',
+    releaseSourceSettingsModal: 'releases releases-source-settings',
     releaseTimeline: 'releases',
     useReleaseTimelineActions: 'releases',
     useWatchedSourcesSync: 'releases',
@@ -422,8 +429,8 @@ const LOCALE_KEY_SCENES = {
   // repository card strings also feed the card-action settings in 外观.
   repositories: {
     repositoryCard: 'repositories settings-appearance',
-    batchStar: 'repositories',
-    repositoryEditModal: 'repositories',
+    batchStar: 'repositories repositories-batch-star-import',
+    repositoryEditModal: 'repositories repositories-edit-modal',
     repositoryList: 'repositories',
     repositoryHealthPanel: 'repositories',
     useBulkRepositoryActions: 'repositories',
