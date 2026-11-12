@@ -435,6 +435,21 @@ const WIRING_REGEX_GUARD_ABSORB = WIRING_REGEX_GUARD_BASE.replace(
 );
 check('a brace inside a regex literal cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_REGEX_GUARD_BASE, WIRING_REGEX_GUARD_ABSORB), false);
 check('the regex absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_REGEX_GUARD_ABSORB, WIRING_REGEX_GUARD_BASE), false);
+const WIRING_AMBIGUOUS_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  if (language) /[}]/.test(language);',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_AMBIGUOUS_ABSORB = WIRING_AMBIGUOUS_BASE.replace(
+  '}\ndocument.documentElement.lang = language;',
+  'document.documentElement.lang = language;\n}',
+);
+check('a slash after a closing paren is ambiguous and stays non-inert', isDesktopBridgeOnlyDiff(WIRING_AMBIGUOUS_BASE, WIRING_AMBIGUOUS_ABSORB), false);
+check('the ambiguous absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_AMBIGUOUS_ABSORB, WIRING_AMBIGUOUS_BASE), false);
+check('a plain division in the diff keeps the file non-inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace('  await i18next.changeLanguage(language);', '  await i18next.changeLanguage(language);\n  const half = total / 2;')), false);
 
 // 7. classifyLocaleKeys — key-level mapping within a namespace
 check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);

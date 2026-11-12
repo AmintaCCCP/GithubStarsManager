@@ -833,10 +833,14 @@ const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\
  * comments and string/template literals are skipped, so a `}` inside a
  * comment or a string cannot close a guard block on the scanner's behalf.
  * Block comments and template literals carry scanner state across lines.
- * Returns null when the file ends inside an unterminated construct
- * (conservative: callers must treat the file as unanalyzable).
+ * Regex-vs-division is decided by the previous significant token; an
+ * ambiguous slash (after an identifier, `)` or `]`) is reported via the
+ * boolean flag rather than guessed — the caller must then treat the file as
+ * unanalyzable. Returns null when the file ends inside an unterminated
+ * construct (same conservative treatment).
  * @param {string} raw - File content.
- * @returns {number[] | null} Net brace delta per line, or null.
+ * @returns {{ deltas: number[] | null, ambiguous: boolean }} Net brace delta
+ *   per line plus the ambiguous-slash flag.
  */
 /** Keywords after which a `/` starts a regex literal instead of division. */
 const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'case', 'do', 'else', 'yield', 'await', 'throw']);
@@ -846,6 +850,7 @@ function braceDeltasPerLine(raw) {
   const deltas = new Array(lines.length).fill(0);
   let state = 'code';
   let regexClass = false;
+  let ambiguous = false;
   let line = 0;
   let i = 0;
   while (i < raw.length) {
@@ -891,6 +896,10 @@ function braceDeltasPerLine(raw) {
           i += 1;
           continue;
         }
+        // Identifier/`)`/`]` before the slash: most likely division, but a
+        // braceless `if (x) /re/.test(y);` proves it is not decidable from
+        // the previous token alone — flag the file as ambiguous.
+        ambiguous = true;
         i += 1;
         continue;
       }
@@ -928,8 +937,8 @@ function braceDeltasPerLine(raw) {
       i += 1;
     }
   }
-  if (state !== 'code') return null;
-  return deltas;
+  if (state !== 'code') return { deltas: null, ambiguous };
+  return { deltas, ambiguous };
 }
 
 /**
@@ -997,9 +1006,12 @@ function projectRange(lines, deltas, start, end) {
 export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
   if (baseRaw === null || headRaw === null) return false;
   if (baseRaw === headRaw) return true;
-  const baseDeltas = braceDeltasPerLine(baseRaw);
-  const headDeltas = braceDeltasPerLine(headRaw);
-  if (baseDeltas === null || headDeltas === null) return false;
+  const baseScan = braceDeltasPerLine(baseRaw);
+  const headScan = braceDeltasPerLine(headRaw);
+  if (baseScan === null || headScan === null) return false;
+  if (baseScan.ambiguous || headScan.ambiguous) return false;
+  const baseDeltas = baseScan.deltas;
+  const headDeltas = headScan.deltas;
   const baseLines = baseRaw.split('\n');
   const headLines = headRaw.split('\n');
   return JSON.stringify(projectRange(baseLines, baseDeltas, 0, baseLines.length))
