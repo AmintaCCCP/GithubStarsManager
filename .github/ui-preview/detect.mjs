@@ -24,6 +24,13 @@
  *                                          plugin-<slug>-<pageId> shot per page
  *                                          by reading the plugin manifest from
  *                                          the built bundle.
+ *   <scene>-<variant>                      an interaction variant of one base
+ *                                          scene (SCENE_VARIANTS below): a
+ *                                          state the default render never
+ *                                          shows, e.g. an open dialog or a
+ *                                          switched tab. shoot.mjs applies the
+ *                                          variant's clicks right after the
+ *                                          base scene's screenshot.
  *
  * `global` (shared chrome: App shell, header, ui primitives, theme tokens,
  * styling configs, common locales) expands to ALL view + settings scenes.
@@ -83,12 +90,102 @@ export const VIEW_SCENES = [
  */
 export const ALL_SCENES = [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)];
 
+/**
+ * Interaction variants: extra screenshots of one base scene in a state the
+ * default render never shows — an open dialog/sheet or a switched tab. Each
+ * spec (`<baseScene>-<name>`) is a valid shoot.mjs scene; the open recipe
+ * lives in shoot.mjs's VARIANT_ACTIONS. detect emits a variant only for diffs
+ * whose visible change lives inside that state (the component rendered there,
+ * via COMPONENT_VARIANTS below), never through `global` expansion.
+ * @type {Array<{spec: string, baseScene: string}>}
+ */
+export const SCENE_VARIANTS = [
+  // Token permission guide dialog: GitHubTokenPermissions renders inside a
+  // Dialog in the General settings tab, closed in the default screenshot.
+  { spec: 'settings-general-token-guide', baseScene: 'settings-general' },
+  // The same component's fine-grained tab: its warning box only renders after
+  // switching tabs, which no default screenshot does.
+  { spec: 'login-token-finegrained', baseScene: 'login' },
+
+  // Settings dialogs (opened by deterministic buttons in their panels).
+  { spec: 'settings-plugins-marketplace', baseScene: 'settings-plugins' },
+  // The sources dialog is chained on top of the open marketplace dialog.
+  { spec: 'settings-plugins-sources', baseScene: 'settings-plugins' },
+  { spec: 'settings-plugins-icon-picker', baseScene: 'settings-plugins' },
+  { spec: 'settings-star-sync-push-modal', baseScene: 'settings-star-sync' },
+  { spec: 'settings-ai-config-form', baseScene: 'settings-ai' },
+  { spec: 'settings-webdav-config-form', baseScene: 'settings-webdav' },
+  // Deploy-guide collapsible + its manual-deployment tab (tabs are hidden
+  // until the guide is expanded).
+  { spec: 'settings-vector-search-deploy-guide', baseScene: 'settings-vector-search' },
+
+  // Repositories-view dialogs and sheets (per-card buttons, toolbar buttons).
+  { spec: 'repositories-edit-modal', baseScene: 'repositories-light' },
+  { spec: 'repositories-release-sheet', baseScene: 'repositories-light' },
+  // Release sheet's notes tab (assets tab is the default sheet render).
+  { spec: 'repositories-release-sheet-notes', baseScene: 'repositories-light' },
+  { spec: 'repositories-chat-sheet', baseScene: 'repositories-light' },
+  { spec: 'repositories-chat-history-sheet', baseScene: 'repositories-light' },
+  { spec: 'repositories-readme-modal', baseScene: 'repositories-light' },
+  { spec: 'repositories-category-edit-modal', baseScene: 'repositories-light' },
+  { spec: 'repositories-batch-star-import', baseScene: 'repositories-light' },
+
+  // Other views.
+  { spec: 'gists-gist-detail', baseScene: 'gists' },
+  { spec: 'gists-new-gist', baseScene: 'gists' },
+  { spec: 'releases-filter-modal', baseScene: 'releases' },
+  { spec: 'releases-source-settings', baseScene: 'releases' },
+];
+
+/**
+ * Dialog/sheet/tab components that render ONLY inside an interaction variant.
+ * Keys are exact file names; values are space-separated SCENE_VARIANTS specs
+ * appended to the component's base-scene classification. A change to one of
+ * these files is invisible in the default render, so its variants are
+ * mandatory to show the change. Deliberately NOT listed: destructive
+ * confirmation dialogs (uninstall, data deletion, unstar — their shells are
+ * generic and their triggers interpolated/stateful), state-gated overlays
+ * (update dialog, sync-mode choice, login conflict, import preview),
+ * selection-gated bulk modals, and discovery channel-gated settings (their
+ * triggers only render on non-default channels the demo never selects).
+ * @type {Record<string, string>}
+ */
+const COMPONENT_VARIANTS = {
+  // Token permission helper: the guide dialog in settings-general and the
+  // fine-grained tab on the login page are closed/inactive by default.
+  'GitHubTokenPermissions.tsx': 'settings-general-token-guide login-token-finegrained',
+  'PluginMarketplaceDialog.tsx': 'settings-plugins-marketplace settings-plugins-sources',
+  'PluginSourcesDialog.tsx': 'settings-plugins-sources',
+  'PluginIconPickerDialog.tsx': 'settings-plugins-icon-picker',
+  'PushCategoriesModal.tsx': 'settings-star-sync-push-modal',
+  // The add/edit AI provider form is Modal-hosted inside the panel.
+  'AIConfigPanel.tsx': 'settings-ai-config-form',
+  'WebDAVPanel.tsx': 'settings-webdav-config-form',
+  // The deploy-guide collapsible hosts the deployment Tabs.
+  'VectorSearchSettings.tsx': 'settings-vector-search-deploy-guide',
+  'RepositoryEditModal.tsx': 'repositories-edit-modal',
+  // The release sheet's notes tab is its non-default content state.
+  'RepositoryReleaseSheet.tsx': 'repositories-release-sheet repositories-release-sheet-notes',
+  'RepositoryChatSheet.tsx': 'repositories-chat-sheet',
+  'GlobalChatHistorySheet.tsx': 'repositories-chat-history-sheet',
+  // The readme modal opens from the repository card body click.
+  'ReadmeModal.tsx': 'repositories-readme-modal',
+  'CategoryEditModal.tsx': 'repositories-category-edit-modal',
+  'BatchStarImportDialog.tsx': 'repositories-batch-star-import',
+  'GistDetailModal.tsx': 'gists-gist-detail',
+  'GistEditorModal.tsx': 'gists-new-gist',
+  // FilterModal renders only in the releases view's filter manager.
+  'FilterModal.tsx': 'releases-filter-modal',
+  'ReleaseSourceSettingsModal.tsx': 'releases-source-settings',
+};
+
 const SETTINGS_SCENE_NAMES = new Set(SETTINGS_TABS.map((t) => t.scene));
 
 /** Standalone scene names outside ALL_SCENES: the login page renders instead
  *  of the app shell, so global chrome never reaches it and it is only shot
- *  when login-specific files change. */
-const EXTRA_SCENE_NAMES = new Set(['login']);
+ *  when login-specific files change. Interaction variant specs join them —
+ *  they are extras shot on top of their base scene. */
+const EXTRA_SCENE_NAMES = new Set(['login', ...SCENE_VARIANTS.map((v) => v.spec)]);
 
 /**
  * Mapping from high-level view identifier to the preview scene names it renders.
@@ -215,21 +312,23 @@ const LOCALE_KEY_SCENES = {
     generalPanel: 'settings-general settings-appearance',
     themeSettingsCard: 'settings-appearance',
     starSyncPanel: 'settings-star-sync',
-    aIConfigPanel: 'settings-ai',
-    webDAVPanel: 'settings-webdav',
+    aIConfigPanel: 'settings-ai settings-ai-config-form',
+    webDAVPanel: 'settings-webdav settings-webdav-config-form',
     backupPanel: 'settings-backup',
     includeKeysToggle: 'settings-backup settings-data',
     backendPanel: 'settings-backend',
     categoryPanel: 'settings-category',
-    pushCategoriesModal: 'settings-star-sync',
+    pushCategoriesModal: 'settings-star-sync settings-star-sync-push-modal',
     // ThemeSettingsCard reuses the menu panel's reorder strings in 外观.
     menuManagementPanel: 'settings-menu settings-appearance',
     dataManagementPanel: 'settings-data',
     diagnosticLogsPanel: 'settings-logs',
     networkPanel: 'settings-network',
     mcpSettingsPanel: 'settings-mcp',
-    vectorSearchSettings: 'settings-vector-search',
-    pluginSettingsPanel: 'settings-plugins',
+    vectorSearchSettings: 'settings-vector-search settings-vector-search-deploy-guide',
+    // The marketplace/sources/icon-picker dialogs render only in their
+    // variants; their strings share this top-level key with the panel.
+    pluginSettingsPanel: 'settings-plugins settings-plugins-marketplace settings-plugins-sources settings-plugins-icon-picker',
     // Viewer/modal strings surface over the repositories view too (repo-card plugin actions).
     pluginPageViewer: 'repositories settings-plugins',
     // Update dialog strings: the check button and dialog live in 通用, the
@@ -244,8 +343,8 @@ const LOCALE_KEY_SCENES = {
     // CategoryPanel reuses the empty-name validation string in 分类管理.
     categoryUtils: 'repositories settings-category',
     categorySidebar: 'repositories',
-    categoryEditModal: 'repositories',
-    repositoryEditModal: 'repositories',
+    categoryEditModal: 'repositories repositories-category-edit-modal',
+    repositoryEditModal: 'repositories repositories-edit-modal',
     searchBar: 'repositories',
     searchDemo: 'repositories',
     searchResultStats: 'repositories',
@@ -261,8 +360,8 @@ const LOCALE_KEY_SCENES = {
     backToTop: 'repositories',
     scrollToBottom: 'repositories',
 
-    // FilterModal renders the asset-filter strings inside the repositories view.
-    assetFilterManager: 'releases repositories',
+    // FilterModal renders only in the releases view (release timeline sidebar).
+    assetFilterManager: 'releases releases-filter-modal',
     useReleaseArtifactActions: 'releases',
     installableAssetRecommendation: 'releases',
 
@@ -271,8 +370,8 @@ const LOCALE_KEY_SCENES = {
 
     markdownRenderer: 'repositories releases discovery',
     bilingualMarkdownRenderer: 'repositories releases discovery',
-    readmeModal: 'repositories',
-    useReadmeFetch: 'repositories',
+    readmeModal: 'repositories repositories-readme-modal',
+    useReadmeFetch: 'repositories repositories-readme-modal',
   },
   // settings.json carries the settings hooks' toasts/errors.
   settings: {
@@ -299,13 +398,18 @@ const LOCALE_KEY_SCENES = {
     usePluginWebSearch: 'repositories settings-plugins',
   },
   chat: {
-    globalChatHistorySheet: 'repositories',
+    globalChatHistorySheet: 'repositories repositories-chat-history-sheet',
     repositoryChatHistoryPanel: 'repositories',
-    repositoryChatSheet: 'repositories',
+    repositoryChatSheet: 'repositories repositories-chat-sheet',
     citationBadge: 'repositories',
     useRepositoryChat: 'repositories',
     useRepositoryChatSessions: 'repositories',
     repositoryChatService: 'repositories',
+  },
+  // gists.json modal strings only render in their interaction variants.
+  gists: {
+    gistDetailModal: 'gists gists-gist-detail',
+    gistEditorModal: 'gists gists-new-gist',
   },
   // releases.json strings are consumed across views: fork cards render in the
   // forks timeline, the subscription card in discovery, and the release sheet
@@ -314,10 +418,10 @@ const LOCALE_KEY_SCENES = {
     forkCard: 'forks',
     forkTimeline: 'forks',
     subscriptionRepoCard: 'discovery',
-    repositoryReleaseSheet: 'releases repositories',
+    repositoryReleaseSheet: 'releases repositories repositories-release-sheet repositories-release-sheet-notes',
     releaseCard: 'releases',
     releasePluginRecommendations: 'releases',
-    releaseSourceSettingsModal: 'releases',
+    releaseSourceSettingsModal: 'releases releases-source-settings',
     releaseTimeline: 'releases',
     useReleaseTimelineActions: 'releases',
     useWatchedSourcesSync: 'releases',
@@ -325,8 +429,8 @@ const LOCALE_KEY_SCENES = {
   // repository card strings also feed the card-action settings in 外观.
   repositories: {
     repositoryCard: 'repositories settings-appearance',
-    batchStar: 'repositories',
-    repositoryEditModal: 'repositories',
+    batchStar: 'repositories repositories-batch-star-import',
+    repositoryEditModal: 'repositories repositories-edit-modal',
     repositoryList: 'repositories',
     repositoryHealthPanel: 'repositories',
     useBulkRepositoryActions: 'repositories',
@@ -366,7 +470,11 @@ const LOCALE_NS_FALLBACK = {
   // shared namespaces can render on any page
   common: 'global',
   errors: 'global',
-  login: 'login',
+  // login.json strings render on the login page AND inside the settings
+  // token-guide dialog (GitHubTokenPermissions reads the login namespace in
+  // both hosts). The dialog and the component's fine-grained tab only show
+  // through their variant scenes.
+  login: ['login', 'settings-general', 'login-token-finegrained', 'settings-general-token-guide'],
   ai: 'global',
   services: 'global',
   search: 'repositories',
@@ -423,13 +531,15 @@ const SAFE_PLUGIN_SLUG = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /**
  * Classify a changed path to its affected view identifier, scene name, scene
- * spec, or list of them. Returns null if the file is ignored or does not
- * affect UI.
+ * spec, or list of them. Returns the base scenes for the path plus any
+ * interaction-variant scenes (COMPONENT_VARIANTS) the path renders only in.
+ * Returns null if the file is ignored or does not affect UI.
  *
  * Returned tokens are one of:
  *   - view ids resolved via VIEW_TO_SCENES ('repositories', 'settings', 'gists', …)
  *   - concrete scene names ('settings-data')
  *   - dynamic plugin specs ('plugin:<slug>')
+ *   - interaction variant specs ('settings-plugins-marketplace', …)
  *   - 'global' (all static scenes)
  *   - 'deferred' (state containers whose visible effect ships through the
  *     components changed in the same PR; expanded to global only when no
@@ -442,7 +552,21 @@ export function classifyPath(filePath) {
   if (isIgnoredPath(path)) {
     return null;
   }
+  const base = classifyBasePath(path);
+  const variantSpecs = splitSpec(COMPONENT_VARIANTS[path.split('/').pop()] ?? '');
+  if (variantSpecs.length === 0) return base;
+  if (!base) return variantSpecs;
+  return [...(Array.isArray(base) ? base : [base]), ...variantSpecs];
+}
 
+/**
+ * Base-scene classification shared by every non-ignored path (the rules that
+ * existed before interaction variants). Returns null when the path affects no
+ * base scene; classifyPath unions the result with COMPONENT_VARIANTS.
+ * @param {string} path - Normalized (forward-slash) repository-relative path.
+ * @returns {string | string[] | null}
+ */
+function classifyBasePath(path) {
   // 0. Locale files classify at namespace level here; mapPathsToScenes
   // overrides this with the key-level diff when one is available.
   if (LOCALE_FILE_PATTERN.test(path)) {
@@ -459,11 +583,12 @@ export function classifyPath(filePath) {
     return 'gists';
   }
 
-  // 2. Releases view
+  // 2. Releases view. FilterModal belongs here: it is instantiated by the
+  // AssetFilterManager in the releases view's context sidebar only.
   if (
     path.startsWith('src/features/releases/') ||
     /^src\/components\/Release/i.test(path) ||
-    /^src\/components\/Asset(FilterManager|LeadingIcon)\./.test(path) ||
+    /^src\/components\/(AssetFilterManager|AssetLeadingIcon|FilterModal)\./.test(path) ||
     /^src\/components\/InstallableAssetRecommendation\./.test(path) ||
     /^src\/components\/SiWindows\./.test(path) ||
     /^src\/hooks\/useReleaseArtifactActions\./.test(path) ||
@@ -551,7 +676,6 @@ export function classifyPath(filePath) {
     /^src\/components\/Repository/i.test(path) ||
     /^src\/components\/Category/i.test(path) ||
     /^src\/components\/Search/i.test(path) ||
-    /^src\/components\/FilterModal\./.test(path) ||
     /^src\/components\/BatchStarImportDialog\./.test(path) ||
     /^src\/components\/Bulk/i.test(path) ||
     /^src\/components\/SimilarViewBanner\./.test(path) ||
@@ -603,8 +727,9 @@ export function classifyPath(filePath) {
     return 'login';
   }
 
-  // 13. Token permission helper renders inside the General settings tab and
-  // on the login page.
+  // 13. Token permission helper renders inline on the login page and inside
+  // the General settings tab's token-guide dialog; its interaction variants
+  // are declared in COMPONENT_VARIANTS.
   if (/^src\/components\/GitHubTokenPermissions\./.test(path)) {
     return ['settings-general', 'login'];
   }
@@ -682,6 +807,294 @@ export function classifyLocaleFile(filePath, changedKeys = null) {
   return splitSpec(typeof fallback === 'string' ? fallback : fallback.join(' '));
 }
 
+/** Whether a line carries no web behavior on its own: importing the bridge
+ *  module, calling a bridge method as a statement (optionally `void`-prefixed,
+ *  arguments restricted to side-effect-free expressions — no nested calls,
+ *  assignments or braces), the bridge-support guard's opening line, or bare
+ *  syntax. Anything that ASSIGNS from the bridge, branches on it for a
+ *  non-bridge value, nests calls in its arguments, or mixes in web-relevant
+ *  literals deliberately does NOT match and stays web-relevant. */
+const BRACE_ONLY_LINE = /^\s*[{}()]*\s*$/;
+const BRIDGE_LINE_SHAPES = [
+  /^\s*import\s+.*electronProxy[^;]*;\s*$/,
+  /^\s*(?:void\s+)?desktopBridge\.[A-Za-z_$][\w$]*\((?:[^()={}\\]|\\.)*\)\s*;\s*$/,
+];
+const isBridgeOrStructuralLine = (line) => BRACE_ONLY_LINE.test(line) || COMMENT_ONLY_LINE.test(line) || BRIDGE_LINE_SHAPES.some((shape) => shape.test(line));
+
+/** Comment-only lines carry no behavior: line comments (block comments that
+ *  span lines degrade conservatively in the projection below). */
+const COMMENT_ONLY_LINE = /^\s*\/\//;
+
+/** The desktop-bridge guard's opening line. */
+const BRIDGE_GUARD_LINE = /^\s*if\s*\(\s*desktopBridge\.isSupported\(\)\s*\)\s*\{\s*$/;
+
+/**
+ * Resolve the source token immediately before `index`, skipping whitespace
+ * and comments. Returns the token's last character (word tokens report their
+ * final character; callers re-collect the full word backward), whether it
+ * resolved, and the index to continue collecting a word from.
+ * @param {string} raw - File content.
+ * @param {number} index - Exclusive start index for the backward scan.
+ * @returns {{ char: string, index: number, resolved: boolean }}
+ */
+const tokenBefore = (raw, mask, index) => {
+  let k = index;
+  // Skip non-code characters (comments, strings, template contents) AND code
+  // whitespace: the previous SIGNIFICANT token decides regex-vs-division,
+  // and `state. // note\n return` must resolve to the property dot across
+  // both kinds of filler.
+  while (k >= 0 && (mask[k] === 0 || /[\s]/.test(raw[k]))) k -= 1;
+  return k;
+};
+
+/** Keywords after which a `/` starts a regex literal instead of division. */
+const REGEX_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'case', 'do', 'else', 'yield', 'await', 'throw']);
+
+/**
+ * Single forward pass over the file producing everything the wiring-diff
+ * analysis needs: the per-character code mask (1 = actual JavaScript code;
+ * comment, string and template-literal contents are unmarked), the per-line
+ * net brace delta (masked characters contribute nothing), and the
+ * ambiguous-slash flag. Regex-vs-division is decided from the previous
+ * significant token (backward scans consult the mask, so comment and string
+ * contents cannot masquerade as tokens):
+ *   - a regex-allowing keyword (return, void, typeof, …) as a standalone
+ *     token starts a regex — but the same name after `.` is a property
+ *     access (state.return), which is ambiguous, with whitespace and
+ *     comments between the dot and the keyword handled by the mask;
+ *   - punctuation where a regex is the only valid continuation ('(', '[',
+ *     '{', ',', ';', '=', ':', '!', '&', '|', '?', '>', start of file)
+ *     starts a regex;
+ *   - anything else (identifier, ')', ']', '}', string end — a braceless
+ *     `if (x) /re/.test(y);` proves division is not decidable from the
+ *     previous token alone) is ambiguous.
+ * Template literals skip their contents including `${}` interpolations (a
+ * conservative approximation). The ambiguous flag and an unterminated
+ * construct at EOF both mean "unanalyzable": callers must treat the file as
+ * non-inert.
+ * @param {string} raw - File content.
+ * @returns {{ mask: Uint8Array, deltas: number[], ambiguous: boolean }}
+ */
+function analyzeCode(raw) {
+  const lines = raw.split('\n');
+  const mask = new Uint8Array(raw.length);
+  const deltas = new Array(lines.length).fill(0);
+  let state = 'code';
+  let regexClass = false;
+  let ambiguous = false;
+  let line = 0;
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === '\n') {
+      // A line comment ends at the newline; block comments and template
+      // literals span it.
+      if (state === 'line') state = 'code';
+      line += 1;
+      i += 1;
+      continue;
+    }
+    if (state === 'code') {
+      if (ch === '/' && raw[i + 1] === '/') {
+        state = 'line';
+        i += 2;
+        continue;
+      }
+      if (ch === '/' && raw[i + 1] === '*') {
+        state = 'block';
+        i += 2;
+        continue;
+      }
+      if (ch === "'" || ch === '"' || ch === '`') {
+        state = ch === "'" ? 'single' : ch === '"' ? 'double' : 'template';
+        mask[i] = 1;
+        i += 1;
+        continue;
+      }
+      if (ch === '/') {
+        const wordStart = tokenBefore(raw, mask, i - 1);
+        let word = '';
+        let beforeWord = '';
+        let isIdentifier = false;
+        if (wordStart >= 0 && /[A-Za-z_$0-9]/.test(raw[wordStart])) {
+          let w = wordStart;
+          while (w >= 0 && mask[w] === 1 && /[A-Za-z_$0-9]/.test(raw[w])) {
+            word = raw[w] + word;
+            w -= 1;
+          }
+          const before = tokenBefore(raw, mask, w);
+          if (before < 0) {
+            ambiguous = true;
+            mask[i] = 1;
+            i += 1;
+            continue;
+          }
+          beforeWord = raw[before];
+          // A plain identifier (not a keyword, not a property) before the
+          // slash: the JS grammar makes a regex literal impossible there, so
+          // this is division — keep counting braces in code state instead of
+          // skipping a regex body.
+          isIdentifier = beforeWord !== '.' && !REGEX_KEYWORDS.has(word);
+        } else {
+          beforeWord = wordStart >= 0 ? raw[wordStart] : '';
+        }
+        if (beforeWord === '.') {
+          // Property chain (state.return): the name after the dot may look
+          // like a keyword but is a property; treat as ambiguous.
+          ambiguous = true;
+          mask[i] = 1;
+          i += 1;
+          continue;
+        }
+        if (isIdentifier) {
+          // Division: the slash does not start a regex body, so scanning
+          // continues in code state and braces keep counting.
+          mask[i] = 1;
+          i += 1;
+          continue;
+        }
+        const isRegexStart = beforeWord === '' || '([{,;=:!&|?>'.includes(beforeWord);
+        if (!isRegexStart) {
+          ambiguous = true;
+          mask[i] = 1;
+          i += 1;
+          continue;
+        }
+        state = 'regex';
+        regexClass = false;
+        i += 1;
+        continue;
+      }
+      mask[i] = 1;
+      if (ch === '{') deltas[line] += 1;
+      else if (ch === '}') deltas[line] -= 1;
+      i += 1;
+    } else if (state === 'line') {
+      if (ch === '\n') {
+        state = 'code';
+        line += 1;
+      }
+      i += 1;
+    } else if (state === 'block') {
+      if (ch === '*' && raw[i + 1] === '/') {
+        state = 'code';
+        i += 2;
+      } else {
+        i += 1;
+      }
+    } else if (state === 'single' || state === 'double') {
+      // Regular strings do not span lines in JS; an unterminated one is a
+      // syntax error the build would catch (the run to EOF marks the file
+      // ambiguous below).
+      if (ch === '\\') i += 2;
+      else {
+        if (ch === (state === 'single' ? "'" : '"')) state = 'code';
+        i += 1;
+      }
+    } else if (state === 'regex') {
+      if (ch === '\\') i += 2;
+      else if (ch === '[') regexClass = true;
+      else if (ch === ']') regexClass = false;
+      else if (ch === '/' && !regexClass) state = 'code';
+      i += 1;
+    } else {
+      if (ch === '\\') i += 2;
+      else if (ch === '`') state = 'code';
+      i += 1;
+    }
+  }
+  if (state !== 'code') ambiguous = true;
+  return { mask, deltas, ambiguous };
+}
+
+/**
+ * The web-relevant projection of a line range: the in-order sequence of lines
+ * that can change web rendering. Bridge-shaped, bare-syntax and comment-only
+ * lines are omitted. A desktop-bridge guard block is omitted too (transparent)
+ * when its own projection is empty — wrapping nothing but bridge statements
+ * cannot change web behavior; otherwise the block is emitted as a `guard{…}`
+ * token, so wrapping, unwrapping or moving the block boundary around web
+ * statements changes the projection. Guard boundaries come from
+ * braceDeltasPerLine, so comment/string braces are ignored. An unbalanced
+ * range degrades conservatively: the whole remaining range is emitted raw.
+ * @param {string[]} lines - File lines.
+ * @param {number[]} deltas - Per-line brace deltas (braceDeltasPerLine).
+ * @param {number} start - Inclusive start index.
+ * @param {number} end - Exclusive end index.
+ * @returns {string[]} Projection tokens.
+ */
+function projectRange(lines, deltas, start, end) {
+  const tokens = [];
+  let i = start;
+  while (i < end) {
+    const line = lines[i];
+    if (BRIDGE_GUARD_LINE.test(line)) {
+      let balance = deltas[i];
+      let close = -1;
+      for (let j = i + 1; j < end; j += 1) {
+        balance += deltas[j];
+        if (balance === 0) {
+          close = j;
+          break;
+        }
+      }
+      if (close === -1) {
+        tokens.push('<unbalanced-guard>');
+        tokens.push(...lines.slice(i + 1, end));
+        break;
+      }
+      const inner = projectRange(lines, deltas, i + 1, close);
+      if (inner.length > 0) tokens.push(`guard{${inner.join('\n')}}`);
+      i = close + 1;
+    } else {
+      if (!isBridgeOrStructuralLine(line)) tokens.push(line);
+      i += 1;
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Whether a file's diff can only affect the Electron desktop surface. The web
+ * bundle's desktopBridge no-ops every method outside Electron (see
+ * src/services/electronProxy.ts), so a diff is web-inert exactly when the two
+ * versions' web projections (projectRange) are identical: every changed,
+ * added, removed or reordered line must be bridge syntax, and guards must
+ * only ever wrap bridge statements — with guard boundaries derived from a
+ * comment/string-aware brace scan, so a `}` inside a comment or string
+ * cannot close a block on the scanner's behalf. Byte-identical contents are
+ * trivially inert; unreadable or ambiguous diffs stay non-inert
+ * (conservative: more screenshots, never fewer).
+ * @param {string} baseRaw - Base version content (null when unreadable).
+ * @param {string} headRaw - Head version content (null when unreadable).
+ * @returns {boolean} True when the diff is provably web-inert.
+ */
+export function isDesktopBridgeOnlyDiff(baseRaw, headRaw) {
+  if (baseRaw === null || headRaw === null) return false;
+  if (baseRaw === headRaw) return true;
+  const baseScan = analyzeCode(baseRaw);
+  const headScan = analyzeCode(headRaw);
+  if (baseScan.ambiguous || headScan.ambiguous) return false;
+  const baseDeltas = baseScan.deltas;
+  const headDeltas = headScan.deltas;
+  const baseLines = baseRaw.split('\n');
+  const headLines = headRaw.split('\n');
+  return JSON.stringify(projectRange(baseLines, baseDeltas, 0, baseLines.length))
+    === JSON.stringify(projectRange(headLines, headDeltas, 0, headLines.length));
+}
+
+/** i18n module wiring (non-locale, non-test): the i18next runtime and its
+ *  side effects. Such a diff usually renders nothing by itself, but CAN (boot
+ *  language resolution), so it classifies as global — unless the content diff
+ *  proves it desktop-bridge-only (see isDesktopBridgeOnlyDiff).
+ * @param {string} filePath - Path relative to the repository root.
+ * @returns {boolean} True for changed src/i18n module files worth diffing.
+ */
+export function isI18nWiringPath(filePath) {
+  const path = filePath.replace(/\\/g, '/');
+  return /^src\/i18n\/[^/]+\.ts$/.test(path) && !/\.(test|spec)\.[jt]sx?$/.test(path);
+}
+
 /**
  * Parse output from GitHub API files queries (handles raw JSON or newline-separated filenames).
  * If the compare output indicates branch divergence (force push) or truncation (>= 300 files),
@@ -726,9 +1139,12 @@ export function parseFileList(raw) {
  *   locale file path to its diffed top-level keys. Entries with an empty key
  *   array mean "diffed, nothing visible changed"; missing entries fall back to
  *   the file-level namespace mapping.
+ * @param {Set<string>} [inertPaths] - Paths whose content diff proves they
+ *   render no web difference (desktop-bridge-only i18n wiring changes); they
+ *   are skipped like ignored paths.
  * @returns {string[]} Selected scene names / specs.
  */
-export function mapPathsToScenes(paths, localeKeysByPath = {}) {
+export function mapPathsToScenes(paths, localeKeysByPath = {}, inertPaths = new Set()) {
   const tokens = new Set();
   let hasGlobal = false;
   let hasDeferred = false;
@@ -741,6 +1157,9 @@ export function mapPathsToScenes(paths, localeKeysByPath = {}) {
   for (const path of paths) {
     if (path === '*' || path === '__ALL__') {
       hasGlobal = true;
+      continue;
+    }
+    if (inertPaths.has(path)) {
       continue;
     }
     let classification;
@@ -1002,20 +1421,34 @@ export async function main() {
     headSha: effectiveHeadSha,
   });
 
-  // Key-level locale diffing: only the strings that actually changed map to
-  // scenes, instead of the whole namespace going global.
+  // Content-level diffing against the base ref, for two purposes:
+  // - locale files: key-level diffing so only the strings that actually
+  //   changed map to scenes, instead of the whole namespace going global;
+  // - i18n module wiring: a diff confined to desktop-bridge lines cannot
+  //   render in the web preview and must not trigger every scene.
   let localeKeysByPath = {};
+  const inertPaths = new Set();
   if (!filenames.includes('*')) {
     const baseRef = action === 'synchronize' && /^[0-9a-f]{40}$/i.test(beforeSha) && !/^0+$/.test(beforeSha)
       ? beforeSha.trim()
       : pull.base?.sha;
     if (baseRef) {
       localeKeysByPath = await diffLocaleKeys({ repo, paths: filenames, baseRef, headRef: effectiveHeadSha });
+      for (const wiringPath of filenames.filter(isI18nWiringPath)) {
+        const [baseRaw, headRaw] = await Promise.all([
+          fetchContentAt({ repo, path: wiringPath, ref: baseRef }),
+          fetchContentAt({ repo, path: wiringPath, ref: effectiveHeadSha }),
+        ]);
+        if (isDesktopBridgeOnlyDiff(baseRaw, headRaw)) {
+          console.log(`detect: ${wiringPath} diff is desktop-bridge-only; renders no web change`);
+          inertPaths.add(wiringPath);
+        }
+      }
     }
   }
 
   const forcedByLabel = (pull.labels ?? []).some((label) => label?.name === 'ui-preview');
-  let scenes = mapPathsToScenes(filenames, localeKeysByPath);
+  let scenes = mapPathsToScenes(filenames, localeKeysByPath, inertPaths);
 
   if (scenes.length === 0 && forcedByLabel) {
     console.log(`detect: forced by ui-preview label; capturing all scenes`);

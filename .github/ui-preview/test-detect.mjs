@@ -2,6 +2,8 @@
  * Run: node test-detect.mjs */
 import {
   isIgnoredPath,
+  isI18nWiringPath,
+  isDesktopBridgeOnlyDiff,
   classifyPath,
   classifyLocaleKeys,
   classifyLocaleFile,
@@ -13,6 +15,7 @@ import {
   VIEW_SCENES,
   SETTINGS_TABS,
   VIEW_TO_SCENES,
+  SCENE_VARIANTS,
 } from './detect.mjs';
 
 let failures = 0;
@@ -31,6 +34,8 @@ const check = (name, actual, expected) => {
 check('all settings tabs have unique scene names', new Set(SETTINGS_TABS.map((t) => t.scene)).size, SETTINGS_TABS.length);
 check('ALL_SCENES is views plus settings tabs', ALL_SCENES, [...VIEW_SCENES, ...SETTINGS_TABS.map((t) => t.scene)]);
 check('settings view expands to every settings scene', VIEW_TO_SCENES.settings, SETTINGS_TABS.map((t) => t.scene));
+check('every interaction variant has a unique spec', new Set(SCENE_VARIANTS.map((v) => v.spec)).size, SCENE_VARIANTS.length);
+check('every interaction variant builds on a known base scene', SCENE_VARIANTS.every((v) => ALL_SCENES.includes(v.baseScene) || v.baseScene === 'login'), true);
 
 // 1. isIgnoredPath tests
 check('test file in src is ignored', isIgnoredPath('src/App.contextSidebar.test.tsx'), true);
@@ -110,8 +115,8 @@ check('appearance panel maps to appearance scene', classifyPath('src/components/
 check('theme settings card maps to appearance scene', classifyPath('src/components/settings/ThemeSettingsCard.tsx'), ['settings-appearance']);
 check('repository card actions maps to appearance scene', classifyPath('src/components/settings/RepositoryCardActionsSettings.tsx'), ['settings-appearance']);
 check('star sync panel maps to star-sync scene', classifyPath('src/components/settings/StarSyncPanel.tsx'), ['settings-star-sync']);
-check('ai config panel maps to ai scene', classifyPath('src/components/settings/AIConfigPanel.tsx'), ['settings-ai']);
-check('webdav panel maps to webdav scene', classifyPath('src/components/settings/WebDAVPanel.tsx'), ['settings-webdav']);
+check('ai config panel spans its scene and the add/edit form variant', classifyPath('src/components/settings/AIConfigPanel.tsx'), ['settings-ai', 'settings-ai-config-form']);
+check('webdav panel spans its scene and the config form variant', classifyPath('src/components/settings/WebDAVPanel.tsx'), ['settings-webdav', 'settings-webdav-config-form']);
 check('backup panel maps to backup scene', classifyPath('src/components/settings/BackupPanel.tsx'), ['settings-backup']);
 check('backend panel maps to backend scene', classifyPath('src/components/settings/BackendPanel.tsx'), ['settings-backend']);
 check('category panel maps to category scene', classifyPath('src/components/settings/CategoryPanel.tsx'), ['settings-category']);
@@ -120,11 +125,11 @@ check('data panel maps to data scene', classifyPath('src/components/settings/Dat
 check('logs panel maps to logs scene', classifyPath('src/components/settings/DiagnosticLogsPanel.tsx'), ['settings-logs']);
 check('network panel maps to network scene', classifyPath('src/components/settings/NetworkPanel.tsx'), ['settings-network']);
 check('mcp panel maps to mcp scene', classifyPath('src/components/settings/McpSettingsPanel.tsx'), ['settings-mcp']);
-check('vector search maps to vector-search scene', classifyPath('src/components/settings/VectorSearchSettings.tsx'), ['settings-vector-search']);
+check('vector search spans its scene and the deploy-guide variant', classifyPath('src/components/settings/VectorSearchSettings.tsx'), ['settings-vector-search', 'settings-vector-search-deploy-guide']);
 check('plugin settings panel maps to plugins scene', classifyPath('src/components/settings/PluginSettingsPanel.tsx'), ['settings-plugins']);
-check('plugin icon picker maps to plugins scene', classifyPath('src/components/settings/PluginIconPickerDialog.tsx'), ['settings-plugins']);
-check('plugin marketplace maps to plugins scene', classifyPath('src/components/settings/PluginMarketplaceDialog.tsx'), ['settings-plugins']);
-check('push categories modal maps to star-sync scene', classifyPath('src/components/settings/PushCategoriesModal.tsx'), ['settings-star-sync']);
+check('plugin icon picker spans its scene and its dialog variant', classifyPath('src/components/settings/PluginIconPickerDialog.tsx'), ['settings-plugins', 'settings-plugins-icon-picker']);
+check('plugin marketplace spans its scene and its dialog variants', classifyPath('src/components/settings/PluginMarketplaceDialog.tsx'), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources']);
+check('push categories modal spans its scene and its dialog variant', classifyPath('src/components/settings/PushCategoriesModal.tsx'), ['settings-star-sync', 'settings-star-sync-push-modal']);
 check('include keys toggle spans backup and data scenes', classifyPath('src/components/settings/IncludeKeysToggle.tsx'), ['settings-backup', 'settings-data']);
 check('unknown settings component falls back to whole settings view', classifyPath('src/components/settings/SomeFuturePanel.tsx'), ['settings']);
 
@@ -165,7 +170,7 @@ check('search locale', classifyPath('src/locales/zh/search.json'), ['repositorie
 check('plugins locale mixes repositories and plugins settings', classifyPath('src/locales/zh/plugins.json'), ['repositories', 'settings-plugins', 'discovery']);
 check('app locale is conservative global', classifyPath('src/locales/zh/app.json'), ['global']);
 check('common locale is global', classifyPath('src/locales/zh/common.json'), ['global']);
-check('login locale maps to the login scene', classifyPath('src/locales/zh/login.json'), ['login']);
+check('login locale spans the login scene, the settings dialog and its variants', classifyPath('src/locales/zh/login.json'), ['login', 'settings-general', 'login-token-finegrained', 'settings-general-token-guide']);
 
 // 6. classifyPath — state containers are deferred, global chrome is global
 check('preference slice is deferred', classifyPath('src/store/slices/preferenceSlice.ts'), 'deferred');
@@ -186,8 +191,28 @@ check('DebugModeIndicator is deferred', classifyPath('src/components/DebugModeIn
 check('MarkdownRenderer is deferred (collapsed notes / closed modals only)', classifyPath('src/components/MarkdownRenderer.tsx'), 'deferred');
 check('BackToTop is deferred (hidden until scroll)', classifyPath('src/components/BackToTop.tsx'), 'deferred');
 check('LoginScreen maps to the login scene', classifyPath('src/components/LoginScreen.tsx'), 'login');
-check('login locale maps to the login scene', classifyPath('src/locales/zh/login.json'), ['login']);
-check('token permissions helper spans settings-general and login', classifyPath('src/components/GitHubTokenPermissions.tsx'), ['settings-general', 'login']);
+check('token permissions helper spans its hosts and their interaction variants', classifyPath('src/components/GitHubTokenPermissions.tsx'), ['settings-general', 'login', 'settings-general-token-guide', 'login-token-finegrained']);
+check('plugin sources dialog spans its scene and its dialog variant', classifyPath('src/components/settings/PluginSourcesDialog.tsx'), ['settings-plugins', 'settings-plugins-sources']);
+check('repository edit modal spans its view and its dialog variant', classifyPath('src/components/RepositoryEditModal.tsx'), ['repositories', 'repositories-edit-modal']);
+check('release sheet spans its view and both sheet variants', classifyPath('src/components/RepositoryReleaseSheet.tsx'), ['repositories', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
+check('repository chat sheet spans its view and its sheet variant', classifyPath('src/components/RepositoryChatSheet.tsx'), ['repositories', 'repositories-chat-sheet']);
+check('global chat history sheet spans its view and its sheet variant', classifyPath('src/components/GlobalChatHistorySheet.tsx'), ['repositories', 'repositories-chat-history-sheet']);
+check('readme modal spans its view and its dialog variant', classifyPath('src/components/ReadmeModal.tsx'), ['repositories', 'repositories-readme-modal']);
+check('category edit modal spans its view and its dialog variant', classifyPath('src/components/CategoryEditModal.tsx'), ['repositories', 'repositories-category-edit-modal']);
+check('batch star import spans its view and its dialog variant', classifyPath('src/components/BatchStarImportDialog.tsx'), ['repositories', 'repositories-batch-star-import']);
+check('gist detail modal spans gists and its dialog variant', classifyPath('src/components/GistDetailModal.tsx'), ['gists', 'gists-gist-detail']);
+check('gist editor modal spans gists and its dialog variant', classifyPath('src/components/GistEditorModal.tsx'), ['gists', 'gists-new-gist']);
+check('filter modal renders in releases only, plus its dialog variant', classifyPath('src/components/FilterModal.tsx'), ['releases', 'releases-filter-modal']);
+check('release source settings modal spans releases and its dialog variant', classifyPath('src/components/ReleaseSourceSettingsModal.tsx'), ['releases', 'releases-source-settings']);
+check('a dialog-file diff orders its variants after the extras', mapPathsToScenes(['src/components/RepositoryReleaseSheet.tsx']), ['repositories-light', 'repositories-dark', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
+check('app readme modal key carries its dialog variant', classifyLocaleKeys('app', ['readmeModal']), ['repositories', 'repositories-readme-modal']);
+check('app category edit modal key carries its dialog variant', classifyLocaleKeys('app', ['categoryEditModal']), ['repositories', 'repositories-category-edit-modal']);
+check('app push categories key carries its dialog variant', classifyLocaleKeys('app', ['pushCategoriesModal']), ['settings-star-sync', 'settings-star-sync-push-modal']);
+check('app ai/webdav/vector keys carry their form variants', classifyLocaleKeys('app', ['aIConfigPanel', 'webDAVPanel', 'vectorSearchSettings']), ['settings-ai', 'settings-ai-config-form', 'settings-webdav', 'settings-webdav-config-form', 'settings-vector-search', 'settings-vector-search-deploy-guide']);
+check('repositories edit modal and batch star keys carry their variants', classifyLocaleKeys('repositories', ['repositoryEditModal', 'batchStar']), ['repositories', 'repositories-edit-modal', 'repositories-batch-star-import']);
+check('gists modal keys carry their editor/detail variants', classifyLocaleKeys('gists', ['gistEditorModal', 'gistDetailModal']), ['gists', 'gists-new-gist', 'gists-gist-detail']);
+check('gists list keys stay on the base scene', classifyLocaleKeys('gists', ['gistView']), ['gists']);
+check('releases source settings key carries its dialog variant', classifyLocaleKeys('releases', ['releaseSourceSettingsModal']), ['releases', 'releases-source-settings']);
 check('auto update check hook is deferred', classifyPath('src/hooks/useAutoUpdateCheck.ts'), 'deferred');
 check('settings feature hooks are deferred', classifyPath('src/features/settings/hooks/useUpdateActions.ts'), 'deferred');
 check('ui button spans app scenes and login (login renders primitives)', classifyPath('src/components/ui/button.tsx'), ['global', 'login']);
@@ -208,21 +233,375 @@ check('mapped release hook keeps its precise scene', classifyPath('src/hooks/use
 check('i18n diff maps to all scenes plus login', mapPathsToScenes(['src/i18n/useT.ts']), [...ALL_SCENES, 'login']);
 check('i18n diff beside panels maps to all scenes plus login', mapPathsToScenes(['src/i18n/useT.ts', 'src/components/GistView.tsx']), [...ALL_SCENES, 'login']);
 
+// 6b. Interaction variants: states a default render never shows
+check('token permissions diff orders its variants after the extras', mapPathsToScenes(['src/components/GitHubTokenPermissions.tsx']), ['settings-general', 'login', 'login-token-finegrained', 'settings-general-token-guide']);
+check('global chrome diff does not trigger interaction variants', mapPathsToScenes(['src/App.tsx']), [...ALL_SCENES]);
+check('token helper diff beside global chrome adds variants once', mapPathsToScenes(['src/App.tsx', 'src/components/GitHubTokenPermissions.tsx']), [...ALL_SCENES, 'login', 'login-token-finegrained', 'settings-general-token-guide']);
+check('login.json key diff keeps the variants', mapPathsToScenes(['src/locales/zh/login.json'], { 'src/locales/zh/login.json': ['loginScreen'] }), ['settings-general', 'login', 'login-token-finegrained', 'settings-general-token-guide']);
+
+// 6c. i18n wiring content diff: desktop-bridge-only changes render nothing in web
+check('i18n wiring path matches module files', isI18nWiringPath('src/i18n/index.ts'), true);
+check('i18n wiring path matches language definitions', isI18nWiringPath('src/i18n/languages.ts'), true);
+check('i18n wiring path skips tests', isI18nWiringPath('src/i18n/traySync.test.ts'), false);
+check('i18n wiring path skips locale json', isI18nWiringPath('src/locales/zh/app.json'), false);
+check('i18n wiring path skips nested paths', isI18nWiringPath('src/i18n/sub/dir/index.ts'), false);
+
+const WIRING_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  '  await i18next.changeLanguage(language);',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_DESKTOP = [
+  "import i18next from 'i18next';",
+  "import { desktopBridge } from '../services/electronProxy';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  '  await i18next.changeLanguage(language);',
+  '  document.documentElement.lang = language;',
+  '  if (desktopBridge.isSupported()) {',
+  '    void desktopBridge.setLanguage(language);',
+  '  }',
+  '}',
+].join('\n');
+const WIRING_WEB = WIRING_BASE.replace(
+  '  document.documentElement.lang = language;',
+  "  document.documentElement.lang = language === 'zh' ? 'zh-CN' : language;",
+);
+check('desktop-bridge-only wiring diff is inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_DESKTOP), true);
+check('wiring diff touching web-rendered lines is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_WEB), false);
+check('unrelated wiring diff is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace("import i18next from 'i18next';", "import i18next, { type i18n as I18nInstance } from 'i18next';")), false);
+check('unreadable wiring content is not inert', isDesktopBridgeOnlyDiff(null, WIRING_DESKTOP), false);
+check('identical wiring content is inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE), true);
+check('a pure line swap between different contents is not inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace(
+  '  await i18next.changeLanguage(language);\n  document.documentElement.lang = language;',
+  '  document.documentElement.lang = language;\n  await i18next.changeLanguage(language);',
+)), false);
+check('inert i18n wiring diff maps to no scenes', mapPathsToScenes(['src/i18n/index.ts'], {}, new Set(['src/i18n/index.ts'])), []);
+check('inert i18n wiring diff beside a panel keeps the panel scene', mapPathsToScenes(['src/i18n/index.ts', 'src/components/GistView.tsx'], {}, new Set(['src/i18n/index.ts'])), ['gists']);
+const WIRING_SWAPPED = [
+  "import i18next from 'i18next';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  "  let finalLanguage = language;",
+  "  finalLanguage = 'zh';",
+  '  document.documentElement.lang = finalLanguage;',
+  "  finalLanguage = language;",
+  '}',
+].join('\n');
+const WIRING_REORDER = [
+  "import i18next from 'i18next';",
+  '',
+  'export async function changeAppLanguage(language) {',
+  "  let finalLanguage = language;",
+  "  finalLanguage = language;",
+  "  finalLanguage = 'zh';",
+  '  document.documentElement.lang = finalLanguage;',
+  '}',
+].join('\n');
+const WIRING_WEB_FALLBACK = [
+  "import i18next from 'i18next';",
+  '',
+  'export function resolveLanguage(desktopBridge) {',
+  "  return desktopBridge ? 'zh' : 'en';",
+  '}',
+].join('\n');
+const WIRING_WEB_FALLBACK_CHANGED = WIRING_WEB_FALLBACK.replace("'en'", "'fr'");
+check('a pure line reorder between different contents is not inert', isDesktopBridgeOnlyDiff(WIRING_SWAPPED, WIRING_REORDER), false);
+check('a bridge ternary with web fallback values is not inert', isDesktopBridgeOnlyDiff(WIRING_WEB_FALLBACK, WIRING_WEB_FALLBACK_CHANGED), false);
+const WIRING_WRAP_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_WRAP_HEAD = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  'document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_REORDER_PLUS_BRIDGE_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'let finalLanguage = language;',
+  "finalLanguage = 'zh';",
+  'document.documentElement.lang = finalLanguage;',
+].join('\n');
+const WIRING_REORDER_PLUS_BRIDGE_HEAD = [
+  "import i18next from 'i18next';",
+  '',
+  'let finalLanguage = language;',
+  'document.documentElement.lang = finalLanguage;',
+  "finalLanguage = 'zh';",
+  "void desktopBridge.setLanguage(finalLanguage);",
+].join('\n');
+const WIRING_BRIDGE_CALL_ARG_SIDE_EFFECT = [
+  "import i18next from 'i18next';",
+  '',
+  "void desktopBridge.setLanguage((window.lang = 'fr'));",
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_BRIDGE_CALL_PLAIN = [
+  "import i18next from 'i18next';",
+  '',
+  'void desktopBridge.setLanguage(language);',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_PLAIN_CALL_ONLY = [
+  "import i18next from 'i18next';",
+  '',
+  'document.documentElement.lang = language;',
+].join('\n');
+check('wrapping an unchanged web statement in an added guard is not inert', isDesktopBridgeOnlyDiff(WIRING_WRAP_BASE, WIRING_WRAP_HEAD), false);
+check('unwrapping a web statement from a removed guard is not inert', isDesktopBridgeOnlyDiff(WIRING_WRAP_HEAD, WIRING_WRAP_BASE), false);
+check('a web reorder mixed with an added bridge call is not inert', isDesktopBridgeOnlyDiff(WIRING_REORDER_PLUS_BRIDGE_BASE, WIRING_REORDER_PLUS_BRIDGE_HEAD), false);
+check('a bridge call with an assignment argument is not inert', isDesktopBridgeOnlyDiff(WIRING_PLAIN_CALL_ONLY, WIRING_BRIDGE_CALL_ARG_SIDE_EFFECT), false);
+check('adding a plain bridge call beside unchanged web lines is inert', isDesktopBridgeOnlyDiff(WIRING_PLAIN_CALL_ONLY, WIRING_BRIDGE_CALL_PLAIN), true);
+const WIRING_GUARD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_GUARD_ABSORB = WIRING_GUARD_BASE.replace(
+  '}\ndocument.documentElement.lang = language;',
+  'document.documentElement.lang = language;\n}',
+);
+const WIRING_GUARD_RELEASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  'document.documentElement.lang = language;',
+  '}',
+].join('\n');
+check('moving a closing brace to absorb a web line into the guard is not inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_BASE, WIRING_GUARD_ABSORB), false);
+check('moving a closing brace to release a web line from the guard is not inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_RELEASE, WIRING_GUARD_BASE), false);
+check('a pre-existing web-wrapping guard left unchanged stays inert', isDesktopBridgeOnlyDiff(WIRING_GUARD_RELEASE, WIRING_GUARD_RELEASE + '\nvoid desktopBridge.setLanguage(language);'), true);
+const WIRING_COMMENT_GUARD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '  // }',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_COMMENT_GUARD_MOVED = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '  // }',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_STRING_BRACE_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  '}',
+  "const marker = '}' || fallbackMarker;",
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_STRING_BRACE_MOVED = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void desktopBridge.setLanguage(language);',
+  "  const marker = '}' || fallbackMarker;",
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+check('a brace inside a comment cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_COMMENT_GUARD_BASE, WIRING_COMMENT_GUARD_MOVED), false);
+check('a brace inside a string cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_STRING_BRACE_BASE, WIRING_STRING_BRACE_MOVED), false);
+const WIRING_REGEX_GUARD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  void /[}]/.test(language);',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_REGEX_GUARD_ABSORB = WIRING_REGEX_GUARD_BASE.replace(
+  '}\ndocument.documentElement.lang = language;',
+  'document.documentElement.lang = language;\n}',
+);
+check('a brace inside a regex literal cannot close the guard on the scanner\'s behalf', isDesktopBridgeOnlyDiff(WIRING_REGEX_GUARD_BASE, WIRING_REGEX_GUARD_ABSORB), false);
+check('the regex absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_REGEX_GUARD_ABSORB, WIRING_REGEX_GUARD_BASE), false);
+const WIRING_AMBIGUOUS_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'if (desktopBridge.isSupported()) {',
+  '  if (language) /[}]/.test(language);',
+  '}',
+  'document.documentElement.lang = language;',
+].join('\n');
+const WIRING_AMBIGUOUS_ABSORB = WIRING_AMBIGUOUS_BASE.replace(
+  '}\ndocument.documentElement.lang = language;',
+  'document.documentElement.lang = language;\n}',
+);
+check('a slash after a closing paren is ambiguous and stays non-inert', isDesktopBridgeOnlyDiff(WIRING_AMBIGUOUS_BASE, WIRING_AMBIGUOUS_ABSORB), false);
+check('the ambiguous absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_AMBIGUOUS_ABSORB, WIRING_AMBIGUOUS_BASE), false);
+check('a plain division in the diff keeps the file non-inert', isDesktopBridgeOnlyDiff(WIRING_BASE, WIRING_BASE.replace('  await i18next.changeLanguage(language);', '  await i18next.changeLanguage(language);\n  const half = total / 2;')), false);
+const WIRING_POSTINC_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    counter++ / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other++ / 2;',
+  '}',
+].join('\n');
+const WIRING_POSTINC_ABSORB = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    counter++ / 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other++ / 2;',
+  '}',
+].join('\n');
+check('a slash after ++ stays ambiguous and non-inert', isDesktopBridgeOnlyDiff(WIRING_POSTINC_BASE, WIRING_POSTINC_ABSORB), false);
+check('the post-increment absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_POSTINC_ABSORB, WIRING_POSTINC_BASE), false);
+const WIRING_PROPKEYWORD_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    state.return / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other.return / 2;',
+  '}',
+].join('\n');
+const WIRING_PROPKEYWORD_ABSORB = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    state.return / 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other.return / 2;',
+  '}',
+].join('\n');
+check('a keyword-named property keeps the slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_PROPKEYWORD_BASE, WIRING_PROPKEYWORD_ABSORB), false);
+check('the property-keyword absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PROPKEYWORD_ABSORB, WIRING_PROPKEYWORD_BASE), false);
+const WIRING_PROPSPACE_BASE = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    other. return / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other. return / 2;',
+  '}',
+].join('\n');
+const WIRING_PROPSPACE_ABSORB = [
+  "import i18next from 'i18next';",
+  '',
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    other. return / 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other. return / 2;',
+  '}',
+].join('\n');
+check('whitespace between the dot and a keyword keeps the slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_PROPSPACE_BASE, WIRING_PROPSPACE_ABSORB), false);
+check('the dot-whitespace absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PROPSPACE_ABSORB, WIRING_PROPSPACE_BASE), false);
+const WIRING_COMMENTDOT_BASE = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    state. // note',
+  '      return/ 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  other.return/ 2;',
+  '}',
+].join('\n');
+const WIRING_COMMENTDOT_ABSORB = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    state. // note',
+  '      return/ 2;',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  other.return/ 2;',
+  '}',
+].join('\n');
+check('a line comment before the keyword keeps the property slash ambiguous', isDesktopBridgeOnlyDiff(WIRING_COMMENTDOT_BASE, WIRING_COMMENTDOT_ABSORB), false);
+check('the comment-property absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_COMMENTDOT_ABSORB, WIRING_COMMENTDOT_BASE), false);
+const WIRING_PAREN_DIV_BASE = [
+  'function apply(language: string) {',
+  '  const counter = 2, other = 2;',
+  '  if (desktopBridge.isSupported()) {',
+  '    void (counter / 2);',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '  void (other / 2);',
+  '}',
+].join('\n');
+const WIRING_PAREN_DIV_ABSORB = [
+  'function apply(language: string) {',
+  '  const counter = 2, other = 2;',
+  '  if (desktopBridge.isSupported()) {',
+  '    void (counter / 2);',
+  '  document.documentElement.lang = language;',
+  '  }',
+  '  void (other / 2);',
+  '}',
+].join('\n');
+check('a division after an identifier scans code braces normally', isDesktopBridgeOnlyDiff(WIRING_PAREN_DIV_BASE, WIRING_PAREN_DIV_ABSORB), false);
+check('the identifier-division absorption reverses conservatively', isDesktopBridgeOnlyDiff(WIRING_PAREN_DIV_ABSORB, WIRING_PAREN_DIV_BASE), false);
+const WIRING_DIV_BRIDGE_BASE = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    void desktopBridge.setLanguage(language);',
+  '    const half = total / 2;',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+const WIRING_DIV_BRIDGE_HEAD = [
+  'function apply() {',
+  '  if (desktopBridge.isSupported()) {',
+  '    void desktopBridge.setLanguage(language);',
+  '    const half = total / 2;',
+  '    void desktopBridge.setLanguage(fallback);',
+  '  }',
+  '  document.documentElement.lang = language;',
+  '}',
+].join('\n');
+check('a pure bridge diff containing a plain division stays inert', isDesktopBridgeOnlyDiff(WIRING_DIV_BRIDGE_BASE, WIRING_DIV_BRIDGE_HEAD), true);
+
 // 7. classifyLocaleKeys — key-level mapping within a namespace
-check('app key maps to its panel scene', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins']);
+check('app plugin settings key carries its dialog variants', classifyLocaleKeys('app', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
 check('app data panel key maps to data scene', classifyLocaleKeys('app', ['dataManagementPanel']), ['settings-data']);
 check('app theme key maps to appearance scene', classifyLocaleKeys('app', ['themeSettingsCard']), ['settings-appearance']);
 check('app general panel key spans general and appearance', classifyLocaleKeys('app', ['generalPanel']), ['settings-general', 'settings-appearance']);
 check('app menu panel key spans menu and appearance', classifyLocaleKeys('app', ['menuManagementPanel']), ['settings-menu', 'settings-appearance']);
 check('app category utils key spans repositories and category tab', classifyLocaleKeys('app', ['categoryUtils']), ['repositories', 'settings-category']);
-check('app asset filter key spans releases and repositories', classifyLocaleKeys('app', ['assetFilterManager']), ['releases', 'repositories']);
+check('app asset filter key spans releases and its filter modal variant', classifyLocaleKeys('app', ['assetFilterManager']), ['releases', 'releases-filter-modal']);
 check('app plugin page viewer key spans repositories and plugins settings', classifyLocaleKeys('app', ['pluginPageViewer']), ['repositories', 'settings-plugins']);
 check('app shell key maps to the settings view', classifyLocaleKeys('app', ['settingsPanel']), ['settings']);
 check('app header key is global', classifyLocaleKeys('app', ['header']), ['global']);
 check('app markdown keys span their consumers', classifyLocaleKeys('app', ['markdownRenderer']), ['repositories', 'releases', 'discovery']);
 check('unknown app key escalates to global', classifyLocaleKeys('app', ['somethingBrandNew']), ['global']);
 check('mixed known and unknown app keys escalate to global', classifyLocaleKeys('app', ['dataManagementPanel', 'somethingBrandNew']), ['settings-data', 'global']);
-check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginSettingsPanel', 'generalPanel']), ['settings-plugins', 'settings-general', 'settings-appearance']);
+check('several app keys union their scenes', classifyLocaleKeys('app', ['pluginSettingsPanel', 'generalPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker', 'settings-general', 'settings-appearance']);
 check('settings hook key maps to its tab', classifyLocaleKeys('settings', ['useMcpActions']), ['settings-mcp']);
 check('star sync hook key spans its tab and repositories', classifyLocaleKeys('settings', ['useStarSyncActions']), ['settings-star-sync', 'repositories']);
 check('unknown settings key escalates to the settings view', classifyLocaleKeys('settings', ['futureHook']), ['repositories', 'settings']);
@@ -233,19 +612,20 @@ check('unknown repositories key covers appearance consumers', classifyLocaleKeys
 check('unknown plugins key covers discovery consumers', classifyLocaleKeys('plugins', ['futureKey']), ['repositories', 'settings-plugins', 'discovery']);
 check('plugins telegram key maps to discovery', classifyLocaleKeys('plugins', ['telegramMessageModal']), ['discovery']);
 check('plugins action key maps to repositories and plugins settings', classifyLocaleKeys('plugins', ['applyPluginActionResult']), ['repositories', 'settings-plugins']);
-check('chat key maps to repositories', classifyLocaleKeys('chat', ['repositoryChatSheet']), ['repositories']);
+check('chat repository chat sheet key carries its sheet variant', classifyLocaleKeys('chat', ['repositoryChatSheet']), ['repositories', 'repositories-chat-sheet']);
+check('chat global history sheet key carries its sheet variant', classifyLocaleKeys('chat', ['globalChatHistorySheet']), ['repositories', 'repositories-chat-history-sheet']);
 check('namespace without table falls back to its scope', classifyLocaleKeys('gists', ['gistViewAnything']), ['gists']);
 check('common namespace falls back to global', classifyLocaleKeys('common', ['anything']), ['global']);
 check('releases fork keys map to forks', classifyLocaleKeys('releases', ['forkCard', 'forkTimeline']), ['forks']);
 check('releases subscription key maps to discovery', classifyLocaleKeys('releases', ['subscriptionRepoCard']), ['discovery']);
-check('releases sheet key spans releases and repositories', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories']);
+check('release sheet key spans its scenes and both sheet variants', classifyLocaleKeys('releases', ['repositoryReleaseSheet']), ['releases', 'repositories', 'repositories-release-sheet', 'repositories-release-sheet-notes']);
 check('repositories card-action hook key maps to repositories', classifyLocaleKeys('repositories', ['useRepositoryCardActions']), ['repositories']);
 check('repositories card key spans repositories and appearance', classifyLocaleKeys('repositories', ['repositoryCard']), ['repositories', 'settings-appearance']);
 check('repositories keys outside the table use the namespace fallback', classifyLocaleKeys('repositories', ['brandNewKey']), ['repositories', 'settings-appearance']);
 check('common fork timeline key maps to forks', classifyLocaleKeys('common', ['useForkTimelineActions']), ['forks']);
 
 // 8. classifyLocaleFile — key diff available, empty, or unavailable
-check('locale file with key diff maps precisely', classifyLocaleFile('src/locales/zh/app.json', ['pluginSettingsPanel']), ['settings-plugins']);
+check('locale file with key diff maps precisely', classifyLocaleFile('src/locales/zh/app.json', ['pluginSettingsPanel']), ['settings-plugins', 'settings-plugins-marketplace', 'settings-plugins-sources', 'settings-plugins-icon-picker']);
 check('locale file whose keys did not change maps to nothing', classifyLocaleFile('src/locales/zh/app.json', []), []);
 check('locale file without key diff uses namespace fallback', classifyLocaleFile('src/locales/zh/app.json'), ['global']);
 check('gists locale with unknown keys stays in gists', classifyLocaleFile('src/locales/zh/gists.json', ['newKey']), ['gists']);
@@ -313,7 +693,7 @@ check('one settings panel maps to one tab scene', mapPathsToScenes([
 check('two settings panels map to their two tab scenes', mapPathsToScenes([
   'src/components/settings/AIConfigPanel.tsx',
   'src/components/settings/NetworkPanel.tsx',
-]), ['settings-ai', 'settings-network']);
+]), ['settings-ai', 'settings-network', 'settings-ai-config-form']);
 
 check('settings shell maps to every settings tab', mapPathsToScenes([
   'src/components/SettingsPanel.tsx',
@@ -410,7 +790,7 @@ check('global i18n diff keeps plugin manifest specs', mapPathsToScenes([
 check('locale key diff maps only the affected settings tab', mapPathsToScenes(
   ['src/locales/zh/app.json'],
   { 'src/locales/zh/app.json': ['pluginSettingsPanel'] },
-), ['settings-plugins']);
+), ['settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 check('locale file with no visible key change maps to nothing', mapPathsToScenes(
   ['src/locales/zh/app.json'],
@@ -440,7 +820,7 @@ check('plugins locale keys map telegram to discovery only', mapPathsToScenes(
 check('PR 577 zh/app.json icon-picker keys map to the plugins settings tab', mapPathsToScenes(
   ['src/locales/zh/app.json'],
   { 'src/locales/zh/app.json': ['pluginSettingsPanel'] },
-), ['settings-plugins']);
+), ['settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 // 13. mapPathsToScenes — the full PR 577 file list (simulated audit case)
 const pr577Files = [
@@ -500,9 +880,12 @@ check('PR 577 full diff maps to exactly the changed pages', mapPathsToScenes(pr5
   'settings-appearance',
   'settings-data',
   'settings-plugins',
+  'settings-plugins-icon-picker',
+  'settings-plugins-marketplace',
+  'settings-plugins-sources',
 ]);
 
-check('PR 577 diff without locale key diffs stays conservative', mapPathsToScenes(pr577Files), ALL_SCENES);
+check('PR 577 diff without locale key diffs stays conservative', mapPathsToScenes(pr577Files), [...ALL_SCENES, 'settings-plugins-icon-picker']);
 
 // 14. collectChangedPaths request selection tests (synchronize vs opened)
 const beforeSha = '1111111111111111111111111111111111111111';
@@ -715,7 +1098,7 @@ check('locale key diff returns changed keys per file', localeKeys, {
 check('locale key diff integrates with scene mapping', mapPathsToScenes(
   ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
   localeKeys,
-), ['settings-plugins']);
+), ['settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 const mockFailingContentExecutor = (args) => {
   const url = args[1];
@@ -734,7 +1117,7 @@ check('unreadable locale files are omitted for file-level fallback', Object.keys
 check('omitted locale files fall back conservatively in scene mapping', mapPathsToScenes(
   ['src/locales/zh/app.json', 'src/locales/zh/gists.json'],
   partialKeys,
-), ['gists', 'settings-plugins']);
+), ['gists', 'settings-plugins', 'settings-plugins-icon-picker', 'settings-plugins-marketplace', 'settings-plugins-sources']);
 
 console.log(`\nTest result: ${failures === 0 ? 'ALL PASSED' : `${failures} FAILURE(S)`}`);
 process.exit(failures ? 1 : 0);

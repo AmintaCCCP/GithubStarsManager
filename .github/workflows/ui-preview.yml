@@ -107,6 +107,10 @@ jobs:
       - name: Build app
         run: |
           npx vite build
+          # The interaction variants resolve click targets from the built
+          # bundle's zh locale; import.meta.glob bundles locale JSONs as JS
+          # chunks, so copy the raw JSON alongside for static serving.
+          cp -r src/locales dist/locales
           if [ -d examples/plugins ]; then
             mkdir -p dist/plugins
             cp -r examples/plugins/. dist/plugins/
