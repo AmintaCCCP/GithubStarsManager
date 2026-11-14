@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
@@ -283,9 +283,15 @@ function App() {
     applyThemeTokens(themeTokens);
   }, [themeTokens, theme, activeThemePreset]);
 
+  // 视图切换并发渲染：切换瞬间先保留旧视图画面，新视图在低优先级渲染完
+  // 再一次性提交，避免重视图（几百张卡片）同步挂载造成的长帧卡顿。
+  const deferredView = useDeferredValue(currentView);
+
+  // 滚动重置跟随 deferredView：新视图提交的同一帧再回顶，避免旧视图
+  // 还在屏上时滚动先跳、新内容后到的闪跳。
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
-  }, [currentView]);
+  }, [deferredView]);
 
   // Language side effect: zustand 的 language 是唯一事实源，这里只负责装载
   // 语言包、切换 i18next 并同步 <html lang>。
@@ -302,7 +308,7 @@ function App() {
   }, [setSelectedCategory]);
 
   const currentViewContent = useMemo(() => {
-    switch (currentView) {
+    switch (deferredView) {
       case 'repositories':
         return (
           <RepositoriesView
@@ -330,7 +336,7 @@ function App() {
       default:
         return null;
     }
-  }, [currentView, repositories, searchResults, searchFilters, selectedCategory, handleCategorySelect]);
+  }, [deferredView, repositories, searchResults, searchFilters, selectedCategory, handleCategorySelect]);
 
   // Show loading state while store is hydrating to ensure correct theme is applied
   if (!hasHydrated) {
@@ -352,7 +358,11 @@ function App() {
       <UpdateNotificationBanner />
       <Header />
       <main className="app-main">
-        {currentViewContent}
+        {/* key 化包裹层：视图切换时重挂载并重放 200ms 淡入，消除硬切的突兀感。
+            只动 opacity（transform 动画期间会为 fixed 后代创建 containing block）。 */}
+        <div key={deferredView} className="motion-safe:animate-fade-in">
+          {currentViewContent}
+        </div>
       </main>
       <BackToTop />
       <DebugModeIndicator />

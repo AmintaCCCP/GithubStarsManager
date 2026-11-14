@@ -240,7 +240,7 @@ export const ThemeSettingsCard: React.FC<ThemeSettingsCardProps> = ({ t }) => {
                   tabIndex={isActive ? 0 : -1}
                   data-theme-preset-id={preset.id}
                   onClick={() => setEditPreset(preset.id as ThemePresetId)}
-                  className={`group relative flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                  className={`group relative flex flex-col items-center gap-2 rounded-lg border p-2.5 transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     isActive
                       ? 'border-primary ring-2 ring-primary/30'
                       : 'border-border hover:border-primary/40'

@@ -467,7 +467,7 @@ export const CategoryPanel: React.FC<CategoryPanelProps> = ({ t }) => {
                   onDragOver={(e) => handleDragOver(e, category.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
-                  className={`flex flex-col p-3 rounded-lg border transition-all ${
+                  className={`flex flex-col p-3 rounded-lg border transition-[background-color,border-color,box-shadow,transform,opacity] ${
                     category.isCustom
                       ? 'bg-muted dark:bg-muted/40 border-border dark:border-border dark:border-border dark:border-border'
                       : 'bg-card dark:bg-card border-border dark:border-border'

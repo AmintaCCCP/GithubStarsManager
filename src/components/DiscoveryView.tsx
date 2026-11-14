@@ -235,7 +235,7 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({
               aria-selected={selectedChannel === channel.id}
               className={`
                 relative flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium snap-start
-                transition-all duration-200 ease-out
+                transition-[color,background-color] duration-200 ease-out
                 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--ui-focus-ring) focus-visible:ring-offset-2
                 ${selectedChannel === channel.id
                   ? 'text-foreground dark:text-foreground '
@@ -921,7 +921,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                   <RefreshCw className={`w-4 h-4 ${currentIsLoading ? 'animate-spin' : ''}`} />
                 </Button>
                 {selectedDiscoveryChannel === 'hot-release' && (
-                  <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-all duration-200 pointer-events-none">
+                  <div className="absolute top-full mt-2 right-0 z-50 opacity-0 group-hover/refresh:opacity-100 translate-y-1 group-hover/refresh:translate-y-0 transition-[opacity,translate] duration-200 pointer-events-none">
                     <div className="bg-popover text-popover-foreground border border-border text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                       {t('discoveryView.each-refresh-shows-different-content')}
                     </div>
@@ -1047,7 +1047,7 @@ export const DiscoveryView: React.FC = React.memo(() => {
                       <div className="relative">
                         <div className="px-2 py-1.5 rounded-lg bg-muted dark:bg-muted/40 text-muted-foreground dark:text-muted-foreground flex items-center gap-1.5 overflow-hidden">
                           <div 
-                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary/50 via-primary/70 to-primary/50 transition-all duration-400 ease-out"
+                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-primary/50 via-primary/70 to-primary/50 transition-[width] duration-400 ease-out"
                             style={{
                               width: analysisProgress.total > 0
                                 ? `${Math.min((analysisProgress.current / analysisProgress.total) * 100, 100)}%`

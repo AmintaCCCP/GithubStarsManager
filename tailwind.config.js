@@ -132,6 +132,8 @@ export default {
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'fade-out': 'fadeOut 0.15s ease-in forwards',
+        // Tab 等高频切换的反馈：只动 opacity，150ms 内完成（高频交互规范）。
+        'tab-fade': 'fadeIn 0.15s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-in forwards',
         'bounce-gentle': 'bounceGentle 2s ease-in-out infinite',

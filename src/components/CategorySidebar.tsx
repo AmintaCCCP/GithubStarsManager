@@ -670,7 +670,7 @@ export const CategorySidebar: React.FC<CategorySidebarProps> = ({
                               <span className="truncate">{category.name}</span>
                             </span>
                             <span
-                              className={`app-side-count ml-auto flex shrink-0 justify-center group-hover:opacity-0 group-focus-within:opacity-0 ${
+                              className={`app-side-count ml-auto flex shrink-0 justify-center transition-opacity duration-150 group-hover:opacity-0 group-focus-within:opacity-0 ${
                                 isDragTarget ? 'bg-success/20! text-success!' : ''
                               }`}
                             >

@@ -358,7 +358,7 @@ html[data-animation='reduced'] *::after {
   }
 
   .input-base {
-    @apply bg-background text-foreground border border-input rounded-md px-[14px] py-[12px] focus:outline-none focus:border-ring focus:ring-2 focus:ring-(--ui-focus-ring/55) transition-all duration-200;
+    @apply bg-background text-foreground border border-input rounded-md px-[14px] py-[12px] focus:outline-none focus:border-ring focus:ring-2 focus:ring-(--ui-focus-ring/55) transition-[border-color,box-shadow] duration-200;
   }
   .input-search {
     @apply bg-transparent text-foreground focus:outline-none placeholder:text-muted-foreground;

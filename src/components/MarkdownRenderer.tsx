@@ -726,8 +726,8 @@ const MarkdownImage: React.FC<{ src?: string; alt?: string; baseUrl?: string }> 
               `
                 h-auto rounded-xl
                 ${isInsideLink
-                  ? 'hover:brightness-95 transition-all duration-200'
-                  : 'hover:brightness-95 transition-all duration-200 cursor-pointer'
+                  ? 'hover:brightness-95 transition-[filter] duration-200'
+                  : 'hover:brightness-95 transition-[filter] duration-200 cursor-pointer'
                 }
               `,
               {

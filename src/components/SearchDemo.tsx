@@ -140,7 +140,7 @@ export const SearchDemo: React.FC = () => {
                 variant="ghost"
                 aria-pressed={selectedExample?.query === example.query}
                 onClick={() => handleExampleClick(example)}
-                className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-all ${
+                className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-[background-color,border-color] ${
                   selectedExample?.query === example.query
                     ? 'border-primary bg-muted dark:bg-primary/20'
                     : 'border-border hover:border-border dark:border-border dark:hover:border-border'
@@ -176,7 +176,7 @@ export const SearchDemo: React.FC = () => {
                 variant="ghost"
                 aria-pressed={selectedExample?.query === example.query}
                 onClick={() => handleExampleClick(example)}
-                className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-all ${
+                className={`w-full h-auto flex-col items-start justify-start p-3 text-left rounded-lg border transition-[background-color,border-color] ${
                   selectedExample?.query === example.query
                     ? 'border-border dark:border-border bg-muted dark:bg-muted/40 '
                     : 'border-border hover:border-border dark:border-border dark:hover:border-border'

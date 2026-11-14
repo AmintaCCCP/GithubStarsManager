@@ -693,9 +693,9 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
   const labelClass = "flex items-center space-x-2 text-[13px] font-medium text-foreground dark:text-foreground mb-3";
   const inputClass = "h-auto w-full px-4 py-3 bg-accent/50 dark:bg-muted/40 border border-border dark:border-border rounded-xl text-foreground dark:text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-(--ui-focus-ring/55) focus:border-ring dark:focus:ring-(--ui-focus-ring/60) dark:focus:border-ring transition-[color,background-color,border-color] duration-200 hover:bg-accent/50 dark:hover:bg-accent hover:border-border dark:hover:border-border-strong text-[13px] leading-[1.625]";
   const textareaClass = `${inputClass} resize-y min-h-[120px] max-h-[400px] overflow-y-auto scrollbar-auto`;
-  const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all duration-200";
+  const buttonSecondaryClass = "h-auto flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-[background-color,border-color,color] duration-200";
   const tagClass = "inline-flex items-center px-2.5 py-1 bg-muted text-muted-foreground dark:bg-muted/40 dark:text-muted-foreground rounded-md text-sm border border-border dark:border-border";
-  const infoBoxClass = "mt-3 p-3.5 border border-border dark:border-border rounded-xl text-[12px] leading-[1.5] transition-all duration-200";
+  const infoBoxClass = "mt-3 p-3.5 border border-border dark:border-border rounded-xl text-[12px] leading-[1.5]";
   const infoTextClass = "text-muted-foreground dark:text-muted-foreground flex items-start";
 
   return (
@@ -716,7 +716,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
         <div className="flex justify-end space-x-3">
           <Button
             onClick={handleCloseWithConfirm}
-            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent dark:hover:text-foreground border border-border dark:border-border transition-all duration-200 shadow-sm"
+            className="flex items-center space-x-2 px-4 py-2.5 text-muted-foreground dark:text-foreground bg-card dark:bg-muted/40 rounded-xl hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent dark:hover:text-foreground border border-border dark:border-border transition-[background-color,color] duration-150 shadow-sm"
           >
             <X className="w-4 h-4" />
             <span className="font-medium">{t('repositoryEditModal.cancel')}</span>
@@ -724,7 +724,7 @@ export const RepositoryEditModal: React.FC<RepositoryEditModalProps> = ({
           <Button
             onClick={() => void handleSave()}
             disabled={!hasChanges}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm font-medium"
+            className="flex items-center space-x-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-[background-color] duration-150 shadow-sm font-medium"
           >
             <Save className="w-4 h-4" />
             <span>{t('repositoryEditModal.save')}</span>

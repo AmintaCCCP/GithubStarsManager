@@ -143,7 +143,7 @@ export const MenuManagementPanel: React.FC<MenuManagementPanelProps> = ({ t }) =
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing select-none ${
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-[background-color,border-color,transform,opacity] cursor-grab active:cursor-grabbing select-none ${
                   isDragging
                     ? 'opacity-50 border-primary/30 bg-primary/5'
                     : isDragOver
