@@ -218,7 +218,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <h4 className="font-semibold text-foreground dark:text-foreground text-sm truncate">
                     {release.repository.name}
                   </h4>
-                  <span className="linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0">
+                  {/* 超长 tag（如含完整 SHA 的 tag）截断为省略号，避免把右侧时间列挤出或覆盖；
+                      悬停经 title 可查看完整 tag */}
+                  <span
+                    className="linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0 max-w-[min(200px,100%)] truncate"
+                    title={release.tag_name}
+                  >
                     {release.tag_name}
                   </span>
                   {release.name && release.name !== release.tag_name && (

@@ -248,6 +248,25 @@ describe('ReleaseCard asset updated indicator', () => {
     expect(within(assetRow).queryByText(/前$/)).not.toBeInTheDocument();
   });
 
+describe('ReleaseCard long tag truncation', () => {
+  it('regression: an overly long tag truncates and exposes the full tag via title', () => {
+    // 截图中 cmux 的超长 tag 会溢出并覆盖右侧时间列；修复后徽标按 200px 截断，
+    // 悬停经 title 仍可查看完整 tag
+    const longTag = 'cmux-app-ffi-dd99e8611da8ceb325798a92c7e201ce06bae07e';
+    renderCard({ release: makeRelease(1, { tag_name: longTag }) });
+    const tag = screen.getByTitle(longTag);
+    expect(tag).toHaveTextContent(longTag);
+    expect(tag).toHaveClass('truncate');
+    expect(tag).toHaveClass('max-w-[min(200px,100%)]');
+  });
+
+  it('keeps short tags untruncated', () => {
+    renderCard({ release: makeRelease(1, { tag_name: 'v2.16.0' }) });
+    const tag = screen.getByTitle('v2.16.0');
+    expect(tag).toHaveTextContent('v2.16.0');
+  });
+});
+
 describe('ReleaseCard asset list filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
