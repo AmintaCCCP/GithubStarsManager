@@ -210,12 +210,15 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
         ))}
       </div>
       
-      {/* 底部活动指示器 */}
+      {/* 底部活动指示器：固定基准宽度 + scaleX 表现实际宽度，
+          只动 transform，避免 width 逐帧重排布局。
+          基准宽度用固定 px（w-24 是 rem，会随 fontScale 缩放），
+          与 scaleX 的分母 96 保持同一单位。 */}
       <div
-        className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-all duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 left-0 h-0.5 w-[96px] bg-primary rounded-full transition-transform duration-200 ease-out will-change-transform"
         style={{
-          transform: `translateX(${indicatorStyle.translateX}px)`,
-          width: indicatorStyle.width,
+          transform: `translateX(${indicatorStyle.translateX}px) scaleX(${indicatorStyle.width / 96})`,
+          transformOrigin: 'left center',
         }}
       />
       
@@ -236,10 +239,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setCurrentView: state.setCurrentView,
   })));
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
-  const [displayTab, setDisplayTab] = useState<SettingsTab>('general');
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const tabChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tabResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const t = useT('app');
   const backendAvailable = useBackendAvailability();
@@ -252,54 +251,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     }
   };
 
-  // 处理标签切换，添加过渡动画
-  // 动画顺序：1.淡出当前内容 2.切换标签 3.淡入新内容
+  // 高频交互：tab 点击立即切换内容，只靠 tabpanel 的 150ms 淡入给过渡。
+  // 不做"淡出→等待→淡入"的定时序列——人为延迟正是点击生硬感的来源，
+  // 转场锁还会吞掉连续点击。
   const handleTabChange = useCallback((tabId: SettingsTab) => {
-    if (tabId === activeTab || isTransitioning) return;
-
-    if (tabChangeTimeoutRef.current) {
-      clearTimeout(tabChangeTimeoutRef.current);
+    if (tabId === activeTab) return;
+    setActiveTab(tabId);
+    if (!isModal) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    if (tabResetTimeoutRef.current) {
-      clearTimeout(tabResetTimeoutRef.current);
-    }
-
-    setIsTransitioning(true);
-
-    tabChangeTimeoutRef.current = setTimeout(() => {
-      setActiveTab(tabId);
-      setDisplayTab(tabId);
-      if (!isModal) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-
-      tabResetTimeoutRef.current = setTimeout(() => {
-        setIsTransitioning(false);
-      }, 120);
-    }, 100);
-  }, [activeTab, isModal, isTransitioning]);
-
-  // 清理定时器
-  useEffect(() => {
-    return () => {
-      if (tabChangeTimeoutRef.current) {
-        clearTimeout(tabChangeTimeoutRef.current);
-      }
-      if (tabResetTimeoutRef.current) {
-        clearTimeout(tabResetTimeoutRef.current);
-      }
-    };
-  }, []);
+  }, [activeTab, isModal]);
 
   // Valid SettingsTab values for runtime validation
   const VALID_TABS: ReadonlySet<string> = useMemo(
     () => new Set(['general', 'appearance', 'starSync', 'ai', 'webdav', 'backup', 'backend', 'category', 'menu', 'data', 'logs', 'network', 'vectorSearch', 'mcp', 'plugins']),
     []
   );
-
-  // Ref to hold a pending tab navigation request (handles race condition
-  // where the event fires before the component mounts / handleTabChange is ready)
-  const pendingTabRef = useRef<SettingsTab | null>(null);
 
   // Check sessionStorage for a pending tab (set by DebugModeIndicator before
   // the view switch, so it survives the SettingsPanel remount)
@@ -310,7 +277,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
       // Apply a pre-mount navigation synchronously. In React Strict Mode an
       // animation timer can be cleaned up during the development remount.
       setActiveTab(stored as SettingsTab);
-      setDisplayTab(stored as SettingsTab);
     } else if (stored) {
       sessionStorage.removeItem('gsm:pending-settings-tab');
     }
@@ -322,26 +288,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const onNavigate = (e: Event) => {
       const tab = (e as CustomEvent<{ tab: SettingsTab }>).detail?.tab;
       if (!tab || !VALID_TABS.has(tab)) return;
-      // If handleTabChange is ready (not transitioning), apply immediately
-      if (!isTransitioning) {
-        handleTabChange(tab);
-      } else {
-        // Store in ref so the second useEffect can pick it up
-        pendingTabRef.current = tab;
-      }
+      handleTabChange(tab);
     };
     window.addEventListener('gsm:navigate-to-settings-tab', onNavigate);
     return () => window.removeEventListener('gsm:navigate-to-settings-tab', onNavigate);
-  }, [handleTabChange, isTransitioning, VALID_TABS]);
-
-  // Apply any pending tab navigation captured before the listener was ready
-  useEffect(() => {
-    if (pendingTabRef.current && !isTransitioning) {
-      const tab = pendingTabRef.current;
-      pendingTabRef.current = null;
-      handleTabChange(tab);
-    }
-  }, [handleTabChange, isTransitioning]);
+  }, [handleTabChange, VALID_TABS]);
 
   const { unindexedRepoCount } = useVectorSearchActions();
 
@@ -442,7 +393,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const renderTabContent = () => {
     const content = (() => {
-      switch (displayTab) {
+      switch (activeTab) {
         case 'general':
           return <GeneralPanel t={t} />;
         case 'appearance':
@@ -480,14 +431,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
     return (
       <div
+        key={activeTab}
         role="tabpanel"
-        id={`settings-tabpanel-${displayTab}`}
-        aria-label={tabs.find((tab) => tab.id === displayTab)?.label ?? t('settingsPanel.settings-content')}
+        id={`settings-tabpanel-${activeTab}`}
+        aria-label={tabs.find((tab) => tab.id === activeTab)?.label ?? t('settingsPanel.settings-content')}
         data-settings-sections
-        className={`
-          transition-all duration-100 ease-out
-          ${isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}
-        `}
+        className="motion-safe:animate-tab-fade"
       >
         {content}
       </div>

@@ -134,7 +134,7 @@ export const PluginIconPickerDialog: React.FC<PluginIconPickerDialogProps> = ({
                 onClick={() => handleSelect(choice.key)}
                 title={choiceTitle}
                 aria-label={choiceTitle}
-                className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border p-1.5 text-center transition-all hover:bg-accent hover:text-accent-foreground ${
+                className={`flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border p-1.5 text-center transition-[background-color,border-color,color,box-shadow] hover:bg-accent hover:text-accent-foreground ${
                   isSelected
                     ? 'border-primary bg-primary/10 text-primary shadow-xs'
                     : 'border-border/60 bg-card text-foreground'

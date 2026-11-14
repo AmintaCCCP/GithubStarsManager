@@ -220,8 +220,8 @@ export const VectorSearchSettings: React.FC<VectorSearchSettingsProps> = ({ t })
             </div>
             <div className="w-full bg-accent dark:bg-muted rounded-full h-2">
               <div
-                className="bg-primary h-2 rounded-full transition-all"
-                style={{ width: `${(phaseDone / phaseTotal) * 100}%` }}
+                className="bg-primary h-2 w-full rounded-full origin-left transition-transform duration-200"
+                style={{ transform: `scaleX(${phaseDone / phaseTotal})` }}
               />
             </div>
           </div>

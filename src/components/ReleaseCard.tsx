@@ -214,7 +214,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   return (
     <div
       onClick={onMarkAsRead}
-      className={`release-card ui-card transition-all duration-200 ease-in-out cursor-pointer ${
+      className={`release-card ui-card transition-[color,background-color,border-color,box-shadow] duration-200 ease-out cursor-pointer ${
         isAnyExpanded ? 'is-expanded' : ''
       }`}
     >
@@ -558,7 +558,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                         e.stopPropagation();
                         onToggleFullContent(e);
                       }}
-                      className="h-auto flex items-center justify-center space-x-1 px-3 py-1.5 rounded hover:bg-primary/90 active:bg-primary/80 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:active:bg-primary/80 transition-all duration-200 text-xs font-medium min-w-[120px]"
+                      className="h-auto flex items-center justify-center space-x-1 px-3 py-1.5 rounded hover:bg-primary/90 active:bg-primary/80 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90 dark:active:bg-primary/80 transition-[background-color] duration-150 text-xs font-medium min-w-[120px]"
                     >
                       <BookOpen className="w-3 h-3" />
                       <span>{isFullContent ? t('releaseCard.collapse') : t('releaseCard.view-full')}</span>
@@ -567,7 +567,7 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                       href={release.html_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-muted text-foreground rounded hover:bg-accent hover:text-accent-foreground active:bg-accent/80 dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground dark:active:bg-accent/80 transition-all duration-200 text-xs font-medium whitespace-nowrap"
+                      className="flex items-center justify-center space-x-1 px-3 py-1.5 bg-muted text-foreground rounded hover:bg-accent hover:text-accent-foreground active:bg-accent/80 dark:bg-muted/40 dark:text-foreground dark:hover:bg-accent dark:hover:text-accent-foreground dark:active:bg-accent/80 transition-[background-color,color] duration-150 text-xs font-medium whitespace-nowrap"
                       onClick={(e) => {
                         e.stopPropagation();
                         onMarkAsRead();

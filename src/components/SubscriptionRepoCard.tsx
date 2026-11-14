@@ -149,7 +149,7 @@ export const SubscriptionRepoCard: React.FC<SubscriptionRepoCardProps> = ({ repo
     <>
     <div
       onClick={handleCardClick}
-      className="app-list-row app-discovery-card ui-card transition-all duration-200 cursor-pointer"
+      className="app-list-row app-discovery-card ui-card transition-[color,background-color,border-color,box-shadow] duration-200 cursor-pointer"
       style={{ userSelect: 'none' }}
       onCopy={(e) => e.preventDefault()}
       onCut={(e) => e.preventDefault()}

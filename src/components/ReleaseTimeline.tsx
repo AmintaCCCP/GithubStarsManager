@@ -1195,7 +1195,7 @@ export const ReleaseTimeline: React.FC = () => {
               variant="ghost"
               onClick={handleMarkAllRead}
               disabled={isMarkingAllRead || unreadCount === 0}
-              className="flex shrink-0 items-center space-x-2 rounded-lg bg-muted px-3 py-2 transition-all hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted/40 dark:hover:bg-accent"
+              className="flex shrink-0 items-center space-x-2 rounded-lg bg-muted px-3 py-2 transition-[background-color] hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 dark:bg-muted/40 dark:hover:bg-accent"
               title={t('releaseTimeline.mark-all-as-read')}
             >
               {isMarkingAllRead ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}

@@ -813,7 +813,7 @@ export const ReadmeModal: React.FC<ReadmeModalProps> = ({
               <Button
                 onClick={scrollToTop}
                 aria-label={t('readmeModal.back-to-top')}
-                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-card dark:bg-muted rounded-full shadow-lg border border-border dark:border-border text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-foreground transition-all z-10"
+                className="absolute bottom-4 right-4 h-8 w-8 p-0 bg-card dark:bg-muted rounded-full shadow-lg border border-border dark:border-border text-muted-foreground dark:text-muted-foreground hover:bg-accent dark:hover:bg-accent hover:text-foreground transition-[background-color,color] duration-150 z-10"
                 title={t('readmeModal.back-to-top')}
               >
                 <ArrowUp className="w-4 h-4" />

@@ -155,7 +155,7 @@ export const GistView: React.FC = () => {
               <h2 className="app-side-title">{t('gistView.sidebar-title')}</h2>
               <div className="group relative">
                 <HelpCircle className="h-3.5 w-3.5 cursor-help text-muted-foreground dark:text-muted-foreground/70" />
-                <div className="gist-access-help-popover absolute left-0 top-full mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-all break-words group-hover:visible group-hover:opacity-100 dark:border-border dark:bg-card dark:text-muted-foreground">
+                <div className="gist-access-help-popover absolute left-0 top-full mt-2 w-72 max-w-xs whitespace-normal rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground shadow-lg opacity-0 invisible transition-[opacity,visibility] duration-150 break-words group-hover:visible group-hover:opacity-100 dark:border-border dark:bg-card dark:text-muted-foreground">
                   <p className="mb-1 font-medium text-foreground dark:text-foreground">
                     {t('gistView.gist-access-requires-the-gist-scope')}
                   </p>

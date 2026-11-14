@@ -83,7 +83,7 @@ export const StarSyncPanel: React.FC<StarSyncPanelProps> = ({ t }) => {
             categories={categories}
             onConfirm={(ids) => { setIsPushModalOpen(false); void handlePushCategoriesToLists(ids); }}
           />
-          {listsPush.isRunning && <div className="mt-4 space-y-2"><div className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground dark:text-muted-foreground">{listsPush.currentLabel || t('starSyncPanel.preparing')}</span><span className="ml-2 shrink-0 text-muted-foreground dark:text-muted-foreground">{listsPush.done}/{listsPush.total}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-muted/40"><div className="h-full bg-primary transition-all duration-200" style={{ width: `${progressPercent}%` }} /></div></div>}
+          {listsPush.isRunning && <div className="mt-4 space-y-2"><div className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground dark:text-muted-foreground">{listsPush.currentLabel || t('starSyncPanel.preparing')}</span><span className="ml-2 shrink-0 text-muted-foreground dark:text-muted-foreground">{listsPush.done}/{listsPush.total}</span></div><div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-muted/40"><div className="h-full w-full bg-primary origin-left transition-transform duration-200" style={{ transform: `scaleX(${progressPercent / 100})` }} /></div></div>}
           {!listsPush.isRunning && listsPush.error && <p role="alert" className="mt-4 whitespace-pre-line text-sm text-destructive">{listsPush.error}</p>}
           {!listsPush.isRunning && listsPush.message && !listsPush.error && <p className="mt-4 text-sm text-success">{listsPush.message}</p>}
         </CardContent>

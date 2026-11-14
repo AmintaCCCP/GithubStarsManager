@@ -72,9 +72,10 @@ export const ListsPushIndicator: React.FC = () => {
         </span>
       </div>
       <div className="h-2 rounded-full bg-muted overflow-hidden mb-2">
+        {/* 只动 transform 的进度条：scaleX 表现进度，避免 width 逐帧重排 */}
         <div
-          className="h-full bg-primary dark:bg-primary transition-all duration-200"
-          style={{ width: `${percent}%` }}
+          className="h-full w-full bg-primary dark:bg-primary origin-left transition-transform duration-200"
+          style={{ transform: `scaleX(${percent / 100})` }}
         />
       </div>
       {listsPush.currentLabel && (
