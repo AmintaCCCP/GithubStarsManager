@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import React, { Suspense, useEffect, useLayoutEffect, useMemo, useCallback, useDeferredValue } from 'react';
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
@@ -52,10 +52,11 @@ const ViewLoadingFallback: React.FC = () => (
   </div>
 );
 
+// 懒视图只保留错误边界。Suspense 上移到 App 视图容器的外层：这样懒模块
+// 加载期间整个淡入容器都不挂载，动画在目标内容真正提交时才开始播放，
+// 而不是先在 loading 占位上播完。
 const LazyViewBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ErrorBoundary>
-    <Suspense fallback={<ViewLoadingFallback />}>{children}</Suspense>
-  </ErrorBoundary>
+  <ErrorBoundary>{children}</ErrorBoundary>
 );
 
 /**
@@ -193,11 +194,7 @@ const SettingsView = React.memo(() => (
 ));
 SettingsView.displayName = 'SettingsView';
 
-const DiscoverySubscriptionView = React.memo(() => (
-  <Suspense fallback={<ViewLoadingFallback />}>
-    <LazyDiscoveryView />
-  </Suspense>
-));
+const DiscoverySubscriptionView = React.memo(() => <LazyDiscoveryView />);
 DiscoverySubscriptionView.displayName = 'DiscoverySubscriptionView';
 
 function App() {
@@ -288,8 +285,9 @@ function App() {
   const deferredView = useDeferredValue(currentView);
 
   // 滚动重置跟随 deferredView：新视图提交的同一帧再回顶，避免旧视图
-  // 还在屏上时滚动先跳、新内容后到的闪跳。
-  useEffect(() => {
+  // 还在屏上时滚动先跳、新内容后到的闪跳。用布局 effect 保证复位发生在
+  // 新内容绘制之前（reduced-motion 下没有淡入遮盖位置跳变）。
+  useLayoutEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [deferredView]);
 
@@ -359,10 +357,14 @@ function App() {
       <Header />
       <main className="app-main">
         {/* key 化包裹层：视图切换时重挂载并重放 200ms 淡入，消除硬切的突兀感。
-            只动 opacity（transform 动画期间会为 fixed 后代创建 containing block）。 */}
-        <div key={deferredView} className="motion-safe:animate-fade-in">
-          {currentViewContent}
-        </div>
+            只动 opacity（transform 动画期间会为 fixed 后代创建 containing block）。
+            Suspense 在容器外层：懒加载 fallback 不在淡入容器内，动画等目标
+            内容真正提交时才开始。切换是低优先级更新，期间旧视图保持可见。 */}
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <div key={deferredView} className="motion-safe:animate-fade-in">
+            {currentViewContent}
+          </div>
+        </Suspense>
       </main>
       <BackToTop />
       <DebugModeIndicator />
