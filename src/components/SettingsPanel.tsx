@@ -211,9 +211,11 @@ const MobileTabNav: React.FC<MobileTabNavProps> = ({ tabs, activeTab, onTabChang
       </div>
       
       {/* 底部活动指示器：固定基准宽度 + scaleX 表现实际宽度，
-          只动 transform，避免 width 逐帧重排布局 */}
+          只动 transform，避免 width 逐帧重排布局。
+          基准宽度用固定 px（w-24 是 rem，会随 fontScale 缩放），
+          与 scaleX 的分母 96 保持同一单位。 */}
       <div
-        className="absolute bottom-0 left-0 h-0.5 w-24 bg-primary rounded-full transition-transform duration-200 ease-out will-change-transform"
+        className="absolute bottom-0 left-0 h-0.5 w-[96px] bg-primary rounded-full transition-transform duration-200 ease-out will-change-transform"
         style={{
           transform: `translateX(${indicatorStyle.translateX}px) scaleX(${indicatorStyle.width / 96})`,
           transformOrigin: 'left center',
