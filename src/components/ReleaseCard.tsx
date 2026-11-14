@@ -109,6 +109,11 @@ const AssetCompatibilityBadge: React.FC<{
   );
 };
 
+// 超过该长度的 tag 徽标按 200px 截断（text-xs 下约容纳 28 个字符），并渲染为
+// 可展开按钮；取 24 保证所有可能被截断的 tag 都能展开，个别未截断的长 tag
+// 可展开也无副作用
+const LONG_TAG_MIN_LENGTH = 24;
+
 const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   release,
   downloadLinks,
@@ -144,6 +149,10 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const summary = useMemo(() => summaries[release.id] ?? { status: 'idle' as const }, [summaries, release.id]);
 
+  // 超长 tag 的展开态（留在卡片内，不持久化）：title 提示在触摸设备上不可达、
+  // 键盘也无法聚焦，故以按钮切换展开/收起来查看完整 tag
+  const [isTagExpanded, setIsTagExpanded] = useState(false);
+
   // 资产清单裁剪：已启用过滤器命中的资产默认展示，未命中的资产由用户按需展开。
   // 「展开全部」状态用**当前命中资产集合的签名**记录，而不是布尔值：过滤器被切换、
   // 或关键词被编辑导致命中集合变化时自动回到「只显示命中的资产」，避免旧的展开态
@@ -162,6 +171,12 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
       current === matchedLinksSignature ? null : matchedLinksSignature
     );
   }, [matchedLinksSignature]);
+
+  // 展开/收起超长 tag；stopPropagation 避免触发卡片的「标记已读」点击
+  const handleToggleTag = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsTagExpanded(current => !current);
+  }, []);
 
   // 完成或失败后自动展开（原 runSummaryAnalysis 成功/失败分支的 setIsSummaryExpanded(true)）
   useEffect(() => {
@@ -218,9 +233,31 @@ const ReleaseCard: React.FC<ReleaseCardProps> = memo(({
                   <h4 className="font-semibold text-foreground dark:text-foreground text-sm truncate">
                     {release.repository.name}
                   </h4>
-                  <span className="linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0">
-                    {release.tag_name}
-                  </span>
+                  {/* 超长 tag（如含完整 SHA 的 tag）截断为省略号，避免把右侧时间列挤出或覆盖。
+                      title 在触摸设备/键盘上不可达，超长 tag 故渲染为按钮：
+                      点击或回车展开显示完整 tag（换行、不破坏布局），再次操作收起 */}
+                  {release.tag_name.length > LONG_TAG_MIN_LENGTH ? (
+                    <button
+                      type="button"
+                      onClick={handleToggleTag}
+                      className={`linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0 cursor-pointer text-left ${
+                        isTagExpanded
+                          ? 'max-w-full whitespace-normal break-all'
+                          : 'max-w-[min(200px,100%)] truncate'
+                      }`}
+                      title={release.tag_name}
+                      aria-expanded={isTagExpanded}
+                    >
+                      {release.tag_name}
+                    </button>
+                  ) : (
+                    <span
+                      className="linear-card-tag px-1.5 py-0.5 text-xs font-medium shrink-0 max-w-[min(200px,100%)] truncate"
+                      title={release.tag_name}
+                    >
+                      {release.tag_name}
+                    </span>
+                  )}
                   {release.name && release.name !== release.tag_name && (
                     <span className="text-xs text-muted-foreground dark:text-muted-foreground truncate max-w-[200px]">
                       {release.name}
