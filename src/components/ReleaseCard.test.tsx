@@ -249,21 +249,42 @@ describe('ReleaseCard asset updated indicator', () => {
   });
 
 describe('ReleaseCard long tag truncation', () => {
-  it('regression: an overly long tag truncates and exposes the full tag via title', () => {
+  it('regression: an overly long tag truncates and expands on click to show the full tag', () => {
     // 截图中 cmux 的超长 tag 会溢出并覆盖右侧时间列；修复后徽标按 200px 截断，
-    // 悬停经 title 仍可查看完整 tag
+    // 且 title 在触摸设备/键盘上不可达，徽标渲染为按钮，点击/回车可展开查看完整 tag
     const longTag = 'cmux-app-ffi-dd99e8611da8ceb325798a92c7e201ce06bae07e';
-    renderCard({ release: makeRelease(1, { tag_name: longTag }) });
-    const tag = screen.getByTitle(longTag);
+    const onMarkAsRead = vi.fn();
+    renderCard({ onMarkAsRead, release: makeRelease(1, { tag_name: longTag }) });
+
+    const tag = screen.getByRole('button', { name: longTag });
     expect(tag).toHaveTextContent(longTag);
+    expect(tag).toHaveAttribute('aria-expanded', 'false');
     expect(tag).toHaveClass('truncate');
     expect(tag).toHaveClass('max-w-[min(200px,100%)]');
+
+    // 展开（button 原生支持触摸点按与键盘 Enter/Space）
+    fireEvent.click(tag);
+    expect(tag).toHaveAttribute('aria-expanded', 'true');
+    expect(tag).not.toHaveClass('truncate');
+    expect(tag).toHaveClass('break-all');
+    expect(tag).toHaveTextContent(longTag);
+
+    // 再次点击收起
+    fireEvent.click(tag);
+    expect(tag).toHaveAttribute('aria-expanded', 'false');
+    expect(tag).toHaveClass('truncate');
+
+    // 点击徽标（展开/收起）不应触发卡片的「标记已读」
+    expect(onMarkAsRead).not.toHaveBeenCalled();
   });
 
-  it('keeps short tags untruncated', () => {
+  it('keeps short tags as plain non-interactive badges', () => {
     renderCard({ release: makeRelease(1, { tag_name: 'v2.16.0' }) });
+    expect(screen.queryByRole('button', { name: 'v2.16.0' })).not.toBeInTheDocument();
     const tag = screen.getByTitle('v2.16.0');
     expect(tag).toHaveTextContent('v2.16.0');
+    expect(tag).toHaveClass('truncate');
+    expect(tag).toHaveClass('max-w-[min(200px,100%)]');
   });
 });
 
