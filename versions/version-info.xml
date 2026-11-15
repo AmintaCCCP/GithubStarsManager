@@ -782,4 +782,23 @@
     </changelog>
     <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.9.0</downloadUrl>
   </version>
+  <version>
+    <number>0.9.1</number>
+    <releaseDate>2026-11-15</releaseDate>
+    <changelog>
+      <item>feat: 新增「Repo Custom Fields」仓库自定义字段插件，支持在仓库卡片添加可点击的自定义链接，插件平台升级至 V1.6 并支持弹出式非全屏窗口。(PR #575)</item>
+      <item>feat: 支持自定义插件图标与仓库卡片快捷操作排序。(PR #577)</item>
+      <item>feat: 新增自动检查更新开关，更新弹窗支持按版本「不再提示」。(PR #579)</item>
+      <item>fix: 桌面托盘菜单跟随界面语言显示，支持全部 10 种语言。(PR #603)</item>
+      <item>fix: 优化视图与设置标签页切换，移除卡顿过渡动画，点击即时响应。(PR #609)</item>
+      <item>fix: 修复 Release 时间线超长 tag 名称遮挡时间与下载量的显示问题。(PR #608)</item>
+      <item>fix: 服务端未配置 API_SECRET 时自动生成随机密钥并拒绝未授权访问，修复接口全公开的高危安全问题。(PR #580)</item>
+      <item>fix: Token 引导默认推荐 Classic Token，并提示 Fine-grained Token 对取消 Star 与 GitHub Lists 的限制。(PR #604)</item>
+      <item>fix: 修复本地 AI 端点（如 Ollama）保存前测试连接报 502 的问题。(PR #605)</item>
+      <item>ci: 新增 UI 预览工作流，PR 界面改动自动截图评论，仅截取实际改动的页面。(PR #573, #576, #578, #581, #606)</item>
+      <item>ci: GitHub Actions 依赖更新自动分组为单个 PR。(PR #595)</item>
+      <item>build: 升级 i18next 27、jsdom 31、Vitest 5.1、undici、axios、zod、parse5、@hono/node-server 等依赖与 CI 工具链。(PR #582-#586, #588-#593, #596-#600, #607)</item>
+    </changelog>
+    <downloadUrl>https://github.com/AmintaCCCP/GithubStarsManager/releases/tag/v0.9.1</downloadUrl>
+  </version>
 </versions>
