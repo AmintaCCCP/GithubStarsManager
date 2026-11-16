@@ -1429,7 +1429,7 @@
     "title": "新增 GitHub 帳號",
     "description": "輸入新的 GitHub Personal Access Token 以新增帳號，目前帳號的資料將被安全保留。",
     "token-label": "GitHub Personal Access Token",
-    "cancel": "取消",
+    "cancel": "關閉",
     "confirm": "新增並切換",
     "reauth-hint": "請為帳號 @{{login}} 重新輸入有效的 GitHub Token"
   }

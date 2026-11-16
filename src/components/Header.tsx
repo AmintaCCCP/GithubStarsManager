@@ -144,7 +144,7 @@ export const Header: React.FC = () => {
             </div>
             <div className="min-w-0 hidden sm:block">
               <h1 className="app-brand-title truncate">
-                GitHub Stars Manager
+                GitHub Stars Manager {/* i18n-allow-literal: 产品名 */}
               </h1>
               <p className="app-brand-subtitle truncate">
                 AI-powered repository management

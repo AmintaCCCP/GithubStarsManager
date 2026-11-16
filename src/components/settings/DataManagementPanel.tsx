@@ -66,6 +66,7 @@ import {
 } from '../../store/helpers/accountWorkspace';
 import {
   buildFullWorkspaces,
+  hasMaskedBackupSecrets,
   maskSavedAccountsForBackup,
   mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
   mergeWorkspacesById,
@@ -200,16 +201,6 @@ const isRealSecret = (value: unknown): value is string => (
   typeof value === 'string' && value.length > 0 && value !== MASKED_SECRET
 );
 
-export const hasMaskedSecrets = (data: ExportData['data']): boolean => {
-  return !!(
-    data.aiConfigs?.some(config => config.apiKey === MASKED_SECRET) ||
-    data.webdavConfigs?.some(config => config.password === MASKED_SECRET) ||
-    data.proxyConfig?.password === MASKED_SECRET ||
-    data.rpcDownloadConfig?.secret === MASKED_SECRET ||
-    data.backendApiSecret === MASKED_SECRET ||
-    Object.values(data.savedAccounts ?? {}).some(account => account?.githubToken === MASKED_SECRET)
-  );
-};
 
 
 
@@ -1337,7 +1328,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
 
       // 如果导入的数据包含屏蔽的密钥，提示用户
-      if (hasMaskedSecrets(importedData)) {
+      if (hasMaskedBackupSecrets(importedData)) {
         showSuccess(t('dataManagementPanel.data-imported-successfully-some-secrets-were-mas'));
       } else {
         showSuccess(t('dataManagementPanel.data-imported-successfully'));
@@ -2298,7 +2289,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               </div>
 
               {/* Warning for masked secrets */}
-              {hasMaskedSecrets(importPreview.data.data) && (
+              {hasMaskedBackupSecrets(importPreview.data.data) && (
                 <div className="flex items-start space-x-3 text-warning bg-warning/10 p-4 rounded-lg border border-warning/30">
                   <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                   <p className="text-sm">

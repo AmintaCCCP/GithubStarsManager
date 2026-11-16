@@ -95,3 +95,24 @@ export const mergeBackupWorkspaces = (
   }
   return merged;
 };
+
+/** 检测备份载荷中是否存在脱敏掩码（提示用户部分密钥未包含）。 */
+export const hasMaskedBackupSecrets = (
+  data: {
+    aiConfigs?: Array<{ apiKey?: unknown }>;
+    webdavConfigs?: Array<{ password?: unknown }>;
+    proxyConfig?: { password?: unknown };
+    rpcDownloadConfig?: { secret?: unknown };
+    backendApiSecret?: unknown;
+    savedAccounts?: Record<string, SavedAccount>;
+  },
+): boolean => (
+  !!(
+    data.aiConfigs?.some(config => config.apiKey === BACKUP_MASKED_SECRET)
+    || data.webdavConfigs?.some(config => config.password === BACKUP_MASKED_SECRET)
+    || data.proxyConfig?.password === BACKUP_MASKED_SECRET
+    || data.rpcDownloadConfig?.secret === BACKUP_MASKED_SECRET
+    || data.backendApiSecret === BACKUP_MASKED_SECRET
+    || Object.values(data.savedAccounts ?? {}).some(account => account?.githubToken === BACKUP_MASKED_SECRET)
+  )
+);
