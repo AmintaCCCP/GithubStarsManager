@@ -34,11 +34,6 @@ const CLAIMED_BY_KEY = 'legacy_default_claimed_by';
 const LEGACY_OWNER_CACHE_KEY = 'legacy_default_owner_id';
 const DEFAULT_SCOPE = 'default';
 
-export interface AccountScopedRequest extends Request {
-  /** 由 accountScopeMiddleware 解析并暂存的账号分区。 */
-  accountScope?: string;
-}
-
 /** 从请求头提取合法的账号 ID；非法/缺失格式一律视为未传（防垃圾字符串污染分区名）。 */
 export function extractRequestedAccountId(req: Request): string | null {
   const raw = req.header('x-github-account-id')?.trim() ?? req.header('X-GitHub-Account-Id')?.trim() ?? '';
@@ -66,8 +61,6 @@ export function computeAccountScope(db: Database.Database, req?: Request): strin
   if (req) {
     const headerId = extractRequestedAccountId(req);
     if (headerId) return headerId;
-    const stashed = (req as AccountScopedRequest).accountScope;
-    if (stashed && ACCOUNT_ID_PATTERN.test(stashed)) return stashed;
   }
   const active = readSetting(db, 'active_account_id');
   if (active && ACCOUNT_ID_PATTERN.test(active)) return active;
