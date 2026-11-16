@@ -136,11 +136,8 @@ export const Header: React.FC = () => {
           {/* Logo and Title */}
           <div className="flex min-w-0 items-center space-x-3">
             <div className="app-brand-mark flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card">
-              <img
-                src="./icon.png"
-                alt="GitHub Stars Manager" {/* i18n-allow-literal: 产品名 */}
-                className="h-full w-full object-cover"
-              />
+              {/* i18n-allow-literal: 产品名（品牌名不翻译） */}
+              <img src="./icon.png" alt="GitHub Stars Manager" className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0 hidden sm:block">
               <h1 className="app-brand-title truncate">
