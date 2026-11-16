@@ -317,8 +317,12 @@ export const LoginScreen: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      const user = await setupBackendGitHubToken(githubToken);
+      // R2 防护（Issue #611）：先归档当前已登录账号（边缘态：持久化了 user 但
+      // 停留在登录页），再向后端写入新 Token——否则 setupBackendGitHubToken 的
+      // settings 写入会携带旧账号请求头，把新账号的 Token 写进旧账号分区。
+      // 归档失败无副作用：parked 快照会在该账号下次登录时自动恢复。
       parkCurrentAccountForRestore();
+      const user = await setupBackendGitHubToken(githubToken);
       await syncBackendData();
       setGitHubToken(githubToken);
       setUser(user);
