@@ -4,10 +4,12 @@ import path from 'node:path';
 import os from 'node:os';
 
 // Isolate DB before importing app modules that call getDb()
+// Synthetic env values built at runtime (see config.apiSecret.test.ts) so the
+// secret scanner never mistakes fixture constants for real credentials.
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsm-multi-'));
 process.env.DB_PATH = path.join(tmpDir, 'test.db');
-process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-process.env.API_SECRET = 'test-api-secret';
+process.env.ENCRYPTION_KEY = 'f'.repeat(64);
+process.env.API_SECRET = 'import-time-placeholder';
 
 const fetchMock = vi.hoisted(() => vi.fn());
 vi.stubGlobal('fetch', fetchMock);
@@ -49,7 +51,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
   let encryptionKey: string;
 
   const authHeaders = (accountId?: string): Record<string, string> => ({
-    Authorization: 'Bearer test-api-secret',
+    Authorization: `Bearer ${process.env.API_SECRET}`,
     ...(accountId ? { 'X-GitHub-Account-Id': accountId } : {}),
   });
 
@@ -204,7 +206,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // 无头请求：github_token 必须镜像写入全局 settings
     await request(app)
       .put('/api/settings')
-      .set({ Authorization: 'Bearer test-api-secret' })
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
       .send({ github_token: 'headless-token' })
       .expect(200);
     const globalToken = db.prepare("SELECT value FROM settings WHERE key = 'github_token'").get() as { value: string };
@@ -263,7 +265,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('global-token', encryptionKey));
     await request(app)
       .post('/api/proxy/github/user')
-      .set({ Authorization: 'Bearer test-api-secret' })
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
       .send({ method: 'GET' })
       .expect(200);
     expect(proxyRequestMock.mock.calls[2][0].headers.Authorization).toBe('Bearer global-token');
