@@ -4,6 +4,11 @@ import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
+import { resolveAccountScope, ACCOUNT_SCOPED_SETTING_KEYS } from '../db/accountScope.js';
+
+// 账号级设置键集合（Per-Account）：从 accountScope 统一出口转发，
+// 保持 configs.ts 作为 /api/settings 语义的定义点。
+export { ACCOUNT_SCOPED_SETTING_KEYS };
 
 const router = Router();
 
@@ -519,9 +524,12 @@ router.delete('/api/configs/webdav/:id', (req, res) => {
 // ── Settings ──
 
 // GET /api/settings
-router.get('/api/settings', (_req, res) => {
+// 先读取全局 settings，再用当前账号 account_settings 中的键值覆盖同名键。
+// 认领账号（legacy_default_claimed_by）缺失键时自然回退全局值（全局先读）。
+router.get('/api/settings', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const rows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
     const settings: Record<string, unknown> = {};
 
@@ -542,6 +550,24 @@ router.get('/api/settings', (_req, res) => {
       settings[key] = value;
     }
 
+    if (accountId !== 'default') {
+      const accountRows = db.prepare('SELECT key, value FROM account_settings WHERE account_id = ?')
+        .all(accountId) as Array<{ key: string; value: string | null }>;
+      for (const row of accountRows) {
+        if (row.key === 'github_token' && row.value) {
+          const { decryptedValue, status } = getMaskedSecretResult({
+            encryptedValue: row.value,
+            encryptionKey: config.encryptionKey,
+            kind: 'GitHub token',
+          });
+          settings.github_token_status = status;
+          settings[row.key] = status === 'empty' ? '' : maskApiKey(decryptedValue);
+          continue;
+        }
+        settings[row.key] = row.value;
+      }
+    }
+
     res.json(settings);
   } catch (err) {
     logger.errorFromError('configs.getSettings', 'GET /api/settings error', err);
@@ -550,12 +576,27 @@ router.get('/api/settings', (_req, res) => {
 });
 
 // PUT /api/settings
+// 镜像语义（防旧客户端丢 token）：
+// - 账号级键（ACCOUNT_SCOPED_SETTING_KEYS）在 resolveAccountScope 解析为真实账号时
+//   写入 account_settings(account_id, key, value)，并同步 accounts 表；
+// - 解析为 'default'（无头请求 / 旧客户端 / 无 active_account_id）时必须同时写入
+//   全局 settings 表，保证 settings.github_token 的旧语义不变。
 router.put('/api/settings', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
+    const isRealAccount = accountId !== 'default';
     const updates = req.body as Record<string, unknown>;
 
-    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    const globalStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    const accountStmt = db.prepare(
+      'INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)'
+    );
+
+    const accountPayload: { userProfile: unknown; tokenEncrypted: string | null } = {
+      userProfile: undefined,
+      tokenEncrypted: null,
+    };
 
     const upsert = db.transaction(() => {
       for (const [key, rawValue] of Object.entries(updates)) {
@@ -567,6 +608,13 @@ router.put('/api/settings', (req, res) => {
             continue;
           }
           value = encrypt(value, config.encryptionKey);
+          if (isRealAccount) accountPayload.tokenEncrypted = value;
+        }
+
+        if (key === 'user_profile') {
+          // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时携带）
+          accountPayload.userProfile = rawValue;
+          continue;
         }
 
         // better-sqlite3 interprets objects/arrays as named parameter maps,
@@ -577,7 +625,19 @@ router.put('/api/settings', (req, res) => {
             : typeof value === 'object'
               ? JSON.stringify(value)
               : value;
-        stmt.run(key, serialized);
+
+        if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && isRealAccount) {
+          accountStmt.run(accountId, key, serialized);
+        } else {
+          globalStmt.run(key, serialized);
+          // 无头请求下账号级键镜像写入全局表已覆盖；真实账号下账号级键不写全局。
+        }
+      }
+
+      if (isRealAccount
+        && (accountPayload.userProfile !== undefined || accountPayload.tokenEncrypted !== null)) {
+        upsertAccountRow(db, accountId, accountPayload.userProfile, accountPayload.tokenEncrypted);
+        globalStmt.run('active_account_id', accountId);
       }
     });
 
@@ -588,6 +648,34 @@ router.put('/api/settings', (req, res) => {
     res.status(500).json({ error: 'Failed to update settings', code: 'UPDATE_SETTINGS_FAILED' });
   }
 });
+
+function upsertAccountRow(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  userProfileRaw: unknown,
+  tokenEncrypted: string | null,
+): void {
+  const existing = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?')
+    .get(accountId) as { user_json: string | null } | undefined;
+  let userJson = existing?.user_json ?? null;
+  if (userProfileRaw !== undefined) {
+    if (userProfileRaw === null || userProfileRaw === '') {
+      userJson = null;
+    } else if (typeof userProfileRaw === 'string') {
+      userJson = userProfileRaw;
+    } else if (typeof userProfileRaw === 'object') {
+      userJson = JSON.stringify(userProfileRaw);
+    }
+  }
+  db.prepare(`
+    INSERT INTO accounts (account_id, user_json, github_token_encrypted, last_used_at)
+    VALUES (?, ?, ?, datetime('now'))
+    ON CONFLICT(account_id) DO UPDATE SET
+      user_json = COALESCE(excluded.user_json, accounts.user_json),
+      github_token_encrypted = COALESCE(excluded.github_token_encrypted, accounts.github_token_encrypted),
+      last_used_at = excluded.last_used_at
+  `).run(accountId, userJson, tokenEncrypted);
+}
 
 // ── Embedding Configs ──
 

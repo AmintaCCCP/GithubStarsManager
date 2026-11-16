@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
+import { resolveAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -34,15 +35,16 @@ function transformRelease(row: Record<string, unknown>) {
 router.get('/api/releases', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 50));
     const repoId = req.query.repo_id as string | undefined;
     const unread = req.query.unread as string | undefined;
     const offset = (page - 1) * limit;
 
-    let sql = 'SELECT * FROM releases';
+    let sql = 'SELECT * FROM releases WHERE account_id = ?';
     const conditions: string[] = [];
-    const params: unknown[] = [];
+    const params: unknown[] = [accountId];
 
     if (repoId) {
       conditions.push('repo_id = ?');
@@ -53,7 +55,7 @@ router.get('/api/releases', (req, res) => {
     }
 
     if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
+      sql += ' AND ' + conditions.join(' AND ');
     }
 
     sql += ' ORDER BY published_at DESC LIMIT ? OFFSET ?';
@@ -62,10 +64,10 @@ router.get('/api/releases', (req, res) => {
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
     const releases = rows.map(transformRelease);
 
-    let countSql = 'SELECT COUNT(*) as total FROM releases';
-    const countParams: unknown[] = [];
+    let countSql = 'SELECT COUNT(*) as total FROM releases WHERE account_id = ?';
+    const countParams: unknown[] = [accountId];
     if (conditions.length > 0) {
-      countSql += ' WHERE ' + conditions.join(' AND ');
+      countSql += ' AND ' + conditions.join(' AND ');
       if (repoId) countParams.push(parseInt(repoId));
     }
     const countRow = db.prepare(countSql).get(...countParams) as { total: number };
@@ -81,6 +83,7 @@ router.get('/api/releases', (req, res) => {
 router.put('/api/releases', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const { releases } = req.body as { releases: Record<string, unknown>[] };
     if (!Array.isArray(releases)) {
       res.status(400).json({ error: 'releases array required', code: 'RELEASES_ARRAY_REQUIRED' });
@@ -94,14 +97,17 @@ router.put('/api/releases', (req, res) => {
       }
     }
 
+    // v4 复合主键 (account_id, id)：两条 UPSERT 的冲突目标与 INSERT 列均加入
+    // account_id；account_id 占位参数一律追加到参数列表末位（参数位置契约）。
     const stmtPreserveIsRead = db.prepare(`
       INSERT INTO releases (
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name,
-        zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
+        zipball_url, tarball_url,
+        account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(account_id, id) DO UPDATE SET
         tag_name = excluded.tag_name,
         name = excluded.name,
         body = excluded.body,
@@ -122,9 +128,10 @@ router.put('/api/releases', (req, res) => {
         id, tag_name, name, body, html_url, published_at,
         prerelease, draft, is_read, assets,
         repo_id, repo_full_name, repo_name,
-        zipball_url, tarball_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
+        zipball_url, tarball_url,
+        account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(account_id, id) DO UPDATE SET
         tag_name = excluded.tag_name,
         name = excluded.name,
         body = excluded.body,
@@ -164,7 +171,8 @@ router.put('/api/releases', (req, res) => {
           repository?.full_name ?? release.repo_full_name ?? null,
           repository?.name ?? release.repo_name ?? null,
           release.zipball_url ?? null,
-          release.tarball_url ?? null
+          release.tarball_url ?? null,
+          accountId
         );
         count++;
       }
@@ -183,6 +191,7 @@ router.put('/api/releases', (req, res) => {
 router.patch('/api/releases/:id', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const id = parseInt(req.params.id);
     const { is_read } = req.body as { is_read?: boolean };
 
@@ -191,9 +200,9 @@ router.patch('/api/releases/:id', (req, res) => {
       return;
     }
 
-    db.prepare('UPDATE releases SET is_read = ? WHERE id = ?').run(is_read ? 1 : 0, id);
+    db.prepare('UPDATE releases SET is_read = ? WHERE account_id = ? AND id = ?').run(is_read ? 1 : 0, accountId, id);
 
-    const row = db.prepare('SELECT * FROM releases WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = db.prepare('SELECT * FROM releases WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
     if (!row) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
@@ -206,10 +215,11 @@ router.patch('/api/releases/:id', (req, res) => {
 });
 
 // POST /api/releases/mark-all-read
-router.post('/api/releases/mark-all-read', (_req, res) => {
+router.post('/api/releases/mark-all-read', (req, res) => {
   try {
     const db = getDb();
-    const result = db.prepare('UPDATE releases SET is_read = 1').run();
+    const accountId = resolveAccountScope(req, db);
+    const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
     res.json({ updated: result.changes });
   } catch (err) {
     console.error('POST /api/releases/mark-all-read error:', err);
@@ -233,7 +243,8 @@ router.delete('/api/releases/:id', (req, res) => {
     }
 
     const db = getDb();
-    const result = db.prepare('DELETE FROM releases WHERE id = ?').run(id);
+    const accountId = resolveAccountScope(req, db);
+    const result = db.prepare('DELETE FROM releases WHERE account_id = ? AND id = ?').run(accountId, id);
 
     if (result.changes === 0) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });

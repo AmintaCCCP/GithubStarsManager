@@ -79,16 +79,20 @@ function configureDb(options: {
           if (sql.includes('FROM repositories')) return repos;
           return [];
         },
-        get: (value?: unknown) => {
+        // v4 多账号隔离后 SQL 均带 account_id 前导条件；第一个绑定参数是
+        // account_id，实际查找值是第二个参数。
+        get: (first?: unknown, second?: unknown) => {
+          const value = second ?? first;
           if (sql.includes('FROM vector_search_configs')) return vectorConfig;
           if (sql.includes('FROM embedding_configs')) return embeddingConfig;
+          if (sql.includes('FROM settings')) return undefined;
           if (sql.includes('FROM releases')) {
             return releases.find((release) => Number(release.repo_id) === Number(value));
           }
-          if (sql.includes('WHERE id = ?')) {
+          if (sql.includes('AND id = ?')) {
             return repos.find((repo) => Number(repo.id) === Number(value));
           }
-          if (sql.includes('WHERE full_name = ?')) {
+          if (sql.includes('full_name = ?')) {
             return repos.find(
               (repo) => String(repo.full_name).toLowerCase() === String(value).toLowerCase()
             );

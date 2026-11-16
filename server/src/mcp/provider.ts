@@ -2,6 +2,7 @@ import { getDb } from '../db/connection.js';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
+import { resolveActiveAccountScope } from '../db/accountScope.js';
 import {
   type McpRepository,
   type McpSearchFilters,
@@ -67,23 +68,26 @@ const MAX_REPOS_IN_MEMORY = 50_000;
 
 export function loadAllRepositories(): McpRepository[] {
   const db = getDb();
+  // MCP 查询按当前活跃账号分区过滤（无头请求回退 active_account_id → 'default'）
+  const accountId = resolveActiveAccountScope(db);
   const rows = db
-    .prepare('SELECT * FROM repositories ORDER BY stargazers_count DESC LIMIT ?')
-    .all(MAX_REPOS_IN_MEMORY) as Record<string, unknown>[];
+    .prepare('SELECT * FROM repositories WHERE account_id = ? ORDER BY stargazers_count DESC LIMIT ?')
+    .all(accountId, MAX_REPOS_IN_MEMORY) as Record<string, unknown>[];
   return rows.map(transformRepoRow);
 }
 
 export function getRepository(idOrFullName: string | number): McpRepository | null {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   let row: Record<string, unknown> | undefined;
   if (typeof idOrFullName === 'number' || /^\d+$/.test(String(idOrFullName))) {
     row = db
-      .prepare('SELECT * FROM repositories WHERE id = ?')
-      .get(Number(idOrFullName)) as Record<string, unknown> | undefined;
+      .prepare('SELECT * FROM repositories WHERE account_id = ? AND id = ?')
+      .get(accountId, Number(idOrFullName)) as Record<string, unknown> | undefined;
   } else {
     row = db
-      .prepare('SELECT * FROM repositories WHERE full_name = ? COLLATE NOCASE')
-      .get(String(idOrFullName)) as Record<string, unknown> | undefined;
+      .prepare('SELECT * FROM repositories WHERE account_id = ? AND full_name = ? COLLATE NOCASE')
+      .get(accountId, String(idOrFullName)) as Record<string, unknown> | undefined;
   }
   return row ? transformRepoRow(row) : null;
 }
@@ -97,15 +101,16 @@ export function getRepositories(inputs: string[]) {
 
 export function getLatestRelease(repoId: number): McpReleaseEvidence | null {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   const row = db
     .prepare(
       `SELECT id, tag_name, name, html_url, published_at, prerelease, draft
        FROM releases
-       WHERE repo_id = ?
+       WHERE account_id = ? AND repo_id = ?
        ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
        LIMIT 1`
     )
-    .get(repoId) as Record<string, unknown> | undefined;
+    .get(accountId, repoId) as Record<string, unknown> | undefined;
   if (!row) return null;
   return {
     id: row.id as number,
@@ -137,15 +142,16 @@ const MAX_RELEASES_PER_REPO_EVIDENCE = 500;
  */
 export function getRepositoryReleases(repoId: number): HealthReleaseInput[] {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   const rows = db
     .prepare(
       `SELECT repo_id, tag_name, published_at, prerelease
        FROM releases
-       WHERE repo_id = ?
+       WHERE account_id = ? AND repo_id = ?
        ORDER BY (published_at IS NULL) ASC, published_at DESC, id DESC
        LIMIT ?`
     )
-    .all(repoId, MAX_RELEASES_PER_REPO_EVIDENCE) as Array<Record<string, unknown>>;
+    .all(accountId, repoId, MAX_RELEASES_PER_REPO_EVIDENCE) as Array<Record<string, unknown>>;
 
   return rows.map((row) => ({
     repo_id: typeof row.repo_id === 'number' ? row.repo_id : Number(row.repo_id),
@@ -157,9 +163,10 @@ export function getRepositoryReleases(repoId: number): HealthReleaseInput[] {
 
 export function listCategories(): Array<Record<string, unknown>> {
   const db = getDb();
+  const accountId = resolveActiveAccountScope(db);
   const rows = db
-    .prepare('SELECT * FROM categories ORDER BY sort_order ASC, name ASC')
-    .all() as Record<string, unknown>[];
+    .prepare('SELECT * FROM categories WHERE account_id = ? ORDER BY sort_order ASC, name ASC')
+    .all(accountId) as Record<string, unknown>[];
   return rows.map((row) => ({
     id: row.id,
     name: row.name,

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
+import { resolveAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -79,17 +80,18 @@ function transformRepo(row: Record<string, unknown>) {
 router.get('/api/repositories', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(10000, Math.max(1, parseInt(req.query.limit as string) || 100));
     const search = req.query.search as string | undefined;
     const offset = (page - 1) * limit;
 
-    let sql = 'SELECT * FROM repositories';
-    const params: unknown[] = [];
+    let sql = 'SELECT * FROM repositories WHERE account_id = ?';
+    const params: unknown[] = [accountId];
 
     if (search) {
       const escaped = search.replace(/[%_\\]/g, '\\$&');
-      sql += " WHERE name LIKE ? ESCAPE '\\' OR full_name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' OR ai_tags LIKE ? ESCAPE '\\'";
+      sql += " AND (name LIKE ? ESCAPE '\\' OR full_name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR ai_summary LIKE ? ESCAPE '\\' OR ai_tags LIKE ? ESCAPE '\\')";
       const searchPattern = `%${escaped}%`;
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
@@ -101,9 +103,9 @@ router.get('/api/repositories', (req, res) => {
     const repositories = rows.map(transformRepo);
 
     const countSql = search
-      ? 'SELECT COUNT(*) as total FROM repositories WHERE name LIKE ? OR full_name LIKE ? OR description LIKE ? OR ai_summary LIKE ? OR ai_tags LIKE ?'
-      : 'SELECT COUNT(*) as total FROM repositories';
-    const countParams = search ? Array(5).fill(`%${search}%`) : [];
+      ? 'SELECT COUNT(*) as total FROM repositories WHERE account_id = ? AND (name LIKE ? OR full_name LIKE ? OR description LIKE ? OR ai_summary LIKE ? OR ai_tags LIKE ?)'
+      : 'SELECT COUNT(*) as total FROM repositories WHERE account_id = ?';
+    const countParams = search ? [accountId, ...Array(5).fill(`%${search}%`)] : [accountId];
     const countRow = db.prepare(countSql).get(...countParams) as { total: number };
 
     res.json({ repositories, total: countRow.total, page, limit });
@@ -117,6 +119,7 @@ router.get('/api/repositories', (req, res) => {
 router.put('/api/repositories', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const { repositories } = req.body as { repositories: Record<string, unknown>[] };
     if (!Array.isArray(repositories)) {
       res.status(400).json({ error: 'repositories array required', code: 'REPOSITORIES_ARRAY_REQUIRED' });
@@ -159,6 +162,10 @@ router.put('/api/repositories', (req, res) => {
       }
     }
 
+    // v4 复合主键 (account_id, id)：UPSERT 冲突目标必须匹配复合主键。
+    // account_id 占位参数追加在参数列表末位（见参数位置契约）。
+    // 跨账号 AI 分析成果复用：当前账号该仓库尚无 AI 总结时，回填同库其他账号
+    // 已分析过的同一仓库的成果（账号归属隔离，免去重复 AI Token 消耗）。
     const stmt = db.prepare(`
       INSERT INTO repositories (
         id, name, full_name, description, html_url, stargazers_count, language,
@@ -167,9 +174,10 @@ router.put('/api/repositories', (req, res) => {
         ai_summary, ai_tags, ai_platforms, analyzed_at, analysis_failed,
         custom_description, custom_tags, custom_category, category_locked, last_edited,
         subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
-        description_display, tags_display
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
+        description_display, tags_display,
+        account_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(account_id, id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
         description = excluded.description,
@@ -183,10 +191,30 @@ router.put('/api/repositories', (req, res) => {
         owner_login = excluded.owner_login,
         owner_avatar_url = excluded.owner_avatar_url,
         topics = excluded.topics,
-        ai_summary = CASE WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.ai_summary ELSE repositories.ai_summary END,
-        ai_tags = CASE WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN excluded.ai_tags ELSE repositories.ai_tags END,
-        ai_platforms = CASE WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN excluded.ai_platforms ELSE repositories.ai_platforms END,
-        analyzed_at = CASE WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at ELSE repositories.analyzed_at END,
+        ai_summary = CASE WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.ai_summary ELSE COALESCE(repositories.ai_summary, (
+          SELECT other.ai_summary FROM repositories AS other
+          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+            AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+          LIMIT 1
+        )) END,
+        ai_tags = CASE WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN excluded.ai_tags ELSE COALESCE(repositories.ai_tags, (
+          SELECT other.ai_tags FROM repositories AS other
+          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+            AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
+          LIMIT 1
+        )) END,
+        ai_platforms = CASE WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN excluded.ai_platforms ELSE COALESCE(repositories.ai_platforms, (
+          SELECT other.ai_platforms FROM repositories AS other
+          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+            AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
+          LIMIT 1
+        )) END,
+        analyzed_at = CASE WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at ELSE COALESCE(repositories.analyzed_at, (
+          SELECT other.analyzed_at FROM repositories AS other
+          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+            AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
+          LIMIT 1
+        )) END,
         analysis_failed = excluded.analysis_failed,
         -- 同步只接收整仓快照：字段缺省即表示客户端已无自定义内容，须照实覆盖，
         -- 否则「跟随列表设置/显示AI」保存后的清空无法同步到后端（#565）。
@@ -209,12 +237,12 @@ router.put('/api/repositories', (req, res) => {
         license = CASE WHEN @licenseProvided IS 1 THEN excluded.license ELSE repositories.license END
     `);
 
-    const deleteAllReleases = db.prepare('DELETE FROM releases');
-    const deleteAllRepositories = db.prepare('DELETE FROM repositories');
+    const deleteAllAccountReleases = db.prepare('DELETE FROM releases WHERE account_id = ?');
+    const deleteAllAccountRepositories = db.prepare('DELETE FROM repositories WHERE account_id = ?');
     const deleteReleasesNotIn = (placeholders: string) =>
-      db.prepare(`DELETE FROM releases WHERE repo_id NOT IN (${placeholders})`);
+      db.prepare(`DELETE FROM releases WHERE account_id = ? AND repo_id NOT IN (${placeholders})`);
     const deleteRepositoriesNotIn = (placeholders: string) =>
-      db.prepare(`DELETE FROM repositories WHERE id NOT IN (${placeholders})`);
+      db.prepare(`DELETE FROM repositories WHERE account_id = ? AND id NOT IN (${placeholders})`);
 
     const upsert = db.transaction(() => {
       const isFullSync = Boolean(req.body?.isFullSync);
@@ -225,14 +253,15 @@ router.put('/api/repositories', (req, res) => {
           .filter((id): id is number => typeof id === 'number');
 
         if (repoIds.length === 0) {
-          deleteAllReleases.run();
-          deleteAllRepositories.run();
+          // 清空严格限定在当前账号分区，绝不能触碰其他账号的数据。
+          deleteAllAccountReleases.run(accountId);
+          deleteAllAccountRepositories.run(accountId);
           return 0;
         }
 
         const placeholders = repoIds.map(() => '?').join(', ');
-        deleteReleasesNotIn(placeholders).run(...repoIds);
-        deleteRepositoriesNotIn(placeholders).run(...repoIds);
+        deleteReleasesNotIn(placeholders).run(accountId, ...repoIds);
+        deleteRepositoriesNotIn(placeholders).run(accountId, ...repoIds);
       }
 
       let count = 0;
@@ -262,6 +291,7 @@ router.put('/api/repositories', (req, res) => {
           typeof repo.vector_indexed_license === 'string' ? repo.vector_indexed_license || null : null,
           toDisplayPref(repo.description_display, DESCRIPTION_DISPLAY_VALUES),
           toDisplayPref(repo.tags_display, TAGS_DISPLAY_VALUES),
+          accountId,
           { licenseProvided }
         );
         count++;
@@ -281,6 +311,7 @@ router.put('/api/repositories', (req, res) => {
 router.patch('/api/repositories/:id', (req, res) => {
   try {
     const db = getDb();
+    const accountId = resolveAccountScope(req, db);
     const id = parseInt(req.params.id);
     const updates = req.body as Record<string, unknown>;
 
@@ -335,10 +366,11 @@ router.patch('/api/repositories/:id', (req, res) => {
       return;
     }
 
-    values.push(id);
-    db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+    // account_id 条件防跨账号改写（WHERE account_id = ? AND id = ?）
+    values.push(accountId, id);
+    db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE account_id = ? AND id = ?`).run(...values);
 
-    const row = db.prepare('SELECT * FROM repositories WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    const row = db.prepare('SELECT * FROM repositories WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
     if (!row) {
       res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
       return;
@@ -366,13 +398,14 @@ router.delete('/api/repositories/:id', (req, res) => {
     }
 
     const db = getDb();
-    const deleteReleases = db.prepare('DELETE FROM releases WHERE repo_id = ?');
-    const deleteRepo = db.prepare('DELETE FROM repositories WHERE id = ?');
+    const accountId = resolveAccountScope(req, db);
+    const deleteReleases = db.prepare('DELETE FROM releases WHERE account_id = ? AND repo_id = ?');
+    const deleteRepo = db.prepare('DELETE FROM repositories WHERE account_id = ? AND id = ?');
 
     const deleteAll = db.transaction(() => {
-      const releaseResult = deleteReleases.run(id);
-      const repoResult = deleteRepo.run(id);
-      
+      const releaseResult = deleteReleases.run(accountId, id);
+      const repoResult = deleteRepo.run(accountId, id);
+
       return {
         releasesDeleted: releaseResult.changes,
         repoDeleted: repoResult.changes
@@ -386,8 +419,8 @@ router.delete('/api/repositories/:id', (req, res) => {
       return;
     }
 
-    res.json({ 
-      deleted: true, 
+    res.json({
+      deleted: true,
       id,
       releasesDeleted: result.releasesDeleted
     });

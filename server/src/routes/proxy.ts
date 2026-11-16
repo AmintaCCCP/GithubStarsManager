@@ -4,6 +4,50 @@ import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { proxyRequest, ProxyConfig, validateUrl, isPrivateOrLoopback } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
+import { resolveAccountScope } from '../db/accountScope.js';
+
+/**
+ * 按当前账号分区解析 GitHub Token（多账号隔离，Issue #611）。
+ * 回退顺序不可颠倒：account_settings → accounts.github_token_encrypted → 全局 settings。
+ * 无头请求（无 X-GitHub-Account-Id 且无 active_account_id）解析为 'default'，
+ * account_settings 查询自然未命中，直接回退全局表，旧客户端行为完全不变。
+ */
+function resolveGitHubTokenForRequest(req: import('express').Request): { token: string | null; decryptFailed: boolean } {
+  const db = getDb();
+  const accountId = resolveAccountScope(req, db);
+  if (accountId !== 'default') {
+    const accountSetting = db
+      .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
+      .get(accountId) as { value: string } | undefined;
+    if (accountSetting?.value) {
+      try {
+        return { token: decrypt(accountSetting.value, config.encryptionKey), decryptFailed: false };
+      } catch {
+        return { token: null, decryptFailed: true };
+      }
+    }
+    const accountRow = db
+      .prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?')
+      .get(accountId) as { github_token_encrypted: string | null } | undefined;
+    if (accountRow?.github_token_encrypted) {
+      try {
+        return { token: decrypt(accountRow.github_token_encrypted, config.encryptionKey), decryptFailed: false };
+      } catch {
+        return { token: null, decryptFailed: true };
+      }
+    }
+  }
+
+  const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
+  if (!tokenRow?.value) {
+    return { token: null, decryptFailed: false };
+  }
+  try {
+    return { token: decrypt(tokenRow.value, config.encryptionKey), decryptFailed: false };
+  } catch {
+    return { token: null, decryptFailed: true };
+  }
+}
 
 function getProxyConfig(): ProxyConfig | null {
   try {
@@ -121,7 +165,6 @@ function completeOpenAiCompatibleUrl(baseUrl: string): string {
 // POST /api/proxy/github/*
 router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
   try {
-    const db = getDb();
     const rawPath = (req.params as Record<string, string>)[0];
     const githubPath = Array.isArray(rawPath) ? rawPath.join('/') : (rawPath ?? '');
 
@@ -131,20 +174,17 @@ router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
       return;
     }
     
-    // Read and decrypt GitHub token from settings
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
-    if (!tokenRow?.value) {
-      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+    // Read and decrypt GitHub token from the current account scope (with global fallback)
+    const tokenResult = resolveGitHubTokenForRequest(req);
+    if (!tokenResult.token) {
+      if (tokenResult.decryptFailed) {
+        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      } else {
+        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      }
       return;
     }
-
-    let token: string;
-    try {
-      token = decrypt(tokenRow.value, config.encryptionKey);
-    } catch {
-      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      return;
-    }
+    const token = tokenResult.token;
 
     const cleanPath = githubPath.replace(/^\/+/, '');
     const safeSegments = cleanPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
@@ -203,20 +243,16 @@ router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
 // Used for fetching individual gist file content (raw_url) when the gist API marks files as truncated.
 router.post('/api/proxy/github-raw', async (req, res) => {
   try {
-    const db = getDb();
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
-    if (!tokenRow?.value) {
-      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+    const tokenResult = resolveGitHubTokenForRequest(req);
+    if (!tokenResult.token) {
+      if (tokenResult.decryptFailed) {
+        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      } else {
+        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      }
       return;
     }
-
-    let token: string;
-    try {
-      token = decrypt(tokenRow.value, config.encryptionKey);
-    } catch {
-      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      return;
-    }
+    const token = tokenResult.token;
 
     const body = req.body as { url?: string; method?: string; headers?: Record<string, string> };
     if (!body.url || typeof body.url !== 'string') {
@@ -516,23 +552,19 @@ router.post('/api/proxy/webdav', async (req, res) => {
 // POST /api/proxy/github/search/repositories
 router.post('/api/proxy/github/search/repositories', async (req, res) => {
   try {
-    const db = getDb();
     const githubPath = 'search/repositories';
     const { query_params } = req.body as { query_params?: Record<string, string> };
 
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
-    if (!tokenRow?.value) {
-      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+    const tokenResult = resolveGitHubTokenForRequest(req);
+    if (!tokenResult.token) {
+      if (tokenResult.decryptFailed) {
+        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      } else {
+        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      }
       return;
     }
-
-    let token: string;
-    try {
-      token = decrypt(tokenRow.value, config.encryptionKey);
-    } catch {
-      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      return;
-    }
+    const token = tokenResult.token;
 
     const queryString = query_params ? '?' + new URLSearchParams(query_params).toString() : '';
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
@@ -557,23 +589,19 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
 // POST /api/proxy/github/search/users
 router.post('/api/proxy/github/search/users', async (req, res) => {
   try {
-    const db = getDb();
     const githubPath = 'search/users';
     const { query_params } = req.body as { query_params?: Record<string, string> };
 
-    const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
-    if (!tokenRow?.value) {
-      res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+    const tokenResult = resolveGitHubTokenForRequest(req);
+    if (!tokenResult.token) {
+      if (tokenResult.decryptFailed) {
+        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+      } else {
+        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+      }
       return;
     }
-
-    let token: string;
-    try {
-      token = decrypt(tokenRow.value, config.encryptionKey);
-    } catch {
-      res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      return;
-    }
+    const token = tokenResult.token;
 
     const queryString = query_params ? '?' + new URLSearchParams(query_params).toString() : '';
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;

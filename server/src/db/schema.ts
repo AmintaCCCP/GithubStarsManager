@@ -14,10 +14,28 @@ export function initializeSchema(db: Database.Database): void {
       applied_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- v4 多账号隔离：repositories/releases/categories 以 (account_id, id) 为复合主键，
+    -- 与 Migration v4 重建后的形状逐列一致，保证全新数据库与升级数据库不漂移。
+    CREATE TABLE IF NOT EXISTS accounts (
+      account_id TEXT PRIMARY KEY,
+      user_json TEXT NOT NULL,
+      github_token_encrypted TEXT,
+      added_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_used_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS account_settings (
+      account_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      PRIMARY KEY (account_id, key)
+    );
+
     CREATE TABLE IF NOT EXISTS repositories (
-      id INTEGER PRIMARY KEY,
+      account_id TEXT NOT NULL DEFAULT 'default',
+      id INTEGER NOT NULL,
       name TEXT NOT NULL,
-      full_name TEXT NOT NULL UNIQUE,
+      full_name TEXT NOT NULL,
       description TEXT,
       html_url TEXT NOT NULL,
       stargazers_count INTEGER DEFAULT 0,
@@ -38,12 +56,20 @@ export function initializeSchema(db: Database.Database): void {
       custom_tags TEXT,
       custom_category TEXT,
       category_locked INTEGER DEFAULT 0,
+      description_display TEXT,
+      tags_display TEXT,
       last_edited TEXT,
-      subscribed_to_releases INTEGER DEFAULT 0
+      subscribed_to_releases INTEGER DEFAULT 0,
+      vector_indexed_at TEXT,
+      license TEXT,
+      vector_indexed_license TEXT,
+      PRIMARY KEY (account_id, id),
+      UNIQUE (account_id, full_name)
     );
 
     CREATE TABLE IF NOT EXISTS releases (
-      id INTEGER PRIMARY KEY,
+      account_id TEXT NOT NULL DEFAULT 'default',
+      id INTEGER NOT NULL,
       tag_name TEXT NOT NULL,
       name TEXT,
       body TEXT,
@@ -57,18 +83,21 @@ export function initializeSchema(db: Database.Database): void {
       draft INTEGER DEFAULT 0,
       is_read INTEGER DEFAULT 0,
       zipball_url TEXT,
-      tarball_url TEXT
+      tarball_url TEXT,
+      PRIMARY KEY (account_id, id)
     );
 
     CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL DEFAULT 'default',
+      id TEXT NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
       icon TEXT NOT NULL DEFAULT '📁',
       keywords TEXT,
       color TEXT,
       sort_order INTEGER DEFAULT 0,
-      is_custom INTEGER DEFAULT 1
+      is_custom INTEGER DEFAULT 1,
+      PRIMARY KEY (account_id, id)
     );
 
     CREATE TABLE IF NOT EXISTS ai_configs (
