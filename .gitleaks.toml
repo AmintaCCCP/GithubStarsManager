@@ -22,6 +22,11 @@ paths = [
   '''^server/tests/middleware/csp\.test\.ts$''',
   '''^server/tests/mcp/routes\.test\.ts$''',
   '''^server/tests/services/config\.test\.ts$''',
+  # multiAccount.test.ts (Issue #611) used the shared synthetic
+  # ENCRYPTION_KEY/API_SECRET fixture constants in early branch commits; HEAD
+  # builds both values at runtime (see config.apiSecret.test.ts). The path
+  # entry only exempts those known-fake constants in this file.
+  '''^server/tests/routes/multiAccount\.test\.ts$''',
 ]
 regexes = [
   # Each entry is an exact synthetic constant from the fixtures — not a
