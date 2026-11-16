@@ -218,6 +218,50 @@ describe('useAccountSwitchActions', () => {
     expect(state.savedAccounts['2']?.githubToken).toBe('ghp_b');
   });
 
+  it('restores the parked account when adding a new account fails after parking', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
+      repositories: [{ id: 1, name: 'repo-1', full_name: 'owner/repo-1' } as never],
+      searchResults: [],
+    });
+    mocks.authenticateWithGitHub.mockResolvedValue(userB);
+
+    // 模拟 park 之后写入新账号失败：首次 setUser 抛错，恢复回放时放行
+    const realSetUser = useAppStore.getState().setUser;
+    let setUserCalls = 0;
+    try {
+      useAppStore.setState({
+        setUser: (u: Parameters<typeof realSetUser>[0]) => {
+          setUserCalls += 1;
+          if (setUserCalls === 1) throw new Error('simulated-write-failure');
+          realSetUser(u);
+        },
+      });
+
+      const { result } = renderHook(() => useAccountSwitchActions());
+      let outcome;
+      await act(async () => {
+        outcome = await result.current.addAccountWithToken('ghp_b');
+      });
+
+      expect(outcome).toEqual({ ok: false, error: 'simulated-write-failure' });
+      const state = useAppStore.getState();
+      // 与 addAccountFromBackend 对称：原账号登录态、工作区与凭证原样恢复
+      expect(state.user?.login).toBe('alice');
+      expect(state.isAuthenticated).toBe(true);
+      expect(state.githubToken).toBe('ghp_a');
+      expect(state.repositories[0]?.id).toBe(1);
+      expect(state.accountWorkspaces['1']?.repositories[0]?.id).toBe(1);
+      // 新账号未被登记（半途失败不得留下半份凭证）
+      expect(state.savedAccounts['2']).toBeUndefined();
+    } finally {
+      useAppStore.setState({ setUser: realSetUser });
+    }
+  });
+
   it('removes a non-active saved account and keeps its workspace data', async () => {
     useAppStore.setState({
       user: userA,

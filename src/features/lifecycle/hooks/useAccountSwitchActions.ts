@@ -184,11 +184,12 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
 
     switchingRef.current = true;
     setIsSwitching(true);
+    let parkedAccountId: string | null = null;
     try {
       await prepareForAccountSwitch(currentAccountId);
       await withAccountSwitchGuard(async () => {
         // R2 预防：先把当前已登录账号工作区安全归档并清空顶层，再落新账号
-        useAppStore.getState().parkCurrentAccountForRestore();
+        parkedAccountId = useAppStore.getState().parkCurrentAccountForRestore();
         useAppStore.getState().setGitHubToken(token);
         useAppStore.getState().setUser(user);
       });
@@ -199,10 +200,15 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       console.error('Add account failed:', error);
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
+      if (!useAppStore.getState().user) {
+        // 与 addAccountFromBackend 对称：归档后写入新账号失败时，
+        // 被归档的原账号工作区与凭证原样恢复，当前会话毫发无损。
+        recoverParkedAccount(parkedAccountId ?? currentAccountId);
+      }
       switchingRef.current = false;
       setIsSwitching(false);
     }
-  }, [alignTargetAccountOnBackend, authenticateWithGitHub]);
+  }, [alignTargetAccountOnBackend, authenticateWithGitHub, recoverParkedAccount]);
 
   const addAccountFromBackend = useCallback(async (url: string, secret: string): Promise<AddAccountResult> => {
     if (switchingRef.current) {
