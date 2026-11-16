@@ -1,5 +1,9 @@
 import { logger } from '../../services/logger';
-import { resetSyncHashes } from '../../services/autoSync';
+import {
+  cancelPendingAccountSwitchPush,
+  resetSyncHashes,
+  withAccountSwitchGuardSync,
+} from '../../services/autoSync';
 import type { AppStoreSlice } from '../types';
 import {
   accountIdKey,
@@ -101,18 +105,22 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           : current.accountWorkspaces;
         clearAuthMirror();
         writeSessionBackendSecret(null);
+        // Issue #611：登出后推送通道失去账号上下文（无 X-GitHub-Account-Id，
+        // 后端回退 active_account_id 分区），旧会话的待推防抖与本次工作区清空
+        // 都绝不能触发 isFullSync 推送，否则会把空快照写入上一账号分区。
+        cancelPendingAccountSwitchPush();
         // Reset sync fingerprints so the next force sync (e.g. backend
         // login restore) applies every shard even if the backend data has
         // not changed since this session.
         resetSyncHashes();
-        set({
+        withAccountSwitchGuardSync(() => set({
           user: null,
           githubToken: null,
           backendApiSecret: null,
           isAuthenticated: false,
           accountWorkspaces,
           ...applyAccountWorkspace(undefined),
-        });
+        }));
         // logout 保留 savedAccounts 中的历史账号记录：用户停留在 LoginScreen
         // 时仍可一键恢复会话，或从下拉菜单直接切换账号。
       },
@@ -152,6 +160,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           return true;
         }
         const previousAccountId = currentAccountId;
+        // Issue #611：切换会整体替换工作区。旧会话的待推防抖若在切换后触发，
+        // 会把旧账号的（可能陈旧/为空的）快照以新账号请求头 isFullSync 推送，
+        // 删除新账号后端分区中不在快照里的数据。取消待推并静音订阅。
+        cancelPendingAccountSwitchPush();
         const switched = switchAccountWorkspace(current, previousAccountId, targetAccountId);
         const now = nowIso();
         const savedAccounts = {
@@ -166,7 +178,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             : {}),
           [targetAccountId]: { ...target, lastUsedAt: now },
         };
-        set({
+        withAccountSwitchGuardSync(() => set({
           user: target.user,
           githubToken: target.githubToken,
           isAuthenticated: true,
@@ -196,7 +208,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
           similarView: null,
           readmeModalOpen: false,
-        });
+        }));
         resetSyncHashes();
         writeAuthMirror({
           user: target.user,
@@ -231,8 +243,12 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         const previousAccountId = accountIdKey(current.user);
         if (!previousAccountId) return null;
         const parked = captureAccountWorkspace(current);
+        // Issue #611：归档会清空顶层工作区并把 user 置空。取消旧会话的待推
+        // 防抖并静音本次订阅，防止 2s 后以无账号请求头（后端回退
+        // active_account_id 分区）把空快照 isFullSync 推送出去。
+        cancelPendingAccountSwitchPush();
         resetSyncHashes();
-        set({
+        withAccountSwitchGuardSync(() => set({
           user: null,
           // 保持 isAuthenticated 原值：LoginScreen 恢复流程（未登录）停留在登录页，
           // AddAccountModal 后端恢复流程（已登录）保持主界面与弹窗挂载不被卸载。
@@ -242,7 +258,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             [previousAccountId]: parked,
           },
           ...applyAccountWorkspace(undefined),
-        });
+        }));
         writeAuthMirror({ user: null, githubToken: null, backendApiSecret: current.backendApiSecret });
         logger.info('store.parkCurrentAccountForRestore', 'Parked account workspace for external restore', {
           accountId: previousAccountId,

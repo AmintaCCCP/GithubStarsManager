@@ -29,6 +29,39 @@ export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T
   }
 }
 
+/**
+ * Synchronous variant for store actions that swap workspaces inside a single
+ * `set()` (switchAccount / logout / parkCurrentAccountForRestore). Saves and
+ * restores the previous flag so nesting inside the async guard stays safe.
+ * Without it the workspace swap fires the subscription and schedules an
+ * isFullSync push of the stale snapshot under the NEXT account's header.
+ */
+export function withAccountSwitchGuardSync<T>(fn: () => T): T {
+  const previous = _isSwitchingAccount;
+  _isSwitchingAccount = true;
+  try {
+    return fn();
+  } finally {
+    _isSwitchingAccount = previous;
+  }
+}
+
+/**
+ * Cancel a scheduled debounced push and clear pending flags (Issue #611).
+ * Account switches / logout / park replace the whole workspace: pending-push
+ * semantics from the old session must never fire afterwards, or the 2s
+ * isFullSync push would write the stale (possibly empty) snapshot into the
+ * wrong backend partition under the new (or absent) account header.
+ */
+export function cancelPendingAccountSwitchPush(): void {
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+  }
+  _hasPendingLocalChanges = false;
+  _hasPendingPush = false;
+}
+
 // Track store subscription for cleanup on restart
 let _storeUnsubscribe: (() => void) | null = null;
 

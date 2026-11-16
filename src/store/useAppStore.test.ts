@@ -1202,6 +1202,54 @@ describe('useAppStore logout and per-account workspaces', () => {
     expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
   });
 
+  it('removing the current account switches to the most recent saved account with both workspaces intact', () => {
+    const aliceRepos = [createRepository(1, { ai_summary: 'alice-ai' })];
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      repositories: aliceRepos,
+      searchResults: aliceRepos,
+      accountWorkspaces: {
+        '2': {
+          repositories: [createRepository(2, { ai_summary: 'bob-ai' })],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+    });
+
+    useAppStore.getState().removeSavedAccount('1');
+    const state = useAppStore.getState();
+    // 被移除的是当前账号：自动切换到下一个已保存账号
+    expect(state.savedAccounts['1']).toBeUndefined();
+    expect(state.user?.login).toBe('bob');
+    expect(state.githubToken).toBe('ghp_b');
+    expect(state.isAuthenticated).toBe(true);
+    // 账号 A 的顶层数据先被归档，账号 B 的工作区被恢复，双端零丢失
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
+    expect(state.repositories[0].ai_summary).toBe('bob-ai');
+  });
+
   it('parks the current account before an external restore without polluting its snapshot', () => {
     const aliceRepos = [createRepository(1, { ai_summary: 'alice-ai' })];
     useAppStore.setState({

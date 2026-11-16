@@ -6,6 +6,7 @@ import {
   prepareForAccountSwitch,
   syncFromBackend,
   withAccountSwitchGuard,
+  withAccountSwitchGuardSync,
 } from '../../../services/autoSync';
 import { refreshMcpElectronBridge } from '../../../services/mcpElectronBridge';
 import { useLoginActions } from './useLoginActions';
@@ -66,13 +67,17 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     if (state.user) return; // 已成功登录另一账号，无需恢复
     const saved = state.savedAccounts[parkedAccountId];
     const workspace = state.accountWorkspaces[parkedAccountId];
-    if (workspace) {
-      useAppStore.setState(applyAccountWorkspace(workspace));
-    }
-    if (saved) {
-      state.setGitHubToken(saved.githubToken);
-      state.setUser(saved.user);
-    }
+    // 恢复写入同样属于切换簿记：静音订阅，避免工作区回放在无账号上下文下
+    // 触发 isFullSync 推送（失败且无 savedAccount 时 user 仍为 null）。
+    withAccountSwitchGuardSync(() => {
+      if (workspace) {
+        useAppStore.setState(applyAccountWorkspace(workspace));
+      }
+      if (saved) {
+        state.setGitHubToken(saved.githubToken);
+        state.setUser(saved.user);
+      }
+    });
   }, []);
 
   /**
