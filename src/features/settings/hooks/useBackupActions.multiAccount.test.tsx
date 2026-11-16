@@ -1,0 +1,251 @@
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useBackupActions } from './useBackupActions';
+import { useAppStore } from '../../../store/useAppStore';
+import type { AccountWorkspace, Repository, SavedAccount } from '../../../types';
+
+// 恢复真实 Store：全局 setup.ts 将 ../store/useAppStore mock 成了选择器桩，
+// 而多账号备份/恢复测试需要驱动真实的工作区与账号状态。
+vi.mock('../../../store/useAppStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../store/useAppStore')>();
+  return actual;
+});
+
+const mocks = vi.hoisted(() => ({
+  toast: vi.fn(),
+  confirm: vi.fn(),
+  uploadFile: vi.fn(),
+  listFiles: vi.fn(),
+  downloadFile: vi.fn(),
+}));
+
+vi.mock('../../../hooks/useDialog', () => ({
+  useDialog: () => ({ toast: mocks.toast, confirm: mocks.confirm }),
+}));
+
+vi.mock('../../../services/webdavService', () => ({
+  WebDAVService: class {
+    uploadFile = mocks.uploadFile;
+    listFiles = mocks.listFiles;
+    downloadFile = mocks.downloadFile;
+    constructor() { /* active config is provided by the store */ }
+  },
+}));
+
+const userA = { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null };
+const userB = { id: 2, login: 'bob', name: 'Bob', avatar_url: 'https://x/b.png', email: null };
+
+const repo = (id: number, summary?: string): Repository => ({
+  id,
+  name: `repo-${id}`,
+  full_name: `owner/repo-${id}`,
+  description: null,
+  html_url: `https://github.com/owner/repo-${id}`,
+  stargazers_count: 1,
+  forks_count: 0,
+  forks: 0,
+  language: null,
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z',
+  pushed_at: '2026-01-01T00:00:00.000Z',
+  owner: { login: 'owner', avatar_url: '' },
+  topics: [],
+  ...(summary ? { ai_summary: summary } : {}),
+});
+
+const workspaceOf = (repos: Repository[]): AccountWorkspace => ({
+  repositories: repos,
+  lastSync: null,
+  gists: [],
+  starredGists: [],
+  selectedGistCategory: 'all',
+  releases: [],
+  releaseSubscriptions: [],
+  releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+  readReleases: [],
+  forks: [],
+  readForks: [],
+  customCategories: [],
+  hiddenDefaultCategoryIds: [],
+  categoryOrder: [],
+  defaultCategoryOverrides: {},
+  categoryListIdMap: {},
+  syncMode: 'stars',
+  syncModeConfigured: false,
+});
+
+const savedAccount = (id: string, user: typeof userA, token: string): SavedAccount => ({
+  accountId: id,
+  user,
+  githubToken: token,
+  addedAt: '2026-01-01T00:00:00.000Z',
+  lastUsedAt: '2026-01-01T00:00:00.000Z',
+});
+
+const activeWebDAV = {
+  id: 'dav-1',
+  name: 'Test',
+  url: 'https://dav.example',
+  username: 'user',
+  password: 'pass',
+  path: '/',
+  isActive: true,
+};
+
+const setupStore = (): void => {
+  useAppStore.setState({
+    user: userA,
+    githubToken: 'ghp_a',
+    isAuthenticated: true,
+    savedAccounts: {
+      '1': savedAccount('1', userA, 'ghp_a'),
+      '2': savedAccount('2', userB, 'ghp_b'),
+    },
+    accountWorkspaces: {
+      '2': workspaceOf([repo(2, 'bob-ai')]),
+    },
+    repositories: [repo(1, 'alice-ai')],
+    searchResults: [repo(1, 'alice-ai')],
+    gists: [],
+    starredGists: [],
+    forks: [],
+    readForks: new Set<number>(),
+    webdavConfigs: [activeWebDAV],
+    activeWebDAVConfig: 'dav-1',
+  });
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.confirm.mockResolvedValue(true);
+  mocks.uploadFile.mockResolvedValue(true);
+  setupStore();
+});
+
+describe('useBackupActions multi-account (Issue #611)', () => {
+  it('backs up v1.3 with full workspaces and masked tokens when keys are excluded', async () => {
+    useAppStore.setState({ includeKeysInBackup: false });
+    const { result } = renderHook(() => useBackupActions());
+
+    await act(async () => {
+      await result.current.backup();
+    });
+
+    expect(mocks.uploadFile).toHaveBeenCalledOnce();
+    const payload = JSON.parse(mocks.uploadFile.mock.calls[0][1] as string);
+    expect(payload.version).toBe('1.3');
+    expect(payload.activeAccountId).toBe('1');
+    // 当前账号实时状态合并进工作区字典
+    expect(payload.accountWorkspaces['1'].repositories[0].ai_summary).toBe('alice-ai');
+    expect(payload.accountWorkspaces['2'].repositories[0].ai_summary).toBe('bob-ai');
+    // 未包含密钥时 Token 一律脱敏
+    expect(payload.savedAccounts['1'].githubToken).toBe('***');
+    expect(payload.savedAccounts['2'].githubToken).toBe('***');
+    expect(JSON.stringify(payload)).not.toContain('ghp_');
+  });
+
+  it('backs up plaintext tokens when keys are included', async () => {
+    useAppStore.setState({ includeKeysInBackup: true });
+    const { result } = renderHook(() => useBackupActions());
+
+    await act(async () => {
+      await result.current.backup();
+    });
+
+    const payload = JSON.parse(mocks.uploadFile.mock.calls[0][1] as string);
+    expect(payload.savedAccounts['1'].githubToken).toBe('ghp_a');
+    expect(payload.savedAccounts['2'].githubToken).toBe('ghp_b');
+  });
+
+  it('restores workspaces and accounts without clobbering local tokens from masked backups', async () => {
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: false,
+      activeAccountId: '1',
+      accountWorkspaces: {
+        '2': workspaceOf([repo(2, 'bob-restored')]),
+      },
+      savedAccounts: {
+        '1': savedAccount('1', userA, '***'),
+        '2': savedAccount('2', userB, '***'),
+      },
+      repositories: [repo(1, 'alice-from-backup')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 工作区恢复：备份内容优先，本机独有的其他账号快照保留
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-restored');
+    // 当前账号按备份内容恢复到顶层并同步工作区快照
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-from-backup');
+    // 掩码 Token 不覆盖本机有效 Token
+    expect(state.savedAccounts['1']?.githubToken).toBe('ghp_a');
+    expect(state.savedAccounts['2']?.githubToken).toBe('ghp_b');
+    // 同账号恢复：备份内容按确认对话框语义覆盖当前顶层
+    expect(state.repositories[0].ai_summary).toBe('alice-from-backup');
+  });
+
+  it('archives top-level backup data into the backup account when restoring across accounts', async () => {
+    useAppStore.setState({ savedAccounts: { '1': savedAccount('1', userA, 'ghp_a') } });
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: true,
+      activeAccountId: '2',
+      accountWorkspaces: {
+        '1': workspaceOf([repo(1, 'alice-backup')]),
+      },
+      savedAccounts: {
+        '2': savedAccount('2', userB, 'ghp_b_backup'),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 备份顶层（bob 的数据）归档进账号 2 工作区
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
+    // 备份中的 alice 工作区应用到当前顶层
+    expect(state.repositories[0].ai_summary).toBe('alice-backup');
+    // 登录态不被改变
+    expect(state.user?.login).toBe('alice');
+    expect(state.isAuthenticated).toBe(true);
+  });
+
+  it('keeps other parked workspaces intact when restoring a legacy 1.2 backup', async () => {
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.2',
+      includeKeysInBackup: false,
+      repositories: [repo(1, 'alice-legacy')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 旧版单账号备份恢复到当前顶层
+    expect(state.repositories[0].ai_summary).toBe('alice-legacy');
+    // 当前账号工作区快照被同步更新
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-legacy');
+    // 其他账号快照原样保留
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
+  });
+});

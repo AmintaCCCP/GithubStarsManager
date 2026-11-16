@@ -57,6 +57,19 @@ import { Github } from '../ui/brand-icons';
 import { useAppStore } from '../../store/useAppStore';
 import { removePersistedSnapshot } from '../../store/persistence/storage';
 import { normalizePluginCustomIcons } from '../../store/normalizers/persistedState';
+import {
+  accountIdKey,
+  applyAccountWorkspace,
+  captureAccountWorkspace,
+  normalizeAccountWorkspaces,
+  normalizeSavedAccounts,
+} from '../../store/helpers/accountWorkspace';
+import {
+  buildFullWorkspaces,
+  maskSavedAccountsForBackup,
+  mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
+  mergeWorkspacesById,
+} from '../../utils/backupWorkspace';
 import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
 import type { ThemePresetId } from '../../constants/themePresets';
@@ -74,7 +87,10 @@ import type {
   SearchFilters,
   ProxyConfig,
   RpcDownloadConfig,
-  ReleaseSourceSettings
+  ReleaseSourceSettings,
+  AccountWorkspace,
+  SavedAccount,
+  SyncMode
 } from '../../types';
 import {
   mergeReleaseSourceSettings,
@@ -117,6 +133,16 @@ interface ExportData {
   exportDate: string;
   appVersion: string;
   data: {
+    activeAccountId?: string | null;
+    savedAccounts?: Record<string, SavedAccount>;
+    accountWorkspaces?: Record<string, AccountWorkspace>;
+    gists?: import('../../types').Gist[];
+    starredGists?: import('../../types').Gist[];
+    forks?: import('../../types').ForkRepo[];
+    readForks?: number[];
+    categoryListIdMap?: Record<string, string>;
+    syncMode?: SyncMode;
+    syncModeConfigured?: boolean;
     repositories?: Repository[];
     releases?: Release[];
     aiConfigs?: AIConfig[];
@@ -174,15 +200,18 @@ const isRealSecret = (value: unknown): value is string => (
   typeof value === 'string' && value.length > 0 && value !== MASKED_SECRET
 );
 
-const hasMaskedSecrets = (data: ExportData['data']): boolean => {
+export const hasMaskedSecrets = (data: ExportData['data']): boolean => {
   return !!(
     data.aiConfigs?.some(config => config.apiKey === MASKED_SECRET) ||
     data.webdavConfigs?.some(config => config.password === MASKED_SECRET) ||
     data.proxyConfig?.password === MASKED_SECRET ||
     data.rpcDownloadConfig?.secret === MASKED_SECRET ||
-    data.backendApiSecret === MASKED_SECRET
+    data.backendApiSecret === MASKED_SECRET ||
+    Object.values(data.savedAccounts ?? {}).some(account => account?.githubToken === MASKED_SECRET)
   );
 };
+
+
 
 const UI_SETTINGS_DATA_KEYS = [
   'theme',
@@ -637,14 +666,31 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       const includeKeys = store.includeKeysInBackup;
 
       const exportDataObj: ExportData = {
-        version: '1.0',
+        version: '1.1',
         exportDate: new Date().toISOString(),
         appVersion: '0.4.0',
         data: { includeKeysInBackup: includeKeys }
       };
 
+      // 多账号备份（Issue #611）：勾选核心数据时一并导出活跃账号 ID、
+      // 全账号工作区字典与已保存账号列表（Token 按 includeKeysInBackup 脱敏）
+      const exportCoreWorkspaces = selectedTypes.includes('repositories')
+        || selectedTypes.includes('releases')
+        || selectedTypes.includes('customCategories');
+      if (exportCoreWorkspaces) {
+        exportDataObj.data.activeAccountId = accountIdKey(store.user);
+        exportDataObj.data.accountWorkspaces = buildFullWorkspaces(store);
+        exportDataObj.data.savedAccounts = maskSavedAccountsForBackup(store.savedAccounts, includeKeys);
+      }
+
       if (selectedTypes.includes('repositories')) {
         exportDataObj.data.repositories = store.repositories;
+        exportDataObj.data.gists = store.gists;
+        exportDataObj.data.starredGists = store.starredGists;
+        exportDataObj.data.forks = store.forks;
+        exportDataObj.data.readForks = Array.from(store.readForks);
+        exportDataObj.data.syncMode = store.syncMode;
+        exportDataObj.data.syncModeConfigured = store.syncModeConfigured;
       }
       if (selectedTypes.includes('releases')) {
         exportDataObj.data.releases = store.releases;
@@ -664,6 +710,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         exportDataObj.data.hiddenDefaultCategoryIds = store.hiddenDefaultCategoryIds;
         exportDataObj.data.defaultCategoryOverrides = store.defaultCategoryOverrides;
         exportDataObj.data.categoryOrder = store.categoryOrder;
+        exportDataObj.data.categoryListIdMap = store.categoryListIdMap;
       }
       if (selectedTypes.includes('assetFilters')) {
         exportDataObj.data.assetFilters = store.assetFilters;
@@ -769,12 +816,110 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       // Legacy compatibility: treat missing flag as true (older exports contained keys)
       const wasIncluded = importedData.includeKeysInBackup ?? true;
 
+      // ── 多账号恢复（Issue #611）───────────────────────────────────────
+      // 绝不丢失其他账号工作区：备份中的工作区合并进本机 accountWorkspaces，
+      // 本机独有的其他账号快照原样保留。
+      const currentAccountId = accountIdKey(store.user);
+      const hasImportedWorkspaces = !!importedData.accountWorkspaces;
+      const importedWorkspaces = hasImportedWorkspaces
+        ? normalizeAccountWorkspaces(importedData.accountWorkspaces)
+        : {};
+      // 备份顶层属于另一个账号（跨账号恢复）：顶层导入结果归档进备份账号工作区，
+      // 当前账号的备份工作区（若存在）应用到顶层，绝不张冠李戴。
+      const backupTargetsOtherAccount = hasImportedWorkspaces
+        && !!importedData.activeAccountId
+        && !!currentAccountId
+        && importedData.activeAccountId !== currentAccountId;
+
+      const archiveTopLevelToBackupAccount = (): void => {
+        if (!importedData.activeAccountId) return;
+        const workspaces = useAppStore.getState().accountWorkspaces;
+        const previous = workspaces[importedData.activeAccountId];
+        useAppStore.setState({
+          accountWorkspaces: {
+            ...workspaces,
+            [importedData.activeAccountId]: {
+              ...(previous ?? captureAccountWorkspace(useAppStore.getState())),
+              repositories: importedData.repositories ?? previous?.repositories ?? [],
+              releases: importedData.releases ?? previous?.releases ?? [],
+              customCategories: importedData.customCategories ?? previous?.customCategories ?? [],
+              hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds ?? previous?.hiddenDefaultCategoryIds ?? [],
+              defaultCategoryOverrides: importedData.defaultCategoryOverrides ?? previous?.defaultCategoryOverrides ?? {},
+              categoryOrder: importedData.categoryOrder ?? previous?.categoryOrder ?? [],
+            },
+          },
+        });
+      };
+
+      const applyCurrentAccountBackupWorkspace = (): void => {
+        if (!currentAccountId) return;
+        const backup = useAppStore.getState().accountWorkspaces[currentAccountId];
+        if (backup) {
+          useAppStore.setState(applyAccountWorkspace(backup));
+        }
+      };
+
+      // savedAccounts 合并：仅当备份包含真实密钥时采用导入 Token，否则保留本机凭证
+      if (importedData.savedAccounts && typeof importedData.savedAccounts === 'object') {
+        const normalizedSaved = normalizeSavedAccounts(importedData.savedAccounts);
+        const mergedSaved = { ...useAppStore.getState().savedAccounts };
+        for (const [id, account] of Object.entries(normalizedSaved)) {
+          const local = mergedSaved[id];
+          const token = wasIncluded && account.githubToken
+            ? account.githubToken
+            : (local?.githubToken ?? '');
+          mergedSaved[id] = {
+            ...(local ?? account),
+            ...account,
+            githubToken: token,
+          };
+        }
+        useAppStore.setState({ savedAccounts: mergedSaved });
+      }
+
       if (mode === 'replace') {
+        // 工作区字典合并（replace）：更新备份中存在的账号，保留本机独有账号
+        if (hasImportedWorkspaces) {
+          useAppStore.setState({
+            accountWorkspaces: mergeAccountWorkspacesForBackup(
+              useAppStore.getState().accountWorkspaces,
+              importedData.accountWorkspaces as Record<string, unknown>,
+              currentAccountId,
+              captureAccountWorkspace(useAppStore.getState()),
+              false,
+            ),
+          });
+        }
         if (selectedTypes.includes('repositories') && importedData.repositories) {
-          store.setRepositories(importedData.repositories, { allowEmpty: true });
+          if (backupTargetsOtherAccount) {
+            // 顶层仓库属于备份账号：归档而非覆盖当前登录账号视图
+            archiveTopLevelToBackupAccount();
+          } else {
+            store.setRepositories(importedData.repositories, { allowEmpty: true });
+          }
+        }
+        if (selectedTypes.includes('repositories') && !backupTargetsOtherAccount) {
+          // 工作区级数据（Gist/Fork/同步范围）随仓库选择一并恢复
+          if (importedData.gists || importedData.starredGists) {
+            useAppStore.setState({
+              gists: importedData.gists ?? useAppStore.getState().gists,
+              starredGists: importedData.starredGists ?? useAppStore.getState().starredGists,
+              gistSearchResults: importedData.gists ?? useAppStore.getState().gistSearchResults,
+            });
+          }
+          if (importedData.forks || importedData.readForks) {
+            useAppStore.setState({
+              forks: importedData.forks ?? useAppStore.getState().forks,
+              readForks: new Set(importedData.readForks ?? Array.from(useAppStore.getState().readForks)),
+            });
+          }
         }
         if (selectedTypes.includes('releases') && importedData.releases) {
-          store.setReleases(importedData.releases, { allowEmpty: true });
+          if (backupTargetsOtherAccount) {
+            archiveTopLevelToBackupAccount();
+          } else {
+            store.setReleases(importedData.releases, { allowEmpty: true });
+          }
         }
         if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
           const restoredConfigs = importedData.aiConfigs.map(cfg => ({
@@ -791,17 +936,24 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           store.setWebDAVConfigs(restoredConfigs);
         }
         if (selectedTypes.includes('customCategories')) {
-          if (importedData.customCategories) {
-            useAppStore.setState({ customCategories: importedData.customCategories });
+          if (backupTargetsOtherAccount) {
+            archiveTopLevelToBackupAccount();
+          } else {
+            if (importedData.customCategories) {
+              useAppStore.setState({ customCategories: importedData.customCategories });
+            }
+            if (importedData.hiddenDefaultCategoryIds) {
+              useAppStore.setState({ hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds });
+            }
+            if (importedData.defaultCategoryOverrides) {
+              useAppStore.setState({ defaultCategoryOverrides: importedData.defaultCategoryOverrides });
+            }
+            if (importedData.categoryOrder) {
+              useAppStore.setState({ categoryOrder: importedData.categoryOrder });
+            }
           }
-          if (importedData.hiddenDefaultCategoryIds) {
-            useAppStore.setState({ hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds });
-          }
-          if (importedData.defaultCategoryOverrides) {
-            useAppStore.setState({ defaultCategoryOverrides: importedData.defaultCategoryOverrides });
-          }
-          if (importedData.categoryOrder) {
-            useAppStore.setState({ categoryOrder: importedData.categoryOrder });
+          if (importedData.categoryListIdMap) {
+            useAppStore.setState({ categoryListIdMap: importedData.categoryListIdMap });
           }
         }
         if (selectedTypes.includes('assetFilters') && Array.isArray(importedData.assetFilters)) {
@@ -922,15 +1074,32 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           setBackendApiSecret(importedData.backendApiSecret);
         }
       } else {
+        // 工作区字典合并（merge）：逐账号按 id 去重合并，保留本机独有账号
+        if (hasImportedWorkspaces) {
+          const merged = { ...useAppStore.getState().accountWorkspaces };
+          for (const [accountId, incoming] of Object.entries(importedWorkspaces)) {
+            const local = merged[accountId];
+            merged[accountId] = local ? mergeWorkspacesById(local, incoming) : incoming;
+          }
+          useAppStore.setState({ accountWorkspaces: merged });
+        }
         if (selectedTypes.includes('repositories') && importedData.repositories) {
-          const existingIds = new Set(store.repositories.map(r => r.id));
-          const newRepos = importedData.repositories.filter(r => !existingIds.has(r.id));
-          store.setRepositories([...store.repositories, ...newRepos]);
+          if (backupTargetsOtherAccount) {
+            archiveTopLevelToBackupAccount();
+          } else {
+            const existingIds = new Set(store.repositories.map(r => r.id));
+            const newRepos = importedData.repositories.filter(r => !existingIds.has(r.id));
+            store.setRepositories([...store.repositories, ...newRepos]);
+          }
         }
         if (selectedTypes.includes('releases') && importedData.releases) {
-          const existingIds = new Set(store.releases.map(r => r.id));
-          const newReleases = importedData.releases.filter(r => !existingIds.has(r.id));
-          store.setReleases([...store.releases, ...newReleases]);
+          if (backupTargetsOtherAccount) {
+            archiveTopLevelToBackupAccount();
+          } else {
+            const existingIds = new Set(store.releases.map(r => r.id));
+            const newReleases = importedData.releases.filter(r => !existingIds.has(r.id));
+            store.setReleases([...store.releases, ...newReleases]);
+          }
         }
         if (selectedTypes.includes('aiConfigs') && importedData.aiConfigs) {
           const existingIds = new Set(store.aiConfigs.map(c => c.id));
@@ -953,11 +1122,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           store.setWebDAVConfigs([...store.webdavConfigs, ...newConfigs]);
         }
         if (selectedTypes.includes('customCategories')) {
-          if (importedData.customCategories) {
+          if (backupTargetsOtherAccount) {
+            archiveTopLevelToBackupAccount();
+          } else if (importedData.customCategories) {
             const existingIds = new Set(store.customCategories.map(c => c.id));
             const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
             useAppStore.setState({
               customCategories: [...store.customCategories, ...newCategories]
+            });
+          }
+          if (!backupTargetsOtherAccount && importedData.categoryListIdMap) {
+            const current = useAppStore.getState().categoryListIdMap;
+            useAppStore.setState({
+              categoryListIdMap: { ...current, ...importedData.categoryListIdMap },
             });
           }
           if (importedData.hiddenDefaultCategoryIds) {
@@ -1142,6 +1319,21 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             setBackendApiSecret(importedUiSettings.backendApiSecret);
           }
         }
+      }
+
+      // ── 多账号恢复收尾（Issue #611）─────────────────────────────────
+      if (backupTargetsOtherAccount) {
+        // 把当前登录账号的备份工作区应用到顶层（若备份中不存在则保留本机状态）
+        applyCurrentAccountBackupWorkspace();
+      } else if (!hasImportedWorkspaces && currentAccountId) {
+        // 旧版单账号备份：同步更新当前账号的工作区快照，其他账号快照不动
+        const live = useAppStore.getState();
+        useAppStore.setState({
+          accountWorkspaces: {
+            ...live.accountWorkspaces,
+            [currentAccountId]: captureAccountWorkspace(live),
+          },
+        });
       }
 
       // 如果导入的数据包含屏蔽的密钥，提示用户

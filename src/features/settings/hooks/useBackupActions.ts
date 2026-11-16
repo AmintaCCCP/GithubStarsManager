@@ -4,8 +4,21 @@ import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { AIConfig, WebDAVConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import {
+  accountIdKey,
+  applyAccountWorkspace,
+  captureAccountWorkspace,
+  normalizeSavedAccounts,
+} from '../../../store/helpers/accountWorkspace';
+import {
+  isRealBackupSecret,
+  maskSavedAccountsForBackup,
+  mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
+} from '../../../utils/backupWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { WebDAVService } from '../../../services/webdavService';
+
+
 
 export interface BackupActions {
   activeConfig: WebDAVConfig | undefined;
@@ -71,6 +84,15 @@ export const useBackupActions = (): BackupActions => {
       const backupData = {
         repositories: state.repositories,
         releases: state.releases,
+        gists: useAppStore.getState().gists,
+        starredGists: useAppStore.getState().starredGists,
+        forks: useAppStore.getState().forks,
+        readForks: Array.from(useAppStore.getState().readForks),
+        categoryOrder: useAppStore.getState().categoryOrder,
+        defaultCategoryOverrides: useAppStore.getState().defaultCategoryOverrides,
+        categoryListIdMap: useAppStore.getState().categoryListIdMap,
+        syncMode: useAppStore.getState().syncMode,
+        syncModeConfigured: useAppStore.getState().syncModeConfigured,
         customCategories: state.customCategories,
         hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
         aiConfigs: state.aiConfigs.map((config) => ({
@@ -95,8 +117,18 @@ export const useBackupActions = (): BackupActions => {
         releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
         readReleases: Array.from(useAppStore.getState().readReleases),
         includeKeysInBackup: state.includeKeysInBackup,
+        // 多账号备份（Issue #611）：活跃账号 ID + 全账号工作区 + 已保存账号列表
+        activeAccountId: accountIdKey(useAppStore.getState().user),
+        accountWorkspaces: mergeAccountWorkspacesForBackup(
+          useAppStore.getState().accountWorkspaces,
+          useAppStore.getState().accountWorkspaces,
+          accountIdKey(useAppStore.getState().user),
+          captureAccountWorkspace(useAppStore.getState()),
+          true,
+        ),
+        savedAccounts: maskSavedAccountsForBackup(useAppStore.getState().savedAccounts, state.includeKeysInBackup),
         exportedAt: new Date().toISOString(),
-        version: '1.2',
+        version: '1.3',
       };
       const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
       const success = await new WebDAVService(activeConfig).uploadFile(filename, JSON.stringify(backupData, null, 2));
@@ -143,8 +175,98 @@ export const useBackupActions = (): BackupActions => {
       }
       const backupData = JSON.parse(content) as Record<string, unknown>;
       const backupIncludedKeys = backupData.includeKeysInBackup ?? true;
-      if (Array.isArray(backupData.repositories)) state.setRepositories(backupData.repositories as typeof state.repositories, { allowEmpty: true });
-      if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
+
+      // ── 多账号恢复（Issue #611）────────────────────────────────────
+      // 先合并工作区与账号元数据，再决定顶层恢复目标（防止跨账号错位）。
+      const liveAccountId = accountIdKey(useAppStore.getState().user);
+      const backupAccountId = typeof backupData.activeAccountId === 'string' && backupData.activeAccountId
+        ? backupData.activeAccountId
+        : null;
+      const restoreTargetsOtherAccount = !!backupAccountId && !!liveAccountId && backupAccountId !== liveAccountId;
+
+      const mergedWorkspaces = backupData.accountWorkspaces
+        ? mergeAccountWorkspacesForBackup(
+            useAppStore.getState().accountWorkspaces,
+            backupData.accountWorkspaces as Record<string, unknown>,
+            liveAccountId,
+            null,
+            false,
+          )
+        : useAppStore.getState().accountWorkspaces;
+
+      // 恢复 savedAccounts：仅当备份包含真实密钥时恢复 Token，否则保留本地已有 Token
+      if (backupData.savedAccounts && typeof backupData.savedAccounts === 'object') {
+        // 仅当备份包含真实密钥时恢复 Token，否则保留本地已有 Token
+        const backupAccounts = normalizeSavedAccounts(backupData.savedAccounts);
+        const stateNow = useAppStore.getState();
+        const mergedSaved = { ...stateNow.savedAccounts };
+        for (const [id, account] of Object.entries(backupAccounts)) {
+          const local = mergedSaved[id];
+          mergedSaved[id] = {
+            ...(local ?? account),
+            ...account,
+            githubToken: backupIncludedKeys && isRealBackupSecret(account.githubToken)
+              ? account.githubToken
+              : (local?.githubToken ?? ''),
+          };
+        }
+        useAppStore.setState({ savedAccounts: mergedSaved });
+      }
+
+      if (restoreTargetsOtherAccount) {
+        // 备份顶层归档进其归属账号工作区
+        const previous = mergedWorkspaces[backupAccountId!];
+        mergedWorkspaces[backupAccountId!] = {
+          ...(previous ?? captureAccountWorkspace(useAppStore.getState())),
+          repositories: Array.isArray(backupData.repositories)
+            ? (backupData.repositories as import('../../../types').Repository[])
+            : (previous?.repositories ?? []),
+          releases: Array.isArray(backupData.releases)
+            ? (backupData.releases as import('../../../types').Release[])
+            : (previous?.releases ?? []),
+          customCategories: Array.isArray(backupData.customCategories)
+            ? (backupData.customCategories as import('../../../types').Category[])
+            : (previous?.customCategories ?? []),
+          hiddenDefaultCategoryIds: Array.isArray(backupData.hiddenDefaultCategoryIds)
+            ? (backupData.hiddenDefaultCategoryIds as string[])
+            : (previous?.hiddenDefaultCategoryIds ?? []),
+          defaultCategoryOverrides: (backupData.defaultCategoryOverrides && typeof backupData.defaultCategoryOverrides === 'object'
+            ? backupData.defaultCategoryOverrides
+            : previous?.defaultCategoryOverrides ?? {}) as import('../../../types').AccountWorkspace['defaultCategoryOverrides'],
+          categoryOrder: Array.isArray(backupData.categoryOrder)
+            ? (backupData.categoryOrder as string[])
+            : (previous?.categoryOrder ?? []),
+        };
+        // 不覆盖当前登录账号的顶层状态；若备份中含当前账号工作区则恢复之
+        useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
+        const liveBackup = mergedWorkspaces[liveAccountId!];
+        if (liveBackup) {
+          useAppStore.setState(applyAccountWorkspace(liveBackup));
+        }
+      } else if (backupData.accountWorkspaces) {
+        useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
+      }
+
+      if (!restoreTargetsOtherAccount) {
+        if (Array.isArray(backupData.repositories)) state.setRepositories(backupData.repositories as typeof state.repositories, { allowEmpty: true });
+        if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
+        // 工作区级数据（Gist / Fork / 同步范围）随 1.3 备份恢复
+        if (Array.isArray(backupData.gists)) useAppStore.setState({ gists: backupData.gists as import('../../../types').Gist[] });
+        if (Array.isArray(backupData.starredGists)) useAppStore.setState({ starredGists: backupData.starredGists as import('../../../types').Gist[] });
+        if (Array.isArray(backupData.forks)) useAppStore.setState({ forks: backupData.forks as import('../../../types').ForkRepo[] });
+        if (Array.isArray(backupData.readForks)) {
+          useAppStore.setState({ readForks: new Set(backupData.readForks.filter((id): id is number => typeof id === 'number')) });
+        }
+        if (typeof backupData.categoryListIdMap === 'object' && backupData.categoryListIdMap !== null) {
+          useAppStore.setState({ categoryListIdMap: backupData.categoryListIdMap as Record<string, string> });
+        }
+        if (backupData.syncMode === 'stars' || backupData.syncMode === 'stars-and-lists') {
+          useAppStore.setState({ syncMode: backupData.syncMode });
+        }
+        if (typeof backupData.syncModeConfigured === 'boolean') {
+          useAppStore.setState({ syncModeConfigured: backupData.syncModeConfigured });
+        }
+      }
 
       try {
         if (Array.isArray(backupData.releaseSubscriptions)) {
@@ -213,7 +335,7 @@ export const useBackupActions = (): BackupActions => {
           for (const config of backupConfigs) {
             if (!config?.id) continue;
             const existing = currentMap.get(config.id);
-            const password = backupIncludedKeys && config.password && config.password !== '***' ? config.password : existing?.password ?? '';
+            const password = backupIncludedKeys && isRealBackupSecret(config.password) ? config.password : existing?.password ?? '';
             if (existing) {
               state.updateWebDAVConfig(config.id, { ...config, password, isActive: existing.isActive });
             } else {
@@ -230,7 +352,7 @@ export const useBackupActions = (): BackupActions => {
           const backupConfig = backupData.proxyConfig as typeof state.proxyConfig;
           state.setProxyConfig({
             ...backupConfig,
-            password: backupIncludedKeys && backupConfig.password && backupConfig.password !== '***' ? backupConfig.password : useAppStore.getState().proxyConfig.password,
+            password: backupIncludedKeys && isRealBackupSecret(backupConfig.password) ? backupConfig.password : useAppStore.getState().proxyConfig.password,
           });
         }
       } catch (error) {
@@ -241,7 +363,7 @@ export const useBackupActions = (): BackupActions => {
           const backupConfig = backupData.rpcDownloadConfig as typeof state.rpcDownloadConfig;
           state.setRpcDownloadConfig({
             ...backupConfig,
-            secret: backupIncludedKeys && backupConfig.secret && backupConfig.secret !== '***' ? backupConfig.secret : useAppStore.getState().rpcDownloadConfig.secret,
+            secret: backupIncludedKeys && isRealBackupSecret(backupConfig.secret) ? backupConfig.secret : useAppStore.getState().rpcDownloadConfig.secret,
           });
         }
       } catch (error) {
@@ -260,11 +382,22 @@ export const useBackupActions = (): BackupActions => {
         console.warn('恢复网络路由偏好时发生问题：', error);
       }
       try {
-        if (backupIncludedKeys && backupData.backendApiSecret !== undefined && backupData.backendApiSecret !== '***') {
+        if (backupIncludedKeys && isRealBackupSecret(backupData.backendApiSecret)) {
           state.setBackendApiSecret(typeof backupData.backendApiSecret === 'string' ? backupData.backendApiSecret : null);
         }
       } catch (error) {
         console.warn('恢复后端 API 密钥时发生问题：', error);
+      }
+      if (!restoreTargetsOtherAccount && liveAccountId) {
+        // 同账号恢复：恢复后同步当前账号工作区快照（含旧版单账号备份与 1.3
+        // 同账号场景）；其他账号在 accountWorkspaces 中的快照保持原样不动。
+        const live = useAppStore.getState();
+        useAppStore.setState({
+          accountWorkspaces: {
+            ...live.accountWorkspaces,
+            [liveAccountId]: captureAccountWorkspace(live),
+          },
+        });
       }
       toast(t('useBackupActions.data-restored-from-backup-repositories-v1-releas', { v1: (backupData.repositories as unknown[] | undefined)?.length ?? 0, v2: (backupData.releases as unknown[] | undefined)?.length ?? 0, v3: (backupData.customCategories as unknown[] | undefined)?.length ?? 0 }), 'success');
     } catch (error) {
