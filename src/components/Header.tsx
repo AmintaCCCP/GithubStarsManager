@@ -138,7 +138,7 @@ export const Header: React.FC = () => {
             <div className="app-brand-mark flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-card">
               <img
                 src="./icon.png"
-                alt="GitHub Stars Manager"
+                alt="GitHub Stars Manager" {/* i18n-allow-literal: 产品名 */}
                 className="h-full w-full object-cover"
               />
             </div>
