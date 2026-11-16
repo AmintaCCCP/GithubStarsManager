@@ -56,6 +56,16 @@ export interface AppActions {
   setGitHubToken: (token: string | null) => void;
   logout: () => void;
 
+  // Auth & Multi-account actions (Issue #611)
+  /** 保存或更新某个账号的凭证与用户信息到 savedAccounts */
+  upsertSavedAccount: (user: GitHubUser, githubToken: string) => void;
+  /** 在已保存账号间原子切换（快照当前账号工作区 -> 恢复目标账号工作区与凭证）；失败返回 false */
+  switchAccount: (accountId: string) => boolean;
+  /** 从已保存账号列表中移除指定账号（保留其 accountWorkspaces；移除当前账号则切到下一个账号或登出） */
+  removeSavedAccount: (accountId: string) => void;
+  /** 在执行外部数据恢复（如后端恢复）前，预先将当前已登录账号的工作区安全归档并清空顶层工作区，防止 R2 污染 */
+  parkCurrentAccountForRestore: () => string | null;
+
   // Repository actions
   setRepositories: (repos: Repository[], options?: { allowEmpty?: boolean }) => void;
   updateRepository: (repo: Repository) => void;

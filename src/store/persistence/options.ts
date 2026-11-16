@@ -1,6 +1,6 @@
 
 import type { PersistOptions, PersistStorage } from 'zustand/middleware';
-import type { Repository, SubscriptionChannel } from '../../types';
+import type { GitHubUser, Repository, SubscriptionChannel } from '../../types';
 import { defaultHeaderMenuConfig, defaultReleaseSourceSettings, defaultSubscriptionChannels } from '../../types';
 import { defaultRepositoryChatSettings } from '../../types/repositoryChat';
 import { logger } from '../../services/logger';
@@ -8,6 +8,7 @@ import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
 import { normalizeXTweetFollows } from '../../utils/xTweetFollows';
 import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
+import { accountIdKey, normalizeSavedAccounts } from '../helpers/accountWorkspace';
 import type { AppStoreState } from '../types';
 import {
   defaultDiscoveryChannels,
@@ -23,7 +24,7 @@ import { debouncedPersistStorage } from './storage';
 
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
   name: 'github-stars-manager',
-  version: 17,
+  version: 18,
   storage: debouncedPersistStorage as PersistStorage<PersistedAppState>,
 partialize: (state) => ({
   // 持久化用户信息和认证状态
@@ -31,6 +32,7 @@ partialize: (state) => ({
   githubToken: state.githubToken,
   isAuthenticated: state.isAuthenticated,
   accountWorkspaces: state.accountWorkspaces,
+  savedAccounts: state.savedAccounts,
 
   // 持久化仓库数据
   repositories: state.repositories,
@@ -428,6 +430,26 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
       || Array.isArray(stateRecord.accountWorkspaces)) {
       stateRecord.accountWorkspaces = {};
     }
+  }
+
+  // v17→v18: 初始化 savedAccounts，并将当前已登录账号自动回填进 savedAccounts
+  if (state) {
+    const stateRecord = state as Record<string, unknown>;
+    const normalizedSaved = normalizeSavedAccounts(stateRecord.savedAccounts);
+    const existingUser = stateRecord.user as GitHubUser | null | undefined;
+    const existingToken = stateRecord.githubToken as string | null | undefined;
+    const uid = accountIdKey(existingUser);
+    if (uid && existingUser && typeof existingToken === 'string' && existingToken) {
+      const now = new Date().toISOString();
+      normalizedSaved[uid] = {
+        accountId: uid,
+        user: existingUser,
+        githubToken: existingToken,
+        addedAt: normalizedSaved[uid]?.addedAt ?? now,
+        lastUsedAt: now,
+      };
+    }
+    stateRecord.savedAccounts = normalizedSaved;
   }
 
   return state as PersistedAppState;

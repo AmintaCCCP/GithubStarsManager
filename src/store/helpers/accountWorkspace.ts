@@ -8,10 +8,12 @@ import type {
   Release,
   ReleaseSourceSettings,
   Repository,
+  SavedAccount,
   SyncMode,
 } from '../../types';
 import { defaultReleaseSourceSettings } from '../../types';
 import { normalizeReleaseSourceSettings } from '../../utils/releaseSources';
+import { useAppStore } from '../useAppStore';
 
 export type { AccountWorkspace };
 
@@ -267,5 +269,94 @@ export const switchAccountWorkspace = (
     accountWorkspaces,
     workspace: applyAccountWorkspace(accountWorkspaces[nextAccountId]),
   };
+};
+
+/**
+ * 规整化持久化/导入来源的 savedAccounts 映射（Issue #611）。
+ * 校验每项包含合法 user（id 为正整数、login 非空字符串、avatar_url 为字符串）
+ * 与 githubToken（字符串）；键统一为 GitHub 数值 ID 字符串。
+ * 保持引用稳定：规整化前后内容一致的条目沿用原对象，整体一致时返回原引用，
+ * 避免 hydration 后每次都重建映射触发无意义的订阅通知。
+ */
+export const normalizeSavedAccounts = (value: unknown): Record<string, SavedAccount> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const source = value as Record<string, unknown>;
+  let changed = false;
+  const result: Record<string, SavedAccount> = {};
+  for (const [key, entry] of Object.entries(source)) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      changed = true;
+      continue;
+    }
+    const record = entry as Record<string, unknown>;
+    const user = record.user as GitHubUser | null | undefined;
+    const userId = user && typeof user === 'object' && !Array.isArray(user) ? user.id : undefined;
+    const validUser = !!user
+      && typeof userId === 'number'
+      && Number.isInteger(userId)
+      && userId > 0
+      && typeof user.login === 'string'
+      && user.login.length > 0
+      && typeof user.avatar_url === 'string';
+    const githubToken = typeof record.githubToken === 'string' ? record.githubToken : null;
+    if (!validUser || githubToken === null) {
+      changed = true;
+      continue;
+    }
+    const accountId = String(userId);
+    const addedAt = typeof record.addedAt === 'string' && record.addedAt ? record.addedAt : '';
+    const lastUsedAt = typeof record.lastUsedAt === 'string' && record.lastUsedAt ? record.lastUsedAt : '';
+    const stable = key === accountId
+      && record.accountId === accountId
+      && addedAt !== ''
+      && lastUsedAt !== ''
+      && (record.user as unknown) === (user as unknown)
+      && record.githubToken === githubToken;
+    if (stable) {
+      result[accountId] = entry as SavedAccount;
+      continue;
+    }
+    changed = true;
+    const now = new Date().toISOString();
+    result[accountId] = {
+      accountId,
+      user,
+      githubToken,
+      addedAt: addedAt || now,
+      lastUsedAt: lastUsedAt || addedAt || now,
+    };
+  }
+  return changed ? result : (source as Record<string, SavedAccount>);
+};
+
+/**
+ * 在已登录态准备拉取另一账号的外部数据（后端恢复 / 添加账号）前，
+ * 将当前账号的完整工作区快照归档进 accountWorkspaces，防止后续
+ * syncBackendData 把新账号数据写进顶层后、setUser 把被污染的顶层
+ * 状态作为当前账号快照再次写入（R2 数据覆盖漏洞）。
+ * 返回归档后的 accountWorkspaces 与重置后的顶层运行时工作区。
+ */
+export const parkCurrentAccountWorkspace = (
+  current: AccountWorkspaceSource & { accountWorkspaces: Record<string, AccountWorkspace> },
+  previousAccountId: string,
+): { accountWorkspaces: Record<string, AccountWorkspace>; workspace: AccountWorkspaceRuntime } => ({
+  accountWorkspaces: {
+    ...current.accountWorkspaces,
+    [previousAccountId]: captureAccountWorkspace(current),
+  },
+  workspace: applyAccountWorkspace(undefined),
+});
+
+/**
+ * 会话代次校验（模块 3 主防线辅助）：判断给定账号是否仍是当前活跃账号。
+ * 供异步批量写路径在写入前调用，不一致时丢弃或归档结果，杜绝跨账号写穿。
+ * 通过 useAppStore 动态读取当前状态（函数体内访问，规避模块初始化环）。
+ */
+export const isCurrentAccount = (expectedAccountId: string | null): boolean => {
+  try {
+    return accountIdKey(useAppStore.getState().user) === expectedAccountId;
+  } catch {
+    return false;
+  }
 };
 

@@ -49,6 +49,7 @@ const currentPersistedKeys = [
   'githubToken',
   'isAuthenticated',
   'accountWorkspaces',
+  'savedAccounts',
   'repositories',
   'lastSync',
   'themeTokens',
@@ -182,7 +183,7 @@ describe('PR-07 Store modularization compatibility', () => {
       rpcDownloadConfig: { enabled: true, host: 'rpc.example.com', port: 6800, secret: 'rpc-secret' },
     });
 
-    expect(options.version).toBe(17);
+    expect(options.version).toBe(18);
     expect(Object.keys(persisted)).toEqual(currentPersistedKeys);
     expect(persisted.analyzingGistIds).toEqual(['gist-1']);
     expect(persisted.proxyConfig).toMatchObject({ password: 'proxy-password' });

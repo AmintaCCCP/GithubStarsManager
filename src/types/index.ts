@@ -506,6 +506,20 @@ export interface AccountWorkspace {
   syncModeConfigured: boolean;
 }
 
+/**
+ * 已保存的 GitHub 账号凭证与档案（多账号切换，Issue #611）。
+ * 键为 GitHub 数值 ID 字符串（与 accountIdKey(user) 一致）。
+ */
+export interface SavedAccount {
+  /** GitHub 数值 ID 字符串，与 accountIdKey(user) 一致 */
+  accountId: string;
+  user: GitHubUser;
+  /** 该账号的 GitHub PAT；仅当用户主动移除账号或未包含密钥导入时为空字符串 */
+  githubToken: string;
+  addedAt: string;
+  lastUsedAt: string;
+}
+
 export interface AppState {
   // Auth
   user: GitHubUser | null;
@@ -513,6 +527,7 @@ export interface AppState {
   isAuthenticated: boolean;
   hasHydrated: boolean;
   accountWorkspaces: Record<string, AccountWorkspace>;
+  savedAccounts: Record<string, SavedAccount>;
   
   // Repositories
   repositories: Repository[];

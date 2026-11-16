@@ -20,7 +20,7 @@ import { normalizeTelegramFollows } from '../../utils/telegramFollows';
 import { normalizeExternalDiscoveryChannels } from '../../utils/discoveryFeeds';
 import { isChannelScrapable, isScrapeSupportSettled } from '../../services/scrapeSupport';
 import type { AppStoreState } from '../types';
-import { normalizeAccountWorkspaces } from '../helpers/accountWorkspace';
+import { accountIdKey, normalizeAccountWorkspaces, normalizeSavedAccounts } from '../helpers/accountWorkspace';
 import { readAuthMirror } from '../persistence/authStorage';
 import {
   defaultDiscoveryChannels,
@@ -148,6 +148,22 @@ export const normalizePersistedState = (
 
   const normalizedAssetFilters = normalizeAssetFilters(safePersisted.assetFilters);
 
+  // savedAccounts：规整化后，若存在有效登录态（user + token），确保当前账号
+  // 也登记在 savedAccounts 中（旧版本升级无 v18 迁移路径时的兜底）。
+  const normalizedSavedAccounts = normalizeSavedAccounts(
+    (safePersisted as Record<string, unknown>).savedAccounts,
+  );
+  const resolvedAccountId = accountIdKey(resolvedUser);
+  if (resolvedAccountId && resolvedUser && typeof resolvedGithubToken === 'string' && resolvedGithubToken) {
+    normalizedSavedAccounts[resolvedAccountId] = {
+      accountId: resolvedAccountId,
+      user: resolvedUser,
+      githubToken: resolvedGithubToken,
+      addedAt: normalizedSavedAccounts[resolvedAccountId]?.addedAt ?? new Date().toISOString(),
+      lastUsedAt: normalizedSavedAccounts[resolvedAccountId]?.lastUsedAt ?? new Date().toISOString(),
+    };
+  }
+
   return {
     ...currentState,
     ...persistedRest,
@@ -160,6 +176,7 @@ export const normalizePersistedState = (
     accountWorkspaces: normalizeAccountWorkspaces(
       (safePersisted as Record<string, unknown>).accountWorkspaces,
     ),
+    savedAccounts: normalizedSavedAccounts,
     themeMode,
     themePresetLight,
     themePresetDark,

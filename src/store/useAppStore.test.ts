@@ -965,6 +965,7 @@ describe('useAppStore logout and per-account workspaces', () => {
       githubToken: null,
       isAuthenticated: false,
       accountWorkspaces: {},
+      savedAccounts: {},
       repositories: [],
       searchResults: [],
       lastSync: null,
@@ -1052,6 +1053,204 @@ describe('useAppStore logout and per-account workspaces', () => {
 
     useAppStore.getState().setRepositories([], { allowEmpty: true });
     expect(useAppStore.getState().repositories).toEqual([]);
+  });
+
+  it('registers the signed-in account into savedAccounts on setUser with a token', () => {
+    useAppStore.getState().setGitHubToken('ghp_a');
+    useAppStore.getState().setUser(userA);
+
+    const saved = useAppStore.getState().savedAccounts['1'];
+    expect(saved).toMatchObject({ accountId: '1', githubToken: 'ghp_a' });
+    expect(saved?.user.login).toBe('alice');
+    expect(typeof saved?.addedAt).toBe('string');
+
+    // 重新登录同一账号保留 addedAt，仅刷新 lastUsedAt
+    const addedAt = saved?.addedAt;
+    useAppStore.getState().setGitHubToken('ghp_a2');
+    const refreshed = useAppStore.getState().savedAccounts['1'];
+    expect(refreshed?.githubToken).toBe('ghp_a2');
+    expect(refreshed?.addedAt).toBe(addedAt);
+  });
+
+  it('switches directly between saved accounts without data loss', () => {
+    const aliceRepos = [createRepository(1, { ai_summary: 'alice-ai' })];
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: aliceRepos,
+      searchResults: aliceRepos,
+      lastSync: '2026-09-16T00:00:00.000Z',
+      selectedCategory: 'web',
+      currentView: 'releases',
+      releaseSearchQuery: 'stale-query',
+    });
+    useAppStore.getState().setGitHubToken('ghp_a');
+    useAppStore.getState().setUser(userA);
+    useAppStore.getState().upsertSavedAccount(userB, 'ghp_b');
+    // 账号 B 有历史本地工作区
+    useAppStore.setState({
+      accountWorkspaces: {
+        ...useAppStore.getState().accountWorkspaces,
+        '2': {
+          repositories: [createRepository(2, { ai_summary: 'bob-ai' })],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+    });
+
+    const switched = useAppStore.getState().switchAccount('2');
+    expect(switched).toBe(true);
+    const state = useAppStore.getState();
+    expect(state.user?.login).toBe('bob');
+    expect(state.githubToken).toBe('ghp_b');
+    expect(state.isAuthenticated).toBe(true);
+    // 账号 A 的数据被快照保留
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
+    // 账号 B 的工作区被恢复
+    expect(state.repositories[0].ai_summary).toBe('bob-ai');
+    // 会话级瞬态 UI 状态被重置
+    expect(state.selectedCategory).toBe('all');
+    expect(state.currentView).toBe('repositories');
+    expect(state.releaseSearchQuery).toBe('');
+    // savedAccounts 双向刷新 lastUsedAt
+    expect(state.savedAccounts['2']?.lastUsedAt).toBeTruthy();
+    expect(state.savedAccounts['1']?.lastUsedAt).toBeTruthy();
+
+    // 切回账号 A 数据完好
+    expect(useAppStore.getState().switchAccount('1')).toBe(true);
+    const back = useAppStore.getState();
+    expect(back.user?.login).toBe('alice');
+    expect(back.repositories[0].ai_summary).toBe('alice-ai');
+    expect(back.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
+  });
+
+  it('refuses to switch to an unknown or tokenless saved account', () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
+    });
+
+    expect(useAppStore.getState().switchAccount('404')).toBe(false);
+    useAppStore.setState({
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '9': { accountId: '9', user: userB, githubToken: '', addedAt: 't', lastUsedAt: 't' },
+      },
+    });
+    expect(useAppStore.getState().switchAccount('9')).toBe(false);
+    expect(useAppStore.getState().user?.login).toBe('alice');
+  });
+
+  it('removes a non-active saved account while keeping its workspace data', () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      accountWorkspaces: {
+        '2': {
+          repositories: [createRepository(2, { ai_summary: 'bob-ai' })],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+    });
+
+    useAppStore.getState().removeSavedAccount('2');
+    const state = useAppStore.getState();
+    expect(state.savedAccounts['2']).toBeUndefined();
+    expect(state.savedAccounts['1']).toBeTruthy();
+    expect(state.user?.login).toBe('alice');
+    // 该账号的本地缓存工作区仍然保留
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
+  });
+
+  it('parks the current account before an external restore without polluting its snapshot', () => {
+    const aliceRepos = [createRepository(1, { ai_summary: 'alice-ai' })];
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: aliceRepos,
+      searchResults: aliceRepos,
+      lastSync: '2026-09-16T00:00:00.000Z',
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
+    });
+
+    const parkedId = useAppStore.getState().parkCurrentAccountForRestore();
+    expect(parkedId).toBe('1');
+
+    let state = useAppStore.getState();
+    expect(state.user).toBeNull();
+    expect(state.repositories).toEqual([]);
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
+
+    // 模拟后端把新账号数据写进顶层（R2 污染路径）
+    const bobRestored = [createRepository(2, { ai_summary: 'bob-restored' })];
+    useAppStore.setState({ repositories: bobRestored, searchResults: bobRestored });
+    useAppStore.getState().setGitHubToken('ghp_b');
+    useAppStore.getState().setUser(userB);
+
+    state = useAppStore.getState();
+    expect(state.user?.login).toBe('bob');
+    expect(state.repositories[0].ai_summary).toBe('bob-restored');
+    // 账号 A 的快照不被新账号数据覆盖
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
+  });
+
+  it('backfills the signed-in account into savedAccounts during the v17→v18 migration', async () => {
+    const options = useAppStore.persist.getOptions() as unknown as {
+      version: number;
+      migrate: (snapshot: unknown, version: number) => Promise<Record<string, unknown>>;
+    };
+    expect(options.version).toBe(18);
+
+    const migrated = await options.migrate({
+      user: { id: 7, login: 'legacy', name: 'Legacy', avatar_url: 'https://x/l.png', email: null },
+      githubToken: 'ghp_legacy',
+      savedAccounts: { broken: 'nope' },
+    }, 17);
+
+    const saved = migrated.savedAccounts as Record<string, { accountId: string; githubToken: string }>;
+    expect(saved['7']).toMatchObject({ accountId: '7', githubToken: 'ghp_legacy' });
+    expect(saved.broken).toBeUndefined();
   });
 });
 
