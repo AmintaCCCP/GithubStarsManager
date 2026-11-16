@@ -236,7 +236,15 @@
     "menu-releases": "freigeben",
     "menu-forks": "Replik",
     "menu-subscription": "Entdecken",
-    "menu-settings": "aufstellen"
+    "menu-settings": "aufstellen",
+    "switch-account": "Konto wechseln",
+    "add-account": "Konto hinzufügen",
+    "current-account": "Aktuelles Konto",
+    "remove-account": "Konto entfernen",
+    "remove-account-confirm-title": "Gespeichertes Konto entfernen",
+    "remove-account-confirm-desc": "Dies entfernt nur die gespeicherten Anmeldedaten dieses Kontos. Zwischengespeicherte Repositories und Kategorien bleiben erhalten. Fortfahren?",
+    "account-switched": "Zu @{{login}} gewechselt",
+    "account-repo-count": "{{count}} Repositories"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Kategorien mit der GitHub-Liste synchronisieren"
@@ -1416,5 +1424,13 @@
     "download": "Herunterladen",
     "detected-from-filenames-and-release-metadata-no": "Erkannt anhand von Dateinamen und Release-Metadaten. Es findet keine Sicherheitsprüfung statt und es wird nichts automatisch ausgeführt. Du kannst unten jederzeit eine andere Datei auswählen.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} Datei(en) ausgeschlossen, die nicht zu diesem Gerät passen (Quellcode, Prüfsummen, Signaturen, Debug-Symbole, Blockmaps, andere Plattformen oder Architekturen)."
+  },
+  "accountModal": {
+    "title": "GitHub-Konto hinzufügen",
+    "description": "Gib ein neues GitHub-Personal-Access-Token ein, um ein Konto hinzuzufügen. Die Daten deines aktuellen Kontos bleiben sicher erhalten.",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "Abbrechen",
+    "confirm": "Hinzufügen und wechseln",
+    "reauth-hint": "Bitte gib ein gültiges GitHub-Token für @{{login}} ein"
   }
 }

@@ -236,7 +236,15 @@
     "menu-releases": "Releases",
     "menu-forks": "Forks",
     "menu-subscription": "Discover",
-    "menu-settings": "Settings"
+    "menu-settings": "Settings",
+    "switch-account": "Switch Account",
+    "add-account": "Add Account",
+    "current-account": "Current Account",
+    "remove-account": "Remove Account",
+    "remove-account-confirm-title": "Remove Saved Account",
+    "remove-account-confirm-desc": "This only removes the saved sign-in credential for this account. Cached repositories and categories will be kept. Continue?",
+    "account-switched": "Switched to @{{login}}",
+    "account-repo-count": "{{count}} repos"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Pushing categories to lists"
@@ -1416,5 +1424,13 @@
     "download": "Download",
     "detected-from-filenames-and-release-metadata-no": "Detected from filenames and release metadata. No safety check is performed and nothing runs automatically. You can always pick another asset in the list below.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Excluded {{v1}} asset(s) that do not apply to this device (source code, checksums, signatures, debug symbols, blockmaps, other platforms or architectures)."
+  },
+  "accountModal": {
+    "title": "Add GitHub Account",
+    "description": "Enter a new GitHub Personal Access Token to add an account. Your current account data will be safely preserved.",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "Cancel",
+    "confirm": "Add & Switch",
+    "reauth-hint": "Please enter a valid GitHub token for @{{login}}"
   }
 }

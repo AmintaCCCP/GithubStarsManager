@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
 import { normalizeBackendUrl } from '../../../utils/backendUrl';
@@ -170,6 +171,8 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     );
     if (!confirmed) return;
     setIsSyncingFromBackend(true);
+    // 账号代次校验（Issue #611）：确认弹窗与拉取期间切号后丢弃结果
+    const startedAccountId = peekCurrentAccountId();
     try {
       const [repoData, releaseData, aiConfigData, webdavConfigData, settingsData] = await Promise.all([
         backend.fetchRepositories(),
@@ -178,6 +181,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
         backend.fetchWebDAVConfigs(),
         backend.fetchSettings(),
       ]);
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       state.setRepositories(repoData.repositories, { allowEmpty: true });
       state.setReleases(releaseData.releases, { allowEmpty: true });
       state.setAIConfigs(aiConfigData);

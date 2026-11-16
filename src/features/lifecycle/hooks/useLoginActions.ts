@@ -1,12 +1,14 @@
 import { useCallback } from 'react';
 import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
+import { useAppStore } from '../../../store/useAppStore';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
-import { backend } from '../../../services/backendAdapter';
+import { backend, type BackendAuthRestoreAccount } from '../../../services/backendAdapter';
 import { syncFromBackend } from '../../../services/autoSync';
+import { accountIdKey } from '../../../store/helpers/accountWorkspace';
 import type { GitHubUser } from '../../../types';
 
 export type BackendLoginResult =
-  | { status: 'connected'; githubToken: string; user: GitHubUser }
+  | { status: 'connected'; githubToken: string; user: GitHubUser; accounts: BackendAuthRestoreAccount[] }
   | { status: 'backend-unavailable' }
   | { status: 'unauthorized' }
   | { status: 'restore-failed' }
@@ -32,7 +34,15 @@ export const useLoginActions = (): LoginActions => {
   const syncTokenToBackend = useCallback(async (token: string) => {
     if (!backend.isAvailable) return { ok: true };
     try {
-      await backend.syncSettings({ github_token: token });
+      // 首次上传 Token 时附带 user_profile / active_account_id：accounts.user_json
+      // 的唯一写入路径就是 PUT /api/settings 的 user_profile（Issue #611）。
+      const { user } = useAppStore.getState();
+      const accountId = accountIdKey(user);
+      await backend.syncSettings({
+        github_token: token,
+        ...(accountId ? { active_account_id: accountId } : {}),
+        ...(user ? { user_profile: user } : {}),
+      });
       return { ok: true };
     } catch (e) {
       console.warn('Failed to save GitHub token to backend:', e);
@@ -62,7 +72,12 @@ export const useLoginActions = (): LoginActions => {
       // Backend, API key, and stored token are all proven — remember the URL
       // (the setup step re-remembers after persisting a new token).
       backend.rememberActiveUrl();
-      return { status: 'connected', githubToken: restored.github_token, user };
+      return {
+        status: 'connected',
+        githubToken: restored.github_token,
+        user,
+        accounts: Array.isArray(restored.accounts) ? restored.accounts : [],
+      };
     } catch (err) {
       if (err instanceof Error && err.message === GITHUB_TOKEN_INVALID_ERROR) {
         // Confirmed auth failure: the stored token is what failed, while the
@@ -77,7 +92,13 @@ export const useLoginActions = (): LoginActions => {
   }, [authenticateWithGitHub]);
   const setupBackendGitHubToken = useCallback(async (token: string) => {
     const user = await authenticateWithGitHub(token);
-    await backend.syncSettings({ github_token: token });
+    // 附带 user_profile / active_account_id，让后端 accounts 表拿到头像与昵称
+    const accountId = accountIdKey(user);
+    await backend.syncSettings({
+      github_token: token,
+      ...(accountId ? { active_account_id: accountId } : {}),
+      user_profile: user,
+    });
     backend.rememberActiveUrl();
     return user;
   }, [authenticateWithGitHub]);

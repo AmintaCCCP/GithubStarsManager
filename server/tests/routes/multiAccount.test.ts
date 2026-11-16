@@ -47,7 +47,6 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
   let encrypt: (value: string, key: string) => string;
   let decrypt: (value: string, key: string) => string;
   let encryptionKey: string;
-  let closeDb: () => void;
 
   const authHeaders = (accountId?: string): Record<string, string> => ({
     Authorization: 'Bearer test-api-secret',
@@ -87,7 +86,6 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
 
     request = supertest.default;
     getDb = conn.getDb;
-    closeDb = conn.closeDb;
     encrypt = crypto.encrypt;
     decrypt = crypto.decrypt;
     encryptionKey = configModule.config.encryptionKey;

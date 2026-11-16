@@ -59,6 +59,9 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend; nunca en los servidores de la app."
+    "token-permissions-local-storage": "Tu token se guarda solo en este dispositivo y en tu propio backend; nunca en los servidores de la app.",
+    "saved-accounts": "Cuentas guardadas",
+    "click-to-sign-in": "Haz clic para iniciar sesión",
+    "token-required": "Se requiere token"
   }
 }

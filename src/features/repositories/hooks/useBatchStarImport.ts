@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { translateBatch } from '../../../services/translateService';
 import { GitHubTokenPermissionError, type GitHubRepoDetailRead } from '../../../services/githubApi';
@@ -231,11 +232,18 @@ export function useBatchStarImport() {
     setSyncError('');
     const api = createGitHubApiService(githubToken);
     let starredCount = 0;
+    // 辅助防线（Issue #611）：批量导入可达分钟级；切号后中止队列并停止写入
+    const jobAccountId = peekCurrentAccountId();
     try {
       for (const { row, index } of selected) {
         const detail = row.detail!;
+        if (!isCurrentAccount(jobAccountId)) {
+          setSyncError('');
+          break;
+        }
         try {
           await api.starRepository(detail.owner.login, detail.name);
+          if (!isCurrentAccount(jobAccountId)) break;
           addRepository({ ...detail, starred_at: new Date().toISOString() } as Repository);
           starredCount += 1;
           setRows(current => current.map((item, itemIndex) =>

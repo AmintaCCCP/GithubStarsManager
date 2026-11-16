@@ -43,7 +43,7 @@ describe('useLoginActions', () => {
     mocks.backend.isAvailable = true;
     mocks.backend.backendUrl = null;
     mocks.backend.verifyAuth.mockResolvedValue(true);
-    mocks.backend.restoreAuth.mockResolvedValue({ github_token: 'ghp_restored' });
+    mocks.backend.restoreAuth.mockResolvedValue({ github_token: 'ghp_restored', accounts: [] });
     mocks.getCurrentUser.mockResolvedValue(user);
   });
 
@@ -61,7 +61,8 @@ describe('useLoginActions', () => {
     expect(mocks.backend.restoreAuth).toHaveBeenCalledOnce();
     expect(mocks.backend.rememberActiveUrl).toHaveBeenCalledOnce();
     expect(mocks.apiTokens).toEqual(['ghp_restored']);
-    expect(restored).toEqual({ status: 'connected', githubToken: 'ghp_restored', user });
+    // 多账号扩展（Issue #611）：connected 结果携带后端已保存账号列表
+    expect(restored).toEqual({ status: 'connected', githubToken: 'ghp_restored', user, accounts: [] });
   });
 
   it('does not remember the URL before the token setup step', async () => {
@@ -133,7 +134,12 @@ describe('useLoginActions', () => {
 
     await expect(result.current.setupBackendGitHubToken('ghp_new')).resolves.toEqual(user);
     expect(mocks.apiTokens).toEqual(['ghp_new']);
-    expect(mocks.backend.syncSettings).toHaveBeenCalledWith({ github_token: 'ghp_new' });
+    // Issue #611：Token 首传附带 user_profile 与 active_account_id（accounts 表唯一写入路径）
+    expect(mocks.backend.syncSettings).toHaveBeenCalledWith({
+      github_token: 'ghp_new',
+      active_account_id: '1',
+      user_profile: user,
+    });
     expect(mocks.backend.rememberActiveUrl).toHaveBeenCalledOnce();
     expect(mocks.syncFromBackend).not.toHaveBeenCalled();
 

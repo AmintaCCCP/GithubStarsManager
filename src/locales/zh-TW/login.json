@@ -59,6 +59,9 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Token 僅儲存在本機與你設定的後端，不會上傳到應用方伺服器。"
+    "token-permissions-local-storage": "Token 僅儲存在本機與你設定的後端，不會上傳到應用方伺服器。",
+    "saved-accounts": "已儲存的帳號",
+    "click-to-sign-in": "點擊直接登入",
+    "token-required": "需補充 Token"
   }
 }

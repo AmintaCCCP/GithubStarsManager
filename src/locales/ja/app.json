@@ -236,7 +236,15 @@
     "menu-releases": "リリース",
     "menu-forks": "レプリカ",
     "menu-subscription": "発見する",
-    "menu-settings": "設定"
+    "menu-settings": "設定",
+    "switch-account": "アカウントを切り替え",
+    "add-account": "アカウントを追加",
+    "current-account": "現在のアカウント",
+    "remove-account": "アカウントを削除",
+    "remove-account-confirm-title": "保存済みアカウントの削除",
+    "remove-account-confirm-desc": "このアカウントの保存されたサインイン情報のみを削除します。キャッシュされたリポジトリとカテゴリは保持されます。続行しますか？",
+    "account-switched": "@{{login}} に切り替えました",
+    "account-repo-count": "{{count}} 件のリポジトリ"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "カテゴリを GitHub リストに同期する"
@@ -1416,5 +1424,13 @@
     "download": "ダウンロード",
     "detected-from-filenames-and-release-metadata-no": "ファイル名と Release メタデータから判定しています。安全性の検証は行わず、自動実行も行いません。下のアセット一覧からいつでも別のアセットを選べます。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "このデバイスに該当しないアセット（ソースコード、チェックサム、署名、デバッグシンボル、blockmap、他のプラットフォームやアーキテクチャ）を {{v1}} 件除外しました。"
+  },
+  "accountModal": {
+    "title": "GitHub アカウントを追加",
+    "description": "新しい GitHub Personal Access Token を入力してアカウントを追加します。現在のアカウントのデータは安全に保持されます。",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "キャンセル",
+    "confirm": "追加して切り替え",
+    "reauth-hint": "@{{login}} の有効な GitHub トークンを再入力してください"
   }
 }

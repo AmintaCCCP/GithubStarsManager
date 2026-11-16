@@ -3,8 +3,9 @@ import { normalizeBackendUrl } from '../utils/backendUrl';
 import { logger } from './logger';
 import { setBackendAvailability, setBackendProbed } from './scrapeSupport';
 
-import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig } from '../types';
+import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig, GitHubUser } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { accountIdKey } from '../store/helpers/accountWorkspace';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 
 interface GitHubContentResponse {
@@ -15,6 +16,21 @@ interface GitHubContentResponse {
 interface GitHubTreeResponse {
   tree?: GitHubReadmeCandidateItem[];
   truncated?: boolean;
+}
+
+/** POST /api/sync/auth 的多账号响应（Issue #611）。 */
+export interface BackendAuthRestoreAccount {
+  accountId: string;
+  user: GitHubUser | null;
+  githubToken: string | null;
+  addedAt?: string | null;
+  lastUsedAt?: string | null;
+}
+
+export interface BackendAuthRestore {
+  github_token: string | null;
+  active_account_id?: string;
+  accounts?: BackendAuthRestoreAccount[];
 }
 
 const BACKEND_URL_STORAGE_KEY = 'github-stars-manager-backend-url';
@@ -71,8 +87,12 @@ const hydrateBackendSettings = (settings: Record<string, unknown>): Record<strin
  * `Authorization: Bearer ...`）。服务端 `authMiddleware` 对所有 `/api/*`
  * （除 health）要求该头，直接 `fetch(backendUrl/...)` 的传输层必须复用它，
  * 否则在配置 API_SECRET 时一律 401。
+ *
+ * 多账号隔离（Issue #611）：自动附加 `X-GitHub-Account-Id` 请求头（当前活跃
+ * 账号的 GitHub 数值 ID）。`explicitAccountId` 用于在切换会话中显式指定账号
+ * （传 null 表示无账号上下文）；缺省时读取 Store 当前登录用户。
  */
-export const getBackendAuthHeaders = (): Record<string, string> => {
+export const getBackendAuthHeaders = (explicitAccountId?: string | null): Record<string, string> => {
   let secret = '';
   try {
     secret = useAppStore.getState().backendApiSecret || '';
@@ -84,6 +104,17 @@ export const getBackendAuthHeaders = (): Record<string, string> => {
   };
   if (secret) {
     headers['Authorization'] = `Bearer ${secret}`;
+  }
+  let accountId: string | null = null;
+  try {
+    accountId = explicitAccountId !== undefined
+      ? explicitAccountId
+      : accountIdKey(useAppStore.getState().user);
+  } catch {
+    accountId = null;
+  }
+  if (accountId) {
+    headers['X-GitHub-Account-Id'] = accountId;
   }
   return headers;
 };
@@ -970,8 +1001,11 @@ class BackendAdapter {
    * session recovery. Only callable when the backend is reachable AND this
    * client already authenticates (Bearer API_SECRET) — the backend never hands
    * it out to unauthenticated callers.
+   *
+   * 多账号扩展（Issue #611）：响应额外携带 active_account_id 与后端保存的
+   * 全部账号列表 accounts，客户端可一次性恢复 savedAccounts。
    */
-  async restoreAuth(): Promise<{ github_token: string | null } | null> {
+  async restoreAuth(): Promise<BackendAuthRestore | null> {
     if (!this._backendUrl) return null;
 
     try {
@@ -980,7 +1014,7 @@ class BackendAdapter {
         headers: this.getAuthHeaders(),
       }, 8000);
       if (!res.ok) return null;
-      return res.json() as Promise<{ github_token: string | null }>;
+      return res.json() as Promise<BackendAuthRestore>;
     } catch {
       return null;
     }

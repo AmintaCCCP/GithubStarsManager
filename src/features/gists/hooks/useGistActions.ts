@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Gist } from '../../../types';
 import type { GistCreateInput, GistUpdateInput } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { selectGistViewState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { AIService } from '../../../services/aiService';
@@ -51,12 +52,17 @@ export const useGistActions = () => {
       return;
     }
     setIsRefreshing(true);
+    // 账号代次校验（Issue #611）：Gist 全量刷新耗时期间切号后丢弃结果
+    const startedAccountId = peekCurrentAccountId();
     try {
       const api = createGitHubApiService(state.githubToken);
       const [mine, starred] = await Promise.all([
         api.getAllGists(state.gists),
         api.getAllStarredGists([...state.gists, ...state.starredGists]),
       ]);
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       const starredIds = new Set(starred.map(gist => gist.id));
       state.setGists(mine.map(gist => ({ ...gist, starred: starredIds.has(gist.id) || gist.starred })));
       state.setStarredGists(starred);
@@ -131,14 +137,19 @@ export const useGistActions = () => {
     let success = 0;
     let failed = 0;
     const concurrency = activeConfig.concurrency && activeConfig.concurrency > 1 ? activeConfig.concurrency : 1;
+    // 账号代次校验（Issue #611）：批量分析切号后中止队列，结果不写新账号
+    const jobAccountId = peekCurrentAccountId();
     const analyzeOne = async (gist: Gist) => {
+      if (!isCurrentAccount(jobAccountId)) return;
       state.setAnalyzingGist(gist.id, true);
       try {
         const detail = await api.getGistForAnalysis(gist.id, gist);
         const summary = await aiService.analyzeGist(detail, api.getGistContentPreview(detail));
+        if (!isCurrentAccount(jobAccountId)) return;
         state.updateGist({ ...detail, ai_summary: summary.trim(), analyzed_at: new Date().toISOString(), analysis_failed: false, analysis_error: undefined });
         success++;
       } catch (error) {
+        if (!isCurrentAccount(jobAccountId)) return;
         state.updateGist({ ...gist, analyzed_at: new Date().toISOString(), analysis_failed: true, analysis_error: error instanceof Error ? error.message : String(error) });
         failed++;
       } finally {
@@ -159,6 +170,8 @@ export const useGistActions = () => {
     if (!state.githubToken) return null;
     try {
       const detail = await createGitHubApiService(state.githubToken).getGist(gist.id, gist);
+      // 账号代次校验（Issue #611）：详情拉取切号后丢弃
+      if (!isCurrentAccount(peekCurrentAccountId())) return null;
       state.updateGist(detail);
       return detail;
     } catch (error) {

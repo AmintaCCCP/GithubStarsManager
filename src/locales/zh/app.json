@@ -236,7 +236,15 @@
     "menu-releases": "发布",
     "menu-forks": "复刻",
     "menu-subscription": "发现",
-    "menu-settings": "设置"
+    "menu-settings": "设置",
+    "switch-account": "切换账号",
+    "add-account": "添加新账号",
+    "current-account": "当前账号",
+    "remove-account": "移除账号",
+    "remove-account-confirm-title": "移除已保存的账号",
+    "remove-account-confirm-desc": "仅移除该账号的快捷登录凭证，本地缓存的仓库与分类数据仍会保留。确定继续吗？",
+    "account-switched": "已切换到账号 @{{login}}",
+    "account-repo-count": "{{count}} 个仓库"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分类到 GitHub list"
@@ -1416,5 +1424,13 @@
     "download": "下载",
     "detected-from-filenames-and-release-metadata-no": "按文件名与 Release 元数据识别，未验证安装包安全性，也不会自动运行。你始终可以在下方资产列表中手动选择其他资产。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 个不适用于当前设备的资产（源代码、校验和、签名、调试符号、blockmap、其他平台/架构）。"
+  },
+  "accountModal": {
+    "title": "添加 GitHub 账号",
+    "description": "输入新的 GitHub Personal Access Token 添加账号，当前账号的数据将被安全保留。",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "取消",
+    "confirm": "添加并切换",
+    "reauth-hint": "请为账号 @{{login}} 重新输入有效的 GitHub Token"
   }
 }

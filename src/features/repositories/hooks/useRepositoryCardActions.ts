@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
@@ -203,6 +204,8 @@ export const useRepositoryCardActions = ({
       });
 
       if (controller.signal.aborted) return;
+      // 账号代次校验（Issue #611）：AI 分析耗时期间切号后，结果绝不写进新账号
+      if (!isCurrentAccount(peekCurrentAccountId())) return;
 
       const updatedRepo = applyAnalysisSuccess(repository, {
         summary: result.summary,
@@ -229,6 +232,9 @@ export const useRepositoryCardActions = ({
         'success',
       );
     } catch (error) {
+      if (!controller.signal.aborted && !isCurrentAccount(peekCurrentAccountId())) {
+        return;
+      }
       if (!controller.signal.aborted) {
         console.error('AI analysis failed:', error);
 

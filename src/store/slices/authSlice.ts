@@ -18,7 +18,10 @@ const excludeSavedAccount = (
   accountId: string,
 ): Record<string, import('../../types').SavedAccount> => {
   if (!(accountId in savedAccounts)) return savedAccounts;
-  const { [accountId]: _removed, ...rest } = savedAccounts;
+  const rest: Record<string, import('../../types').SavedAccount> = {};
+  for (const [key, value] of Object.entries(savedAccounts)) {
+    if (key !== accountId) rest[key] = value;
+  }
   return rest;
 };
 

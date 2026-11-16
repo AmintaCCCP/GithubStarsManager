@@ -11,6 +11,7 @@ import {
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { normalizeLicense } from '../../../utils/licenseFilter';
 
 export interface EmbeddingDraft {
@@ -147,6 +148,15 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     setAbortController(controller);
     state.setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
     let currentFormatVersion = LEGACY_EMBEDDING_FORMAT_VERSION;
+    // 账号代次校验（Issue #611）：索引可达分钟级；切号后中止任务并停止打戳
+    const jobAccountId = peekCurrentAccountId();
+    const onAccountChanged = (): boolean => {
+      if (!isCurrentAccount(jobAccountId)) {
+        controller.abort();
+        return true;
+      }
+      return false;
+    };
     try {
       const currentState = useAppStore.getState();
       const repositories = currentState.repositories;
@@ -185,11 +195,13 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         incremental,
         ...(incremental ? { formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION } : {}),
         onRepoIndexed: (id) => {
+          // 切号后立即中止：打戳写入的是当前活跃账号的元数据，绝不能串号
+          if (onAccountChanged()) return;
           stamped.push(id);
           if (stamped.length % 32 === 0) state.updateRepositoriesMetadata(stamped.splice(0).map(stamp));
         },
       });
-      if (stamped.length) state.updateRepositoriesMetadata(stamped.map(stamp));
+      if (stamped.length && !onAccountChanged()) state.updateRepositoriesMetadata(stamped.map(stamp));
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       if (!incremental && result.errors === 0) {
         const cleanupKeepIds = [...new Set([...result.indexedRepoIds.map(String), ...excludedVectorIds])];

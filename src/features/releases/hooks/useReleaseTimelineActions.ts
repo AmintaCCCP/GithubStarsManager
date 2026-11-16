@@ -2,6 +2,7 @@ import { useT } from "../../../i18n/useT";
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { selectReleaseTimelineState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
@@ -58,12 +59,17 @@ export const useReleaseTimelineActions = () => {
     }
 
     setReleaseIsRefreshing(true);
+    // 账号代次校验（Issue #611）：Release 批量刷新耗时期间切号后丢弃结果
+    const startedAccountId = peekCurrentAccountId();
     try {
       const githubApi = createGitHubApiService(githubToken);
       const { releases: newReleases, latestReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
         subscribedRepos,
         { includePreRelease, refreshExistingAssets: true },
       );
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       const now = new Date().toISOString();
       const failedRepoIds = new Set(failedRepos.map(repo => repo.repoId));
       for (const entry of resolvedSources.entries) {
@@ -159,6 +165,10 @@ export const useReleaseTimelineActions = () => {
       readReleases: new Set(stateBeforeConfirm.readReleases),
       releaseExpandedRepositories: new Set(stateBeforeConfirm.releaseExpandedRepositories),
     };
+    // 账号代次校验（Issue #611）：确认弹窗等待期间可能已切号，回滚快照跨账号会污染
+    if (!isCurrentAccount(peekCurrentAccountId())) {
+      return;
+    }
     if (sourcesToRemove.includes(STARRED_RELEASE_SOURCE_ID) && starredRepo) {
       state.updateRepository({ ...starredRepo, subscribed_to_releases: false });
       state.batchUnsubscribeReleases([starredRepo.id]);

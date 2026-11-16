@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIAnalysisOptimizer, type AnalysisResult } from '../../../services/aiAnalysisOptimizer';
 import { AIService } from '../../../services/aiService';
@@ -218,6 +219,8 @@ export const useRepositoryAnalysisJob = ({
 
     let successCount = 0;
     let failedCount = 0;
+    // 辅助防线（Issue #611）：记录任务发起时的账号；切号后结果绝不写穿到新账号
+    const jobAccountId = peekCurrentAccountId();
 
     try {
       const githubApi = createGitHubApiService(githubToken);
@@ -226,6 +229,13 @@ export const useRepositoryAnalysisJob = ({
       const aiCategoryHints = buildCategoryHints(allCategories);
       const onResult = (result: AnalysisResult) => {
         if (!mountedRef.current || optimizerRef.current !== optimizer) return;
+
+        // 账号已切换：丢弃本条结果并中止后续分析队列，绝不写入新账号的活跃列表
+        if (!isCurrentAccount(jobAccountId)) {
+          stopRequestedRef.current = true;
+          optimizer.abort();
+          return;
+        }
 
         if (result.success) {
           const resolvedCategory = resolveCategoryAssignment(

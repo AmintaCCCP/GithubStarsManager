@@ -11,6 +11,24 @@ import type { Repository } from '../types';
 let _isSyncingFromBackend = false;
 let _isSyncingFromBackendActive = false;
 
+// Account switch guard (Issue #611): while switching accounts the store
+// workspace changes (repositories reference swap etc.) must NOT be mistaken
+// for local edits and pushed under the new account's partition.
+let _isSwitchingAccount = false;
+
+/**
+ * Wrap an account switch sequence so the Store subscription treats all state
+ * changes inside as switch bookkeeping, not as local edits to push.
+ */
+export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T> {
+  _isSwitchingAccount = true;
+  try {
+    return await fn();
+  } finally {
+    _isSwitchingAccount = false;
+  }
+}
+
 // Track store subscription for cleanup on restart
 let _storeUnsubscribe: (() => void) | null = null;
 
@@ -55,6 +73,58 @@ export async function waitForInFlightSync(): Promise<void> {
     } catch {
       // swallow error so waiting callers continue
     }
+  }
+}
+
+const SWITCH_FLUSH_MAX_ATTEMPTS = 3;
+
+/**
+ * 账号切换前置冲刷（Issue #611，解决 R3/R4 的推送半程）：
+ * 在旧账号上下文（请求头仍是 previousAccountId）下把未决的防抖推送全部
+ * 落入后端旧账号分区，再等待在途拉取结束。冲刷必须排空推送通道——
+ * `waitForInFlightSync()` 只等待拉取 `_syncPromise`，不等待推送 `_pushPromise`。
+ *
+ * 推送内容与请求头原子一致：冲刷失败时不阻塞切换，也不会把失败标记带进
+ * 新账号会话（模块级待推标志统一清零；旧账号的未决修改会在下次进入该账号
+ * 会话、工作区恢复且同步指纹重置后由订阅器补推）。
+ */
+export async function prepareForAccountSwitch(previousAccountId?: string | null): Promise<void> {
+  // previousAccountId 保留在签名中以表达「冲刷发生在旧账号上下文」的语义；
+  // 请求头由 Store 当前登录用户自动推导，无需在此显式传递。
+  void previousAccountId;
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+  }
+  if (backend.isAvailable) {
+    let attempts = 0;
+    while ((_hasPendingLocalChanges || _pushPromise) && attempts < SWITCH_FLUSH_MAX_ATTEMPTS) {
+      attempts += 1;
+      try {
+        await syncToBackend();
+      } catch (err) {
+        logger.warn('sync.switch', 'Flush attempt failed before account switch', {
+          error: err instanceof Error ? err.message : String(err),
+          attempt: attempts,
+        });
+        break;
+      }
+    }
+    if (_hasPendingLocalChanges || _pushPromise) {
+      logger.warn('sync.switch', 'Backend flush incomplete before account switch; pending edits stay bound to the previous account partition', {
+        pendingLocalChanges: _hasPendingLocalChanges,
+        hasPushPromise: _pushPromise !== null,
+      });
+    }
+  }
+  // 等待在途拉取结束，避免旧账号的拉取结果写进新账号的活跃工作区
+  await waitForInFlightSync();
+  // 切换静默前统一清零模块级标志，绝不把旧账号的待推语义带进新账号会话
+  _hasPendingPush = false;
+  _hasPendingLocalChanges = false;
+  if (_debounceTimer) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
   }
 }
 
@@ -206,6 +276,17 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
 
     useAppStore.getState().setGitHubToken(restored.github_token);
     useAppStore.getState().setUser(user);
+    // 多账号恢复（Issue #611）：后端保存的所有账号一次性登记进 savedAccounts，
+    // 让登录页/下拉菜单能直接列出并一键切换。仅接受带有效 Token 与合法 user 的条目。
+    if (Array.isArray(restored.accounts)) {
+      const { upsertSavedAccount } = useAppStore.getState();
+      for (const account of restored.accounts) {
+        if (!account || typeof account.accountId !== 'string') continue;
+        if (typeof account.githubToken !== 'string' || !account.githubToken.trim()) continue;
+        if (!account.user || typeof account.user.id !== 'number' || !account.user.login) continue;
+        upsertSavedAccount(account.user, account.githubToken);
+      }
+    }
     logger.info('sync.restoreAuth', 'Restored session from backend', { login: user.login });
     return true;
   } catch (err) {
@@ -753,7 +834,7 @@ export function startAutoSync(): () => void {
   _hasPendingLocalChanges = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
-    if (_isSyncingFromBackend) return;
+    if (_isSyncingFromBackend || _isSwitchingAccount) return;
 
     const changed =
       state.repositories !== prevState.repositories ||
@@ -790,6 +871,8 @@ export function startAutoSync(): () => void {
 
   // 2. Poll backend every 5s → pull fresh data for cross-device sync
   _pollTimer = setInterval(() => {
+    // 切换期间拉取由 switchToAccount 编排，轮询暂停避免半程拉取串号
+    if (_isSwitchingAccount) return;
     syncFromBackend();
   }, POLL_INTERVAL);
 

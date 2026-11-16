@@ -59,6 +59,9 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "토큰은 이 기기와 직접 구성한 백엔드에만 저장되며 앱 서버로 전송되지 않습니다."
+    "token-permissions-local-storage": "토큰은 이 기기와 직접 구성한 백엔드에만 저장되며 앱 서버로 전송되지 않습니다.",
+    "saved-accounts": "저장된 계정",
+    "click-to-sign-in": "클릭하여 로그인",
+    "token-required": "토큰 필요"
   }
 }

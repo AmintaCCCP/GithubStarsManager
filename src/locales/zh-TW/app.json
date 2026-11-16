@@ -236,7 +236,15 @@
     "menu-releases": "發布",
     "menu-forks": "復刻",
     "menu-subscription": "發現",
-    "menu-settings": "設定"
+    "menu-settings": "設定",
+    "switch-account": "切換帳號",
+    "add-account": "新增帳號",
+    "current-account": "目前帳號",
+    "remove-account": "移除帳號",
+    "remove-account-confirm-title": "移除已儲存的帳號",
+    "remove-account-confirm-desc": "僅會移除該帳號的快速登入憑證，本機快取的儲存庫與分類仍會保留。確定要繼續嗎？",
+    "account-switched": "已切換至 @{{login}}",
+    "account-repo-count": "{{count}} 個儲存庫"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "同步分類到 GitHub list"
@@ -1416,5 +1424,13 @@
     "download": "下載",
     "detected-from-filenames-and-release-metadata-no": "依檔名與 Release 中繼資料辨識，未驗證安裝包安全性，也不會自動執行。你隨時可以在下方資產清單中手動選擇其他資產。",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "已排除 {{v1}} 個不適用於目前裝置的資產（原始碼、校驗和、簽章、偵錯符號、blockmap、其他平台/架構）。"
+  },
+  "accountModal": {
+    "title": "新增 GitHub 帳號",
+    "description": "輸入新的 GitHub Personal Access Token 以新增帳號，目前帳號的資料將被安全保留。",
+    "token-label": "GitHub Personal Access Token",
+    "cancel": "取消",
+    "confirm": "新增並切換",
+    "reauth-hint": "請為帳號 @{{login}} 重新輸入有效的 GitHub Token"
   }
 }

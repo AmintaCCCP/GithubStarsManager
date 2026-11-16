@@ -8,6 +8,7 @@ import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
@@ -103,6 +104,12 @@ export const useBulkRepositoryActions = ({
       }
     }
 
+    // 账号代次校验（Issue #611）：unstar 等待 GitHub API 期间可能已切号，
+    // 不得把旧账号的删除动作写进新账号工作区
+    if (!isCurrentAccount(peekCurrentAccountId())) {
+      toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
+      return false;
+    }
     for (const repositoryId of successIds) {
       deleteRepository(repositoryId);
     }
@@ -119,6 +126,7 @@ export const useBulkRepositoryActions = ({
   const restore = useCallback(async (repositories: Repository[], config: RepositoryRestoreConfig) => {
     if (repositories.length === 0) return false;
 
+    if (!isCurrentAccount(peekCurrentAccountId())) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
@@ -144,6 +152,7 @@ export const useBulkRepositoryActions = ({
   }, [language, toast, updateRepository, t]);
 
   const categorize = useCallback(async (repositories: Repository[], categoryName: string) => {
+    if (!isCurrentAccount(peekCurrentAccountId())) return false;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
       try {
@@ -168,6 +177,7 @@ export const useBulkRepositoryActions = ({
   }, [allCategories, language, toast, updateRepository, t]);
 
   const subscribe = useCallback(async (repositories: Repository[]) => {
+    if (!isCurrentAccount(peekCurrentAccountId())) return false;
     let successCount = 0;
     for (const repository of repositories) {
       try {
@@ -196,6 +206,7 @@ export const useBulkRepositoryActions = ({
       return false;
     }
 
+    if (!isCurrentAccount(peekCurrentAccountId())) return false;
     batchUnsubscribeReleases(subscribedRepositories.map((repository) => repository.id));
     const failedRepositories: string[] = [];
     for (const repository of subscribedRepositories) {
@@ -218,6 +229,7 @@ export const useBulkRepositoryActions = ({
   }, [batchUnsubscribeReleases, language, releaseSubscriptions, t, toast, updateRepository]);
 
   const lockCategory = useCallback(async (repositories: Repository[]) => {
+    if (!isCurrentAccount(peekCurrentAccountId())) return false;
     let successCount = 0;
     let skippedCount = 0;
     const failedRepositories: string[] = [];
@@ -249,6 +261,7 @@ export const useBulkRepositoryActions = ({
   }, [language, toast, updateRepository, t]);
 
   const unlockCategory = useCallback(async (repositories: Repository[]) => {
+    if (!isCurrentAccount(peekCurrentAccountId())) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {

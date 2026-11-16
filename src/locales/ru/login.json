@@ -59,6 +59,9 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения."
+    "token-permissions-local-storage": "Токен хранится только на этом устройстве и вашем собственном бэкенде — никогда на серверах приложения.",
+    "saved-accounts": "Сохранённые аккаунты",
+    "click-to-sign-in": "Нажмите, чтобы войти",
+    "token-required": "Требуется токен"
   }
 }

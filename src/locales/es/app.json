@@ -236,7 +236,15 @@
     "menu-releases": "liberar",
     "menu-forks": "réplica",
     "menu-subscription": "Descubrir",
-    "menu-settings": "configuración"
+    "menu-settings": "configuración",
+    "switch-account": "Cambiar de cuenta",
+    "add-account": "Añadir cuenta",
+    "current-account": "Cuenta actual",
+    "remove-account": "Eliminar cuenta",
+    "remove-account-confirm-title": "Eliminar cuenta guardada",
+    "remove-account-confirm-desc": "Esto solo elimina la credencial de inicio de sesión guardada de esta cuenta. Los repositorios y las categorías en caché se conservarán. ¿Continuar?",
+    "account-switched": "Cambiado a @{{login}}",
+    "account-repo-count": "{{count}} repositorios"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Sincronizar categorías con la lista de GitHub"
@@ -1416,5 +1424,13 @@
     "download": "Descargar",
     "detected-from-filenames-and-release-metadata-no": "Se detecta a partir de nombres de archivo y metadatos del Release. No se comprueba la seguridad ni se ejecuta nada automáticamente. Siempre puedes elegir otro recurso en la lista de abajo.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "Se excluyeron {{v1}} recursos que no aplican a este dispositivo (código fuente, sumas de verificación, firmas, símbolos de depuración, blockmaps, otras plataformas o arquitecturas)."
+  },
+  "accountModal": {
+    "title": "Añadir cuenta de GitHub",
+    "description": "Introduce un nuevo token personal de GitHub para añadir una cuenta. Los datos de tu cuenta actual se conservarán de forma segura.",
+    "token-label": "Token personal de GitHub",
+    "cancel": "Cancelar",
+    "confirm": "Añadir y cambiar",
+    "reauth-hint": "Introduce un token de GitHub válido para @{{login}}"
   }
 }

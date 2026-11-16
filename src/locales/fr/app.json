@@ -236,7 +236,15 @@
     "menu-releases": "libérer",
     "menu-forks": "réplique",
     "menu-subscription": "Découvrir",
-    "menu-settings": "installation"
+    "menu-settings": "installation",
+    "switch-account": "Changer de compte",
+    "add-account": "Ajouter un compte",
+    "current-account": "Compte actuel",
+    "remove-account": "Supprimer le compte",
+    "remove-account-confirm-title": "Supprimer le compte enregistré",
+    "remove-account-confirm-desc": "Cela supprime uniquement les identifiants de connexion enregistrés pour ce compte. Les dépôts et catégories en cache seront conservés. Continuer ?",
+    "account-switched": "Compte basculé vers @{{login}}",
+    "account-repo-count": "{{count}} dépôts"
   },
   "listsPushIndicator": {
     "pushing-categories-to-lists": "Synchroniser les catégories avec la liste GitHub"
@@ -1416,5 +1424,13 @@
     "download": "Télécharger",
     "detected-from-filenames-and-release-metadata-no": "Détecté à partir des noms de fichiers et des métadonnées de la Release. Aucun contrôle de sécurité n'est effectué et rien ne s'exécute automatiquement. Vous pouvez toujours choisir un autre fichier dans la liste ci-dessous.",
     "excluded-v1-asset-s-that-do-not-apply-to-this-de": "{{v1}} fichier(s) écarté(s) car ils ne concernent pas cet appareil (code source, sommes de contrôle, signatures, symboles de débogage, blockmaps, autres plateformes ou architectures)."
+  },
+  "accountModal": {
+    "title": "Ajouter un compte GitHub",
+    "description": "Saisissez un nouveau jeton d'accès personnel GitHub pour ajouter un compte. Les données de votre compte actuel seront préservées en toute sécurité.",
+    "token-label": "Jeton d'accès personnel GitHub",
+    "cancel": "Annuler",
+    "confirm": "Ajouter et basculer",
+    "reauth-hint": "Veuillez saisir un jeton GitHub valide pour @{{login}}"
   }
 }

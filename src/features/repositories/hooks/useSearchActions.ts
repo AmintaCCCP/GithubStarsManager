@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'r
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
@@ -369,6 +370,9 @@ export const useSearchActions = (): SearchActions => {
     setIsSearching(true);
     setSearchPhase(null);
     vectorScoreMapRef.current = null;
+    // 账号代次校验（Issue #611）：向量索引内容为实例共享，搜索期间切号后
+    // 结果不得写进新账号（结果仓库还会按当前账号 id 集合二次过滤）
+    const startedAccountId = peekCurrentAccountId();
 
     try {
       // ====== 向量搜索分支 ======
@@ -420,7 +424,15 @@ export const useSearchActions = (): SearchActions => {
             return;
           }
 
-          const finalFiltered = applyFilters([...result.repositories]);
+          // 跨账号数据外泄防护：按当前活跃账号的仓库 id 集合过滤后才能展示
+          if (!isCurrentAccount(startedAccountId)) {
+            return;
+          }
+          const currentRepoIds = new Set(
+            useAppStore.getState().repositories.map((repo) => String(repo.id)),
+          );
+          const finalFiltered = applyFilters([...result.repositories])
+            .filter((repo) => currentRepoIds.has(String(repo.id)));
           const order = new Map(
             result.repositories.map((repo, index) => [String(repo.id), index]),
           );
@@ -467,10 +479,15 @@ export const useSearchActions = (): SearchActions => {
     }
 
     setSyncingStars(true);
+    // 账号代次校验（Issue #611）：全量拉取耗时期间切号后丢弃结果，绝不覆盖新账号
+    const startedAccountId = peekCurrentAccountId();
     try {
       const githubApi = createGitHubApiService(githubToken);
       const newRepositories = await githubApi.getAllStarredRepositories();
 
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       const storeRepos = useAppStore.getState().repositories;
       const mergedRepositories = mergeStarredRepositories(newRepositories, storeRepos);
 
@@ -535,6 +552,9 @@ export const useSearchActions = (): SearchActions => {
       // 会被误报为新增，弹出「发现 N 个新仓库」的错误提示。
       const newRepoCount = countNewStarredRepositories(newRepositories, storeRepos);
 
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       setRepositories(finalRepositories);
       await forceSyncToBackend();
 

@@ -6,6 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
+import { useAccountSwitchActions } from '../features/lifecycle/hooks/useAccountSwitchActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
 import { accountIdKey, workspaceHasData } from '../store/helpers/accountWorkspace';
@@ -79,6 +80,8 @@ function LoginCardPattern() {
 
 export const LoginScreen: React.FC = () => {
   const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend } = useLoginActions();
+  const { switchToAccount, parkCurrentAccountForRestore } = useAccountSwitchActions();
+  const githubTokenInputRef = useRef<HTMLInputElement | null>(null);
   const [loginMode, setLoginMode] = useState<'github' | 'backend'>('github');
   const [backendStep, setBackendStep] = useState<'credentials' | 'githubToken'>('credentials');
   const [tokenSetupReason, setTokenSetupReason] = useState<'missing' | 'invalid'>('missing');
@@ -102,7 +105,7 @@ export const LoginScreen: React.FC = () => {
     repositories, gists, starredGists, releases, forks,
     customCategories, categoryOrder, hiddenDefaultCategoryIds,
     defaultCategoryOverrides, categoryListIdMap,
-    lastSync, accountWorkspaces, language, setLanguage, themeMode, systemTheme, setThemeMode,
+    lastSync, accountWorkspaces, savedAccounts, language, setLanguage, themeMode, systemTheme, setThemeMode,
   } = useAppStore(useShallow((state) => ({
     setUser: state.setUser,
     setGitHubToken: state.setGitHubToken,
@@ -120,6 +123,7 @@ export const LoginScreen: React.FC = () => {
     categoryListIdMap: state.categoryListIdMap,
     lastSync: state.lastSync,
     accountWorkspaces: state.accountWorkspaces,
+    savedAccounts: state.savedAccounts,
     language: state.language,
     setLanguage: state.setLanguage,
     themeMode: state.themeMode,
@@ -137,6 +141,39 @@ export const LoginScreen: React.FC = () => {
     .filter((value): value is string => typeof value === 'string')
     .sort();
   const cachedLastSync = lastSync ?? parkedLastSyncs[parkedLastSyncs.length - 1] ?? null;
+  // 已保存账号快捷列表（Issue #611）：按 lastUsedAt 倒序，一键恢复会话
+  const savedAccountList = Object.values(savedAccounts ?? {})
+    .filter(account => !!account?.user)
+    .sort((a, b) => (a.lastUsedAt < b.lastUsedAt ? 1 : a.lastUsedAt > b.lastUsedAt ? -1 : 0));
+
+  const handleQuickSignIn = async (accountId: string, hasToken: boolean) => {
+    if (!hasToken) {
+      // Token 缺失（如导入脱敏备份）：聚焦 Token 输入框重新授权
+      setLoginMode('github');
+      setBackendStep('credentials');
+      setTokenSetupReason('missing');
+      setError(t('loginScreen.token-required'));
+      githubTokenInputRef.current?.focus();
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const result = await switchToAccount(accountId);
+      if (!result.ok) {
+        if (result.needsToken) {
+          setError(t('loginScreen.token-required'));
+          githubTokenInputRef.current?.focus();
+        } else {
+          setError(result.error ?? t('loginScreen.sign-in-failed-please-try-again'));
+        }
+        return;
+      }
+      // 成功切换后 App 因 isAuthenticated=true 自动渲染主界面
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const switchLoginMode = (mode: 'github' | 'backend') => {
     setLoginMode(mode);
@@ -247,11 +284,15 @@ export const LoginScreen: React.FC = () => {
           setIsLoading(false); // Let user interact with dialog
         });
         setIsLoading(true);
+        // R2 防护（Issue #611）：拉取后端数据写入 Store 前先把当前已登录账号
+        // 的工作区安全归档并清空顶层，防止被新账号数据污染后作为旧快照覆盖
+        parkCurrentAccountForRestore();
         if (overwrite) {
           await syncBackendData();
         }
         // Either way, complete login with backend credentials
       } else {
+        parkCurrentAccountForRestore();
         // No conflict: sync backend data directly
         await syncBackendData();
       }
@@ -277,6 +318,7 @@ export const LoginScreen: React.FC = () => {
     setError('');
     try {
       const user = await setupBackendGitHubToken(githubToken);
+      parkCurrentAccountForRestore();
       await syncBackendData();
       setGitHubToken(githubToken);
       setUser(user);
@@ -380,6 +422,44 @@ export const LoginScreen: React.FC = () => {
           <p className="text-sm text-muted-foreground">{t('loginScreen.ai-powered-repository-management')}</p>
         </div>
 
+        {savedAccountList.length > 0 && (
+          <Card className="mb-4 border-border bg-card/60 p-3 shadow-sm">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t('loginScreen.saved-accounts')}
+            </p>
+            <div className="space-y-1">
+              {savedAccountList.map((account) => (
+                <button
+                  key={account.accountId}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => void handleQuickSignIn(account.accountId, !!account.githubToken.trim())}
+                  className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                >
+                  <img
+                    src={account.user.avatar_url}
+                    alt={account.user.name || account.user.login}
+                    className="h-8 w-8 shrink-0 rounded-full"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {account.user.name || account.user.login}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      @{account.user.login} · {t('loginScreen.click-to-sign-in')}
+                    </span>
+                  </span>
+                  {!account.githubToken.trim() && (
+                    <span className="shrink-0 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+                      {t('loginScreen.token-required')}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
+
         <Card className="relative overflow-hidden border-border bg-card p-0 shadow-lg shadow-black/5">
           <div className={cn('relative grid', showsTokenPermissions && 'lg:grid-cols-2')}>
             <div className="relative flex flex-col justify-center overflow-hidden px-6 py-12 sm:px-8">
@@ -450,6 +530,7 @@ export const LoginScreen: React.FC = () => {
                   <div className="relative">
                     <Key className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground dark:text-muted-foreground/70" />
                     <Input
+                      ref={loginMode === 'github' ? githubTokenInputRef : undefined}
                       id={loginMode === 'github' ? 'github-token' : backendStep === 'credentials' ? 'backend-api-key' : 'backend-github-token'}
                       type="password"
                       autoComplete="current-password"

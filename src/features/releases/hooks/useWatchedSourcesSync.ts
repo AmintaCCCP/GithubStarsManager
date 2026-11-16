@@ -5,6 +5,7 @@
 import { useT } from '../../../i18n/useT';
 import { useCallback, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
+import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { useDialog } from '../../../hooks/useDialog';
 import {
@@ -30,11 +31,16 @@ export const useWatchedSourcesSync = () => {
     if (!githubToken || isSyncingWatchedSources) return;
 
     setIsSyncingWatchedSources(true);
+    // 账号代次校验（Issue #611）：Watch 拉取切号后丢弃结果，不写入新账号的来源配置
+    const startedAccountId = peekCurrentAccountId();
     try {
       const githubApi = createGitHubApiService(githubToken);
       // 只拉 /user/subscriptions（含私有仓）。/users/{login}/subscriptions 已被 GitHub 改为
       // 恒定返回 204 空响应体，且其结果本就是前者的公开子集，并行合并只会拖垮整个同步。
       const watchedRepos = await githubApi.getAllWatchedRepositories();
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       // hiddenByRepo 在 await 之后从最新 state 读取：同步期间用户仍可在设置面板
       // 切换 release_hidden，旧快照会在 setReleaseSourceRepositories 时覆盖该修改。
       const hiddenByRepo = new Map(
