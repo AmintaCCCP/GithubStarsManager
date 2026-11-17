@@ -1,4 +1,4 @@
-import { backend } from './backendAdapter';
+import { backend, isValidBackendRestoreAccount } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { normalizeAssetFilters } from '../utils/assetFilters';
@@ -16,16 +16,35 @@ let _isSyncingFromBackendActive = false;
 // for local edits and pushed under the new account's partition.
 let _isSwitchingAccount = false;
 
+// 切换簿记标记（Issue #611 审计修复）：withAccountSwitchGuardSync 覆盖的
+// 同步工作区替换（switchAccount / logout / park）属于切换簿记；异步守卫
+// 覆盖窗口内的其余 store 变化才是对齐窗口里的真实用户编辑。订阅器据此区分
+// 「簿记不记录」与「窗口内编辑必须记为待推」，否则对齐窗口内的
+// categoryOrder 编辑会被静默丢弃（数据丢失）。
+let _isAccountSwitchBookkeeping = false;
+
 /**
  * Wrap an account switch sequence so the Store subscription treats all state
  * changes inside as switch bookkeeping, not as local edits to push.
+ * Saves and restores the previous flag so nesting stays safe, and drains the
+ * pending edits recorded inside the window right after releasing it so the
+ * alignment-window edits are pushed under the (now active) account's header.
  */
 export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = _isSwitchingAccount;
+  const previousBookkeeping = _isAccountSwitchBookkeeping;
   _isSwitchingAccount = true;
   try {
     return await fn();
   } finally {
-    _isSwitchingAccount = false;
+    _isSwitchingAccount = previous;
+    _isAccountSwitchBookkeeping = previousBookkeeping;
+    // 对齐窗口内被静音的用户编辑：守卫释放后立即补推，绝不能静默丢弃。
+    //（拉取应用阶段写入的 _hasPendingPush 已由 syncFromBackend 的 finally 排空，
+    // 这里只需处理订阅器记录的窗口内本地编辑。）
+    if (_hasPendingLocalChanges && !_isSyncingFromBackendActive) {
+      void syncToBackend();
+    }
   }
 }
 
@@ -38,11 +57,14 @@ export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T
  */
 export function withAccountSwitchGuardSync<T>(fn: () => T): T {
   const previous = _isSwitchingAccount;
+  const previousBookkeeping = _isAccountSwitchBookkeeping;
   _isSwitchingAccount = true;
+  _isAccountSwitchBookkeeping = true;
   try {
     return fn();
   } finally {
     _isSwitchingAccount = previous;
+    _isAccountSwitchBookkeeping = previousBookkeeping;
   }
 }
 
@@ -111,15 +133,39 @@ export async function waitForInFlightSync(): Promise<void> {
 
 const SWITCH_FLUSH_MAX_ATTEMPTS = 3;
 
+// 账号级未同步状态（Issue #611 审计修复）：切换前冲刷失败时，旧账号的未推
+// 修改保留在其本地工作区，并记录到该集合。模块级待推标志是会话全局状态，
+// 绝不能带进新账号会话；切回该账号时由 consumePendingAccountSync 消费，
+// 先补推本地工作区再拉取后端，防止非强制拉取用后端旧快照覆盖未推修改。
+const _pendingSyncAccounts = new Set<string>();
+
+/**
+ * 是否存在指定账号尚未补推的本地修改（冲刷失败遗留）。
+ */
+export function hasPendingAccountSync(accountId: string | null | undefined): boolean {
+  return !!accountId && _pendingSyncAccounts.has(accountId);
+}
+
+/**
+ * 消费指定账号的未同步标记：切回该账号并完成补推协调前调用。
+ * 返回是否存在遗留待推状态（存在则调用方必须先 syncToBackend 再拉取）。
+ */
+export function consumePendingAccountSync(accountId: string | null | undefined): boolean {
+  if (!accountId || !_pendingSyncAccounts.has(accountId)) return false;
+  _pendingSyncAccounts.delete(accountId);
+  return true;
+}
+
 /**
  * 账号切换前置冲刷（Issue #611，解决 R3/R4 的推送半程）：
  * 在旧账号上下文（请求头仍是 previousAccountId）下把未决的防抖推送全部
- * 落入后端旧账号分区，再等待在途拉取结束。冲刷必须排空推送通道——
- * `waitForInFlightSync()` 只等待拉取 `_syncPromise`，不等待推送 `_pushPromise`。
+ * 落入后端旧账号分区，再等待在途拉取与在途推送结束。冲刷必须排空推送通道——
+ * `waitForInFlightSync()` 只等待拉取 `_syncPromise`；拉取的 finally 可能
+ * 启动新的 `syncToBackend()`，所以排空之后还要继续等待推送通道排空。
  *
- * 推送内容与请求头原子一致：冲刷失败时不阻塞切换，也不会把失败标记带进
- * 新账号会话（模块级待推标志统一清零；旧账号的未决修改会在下次进入该账号
- * 会话、工作区恢复且同步指纹重置后由订阅器补推）。
+ * 冲刷失败语义（审计修复）：不再无条件清除待推标志后继续切换——失败时把
+ * 未推修改按账号记录（_pendingSyncAccounts），切回该账号后先补推再拉取；
+ * 模块级标志仍统一清零，旧账号的待推语义绝不带进新账号会话。
  */
 export async function prepareForAccountSwitch(previousAccountId?: string | null): Promise<void> {
   // previousAccountId 保留在签名中以表达「冲刷发生在旧账号上下文」的语义；
@@ -143,16 +189,31 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
         break;
       }
     }
-    if (_hasPendingLocalChanges || _pushPromise) {
-      logger.warn('sync.switch', 'Backend flush incomplete before account switch; pending edits stay bound to the previous account partition', {
-        pendingLocalChanges: _hasPendingLocalChanges,
-        hasPushPromise: _pushPromise !== null,
-      });
-    }
   }
   // 等待在途拉取结束，避免旧账号的拉取结果写进新账号的活跃工作区
   await waitForInFlightSync();
-  // 切换静默前统一清零模块级标志，绝不把旧账号的待推语义带进新账号会话
+  // 拉取的 finally 可能启动了新的推送（旧账号上下文）：继续排空推送通道，
+  // 直到旧账号的拉取与推送回调都不会再修改新会话的同步状态
+  while (_pushPromise) {
+    try {
+      await _pushPromise;
+    } catch {
+      // 冲刷失败语义由待推标志承载，等待方继续排空
+    }
+  }
+  // 排空完成后残留的待推标志 = 冲刷未完成：按账号保留未同步状态，
+  // 模块级标志仍统一清零（绝不把旧账号的待推语义带进新账号会话）
+  if (_hasPendingLocalChanges) {
+    if (previousAccountId) {
+      _pendingSyncAccounts.add(previousAccountId);
+    }
+    logger.warn('sync.switch', 'Backend flush incomplete before account switch; pending edits stay bound to the previous account partition', {
+      accountId: previousAccountId ?? null,
+      pendingLocalChanges: _hasPendingLocalChanges,
+    });
+  } else if (previousAccountId) {
+    _pendingSyncAccounts.delete(previousAccountId);
+  }
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
   if (_debounceTimer) {
@@ -161,10 +222,21 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
   }
 }
 
-// Drain and clean up any in-flight sync before switching backend URL
+// Drain and clean up any in-flight sync before switching backend URL.
+// The hook must drain the PUSH channel too: a push still in flight for the
+// old backend URL must complete before `backend.init()` commits the new URL,
+// otherwise a follow-up push would send the old account's data to the new
+// backend (headers are read from the store at request construction time).
 if (typeof backend.registerBeforeInitHook === 'function') {
   backend.registerBeforeInitHook(async () => {
     await waitForInFlightSync();
+    while (_pushPromise) {
+      try {
+        await _pushPromise;
+      } catch {
+        // swallow so init can proceed
+      }
+    }
     _hasPendingPush = false;
     _hasPendingLocalChanges = false;
     if (_debounceTimer) {
@@ -310,13 +382,12 @@ export async function tryRestoreAuthFromBackend(): Promise<boolean> {
     useAppStore.getState().setGitHubToken(restored.github_token);
     useAppStore.getState().setUser(user);
     // 多账号恢复（Issue #611）：后端保存的所有账号一次性登记进 savedAccounts，
-    // 让登录页/下拉菜单能直接列出并一键切换。仅接受带有效 Token 与合法 user 的条目。
+    // 让登录页/下拉菜单能直接列出并一键切换。仅接受带有效 Token 与合法 user 的条目
+    //（过滤规则与登录页 handleBackendConnect / addAccountFromBackend 共用同一校验函数）。
     if (Array.isArray(restored.accounts)) {
       const { upsertSavedAccount } = useAppStore.getState();
       for (const account of restored.accounts) {
-        if (!account || typeof account.accountId !== 'string') continue;
-        if (typeof account.githubToken !== 'string' || !account.githubToken.trim()) continue;
-        if (!account.user || typeof account.user.id !== 'number' || !account.user.login) continue;
+        if (!isValidBackendRestoreAccount(account)) continue;
         upsertSavedAccount(account.user, account.githubToken);
       }
     }
@@ -867,7 +938,15 @@ export function startAutoSync(): () => void {
   _hasPendingLocalChanges = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
-    if (_isSyncingFromBackend || _isSwitchingAccount) return;
+    if (_isSyncingFromBackend || _isSwitchingAccount) {
+      // 切换守卫窗口内的真实用户编辑（如对齐拉取期间调整 categoryOrder）不能
+      // 静默丢弃：记为待推，守卫释放后立即补推。切换簿记（guardSync 覆盖的
+      // 工作区替换）与拉取应用阶段（_isSyncingFromBackend）的变化不记录。
+      if (_isSwitchingAccount && !_isSyncingFromBackend && !_isAccountSwitchBookkeeping) {
+        _hasPendingLocalChanges = true;
+      }
+      return;
+    }
 
     const changed =
       state.repositories !== prevState.repositories ||

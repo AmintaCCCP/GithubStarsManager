@@ -27,6 +27,26 @@ export interface BackendAuthRestoreAccount {
   lastUsedAt?: string | null;
 }
 
+/**
+ * 后端返回的已保存账号条目有效性校验（Issue #611 审计修复）。
+ * 所有登记 savedAccounts 的后端登录路径（tryRestoreAuthFromBackend /
+ * 登录页 handleBackendConnect / addAccountFromBackend）必须共用同一过滤规则：
+ * accountId 为字符串、Token 非空字符串、user 含数字 id 与非空 login。
+ * 返回类型同时收窄 user/githubToken 非空，调用方无需重复判空。
+ */
+export const isValidBackendRestoreAccount = (
+  account: unknown,
+): account is BackendAuthRestoreAccount & { user: GitHubUser; githubToken: string } => {
+  if (!account || typeof account !== 'object') return false;
+  const record = account as Partial<BackendAuthRestoreAccount>;
+  return typeof record.accountId === 'string'
+    && typeof record.githubToken === 'string'
+    && record.githubToken.trim().length > 0
+    && !!record.user
+    && typeof record.user.id === 'number'
+    && !!record.user.login;
+};
+
 export interface BackendAuthRestore {
   github_token: string | null;
   active_account_id?: string;

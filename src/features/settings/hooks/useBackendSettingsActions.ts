@@ -184,13 +184,20 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       if (!isCurrentAccount(startedAccountId)) {
         return;
       }
+      // 账号与分类状态必须同一快照（Issue #611 审计修复）：hook 渲染期捕获的
+      // state 可能仍属于确认框之前的前一个账号；确认并拉取后重读当前完整状态，
+      // 保证隐藏分类恢复的检查与写入基于同一账号快照。
+      // 测试桩兼容：store 被整体 mock 且无 getState 时回退渲染期快照。
+      const liveState = typeof useAppStore.getState === 'function'
+        ? useAppStore.getState()
+        : state;
       state.setRepositories(repoData.repositories, { allowEmpty: true });
       state.setReleases(releaseData.releases, { allowEmpty: true });
       state.setAIConfigs(aiConfigData);
       state.setWebDAVConfigs(webdavConfigData);
       const serverHidden = Array.isArray(settingsData.hiddenDefaultCategoryIds) ? settingsData.hiddenDefaultCategoryIds : [];
       for (const categoryId of serverHidden) if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
-      for (const categoryId of state.hiddenDefaultCategoryIds) {
+      for (const categoryId of liveState.hiddenDefaultCategoryIds) {
         if (typeof categoryId === 'string' && !serverHidden.includes(categoryId)) state.showDefaultCategory(categoryId);
       }
       if (

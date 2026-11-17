@@ -40,6 +40,8 @@ const mocks = vi.hoisted(() => ({
   switchToAccount: vi.fn(),
   removeAccount: vi.fn(),
   logoutCurrentAccount: vi.fn(),
+  addAccountWithToken: vi.fn(),
+  addAccountFromBackend: vi.fn(),
 }));
 
 vi.mock('../hooks/useDialog', () => ({
@@ -50,8 +52,8 @@ vi.mock('../features/lifecycle/hooks/useAccountSwitchActions', () => ({
   useAccountSwitchActions: () => ({
     isSwitching: false,
     switchToAccount: mocks.switchToAccount,
-    addAccountWithToken: vi.fn(),
-    addAccountFromBackend: vi.fn(),
+    addAccountWithToken: mocks.addAccountWithToken,
+    addAccountFromBackend: mocks.addAccountFromBackend,
     removeAccount: mocks.removeAccount,
     logoutCurrentAccount: mocks.logoutCurrentAccount,
   }),
@@ -214,6 +216,30 @@ describe('Header account switcher', () => {
     });
     await waitFor(() => {
       expect(mocks.logoutCurrentAccount).toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('renders the AddAccountModal action buttons and submits the entered PAT', async () => {
+    // 审计修复回归：Modal 只在 scrollable=true 时渲染 footer——不启用则
+    // 确认/取消按钮根本不渲染，用户填写凭据后无法提交
+    baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    mocks.addAccountWithToken.mockResolvedValue({ ok: true });
+    const { unmount } = render(<Header />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
+    fireEvent.click(screen.getByText('header.add-account'));
+
+    const confirmButton = await screen.findByRole('button', { name: 'app:accountModal.confirm' });
+    expect(screen.getByRole('button', { name: 'app:accountModal.cancel' })).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('app:accountModal.token-label'), {
+      target: { value: 'ghp_new_token' },
+    });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(mocks.addAccountWithToken).toHaveBeenCalledWith('ghp_new_token');
     });
     unmount();
   });

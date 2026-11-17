@@ -147,7 +147,7 @@ describe('LoginScreen 后端登录', () => {
     expect(screen.getByLabelText('GitHub Personal Access Token')).toHaveAttribute('id', 'backend-github-token');
   });
 
-  it('连接已有后端成功后先拉后端数据再登录', async () => {
+  it('连接已有后端成功后先登录再拉取后端数据（拉取固定到已验证账号）', async () => {
     mocks.restoreBackendSession.mockResolvedValue({
       status: 'connected',
       githubToken: 'ghp_restored',
@@ -162,12 +162,14 @@ describe('LoginScreen 后端登录', () => {
     await waitFor(() => expect(mocks.store.setUser).toHaveBeenCalledWith({ id: 1, login: 'octocat' }));
     expect(mocks.syncBackendData).toHaveBeenCalledOnce();
     expect(mocks.store.setGitHubToken).toHaveBeenCalledWith('ghp_restored');
-    expect(mocks.syncBackendData.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.store.setUser.mock.invocationCallOrder[0],
+    // Issue #611 审计修复：先落登录态再拉取，使全部拉取请求携带已验证账号的
+    // X-GitHub-Account-Id，而不是回退到服务端全局 active_account_id 分区。
+    expect(mocks.store.setUser.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.syncBackendData.mock.invocationCallOrder[0],
     );
   });
 
-  it('后端数据同步失败时不提交登录状态', async () => {
+  it('后端数据同步失败时回滚登录状态', async () => {
     mocks.restoreBackendSession.mockResolvedValue({
       status: 'connected',
       githubToken: 'ghp_restored',
@@ -181,12 +183,13 @@ describe('LoginScreen 后端登录', () => {
     fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('sync failed');
-    expect(mocks.store.setUser).not.toHaveBeenCalled();
-    expect(mocks.store.setGitHubToken).not.toHaveBeenCalled();
+    // 登录态先落地（拉取固定到已验证账号），同步失败后回滚为未登录。
+    expect(mocks.store.setUser).toHaveBeenLastCalledWith(null);
+    expect(mocks.store.setGitHubToken).toHaveBeenLastCalledWith(null);
     expect(mocks.store.setBackendApiSecret).toHaveBeenLastCalledWith(null);
   });
 
-  it('令牌配置流程同步失败时不提交登录状态', async () => {
+  it('令牌配置流程同步失败时回滚登录状态', async () => {
     mocks.restoreBackendSession.mockResolvedValue({ status: 'github-token-required' });
     mocks.setupBackendGitHubToken.mockResolvedValue({ id: 1, login: 'octocat' });
     mocks.syncBackendData.mockRejectedValueOnce(new Error('sync failed'));
@@ -201,8 +204,8 @@ describe('LoginScreen 后端登录', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存并继续' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('sync failed');
-    expect(mocks.store.setUser).not.toHaveBeenCalled();
-    expect(mocks.store.setGitHubToken).not.toHaveBeenCalled();
+    expect(mocks.store.setUser).toHaveBeenLastCalledWith(null);
+    expect(mocks.store.setGitHubToken).toHaveBeenLastCalledWith(null);
   });
 
   it('当本地存在已归档的自定义分类时弹出冲突确认对话框并确认覆盖', async () => {

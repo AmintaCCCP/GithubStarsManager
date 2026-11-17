@@ -106,6 +106,9 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       onClose={handleCancel}
       title={t('app:accountModal.title')}
       maxWidth="max-w-md"
+      // Modal 只在 scrollable=true 时渲染 footer（默认分支会丢弃 footer）：
+      // 不启用则确认/取消按钮根本不会出现，用户填写凭据后无法提交（审计修复）
+      scrollable
       footer={
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={handleCancel} disabled={busy}>

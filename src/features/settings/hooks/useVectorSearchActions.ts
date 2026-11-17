@@ -10,6 +10,7 @@ import {
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
+import { logger } from '../../../services/logger';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
 import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
 import { normalizeLicense } from '../../../utils/licenseFilter';
@@ -187,7 +188,11 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       }
       const stamped: number[] = [];
       const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
-        onProgress: (progress) => state.setVectorIndexingState({ phase: progress.phase, phaseDone: progress.done, phaseTotal: progress.total }),
+        onProgress: (progress) => {
+          // 切号后立即中止：进度状态写入的是共享的 vectorIndexingState，绝不能串号
+          if (onAccountChanged()) return;
+          state.setVectorIndexingState({ phase: progress.phase, phaseDone: progress.done, phaseTotal: progress.total });
+        },
         signal: controller.signal,
         readmeFetcher: clients.readmeFetcher,
         indexMode: draft.indexMode,
@@ -204,10 +209,26 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       if (stamped.length && !onAccountChanged()) state.updateRepositoriesMetadata(stamped.map(stamp));
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       if (!incremental && result.errors === 0) {
-        const cleanupKeepIds = [...new Set([...result.indexedRepoIds.map(String), ...excludedVectorIds])];
-        await clients.vectorService.cleanup(cleanupKeepIds, controller.signal);
+        // 多账号共享同一向量索引（Issue #611 审计修复）：向量服务配置
+        //（worker_url/auth_token）保存在全局行 vector_search_configs，不属于
+        // ACCOUNT_SCOPED_SETTING_KEYS，且向量 ID 无账号前缀；/cleanup 会把
+        // keepIds 之外的全部匹配向量从共享 VECTORIZE 索引中删除。因此多账号
+        // 存在时执行 cleanup 会物理删除其他账号的向量。在实现按账号隔离
+        //（独立命名空间或账号前缀的向量 ID + Worker 按账号过滤删除）之前，
+        // 多账号共享索引时必须跳过 cleanup：宁可保留冗余向量靠后续重建收敛，
+        // 也绝不删除其他账号的数据。
+        const sharedIndexAcrossAccounts = Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1;
+        if (sharedIndexAcrossAccounts) {
+          logger.warn('vectorSearch.index', 'Skip vector cleanup: the vector index is shared across multiple accounts');
+        } else {
+          const cleanupKeepIds = [...new Set([...result.indexedRepoIds.map(String), ...excludedVectorIds])];
+          await clients.vectorService.cleanup(cleanupKeepIds, controller.signal);
+        }
       }
-      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      // cleanup 等待期间可能切号（stamped 为空时上方 onAccountChanged 不会触发）：
+      // 共享状态写入前同时校验账号与取消信号，旧账号任务不得更新新账号的
+      // 索引状态/向量状态/格式版本
+      if (onAccountChanged() || controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       state.setVectorIndexingState({ result, isIndexing: false, phase: null });
       const previousCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
       state.setVectorSearchStatus({
@@ -223,6 +244,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         state.setVectorSearchConfig({ embeddingFormatVersion: EMBEDDING_FORMAT_VERSION });
       }
     } catch (reason) {
+      // 切号后旧任务的收尾状态不得写入当前账号：包括 isIndexing=false，
+      // 否则会覆盖新账号已启动任务的运行状态
+      if (!isCurrentAccount(jobAccountId)) return;
       const isCancelled = controller.signal.aborted
         || (reason instanceof Error && (reason.name === 'AbortError' || reason.message === 'Aborted'));
       if (isCancelled) {
@@ -237,7 +261,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         });
       }
     } finally {
-      setAbortController(null);
+      // 仅当当前保存的中止控制器仍属于本任务时才清空：切号后新账号可能已
+      // 启动自己的索引任务，无条件置 null 会让新任务的中止操作失效
+      setAbortController((current) => (current === controller ? null : current));
     }
   }, [createClients, state]);
 

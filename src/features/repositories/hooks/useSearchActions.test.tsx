@@ -12,6 +12,9 @@ import {
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
+  // accountWorkspace 的账号代次辅助经 ESM 循环加载绑定到真实 zustand store
+  //（importOriginal 在 mock 工厂内加载真实模块），切号用例必须驱动真实 store
+  realStore: null as unknown as { setState: (partial: Record<string, unknown>) => void },
   toast: vi.fn(),
   embed: vi.fn(),
   vectorQuery: vi.fn(),
@@ -26,6 +29,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../store/useAppStore', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../store/useAppStore')>();
+  mocks.realStore = actual.useAppStore as unknown as { setState: (partial: Record<string, unknown>) => void };
   return { ...actual, useAppStore: mocks.useAppStore };
 });
 
@@ -931,5 +935,71 @@ describe('useSearchActions pure helpers', () => {
     expect(mapped[1]).toMatchObject({ custom_tags: ['Web Apps', 'Second List'], custom_category: 'Web Apps', category_locked: true });
     expect(mapped[1].last_edited).toEqual(expect.any(String));
     expect(appliedTagsCount).toEqual({ 'Web Apps': 2, 'Second List': 1 });
+  });
+});
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：
+ * - keywordSearch 是所有搜索写入分支（无向量配置 / 向量 null / 向量失败降级）的
+ *   共用提交路径，等待 AI 期间切号后不得提交旧账号的查询与结果；
+ * - syncStars 的 Lists 分支必须在创建任何自定义分类之前复核发起账号。
+ */
+describe('useSearchActions account switch guards', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    setupStoreMocks();
+    (storeState as unknown as { user: { id: number; login: string } }).user = { id: 1, login: 'me' };
+    // 账号代次辅助读取的是真实 zustand store：初始置为账号 A(id=1)
+    mocks.realStore?.setState({ user: { id: 1, login: 'me', avatar_url: '' } });
+  });
+
+  const switchToB = () => {
+    // 切号：同时驱动真实 store（账号代次辅助的读取源）与 mock 状态
+    mocks.realStore?.setState({ user: { id: 2, login: 'other', avatar_url: '' } });
+    (storeState as unknown as { user: { id: number; login: string } }).user = { id: 2, login: 'other' };
+  };
+
+  it('keywordSearch drops the AI result submission after a switch', async () => {
+    mocks.searchRepositoriesWithSelection.mockImplementation(async () => {
+      switchToB();
+      return [baseRepo({ id: 1, full_name: 'owner/repo-one' })];
+    });
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.keywordSearch('foo', identity); });
+
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(storeState.setSearchFilters).not.toHaveBeenCalled();
+  });
+
+  it('keywordSearch drops the lexical fallback submission after a switch', async () => {
+    mocks.searchRepositoriesWithSelection.mockImplementation(async () => {
+      switchToB();
+      throw new Error('ai down');
+    });
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.keywordSearch('foo', identity); });
+
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(storeState.setSearchFilters).not.toHaveBeenCalled();
+  });
+
+  it('syncStars stops before creating list categories after a switch', async () => {
+    mocks.getAllStarredRepositories.mockResolvedValue([baseRepo({ id: 1, full_name: 'owner/repo-one' })]);
+    mocks.getUserLists.mockImplementation(async () => {
+      switchToB();
+      return [{ id: 'l1', name: 'BrandNewList', isPrivate: false, items: ['owner/repo-one'] }];
+    });
+    storeState.repositories = [baseRepo({ id: 1, full_name: 'owner/repo-one' })];
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.syncStars('stars-and-lists'); });
+
+    // 分类绝不能写入新账号；仓库写入与同步同样被丢弃
+    expect(storeState.addCustomCategory).not.toHaveBeenCalled();
+    expect(storeState.setRepositories).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(storeState.setSyncingStars).toHaveBeenLastCalledWith(false);
   });
 });

@@ -153,6 +153,10 @@ export const useRepositoryCardActions = ({
       return;
     }
 
+    // 账号代次校验（Issue #611 审计修复）：确认框与分析请求之前保存账号 ID，
+    // 确认后与提交前用保存值复核；请求完成后再读取当前账号会让检查恒通过
+    const startedAccountId = peekCurrentAccountId();
+
     if (repository.analyzed_at) {
       const confirmMessage = t('useRepositoryCardActions.this-repository-was-analyzed-on-v1-do-you-want-t', { v1: new Date(repository.analyzed_at).toLocaleString() });
 
@@ -163,6 +167,7 @@ export const useRepositoryCardActions = ({
       )) {
         return;
       }
+      if (!isCurrentAccount(startedAccountId)) return;
     }
 
     abortControllerRef.current?.abort();
@@ -205,7 +210,7 @@ export const useRepositoryCardActions = ({
 
       if (controller.signal.aborted) return;
       // 账号代次校验（Issue #611）：AI 分析耗时期间切号后，结果绝不写进新账号
-      if (!isCurrentAccount(peekCurrentAccountId())) return;
+      if (!isCurrentAccount(startedAccountId)) return;
 
       const updatedRepo = applyAnalysisSuccess(repository, {
         summary: result.summary,
@@ -232,7 +237,7 @@ export const useRepositoryCardActions = ({
         'success',
       );
     } catch (error) {
-      if (!controller.signal.aborted && !isCurrentAccount(peekCurrentAccountId())) {
+      if (!controller.signal.aborted && !isCurrentAccount(startedAccountId)) {
         return;
       }
       if (!controller.signal.aborted) {
@@ -266,7 +271,9 @@ export const useRepositoryCardActions = ({
         abortControllerRef.current = null;
         setIsLocallyAnalyzing(false);
       }
-      if (!controller.signal.aborted) {
+      // 分析标记清理只作用于发起账号仍是当前账号的工作区：切号后清理会误清
+      // 新账号同 ID 仓库的分析标记（发起账号的标记不入工作区快照，无需额外清理）
+      if (!controller.signal.aborted && isCurrentAccount(startedAccountId)) {
         setAnalyzingRepository(repoId, false);
       }
     }
@@ -299,6 +306,9 @@ export const useRepositoryCardActions = ({
     similarityAbortRef.current?.abort();
     const controller = new AbortController();
     similarityAbortRef.current = controller;
+    // 账号代次校验（Issue #611）：相似搜索等待期间切号后，结果绝不写入新账号
+    // 的全局相似视图（与分析流程同一账号代次边界）
+    const requestAccountId = peekCurrentAccountId();
     setIsFindingSimilar(true);
     try {
       const embeddingClient = new EmbeddingClient({
@@ -343,6 +353,7 @@ export const useRepositoryCardActions = ({
       if (
         controller.signal.aborted
         || similarityAbortRef.current !== controller
+        || !isCurrentAccount(requestAccountId)
       ) {
         throw new DOMException('Similar search superseded', 'AbortError');
       }
@@ -393,6 +404,11 @@ export const useRepositoryCardActions = ({
       return;
     }
 
+    // 账号代次校验（Issue #611 审计修复）：确认框等待期间可能切号——账号 ID
+    // 在确认框之前保存，确认后与远端请求完成后分别复核，绝不删除切号后
+    // 当前工作区中同 ID 的仓库并同步该删除。
+    const startedAccountId = peekCurrentAccountId();
+
     const confirmMessage = t('useRepositoryCardActions.are-you-sure-you-want-to-unstar-v1-this-will-rem', { v1: repository.full_name });
 
     if (!await confirm(
@@ -405,12 +421,16 @@ export const useRepositoryCardActions = ({
     )) {
       return;
     }
+    if (!isCurrentAccount(startedAccountId)) return;
 
     setIsUnstarring(true);
     try {
       const githubApi = createGitHubApiService(githubToken);
       const [owner, repo] = repository.full_name.split('/');
       await githubApi.unstarRepository(owner, repo);
+      // 远端取消星标已按发起账号完成；账号已切换时跳过本地删除与同步，
+      // 避免删除新账号工作区中的同 ID 仓库（原账号记录留待下次同步收敛）
+      if (!isCurrentAccount(startedAccountId)) return;
       deleteRepository(repository.id);
       await forceSyncToBackend();
       toast(t('useRepositoryCardActions.successfully-unstarred'), 'success');

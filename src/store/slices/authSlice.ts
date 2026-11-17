@@ -149,14 +149,30 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         if (!target || !target.githubToken.trim()) return false;
         const currentAccountId = accountIdKey(current.user);
         if (currentAccountId === targetAccountId) {
-          // 同账号：仅刷新 lastUsedAt
+          // 同账号：仅当当前会话已使用目标凭证且已认证时直接返回（刷新 lastUsedAt）。
+          // 水化后可能出现 user 保留但顶层 githubToken 丢失/未认证的破损会话：
+          // 此时同账号切换必须从 savedAccounts 恢复认证字段并同步认证镜像，
+          // 否则调用方拿到 true 但登录态依旧是坏的（审计：Functional Correctness）。
+          const sessionUsesTargetCredentials = current.isAuthenticated
+            && current.githubToken === target.githubToken;
           const now = nowIso();
           set({
             savedAccounts: {
               ...current.savedAccounts,
               [targetAccountId]: { ...target, lastUsedAt: now },
             },
+            ...(sessionUsesTargetCredentials ? {} : {
+              githubToken: target.githubToken,
+              isAuthenticated: true,
+            }),
           });
+          if (!sessionUsesTargetCredentials) {
+            writeAuthMirror({
+              user: target.user,
+              githubToken: target.githubToken,
+              backendApiSecret: current.backendApiSecret,
+            });
+          }
           return true;
         }
         const previousAccountId = currentAccountId;

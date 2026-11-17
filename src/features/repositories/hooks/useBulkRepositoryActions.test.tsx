@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
 import { useBulkRepositoryActions } from './useBulkRepositoryActions';
 import { useAppStore } from '../../../store/useAppStore';
@@ -186,5 +186,87 @@ describe('useBulkRepositoryActions', () => {
     expect(storeState.updateRepository).toHaveBeenCalledWith(expect.objectContaining({ id: alreadySubscribed.id, subscribed_to_releases: false }));
     expect(storeState.updateRepository).not.toHaveBeenCalledWith(expect.objectContaining({ id: toSubscribe.id, subscribed_to_releases: false }));
     expect(mocks.forceSyncToBackend).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：操作所属账号必须在任何 await 之前
+ * 保存；确认返回后、每次远端操作前与删除本地仓库前都用保存值复核。等待期间
+ * 切号后：远端操作按发起账号完成（不可撤销），本地删除与同步被整体跳过。
+ */
+describe('useBulkRepositoryActions account switch guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
+      selector ? selector(storeState) : storeState
+    )) as typeof useAppStore);
+    (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    mocks.confirm.mockResolvedValue(true);
+    mocks.forceSyncToBackend.mockResolvedValue(undefined);
+    mocks.unstarRepository.mockResolvedValue(undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const switchToB = () => {
+    (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+  };
+
+  it('stops before any remote call when the account switched during the confirm dialog', async () => {
+    mocks.confirm.mockImplementation(async () => {
+      switchToB();
+      return true;
+    });
+
+    const { result } = renderActions();
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.unstar([repository(1), repository(2)]);
+    });
+
+    expect(outcome).toBe(false);
+    expect(mocks.unstarRepository).not.toHaveBeenCalled();
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('keeps completed remote unstars but skips local deletion and sync after a mid-loop switch', async () => {
+    let calls = 0;
+    mocks.unstarRepository.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) switchToB();
+      return undefined;
+    });
+
+    const { result } = renderActions();
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.unstar([repository(1), repository(2)]);
+    });
+
+    // 第一个远端取消星标已完成（不可撤销），第二个不再发起
+    expect(calls).toBe(1);
+    expect(outcome).toBe(false);
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('deletes locally and syncs when the account never changed (control)', async () => {
+    const { result } = renderActions();
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.unstar([repository(1)]);
+    });
+
+    expect(outcome).toBe(true);
+    expect(storeState.deleteRepository).toHaveBeenCalledWith(1);
+    expect(mocks.forceSyncToBackend).toHaveBeenCalledOnce();
   });
 });

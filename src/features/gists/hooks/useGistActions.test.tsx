@@ -8,11 +8,14 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   confirm: vi.fn(),
   forceSyncToBackend: vi.fn(),
+  getGist: vi.fn(),
   getGistForAnalysis: vi.fn(),
   getGistContentPreview: vi.fn(),
   unstarGist: vi.fn(),
   deleteGist: vi.fn(),
   getGistFileRaw: vi.fn(),
+  updateGist: vi.fn(),
+  createGist: vi.fn(),
   analyzeGist: vi.fn(),
   searchGistsWithReranking: vi.fn(),
 }));
@@ -31,11 +34,14 @@ vi.mock('../../../services/autoSync', () => ({
 
 vi.mock('../../../services/githubApiFactory', () => ({
   createGitHubApiService: () => ({
+    getGist: mocks.getGist,
     getGistForAnalysis: mocks.getGistForAnalysis,
     getGistContentPreview: mocks.getGistContentPreview,
     unstarGist: mocks.unstarGist,
     deleteGist: mocks.deleteGist,
     getGistFileRaw: mocks.getGistFileRaw,
+    updateGist: mocks.updateGist,
+    createGist: mocks.createGist,
   }),
 }));
 
@@ -346,6 +352,123 @@ describe('useGistActions AI search', () => {
 
     expect(storeState.setGistSearchResults).toHaveBeenCalledWith([pending]);
     expect(onReranked).toHaveBeenCalledWith(ranked);
+  });
+});
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：任何异步 Gist 操作在等待期间切号后，
+ * 结果绝不写入切号后的当前账号工作区，结果回调不再触发。
+ */
+describe('useGistActions account switch guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    // accountIdKey 需要数值 id：默认账号 A(id=1)，切号目标 B(id=2)
+    (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' };
+  });
+
+  const switchToB = () => {
+    (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 2, login: 'other', avatar_url: 'https://example.com/other.png' };
+  };
+
+  it('aiSearch drops results, callbacks and filter writes after a switch', async () => {
+    mocks.searchGistsWithReranking.mockImplementation(async () => {
+      switchToB();
+      return [gist];
+    });
+    const { result } = renderHook(() => useGistActions());
+    const onReranked = vi.fn();
+    await act(async () => { await result.current.aiSearch('query', [gist], onReranked); });
+
+    expect(onReranked).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('aiSearch also drops the failure fallback filter write after a switch', async () => {
+    mocks.searchGistsWithReranking.mockImplementation(async () => {
+      switchToB();
+      throw new Error('ai down');
+    });
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.aiSearch('query', [gist], vi.fn()); });
+
+    expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('single-card analyzeOne skips result writes and the analyzing cleanup after a switch', async () => {
+    mocks.getGistForAnalysis.mockImplementation(async () => {
+      switchToB();
+      return gistDetail;
+    });
+    mocks.getGistContentPreview.mockReturnValue('preview');
+    mocks.analyzeGist.mockResolvedValue('summary');
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.analyzeOne(gist); });
+
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // 分析标记作用于发起账号：切号后 finally 不清理当前账号工作区的标记
+    expect(storeState.setAnalyzingGist).toHaveBeenCalledTimes(1);
+    expect(storeState.setAnalyzingGist).toHaveBeenCalledWith('gist-1', true);
+  });
+
+  it('fetchGistDetail returns null and skips updateGist after a switch', async () => {
+    mocks.getGist.mockImplementation(async () => {
+      switchToB();
+      return gistDetail;
+    });
+    const { result } = renderHook(() => useGistActions());
+    let detail: Gist | null = gist;
+    await act(async () => { detail = await result.current.fetchGistDetail(gist); });
+
+    expect(detail).toBeNull();
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+  });
+
+  it('unstarGist skips the onUnstarred callback and local writes after a switch', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.unstarGist.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    const { result } = renderHook(() => useGistActions());
+    const onUnstarred = vi.fn();
+    await act(async () => { await result.current.unstarGist(gist, onUnstarred); });
+
+    // 远端取消星标已按发起账号完成；本地写入与回调被丢弃
+    expect(mocks.unstarGist).toHaveBeenCalledWith('gist-1');
+    expect(onUnstarred).not.toHaveBeenCalled();
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('deleteGist skips local deletion and the onDeleted callback after a switch', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    mocks.deleteGist.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    const { result } = renderHook(() => useGistActions());
+    const onDeleted = vi.fn();
+    await act(async () => { await result.current.deleteGist(gist, onDeleted); });
+
+    expect(onDeleted).not.toHaveBeenCalled();
+    expect(storeState.deleteGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('submitGist skips the local update and success toast after a switch', async () => {
+    mocks.updateGist.mockImplementation(async () => {
+      switchToB();
+      return gistDetail;
+    });
+    const { result } = renderHook(() => useGistActions());
+    await act(async () => { await result.current.submitGist({ description: 'x' } as never, gist); });
+
+    expect(storeState.updateGist).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
   });
 });
 

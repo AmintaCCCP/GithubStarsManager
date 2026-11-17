@@ -289,6 +289,10 @@ export const useSearchActions = (): SearchActions => {
     applyFilters: (repos: Repository[]) => Repository[],
     options?: { signal?: AbortSignal },
   ): Promise<void> => {
+    // 账号代次校验（Issue #611 审计修复）：AI 等待期间切号后，旧账号的查询与
+    // 结果绝不能提交到新账号。此检查保护所有写入分支——未启用向量搜索、向量
+    // 结果为 null、向量请求失败降级都会经过本函数的提交路径。
+    const startedAccountId = peekCurrentAccountId();
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
 
     let filtered = repositories;
@@ -332,6 +336,11 @@ export const useSearchActions = (): SearchActions => {
 
     if (options?.signal?.aborted) {
       throw new DOMException('Search cancelled', 'AbortError');
+    }
+
+    // 提交前用保存的发起账号复核（不能只依赖取消信号）
+    if (!isCurrentAccount(startedAccountId)) {
+      return;
     }
 
     // Apply other filters and update results
@@ -507,6 +516,12 @@ export const useSearchActions = (): SearchActions => {
             throw new Error(t('useSearchActions.failed-to-get-github-username-please-login-again'));
           }
           const lists = await listsApi.getUserLists(login);
+
+          // 账号代次校验（Issue #611 审计修复）：getUserLists 等待期间切号后，
+          // 必须在写入任何分类之前退出——末尾的账号检查无法撤销已创建的分类
+          if (!isCurrentAccount(startedAccountId)) {
+            return;
+          }
 
           // allCategories 与 View 的 useMemo 同源同值（getAllCategories 四参口径）
           const allCategories = getAllCategories(customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides);

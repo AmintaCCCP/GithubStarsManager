@@ -86,6 +86,9 @@ export const useGistActions = () => {
       return;
     }
     setIsSearching(true);
+    // 账号代次校验（Issue #611）：AI 搜索等待期间切号后，旧账号的查询与结果
+    // 绝不能写入新账号的搜索视图（含失败回退路径），沿用 refreshGists 的模式
+    const startedAccountId = peekCurrentAccountId();
     try {
       const aiService = new AIService(activeConfig, state.language);
       // 候选集不做分析状态预过滤：分析状态是视图层筛选，排序结果需覆盖两种状态，
@@ -94,6 +97,8 @@ export const useGistActions = () => {
         filterAndSortGists(categoryItems, { ...state.gistSearchFilters, query: '', isAnalyzed: undefined }),
         query,
       );
+      // 账号已切换：跳过 onReranked 与全部搜索写入，丢弃旧账号结果
+      if (!isCurrentAccount(startedAccountId)) return;
       const currentState = useAppStore.getState();
       const filteredRanked = applyGistAnalysisFilter(
         ranked,
@@ -103,6 +108,7 @@ export const useGistActions = () => {
       currentState.setGistSearchFilters({ query });
       currentState.setGistSearchResults(filteredRanked);
     } catch {
+      if (!isCurrentAccount(startedAccountId)) return;
       state.setGistSearchFilters({ query });
     } finally {
       setIsSearching(false);
@@ -153,7 +159,12 @@ export const useGistActions = () => {
         state.updateGist({ ...gist, analyzed_at: new Date().toISOString(), analysis_failed: true, analysis_error: error instanceof Error ? error.message : String(error) });
         failed++;
       } finally {
-        state.setAnalyzingGist(gist.id, false);
+        // 分析标记清理只作用于发起账号仍是当前账号的场景：切号后 setAnalyzingGist
+        // 作用于新账号工作区，会误清新账号同 ID Gist 的分析标记（分析中标记不
+        // 入工作区快照，无需对归档工作区做额外清理）。
+        if (isCurrentAccount(jobAccountId)) {
+          state.setAnalyzingGist(gist.id, false);
+        }
       }
     };
     try {
@@ -168,10 +179,13 @@ export const useGistActions = () => {
 
   const fetchGistDetail = useCallback(async (gist: Gist): Promise<Gist | null> => {
     if (!state.githubToken) return null;
+    // 账号代次校验（Issue #611 审计修复）：账号 ID 必须在任何 await 之前保存，
+    // 提交结果前用保存值复核——请求完成后再读取会拿到切号后的账号，检查恒通过
+    const startedAccountId = peekCurrentAccountId();
     try {
       const detail = await createGitHubApiService(state.githubToken).getGist(gist.id, gist);
-      // 账号代次校验（Issue #611）：详情拉取切号后丢弃
-      if (!isCurrentAccount(peekCurrentAccountId())) return null;
+      // 详情拉取切号后丢弃：不写入当前工作区，也不向调用方返回旧账号详情
+      if (!isCurrentAccount(startedAccountId)) return null;
       state.updateGist(detail);
       return detail;
     } catch (error) {
@@ -187,18 +201,24 @@ export const useGistActions = () => {
 
   const submitGist = useCallback(async (input: GistCreateInput | GistUpdateInput, editingGist: Gist | null) => {
     if (!state.githubToken) return;
+    // 账号代次校验（Issue #611）：等待 GitHub API 期间切号后，本地写入与
+    // 提示一律丢弃（远端操作已按发起账号的 Token 完成，不可撤销）
+    const startedAccountId = peekCurrentAccountId();
     const api = createGitHubApiService(state.githubToken);
     try {
       if (editingGist) {
         const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
+        if (!isCurrentAccount(startedAccountId)) return;
         state.updateGist({ ...updated, last_edited: new Date().toISOString() });
         toast(t('useGistActions.gist-updated'), 'success');
         return;
       }
       const created = await api.createGist(input as GistCreateInput);
+      if (!isCurrentAccount(startedAccountId)) return;
       state.updateGist({ ...created, last_edited: new Date().toISOString() });
       toast(t('useGistActions.gist-created'), 'success');
     } catch (error) {
+      if (!isCurrentAccount(startedAccountId)) return;
       const message = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(message);
       toast(
@@ -228,6 +248,10 @@ export const useGistActions = () => {
       return;
     }
 
+    // 账号代次校验（Issue #611 审计修复）：确认弹窗与两次 AI 等待期间都可能
+    // 切号——账号 ID 在任何 await 之前保存，成功/失败/标记清理三条路径全部用
+    // 保存值复核，绝不写入切号后的当前工作区。
+    const startedAccountId = peekCurrentAccountId();
     // 失败的 gist 已写入 analyzed_at，但重试应与批量分析一致：直接执行，不弹覆盖确认
     if (gist.analyzed_at && !gist.analysis_failed) {
       const shouldContinue = await confirm(
@@ -237,6 +261,7 @@ export const useGistActions = () => {
       );
       if (!shouldContinue) return;
     }
+    if (!isCurrentAccount(startedAccountId)) return;
 
     state.setAnalyzingGist(gist.id, true);
     try {
@@ -244,18 +269,26 @@ export const useGistActions = () => {
       const detail = await githubApi.getGistForAnalysis(gist.id, gist);
       const aiService = new AIService(activeConfig, state.language);
       const summary = await aiService.analyzeGist(detail, githubApi.getGistContentPreview(detail));
+      if (!isCurrentAccount(startedAccountId)) return;
       state.updateGist(applyGistAnalysisSuccess(detail, summary, new Date().toISOString()));
       toast(t('useGistActions.gist-ai-analysis-completed'), 'success');
     } catch (error) {
+      if (!isCurrentAccount(startedAccountId)) return;
       state.updateGist(applyGistAnalysisFailure(gist, error instanceof Error ? error.message : String(error), new Date().toISOString()));
       toast(t('useGistActions.gist-ai-analysis-failed'), 'error');
     } finally {
-      state.setAnalyzingGist(gist.id, false);
+      // 与批量分析一致：分析标记清理只作用于发起账号仍是当前账号的工作区
+      if (isCurrentAccount(startedAccountId)) {
+        state.setAnalyzingGist(gist.id, false);
+      }
     }
   }, [state, t, toast, confirm]);
 
   const unstarGist = useCallback(async (gist: Gist, onUnstarred?: (gistId: string) => void) => {
     if (!state.githubToken) return;
+    // 账号代次校验（Issue #611）：确认弹窗与远端等待期间切号后，本地写入与
+    // 结果回调一律丢弃（远端操作已按发起账号的 Token 完成，不可撤销）
+    const startedAccountId = peekCurrentAccountId();
     const confirmed = await confirm(
       t('useGistActions.unstar-gist'),
       t('useGistActions.are-you-sure-you-want-to-unstar-this-gist'),
@@ -266,10 +299,12 @@ export const useGistActions = () => {
     setIsMutating(true);
     try {
       await createGitHubApiService(state.githubToken).unstarGist(gist.id);
+      if (!isCurrentAccount(startedAccountId)) return;
       onUnstarred?.(gist.id);
       state.updateGist({ ...gist, starred: false });
       toast(t('useGistActions.unstarred'), 'success');
     } catch {
+      if (!isCurrentAccount(startedAccountId)) return;
       toast(t('useGistActions.failed-to-unstar'), 'error');
     } finally {
       setIsMutating(false);
@@ -281,6 +316,9 @@ export const useGistActions = () => {
   // 从 useAppStore 订阅（GistView 的 onDeleted 即如此）。
   const deleteGist = useCallback(async (gist: Gist, onDeleted?: (gistId: string) => void) => {
     if (!state.githubToken || gist.owner?.login !== state.user?.login) return;
+    // 账号代次校验（Issue #611）：确认弹窗与远端等待期间切号后，本地删除与
+    // 结果回调一律丢弃（远端删除已按发起账号的 Token 完成，不可撤销）
+    const startedAccountId = peekCurrentAccountId();
     const confirmed = await confirm(
       t('useGistActions.delete-gist'),
       t('useGistActions.are-you-sure-you-want-to-delete-this-gist-this-c'),
@@ -291,10 +329,12 @@ export const useGistActions = () => {
     setIsMutating(true);
     try {
       await createGitHubApiService(state.githubToken).deleteGist(gist.id);
+      if (!isCurrentAccount(startedAccountId)) return;
       state.deleteGist(gist.id);
       onDeleted?.(gist.id);
       toast(t('useGistActions.gist-deleted'), 'success');
     } catch (error) {
+      if (!isCurrentAccount(startedAccountId)) return;
       const msg = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
       toast(

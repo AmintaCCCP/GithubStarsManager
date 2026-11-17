@@ -2,10 +2,15 @@ import { useCallback } from 'react';
 import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
-import { backend, type BackendAuthRestoreAccount } from '../../../services/backendAdapter';
+import { backend, isValidBackendRestoreAccount, type BackendAuthRestoreAccount } from '../../../services/backendAdapter';
 import { syncFromBackend } from '../../../services/autoSync';
 import { accountIdKey } from '../../../store/helpers/accountWorkspace';
 import type { GitHubUser } from '../../../types';
+
+// 视图组件（LoginScreen）不得直接 import 业务服务（ADR 0001 分层守则）：
+// 后端账号条目的共享过滤规则经本 hook 模块转出口，供登录页与
+// tryRestoreAuthFromBackend / addAccountFromBackend 使用同一规则。
+export { isValidBackendRestoreAccount };
 
 export type BackendLoginResult =
   | { status: 'connected'; githubToken: string; user: GitHubUser; accounts: BackendAuthRestoreAccount[] }

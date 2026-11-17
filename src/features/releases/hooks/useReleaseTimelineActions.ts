@@ -115,13 +115,19 @@ export const useReleaseTimelineActions = () => {
 
   const handleMarkAllRead = useCallback(async () => {
     const readReleasesBeforeUpdate = new Set(useAppStore.getState().readReleases);
+    // 账号代次校验（Issue #611 审计修复）：请求发起前保存账号，失败回滚只在
+    // 发起账号仍是当前账号时执行——切号后把旧账号的已读快照写入新账号会
+    // 覆盖并污染新账号的已读状态
+    const startedAccountId = peekCurrentAccountId();
     setIsMarkingAllRead(true);
     try {
       state.markAllReleasesAsRead();
       await backend.markAllReleasesAsRead();
       toast(t('useReleaseTimelineActions.all-marked-as-read'), 'success');
     } catch {
-      useAppStore.setState({ readReleases: readReleasesBeforeUpdate });
+      if (isCurrentAccount(startedAccountId)) {
+        useAppStore.setState({ readReleases: readReleasesBeforeUpdate });
+      }
       toast(t('useReleaseTimelineActions.failed-to-mark-all-as-read'), 'error');
     } finally {
       setIsMarkingAllRead(false);
@@ -136,6 +142,10 @@ export const useReleaseTimelineActions = () => {
       return;
     }
 
+    // 账号代次校验（Issue #611 审计修复）：账号 ID 必须在 await confirm 之前
+    // 保存——确认后再读取会拿到切号后的账号，比较恒通过；stateBeforeConfirm、
+    // starredRepo 与 sourcesToRemove 都属于发起账号，账号已切换时必须整体退出。
+    const accountIdBeforeConfirm = peekCurrentAccountId();
     const stateBeforeConfirm = useAppStore.getState();
     const repoKey = normalizeRepoKey(releaseRepo.full_name);
     const starredRepo = stateBeforeConfirm.repositories.find(item => normalizeRepoKey(item.full_name) === repoKey);
@@ -166,7 +176,7 @@ export const useReleaseTimelineActions = () => {
       releaseExpandedRepositories: new Set(stateBeforeConfirm.releaseExpandedRepositories),
     };
     // 账号代次校验（Issue #611）：确认弹窗等待期间可能已切号，回滚快照跨账号会污染
-    if (!isCurrentAccount(peekCurrentAccountId())) {
+    if (!isCurrentAccount(accountIdBeforeConfirm)) {
       return;
     }
     if (sourcesToRemove.includes(STARRED_RELEASE_SOURCE_ID) && starredRepo) {
@@ -182,7 +192,10 @@ export const useReleaseTimelineActions = () => {
       await forceSyncToBackend();
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
-      useAppStore.setState(rollbackState);
+      // 同步等待期间可能已切号：发起账号的回滚快照绝不写入新账号工作区
+      if (isCurrentAccount(accountIdBeforeConfirm)) {
+        useAppStore.setState(rollbackState);
+      }
       toast(t('useReleaseTimelineActions.failed-to-unsubscribe-please-check-backend-conne'), 'error');
       return;
     }

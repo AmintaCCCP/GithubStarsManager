@@ -77,6 +77,11 @@ export const useBulkRepositoryActions = ({
   const t = useT('repositories');
 
   const unstar = useCallback(async (repositories: Repository[]) => {
+    // 账号代次校验（Issue #611 审计修复）：操作所属账号必须在任何 await（含
+    // 确认框）之前保存；确认返回后、每次远端操作前、删除本地仓库前都用保存值
+    // 复核——两次即时读取（peekCurrentAccountId + isCurrentAccount 内部再读）
+    // 比较的都是当前账号，识别不出等待期间发生的切号。
+    const startedAccountId = peekCurrentAccountId();
     if (!githubToken) {
       toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
       return false;
@@ -88,12 +93,17 @@ export const useBulkRepositoryActions = ({
       { type: 'danger', confirmText: t('useBulkRepositoryActions.unstar') },
     );
     if (!confirmed) return false;
+    if (!isCurrentAccount(startedAccountId)) {
+      return false;
+    }
 
     const githubApi = createGitHubApiService(githubToken);
     const successIds: number[] = [];
     const failedRepositories: string[] = [];
 
     for (const repository of repositories) {
+      // 切号后不再发起新的远端操作（已完成的远端取消星标不可撤销）
+      if (!isCurrentAccount(startedAccountId)) break;
       try {
         const [owner, name] = repository.full_name.split('/');
         await githubApi.unstarRepository(owner, name);
@@ -104,10 +114,9 @@ export const useBulkRepositoryActions = ({
       }
     }
 
-    // 账号代次校验（Issue #611）：unstar 等待 GitHub API 期间可能已切号，
-    // 不得把旧账号的删除动作写进新账号工作区
-    if (!isCurrentAccount(peekCurrentAccountId())) {
-      toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
+    // 等待 GitHub API 期间已切号：远端取消星标按发起账号完成（保留），
+    // 但绝不把旧账号的删除动作写进新账号工作区，也不触发同步
+    if (!isCurrentAccount(startedAccountId)) {
       return false;
     }
     for (const repositoryId of successIds) {
@@ -126,7 +135,9 @@ export const useBulkRepositoryActions = ({
   const restore = useCallback(async (repositories: Repository[], config: RepositoryRestoreConfig) => {
     if (repositories.length === 0) return false;
 
-    if (!isCurrentAccount(peekCurrentAccountId())) return false;
+    // 账号代次校验（Issue #611）：本地写入为同步执行，入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
@@ -152,7 +163,9 @@ export const useBulkRepositoryActions = ({
   }, [language, toast, updateRepository, t]);
 
   const categorize = useCallback(async (repositories: Repository[], categoryName: string) => {
-    if (!isCurrentAccount(peekCurrentAccountId())) return false;
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {
       try {
@@ -177,7 +190,9 @@ export const useBulkRepositoryActions = ({
   }, [allCategories, language, toast, updateRepository, t]);
 
   const subscribe = useCallback(async (repositories: Repository[]) => {
-    if (!isCurrentAccount(peekCurrentAccountId())) return false;
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     for (const repository of repositories) {
       try {
@@ -206,7 +221,9 @@ export const useBulkRepositoryActions = ({
       return false;
     }
 
-    if (!isCurrentAccount(peekCurrentAccountId())) return false;
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     batchUnsubscribeReleases(subscribedRepositories.map((repository) => repository.id));
     const failedRepositories: string[] = [];
     for (const repository of subscribedRepositories) {
@@ -229,7 +246,9 @@ export const useBulkRepositoryActions = ({
   }, [batchUnsubscribeReleases, language, releaseSubscriptions, t, toast, updateRepository]);
 
   const lockCategory = useCallback(async (repositories: Repository[]) => {
-    if (!isCurrentAccount(peekCurrentAccountId())) return false;
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     let skippedCount = 0;
     const failedRepositories: string[] = [];
@@ -261,7 +280,9 @@ export const useBulkRepositoryActions = ({
   }, [language, toast, updateRepository, t]);
 
   const unlockCategory = useCallback(async (repositories: Repository[]) => {
-    if (!isCurrentAccount(peekCurrentAccountId())) return false;
+    // 账号代次校验（Issue #611）：入口保存并复核一次快照
+    const startedAccountId = peekCurrentAccountId();
+    if (!isCurrentAccount(startedAccountId)) return false;
     let successCount = 0;
     const failedRepositories: string[] = [];
     for (const repository of repositories) {

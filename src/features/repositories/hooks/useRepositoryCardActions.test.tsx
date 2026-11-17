@@ -345,3 +345,107 @@ describe('useRepositoryCardActions', () => {
     expect(mocks.toast).toHaveBeenCalledWith('已成功取消 Star', 'success');
   });
 });
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：分析/相似搜索/取消星标在等待期间
+ * 切号后，结果绝不写入切号后的当前账号工作区；分析标记的清理只作用于
+ * 发起账号仍是当前账号的工作区。
+ */
+describe('useRepositoryCardActions account switch guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
+      selector ? selector(storeState) : storeState
+    )) as typeof useAppStore);
+    (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    mocks.confirm.mockResolvedValue(true);
+    mocks.forceSyncToBackend.mockResolvedValue(undefined);
+    mocks.unstarRepository.mockResolvedValue(undefined);
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      callback(performance.now());
+      return 1;
+    }));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const switchToB = () => {
+    (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+  };
+
+  it('drops the analysis result and skips the analyzing cleanup after a switch', async () => {
+    mocks.analyzeRepository.mockImplementation(async () => {
+      switchToB();
+      return { summary: 's', tags: [], platforms: [], custom_category: null, category_locked: false, analyzed_at: '2026-09-01T00:00:00.000Z' };
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.analyze(); });
+
+    expect(storeState.updateRepository).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // 分析标记清理只作用于发起账号仍是当前账号的工作区（切号后不再误清）
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(1);
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledWith(1, true);
+  });
+
+  it('drops the analysis failure patch after a switch', async () => {
+    mocks.analyzeRepository.mockImplementation(async () => {
+      switchToB();
+      throw new Error('ai down');
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.analyze(); });
+
+    expect(storeState.updateRepository).not.toHaveBeenCalled();
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not enter the similar view after a switch', async () => {
+    mocks.runSimilarRepositoryPipeline.mockImplementation(async () => {
+      switchToB();
+      return { repositories: [repository], diagnostics: {} };
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.findSimilar(); });
+
+    expect(storeState.enterSimilarView).not.toHaveBeenCalled();
+  });
+
+  it('stops the unstar flow before the remote call when the account switched during confirm', async () => {
+    mocks.confirm.mockImplementation(async () => {
+      switchToB();
+      return true;
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.unstar(); });
+
+    expect(mocks.unstarRepository).not.toHaveBeenCalled();
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+  });
+
+  it('skips local deletion and sync when the remote unstar completed but the account switched', async () => {
+    mocks.unstarRepository.mockImplementation(async () => {
+      switchToB();
+      return undefined;
+    });
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.unstar(); });
+
+    expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+});

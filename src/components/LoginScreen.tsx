@@ -5,7 +5,7 @@ import { Github } from './ui/brand-icons';
 import { useAppStore } from '../store/useAppStore';
 import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
-import { useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
+import { isValidBackendRestoreAccount, useLoginActions } from '../features/lifecycle/hooks/useLoginActions';
 import { useAccountSwitchActions } from '../features/lifecycle/hooks/useAccountSwitchActions';
 import { safeReadText } from '../utils/clipboardUtils';
 import { normalizeBackendUrl } from '../utils/backendUrl';
@@ -101,7 +101,7 @@ export const LoginScreen: React.FC = () => {
   // Ref to resolve the conflict dialog promise
   const conflictResolveRef = useRef<((overwrite: boolean) => void) | null>(null);
   const {
-    setUser, setGitHubToken, setBackendApiSecret, backendApiSecret,
+    setUser, setGitHubToken, setBackendApiSecret, upsertSavedAccount, backendApiSecret,
     repositories, gists, starredGists, releases, forks,
     customCategories, categoryOrder, hiddenDefaultCategoryIds,
     defaultCategoryOverrides, categoryListIdMap,
@@ -110,6 +110,7 @@ export const LoginScreen: React.FC = () => {
     setUser: state.setUser,
     setGitHubToken: state.setGitHubToken,
     setBackendApiSecret: state.setBackendApiSecret,
+    upsertSavedAccount: state.upsertSavedAccount,
     backendApiSecret: state.backendApiSecret,
     repositories: state.repositories,
     gists: state.gists,
@@ -193,6 +194,11 @@ export const LoginScreen: React.FC = () => {
 
     try {
       const user = await authenticateWithGitHub(token);
+      // R2 防护（Issue #611 审计修复）：登录页可能仍保留已登录账号 A（持久化
+      // user 但未认证的边缘态）。写入新凭证前必须先归档当前账号，否则
+      // setGitHubToken 会以 A 为所有者把账号 B 的 Token 写进 savedAccounts[A]，
+      // 切回 A 时会拿 B 的凭证发起请求，且 A 原有 Token 丢失。
+      parkCurrentAccountForRestore();
       setGitHubToken(token);
       setUser(user);
 
@@ -233,6 +239,10 @@ export const LoginScreen: React.FC = () => {
     setError('');
     const previousApiSecret = backendApiSecret;
     setBackendApiSecret(apiKey);
+    // 拉取固定到已验证账号（Issue #611 审计修复）后，登录态必须先于拉取落地；
+    // 若随后的后端同步失败，回滚登录态以保持「同步失败不提交登录状态」契约
+    // （已归档的旧账号数据安全，重新登录即可恢复）。
+    let loginCommitted = false;
 
     try {
       const result = await restoreBackendSession(url);
@@ -287,20 +297,43 @@ export const LoginScreen: React.FC = () => {
         // R2 防护（Issue #611）：拉取后端数据写入 Store 前先把当前已登录账号
         // 的工作区安全归档并清空顶层，防止被新账号数据污染后作为旧快照覆盖
         parkCurrentAccountForRestore();
+        // 恢复拉取必须固定到已验证账号（Issue #611 审计修复）：先落新账号
+        // 凭证再拉取，使 syncFromBackend 的全部请求携带
+        // X-GitHub-Account-Id（已验证账号）。归档后 user 为 null 时请求头
+        // 缺失，服务端 computeAccountScope 会回退到全局 active_account_id，
+        // 可能读到其他账号的分区。
+        setGitHubToken(result.githubToken);
+        setUser(result.user);
+        loginCommitted = true;
         if (overwrite) {
           await syncBackendData();
         }
         // Either way, complete login with backend credentials
       } else {
         parkCurrentAccountForRestore();
+        // 同上：恢复拉取固定到已验证账号（显式登录态，而非服务端全局分区）
+        setGitHubToken(result.githubToken);
+        setUser(result.user);
+        loginCommitted = true;
         // No conflict: sync backend data directly
         await syncBackendData();
       }
 
-      setGitHubToken(result.githubToken);
-      setUser(result.user);
+      // 登记后端保存的全部有效账号（Issue #611 审计修复）：与
+      // tryRestoreAuthFromBackend / addAccountFromBackend 共用同一过滤规则，
+      // 否则新设备经登录页连接后端后，账号下拉菜单只显示当前账号。
+      for (const account of result.accounts ?? []) {
+        if (!isValidBackendRestoreAccount(account)) continue;
+        upsertSavedAccount(account.user, account.githubToken);
+      }
     } catch (error) {
       setBackendApiSecret(previousApiSecret);
+      if (loginCommitted) {
+        // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。
+        // 已落地的凭证保留在 savedAccounts 中（下次一键恢复），归档数据不受影响。
+        setUser(null);
+        setGitHubToken(null);
+      }
       setError(error instanceof Error ? error.message : t('loginScreen.sign-in-failed-please-try-again'));
     } finally {
       setIsLoading(false);
@@ -316,6 +349,7 @@ export const LoginScreen: React.FC = () => {
 
     setIsLoading(true);
     setError('');
+    let loginCommitted = false;
     try {
       // R2 防护（Issue #611）：先归档当前已登录账号（边缘态：持久化了 user 但
       // 停留在登录页），再向后端写入新 Token——否则 setupBackendGitHubToken 的
@@ -323,10 +357,19 @@ export const LoginScreen: React.FC = () => {
       // 归档失败无副作用：parked 快照会在该账号下次登录时自动恢复。
       parkCurrentAccountForRestore();
       const user = await setupBackendGitHubToken(githubToken);
-      await syncBackendData();
+      // 恢复拉取固定到已验证账号（Issue #611 审计修复）：先落登录态再拉取，
+      // 全部拉取请求携带已验证账号的 X-GitHub-Account-Id，不回退到服务端全局
+      // active_account_id 分区。
       setGitHubToken(githubToken);
       setUser(user);
+      loginCommitted = true;
+      await syncBackendData();
     } catch (error) {
+      if (loginCommitted) {
+        // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。
+        setUser(null);
+        setGitHubToken(null);
+      }
       setError(error instanceof Error ? error.message : t('loginScreen.setup-failed-please-try-again'));
     } finally {
       setIsLoading(false);
