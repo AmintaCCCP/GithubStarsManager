@@ -86,6 +86,37 @@ export const mergeWorkspacesById = (
 };
 
 /**
+ * 分类显示/映射设置合并（R5 审计修复，CodeRabbit 发现 3）：
+ * mergeWorkspacesById 只合并列表与 ID 集合（其余字段取本机基座），恢复/归档
+ * 的 merge 分支若不显式合并这些字段，备份当前账号工作区新增的分类显示设置
+ * 会被整段丢弃。规则与导入面板的分类合并分支一致：
+ * - hiddenDefaultCategoryIds / categoryOrder：并集（保留本机 + 恢复备份新增）；
+ * - defaultCategoryOverrides / categoryListIdMap：按键合并，备份同键覆盖本机。
+ * 返回值展开进合并结果即可，调用方不得再用本机基座的同名字段覆盖。
+ */
+export const mergeWorkspaceCategorySettings = (
+  local: AccountWorkspace,
+  incoming: Partial<Pick<AccountWorkspace, 'hiddenDefaultCategoryIds' | 'defaultCategoryOverrides' | 'categoryOrder' | 'categoryListIdMap'>>,
+): Pick<AccountWorkspace, 'hiddenDefaultCategoryIds' | 'defaultCategoryOverrides' | 'categoryOrder' | 'categoryListIdMap'> => ({
+  hiddenDefaultCategoryIds: Array.from(new Set([
+    ...local.hiddenDefaultCategoryIds,
+    ...(incoming.hiddenDefaultCategoryIds ?? []),
+  ])),
+  defaultCategoryOverrides: {
+    ...local.defaultCategoryOverrides,
+    ...(incoming.defaultCategoryOverrides ?? {}),
+  },
+  categoryOrder: Array.from(new Set([
+    ...local.categoryOrder,
+    ...(incoming.categoryOrder ?? []),
+  ])),
+  categoryListIdMap: {
+    ...local.categoryListIdMap,
+    ...(incoming.categoryListIdMap ?? {}),
+  },
+});
+
+/**
  * 按导出数据类型选择裁剪工作区字段（导出隐私边界）。
  * 未选择的数据类型在工作区中以空默认值占位，绝不把未勾选类型的
  * 其他账号仓库/Release/Gist/Fork 等数据写入导出 JSON。

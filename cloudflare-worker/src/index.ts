@@ -106,11 +106,32 @@ export default {
       }
 
       // POST /cleanup — 删除不在 keepIds 列表中的向量（清理已 unstar 的仓库）
+      // R5 审计修复：多账号共享同一 VECTORIZE 索引时，向量 ID 以账号为前缀
+      //（`${accountId}:${repoId}`）。请求可携带范围参数限定删除范围：
+      // - accountPrefix：只允许删除该账号前缀的向量，其他账号前缀的向量一律保留；
+      // - includeLegacy：单租户时代的 legacy 无前缀向量属于唯一所有者，仅在
+      //   请求显式携带 includeLegacy=true 时才允许删除；
+      // - 两个参数都不携带时保持旧行为（删除全部不在 keepIds 中的向量），
+      //   旧版客户端不受影响。
       if (request.method === 'POST' && url.pathname === '/cleanup') {
-        const { keepIds } = (await request.json()) as { keepIds: string[] };
+        const body = (await request.json()) as {
+          keepIds?: string[];
+          accountPrefix?: string;
+          includeLegacy?: boolean;
+        };
+        const { keepIds } = body;
         if (!Array.isArray(keepIds)) {
           return jsonResponse({ success: false, error: 'keepIds array required' }, 400);
         }
+        const accountPrefix = typeof body.accountPrefix === 'string' && body.accountPrefix.length > 0
+          ? body.accountPrefix
+          : null;
+        const includeLegacy = body.includeLegacy === true;
+        // 新客户端总是显式携带范围参数；accountPrefix 缺失但请求中出现
+        // includeLegacy 时（未登录边缘态），legacy 向量成为唯一删除候选
+        const scoped = accountPrefix !== null || body.includeLegacy !== undefined;
+        const prefix = accountPrefix !== null ? `${accountPrefix}:` : null;
+        const isLegacyId = (id: string): boolean => /^\d+$/.test(id);
         const keepSet = new Set(keepIds);
         const info = await env.VECTORIZE.describe();
         if ((info.vectorCount ?? 0) === 0) {
@@ -128,7 +149,12 @@ export default {
             returnMetadata: 'none',
           });
           const staleIds = result.matches
-            .filter((m) => !keepSet.has(m.id))
+            .filter((m) => {
+              if (keepSet.has(m.id)) return false;
+              if (!scoped) return true;
+              if (prefix && m.id.startsWith(prefix)) return true;
+              return includeLegacy && isLegacyId(m.id);
+            })
             .map((m) => m.id);
           if (staleIds.length === 0) break;
           await env.VECTORIZE.deleteByIds(staleIds);
@@ -144,6 +170,9 @@ export default {
           success: true,
           vectorCount: info.vectorCount ?? 0,
           dimensions: info.dimensions ?? 0,
+          // R5 审计修复：客户端据此判定 /cleanup 是否支持按账号前缀限定删除
+          // 范围（旧部署的 Worker 不携带该字段，客户端跳过 cleanup）。
+          accountScopedCleanup: true,
         });
       }
 

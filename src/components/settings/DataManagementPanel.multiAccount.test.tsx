@@ -609,6 +609,50 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
   });
 
+  it('merge import from another account unions current-account category settings from the backup (R5)', async () => {
+    // R5 审计修复回归（CodeRabbit 发现 3）：mergeWorkspacesById 只合并列表与
+    // ID 集合——hiddenDefaultCategoryIds、defaultCategoryOverrides、categoryOrder
+    // 与 categoryListIdMap 若不按分类合并分支的规则合并，备份当前账号工作区
+    // 新增的分类显示设置会整段保留本机值而被丢弃。
+    useAppStore.setState({
+      repositories: [repo(1, 'alice-live')],
+      accountWorkspaces: {},
+    });
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      // 顶层带 customCategories 键，使分类类型进入 selectedTypes
+      customCategories: [],
+      accountWorkspaces: {
+        '1': workspaceOf({
+          hiddenDefaultCategoryIds: ['hidden-backup'],
+          categoryOrder: ['cat-backup-order'],
+          defaultCategoryOverrides: { 'cat-backup-override': { name: 'Backup Override' } },
+          categoryListIdMap: { 'list-2': 'cat-backup' },
+        }),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 本机设置保留，备份新增设置并入实时状态
+    expect(state.hiddenDefaultCategoryIds).toEqual(expect.arrayContaining(['hidden-a', 'hidden-backup']));
+    expect(state.categoryOrder).toEqual(expect.arrayContaining(['cat-alice', 'cat-backup-order']));
+    expect(state.defaultCategoryOverrides['cat-alice']?.name).toBe('Alice Override');
+    expect(state.defaultCategoryOverrides['cat-backup-override']?.name).toBe('Backup Override');
+    expect(state.categoryListIdMap).toEqual(expect.objectContaining({ 'list-1': 'cat-alice', 'list-2': 'cat-backup' }));
+    // 合并结果同步进当前账号工作区快照（切换/再次导出不丢失）
+    const snapshot = state.accountWorkspaces['1'];
+    expect(snapshot?.hiddenDefaultCategoryIds).toEqual(expect.arrayContaining(['hidden-a', 'hidden-backup']));
+    expect(snapshot?.categoryOrder).toEqual(expect.arrayContaining(['cat-alice', 'cat-backup-order']));
+    expect(snapshot?.defaultCategoryOverrides['cat-backup-override']?.name).toBe('Backup Override');
+    expect(snapshot?.categoryListIdMap).toEqual(expect.objectContaining({ 'list-1': 'cat-alice', 'list-2': 'cat-backup' }));
+    // 备份顶层数据仍归档进备份账号工作区（既有合并语义不受影响）
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
+  });
+
   it('same-account merge import restores backup-only gists into live state', async () => {
     const user = userEvent.setup();
 

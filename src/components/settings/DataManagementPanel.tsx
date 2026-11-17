@@ -70,6 +70,7 @@ import {
   hasMaskedBackupSecrets,
   maskSavedAccountsForBackup,
   mergeWorkspacesById,
+  mergeWorkspaceCategorySettings,
   replaceWorkspacesForSelectedTypes,
   trimWorkspacesForSelectedTypes,
 } from '../../utils/backupWorkspace';
@@ -857,18 +858,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 releaseSubscriptions: importedData.releaseSubscriptions ?? [],
                 readReleases: importedData.readReleases ?? [],
               }),
-              hiddenDefaultCategoryIds: Array.from(new Set([
-                ...base.hiddenDefaultCategoryIds,
-                ...(importedData.hiddenDefaultCategoryIds ?? []),
-              ])),
-              defaultCategoryOverrides: {
-                ...base.defaultCategoryOverrides,
-                ...(importedData.defaultCategoryOverrides ?? {}),
-              },
-              categoryOrder: Array.from(new Set([
-                ...base.categoryOrder,
-                ...(importedData.categoryOrder ?? []),
-              ])),
+              // R5 审计修复：分类显示/映射设置复用分类合并分支的规则合并
+              //（保留本机 + 恢复备份新增），包括此前遗漏的 categoryListIdMap
+              ...mergeWorkspaceCategorySettings(base, importedData),
             }
           : {
               // replace：备份顶层存在则整体替换，缺失字段保留本机快照值
@@ -902,6 +894,10 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           // 取本机基座），releaseSourceSettings 会整段保留本机值——备份当前
           // 账号工作区里的自定义发布来源会被丢弃。必须按并集合并本机与备份
           // 的来源设置（与列表合并同一语义：备份新增来源不丢失）。
+          // R5 审计修复（CodeRabbit 发现 3）：分类显示/映射设置同理——
+          // hiddenDefaultCategoryIds、defaultCategoryOverrides、categoryOrder、
+          // categoryListIdMap 必须按分类合并分支的规则合并（保留本机 + 恢复
+          // 备份新增），否则备份当前账号工作区里新增的分类设置会被丢弃。
           const effective = restoreMode === 'merge'
             ? {
               ...mergeWorkspacesById(localWorkspace, backupWorkspace),
@@ -909,6 +905,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
                 localWorkspace.releaseSourceSettings,
                 backupWorkspace.releaseSourceSettings,
               ),
+              ...mergeWorkspaceCategorySettings(localWorkspace, backupWorkspace),
             }
             : backupWorkspace;
           useAppStore.setState(applyAccountWorkspaceForTypes(effective, selectedTypes));

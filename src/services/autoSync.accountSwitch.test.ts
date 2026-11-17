@@ -479,3 +479,204 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     expect(hasPendingAccountSync('1')).toBe(false);
   });
 });
+
+/**
+ * R5 审计修复（CodeRabbit 发现 1）回归：
+ * 切换到本地无快照的账号（本地真空）时仓库列表为空，而后端分区可能已有其他
+ * 设备写入的数据。对齐窗口内的用户编辑被订阅器记为待推 → 非强制 syncFromBackend
+ * 因待推标志直接返回（后端数据从未拉取）→ 守卫退出冲刷以空列表 isFullSync 推送
+ * → 服务端物理删除该账号分区的仓库与 release。
+ *
+ * 修复语义（三段）：
+ * 1. 「本地真空 + 后端事实未知」时 pushToBackend 拒绝空列表全量推送并保留待推
+ *    标记（守卫退出冲刷、防抖推送、对齐补推全部经此拒收）；
+ * 2. 非强制拉取在该状态下放行待推早退（走只并入后端新到仓库的待推分支），
+ *    对齐得以完成、死锁解除；
+ * 3. 本地列表曾非空（用户主动清空）或后端分区已被成功拉取观察过 → 空列表
+ *    推送照常放行。
+ */
+describe('vacuum account sessions never push an empty full-sync snapshot before alignment (R5 finding 1)', () => {
+  let originalState: ReturnType<typeof useAppStore.getState>;
+  let unsubscribe: (() => void) | undefined;
+
+  beforeEach(() => {
+    originalState = useAppStore.getState();
+    vi.useFakeTimers();
+    vi.mocked(backend.syncRepositories).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncReleases).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncAIConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncWebDAVConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncEmbeddingConfigs).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncVectorSearchConfig).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockReset().mockResolvedValue(undefined);
+    vi.mocked(backend.fetchRepositories).mockReset().mockResolvedValue({ repositories: [], total: 0 });
+    vi.mocked(backend.fetchReleases).mockReset().mockResolvedValue({ releases: [], total: 0 });
+    vi.mocked(backend.fetchAIConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchWebDAVConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchEmbeddingConfigs).mockReset().mockResolvedValue([]);
+    vi.mocked(backend.fetchVectorSearchConfig).mockReset().mockResolvedValue({
+      enabled: false, workerUrl: '', authToken: '', embeddingConfigId: '',
+      indexMode: 'description', readmeMaxChars: 6000, searchThreshold: 0.35,
+      searchTopK: 30, enableHyDE: true, enableReranking: true,
+    });
+    vi.mocked(backend.fetchSettings).mockReset().mockResolvedValue({});
+    resetSyncHashes();
+    unsubscribe = startAutoSync();
+  });
+
+  afterEach(() => {
+    if (unsubscribe) {
+      stopAutoSync(unsubscribe);
+      unsubscribe = undefined;
+    }
+    vi.useRealTimers();
+    useAppStore.setState(originalState);
+  });
+
+  /** 账号 A 已登录且仓库非空；账号 B 已保存但本地工作区为空（真空）。 */
+  const seedVacuumTarget = () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      repositories: [createRepository(1)],
+      searchResults: [createRepository(1)],
+    });
+    // 种子 setState 会被订阅器记为待推并调度防抖——与本用例无关的噪声，先取消
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+  };
+
+  /** 在切换守卫内完成「簿记工作区替换 + 窗口内真实用户编辑」。 */
+  const switchWithInWindowEdit = async (targetUser: typeof userB, categoryOrder: string[]) => {
+    await withAccountSwitchGuard(async () => {
+      withAccountSwitchGuardSync(() => {
+        useAppStore.getState().setGitHubToken(`ghp_${targetUser.login.toLowerCase()}`);
+        useAppStore.getState().setUser(targetUser);
+      });
+      // 窗口内真实编辑（categoryOrder 是订阅器跟踪字段）：订阅器在静音窗口内
+      // 将其记为待推，守卫退出时触发冲刷
+      useAppStore.setState({ categoryOrder });
+    });
+  };
+
+  it('guard-exit flush with a vacuum target account performs zero push, keeps edits pending, and recovers after the alignment pull', async () => {
+    seedVacuumTarget();
+
+    // 切到真空账号 B + 窗口内用户编辑（对齐拉取被待推标志跳过前的典型时序）
+    await switchWithInWindowEdit(userB, ['user-edit-in-window']);
+    expect(useAppStore.getState().user?.id).toBe(2);
+    expect(useAppStore.getState().repositories).toEqual([]);
+
+    // 守卫退出冲刷：真空 + 后端事实未知 → 拒绝空列表 isFullSync 推送，零推送
+    await vi.advanceTimersByTimeAsync(100);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+
+    // 对齐拉取不再被待推标志卡死：拉取成功合并后端数据并排空待推队列
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({
+      repositories: [createRepository(7), createRepository(8)],
+      total: 2,
+    });
+    await syncFromBackend();
+    expect(useAppStore.getState().repositories.map((repo) => repo.id)).toEqual(expect.arrayContaining([7, 8]));
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    const pushedRepos = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
+    expect(pushedRepos.map((repo) => repo.id)).toEqual(expect.arrayContaining([7, 8]));
+    // 窗口内的用户编辑未被对齐流程静默丢弃：随排空推送一并落盘
+    const settingsPayloads = vi.mocked(backend.syncSettings).mock.calls;
+    const lastSettings = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
+    expect(lastSettings.categoryOrder).toEqual(['user-edit-in-window']);
+  });
+
+  it('switching into a non-empty workspace still flushes at guard exit (control)', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      accountWorkspaces: {
+        '2': {
+          repositories: [createRepository(3)],
+          lastSync: null,
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: useAppStore.getState().releaseSourceSettings,
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          categoryOrder: [],
+          defaultCategoryOverrides: {},
+          categoryListIdMap: {},
+          syncMode: 'stars',
+          syncModeConfigured: false,
+        },
+      },
+      repositories: [createRepository(1)],
+      searchResults: [createRepository(1)],
+    });
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    // 换入非空工作区：守卫退出冲刷卡在空列表豁免之外——照常推送该账号自己的完整数据
+    await switchWithInWindowEdit(userB, ['b-edit']);
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    const pushedRepos = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
+    expect(pushedRepos.map((repo) => repo.id)).toContain(3);
+    const settingsPayloads = vi.mocked(backend.syncSettings).mock.calls;
+    const lastSettings = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
+    expect(lastSettings.categoryOrder).toEqual(['b-edit']);
+  });
+
+  it('a deliberate full clear still pushes the empty snapshot (seen-non-empty exemption)', async () => {
+    seedVacuumTarget();
+
+    // 用户在本会话内主动清空全部仓库：本地列表曾非空 → 空列表全量推送必须放行，
+    // 否则删除永远无法同步到后端（僵尸仓库回潮）
+    useAppStore.setState({ repositories: [] });
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(backend.syncRepositories).mock.calls[0][0]).toEqual([]);
+  });
+
+  it('direct syncToBackend in an unaligned vacuum session refuses the empty push until the backend partition is observed', async () => {
+    seedVacuumTarget();
+    // 模拟对齐拉取被跳过后的真空会话：直接推送必须被拒收
+    useAppStore.setState({ user: userB, githubToken: 'ghp_b', isAuthenticated: true, repositories: [] });
+    cancelPendingAccountSwitchPush();
+
+    await syncToBackend();
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+
+    // 一次成功的仓库拉取观察过后端分区后，推送通道恢复
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({
+      repositories: [createRepository(9)],
+      total: 1,
+    });
+    await syncFromBackend();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    const pushedRepos = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
+    expect(pushedRepos.map((repo) => repo.id)).toContain(9);
+  });
+});

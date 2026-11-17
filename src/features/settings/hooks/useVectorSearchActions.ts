@@ -233,29 +233,50 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       if (stamped.length && !onAccountChanged()) state.updateRepositoriesMetadata(stamped.map(stamp));
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       if (!incremental && result.errors === 0) {
-        // 多账号共享同一向量索引（Issue #611 审计修复）：向量服务配置
-        //（worker_url/auth_token）保存在全局行 vector_search_configs，不属于
-        // ACCOUNT_SCOPED_SETTING_KEYS，且向量 ID 无账号前缀；/cleanup 会把
-        // keepIds 之外的全部匹配向量从共享 VECTORIZE 索引中删除。因此多账号
-        // 存在时执行 cleanup 会物理删除其他账号的向量。在实现按账号隔离
-        //（独立命名空间或账号前缀的向量 ID + Worker 按账号过滤删除）之前，
-        // 多账号共享索引时必须跳过 cleanup：宁可保留冗余向量靠后续重建收敛，
-        // 也绝不删除其他账号的数据。
-        const sharedIndexAcrossAccounts = Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1;
-        if (sharedIndexAcrossAccounts) {
-          logger.warn('vectorSearch.index', 'Skip vector cleanup: the vector index is shared across multiple accounts');
+        // R5 审计修复（CodeRabbit 发现 2）：cleanup 的删除范围绝不能只凭本机
+        // savedAccounts 数量推断——共享 Worker 索引中可能有其他设备/其他账号
+        // 上传的向量（ID 为 `${accountId}:${repoId}` 前缀形态），本机账号数
+        // 无法发现它们。与 Worker 的范围约定：
+        // - 新版 Worker（/status 返回 accountScopedCleanup）支持 accountPrefix：
+        //   只删除当前账号前缀的向量，其他设备/其他账号的向量一律保留；
+        //   legacy 无前缀向量（单租户时代产物，归属唯一所有者）仅在本机单账号
+        //   时随 includeLegacy=true 清理（与 server 侧 legacy identity claim 一致）；
+        // - 旧版 Worker 会把 keepIds 之外的全部采样向量物理删除（含其他账号），
+        //   无法安全限定范围——一律跳过 cleanup：宁可保留冗余向量靠后续重建
+        //   收敛，也绝不删除其他账号的数据（重新部署仓库内 Worker 即可恢复）；
+        // - 未登录边缘态（jobAccountId 为 null）无法限定清理范围，同样跳过。
+        if (!jobAccountId) {
+          logger.warn('vectorSearch.index', 'Skip vector cleanup: no active account context to scope the deletion');
         } else {
-          // keepIds 必须与索引中的实际向量 ID 形态一致：本次上传使用账号前缀
-          // 形态（buildAccountScopedVectorId）；排除项（已索引但分析缺失/失败、
-          // 不参与本次重建的仓库）的存量向量可能是 legacy 无前缀形态或前缀
-          // 形态，两种形式都保留——cleanup 按 keepIds 之外的 ID 物理删除，
-          // 漏掉任一形态都会误删这些仓库的向量。
-          const cleanupKeepIds = [...new Set([
-            ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
-            ...excludedVectorIds,
-            ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
-          ])];
-          await clients.vectorService.cleanup(cleanupKeepIds, controller.signal);
+          let accountScopedCleanup = false;
+          try {
+            const status = await clients.vectorService.getStatus();
+            accountScopedCleanup = status.accountScopedCleanup === true;
+          } catch (error) {
+            logger.warn('vectorSearch.index', 'Skip vector cleanup: worker status probe failed', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+          if (!accountScopedCleanup) {
+            logger.warn('vectorSearch.index', 'Skip vector cleanup: worker does not support account-scoped deletion; redeploy the bundled cloudflare-worker to enable it');
+          } else {
+            const singleAccountOnDevice = Object.keys(useAppStore.getState().savedAccounts ?? {}).length <= 1;
+            // keepIds 必须与索引中的实际向量 ID 形态一致：本次上传使用账号前缀
+            // 形态（buildAccountScopedVectorId）；排除项（已索引但分析缺失/失败、
+            // 不参与本次重建的仓库）的存量向量可能是 legacy 无前缀形态或前缀
+            // 形态，两种形式都保留——cleanup 按 keepIds 之外的 ID 物理删除，
+            // 漏掉任一形态都会误删这些仓库的向量。
+            const cleanupKeepIds = [...new Set([
+              ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
+              ...excludedVectorIds,
+              ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
+            ])];
+            await clients.vectorService.cleanup(cleanupKeepIds, {
+              accountPrefix: jobAccountId,
+              includeLegacy: singleAccountOnDevice,
+              signal: controller.signal,
+            });
+          }
         }
       }
       // cleanup 等待期间可能切号（stamped 为空时上方 onAccountChanged 不会触发）：

@@ -252,6 +252,23 @@ export interface VectorizeStatus {
   vectorCount: number;
   dimensions: number;
   indexName?: string;
+  /** /cleanup 是否支持按账号前缀限定删除范围（旧部署的 Worker 不携带该字段） */
+  accountScopedCleanup?: boolean;
+}
+
+/** /cleanup 的账号范围参数（R5 审计修复：多账号共享索引时的删除范围约定）。 */
+export interface VectorCleanupOptions {
+  /**
+   * 仅删除 ID 以 `${accountPrefix}:` 开头的向量；其他账号前缀与 legacy 无前缀
+   * 向量一律保留。缺省时 Worker 保持旧行为（删除全部不在 keepIds 中的向量）。
+   */
+  accountPrefix?: string | null;
+  /**
+   * 是否同时清理 legacy 无前缀向量。legacy 向量属于单租户时代的唯一所有者，
+   * 仅在本机单账号（归属明确）时才允许传 true。
+   */
+  includeLegacy?: boolean;
+  signal?: AbortSignal;
 }
 
 type VectorSearchServiceConfig = Pick<VectorSearchConfig, 'workerUrl' | 'authToken'>;
@@ -324,12 +341,25 @@ export class VectorSearchService {
   }
 
   /**
-   * 清理不在 keepIds 列表中的向量（删除已 unstar 的仓库）
+   * 清理不在 keepIds 列表中的向量（删除已 unstar 的仓库）。
+   *
+   * R5 审计修复：多账号共享同一 VECTORIZE 索引时必须携带账号范围——
+   * `accountPrefix` 限定只删除当前账号前缀的向量（其他设备/其他账号的向量
+   * 一律保留）；`includeLegacy` 仅在本机单账号、legacy 无前缀向量归属明确时
+   * 传 true。两者都缺省时请求体与旧版客户端一致，Worker 保持旧行为。
+   * 兼容旧签名 cleanup(keepIds, signal)。
    */
-  async cleanup(keepIds: string[], signal?: AbortSignal): Promise<{ deleted: number }> {
+  async cleanup(keepIds: string[], options: VectorCleanupOptions | AbortSignal = {}): Promise<{ deleted: number }> {
+    const normalized: VectorCleanupOptions = options instanceof AbortSignal
+      ? { signal: options }
+      : options ?? {};
+    const { accountPrefix, includeLegacy, signal } = normalized;
+    const body: Record<string, unknown> = { keepIds };
+    if (accountPrefix) body.accountPrefix = accountPrefix;
+    if (includeLegacy) body.includeLegacy = true;
     return this.request<{ deleted: number }>('/cleanup', {
       method: 'POST',
-      body: JSON.stringify({ keepIds }),
+      body: JSON.stringify(body),
     }, signal);
   }
 
@@ -666,6 +696,12 @@ export async function indexAllRepos(
 
       // 2. 组装成功项的 Vectorize 格式（跳过 null 的失败项）
       const vectorizeVectors: VectorizeVector[] = [];
+      // R5 审计修复（CodeRabbit 发现 4）：构造向量的同时记录每个成功向量对应的
+      // 仓库 ID——embedding 失败的项（null）不入列，两者的下标一一对应。此前
+      // upsertedCount 回调直接取 batch[j].id，当批内存在失败项时会把「失败仓库」
+      // 报告为已上传（调用方写入 vector_indexed_at，增量索引永久跳过它），而
+      // 真正上传成功的仓库反而没有标记。
+      const vectorizeRepoIds: number[] = [];
       let batchErrors = 0;
       for (let j = 0; j < batch.length; j++) {
         const vec = vectors[j];
@@ -687,6 +723,7 @@ export async function indexAllRepos(
               ...(accountId ? { accountId } : {}),
             },
           });
+          vectorizeRepoIds.push(batch[j].id);
         } else {
           batchErrors++;
         }
@@ -702,11 +739,12 @@ export async function indexAllRepos(
           ? Math.min(upsertResult.upserted, vectorizeVectors.length)
           : vectorizeVectors.length;
         indexed += upsertedCount;
-        // 仅标记确认 upserted 的 repo（按顺序）。vectorizeVectors 与 batch
-        // 逐位对应（null 项未入列），直接取 batch 的数值 id——向量 ID 带
-        // 账号前缀后不能再 parseInt(id)（前缀非数字会得到 NaN）。
+        // 仅标记确认 upserted 的 repo（按 vectorizeRepoIds 的顺序，即成功向量
+        // 的构造顺序）。全批成功时该列表与 batch 的 id 顺序一致，保持既有报告
+        // 顺序；有失败项时失败仓库不会被报告——向量 ID 带账号前缀后不能再
+        // parseInt(id)（前缀非数字会得到 NaN）。
         for (let j = 0; j < upsertedCount; j++) {
-          const repoId = batch[j].id;
+          const repoId = vectorizeRepoIds[j];
           indexedRepoIds.push(repoId);
           onRepoIndexed?.(repoId);
         }

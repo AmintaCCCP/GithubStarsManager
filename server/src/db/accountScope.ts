@@ -35,6 +35,19 @@ const CLAIMED_BY_KEY = 'legacy_default_claimed_by';
 const LEGACY_OWNER_CACHE_KEY = 'legacy_default_owner_id';
 const DEFAULT_SCOPE = 'default';
 
+/**
+ * 只存于全局 settings 的内部账号状态键（活跃账号 / 认领标记 / 已验证所有者）。
+ * 绝不随 /api/sync 导出/导入迁移：legacy_default_owner_id 的 JSON 还绑定全局
+ * Token 密文（github_token 本身在导出时已脱敏），且这些键描述的是「本服务器
+ * 自身」的认领与活跃状态，随备份迁移会覆盖导入方的既有状态。导入侧同样跳过，
+ * 以兼容已生成、内含这些键的旧备份。
+ */
+export const INTERNAL_SETTING_KEYS: ReadonlySet<string> = new Set([
+  'active_account_id',
+  CLAIMED_BY_KEY,
+  LEGACY_OWNER_CACHE_KEY,
+]);
+
 /** 从请求头提取合法的账号 ID；非法/缺失格式一律视为未传（防垃圾字符串污染分区名）。 */
 export function extractRequestedAccountId(req: Request): string | null {
   const raw = req.header('x-github-account-id')?.trim() ?? req.header('X-GitHub-Account-Id')?.trim() ?? '';
@@ -99,47 +112,77 @@ interface LegacyOwnerResolution {
 }
 
 /**
- * 解析存量 default 数据的「已验证所有者」——与可替换的全局 Token 解耦。
- *
- * 归属一经 GitHub /user 校验确立（无论请求者是否匹配），即持久化到
- * settings.legacy_default_owner_id（绑定校验时的加密 Token）；此后认领判定
- * 只认这份已验证所有者，绝不随全局 Token 轮换/换绑重新判定——防止无头请求
- * 把全局 Token 换成其他账号后，把原属旧账号的存量数据错误迁移给新账号。
- * 同一账号轮换 Token 不影响其认领资格。
- * 从未成功验证过归属（校验网络失败 / 无 Token / 解密失败）时返回 null：
- * 存量数据保持不可认领，直到真正的归属账号登录后校验成功再确立归属。
+ * 失败负缓存 TTL：身份校验失败（网络错误 / 超时 / 401 / 无效 Token）后的窗口期内，
+ * 带账号头的请求不再重复发起 /user 校验——middleware 对每个请求同步等待校验完成，
+ * 失败若不被短期记忆，网络不可用时每个请求都会被拖住最多 8s。负缓存只针对
+ * 「校验失败」；成功结果另有持久化（legacy_default_owner_id），不受影响。
  */
-async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyOwnerResolution> {
-  const cached = readSetting(db, LEGACY_OWNER_CACHE_KEY);
-  if (cached) {
-    // 已验证归属已持久化：直接采用，绝不依据当前全局 Token 重新判定。
-    // 旧版缓存为裸账号 id（无 Token 绑定）：归属可信，仅缺 Token 绑定。
-    if (ACCOUNT_ID_PATTERN.test(cached)) {
-      return { ownerId: cached, verifiedToken: null };
-    }
+const LEGACY_CHECK_FAILURE_TTL_MS = 60_000;
+
+/** 身份校验的进程内运行态（按 DB 实例隔离）：失败负缓存时间戳 + 进行中的校验 Promise。 */
+interface LegacyOwnerCheckRuntime {
+  /** 最近一次校验失败的时间戳（毫秒）；0 表示当前没有生效的失败负缓存。 */
+  lastFailureAt: number;
+  /** 进行中的 /user 校验：并发请求共享同一次网络调用。 */
+  inFlight: Promise<LegacyOwnerResolution> | null;
+}
+
+const legacyCheckRuntimeByDb = new WeakMap<Database.Database, LegacyOwnerCheckRuntime>();
+
+function getLegacyOwnerCheckRuntime(db: Database.Database): LegacyOwnerCheckRuntime {
+  let runtime = legacyCheckRuntimeByDb.get(db);
+  if (!runtime) {
+    runtime = { lastFailureAt: 0, inFlight: null };
+    legacyCheckRuntimeByDb.set(db, runtime);
+  }
+  return runtime;
+}
+
+/**
+ * 清空指定 DB 的 legacy 认领身份校验内存态（失败负缓存 + 进行中去重 Promise）。
+ * 仅供测试在清空/重建数据库后调用；生产路径的内存态与 DB 生命周期天然一致，
+ * 无需主动重置。
+ */
+export function resetLegacyOwnerResolutionState(db: Database.Database): void {
+  const runtime = legacyCheckRuntimeByDb.get(db);
+  if (runtime) {
+    runtime.lastFailureAt = 0;
+    runtime.inFlight = null;
+  }
+}
+
+/**
+ * default 分区是否仍有待认领数据：repositories / releases / categories /
+ * account_settings 任一存在 account_id='default' 的行。
+ * claimed_by 已设置（认领完成）时上游 claimLegacyDefaultIfNeeded 已提前返回；
+ * 这里覆盖的是「认领未发生但也不存在任何 default 数据」的情形——身份校验无从
+ * 服务任何目的，直接跳过、不发起网络请求。default 行随后续无头/旧客户端写入
+ * 再次出现时，认领流程自然恢复。
+ */
+function hasDefaultPartitionRows(db: Database.Database): boolean {
+  for (const table of ['repositories', 'releases', 'categories', 'account_settings'] as const) {
     try {
-      const parsed = JSON.parse(cached) as { ownerId?: unknown; token?: unknown };
-      if (typeof parsed.ownerId === 'string' && ACCOUNT_ID_PATTERN.test(parsed.ownerId)) {
-        return {
-          ownerId: parsed.ownerId,
-          verifiedToken: typeof parsed.token === 'string' && parsed.token ? parsed.token : null,
-        };
-      }
+      const row = db.prepare(`SELECT 1 AS one FROM ${table} WHERE account_id = 'default' LIMIT 1`).get();
+      if (row) return true;
     } catch {
-      // 无法解析的脏缓存：视为未验证，走重新校验并覆写。
+      // 表不存在（未跑 v4 迁移）时按无 default 行处理
     }
   }
+  return false;
+}
 
-  const encrypted = readSetting(db, 'github_token');
-  if (!encrypted) return { ownerId: null, verifiedToken: null };
-  let token: string;
-  try {
-    token = decrypt(encrypted, config.encryptionKey);
-  } catch {
-    logger.warn('db.accountScope', 'Failed to decrypt legacy github_token for default-claim identity check');
-    return { ownerId: null, verifiedToken: null };
-  }
-
+/**
+ * 执行一次 GitHub /user 身份校验（8s 超时）。成功即冻结归属（持久化已验证所有者
+ * 与被校验的加密 Token）；任何失败（网络错误 / 超时 / 401 / 无法解析的载荷）都
+ * 写入失败负缓存并返回 ownerId=null——归属未确立：不冻结、不认领，等待真正的
+ * 归属账号登录后再校验。
+ */
+async function performLegacyOwnerIdentityCheck(
+  db: Database.Database,
+  token: string,
+  encryptedToken: string,
+): Promise<LegacyOwnerResolution> {
+  const runtime = getLegacyOwnerCheckRuntime(db);
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -170,17 +213,88 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
         // 首次成功校验即冻结归属（同时记录被校验的加密 Token）：此后认领判定
         // 只认这份已验证所有者，不再随 Token 轮换重新判定，且供后续请求免网络复用。
         db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
-          .run(LEGACY_OWNER_CACHE_KEY, JSON.stringify({ ownerId, token: encrypted }));
+          .run(LEGACY_OWNER_CACHE_KEY, JSON.stringify({ ownerId, token: encryptedToken }));
       } catch { /* cache write is best-effort */ }
+      return { ownerId, verifiedToken: encryptedToken };
     }
-    return { ownerId, verifiedToken: encrypted };
+    // 校验被拒绝（401 / 无效 Token / 无法解析的载荷）：归属未确立，不冻结、不认领。
+    runtime.lastFailureAt = Date.now();
+    return { ownerId: null, verifiedToken: null };
   } catch (err) {
     logger.warn('db.accountScope', 'Legacy default-claim identity check request failed', {
       error: err instanceof Error ? err.message : String(err),
     });
-    // 校验失败 = 归属未确立：不冻结、不认领，等待真正的归属账号登录后再校验。
+    // 校验失败（网络/超时）= 归属未确立：不冻结、不认领；负缓存窗口内不重发请求。
+    runtime.lastFailureAt = Date.now();
     return { ownerId: null, verifiedToken: null };
   }
+}
+
+/**
+ * 解析存量 default 数据的「已验证所有者」——与可替换的全局 Token 解耦。
+ *
+ * 归属一经 GitHub /user 校验确立（无论请求者是否匹配），即持久化到
+ * settings.legacy_default_owner_id（绑定校验时的加密 Token）；此后认领判定
+ * 只认这份已验证所有者，绝不随全局 Token 轮换/换绑重新判定——防止无头请求
+ * 把全局 Token 换成其他账号后，把原属旧账号的存量数据错误迁移给新账号。
+ * 同一账号轮换 Token 不影响其认领资格。
+ * 从未成功验证过归属（校验网络失败 / 无 Token / 解密失败）时返回 null：
+ * 存量数据保持不可认领，直到真正的归属账号登录后校验成功再确立归属。
+ *
+ * 网络校验发起前依次经过三道零网络闸门：已验证归属缓存 → default 分区是否
+ * 还有待认领行 → 失败负缓存（TTL）；真正需要发起 /user 时以进行中 Promise
+ * 去重，并发请求共享同一次网络调用。
+ */
+async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyOwnerResolution> {
+  const runtime = getLegacyOwnerCheckRuntime(db);
+
+  const cached = readSetting(db, LEGACY_OWNER_CACHE_KEY);
+  if (cached) {
+    // 已验证归属已持久化：直接采用，绝不依据当前全局 Token 重新判定。
+    // 旧版缓存为裸账号 id（无 Token 绑定）：归属可信，仅缺 Token 绑定。
+    if (ACCOUNT_ID_PATTERN.test(cached)) {
+      return { ownerId: cached, verifiedToken: null };
+    }
+    try {
+      const parsed = JSON.parse(cached) as { ownerId?: unknown; token?: unknown };
+      if (typeof parsed.ownerId === 'string' && ACCOUNT_ID_PATTERN.test(parsed.ownerId)) {
+        return {
+          ownerId: parsed.ownerId,
+          verifiedToken: typeof parsed.token === 'string' && parsed.token ? parsed.token : null,
+        };
+      }
+    } catch {
+      // 无法解析的脏缓存：视为未验证，走重新校验并覆写。
+    }
+  }
+
+  // default 分区无任何待认领数据：无需身份校验，直接返回（不发起网络请求）。
+  if (!hasDefaultPartitionRows(db)) {
+    return { ownerId: null, verifiedToken: null };
+  }
+
+  // 失败负缓存仍在 TTL 窗口内：不重发网络请求（等待窗口过后自然重试）。
+  if (runtime.lastFailureAt > 0 && Date.now() - runtime.lastFailureAt < LEGACY_CHECK_FAILURE_TTL_MS) {
+    return { ownerId: null, verifiedToken: null };
+  }
+
+  const encrypted = readSetting(db, 'github_token');
+  if (!encrypted) return { ownerId: null, verifiedToken: null };
+  let token: string;
+  try {
+    token = decrypt(encrypted, config.encryptionKey);
+  } catch {
+    logger.warn('db.accountScope', 'Failed to decrypt legacy github_token for default-claim identity check');
+    return { ownerId: null, verifiedToken: null };
+  }
+
+  // 并发去重：进行中的校验 Promise 被共享，同一时刻只发一次 /user 调用。
+  if (!runtime.inFlight) {
+    runtime.inFlight = performLegacyOwnerIdentityCheck(db, token, encrypted).finally(() => {
+      runtime.inFlight = null;
+    });
+  }
+  return runtime.inFlight;
 }
 
 /**
@@ -384,6 +498,9 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
 /**
  * 全局中间件：对携带真实账号 ID 的请求尝试执行一次存量 default 数据认领。
  * 认领失败（网络/校验不可用）不阻塞请求；分区解析本身是纯同步逻辑。
+ * 身份校验有「已验证缓存 → 无 default 行免校验 → 失败负缓存（TTL）」三道零
+ * 网络闸门与进行中 Promise 去重，网络不可用时请求不会被成批拖住
+ * （详见 resolveLegacyDefaultOwner）。
  */
 export function accountScopeMiddleware(req: Request, _res: import('express').Response, next: import('express').NextFunction): void {
   const requested = extractRequestedAccountId(req);

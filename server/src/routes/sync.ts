@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
-import { resolveAccountScope, ACCOUNT_SCOPED_SETTING_KEYS } from '../db/accountScope.js';
+import { resolveAccountScope, ACCOUNT_SCOPED_SETTING_KEYS, INTERNAL_SETTING_KEYS } from '../db/accountScope.js';
 import { toDisplayPref, DESCRIPTION_DISPLAY_VALUES, TAGS_DISPLAY_VALUES } from './repositories.js';
 
 const router = Router();
@@ -136,11 +136,15 @@ router.post('/api/sync/export', (req, res) => {
       return masked;
     });
 
-    // Settings — mask github_token
+    // Settings — mask github_token。
+    // 内部账号状态键（INTERNAL_SETTING_KEYS）绝不导出：legacy_default_owner_id 的
+    // JSON 绑定全局 GitHub Token 密文（github_token 本身在下方已脱敏），且认领标记 /
+    // 已验证所有者 / 活跃账号只属于本服务器自身，随备份迁移会覆盖导入方的状态。
     const settingsRows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
     const settings: Record<string, unknown> = {};
     for (const row of settingsRows) {
       const key = row.key as string;
+      if (INTERNAL_SETTING_KEYS.has(key)) continue;
       let value = row.value as string | null;
       if (key === 'github_token' && value) {
         try {
@@ -538,6 +542,9 @@ router.post('/api/sync/import', (req, res) => {
             ? null
             : typeof v === 'object' ? JSON.stringify(v) : (v as string);
         for (const [key, value] of Object.entries(settings)) {
+          // 内部账号状态键一律跳过（兼容已生成、内含这些键的旧备份）：认领标记 /
+          // 已验证所有者 / 活跃账号只属于目标服务器自身，绝不随备份迁移覆盖。
+          if (INTERNAL_SETTING_KEYS.has(key)) continue;
           if (key === 'github_token' && typeof value === 'string' && value.startsWith('***')) {
             continue; // Skip masked token
           }

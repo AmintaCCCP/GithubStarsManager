@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   needsReindex: vi.fn(),
   indexAllRepos: vi.fn(),
   cleanup: vi.fn(),
+  vectorGetStatus: vi.fn(),
   vectorTestConnection: vi.fn(),
   setVectorIndexingState: vi.fn(),
   setVectorSearchConfig: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
     EmbeddingClient: class {},
     VectorSearchService: class {
       cleanup = mocks.cleanup;
+      getStatus = mocks.vectorGetStatus;
       testConnection = mocks.vectorTestConnection;
     },
     indexAllRepos: mocks.indexAllRepos,
@@ -102,7 +104,11 @@ describe('useVectorSearchActions', () => {
       selector ? selector(storeState) : storeState
     )) as typeof useAppStore);
     Object.assign(mockUseAppStore, { getState: () => storeState });
+    // cleanup 范围约定（R5 发现 2）需要活跃账号上下文与新版 Worker 能力探针：
+    // 真实重建流程总在已登录会话中执行
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
     mocks.cleanup.mockResolvedValue(undefined);
+    mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);
   });
@@ -133,8 +139,9 @@ describe('useVectorSearchActions', () => {
     await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
-    expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1', '2'], expect.any(AbortSignal));
-    expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1', '2'], expect.any(AbortSignal));
+    const expectedCleanupOptions = { accountPrefix: '1', includeLegacy: true, signal: expect.any(AbortSignal) };
+    expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1:1', '2', '1:2'], expectedCleanupOptions);
+    expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1:1', '2', '1:2'], expectedCleanupOptions);
     expect(mocks.updateRepositoriesMetadata).not.toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ id: 2 }),
     ]));
@@ -174,8 +181,8 @@ describe('useVectorSearchActions', () => {
 
   it('treats an AbortError from cleanup as a cancelled index operation', async () => {
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
-    mocks.cleanup.mockImplementation((_ids: string[], signal: AbortSignal) => new Promise<void>((_, reject) => {
-      signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+    mocks.cleanup.mockImplementation((_ids: string[], options: { signal: AbortSignal }) => new Promise<void>((_, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
     }));
     const { result } = renderHook(() => useVectorSearchActions());
 
@@ -192,8 +199,10 @@ describe('useVectorSearchActions', () => {
 
 /**
  * 账号代次校验回归（Issue #611 审计修复）：
- * - 多账号共享同一向量索引（全局 vector_search_configs、向量 ID 无账号前缀），
- *   /cleanup 会删除 keepIds 之外的全部匹配向量——多账号时必须跳过 cleanup；
+ * - 共享 Worker 索引中可能有其他设备/其他账号上传的向量（R5 发现 2）：
+ *   新版 Worker（/status 声明 accountScopedCleanup）按 accountPrefix 只删除
+ *   当前账号前缀的向量，legacy 向量仅在本机单账号时清理；旧版 Worker 无法
+ *   按账号限定删除范围——一律跳过 cleanup，绝不删除其他账号的数据；
  * - 索引任务切号后不得把共享索引状态/向量状态/格式版本写入新账号。
  */
 describe('useVectorSearchActions account switch guards', () => {
@@ -206,6 +215,7 @@ describe('useVectorSearchActions account switch guards', () => {
     Object.assign(mockUseAppStore, { getState: () => storeState });
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
     mocks.cleanup.mockResolvedValue(undefined);
+    mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);
   });
@@ -217,18 +227,80 @@ describe('useVectorSearchActions account switch guards', () => {
     };
   };
 
-  it('skips vector cleanup while the index is shared across multiple accounts', async () => {
+  it('scopes vector cleanup to the active account while the index is shared across local accounts (new worker)', async () => {
     seedTwoAccounts();
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    // 宁可保留冗余向量，也绝不删除共享索引中其他账号的向量
-    expect(mocks.cleanup).not.toHaveBeenCalled();
+    // R5 审计修复：新版 Worker 按账号前缀删除——本机多账号也不再跳过 cleanup，
+    // 但只允许删除当前账号（id=1）前缀的向量；legacy 向量归属不明，绝不删除
+    expect(mocks.vectorGetStatus).toHaveBeenCalledTimes(1);
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
+      accountPrefix: '1',
+      includeLegacy: false,
+      signal: expect.any(AbortSignal),
+    });
     // 索引本身照常完成并更新本账号状态
     expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
     expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
+  });
+
+  it('clears legacy vectors only for a single-account device (identity claim alignment)', async () => {
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    // 本机单账号：legacy 无前缀向量属于单租户时代的唯一所有者，随重建清理
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
+      accountPrefix: '1',
+      includeLegacy: true,
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('skips vector cleanup when the worker does not advertise account-scoped deletion (old deployment)', async () => {
+    // 旧版 Worker 会把 keepIds 之外的全部采样向量物理删除（含其他设备上传的
+    // 其他账号向量）：无论本机账号数量，一律跳过
+    mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536 });
+    seedTwoAccounts();
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
+  });
+
+  it('skips vector cleanup for a single-account device on an old worker too (other devices may hold other accounts)', async () => {
+    // R5 发现 2 的原始场景：两台设备各只保存一个账号、指向同一 Worker——
+    // 本机账号数量无法发现另一台设备上的账号，旧 Worker 一律不清理
+    mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536 });
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+  });
+
+  it('skips vector cleanup when the worker status probe fails', async () => {
+    mocks.vectorGetStatus.mockRejectedValue(new Error('worker unreachable'));
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    // 探针失败只影响清理，索引结果照常落盘
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
+      isIndexing: false,
+      result: expect.objectContaining({ indexed: 1 }),
+    }));
   });
 
   it('still runs cleanup for a single-account index (control)', async () => {
@@ -239,7 +311,11 @@ describe('useVectorSearchActions account switch guards', () => {
 
     // R4 审计修复：keepIds 与索引中的实际向量 ID 形态一致——账号前缀形态
     //（发起账号 id=1 → '1:1'）
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], expect.any(AbortSignal));
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
+      accountPrefix: '1',
+      includeLegacy: true,
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('passes the owning account to indexAllRepos for account-scoped vector IDs (R4)', async () => {
@@ -269,7 +345,11 @@ describe('useVectorSearchActions account switch guards', () => {
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1', '2', '1:2'], expect.any(AbortSignal));
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1', '2', '1:2'], {
+      accountPrefix: '1',
+      includeLegacy: true,
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('does not write indexing state into the new account after a mid-task switch', async () => {

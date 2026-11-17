@@ -49,6 +49,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
   let encrypt: (value: string, key: string) => string;
   let decrypt: (value: string, key: string) => string;
   let encryptionKey: string;
+  let resetLegacyOwnerResolutionState: (db: import('better-sqlite3').Database) => void;
 
   const authHeaders = (accountId?: string): Record<string, string> => ({
     Authorization: `Bearer ${process.env.API_SECRET}`,
@@ -83,6 +84,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     const migrations = await import('../../src/db/migrations.js');
     const crypto = await import('../../src/services/crypto.js');
     const configModule = await import('../../src/config.js');
+    const accountScope = await import('../../src/db/accountScope.js');
     const index = await import('../../src/index.js');
     const supertest = await import('supertest');
 
@@ -91,6 +93,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     encrypt = crypto.encrypt;
     decrypt = crypto.decrypt;
     encryptionKey = configModule.config.encryptionKey;
+    resetLegacyOwnerResolutionState = accountScope.resetLegacyOwnerResolutionState;
 
     const db = conn.getDb();
     migrations.runMigrations(db);
@@ -102,6 +105,8 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     proxyRequestMock.mockReset();
     proxyRequestMock.mockResolvedValue({ status: 200, data: { ok: true }, headers: {} });
     wipeDb();
+    // 认领身份校验的内存态（失败负缓存 / 进行中去重 Promise）随库清空一起重置
+    resetLegacyOwnerResolutionState(getDb());
   });
 
   it('v4 schema isolates full syncs per account (isFullSync never deletes other accounts)', async () => {
@@ -198,6 +203,90 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     const rows = db.prepare('SELECT account_id FROM repositories').all() as Array<{ account_id: string }>;
     expect(rows.map((r) => r.account_id)).toEqual(['default']);
     expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get()).toBeUndefined();
+  });
+
+  it('shares one in-flight identity check across concurrent requests (fetch called once)', async () => {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('legacy-token', encryptionKey));
+
+    // 收集每个 fetch 调用的 resolver：即使去重失效也不会悬挂，计数断言会明确报错
+    const releaseFetches: Array<(value: { ok: boolean; status: number; json: () => Promise<{ id: number }> }) => void> = [];
+    fetchMock.mockImplementation(() => new Promise((resolve) => { releaseFetches.push(resolve); }));
+
+    // supertest 的 Test 是 thenable：挂接 .then 才会真正发送请求。两个请求并发
+    // 进入认领中间件，应共享同一次进行中的 /user 校验。
+    const first = request(app).get('/api/repositories').set(authHeaders('111'))
+      .expect(200).then((r) => r, (e) => { throw e; });
+    const second = request(app).get('/api/repositories').set(authHeaders('111'))
+      .expect(200).then((r) => r, (e) => { throw e; });
+
+    // 两个并发请求共享同一次进行中的 /user 校验
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    // 等第二个请求也抵达中间件：期间 fetch 绝不能被再次调用（共享进行中 Promise）
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    for (const release of releaseFetches) release({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+    await Promise.all([first, second]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 共享校验完成后认领照常完成（并发下的二次确认保证只认领一次）
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string }).value).toBe('111');
+  });
+
+  it('does not resend the identity check while the failure negative cache is fresh', async () => {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('legacy-token', encryptionKey));
+
+    // 第一次校验网络失败：归属未确立，业务请求照常
+    fetchMock.mockRejectedValueOnce(new Error('identity check unavailable'));
+    await request(app).get('/api/repositories').set(authHeaders('111')).expect(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get()).toBeUndefined();
+
+    // 负缓存 TTL 窗口内重试：不重发网络请求，default 数据保持未认领
+    await request(app).get('/api/repositories').set(authHeaders('111')).expect(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // TTL 过期后允许重试：重试成功即完成认领
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+    try {
+      await request(app).get('/api/repositories').set(authHeaders('111')).expect(200);
+    } finally {
+      nowSpy.mockRestore();
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string }).value).toBe('111');
+  });
+
+  it('skips the identity network call when the default partition has no rows to claim', async () => {
+    const db = getDb();
+    // 认领未发生、全局 Token 已配置，但 default 分区（含 account_settings）无任何行：
+    // 无可认领数据 → 不发起网络请求、不写认领标记
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('ready-token', encryptionKey));
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+
+    await request(app).get('/api/repositories').set(authHeaders('111')).expect(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get()).toBeUndefined();
+
+    // 之后 default 分区出现待认领数据（旧客户端 / 无头请求写入）：认领流程自然恢复
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+    await request(app).get('/api/repositories').set(authHeaders('111')).expect(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string }).value).toBe('111');
   });
 
   it('writes account-scoped settings to account_settings for real accounts and mirrors to global for headless requests', async () => {
@@ -338,6 +427,70 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // AI 成果（ai_summary）随工作区复原
     const summary = db.prepare('SELECT ai_summary FROM repositories WHERE account_id = ? AND id = 1').get(ACCOUNT_A) as { ai_summary: string };
     expect(summary.ai_summary).toBe('ai-one');
+  });
+
+  it('excludes internal account-state keys from export settings (no token ciphertext leak)', async () => {
+    const db = getDb();
+    // 内部账号状态键 + 全局 Token：导出的 settings 绝不包含前者
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', '222')").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_owner_id', ?)")
+      .run(JSON.stringify({ ownerId: '222', token: encrypt('legacy-owner-ciphertext', encryptionKey) }));
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('plain-global-token', encryptionKey));
+
+    // 账号 A 有自己的分区凭据（导出包含其 workspace account_settings）
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ github_token: 'token-a', user_profile: { id: 111, login: 'alice', avatar_url: 'https://x/a.png' } })
+      .expect(200);
+
+    const exported = await request(app).post('/api/sync/export').set(authHeaders(ACCOUNT_A)).expect(200);
+    const settings = exported.body.settings as Record<string, unknown>;
+    expect(settings.active_account_id).toBeUndefined();
+    expect(settings.legacy_default_claimed_by).toBeUndefined();
+    expect(settings.legacy_default_owner_id).toBeUndefined();
+    // 普通键与脱敏后的 github_token 照常导出
+    expect(settings.github_token).toMatch(/^\*\*\*/);
+    // legacy_default_owner_id 内的全局 Token 密文绝不随备份带出
+    expect(JSON.stringify(exported.body)).not.toContain('legacy-owner-ciphertext');
+    // workspace account_settings 只存账号级键：内部键不会出现在任何工作区中
+    for (const ws of exported.body.account_workspaces as Array<Record<string, unknown>>) {
+      const wsSettings = ws.account_settings as Record<string, unknown>;
+      expect(wsSettings.active_account_id).toBeUndefined();
+      expect(wsSettings.legacy_default_claimed_by).toBeUndefined();
+      expect(wsSettings.legacy_default_owner_id).toBeUndefined();
+    }
+  });
+
+  it('does not overwrite internal account-state keys on import (legacy backups included)', async () => {
+    const db = getDb();
+    // 目标服务器自身的内部状态
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', '222')").run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_owner_id', ?)")
+      .run(JSON.stringify({ ownerId: '222', token: 'target-owner-ciphertext' }));
+
+    // 旧备份内含内部键（v1 与多账号格式都可能出现）：导入必须跳过，绝不覆盖目标状态
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_A))
+      .send({
+        settings: {
+          active_account_id: '111',
+          legacy_default_claimed_by: '111',
+          legacy_default_owner_id: JSON.stringify({ ownerId: '111', token: 'backup-owner-ciphertext' }),
+          activeAIConfig: 'restored-config',
+        },
+      })
+      .expect(200);
+
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'").get() as { value: string }).value).toBe('222');
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string }).value).toBe('222');
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_owner_id'").get() as { value: string }).value)
+      .toBe(JSON.stringify({ ownerId: '222', token: 'target-owner-ciphertext' }));
+    // 非内部键照常导入（activeAIConfig 非账号级 → 全局表）
+    expect((db.prepare("SELECT value FROM settings WHERE key = 'activeAIConfig'").get() as { value: string }).value).toBe('restored-config');
   });
 
   it('generates an explicit id on POST /api/categories and scopes lists per account', async () => {
@@ -637,6 +790,9 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .send({ repositories: [repoRow(1, 'owner/one')] })
       .expect(200);
 
+    // 失败负缓存覆盖 60s 窗口；此处模拟窗口过后网络恢复的重试（测试内直接重置
+    // 内存态，等待真实 TTL 会拖慢测试）
+    resetLegacyOwnerResolutionState(getDb());
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
 
     const list = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
@@ -683,6 +839,9 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .send({ repositories: [repoRow(20, 'owner/rebuilt')] })
       .expect(200);
 
+    // 上面的首次请求在 fetch 无 mock 时校验失败并进入负缓存；此处模拟负缓存窗口
+    // 过后网络恢复的重试（测试内直接重置内存态，等待真实 TTL 会拖慢测试）
+    resetLegacyOwnerResolutionState(getDb());
     fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
 
     const list = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);

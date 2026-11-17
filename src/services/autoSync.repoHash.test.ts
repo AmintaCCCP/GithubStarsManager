@@ -299,6 +299,15 @@ describe('sync defaultCategoryOverrides with backend settings', () => {
     resetSyncHashes();
     vi.mocked(backend.fetchSettings).mockResolvedValue({});
     vi.mocked(backend.syncSettings).mockClear();
+    // 设置推送发生在已登录会话中（R5 审计修复：无账号上下文的空仓库推送会被
+    // autoSync 拒绝——服务端会回退 active_account_id 分区，空快照可能清空分区），
+    // 测试同样必须提供已登录且仓库非空的会话前提。
+    useAppStore.setState({
+      user: { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null },
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: [createRepository(1)],
+    });
     useAppStore.setState({ defaultCategoryOverrides: {} });
   });
 
@@ -351,6 +360,22 @@ describe('sync defaultCategoryOverrides with backend settings', () => {
 });
 
 describe('explicit backend push error reporting', () => {
+  beforeEach(() => {
+    // 推送前提与生产一致：已登录且本地仓库非空（R5 审计修复后，无账号上下文
+    // 的空仓库推送会被 autoSync 拒绝）
+    resetSyncHashes();
+    useAppStore.setState({
+      user: { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null },
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: [createRepository(1)],
+    });
+  });
+
+  afterEach(() => {
+    resetSyncHashes();
+  });
+
   it('resolves when all backend writes succeed', async () => {
     await expect(forceSyncToBackend()).resolves.toBeUndefined();
     expect(backend.syncRepositories).toHaveBeenCalled();

@@ -1,5 +1,6 @@
 import { backend, isValidBackendRestoreAccount } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
+import { accountIdKey } from '../store/helpers/accountWorkspace';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { normalizeAssetFilters } from '../utils/assetFilters';
 import { createGitHubApiService } from './githubApiFactory';
@@ -53,6 +54,9 @@ export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T
     // 对齐窗口内被静音的用户编辑：守卫释放后立即补推，绝不能静默丢弃。
     //（拉取应用阶段写入的 _hasPendingPush 已由 syncFromBackend 的 finally 排空，
     // 这里只需处理订阅器记录的窗口内本地编辑。）
+    // R5 审计修复（发现1）：本地真空且后端分区未观察时，pushToBackend 会
+    // 拒绝空列表 isFullSync 推送并保留待推标记——编辑交给放行后的对齐拉取
+    // 合并流程补推，而不是以空快照覆盖目标账号分区。
     if (_hasPendingLocalChanges && !_isSyncingFromBackendActive) {
       void syncToBackend();
     }
@@ -125,6 +129,23 @@ export function withAccountSwitchGuardSync<T>(fn: () => T): T {
   } finally {
     _isSwitchingAccount = previous;
     _isAccountSwitchBookkeeping = previousBookkeeping;
+    // R5 审计修复（发现1）：簿记写入完成后重新观察本地仓库列表。切换换入的
+    // 工作区若自带非空仓库快照，该账号立即获得空推送豁免（推的是该账号自己的
+    // 完整数据）；真空会话保持受限，直到对齐拉取观察过后端分区。
+    // 测试桩兼容：单元测试可能把 store 模块整体 mock 成无 getState 的选择器
+    // 函数（与 accountIdKey/peekCurrentAccountId 的放行语义一致），此时跳过
+    // 观察，保持旧测试契约。
+    try {
+      const store = useAppStore as unknown as { getState?: () => { user: Parameters<typeof accountIdKey>[0]; repositories: unknown[] } };
+      if (typeof store.getState === 'function') {
+        const swapped = store.getState();
+        if (Array.isArray(swapped.repositories) && swapped.repositories.length > 0) {
+          markAccountSeenNonEmptyRepos(accountIdKey(swapped.user));
+        }
+      }
+    } catch {
+      // 桩环境观察失败不阻断簿记流程
+    }
   }
 }
 
@@ -154,6 +175,66 @@ let _pushPromise: Promise<boolean> | null = null;
 let _hasPendingPush = false;
 // Track unsynced local edits so backend polling does not overwrite them.
 let _hasPendingLocalChanges = false;
+
+// 账号对齐观察集（R5 审计修复，CodeRabbit 发现 1）：服务端 PUT /repositories
+// 以 isFullSync:true 收到空列表时会物理删除该账号分区的全部仓库与 release。
+// 切换到本地无快照的账号（本地真空）时列表为空，而后端分区可能已有其他设备
+// 写入的数据——对齐窗口内的任何空列表全量推送都是致命覆盖。
+//
+// 两个集合记录「当前对齐会话」（自最近一次 resetSyncHashes 起的工作区会话）
+// 内按账号累积的观察事实，用于区分两种语义：
+// - 本地真空 + 后端事实未知（两个集合都没有该账号）→ 空列表推送必须拒绝，
+//   待对齐拉取合并后端数据后再由正常流程补推（待推编辑保留）；
+// - 本地列表曾非空（用户真的清空了所有仓库）或后端分区已被成功拉取观察过
+//   → 空列表推送代表本地真实状态，照常放行。
+// 集合随 resetSyncHashes 清零：logout / 切换 / 归档开启新对齐会话时，
+// 新活跃账号必须重新取得豁免，绝不能继承上一会话的观察结论。
+const _accountsSeenNonEmptyRepos = new Set<string>();
+const _accountsObservedBackendRepos = new Set<string>();
+
+/** 记录某账号在本对齐会话内本地仓库列表曾非空（空列表全量推送豁免依据）。 */
+function markAccountSeenNonEmptyRepos(accountId: string | null | undefined): void {
+  if (!accountId) return;
+  _accountsSeenNonEmptyRepos.add(accountId);
+}
+
+/** 记录某账号在本对齐会话内已完成一次成功的后端仓库拉取（分区事实已观察）。 */
+function markAccountBackendReposObserved(accountId: string | null | undefined): void {
+  if (!accountId) return;
+  _accountsObservedBackendRepos.add(accountId);
+}
+
+/**
+ * 当前状态下是否允许推送空仓库快照（isFullSync）。
+ * 列表非空时恒真（推的不是空快照）；列表为空时仅在以下情形放行：
+ * - 本会话内该账号的本地列表曾非空（用户主动清空全部仓库）；
+ * - 本会话内已成功拉取过该账号的后端仓库（分区事实已被观察）。
+ * 无活跃账号上下文（user 为 null，请求头缺失、服务端回退 active_account_id
+ * 分区）时一律拒绝——空快照写错分区比不推送更危险。
+ */
+function canPushEmptyRepositorySnapshot(): boolean {
+  const state = useAppStore.getState();
+  if (state.repositories.length > 0) return true;
+  const accountId = accountIdKey(state.user);
+  if (!accountId) return false;
+  return _accountsSeenNonEmptyRepos.has(accountId) || _accountsObservedBackendRepos.has(accountId);
+}
+
+/**
+ * 当前是否处于「本地真空且后端事实未知」的未对齐会话。
+ * 仅用于放宽非强制拉取的待推早退：此状态下待推保护（跳过拉取防止陈旧快照
+ * 覆盖未推修改）会让对齐拉取永远无法发生，空列表推送又已被拒绝——死锁。
+ * 放行后拉取走「待推合并」分支（autoSync.doSync 内 _hasPendingLocalChanges
+ * 分支）：只把后端新到仓库并入本地、绝不覆盖本地数据，随后排空待推队列。
+ * 无活跃账号时返回 false（放宽会让无账号头请求合并错误分区）。
+ */
+function isUnalignedVacuumAccountSession(): boolean {
+  const state = useAppStore.getState();
+  if (state.repositories.length !== 0) return false;
+  const accountId = accountIdKey(state.user);
+  if (!accountId) return false;
+  return !_accountsSeenNonEmptyRepos.has(accountId) && !_accountsObservedBackendRepos.has(accountId);
+}
 
 // Debounce timer for push-to-backend
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -323,6 +404,10 @@ if (typeof backend.registerBeforeInitHook === 'function') {
  * Reset all sync fingerprints. Must be called on logout so that the next
  * force sync (e.g. backend login restore) applies every shard regardless of
  * whether the backend data has changed since the last session.
+ *
+ * 同时清空账号对齐观察集（R5 审计修复）：logout / 切换 / 归档 / 部分登录
+ * 回滚都会调用本函数开启新的对齐会话——新活跃账号在完成一次成功拉取或
+ * 换入非空工作区之前，绝不继承上一会话的空推送豁免。
  */
 export function resetSyncHashes(): void {
   _lastHash.repos = '';
@@ -332,6 +417,8 @@ export function resetSyncHashes(): void {
   _lastHash.embedding = '';
   _lastHash.vectorSearch = '';
   _lastHash.settings = '';
+  _accountsSeenNonEmptyRepos.clear();
+  _accountsObservedBackendRepos.clear();
 }
 
 function quickHash(data: unknown): string {
@@ -521,7 +608,11 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
   if (!options.force && (
     _isSyncingFromBackendActive ||
     _isPushingToBackend ||
-    _hasPendingLocalChanges ||
+    // R5 审计修复（发现1）：待推早退会阻止对齐拉取——「本地真空 + 后端事实
+    // 未知」时空列表推送已被拒绝，若拉取再被待推标志卡住，对齐永远无法完成
+    // （死锁）。此状态下放行拉取：doSync 的待推分支只并入后端新到仓库、
+    // 绝不用后端快照覆盖本地数据，随后排空待推队列完成安全补推。
+    (_hasPendingLocalChanges && !isUnalignedVacuumAccountSession()) ||
     _debounceTimer
   )) {
     return;
@@ -546,7 +637,10 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
   const doSync = async () => {
   const startTime = Date.now();
   try {
-    const repositoriesBeforeFetch = useAppStore.getState().repositories;
+    const stateBeforeFetch = useAppStore.getState();
+    const repositoriesBeforeFetch = stateBeforeFetch.repositories;
+    // 请求头在 fetch 调用时从 Store 读取：先取快照，fulfilled 后归属到同一账号。
+    const fetchedAccountId = accountIdKey(stateBeforeFetch.user);
     const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
       backend.fetchReleases(),
@@ -556,6 +650,13 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       backend.fetchVectorSearchConfig(),
       backend.fetchSettings(),
     ]);
+
+    // R5 审计修复（发现1）：仓库拉取成功即视为该账号的后端分区事实已被观察
+    // ——此后本地（哪怕仍为空）与后端对齐，空列表全量推送不再有清空风险。
+    // 必须在待推分支 return 之前记录，待推分支的排空推送依赖该豁免。
+    if (reposResult.status === 'fulfilled') {
+      markAccountBackendReposObserved(fetchedAccountId);
+    }
 
     // Local edits made during the fetch must be pushed before applying the
     // stale snapshot. The fetched repositories still matter: the queued full
@@ -890,6 +991,25 @@ export async function syncToBackend(): Promise<boolean> {
  * for the next push.
  */
 async function pushToBackend(): Promise<boolean> {
+  // R5 审计修复（发现1，CodeRabbit Major/Heavy lift）：本地真空且该账号的
+  // 后端分区尚未被观察（本会话既没有成功的仓库拉取、本地列表也从未非空）时，
+  // 绝不能发送空列表 isFullSync 快照——服务端会物理删除该账号分区的全部
+  // 仓库与 release。典型场景：切换到本地无快照的账号后，对齐拉取被窗口内
+  // 的用户编辑（待推标志）跳过，守卫退出冲塑以空快照 isFullSync 推送。
+  // 处理：跳过本次推送并保留待推标记，待对齐拉取（已放行待推早退）合并
+  // 后端数据后由正常流程补推。清空 _hasPendingPush 防止 pushLatest 的
+  // 重试循环在拒绝状态下自旋；待推编辑由 _hasPendingLocalChanges 承载。
+  if (!canPushEmptyRepositorySnapshot()) {
+    const blockedAccountId = accountIdKey(useAppStore.getState().user);
+    _hasPendingPush = false;
+    _hasPendingLocalChanges = true;
+    logger.warn('sync.pushToBackend', 'Refused to push an empty full-sync snapshot before backend alignment; pending edits stay queued for the post-alignment push', {
+      accountId: blockedAccountId,
+      seenNonEmpty: blockedAccountId ? _accountsSeenNonEmptyRepos.has(blockedAccountId) : false,
+      backendObserved: blockedAccountId ? _accountsObservedBackendRepos.has(blockedAccountId) : false,
+    });
+    return false;
+  }
   _isPushingToBackend = true;
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
@@ -1011,6 +1131,12 @@ export function startAutoSync(): () => void {
   _hasPendingLocalChanges = false;
   // 1. Subscribe to local changes → push to backend (2s debounce)
   const unsubscribe = useAppStore.subscribe((state, prevState) => {
+    // R5 审计修复（发现1）：无论处于何种静音窗口，只要活跃账号的本地仓库
+    // 列表非空就记入对齐观察集——这是区分「本地真空」与「用户在会话中主动
+    // 清空全部仓库」的唯一依据，绝不能因守卫静音提前返回而漏记。
+    if (state.repositories.length > 0) {
+      markAccountSeenNonEmptyRepos(accountIdKey(state.user));
+    }
     if (_isSyncingFromBackend || _isSwitchingAccount) {
       // 切换守卫窗口内的真实用户编辑（如对齐拉取期间调整 categoryOrder）不能
       // 静默丢弃：记为待推，守卫释放后立即补推。切换簿记（guardSync 覆盖的

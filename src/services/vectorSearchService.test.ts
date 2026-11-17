@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Repository } from '../types';
 import {
   buildAccountScopedVectorId,
@@ -9,6 +9,7 @@ import {
   indexAllRepos,
   needsReindex,
   EMBEDDING_FORMAT_VERSION,
+  VectorSearchService,
 } from './vectorSearchService';
 
 // Minimal mock: only the `.embed` method is used by embedWithFallback.
@@ -184,6 +185,60 @@ describe('indexAllRepos incremental filtering', () => {
     expect(indexedIds).toEqual(expected);
     expect(result.indexedRepoIds).toEqual(expected);
     expect(result.indexed).toBe(expected.length);
+  });
+});
+
+describe('indexAllRepos partial embedding failure reporting (R5 finding 4)', () => {
+  // 回归（CodeRabbit 发现 4）：upsertedCount 回调此前从原始 batch 推算仓库 ID，
+  // 当 batch=[repo1,repo2]、embedding=[null,vector2] 时会把「embedding 失败的
+  // repo1」报告为已上传——调用方给 repo1 写 vector_indexed_at，增量索引永久
+  // 跳过它；真正上传成功的 repo2 反而没有标记。修复后从成功向量列表读取。
+  const makePartiallyFailingClient = (vectors: Array<number[] | null>) => ({
+    embed: vi.fn(async () => vectors),
+  }) as unknown as Parameters<typeof indexAllRepos>[1];
+
+  const captureIndexed = async (vectors: Array<number[] | null>) => {
+    const client = makePartiallyFailingClient(vectors);
+    const vectorService = makeVectorService();
+    const indexedIds: number[] = [];
+    const result = await indexAllRepos(
+      [makeRepository(1), makeRepository(2), makeRepository(3)],
+      client,
+      vectorService,
+      { indexMode: 'description', onRepoIndexed: (repoId) => indexedIds.push(repoId) },
+    );
+    return { client, vectorService, indexedIds, result };
+  };
+
+  it('does not report the first repo as indexed when its embedding fails', async () => {
+    const { vectorService, indexedIds, result } = await captureIndexed([null, vec(2), vec(3)]);
+
+    // 只有 repo2/repo3 被上传并报告；失败的 repo1 绝不能出现在已索引列表
+    const upsertedVectorIds = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
+    expect(upsertedVectorIds).toHaveLength(2);
+    expect(indexedIds).toEqual([2, 3]);
+    expect(result.indexedRepoIds).toEqual([2, 3]);
+    expect(result.indexed).toBe(2);
+    expect(result.errors).toBe(1);
+  });
+
+  it('does not report middle repos as indexed when their embedding fails', async () => {
+    const { indexedIds, result } = await captureIndexed([vec(1), null, vec(3)]);
+
+    // repo1 在失败项之前：仍按构造顺序报告；repo3 在失败项之后：不被错位占用
+    expect(indexedIds).toEqual([1, 3]);
+    expect(result.indexedRepoIds).toEqual([1, 3]);
+    expect(result.indexed).toBe(2);
+    expect(result.errors).toBe(1);
+  });
+
+  it('keeps the existing report order when every embedding succeeds', async () => {
+    const { indexedIds, result } = await captureIndexed([vec(1), vec(2), vec(3)]);
+
+    expect(indexedIds).toEqual([1, 2, 3]);
+    expect(result.indexedRepoIds).toEqual([1, 2, 3]);
+    expect(result.indexed).toBe(3);
+    expect(result.errors).toBe(0);
   });
 });
 
@@ -465,5 +520,64 @@ describe('账号隔离向量 ID 编解码（R4 审计修复）', () => {
     expect(parseAccountScopedVectorId('7')).toEqual({ accountId: null, repoId: '7' });
     // 非数字前缀不是账号前缀（防垃圾字符串污染归属）
     expect(parseAccountScopedVectorId('owner:7')).toEqual({ accountId: null, repoId: 'owner:7' });
+  });
+});
+
+describe('VectorSearchService.cleanup 账号范围参数（R5 发现 2）', () => {
+  const stubFetch = (capture: (url: string, init: RequestInit) => void) => {
+    const fetchMock = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      capture(String(url), init ?? {});
+      return new Response(JSON.stringify({ success: true, deleted: 0 }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends accountPrefix and includeLegacy in the request body', async () => {
+    let capturedBody = '';
+    stubFetch((_url, init) => { capturedBody = String(init.body); });
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await service.cleanup(['1:1', '42'], { accountPrefix: '1', includeLegacy: true });
+
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1:1', '42'], accountPrefix: '1', includeLegacy: true });
+  });
+
+  it('omits scoping params when they are not provided (legacy client compatibility)', async () => {
+    let capturedBody = '';
+    stubFetch((_url, init) => { capturedBody = String(init.body); });
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await service.cleanup(['1'], { accountPrefix: null, includeLegacy: false });
+
+    // 无范围参数 → Worker 保持旧行为（向后兼容旧客户端契约）
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'] });
+  });
+
+  it('keeps the legacy (keepIds, signal) call signature working', async () => {
+    let capturedBody = '';
+    let capturedSignal: AbortSignal | null | undefined;
+    stubFetch((_url, init) => {
+      capturedBody = String(init.body);
+      capturedSignal = init.signal;
+    });
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+    const controller = new AbortController();
+
+    await service.cleanup(['1'], controller.signal);
+
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'] });
+    expect(capturedSignal).toBe(controller.signal);
+  });
+
+  it('surfaces worker failures as errors (contract unchanged)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: false, error: 'boom' }), { status: 500 })));
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await expect(service.cleanup(['1'], { accountPrefix: '1' })).rejects.toThrow('boom');
   });
 });
