@@ -7,6 +7,17 @@ import { toDisplayPref, DESCRIPTION_DISPLAY_VALUES, TAGS_DISPLAY_VALUES } from '
 
 const router = Router();
 
+/**
+ * 服务端导出（SELECT *）把 is_read 序列化为数字 0/1，客户端备份则是布尔值。
+ * 两者都视为「显式已读状态」：按对应值恢复；缺省或无效值走保留分支，
+ * 维持目标记录的现有已读状态。
+ */
+function hasExplicitIsRead(row: Record<string, unknown>): boolean {
+  return typeof row.is_read === 'boolean' || row.is_read === 0 || row.is_read === 1;
+}
+
+const toIsReadBit = (value: unknown): number => (value === true || value === 1) ? 1 : 0;
+
 // 控制字符或 Latin-1 以外的码位会被 undici 拒绝，直接拒绝存储
 const sanitizeUserAgent = (value: unknown): string | null =>
   typeof value === 'string' && !/[^\u0020-\u007e\u00a0-\u00ff]/.test(value) ? value : null;
@@ -406,15 +417,15 @@ router.post('/api/sync/import', (req, res) => {
         `);
         for (const r of rels) {
           const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
-          const hasExplicitIsRead = typeof r.is_read === 'boolean';
-          const relStmt = hasExplicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
+          const explicitIsRead = hasExplicitIsRead(r);
+          const relStmt = explicitIsRead ? relStmtOverwriteIsRead : relStmtPreserveIsRead;
           relStmt.run(
             r.id, r.tag_name ?? null, r.name ?? null, r.body ?? null,
             r.html_url ?? null, r.published_at ?? null,
             r.prerelease ? 1 : 0, r.draft ? 1 : 0,
             // 保留分支下仍落 0（非空），与 releases 表 is_read DEFAULT 0 语义一致，
             // 避免新导入行写入 NULL 导致 unread 过滤（is_read = 0）漏行。
-            hasExplicitIsRead ? (r.is_read ? 1 : 0) : 0,
+            explicitIsRead ? toIsReadBit(r.is_read) : 0,
             typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
             r.repo_id ?? repository?.id ?? null,
             r.repo_full_name ?? repository?.full_name ?? null,
@@ -507,19 +518,32 @@ router.post('/api/sync/import', (req, res) => {
       }
 
       // Settings — skip masked github_token。
-      // 账号级键在真实账号分区下写入 account_settings，其余写全局 settings。
+      // 无 account_workspaces（v1 备份）：账号级键在真实账号分区下写入
+      // account_settings，其余写全局 settings。
+      // 多账号全量导入：顶层 settings 中的账号级键来自导出时的全局 settings
+      // （各账号分区自身的键已由 account_workspaces 按分区复原），统一恢复回
+      // 全局表——默认分区/旧客户端/无头请求与 legacy 认领流程都依赖全局表，
+      // 绝不能因存在工作区就静默丢弃这些默认分区设置。
       const settings = data.settings as Record<string, unknown> | undefined;
       if (settings && typeof settings === 'object') {
         const globalSettingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
         const accountSettingsStmt = db.prepare('INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)');
         let settingsCount = 0;
+        const serializeSettingValue = (v: unknown): string | null =>
+          v === null || v === undefined
+            ? null
+            : typeof v === 'object' ? JSON.stringify(v) : (v as string);
         for (const [key, value] of Object.entries(settings)) {
           if (key === 'github_token' && typeof value === 'string' && value.startsWith('***')) {
             continue; // Skip masked token
           }
-          // 多账号全量导入：账号级键已由 account_workspaces 按各自分区复原，
-          // 顶层 settings 中的账号级键属于导出账号，跳过以防错位覆盖。
           if (hasAccountWorkspaces && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
+            if (key === 'github_token' && value && typeof value === 'string') {
+              globalSettingsStmt.run(key, encrypt(value, config.encryptionKey));
+            } else {
+              globalSettingsStmt.run(key, serializeSettingValue(value));
+            }
+            settingsCount++;
             continue;
           }
           if (key === 'github_token' && value && typeof value === 'string') {
@@ -530,12 +554,9 @@ router.post('/api/sync/import', (req, res) => {
               globalSettingsStmt.run(key, encrypted);
             }
           } else if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && accountId !== 'default') {
-            const serialized = value === null || value === undefined
-              ? null
-              : typeof value === 'object' ? JSON.stringify(value) : (value as string);
-            accountSettingsStmt.run(accountId, key, serialized);
+            accountSettingsStmt.run(accountId, key, serializeSettingValue(value));
           } else {
-            globalSettingsStmt.run(key, (value as string) ?? null);
+            globalSettingsStmt.run(key, serializeSettingValue(value));
           }
           settingsCount++;
         }
@@ -668,13 +689,13 @@ router.post('/api/sync/import', (req, res) => {
           if (Array.isArray(wsRels)) {
             for (const r of wsRels) {
               const repository = r.repository as { id?: number; full_name?: string; name?: string } | undefined;
-              const hasExplicitIsRead = typeof r.is_read === 'boolean';
-              const wsRelStmt = hasExplicitIsRead ? wsRelStmtOverwriteIsRead : wsRelStmtPreserveIsRead;
+              const explicitIsRead = hasExplicitIsRead(r);
+              const wsRelStmt = explicitIsRead ? wsRelStmtOverwriteIsRead : wsRelStmtPreserveIsRead;
               wsRelStmt.run(
                 r.id, r.tag_name ?? null, r.name ?? null, r.body ?? null,
                 r.html_url ?? null, r.published_at ?? null,
                 r.prerelease ? 1 : 0, r.draft ? 1 : 0,
-                hasExplicitIsRead ? (r.is_read ? 1 : 0) : 0,
+                explicitIsRead ? toIsReadBit(r.is_read) : 0,
                 typeof r.assets === 'string' ? r.assets : JSON.stringify(r.assets ?? []),
                 r.repo_id ?? repository?.id ?? null,
                 r.repo_full_name ?? repository?.full_name ?? null,
@@ -705,9 +726,14 @@ router.post('/api/sync/import', (req, res) => {
               if (key === 'github_token' && typeof value === 'string' && value.startsWith('***')) {
                 continue; // 掩码 Token：保留库中已有的 github_token_encrypted
               }
-              const serialized = value === null || value === undefined
+              let serialized = value === null || value === undefined
                 ? null
                 : typeof value === 'object' ? JSON.stringify(value) : (value as string);
+              if (key === 'github_token' && typeof value === 'string' && value) {
+                // 真实 Token（勾选「包含密钥」的备份）：与其他凭据一致，写入前必须
+                // encrypt()，绝不能把明文凭证当作普通设置序列化入库。
+                serialized = encrypt(value, config.encryptionKey);
+              }
               wsSettingsStmt.run(wsAccountId, key, serialized);
               workspaceSettingsCount++;
             }

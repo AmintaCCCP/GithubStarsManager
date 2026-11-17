@@ -110,6 +110,40 @@ describe('POST /api/sync/import release upsert is_read semantics', () => {
     expect(releasePreserveIndex(statements)).toBe(-1);
   });
 
+  it('treats numeric is_read 1 from server exports as explicit read state', async () => {
+    const { statements } = captureStatements();
+    // 服务端导出（SELECT *）把 is_read 序列化为数字：再次导入必须按原值恢复
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({ is_read: 1 })],
+      })
+      .expect(200);
+
+    const idx = releaseOverwriteIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    expect(statements[idx].sql).toContain('is_read = excluded.is_read');
+    expect(statements[idx].params[8]).toBe(1);
+    expect(releasePreserveIndex(statements)).toBe(-1);
+  });
+
+  it('treats numeric is_read 0 from server exports as explicit unread state', async () => {
+    const { statements } = captureStatements();
+    await request(createTestApp())
+      .post('/api/sync/import')
+      .send({
+        repositories: [],
+        releases: [validRelease({ is_read: 0 })],
+      })
+      .expect(200);
+
+    const idx = releaseOverwriteIndex(statements);
+    expect(idx).toBeGreaterThan(-1);
+    expect(statements[idx].params[8]).toBe(0);
+    expect(releasePreserveIndex(statements)).toBe(-1);
+  });
+
   it('rejects release snapshot missing required repository fields with 400', async () => {
     captureStatements();
     const res = await request(createTestApp())

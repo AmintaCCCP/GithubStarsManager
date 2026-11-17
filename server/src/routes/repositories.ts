@@ -166,6 +166,8 @@ router.put('/api/repositories', (req, res) => {
     // account_id 占位参数追加在参数列表末位（见参数位置契约）。
     // 跨账号 AI 分析成果复用：当前账号该仓库尚无 AI 总结时，回填同库其他账号
     // 已分析过的同一仓库的成果（账号归属隔离，免去重复 AI Token 消耗）。
+    // 已存储的 '[]'（普通同步对缺省字段的默认序列化）与 ''/NULL 一律视为
+    // 「可回填」，当前账号已有非空值时保留其值。
     const stmt = db.prepare(`
       INSERT INTO repositories (
         id, name, full_name, description, html_url, stargazers_count, language,
@@ -191,30 +193,46 @@ router.put('/api/repositories', (req, res) => {
         owner_login = excluded.owner_login,
         owner_avatar_url = excluded.owner_avatar_url,
         topics = excluded.topics,
-        ai_summary = CASE WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.ai_summary ELSE COALESCE(repositories.ai_summary, (
-          SELECT other.ai_summary FROM repositories AS other
-          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
-            AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
-          LIMIT 1
-        )) END,
-        ai_tags = CASE WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN excluded.ai_tags ELSE COALESCE(repositories.ai_tags, (
-          SELECT other.ai_tags FROM repositories AS other
-          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
-            AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
-          LIMIT 1
-        )) END,
-        ai_platforms = CASE WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN excluded.ai_platforms ELSE COALESCE(repositories.ai_platforms, (
-          SELECT other.ai_platforms FROM repositories AS other
-          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
-            AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
-          LIMIT 1
-        )) END,
-        analyzed_at = CASE WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at ELSE COALESCE(repositories.analyzed_at, (
-          SELECT other.analyzed_at FROM repositories AS other
-          WHERE other.id = excluded.id AND other.account_id != repositories.account_id
-            AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
-          LIMIT 1
-        )) END,
+        ai_summary = CASE
+          WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN excluded.ai_summary
+          WHEN repositories.ai_summary IS NOT NULL AND repositories.ai_summary != '' THEN repositories.ai_summary
+          ELSE COALESCE((
+            SELECT other.ai_summary FROM repositories AS other
+            WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+            LIMIT 1
+          ), repositories.ai_summary)
+        END,
+        ai_tags = CASE
+          WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN excluded.ai_tags
+          WHEN repositories.ai_tags IS NOT NULL AND repositories.ai_tags != '[]' THEN repositories.ai_tags
+          ELSE COALESCE((
+            SELECT other.ai_tags FROM repositories AS other
+            WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
+            LIMIT 1
+          ), repositories.ai_tags)
+        END,
+        ai_platforms = CASE
+          WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN excluded.ai_platforms
+          WHEN repositories.ai_platforms IS NOT NULL AND repositories.ai_platforms != '[]' THEN repositories.ai_platforms
+          ELSE COALESCE((
+            SELECT other.ai_platforms FROM repositories AS other
+            WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
+            LIMIT 1
+          ), repositories.ai_platforms)
+        END,
+        analyzed_at = CASE
+          WHEN excluded.analyzed_at IS NOT NULL AND excluded.analyzed_at != '' THEN excluded.analyzed_at
+          WHEN repositories.analyzed_at IS NOT NULL AND repositories.analyzed_at != '' THEN repositories.analyzed_at
+          ELSE COALESCE((
+            SELECT other.analyzed_at FROM repositories AS other
+            WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
+            LIMIT 1
+          ), repositories.analyzed_at)
+        END,
         analysis_failed = excluded.analysis_failed,
         -- 同步只接收整仓快照：字段缺省即表示客户端已无自定义内容，须照实覆盖，
         -- 否则「跟随列表设置/显示AI」保存后的清空无法同步到后端（#565）。
@@ -243,6 +261,52 @@ router.put('/api/repositories', (req, res) => {
       db.prepare(`DELETE FROM releases WHERE account_id = ? AND repo_id NOT IN (${placeholders})`);
     const deleteRepositoriesNotIn = (placeholders: string) =>
       db.prepare(`DELETE FROM repositories WHERE account_id = ? AND id NOT IN (${placeholders})`);
+
+    // 跨账号 AI 成果批量回填：ON CONFLICT DO UPDATE 的回填子查询只覆盖冲突
+    // （更新）路径；首次 INSERT 不进入该分支。这里对当前账号分区中仍缺 AI
+    // 成果的仓库（含本次首次插入的行）统一补齐同库其他账号对同一仓库的
+    // 已有分析成果，只补缺失字段、绝不覆盖当前账号已有非空值。
+    const backfillAiFromOtherAccounts = db.prepare(`
+      UPDATE repositories SET
+        ai_summary = CASE
+          WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE((
+            SELECT other.ai_summary FROM repositories AS other
+            WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
+            LIMIT 1
+          ), ai_summary)
+          ELSE ai_summary END,
+        ai_tags = CASE
+          WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE((
+            SELECT other.ai_tags FROM repositories AS other
+            WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
+            LIMIT 1
+          ), ai_tags)
+          ELSE ai_tags END,
+        ai_platforms = CASE
+          WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE((
+            SELECT other.ai_platforms FROM repositories AS other
+            WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
+            LIMIT 1
+          ), ai_platforms)
+          ELSE ai_platforms END,
+        analyzed_at = CASE
+          WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE((
+            SELECT other.analyzed_at FROM repositories AS other
+            WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
+            LIMIT 1
+          ), analyzed_at)
+          ELSE analyzed_at END
+      WHERE account_id = ? AND (
+        ai_summary IS NULL OR ai_summary = ''
+        OR ai_tags IS NULL OR ai_tags = '[]'
+        OR ai_platforms IS NULL OR ai_platforms = '[]'
+        OR analyzed_at IS NULL OR analyzed_at = ''
+      )
+    `);
 
     const upsert = db.transaction(() => {
       const isFullSync = Boolean(req.body?.isFullSync);
@@ -295,6 +359,12 @@ router.put('/api/repositories', (req, res) => {
           { licenseProvided }
         );
         count++;
+      }
+
+      // 首次插入的行不经过 ON CONFLICT DO UPDATE 的回填分支：统一执行一次
+      // 批量回填（对已补齐的行是 no-op），保证新账号首次同步即可复用已有分析。
+      if (count > 0) {
+        backfillAiFromOtherAccounts.run(accountId);
       }
       return count;
     });

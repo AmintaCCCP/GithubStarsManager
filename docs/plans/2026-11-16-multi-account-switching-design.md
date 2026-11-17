@@ -522,7 +522,12 @@ export interface AccountSwitchActions {
      - `github_token_encrypted` 一律复用 `server/src/services/crypto.ts` 的 `encrypt()`（与 `settings.github_token` 同款加密，`server/src/routes/sync.ts:388` 有先例）。
 
 7. **`server/src/routes/proxy.ts`（`/api/proxy/github/*` 与 `/api/proxy/github-raw`）**：
-   - 读取 GitHub Token 时，优先按 `const accountId = resolveAccountScope(req, db)` 查询 `account_settings`（`WHERE account_id = ? AND key = 'github_token'`）或 `accounts.github_token_encrypted`；若未命中**再回退查全局 `settings WHERE key = 'github_token'`（回退顺序不可颠倒——现有 `server/tests/routes/githubProxyRoute.test.ts:12` 的 mock 只对含 `FROM settings` 的 SQL 返回数据，依赖该回退路径才能通过）**。确保切换账号后通过后端代理发起的 GitHub API 请求 100% 使用当前活跃账号的 Token。
+   - 读取 GitHub Token 时，优先按 `const accountId = resolveAccountScope(req, db)` 查询 `account_settings`（`WHERE account_id = ? AND key = 'github_token'`）或 `accounts.github_token_encrypted`。
+   - **全局 `settings WHERE key = 'github_token'` 的回退仅限旧语义范围，防止账号 B 使用账号 A 的凭证**：
+     - 解析为 `'default'`（旧客户端 / 无头请求、无 `active_account_id`）时回退全局表，行为与 v4 之前完全一致（`server/tests/routes/githubProxyRoute.test.ts:12` 的 mock 只对含 `FROM settings` 的 SQL 返回数据，依赖该回退路径通过，契约保持不变）；
+     - 请求未显式携带 `X-GitHub-Account-Id`、且当前活跃账号是 `legacy_default_claimed_by` 认领的存量归属账号（全局 Token 已在认领时通过 GitHub 身份校验归属该账号）时，允许回退全局表；
+     - **显式指定真实账号**（`X-GitHub-Account-Id` 命中）而该账号没有任何自身凭据，或其 `account_settings.github_token` 记录存在但已被显式清空（空值）时，一律返回「GitHub token not configured」，**不回退 `accounts.github_token_encrypted` 旧凭据，也不读取全局 `settings`**。
+   - 回退顺序不可颠倒：account_settings → accounts.github_token_encrypted → 全局 settings（仅在上述允许范围内）。确保切换账号后通过后端代理发起的 GitHub API 请求 100% 使用当前活跃账号的 Token。
 
 8. **`server/src/routes/authRestore.ts`（`POST /api/sync/auth`）**：
    - 支持可选请求体 `{ account_id?: string }` 或请求头 `X-GitHub-Account-Id`；

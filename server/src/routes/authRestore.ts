@@ -66,7 +66,9 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
  * 解析恢复目标账号的 Token：
  * 1. account_settings.github_token（当前账号分区）；
  * 2. accounts.github_token_encrypted（账号元数据表）；
- * 3. 全局 settings.github_token（旧版兼容回退）。
+ * 3. 全局 settings.github_token —— 仅当目标账号为 'default'（旧版兼容回退）。
+ *    显式/解析出的真实账号缺少自身凭据时返回 null，绝不回退可能属于
+ *    其他账号的全局凭证（恢复脱敏备份后无账号 Token 是明确支持的状态）。
  */
 function readScopedToken(db: ReturnType<typeof getDb>, accountId: string): string | null {
   const decryptOrNull = (value: string | null | undefined): string | null => {
@@ -89,6 +91,9 @@ function readScopedToken(db: ReturnType<typeof getDb>, accountId: string): strin
       .get(accountId) as { github_token_encrypted: string | null } | undefined;
     const fromAccounts = decryptOrNull(accountRow?.github_token_encrypted ?? null);
     if (fromAccounts) return fromAccounts;
+
+    // 真实账号没有自身凭据：返回 null（不回退全局，避免与其他账号凭证串号）。
+    return null;
   }
 
   const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;

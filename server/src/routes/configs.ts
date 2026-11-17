@@ -4,7 +4,7 @@ import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
-import { resolveAccountScope, ACCOUNT_SCOPED_SETTING_KEYS } from '../db/accountScope.js';
+import { resolveAccountScope, getLegacyDefaultClaimedBy, ACCOUNT_SCOPED_SETTING_KEYS } from '../db/accountScope.js';
 
 // 账号级设置键集合（Per-Account）：从 accountScope 统一出口转发，
 // 保持 configs.ts 作为 /api/settings 语义的定义点。
@@ -525,16 +525,24 @@ router.delete('/api/configs/webdav/:id', (req, res) => {
 
 // GET /api/settings
 // 先读取全局 settings，再用当前账号 account_settings 中的键值覆盖同名键。
-// 认领账号（legacy_default_claimed_by）缺失键时自然回退全局值（全局先读）。
+// 全局表中的账号级键（ACCOUNT_SCOPED_SETTING_KEYS）只归属 default 分区或
+// 已认领存量数据的 legacy owner（legacy_default_claimed_by）账号；其他真实账号
+// 缺失账号级键时保持缺失，绝不继承其他账号留在全局表中的旧值（防串号）。
 router.get('/api/settings', (req, res) => {
   try {
     const db = getDb();
     const accountId = resolveAccountScope(req, db);
+    const inheritLegacyScopedSettings = accountId === 'default'
+      || getLegacyDefaultClaimedBy(db) === accountId;
     const rows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
     const settings: Record<string, unknown> = {};
 
     for (const row of rows) {
       const key = row.key as string;
+      if (!inheritLegacyScopedSettings && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
+        // 其他账号的账号级设置：对当前账号不可见。
+        continue;
+      }
       let value = row.value as string | null;
 
       if (key === 'github_token' && value) {
@@ -593,22 +601,29 @@ router.put('/api/settings', (req, res) => {
       'INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)'
     );
 
-    const accountPayload: { userProfile: unknown; tokenEncrypted: string | null } = {
+    const accountPayload: { userProfile: unknown; tokenEncrypted: string | null; tokenCleared: boolean } = {
       userProfile: undefined,
       tokenEncrypted: null,
+      tokenCleared: false,
     };
 
     const upsert = db.transaction(() => {
       for (const [key, rawValue] of Object.entries(updates)) {
         let value = rawValue as string | null;
 
-        if (key === 'github_token' && value && typeof value === 'string') {
-          if (value.startsWith('***')) {
+        if (key === 'github_token') {
+          if (typeof value === 'string' && value.startsWith('***')) {
             // Skip masked values — keep existing
             continue;
           }
-          value = encrypt(value, config.encryptionKey);
-          if (isRealAccount) accountPayload.tokenEncrypted = value;
+          if (value && typeof value === 'string') {
+            value = encrypt(value, config.encryptionKey);
+            if (isRealAccount) accountPayload.tokenEncrypted = value;
+          } else if (isRealAccount) {
+            // 显式清空（'' / null）：除 account_settings 外，accounts 表的加密
+            // 凭据副本必须一并清空，否则代理会继续复用旧 Token。
+            accountPayload.tokenCleared = true;
+          }
         }
 
         if (key === 'user_profile') {
@@ -635,8 +650,16 @@ router.put('/api/settings', (req, res) => {
       }
 
       if (isRealAccount
-        && (accountPayload.userProfile !== undefined || accountPayload.tokenEncrypted !== null)) {
-        upsertAccountRow(db, accountId, accountPayload.userProfile, accountPayload.tokenEncrypted);
+        && (accountPayload.userProfile !== undefined
+          || accountPayload.tokenEncrypted !== null
+          || accountPayload.tokenCleared)) {
+        upsertAccountRow(
+          db,
+          accountId,
+          accountPayload.userProfile,
+          accountPayload.tokenCleared ? null : accountPayload.tokenEncrypted,
+          accountPayload.tokenCleared,
+        );
         globalStmt.run('active_account_id', accountId);
       }
     });
@@ -654,6 +677,7 @@ function upsertAccountRow(
   accountId: string,
   userProfileRaw: unknown,
   tokenEncrypted: string | null,
+  clearToken = false,
 ): void {
   const existing = db.prepare('SELECT user_json FROM accounts WHERE account_id = ?')
     .get(accountId) as { user_json: string | null } | undefined;
@@ -667,14 +691,26 @@ function upsertAccountRow(
       userJson = JSON.stringify(userProfileRaw);
     }
   }
+  // v4 schema 将 accounts.user_json 声明为 NOT NULL：首建账号行且本次未携带有效
+  // 资料时，以仅含 GitHub 数值 id 的占位身份落库（accountId 即 GitHub user id），
+  // 保证 token-only 凭据保存（autoSync 通道）不会触发约束错误回滚整个设置事务。
+  const numericId = Number(accountId);
+  const placeholderUserJson = Number.isInteger(numericId) && numericId > 0
+    ? JSON.stringify({ id: numericId })
+    : JSON.stringify({ id: accountId });
+  const effectiveUserJson = userJson ?? placeholderUserJson;
   db.prepare(`
     INSERT INTO accounts (account_id, user_json, github_token_encrypted, last_used_at)
     VALUES (?, ?, ?, datetime('now'))
     ON CONFLICT(account_id) DO UPDATE SET
-      user_json = COALESCE(excluded.user_json, accounts.user_json),
-      github_token_encrypted = COALESCE(excluded.github_token_encrypted, accounts.github_token_encrypted),
+      user_json = CASE WHEN @userJsonProvided THEN excluded.user_json ELSE accounts.user_json END,
+      github_token_encrypted = CASE WHEN @clearToken THEN NULL
+        ELSE COALESCE(excluded.github_token_encrypted, accounts.github_token_encrypted) END,
       last_used_at = excluded.last_used_at
-  `).run(accountId, userJson, tokenEncrypted);
+  `).run(accountId, effectiveUserJson, tokenEncrypted, {
+    userJsonProvided: userJson !== null ? 1 : 0,
+    clearToken: clearToken ? 1 : 0,
+  });
 }
 
 // ── Embedding Configs ──

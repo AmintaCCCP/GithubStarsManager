@@ -4,22 +4,32 @@ import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { proxyRequest, ProxyConfig, validateUrl, isPrivateOrLoopback } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
-import { resolveAccountScope } from '../db/accountScope.js';
+import { resolveAccountScope, extractRequestedAccountId, getLegacyDefaultClaimedBy } from '../db/accountScope.js';
 
 /**
  * 按当前账号分区解析 GitHub Token（多账号隔离，Issue #611）。
  * 回退顺序不可颠倒：account_settings → accounts.github_token_encrypted → 全局 settings。
- * 无头请求（无 X-GitHub-Account-Id 且无 active_account_id）解析为 'default'，
- * account_settings 查询自然未命中，直接回退全局表，旧客户端行为完全不变。
+ *
+ * 全局 Token 回退仅限旧语义范围（防跨账号凭证串号）：
+ * - 解析为 'default'（旧客户端 / 无头请求，无 active_account_id）——行为与 v4 之前完全一致；
+ * - 请求未显式携带 X-GitHub-Account-Id、且当前账号是 legacy_default_claimed_by
+ *   认领的存量归属账号（全局 Token 已在认领时通过 GitHub 身份校验归属该账号）。
+ * 显式指定真实账号而账号级 Token 缺失或已被显式清空时，一律返回「未配置」，
+ * 绝不回退 accounts 旧凭据或全局 Token。
  */
 function resolveGitHubTokenForRequest(req: import('express').Request): { token: string | null; decryptFailed: boolean } {
   const db = getDb();
+  const explicitAccountId = extractRequestedAccountId(req);
   const accountId = resolveAccountScope(req, db);
   if (accountId !== 'default') {
     const accountSetting = db
       .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
-      .get(accountId) as { value: string } | undefined;
-    if (accountSetting?.value) {
+      .get(accountId) as { value: string | null } | undefined;
+    if (accountSetting) {
+      // 记录存在但值为空 = 已被显式清空：不得复用 accounts 旧 Token 或全局 Token。
+      if (!accountSetting.value) {
+        return { token: null, decryptFailed: false };
+      }
       try {
         return { token: decrypt(accountSetting.value, config.encryptionKey), decryptFailed: false };
       } catch {
@@ -35,6 +45,15 @@ function resolveGitHubTokenForRequest(req: import('express').Request): { token: 
       } catch {
         return { token: null, decryptFailed: true };
       }
+    }
+    // 显式指定真实账号而其没有任何自身凭据：返回未配置，绝不使用其他账号的全局身份。
+    if (explicitAccountId) {
+      return { token: null, decryptFailed: false };
+    }
+    // 无显式账号头的请求（旧客户端 / 无头）按活跃账号解析：仅存量归属账号
+    // （legacy_default_claimed_by）允许回退全局 Token，其余账号视为未配置。
+    if (getLegacyDefaultClaimedBy(db) !== accountId) {
+      return { token: null, decryptFailed: false };
     }
   }
 

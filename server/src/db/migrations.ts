@@ -183,6 +183,11 @@ const migrations: Record<number, (db: Database.Database) => void> = {
       `);
     }
   },
+  5: (db) => {
+    // 跨账号 AI 成果回填子查询按纯 id 条件检索捐赠行（account_id != ?），
+    // 复合主键 (account_id, id) 无法命中；补充独立索引避免全表扫描。
+    db.exec('CREATE INDEX IF NOT EXISTS idx_repositories_repo_id ON repositories(id)');
+  },
 };
 
 export function runMigrations(db: Database.Database): void {

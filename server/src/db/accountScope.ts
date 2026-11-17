@@ -81,19 +81,51 @@ function isLegacyClaimPending(db: Database.Database): boolean {
   return readSetting(db, CLAIMED_BY_KEY) === null;
 }
 
-/** 通过 GitHub /user API 解析 Token 真实归属的账号 id；成功结果缓存进 settings。 */
-async function resolveLegacyDefaultOwner(db: Database.Database): Promise<string | null> {
-  const cached = readSetting(db, LEGACY_OWNER_CACHE_KEY);
-  if (cached && ACCOUNT_ID_PATTERN.test(cached)) return cached;
+/** 读取存量 default 数据的认领账号（未认领或标记非法时为 null）。 */
+export function getLegacyDefaultClaimedBy(db: Database.Database): string | null {
+  const claimed = readSetting(db, CLAIMED_BY_KEY);
+  return claimed && ACCOUNT_ID_PATTERN.test(claimed) ? claimed : null;
+}
 
+interface LegacyOwnerResolution {
+  ownerId: string | null;
+  /** 身份校验时实际使用的加密 Token；认领事务据此确认 Token 未被换绑。 */
+  verifiedToken: string | null;
+}
+
+/**
+ * 通过 GitHub /user API 解析全局 Token 真实归属的账号 id。
+ * 身份缓存（legacy_default_owner_id）绑定到「已通过校验的那份加密 Token」：
+ * 仅当当前全局 Token 与缓存记录的 Token 完全一致时缓存才可信，否则重新校验——
+ * 防止全局 Token 被换成其他账号后仍沿用旧身份（凭证错配）。
+ */
+async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyOwnerResolution> {
   const encrypted = readSetting(db, 'github_token');
-  if (!encrypted) return null;
+
+  const cached = readSetting(db, LEGACY_OWNER_CACHE_KEY);
+  if (cached && encrypted) {
+    try {
+      const parsed = JSON.parse(cached) as { ownerId?: unknown; token?: unknown };
+      if (
+        typeof parsed.ownerId === 'string'
+        && ACCOUNT_ID_PATTERN.test(parsed.ownerId)
+        && typeof parsed.token === 'string'
+        && parsed.token === encrypted
+      ) {
+        return { ownerId: parsed.ownerId, verifiedToken: parsed.token };
+      }
+    } catch {
+      // 旧版缓存为裸账号 id（无 Token 绑定）：绑定关系未知，重新校验并升级格式。
+    }
+  }
+
+  if (!encrypted) return { ownerId: null, verifiedToken: null };
   let token: string;
   try {
     token = decrypt(encrypted, config.encryptionKey);
   } catch {
     logger.warn('db.accountScope', 'Failed to decrypt legacy github_token for default-claim identity check');
-    return null;
+    return { ownerId: null, verifiedToken: null };
   }
 
   try {
@@ -123,15 +155,17 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<string 
     }
     if (ownerId) {
       try {
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(LEGACY_OWNER_CACHE_KEY, ownerId);
+        // 缓存同时记录身份与被校验的加密 Token，供下次免网络复用（并防换绑错配）。
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
+          .run(LEGACY_OWNER_CACHE_KEY, JSON.stringify({ ownerId, token: encrypted }));
       } catch { /* cache write is best-effort */ }
     }
-    return ownerId;
+    return { ownerId, verifiedToken: encrypted };
   } catch (err) {
     logger.warn('db.accountScope', 'Legacy default-claim identity check request failed', {
       error: err instanceof Error ? err.message : String(err),
     });
-    return null;
+    return { ownerId: null, verifiedToken: encrypted };
   }
 }
 
@@ -140,50 +174,174 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<string 
  *
  * 仅当同时满足以下条件时才执行认领，否则 'default' 数据原地不动：
  * 1. settings 中尚未记录 legacy_default_claimed_by；
- * 2. 全局 settings.github_token 经 GitHub /user 校验出的真实归属 === 请求账号 ID。
+ * 2. 全局 settings.github_token 经 GitHub /user 校验出的真实归属 === 请求账号 ID；
+ * 3. 认领事务内再次核对全局 Token 与身份校验所用 Token 一致（校验期间被换绑则中止）。
  *
  * 认领在单个事务中完成：repositories / releases / categories 的 default 行
- * 迁移为请求账号 ID，账号级设置键复制进 account_settings，并写入
- * legacy_default_claimed_by 与 active_account_id。
+ * 「逐条」迁移为请求账号 ID（目标分区已有数据时按记录合并而非整表跳过），
+ * 账号级设置键以「只补缺失」方式复制进 account_settings（不覆盖账号已保存的
+ * 新值），最后写入 legacy_default_claimed_by 与 active_account_id。
+ * 若仍有 default 残留行（意外冲突），整体回滚并保持可重试状态，绝不写认领标记。
  */
 export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountId: string): Promise<void> {
   if (!ACCOUNT_ID_PATTERN.test(accountId)) return;
   if (!isLegacyClaimPending(db)) return;
 
-  const ownerId = await resolveLegacyDefaultOwner(db);
-  if (!ownerId) return;
-  if (ownerId !== accountId) {
+  const resolution = await resolveLegacyDefaultOwner(db);
+  if (!resolution.ownerId) return;
+  if (resolution.ownerId !== accountId) {
     // 身份不符：绝不认领。'default' 存量数据原地保留，等待真正的归属账号登录。
     logger.info('db.accountScope', 'Skipping legacy default claim: identity mismatch', {
-      legacyOwner: ownerId,
+      legacyOwner: resolution.ownerId,
       requested: accountId,
     });
     return;
   }
 
+  const verifiedToken = resolution.verifiedToken;
   const claim = db.transaction(() => {
     const claimed = readSetting(db, CLAIMED_BY_KEY);
-    if (claimed) return; // 并发请求下的二次确认
+    if (claimed) return null; // 并发请求下的二次确认
+
+    // 身份查询存在网络等待：提交前确认全局 Token 仍是当初通过校验的那份，
+    // 否则（例如等待期间无头请求把全局 Token 换成了其他账号）中止本次认领。
+    const currentEncrypted = readSetting(db, 'github_token');
+    if (!verifiedToken || currentEncrypted !== verifiedToken) {
+      logger.warn('db.accountScope', 'Aborting legacy default claim: global token changed during identity check');
+      return null;
+    }
 
     const counts = {
       repositories: 0,
       releases: 0,
       categories: 0,
     };
+
+    // ── repositories：先迁移无冲突行；再按记录合并冲突行（同 id / 同 full_name），
+    // 目标分区已有数据时绝不整表跳过，避免存量行永久滞留 default。──
+    counts.repositories = db.prepare(
+      "UPDATE OR IGNORE repositories SET account_id = ? WHERE account_id = 'default'"
+    ).run(accountId).changes;
+
+    // 同 id 冲突：目标行（账号自己的同步结果）保留，把 default 行独有的 AI 成果与
+    // 用户自定义数据按「只补缺失」合并进目标行，然后删除 default 行。
+    db.prepare(`
+      UPDATE repositories SET
+        ai_summary = CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE(
+          (SELECT d.ai_summary FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), ai_summary) ELSE ai_summary END,
+        ai_tags = CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE(
+          (SELECT d.ai_tags FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), ai_tags) ELSE ai_tags END,
+        ai_platforms = CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE(
+          (SELECT d.ai_platforms FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), ai_platforms) ELSE ai_platforms END,
+        analyzed_at = CASE WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE(
+          (SELECT d.analyzed_at FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), analyzed_at) ELSE analyzed_at END,
+        custom_description = COALESCE(custom_description, (SELECT d.custom_description FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        custom_tags = COALESCE(custom_tags, (SELECT d.custom_tags FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        custom_category = COALESCE(custom_category, (SELECT d.custom_category FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        category_locked = CASE WHEN category_locked = 1 THEN 1 ELSE COALESCE(
+          (SELECT d.category_locked FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), category_locked) END,
+        description_display = COALESCE(description_display, (SELECT d.description_display FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        tags_display = COALESCE(tags_display, (SELECT d.tags_display FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        last_edited = COALESCE(last_edited, (SELECT d.last_edited FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        starred_at = COALESCE(starred_at, (SELECT d.starred_at FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
+        subscribed_to_releases = CASE WHEN subscribed_to_releases = 1 THEN 1 ELSE COALESCE(
+          (SELECT d.subscribed_to_releases FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), subscribed_to_releases) END
+      WHERE account_id = ? AND EXISTS (
+        SELECT 1 FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id
+      )
+    `).run(accountId);
+    db.prepare(`
+      DELETE FROM repositories WHERE account_id = 'default' AND EXISTS (
+        SELECT 1 FROM repositories t WHERE t.account_id = ? AND t.id = repositories.id
+      )
+    `).run(accountId);
+
+    // 同 full_name 异 id 冲突（仓库删除后重建等）：同样补入后删除。
+    db.prepare(`
+      UPDATE repositories SET
+        ai_summary = CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE(
+          (SELECT d.ai_summary FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), ai_summary) ELSE ai_summary END,
+        ai_tags = CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE(
+          (SELECT d.ai_tags FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), ai_tags) ELSE ai_tags END,
+        ai_platforms = CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE(
+          (SELECT d.ai_platforms FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), ai_platforms) ELSE ai_platforms END,
+        analyzed_at = CASE WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE(
+          (SELECT d.analyzed_at FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), analyzed_at) ELSE analyzed_at END,
+        custom_description = COALESCE(custom_description, (SELECT d.custom_description FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        custom_tags = COALESCE(custom_tags, (SELECT d.custom_tags FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        custom_category = COALESCE(custom_category, (SELECT d.custom_category FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        description_display = COALESCE(description_display, (SELECT d.description_display FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        tags_display = COALESCE(tags_display, (SELECT d.tags_display FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        last_edited = COALESCE(last_edited, (SELECT d.last_edited FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        starred_at = COALESCE(starred_at, (SELECT d.starred_at FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        subscribed_to_releases = CASE WHEN subscribed_to_releases = 1 THEN 1 ELSE COALESCE(
+          (SELECT d.subscribed_to_releases FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), subscribed_to_releases) END
+      WHERE account_id = ? AND EXISTS (
+        SELECT 1 FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name
+      )
+    `).run(accountId);
+    db.prepare(`
+      DELETE FROM repositories WHERE account_id = 'default' AND EXISTS (
+        SELECT 1 FROM repositories t WHERE t.account_id = ? AND t.full_name = repositories.full_name
+      )
+    `).run(accountId);
+
+    // ── releases：同 id 冲突时合并已读状态（并集），其余行直接迁移。──
+    counts.releases = db.prepare(
+      "UPDATE OR IGNORE releases SET account_id = ? WHERE account_id = 'default'"
+    ).run(accountId).changes;
+    db.prepare(`
+      UPDATE releases SET
+        is_read = CASE WHEN is_read = 1 THEN 1 ELSE COALESCE(
+          (SELECT d.is_read FROM releases d WHERE d.account_id = 'default' AND d.id = releases.id), is_read) END
+      WHERE account_id = ? AND EXISTS (
+        SELECT 1 FROM releases d WHERE d.account_id = 'default' AND d.id = releases.id
+      )
+    `).run(accountId);
+    db.prepare(`
+      DELETE FROM releases WHERE account_id = 'default' AND EXISTS (
+        SELECT 1 FROM releases t WHERE t.account_id = ? AND t.id = releases.id
+      )
+    `).run(accountId);
+
+    // ── categories：同 id 冲突时补入目标缺失的分类字段，其余行直接迁移。──
+    counts.categories = db.prepare(
+      "UPDATE OR IGNORE categories SET account_id = ? WHERE account_id = 'default'"
+    ).run(accountId).changes;
+    db.prepare(`
+      UPDATE categories SET
+        keywords = COALESCE(keywords, (SELECT d.keywords FROM categories d WHERE d.account_id = 'default' AND d.id = categories.id)),
+        description = COALESCE(description, (SELECT d.description FROM categories d WHERE d.account_id = 'default' AND d.id = categories.id)),
+        color = COALESCE(color, (SELECT d.color FROM categories d WHERE d.account_id = 'default' AND d.id = categories.id)),
+        sort_order = COALESCE(sort_order, (SELECT d.sort_order FROM categories d WHERE d.account_id = 'default' AND d.id = categories.id))
+      WHERE account_id = ? AND EXISTS (
+        SELECT 1 FROM categories d WHERE d.account_id = 'default' AND d.id = categories.id
+      )
+    `).run(accountId);
+    db.prepare(`
+      DELETE FROM categories WHERE account_id = 'default' AND EXISTS (
+        SELECT 1 FROM categories t WHERE t.account_id = ? AND t.id = categories.id
+      )
+    `).run(accountId);
+
+    // 迁移完整性校验：仍有 default 残留行（意外冲突）时整体回滚，保留可重试状态；
+    // 绝不在迁移未完成时写入 legacy_default_claimed_by。
+    let leftover = 0;
     for (const table of ['repositories', 'releases', 'categories'] as const) {
-      const defaultRow = db.prepare(`SELECT COUNT(*) as total FROM ${table} WHERE account_id = 'default'`).get() as { total: number } | undefined;
-      const accountRow = db.prepare(`SELECT COUNT(*) as total FROM ${table} WHERE account_id = ?`).get(accountId) as { total: number } | undefined;
-      if ((defaultRow?.total ?? 0) > 0 && (accountRow?.total ?? 0) === 0) {
-        const result = db
-          .prepare(`UPDATE ${table} SET account_id = ? WHERE account_id = 'default'`)
-          .run(accountId);
-        counts[table] = result.changes;
-      }
+      const row = db.prepare(`SELECT COUNT(*) as total FROM ${table} WHERE account_id = 'default'`).get() as { total: number };
+      leftover += row.total;
     }
+    if (leftover > 0) {
+      logger.warn('db.accountScope', 'Legacy default claim aborted: unmigrated default rows remain', { leftover });
+      throw new Error('legacy default claim incomplete');
+    }
+
     for (const key of ACCOUNT_SCOPED_SETTING_KEYS) {
       const value = readSetting(db, key);
       if (value === null) continue;
-      db.prepare('INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
+      // 只补充目标账号缺失的设置：账号已保存的新值（如认领前先写入的
+      // customCategories / github_token）绝不被全局存量值覆盖。
+      db.prepare('INSERT OR IGNORE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
         .run(accountId, key, value);
     }
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(CLAIMED_BY_KEY, accountId);
@@ -191,7 +349,16 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
     return counts;
   });
 
-  const claimed = claim();
+  let claimed: { repositories: number; releases: number; categories: number } | null = null;
+  try {
+    claimed = claim();
+  } catch (err) {
+    // 事务已回滚：保留 default 数据与可重试状态，本次请求照常继续。
+    logger.warn('db.accountScope', 'Legacy default claim transaction rolled back', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
   if (claimed) {
     logger.info('db.accountScope', 'Legacy default data claimed by first verified account', { accountId, ...claimed });
   }
