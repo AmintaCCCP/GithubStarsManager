@@ -51,7 +51,7 @@ vi.mock('./useLoginActions', () => ({
 }));
 
 import { useAppStore } from '../../../store/useAppStore';
-import { startAutoSync, stopAutoSync } from '../../../services/autoSync';
+import { hasPendingAccountSync, startAutoSync, stopAutoSync } from '../../../services/autoSync';
 import type { GitHubUser } from '../../../types';
 import { useAccountSwitchActions } from './useAccountSwitchActions';
 
@@ -538,7 +538,7 @@ describe('useAccountSwitchActions audit fixes', () => {
     expect(mocks.backend.init).toHaveBeenCalledWith('https://old.example/api');
   });
 
-  it('does not flush edits made during the backend restore window to the candidate backend', async () => {
+  it('buffers edits made during the restore window and re-pushes them after a failed restore', async () => {
     useAppStore.setState({
       user: userA,
       githubToken: 'ghp_a',
@@ -546,6 +546,11 @@ describe('useAccountSwitchActions audit fixes', () => {
       savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
     });
     mocks.backend.isAvailable = true;
+    const usersAtPush: Array<string | null> = [];
+    mocks.syncToBackend.mockImplementation(async () => {
+      usersAtPush.push(useAppStore.getState().user?.login ?? null);
+      return true;
+    });
     mocks.restoreBackendSession.mockImplementation(async () => {
       // 模拟 backend.init 已提交候选 URL 后、身份验证等待期间的用户编辑
       //（categoryOrder 是订阅器跟踪的字段；此时旧账号尚未归档）
@@ -562,12 +567,72 @@ describe('useAccountSwitchActions audit fixes', () => {
       });
 
       expect(outcome).toEqual({ ok: false, error: 'github-token-required' });
-      // 审计修复：恢复窗口被冻结——窗口内编辑不记为待推，守卫退出绝不把
-      // 尚未归档的旧账号工作区（或空工作区）写入候选后端分区
-      expect(mocks.syncToBackend).not.toHaveBeenCalled();
+      // R4 审计修复：窗口内编辑被缓冲，绝不推给候选后端（守卫退出零推送）；
+      // 连接复原到原后端后按发起账号立即补推一次（此刻仍以 A 的身份请求）
+      expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
+      expect(usersAtPush[0]).toBe('alice');
       expect(mocks.backend.syncSettings).not.toHaveBeenCalled();
-      // 失败恢复：账号 A 保持登录态且数据完好
+      // 账号级待推标记保留：本次补推失败时，下次进入该账号仍先补推再拉取
+      expect(hasPendingAccountSync('1')).toBe(true);
+      // 失败恢复：账号 A 保持登录态且数据完好（含窗口内编辑）
       expect(useAppStore.getState().user?.login).toBe('alice');
+      expect(useAppStore.getState().categoryOrder).toEqual(['reordered-during-restore']);
+      // R4 审计修复（候选后端恢复）：恢复请求绝不携带本机旧账号头
+      expect(mocks.restoreBackendSession).toHaveBeenCalledWith('https://candidate.example', { omitAccountHeader: true });
+    } finally {
+      stopAutoSync(unsubscribe);
+    }
+  });
+
+  it('keeps buffered edits local on a successful restore and pushes them before the pull when switching back', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      accountWorkspaces: { '2': workspaceOf(2) },
+    });
+    mocks.backend.isAvailable = true;
+    const usersAtPush: Array<string | null> = [];
+    mocks.syncToBackend.mockImplementation(async () => {
+      usersAtPush.push(useAppStore.getState().user?.login ?? null);
+      return true;
+    });
+    mocks.restoreBackendSession.mockImplementation(async () => {
+      // 恢复等待期间的真实编辑（尚未归档，归属发起账号 A）
+      useAppStore.setState({ categoryOrder: ['edited-during-restore'] });
+      return { status: 'connected', githubToken: 'ghp_b', user: userB, accounts: [] };
+    });
+
+    const unsubscribe = startAutoSync();
+    try {
+      const { result } = renderHook(() => useAccountSwitchActions());
+      let outcome;
+      await act(async () => {
+        outcome = await result.current.addAccountFromBackend('https://candidate.example', 'candidate-key');
+      });
+
+      expect(outcome).toEqual({ ok: true, user: userB });
+      expect(useAppStore.getState().user?.login).toBe('bob');
+      // 候选后端零推送：窗口内编辑绝不外发（整个恢复流程 syncToBackend 未被调用）
+      expect(mocks.syncToBackend).not.toHaveBeenCalled();
+      // 编辑归属发起账号 A：标记待补推，切回该账号时消费
+      expect(hasPendingAccountSync('1')).toBe(true);
+      expect(hasPendingAccountSync('2')).toBe(false);
+
+      // 切回账号 A：先补推（A 的上下文）再拉取——顺序绝不能颠倒
+      mocks.consumePendingAccountSync.mockReturnValueOnce(true);
+      await act(async () => {
+        await result.current.switchToAccount('1');
+      });
+      expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
+      expect(usersAtPush[0]).toBe('alice');
+      const pushOrder = mocks.syncToBackend.mock.invocationCallOrder[0];
+      const pullOrder = mocks.syncFromBackend.mock.invocationCallOrder.at(-1)!;
+      expect(pushOrder).toBeLessThan(pullOrder);
     } finally {
       stopAutoSync(unsubscribe);
     }

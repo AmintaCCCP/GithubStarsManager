@@ -4,6 +4,7 @@ import { accountIdKey, applyAccountWorkspace } from '../../../store/helpers/acco
 import { backend, isValidBackendRestoreAccount } from '../../../services/backendAdapter';
 import {
   consumePendingAccountSync,
+  hasPendingAccountSync,
   prepareForAccountSwitch,
   syncFromBackend,
   syncToBackend,
@@ -298,7 +299,12 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       const restoreOutcome = await withAccountSwitchFrozen(async (): Promise<
         { ok: false; error: string } | { ok: true; result: ConnectedRestore; targetAccountId: string }
       > => {
-        const result = await withAccountSwitchGuard(() => restoreBackendSession(url));
+        // R4 审计修复：本机仍登录旧账号 A 时，恢复请求绝不能携带 A 的账号头
+        // （X-GitHub-Account-Id）——服务端会优先选择 A 分区，候选后端的活跃
+        // 账号是 B 时返回 github_token: null，B 的有效凭证被误判为
+        // github-token-required。显式省略账号头，让服务端回退到候选后端自己
+        // 的 active_account_id 分区。
+        const result = await withAccountSwitchGuard(() => restoreBackendSession(url, { omitAccountHeader: true }));
         if (result.status === 'backend-unavailable') return { ok: false, error: 'backend-unavailable' };
         if (result.status === 'unauthorized') return { ok: false, error: 'unauthorized' };
         if (result.status === 'restore-failed') return { ok: false, error: 'restore-failed' };
@@ -359,6 +365,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         }
         // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
         recoverParkedAccount(parkedAccountId);
+        // R4 审计修复：冻结窗口内的真实编辑已按归属账号记入待推集合（或
+        // 此前冲刷失败遗留的标记）。连接已复原到原后端、当前账号工作区已
+        // 就位——立即补推到正确分区；无编辑（无标记）时保持零推送。标记
+        // 保留不消费：本次补推失败时，下次进入该账号仍会先补推再拉取。
+        if (hasPendingAccountSync(currentAccountId)) {
+          void syncToBackend();
+        }
       }
       releaseAccountSwitchLock();
       setIsSwitching(false);

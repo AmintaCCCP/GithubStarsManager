@@ -421,6 +421,95 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(accountRow.github_token_encrypted).toBeNull();
   });
 
+  it('clears the accounts credential copy when an imported top-level github_token is explicitly empty', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ github_token: 'token-a' })
+      .expect(200);
+
+    // v1 顶层导入：settings.github_token 显式清空（''，非掩码）
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ settings: { github_token: '' } })
+      .expect(200);
+
+    const scoped = db.prepare("SELECT value FROM account_settings WHERE account_id = '111' AND key = 'github_token'").get() as { value: string | null };
+    expect(scoped.value).toBe('');
+    // 与 configs.ts 显式清空语义一致：accounts 的加密凭据副本必须同步清空，
+    // 否则 readScopedToken / readAccountRows / proxy 的 accounts 回退会让旧 Token 复活
+    const accountRow = db.prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?').get(ACCOUNT_A) as { github_token_encrypted: string | null };
+    expect(accountRow.github_token_encrypted).toBeNull();
+
+    // 防御纵深：即使 accounts 残留旧凭据副本，显式清空记录也不允许 Token 复活
+    db.prepare('UPDATE accounts SET github_token_encrypted = ? WHERE account_id = ?')
+      .run(encrypt('stale-token', encryptionKey), ACCOUNT_A);
+    const restored = await request(app).post('/api/sync/auth').set(authHeaders(ACCOUNT_A)).expect(200);
+    expect(restored.body.github_token).toBeNull();
+    const listed = (restored.body.accounts as Array<{ accountId: string; githubToken: string | null }>)
+      .find((a) => a.accountId === ACCOUNT_A);
+    expect(listed?.githubToken).toBeNull();
+  });
+
+  it('clears the accounts credential copy when a workspace imports an explicitly empty github_token', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ github_token: 'token-a' })
+      .expect(200);
+
+    // 多账号工作区导入：账号 A 工作区显式携带空 Token（null）
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_B))
+      .send({
+        account_workspaces: [{
+          account_id: ACCOUNT_A,
+          repositories: [],
+          releases: [],
+          categories: [],
+          account_settings: { github_token: null },
+        }],
+      })
+      .expect(200);
+
+    const scoped = db.prepare("SELECT value FROM account_settings WHERE account_id = '111' AND key = 'github_token'").get() as { value: string | null };
+    expect(scoped.value).toBeNull();
+    const accountRow = db.prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?').get(ACCOUNT_A) as { github_token_encrypted: string | null };
+    expect(accountRow.github_token_encrypted).toBeNull();
+
+    // 已清空的 Token 不得经恢复通道复活
+    const restored = await request(app).post('/api/sync/auth').set(authHeaders(ACCOUNT_A)).expect(200);
+    expect(restored.body.github_token).toBeNull();
+  });
+
+  it('keeps the accounts credential copy when a workspace imports a masked github_token', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ github_token: 'token-a' })
+      .expect(200);
+
+    // 掩码 Token（'***' 前缀）不是显式清空：库中已有凭据必须原样保留
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_B))
+      .send({
+        account_workspaces: [{
+          account_id: ACCOUNT_A,
+          account_settings: { github_token: '***en-a' },
+        }],
+      })
+      .expect(200);
+
+    const accountRow = db.prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?').get(ACCOUNT_A) as { github_token_encrypted: string | null };
+    expect(accountRow.github_token_encrypted).not.toBeNull();
+  });
+
   it('does not fall back to the global token for an explicit account without credentials', async () => {
     const db = getDb();
     // 全局 Token 属于其他账号（999）：显式请求账号 B 绝不能使用它
@@ -607,7 +696,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(defaultRepos.total).toBe(0);
   });
 
-  it('revalidates the cached legacy identity against the current global token', async () => {
+  it('does not transfer legacy default data when the global token is swapped to another account', async () => {
     const db = getDb();
     db.prepare(`
       INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
@@ -615,7 +704,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     `).run();
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('token-of-999', encryptionKey));
 
-    // 第一次身份校验：存量 Token 属于 999（与请求者 222 不符）→ 缓存 999、不认领
+    // 第一次身份校验：存量 Token 属于 999（与请求者 222 不符）→ 已验证所有者确立为 999、不认领
     fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 999 }) });
     await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_B)).expect(200);
     expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get()).toBeUndefined();
@@ -627,17 +716,51 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .send({ github_token: 'token-of-222' })
       .expect(200);
 
-    // 缓存的 999 绑定的是旧 Token：与当前全局 Token 不一致时必须重新校验，
-    // 不得沿用旧身份错配新凭证
-    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+    // 已验证的数据所有者（999）与可替换的全局 Token 解耦：不得因换绑 Token 重新
+    // 判定归属，222 绝不能据此认领原属 999 的存量数据
+    const fetchCallsBefore = fetchMock.mock.calls.length;
     await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_B)).expect(200);
 
-    const claimedBy = db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string };
-    expect(claimedBy.value).toBe(ACCOUNT_B);
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get()).toBeUndefined();
     const rows = db.prepare('SELECT account_id FROM repositories').all() as Array<{ account_id: string }>;
-    expect(rows.map((r) => r.account_id)).toEqual([ACCOUNT_B]);
-    const scopedToken = db.prepare("SELECT value FROM account_settings WHERE account_id = '222' AND key = 'github_token'").get() as { value: string };
-    expect(decrypt(scopedToken.value, encryptionKey)).toBe('token-of-222');
+    expect(rows.map((r) => r.account_id)).toEqual(['default']);
+    // 认领判定只认已验证所有者：不得依据换绑后的 Token 重新发起身份校验
+    expect(fetchMock.mock.calls.length).toBe(fetchCallsBefore);
+    // 222 分区既未收到存量数据，也未收到任何全局凭据 / 账号级设置
+    expect(db.prepare('SELECT COUNT(*) as total FROM account_settings WHERE account_id = ?').get(ACCOUNT_B) as { total: number })
+      .toMatchObject({ total: 0 });
+  });
+
+  it('still claims legacy default data for the verified owner after a same-account token rotation', async () => {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('token-of-999', encryptionKey));
+
+    // 先由其他账号触发首次校验：归属确立为 999（请求者 222 被拒绝）
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 999 }) });
+    await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_B)).expect(200);
+
+    // 999 同账号轮换 Token（无头通道换绑全局 Token）
+    await request(app)
+      .put('/api/settings')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({ github_token: 'token-of-999-rotated' })
+      .expect(200);
+
+    // 已验证归属不随 Token 轮换改变：999 携带账号头登录仍可认领存量数据
+    const list = await request(app).get('/api/repositories').set(authHeaders('999')).expect(200);
+    expect(list.body.repositories.map((r: { id: number }) => r.id)).toEqual([1]);
+
+    const claimedBy = db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string };
+    expect(claimedBy.value).toBe('999');
+    const rows = db.prepare('SELECT account_id FROM repositories').all() as Array<{ account_id: string }>;
+    expect(rows.map((r) => r.account_id)).toEqual(['999']);
+    // 轮换后的全局 Token 与验证时绑定的 Token 不一致：绝不把来源无法证明的
+    // 凭据复制进认领账号的分区
+    expect(db.prepare("SELECT value FROM account_settings WHERE account_id = '999' AND key = 'github_token'").get()).toBeUndefined();
   });
 
   it('restores default-partition account-level settings from top-level settings on workspace import', async () => {

@@ -24,7 +24,13 @@ export interface LoginActions {
   authenticateWithGitHub: (token: string) => Promise<GitHubUser>;
   syncTokenToBackend: (token: string) => Promise<{ ok: boolean }>;
   configuredBackendUrl: string | null;
-  restoreBackendSession: (url: string) => Promise<BackendLoginResult>;
+  /**
+   * 候选后端恢复。options.omitAccountHeader 为 true 时显式省略
+   * X-GitHub-Account-Id 请求头（addAccountFromBackend 在本机仍登录旧账号时
+   * 必须省略——否则服务端优先选择本机旧账号分区，候选后端活跃账号 B 的
+   * 有效凭证会被误判为 github-token-required；R4 审计修复）。
+   */
+  restoreBackendSession: (url: string, options?: { omitAccountHeader?: boolean }) => Promise<BackendLoginResult>;
   setupBackendGitHubToken: (token: string) => Promise<GitHubUser>;
   syncBackendData: () => Promise<void>;
 }
@@ -54,7 +60,10 @@ export const useLoginActions = (): LoginActions => {
       return { ok: false };
     }
   }, []);
-  const restoreBackendSession = useCallback(async (url: string): Promise<BackendLoginResult> => {
+  const restoreBackendSession = useCallback(async (
+    url: string,
+    options?: { omitAccountHeader?: boolean },
+  ): Promise<BackendLoginResult> => {
     const previousUrl = backend.backendUrl;
     await backend.init(url);
     if (!backend.isAvailable) return { status: 'backend-unavailable' };
@@ -65,7 +74,7 @@ export const useLoginActions = (): LoginActions => {
       return { status: 'unauthorized' };
     }
 
-    const restored = await backend.restoreAuth();
+    const restored = await backend.restoreAuth(options);
     if (!restored) {
       await backend.init(previousUrl ?? undefined);
       return { status: 'restore-failed' };

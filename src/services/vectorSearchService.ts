@@ -195,6 +195,9 @@ export interface VectorizeVector {
     // 可选：此 PR 之前（embedding v2）索引的向量不含 license 键，重索引前以 undefined 出现。
     // indexAllRepos 写入时会填入字符串；消费方请按可选处理。
     license?: string;
+    // 可选：多账号账号隔离（R4 审计修复）。此前的存量向量（legacy）没有该键；
+    // 新写入的向量始终记录归属账号，供查询侧按当前账号过滤。
+    accountId?: string;
   };
 }
 
@@ -209,8 +212,41 @@ export interface VectorQueryResult {
     tags: string[];
     // 同上：旧向量查询返回时缺该键，按可选处理。
     license?: string;
+    // 同上：legacy 向量缺该键，按可选处理。
+    accountId?: string;
   };
 }
+
+/**
+ * 账号隔离的向量 ID（R4 审计修复）：多账号共享同一 VECTORIZE 索引，若沿用
+ * `String(repo.id)` 作为向量 ID，两个账号索引同一仓库会以相同 ID 互相覆盖
+ * 向量与 metadata（ai_tags/license 串号泄漏）。upsert 统一写入
+ * `${accountId}:${repo.id}` 并在 metadata 记录 accountId，使每个账号拥有
+ * 独立的向量副本。
+ *
+ * 兼容策略：accountId 未知（未登录边缘态）时保持旧格式无前缀 ID——与
+ * cleanup keepIds 的 legacy 形式一致；存量旧格式 ID 由查询侧按会话形态兼容
+ * （单账号会话视为本账号 legacy 数据继续可见，多账号会话因无法判定归属而
+ * 过滤，详见 hydrateMatches）。
+ */
+export const buildAccountScopedVectorId = (accountId: string | null | undefined, repoId: number | string): string => (
+  accountId ? `${accountId}:${repoId}` : String(repoId)
+);
+
+/**
+ * 解析向量 ID：带合法数字账号前缀（`accountId:repoId`）时返回归属账号与仓库
+ * ID；否则视为 legacy 无前缀 ID（accountId=null，repoId 即原 ID）。
+ */
+export const parseAccountScopedVectorId = (id: string): { accountId: string | null; repoId: string } => {
+  const separatorIndex = id.indexOf(':');
+  if (separatorIndex > 0) {
+    const prefix = id.slice(0, separatorIndex);
+    if (/^\d+$/.test(prefix)) {
+      return { accountId: prefix, repoId: id.slice(separatorIndex + 1) };
+    }
+  }
+  return { accountId: null, repoId: id };
+};
 
 export interface VectorizeStatus {
   vectorCount: number;
@@ -563,9 +599,16 @@ export async function indexAllRepos(
     formatVersion?: number;
     /** 最新格式版本号（EMBEDDING_FORMAT_VERSION） */
     currentFormatVersion?: number;
+    /**
+     * 归属账号（GitHub 数值 ID 字符串）。多账号共享同一向量索引时必须提供：
+     * 向量 ID 以账号为前缀、metadata 记录归属，避免不同账号互相覆盖/泄漏。
+     * 未提供（未登录边缘态）时退回 legacy 无前缀 ID（见
+     * buildAccountScopedVectorId 的兼容策略）。
+     */
+    accountId?: string | null;
   } = {}
 ): Promise<{ indexed: number; skipped: number; errors: number; error?: string; indexedRepoIds: number[] }> {
-  const { batchSize = 32, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed } = options;
+  const { batchSize = 32, onProgress, signal, readmeFetcher, indexMode = 'readme', readmeMaxChars = 6000, incremental, onRepoIndexed, accountId } = options;
 
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
     throw new Error('batchSize must be a positive integer');
@@ -628,7 +671,9 @@ export async function indexAllRepos(
         const vec = vectors[j];
         if (vec && Array.isArray(vec)) {
           vectorizeVectors.push({
-            id: String(batch[j].id),
+            // 账号隔离（R4 审计修复）：多账号共享索引时按账号前缀区分向量，
+            // metadata 同步记录归属账号，查询侧据此过滤
+            id: buildAccountScopedVectorId(accountId, batch[j].id),
             values: vec,
             metadata: {
               full_name: batch[j].full_name,
@@ -639,6 +684,7 @@ export async function indexAllRepos(
               // 历史/导入数据 license 可能是 GitHub 对象或数字；统一经 normalizeLicense
               // 降为 SPDX id / 哨兵，避免把 "[object Object]" 写入向量元数据。
               license: normalizeLicense(batch[j].license),
+              ...(accountId ? { accountId } : {}),
             },
           });
         } else {
@@ -656,9 +702,11 @@ export async function indexAllRepos(
           ? Math.min(upsertResult.upserted, vectorizeVectors.length)
           : vectorizeVectors.length;
         indexed += upsertedCount;
-        // 仅标记确认 upserted 的 repo（按顺序）
+        // 仅标记确认 upserted 的 repo（按顺序）。vectorizeVectors 与 batch
+        // 逐位对应（null 项未入列），直接取 batch 的数值 id——向量 ID 带
+        // 账号前缀后不能再 parseInt(id)（前缀非数字会得到 NaN）。
         for (let j = 0; j < upsertedCount; j++) {
-          const repoId = parseInt(vectorizeVectors[j].id, 10);
+          const repoId = batch[j].id;
           indexedRepoIds.push(repoId);
           onRepoIndexed?.(repoId);
         }

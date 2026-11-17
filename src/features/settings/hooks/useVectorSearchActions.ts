@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { EmbeddingApiType } from '../../../types';
 import {
+  buildAccountScopedVectorId,
   EMBEDDING_FORMAT_VERSION,
   EmbeddingClient,
   indexAllRepos,
@@ -205,6 +206,10 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         })));
       }
       const stamped: number[] = [];
+      // 账号隔离（R4 审计修复）：向量 ID 以发起账号为前缀、metadata 记录归属
+      // 账号——多账号共享同一 VECTORIZE 索引时按 `accountId:repoId` 区分副本，
+      // 避免同仓库互相覆盖向量与 metadata（ai_tags/license 串号）。未登录
+      // 边缘态（jobAccountId 为 null）退回 legacy 无前缀 ID。
       const result = await indexAllRepos(repositories, clients.embeddingClient, clients.vectorService, {
         onProgress: (progress) => {
           // 切号后立即中止：进度状态写入的是共享的 vectorIndexingState，绝不能串号
@@ -216,6 +221,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         indexMode: draft.indexMode,
         readmeMaxChars: draft.readmeMaxChars,
         incremental,
+        accountId: jobAccountId,
         ...(incremental ? { formatVersion: currentFormatVersion, currentFormatVersion: EMBEDDING_FORMAT_VERSION } : {}),
         onRepoIndexed: (id) => {
           // 切号后立即中止：打戳写入的是当前活跃账号的元数据，绝不能串号
@@ -239,7 +245,16 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         if (sharedIndexAcrossAccounts) {
           logger.warn('vectorSearch.index', 'Skip vector cleanup: the vector index is shared across multiple accounts');
         } else {
-          const cleanupKeepIds = [...new Set([...result.indexedRepoIds.map(String), ...excludedVectorIds])];
+          // keepIds 必须与索引中的实际向量 ID 形态一致：本次上传使用账号前缀
+          // 形态（buildAccountScopedVectorId）；排除项（已索引但分析缺失/失败、
+          // 不参与本次重建的仓库）的存量向量可能是 legacy 无前缀形态或前缀
+          // 形态，两种形式都保留——cleanup 按 keepIds 之外的 ID 物理删除，
+          // 漏掉任一形态都会误删这些仓库的向量。
+          const cleanupKeepIds = [...new Set([
+            ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
+            ...excludedVectorIds,
+            ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
+          ])];
           await clients.vectorService.cleanup(cleanupKeepIds, controller.signal);
         }
       }

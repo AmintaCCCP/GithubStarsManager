@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backend } from './backendAdapter';
 
+// 可变共享桩：restoreAuth 账号头测试需要模拟「本机已登录账号 A」的会话状态
+const mockStoreState: { backendApiSecret: string; user: { id: number; login: string } | null } = {
+  backendApiSecret: '',
+  user: null,
+};
+
 vi.mock('../store/useAppStore', () => ({
-  useAppStore: { getState: () => ({ backendApiSecret: '' }) },
+  useAppStore: { getState: () => mockStoreState },
 }));
 
 function make429Response(headers: Record<string, string>): Response {
@@ -224,6 +230,46 @@ describe('backendAdapter 后端 URL 安全策略', () => {
 
     expect(window.fetch).toHaveBeenCalledWith('http://127.0.0.2:8080/api/health', expect.anything());
     expect(backend.isAvailable).toBe(true);
+  });
+});
+
+describe('restoreAuth 账号头策略（R4 审计修复）', () => {
+  const adapter = backend as unknown as BackendAdapterLike;
+
+  afterEach(() => {
+    vi.mocked(window.fetch).mockReset();
+    adapter._backendUrl = null;
+    mockStoreState.user = null;
+    mockStoreState.backendApiSecret = '';
+  });
+
+  const requestHeaders = (): Record<string, string> => {
+    const init = vi.mocked(window.fetch).mock.calls[0]?.[1] as RequestInit;
+    return init.headers as Record<string, string>;
+  };
+
+  it('缺省携带当前登录账号的 X-GitHub-Account-Id（普通账号定向恢复保留）', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    mockStoreState.user = { id: 1, login: 'alice' };
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({ github_token: 'tok', accounts: [] }));
+
+    await backend.restoreAuth();
+
+    expect(requestHeaders()['X-GitHub-Account-Id']).toBe('1');
+  });
+
+  it('omitAccountHeader 模式显式省略账号头，Bearer 鉴权保留', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    mockStoreState.user = { id: 1, login: 'alice' };
+    mockStoreState.backendApiSecret = 'api-secret';
+    vi.mocked(window.fetch).mockResolvedValue(makeJsonResponse({ github_token: 'tok', accounts: [] }));
+
+    await backend.restoreAuth({ omitAccountHeader: true });
+
+    const headers = requestHeaders();
+    // 候选后端恢复：绝不继承本机旧账号头（服务端回退后端自己的 active_account_id）
+    expect(headers['X-GitHub-Account-Id']).toBeUndefined();
+    expect(headers['Authorization']).toBe('Bearer api-secret');
   });
 });
 

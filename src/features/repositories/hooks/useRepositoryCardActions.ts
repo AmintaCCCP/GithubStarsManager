@@ -349,6 +349,16 @@ export const useRepositoryCardActions = ({
         crossEncoder: new CrossEncoderReranker(activeConfig),
         readmeFetcher,
         signal: controller.signal,
+        // 账号隔离范围（R4 审计修复）：多账号共享同一向量索引时按归属账号
+        // 过滤命中，防止他账号向量经同一仓库 ID 串入当前账号的相似视图
+        ...(requestAccountId
+          ? {
+            accountIdScope: {
+              accountId: requestAccountId,
+              multiAccount: Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1,
+            },
+          }
+          : {}),
       });
       if (
         controller.signal.aborted

@@ -23,6 +23,17 @@ let _isSwitchingAccount = false;
 // categoryOrder 编辑会被静默丢弃（数据丢失）。
 let _isAccountSwitchBookkeeping = false;
 
+// 冻结窗口标记（R4 审计修复）：withAccountSwitchFrozen 覆盖的候选后端恢复
+// 窗口内，连接可能指向候选后端——真实编辑不得走会话级待推通道（守卫退出
+// 会立即推送），改记入窗口缓冲按归属账号归档。
+let _isAccountSwitchFrozen = false;
+
+// 冻结窗口内的真实编辑缓冲（R4 审计修复）：记录编辑发生时的活跃账号
+// （GitHub 数值 ID 字符串）。窗口退出时按恢复结果分流：恢复失败（回滚原
+// 后端）→ 调用方在复原连接后立即补推；恢复成功（切到新后端）→ 并入
+// _pendingSyncAccounts，下次进入该账号先补推再拉取。窗口内绝不推送。
+let _frozenWindowEditAccounts = new Set<string>();
+
 /**
  * Wrap an account switch sequence so the Store subscription treats all state
  * changes inside as switch bookkeeping, not as local edits to push.
@@ -51,24 +62,49 @@ export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T
 /**
  * Frozen variant for windows where the backend connection itself is in flux
  * (candidate backend init / auth restore for addAccountFromBackend). Holds the
- * switch guard AND the bookkeeping flag for the whole window, so edits made
- * while the connection may point at the candidate backend are neither recorded
- * as pending nor flushed at guard exit — pushing the (not yet archived) old
- * account's workspace, or an empty one, at the candidate backend would clobber
- * that backend's account partitions. Unlike withAccountSwitchGuard this does
- * NOT flush pending edits on exit; such edits are picked up by the next change
- * event once the connection is stable again.
+ * switch guard for the whole window, so edits made while the connection may
+ * point at the candidate backend are never flushed at guard exit — pushing the
+ * (not yet archived) old account's workspace, or an empty one, at the candidate
+ * backend would clobber that backend's account partitions.
+ *
+ * R4 审计修复——窗口内的真实编辑不再被静默丢弃，也不再用全程簿记标记压制：
+ * guardSync 覆盖的簿记写入（工作区替换、身份提交）仍由其自带标记抑制；
+ * 窗口内其余 store 写入视为真实用户编辑，记入窗口缓冲（
+ * _frozenWindowEditAccounts，按编辑时的活跃账号归属）。窗口退出时把缓冲
+ * 并入 _pendingSyncAccounts（不在此处推送——连接此刻可能仍指向候选后端）：
+ * - 恢复成功（已切到新后端）：标记保留，下次进入该账号先补推再拉取；
+ * - 恢复失败（回滚原后端）：调用方在复原连接后按 hasPendingAccountSync
+ *   立即补推到原后端的正确分区。
+ * 无真实编辑时缓冲为空、零标记，整个窗口保持零推送。
  */
 export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<T> {
   const previousSwitching = _isSwitchingAccount;
   const previousBookkeeping = _isAccountSwitchBookkeeping;
+  const previousFrozen = _isAccountSwitchFrozen;
+  const previousBuffer = _frozenWindowEditAccounts;
+  // 嵌套窗口共享最外层缓冲：只有最外层窗口退出时做缓冲分流
+  const isOutermostWindow = !previousFrozen;
   _isSwitchingAccount = true;
-  _isAccountSwitchBookkeeping = true;
+  _isAccountSwitchFrozen = true;
+  // 冻结窗口内不再全程置簿记标记：guardSync 覆盖的簿记写入自带标记并自行
+  // 恢复；窗口内其余写入由此被订阅器视为真实编辑进入窗口缓冲
+  _isAccountSwitchBookkeeping = false;
+  if (isOutermostWindow) {
+    _frozenWindowEditAccounts = new Set();
+  }
   try {
     return await fn();
   } finally {
     _isSwitchingAccount = previousSwitching;
     _isAccountSwitchBookkeeping = previousBookkeeping;
+    _isAccountSwitchFrozen = previousFrozen;
+    if (isOutermostWindow) {
+      const bufferedAccounts = _frozenWindowEditAccounts;
+      _frozenWindowEditAccounts = previousBuffer;
+      for (const accountId of bufferedAccounts) {
+        _pendingSyncAccounts.add(accountId);
+      }
+    }
   }
 }
 
@@ -980,7 +1016,20 @@ export function startAutoSync(): () => void {
       // 静默丢弃：记为待推，守卫释放后立即补推。切换簿记（guardSync 覆盖的
       // 工作区替换）与拉取应用阶段（_isSyncingFromBackend）的变化不记录。
       if (_isSwitchingAccount && !_isSyncingFromBackend && !_isAccountSwitchBookkeeping) {
-        _hasPendingLocalChanges = true;
+        if (_isAccountSwitchFrozen) {
+          // 冻结窗口（候选后端恢复，R4 审计修复）：真实编辑只记入窗口缓冲并
+          // 按编辑时的活跃账号归属——绝不置会话级待推（守卫退出会立即推送，
+          // 而此时连接可能指向候选后端，旧账号工作区绝不能外发）。窗口退出
+          // 时按恢复结果分流（见 withAccountSwitchFrozen）。归属取写入后
+          // 状态的 user：归档（park）前的编辑归属本机旧账号——正是发起恢复、
+          // 需要补推的账号。
+          const editUserId = state.user?.id;
+          if (typeof editUserId === 'number' && Number.isFinite(editUserId)) {
+            _frozenWindowEditAccounts.add(String(editUserId));
+          }
+        } else {
+          _hasPendingLocalChanges = true;
+        }
       }
       return;
     }

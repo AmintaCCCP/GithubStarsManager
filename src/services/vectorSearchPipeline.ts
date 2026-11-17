@@ -1,6 +1,11 @@
 import type { EmbeddingConfig, Repository, VectorSearchConfig } from '../types';
 import { AIService, isAbortError } from './aiService';
-import type { EmbeddingClient, VectorQueryResult, VectorSearchService } from './vectorSearchService';
+import {
+  parseAccountScopedVectorId,
+  type EmbeddingClient,
+  type VectorQueryResult,
+  type VectorSearchService,
+} from './vectorSearchService';
 import {
   buildCrossEncoderDocument,
   deriveRepoKind,
@@ -169,19 +174,51 @@ function buildRepoIndex(repositories: Repository[]): Map<string, Repository> {
   return repoById;
 }
 
+/**
+ * 查询侧的账号隔离范围（R4 审计修复）：多账号共享同一向量索引，命中必须
+ * 按归属账号过滤后才能参与召回，防止其他账号的向量（ai_tags/license 等
+ * metadata 与 embedding 内容）经同一仓库 ID 串入当前账号的搜索结果。
+ */
+export interface VectorAccountIdScope {
+  /** 当前活跃账号（GitHub 数值 ID 字符串） */
+  accountId: string;
+  /**
+   * 会话中是否保存了多个账号。legacy 无归属向量（账号隔离上线前索引、无
+   * accountId 元数据）无法判定归属：单账号会话视为本账号数据继续可见
+   * （存量索引不失效）；多账号会话一律隐藏，防止串号。
+   */
+  multiAccount: boolean;
+}
+
 export function hydrateMatches(
   matches: VectorQueryResult[],
   repoById: Map<string, Repository>,
   options: {
     excludeSource?: Repository;
     excludeForks?: boolean;
+    accountIdScope?: VectorAccountIdScope;
   } = {},
 ): RankedChannel[] {
   const best = new Map<string, { repo: Repository; score: number }>();
   const sourceId = options.excludeSource ? String(options.excludeSource.id) : '';
   const sourceFullName = options.excludeSource?.full_name.trim().toLowerCase() || '';
   matches.forEach((match) => {
-    const repo = repoById.get(String(match.id));
+    // 账号隔离过滤（R4 审计修复）：带归属元数据的向量只对所属账号可见；
+    // legacy 无归属向量仅在单账号会话可见。未提供 scope（旧调用方/测试）
+    // 时保持既有行为不过滤。
+    const scope = options.accountIdScope;
+    if (scope) {
+      const matchAccountId = match.metadata?.accountId;
+      if (matchAccountId) {
+        if (matchAccountId !== scope.accountId) return;
+      } else if (scope.multiAccount) {
+        return;
+      }
+    }
+    // 向量 ID 带账号前缀（accountId:repoId）：水合前剥离前缀，legacy 无前缀
+    // ID 原样使用
+    const { repoId } = parseAccountScopedVectorId(String(match.id));
+    const repo = repoById.get(repoId);
     if (!repo || !Number.isFinite(match.score) || match.score <= 0) return;
     const id = String(repo.id);
     if (
@@ -617,6 +654,11 @@ export interface RunVectorSearchPipelineOptions {
   crossEncoder: CrossEncoderReranker | null;
   signal: AbortSignal;
   onPhase?: (phase: 'analyzing' | 'embedding' | 'recalling' | 'reranking') => void;
+  /**
+   * 账号隔离范围（R4 审计修复）：多账号共享向量索引时按归属账号过滤命中；
+   * 缺省（未登录边缘态）不过滤，保持既有行为。
+   */
+  accountIdScope?: VectorAccountIdScope;
 }
 
 export async function runVectorSearchPipeline(
@@ -736,8 +778,8 @@ export async function runVectorSearchPipeline(
 
   options.onPhase?.('recalling');
   const repoById = buildRepoIndex(repositories);
-  const rawMatches = hydrateMatches(rawMatchResults, repoById);
-  const idealMatches = hydrateMatches(idealMatchResults, repoById);
+  const rawMatches = hydrateMatches(rawMatchResults, repoById, { accountIdScope: options.accountIdScope });
+  const idealMatches = hydrateMatches(idealMatchResults, repoById, { accountIdScope: options.accountIdScope });
   const lexical = AIService.rankLexicalCandidates(repositories, query, analysis?.keywords ?? [])
     .filter(item => item.score > 0);
   const structured = rankStructuredCandidates(repositories, analysis, query);

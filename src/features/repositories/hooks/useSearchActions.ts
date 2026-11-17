@@ -402,6 +402,16 @@ export const useSearchActions = (): SearchActions => {
           const crossEncoder = activeEmbConfig.apiType === 'siliconflow'
             ? new CrossEncoderReranker(activeEmbConfig)
             : null;
+          // 账号隔离范围（R4 审计修复）：多账号共享同一向量索引，命中必须按
+          // 归属账号过滤（同仓库在两个账号列表中都存在时，既有 id 集合过滤
+          // 无法拦截他账号向量经同一 ID 水合进来）
+          const scopeAccountId = peekCurrentAccountId();
+          const accountIdScope = scopeAccountId
+            ? {
+              accountId: scopeAccountId,
+              multiAccount: Object.keys(useAppStore.getState().savedAccounts ?? {}).length > 1,
+            }
+            : undefined;
           const result = await runVectorSearchPipeline({
             query,
             repositories,
@@ -412,6 +422,7 @@ export const useSearchActions = (): SearchActions => {
             vectorService,
             crossEncoder,
             signal: controller.signal,
+            accountIdScope,
             onPhase: (phase) => {
               setSearchPhase(
                 phase === 'analyzing'

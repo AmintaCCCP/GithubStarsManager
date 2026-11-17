@@ -22,30 +22,35 @@ vi.mock('../../../store/useAppStore', () => ({
   isKnownEmbeddingFormatVersion: (value: unknown) => value === 1 || value === 2 || value === 3,
   useAppStore: mocks.useAppStore,
 }));
-vi.mock('../../../services/vectorSearchService', () => ({
-  EMBEDDING_FORMAT_VERSION: 3,
-  EmbeddingClient: class {},
-  VectorSearchService: class {
-    cleanup = mocks.cleanup;
-    testConnection = mocks.vectorTestConnection;
-  },
-  indexAllRepos: mocks.indexAllRepos,
-  needsReindex: mocks.needsReindex,
-  // 与真实实现同构：分析过滤 → 增量 needsReindex → 按 id 首条去重
-  selectIndexableRepos: (repos: Repository[], options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {}) => {
-    let indexable = repos.filter((repo) => repo.analyzed_at && !repo.analysis_failed);
-    if (options.incremental) {
-      const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? 3);
-      indexable = indexable.filter((repo) => mocks.needsReindex(repo, formatVersionChanged));
-    }
-    const seen = new Set<number>();
-    return indexable.filter((repo) => {
-      if (seen.has(repo.id)) return false;
-      seen.add(repo.id);
-      return true;
-    });
-  },
-}));
+vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../services/vectorSearchService')>();
+  return {
+    // 保留真实的账号隔离向量 ID 编解码工具（runIndex 的 cleanup keepIds 依赖）
+    ...actual,
+    EMBEDDING_FORMAT_VERSION: 3,
+    EmbeddingClient: class {},
+    VectorSearchService: class {
+      cleanup = mocks.cleanup;
+      testConnection = mocks.vectorTestConnection;
+    },
+    indexAllRepos: mocks.indexAllRepos,
+    needsReindex: mocks.needsReindex,
+    // 与真实实现同构：分析过滤 → 增量 needsReindex → 按 id 首条去重
+    selectIndexableRepos: (repos: Repository[], options: { incremental?: boolean; formatVersion?: number; currentFormatVersion?: number } = {}) => {
+      let indexable = repos.filter((repo) => repo.analyzed_at && !repo.analysis_failed);
+      if (options.incremental) {
+        const formatVersionChanged = (options.formatVersion ?? 1) < (options.currentFormatVersion ?? 3);
+        indexable = indexable.filter((repo) => mocks.needsReindex(repo, formatVersionChanged));
+      }
+      const seen = new Set<number>();
+      return indexable.filter((repo) => {
+        if (seen.has(repo.id)) return false;
+        seen.add(repo.id);
+        return true;
+      });
+    },
+  };
+});
 vi.mock('../../../services/githubApi', () => ({ GitHubApiService: class {} }));
 vi.mock('../../../utils/licenseFilter', () => ({ normalizeLicense: (value: string | null) => value }));
 
@@ -232,7 +237,39 @@ describe('useVectorSearchActions account switch guards', () => {
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1'], expect.any(AbortSignal));
+    // R4 审计修复：keepIds 与索引中的实际向量 ID 形态一致——账号前缀形态
+    //（发起账号 id=1 → '1:1'）
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], expect.any(AbortSignal));
+  });
+
+  it('passes the owning account to indexAllRepos for account-scoped vector IDs (R4)', async () => {
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    // 账号隔离：向量 ID 以发起账号为前缀、metadata 记录归属（indexAllRepos 侧实现）
+    expect(mocks.indexAllRepos).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ accountId: '1' }),
+    );
+  });
+
+  it('keeps excluded repos in cleanup keepIds in both legacy and account-scoped forms (R4)', async () => {
+    // 排除项（已索引但分析缺失/失败）的存量向量可能是 legacy 或前缀形态：
+    // cleanup 按 keepIds 之外的 ID 物理删除，漏掉任一形态都会误删向量
+    storeState.repositories = [
+      repository,
+      { ...repository, id: 2, analyzed_at: undefined, analysis_failed: true, vector_indexed_at: '2026-08-01T00:00:00.000Z' } as Repository,
+    ];
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 1, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1', '2', '1:2'], expect.any(AbortSignal));
   });
 
   it('does not write indexing state into the new account after a mid-task switch', async () => {

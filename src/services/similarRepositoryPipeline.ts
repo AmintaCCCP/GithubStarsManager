@@ -16,6 +16,7 @@ import {
   hydrateMatches,
   rankStructuredCandidates,
   withBudget,
+  type VectorAccountIdScope,
   type VectorQueryAnalysis,
 } from './vectorSearchPipeline';
 import {
@@ -56,6 +57,11 @@ export interface RunSimilarRepositoryPipelineOptions {
     signal?: AbortSignal,
   ) => Promise<string>;
   signal: AbortSignal;
+  /**
+   * 账号隔离范围（R4 审计修复）：多账号共享向量索引时按归属账号过滤命中；
+   * 缺省（未登录边缘态）不过滤，保持既有行为。
+   */
+  accountIdScope?: VectorAccountIdScope;
 }
 
 export interface SimilarRepositoryPipelineResult {
@@ -451,12 +457,12 @@ export async function runSimilarRepositoryPipeline(
   const rawMatches = hydrateMatches(
     exactOutcome.matches,
     repoById,
-    { excludeSource: source, excludeForks: true },
+    { excludeSource: source, excludeForks: true, accountIdScope: options.accountIdScope },
   );
   const profileMatches = hydrateMatches(
     profileOutcome.matches,
     repoById,
-    { excludeSource: source, excludeForks: true },
+    { excludeSource: source, excludeForks: true, accountIdScope: options.accountIdScope },
   );
   const similarityQueryText = buildSimilarityLexicalQuery(profile);
   const lexical = AIService.rankLexicalCandidates(

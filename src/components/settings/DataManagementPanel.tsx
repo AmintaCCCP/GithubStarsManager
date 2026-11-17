@@ -897,8 +897,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           // merge 模式必须以当前实时快照为基座按 id 合并后再应用：备份中的
           // 当前账号快照可能早于实时数据，直接应用会用备份旧快照覆盖实时
           // 状态（本地新增仓库丢失）。
+          const localWorkspace = captureAccountWorkspace(useAppStore.getState());
+          // R4 审计修复：mergeWorkspacesById 只合并列表与 ID 集合（其余字段
+          // 取本机基座），releaseSourceSettings 会整段保留本机值——备份当前
+          // 账号工作区里的自定义发布来源会被丢弃。必须按并集合并本机与备份
+          // 的来源设置（与列表合并同一语义：备份新增来源不丢失）。
           const effective = restoreMode === 'merge'
-            ? mergeWorkspacesById(captureAccountWorkspace(useAppStore.getState()), backupWorkspace)
+            ? {
+              ...mergeWorkspacesById(localWorkspace, backupWorkspace),
+              releaseSourceSettings: mergeReleaseSourceSettings(
+                localWorkspace.releaseSourceSettings,
+                backupWorkspace.releaseSourceSettings,
+              ),
+            }
             : backupWorkspace;
           useAppStore.setState(applyAccountWorkspaceForTypes(effective, selectedTypes));
           // 应用后以恢复后的实时状态为准同步当前账号工作区快照，

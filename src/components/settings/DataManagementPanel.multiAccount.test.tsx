@@ -544,6 +544,71 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
       .toEqual(summaries);
   });
 
+  it('merge import from another account unions current-account release source settings from the backup (R4)', async () => {
+    // R4 审计修复回归：mergeWorkspacesById 只合并列表与 ID 集合（其余字段取
+    // 本机基座）——备份当前账号工作区的自定义发布来源若不经
+    // mergeReleaseSourceSettings 合并，会整段保留本机值而丢失备份来源。
+    useAppStore.setState({
+      repositories: [repo(1, 'alice-live')],
+      accountWorkspaces: {},
+      releaseSourceSettings: {
+        enabledSourceIds: ['starred-release-subscription'],
+        watchCustomReleaseRepos: [],
+        customReleaseRepos: [{
+          id: 11,
+          name: 'local-only',
+          full_name: 'local/owner-only',
+          html_url: 'https://github.com/local/owner-only',
+          owner: { login: 'local', avatar_url: '' },
+        }],
+      },
+    });
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      // 顶层带 releaseSubscriptions 键，使 releaseSubscriptions 进入 selectedTypes
+      releaseSubscriptions: [],
+      accountWorkspaces: {
+        '1': workspaceOf({
+          releaseSourceSettings: {
+            enabledSourceIds: ['starred-release-subscription', 'watch-custom-release', 'custom-release'],
+            watchCustomReleaseRepos: [{
+              id: 21,
+              name: 'watched',
+              full_name: 'backup/watched',
+              html_url: 'https://github.com/backup/watched',
+              owner: { login: 'backup', avatar_url: '' },
+            }],
+            customReleaseRepos: [{
+              id: 22,
+              name: 'custom',
+              full_name: 'backup/custom',
+              html_url: 'https://github.com/backup/custom',
+              owner: { login: 'backup', avatar_url: '' },
+            }],
+          },
+        }),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 备份中的自定义/关注来源并入实时状态，本机已有来源保留
+    expect(state.releaseSourceSettings.customReleaseRepos.map((r) => r.full_name))
+      .toEqual(expect.arrayContaining(['backup/custom', 'local/owner-only']));
+    expect(state.releaseSourceSettings.watchCustomReleaseRepos.map((r) => r.full_name))
+      .toContain('backup/watched');
+    expect(state.releaseSourceSettings.enabledSourceIds)
+      .toEqual(expect.arrayContaining(['watch-custom-release', 'custom-release']));
+    // 合并结果同步进当前账号工作区快照（切换/再次导出不丢失）
+    const snapshot = state.accountWorkspaces['1']?.releaseSourceSettings;
+    expect(snapshot?.customReleaseRepos.map((r) => r.full_name)).toContain('backup/custom');
+    // 备份顶层数据仍归档进备份账号工作区（既有合并语义不受影响）
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
+  });
+
   it('same-account merge import restores backup-only gists into live state', async () => {
     const user = userEvent.setup();
 

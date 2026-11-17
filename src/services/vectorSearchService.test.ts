@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Repository } from '../types';
 import {
+  buildAccountScopedVectorId,
   looksLikeLengthError,
+  parseAccountScopedVectorId,
   truncateForRetry,
   embedWithFallback,
   indexAllRepos,
@@ -398,5 +400,70 @@ describe('embedWithFallback', () => {
     controller.abort();
     const client = makeClient(async () => [vec(1)]);
     await expect(embedWithFallback(['a'], client, controller.signal, 6000)).rejects.toThrow('Aborted');
+  });
+});
+
+describe('indexAllRepos 账号隔离向量 ID（R4 审计修复）', () => {
+  const scopedRepos = (): Repository[] => [
+    makeRepository(1, { ai_tags: ['tag-a'] }),
+    makeRepository(2),
+  ];
+
+  const makeVectorServiceWithMock = () => {
+    const upsert = vi.fn(async (vectors: Array<{ id: string }>) => ({ upserted: vectors.length }));
+    return {
+      upsert,
+      service: { upsert } as unknown as Parameters<typeof indexAllRepos>[2],
+    };
+  };
+
+  it('prefixes vector IDs with the owning account and records it in metadata', async () => {
+    const { upsert, service } = makeVectorServiceWithMock();
+    await indexAllRepos(scopedRepos(), makeIndexClient(), service, { accountId: '42' });
+
+    const upserted = upsert.mock.calls[0][0] as Array<{ id: string; metadata: { accountId?: string } }>;
+    // 账号隔离：多账号共享索引时同仓库向量不再互相覆盖
+    expect(upserted.map((v) => v.id)).toEqual(['42:1', '42:2']);
+    expect(upserted[0].metadata.accountId).toBe('42');
+    expect(upserted[1].metadata.accountId).toBe('42');
+  });
+
+  it('falls back to legacy unprefixed IDs when no owning account is available', async () => {
+    const { upsert, service } = makeVectorServiceWithMock();
+    await indexAllRepos(scopedRepos(), makeIndexClient(), service, {});
+
+    const upserted = upsert.mock.calls[0][0] as Array<{ id: string; metadata: { accountId?: string } }>;
+    expect(upserted.map((v) => v.id)).toEqual(['1', '2']);
+    expect(upserted[0].metadata.accountId).toBeUndefined();
+  });
+
+  it('reports numeric repo ids to onRepoIndexed for account-prefixed vectors', async () => {
+    const { service } = makeVectorServiceWithMock();
+    const onRepoIndexed = vi.fn();
+    const result = await indexAllRepos(scopedRepos(), makeIndexClient(), service, {
+      accountId: '42',
+      onRepoIndexed,
+    });
+
+    // 向量 ID 带账号前缀后不得按 parseInt(id) 解析（前缀非数字会得到 NaN）
+    expect(onRepoIndexed).toHaveBeenCalledWith(1);
+    expect(onRepoIndexed).toHaveBeenCalledWith(2);
+    expect(result.indexedRepoIds).toEqual([1, 2]);
+  });
+});
+
+describe('账号隔离向量 ID 编解码（R4 审计修复）', () => {
+  it('builds prefixed IDs for known accounts and legacy IDs otherwise', () => {
+    expect(buildAccountScopedVectorId('42', 7)).toBe('42:7');
+    expect(buildAccountScopedVectorId('42', '7')).toBe('42:7');
+    expect(buildAccountScopedVectorId(null, 7)).toBe('7');
+    expect(buildAccountScopedVectorId(undefined, 7)).toBe('7');
+  });
+
+  it('parses scoped IDs and treats legacy IDs as unowned', () => {
+    expect(parseAccountScopedVectorId('42:7')).toEqual({ accountId: '42', repoId: '7' });
+    expect(parseAccountScopedVectorId('7')).toEqual({ accountId: null, repoId: '7' });
+    // 非数字前缀不是账号前缀（防垃圾字符串污染归属）
+    expect(parseAccountScopedVectorId('owner:7')).toEqual({ accountId: null, repoId: 'owner:7' });
   });
 });

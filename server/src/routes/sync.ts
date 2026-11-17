@@ -528,6 +528,10 @@ router.post('/api/sync/import', (req, res) => {
       if (settings && typeof settings === 'object') {
         const globalSettingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
         const accountSettingsStmt = db.prepare('INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)');
+        // 显式空 Token 时与 configs.ts 的显式清空语义一致：同步清空 accounts 的
+        // 加密凭据副本，否则 readScopedToken / readAccountRows / proxy 的 accounts
+        // 回退会让已清空的 Token 复活。
+        const clearAccountTokenStmt = db.prepare('UPDATE accounts SET github_token_encrypted = NULL WHERE account_id = ?');
         let settingsCount = 0;
         const serializeSettingValue = (v: unknown): string | null =>
           v === null || v === undefined
@@ -552,6 +556,15 @@ router.post('/api/sync/import', (req, res) => {
               accountSettingsStmt.run(accountId, key, encrypted);
             } else {
               globalSettingsStmt.run(key, encrypted);
+            }
+          } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
+            // 显式空 Token（null / ''；掩码 '***' 已在上方跳过）：除写入空值占位
+            // 外，必须同步清空 accounts 的加密凭据副本，避免旧 Token 回退复活。
+            if (accountId !== 'default') {
+              accountSettingsStmt.run(accountId, key, serializeSettingValue(value));
+              clearAccountTokenStmt.run(accountId);
+            } else {
+              globalSettingsStmt.run(key, serializeSettingValue(value));
             }
           } else if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && accountId !== 'default') {
             accountSettingsStmt.run(accountId, key, serializeSettingValue(value));
@@ -632,6 +645,10 @@ router.post('/api/sync/import', (req, res) => {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const wsSettingsStmt = db.prepare('INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)');
+        // 显式空 Token 时同步清空 accounts 的加密凭据副本（与 configs.ts 显式清空
+        // 语义一致），否则 readScopedToken / readAccountRows / proxy 的 accounts
+        // 回退会让已清空的 Token 复活。
+        const wsClearAccountTokenStmt = db.prepare('UPDATE accounts SET github_token_encrypted = NULL WHERE account_id = ?');
 
         let workspaceRepoCount = 0;
         let workspaceReleaseCount = 0;
@@ -733,6 +750,10 @@ router.post('/api/sync/import', (req, res) => {
                 // 真实 Token（勾选「包含密钥」的备份）：与其他凭据一致，写入前必须
                 // encrypt()，绝不能把明文凭证当作普通设置序列化入库。
                 serialized = encrypt(value, config.encryptionKey);
+              } else if (key === 'github_token' && (value === null || value === undefined || value === '')) {
+                // 显式空 Token（null / ''）：同步清空 accounts 的加密凭据副本，
+                // 避免已清空的 Token 经 accounts 回退复活。
+                wsClearAccountTokenStmt.run(wsAccountId);
               }
               wsSettingsStmt.run(wsAccountId, key, serialized);
               workspaceSettingsCount++;

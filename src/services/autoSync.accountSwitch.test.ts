@@ -9,6 +9,7 @@ import {
   startAutoSync,
   stopAutoSync,
   syncFromBackend,
+  syncToBackend,
   withAccountSwitchFrozen,
   withAccountSwitchGuard,
   withAccountSwitchGuardSync,
@@ -223,7 +224,7 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     // 审计修复回归（addAccountFromBackend）：候选后端 init 提交 URL 起到旧账号
     // 归档前的窗口内，后端连接处于「候选后端」状态——窗口内编辑若被记为待推，
     // 守卫退出会把尚未归档的旧账号工作区（或空工作区）写入候选后端分区。
-    // 冻结窗口（withAccountSwitchFrozen）内编辑不记录、不推送。
+    // 冻结窗口（withAccountSwitchFrozen）内编辑不推送。
     seedTwoAccounts([]);
     // 种子数据本身的 setState 会被订阅器记为待推并调度防抖——与本用例无关的
     // 噪声，先取消（与拆除类动作的既有语义一致），再进入冻结窗口
@@ -242,6 +243,82 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     await vi.advanceTimersByTimeAsync(3000);
     expect(backend.syncRepositories).not.toHaveBeenCalled();
     expect(backend.syncSettings).not.toHaveBeenCalled();
+    // R4 审计修复：窗口内的编辑按归属账号并入待推集合（零推送的前提下保留
+    // 补推标记）。清理标记避免泄漏到后续用例。
+    consumePendingAccountSync('1');
+  });
+
+  it('routes real frozen-window edits to the originating account pending marker with zero pushes (R4)', async () => {
+    // R4 审计修复回归：冻结窗口内的真实编辑不再被静默丢弃——按编辑时的活跃
+    // 账号记入窗口缓冲，窗口退出并入 _pendingSyncAccounts（恢复成功场景：
+    // 下次进入该账号先补推再拉取），全程零推送。
+    seedTwoAccounts([]);
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+    expect(hasPendingAccountSync('1')).toBe(false);
+
+    await withAccountSwitchFrozen(async () => {
+      // 模拟恢复等待期间（归档前）的用户编辑：顶层工作区仍属于账号 A
+      useAppStore.setState({ categoryOrder: ['reordered-by-alice'] });
+    });
+
+    // 窗口退出：绝不推送（连接可能指向候选后端），但发起账号必须带上补推标记
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+    expect(hasPendingAccountSync('1')).toBe(true);
+    expect(consumePendingAccountSync('1')).toBe(true);
+    expect(hasPendingAccountSync('1')).toBe(false);
+  });
+
+  it('keeps guardSync bookkeeping writes inside a frozen window suppressed (R4)', async () => {
+    // 簿记变更（guardSync 覆盖的工作区替换/身份提交）不得被当成真实编辑记入
+    // 缓冲——否则恢复流程自身的工作区替换会给发起账号挂上补推标记。
+    seedTwoAccounts([]);
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    await withAccountSwitchFrozen(async () => {
+      await withAccountSwitchGuard(async () => {
+        withAccountSwitchGuardSync(() => {
+          // 恢复流程自身的簿记写入（如身份提交）——归属账号 A 在登录态
+          useAppStore.setState({ categoryOrder: ['bookkeeping-write'] });
+        });
+      });
+    });
+
+    // 只有簿记写入时：缓冲为空、零标记、零推送
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+    expect(hasPendingAccountSync('1')).toBe(false);
+    expect(hasPendingAccountSync('2')).toBe(false);
+  });
+
+  it('delivers a buffered frozen-window edit to the original backend partition on re-push (R4 failure path)', async () => {
+    // 恢复失败（回滚原后端）后的调用方补推：缓冲编辑所在的工作区在原后端、
+    // 以发起账号 A 的上下文落盘（syncSettings 携带 A 的 categoryOrder）。
+    seedTwoAccounts([]);
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    await withAccountSwitchFrozen(async () => {
+      useAppStore.setState({ categoryOrder: ['restored-edit'] });
+    });
+    expect(hasPendingAccountSync('1')).toBe(true);
+
+    // 模拟调用方失败收尾：连接已复原、发起账号仍活跃——立即补推
+    await syncToBackend();
+    const settingsPayloads = vi.mocked(backend.syncSettings).mock.calls;
+    const lastPayload = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
+    expect(lastPayload.categoryOrder).toEqual(['restored-edit']);
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    // 标记不因本次补推被 autoSync 清除：补推失败时下次进入该账号仍会先补推
+    expect(hasPendingAccountSync('1')).toBe(true);
+    consumePendingAccountSync('1');
   });
 });
 

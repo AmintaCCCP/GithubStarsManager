@@ -12,7 +12,8 @@ import { getDb } from './connection.js';
  * - 未携带（旧版客户端 / 无头请求 / MCP）时回退读取全局 `settings.active_account_id`；
  * - 仍不存在则返回 'default'（与 v4 之前无租户概念的存量数据 100% 兼容）；
  * - 首个携带真实账号 ID 的请求会触发「存量 default 数据认领」流程
- *   （claimLegacyDefaultIfNeeded），该流程带 GitHub 身份校验，防止误认领。
+ *   （claimLegacyDefaultIfNeeded），该流程带 GitHub 身份校验，防止误认领；
+ *   归属一经校验确立即冻结（legacy_default_owner_id），不随全局 Token 轮换改变。
  */
 
 /** 账号专属（Per-Account）设置键：写入 account_settings，切换账号互不可见。 */
@@ -89,36 +90,47 @@ export function getLegacyDefaultClaimedBy(db: Database.Database): string | null 
 
 interface LegacyOwnerResolution {
   ownerId: string | null;
-  /** 身份校验时实际使用的加密 Token；认领事务据此确认 Token 未被换绑。 */
+  /**
+   * 归属验证时所绑定的加密全局 Token；null 表示无法证明当前全局 Token 与
+   * 已验证归属同源（如旧版裸 id 缓存）。认领事务据此决定是否把全局
+   * github_token 复制进账号分区。
+   */
   verifiedToken: string | null;
 }
 
 /**
- * 通过 GitHub /user API 解析全局 Token 真实归属的账号 id。
- * 身份缓存（legacy_default_owner_id）绑定到「已通过校验的那份加密 Token」：
- * 仅当当前全局 Token 与缓存记录的 Token 完全一致时缓存才可信，否则重新校验——
- * 防止全局 Token 被换成其他账号后仍沿用旧身份（凭证错配）。
+ * 解析存量 default 数据的「已验证所有者」——与可替换的全局 Token 解耦。
+ *
+ * 归属一经 GitHub /user 校验确立（无论请求者是否匹配），即持久化到
+ * settings.legacy_default_owner_id（绑定校验时的加密 Token）；此后认领判定
+ * 只认这份已验证所有者，绝不随全局 Token 轮换/换绑重新判定——防止无头请求
+ * 把全局 Token 换成其他账号后，把原属旧账号的存量数据错误迁移给新账号。
+ * 同一账号轮换 Token 不影响其认领资格。
+ * 从未成功验证过归属（校验网络失败 / 无 Token / 解密失败）时返回 null：
+ * 存量数据保持不可认领，直到真正的归属账号登录后校验成功再确立归属。
  */
 async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyOwnerResolution> {
-  const encrypted = readSetting(db, 'github_token');
-
   const cached = readSetting(db, LEGACY_OWNER_CACHE_KEY);
-  if (cached && encrypted) {
+  if (cached) {
+    // 已验证归属已持久化：直接采用，绝不依据当前全局 Token 重新判定。
+    // 旧版缓存为裸账号 id（无 Token 绑定）：归属可信，仅缺 Token 绑定。
+    if (ACCOUNT_ID_PATTERN.test(cached)) {
+      return { ownerId: cached, verifiedToken: null };
+    }
     try {
       const parsed = JSON.parse(cached) as { ownerId?: unknown; token?: unknown };
-      if (
-        typeof parsed.ownerId === 'string'
-        && ACCOUNT_ID_PATTERN.test(parsed.ownerId)
-        && typeof parsed.token === 'string'
-        && parsed.token === encrypted
-      ) {
-        return { ownerId: parsed.ownerId, verifiedToken: parsed.token };
+      if (typeof parsed.ownerId === 'string' && ACCOUNT_ID_PATTERN.test(parsed.ownerId)) {
+        return {
+          ownerId: parsed.ownerId,
+          verifiedToken: typeof parsed.token === 'string' && parsed.token ? parsed.token : null,
+        };
       }
     } catch {
-      // 旧版缓存为裸账号 id（无 Token 绑定）：绑定关系未知，重新校验并升级格式。
+      // 无法解析的脏缓存：视为未验证，走重新校验并覆写。
     }
   }
 
+  const encrypted = readSetting(db, 'github_token');
   if (!encrypted) return { ownerId: null, verifiedToken: null };
   let token: string;
   try {
@@ -155,7 +167,8 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
     }
     if (ownerId) {
       try {
-        // 缓存同时记录身份与被校验的加密 Token，供下次免网络复用（并防换绑错配）。
+        // 首次成功校验即冻结归属（同时记录被校验的加密 Token）：此后认领判定
+        // 只认这份已验证所有者，不再随 Token 轮换重新判定，且供后续请求免网络复用。
         db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)')
           .run(LEGACY_OWNER_CACHE_KEY, JSON.stringify({ ownerId, token: encrypted }));
       } catch { /* cache write is best-effort */ }
@@ -165,7 +178,8 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
     logger.warn('db.accountScope', 'Legacy default-claim identity check request failed', {
       error: err instanceof Error ? err.message : String(err),
     });
-    return { ownerId: null, verifiedToken: encrypted };
+    // 校验失败 = 归属未确立：不冻结、不认领，等待真正的归属账号登录后再校验。
+    return { ownerId: null, verifiedToken: null };
   }
 }
 
@@ -174,13 +188,15 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
  *
  * 仅当同时满足以下条件时才执行认领，否则 'default' 数据原地不动：
  * 1. settings 中尚未记录 legacy_default_claimed_by；
- * 2. 全局 settings.github_token 经 GitHub /user 校验出的真实归属 === 请求账号 ID；
- * 3. 认领事务内再次核对全局 Token 与身份校验所用 Token 一致（校验期间被换绑则中止）。
+ * 2. 存量数据的「已验证所有者」（resolveLegacyDefaultOwner 冻结的身份，一经
+ *    校验确立便不再随 Token 轮换改变）=== 请求账号 ID。
  *
  * 认领在单个事务中完成：repositories / releases / categories 的 default 行
  * 「逐条」迁移为请求账号 ID（目标分区已有数据时按记录合并而非整表跳过），
  * 账号级设置键以「只补缺失」方式复制进 account_settings（不覆盖账号已保存的
- * 新值），最后写入 legacy_default_claimed_by 与 active_account_id。
+ * 新值；其中全局 github_token 仅当仍是当初通过身份校验的那份加密 Token 时才
+ * 复制，Token 已换绑其他账号或同账号轮换时一律跳过，绝不把来源无法证明的
+ * 凭据迁移进账号分区），最后写入 legacy_default_claimed_by 与 active_account_id。
  * 若仍有 default 残留行（意外冲突），整体回滚并保持可重试状态，绝不写认领标记。
  */
 export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountId: string): Promise<void> {
@@ -190,8 +206,9 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
   const resolution = await resolveLegacyDefaultOwner(db);
   if (!resolution.ownerId) return;
   if (resolution.ownerId !== accountId) {
-    // 身份不符：绝不认领。'default' 存量数据原地保留，等待真正的归属账号登录。
-    logger.info('db.accountScope', 'Skipping legacy default claim: identity mismatch', {
+    // 身份不符：绝不认领。'default' 存量数据原地保留，等待已验证的归属账号登录；
+    // 全局 Token 被换成其他账号不得改变已验证的归属。
+    logger.info('db.accountScope', 'Skipping legacy default claim: verified owner does not match requester', {
       legacyOwner: resolution.ownerId,
       requested: accountId,
     });
@@ -202,14 +219,6 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
   const claim = db.transaction(() => {
     const claimed = readSetting(db, CLAIMED_BY_KEY);
     if (claimed) return null; // 并发请求下的二次确认
-
-    // 身份查询存在网络等待：提交前确认全局 Token 仍是当初通过校验的那份，
-    // 否则（例如等待期间无头请求把全局 Token 换成了其他账号）中止本次认领。
-    const currentEncrypted = readSetting(db, 'github_token');
-    if (!verifiedToken || currentEncrypted !== verifiedToken) {
-      logger.warn('db.accountScope', 'Aborting legacy default claim: global token changed during identity check');
-      return null;
-    }
 
     const counts = {
       repositories: 0,
@@ -343,6 +352,12 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
       if (value === null) continue;
       // 只补充目标账号缺失的设置：账号已保存的新值（如认领前先写入的
       // customCategories / github_token）绝不被全局存量值覆盖。
+      if (key === 'github_token') {
+        // 全局 Token 与存量归属可能已脱钩（其他账号换绑 / 同账号轮换）：
+        // 仅当它仍是当初通过身份校验的那份加密 Token 时才复制，绝不把
+        // 来源无法证明的凭据迁移进认领账号的分区（宁可缺失，不可错配）。
+        if (!verifiedToken || readSetting(db, 'github_token') !== verifiedToken) continue;
+      }
       db.prepare('INSERT OR IGNORE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
         .run(accountId, key, value);
     }

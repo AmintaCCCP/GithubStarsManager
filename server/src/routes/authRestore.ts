@@ -47,7 +47,16 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
       ? db.prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
           .get(accountId) as { value: string | null } | undefined
       : undefined;
-    const encrypted = (typeof scopedRow?.value === 'string' && scopedRow.value) ? scopedRow.value : row.github_token_encrypted;
+    let encrypted: unknown = row.github_token_encrypted;
+    if (scopedRow !== undefined) {
+      if (!scopedRow.value) {
+        // 记录存在但值为空 = 已被显式清空：绝不回退 accounts 旧凭据副本，
+        // 否则已清空的 Token 会复活（与 proxy 的显式清空优先语义一致）。
+        encrypted = null;
+      } else if (typeof scopedRow.value === 'string') {
+        encrypted = scopedRow.value;
+      }
+    }
     if (typeof encrypted === 'string' && encrypted) {
       try {
         githubToken = decrypt(encrypted, config.encryptionKey);
@@ -92,8 +101,15 @@ function readScopedToken(db: ReturnType<typeof getDb>, accountId: string): strin
   if (accountId !== 'default') {
     const scoped = db.prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
       .get(accountId) as { value: string | null } | undefined;
-    const fromScoped = decryptOrNull(scoped?.value ?? null);
-    if (fromScoped) return fromScoped;
+    if (scoped !== undefined) {
+      if (!scoped.value) {
+        // 记录存在但值为空 = 已被显式清空：绝不回退 accounts 旧凭据副本，
+        // 否则已清空的 Token 会复活（与 proxy 的显式清空优先语义一致）。
+        return null;
+      }
+      const fromScoped = decryptOrNull(scoped.value);
+      if (fromScoped) return fromScoped;
+    }
 
     const accountRow = db.prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?')
       .get(accountId) as { github_token_encrypted: string | null } | undefined;

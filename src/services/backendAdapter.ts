@@ -1031,14 +1031,23 @@ class BackendAdapter {
    *
    * 多账号扩展（Issue #611）：响应额外携带 active_account_id 与后端保存的
    * 全部账号列表 accounts，客户端可一次性恢复 savedAccounts。
+   *
+   * 候选后端恢复（R4 审计修复）：传 { omitAccountHeader: true } 显式省略
+   * X-GitHub-Account-Id。本机仍登录旧账号 A 时若照常携带账号头，服务端会
+   * 优先选择 A 分区——候选后端的活跃账号是 B 时返回 github_token: null，
+   * 调用方据此误判 github-token-required，B 的有效凭证无法恢复。省略账号头
+   * 后服务端回退到后端自己的 active_account_id 分区。Bearer 鉴权与普通
+   * 账号定向恢复（缺省读取 Store 账号）均不受影响。
    */
-  async restoreAuth(): Promise<BackendAuthRestore | null> {
+  async restoreAuth(options?: { omitAccountHeader?: boolean }): Promise<BackendAuthRestore | null> {
     if (!this._backendUrl) return null;
 
     try {
       const res = await this.fetchWithTimeout(`${this._backendUrl}/sync/auth`, {
         method: 'POST',
-        headers: this.getAuthHeaders(),
+        headers: options?.omitAccountHeader
+          ? getBackendAuthHeaders(null)
+          : this.getAuthHeaders(),
       }, 8000);
       if (!res.ok) return null;
       return res.json() as Promise<BackendAuthRestore>;
