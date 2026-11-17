@@ -49,6 +49,30 @@ export async function withAccountSwitchGuard<T>(fn: () => Promise<T>): Promise<T
 }
 
 /**
+ * Frozen variant for windows where the backend connection itself is in flux
+ * (candidate backend init / auth restore for addAccountFromBackend). Holds the
+ * switch guard AND the bookkeeping flag for the whole window, so edits made
+ * while the connection may point at the candidate backend are neither recorded
+ * as pending nor flushed at guard exit — pushing the (not yet archived) old
+ * account's workspace, or an empty one, at the candidate backend would clobber
+ * that backend's account partitions. Unlike withAccountSwitchGuard this does
+ * NOT flush pending edits on exit; such edits are picked up by the next change
+ * event once the connection is stable again.
+ */
+export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<T> {
+  const previousSwitching = _isSwitchingAccount;
+  const previousBookkeeping = _isAccountSwitchBookkeeping;
+  _isSwitchingAccount = true;
+  _isAccountSwitchBookkeeping = true;
+  try {
+    return await fn();
+  } finally {
+    _isSwitchingAccount = previousSwitching;
+    _isAccountSwitchBookkeeping = previousBookkeeping;
+  }
+}
+
+/**
  * Synchronous variant for store actions that swap workspaces inside a single
  * `set()` (switchAccount / logout / parkCurrentAccountForRestore). Saves and
  * restores the previous flag so nesting inside the async guard stays safe.
@@ -171,6 +195,10 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
   // previousAccountId 保留在签名中以表达「冲刷发生在旧账号上下文」的语义；
   // 请求头由 Store 当前登录用户自动推导，无需在此显式传递。
   void previousAccountId;
+  // 本次调用是否观察到一次实际成功的推送（审计修复）：只有观察到成功推送，
+  // 才允许清除该账号的待推标记——推送循环被跳过（会话标志为空）或失败时，
+  // 账号级未推修改仍未落盘，标记必须保留。
+  let flushPushSucceeded = false;
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
@@ -180,7 +208,13 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
     while ((_hasPendingLocalChanges || _pushPromise) && attempts < SWITCH_FLUSH_MAX_ATTEMPTS) {
       attempts += 1;
       try {
-        await syncToBackend();
+        // 记录本次冲刷是否观察到成功推送（审计修复）：会话级标志在冲刷失败后
+        // 已被统一清零，下一次调用会因标志为空而完全跳过推送循环——此时
+        // 「标志为空」不能证明该账号的未推修改已落盘，绝不能据此删除账号级
+        // 待推标记。
+        if (await syncToBackend()) {
+          flushPushSucceeded = true;
+        }
       } catch (err) {
         logger.warn('sync.switch', 'Flush attempt failed before account switch', {
           error: err instanceof Error ? err.message : String(err),
@@ -211,7 +245,10 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
       accountId: previousAccountId ?? null,
       pendingLocalChanges: _hasPendingLocalChanges,
     });
-  } else if (previousAccountId) {
+  } else if (previousAccountId && flushPushSucceeded) {
+    // 仅在本次调用观察到实际成功的推送后才清除标记（审计修复）：推送循环被
+    // 跳过（上一次失败冲刷已把会话标志清零）时标志为空不代表补推成功，
+    // 误删会让非强制拉取用后端旧快照覆盖未推送的本地修改
     _pendingSyncAccounts.delete(previousAccountId);
   }
   _hasPendingPush = false;

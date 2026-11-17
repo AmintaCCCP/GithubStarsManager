@@ -32,6 +32,7 @@ const excludeSavedAccount = (
 export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
   'setUser' | 'setGitHubToken' | 'setBackendApiSecret' | 'logout'
   | 'upsertSavedAccount' | 'switchAccount' | 'removeSavedAccount' | 'parkCurrentAccountForRestore'
+  | 'discardPartialLoginWorkspace'
 >> = (set, get) => ({
       setUser: (user) => {
         logger.info('store.setUser', 'Setting user', { hasUser: !!user, userId: user?.id ?? null });
@@ -280,6 +281,24 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           accountId: previousAccountId,
         });
         return previousAccountId;
+      },
+
+      /**
+       * 丢弃一次未完成登录残留在顶层工作区的部分同步数据（Issue #611 审计修复）。
+       * 后端同步失败回滚登录态时调用：只清 user/githubToken 会让下一次登录的
+       * park 返回 null（无当前用户不归档）、switchAccountWorkspace 在顶层已有
+       * 数据时保留顶层——残留数据会串到下一个登录的账号。这里把顶层工作区
+       * 重置为空；与 park 不同，绝不归档（未完成同步的数据不能存为任何账号
+       * 的快照）。
+       */
+      discardPartialLoginWorkspace: () => {
+        // 回滚时推送通道已失去账号上下文：取消旧会话的待推防抖并静音本次
+        // 重置，防止空快照以无账号请求头（服务端回退 active_account_id 分区）
+        // isFullSync 推送出去。
+        cancelPendingAccountSwitchPush();
+        resetSyncHashes();
+        withAccountSwitchGuardSync(() => set({ ...applyAccountWorkspace(undefined) }));
+        logger.info('store.discardPartialLoginWorkspace', 'Discarded partially synced top-level workspace after failed login');
       },
 
 });

@@ -65,6 +65,8 @@ export interface AppActions {
   removeSavedAccount: (accountId: string) => void;
   /** 在执行外部数据恢复（如后端恢复）前，预先将当前已登录账号的工作区安全归档并清空顶层工作区，防止 R2 污染 */
   parkCurrentAccountForRestore: () => string | null;
+  /** 丢弃一次未完成登录残留在顶层工作区的部分同步数据（重置为空工作区，绝不归档为账号快照） */
+  discardPartialLoginWorkspace: () => void;
 
   // Repository actions
   setRepositories: (repos: Repository[], options?: { allowEmpty?: boolean }) => void;

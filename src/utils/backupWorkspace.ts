@@ -182,6 +182,62 @@ export const applyAccountWorkspaceForTypes = (
 };
 
 /**
+ * replace 模式的工作区字典恢复：逐账号按所选导入数据类型「只替换已选字段」。
+ * 已选类型的字段以备份值为准；未选类型的字段保留本机快照——否则
+ * 「单类型导出（如仅分类）→ replace 导入」往返会把裁剪备份中的空占位
+ * 整体覆盖进工作区，清空非当前账号的仓库/Gist/Fork/订阅等未选数据。
+ */
+export const replaceWorkspacesForSelectedTypes = (
+  localWorkspaces: Record<string, AccountWorkspace>,
+  backupWorkspaces: Record<string, unknown>,
+  selectedTypes: string[],
+): Record<string, AccountWorkspace> => {
+  const normalized = normalizeAccountWorkspaces(backupWorkspaces);
+  const merged = { ...localWorkspaces };
+  const includeRepos = selectedTypes.includes('repositories');
+  const includeReleases = selectedTypes.includes('releases');
+  const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
+  const includeCategories = selectedTypes.includes('customCategories');
+  for (const [accountId, incoming] of Object.entries(normalized)) {
+    const local = merged[accountId] ?? emptyAccountWorkspace();
+    merged[accountId] = {
+      ...local,
+      ...(includeRepos
+        ? {
+            repositories: incoming.repositories,
+            lastSync: incoming.lastSync,
+            gists: incoming.gists,
+            starredGists: incoming.starredGists,
+            selectedGistCategory: incoming.selectedGistCategory,
+            forks: incoming.forks,
+            readForks: incoming.readForks,
+            syncMode: incoming.syncMode,
+            syncModeConfigured: incoming.syncModeConfigured,
+          }
+        : {}),
+      ...(includeReleases ? { releases: incoming.releases } : {}),
+      ...(includeReleaseSubs
+        ? {
+            releaseSubscriptions: incoming.releaseSubscriptions,
+            releaseSourceSettings: incoming.releaseSourceSettings,
+            readReleases: incoming.readReleases,
+          }
+        : {}),
+      ...(includeCategories
+        ? {
+            customCategories: incoming.customCategories,
+            hiddenDefaultCategoryIds: incoming.hiddenDefaultCategoryIds,
+            defaultCategoryOverrides: incoming.defaultCategoryOverrides,
+            categoryOrder: incoming.categoryOrder,
+            categoryListIdMap: incoming.categoryListIdMap,
+          }
+        : {}),
+    } satisfies AccountWorkspace;
+  }
+  return merged;
+};
+
+/**
  * 合并备份工作区：更新备份中存在的账号，保留本机独有的其他账号工作区。
  * preferLive=true（备份创建）：活跃账号的实时状态优先于可能过期的快照；
  * preferLive=false（恢复）：备份内容优先，本机独有的其他账号快照保留。

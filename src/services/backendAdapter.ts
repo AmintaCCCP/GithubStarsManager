@@ -937,12 +937,19 @@ class BackendAdapter {
    * An optional signal lets startup-only synchronization stop without delaying
    * the rest of application initialization when the backend is unreachable.
    */
-  async syncSettings(settings: Record<string, unknown>, signal?: AbortSignal): Promise<void> {
+  async syncSettings(
+    settings: Record<string, unknown>,
+    signal?: AbortSignal,
+    accountId?: string | null,
+  ): Promise<void> {
     if (!this._backendUrl) return;
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
       method: 'PUT',
-      headers: this.getAuthHeaders(),
+      // accountId 显式指定目标账号（登录/添加流程在 Store 用户落位前写入后端时
+      // 必须传入，否则请求头缺 X-GitHub-Account-Id，服务端回退全局
+      // active_account_id 分区）；缺省时保持原行为（读取 Store 当前用户）。
+      headers: getBackendAuthHeaders(accountId),
       body: JSON.stringify(settings),
       signal,
     });

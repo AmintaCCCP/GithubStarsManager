@@ -102,6 +102,7 @@ export const LoginScreen: React.FC = () => {
   const conflictResolveRef = useRef<((overwrite: boolean) => void) | null>(null);
   const {
     setUser, setGitHubToken, setBackendApiSecret, upsertSavedAccount, backendApiSecret,
+    discardPartialLoginWorkspace,
     repositories, gists, starredGists, releases, forks,
     customCategories, categoryOrder, hiddenDefaultCategoryIds,
     defaultCategoryOverrides, categoryListIdMap,
@@ -112,6 +113,7 @@ export const LoginScreen: React.FC = () => {
     setBackendApiSecret: state.setBackendApiSecret,
     upsertSavedAccount: state.upsertSavedAccount,
     backendApiSecret: state.backendApiSecret,
+    discardPartialLoginWorkspace: state.discardPartialLoginWorkspace,
     repositories: state.repositories,
     gists: state.gists,
     starredGists: state.starredGists,
@@ -333,6 +335,12 @@ export const LoginScreen: React.FC = () => {
         // 已落地的凭证保留在 savedAccounts 中（下次一键恢复），归档数据不受影响。
         setUser(null);
         setGitHubToken(null);
+        // 审计修复：同步失败前已写入顶层的账号 B 部分同步结果必须一并丢弃——
+        // 只清 user/token 时，下一次登录的 park 因无当前用户返回 null、
+        // switchAccountWorkspace 在顶层已有数据时保留顶层，账号 B 的残留数据
+        // 会被账号 C 看到。重置顶层工作区为空，且绝不归档（未完成同步的数据
+        // 不能存为账号 B 的快照）。
+        discardPartialLoginWorkspace();
       }
       setError(error instanceof Error ? error.message : t('loginScreen.sign-in-failed-please-try-again'));
     } finally {
@@ -369,6 +377,9 @@ export const LoginScreen: React.FC = () => {
         // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。
         setUser(null);
         setGitHubToken(null);
+        // 审计修复：与 handleBackendConnect 的回滚分支一致——同步失败前写入
+        // 顶层的部分同步结果一并丢弃（不归档），防止残留数据串到下一个账号。
+        discardPartialLoginWorkspace();
       }
       setError(error instanceof Error ? error.message : t('loginScreen.setup-failed-please-try-again'));
     } finally {

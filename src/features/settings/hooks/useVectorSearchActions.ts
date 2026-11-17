@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { EmbeddingApiType } from '../../../types';
 import {
@@ -118,10 +118,14 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   const testWorker = useCallback(async (draft: VectorWorkerDraft) => {
     setTestingWorker(true);
     setWorkerTestResult(null);
+    // 账号代次校验（审计修复）：连接测试等待期间切号后，发起账号 A 的连接
+    // 状态/向量数量/维度不得写入当前账号 B 的共享 vectorSearchStatus
+    //（runIndex 对同类写入已有账号保护，testWorker 补齐同一约束）。
+    const startedAccountId = peekCurrentAccountId();
     try {
       const result = await new VectorSearchService(draft).testConnection();
       setWorkerTestResult(result);
-      if (result.success) {
+      if (result.success && isCurrentAccount(startedAccountId)) {
         state.setVectorSearchStatus({ connected: true, vectorCount: result.vectorCount, dimensions: result.dimensions });
       }
     } catch (reason) {
@@ -142,17 +146,31 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     return { embeddingClient, vectorService, readmeFetcher };
   }, [activeConfig, state.githubToken]);
 
+  // 索引任务身份（审计修复）：仅靠账号 ID 判定任务过期在 A→B→A 切回后会重新
+  // 匹配，旧任务得以通过检查并把共享状态（isIndexing/result/向量状态/格式版本）
+  // 覆盖到新任务头上。每次 runIndex 注册唯一任务身份；启动新任务前先取消在途
+  // 旧任务；所有共享状态写入前同时校验任务身份与账号代次。
+  const indexJobRef = useRef<{ id: number; controller: AbortController } | null>(null);
+
   const runIndex = useCallback(async (draft: VectorIndexDraft, incremental: boolean) => {
     const clients = createClients(draft);
     if (!clients) return;
+    // 启动新任务前取消仍在途的旧任务：其身份随即失效，后续收尾写入全部跳过
+    //（被新任务取代的旧任务不得重置新任务刚置位的 isIndexing 运行状态）
+    indexJobRef.current?.controller.abort();
+    const jobId = (indexJobRef.current?.id ?? 0) + 1;
     const controller = new AbortController();
+    indexJobRef.current = { id: jobId, controller };
     setAbortController(controller);
     state.setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
     let currentFormatVersion = LEGACY_EMBEDDING_FORMAT_VERSION;
     // 账号代次校验（Issue #611）：索引可达分钟级；切号后中止任务并停止打戳
     const jobAccountId = peekCurrentAccountId();
+    const isCurrentJob = (): boolean => (
+      indexJobRef.current?.id === jobId && indexJobRef.current.controller === controller
+    );
     const onAccountChanged = (): boolean => {
-      if (!isCurrentAccount(jobAccountId)) {
+      if (!isCurrentJob() || !isCurrentAccount(jobAccountId)) {
         controller.abort();
         return true;
       }
@@ -245,8 +263,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       }
     } catch (reason) {
       // 切号后旧任务的收尾状态不得写入当前账号：包括 isIndexing=false，
-      // 否则会覆盖新账号已启动任务的运行状态
-      if (!isCurrentAccount(jobAccountId)) return;
+      // 否则会覆盖新账号已启动任务的运行状态。被新任务取代的旧任务
+      //（身份已失效）同样跳过全部收尾写入
+      if (!isCurrentJob() || !isCurrentAccount(jobAccountId)) return;
       const isCancelled = controller.signal.aborted
         || (reason instanceof Error && (reason.name === 'AbortError' || reason.message === 'Aborted'));
       if (isCancelled) {

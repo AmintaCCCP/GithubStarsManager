@@ -127,6 +127,25 @@ export const useReleaseTimelineActions = () => {
     } catch {
       if (isCurrentAccount(startedAccountId)) {
         useAppStore.setState({ readReleases: readReleasesBeforeUpdate });
+      } else if (startedAccountId) {
+        // 账号代次校验补充（审计修复）：切号时 switchAccountWorkspace 已把
+        // 包含乐观更新（全部已读）的 live 工作区写入发起账号的归档快照，
+        // 仅跳过 live 回滚会让服务端失败的已读状态留在该快照里，下次激活
+        // 原账号时被恢复。这里只把发起账号快照中的 readReleases 回写为
+        // 操作前集合，绝不创建/覆盖不存在的快照，也不触碰当前账号的工作区。
+        useAppStore.setState((state) => {
+          const parked = state.accountWorkspaces?.[startedAccountId];
+          if (!parked) return state;
+          return {
+            accountWorkspaces: {
+              ...state.accountWorkspaces,
+              [startedAccountId]: {
+                ...parked,
+                readReleases: Array.from(readReleasesBeforeUpdate),
+              },
+            },
+          };
+        });
       }
       toast(t('useReleaseTimelineActions.failed-to-mark-all-as-read'), 'error');
     } finally {

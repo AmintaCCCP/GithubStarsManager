@@ -7,11 +7,13 @@ import {
   prepareForAccountSwitch,
   syncFromBackend,
   syncToBackend,
+  withAccountSwitchFrozen,
   withAccountSwitchGuard,
   withAccountSwitchGuardSync,
 } from '../../../services/autoSync';
 import { refreshMcpElectronBridge } from '../../../services/mcpElectronBridge';
 import { useLoginActions } from './useLoginActions';
+import type { BackendLoginResult } from './useLoginActions';
 import type { GitHubUser } from '../../../types';
 
 // 模块级共享切换锁（Issue #611 审计修复）：Header 与 AddAccountModal 各自创建
@@ -222,6 +224,12 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           latest.setGitHubToken(token);
           latest.setUser(user);
         });
+        // 审计修复：后端保存的旧 Token 可能已失效——直连校验通过后必须把新
+        // 凭据对齐到后端目标分区（syncSettings 携带 github_token/账号头），否则
+        // 后端代理继续读取旧 Token，后续 GitHub 请求反复失败。当前账号工作区
+        // 保持不变（不归档、不切换）。
+        await alignTargetAccountOnBackend(targetAccountId, token, user);
+        refreshMcpElectronBridge();
         return { ok: true, user };
       }
 
@@ -229,8 +237,15 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       await withAccountSwitchGuard(async () => {
         // R2 预防：先把当前已登录账号工作区安全归档并清空顶层，再落新账号
         parkedAccountId = useAppStore.getState().parkCurrentAccountForRestore();
-        useAppStore.getState().setGitHubToken(token);
-        useAppStore.getState().setUser(user);
+        // 审计修复：身份写入属于切换簿记，必须包入同步簿记守卫——异步守卫只置
+        // _isSwitchingAccount，订阅器会把窗口内的任何状态变化记为待推，守卫
+        // 释放时立即以新账号（本地尚无快照、仓库列表为空）的工作区 isFullSync
+        // 推送，早于 alignTargetAccountOnBackend 的拉取，会删除新账号后端分区
+        // 中已有的全部仓库与发布记录。
+        withAccountSwitchGuardSync(() => {
+          useAppStore.getState().setGitHubToken(token);
+          useAppStore.getState().setUser(user);
+        });
       });
       await alignTargetAccountOnBackend(targetAccountId, token, user);
       refreshMcpElectronBridge();
@@ -255,6 +270,10 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     }
     setIsSwitching(true);
     const previousSecret = useAppStore.getState().backendApiSecret;
+    // 审计修复：保存切换前的后端 URL——restoreBackendSession 在
+    // restored-token-invalid / github-token-required 分支会保留候选后端的 URL，
+    // 失败时只恢复密钥会让原账号拿着原密钥请求候选后端，原连接无法继续工作。
+    const previousBackendUrl = backend.backendUrl;
     const currentAccountId = accountIdKey(useAppStore.getState().user);
     let parkedAccountId: string | null = null;
     let succeeded = false;
@@ -268,28 +287,49 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       // restoreAuth 通过 getBackendAuthHeaders() 读取 Store 密钥，不传入参。
       // 否则目标后端使用不同 Key 时会以旧密钥校验并返回 unauthorized。
       useAppStore.getState().setBackendApiSecret(secret);
-      const result = await withAccountSwitchGuard(() => restoreBackendSession(url));
-      if (result.status === 'backend-unavailable') return { ok: false, error: 'backend-unavailable' };
-      if (result.status === 'unauthorized') return { ok: false, error: 'unauthorized' };
-      if (result.status === 'restore-failed') return { ok: false, error: 'restore-failed' };
-      if (result.status === 'restored-token-invalid' || result.status === 'github-token-required') {
-        return { ok: false, error: result.status };
-      }
-
-      const targetAccountId = accountIdKey(result.user);
-      if (!targetAccountId) return { ok: false, error: 'invalid-github-user' };
-
-      if (currentAccountId && targetAccountId !== currentAccountId) {
-        // R2 预防：拉取后端数据写入 Store 前先归档当前账号
-        await prepareForAccountSwitch(currentAccountId);
-        parkedAccountId = parkCurrentAccountForRestore();
-      }
-
-      await withAccountSwitchGuard(async () => {
-        useAppStore.getState().setBackendApiSecret(secret);
-        useAppStore.getState().setGitHubToken(result.githubToken);
-        useAppStore.getState().setUser(result.user);
+      // 审计修复：backend.init 提交候选 URL 起到旧账号归档前的整个窗口内，
+      // 后端连接处于「候选后端」状态。恢复守卫本身不冻结订阅簿记——窗口内的
+      // 真实编辑会被订阅器记为待推，并在守卫退出时立即 syncToBackend，此时
+      // 旧账号尚未归档，其完整工作区会以旧账号请求头写入候选后端分区，
+      // 可能覆盖该分区已有数据。用冻结窗口包住「恢复 → 归档 → 身份提交」：
+      // 窗口内编辑不记录、不推送（冻结期间轮询同样暂停），失败恢复后由
+      // 下一次真实编辑在已复原的连接上下文中照常补推。
+      type ConnectedRestore = Extract<BackendLoginResult, { status: 'connected' }>;
+      const restoreOutcome = await withAccountSwitchFrozen(async (): Promise<
+        { ok: false; error: string } | { ok: true; result: ConnectedRestore; targetAccountId: string }
+      > => {
+        const result = await withAccountSwitchGuard(() => restoreBackendSession(url));
+        if (result.status === 'backend-unavailable') return { ok: false, error: 'backend-unavailable' };
+        if (result.status === 'unauthorized') return { ok: false, error: 'unauthorized' };
+        if (result.status === 'restore-failed') return { ok: false, error: 'restore-failed' };
+        if (result.status === 'restored-token-invalid' || result.status === 'github-token-required') {
+          return { ok: false, error: result.status };
+        }
+        const targetAccountId = accountIdKey(result.user);
+        if (!targetAccountId) return { ok: false, error: 'invalid-github-user' };
+        if (currentAccountId && targetAccountId !== currentAccountId) {
+          // R2 预防：拉取后端数据写入 Store 前先归档当前账号（仍在冻结窗口内：
+          // 归档本身是簿记写入，且窗口内不存在会外发旧账号数据的推送）
+          parkedAccountId = parkCurrentAccountForRestore();
+        }
+        // 审计修复：身份与工作区提交纳入恢复守卫覆盖，并以同步簿记守卫包裹
+        // setGitHubToken/setUser——否则订阅器把这两项写入记为待推，守卫释放时
+        // 以（本地尚无快照、可能为空的）新账号工作区 isFullSync 推送到候选后端，
+        // 删除其分区中已有的仓库与发布记录。
+        await withAccountSwitchGuard(async () => {
+          withAccountSwitchGuardSync(() => {
+            useAppStore.getState().setBackendApiSecret(secret);
+            useAppStore.getState().setGitHubToken(result.githubToken);
+            useAppStore.getState().setUser(result.user);
+          });
+        });
+        return { ok: true, result, targetAccountId };
       });
+      if (!restoreOutcome.ok) {
+        return { ok: false, error: restoreOutcome.error };
+      }
+      const { result, targetAccountId } = restoreOutcome;
+
       // 登记后端保存的全部有效账号（与 tryRestoreAuthFromBackend / 登录页
       // handleBackendConnect 共用同一过滤规则），否则新设备连接后端后
       // 账号下拉菜单只显示当前账号。
@@ -306,9 +346,17 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
       if (!succeeded) {
-        // 每个失败返回路径都必须恢复原密钥：失败的候选密钥绝不能残留
-        //（包括当前账号仍处于登录态、原有 !user 条件不成立的情况）。
+        // 每个失败返回路径都必须恢复原密钥与原后端 URL：失败的候选密钥与
+        // 候选 URL 绝不能残留（包括当前账号仍处于登录态、原有 !user 条件
+        // 不成立的情况），否则原账号拿原密钥请求候选后端无法继续工作。
         useAppStore.getState().setBackendApiSecret(previousSecret);
+        if (backend.backendUrl !== previousBackendUrl) {
+          try {
+            await backend.init(previousBackendUrl ?? undefined);
+          } catch {
+            // 复原连接探测失败时保持探测结果（本地模式或原 URL），不叠加新错误
+          }
+        }
         // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
         recoverParkedAccount(parkedAccountId);
       }
@@ -331,12 +379,27 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         await prepareForAccountSwitch(currentAccountId);
       }
       useAppStore.getState().removeSavedAccount(targetAccountId);
+      // 审计修复：移除当前账号时 removeSavedAccount 会自动切换到最近使用的
+      // 备选账号，但该路径此前只刷新桥接——备选账号的 Token 若仅保存在本机，
+      // 后端分区没有其凭据，代理请求会返回 GITHUB_TOKEN_NOT_CONFIGURED，且
+      // 常规自动同步不上传 github_token，轮询无法自愈。删除完成后重新读取
+      // 当前账号：若已自动切换到备选账号，复用与正常切换相同的后端对齐
+      //（先补推再拉取）；没有备选账号时保持现有登出行为。
+      const nextUser = useAppStore.getState().user;
+      const nextAccountId = accountIdKey(nextUser);
+      if (nextUser && nextAccountId && nextAccountId !== currentAccountId) {
+        await alignTargetAccountOnBackend(
+          nextAccountId,
+          useAppStore.getState().githubToken ?? '',
+          nextUser,
+        );
+      }
       refreshMcpElectronBridge();
     } finally {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, []);
+  }, [alignTargetAccountOnBackend]);
 
   const logoutCurrentAccount = useCallback(async (): Promise<void> => {
     if (!acquireAccountSwitchLock()) return;

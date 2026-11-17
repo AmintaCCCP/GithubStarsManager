@@ -578,6 +578,35 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(decrypt(scopedToken.value, encryptionKey)).toBe('token-of-111');
   });
 
+  it('preserves category_locked when claiming legacy rows that conflict by full_name', async () => {
+    const db = getDb();
+    // 存量 default：仓库已锁定分类并带自定义分类；账号分区已有同 full_name、
+    // 不同 id 的仓库（删除后重建），分类未锁定
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, custom_category, category_locked)
+      VALUES ('default', 10, 'legacy-locked', 'owner/rebuilt', 'https://github.com/owner/rebuilt', 'owner', '[]', 'legacy-cat', 1)
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('token-of-111', encryptionKey));
+
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ repositories: [repoRow(20, 'owner/rebuilt')] })
+      .expect(200);
+
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+
+    const list = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+    // full_name 冲突行未跳过：同 full_name 只保留账号自己的仓库（UNIQUE 约束）
+    expect(list.body.repositories.map((r: { id: number }) => r.id)).toEqual([20]);
+    const row = db.prepare("SELECT custom_category, category_locked FROM repositories WHERE account_id = '111' AND id = 20").get() as { custom_category: string | null; category_locked: number };
+    // 删除 default 行前必须合并：custom_category 补入且 category_locked 保留 1
+    expect(row.custom_category).toBe('legacy-cat');
+    expect(row.category_locked).toBe(1);
+    const defaultRepos = db.prepare("SELECT COUNT(*) as total FROM repositories WHERE account_id = 'default'").get() as { total: number };
+    expect(defaultRepos.total).toBe(0);
+  });
+
   it('revalidates the cached legacy identity against the current global token', async () => {
     const db = getDb();
     db.prepare(`

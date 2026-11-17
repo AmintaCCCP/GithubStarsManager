@@ -83,6 +83,14 @@ mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => un
   selector ? selector(storeState) : storeState
 )) as typeof useAppStore);
 (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
+// setState 桩支持函数更新器（真实 zustand 语义）：切号快照回写用
+// setState((state) => ...) 提交，测试需要观察更新器对归档工作区的修改
+mocks.setState.mockImplementation((partial: unknown) => {
+  const patch = typeof partial === 'function'
+    ? (partial as (state: typeof storeState) => unknown)(storeState)
+    : partial;
+  if (patch && typeof patch === 'object') Object.assign(storeState, patch as Record<string, unknown>);
+});
 (mockUseAppStore as unknown as { setState: typeof mocks.setState }).setState = mocks.setState;
 
 const renderActions = () => renderHook(() => useReleaseTimelineActions());
@@ -103,6 +111,13 @@ describe('useReleaseTimelineActions account switch guards', () => {
     )) as typeof useAppStore);
     (mockUseAppStore as unknown as { getState: () => typeof storeState }).getState = () => storeState;
     (mockUseAppStore as unknown as { setState: typeof mocks.setState }).setState = mocks.setState;
+    // afterEach 的 restoreAllMocks 会清掉模块级实现：每次重建函数更新器支持
+    mocks.setState.mockImplementation((partial: unknown) => {
+      const patch = typeof partial === 'function'
+        ? (partial as (state: typeof storeState) => unknown)(storeState)
+        : partial;
+      if (patch && typeof patch === 'object') Object.assign(storeState, patch as Record<string, unknown>);
+    });
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
     mocks.confirm.mockResolvedValue(true);
     mocks.forceSyncToBackend.mockResolvedValue(undefined);
@@ -145,6 +160,44 @@ describe('useReleaseTimelineActions account switch guards', () => {
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
     // 切号后回滚被丢弃：绝不以账号 A 的已读快照覆盖账号 B
     expect(rollbackCalls()).toHaveLength(0);
+  });
+
+  it('writes the read-state rollback into the originating account snapshot after a switch', async () => {
+    mocks.markAllReleasesAsRead.mockImplementation(async () => {
+      switchToB();
+      throw new Error('backend down');
+    });
+    // 切换时 switchAccountWorkspace 已把包含乐观更新（全部已读）的 live 工作区
+    // 写入账号 A 的归档快照——这里以「全部已读后的已读集合」模拟该快照
+    (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces = {
+      '1': { repositories: [], releases: [], readReleases: [101, 102] },
+    };
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.handleMarkAllRead(); });
+
+    expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
+    // 当前账号 B 的 live 状态没有回滚写入
+    expect(rollbackCalls()).toHaveLength(0);
+    // 发起账号 A 的快照已回写为操作前的已读集合，下次激活时不再显示
+    // 服务端已失败的「全部已读」状态
+    const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
+    expect(parked?.readReleases).toEqual([7, 8]);
+  });
+
+  it('does not create a workspace snapshot when the originating account has none', async () => {
+    mocks.markAllReleasesAsRead.mockImplementation(async () => {
+      switchToB();
+      throw new Error('backend down');
+    });
+    // 发起账号没有归档快照（如从未切过号的全新会话）：不得凭空创建
+    const { result } = renderActions();
+
+    await act(async () => { await result.current.handleMarkAllRead(); });
+
+    expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
+    expect(rollbackCalls()).toHaveLength(0);
+    expect((storeState as { accountWorkspaces?: Record<string, unknown> }).accountWorkspaces).toBeUndefined();
   });
 
   it('aborts the unsubscribe flow entirely when the account switched during the confirm dialog', async () => {

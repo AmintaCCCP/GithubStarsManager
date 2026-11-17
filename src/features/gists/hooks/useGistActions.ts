@@ -134,8 +134,14 @@ export const useGistActions = () => {
       toast(t('useGistActions.no-gists-need-analysis-in-the-current-list'), 'info');
       return;
     }
+    // 账号代次校验（Issue #611 审计修复）：targets/api/aiService 都取自发起账号的
+    // 闭包，jobAccountId 必须在 await confirm 之前记录——确认后再读取会拿到
+    // 切号后的账号，后续 isCurrentAccount 校验恒通过，旧账号的分析结果会写进
+    // 新账号工作区。确认通过后用保存值复核一次，切号即整体退出。
+    const jobAccountId = peekCurrentAccountId();
     const confirmed = await confirm(t('useGistActions.batch-ai-analysis'), t('useGistActions.analyze-v1-gists-continue', { v1: targets.length }), { type: 'warning' });
     if (!confirmed) return;
+    if (!isCurrentAccount(jobAccountId)) return;
 
     setIsAnalyzingAll(true);
     const api = createGitHubApiService(state.githubToken);
@@ -143,8 +149,6 @@ export const useGistActions = () => {
     let success = 0;
     let failed = 0;
     const concurrency = activeConfig.concurrency && activeConfig.concurrency > 1 ? activeConfig.concurrency : 1;
-    // 账号代次校验（Issue #611）：批量分析切号后中止队列，结果不写新账号
-    const jobAccountId = peekCurrentAccountId();
     const analyzeOne = async (gist: Gist) => {
       if (!isCurrentAccount(jobAccountId)) return;
       state.setAnalyzingGist(gist.id, true);

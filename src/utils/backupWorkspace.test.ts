@@ -4,6 +4,7 @@ import {
   buildFullWorkspaces,
   maskSavedAccountsForBackup,
   mergeWorkspacesById,
+  replaceWorkspacesForSelectedTypes,
   trimWorkspacesForSelectedTypes,
 } from './backupWorkspace';
 import type { AccountWorkspace, GitHubUser, Repository, SavedAccount } from '../types';
@@ -164,6 +165,52 @@ describe('multi-account backup helpers (Issue #611)', () => {
     expect(repoTrimmed['1'].syncMode).toBe(full.syncMode);
     expect(repoTrimmed['1'].customCategories).toEqual([]);
     expect(repoTrimmed['1'].categoryListIdMap).toEqual({});
+  });
+
+  it('replace-restores workspaces per selected types, preserving unselected local fields', () => {
+    // 单类型（仅 customCategories）导出的裁剪备份：未选字段为空占位
+    const trimmedBackup = trimWorkspacesForSelectedTypes(
+      { '2': workspaceOf([repo(2, 'backup-stale')]) },
+      ['customCategories'],
+    );
+    trimmedBackup['2'] = {
+      ...trimmedBackup['2'],
+      customCategories: [{ id: 'cat-bob-backup', name: 'Bob Backup', icon: 'folder', keywords: [], isCustom: true }],
+    };
+
+    const local = {
+      '2': {
+        ...workspaceOf([repo(2, 'bob-precious')]),
+        gists: [{ id: 'gist-1' } as never],
+        releaseSubscriptions: [7],
+        readReleases: [8],
+      },
+      '3': workspaceOf([repo(3, 'local-only-account')]),
+    };
+
+    const restored = replaceWorkspacesForSelectedTypes(local, trimmedBackup, ['customCategories']);
+    // 已选类型（分类）以备份为准
+    expect(restored['2'].customCategories.map((c: { id: string }) => c.id)).toEqual(['cat-bob-backup']);
+    // 未选类型的本机数据绝不备份空占位覆盖
+    expect(restored['2'].repositories.map((r: Repository) => r.ai_summary)).toEqual(['bob-precious']);
+    expect(restored['2'].gists).toHaveLength(1);
+    expect(restored['2'].releaseSubscriptions).toEqual([7]);
+    expect(restored['2'].readReleases).toEqual([8]);
+    // 本机独有账号保留
+    expect(restored['3'].repositories[0].ai_summary).toBe('local-only-account');
+  });
+
+  it('replace-restores all fields when every type is selected (full backup equivalence)', () => {
+    const backup = { '2': workspaceOf([repo(2, 'backup-full')]) };
+    const local = { '2': workspaceOf([repo(2, 'local-old')]) };
+
+    const restored = replaceWorkspacesForSelectedTypes(
+      local,
+      backup,
+      ['repositories', 'releases', 'releaseSubscriptions', 'customCategories'],
+    );
+    expect(restored['2'].repositories.map((r: Repository) => r.ai_summary)).toEqual(['backup-full']);
+    expect(restored['2'].lastSync).toBe('2026-02-01T00:00:00.000Z');
   });
 
   it('applies only workspace fields for the selected import types', () => {

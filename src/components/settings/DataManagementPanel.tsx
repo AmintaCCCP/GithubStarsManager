@@ -69,8 +69,8 @@ import {
   buildFullWorkspaces,
   hasMaskedBackupSecrets,
   maskSavedAccountsForBackup,
-  mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
   mergeWorkspacesById,
+  replaceWorkspacesForSelectedTypes,
   trimWorkspacesForSelectedTypes,
 } from '../../utils/backupWorkspace';
 import { useShallow } from 'zustand/react/shallow';
@@ -666,10 +666,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       };
 
       // 多账号备份（Issue #611）：勾选核心数据时一并导出活跃账号 ID、
-      // 全账号工作区字典与已保存账号列表（Token 按 includeKeysInBackup 脱敏）
+      // 全账号工作区字典与已保存账号列表（Token 按 includeKeysInBackup 脱敏）。
+      // releaseSubscriptions 也属于账号归属数据：仅导出订阅时若缺少
+      // activeAccountId/accountWorkspaces，导入端无法识别跨账号备份，
+      // 会把备份账号的订阅/已读状态当成恢复者账号的数据恢复（串号）。
       const exportCoreWorkspaces = selectedTypes.includes('repositories')
         || selectedTypes.includes('releases')
-        || selectedTypes.includes('customCategories');
+        || selectedTypes.includes('customCategories')
+        || selectedTypes.includes('releaseSubscriptions');
       if (exportCoreWorkspaces) {
         exportDataObj.data.activeAccountId = accountIdKey(store.user);
         // 工作区字段按 selectedTypes 裁剪（隐私边界）：只选 customCategories 时
@@ -884,13 +888,28 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         });
       };
 
-      const applyCurrentAccountBackupWorkspace = (): void => {
+      const applyCurrentAccountBackupWorkspace = (restoreMode: 'merge' | 'replace'): void => {
         if (!currentAccountId) return;
         const backupWorkspace = importedWorkspaces[currentAccountId];
         if (backupWorkspace) {
           // 备份确实包含当前账号工作区：按导入类型应用其字段（类型过滤确保
-          // 裁剪备份的空字段不会回滚未选类型的实时数据）
-          useAppStore.setState(applyAccountWorkspaceForTypes(backupWorkspace, selectedTypes));
+          // 裁剪备份的空字段不会回滚未选类型的实时数据）。
+          // merge 模式必须以当前实时快照为基座按 id 合并后再应用：备份中的
+          // 当前账号快照可能早于实时数据，直接应用会用备份旧快照覆盖实时
+          // 状态（本地新增仓库丢失）。
+          const effective = restoreMode === 'merge'
+            ? mergeWorkspacesById(captureAccountWorkspace(useAppStore.getState()), backupWorkspace)
+            : backupWorkspace;
+          useAppStore.setState(applyAccountWorkspaceForTypes(effective, selectedTypes));
+          // 应用后以恢复后的实时状态为准同步当前账号工作区快照，
+          // 避免字典中残留备份旧快照与实时状态不一致
+          const restored = useAppStore.getState();
+          useAppStore.setState({
+            accountWorkspaces: {
+              ...restored.accountWorkspaces,
+              [currentAccountId]: captureAccountWorkspace(restored),
+            },
+          });
           return;
         }
         // 备份不含当前账号工作区：先把实时数据快照保存进工作区字典，
@@ -900,6 +919,48 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           accountWorkspaces: {
             ...live.accountWorkspaces,
             [currentAccountId]: captureAccountWorkspace(live),
+          },
+        });
+      };
+
+      // 跨账号恢复订阅/已读状态：这组账号字段属于备份账号（如 A 导入 B 的
+      // 备份，B 的订阅/来源设置/已读状态归档进 B 的工作区），绝不写入当前
+      // 账号实时状态——否则收尾的实时快照会把它们保存进当前账号工作区。
+      const archiveSubscriptionsToBackupAccount = (archiveMode: 'merge' | 'replace'): void => {
+        if (!importedData.activeAccountId) return;
+        const workspaces = useAppStore.getState().accountWorkspaces;
+        const base = workspaces[importedData.activeAccountId] ?? emptyAccountWorkspace();
+        const importedSubs = importedData.releaseSubscriptions;
+        const importedReadReleases = importedData.readReleases;
+        const importedSourceSettings = importedData.releaseSourceSettings;
+        const archived: AccountWorkspace = {
+          ...base,
+          releaseSubscriptions: archiveMode === 'replace'
+            ? (importedSubs !== undefined
+              ? Array.from(new Set(importedSubs || []))
+              : base.releaseSubscriptions)
+            : (importedSubs
+              ? Array.from(new Set([...base.releaseSubscriptions, ...importedSubs]))
+              : base.releaseSubscriptions),
+          readReleases: archiveMode === 'replace'
+            ? (importedReadReleases !== undefined
+              ? Array.from(new Set(importedReadReleases || []))
+              : base.readReleases)
+            : (importedReadReleases
+              ? Array.from(new Set([...base.readReleases, ...importedReadReleases]))
+              : base.readReleases),
+          releaseSourceSettings: archiveMode === 'replace'
+            ? (importedSourceSettings !== undefined
+              ? normalizeReleaseSourceSettings(importedSourceSettings || null)
+              : base.releaseSourceSettings)
+            : (importedSourceSettings
+              ? mergeReleaseSourceSettings(base.releaseSourceSettings, normalizeReleaseSourceSettings(importedSourceSettings))
+              : base.releaseSourceSettings),
+        };
+        useAppStore.setState({
+          accountWorkspaces: {
+            ...workspaces,
+            [importedData.activeAccountId]: archived,
           },
         });
       };
@@ -924,15 +985,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
 
       if (mode === 'replace') {
-        // 工作区字典合并（replace）：更新备份中存在的账号，保留本机独有账号
+        // 工作区字典合并（replace）：逐账号按所选类型只替换已选字段，保留
+        // 本机独有账号与未选类型的本机数据——裁剪备份的空占位字段绝不能
+        // 整体覆盖工作区（否则单类型导入会清空非当前账号的仓库等数据）。
         if (hasImportedWorkspaces) {
           useAppStore.setState({
-            accountWorkspaces: mergeAccountWorkspacesForBackup(
+            accountWorkspaces: replaceWorkspacesForSelectedTypes(
               useAppStore.getState().accountWorkspaces,
               importedData.accountWorkspaces as Record<string, unknown>,
-              currentAccountId,
-              captureAccountWorkspace(useAppStore.getState()),
-              false,
+              selectedTypes,
             ),
           });
         }
@@ -1033,14 +1094,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('releaseSubscriptions')) {
-          if (importedData.releaseSubscriptions !== undefined) {
-            useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
-          }
-          if (importedData.releaseSourceSettings !== undefined) {
-            store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
-          }
-          if (importedData.readReleases !== undefined) {
-            useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
+          if (backupTargetsOtherAccount) {
+            // 跨账号：订阅/来源设置/已读状态归档进备份账号工作区，
+            // 不改写当前账号实时状态（避免实时快照把它们存进当前账号工作区）
+            archiveSubscriptionsToBackupAccount('replace');
+          } else {
+            if (importedData.releaseSubscriptions !== undefined) {
+              useAppStore.setState({ releaseSubscriptions: new Set(importedData.releaseSubscriptions || []) });
+            }
+            if (importedData.releaseSourceSettings !== undefined) {
+              store.setReleaseSourceSettings(normalizeReleaseSourceSettings(importedData.releaseSourceSettings || null));
+            }
+            if (importedData.readReleases !== undefined) {
+              useAppStore.setState({ readReleases: new Set(importedData.readReleases || []) });
+            }
           }
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
@@ -1275,22 +1342,28 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
         }
         if (selectedTypes.includes('releaseSubscriptions')) {
-          if (importedData.releaseSubscriptions) {
-            const existingSubs = store.releaseSubscriptions;
-            const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
-            useAppStore.setState({ releaseSubscriptions: newSubs });
-          }
-          if (importedData.releaseSourceSettings) {
-            store.setReleaseSourceSettings(mergeReleaseSourceSettings(
-              store.releaseSourceSettings,
-              normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
-            ));
-          }
-          if (importedData.readReleases) {
-            const currentReadReleases = useAppStore.getState().readReleases;
-            useAppStore.setState({
-              readReleases: new Set([...currentReadReleases, ...importedData.readReleases]),
-            });
+          if (backupTargetsOtherAccount) {
+            // 跨账号：订阅/来源设置/已读状态按并集归档进备份账号工作区，
+            // 不改写当前账号实时状态（避免实时快照把它们存进当前账号工作区）
+            archiveSubscriptionsToBackupAccount('merge');
+          } else {
+            if (importedData.releaseSubscriptions) {
+              const existingSubs = store.releaseSubscriptions;
+              const newSubs = new Set([...Array.from(existingSubs), ...importedData.releaseSubscriptions]);
+              useAppStore.setState({ releaseSubscriptions: newSubs });
+            }
+            if (importedData.releaseSourceSettings) {
+              store.setReleaseSourceSettings(mergeReleaseSourceSettings(
+                store.releaseSourceSettings,
+                normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
+              ));
+            }
+            if (importedData.readReleases) {
+              const currentReadReleases = useAppStore.getState().readReleases;
+              useAppStore.setState({
+                readReleases: new Set([...currentReadReleases, ...importedData.readReleases]),
+              });
+            }
           }
         }
         if (selectedTypes.includes('searchFilters') && importedData.searchFilters) {
@@ -1376,17 +1449,34 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       if (backupTargetsOtherAccount) {
         // 把当前登录账号的备份工作区应用到顶层；备份不含当前账号工作区时
         // 保存实时数据快照，绝不回滚实时状态
-        applyCurrentAccountBackupWorkspace();
+        applyCurrentAccountBackupWorkspace(mode);
       } else if (currentAccountId && (mode === 'replace' || !hasImportedWorkspaces)) {
         // 同账号替换恢复：先应用备份中当前账号工作区的所选类型字段
         // （syncMode、syncModeConfigured、lastSync、selectedGistCategory 等
-        // 仅存在于工作区的设置由此真正恢复）；merge 模式不应用也不回滚，
-        // 保留逐账号合并结果。最后同步当前账号工作区快照：以恢复后的
-        // 实时状态为准（旧版单账号备份路径保持原有行为）。
+        // 仅存在于工作区的设置由此真正恢复）。最后同步当前账号工作区快照：
+        // 以恢复后的实时状态为准（旧版单账号备份路径保持原有行为）。
         const backupWorkspace = importedWorkspaces[currentAccountId];
         if (hasImportedWorkspaces && backupWorkspace) {
           useAppStore.setState(applyAccountWorkspaceForTypes(backupWorkspace, selectedTypes));
         }
+        const live = useAppStore.getState();
+        useAppStore.setState({
+          accountWorkspaces: {
+            ...live.accountWorkspaces,
+            [currentAccountId]: captureAccountWorkspace(live),
+          },
+        });
+      } else if (currentAccountId && hasImportedWorkspaces && importedWorkspaces[currentAccountId]) {
+        // 同账号 merge：以当前实时快照为基座按 id 合并备份工作区并应用所选
+        // 字段。merge 分支只合并了顶层 repositories/releases/订阅，Gist/Fork
+        // 等仅存在于工作区字段中的备份新增条目若不在此落回实时状态，下一次
+        // 导出的 buildFullWorkspaces 会用实时状态覆盖工作区，刚导入的条目
+        // 随之丢失。本地同 ID 条目保留，备份新增条目并入。
+        const effective = mergeWorkspacesById(
+          captureAccountWorkspace(useAppStore.getState()),
+          importedWorkspaces[currentAccountId],
+        );
+        useAppStore.setState(applyAccountWorkspaceForTypes(effective, selectedTypes));
         const live = useAppStore.getState();
         useAppStore.setState({
           accountWorkspaces: {

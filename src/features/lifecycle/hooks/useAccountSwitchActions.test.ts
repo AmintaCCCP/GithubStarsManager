@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   backend: {
     isAvailable: true,
     syncSettings: vi.fn(),
+    backendUrl: null as string | null,
+    init: vi.fn(async () => undefined),
   },
   restoreBackendSession: vi.fn(),
   authenticateWithGitHub: vi.fn(),
@@ -25,10 +27,10 @@ vi.mock('../../../services/autoSync', async (importOriginal) => {
     syncFromBackend: mocks.syncFromBackend,
     consumePendingAccountSync: mocks.consumePendingAccountSync,
     syncToBackend: mocks.syncToBackend,
-    // 透传执行被包裹的切换序列，并记录调用次数
-    withAccountSwitchGuard: async (fn: () => Promise<unknown>) => {
+    // 透传真实守卫（保留退出时的待推冲刷语义）并记录调用次数
+    withAccountSwitchGuard: async <T>(fn: () => Promise<T>) => {
       mocks.withAccountSwitchGuard();
-      return fn();
+      return actual.withAccountSwitchGuard(fn);
     },
   };
 });
@@ -49,6 +51,7 @@ vi.mock('./useLoginActions', () => ({
 }));
 
 import { useAppStore } from '../../../store/useAppStore';
+import { startAutoSync, stopAutoSync } from '../../../services/autoSync';
 import type { GitHubUser } from '../../../types';
 import { useAccountSwitchActions } from './useAccountSwitchActions';
 
@@ -102,6 +105,7 @@ describe('useAccountSwitchActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.backend.isAvailable = false;
+    mocks.backend.backendUrl = null;
     mocks.syncFromBackend.mockResolvedValue(undefined);
     mocks.prepareForAccountSwitch.mockResolvedValue(undefined);
     mocks.consumePendingAccountSync.mockReturnValue(false);
@@ -180,7 +184,7 @@ describe('useAccountSwitchActions', () => {
     expect(useAppStore.getState().user?.login).toBe('alice');
   });
 
-  it('updates only the token when re-adding the current account', async () => {
+  it('updates only the token when re-adding the current account and aligns backend credentials', async () => {
     useAppStore.setState({
       user: userA,
       githubToken: 'ghp_a',
@@ -188,6 +192,7 @@ describe('useAccountSwitchActions', () => {
       savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't0', lastUsedAt: 't' } },
     });
     mocks.authenticateWithGitHub.mockResolvedValue(userA);
+    mocks.backend.isAvailable = true;
 
     const { result } = renderHook(() => useAccountSwitchActions());
     let outcome;
@@ -199,8 +204,17 @@ describe('useAccountSwitchActions', () => {
     expect(useAppStore.getState().githubToken).toBe('ghp_a2');
     expect(useAppStore.getState().savedAccounts['1']?.githubToken).toBe('ghp_a2');
     expect(useAppStore.getState().savedAccounts['1']?.addedAt).toBe('t0');
-    // 同账号刷新：不触发归档与后端切换对齐
+    // 同账号刷新：不触发归档与切换冲刷（当前账号工作区保持不变）
     expect(mocks.prepareForAccountSwitch).not.toHaveBeenCalled();
+    expect(useAppStore.getState().accountWorkspaces['1']).toBeUndefined();
+    // 审计修复：后端保存的旧 Token 可能已失效——新凭据必须对齐到后端目标
+    // 分区并刷新桥接，否则后端代理继续用旧 Token、后续请求反复失败
+    expect(mocks.backend.syncSettings).toHaveBeenCalledWith({
+      github_token: 'ghp_a2',
+      active_account_id: '1',
+      user_profile: userA,
+    });
+    expect(mocks.refreshMcpElectronBridge).toHaveBeenCalled();
   });
 
   it('archives the current account before switching to a newly added one', async () => {
@@ -356,6 +370,7 @@ describe('useAccountSwitchActions audit fixes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.backend.isAvailable = false;
+    mocks.backend.backendUrl = null;
     mocks.syncFromBackend.mockResolvedValue(undefined);
     mocks.prepareForAccountSwitch.mockResolvedValue(undefined);
     mocks.consumePendingAccountSync.mockReturnValue(false);
@@ -491,6 +506,101 @@ describe('useAccountSwitchActions audit fixes', () => {
     expect(secretsSeenDuringRestore).toEqual(['candidate-key']);
     expect(useAppStore.getState().backendApiSecret).toBe('old-key');
     expect(useAppStore.getState().user?.login).toBe('alice');
+  });
+
+  it('restores the previous backend URL together with the secret when the candidate keeps its URL', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
+    });
+    useAppStore.getState().setBackendApiSecret('old-key');
+    // 原连接：URL X + 密钥 Kx；候选后端 restoreBackendSession 提交了 Y 的 URL
+    //（restored-token-invalid / github-token-required 分支会保留候选 URL）
+    mocks.backend.backendUrl = 'https://old.example/api';
+    mocks.restoreBackendSession.mockImplementation(async () => {
+      mocks.backend.backendUrl = 'https://candidate.example/api';
+      return { status: 'github-token-required' };
+    });
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.addAccountFromBackend('https://candidate.example', 'candidate-key');
+    });
+
+    expect(outcome).toEqual({ ok: false, error: 'github-token-required' });
+    // 审计修复：失败路径必须同时恢复原 URL 与原密钥——只恢复密钥会让原账号
+    // 拿着原密钥请求候选后端 Y，原连接无法继续工作
+    expect(useAppStore.getState().backendApiSecret).toBe('old-key');
+    expect(mocks.backend.init).toHaveBeenCalledTimes(1);
+    expect(mocks.backend.init).toHaveBeenCalledWith('https://old.example/api');
+  });
+
+  it('does not flush edits made during the backend restore window to the candidate backend', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
+    });
+    mocks.backend.isAvailable = true;
+    mocks.restoreBackendSession.mockImplementation(async () => {
+      // 模拟 backend.init 已提交候选 URL 后、身份验证等待期间的用户编辑
+      //（categoryOrder 是订阅器跟踪的字段；此时旧账号尚未归档）
+      useAppStore.setState({ categoryOrder: ['reordered-during-restore'] });
+      return { status: 'github-token-required' };
+    });
+
+    const unsubscribe = startAutoSync();
+    try {
+      const { result } = renderHook(() => useAccountSwitchActions());
+      let outcome;
+      await act(async () => {
+        outcome = await result.current.addAccountFromBackend('https://candidate.example', 'candidate-key');
+      });
+
+      expect(outcome).toEqual({ ok: false, error: 'github-token-required' });
+      // 审计修复：恢复窗口被冻结——窗口内编辑不记为待推，守卫退出绝不把
+      // 尚未归档的旧账号工作区（或空工作区）写入候选后端分区
+      expect(mocks.syncToBackend).not.toHaveBeenCalled();
+      expect(mocks.backend.syncSettings).not.toHaveBeenCalled();
+      // 失败恢复：账号 A 保持登录态且数据完好
+      expect(useAppStore.getState().user?.login).toBe('alice');
+    } finally {
+      stopAutoSync(unsubscribe);
+    }
+  });
+
+  it('aligns the backend for the auto-selected fallback account after removing the current account', async () => {
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      accountWorkspaces: { '2': workspaceOf(2) },
+    });
+    mocks.backend.isAvailable = true;
+
+    const { result } = renderHook(() => useAccountSwitchActions());
+    await act(async () => {
+      await result.current.removeAccount('1');
+    });
+
+    expect(useAppStore.getState().user?.login).toBe('bob');
+    // 审计修复：备选账号的 Token 可能仅保存在本机——删除后自动切换到它时
+    // 必须执行与正常切换相同的后端对齐（凭据对齐 + 先补推再拉取）
+    expect(mocks.backend.syncSettings).toHaveBeenCalledWith({
+      github_token: 'ghp_b',
+      active_account_id: '2',
+      user_profile: userB,
+    });
+    expect(mocks.syncFromBackend).toHaveBeenCalledWith({ force: false });
+    expect(mocks.refreshMcpElectronBridge).toHaveBeenCalled();
   });
 
   it('registers every valid backend account after a successful backend restore', async () => {

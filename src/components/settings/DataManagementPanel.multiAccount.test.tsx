@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataManagementPanel } from './DataManagementPanel';
 import { useAppStore } from '../../store/useAppStore';
-import type { AccountWorkspace, Category, GitHubUser, Repository, SavedAccount } from '../../types';
+import type { AccountWorkspace, Category, Gist, GitHubUser, Repository, SavedAccount } from '../../types';
 
 // 恢复真实 Store：全局 setup.ts 将 store mock 成了选择器桩，而多账号
 // 导入/导出测试需要驱动真实的工作区与账号状态。
@@ -68,6 +68,18 @@ const category = (id: string, name: string): Category => ({
   icon: 'folder',
   keywords: [],
   isCustom: true,
+});
+
+const gist = (id: string, description: string): Gist => ({
+  id,
+  description,
+  public: true,
+  html_url: `https://gist.github.com/${id}`,
+  created_at: '2026-01-01T00:00:00.000Z',
+  updated_at: '2026-01-01T00:00:00.000Z',
+  comments: 0,
+  owner: { login: 'alice', avatar_url: '' },
+  files: {},
 });
 
 const workspaceOf = (overrides: Partial<AccountWorkspace> = {}): AccountWorkspace => ({
@@ -358,6 +370,200 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     expect(state.repositories[0].ai_summary).toBe('alice-restored');
     // 快照以恢复后的实时状态为准
     expect(state.accountWorkspaces['1']?.syncMode).toBe('stars-and-lists');
+  });
+
+  it('exports account attribution when only releaseSubscriptions is selected', async () => {
+    const user = userEvent.setup();
+    const createObjectURLMock = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
+    const revokeObjectURLMock = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURLMock });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURLMock });
+
+    render(<DataManagementPanel t={t} />);
+
+    // 反选除 release-subscriptions 之外的所有类型
+    const labelsToUncheck = [
+      'dataManagementPanel.repositories',
+      'dataManagementPanel.releases',
+      'dataManagementPanel.ai-configs',
+      'dataManagementPanel.webdav-configs',
+      'dataManagementPanel.asset-filters',
+      'dataManagementPanel.discovery-data',
+      'dataManagementPanel.subscription-data',
+      'dataManagementPanel.categories',
+      'dataManagementPanel.search-filters',
+      'dataManagementPanel.ui-settings',
+    ];
+    for (const label of labelsToUncheck) {
+      await user.click(screen.getByLabelText(label));
+    }
+
+    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
+
+    expect(createObjectURLMock).toHaveBeenCalledOnce();
+    const blob = createObjectURLMock.mock.calls[0][0] as Blob;
+    const payload = JSON.parse(await blob.text());
+
+    // 仅导出订阅时也必须带账号归属：否则导入端无法识别跨账号备份
+    expect(payload.data.releaseSubscriptions).toEqual([111]);
+    expect(payload.data.activeAccountId).toBe('1');
+    expect(payload.data.accountWorkspaces).toBeDefined();
+    expect(payload.data.savedAccounts).toBeDefined();
+    // 工作区按所选类型裁剪：只含订阅/已读字段，不含其他账号仓库
+    expect(payload.data.accountWorkspaces['1'].releaseSubscriptions).toEqual([111]);
+    expect(payload.data.accountWorkspaces['1'].repositories).toEqual([]);
+    expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
+  });
+
+  it('replace import of a categories-only export restores categories without wiping other accounts', async () => {
+    // 往返：仅导出 customCategories → replace 导入，非当前账号的仓库等
+    // 未选数据绝不被裁剪备份的空占位清空
+    const user = userEvent.setup();
+    const createObjectURLMock = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
+    const revokeObjectURLMock = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, writable: true, value: createObjectURLMock });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, writable: true, value: revokeObjectURLMock });
+
+    render(<DataManagementPanel t={t} />);
+    const labelsToUncheck = [
+      'dataManagementPanel.repositories',
+      'dataManagementPanel.releases',
+      'dataManagementPanel.ai-configs',
+      'dataManagementPanel.webdav-configs',
+      'dataManagementPanel.asset-filters',
+      'dataManagementPanel.discovery-data',
+      'dataManagementPanel.subscription-data',
+      'dataManagementPanel.release-subscriptions',
+      'dataManagementPanel.search-filters',
+      'dataManagementPanel.ui-settings',
+    ];
+    for (const label of labelsToUncheck) {
+      await user.click(screen.getByLabelText(label));
+    }
+    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.export-selected' }));
+    const blob = createObjectURLMock.mock.calls[0][0] as Blob;
+    const payload = JSON.parse(await blob.text());
+    expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
+
+    await importBackupAndClick(user, payload.data, 'dataManagementPanel.replace-import');
+
+    const state = useAppStore.getState();
+    // 分类恢复到当前账号
+    expect(state.customCategories.map((c: Category) => c.id)).toEqual(['cat-alice']);
+    // 非当前账号的仓库数据保留（未被空占位整体覆盖）
+    expect(state.accountWorkspaces['2']?.repositories.map((r: Repository) => r.ai_summary))
+      .toEqual(['bob-ai']);
+    expect(state.accountWorkspaces['2']?.customCategories.map((c: Category) => c.id))
+      .toEqual(['cat-bob-local']);
+  });
+
+  it('archives backup-account subscriptions to its workspace on cross-account replace import', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      accountWorkspaces: {},
+      releaseSubscriptions: [999],
+      readReleases: [888],
+      releaseSourceSettings: {
+        enabledSourceIds: ['starred-release-subscription'],
+        watchCustomReleaseRepos: [],
+        customReleaseRepos: [],
+      },
+    }, 'dataManagementPanel.replace-import');
+
+    const state = useAppStore.getState();
+    // 当前账号的订阅/已读/来源设置不被跨账号备份改写
+    expect(Array.from(state.releaseSubscriptions)).toEqual([111]);
+    expect(Array.from(state.readReleases)).toEqual([222]);
+    // 备份账号工作区持有备份的订阅/已读状态
+    expect(state.accountWorkspaces['2']?.releaseSubscriptions).toEqual([999]);
+    expect(state.accountWorkspaces['2']?.readReleases).toEqual([888]);
+  });
+
+  it('unions backup-account subscriptions into its workspace on cross-account merge import', async () => {
+    useAppStore.setState({
+      accountWorkspaces: {
+        '2': workspaceOf({
+          repositories: [repo(2, 'bob-ai')],
+          releaseSubscriptions: [555],
+          readReleases: [666],
+        }),
+      },
+    });
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      accountWorkspaces: {},
+      releaseSubscriptions: [999, 555],
+      readReleases: [666, 888],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 备份账号工作区按并集合并，保留本机条目并恢复备份条目
+    expect(state.accountWorkspaces['2']?.releaseSubscriptions).toEqual([555, 999]);
+    expect(state.accountWorkspaces['2']?.readReleases).toEqual([666, 888]);
+    // 当前账号实时状态不动
+    expect(Array.from(state.releaseSubscriptions)).toEqual([111]);
+    expect(Array.from(state.readReleases)).toEqual([222]);
+  });
+
+  it('merge import from another account merges stale current-account workspace into live state', async () => {
+    // 备份包含当前账号的旧快照：merge 必须以实时快照为基座合并，
+    // 绝不能用备份旧快照覆盖实时数据
+    useAppStore.setState({
+      repositories: [repo(1, 'alice-live-1'), repo(3, 'alice-new-local')],
+      accountWorkspaces: {},
+    });
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      accountWorkspaces: {
+        '1': workspaceOf({ repositories: [repo(1, 'stale-alice'), repo(9, 'backup-only-alice')] }),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    const summaries = state.repositories.map((r: Repository) => r.ai_summary);
+    // 实时数据保留（不被备份旧快照 [stale-alice] 回滚）
+    expect(summaries).toContain('alice-live-1');
+    expect(summaries).toContain('alice-new-local');
+    // 备份工作区中当前账号的新增条目并入实时状态
+    expect(summaries).toContain('backup-only-alice');
+    expect(summaries).not.toContain('stale-alice');
+    // 备份顶层数据归档进备份账号工作区
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
+    // 当前账号工作区快照与合并后的实时状态一致
+    expect(state.accountWorkspaces['1']?.repositories.map((r: Repository) => r.ai_summary))
+      .toEqual(summaries);
+  });
+
+  it('same-account merge import restores backup-only gists into live state', async () => {
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '1',
+      includeKeysInBackup: true,
+      accountWorkspaces: {
+        '1': workspaceOf({ gists: [gist('gist-backup-new', 'backup gist')] }),
+      },
+      repositories: [repo(1, 'alice-restored')],
+    }, 'dataManagementPanel.merge-import');
+
+    const state = useAppStore.getState();
+    // 仅存在于工作区字段中的备份新增 Gist 落回实时状态
+    expect(state.gists.map((g: Gist) => g.id)).toContain('gist-backup-new');
+    expect(state.gistSearchResults.map((g: Gist) => g.id)).toContain('gist-backup-new');
+    // 工作区快照包含合并结果：再次导出不会丢失刚导入的条目
+    expect(state.accountWorkspaces['1']?.gists.map((g: Gist) => g.id)).toContain('gist-backup-new');
+    // 本地实时仓库条目保留
+    expect(state.repositories[0].ai_summary).toBe('alice-live');
   });
 
   it('clears savedAccounts when deleting all data so tokens are not re-persisted', async () => {

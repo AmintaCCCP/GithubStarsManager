@@ -97,13 +97,17 @@ export const useLoginActions = (): LoginActions => {
   }, [authenticateWithGitHub]);
   const setupBackendGitHubToken = useCallback(async (token: string) => {
     const user = await authenticateWithGitHub(token);
-    // 附带 user_profile / active_account_id，让后端 accounts 表拿到头像与昵称
+    // 附带 user_profile / active_account_id，让后端 accounts 表拿到头像与昵称。
+    // 请求头必须显式携带目标账号（审计修复）：LoginScreen 先 park 当前账号
+    // （Store user 为 null）再调用本流程，缺省头会缺 X-GitHub-Account-Id，
+    // 服务端回退全局 active_account_id——旧账号 A 的凭据会被新账号 B 的
+    // Token/user_profile 覆盖。
     const accountId = accountIdKey(user);
     await backend.syncSettings({
       github_token: token,
       ...(accountId ? { active_account_id: accountId } : {}),
       user_profile: user,
-    });
+    }, undefined, accountId);
     backend.rememberActiveUrl();
     return user;
   }, [authenticateWithGitHub]);

@@ -270,6 +270,8 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
         custom_description = COALESCE(custom_description, (SELECT d.custom_description FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
         custom_tags = COALESCE(custom_tags, (SELECT d.custom_tags FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
         custom_category = COALESCE(custom_category, (SELECT d.custom_category FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
+        category_locked = CASE WHEN category_locked = 1 THEN 1 ELSE COALESCE(
+          (SELECT d.category_locked FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), category_locked) END,
         description_display = COALESCE(description_display, (SELECT d.description_display FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
         tags_display = COALESCE(tags_display, (SELECT d.tags_display FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
         last_edited = COALESCE(last_edited, (SELECT d.last_edited FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),

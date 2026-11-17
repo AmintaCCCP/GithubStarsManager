@@ -429,6 +429,12 @@ export const useSearchActions = (): SearchActions => {
             throw new DOMException('Search superseded', 'AbortError');
           }
           if (result === null) {
+            // 回退前复核发起账号（审计修复）：keywordSearch 内部的账号检查以
+            // 当前账号为准，切号后恒通过——闭包里的 query/repositories 仍是
+            // 旧账号的，回退会把旧账号的结果写进新账号的搜索视图
+            if (!isCurrentAccount(startedAccountId)) {
+              return;
+            }
             await keywordSearch(query, applyFilters, { signal: controller.signal });
             return;
           }
@@ -462,6 +468,11 @@ export const useSearchActions = (): SearchActions => {
       }
       // ====== 向量搜索分支结束 ======
 
+      // 回退前复核发起账号（审计修复）：向量请求抛出非取消异常或未启用向量时，
+      // 切号后闭包中的 query/repositories 已不属于当前账号，回退提交必须丢弃
+      if (!isCurrentAccount(startedAccountId)) {
+        return;
+      }
       await keywordSearch(query, applyFilters, { signal: controller.signal });
     } catch (error) {
       // 取消不是失败：静默结束当前搜索（不产出结果），不当作可恢复的 AI 失败

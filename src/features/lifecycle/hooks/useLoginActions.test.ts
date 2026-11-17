@@ -135,11 +135,18 @@ describe('useLoginActions', () => {
     await expect(result.current.setupBackendGitHubToken('ghp_new')).resolves.toEqual(user);
     expect(mocks.apiTokens).toEqual(['ghp_new']);
     // Issue #611：Token 首传附带 user_profile 与 active_account_id（accounts 表唯一写入路径）
-    expect(mocks.backend.syncSettings).toHaveBeenCalledWith({
-      github_token: 'ghp_new',
-      active_account_id: '1',
-      user_profile: user,
-    });
+    // 审计修复：请求头必须显式携带目标账号——登录页先 park 当前账号（Store
+    // user 为 null），缺省头会缺 X-GitHub-Account-Id，服务端回退全局
+    // active_account_id 分区，新账号凭据会覆盖旧账号行
+    expect(mocks.backend.syncSettings).toHaveBeenLastCalledWith(
+      {
+        github_token: 'ghp_new',
+        active_account_id: '1',
+        user_profile: user,
+      },
+      undefined,
+      '1',
+    );
     expect(mocks.backend.rememberActiveUrl).toHaveBeenCalledOnce();
     expect(mocks.syncFromBackend).not.toHaveBeenCalled();
 

@@ -39,7 +39,15 @@ function readAccountRows(db: ReturnType<typeof getDb>): AccountEntry[] {
   const rows = db.prepare('SELECT * FROM accounts ORDER BY last_used_at DESC').all() as Array<Record<string, unknown>>;
   return rows.map((row) => {
     let githubToken: string | null = null;
-    const encrypted = row.github_token_encrypted;
+    // 与 readScopedToken 相同的来源顺序：非 default 账号优先读
+    // account_settings.github_token（多账号备份导入后凭据保存在该表），
+    // 缺失再回退 accounts.github_token_encrypted。
+    const accountId = String(row.account_id);
+    const scopedRow = accountId !== 'default'
+      ? db.prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
+          .get(accountId) as { value: string | null } | undefined
+      : undefined;
+    const encrypted = (typeof scopedRow?.value === 'string' && scopedRow.value) ? scopedRow.value : row.github_token_encrypted;
     if (typeof encrypted === 'string' && encrypted) {
       try {
         githubToken = decrypt(encrypted, config.encryptionKey);

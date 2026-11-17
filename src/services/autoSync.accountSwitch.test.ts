@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import {
+  cancelPendingAccountSwitchPush,
   consumePendingAccountSync,
   hasPendingAccountSync,
   prepareForAccountSwitch,
@@ -8,6 +9,9 @@ import {
   startAutoSync,
   stopAutoSync,
   syncFromBackend,
+  withAccountSwitchFrozen,
+  withAccountSwitchGuard,
+  withAccountSwitchGuardSync,
 } from './autoSync';
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
@@ -191,6 +195,54 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
     expect(vi.mocked(backend.syncRepositories).mock.calls[0][0].map(repo => repo.id)).toContain(5);
   });
+
+  it('identity writes inside the switch guard are bookkeeping and never schedule a push (addAccountWithToken R2)', async () => {
+    // 审计修复回归（addAccountWithToken）：park 后落新账号的 setGitHubToken/setUser
+    // 属于切换簿记，必须包入 withAccountSwitchGuardSync——否则订阅器把这两项写入
+    // 记为待推，异步守卫释放时立即以新账号（本地尚无快照、仓库列表为空）的
+    // 工作区 isFullSync 推送，早于后端对齐拉取，会删除新账号后端分区的数据。
+    seedTwoAccounts([]);
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    await withAccountSwitchGuard(async () => {
+      useAppStore.getState().parkCurrentAccountForRestore();
+      withAccountSwitchGuardSync(() => {
+        useAppStore.getState().setGitHubToken('ghp_b');
+        useAppStore.getState().setUser(userB);
+      });
+    });
+
+    expect(useAppStore.getState().user?.id).toBe(2);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+  });
+
+  it('edits inside a frozen switch window are not flushed at guard exit (backend-in-flux window)', async () => {
+    // 审计修复回归（addAccountFromBackend）：候选后端 init 提交 URL 起到旧账号
+    // 归档前的窗口内，后端连接处于「候选后端」状态——窗口内编辑若被记为待推，
+    // 守卫退出会把尚未归档的旧账号工作区（或空工作区）写入候选后端分区。
+    // 冻结窗口（withAccountSwitchFrozen）内编辑不记录、不推送。
+    seedTwoAccounts([]);
+    // 种子数据本身的 setState 会被订阅器记为待推并调度防抖——与本用例无关的
+    // 噪声，先取消（与拆除类动作的既有语义一致），再进入冻结窗口
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    await withAccountSwitchFrozen(async () => {
+      await withAccountSwitchGuard(async () => {
+        // 模拟恢复等待期间的用户编辑（categoryOrder 是订阅器跟踪的字段）
+        useAppStore.setState({ categoryOrder: ['reordered'] });
+        expect(useAppStore.getState().categoryOrder).toEqual(['reordered']);
+      });
+    });
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+  });
 });
 
 /**
@@ -277,7 +329,7 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     expect(hasPendingAccountSync('1')).toBe(false);
   });
 
-  it('clears the account pending record when the flush succeeds', async () => {
+  it('keeps the account pending record when no push runs and clears it only after a successful push', async () => {
     seedAccountA();
     // 先制造一条失败记录
     rejectAllSyncs();
@@ -285,11 +337,30 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     await prepareForAccountSwitch('1');
     expect(hasPendingAccountSync('1')).toBe(true);
 
-    // 第二次切换前冲刷成功：记录被清除，不带入陈旧待推语义
+    // 第二次准备：会话级标志已随失败冲刷统一清零，推送循环被整体跳过——
+    // 没有任何推送发生，绝不能清除仍未补推的账号标记（审计修复：修复前
+    // 这里会因「标志为空」误删标记，后续非强制拉取会用后端旧快照覆盖
+    // 未推送的本地修改）
     useAppStore.setState({ user: userA, githubToken: 'ghp_a', isAuthenticated: true });
+    await prepareForAccountSwitch('1');
+    expect(hasPendingAccountSync('1')).toBe(true);
+
+    // 补推实际成功（新编辑触发推送通道并成功落盘）后标记才被清除，
+    // 且推送负载必须包含此前未推送的 repo-98 与本次新编辑 repo-97
+    vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
+    vi.mocked(backend.syncReleases).mockResolvedValue(undefined);
+    vi.mocked(backend.syncAIConfigs).mockResolvedValue(undefined);
+    vi.mocked(backend.syncWebDAVConfigs).mockResolvedValue(undefined);
+    vi.mocked(backend.syncEmbeddingConfigs).mockResolvedValue(undefined);
+    vi.mocked(backend.syncVectorSearchConfig).mockResolvedValue(undefined);
+    vi.mocked(backend.syncSettings).mockResolvedValue(undefined);
+    useAppStore.getState().addRepository(createRepository(97, { full_name: 'owner/repo-97' }));
     await prepareForAccountSwitch('1');
     expect(hasPendingAccountSync('1')).toBe(false);
     expect(consumePendingAccountSync('1')).toBe(false);
+    const pushedPayloads = vi.mocked(backend.syncRepositories).mock.calls;
+    const lastPayload = pushedPayloads[pushedPayloads.length - 1][0] as Repository[];
+    expect(lastPayload.map((repo) => repo.id)).toEqual(expect.arrayContaining([98, 97]));
   });
 
   it('waits for the push started by the pull finally before resolving (finding: drain after pull)', async () => {

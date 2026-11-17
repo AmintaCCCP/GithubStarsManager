@@ -959,6 +959,56 @@ describe('useSearchActions account switch guards', () => {
     (storeState as unknown as { user: { id: number; login: string } }).user = { id: 2, login: 'other' };
   };
 
+  it('aiSearch skips the keywordSearch fallback when the vector result is null after a switch', async () => {
+    // 启用向量搜索分支（该 describe 默认关闭向量，aiSearch 不会进入 pipeline）
+    storeState.vectorSearchConfig = {
+      ...storeState.vectorSearchConfig,
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+    };
+    mocks.runVectorSearchPipeline.mockImplementation(async () => {
+      switchToB();
+      return null; // 向量结果为 null → 走 keywordSearch 回退路径
+    });
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+
+    // 审计修复：回退前复核发起账号——keywordSearch 的内部账号检查以当前账号
+    // 为准（切号后恒通过），闭包里的 query/repositories 仍是旧账号的，回退
+    // 会把旧账号的结果写进新账号的搜索视图，必须整体丢弃
+    expect(mocks.runVectorSearchPipeline).toHaveBeenCalledTimes(1);
+    expect(mocks.searchRepositoriesWithSelection).not.toHaveBeenCalled();
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(storeState.setSearchFilters).not.toHaveBeenCalled();
+  });
+
+  it('aiSearch skips the keywordSearch fallback when the vector request fails after a switch', async () => {
+    // 启用向量搜索分支（该 describe 默认关闭向量，aiSearch 不会进入 pipeline）
+    storeState.vectorSearchConfig = {
+      ...storeState.vectorSearchConfig,
+      enabled: true,
+      workerUrl: 'https://worker.example',
+      authToken: 'worker-token',
+      embeddingConfigId: 'emb',
+    };
+    mocks.runVectorSearchPipeline.mockImplementation(async () => {
+      switchToB();
+      throw new Error('vector down');
+    });
+
+    const { result } = renderHook(() => useSearchActions());
+    await act(async () => { await result.current.aiSearch('foo', identity); });
+
+    // 向量异常降级路径同样必须复核发起账号后再回退
+    expect(mocks.runVectorSearchPipeline).toHaveBeenCalledTimes(1);
+    expect(mocks.searchRepositoriesWithSelection).not.toHaveBeenCalled();
+    expect(storeState.setSearchResults).not.toHaveBeenCalled();
+    expect(storeState.setSearchFilters).not.toHaveBeenCalled();
+  });
+
   it('keywordSearch drops the AI result submission after a switch', async () => {
     mocks.searchRepositoriesWithSelection.mockImplementation(async () => {
       switchToB();

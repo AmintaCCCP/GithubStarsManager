@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   needsReindex: vi.fn(),
   indexAllRepos: vi.fn(),
   cleanup: vi.fn(),
+  vectorTestConnection: vi.fn(),
   setVectorIndexingState: vi.fn(),
   setVectorSearchConfig: vi.fn(),
   setVectorSearchStatus: vi.fn(),
@@ -26,7 +27,7 @@ vi.mock('../../../services/vectorSearchService', () => ({
   EmbeddingClient: class {},
   VectorSearchService: class {
     cleanup = mocks.cleanup;
-    testConnection = vi.fn();
+    testConnection = mocks.vectorTestConnection;
   },
   indexAllRepos: mocks.indexAllRepos,
   needsReindex: mocks.needsReindex,
@@ -249,5 +250,88 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.setVectorIndexingState).toHaveBeenCalledWith({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
     expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
+  });
+
+  it('supersedes an in-flight index task when a new one starts; the old task writes nothing', async () => {
+    // 审计修复回归：仅靠账号 ID 判过期在 A→B→A 切回后会重新匹配，旧任务
+    // 得以通过检查并覆盖新任务的运行状态/结果。这里以同账号连续两次
+    // rebuildIndex 模拟任务取代：旧任务（已被新任务取消）不得写任何共享状态。
+    const resolvers: Array<(value: { indexed: number; skipped: number; errors: number; indexedRepoIds: number[] }) => void> = [];
+    mocks.indexAllRepos.mockImplementation((_repos: unknown, _embedding: unknown, _vector: unknown, options: { signal?: AbortSignal }) => (
+      new Promise((resolve) => {
+        resolvers.push(resolve);
+        options.signal?.addEventListener('abort', () => resolve({ indexed: 0, skipped: 0, errors: 1, indexedRepoIds: [] }));
+      })
+    ));
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    let first!: Promise<void>;
+    act(() => { first = result.current.rebuildIndex(draft); });
+    await act(async () => { await Promise.resolve(); });
+    let second!: Promise<void>;
+    await act(async () => { second = result.current.rebuildIndex(draft); });
+    // 放行两个任务：旧任务已被取代，新任务是当前任务
+    await act(async () => {
+      resolvers[0]?.({ indexed: 9, skipped: 0, errors: 0, indexedRepoIds: [1] });
+      resolvers[1]?.({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+      await first;
+      await second;
+    });
+
+    // 旧任务的收尾写入全部跳过：result 只由新任务写入一次
+    const resultWrites = mocks.setVectorIndexingState.mock.calls.filter(
+      (call) => {
+        const payload = call[0] as { result?: unknown };
+        return payload.result !== undefined && payload.result !== null;
+      },
+    );
+    expect(resultWrites).toHaveLength(1);
+    expect((resultWrites[0][0] as { result: { indexed: number } }).result.indexed).toBe(1);
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalledTimes(1);
+    expect(mocks.setVectorSearchConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it('still resets the running state when the user cancels the current task (control)', async () => {
+    // 取消路径保持既有行为：当前任务被用户取消时 isIndexing 必须复位
+    mocks.indexAllRepos.mockImplementation((_repos: unknown, _embedding: unknown, _vector: unknown, options: { signal?: AbortSignal }) => (
+      new Promise((resolve) => {
+        options.signal?.addEventListener('abort', () => resolve({ indexed: 0, skipped: 0, errors: 1, indexedRepoIds: [] }));
+      })
+    ));
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    let indexing!: Promise<void>;
+    act(() => { indexing = result.current.rebuildIndex(draft); });
+    await act(async () => { await Promise.resolve(); });
+    act(() => { result.current.abortIndexing(); });
+    await act(async () => { await indexing; });
+
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith({ isIndexing: false, phase: null, result: null });
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+  });
+
+  it('writes connection status for the current account after a successful worker test', async () => {
+    mocks.vectorTestConnection.mockResolvedValue({ success: true, vectorCount: 5, dimensions: 1536 });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'worker-token' }); });
+
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 5, dimensions: 1536 });
+  });
+
+  it('skips the connection status write when the account switched during the worker test', async () => {
+    // 审计修复回归：连接测试等待期间切号后，发起账号 A 的连接状态/向量数量/
+    // 维度不得写入当前账号 B 的共享 vectorSearchStatus（runIndex 对同类写入
+    // 已有账号保护，testWorker 补齐同一约束）；本地测试结果照常展示
+    mocks.vectorTestConnection.mockImplementation(async () => {
+      (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+      return { success: true, vectorCount: 5, dimensions: 1536 };
+    });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'worker-token' }); });
+
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
   });
 });
