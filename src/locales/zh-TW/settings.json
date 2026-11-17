@@ -25,7 +25,8 @@
     "no-backup-files-found": "未找到備份檔。",
     "backup-file-is-empty-cannot-restore": "備份文件內容為空，無法恢復。",
     "data-restored-from-backup-repositories-v1-releas": "已從備份還原資料：倉庫 {{v1}}，發布 {{v2}}，自訂分類 {{v3}}。",
-    "restore-failed": "恢復失敗"
+    "restore-failed": "恢復失敗",
+    "account-changed-during-restore": "還原期間帳號已切換，已中止本次還原以保護資料安全。"
   },
   "useDesktopActions": {
     "load-failed": "載入失敗",

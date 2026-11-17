@@ -25,7 +25,8 @@
     "no-backup-files-found": "Fichier de sauvegarde introuvable.",
     "backup-file-is-empty-cannot-restore": "Le contenu du fichier de sauvegarde est vide et ne peut pas être restauré.",
     "data-restored-from-backup-repositories-v1-releas": "Données restaurées à partir de la sauvegarde : entrepôt {{v1}}, version {{v2}}, classification personnalisée {{v3}}.",
-    "restore-failed": "La récupération a échoué"
+    "restore-failed": "La récupération a échoué",
+    "account-changed-during-restore": "Le compte a changé pendant la restauration. La restauration a été interrompue pour protéger vos données."
   },
   "useDesktopActions": {
     "load-failed": "Le chargement a échoué",

@@ -2,7 +2,9 @@ import type { AccountWorkspace, GitHubUser, SavedAccount } from '../types';
 import {
   accountIdKey,
   captureAccountWorkspace,
+  emptyAccountWorkspace,
   normalizeAccountWorkspaces,
+  type AccountWorkspaceRuntime,
   type AccountWorkspaceSource,
 } from '../store/helpers/accountWorkspace';
 
@@ -52,6 +54,9 @@ export const maskSavedAccountsForBackup = (
 /**
  * 工作区数组按条目 id 去重合并（merge 模式）：
  * 本地已有条目保留，仅追加本地没有的新条目。
+ * 订阅/已读集合字段（readForks、releaseSubscriptions、readReleases）按并集
+ * 合并：保留本机状态并恢复备份条目，避免备份中的条目虽然恢复、
+ * 其已读/订阅状态却丢失。
  */
 export const mergeWorkspacesById = (
   local: AccountWorkspace,
@@ -61,6 +66,7 @@ export const mergeWorkspacesById = (
     const existingIds = new Set(localList.map(item => String(item?.id)));
     return [...localList, ...incomingList.filter(item => !existingIds.has(String(item?.id)))];
   };
+  const unionIds = <T>(localIds: T[], incomingIds: T[]): T[] => Array.from(new Set([...localIds, ...incomingIds]));
   const categoryLocalIds = new Set(local.customCategories.map(item => String(item?.id)));
   return {
     ...local,
@@ -73,7 +79,106 @@ export const mergeWorkspacesById = (
       ...local.customCategories,
       ...incoming.customCategories.filter(item => !categoryLocalIds.has(String(item?.id))),
     ],
+    readForks: unionIds(local.readForks, incoming.readForks),
+    releaseSubscriptions: unionIds(local.releaseSubscriptions, incoming.releaseSubscriptions),
+    readReleases: unionIds(local.readReleases, incoming.readReleases),
   };
+};
+
+/**
+ * 按导出数据类型选择裁剪工作区字段（导出隐私边界）。
+ * 未选择的数据类型在工作区中以空默认值占位，绝不把未勾选类型的
+ * 其他账号仓库/Release/Gist/Fork 等数据写入导出 JSON。
+ */
+export const trimWorkspacesForSelectedTypes = (
+  workspaces: Record<string, AccountWorkspace>,
+  selectedTypes: string[],
+): Record<string, AccountWorkspace> => {
+  const includeRepos = selectedTypes.includes('repositories');
+  const includeReleases = selectedTypes.includes('releases');
+  const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
+  const includeCategories = selectedTypes.includes('customCategories');
+  const empty = emptyAccountWorkspace();
+  return Object.fromEntries(
+    Object.entries(workspaces).map(([accountId, workspace]) => [
+      accountId,
+      {
+        ...empty,
+        ...(includeRepos
+          ? {
+              repositories: workspace.repositories,
+              lastSync: workspace.lastSync,
+              gists: workspace.gists,
+              starredGists: workspace.starredGists,
+              selectedGistCategory: workspace.selectedGistCategory,
+              forks: workspace.forks,
+              readForks: workspace.readForks,
+              syncMode: workspace.syncMode,
+              syncModeConfigured: workspace.syncModeConfigured,
+            }
+          : {}),
+        ...(includeReleases ? { releases: workspace.releases } : {}),
+        ...(includeReleaseSubs
+          ? {
+              releaseSubscriptions: workspace.releaseSubscriptions,
+              releaseSourceSettings: workspace.releaseSourceSettings,
+              readReleases: workspace.readReleases,
+            }
+          : {}),
+        ...(includeCategories
+          ? {
+              customCategories: workspace.customCategories,
+              hiddenDefaultCategoryIds: workspace.hiddenDefaultCategoryIds,
+              defaultCategoryOverrides: workspace.defaultCategoryOverrides,
+              categoryOrder: workspace.categoryOrder,
+              categoryListIdMap: workspace.categoryListIdMap,
+            }
+          : {}),
+      } satisfies AccountWorkspace,
+    ]),
+  );
+};
+
+/**
+ * 按导入数据类型选择应用工作区（applyAccountWorkspace 的类型过滤版）。
+ * 仅返回所选类型对应的工作区字段补丁，未选择的类型不影响当前状态。
+ * 导入面板以备份实际包含的数据类型解析 selectedTypes，因此裁剪备份
+ * 中的空字段不会回滚当前实时数据。
+ */
+export const applyAccountWorkspaceForTypes = (
+  workspace: AccountWorkspace,
+  selectedTypes: string[],
+): Partial<AccountWorkspaceRuntime> => {
+  const patch: Partial<AccountWorkspaceRuntime> = {};
+  if (selectedTypes.includes('repositories')) {
+    patch.repositories = workspace.repositories;
+    patch.lastSync = workspace.lastSync;
+    patch.gists = workspace.gists;
+    patch.starredGists = workspace.starredGists;
+    patch.gistSearchResults = workspace.gists;
+    patch.selectedGistCategory = workspace.selectedGistCategory;
+    patch.searchResults = workspace.repositories;
+    patch.forks = workspace.forks;
+    patch.readForks = new Set(workspace.readForks);
+    patch.syncMode = workspace.syncMode;
+    patch.syncModeConfigured = workspace.syncModeConfigured;
+  }
+  if (selectedTypes.includes('releases')) {
+    patch.releases = workspace.releases;
+  }
+  if (selectedTypes.includes('releaseSubscriptions')) {
+    patch.releaseSubscriptions = new Set(workspace.releaseSubscriptions);
+    patch.releaseSourceSettings = workspace.releaseSourceSettings;
+    patch.readReleases = new Set(workspace.readReleases);
+  }
+  if (selectedTypes.includes('customCategories')) {
+    patch.customCategories = workspace.customCategories;
+    patch.hiddenDefaultCategoryIds = workspace.hiddenDefaultCategoryIds;
+    patch.categoryOrder = workspace.categoryOrder;
+    patch.defaultCategoryOverrides = workspace.defaultCategoryOverrides;
+    patch.categoryListIdMap = workspace.categoryListIdMap;
+  }
+  return patch;
 };
 
 /**

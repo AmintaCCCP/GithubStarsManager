@@ -8,6 +8,8 @@ import {
   accountIdKey,
   applyAccountWorkspace,
   captureAccountWorkspace,
+  emptyAccountWorkspace,
+  normalizeAccountWorkspaces,
   normalizeSavedAccounts,
 } from '../../../store/helpers/accountWorkspace';
 import {
@@ -152,23 +154,39 @@ export const useBackupActions = (): BackupActions => {
       toast(t('useBackupActions.please-configure-and-activate-webdav-service-fir'), 'error');
       return;
     }
+    // 恢复流程在 confirm()/listFiles()/downloadFile() 处异步等待，期间账号可能
+    // 被切换（switchAccount 不检查恢复状态）。先记录发起恢复的账号 ID，
+    // 每个 await 之后、任何 Store/WebDAV 写入之前校验一致性，不一致立即中止，
+    // 确保旧版（无 activeAccountId）备份也不会把数据写进切换后的新账号。
+    const restoreAccountId = accountIdKey(useAppStore.getState().user);
+    const ensureSameAccount = (): boolean => {
+      const currentAccountId = accountIdKey(useAppStore.getState().user);
+      if (currentAccountId !== restoreAccountId) {
+        toast(t('useBackupActions.account-changed-during-restore'), 'error');
+        return false;
+      }
+      return true;
+    };
     const confirmed = await confirm(
       t('useBackupActions.restore-data'),
       t('useBackupActions.restoring-data-will-overwrite-all-current-data-c'),
       { type: 'warning' },
     );
     if (!confirmed) return;
+    if (!ensureSameAccount()) return;
 
     setIsRestoring(true);
     try {
       const service = new WebDAVService(activeConfig);
       const files = await service.listFiles();
+      if (!ensureSameAccount()) return;
       const backupFiles = files.filter((file) => file.startsWith('github-stars-backup-'));
       if (backupFiles.length === 0) {
         toast(t('useBackupActions.no-backup-files-found'), 'error');
         return;
       }
       const content = await service.downloadFile(backupFiles.sort().reverse()[0]);
+      if (!ensureSameAccount()) return;
       if (!content) {
         toast(t('useBackupActions.backup-file-is-empty-cannot-restore'), 'error');
         return;
@@ -178,12 +196,20 @@ export const useBackupActions = (): BackupActions => {
 
       // ── 多账号恢复（Issue #611）────────────────────────────────────
       // 先合并工作区与账号元数据，再决定顶层恢复目标（防止跨账号错位）。
-      const liveAccountId = accountIdKey(useAppStore.getState().user);
+      // liveAccountId 用发起恢复时记录的账号 ID（等待期间账号可能已切换）。
+      const liveAccountId = restoreAccountId;
       const backupAccountId = typeof backupData.activeAccountId === 'string' && backupData.activeAccountId
         ? backupData.activeAccountId
         : null;
       const restoreTargetsOtherAccount = !!backupAccountId && !!liveAccountId && backupAccountId !== liveAccountId;
 
+      // 备份实际携带的工作区（规整化后）：判断是否应用当前账号工作区必须以它
+      // 为准，不能用合并结果——合并结果含本机旧快照，备份不含当前账号时会
+      // 误把旧快照应用回顶层，回滚实时数据。
+      const normalizedBackupWorkspaces = backupData.accountWorkspaces
+        ? normalizeAccountWorkspaces(backupData.accountWorkspaces)
+        : {};
+      // 防御性复制：备份未携带工作区时避免归档写原地改写当前 state 字典
       const mergedWorkspaces = backupData.accountWorkspaces
         ? mergeAccountWorkspacesForBackup(
             useAppStore.getState().accountWorkspaces,
@@ -192,7 +218,7 @@ export const useBackupActions = (): BackupActions => {
             null,
             false,
           )
-        : useAppStore.getState().accountWorkspaces;
+        : { ...useAppStore.getState().accountWorkspaces };
 
       // 恢复 savedAccounts：仅当备份包含真实密钥时恢复 Token，否则保留本地已有 Token
       if (backupData.savedAccounts && typeof backupData.savedAccounts === 'object') {
@@ -214,10 +240,11 @@ export const useBackupActions = (): BackupActions => {
       }
 
       if (restoreTargetsOtherAccount) {
-        // 备份顶层归档进其归属账号工作区
+        // 备份顶层归档进其归属账号工作区。归档基座绝不借用当前登录账号的
+        // 实时数据（跨账号串号防线）：本机无该账号快照时以空工作区为基座。
         const previous = mergedWorkspaces[backupAccountId!];
         mergedWorkspaces[backupAccountId!] = {
-          ...(previous ?? captureAccountWorkspace(useAppStore.getState())),
+          ...(previous ?? emptyAccountWorkspace()),
           repositories: Array.isArray(backupData.repositories)
             ? (backupData.repositories as import('../../../types').Repository[])
             : (previous?.repositories ?? []),
@@ -237,14 +264,23 @@ export const useBackupActions = (): BackupActions => {
             ? (backupData.categoryOrder as string[])
             : (previous?.categoryOrder ?? []),
         };
-        // 不覆盖当前登录账号的顶层状态；若备份中含当前账号工作区则恢复之
+        // 不覆盖当前登录账号的顶层状态；仅当备份实际包含当前账号工作区时应用，
+        // 否则保留实时状态（不用本机旧快照回滚）
         useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
-        const liveBackup = mergedWorkspaces[liveAccountId!];
+        const liveBackup = liveAccountId ? normalizedBackupWorkspaces[liveAccountId] : undefined;
         if (liveBackup) {
           useAppStore.setState(applyAccountWorkspace(liveBackup));
         }
       } else if (backupData.accountWorkspaces) {
         useAppStore.setState({ accountWorkspaces: mergedWorkspaces });
+        // 同账号恢复：先应用备份中当前账号的完整工作区（含 categoryOrder、
+        // defaultCategoryOverrides、selectedGistCategory、lastSync 等仅存在于
+        // 工作区的字段），随后的旧格式顶层兼容字段按需覆盖，最后统一更新
+        // 工作区快照——避免未完整恢复的实时状态覆盖导入数据。
+        const liveBackup = liveAccountId ? normalizedBackupWorkspaces[liveAccountId] : undefined;
+        if (liveBackup) {
+          useAppStore.setState(applyAccountWorkspace(liveBackup));
+        }
       }
 
       if (!restoreTargetsOtherAccount) {
@@ -268,41 +304,45 @@ export const useBackupActions = (): BackupActions => {
         }
       }
 
-      try {
-        if (Array.isArray(backupData.releaseSubscriptions)) {
-          const values = backupData.releaseSubscriptions.filter((id): id is number => typeof id === 'number');
-          useAppStore.setState({ releaseSubscriptions: new Set(values) });
+      // 跨账号恢复时，备份顶层的订阅/已读/分类属于被恢复账号，已随顶层归档进
+      // 其工作区；绝不能写入恢复者当前账号的顶层状态（串号防线）。
+      if (!restoreTargetsOtherAccount) {
+        try {
+          if (Array.isArray(backupData.releaseSubscriptions)) {
+            const values = backupData.releaseSubscriptions.filter((id): id is number => typeof id === 'number');
+            useAppStore.setState({ releaseSubscriptions: new Set(values) });
+          }
+          if (backupData.releaseSourceSettings) state.setReleaseSourceSettings(backupData.releaseSourceSettings as Parameters<typeof state.setReleaseSourceSettings>[0]);
+          if (Array.isArray(backupData.readReleases)) {
+            const values = backupData.readReleases.filter((id): id is number => typeof id === 'number');
+            useAppStore.setState({ readReleases: new Set(values) });
+          }
+        } catch (error) {
+          console.warn('恢复 Release 订阅与已读状态时发生问题：', error);
         }
-        if (backupData.releaseSourceSettings) state.setReleaseSourceSettings(backupData.releaseSourceSettings as Parameters<typeof state.setReleaseSourceSettings>[0]);
-        if (Array.isArray(backupData.readReleases)) {
-          const values = backupData.readReleases.filter((id): id is number => typeof id === 'number');
-          useAppStore.setState({ readReleases: new Set(values) });
-        }
-      } catch (error) {
-        console.warn('恢复 Release 订阅与已读状态时发生问题：', error);
-      }
 
-      try {
-        for (const category of useAppStore.getState().customCategories) {
-          if (category?.id) state.deleteCustomCategory(category.id);
-        }
-        if (Array.isArray(backupData.customCategories)) {
-          for (const category of backupData.customCategories) {
-            if (category && typeof category === 'object' && 'id' in category && 'name' in category) {
-              state.addCustomCategory({ ...(category as Parameters<typeof state.addCustomCategory>[0]), isCustom: true });
+        try {
+          for (const category of useAppStore.getState().customCategories) {
+            if (category?.id) state.deleteCustomCategory(category.id);
+          }
+          if (Array.isArray(backupData.customCategories)) {
+            for (const category of backupData.customCategories) {
+              if (category && typeof category === 'object' && 'id' in category && 'name' in category) {
+                state.addCustomCategory({ ...(category as Parameters<typeof state.addCustomCategory>[0]), isCustom: true });
+              }
             }
           }
-        }
-        for (const categoryId of useAppStore.getState().hiddenDefaultCategoryIds) {
-          if (typeof categoryId === 'string') state.showDefaultCategory(categoryId);
-        }
-        if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
-          for (const categoryId of backupData.hiddenDefaultCategoryIds) {
-            if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
+          for (const categoryId of useAppStore.getState().hiddenDefaultCategoryIds) {
+            if (typeof categoryId === 'string') state.showDefaultCategory(categoryId);
           }
+          if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
+            for (const categoryId of backupData.hiddenDefaultCategoryIds) {
+              if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
+            }
+          }
+        } catch (error) {
+          console.warn('恢复自定义分类时发生问题：', error);
         }
-      } catch (error) {
-        console.warn('恢复自定义分类时发生问题：', error);
       }
 
       try {

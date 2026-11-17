@@ -25,7 +25,8 @@
     "no-backup-files-found": "No backup files found.",
     "backup-file-is-empty-cannot-restore": "Backup file is empty, cannot restore.",
     "data-restored-from-backup-repositories-v1-releas": "Data restored from backup: repositories {{v1}}, releases {{v2}}, custom categories {{v3}}.",
-    "restore-failed": "Restore failed"
+    "restore-failed": "Restore failed",
+    "account-changed-during-restore": "The account changed during restore. This restore was aborted to protect your data."
   },
   "useDesktopActions": {
     "load-failed": "Load failed",

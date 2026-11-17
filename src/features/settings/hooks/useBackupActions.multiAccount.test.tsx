@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useBackupActions } from './useBackupActions';
 import { useAppStore } from '../../../store/useAppStore';
-import type { AccountWorkspace, Repository, SavedAccount } from '../../../types';
+import type { AccountWorkspace, Category, Repository, SavedAccount } from '../../../types';
 
 // 恢复真实 Store：全局 setup.ts 将 ../store/useAppStore mock 成了选择器桩，
 // 而多账号备份/恢复测试需要驱动真实的工作区与账号状态。
@@ -80,6 +80,14 @@ const savedAccount = (id: string, user: typeof userA, token: string): SavedAccou
   githubToken: token,
   addedAt: '2026-01-01T00:00:00.000Z',
   lastUsedAt: '2026-01-01T00:00:00.000Z',
+});
+
+const category = (id: string, name: string): Category => ({
+  id,
+  name,
+  icon: 'folder',
+  keywords: [],
+  isCustom: true,
 });
 
 const activeWebDAV = {
@@ -247,5 +255,187 @@ describe('useBackupActions multi-account (Issue #611)', () => {
     expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-legacy');
     // 其他账号快照原样保留
     expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
+  });
+
+  it('aborts the restore when the account switches during the confirm dialog', async () => {
+    const stateBefore = useAppStore.getState();
+    mocks.confirm.mockImplementation(async () => {
+      // 确认等待期间切换到账号 2
+      useAppStore.setState({ user: userB });
+      return true;
+    });
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.2',
+      repositories: [repo(2, 'bob-legacy-should-not-apply')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 恢复被中止：未发生任何 WebDAV 读取或 Store 写入
+    expect(mocks.listFiles).not.toHaveBeenCalled();
+    expect(mocks.downloadFile).not.toHaveBeenCalled();
+    expect(state.repositories).toEqual(stateBefore.repositories);
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
+    // 错误提示（i18n 键随 useBackupActions.account-changed-during-restore 合入）
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.stringContaining('account changed during restore'),
+      'error',
+    );
+  });
+
+  it('aborts the restore when the account switches during file download (legacy backup included)', async () => {
+    const stateBefore = useAppStore.getState();
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockImplementation(async () => {
+      // 下载等待期间切换到账号 2（旧版备份没有 activeAccountId 也必须中止）
+      useAppStore.setState({ user: userB });
+      return JSON.stringify({
+        version: '1.2',
+        repositories: [repo(2, 'bob-legacy-should-not-apply')],
+        releases: [],
+        customCategories: [],
+      });
+    });
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 下载完成后、任何写入前中止：仓库与已保存账号 Token 均未被改写
+    expect(mocks.downloadFile).toHaveBeenCalledOnce();
+    expect(state.repositories).toEqual(stateBefore.repositories);
+    expect(state.savedAccounts['1']?.githubToken).toBe('ghp_a');
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.stringContaining('account changed during restore'),
+      'error',
+    );
+  });
+
+  it('does not pollute the restorer top-level subscriptions, read state or categories when restoring across accounts', async () => {
+    useAppStore.setState({
+      customCategories: [category('cat-alice', 'Alice Cat')],
+      hiddenDefaultCategoryIds: ['default-hidden-by-alice'],
+      releaseSubscriptions: new Set([111]),
+      readReleases: new Set([222]),
+    });
+    const releaseSourceBefore = useAppStore.getState().releaseSourceSettings;
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: true,
+      activeAccountId: '2',
+      accountWorkspaces: {
+        '2': workspaceOf([repo(2, 'bob-backup')]),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+      releases: [],
+      customCategories: [category('cat-bob', 'Bob Cat')],
+      hiddenDefaultCategoryIds: ['default-hidden-by-bob'],
+      releaseSubscriptions: [999],
+      readReleases: [888],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 备份顶层（bob 的数据）归档进账号 2 工作区
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
+    expect(state.accountWorkspaces['2']?.customCategories[0].id).toBe('cat-bob');
+    // 恢复者（alice）的顶层订阅/已读/分类完全不被备份顶层数据污染
+    expect(state.releaseSubscriptions).toEqual(new Set([111]));
+    expect(state.readReleases).toEqual(new Set([222]));
+    expect(state.releaseSourceSettings).toBe(releaseSourceBefore);
+    expect(state.customCategories.map((c: Category) => c.id)).toEqual(['cat-alice']);
+    expect(state.hiddenDefaultCategoryIds).toEqual(['default-hidden-by-alice']);
+  });
+
+  it('keeps live data when a cross-account backup lacks the current account workspace', async () => {
+    // 本机存有账号 1 的旧快照（仅 a1），实时数据已新增 a2
+    useAppStore.setState({
+      accountWorkspaces: {
+        '1': workspaceOf([repo(1, 'stale-alice')]),
+        '2': workspaceOf([repo(2, 'bob-ai')]),
+      },
+      repositories: [repo(1, 'alice-live-1'), repo(3, 'alice-live-2')],
+    });
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: true,
+      activeAccountId: '2',
+      accountWorkspaces: {
+        '2': workspaceOf([repo(2, 'bob-backup')]),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 备份不含当前账号工作区：实时状态保留，绝不用本机旧快照回滚
+    expect(state.repositories.map((r: Repository) => r.ai_summary))
+      .toEqual(['alice-live-1', 'alice-live-2']);
+    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('stale-alice');
+    // 备份账号数据正常归档
+    expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
+  });
+
+  it('applies the full workspace on same-account restore (categoryOrder, overrides, gist tab, lastSync, syncMode)', async () => {
+    mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
+    mocks.downloadFile.mockResolvedValue(JSON.stringify({
+      version: '1.3',
+      includeKeysInBackup: true,
+      activeAccountId: '1',
+      accountWorkspaces: {
+        '1': {
+          ...workspaceOf([repo(1, 'alice-restored')]),
+          categoryOrder: ['cat-x'],
+          defaultCategoryOverrides: { 'cat-x': { name: 'Override X' } },
+          selectedGistCategory: 'mine',
+          lastSync: '2026-04-01T00:00:00.000Z',
+          syncMode: 'stars-and-lists',
+          syncModeConfigured: true,
+        },
+      },
+      repositories: [repo(1, 'alice-restored')],
+      releases: [],
+      customCategories: [],
+    }));
+
+    const { result } = renderHook(() => useBackupActions());
+    await act(async () => {
+      await result.current.restore();
+    });
+
+    const state = useAppStore.getState();
+    // 完整工作区字段全部还原为备份值
+    expect(state.categoryOrder).toEqual(['cat-x']);
+    expect(state.defaultCategoryOverrides['cat-x']?.name).toBe('Override X');
+    expect(state.selectedGistCategory).toBe('mine');
+    expect(state.lastSync).toBe('2026-04-01T00:00:00.000Z');
+    expect(state.syncMode).toBe('stars-and-lists');
+    expect(state.syncModeConfigured).toBe(true);
+    expect(state.repositories[0].ai_summary).toBe('alice-restored');
+    // 恢复后快照以恢复完成的实时状态为准
+    expect(state.accountWorkspaces['1']?.categoryOrder).toEqual(['cat-x']);
+    expect(state.accountWorkspaces['1']?.lastSync).toBe('2026-04-01T00:00:00.000Z');
   });
 });

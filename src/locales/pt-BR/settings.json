@@ -25,7 +25,8 @@
     "no-backup-files-found": "Arquivo de backup não encontrado.",
     "backup-file-is-empty-cannot-restore": "O conteúdo do arquivo de backup está vazio e não pode ser restaurado.",
     "data-restored-from-backup-repositories-v1-releas": "Dados restaurados do backup: Armazém {{v1}}, Versão {{v2}}, Classificação Customizada {{v3}}.",
-    "restore-failed": "Falha na recuperação"
+    "restore-failed": "Falha na recuperação",
+    "account-changed-during-restore": "A conta foi trocada durante a restauração. A restauração foi abortada para proteger seus dados."
   },
   "useDesktopActions": {
     "load-failed": "Falha no carregamento",

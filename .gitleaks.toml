@@ -4,7 +4,7 @@
 # test corpus for the app's own log-redaction and sanitizer layers
 # (src/services/redact.ts and the server log sanitizer).
 #
-# `condition = "and"` (gitleaks >= 8.21) means a finding is exempted only when
+# `condition = "and"` (gitleaks >= 8.25.0) means a finding is exempted only when
 # BOTH the file is one of these fixtures AND the matched secret matches one of
 # the obviously-fake constants listed in `regexes`. A real-looking credential
 # committed to these files still fails the scan, and secrets anywhere else —

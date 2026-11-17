@@ -25,7 +25,8 @@
     "no-backup-files-found": "未找到备份文件。",
     "backup-file-is-empty-cannot-restore": "备份文件内容为空，无法恢复。",
     "data-restored-from-backup-repositories-v1-releas": "已从备份恢复数据：仓库 {{v1}}，发布 {{v2}}，自定义分类 {{v3}}。",
-    "restore-failed": "恢复失败"
+    "restore-failed": "恢复失败",
+    "account-changed-during-restore": "恢复期间账号已切换，已中止本次恢复以保护数据安全。"
   },
   "useDesktopActions": {
     "load-failed": "加载失败",

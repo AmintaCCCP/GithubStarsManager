@@ -183,3 +183,71 @@ describe('useVectorSearchActions', () => {
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 账号代次校验回归（Issue #611 审计修复）：
+ * - 多账号共享同一向量索引（全局 vector_search_configs、向量 ID 无账号前缀），
+ *   /cleanup 会删除 keepIds 之外的全部匹配向量——多账号时必须跳过 cleanup；
+ * - 索引任务切号后不得把共享索引状态/向量状态/格式版本写入新账号。
+ */
+describe('useVectorSearchActions account switch guards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storeState = createStoreState();
+    mockUseAppStore.mockImplementation(((selector?: (state: typeof storeState) => unknown) => (
+      selector ? selector(storeState) : storeState
+    )) as typeof useAppStore);
+    Object.assign(mockUseAppStore, { getState: () => storeState });
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    mocks.cleanup.mockResolvedValue(undefined);
+    mocks.needsReindex.mockReset();
+    mocks.needsReindex.mockReturnValue(false);
+  });
+
+  const seedTwoAccounts = () => {
+    (storeState as { savedAccounts?: Record<string, unknown> }).savedAccounts = {
+      '1': { accountId: '1' },
+      '2': { accountId: '2' },
+    };
+  };
+
+  it('skips vector cleanup while the index is shared across multiple accounts', async () => {
+    seedTwoAccounts();
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    // 宁可保留冗余向量，也绝不删除共享索引中其他账号的向量
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    // 索引本身照常完成并更新本账号状态
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({ isIndexing: false }));
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
+  });
+
+  it('still runs cleanup for a single-account index (control)', async () => {
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1'], expect.any(AbortSignal));
+  });
+
+  it('does not write indexing state into the new account after a mid-task switch', async () => {
+    mocks.indexAllRepos.mockImplementation(async () => {
+      (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+      return { indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] };
+    });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    // 初始 isIndexing:true 之后的所有收尾写入（含 isIndexing:false、
+    // vectorSearchStatus、格式版本）都因切号被丢弃
+    expect(mocks.setVectorIndexingState).toHaveBeenCalledTimes(1);
+    expect(mocks.setVectorIndexingState).toHaveBeenCalledWith({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+    expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
+  });
+});
