@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "axios": "^1.21.0",
+    "axios": "^1.21.1",
     "better-sqlite3": "^13.2.0",
     "cors": "^2.8.5",
     "express": "^5.3.0",
