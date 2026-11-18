@@ -312,6 +312,7 @@ router.post('/api/sync/import', (req, res) => {
             account_id
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
+        let importedRepos = 0;
         for (const r of repos) {
           // 单条脏数据不得回滚整个导入事务：缺必填字段的仓库直接跳过。
           if (
@@ -368,8 +369,9 @@ router.post('/api/sync/import', (req, res) => {
             , toDisplayPref(r.tags_display, TAGS_DISPLAY_VALUES)
             , accountId
           );
+          importedRepos += 1;
         }
-        counts.repositories = repos.length;
+        counts.repositories = importedRepos;
       }
 
       // Releases

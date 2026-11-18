@@ -378,3 +378,22 @@ export const isCurrentAccount = (expectedAccountId: string | null): boolean => {
   }
 };
 
+/**
+ * 会话代次（Issue #611 审计修复）：仅比较账号 ID 无法识别「切出后又切回
+ * 同一账号」——旧请求结算时账号又变回 A，仍会把过期结果写进 A 的当前工作区。
+ * 切换 / 登出 / 替换会话时递增；异步任务开始时捕获代次，提交结果前一并校验。
+ */
+let _accountSessionGeneration = 0;
+
+export const getAccountSessionGeneration = (): number => _accountSessionGeneration;
+
+export const bumpAccountSessionGeneration = (): number => {
+  _accountSessionGeneration += 1;
+  return _accountSessionGeneration;
+};
+
+export const isCurrentAccountSession = (
+  expectedAccountId: string | null,
+  expectedGeneration: number,
+): boolean => expectedGeneration === _accountSessionGeneration && isCurrentAccount(expectedAccountId);
+

@@ -8,7 +8,11 @@ import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/a
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
 import { normalizeBackendUrl } from '../../../utils/backendUrl';
-import { syncLocalGitHubTokenToBackend, tryRestoreAuthFromBackend } from '../../../services/autoSync';
+import {
+  forceSyncToBackend,
+  syncLocalGitHubTokenToBackend,
+  tryRestoreAuthFromBackend,
+} from '../../../services/autoSync';
 
 type BackendStatus = 'connected' | 'disconnected' | 'checking';
 
@@ -127,30 +131,10 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     }
     setIsSyncingToBackend(true);
     try {
-      const results = await Promise.allSettled([
-        backend.syncRepositories(state.repositories),
-        backend.syncReleases(state.releases),
-        backend.syncAIConfigs(state.aiConfigs),
-        backend.syncWebDAVConfigs(state.webdavConfigs),
-        backend.syncSettings({
-          activeAIConfig: state.activeAIConfig,
-          activeWebDAVConfig: state.activeWebDAVConfig,
-          hiddenDefaultCategoryIds: state.hiddenDefaultCategoryIds,
-          categoryOrder: state.categoryOrder,
-          customCategories: state.customCategories,
-          assetFilters: state.assetFilters,
-          defaultCategoryOverrides: state.defaultCategoryOverrides,
-          collapsedSidebarCategoryCount: state.collapsedSidebarCategoryCount,
-        }),
-      ]);
-      const failures = results.filter((result) => result.status === 'rejected');
-      const successes = results.filter((result) => result.status === 'fulfilled');
-      if (failures.length) {
-        console.warn('Some syncs failed:', failures.map((failure) => (failure as PromiseRejectedResult).reason));
-        toast(t('useBackendSettingsActions.partial-sync-failure-v1-failed-v2-succeeded', { v1: failures.length, v2: successes.length }), 'error');
-      } else {
-        toast(t('useBackendSettingsActions.synced-to-backend-repos-v1-releases-v2-ai-config', { v1: state.repositories.length, v2: state.releases.length, v3: state.aiConfigs.length, v4: state.webdavConfigs.length }), 'success');
-      }
+      // 复用 autoSync 的安全推送路径：先做非破坏性对账，且拒绝在分区未对齐
+      // 时推送空仓库快照（手动同步绝不能绕过这两道防线）。
+      await forceSyncToBackend({ reportFailures: true });
+      toast(t('useBackendSettingsActions.synced-to-backend-repos-v1-releases-v2-ai-config', { v1: state.repositories.length, v2: state.releases.length, v3: state.aiConfigs.length, v4: state.webdavConfigs.length }), 'success');
     } catch (error) {
       console.error('Sync to backend failed:', error);
       toast(`${t('useBackendSettingsActions.sync-failed')}: ${(error as Error).message}`, 'error');

@@ -827,9 +827,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         : {};
       // 备份顶层属于另一个账号（跨账号恢复）：顶层导入结果归档进备份账号工作区，
       // 当前账号的备份工作区（若存在）应用到顶层，绝不张冠李戴。
-      const backupTargetsOtherAccount = hasImportedWorkspaces
-        && !!importedData.activeAccountId
-        && !!currentAccountId
+      // 归属判断只看备份显式声明的 activeAccountId：只要与当前账号不同
+      //（含当前未登录），顶层数据就必须归档进备份账号，绝不能写入当前账号。
+      const backupTargetsOtherAccount = !!importedData.activeAccountId
         && importedData.activeAccountId !== currentAccountId;
 
       const archiveTopLevelToBackupAccount = (archiveMode: 'merge' | 'replace'): void => {
@@ -865,6 +865,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               ...base,
               repositories: importedData.repositories ?? previous?.repositories ?? [],
               releases: importedData.releases ?? previous?.releases ?? [],
+              gists: importedData.gists ?? previous?.gists ?? [],
+              starredGists: importedData.starredGists ?? previous?.starredGists ?? [],
+              forks: importedData.forks ?? previous?.forks ?? [],
+              readForks: importedData.readForks ?? previous?.readForks ?? [],
+              releaseSubscriptions: importedData.releaseSubscriptions ?? previous?.releaseSubscriptions ?? [],
+              readReleases: importedData.readReleases ?? previous?.readReleases ?? [],
+              releaseSourceSettings: importedData.releaseSourceSettings !== undefined
+                ? normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
+                : (previous?.releaseSourceSettings ?? base.releaseSourceSettings),
+              categoryListIdMap: importedData.categoryListIdMap ?? previous?.categoryListIdMap ?? {},
+              syncMode: importedData.syncMode ?? previous?.syncMode ?? base.syncMode,
+              syncModeConfigured: importedData.syncModeConfigured ?? previous?.syncModeConfigured ?? base.syncModeConfigured,
               customCategories: importedData.customCategories ?? previous?.customCategories ?? [],
               hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds ?? previous?.hiddenDefaultCategoryIds ?? [],
               defaultCategoryOverrides: importedData.defaultCategoryOverrides ?? previous?.defaultCategoryOverrides ?? {},
@@ -1206,10 +1218,15 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             merged[accountId] = local
               ? {
                   ...mergeWorkspacesById(local, incoming),
-                  releaseSourceSettings: mergeReleaseSourceSettings(
-                    local.releaseSourceSettings,
-                    incoming.releaseSourceSettings,
-                  ),
+                  // 未勾选发布订阅时保留本机来源设置：其他类型的导入不得改动它。
+                  ...(selectedTypes.includes('releaseSubscriptions')
+                    ? {
+                        releaseSourceSettings: mergeReleaseSourceSettings(
+                          local.releaseSourceSettings,
+                          incoming.releaseSourceSettings,
+                        ),
+                      }
+                    : {}),
                   ...mergeWorkspaceCategorySettings(local, incoming),
                 }
               : incoming;

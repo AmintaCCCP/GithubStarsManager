@@ -547,15 +547,15 @@ describe('VectorSearchService.cleanup 账号范围参数（R5 发现 2）', () =
     expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1:1', '42'], accountPrefix: '1', includeLegacy: true });
   });
 
-  it('omits scoping params when they are not provided (legacy client compatibility)', async () => {
+  it('forwards an explicit includeLegacy=false instead of dropping it', async () => {
     let capturedBody = '';
     stubFetch((_url, init) => { capturedBody = String(init.body); });
     const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
 
     await service.cleanup(['1'], { accountPrefix: null, includeLegacy: false });
 
-    // 无范围参数 → Worker 保持旧行为（向后兼容旧客户端契约）
-    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'] });
+    // 显式 false 必须写入：省略会被 Worker 当成旧版无范围请求
+    expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'], includeLegacy: false });
   });
 
   it('keeps the legacy (keepIds, signal) call signature working', async () => {

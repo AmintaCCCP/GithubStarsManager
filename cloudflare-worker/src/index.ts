@@ -10,12 +10,15 @@ import { compactUpsertVectors } from './metadata';
 interface Env {
   VECTORIZE: Vectorize;
   AUTH_TOKEN: string;
+  /** 'true' 表示 Vectorize 已建立 accountId 元数据索引且存量向量已回填。 */
+  ACCOUNT_METADATA_INDEXED?: string;
 }
 
 interface QueryRequest {
   vector: number[];
   topK?: number;
   threshold?: number;
+  accountId?: string;
 }
 
 interface DeleteRequest {
@@ -76,7 +79,7 @@ export default {
 
       // POST /query — 向量相似度查询
       if (request.method === 'POST' && url.pathname === '/query') {
-        const { vector, topK = QUERY_DEFAULT_TOPK, threshold = 0.35 } = (await request.json()) as QueryRequest;
+        const { vector, topK = QUERY_DEFAULT_TOPK, threshold = 0.35, accountId } = (await request.json()) as QueryRequest;
         if (!Array.isArray(vector) || vector.length === 0) {
           return jsonResponse({ success: false, error: 'vector array required' }, 400);
         }
@@ -86,9 +89,15 @@ export default {
           ? Math.floor(topK)
           : QUERY_DEFAULT_TOPK;
         const clampedTopK = Math.min(Math.max(requestedTopK, 1), QUERY_TOPK_LIMIT);
+        // 账号范围过滤必须在 topK 之前生效（Vectorize 的 filter 语义），
+        // 否则其他账号的高分向量会占满候选名额。
+        const accountFilter = typeof accountId === 'string' && accountId.length > 0
+          ? { accountId }
+          : undefined;
         const matches = await env.VECTORIZE.query(vector, {
           topK: clampedTopK,
           returnMetadata: 'all' as const,
+          ...(accountFilter ? { filter: accountFilter } : {}),
         });
         // 过滤低分结果
         const filtered = matches.matches.filter((m) => m.score >= threshold);
@@ -141,6 +150,7 @@ export default {
         // Vectorize binding 不支持 listVectors，topK 上限 100
         const dimensions = info.dimensions ?? 1536;
         let totalDeleted = 0;
+        let sampledAll = false;
         // 采样收敛判定：query 只返回 topK 条，且无法 listVectors。若某轮采样
         // 恰好没有当前账号前缀/legacy 的向量，旧逻辑直接 break 并返回
         // deleted:0，客户端误以为清理完成。改为持续采样到没有新向量出现，
@@ -151,7 +161,8 @@ export default {
         // includeLegacy 时不能过滤（legacy 向量没有 accountId）。
         const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix as string } : undefined;
         // 最多迭代 10 轮（覆盖最多 1000 个向量）
-        for (let round = 0; round < 10; round++) {
+        const MAX_ROUNDS = 10;
+        for (let round = 0; round < MAX_ROUNDS; round++) {
           // 每轮用随机向量采样：固定零向量在无 listVectors 时可能每轮都命中
           // 同一批 keepIds，随机向量让采样窗口在候选池内轮转。
           const queryVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
@@ -163,7 +174,9 @@ export default {
           const staleIds = result.matches
             .filter((m) => {
               if (keepSet.has(m.id)) return false;
-              if (!scoped) return true;
+              // 无范围参数（旧客户端）只清理 legacy 无前缀向量：带账号前缀的
+              // 向量只有在请求显式给出范围时才可删除。
+              if (!scoped) return isLegacyId(m.id);
               if (prefix && m.id.startsWith(prefix)) return true;
               return includeLegacy && isLegacyId(m.id);
             })
@@ -171,13 +184,17 @@ export default {
           const unseen = result.matches.filter((m) => !seenIds.has(m.id));
           for (const match of unseen) seenIds.add(match.id);
           if (staleIds.length === 0) {
-            if (unseen.length === 0) break;
+            if (unseen.length === 0) {
+              sampledAll = true;
+              break;
+            }
             continue;
           }
           await env.VECTORIZE.deleteByIds(staleIds);
           totalDeleted += staleIds.length;
         }
-        return jsonResponse({ success: true, deleted: totalDeleted });
+        // 采样轮数耗尽仍可能有未处理的向量：明确返回 partial，不谎报完成。
+        return jsonResponse({ success: true, deleted: totalDeleted, partial: !sampledAll });
       }
 
       // GET /status — 返回索引信息
@@ -187,9 +204,9 @@ export default {
           success: true,
           vectorCount: info.vectorCount ?? 0,
           dimensions: info.dimensions ?? 0,
-          // R5 审计修复：客户端据此判定 /cleanup 是否支持按账号前缀限定删除
-          // 范围（旧部署的 Worker 不携带该字段，客户端跳过 cleanup）。
-          accountScopedCleanup: true,
+          // 客户端据此判定 /cleanup 是否支持按账号前缀限定删除范围。
+          // 只有在部署方确认 accountId 元数据索引已建立并回填后才启用。
+          accountScopedCleanup: env.ACCOUNT_METADATA_INDEXED === 'true',
         });
       }
 

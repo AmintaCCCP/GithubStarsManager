@@ -4,6 +4,14 @@ compatibility_date = "2024-01-01"
 
 # AUTH_TOKEN 通过 wrangler secret put AUTH_TOKEN 设置，不要写在 [vars] 中
 
+[vars]
+# 多账号共享同一索引时，/cleanup 需要按 accountId 元数据过滤。
+# 先创建元数据索引（存量向量需重新写入后才会带上 accountId）：
+#   npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
+# 确认索引可用后再改为 "true"；否则客户端会跳过按账号范围的清理，
+# 避免在索引缺失时把其他账号的向量当成候选。
+ACCOUNT_METADATA_INDEXED = "false"
+
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "github-stars"

@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccount,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
@@ -418,6 +423,7 @@ export const useRepositoryCardActions = ({
     // 在确认框之前保存，确认后与远端请求完成后分别复核，绝不删除切号后
     // 当前工作区中同 ID 的仓库并同步该删除。
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
 
     const confirmMessage = t('useRepositoryCardActions.are-you-sure-you-want-to-unstar-v1-this-will-rem', { v1: repository.full_name });
 
@@ -431,7 +437,7 @@ export const useRepositoryCardActions = ({
     )) {
       return;
     }
-    if (!isCurrentAccount(startedAccountId)) return;
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
     setIsUnstarring(true);
     try {
@@ -440,7 +446,7 @@ export const useRepositoryCardActions = ({
       await githubApi.unstarRepository(owner, repo);
       // 远端取消星标已按发起账号完成；账号已切换时跳过本地删除与同步，
       // 避免删除新账号工作区中的同 ID 仓库（原账号记录留待下次同步收敛）
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       deleteRepository(repository.id);
       await forceSyncToBackend();
       toast(t('useRepositoryCardActions.successfully-unstarred'), 'success');

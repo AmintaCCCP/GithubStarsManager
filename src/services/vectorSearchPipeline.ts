@@ -708,7 +708,12 @@ export async function runVectorSearchPipeline(
       return withBudget(
         stageSignal => options.vectorService.query(
           vectors[0],
-          { topK: RECALL_TOP_K, threshold },
+          {
+            topK: RECALL_TOP_K,
+            threshold,
+            // 仅多账号模式下发账号范围：单账号模式的存量向量可能没有归属元数据。
+            ...(options.accountIdScope?.multiAccount ? { accountId: options.accountIdScope.accountId } : {}),
+          },
           stageSignal,
         ),
         WORKER_TIMEOUT_MS,
@@ -753,7 +758,11 @@ export async function runVectorSearchPipeline(
           return withBudget(
             stageSignal => options.vectorService.query(
               vectors[0],
-              { topK: RECALL_TOP_K, threshold },
+              {
+                topK: RECALL_TOP_K,
+                threshold,
+                ...(options.accountIdScope?.multiAccount ? { accountId: options.accountIdScope.accountId } : {}),
+              },
               stageSignal,
             ),
             WORKER_TIMEOUT_MS,

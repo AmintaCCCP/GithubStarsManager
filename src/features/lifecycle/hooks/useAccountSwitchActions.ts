@@ -7,6 +7,7 @@ import {
   hasPendingAccountSync,
   markPendingAccountSync,
   prepareForAccountSwitch,
+  schedulePendingAccountSyncRetry,
   syncFromBackend,
   syncToBackend,
   withAccountSwitchFrozen,
@@ -55,13 +56,13 @@ export interface AccountSwitchActions {
   /** 在已保存账号间无缝切换（冲刷旧账号在途同步 -> 原子切换工作区 -> 对齐后端目标分区） */
   switchToAccount: (targetAccountId: string) => Promise<AccountSwitchResult>;
   /** 用 PAT 在线添加并切换到新账号（不登出当前账号；取消弹窗对当前账号零影响） */
-  addAccountWithToken: (token: string) => Promise<AddAccountResult>;
+  addAccountWithToken: (token: string, expectedAccountId?: string) => Promise<AddAccountResult>;
   /** AddAccountModal 后端恢复模式：连接后端并恢复其活跃账号（已登录时先安全归档当前账号） */
   addAccountFromBackend: (url: string, secret: string) => Promise<AddAccountResult>;
   /** 从已保存账号列表移除指定账号（保留其本地工作区数据） */
   removeAccount: (targetAccountId: string) => Promise<void>;
   /** 退出登录（含二次确认调用方） */
-  logoutCurrentAccount: () => Promise<void>;
+  logoutCurrentAccount: () => Promise<boolean>;
 }
 
 /**
@@ -130,6 +131,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 失败时恢复账号级标记，重启后仍会补推。
         if (!await syncToBackend()) {
           markPendingAccountSync(accountId);
+          schedulePendingAccountSyncRetry(accountId);
         }
       }
       // force=false：后端已有数据则合并；后端分区为空而本地有数据时，
@@ -198,7 +200,10 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     }
   }, [alignTargetAccountOnBackend]);
 
-  const addAccountWithToken = useCallback(async (token: string): Promise<AddAccountResult> => {
+  const addAccountWithToken = useCallback(async (
+    token: string,
+    expectedAccountId?: string,
+  ): Promise<AddAccountResult> => {
     // 切换锁必须在首次 await（authenticateWithGitHub 身份校验）之前获取，
     // 并保持到整个流程结束：否则校验等待窗口内用户可以取消弹窗或重复提交，
     // 而校验完成后代码仍会归档当前账号并切换（审计：Functional Correctness）。
@@ -219,6 +224,11 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       const targetAccountId = accountIdKey(user);
       if (!targetAccountId) {
         return { ok: false, error: 'invalid-github-user' };
+      }
+      // 补全 Token（reauth）必须校验身份仍是目标账号：Token 输错成另一个
+      // 账号时不能把该账号登记/切换到本机。
+      if (expectedAccountId && targetAccountId !== expectedAccountId) {
+        return { ok: false, error: 'account-mismatch' };
       }
 
       // 校验等待期间会话可能已被其他路径改变：以当前 Store 状态为准
@@ -360,7 +370,8 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 每个失败返回路径都必须恢复原密钥与原后端 URL：失败的候选密钥与
         // 候选 URL 绝不能残留（包括当前账号仍处于登录态、原有 !user 条件
         // 不成立的情况），否则原账号拿原密钥请求候选后端无法继续工作。
-        useAppStore.getState().setBackendApiSecret(previousSecret);
+        // 先复原 URL 再复原密钥：反过来会让原密钥在候选 URL 上短暂可用
+        // （候选后端的 /health 探测不需要密钥，故不会影响 init）。
         if (backend.backendUrl !== previousBackendUrl) {
           try {
             await backend.init(previousBackendUrl ?? undefined);
@@ -368,6 +379,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
             // 复原连接探测失败时保持探测结果（本地模式或原 URL），不叠加新错误
           }
         }
+        useAppStore.getState().setBackendApiSecret(previousSecret);
         // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
         recoverParkedAccount(parkedAccountId);
         // R4 审计修复：冻结窗口内的真实编辑已按归属账号记入待推集合（或
@@ -419,14 +431,16 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     }
   }, [alignTargetAccountOnBackend]);
 
-  const logoutCurrentAccount = useCallback(async (): Promise<void> => {
-    if (!acquireAccountSwitchLock()) return;
+  const logoutCurrentAccount = useCallback(async (): Promise<boolean> => {
+    // 切换流程占用锁时明确返回失败，由调用方提示用户（绝不静默忽略退出）。
+    if (!acquireAccountSwitchLock()) return false;
     setIsSwitching(true);
     try {
       const currentAccountId = accountIdKey(useAppStore.getState().user);
       await prepareForAccountSwitch(currentAccountId);
       useAppStore.getState().logout();
       refreshMcpElectronBridge();
+      return true;
     } finally {
       releaseAccountSwitchLock();
       setIsSwitching(false);

@@ -4,7 +4,12 @@ import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { proxyRequest, ProxyConfig, validateUrl, isPrivateOrLoopback } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
-import { resolveAccountScope, extractRequestedAccountId, getLegacyDefaultClaimedBy } from '../db/accountScope.js';
+import {
+  resolveAccountScope,
+  extractRequestedAccountId,
+  getLegacyDefaultClaimedBy,
+  getLegacyDefaultVerifiedToken,
+} from '../db/accountScope.js';
 
 /**
  * 按当前账号分区解析 GitHub Token（多账号隔离，Issue #611）。
@@ -53,6 +58,15 @@ function resolveGitHubTokenForRequest(req: import('express').Request): { token: 
     // 无显式账号头的请求（旧客户端 / 无头）按活跃账号解析：仅存量归属账号
     // （legacy_default_claimed_by）允许回退全局 Token，其余账号视为未配置。
     if (getLegacyDefaultClaimedBy(db) !== accountId) {
+      return { token: null, decryptFailed: false };
+    }
+    // 认领标记只证明存量数据归属；全局 Token 若已换绑其他账号，其密文
+    // 与身份校验时绑定的那份不再一致，此时不得复用它。
+    const boundToken = getLegacyDefaultVerifiedToken(db);
+    const currentGlobal = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as
+      | { value: string | null }
+      | undefined;
+    if (!boundToken || currentGlobal?.value !== boundToken) {
       return { token: null, decryptFailed: false };
     }
   }

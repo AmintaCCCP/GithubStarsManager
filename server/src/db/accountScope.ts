@@ -169,7 +169,15 @@ export function isHeaderlessFullSyncSafe(db: Database.Database, req: Request): b
   if (extractRequestedAccountId(req)) return true;
   const accountId = computeAccountScope(db, req);
   if (accountId === DEFAULT_SCOPE) return true;
-  if (getLegacyDefaultClaimedBy(db) === accountId) return true;
+  return !hasAmbiguousAccountScope(db, req);
+}
+
+/**
+ * 多账号分区共存时，无账号头请求无法证明目标分区（回退到可变的全局
+ * active_account_id 可能命中其他账号）。显式账号头永远不歧义。
+ */
+export function hasAmbiguousAccountScope(db: Database.Database, req: Request): boolean {
+  if (extractRequestedAccountId(req)) return false;
   try {
     // accounts 元数据可能缺失（工作区导入可先落仓库分区），同时统计仓库
     // 分区，避免「多分区但无 accounts 行」时误判为单账号。
@@ -182,10 +190,10 @@ export function isHeaderlessFullSyncSafe(db: Database.Database, req: Request): b
         )
       `)
       .get() as { total: number } | undefined;
-    return (row?.total ?? 0) <= 1;
+    return (row?.total ?? 0) > 1;
   } catch {
     // 单元测试的轻量 DB stub 可能没有 accounts 表；无法计数时保持旧行为。
-    return true;
+    return false;
   }
 }
 
@@ -197,6 +205,24 @@ function isLegacyClaimPending(db: Database.Database): boolean {
 export function getLegacyDefaultClaimedBy(db: Database.Database): string | null {
   const claimed = readSetting(db, CLAIMED_BY_KEY);
   return claimed && ACCOUNT_ID_PATTERN.test(claimed) ? claimed : null;
+}
+
+/**
+ * 认领时通过 GitHub 身份校验的那份全局 Token 密文。
+ *
+ * 认领标记只证明「存量数据归属」，不证明当前全局 Token 仍属于该账号：
+ * 调用方用它校验全局凭据未被换绑后才可复用。
+ */
+export function getLegacyDefaultVerifiedToken(db: Database.Database): string | null {
+  const cached = readSetting(db, LEGACY_OWNER_CACHE_KEY);
+  if (!cached) return null;
+  if (ACCOUNT_ID_PATTERN.test(cached)) return null; // 旧版裸 id 缓存没有绑定 Token
+  try {
+    const parsed = JSON.parse(cached) as { token?: unknown };
+    return typeof parsed.token === 'string' && parsed.token ? parsed.token : null;
+  } catch {
+    return null;
+  }
 }
 
 interface LegacyOwnerResolution {
@@ -518,7 +544,12 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
         .run(accountId, key, value);
     }
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(CLAIMED_BY_KEY, accountId);
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('active_account_id', accountId);
+    // 认领只补「尚无有效活跃账号」的缺口：用户可能已在设置里显式切到其他账号，
+    // 认领不得把它改回存量归属账号。
+    const active = readSetting(db, 'active_account_id');
+    if (!active || !ACCOUNT_ID_PATTERN.test(active)) {
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('active_account_id', accountId);
+    }
     return counts;
   });
 
@@ -545,6 +576,11 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
  * （详见 resolveLegacyDefaultOwner）。
  */
 export function accountScopeMiddleware(req: Request, _res: import('express').Response, next: import('express').NextFunction): void {
+  // 健康检查必须零副作用：不校验 GitHub、不迁移数据、不改账号状态。
+  if (req.path === '/health' || req.path === '/health/') {
+    next();
+    return;
+  }
   const requested = extractRequestedAccountId(req);
   if (!requested) {
     next();

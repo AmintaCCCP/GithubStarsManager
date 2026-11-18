@@ -241,6 +241,7 @@
     "add-account": "アカウントを追加",
     "current-account": "現在のアカウント",
     "remove-account": "アカウントを削除",
+    "switch-in-progress": "アカウントを切り替えています。しばらくしてから再度お試しください。",
     "remove-account-confirm-title": "保存済みアカウントの削除",
     "remove-account-confirm-desc": "このアカウントの保存されたサインイン情報のみを削除します。キャッシュされたリポジトリとカテゴリは保持されます。続行しますか？",
     "account-switched": "@{{login}} に切り替えました",
@@ -1431,6 +1432,7 @@
     "token-label": "GitHub Personal Access Token",
     "cancel": "キャンセル",
     "confirm": "追加して切り替え",
-    "reauth-hint": "@{{login}} の有効な GitHub トークンを再入力してください"
+    "reauth-hint": "@{{login}} の有効な GitHub トークンを再入力してください",
+    "account-mismatch": "このトークンは別の GitHub アカウントのものです。@{{login}} のトークンでサインインしてください。"
   }
 }

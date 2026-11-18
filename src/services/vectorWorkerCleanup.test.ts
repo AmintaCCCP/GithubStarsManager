@@ -7,8 +7,8 @@ import { describe, expect, it, vi } from 'vitest';
  * 形态，单租户时代遗留 legacy 无前缀向量。Worker /cleanup 必须支持：
  * - accountPrefix：只删除该账号前缀的向量，其他账号前缀向量一律保留；
  * - includeLegacy=true：才允许删除 legacy 无前缀向量；
- * - 两个参数都不携带：保持旧行为（删除全部不在 keepIds 中的向量，向后兼容）。
- * /status 携带 accountScopedCleanup: true，客户端据此判定 Worker 能力。
+ * - 两个参数都不携带：只清理 legacy 无前缀向量（带前缀向量归属不可证明）。
+ * /status 仅在部署方声明 accountId 元数据索引就绪时携带 accountScopedCleanup: true。
  *
  * 两份部署产物（Dashboard 粘贴版 worker.js 与 wrangler 入口 src/index.ts）
  * 必须保持同一契约，这里用同一组用例参数化覆盖。
@@ -22,6 +22,7 @@ interface CleanupEnv {
     upsert: (vectors: unknown[]) => Promise<void>;
   };
   AUTH_TOKEN: string;
+  ACCOUNT_METADATA_INDEXED?: string;
 }
 
 type WorkerModule = {
@@ -49,6 +50,7 @@ const makeEnv = (indexIds: string[]): CleanupEnv & { deleted: string[]; queries:
   let queries = 0;
   return {
     AUTH_TOKEN: 'worker-token',
+    ACCOUNT_METADATA_INDEXED: 'true',
     deleted,
     queries,
     get VECTORIZE() {
@@ -170,13 +172,13 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     expect(env.deleted).toEqual(['1:101']);
   });
 
-  it('falls back to the legacy unscoped behavior when no scoping params are sent', async () => {
+  it('deletes only legacy unscoped ids when no scoping params are sent', async () => {
     const worker = await loadWorker(path);
     const env = makeEnv(['1:101', '2:201', '42']);
     const result = await postCleanup(worker, env, { keepIds: ['1:101'] });
-    // 向后兼容：旧版客户端（无范围参数）保持旧行为
-    expect(result.deleted).toBe(2);
-    expect(env.deleted).toEqual(['2:201', '42']);
+    // 旧客户端没有账号范围：带前缀的向量归属不可证明，只能清理 legacy 无前缀 ID
+    expect(result.deleted).toBe(1);
+    expect(env.deleted).toEqual(['42']);
   });
 
   it('treats includeLegacy without accountPrefix as legacy-only cleanup', async () => {
@@ -216,5 +218,13 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     const env = makeEnv(['1:101']);
     const status = await getStatus(worker, env);
     expect(status.accountScopedCleanup).toBe(true);
+  });
+
+  it('does not advertise accountScopedCleanup until the metadata index is ready', async () => {
+    const worker = await loadWorker(path);
+    const env = makeEnv(['1:101']);
+    delete env.ACCOUNT_METADATA_INDEXED;
+    const status = await getStatus(worker, env);
+    expect(status.accountScopedCleanup).toBe(false);
   });
 });

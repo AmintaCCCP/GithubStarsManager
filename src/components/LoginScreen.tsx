@@ -247,7 +247,9 @@ export const LoginScreen: React.FC = () => {
     let loginCommitted = false;
 
     try {
-      const result = await restoreBackendSession(url);
+      // 登录页可能残留上一会话的账号头：候选后端必须按自身 active_account_id
+      // 恢复，绝不能携带本机旧账号分区。
+      const result = await restoreBackendSession(url, { omitAccountHeader: true });
       if (result.status === 'backend-unavailable') {
         throw new Error(t('loginScreen.unable-to-connect-to-this-backend-url'));
       }

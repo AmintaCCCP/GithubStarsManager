@@ -172,6 +172,53 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(listB.body.repositories.map((r: { id: number }) => r.id)).toEqual([2]);
   });
 
+  it('does not let the legacy claim marker authorize a headerless full sync', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] })
+      .expect(200);
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ isFullSync: true, repositories: [repoRow(2, 'owner/two')] })
+      .expect(200);
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', ?)").run(ACCOUNT_A);
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', ?)").run(ACCOUNT_A);
+
+    // 认领标记只证明存量数据归属，不能证明无头请求属于 A：多分区仍须拒绝
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders())
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+
+    const listB = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_B)).expect(200);
+    expect(listB.body.repositories.map((r: { id: number }) => r.id)).toEqual([2]);
+  });
+
+  it('keeps an already-chosen active account when legacy data is claimed', async () => {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('default', 1, 'legacy', 'owner/legacy', 'https://github.com/owner/legacy', 'owner', '[]')
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)")
+      .run(encrypt('legacy-token', encryptionKey));
+    // 用户已显式切到另一个账号
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', ?)").run(ACCOUNT_B);
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+
+    await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_A)).expect(200);
+
+    const claimedBy = db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string };
+    expect(claimedBy.value).toBe(ACCOUNT_A);
+    const active = db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'").get() as { value: string };
+    expect(active.value).toBe(ACCOUNT_B);
+  });
+
   it('claims legacy default data for the verified owner and sets active_account_id', async () => {
     const db = getDb();
     // 存量 default 数据 + 加密的 github_token

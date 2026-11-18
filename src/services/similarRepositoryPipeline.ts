@@ -391,7 +391,11 @@ export async function runSimilarRepositoryPipeline(
       const matches = await withBudget(
         stageSignal => options.vectorService.query(
           vectors[0],
-          { topK: RECALL_TOP_K, threshold },
+          {
+            topK: RECALL_TOP_K,
+            threshold,
+            ...(options.accountIdScope?.multiAccount ? { accountId: options.accountIdScope.accountId } : {}),
+          },
           stageSignal,
         ),
         WORKER_TIMEOUT_MS,

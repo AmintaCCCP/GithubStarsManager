@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
-import { forceSyncToBackend, repositoryPayloadHash, resetSyncHashes, startAutoSync, stopAutoSync, syncFromBackend, syncToBackend } from './autoSync';
+import { consumePendingAccountSync, forceSyncToBackend, hasPendingAccountSync, markPendingAccountSync, repositoryPayloadHash, resetSyncHashes, startAutoSync, stopAutoSync, syncFromBackend, syncToBackend } from './autoSync';
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
@@ -408,6 +408,72 @@ describe('explicit backend push error reporting', () => {
   });
 });
 
+describe('destructive push safeguards (Issue #611)', () => {
+  beforeEach(() => {
+    resetSyncHashes();
+    useAppStore.setState({
+      user: { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null },
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      repositories: [createRepository(1), createRepository(2)],
+    });
+  });
+
+  afterEach(() => {
+    resetSyncHashes();
+    vi.mocked(backend.fetchRepositories).mockReset();
+  });
+
+  it('does not resurrect repositories the user deleted locally', async () => {
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({
+      repositories: [createRepository(1), createRepository(2)],
+      total: 2,
+    });
+    await forceSyncToBackend();
+
+    // Simulate a restart: the pushed-ID baseline is persisted, the session
+    // observation sets are not.
+    resetSyncHashes();
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    vi.mocked(backend.syncRepositories).mockClear();
+
+    // The remote still holds repo 2, but the user deleted it locally.
+    await forceSyncToBackend();
+
+    expect(useAppStore.getState().repositories.map((repo) => repo.id)).toEqual([1]);
+    const pushed = vi.mocked(backend.syncRepositories).mock.calls.at(-1)?.[0] ?? [];
+    expect(pushed.map((repo) => repo.id)).toEqual([1]);
+  });
+
+  it('defers a destructive push when the remote snapshot is incomplete', async () => {
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({ repositories: [createRepository(1)], total: 5 });
+    vi.mocked(backend.syncRepositories).mockClear();
+
+    await forceSyncToBackend();
+
+    expect(vi.mocked(backend.syncRepositories)).not.toHaveBeenCalled();
+  });
+
+  it('binds a pending account sync to the backend that queued it', () => {
+    const adapter = backend as unknown as { backendUrl?: string };
+    const accountId = 'pending-backend-binding';
+    adapter.backendUrl = 'http://backend-a';
+    try {
+      markPendingAccountSync(accountId);
+      expect(hasPendingAccountSync(accountId)).toBe(true);
+
+      adapter.backendUrl = 'http://backend-b';
+      expect(hasPendingAccountSync(accountId)).toBe(false);
+      expect(consumePendingAccountSync(accountId)).toBe(false);
+
+      adapter.backendUrl = 'http://backend-a';
+      expect(consumePendingAccountSync(accountId)).toBe(true);
+    } finally {
+      delete adapter.backendUrl;
+    }
+  });
+});
+
 describe('hasActiveSearchFilters (Issue #304 searchResults guard)', () => {
   const baseFilters = (): import('../types').SearchFilters => ({
     query: '',
@@ -490,42 +556,21 @@ describe('backend pushes requested during another sync', () => {
     await expect(forceSyncToBackend()).resolves.toBeUndefined();
   });
 
-  it.each([false, true])('awaits the latest snapshot after an active push (failure: %s)', async fail => {
-    const first = deferred<void>();
-    const followUp = deferred<void>();
-    vi.mocked(backend.syncRepositories).mockReturnValueOnce(first.promise).mockImplementationOnce(() =>
-      followUp.promise.then(() => { if (fail) throw new Error('offline'); }),
-    );
-    const initialPush = syncToBackend();
-    useAppStore.getState().addRepository(createRepository(2));
-    let settled = false;
-    const outcome = forceSyncToBackend({ reportFailures: true }).then(() => { settled = true; return ''; }, error => {
-      settled = true;
-      return (error as Error).message;
-    });
-    first.resolve();
-    await vi.waitFor(() => expect(backend.syncRepositories).toHaveBeenCalledTimes(2));
-    expect(settled).toBe(false);
-    expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
-    followUp.resolve();
-    expect(await outcome).toBe(fail ? 'Failed to sync to backend' : '');
-    await initialPush;
-    if (fail) {
-      await syncFromBackend();
-      expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
-      await expect(forceSyncToBackend()).resolves.toBeUndefined();
-    }
-  });
-
-  it('automatically pushes edits made after the active snapshot', async () => {
+  // 仓库分片未变化时不再重复发送 isFullSync 快照：在途快照已包含编辑时，
+  // 排队中的补推被安全跳过（只推送一次最新快照）。
+  it('pushes the latest snapshot once and skips the redundant queued push', async () => {
     const first = deferred<void>();
     vi.mocked(backend.syncRepositories).mockReturnValueOnce(first.promise);
-    const push = syncToBackend();
+    const initialPush = syncToBackend();
     useAppStore.getState().addRepository(createRepository(2));
+    const forced = forceSyncToBackend({ reportFailures: true });
     first.resolve();
-    await push;
-    expect(backend.syncRepositories).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(backend.syncRepositories).mock.calls[1][0]).toEqual(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
+    await forced;
+    await initialPush;
+    expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(backend.syncRepositories).mock.calls[0][0]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]),
+    );
   });
 
   it('keeps remotely arrived repositories when local edits queue a push after the pull', async () => {

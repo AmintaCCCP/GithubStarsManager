@@ -260,7 +260,7 @@ export interface VectorizeStatus {
 export interface VectorCleanupOptions {
   /**
    * 仅删除 ID 以 `${accountPrefix}:` 开头的向量；其他账号前缀与 legacy 无前缀
-   * 向量一律保留。缺省时 Worker 保持旧行为（删除全部不在 keepIds 中的向量）。
+   * 向量一律保留。缺省时 Worker 只清理 legacy 无前缀向量。
    */
   accountPrefix?: string | null;
   /**
@@ -319,13 +319,14 @@ export class VectorSearchService {
    */
   async query(
     vector: number[],
-    options: { topK?: number; threshold?: number } = {},
+    options: { topK?: number; threshold?: number; accountId?: string } = {},
     signal?: AbortSignal,
   ): Promise<VectorQueryResult[]> {
-    const { topK = 20, threshold = 0.35 } = options;
+    const { topK = 20, threshold = 0.35, accountId } = options;
     const result = await this.request<{ matches: VectorQueryResult[] }>('/query', {
       method: 'POST',
-      body: JSON.stringify({ vector, topK, threshold }),
+      // accountId 让 Worker 在 topK 之前按归属过滤（多账号共享索引）。
+      body: JSON.stringify({ vector, topK, threshold, ...(accountId ? { accountId } : {}) }),
     }, signal);
     return result.matches;
   }
@@ -356,7 +357,8 @@ export class VectorSearchService {
     const { accountPrefix, includeLegacy, signal } = normalized;
     const body: Record<string, unknown> = { keepIds };
     if (accountPrefix) body.accountPrefix = accountPrefix;
-    if (includeLegacy) body.includeLegacy = true;
+    // 显式 false 也必须写入：省略会让 Worker 按旧版无范围请求处理。
+    if (includeLegacy !== undefined) body.includeLegacy = includeLegacy;
     return this.request<{ deleted: number }>('/cleanup', {
       method: 'POST',
       body: JSON.stringify(body),
@@ -366,8 +368,8 @@ export class VectorSearchService {
   /**
    * 获取索引状态
    */
-  async getStatus(): Promise<VectorizeStatus> {
-    return this.request<VectorizeStatus>('/status');
+  async getStatus(signal?: AbortSignal): Promise<VectorizeStatus> {
+    return this.request<VectorizeStatus>('/status', {}, signal);
   }
 
   /**

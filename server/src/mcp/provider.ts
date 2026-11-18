@@ -66,19 +66,19 @@ export function transformRepoRow(row: Record<string, unknown>): McpRepository {
 /** Soft cap to avoid unbounded memory if a DB ever holds extreme row counts. */
 const MAX_REPOS_IN_MEMORY = 50_000;
 
-export function loadAllRepositories(): McpRepository[] {
+export function loadAllRepositories(scope?: string): McpRepository[] {
   const db = getDb();
   // MCP 查询按当前活跃账号分区过滤（无头请求回退 active_account_id → 'default'）
-  const accountId = resolveActiveAccountScope(db);
+  const accountId = scope ?? resolveActiveAccountScope(db);
   const rows = db
     .prepare('SELECT * FROM repositories WHERE account_id = ? ORDER BY stargazers_count DESC LIMIT ?')
     .all(accountId, MAX_REPOS_IN_MEMORY) as Record<string, unknown>[];
   return rows.map(transformRepoRow);
 }
 
-export function getRepository(idOrFullName: string | number): McpRepository | null {
+export function getRepository(idOrFullName: string | number, scope?: string): McpRepository | null {
   const db = getDb();
-  const accountId = resolveActiveAccountScope(db);
+  const accountId = scope ?? resolveActiveAccountScope(db);
   let row: Record<string, unknown> | undefined;
   if (typeof idOrFullName === 'number' || /^\d+$/.test(String(idOrFullName))) {
     row = db
@@ -412,6 +412,8 @@ export async function vectorSearch(
   }
 
   const db = getDb();
+  // 固定一次账号范围：后续两次查询（Worker 候选 + DB 仓库）必须同一账号。
+  const accountId = resolveActiveAccountScope(db);
   const vs = db
     .prepare('SELECT * FROM vector_search_configs WHERE id = ?')
     .get('default') as Record<string, unknown>;
@@ -453,7 +455,7 @@ export async function vectorSearch(
         'Content-Type': 'application/json',
         ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
       },
-      body: JSON.stringify({ vector, topK: workerTopK, threshold }),
+      body: JSON.stringify({ vector, topK: workerTopK, threshold, accountId }),
     });
   } catch {
     // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
@@ -484,15 +486,22 @@ export async function vectorSearch(
     return { available: false, reason: 'worker_query_failed' };
   }
   const matches = data.matches;
-  const repos = loadAllRepositories();
+  const repos = loadAllRepositories(accountId);
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
   const candidates = matches
     .map((m) => {
-      const repo = byId.get(String(m.id));
+      // 向量 ID 可能是 `${accountId}:${repoId}`：先解析再核对归属。
+      const rawId = String(m.id);
+      const separator = rawId.indexOf(':');
+      const prefix = separator > 0 ? rawId.slice(0, separator) : '';
+      const scopedAccountId = /^\d+$/.test(prefix) ? prefix : null;
+      if (scopedAccountId && scopedAccountId !== accountId) return null;
+      const repoId = scopedAccountId ? rawId.slice(separator + 1) : rawId;
+      const repo = byId.get(repoId);
       if (!repo) return null;
       return {
-        id: String(m.id),
+        id: repoId,
         score: Number(m.score),
         repository: repo,
       };
@@ -542,7 +551,8 @@ export async function findSimilarRepositories(
       matches: Array<Record<string, unknown>>;
     }
 > {
-  const source = getRepository(idOrFullName);
+  const accountId = resolveActiveAccountScope(getDb());
+  const source = getRepository(idOrFullName, accountId);
   if (!source) return { error: 'not_found', idOrFullName: String(idOrFullName) };
 
   const topK = Math.min(50, Math.max(1, opts.topK ?? 10));

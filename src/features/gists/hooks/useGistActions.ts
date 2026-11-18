@@ -4,7 +4,12 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Gist } from '../../../types';
 import type { GistCreateInput, GistUpdateInput } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccount,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { selectGistViewState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { AIService } from '../../../services/aiService';
@@ -54,13 +59,14 @@ export const useGistActions = () => {
     setIsRefreshing(true);
     // 账号代次校验（Issue #611）：Gist 全量刷新耗时期间切号后丢弃结果
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const api = createGitHubApiService(state.githubToken);
       const [mine, starred] = await Promise.all([
         api.getAllGists(state.gists),
         api.getAllStarredGists([...state.gists, ...state.starredGists]),
       ]);
-      if (!isCurrentAccount(startedAccountId)) {
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       const starredIds = new Set(starred.map(gist => gist.id));
@@ -256,6 +262,7 @@ export const useGistActions = () => {
     // 切号——账号 ID 在任何 await 之前保存，成功/失败/标记清理三条路径全部用
     // 保存值复核，绝不写入切号后的当前工作区。
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     // 失败的 gist 已写入 analyzed_at，但重试应与批量分析一致：直接执行，不弹覆盖确认
     if (gist.analyzed_at && !gist.analysis_failed) {
       const shouldContinue = await confirm(
@@ -265,7 +272,7 @@ export const useGistActions = () => {
       );
       if (!shouldContinue) return;
     }
-    if (!isCurrentAccount(startedAccountId)) return;
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
     state.setAnalyzingGist(gist.id, true);
     try {
@@ -273,16 +280,16 @@ export const useGistActions = () => {
       const detail = await githubApi.getGistForAnalysis(gist.id, gist);
       const aiService = new AIService(activeConfig, state.language);
       const summary = await aiService.analyzeGist(detail, githubApi.getGistContentPreview(detail));
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       state.updateGist(applyGistAnalysisSuccess(detail, summary, new Date().toISOString()));
       toast(t('useGistActions.gist-ai-analysis-completed'), 'success');
     } catch (error) {
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       state.updateGist(applyGistAnalysisFailure(gist, error instanceof Error ? error.message : String(error), new Date().toISOString()));
       toast(t('useGistActions.gist-ai-analysis-failed'), 'error');
     } finally {
       // 与批量分析一致：分析标记清理只作用于发起账号仍是当前账号的工作区
-      if (isCurrentAccount(startedAccountId)) {
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
         state.setAnalyzingGist(gist.id, false);
       }
     }
@@ -293,22 +300,27 @@ export const useGistActions = () => {
     // 账号代次校验（Issue #611）：确认弹窗与远端等待期间切号后，本地写入与
     // 结果回调一律丢弃（远端操作已按发起账号的 Token 完成，不可撤销）
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     const confirmed = await confirm(
       t('useGistActions.unstar-gist'),
       t('useGistActions.are-you-sure-you-want-to-unstar-this-gist'),
       { type: 'warning', confirmText: t('useGistActions.unstar') }
     );
     if (!confirmed) return;
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
+    // 客户端必须在复核之后同步创建：工厂从实时 Store 读取账号头，
+    // 任何 await 之后创建都可能把请求发到切号后的账号。
+    const api = createGitHubApiService(state.githubToken);
     setIsMutating(true);
     try {
-      await createGitHubApiService(state.githubToken).unstarGist(gist.id);
-      if (!isCurrentAccount(startedAccountId)) return;
+      await api.unstarGist(gist.id);
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       onUnstarred?.(gist.id);
       state.updateGist({ ...gist, starred: false });
       toast(t('useGistActions.unstarred'), 'success');
     } catch {
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       toast(t('useGistActions.failed-to-unstar'), 'error');
     } finally {
       setIsMutating(false);
@@ -323,22 +335,25 @@ export const useGistActions = () => {
     // 账号代次校验（Issue #611）：确认弹窗与远端等待期间切号后，本地删除与
     // 结果回调一律丢弃（远端删除已按发起账号的 Token 完成，不可撤销）
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     const confirmed = await confirm(
       t('useGistActions.delete-gist'),
       t('useGistActions.are-you-sure-you-want-to-delete-this-gist-this-c'),
       { type: 'danger', confirmText: t('useGistActions.delete') }
     );
     if (!confirmed) return;
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
+    const api = createGitHubApiService(state.githubToken);
     setIsMutating(true);
     try {
-      await createGitHubApiService(state.githubToken).deleteGist(gist.id);
-      if (!isCurrentAccount(startedAccountId)) return;
+      await api.deleteGist(gist.id);
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       state.deleteGist(gist.id);
       onDeleted?.(gist.id);
       toast(t('useGistActions.gist-deleted'), 'success');
     } catch (error) {
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       const msg = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(msg);
       toast(

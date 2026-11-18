@@ -67,6 +67,17 @@ wrangler secret put AUTH_TOKEN
 npm run deploy
 ```
 
+> **多账号（Issue #611）**：若多个 GitHub 账号共享同一个 Vectorize 索引，
+> 请先创建 `accountId` 元数据索引，并把 `wrangler.toml` 中的
+> `ACCOUNT_METADATA_INDEXED` 改为 `"true"`：
+>
+> ```bash
+> npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
+> ```
+>
+> 未开启时 Worker 仍可查询/写入，但客户端会跳过「按账号范围清理」，
+> 避免在缺少索引时误删其他账号的向量。
+
 部署成功后，Wrangler 会输出 Worker 的 URL，格式类似：
 ```text
 https://github-stars-vectorize.<your-subdomain>.workers.dev

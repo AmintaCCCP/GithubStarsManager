@@ -328,8 +328,10 @@ describe('useAccountSwitchActions', () => {
     expect(state.user).toBeNull();
     expect(state.isAuthenticated).toBe(false);
     expect(state.accountWorkspaces['1']?.repositories[0]?.id).toBe(1);
-    // 登出保留已保存账号，供登录页一键恢复
-    expect(state.savedAccounts['1']?.githubToken).toBe('ghp_a');
+    // 登出清除当前账号已保存的 PAT（登录页不能凭旧记录直接恢复会话），
+    // 但账号资料与工作区保留
+    expect(state.savedAccounts['1']?.githubToken).toBe('');
+    expect(state.savedAccounts['1']?.user.login).toBe(userA.login);
   });
 
   it('restores the parked account when a backend account restore fails', async () => {

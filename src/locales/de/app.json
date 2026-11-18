@@ -241,6 +241,7 @@
     "add-account": "Konto hinzufügen",
     "current-account": "Aktuelles Konto",
     "remove-account": "Konto entfernen",
+    "switch-in-progress": "Ein Kontowechsel läuft. Bitte versuche es gleich erneut.",
     "remove-account-confirm-title": "Gespeichertes Konto entfernen",
     "remove-account-confirm-desc": "Dies entfernt nur die gespeicherten Anmeldedaten dieses Kontos. Zwischengespeicherte Repositories und Kategorien bleiben erhalten. Fortfahren?",
     "account-switched": "Zu @{{login}} gewechselt",
@@ -1431,6 +1432,7 @@
     "token-label": "GitHub Personal Access Token",
     "cancel": "Abbrechen",
     "confirm": "Hinzufügen und wechseln",
-    "reauth-hint": "Bitte gib ein gültiges GitHub-Token für @{{login}} ein"
+    "reauth-hint": "Bitte gib ein gültiges GitHub-Token für @{{login}} ein",
+    "account-mismatch": "Dieses Token gehört zu einem anderen GitHub-Konto. Bitte melde dich mit dem Token von @{{login}} an."
   }
 }

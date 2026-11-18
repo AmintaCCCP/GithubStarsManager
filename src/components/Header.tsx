@@ -120,7 +120,8 @@ export const Header: React.FC = () => {
       { type: 'warning' },
     );
     if (confirmed) {
-      await logoutCurrentAccount();
+      const loggedOut = await logoutCurrentAccount();
+      if (!loggedOut) toast(t('header.switch-in-progress'), 'error');
     }
   };
 
@@ -262,15 +263,11 @@ export const Header: React.FC = () => {
                     const isCurrent = account.accountId === currentAccountId;
                     const count = repoCountFor(account);
                     return (
-                      <div
-                        key={account.accountId}
-                        className="group/account flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent focus-visible:bg-accent"
-                      >
-                        <button
-                          type="button"
-                          className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:opacity-50"
+                      <div key={account.accountId}>
+                        <DropdownMenuItem
+                          className="flex min-w-0 items-center gap-2"
                           disabled={isSwitchingMenu}
-                          onClick={() => void handleSwitchAccount(account)}
+                          onSelect={() => void handleSwitchAccount(account)}
                         >
                           <img
                             src={account.user.avatar_url}
@@ -283,22 +280,19 @@ export const Header: React.FC = () => {
                               @{account.user.login} · {t('header.account-repo-count', { count })}
                             </span>
                           </span>
-                        </button>
-                        {isCurrent ? (
-                          <Check className="h-4 w-4 shrink-0 text-primary" aria-label={t('header.current-account')} />
-                        ) : (
-                          <button
-                            type="button"
-                            className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover/account:opacity-100"
-                            aria-label={t('header.remove-account')}
+                          {isCurrent && (
+                            <Check className="h-4 w-4 shrink-0 text-primary" aria-label={t('header.current-account')} />
+                          )}
+                        </DropdownMenuItem>
+                        {!isCurrent && (
+                          <DropdownMenuItem
+                            className="pl-10 text-xs text-muted-foreground"
                             disabled={isSwitchingMenu}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleRemoveAccount(account);
-                            }}
+                            onSelect={() => void handleRemoveAccount(account)}
                           >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                            {t('header.remove-account')}
+                          </DropdownMenuItem>
                         )}
                       </div>
                     );

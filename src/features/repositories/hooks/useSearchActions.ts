@@ -3,7 +3,11 @@ import { useCallback, useMemo, useState, type MutableRefObject, useRef } from 'r
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore, getAllCategories } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { AIService, isAbortError } from '../../../services/aiService';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
@@ -293,6 +297,7 @@ export const useSearchActions = (): SearchActions => {
     // 结果绝不能提交到新账号。此检查保护所有写入分支——未启用向量搜索、向量
     // 结果为 null、向量请求失败降级都会经过本函数的提交路径。
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     const activeConfig = aiConfigs.find(config => config.id === activeAIConfig);
 
     let filtered = repositories;
@@ -339,7 +344,7 @@ export const useSearchActions = (): SearchActions => {
     }
 
     // 提交前用保存的发起账号复核（不能只依赖取消信号）
-    if (!isCurrentAccount(startedAccountId)) {
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
       return;
     }
 
@@ -382,6 +387,7 @@ export const useSearchActions = (): SearchActions => {
     // 账号代次校验（Issue #611）：向量索引内容为实例共享，搜索期间切号后
     // 结果不得写进新账号（结果仓库还会按当前账号 id 集合二次过滤）
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
 
     try {
       // ====== 向量搜索分支 ======
@@ -443,7 +449,7 @@ export const useSearchActions = (): SearchActions => {
             // 回退前复核发起账号（审计修复）：keywordSearch 内部的账号检查以
             // 当前账号为准，切号后恒通过——闭包里的 query/repositories 仍是
             // 旧账号的，回退会把旧账号的结果写进新账号的搜索视图
-            if (!isCurrentAccount(startedAccountId)) {
+            if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
               return;
             }
             await keywordSearch(query, applyFilters, { signal: controller.signal });
@@ -451,7 +457,7 @@ export const useSearchActions = (): SearchActions => {
           }
 
           // 跨账号数据外泄防护：按当前活跃账号的仓库 id 集合过滤后才能展示
-          if (!isCurrentAccount(startedAccountId)) {
+          if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
             return;
           }
           const currentRepoIds = new Set(
@@ -481,7 +487,7 @@ export const useSearchActions = (): SearchActions => {
 
       // 回退前复核发起账号（审计修复）：向量请求抛出非取消异常或未启用向量时，
       // 切号后闭包中的 query/repositories 已不属于当前账号，回退提交必须丢弃
-      if (!isCurrentAccount(startedAccountId)) {
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       await keywordSearch(query, applyFilters, { signal: controller.signal });
@@ -512,11 +518,12 @@ export const useSearchActions = (): SearchActions => {
     setSyncingStars(true);
     // 账号代次校验（Issue #611）：全量拉取耗时期间切号后丢弃结果，绝不覆盖新账号
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const githubApi = createGitHubApiService(githubToken);
       const newRepositories = await githubApi.getAllStarredRepositories();
 
-      if (!isCurrentAccount(startedAccountId)) {
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       const storeRepos = useAppStore.getState().repositories;
@@ -541,7 +548,7 @@ export const useSearchActions = (): SearchActions => {
 
           // 账号代次校验（Issue #611 审计修复）：getUserLists 等待期间切号后，
           // 必须在写入任何分类之前退出——末尾的账号检查无法撤销已创建的分类
-          if (!isCurrentAccount(startedAccountId)) {
+          if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
             return;
           }
 
@@ -589,7 +596,7 @@ export const useSearchActions = (): SearchActions => {
       // 会被误报为新增，弹出「发现 N 个新仓库」的错误提示。
       const newRepoCount = countNewStarredRepositories(newRepositories, storeRepos);
 
-      if (!isCurrentAccount(startedAccountId)) {
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       setRepositories(finalRepositories);

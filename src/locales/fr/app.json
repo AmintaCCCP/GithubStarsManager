@@ -241,6 +241,7 @@
     "add-account": "Ajouter un compte",
     "current-account": "Compte actuel",
     "remove-account": "Supprimer le compte",
+    "switch-in-progress": "Un changement de compte est en cours. Veuillez réessayer dans un instant.",
     "remove-account-confirm-title": "Supprimer le compte enregistré",
     "remove-account-confirm-desc": "Cela supprime uniquement les identifiants de connexion enregistrés pour ce compte. Les dépôts et catégories en cache seront conservés. Continuer ?",
     "account-switched": "Compte basculé vers @{{login}}",
@@ -1431,6 +1432,7 @@
     "token-label": "Jeton d'accès personnel GitHub",
     "cancel": "Annuler",
     "confirm": "Ajouter et basculer",
-    "reauth-hint": "Veuillez saisir un jeton GitHub valide pour @{{login}}"
+    "reauth-hint": "Veuillez saisir un jeton GitHub valide pour @{{login}}",
+    "account-mismatch": "Ce jeton appartient à un autre compte GitHub. Connectez-vous avec le jeton de @{{login}}."
   }
 }

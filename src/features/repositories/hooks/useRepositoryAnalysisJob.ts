@@ -3,7 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { AIAnalysisOptimizer, type AnalysisResult } from '../../../services/aiAnalysisOptimizer';
 import { AIService } from '../../../services/aiService';
@@ -197,12 +201,17 @@ export const useRepositoryAnalysisJob = ({
       ? (t('useRepositoryAnalysisJob.will-analyze-v1-repositories-with-ai-this-may-ta', { v1: repositories.length }))
       : (t('useRepositoryAnalysisJob.will-analyze-v1-actiontext-repositories-with-ai', { v1: repositories.length, actionText: actionText }));
 
+    // 确认弹窗等待期间可能切号：在任何副作用（优化器/加载态/provider）之前
+    // 捕获账号与会话代次，确认后立即复核。
+    const jobAccountId = peekCurrentAccountId();
+    const jobGeneration = getAccountSessionGeneration();
     const confirmed = await confirm(
       t('useRepositoryAnalysisJob.ai-analysis-confirmation'),
       confirmationMessage,
       { type: 'warning' },
     );
     if (!confirmed) return false;
+    if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
 
     const optimizer = createOptimizer(activeConfig.concurrency, activeConfig.requestsPerMinute);
     optimizerRef.current = optimizer;
@@ -219,9 +228,6 @@ export const useRepositoryAnalysisJob = ({
 
     let successCount = 0;
     let failedCount = 0;
-    // 辅助防线（Issue #611）：记录任务发起时的账号；切号后结果绝不写穿到新账号
-    const jobAccountId = peekCurrentAccountId();
-
     try {
       const githubApi = createGitHubApiService(githubToken);
       const aiService = new AIService(activeConfig, language);
@@ -231,7 +237,7 @@ export const useRepositoryAnalysisJob = ({
         if (!mountedRef.current || optimizerRef.current !== optimizer) return;
 
         // 账号已切换：丢弃本条结果并中止后续分析队列，绝不写入新账号的活跃列表
-        if (!isCurrentAccount(jobAccountId)) {
+        if (!isCurrentAccountSession(jobAccountId, jobGeneration)) {
           stopRequestedRef.current = true;
           optimizer.abort();
           return;
@@ -271,6 +277,8 @@ export const useRepositoryAnalysisJob = ({
         aiCategoryHints,
         (current, total, currentConcurrency) => {
           if (!mountedRef.current || optimizerRef.current !== optimizer) return;
+          // 切号后不得写入共享进度状态（旧任务的进度不能覆盖新账号视图）。
+          if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
           setAnalysisProgress({ current, total });
           setProgress({ current, total });
           console.log(`AI Analysis Progress: ${current}/${total}, Concurrency: ${currentConcurrency}`);
@@ -280,6 +288,8 @@ export const useRepositoryAnalysisJob = ({
 
       const stats = optimizer.getStats();
       console.log('AI Analysis Stats:', stats);
+      // 账号已切换（含 A→B→A）：本次任务的结果与提示一律作废。
+      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
       if (syncOnComplete) {
         await forceSyncToBackend();
       }

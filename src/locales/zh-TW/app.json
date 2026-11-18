@@ -241,6 +241,7 @@
     "add-account": "新增帳號",
     "current-account": "目前帳號",
     "remove-account": "移除帳號",
+    "switch-in-progress": "正在切換帳號，請稍後再試。",
     "remove-account-confirm-title": "移除已儲存的帳號",
     "remove-account-confirm-desc": "僅會移除該帳號的快速登入憑證，本機快取的儲存庫與分類仍會保留。確定要繼續嗎？",
     "account-switched": "已切換至 @{{login}}",
@@ -1431,6 +1432,7 @@
     "token-label": "GitHub Personal Access Token",
     "cancel": "關閉",
     "confirm": "新增並切換",
-    "reauth-hint": "請為帳號 @{{login}} 重新輸入有效的 GitHub Token"
+    "reauth-hint": "請為帳號 @{{login}} 重新輸入有效的 GitHub Token",
+    "account-mismatch": "此 Token 屬於另一個 GitHub 帳號，請使用 @{{login}} 的 Token 登入。"
   }
 }

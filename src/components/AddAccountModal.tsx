@@ -58,11 +58,15 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
     // 取消：当前账号工作区与会话不受任何影响
     setError('');
     setToken('');
+    setBackendSecret('');
     onClose();
   };
 
   const describeError = (code: string | undefined): string => {
     if (!code) return tLogin('loginScreen.sign-in-failed-please-try-again');
+    if (code === 'account-mismatch') {
+      return tLogin('app:accountModal.account-mismatch', { login: reauthAccount?.user.login ?? '' });
+    }
     const mapped = BACKEND_ERROR_KEYS[code];
     return mapped ? tLogin(mapped) : code;
   };
@@ -74,7 +78,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       return;
     }
     setError('');
-    const result = await addAccountWithToken(trimmed);
+    const result = await addAccountWithToken(trimmed, reauthAccount?.accountId);
     if (!result.ok) {
       setError(describeError(result.error));
       return;
@@ -179,7 +183,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
                 autoComplete="url"
                 placeholder="https://example.com"
                 value={backendUrl}
-                onChange={(event) => { setBackendUrl(event.target.value); setError(''); }}
+                onChange={(event) => {
+                  // URL 变更后旧密钥不再对应目标后端：必须重新输入。
+                  if (event.target.value !== backendUrl) setBackendSecret('');
+                  setBackendUrl(event.target.value);
+                  setError('');
+                }}
                 disabled={busy}
                 className="pl-10"
               />

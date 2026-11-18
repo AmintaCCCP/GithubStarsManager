@@ -8,6 +8,7 @@ import type { AppStoreSlice } from '../types';
 import {
   accountIdKey,
   applyAccountWorkspace,
+  bumpAccountSessionGeneration,
   captureAccountWorkspace,
   switchAccountWorkspace,
 } from '../helpers/accountWorkspace';
@@ -41,6 +42,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         const nextAccountId = accountIdKey(user);
         if (user && nextAccountId) {
           const switched = switchAccountWorkspace(current, previousAccountId, nextAccountId);
+          if (nextAccountId !== previousAccountId) bumpAccountSessionGeneration();
           set({
             user,
             isAuthenticated: true,
@@ -100,6 +102,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         // Credential teardown only. Snapshot the GitHub-id workspace first, then
         // park the live lists so the login screen cannot inherit another account.
         const current = get();
+        bumpAccountSessionGeneration();
         const accountId = accountIdKey(current.user);
         const accountWorkspaces = accountId
           ? { ...current.accountWorkspaces, [accountId]: captureAccountWorkspace(current) }
@@ -120,10 +123,16 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           backendApiSecret: null,
           isAuthenticated: false,
           accountWorkspaces,
+          // 退出即清除当前账号已保存的 PAT：登录页不能凭旧记录一键恢复会话。
+          savedAccounts: accountId && current.savedAccounts[accountId]
+            ? {
+                ...current.savedAccounts,
+                [accountId]: { ...current.savedAccounts[accountId], githubToken: '' },
+              }
+            : current.savedAccounts,
           ...applyAccountWorkspace(undefined),
         }));
-        // logout 保留 savedAccounts 中的历史账号记录：用户停留在 LoginScreen
-        // 时仍可一键恢复会话，或从下拉菜单直接切换账号。
+        // logout 保留其他账号的记录；当前账号仅保留资料与工作区，凭据已清除。
       },
       upsertSavedAccount: (user, githubToken) => {
         const accountId = accountIdKey(user);
@@ -148,6 +157,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         const current = get();
         const target = current.savedAccounts[targetAccountId];
         if (!target || !target.githubToken.trim()) return false;
+        bumpAccountSessionGeneration();
         const currentAccountId = accountIdKey(current.user);
         if (currentAccountId === targetAccountId) {
           // 同账号：仅当当前会话已使用目标凭证且已认证时直接返回（刷新 lastUsedAt）。

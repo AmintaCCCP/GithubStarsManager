@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope } from '../db/accountScope.js';
+import { resolveAccountScope, hasAmbiguousAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -218,6 +218,10 @@ router.patch('/api/releases/:id', (req, res) => {
 router.post('/api/releases/mark-all-read', (req, res) => {
   try {
     const db = getDb();
+    if (hasAmbiguousAccountScope(db, req)) {
+      res.status(400).json({ error: 'Account id required', code: 'ACCOUNT_SCOPE_REQUIRED' });
+      return;
+    }
     const accountId = resolveAccountScope(req, db);
     const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
     res.json({ updated: result.changes });

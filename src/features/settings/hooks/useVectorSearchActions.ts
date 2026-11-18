@@ -13,7 +13,12 @@ import {
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccount,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { normalizeLicense } from '../../../utils/licenseFilter';
 
 export interface EmbeddingDraft {
@@ -123,10 +128,11 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     // 状态/向量数量/维度不得写入当前账号 B 的共享 vectorSearchStatus
     //（runIndex 对同类写入已有账号保护，testWorker 补齐同一约束）。
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const result = await new VectorSearchService(draft).testConnection();
       setWorkerTestResult(result);
-      if (result.success && isCurrentAccount(startedAccountId)) {
+      if (result.success && isCurrentAccountSession(startedAccountId, startedGeneration)) {
         state.setVectorSearchStatus({ connected: true, vectorCount: result.vectorCount, dimensions: result.dimensions });
       }
     } catch (reason) {
@@ -249,13 +255,21 @@ export const useVectorSearchActions = (): VectorSearchActions => {
           logger.warn('vectorSearch.index', 'Skip vector cleanup: no active account context to scope the deletion');
         } else {
           let accountScopedCleanup = false;
+          const statusController = new AbortController();
+          const abortStatus = () => statusController.abort();
+          controller.signal.addEventListener('abort', abortStatus);
+          const statusTimeout = setTimeout(abortStatus, 10_000);
           try {
-            const status = await clients.vectorService.getStatus();
+            const status = await clients.vectorService.getStatus(statusController.signal);
             accountScopedCleanup = status.accountScopedCleanup === true;
           } catch (error) {
+            if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
             logger.warn('vectorSearch.index', 'Skip vector cleanup: worker status probe failed', {
               error: error instanceof Error ? error.message : String(error),
             });
+          } finally {
+            clearTimeout(statusTimeout);
+            controller.signal.removeEventListener('abort', abortStatus);
           }
           if (!accountScopedCleanup) {
             logger.warn('vectorSearch.index', 'Skip vector cleanup: worker does not support account-scoped deletion; redeploy the bundled cloudflare-worker to enable it');

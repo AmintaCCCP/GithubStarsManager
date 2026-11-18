@@ -123,9 +123,9 @@ describe('Header account switcher', () => {
     expect(screen.getByText(/@alice . header\.account-repo-count\[0\]/)).toBeTruthy();
     // 其他账号的仓库数来自其工作区缓存
     expect(screen.getByText(/@bob . header\.account-repo-count\[3\]/)).toBeTruthy();
-    // 当前账号有勾选标识（aria-label），非当前账号有移除按钮
+    // 当前账号有勾选标识（aria-label），非当前账号有可键盘访问的移除菜单项
     expect(screen.getByLabelText('header.current-account')).toBeTruthy();
-    expect(screen.getAllByLabelText('header.remove-account')).toHaveLength(1);
+    expect(screen.getAllByText('header.remove-account')).toHaveLength(1);
     unmount();
   });
 
@@ -193,7 +193,7 @@ describe('Header account switcher', () => {
     const { unmount } = render(<Header />);
 
     await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
-    fireEvent.click(screen.getByLabelText('header.remove-account'));
+    fireEvent.click(screen.getByText('header.remove-account'));
 
     await waitFor(() => {
       expect(mocks.confirm).toHaveBeenCalled();
@@ -239,7 +239,7 @@ describe('Header account switcher', () => {
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(mocks.addAccountWithToken).toHaveBeenCalledWith('ghp_new_token');
+      expect(mocks.addAccountWithToken).toHaveBeenCalledWith('ghp_new_token', undefined);
     });
     unmount();
   });

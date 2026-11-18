@@ -102,13 +102,9 @@ function readScopedToken(db: ReturnType<typeof getDb>, accountId: string): strin
     const scoped = db.prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
       .get(accountId) as { value: string | null } | undefined;
     if (scoped !== undefined) {
-      if (!scoped.value) {
-        // 记录存在但值为空 = 已被显式清空：绝不回退 accounts 旧凭据副本，
-        // 否则已清空的 Token 会复活（与 proxy 的显式清空优先语义一致）。
-        return null;
-      }
-      const fromScoped = decryptOrNull(scoped.value);
-      if (fromScoped) return fromScoped;
+      // 记录存在即权威：为空表示显式清空，解密失败也返回 null，
+      // 绝不回退 accounts 旧凭据副本（否则已清空的 Token 会复活）。
+      return decryptOrNull(scoped.value);
     }
 
     const accountRow = db.prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?')

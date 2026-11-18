@@ -14,6 +14,7 @@ export type CompactMetadata = {
   stars: number;
   tags: string[];
   license?: string;
+  accountId?: string;
 };
 
 /** Mirror of Vectorize's metadata value types, kept free of workers-types. */
@@ -74,6 +75,8 @@ function normalizeMetadata(input: unknown): CompactMetadata {
       : [],
   };
   if (typeof source.license === 'string') metadata.license = source.license;
+  // accountId 是清理/查询过滤的必备归属字段，压缩时不得丢弃。
+  if (typeof source.accountId === 'string' && source.accountId) metadata.accountId = source.accountId;
   return metadata;
 }
 
@@ -172,6 +175,7 @@ export function compactVectorMetadata(input: unknown): Record<string, VectorMeta
     tags: [],
   };
   if (metadata.license) fallback.license = truncateUtf8(metadata.license, 256);
+  if (metadata.accountId) fallback.accountId = metadata.accountId;
   if (jsonByteLength(fallback) > VECTORIZE_METADATA_SAFE_BYTES) delete fallback.license;
   return fallback as Record<string, VectorMetadata>;
 }

@@ -241,6 +241,7 @@
     "add-account": "Adicionar conta",
     "current-account": "Conta atual",
     "remove-account": "Remover conta",
+    "switch-in-progress": "Uma troca de conta está em andamento. Tente novamente em instantes.",
     "remove-account-confirm-title": "Remover conta salva",
     "remove-account-confirm-desc": "Isso remove apenas a credencial de login salva desta conta. Os repositórios e categorias em cache serão mantidos. Continuar?",
     "account-switched": "Alterado para @{{login}}",
@@ -1431,6 +1432,7 @@
     "token-label": "Token pessoal do GitHub",
     "cancel": "Cancelar",
     "confirm": "Adicionar e trocar",
-    "reauth-hint": "Insira um token do GitHub válido para @{{login}}"
+    "reauth-hint": "Insira um token do GitHub válido para @{{login}}",
+    "account-mismatch": "Este token pertence a outra conta do GitHub. Entre com o token de @{{login}}."
   }
 }

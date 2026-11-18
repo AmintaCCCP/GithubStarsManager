@@ -4,7 +4,12 @@ import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
-import { resolveAccountScope, getLegacyDefaultClaimedBy, ACCOUNT_SCOPED_SETTING_KEYS } from '../db/accountScope.js';
+import {
+  resolveAccountScope,
+  getLegacyDefaultClaimedBy,
+  ACCOUNT_SCOPED_SETTING_KEYS,
+  INTERNAL_SETTING_KEYS,
+} from '../db/accountScope.js';
 
 // 账号级设置键集合（Per-Account）：从 accountScope 统一出口转发，
 // 保持 configs.ts 作为 /api/settings 语义的定义点。
@@ -562,6 +567,12 @@ router.get('/api/settings', (req, res) => {
       const accountRows = db.prepare('SELECT key, value FROM account_settings WHERE account_id = ?')
         .all(accountId) as Array<{ key: string; value: string | null }>;
       for (const row of accountRows) {
+        if (row.key === 'github_token' && !row.value) {
+          // 账号级记录存在但为空 = 显式清空：不能沿用全局 Token 的可用状态。
+          settings.github_token = '';
+          settings.github_token_status = 'empty';
+          continue;
+        }
         if (row.key === 'github_token' && row.value) {
           const { decryptedValue, status } = getMaskedSecretResult({
             encryptedValue: row.value,
@@ -610,6 +621,9 @@ router.put('/api/settings', (req, res) => {
     const upsert = db.transaction(() => {
       for (const [key, rawValue] of Object.entries(updates)) {
         let value = rawValue as string | null;
+
+        // 内部账号状态（认领标记 / 已验证所有者）只能由服务端认领流程写入。
+        if (INTERNAL_SETTING_KEYS.has(key)) continue;
 
         if (key === 'github_token') {
           if (typeof value === 'string' && value.startsWith('***')) {

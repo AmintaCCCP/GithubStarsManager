@@ -9,6 +9,7 @@ import {
   applyAccountWorkspace,
   captureAccountWorkspace,
   emptyAccountWorkspace,
+  getAccountSessionGeneration,
   normalizeAccountWorkspaces,
   normalizeSavedAccounts,
 } from '../../../store/helpers/accountWorkspace';
@@ -159,9 +160,14 @@ export const useBackupActions = (): BackupActions => {
     // 每个 await 之后、任何 Store/WebDAV 写入之前校验一致性，不一致立即中止，
     // 确保旧版（无 activeAccountId）备份也不会把数据写进切换后的新账号。
     const restoreAccountId = accountIdKey(useAppStore.getState().user);
+    const restoreGeneration = getAccountSessionGeneration();
     const ensureSameAccount = (): boolean => {
       const currentAccountId = accountIdKey(useAppStore.getState().user);
-      if (currentAccountId !== restoreAccountId) {
+      // 仅比较账号 ID 无法识别「切出后又切回」：会话代次同时校验。
+      if (
+        currentAccountId !== restoreAccountId
+        || getAccountSessionGeneration() !== restoreGeneration
+      ) {
         toast(t('useBackupActions.account-changed-during-restore'), 'error');
         return false;
       }
@@ -201,7 +207,8 @@ export const useBackupActions = (): BackupActions => {
       const backupAccountId = typeof backupData.activeAccountId === 'string' && backupData.activeAccountId
         ? backupData.activeAccountId
         : null;
-      const restoreTargetsOtherAccount = !!backupAccountId && !!liveAccountId && backupAccountId !== liveAccountId;
+      // 备份显式声明了归属账号即以其为准（包括当前未登录 liveAccountId=null）。
+      const restoreTargetsOtherAccount = !!backupAccountId && backupAccountId !== liveAccountId;
 
       // 备份实际携带的工作区（规整化后）：判断是否应用当前账号工作区必须以它
       // 为准，不能用合并结果——合并结果含本机旧快照，备份不含当前账号时会
@@ -263,6 +270,37 @@ export const useBackupActions = (): BackupActions => {
           categoryOrder: Array.isArray(backupData.categoryOrder)
             ? (backupData.categoryOrder as string[])
             : (previous?.categoryOrder ?? []),
+          // 备份实际提供的其余工作区字段：缺失时才沿用该账号原快照。
+          ...(Array.isArray(backupData.gists)
+            ? { gists: backupData.gists as import('../../../types').Gist[] }
+            : {}),
+          ...(Array.isArray(backupData.starredGists)
+            ? { starredGists: backupData.starredGists as import('../../../types').Gist[] }
+            : {}),
+          ...(Array.isArray(backupData.forks)
+            ? { forks: backupData.forks as import('../../../types').ForkRepo[] }
+            : {}),
+          ...(Array.isArray(backupData.readForks)
+            ? { readForks: backupData.readForks as number[] }
+            : {}),
+          ...(Array.isArray(backupData.releaseSubscriptions)
+            ? { releaseSubscriptions: backupData.releaseSubscriptions as number[] }
+            : {}),
+          ...(Array.isArray(backupData.readReleases)
+            ? { readReleases: backupData.readReleases as number[] }
+            : {}),
+          ...(backupData.releaseSourceSettings && typeof backupData.releaseSourceSettings === 'object'
+            ? { releaseSourceSettings: backupData.releaseSourceSettings as import('../../../types').AccountWorkspace['releaseSourceSettings'] }
+            : {}),
+          ...(backupData.categoryListIdMap && typeof backupData.categoryListIdMap === 'object'
+            ? { categoryListIdMap: backupData.categoryListIdMap as Record<string, string> }
+            : {}),
+          ...(typeof backupData.syncMode === 'string'
+            ? { syncMode: backupData.syncMode as import('../../../types').AccountWorkspace['syncMode'] }
+            : {}),
+          ...(typeof backupData.syncModeConfigured === 'boolean'
+            ? { syncModeConfigured: backupData.syncModeConfigured }
+            : {}),
         };
         // 不覆盖当前登录账号的顶层状态；仅当备份实际包含当前账号工作区时应用，
         // 否则保留实时状态（不用本机旧快照回滚）
@@ -322,20 +360,22 @@ export const useBackupActions = (): BackupActions => {
         }
 
         try {
-          for (const category of useAppStore.getState().customCategories) {
-            if (category?.id) state.deleteCustomCategory(category.id);
-          }
+          // 只有备份实际提供该字段时才清空既有数据：缺失字段必须保留已恢复
+          // 的工作区状态（显式空数组仍表示清空）。
           if (Array.isArray(backupData.customCategories)) {
+            for (const category of useAppStore.getState().customCategories) {
+              if (category?.id) state.deleteCustomCategory(category.id);
+            }
             for (const category of backupData.customCategories) {
               if (category && typeof category === 'object' && 'id' in category && 'name' in category) {
                 state.addCustomCategory({ ...(category as Parameters<typeof state.addCustomCategory>[0]), isCustom: true });
               }
             }
           }
-          for (const categoryId of useAppStore.getState().hiddenDefaultCategoryIds) {
-            if (typeof categoryId === 'string') state.showDefaultCategory(categoryId);
-          }
           if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
+            for (const categoryId of useAppStore.getState().hiddenDefaultCategoryIds) {
+              if (typeof categoryId === 'string') state.showDefaultCategory(categoryId);
+            }
             for (const categoryId of backupData.hiddenDefaultCategoryIds) {
               if (typeof categoryId === 'string') state.hideDefaultCategory(categoryId);
             }
@@ -422,8 +462,10 @@ export const useBackupActions = (): BackupActions => {
         console.warn('恢复网络路由偏好时发生问题：', error);
       }
       try {
-        if (backupIncludedKeys && isRealBackupSecret(backupData.backendApiSecret)) {
-          state.setBackendApiSecret(typeof backupData.backendApiSecret === 'string' ? backupData.backendApiSecret : null);
+        const backupSecret = backupData.backendApiSecret;
+        // 显式 null 表示清空；缺失/掩码值保持现有密钥。
+        if (backupIncludedKeys && (backupSecret === null || isRealBackupSecret(backupSecret))) {
+          state.setBackendApiSecret(typeof backupSecret === 'string' ? backupSecret : null);
         }
       } catch (error) {
         console.warn('恢复后端 API 密钥时发生问题：', error);

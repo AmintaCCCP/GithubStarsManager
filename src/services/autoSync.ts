@@ -191,6 +191,44 @@ let _hasPendingLocalChanges = false;
 // 新活跃账号必须重新取得豁免，绝不能继承上一会话的观察结论。
 const _accountsSeenNonEmptyRepos = new Set<string>();
 const _accountsObservedBackendRepos = new Set<string>();
+// 上次成功推送的仓库 ID 基线（按账号、跨重启持久化）：对账时据此区分
+// 「本地显式删除」与「远端新增」，绝不把用户删除过的仓库合并回来。
+const PUSHED_REPO_IDS_KEY = 'gsm.pushedRepoIds';
+
+const loadPushedRepoIds = (): Map<string, Set<number>> => {
+  try {
+    const raw = localStorage.getItem(PUSHED_REPO_IDS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    const result = new Map<string, Set<number>>();
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      for (const [accountId, ids] of Object.entries(parsed as Record<string, unknown>)) {
+        if (!Array.isArray(ids)) continue;
+        result.set(accountId, new Set(ids.filter((id): id is number => Number.isInteger(id))));
+      }
+    }
+    return result;
+  } catch {
+    return new Map();
+  }
+};
+
+const persistPushedRepoIds = (): void => {
+  try {
+    localStorage.setItem(
+      PUSHED_REPO_IDS_KEY,
+      JSON.stringify(Object.fromEntries([..._lastPushedRepoIds].map(([id, ids]) => [id, [...ids]]))),
+    );
+  } catch {
+    // 存储不可用时退化为会话内基线
+  }
+};
+
+const _lastPushedRepoIds = loadPushedRepoIds();
+
+// 推送失败后的退避重试（只在账号仍匹配时重试一次链）。
+let _pushRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let _pushRetryDelay = 2000;
+const PUSH_RETRY_MAX_DELAY = 60_000;
 
 /** 记录某账号在本对齐会话内本地仓库列表曾非空（空列表全量推送豁免依据）。 */
 function markAccountSeenNonEmptyRepos(accountId: string | null | undefined): void {
@@ -282,15 +320,23 @@ const SWITCH_FLUSH_MAX_ATTEMPTS = 3;
 // 丢失会让普通拉取直接用后端旧快照覆盖未同步修改。
 const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
 
-const loadPendingSyncAccounts = (): Set<string> => {
+// 值 = 产生待推状态的后端 URL（'' 表示旧版记录/未知）。待推修改只属于
+// 原后端：切到不同后端时绝不能把原工作区推过去。
+const loadPendingSyncAccounts = (): Map<string, string> => {
   try {
     const raw = localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    return new Set(
-      Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [],
-    );
+    const entries = new Map<string, string>();
+    if (!Array.isArray(parsed)) return entries;
+    for (const item of parsed) {
+      if (typeof item === 'string') entries.set(item, '');
+      else if (Array.isArray(item) && typeof item[0] === 'string') {
+        entries.set(item[0], typeof item[1] === 'string' ? item[1] : '');
+      }
+    }
+    return entries;
   } catch {
-    return new Set();
+    return new Map();
   }
 };
 
@@ -306,8 +352,9 @@ const _pendingSyncAccounts = loadPendingSyncAccounts();
 
 /** 记录账号级待推状态（补推成功前必须保留，跨重启持久化）。 */
 export function markPendingAccountSync(accountId: string): void {
-  if (_pendingSyncAccounts.has(accountId)) return;
-  _pendingSyncAccounts.add(accountId);
+  const backendUrl = backend.backendUrl ?? '';
+  if (_pendingSyncAccounts.get(accountId) === backendUrl) return;
+  _pendingSyncAccounts.set(accountId, backendUrl);
   persistPendingSyncAccounts();
 }
 
@@ -321,7 +368,10 @@ export function clearPendingAccountSync(accountId: string | null | undefined): v
  * 是否存在指定账号尚未补推的本地修改（冲刷失败遗留）。
  */
 export function hasPendingAccountSync(accountId: string | null | undefined): boolean {
-  return !!accountId && _pendingSyncAccounts.has(accountId);
+  if (!accountId || !_pendingSyncAccounts.has(accountId)) return false;
+  const pendingBackend = _pendingSyncAccounts.get(accountId) ?? '';
+  // 旧版记录没有绑定后端：沿用旧语义，避免升级后丢失待推保护。
+  return !pendingBackend || pendingBackend === (backend.backendUrl ?? '');
 }
 
 /**
@@ -329,7 +379,7 @@ export function hasPendingAccountSync(accountId: string | null | undefined): boo
  * 返回是否存在遗留待推状态（存在则调用方必须先 syncToBackend 再拉取）。
  */
 export function consumePendingAccountSync(accountId: string | null | undefined): boolean {
-  if (!accountId || !_pendingSyncAccounts.has(accountId)) return false;
+  if (!accountId || !hasPendingAccountSync(accountId)) return false;
   _pendingSyncAccounts.delete(accountId);
   persistPendingSyncAccounts();
   return true;
@@ -457,6 +507,11 @@ export function resetSyncHashes(): void {
   _lastHash.settings = '';
   _accountsSeenNonEmptyRepos.clear();
   _accountsObservedBackendRepos.clear();
+  if (_pushRetryTimer) {
+    clearTimeout(_pushRetryTimer);
+    _pushRetryTimer = null;
+  }
+  _pushRetryDelay = 2000;
 }
 
 function quickHash(data: unknown): string {
@@ -637,6 +692,85 @@ export async function syncLocalGitHubTokenToBackend(
 }
 
 /**
+ * 应用后端 settings 分片（拉取与待推合并分支共用同一套规则）。
+ * `protectLocal` 用于待推分支：本地非空而后端为空的字段保留本地值，
+ * 既不让本机空值覆盖后端配置，也不回滚拉取窗口内的本地编辑。
+ */
+function applyBackendSettings(settings: Record<string, unknown>, protectLocal = false): void {
+  const state = useAppStore.getState();
+  const keepLocal = (backendValue: unknown, localValue: unknown): boolean => (
+    protectLocal && (backendValue === null || backendValue === undefined) && localValue != null
+  );
+  if ((typeof settings.activeAIConfig === 'string' || settings.activeAIConfig === null)
+    && !keepLocal(settings.activeAIConfig, state.activeAIConfig)) {
+    state.setActiveAIConfig(settings.activeAIConfig as string | null);
+  }
+  if ((typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null)
+    && !keepLocal(settings.activeWebDAVConfig, state.activeWebDAVConfig)) {
+    state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
+  }
+  if ((typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null)
+    && !keepLocal(settings.activeEmbeddingConfig, state.activeEmbeddingConfig)) {
+    state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);
+  }
+  if (Array.isArray(settings.hiddenDefaultCategoryIds)) {
+    const skipEmpty = protectLocal
+      && settings.hiddenDefaultCategoryIds.length === 0
+      && (state.hiddenDefaultCategoryIds ?? []).length > 0;
+    if (!skipEmpty) {
+      const nextHiddenIds = settings.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string');
+      const currentHiddenIds = state.hiddenDefaultCategoryIds || [];
+      for (const id of currentHiddenIds) {
+        if (!nextHiddenIds.includes(id)) {
+          state.showDefaultCategory(id);
+        }
+      }
+      for (const id of nextHiddenIds) {
+        if (!currentHiddenIds.includes(id)) {
+          state.hideDefaultCategory(id);
+        }
+      }
+    }
+  }
+  if (Array.isArray(settings.categoryOrder)) {
+    if (!(protectLocal && settings.categoryOrder.length === 0 && state.categoryOrder.length > 0)) {
+      useAppStore.setState({ categoryOrder: settings.categoryOrder.filter((id): id is string => typeof id === 'string') });
+    }
+  }
+  if (Array.isArray(settings.customCategories)) {
+    if (!(protectLocal && settings.customCategories.length === 0 && state.customCategories.length > 0)) {
+      useAppStore.setState({ customCategories: settings.customCategories });
+    }
+  }
+  if (Array.isArray(settings.assetFilters)) {
+    if (!(protectLocal && settings.assetFilters.length === 0 && Object.keys(state.assetFilters ?? {}).length > 0)) {
+      useAppStore.setState({ assetFilters: normalizeAssetFilters(settings.assetFilters) });
+    }
+  }
+  if (
+    settings.defaultCategoryOverrides !== null
+    && typeof settings.defaultCategoryOverrides === 'object'
+    && !Array.isArray(settings.defaultCategoryOverrides)
+  ) {
+    const backendOverrides = settings.defaultCategoryOverrides as Record<string, unknown>;
+    if (!(protectLocal && Object.keys(backendOverrides).length === 0 && Object.keys(state.defaultCategoryOverrides ?? {}).length > 0)) {
+      useAppStore.setState({
+        defaultCategoryOverrides: settings.defaultCategoryOverrides as typeof state.defaultCategoryOverrides,
+      });
+    }
+  }
+  if (settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object'
+    && !(protectLocal
+      && Object.keys(settings.releaseSourceSettings as object).length === 0
+      && Object.keys(state.releaseSourceSettings ?? {}).length > 0)) {
+    state.setReleaseSourceSettings(settings.releaseSourceSettings as typeof state.releaseSourceSettings);
+  }
+  if (typeof settings.collapsedSidebarCategoryCount === 'number' && settings.collapsedSidebarCategoryCount >= 1) {
+    useAppStore.setState({ collapsedSidebarCategoryCount: settings.collapsedSidebarCategoryCount });
+  }
+}
+
+/**
  * Pull all data from backend and update local store.
  * Backend-first strategy: backend data overwrites local data.
  * Silent: errors logged to console only.
@@ -728,6 +862,12 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         // A completed fetch — an empty list included — proves the store is
         // complete against the server, so its queued push is safe to drain.
         _hasPendingPush = true;
+      }
+      // 待推分支只跳过仓库快照，但设置同样来自后端：不应用就会用本地空值
+      // （如 customCategories）覆盖后端已有配置。
+      if (settingsResult.status === 'fulfilled') {
+        applyBackendSettings(settingsResult.value, true);
+        _lastHash.settings = quickHash(settingsResult.value);
       }
       // A failed repositories fetch leaves the remote state unknown: the pull
       // must not trigger a push of an unverified list, which would delete
@@ -921,54 +1061,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     }
     // Sync active selections from settings
     if (changed.settings && settingsResult.status === 'fulfilled') {
-      const settings = settingsResult.value;
-      if (typeof settings.activeAIConfig === 'string' || settings.activeAIConfig === null) {
-        state.setActiveAIConfig(settings.activeAIConfig as string | null);
-      }
-      if (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null) {
-        state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
-      }
-      if (typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null) {
-        state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);
-      }
-      if (Array.isArray(settings.hiddenDefaultCategoryIds)) {
-        const nextHiddenIds = settings.hiddenDefaultCategoryIds.filter((id): id is string => typeof id === 'string');
-        const currentHiddenIds = state.hiddenDefaultCategoryIds || [];
-        for (const id of currentHiddenIds) {
-          if (!nextHiddenIds.includes(id)) {
-            state.showDefaultCategory(id);
-          }
-        }
-        for (const id of nextHiddenIds) {
-          if (!currentHiddenIds.includes(id)) {
-            state.hideDefaultCategory(id);
-          }
-        }
-      }
-      if (Array.isArray(settings.categoryOrder)) {
-        useAppStore.setState({ categoryOrder: settings.categoryOrder.filter((id: unknown): id is string => typeof id === 'string') });
-      }
-      if (Array.isArray(settings.customCategories)) {
-        useAppStore.setState({ customCategories: settings.customCategories });
-      }
-      if (Array.isArray(settings.assetFilters)) {
-        useAppStore.setState({ assetFilters: normalizeAssetFilters(settings.assetFilters) });
-      }
-      if (
-        settings.defaultCategoryOverrides !== null
-        && typeof settings.defaultCategoryOverrides === 'object'
-        && !Array.isArray(settings.defaultCategoryOverrides)
-      ) {
-        useAppStore.setState({
-          defaultCategoryOverrides: settings.defaultCategoryOverrides as typeof state.defaultCategoryOverrides,
-        });
-      }
-      if (settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object') {
-        state.setReleaseSourceSettings(settings.releaseSourceSettings as typeof state.releaseSourceSettings);
-      }
-      if (typeof settings.collapsedSidebarCategoryCount === 'number' && settings.collapsedSidebarCategoryCount >= 1) {
-        useAppStore.setState({ collapsedSidebarCategoryCount: settings.collapsedSidebarCategoryCount });
-      }
+      applyBackendSettings(settingsResult.value);
       _lastHash.settings = hashes.settings;
     }
 
@@ -1051,10 +1144,23 @@ async function reconcileBeforeDestructivePush(accountId: string): Promise<boolea
   if (_accountsObservedBackendRepos.has(accountId)) return true;
   try {
     const remote = await backend.fetchRepositories();
+    // 分页截断的响应不是完整快照：据此推送会物理删除未读到的远端仓库。
+    if (remote.repositories.length < (remote.total ?? remote.repositories.length)) {
+      logger.warn('sync.pushToBackend', 'Deferred destructive push: backend repository snapshot is incomplete', {
+        accountId,
+        fetched: remote.repositories.length,
+        total: remote.total,
+      });
+      return false;
+    }
     markAccountBackendReposObserved(accountId);
     const local = useAppStore.getState().repositories;
     const localIds = new Set(local.map((repo) => repo.id));
-    const arrived = remote.repositories.filter((repo) => !localIds.has(repo.id));
+    // 上次成功推送后本地消失的仓库 = 用户显式删除，不得因远端仍有而复活。
+    const deletedLocally = _lastPushedRepoIds.get(accountId);
+    const arrived = remote.repositories.filter((repo) => (
+      !localIds.has(repo.id) && !deletedLocally?.has(repo.id)
+    ));
     if (arrived.length > 0) {
       useAppStore.getState().setRepositories([...local, ...arrived]);
     }
@@ -1066,6 +1172,24 @@ async function reconcileBeforeDestructivePush(accountId: string): Promise<boolea
     });
     return false;
   }
+}
+
+/**
+ * 推送失败/被推迟时按账号退避重试，避免轮询被待推标志永久卡死。
+ * 账号或后端连接已变化时放弃重试（绝不把旧目标的数据推到新目标）。
+ */
+export function schedulePendingAccountSyncRetry(accountId: string): void {
+  if (_pushRetryTimer) return;
+  const delay = _pushRetryDelay;
+  _pushRetryDelay = Math.min(_pushRetryDelay * 2, PUSH_RETRY_MAX_DELAY);
+  const expectedBackend = backend.backendUrl ?? '';
+  _pushRetryTimer = setTimeout(() => {
+    _pushRetryTimer = null;
+    if (accountIdKey(useAppStore.getState().user) !== accountId) return;
+    if ((backend.backendUrl ?? '') !== expectedBackend) return;
+    _hasPendingLocalChanges = true;
+    void syncToBackend();
+  }, delay);
 }
 
 /**
@@ -1106,12 +1230,18 @@ async function pushToBackend(): Promise<boolean> {
     if (!pushAccountId || !(await reconcileBeforeDestructivePush(pushAccountId))) {
       _hasPendingPush = false;
       _hasPendingLocalChanges = true;
+      if (pushAccountId) schedulePendingAccountSyncRetry(pushAccountId);
       return false;
     }
     const state = useAppStore.getState();
+    // 仓库分片未变化（例如只改了设置）时不要发送 isFullSync 全量快照：
+    // 陈旧快照会删除其他设备在该分区新增的仓库。
+    const reposHash = repositoryPayloadHash(state.repositories);
+    const reposUnchanged = reposHash === _lastHash.repos;
+    const skipped = Symbol('skipped');
 
     const results = await Promise.allSettled([
-      backend.syncRepositories(state.repositories),
+      reposUnchanged ? Promise.resolve(skipped) : backend.syncRepositories(state.repositories),
       backend.syncReleases(state.releases),
       backend.syncAIConfigs(state.aiConfigs),
       backend.syncWebDAVConfigs(state.webdavConfigs),
@@ -1138,13 +1268,18 @@ async function pushToBackend(): Promise<boolean> {
       _hasPendingLocalChanges = true;
     } else {
       logger.info('sync.pushToBackend', 'Synced to backend', { durationMs: Date.now() - pushStartTime });
+      _pushRetryDelay = 2000;
     }
 
     // Only update _lastHash for successfully synced slices.
     // Hash the raw pushed payload (local-only fields like vector_indexed_at are
     // never stored by the backend), so the next pull compares against the same
     // projection and doesn't re-apply setRepositories after a push.
-    if (reposSync.status === 'fulfilled') _lastHash.repos = quickHash(stripLocalRepositoryFields(state.repositories));
+    if (reposSync.status === 'fulfilled' && reposSync.value !== skipped) {
+      _lastHash.repos = reposHash;
+      _lastPushedRepoIds.set(pushAccountId, new Set(state.repositories.map((repo) => repo.id)));
+      persistPushedRepoIds();
+    }
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
     if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
     if (webdavSync.status === 'fulfilled') _lastHash.webdav = quickHash(state.webdavConfigs);
