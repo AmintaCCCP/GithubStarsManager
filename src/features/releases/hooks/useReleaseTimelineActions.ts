@@ -229,7 +229,7 @@ export const useReleaseTimelineActions = () => {
     const stillActive = resolveReleaseSources(useAppStore.getState()).entries.some(entry => normalizeRepoKey(entry.repository.full_name) === repoKey);
     if (!stillActive) state.removeReleasesByRepoFullName(releaseRepo.full_name);
     try {
-      await forceSyncToBackend();
+      await forceSyncToBackend({ reportFailures: true });
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
       // 同步等待期间可能已切号：发起账号的回滚快照绝不写入新账号工作区

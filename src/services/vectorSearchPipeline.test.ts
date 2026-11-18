@@ -527,13 +527,30 @@ describe('hydrateMatches 账号隔离（R4 审计修复）', () => {
     expect(ranked).toEqual([]);
   });
 
-  it('keeps legacy unowned matches visible in single-account sessions', () => {
-    const ranked = hydrateMatches(
+  it('keeps legacy unowned matches visible only when legacy ownership is explicitly confirmed', () => {
+    const rankedConfirmed = hydrateMatches(
+      [match('1')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: false, allowLegacyUnscoped: true } },
+    );
+    expect(rankedConfirmed.map(item => item.repo.id)).toEqual([1]);
+
+    // 仅本机保存单个账号（未确认 legacy 归属）不得召回无归属旧向量
+    const rankedUnconfirmed = hydrateMatches(
       [match('1')],
       repoById,
       { accountIdScope: { accountId: '7', multiAccount: false } },
     );
-    expect(ranked.map(item => item.repo.id)).toEqual([1]);
+    expect(rankedUnconfirmed).toEqual([]);
+  });
+
+  it('rejects prefixed matches whose metadata.accountId conflicts with the prefix', () => {
+    const ranked = hydrateMatches(
+      [match('7:1', '8')],
+      repoById,
+      { accountIdScope: { accountId: '7', multiAccount: true } },
+    );
+    expect(ranked).toEqual([]);
   });
 
   it('does not filter when no scope is provided (legacy callers)', () => {

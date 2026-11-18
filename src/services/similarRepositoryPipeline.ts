@@ -15,6 +15,7 @@ import {
   fuseCandidates,
   hydrateMatches,
   rankStructuredCandidates,
+  resolveDenseQueryAccountScope,
   withBudget,
   type VectorAccountIdScope,
   type VectorQueryAnalysis,
@@ -386,6 +387,10 @@ export async function runSimilarRepositoryPipeline(
         return { matches: [], success: false, error: `${prefix} embedding returned no vector` };
       }
 
+      const denseScope = await resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
+      if (denseScope.skip) {
+        return { matches: [], success: true };
+      }
       let workerTimedOut = false;
       const workerStarted = Date.now();
       const matches = await withBudget(
@@ -394,7 +399,7 @@ export async function runSimilarRepositoryPipeline(
           {
             topK: RECALL_TOP_K,
             threshold,
-            ...(options.accountIdScope?.multiAccount ? { accountId: options.accountIdScope.accountId } : {}),
+            ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
           },
           stageSignal,
         ),

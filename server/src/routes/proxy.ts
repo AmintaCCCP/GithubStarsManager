@@ -5,27 +5,27 @@ import { config } from '../config.js';
 import { proxyRequest, ProxyConfig, validateUrl, isPrivateOrLoopback } from '../services/proxyService.js';
 import { logger } from '../services/logger.js';
 import {
-  resolveAccountScope,
+  resolveWritableAccountScope,
   extractRequestedAccountId,
   getLegacyDefaultClaimedBy,
   getLegacyDefaultVerifiedToken,
 } from '../db/accountScope.js';
 
-/**
- * 按当前账号分区解析 GitHub Token（多账号隔离，Issue #611）。
- * 回退顺序不可颠倒：account_settings → accounts.github_token_encrypted → 全局 settings。
- *
- * 全局 Token 回退仅限旧语义范围（防跨账号凭证串号）：
- * - 解析为 'default'（旧客户端 / 无头请求，无 active_account_id）——行为与 v4 之前完全一致；
- * - 请求未显式携带 X-GitHub-Account-Id、且当前账号是 legacy_default_claimed_by
- *   认领的存量归属账号（全局 Token 已在认领时通过 GitHub 身份校验归属该账号）。
- * 显式指定真实账号而账号级 Token 缺失或已被显式清空时，一律返回「未配置」，
- * 绝不回退 accounts 旧凭据或全局 Token。
- */
-function resolveGitHubTokenForRequest(req: import('express').Request): { token: string | null; decryptFailed: boolean } {
+function resolveGitHubTokenForRequest(
+  req: import('express').Request,
+): { token: string | null; decryptFailed: boolean; scopeRequired?: boolean } {
   const db = getDb();
   const explicitAccountId = extractRequestedAccountId(req);
-  const accountId = resolveAccountScope(req, db);
+  const scope = resolveWritableAccountScope(req, db);
+  if (!scope.ok) {
+    return { token: null, decryptFailed: false, scopeRequired: true };
+  }
+  const accountId = scope.accountId;
+
+  const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as
+    | { value: string | null }
+    | undefined;
+
   if (accountId !== 'default') {
     const accountSetting = db
       .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
@@ -63,15 +63,11 @@ function resolveGitHubTokenForRequest(req: import('express').Request): { token: 
     // 认领标记只证明存量数据归属；全局 Token 若已换绑其他账号，其密文
     // 与身份校验时绑定的那份不再一致，此时不得复用它。
     const boundToken = getLegacyDefaultVerifiedToken(db);
-    const currentGlobal = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as
-      | { value: string | null }
-      | undefined;
-    if (!boundToken || currentGlobal?.value !== boundToken) {
+    if (!boundToken || tokenRow?.value !== boundToken) {
       return { token: null, decryptFailed: false };
     }
   }
 
-  const tokenRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('github_token') as { value: string } | undefined;
   if (!tokenRow?.value) {
     return { token: null, decryptFailed: false };
   }
@@ -80,6 +76,25 @@ function resolveGitHubTokenForRequest(req: import('express').Request): { token: 
   } catch {
     return { token: null, decryptFailed: true };
   }
+}
+
+function requireGitHubTokenForProxy(
+  req: import('express').Request,
+  res: import('express').Response,
+): string | null {
+  const tokenResult = resolveGitHubTokenForRequest(req);
+  if (tokenResult.token) return tokenResult.token;
+  if (tokenResult.scopeRequired) {
+    res.status(409).json({
+      error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+      code: 'ACCOUNT_SCOPE_REQUIRED',
+    });
+  } else if (tokenResult.decryptFailed) {
+    res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
+  } else {
+    res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
+  }
+  return null;
 }
 
 function getProxyConfig(): ProxyConfig | null {
@@ -208,16 +223,8 @@ router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
     }
     
     // Read and decrypt GitHub token from the current account scope (with global fallback)
-    const tokenResult = resolveGitHubTokenForRequest(req);
-    if (!tokenResult.token) {
-      if (tokenResult.decryptFailed) {
-        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      } else {
-        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
-      }
-      return;
-    }
-    const token = tokenResult.token;
+    const token = requireGitHubTokenForProxy(req, res);
+    if (!token) return;
 
     const cleanPath = githubPath.replace(/^\/+/, '');
     const safeSegments = cleanPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
@@ -276,16 +283,8 @@ router.post(/^\/api\/proxy\/github\/(.*)/, async (req, res) => {
 // Used for fetching individual gist file content (raw_url) when the gist API marks files as truncated.
 router.post('/api/proxy/github-raw', async (req, res) => {
   try {
-    const tokenResult = resolveGitHubTokenForRequest(req);
-    if (!tokenResult.token) {
-      if (tokenResult.decryptFailed) {
-        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      } else {
-        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
-      }
-      return;
-    }
-    const token = tokenResult.token;
+    const token = requireGitHubTokenForProxy(req, res);
+    if (!token) return;
 
     const body = req.body as { url?: string; method?: string; headers?: Record<string, string> };
     if (!body.url || typeof body.url !== 'string') {
@@ -588,16 +587,8 @@ router.post('/api/proxy/github/search/repositories', async (req, res) => {
     const githubPath = 'search/repositories';
     const { query_params } = req.body as { query_params?: Record<string, string> };
 
-    const tokenResult = resolveGitHubTokenForRequest(req);
-    if (!tokenResult.token) {
-      if (tokenResult.decryptFailed) {
-        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      } else {
-        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
-      }
-      return;
-    }
-    const token = tokenResult.token;
+    const token = requireGitHubTokenForProxy(req, res);
+    if (!token) return;
 
     const queryString = query_params ? '?' + new URLSearchParams(query_params).toString() : '';
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;
@@ -625,16 +616,8 @@ router.post('/api/proxy/github/search/users', async (req, res) => {
     const githubPath = 'search/users';
     const { query_params } = req.body as { query_params?: Record<string, string> };
 
-    const tokenResult = resolveGitHubTokenForRequest(req);
-    if (!tokenResult.token) {
-      if (tokenResult.decryptFailed) {
-        res.status(500).json({ error: 'Failed to decrypt GitHub token', code: 'GITHUB_TOKEN_DECRYPT_FAILED' });
-      } else {
-        res.status(400).json({ error: 'GitHub token not configured', code: 'GITHUB_TOKEN_NOT_CONFIGURED' });
-      }
-      return;
-    }
-    const token = tokenResult.token;
+    const token = requireGitHubTokenForProxy(req, res);
+    if (!token) return;
 
     const queryString = query_params ? '?' + new URLSearchParams(query_params).toString() : '';
     const targetUrl = `https://api.github.com/${githubPath}${queryString}`;

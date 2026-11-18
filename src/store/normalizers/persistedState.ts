@@ -91,11 +91,14 @@ export const normalizePersistedState = (
 
   // Effective auth: persisted values win; the synchronous localStorage mirror
   // back-fills when the IndexedDB snapshot lost them (asynchronous unload write).
+  // Only pair persisted user with mirror token when both belong to the same account.
   const resolvedUser = safePersisted.user ?? authMirror?.user ?? null;
+  const mirrorMatchesPersistedUser = !safePersisted.user
+    || (!!authMirror?.user && accountIdKey(authMirror.user) === accountIdKey(safePersisted.user));
   const resolvedGithubToken =
     typeof safePersisted.githubToken === 'string'
       ? safePersisted.githubToken
-      : (authMirror?.githubToken ?? null);
+      : (mirrorMatchesPersistedUser ? (authMirror?.githubToken ?? null) : null);
   const resolvedBackendApiSecret =
     typeof safePersisted.backendApiSecret === 'string'
       ? (safePersisted.backendApiSecret || null)
@@ -148,21 +151,31 @@ export const normalizePersistedState = (
 
   const normalizedAssetFilters = normalizeAssetFilters(safePersisted.assetFilters);
 
-  // savedAccounts：规整化后，若存在有效登录态（user + token），确保当前账号
-  // 也登记在 savedAccounts 中（旧版本升级无 v18 迁移路径时的兜底）。
-  const normalizedSavedAccounts = normalizeSavedAccounts(
+  // savedAccounts：规整化后，仅在对应账号记录缺失时才从当前会话补录，
+  // 避免覆盖从备份恢复的 PAT；补录前先复制映射，保持原映射引用不被就地修改。
+  const baseSavedAccounts = normalizeSavedAccounts(
     (safePersisted as Record<string, unknown>).savedAccounts,
   );
   const resolvedAccountId = accountIdKey(resolvedUser);
-  if (resolvedAccountId && resolvedUser && typeof resolvedGithubToken === 'string' && resolvedGithubToken) {
-    normalizedSavedAccounts[resolvedAccountId] = {
-      accountId: resolvedAccountId,
-      user: resolvedUser,
-      githubToken: resolvedGithubToken,
-      addedAt: normalizedSavedAccounts[resolvedAccountId]?.addedAt ?? new Date().toISOString(),
-      lastUsedAt: normalizedSavedAccounts[resolvedAccountId]?.lastUsedAt ?? new Date().toISOString(),
-    };
-  }
+  const needsBackfill = Boolean(
+    resolvedAccountId
+    && resolvedUser
+    && typeof resolvedGithubToken === 'string'
+    && resolvedGithubToken
+    && !baseSavedAccounts[resolvedAccountId],
+  );
+  const normalizedSavedAccounts = needsBackfill && resolvedAccountId && resolvedUser && resolvedGithubToken
+    ? {
+        ...baseSavedAccounts,
+        [resolvedAccountId]: {
+          accountId: resolvedAccountId,
+          user: resolvedUser,
+          githubToken: resolvedGithubToken,
+          addedAt: new Date().toISOString(),
+          lastUsedAt: new Date().toISOString(),
+        },
+      }
+    : baseSavedAccounts;
 
   return {
     ...currentState,

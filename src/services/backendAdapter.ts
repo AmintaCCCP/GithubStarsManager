@@ -44,7 +44,9 @@ export const isValidBackendRestoreAccount = (
     && record.githubToken.trim().length > 0
     && !!record.user
     && typeof record.user.id === 'number'
-    && !!record.user.login;
+    && String(record.user.id) === record.accountId
+    && typeof record.user.login === 'string'
+    && record.user.login.trim().length > 0;
 };
 
 export interface BackendAuthRestore {
@@ -523,12 +525,14 @@ class BackendAdapter {
   async listRepositoryReadmeCandidates(owner: string, repo: string, defaultBranch?: string, signal?: AbortSignal): Promise<GitHubReadmeCandidateItem[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    // 一次操作内的多次代理读取必须固定同一个账号：默认分支/tree/根目录分别
-    // 读取 Store 会在切号后把 A 响应里的分支拿去问 B 的分区（私有库变空）。
+    // 一次操作内的多次代理读取必须固定同一个账号与后端地址：默认分支/tree/根目录
+    // 分别读取 Store 会在切号或切换后端后把旧凭据发往新地址或新分区。
+    const backendUrl = this._backendUrl;
     const headers = this.getAuthHeaders();
 
     const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
-      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/contents`, {
+      if (this._backendUrl !== backendUrl) return [];
+      const res = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}/contents`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ method: 'GET' }),
@@ -542,7 +546,8 @@ class BackendAdapter {
     let branch = defaultBranch;
     if (!branch) {
       try {
-        const repoRes = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}`, {
+        if (this._backendUrl !== backendUrl) return [];
+        const repoRes = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ method: 'GET' }),
@@ -566,7 +571,8 @@ class BackendAdapter {
     }
 
     try {
-      const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
+      if (this._backendUrl !== backendUrl) return [];
+      const res = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ method: 'GET' }),

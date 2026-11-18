@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { isHeaderlessFullSyncSafe, resolveAccountScope } from '../db/accountScope.js';
+import { resolveAccountScope, resolveWritableAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -119,7 +119,6 @@ router.get('/api/repositories', (req, res) => {
 router.put('/api/repositories', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
     const { repositories } = req.body as { repositories: Record<string, unknown>[] };
     if (!Array.isArray(repositories)) {
       res.status(400).json({ error: 'repositories array required', code: 'REPOSITORIES_ARRAY_REQUIRED' });
@@ -130,13 +129,15 @@ router.put('/api/repositories', (req, res) => {
     // 回退到全局 active_account_id 会把它账号的快照写进当前活跃分区——全量写入
     // 会物理删除缺项，增量 UPSERT 也会覆盖另一账号同 ID 仓库的自定义字段。
     // 两种情况都必须拒绝。
-    if (!isHeaderlessFullSyncSafe(db, req)) {
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
       res.status(409).json({
         error: 'X-GitHub-Account-Id is required when multiple accounts exist',
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
     }
+    const accountId = scope.accountId;
 
     // 验证每个仓库的ID
     for (const repo of repositories) {
@@ -211,6 +212,7 @@ router.put('/api/repositories', (req, res) => {
           ELSE COALESCE((
             SELECT other.ai_summary FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             LIMIT 1
           ), repositories.ai_summary)
@@ -221,6 +223,7 @@ router.put('/api/repositories', (req, res) => {
           ELSE COALESCE((
             SELECT other.ai_tags FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
             LIMIT 1
           ), repositories.ai_tags)
@@ -231,6 +234,7 @@ router.put('/api/repositories', (req, res) => {
           ELSE COALESCE((
             SELECT other.ai_platforms FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
             LIMIT 1
           ), repositories.ai_platforms)
@@ -241,6 +245,7 @@ router.put('/api/repositories', (req, res) => {
           ELSE COALESCE((
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), repositories.analyzed_at)
@@ -284,6 +289,7 @@ router.put('/api/repositories', (req, res) => {
           WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE((
             SELECT other.ai_summary FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default'
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             LIMIT 1
           ), ai_summary)
@@ -292,6 +298,7 @@ router.put('/api/repositories', (req, res) => {
           WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE((
             SELECT other.ai_tags FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default'
               AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
             LIMIT 1
           ), ai_tags)
@@ -300,6 +307,7 @@ router.put('/api/repositories', (req, res) => {
           WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE((
             SELECT other.ai_platforms FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default'
               AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
             LIMIT 1
           ), ai_platforms)
@@ -308,11 +316,12 @@ router.put('/api/repositories', (req, res) => {
           WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE((
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
+              AND other.account_id != 'default'
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), analyzed_at)
           ELSE analyzed_at END
-      WHERE account_id = ? AND (
+      WHERE account_id = ? AND account_id != 'default' AND (
         ai_summary IS NULL OR ai_summary = ''
         OR ai_tags IS NULL OR ai_tags = '[]'
         OR ai_platforms IS NULL OR ai_platforms = '[]'
@@ -391,7 +400,15 @@ router.put('/api/repositories', (req, res) => {
 router.patch('/api/repositories/:id', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const id = parseInt(req.params.id);
     const updates = req.body as Record<string, unknown>;
 
@@ -478,7 +495,15 @@ router.delete('/api/repositories/:id', (req, res) => {
     }
 
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const deleteReleases = db.prepare('DELETE FROM releases WHERE account_id = ? AND repo_id = ?');
     const deleteRepo = db.prepare('DELETE FROM repositories WHERE account_id = ? AND id = ?');
 

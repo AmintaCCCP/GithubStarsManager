@@ -3,11 +3,9 @@ import { useAppStore } from '../../../store/useAppStore';
 import { accountIdKey, applyAccountWorkspace } from '../../../store/helpers/accountWorkspace';
 import { backend, isValidBackendRestoreAccount } from '../../../services/backendAdapter';
 import {
-  consumePendingAccountSync,
   hasPendingAccountSync,
   markPendingAccountSync,
   prepareForAccountSwitch,
-  rebindPendingAccountSyncToCurrentBackend,
   schedulePendingAccountSyncRetry,
   syncFromBackend,
   syncToBackend,
@@ -125,11 +123,9 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       console.warn('Failed to align account settings on backend:', error);
     }
     try {
-      // 冲刷失败遗留：先补推本地工作区（推送失败时标志置回，非强制拉取会被
-      // 跳过，后端旧快照无法覆盖本地修改），成功后再拉取后端。
-      if (consumePendingAccountSync(accountId)) {
-        // 推送本身会先做非破坏性对账（把远端新增仓库并入本地再全量推送）；
-        // 失败时恢复账号级标记，重启后仍会补推。
+      // 冲刷失败遗留：先补推本地工作区（推送失败时保留持久待推标记，非强制拉取
+      // 会走合并分支；只有推送确认成功后才由 pushLatest 清除待推标记）。
+      if (hasPendingAccountSync(accountId)) {
         if (!await syncToBackend()) {
           markPendingAccountSync(accountId);
           schedulePendingAccountSyncRetry(accountId);
@@ -381,21 +377,20 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         if (backend.backendUrl !== previousBackendUrl) {
           try {
             await backend.init(previousBackendUrl ?? undefined);
+            if (previousBackendUrl && backend.backendUrl === previousBackendUrl) {
+              backend.rememberActiveUrl();
+            }
           } catch {
             // 复原连接探测失败时保持探测结果（本地模式或原 URL），不叠加新错误
           }
         }
         useAppStore.getState().setBackendApiSecret(previousSecret);
-        // 冻结窗口内的编辑在候选连接下记入待推集合（绑定候选 URL）；连接已
-        // 回滚，标记必须重新绑定到原后端，否则下方补推永远不会执行。
-        rebindPendingAccountSyncToCurrentBackend(currentAccountId);
         // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
         recoverParkedAccount(parkedAccountId);
-        // R4 审计修复：冻结窗口内的真实编辑已按归属账号记入待推集合（或
-        // 此前冲刷失败遗留的标记）。连接已复原到原后端、当前账号工作区已
-        // 就位——立即补推到正确分区；无编辑（无标记）时保持零推送。标记
-        // 保留不消费：本次补推失败时，下次进入该账号仍会先补推再拉取。
-        if (hasPendingAccountSync(currentAccountId)) {
+        // R4 审计修复：冻结窗口内的真实编辑已按原后端绑定记入待推集合（或
+        // 此前冲刷失败遗留的标记）。只有连接已成功复原到原后端时才立即补推；
+        // 若复原失败，标记仍保留绑定在原后端，绝不推往候选后端。
+        if (backend.backendUrl === previousBackendUrl && hasPendingAccountSync(currentAccountId)) {
           void syncToBackend();
         }
       }

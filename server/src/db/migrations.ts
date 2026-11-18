@@ -176,14 +176,24 @@ const migrations: Record<number, (db: Database.Database) => void> = {
 
         INSERT INTO categories_v4 (account_id, id, name, description, icon, keywords, color, sort_order, is_custom)
         -- v3 的 id 是可空 TEXT PRIMARY KEY（旧 POST /api/categories 不写 id）：
-        -- NULL 原样复制会撞 v4 的 NOT NULL 并让整个迁移回滚、后端无法启动。
-        SELECT 'default', COALESCE(id, 'legacy-category-' || rowid), name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
+        -- NULL 原样复制会撞 v4 的 NOT NULL 并让整个迁移回滚、后端无法启动；
+        -- 追加随机后缀避免与已有 legacy-category-* 冲突。
+        SELECT 'default', COALESCE(id, 'legacy-category-' || rowid || '-' || lower(hex(randomblob(8)))), name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
         FROM categories;
 
         DROP TABLE categories;
         ALTER TABLE categories_v4 RENAME TO categories;
       `);
     }
+
+    // 固化 v4 迁移时刻的存量全局 github_token，避免后续无头客户端覆盖 settings.github_token
+    // 后被误用于判定存量 default 数据的归属。
+    db.exec(`
+      INSERT OR IGNORE INTO settings (key, value)
+      SELECT 'legacy_default_github_token', value
+      FROM settings
+      WHERE key = 'github_token' AND value IS NOT NULL AND value != '';
+    `);
   },
   5: (db) => {
     // 跨账号 AI 成果回填子查询按纯 id 条件检索捐赠行（account_id != ?），

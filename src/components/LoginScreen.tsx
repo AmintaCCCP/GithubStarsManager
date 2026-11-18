@@ -1,5 +1,5 @@
 import { useT } from "../i18n/useT";
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, Database, Key, Link, Loader2, Moon, Sun } from 'lucide-react';
 import { Github } from './ui/brand-icons';
 import { useAppStore } from '../store/useAppStore';
@@ -79,12 +79,14 @@ function LoginCardPattern() {
 }
 
 export const LoginScreen: React.FC = () => {
-  const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend, getBackendUrl, rollbackBackendConnection } = useLoginActions();
+  const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend, getBackendUrl, rollbackBackendConnection, runWithBackendRestoreFrozen } = useLoginActions();
   const { switchToAccount, parkCurrentAccountForRestore } = useAccountSwitchActions();
   const githubTokenInputRef = useRef<HTMLInputElement | null>(null);
   const [loginMode, setLoginMode] = useState<'github' | 'backend'>('github');
   const [backendStep, setBackendStep] = useState<'credentials' | 'githubToken'>('credentials');
   const [tokenSetupReason, setTokenSetupReason] = useState<'missing' | 'invalid'>('missing');
+  const [reauthAccountId, setReauthAccountId] = useState<string | null>(null);
+  const [pendingFocusGithubToken, setPendingFocusGithubToken] = useState(false);
   const [token, setToken] = useState('');
   const [backendUrl, setBackendUrl] = useState(() => {
     if (configuredBackendUrl) return configuredBackendUrl.replace(/\/api$/, '');
@@ -149,16 +151,30 @@ export const LoginScreen: React.FC = () => {
     .filter(account => !!account?.user)
     .sort((a, b) => (a.lastUsedAt < b.lastUsedAt ? 1 : a.lastUsedAt > b.lastUsedAt ? -1 : 0));
 
+  useEffect(() => {
+    if (pendingFocusGithubToken && loginMode === 'github') {
+      githubTokenInputRef.current?.focus();
+      setPendingFocusGithubToken(false);
+    }
+  }, [pendingFocusGithubToken, loginMode]);
+
   const handleQuickSignIn = async (accountId: string, hasToken: boolean) => {
+    if (backendStep === 'githubToken') return;
     if (!hasToken) {
-      // Token 缺失（如导入脱敏备份）：聚焦 Token 输入框重新授权
+      // Token 缺失（如导入脱敏备份）：记录待补授权账号 ID，切到 GitHub 模式后聚焦输入框
+      setReauthAccountId(accountId);
       setLoginMode('github');
       setBackendStep('credentials');
       setTokenSetupReason('missing');
       setError(t('loginScreen.token-required'));
-      githubTokenInputRef.current?.focus();
+      if (loginMode === 'github') {
+        githubTokenInputRef.current?.focus();
+      } else {
+        setPendingFocusGithubToken(true);
+      }
       return;
     }
+    setReauthAccountId(null);
     setIsLoading(true);
     setError('');
     try {
@@ -179,6 +195,7 @@ export const LoginScreen: React.FC = () => {
   };
 
   const switchLoginMode = (mode: 'github' | 'backend') => {
+    setReauthAccountId(null);
     setLoginMode(mode);
     setBackendStep('credentials');
     setTokenSetupReason('missing');
@@ -196,6 +213,12 @@ export const LoginScreen: React.FC = () => {
 
     try {
       const user = await authenticateWithGitHub(token);
+      if (reauthAccountId && accountIdKey(user) !== reauthAccountId) {
+        const expectedAccount = savedAccounts?.[reauthAccountId];
+        setError(t('app:accountModal.account-mismatch', { login: expectedAccount?.user.login ?? reauthAccountId }));
+        return;
+      }
+      setReauthAccountId(null);
       // R2 防护（Issue #611 审计修复）：登录页可能仍保留已登录账号 A（持久化
       // user 但未认证的边缘态）。写入新凭证前必须先归档当前账号，否则
       // setGitHubToken 会以 A 为所有者把账号 B 的 Token 写进 savedAccounts[A]，
@@ -249,7 +272,7 @@ export const LoginScreen: React.FC = () => {
     // （已归档的旧账号数据安全，重新登录即可恢复）。
     let loginCommitted = false;
 
-    try {
+    const runConnect = async () => {
       // 登录页可能残留上一会话的账号头：候选后端必须按自身 active_account_id
       // 恢复，绝不能携带本机旧账号分区。
       const result = await restoreBackendSession(url, { omitAccountHeader: true });
@@ -333,6 +356,10 @@ export const LoginScreen: React.FC = () => {
         if (!isValidBackendRestoreAccount(account)) continue;
         upsertSavedAccount(account.user, account.githubToken);
       }
+    };
+
+    try {
+      await (runWithBackendRestoreFrozen ? runWithBackendRestoreFrozen(runConnect) : runConnect());
     } catch (error) {
       await rollbackBackendConnection(previousBackendUrl);
       setBackendApiSecret(previousApiSecret);
@@ -371,13 +398,40 @@ export const LoginScreen: React.FC = () => {
       // 归档失败无副作用：parked 快照会在该账号下次登录时自动恢复。
       parkCurrentAccountForRestore();
       const user = await setupBackendGitHubToken(githubToken);
+      const nextAccountId = accountIdKey(user);
+      const liveState = useAppStore.getState();
+      const parkedWorkspace = nextAccountId ? liveState.accountWorkspaces[nextAccountId] : undefined;
+      const currentWorkspace = {
+        repositories: liveState.repositories,
+        gists: liveState.gists,
+        starredGists: liveState.starredGists,
+        releases: liveState.releases,
+        forks: liveState.forks,
+        customCategories: liveState.customCategories,
+        categoryOrder: liveState.categoryOrder,
+        hiddenDefaultCategoryIds: liveState.hiddenDefaultCategoryIds,
+        defaultCategoryOverrides: liveState.defaultCategoryOverrides,
+        categoryListIdMap: liveState.categoryListIdMap,
+      };
+      const localHasData = workspaceHasData(currentWorkspace) || workspaceHasData(parkedWorkspace);
+      let overwrite = true;
+      if (localHasData) {
+        overwrite = await new Promise<boolean>((resolve) => {
+          conflictResolveRef.current = resolve;
+          setConflictDialogOpen(true);
+          setIsLoading(false);
+        });
+        setIsLoading(true);
+      }
       // 恢复拉取固定到已验证账号（Issue #611 审计修复）：先落登录态再拉取，
       // 全部拉取请求携带已验证账号的 X-GitHub-Account-Id，不回退到服务端全局
       // active_account_id 分区。
       setGitHubToken(githubToken);
       setUser(user);
       loginCommitted = true;
-      await syncBackendData();
+      if (overwrite) {
+        await syncBackendData();
+      }
     } catch (error) {
       if (loginCommitted) {
         // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。
@@ -496,7 +550,7 @@ export const LoginScreen: React.FC = () => {
                 <button
                   key={account.accountId}
                   type="button"
-                  disabled={isLoading}
+                  disabled={isLoading || backendStep === 'githubToken'}
                   onClick={() => void handleQuickSignIn(account.accountId, !!account.githubToken.trim())}
                   className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 >

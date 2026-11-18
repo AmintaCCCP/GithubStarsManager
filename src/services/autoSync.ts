@@ -88,6 +88,7 @@ export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<
   const previousBuffer = _frozenWindowEditAccounts;
   // 嵌套窗口共享最外层缓冲：只有最外层窗口退出时做缓冲分流
   const isOutermostWindow = !previousFrozen;
+  const originBackendUrl = backend.backendUrl ?? '';
   _isSwitchingAccount = true;
   _isAccountSwitchFrozen = true;
   // 冻结窗口内不再全程置簿记标记：guardSync 覆盖的簿记写入自带标记并自行
@@ -106,7 +107,7 @@ export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<
       const bufferedAccounts = _frozenWindowEditAccounts;
       _frozenWindowEditAccounts = previousBuffer;
       for (const accountId of bufferedAccounts) {
-        markPendingAccountSync(accountId);
+        markPendingAccountSync(accountId, originBackendUrl);
       }
     }
   }
@@ -237,6 +238,10 @@ function pushedRepoBaselineKey(accountId: string): string | null {
 // 推送失败后的退避重试（只在账号仍匹配时重试一次链）。
 let _pushRetryTimer: ReturnType<typeof setTimeout> | null = null;
 let _pushRetryDelay = 2000;
+let _syncGeneration = 0;
+let _lastReposHashKey = '';
+const _sessionDeletedRepoIds = new Map<string, Set<number>>();
+const _dirtySettingKeys = new Set<string>();
 const PUSH_RETRY_MAX_DELAY = 60_000;
 
 /** 记录某账号在本对齐会话内本地仓库列表曾非空（空列表全量推送豁免依据）。 */
@@ -329,18 +334,24 @@ const SWITCH_FLUSH_MAX_ATTEMPTS = 3;
 // 丢失会让普通拉取直接用后端旧快照覆盖未同步修改。
 const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
 
-// 值 = 产生待推状态的后端 URL（'' 表示旧版记录/未知）。待推修改只属于
-// 原后端：切到不同后端时绝不能把原工作区推过去。
-const loadPendingSyncAccounts = (): Map<string, string> => {
+function pendingSyncCompositeKey(accountId: string, backendUrl: string): string {
+  return `${backendUrl}\n${accountId}`;
+}
+
+// 值 = 产生待推状态的 { accountId, backendUrl }（'' 表示旧版记录/未知）。
+// 按 backendUrl + accountId 共同建索引，避免不同后端的待推记录互相覆盖。
+const loadPendingSyncAccounts = (): Map<string, { accountId: string; backendUrl: string }> => {
   try {
     const raw = localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    const entries = new Map<string, string>();
+    const entries = new Map<string, { accountId: string; backendUrl: string }>();
     if (!Array.isArray(parsed)) return entries;
     for (const item of parsed) {
-      if (typeof item === 'string') entries.set(item, '');
-      else if (Array.isArray(item) && typeof item[0] === 'string') {
-        entries.set(item[0], typeof item[1] === 'string' ? item[1] : '');
+      if (typeof item === 'string') {
+        entries.set(pendingSyncCompositeKey(item, ''), { accountId: item, backendUrl: '' });
+      } else if (Array.isArray(item) && typeof item[0] === 'string') {
+        const backendUrl = typeof item[1] === 'string' ? item[1] : '';
+        entries.set(pendingSyncCompositeKey(item[0], backendUrl), { accountId: item[0], backendUrl });
       }
     }
     return entries;
@@ -351,7 +362,10 @@ const loadPendingSyncAccounts = (): Map<string, string> => {
 
 const persistPendingSyncAccounts = (): void => {
   try {
-    localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([..._pendingSyncAccounts]));
+    localStorage.setItem(
+      PENDING_SYNC_ACCOUNTS_KEY,
+      JSON.stringify([..._pendingSyncAccounts.values()].map(({ accountId, backendUrl }) => [accountId, backendUrl])),
+    );
   } catch {
     // 存储不可用（隐私模式/配额）时退化为会话内标记
   }
@@ -360,27 +374,36 @@ const persistPendingSyncAccounts = (): void => {
 const _pendingSyncAccounts = loadPendingSyncAccounts();
 
 /** 记录账号级待推状态（补推成功前必须保留，跨重启持久化）。 */
-export function markPendingAccountSync(accountId: string): void {
-  const backendUrl = backend.backendUrl ?? '';
-  if (_pendingSyncAccounts.get(accountId) === backendUrl) return;
-  _pendingSyncAccounts.set(accountId, backendUrl);
+export function markPendingAccountSync(accountId: string, targetBackendUrl = backend.backendUrl ?? ''): void {
+  const key = pendingSyncCompositeKey(accountId, targetBackendUrl);
+  if (_pendingSyncAccounts.has(key)) return;
+  _pendingSyncAccounts.set(key, { accountId, backendUrl: targetBackendUrl });
   persistPendingSyncAccounts();
 }
 
-/** 补推确认成功后清除账号级待推标记（失败时保留，重启后仍会补推）。 */
-export function clearPendingAccountSync(accountId: string | null | undefined): void {
-  if (!accountId || !_pendingSyncAccounts.delete(accountId)) return;
-  persistPendingSyncAccounts();
+/** 补推确认成功后清除指定后端+账号的待推标记（失败时保留，重启后仍会补推）。 */
+export function clearPendingAccountSync(
+  accountId: string | null | undefined,
+  targetBackendUrl = backend.backendUrl ?? '',
+): void {
+  if (!accountId) return;
+  const removedExact = _pendingSyncAccounts.delete(pendingSyncCompositeKey(accountId, targetBackendUrl));
+  const removedLegacy = targetBackendUrl !== ''
+    ? _pendingSyncAccounts.delete(pendingSyncCompositeKey(accountId, ''))
+    : false;
+  if (removedExact || removedLegacy) {
+    persistPendingSyncAccounts();
+  }
 }
 
 /**
  * 是否存在指定账号尚未补推的本地修改（冲刷失败遗留）。
  */
 export function hasPendingAccountSync(accountId: string | null | undefined): boolean {
-  if (!accountId || !_pendingSyncAccounts.has(accountId)) return false;
-  const pendingBackend = _pendingSyncAccounts.get(accountId) ?? '';
-  // 旧版记录没有绑定后端：沿用旧语义，避免升级后丢失待推保护。
-  return !pendingBackend || pendingBackend === (backend.backendUrl ?? '');
+  if (!accountId) return false;
+  const currentBackend = backend.backendUrl ?? '';
+  return _pendingSyncAccounts.has(pendingSyncCompositeKey(accountId, currentBackend))
+    || _pendingSyncAccounts.has(pendingSyncCompositeKey(accountId, ''));
 }
 
 /**
@@ -388,11 +411,16 @@ export function hasPendingAccountSync(accountId: string | null | undefined): boo
  * 回滚意味着这些编辑属于原账号的原后端，绝不能在候选后端上补推。
  */
 export function rebindPendingAccountSyncToCurrentBackend(accountId: string | null | undefined): void {
-  if (!accountId || !_pendingSyncAccounts.has(accountId)) return;
+  if (!accountId) return;
   const backendUrl = backend.backendUrl ?? '';
-  if (_pendingSyncAccounts.get(accountId) === backendUrl) return;
-  _pendingSyncAccounts.set(accountId, backendUrl);
-  persistPendingSyncAccounts();
+  let changed = false;
+  for (const [key, entry] of [..._pendingSyncAccounts.entries()]) {
+    if (entry.accountId !== accountId || entry.backendUrl === backendUrl) continue;
+    _pendingSyncAccounts.delete(key);
+    _pendingSyncAccounts.set(pendingSyncCompositeKey(accountId, backendUrl), { accountId, backendUrl });
+    changed = true;
+  }
+  if (changed) persistPendingSyncAccounts();
 }
 
 /**
@@ -401,8 +429,7 @@ export function rebindPendingAccountSyncToCurrentBackend(accountId: string | nul
  */
 export function consumePendingAccountSync(accountId: string | null | undefined): boolean {
   if (!accountId || !hasPendingAccountSync(accountId)) return false;
-  _pendingSyncAccounts.delete(accountId);
-  persistPendingSyncAccounts();
+  clearPendingAccountSync(accountId);
   return true;
 }
 
@@ -520,12 +547,14 @@ if (typeof backend.registerBeforeInitHook === 'function') {
  */
 export function resetSyncHashes(): void {
   _lastHash.repos = '';
+  _lastReposHashKey = '';
   _lastHash.releases = '';
   _lastHash.ai = '';
   _lastHash.webdav = '';
   _lastHash.embedding = '';
   _lastHash.vectorSearch = '';
   _lastHash.settings = '';
+  _dirtySettingKeys.clear();
   _accountsSeenNonEmptyRepos.clear();
   _accountsObservedBackendRepos.clear();
   if (_pushRetryTimer) {
@@ -719,22 +748,26 @@ export async function syncLocalGitHubTokenToBackend(
  */
 function applyBackendSettings(settings: Record<string, unknown>, protectLocal = false): void {
   const state = useAppStore.getState();
-  const keepLocal = (backendValue: unknown, localValue: unknown): boolean => (
-    protectLocal && (backendValue === null || backendValue === undefined) && localValue != null
+  const isDirty = (key: string): boolean => protectLocal && _dirtySettingKeys.has(key);
+  const keepLocal = (key: string, backendValue: unknown, localValue: unknown): boolean => (
+    isDirty(key) || (protectLocal && (backendValue === null || backendValue === undefined) && localValue != null)
   );
-  if ((typeof settings.activeAIConfig === 'string' || settings.activeAIConfig === null)
-    && !keepLocal(settings.activeAIConfig, state.activeAIConfig)) {
+  if (!isDirty('activeAIConfig')
+    && (typeof settings.activeAIConfig === 'string' || settings.activeAIConfig === null)
+    && !keepLocal('activeAIConfig', settings.activeAIConfig, state.activeAIConfig)) {
     state.setActiveAIConfig(settings.activeAIConfig as string | null);
   }
-  if ((typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null)
-    && !keepLocal(settings.activeWebDAVConfig, state.activeWebDAVConfig)) {
+  if (!isDirty('activeWebDAVConfig')
+    && (typeof settings.activeWebDAVConfig === 'string' || settings.activeWebDAVConfig === null)
+    && !keepLocal('activeWebDAVConfig', settings.activeWebDAVConfig, state.activeWebDAVConfig)) {
     state.setActiveWebDAVConfig(settings.activeWebDAVConfig as string | null);
   }
-  if ((typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null)
-    && !keepLocal(settings.activeEmbeddingConfig, state.activeEmbeddingConfig)) {
+  if (!isDirty('activeEmbeddingConfig')
+    && (typeof settings.activeEmbeddingConfig === 'string' || settings.activeEmbeddingConfig === null)
+    && !keepLocal('activeEmbeddingConfig', settings.activeEmbeddingConfig, state.activeEmbeddingConfig)) {
     state.setActiveEmbeddingConfig(settings.activeEmbeddingConfig as string | null);
   }
-  if (Array.isArray(settings.hiddenDefaultCategoryIds)) {
+  if (!isDirty('hiddenDefaultCategoryIds') && Array.isArray(settings.hiddenDefaultCategoryIds)) {
     const skipEmpty = protectLocal
       && settings.hiddenDefaultCategoryIds.length === 0
       && (state.hiddenDefaultCategoryIds ?? []).length > 0;
@@ -753,23 +786,24 @@ function applyBackendSettings(settings: Record<string, unknown>, protectLocal = 
       }
     }
   }
-  if (Array.isArray(settings.categoryOrder)) {
+  if (!isDirty('categoryOrder') && Array.isArray(settings.categoryOrder)) {
     if (!(protectLocal && settings.categoryOrder.length === 0 && state.categoryOrder.length > 0)) {
       useAppStore.setState({ categoryOrder: settings.categoryOrder.filter((id): id is string => typeof id === 'string') });
     }
   }
-  if (Array.isArray(settings.customCategories)) {
+  if (!isDirty('customCategories') && Array.isArray(settings.customCategories)) {
     if (!(protectLocal && settings.customCategories.length === 0 && state.customCategories.length > 0)) {
       useAppStore.setState({ customCategories: settings.customCategories });
     }
   }
-  if (Array.isArray(settings.assetFilters)) {
+  if (!isDirty('assetFilters') && Array.isArray(settings.assetFilters)) {
     if (!(protectLocal && settings.assetFilters.length === 0 && Object.keys(state.assetFilters ?? {}).length > 0)) {
       useAppStore.setState({ assetFilters: normalizeAssetFilters(settings.assetFilters) });
     }
   }
   if (
-    settings.defaultCategoryOverrides !== null
+    !isDirty('defaultCategoryOverrides')
+    && settings.defaultCategoryOverrides !== null
     && typeof settings.defaultCategoryOverrides === 'object'
     && !Array.isArray(settings.defaultCategoryOverrides)
   ) {
@@ -780,13 +814,16 @@ function applyBackendSettings(settings: Record<string, unknown>, protectLocal = 
       });
     }
   }
-  if (settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object'
+  if (!isDirty('releaseSourceSettings')
+    && settings.releaseSourceSettings && typeof settings.releaseSourceSettings === 'object'
     && !(protectLocal
       && Object.keys(settings.releaseSourceSettings as object).length === 0
       && Object.keys(state.releaseSourceSettings ?? {}).length > 0)) {
     state.setReleaseSourceSettings(settings.releaseSourceSettings as typeof state.releaseSourceSettings);
   }
-  if (typeof settings.collapsedSidebarCategoryCount === 'number' && settings.collapsedSidebarCategoryCount >= 1) {
+  if (!isDirty('collapsedSidebarCategoryCount')
+    && typeof settings.collapsedSidebarCategoryCount === 'number'
+    && settings.collapsedSidebarCategoryCount >= 1) {
     useAppStore.setState({ collapsedSidebarCategoryCount: settings.collapsedSidebarCategoryCount });
   }
 }
@@ -796,7 +833,7 @@ function applyBackendSettings(settings: Record<string, unknown>, protectLocal = 
  * Backend-first strategy: backend data overwrites local data.
  * Silent: errors logged to console only.
  */
-export async function syncFromBackend(options: { force?: boolean } = {}): Promise<void> {
+export async function syncFromBackend(options: { force?: boolean; throwOnRepoFailure?: boolean } = {}): Promise<void> {
   if (!backend.isAvailable) return;
   const activeAccountId = accountIdKey(useAppStore.getState().user);
   // 无活跃账号（登录页/归档窗口）时请求头缺失，服务端会回退全局
@@ -843,8 +880,9 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
   try {
     const stateBeforeFetch = useAppStore.getState();
     const repositoriesBeforeFetch = stateBeforeFetch.repositories;
-    // 请求头在 fetch 调用时从 Store 读取：先取快照，fulfilled 后归属到同一账号。
+    // 请求头在 fetch 调用时从 Store 读取：先取快照，fulfilled 后归属到同一账号与后端。
     const fetchedAccountId = accountIdKey(stateBeforeFetch.user);
+    const fetchedBackendUrl = backend.backendUrl ?? '';
     const [reposResult, releasesResult, aiResult, webdavResult, embeddingResult, vectorSearchResult, settingsResult] = await Promise.allSettled([
       backend.fetchRepositories(),
       backend.fetchReleases(),
@@ -855,10 +893,22 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
       backend.fetchSettings(),
     ]);
 
-    // R5 审计修复（发现1）：仓库拉取成功即视为该账号的后端分区事实已被观察
-    // ——此后本地（哪怕仍为空）与后端对齐，空列表全量推送不再有清空风险。
-    // 必须在待推分支 return 之前记录，待推分支的排空推送依赖该豁免。
-    if (reposResult.status === 'fulfilled') {
+    if ((backend.backendUrl ?? '') !== fetchedBackendUrl) {
+      return;
+    }
+
+    if (options.throwOnRepoFailure && reposResult.status !== 'fulfilled') {
+      throw reposResult.reason instanceof Error
+        ? reposResult.reason
+        : new Error('Failed to fetch repositories from backend');
+    }
+
+    const reposComplete = reposResult.status === 'fulfilled'
+      && reposResult.value.repositories.length >= (reposResult.value.total ?? reposResult.value.repositories.length);
+
+    // R5 审计修复（发现1）：仓库拉取完整且成功即视为该账号的后端分区事实已被观察
+    // ——截断响应绝不能授权破坏性全量推送。
+    if (reposComplete) {
       markAccountBackendReposObserved(fetchedAccountId);
     }
 
@@ -870,12 +920,18 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     // otherwise it was deleted locally during the fetch and must stay
     // deleted — and is still absent from the store now.
     if (_hasPendingLocalChanges) {
-      if (reposResult.status === 'fulfilled') {
+      if (reposComplete) {
         const repositoriesNow = useAppStore.getState().repositories;
         const knownBeforeFetch = new Set(repositoriesBeforeFetch.map(repo => repo.id));
         const knownNow = new Set(repositoriesNow.map(repo => repo.id));
+        const baselineKey = fetchedAccountId ? pushedRepoBaselineKey(fetchedAccountId) : null;
+        const deletedBaseline = baselineKey ? _lastPushedRepoIds.get(baselineKey) : undefined;
+        const sessionDeleted = baselineKey ? _sessionDeletedRepoIds.get(baselineKey) : undefined;
         const arrivedRemotely = reposResult.value.repositories.filter(repo =>
-          !knownBeforeFetch.has(repo.id) && !knownNow.has(repo.id)
+          !knownBeforeFetch.has(repo.id)
+          && !knownNow.has(repo.id)
+          && !deletedBaseline?.has(repo.id)
+          && !sessionDeleted?.has(repo.id)
         );
         if (arrivedRemotely.length > 0) {
           useAppStore.getState().setRepositories([...repositoriesNow, ...arrivedRemotely]);
@@ -883,17 +939,16 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         // A completed fetch — an empty list included — proves the store is
         // complete against the server, so its queued push is safe to drain.
         _hasPendingPush = true;
+      } else if (fetchedAccountId) {
+        // 恢复持久待推标记后若仓库拉取失败/不完整，安排退避重试，避免后续轮询被永久跳过。
+        schedulePendingAccountSyncRetry(fetchedAccountId);
       }
       // 待推分支只跳过仓库快照，但设置同样来自后端：不应用就会用本地空值
-      // （如 customCategories）覆盖后端已有配置。
+      // （如 customCategories）覆盖后端已有配置；已编辑字段通过 protectLocal 保留。
       if (settingsResult.status === 'fulfilled') {
         applyBackendSettings(settingsResult.value, true);
         _lastHash.settings = quickHash(settingsResult.value);
       }
-      // A failed repositories fetch leaves the remote state unknown: the pull
-      // must not trigger a push of an unverified list, which would delete
-      // remotely arrived repositories. Pending local edits still sync through
-      // their own change-driven push once the backend is reachable.
       return;
     }
 
@@ -904,9 +959,10 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
 
     // Compute hashes for each slice — only mark changed if hash differs
     const hashes: Record<string, string> = {};
-    if (reposResult.status === 'fulfilled') {
+    const currentReposHashKey = `${fetchedBackendUrl}|${fetchedAccountId ?? ''}`;
+    if (reposComplete) {
       const hash = repositoryPayloadHash(reposResult.value.repositories);
-      if (options.force || hash !== _lastHash.repos) {
+      if (options.force || hash !== _lastHash.repos || currentReposHashKey !== _lastReposHashKey) {
         hashes.repos = hash;
         changed.repos = true;
       }
@@ -990,6 +1046,7 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
         // so hashing `merged` here made the next poll's backend hash differ
         // forever — re-applying setRepositories every poll cycle.
         _lastHash.repos = hashes.repos;
+        _lastReposHashKey = currentReposHashKey;
       }
     }
     if (changed.releases && releasesResult.status === 'fulfilled') {
@@ -1118,6 +1175,11 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
  * Queued callers wait for a push containing the latest local state.
  */
 export async function syncToBackend(): Promise<boolean> {
+  if (_isAccountSwitchFrozen) {
+    const id = accountIdKey(useAppStore.getState().user);
+    if (id) _frozenWindowEditAccounts.add(id);
+    return false;
+  }
   if (!backend.isAvailable) return true;
   if (_isSyncingFromBackendActive) {
     _hasPendingPush = true;
@@ -1130,19 +1192,26 @@ export async function syncToBackend(): Promise<boolean> {
   }
 
   const pushLatest = async (): Promise<boolean> => {
-    // 清除标记必须归属本次推送的账号：推送期间若会话已切走，不能误清新账号
-    // 的待推状态。
+    // 清除标记必须归属本次推送的账号与后端：推送期间若会话或后端已切走，
+    // 不能误清其他目标的待推状态。
     const pushAccountId = accountIdKey(useAppStore.getState().user);
+    const pushBackendUrl = backend.backendUrl ?? '';
     let succeeded = await pushToBackend();
     // Requests and edits arriving after the snapshot need a fresh push.
     // Failed writes stay pending for retry without an automatic retry loop.
     while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
+      if (_isAccountSwitchFrozen) break;
       succeeded = await pushToBackend();
     }
-    // 只有确认最新状态已全部落盘才清除账号级待推标记：推送期间的新编辑
-    // 会在循环里再推一次，最后一轮失败时标记必须保留。
-    if (succeeded && !_hasPendingLocalChanges && !_hasPendingPush) {
-      clearPendingAccountSync(pushAccountId);
+    // 只有确认最新状态已全部落盘且未切换目标才清除账号级待推标记：推送期间的
+    // 新编辑会在循环里再推一次，最后一轮失败时标记必须保留。
+    if (
+      succeeded
+      && !_hasPendingLocalChanges
+      && !_hasPendingPush
+      && (backend.backendUrl ?? '') === pushBackendUrl
+    ) {
+      clearPendingAccountSync(pushAccountId, pushBackendUrl);
     }
     return succeeded;
   };
@@ -1177,11 +1246,13 @@ async function reconcileBeforeDestructivePush(accountId: string): Promise<boolea
     markAccountBackendReposObserved(accountId);
     const local = useAppStore.getState().repositories;
     const localIds = new Set(local.map((repo) => repo.id));
-    // 上次成功推送后本地消失的仓库 = 用户显式删除，不得因远端仍有而复活。
+    // 上次成功推送后本地消失的仓库 + 本会话内本地删除的仓库 = 用户显式删除，
+    // 即使尚无历史基线，也不得因远端仍有而复活。
     const baselineKey = pushedRepoBaselineKey(accountId);
     const deletedLocally = baselineKey ? _lastPushedRepoIds.get(baselineKey) : undefined;
+    const sessionDeleted = baselineKey ? _sessionDeletedRepoIds.get(baselineKey) : undefined;
     const arrived = remote.repositories.filter((repo) => (
-      !localIds.has(repo.id) && !deletedLocally?.has(repo.id)
+      !localIds.has(repo.id) && !deletedLocally?.has(repo.id) && !sessionDeleted?.has(repo.id)
     ));
     if (arrived.length > 0) {
       useAppStore.getState().setRepositories([...local, ...arrived]);
@@ -1205,8 +1276,10 @@ export function schedulePendingAccountSyncRetry(accountId: string): void {
   const delay = _pushRetryDelay;
   _pushRetryDelay = Math.min(_pushRetryDelay * 2, PUSH_RETRY_MAX_DELAY);
   const expectedBackend = backend.backendUrl ?? '';
+  const expectedGeneration = _syncGeneration;
   _pushRetryTimer = setTimeout(() => {
     _pushRetryTimer = null;
+    if (_syncGeneration !== expectedGeneration) return;
     if (accountIdKey(useAppStore.getState().user) !== accountId) return;
     if ((backend.backendUrl ?? '') !== expectedBackend) return;
     _hasPendingLocalChanges = true;
@@ -1244,22 +1317,31 @@ async function pushToBackend(): Promise<boolean> {
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
   setRepositorySyncVisualState(true);
+  const pushGeneration = _syncGeneration;
   const pushStartTime = Date.now();
   try {
     const pushAccountId = accountIdKey(useAppStore.getState().user);
+    const pushBackendUrl = backend.backendUrl ?? '';
     // 无活跃账号时请求头缺失，服务端会回退全局 active_account_id——绝不能把
     // 无归属会话的列表写进任意分区；分区未被观察时也不允许破坏性全量推送。
     if (!pushAccountId || !(await reconcileBeforeDestructivePush(pushAccountId))) {
       _hasPendingPush = false;
       _hasPendingLocalChanges = true;
-      if (pushAccountId) schedulePendingAccountSyncRetry(pushAccountId);
+      if (pushAccountId && _syncGeneration === pushGeneration) {
+        schedulePendingAccountSyncRetry(pushAccountId);
+      }
+      return false;
+    }
+    if ((backend.backendUrl ?? '') !== pushBackendUrl) {
+      _hasPendingLocalChanges = true;
       return false;
     }
     const state = useAppStore.getState();
     // 仓库分片未变化（例如只改了设置）时不要发送 isFullSync 全量快照：
     // 陈旧快照会删除其他设备在该分区新增的仓库。
     const reposHash = repositoryPayloadHash(state.repositories);
-    const reposUnchanged = reposHash === _lastHash.repos;
+    const currentReposHashKey = `${pushBackendUrl}|${pushAccountId}`;
+    const reposUnchanged = reposHash === _lastHash.repos && currentReposHashKey === _lastReposHashKey;
     const skipped = Symbol('skipped');
 
     const results = await Promise.allSettled([
@@ -1299,9 +1381,11 @@ async function pushToBackend(): Promise<boolean> {
     // projection and doesn't re-apply setRepositories after a push.
     if (reposSync.status === 'fulfilled' && reposSync.value !== skipped) {
       _lastHash.repos = reposHash;
+      _lastReposHashKey = currentReposHashKey;
       const baselineKey = pushedRepoBaselineKey(pushAccountId);
       if (baselineKey) {
         _lastPushedRepoIds.set(baselineKey, new Set(state.repositories.map((repo) => repo.id)));
+        _sessionDeletedRepoIds.delete(baselineKey);
         persistPushedRepoIds();
       }
     }
@@ -1311,6 +1395,7 @@ async function pushToBackend(): Promise<boolean> {
     if (embeddingSync.status === 'fulfilled') _lastHash.embedding = quickHash(state.embeddingConfigs);
     if (vectorSearchSync.status === 'fulfilled') _lastHash.vectorSearch = vectorSearchFingerprint(state.vectorSearchConfig);
     if (settingsSync.status === 'fulfilled') {
+      _dirtySettingKeys.clear();
       _lastHash.settings = quickHash({
         activeAIConfig: state.activeAIConfig,
         activeWebDAVConfig: state.activeWebDAVConfig,
@@ -1361,6 +1446,7 @@ export async function forceSyncToBackend(options: { reportFailures?: boolean } =
  * Returns an unsubscribe function for cleanup.
  */
 export function startAutoSync(): () => void {
+  _syncGeneration += 1;
   // Guard: if already running, stop previous instance first
   if (_storeUnsubscribe) {
     _storeUnsubscribe();
@@ -1434,6 +1520,35 @@ export function startAutoSync(): () => void {
 
     if (!changed) return;
 
+    // 同一账号下本地明确删除的仓库（即使尚无历史基线），在对齐合并时绝不复活。
+    const activeId = accountIdKey(state.user);
+    if (activeId && activeId === accountIdKey(prevState.user) && state.repositories !== prevState.repositories) {
+      const nextIds = new Set(state.repositories.map((r) => r.id));
+      const baselineKey = pushedRepoBaselineKey(activeId);
+      if (baselineKey) {
+        for (const prevRepo of prevState.repositories) {
+          if (!nextIds.has(prevRepo.id)) {
+            let deletedSet = _sessionDeletedRepoIds.get(baselineKey);
+            if (!deletedSet) {
+              deletedSet = new Set();
+              _sessionDeletedRepoIds.set(baselineKey, deletedSet);
+            }
+            deletedSet.add(prevRepo.id);
+          }
+        }
+      }
+    }
+    if (state.activeAIConfig !== prevState.activeAIConfig) _dirtySettingKeys.add('activeAIConfig');
+    if (state.activeWebDAVConfig !== prevState.activeWebDAVConfig) _dirtySettingKeys.add('activeWebDAVConfig');
+    if (state.activeEmbeddingConfig !== prevState.activeEmbeddingConfig) _dirtySettingKeys.add('activeEmbeddingConfig');
+    if (state.hiddenDefaultCategoryIds !== prevState.hiddenDefaultCategoryIds) _dirtySettingKeys.add('hiddenDefaultCategoryIds');
+    if (state.categoryOrder !== prevState.categoryOrder) _dirtySettingKeys.add('categoryOrder');
+    if (state.customCategories !== prevState.customCategories) _dirtySettingKeys.add('customCategories');
+    if (state.assetFilters !== prevState.assetFilters) _dirtySettingKeys.add('assetFilters');
+    if (state.defaultCategoryOverrides !== prevState.defaultCategoryOverrides) _dirtySettingKeys.add('defaultCategoryOverrides');
+    if (state.releaseSourceSettings !== prevState.releaseSourceSettings) _dirtySettingKeys.add('releaseSourceSettings');
+    if (state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount) _dirtySettingKeys.add('collapsedSidebarCategoryCount');
+
     _hasPendingLocalChanges = true;
 
     // Debounce: wait 2s after last change before pushing
@@ -1462,6 +1577,7 @@ export function startAutoSync(): () => void {
  * Stop auto-sync: clear debounce timer and unsubscribe from store.
  */
 export function stopAutoSync(unsubscribe: () => void): void {
+  _syncGeneration += 1;
   if (_pushRetryTimer) {
     clearTimeout(_pushRetryTimer);
     _pushRetryTimer = null;

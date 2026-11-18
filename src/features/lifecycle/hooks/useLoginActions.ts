@@ -3,7 +3,7 @@ import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { backend, isValidBackendRestoreAccount, type BackendAuthRestoreAccount } from '../../../services/backendAdapter';
-import { syncFromBackend } from '../../../services/autoSync';
+import { syncFromBackend, withAccountSwitchFrozen } from '../../../services/autoSync';
 import { accountIdKey } from '../../../store/helpers/accountWorkspace';
 import type { GitHubUser } from '../../../types';
 
@@ -37,6 +37,8 @@ export interface LoginActions {
   getBackendUrl: () => string | null;
   /** 把后端 URL 复原到候选连接之前的值（密钥由调用方成对恢复）。 */
   rollbackBackendConnection: (url: string | null) => Promise<void>;
+  /** 在候选后端恢复期间冻结自动同步与推送窗口。 */
+  runWithBackendRestoreFrozen?: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
 export const useLoginActions = (): LoginActions => {
@@ -125,7 +127,7 @@ export const useLoginActions = (): LoginActions => {
     return user;
   }, [authenticateWithGitHub]);
   const syncBackendData = useCallback(async () => {
-    await syncFromBackend({ force: true });
+    await syncFromBackend({ force: true, throwOnRepoFailure: true });
   }, []);
 
   const getBackendUrl = useCallback(() => backend.backendUrl, []);
@@ -147,5 +149,6 @@ export const useLoginActions = (): LoginActions => {
     syncBackendData,
     getBackendUrl,
     rollbackBackendConnection,
+    runWithBackendRestoreFrozen: withAccountSwitchFrozen,
   };
 };

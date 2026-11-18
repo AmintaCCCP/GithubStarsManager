@@ -135,6 +135,7 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     let queries = 0;
     const env = {
       AUTH_TOKEN: 'worker-token',
+      ACCOUNT_METADATA_INDEXED: 'true',
       VECTORIZE: {
         describe: async () => ({ vectorCount: indexIds.length, dimensions: 3 }),
         query: async () => {

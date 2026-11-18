@@ -346,9 +346,10 @@ export class VectorSearchService {
    *
    * R5 审计修复：多账号共享同一 VECTORIZE 索引时必须携带账号范围——
    * `accountPrefix` 限定只删除当前账号前缀的向量（其他设备/其他账号的向量
-   * 一律保留）；`includeLegacy` 仅在本机单账号、legacy 无前缀向量归属明确时
-   * 传 true。两者都缺省时请求体与旧版客户端一致，Worker 保持旧行为：只删除
-   * keepIds 之外的纯数字 legacy ID，带账号前缀的向量一律保留。
+   * 一律保留）；`includeLegacy` 默认应为 `false`，本机仅有一个已保存账号不足以
+   * 证明共享索引中无前缀 legacy 向量的归属，只有独立确认归属后才可传入 true。
+   * 两者都缺省时请求体与旧版客户端一致，Worker 保持旧行为：只删除 keepIds
+   * 之外的纯数字 legacy ID，带账号前缀的向量一律保留。
    * 兼容旧签名 cleanup(keepIds, signal)。
    */
   async cleanup(keepIds: string[], options: VectorCleanupOptions | AbortSignal = {}): Promise<{ deleted: number; partial?: boolean }> {

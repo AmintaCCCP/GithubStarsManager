@@ -59,10 +59,20 @@ export default {
         }
         // returnMetadata:'all' caps topK at 50; clamp to avoid silent truncation
         const clampedTopK = Math.min(topK, 50);
-        // 账号过滤必须先于 topK 生效，避免其他账号的向量占满候选名额。
-        const accountFilter = typeof accountId === 'string' && accountId.length > 0
-          ? { accountId }
-          : undefined;
+        // 账号过滤必须先于 topK 生效，避免其他账号的向量占满候选名额；
+        // 若 accountId 元数据索引尚未就绪，拒绝按账号过滤的查询。
+        const requestedAccountId = typeof accountId === 'string' && accountId.length > 0 ? accountId : null;
+        if (requestedAccountId && env.ACCOUNT_METADATA_INDEXED !== 'true') {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'accountId metadata index is not ready (ACCOUNT_METADATA_INDEXED != true)',
+              code: 'ACCOUNT_METADATA_NOT_INDEXED',
+            },
+            400,
+          );
+        }
+        const accountFilter = requestedAccountId ? { accountId: requestedAccountId } : undefined;
         const matches = await env.VECTORIZE.query(vector, {
           topK: clampedTopK,
           returnMetadata: 'all',
@@ -89,21 +99,27 @@ export default {
       // - accountPrefix：只允许删除该账号前缀的向量，其他账号前缀的向量一律保留；
       // - includeLegacy：单租户时代的 legacy 无前缀向量属于唯一所有者，仅在
       //   请求显式携带 includeLegacy=true 时才允许删除；
-      // - 两个参数都不携带时保持旧行为（删除全部不在 keepIds 中的向量），
-      //   旧版客户端不受影响。
+      // - 两个参数都不携带时保持旧行为：只删除采样结果中不在 keepIds 且 ID 为
+      //   纯数字的 legacy 向量，带账号前缀的向量一律保留。
       if (request.method === 'POST' && url.pathname === '/cleanup') {
         const body = await request.json();
         const { keepIds } = body ?? {};
         if (!Array.isArray(keepIds)) {
           return jsonResponse({ success: false, error: 'keepIds array required' }, 400);
         }
-        const accountPrefix = typeof body.accountPrefix === 'string' && body.accountPrefix.length > 0
-          ? body.accountPrefix
-          : null;
+        if (body.accountPrefix !== undefined) {
+          if (typeof body.accountPrefix !== 'string' || !/^\d+$/.test(body.accountPrefix.trim())) {
+            return jsonResponse({ success: false, error: 'accountPrefix must be a numeric account id string' }, 400);
+          }
+        }
+        if (body.includeLegacy !== undefined && typeof body.includeLegacy !== 'boolean') {
+          return jsonResponse({ success: false, error: 'includeLegacy must be a boolean' }, 400);
+        }
+        const accountPrefix = typeof body.accountPrefix === 'string' ? body.accountPrefix.trim() : null;
         const includeLegacy = body.includeLegacy === true;
         // 新客户端总是显式携带范围参数；accountPrefix 缺失但请求中出现
         // includeLegacy 时（未登录边缘态），legacy 向量成为唯一删除候选
-        const scoped = accountPrefix !== null || body.includeLegacy !== undefined;
+        const scoped = body.accountPrefix !== undefined || body.includeLegacy !== undefined;
         const prefix = accountPrefix !== null ? `${accountPrefix}:` : null;
         const isLegacyId = (id) => /^\d+$/.test(id);
         const keepSet = new Set(keepIds);
@@ -123,6 +139,16 @@ export default {
         const deletedIds = new Set();
         // 按前缀清理时用 metadata filter 收窄候选池（includeLegacy 时不能过滤）
         const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix } : undefined;
+        if (accountFilter && env.ACCOUNT_METADATA_INDEXED !== 'true') {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'accountId metadata index is not ready (ACCOUNT_METADATA_INDEXED != true)',
+              code: 'ACCOUNT_METADATA_NOT_INDEXED',
+            },
+            400,
+          );
+        }
         for (let round = 0; round < 10; round++) {
           // 随机向量采样：固定向量可能每轮命中同一批 keepIds，无法覆盖候选池
           const queryVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
@@ -145,7 +171,9 @@ export default {
           for (const match of unseen) seenIds.add(match.id);
           if (staleIds.length === 0) {
             if (unseen.length === 0) {
-              sampledAll = true;
+              if (seenIds.size >= (info.vectorCount ?? 0)) {
+                sampledAll = true;
+              }
               break;
             }
             continue;

@@ -6,7 +6,6 @@ import type { GistCreateInput, GistUpdateInput } from '../../../services/githubA
 import { useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
-  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
@@ -95,6 +94,7 @@ export const useGistActions = () => {
     // 账号代次校验（Issue #611）：AI 搜索等待期间切号后，旧账号的查询与结果
     // 绝不能写入新账号的搜索视图（含失败回退路径），沿用 refreshGists 的模式
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const aiService = new AIService(activeConfig, state.language);
       // 候选集不做分析状态预过滤：分析状态是视图层筛选，排序结果需覆盖两种状态，
@@ -104,7 +104,7 @@ export const useGistActions = () => {
         query,
       );
       // 账号已切换：跳过 onReranked 与全部搜索写入，丢弃旧账号结果
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       const currentState = useAppStore.getState();
       const filteredRanked = applyGistAnalysisFilter(
         ranked,
@@ -114,7 +114,7 @@ export const useGistActions = () => {
       currentState.setGistSearchFilters({ query });
       currentState.setGistSearchResults(filteredRanked);
     } catch {
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       state.setGistSearchFilters({ query });
     } finally {
       setIsSearching(false);
@@ -197,10 +197,11 @@ export const useGistActions = () => {
     // 账号代次校验（Issue #611 审计修复）：账号 ID 必须在任何 await 之前保存，
     // 提交结果前用保存值复核——请求完成后再读取会拿到切号后的账号，检查恒通过
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const detail = await createGitHubApiService(state.githubToken).getGist(gist.id, gist);
       // 详情拉取切号后丢弃：不写入当前工作区，也不向调用方返回旧账号详情
-      if (!isCurrentAccount(startedAccountId)) return null;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return null;
       state.updateGist(detail);
       return detail;
     } catch (error) {
@@ -219,21 +220,22 @@ export const useGistActions = () => {
     // 账号代次校验（Issue #611）：等待 GitHub API 期间切号后，本地写入与
     // 提示一律丢弃（远端操作已按发起账号的 Token 完成，不可撤销）
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     const api = createGitHubApiService(state.githubToken);
     try {
       if (editingGist) {
         const updated = await api.updateGist(editingGist.id, input as GistUpdateInput, editingGist);
-        if (!isCurrentAccount(startedAccountId)) return;
+        if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
         state.updateGist({ ...updated, last_edited: new Date().toISOString() });
         toast(t('useGistActions.gist-updated'), 'success');
         return;
       }
       const created = await api.createGist(input as GistCreateInput);
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       state.updateGist({ ...created, last_edited: new Date().toISOString() });
       toast(t('useGistActions.gist-created'), 'success');
     } catch (error) {
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       const message = error instanceof Error ? error.message : '';
       const isPermission = /403|404|forbidden|scope|permission/i.test(message);
       toast(
@@ -283,6 +285,7 @@ export const useGistActions = () => {
     try {
       const githubApi = createGitHubApiService(state.githubToken);
       const detail = await githubApi.getGistForAnalysis(gist.id, gist);
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       const aiService = new AIService(activeConfig, state.language);
       const summary = await aiService.analyzeGist(detail, githubApi.getGistContentPreview(detail));
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;

@@ -191,7 +191,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         // 会把旧账号的（可能陈旧/为空的）快照以新账号请求头 isFullSync 推送，
         // 删除新账号后端分区中不在快照里的数据。取消待推并静音订阅。
         cancelPendingAccountSwitchPush();
-        const switched = switchAccountWorkspace(current, previousAccountId, targetAccountId);
+        const switched = switchAccountWorkspace(current, previousAccountId, targetAccountId, { forceLoadTarget: true });
         const now = nowIso();
         const savedAccounts = {
           ...current.savedAccounts,

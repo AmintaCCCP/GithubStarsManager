@@ -107,7 +107,7 @@ describe('useVectorSearchActions', () => {
     // cleanup 范围约定（R5 发现 2）需要活跃账号上下文与新版 Worker 能力探针：
     // 真实重建流程总在已登录会话中执行
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
-    mocks.cleanup.mockResolvedValue(undefined);
+    mocks.cleanup.mockResolvedValue({ deleted: 0, partial: false });
     mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);
@@ -214,7 +214,7 @@ describe('useVectorSearchActions account switch guards', () => {
     )) as typeof useAppStore);
     Object.assign(mockUseAppStore, { getState: () => storeState });
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
-    mocks.cleanup.mockResolvedValue(undefined);
+    mocks.cleanup.mockResolvedValue({ deleted: 0, partial: false });
     mocks.vectorGetStatus.mockResolvedValue({ success: true, vectorCount: 0, dimensions: 1536, accountScopedCleanup: true });
     mocks.needsReindex.mockReset();
     mocks.needsReindex.mockReturnValue(false);

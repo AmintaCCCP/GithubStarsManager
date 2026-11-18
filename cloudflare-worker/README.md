@@ -68,15 +68,16 @@ npm run deploy
 ```
 
 > **多账号（Issue #611）**：若多个 GitHub 账号共享同一个 Vectorize 索引，
-> 请先创建 `accountId` 元数据索引，并把 `wrangler.toml` 中的
-> `ACCOUNT_METADATA_INDEXED` 改为 `"true"`：
+> 请按顺序完成以下步骤：
 >
-> ```bash
-> npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
-> ```
+> 1. 创建 `accountId` 元数据索引：
+>    ```bash
+>    npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
+>    ```
+> 2. 等待元数据索引生效后，在客户端为每个已登录账号重新生成/上传向量（回填 `accountId` 元数据；索引建立前写入的存量向量不会被该索引收录）。
+> 3. 将 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED` 改为 `"true"`，并重新执行 `npm run deploy` 部署 Worker 使配置生效。
 >
-> 未开启时 Worker 仍可查询/写入，但客户端会跳过「按账号范围清理」，
-> 避免在缺少索引时误删其他账号的向量。
+> 在 `accountId` 元数据索引就绪并启用 `ACCOUNT_METADATA_INDEXED = "true"` 之前，按账号过滤的向量查询会被 Worker 拒绝（客户端会降级为本地关键词/词法检索，且会跳过按账号范围清理），以避免在缺少索引时漏召回或混入其他账号的向量。
 
 部署成功后，Wrangler 会输出 Worker 的 URL，格式类似：
 ```text

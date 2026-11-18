@@ -840,47 +840,56 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         // 本机无该账号快照时以空工作区为基座
         const base = previous ?? emptyAccountWorkspace();
         const empty = emptyAccountWorkspace();
+        const includeRepos = selectedTypes.includes('repositories');
+        const includeReleases = selectedTypes.includes('releases');
+        const includeCategories = selectedTypes.includes('customCategories');
+        const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
         const archived: AccountWorkspace = archiveMode === 'merge'
           ? {
-              // merge：备份顶层数据按 id/并集并入，保留已合并的本机条目，
-              // 不得用备份顶层数组整体覆盖合并结果
+              // merge：只按本次恢复所选类型并入备份顶层数据，保留未选类型的本机数据
               ...mergeWorkspacesById(base, {
                 ...empty,
-                repositories: importedData.repositories ?? [],
-                releases: importedData.releases ?? [],
-                gists: importedData.gists ?? [],
-                starredGists: importedData.starredGists ?? [],
-                forks: importedData.forks ?? [],
-                customCategories: importedData.customCategories ?? [],
-                readForks: importedData.readForks ?? [],
-                releaseSubscriptions: importedData.releaseSubscriptions ?? [],
-                readReleases: importedData.readReleases ?? [],
+                repositories: includeRepos ? (importedData.repositories ?? []) : [],
+                releases: includeReleases ? (importedData.releases ?? []) : [],
+                gists: includeRepos ? (importedData.gists ?? []) : [],
+                starredGists: includeRepos ? (importedData.starredGists ?? []) : [],
+                forks: includeRepos ? (importedData.forks ?? []) : [],
+                customCategories: includeCategories ? (importedData.customCategories ?? []) : [],
+                readForks: includeRepos ? (importedData.readForks ?? []) : [],
+                releaseSubscriptions: includeReleaseSubs ? (importedData.releaseSubscriptions ?? []) : [],
+                readReleases: includeReleaseSubs ? (importedData.readReleases ?? []) : [],
               }),
-              // R5 审计修复：分类显示/映射设置复用分类合并分支的规则合并
-              //（保留本机 + 恢复备份新增），包括此前遗漏的 categoryListIdMap
-              ...mergeWorkspaceCategorySettings(base, importedData),
+              ...(includeCategories ? mergeWorkspaceCategorySettings(base, importedData) : {}),
             }
           : {
-              // replace：备份顶层存在则整体替换，缺失字段保留本机快照值
+              // replace：仅替换本次恢复所选类型的字段，未选类型保留本机快照值
               ...base,
-              repositories: importedData.repositories ?? previous?.repositories ?? [],
-              releases: importedData.releases ?? previous?.releases ?? [],
-              gists: importedData.gists ?? previous?.gists ?? [],
-              starredGists: importedData.starredGists ?? previous?.starredGists ?? [],
-              forks: importedData.forks ?? previous?.forks ?? [],
-              readForks: importedData.readForks ?? previous?.readForks ?? [],
-              releaseSubscriptions: importedData.releaseSubscriptions ?? previous?.releaseSubscriptions ?? [],
-              readReleases: importedData.readReleases ?? previous?.readReleases ?? [],
-              releaseSourceSettings: importedData.releaseSourceSettings !== undefined
-                ? normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
-                : (previous?.releaseSourceSettings ?? base.releaseSourceSettings),
-              categoryListIdMap: importedData.categoryListIdMap ?? previous?.categoryListIdMap ?? {},
-              syncMode: importedData.syncMode ?? previous?.syncMode ?? base.syncMode,
-              syncModeConfigured: importedData.syncModeConfigured ?? previous?.syncModeConfigured ?? base.syncModeConfigured,
-              customCategories: importedData.customCategories ?? previous?.customCategories ?? [],
-              hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds ?? previous?.hiddenDefaultCategoryIds ?? [],
-              defaultCategoryOverrides: importedData.defaultCategoryOverrides ?? previous?.defaultCategoryOverrides ?? {},
-              categoryOrder: importedData.categoryOrder ?? previous?.categoryOrder ?? [],
+              ...(includeRepos ? {
+                repositories: importedData.repositories ?? previous?.repositories ?? [],
+                gists: importedData.gists ?? previous?.gists ?? [],
+                starredGists: importedData.starredGists ?? previous?.starredGists ?? [],
+                forks: importedData.forks ?? previous?.forks ?? [],
+                readForks: importedData.readForks ?? previous?.readForks ?? [],
+                syncMode: importedData.syncMode ?? previous?.syncMode ?? base.syncMode,
+                syncModeConfigured: importedData.syncModeConfigured ?? previous?.syncModeConfigured ?? base.syncModeConfigured,
+              } : {}),
+              ...(includeReleases ? {
+                releases: importedData.releases ?? previous?.releases ?? [],
+              } : {}),
+              ...(includeReleaseSubs ? {
+                releaseSubscriptions: importedData.releaseSubscriptions ?? previous?.releaseSubscriptions ?? [],
+                readReleases: importedData.readReleases ?? previous?.readReleases ?? [],
+                releaseSourceSettings: importedData.releaseSourceSettings !== undefined
+                  ? normalizeReleaseSourceSettings(importedData.releaseSourceSettings)
+                  : (previous?.releaseSourceSettings ?? base.releaseSourceSettings),
+              } : {}),
+              ...(includeCategories ? {
+                categoryListIdMap: importedData.categoryListIdMap ?? previous?.categoryListIdMap ?? {},
+                customCategories: importedData.customCategories ?? previous?.customCategories ?? [],
+                hiddenDefaultCategoryIds: importedData.hiddenDefaultCategoryIds ?? previous?.hiddenDefaultCategoryIds ?? [],
+                defaultCategoryOverrides: importedData.defaultCategoryOverrides ?? previous?.defaultCategoryOverrides ?? {},
+                categoryOrder: importedData.categoryOrder ?? previous?.categoryOrder ?? [],
+              } : {}),
             };
         useAppStore.setState({
           accountWorkspaces: {
@@ -983,37 +992,46 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         });
       };
 
-      // savedAccounts 合并：仅当备份包含真实密钥时采用导入 Token（掩码值
-      // 不覆盖本机有效 Token），否则保留本机凭证；本机无 Token 时存空字符串
-      if (importedData.savedAccounts && typeof importedData.savedAccounts === 'object') {
-        const normalizedSaved = normalizeSavedAccounts(importedData.savedAccounts);
-        const mergedSaved = { ...useAppStore.getState().savedAccounts };
-        for (const [id, account] of Object.entries(normalizedSaved)) {
-          const local = mergedSaved[id];
-          const token = wasIncluded && isRealSecret(account.githubToken)
-            ? account.githubToken
-            : (local?.githubToken ?? '');
-          mergedSaved[id] = {
-            ...(local ?? account),
-            ...account,
-            githubToken: token,
-          };
-        }
-        useAppStore.setState({ savedAccounts: mergedSaved });
-      }
+      // savedAccounts 合并：仅当本机无凭证且备份包含非空白真实密钥时采用导入 Token，
+      // 绝不用未验证或空白的备份 PAT 覆盖本机已有的有效凭证；先计算并校验工作区后再提交。
+      const pendingSavedAccounts = importedData.savedAccounts && typeof importedData.savedAccounts === 'object'
+        ? (() => {
+            const normalizedSaved = normalizeSavedAccounts(importedData.savedAccounts);
+            const mergedSaved = { ...useAppStore.getState().savedAccounts };
+            for (const [id, account] of Object.entries(normalizedSaved)) {
+              const local = mergedSaved[id];
+              const hasRealBackupToken = wasIncluded
+                && isRealSecret(account.githubToken)
+                && account.githubToken.trim().length > 0;
+              const token = local?.githubToken
+                ? local.githubToken
+                : (hasRealBackupToken ? account.githubToken : '');
+              mergedSaved[id] = {
+                ...(local ?? account),
+                ...account,
+                githubToken: token,
+              };
+            }
+            return mergedSaved;
+          })()
+        : null;
 
       if (mode === 'replace') {
         // 工作区字典合并（replace）：逐账号按所选类型只替换已选字段，保留
         // 本机独有账号与未选类型的本机数据——裁剪备份的空占位字段绝不能
         // 整体覆盖工作区（否则单类型导入会清空非当前账号的仓库等数据）。
-        if (hasImportedWorkspaces) {
-          useAppStore.setState({
-            accountWorkspaces: replaceWorkspacesForSelectedTypes(
+        const nextReplacedWorkspaces = hasImportedWorkspaces
+          ? replaceWorkspacesForSelectedTypes(
               useAppStore.getState().accountWorkspaces,
               importedData.accountWorkspaces as Record<string, unknown>,
               selectedTypes,
-            ),
-          });
+            )
+          : null;
+        if (pendingSavedAccounts) {
+          useAppStore.setState({ savedAccounts: pendingSavedAccounts });
+        }
+        if (nextReplacedWorkspaces) {
+          useAppStore.setState({ accountWorkspaces: nextReplacedWorkspaces });
         }
         if (selectedTypes.includes('repositories') && importedData.repositories) {
           if (backupTargetsOtherAccount) {
@@ -1207,29 +1225,52 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           setBackendApiSecret(importedData.backendApiSecret);
         }
       } else {
-        // 工作区字典合并（merge）：逐账号按 id 去重合并，保留本机独有账号
+        if (pendingSavedAccounts) {
+          useAppStore.setState({ savedAccounts: pendingSavedAccounts });
+        }
+        // 工作区字典合并（merge）：逐账号按所选类型过滤并按 id 去重合并，保留本机独有账号与未选字段
         if (hasImportedWorkspaces) {
           const merged = { ...useAppStore.getState().accountWorkspaces };
+          const empty = emptyAccountWorkspace();
+          const includeRepos = selectedTypes.includes('repositories');
+          const includeReleases = selectedTypes.includes('releases');
+          const includeCategories = selectedTypes.includes('customCategories');
+          const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
           for (const [accountId, incoming] of Object.entries(importedWorkspaces)) {
             const local = merged[accountId];
-            // 非活跃账号同样合并 releaseSourceSettings / 分类显示与映射设置：
-            // mergeWorkspacesById 只合并列表与 ID 集合，其余字段取本机基座，
-            // 备份中的新增设置会被静默丢弃（与活跃账号分支同一规则）。
+            const filteredIncoming: AccountWorkspace = {
+              ...empty,
+              repositories: includeRepos ? incoming.repositories : [],
+              releases: includeReleases ? incoming.releases : [],
+              gists: includeRepos ? incoming.gists : [],
+              starredGists: includeRepos ? incoming.starredGists : [],
+              forks: includeRepos ? incoming.forks : [],
+              readForks: includeRepos ? incoming.readForks : [],
+              syncMode: includeRepos ? incoming.syncMode : empty.syncMode,
+              syncModeConfigured: includeRepos ? incoming.syncModeConfigured : empty.syncModeConfigured,
+              customCategories: includeCategories ? incoming.customCategories : [],
+              hiddenDefaultCategoryIds: includeCategories ? incoming.hiddenDefaultCategoryIds : [],
+              defaultCategoryOverrides: includeCategories ? incoming.defaultCategoryOverrides : {},
+              categoryOrder: includeCategories ? incoming.categoryOrder : [],
+              categoryListIdMap: includeCategories ? incoming.categoryListIdMap : {},
+              releaseSubscriptions: includeReleaseSubs ? incoming.releaseSubscriptions : [],
+              readReleases: includeReleaseSubs ? incoming.readReleases : [],
+              releaseSourceSettings: includeReleaseSubs ? incoming.releaseSourceSettings : empty.releaseSourceSettings,
+            };
             merged[accountId] = local
               ? {
-                  ...mergeWorkspacesById(local, incoming),
-                  // 未勾选发布订阅时保留本机来源设置：其他类型的导入不得改动它。
-                  ...(selectedTypes.includes('releaseSubscriptions')
+                  ...mergeWorkspacesById(local, filteredIncoming),
+                  ...(includeReleaseSubs
                     ? {
                         releaseSourceSettings: mergeReleaseSourceSettings(
                           local.releaseSourceSettings,
-                          incoming.releaseSourceSettings,
+                          filteredIncoming.releaseSourceSettings,
                         ),
                       }
                     : {}),
-                  ...mergeWorkspaceCategorySettings(local, incoming),
+                  ...(includeCategories ? mergeWorkspaceCategorySettings(local, filteredIncoming) : {}),
                 }
-              : incoming;
+              : filteredIncoming;
           }
           useAppStore.setState({ accountWorkspaces: merged });
         }

@@ -83,8 +83,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       setError(describeError(result.error));
       return;
     }
-    setToken('');
-    onClose();
+    handleCancel();
   };
 
   const handleConfirmBackend = async () => {
@@ -99,8 +98,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       setError(describeError(result.error));
       return;
     }
-    setBackendSecret('');
-    onClose();
+    handleCancel();
   };
 
   const hintForReauth = !!reauthAccount && mode === 'token';

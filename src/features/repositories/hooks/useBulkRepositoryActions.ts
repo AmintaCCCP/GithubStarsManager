@@ -15,7 +15,7 @@ import {
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
-import { forceSyncToBackend } from '../../../services/autoSync';
+import { forceSyncToBackend, markPendingAccountSync, withAccountSwitchGuardSync } from '../../../services/autoSync';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../../../utils/categoryUtils';
 import {
@@ -122,8 +122,28 @@ export const useBulkRepositoryActions = ({
     }
 
     // 等待 GitHub API 期间已切号：远端取消星标按发起账号完成（保留），
-    // 但绝不把旧账号的删除动作写进新账号工作区，也不触发同步
+    // 将已确认结果写回发起账号的归档工作区并标记待补推，绝不污染新账号工作区
     if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      if (startedAccountId && successIds.length > 0 && typeof useAppStore.setState === 'function') {
+        const unstarredSet = new Set(successIds);
+        withAccountSwitchGuardSync(() => {
+          useAppStore.setState((state) => {
+            const parked = state.accountWorkspaces[startedAccountId];
+            if (!parked) return state;
+            return {
+              accountWorkspaces: {
+                ...state.accountWorkspaces,
+                [startedAccountId]: {
+                  ...parked,
+                  repositories: parked.repositories.filter((r) => !unstarredSet.has(r.id)),
+                  releases: parked.releases.filter((rel) => !unstarredSet.has(rel.repository.id)),
+                },
+              },
+            };
+          });
+        });
+        markPendingAccountSync(startedAccountId);
+      }
       return false;
     }
     for (const repositoryId of successIds) {

@@ -2,7 +2,10 @@ import { getDb } from '../db/connection.js';
 import { decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
 import { logger } from '../services/logger.js';
-import { resolveActiveAccountScope } from '../db/accountScope.js';
+import {
+  resolveActiveAccountScope,
+  getLegacyDefaultClaimedBy,
+} from '../db/accountScope.js';
 import {
   type McpRepository,
   type McpSearchFilters,
@@ -447,16 +450,24 @@ export async function vectorSearch(
   }
 
   const workerUrl = String(vs.worker_url).replace(/\/$/, '');
+  const queryHeaders = {
+    'Content-Type': 'application/json',
+    ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
+  };
+  const sendWorkerQuery = (scopedAccountId?: string) => fetchWithTimeout(`${workerUrl}/query`, {
+    method: 'POST',
+    headers: queryHeaders,
+    body: JSON.stringify({
+      vector,
+      topK: workerTopK,
+      threshold,
+      ...(scopedAccountId ? { accountId: scopedAccountId } : {}),
+    }),
+  });
+
   let res: Response;
   try {
-    res = await fetchWithTimeout(`${workerUrl}/query`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(workerToken ? { Authorization: `Bearer ${workerToken}` } : {}),
-      },
-      body: JSON.stringify({ vector, topK: workerTopK, threshold, accountId }),
-    });
+    res = await sendWorkerQuery(accountId !== 'default' ? accountId : undefined);
   } catch {
     // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
     // 永不 throw，异常必须折叠进声明的 { available: false } 结果
@@ -467,7 +478,34 @@ export async function vectorSearch(
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    return { available: false, reason: `worker_query_failed: ${res.status} ${text.slice(0, 120)}` };
+    const isMetadataNotIndexed = res.status === 400 && text.includes('ACCOUNT_METADATA_NOT_INDEXED');
+    if (isMetadataNotIndexed && accountId !== 'default' && getLegacyDefaultClaimedBy(db) === accountId) {
+      // 已确认的单账号存量部署在回填前保留按仓库 ID 匹配的兼容查询路径。
+      let isSingleAccount = true;
+      try {
+        const countRow = db
+          .prepare("SELECT COUNT(DISTINCT account_id) AS total FROM repositories WHERE account_id != 'default'")
+          .get() as { total: number } | undefined;
+        isSingleAccount = (countRow?.total ?? 0) <= 1;
+      } catch {
+        isSingleAccount = false;
+      }
+      if (isSingleAccount) {
+        try {
+          res = await sendWorkerQuery(undefined);
+        } catch {
+          return { available: false, reason: 'worker_query_failed' };
+        }
+        if (!res.ok) {
+          const retryText = await res.text().catch(() => '');
+          return { available: false, reason: `worker_query_failed: ${res.status} ${retryText.slice(0, 120)}` };
+        }
+      } else {
+        return { available: false, reason: 'account_metadata_not_indexed' };
+      }
+    } else {
+      return { available: false, reason: `worker_query_failed: ${res.status} ${text.slice(0, 120)}` };
+    }
   }
   let data: {
     matches?: Array<{ id: string; score: number; metadata?: Record<string, unknown> }>;
@@ -491,12 +529,15 @@ export async function vectorSearch(
 
   const candidates = matches
     .map((m) => {
-      // 向量 ID 可能是 `${accountId}:${repoId}`：先解析再核对归属。
+      // 向量 ID 可能是 `${accountId}:${repoId}`：先解析再核对归属与元数据一致性。
       const rawId = String(m.id);
       const separator = rawId.indexOf(':');
       const prefix = separator > 0 ? rawId.slice(0, separator) : '';
       const scopedAccountId = /^\d+$/.test(prefix) ? prefix : null;
       if (scopedAccountId && scopedAccountId !== accountId) return null;
+      const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
+      if (metaAccountId && metaAccountId !== accountId) return null;
+      if (scopedAccountId && metaAccountId && metaAccountId !== scopedAccountId) return null;
       const repoId = scopedAccountId ? rawId.slice(separator + 1) : rawId;
       const repo = byId.get(repoId);
       if (!repo) return null;

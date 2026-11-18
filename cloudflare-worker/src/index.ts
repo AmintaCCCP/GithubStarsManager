@@ -1,4 +1,4 @@
-import { compactUpsertVectors } from './metadata';
+import { compactUpsertVectors, InvalidVectorMetadataError } from './metadata';
 
 /**
  * GitHub Stars Vectorize — 极简代理 Worker
@@ -72,7 +72,15 @@ export default {
         if (!Array.isArray(vectors) || vectors.length === 0) {
           return jsonResponse({ success: false, error: 'vectors array required' }, 400);
         }
-        const compactedVectors = compactUpsertVectors(vectors);
+        let compactedVectors;
+        try {
+          compactedVectors = compactUpsertVectors(vectors);
+        } catch (err) {
+          if (err instanceof InvalidVectorMetadataError) {
+            return jsonResponse({ success: false, error: err.message }, 400);
+          }
+          throw err;
+        }
         await env.VECTORIZE.upsert(compactedVectors);
         return jsonResponse({ success: true, upserted: vectors.length });
       }
@@ -90,10 +98,20 @@ export default {
           : QUERY_DEFAULT_TOPK;
         const clampedTopK = Math.min(Math.max(requestedTopK, 1), QUERY_TOPK_LIMIT);
         // 账号范围过滤必须在 topK 之前生效（Vectorize 的 filter 语义），
-        // 否则其他账号的高分向量会占满候选名额。
-        const accountFilter = typeof accountId === 'string' && accountId.length > 0
-          ? { accountId }
-          : undefined;
+        // 否则其他账号的高分向量会占满候选名额；若 accountId 元数据索引尚未
+        // 就绪，直接拒绝按账号过滤的查询，避免静默漏召回或退回无范围查询。
+        const requestedAccountId = typeof accountId === 'string' && accountId.length > 0 ? accountId : null;
+        if (requestedAccountId && env.ACCOUNT_METADATA_INDEXED !== 'true') {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'accountId metadata index is not ready (ACCOUNT_METADATA_INDEXED != true)',
+              code: 'ACCOUNT_METADATA_NOT_INDEXED',
+            },
+            400,
+          );
+        }
+        const accountFilter = requestedAccountId ? { accountId: requestedAccountId } : undefined;
         const matches = await env.VECTORIZE.query(vector, {
           topK: clampedTopK,
           returnMetadata: 'all' as const,
@@ -120,25 +138,31 @@ export default {
       // - accountPrefix：只允许删除该账号前缀的向量，其他账号前缀的向量一律保留；
       // - includeLegacy：单租户时代的 legacy 无前缀向量属于唯一所有者，仅在
       //   请求显式携带 includeLegacy=true 时才允许删除；
-      // - 两个参数都不携带时保持旧行为（删除全部不在 keepIds 中的向量），
-      //   旧版客户端不受影响。
+      // - 两个参数都不携带时保持旧行为：只删除采样结果中不在 keepIds 且 ID 为
+      //   纯数字的 legacy 向量，带账号前缀的向量一律保留。
       if (request.method === 'POST' && url.pathname === '/cleanup') {
         const body = (await request.json()) as {
           keepIds?: string[];
-          accountPrefix?: string;
-          includeLegacy?: boolean;
+          accountPrefix?: unknown;
+          includeLegacy?: unknown;
         };
         const { keepIds } = body;
         if (!Array.isArray(keepIds)) {
           return jsonResponse({ success: false, error: 'keepIds array required' }, 400);
         }
-        const accountPrefix = typeof body.accountPrefix === 'string' && body.accountPrefix.length > 0
-          ? body.accountPrefix
-          : null;
+        if (body.accountPrefix !== undefined) {
+          if (typeof body.accountPrefix !== 'string' || !/^\d+$/.test(body.accountPrefix.trim())) {
+            return jsonResponse({ success: false, error: 'accountPrefix must be a numeric account id string' }, 400);
+          }
+        }
+        if (body.includeLegacy !== undefined && typeof body.includeLegacy !== 'boolean') {
+          return jsonResponse({ success: false, error: 'includeLegacy must be a boolean' }, 400);
+        }
+        const accountPrefix = typeof body.accountPrefix === 'string' ? body.accountPrefix.trim() : null;
         const includeLegacy = body.includeLegacy === true;
         // 新客户端总是显式携带范围参数；accountPrefix 缺失但请求中出现
         // includeLegacy 时（未登录边缘态），legacy 向量成为唯一删除候选
-        const scoped = accountPrefix !== null || body.includeLegacy !== undefined;
+        const scoped = body.accountPrefix !== undefined || body.includeLegacy !== undefined;
         const prefix = accountPrefix !== null ? `${accountPrefix}:` : null;
         const isLegacyId = (id: string): boolean => /^\d+$/.test(id);
         const keepSet = new Set(keepIds);
@@ -163,6 +187,16 @@ export default {
         // filter 把候选池收窄到该账号，采样不再被其他账号的向量占满。
         // includeLegacy 时不能过滤（legacy 向量没有 accountId）。
         const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix as string } : undefined;
+        if (accountFilter && env.ACCOUNT_METADATA_INDEXED !== 'true') {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'accountId metadata index is not ready (ACCOUNT_METADATA_INDEXED != true)',
+              code: 'ACCOUNT_METADATA_NOT_INDEXED',
+            },
+            400,
+          );
+        }
         // 最多迭代 10 轮（覆盖最多 1000 个向量）
         const MAX_ROUNDS = 10;
         for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -188,7 +222,11 @@ export default {
           for (const match of unseen) seenIds.add(match.id);
           if (staleIds.length === 0) {
             if (unseen.length === 0) {
-              sampledAll = true;
+              // 仅当已采样覆盖全索引向量数时才能证明清理完整；随机采样无法
+              // 穷尽未见向量时保持 sampledAll=false（返回 partial:true）。
+              if (seenIds.size >= (info.vectorCount ?? 0)) {
+                sampledAll = true;
+              }
               break;
             }
             continue;

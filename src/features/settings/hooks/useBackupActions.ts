@@ -134,7 +134,9 @@ export const useBackupActions = (): BackupActions => {
         exportedAt: new Date().toISOString(),
         version: '1.3',
       };
-      const filename = `github-stars-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const accountTag = accountIdKey(useAppStore.getState().user) ?? 'local';
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `github-stars-backup-${timestamp}-${accountTag}.json`;
       const success = await new WebDAVService(activeConfig).uploadFile(filename, JSON.stringify(backupData, null, 2));
       if (success) {
         state.setLastBackup(new Date().toISOString());
@@ -205,9 +207,16 @@ export const useBackupActions = (): BackupActions => {
       // 先合并工作区与账号元数据，再决定顶层恢复目标（防止跨账号错位）。
       // liveAccountId 用发起恢复时记录的账号 ID（等待期间账号可能已切换）。
       const liveAccountId = restoreAccountId;
-      const backupAccountId = typeof backupData.activeAccountId === 'string' && backupData.activeAccountId
-        ? backupData.activeAccountId
-        : null;
+      const rawActiveAccountId = backupData.activeAccountId;
+      if (
+        rawActiveAccountId !== undefined
+        && rawActiveAccountId !== null
+        && (typeof rawActiveAccountId !== 'string' || !/^\d+$/.test(rawActiveAccountId))
+      ) {
+        toast(t('useBackupActions.backup-failed'), 'error');
+        return;
+      }
+      const backupAccountId = typeof rawActiveAccountId === 'string' ? rawActiveAccountId : null;
       // 备份显式声明了归属账号即以其为准（包括当前未登录 liveAccountId=null）。
       const restoreTargetsOtherAccount = !!backupAccountId && backupAccountId !== liveAccountId;
 
@@ -239,9 +248,9 @@ export const useBackupActions = (): BackupActions => {
           mergedSaved[id] = {
             ...(local ?? account),
             ...account,
-            githubToken: backupIncludedKeys && isRealBackupSecret(account.githubToken)
-              ? account.githubToken
-              : (local?.githubToken ?? ''),
+            githubToken: local?.githubToken
+              ? local.githubToken
+              : (backupIncludedKeys && isRealBackupSecret(account.githubToken) ? account.githubToken : ''),
           };
         }
         useAppStore.setState({ savedAccounts: mergedSaved });
@@ -296,8 +305,8 @@ export const useBackupActions = (): BackupActions => {
           ...(backupData.categoryListIdMap && typeof backupData.categoryListIdMap === 'object'
             ? { categoryListIdMap: backupData.categoryListIdMap as Record<string, string> }
             : {}),
-          ...(typeof backupData.syncMode === 'string'
-            ? { syncMode: backupData.syncMode as import('../../../types').AccountWorkspace['syncMode'] }
+          ...(backupData.syncMode === 'stars' || backupData.syncMode === 'stars-and-lists'
+            ? { syncMode: backupData.syncMode }
             : {}),
           ...(typeof backupData.syncModeConfigured === 'boolean'
             ? { syncModeConfigured: backupData.syncModeConfigured }

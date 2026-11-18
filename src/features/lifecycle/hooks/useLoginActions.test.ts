@@ -30,7 +30,10 @@ vi.mock('../../../services/githubApi', () => ({
   },
 }));
 vi.mock('../../../services/backendAdapter', () => ({ backend: mocks.backend }));
-vi.mock('../../../services/autoSync', () => ({ syncFromBackend: mocks.syncFromBackend }));
+vi.mock('../../../services/autoSync', () => ({
+  syncFromBackend: mocks.syncFromBackend,
+  withAccountSwitchFrozen: (fn: () => Promise<unknown>) => fn(),
+}));
 
 import { useLoginActions } from './useLoginActions';
 
@@ -151,6 +154,6 @@ describe('useLoginActions', () => {
     expect(mocks.syncFromBackend).not.toHaveBeenCalled();
 
     await result.current.syncBackendData();
-    expect(mocks.syncFromBackend).toHaveBeenCalledWith({ force: true });
+    expect(mocks.syncFromBackend).toHaveBeenCalledWith({ force: true, throwOnRepoFailure: true });
   });
 });

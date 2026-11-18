@@ -159,7 +159,11 @@ router.post('/api/sync/export', (req, res) => {
     // 多账号扩展：accounts 元数据（token 脱敏）与各账号分区全量工作区。
     let accounts: Array<Record<string, unknown>> = [];
     let account_workspaces: Array<Record<string, unknown>> = [];
-    try {
+    const hasMultiAccountTables = Boolean(
+      db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'accounts'").get()
+      && db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'account_settings'").get(),
+    );
+    if (hasMultiAccountTables) {
       const accountRows = db.prepare('SELECT * FROM accounts').all() as Record<string, unknown>[];
       accounts = accountRows.map((row) => {
         const masked = { ...row };
@@ -174,7 +178,7 @@ router.post('/api/sync/export', (req, res) => {
         return masked;
       });
       account_workspaces = collectAccountIds(db).map((id) => exportAccountWorkspace(db, id));
-    } catch { /* 旧库未迁移时降级为 v1 导出 */ }
+    }
 
     res.json({
       version: 1,
@@ -215,6 +219,13 @@ router.post('/api/sync/import', (req, res) => {
     const importRels = data.releases as Record<string, unknown>[] | undefined;
     if (Array.isArray(importRels)) {
       for (const r of importRels) {
+        if (!r || typeof r !== 'object' || Array.isArray(r)) {
+          res.status(400).json({
+            error: 'Each release must be an object',
+            code: 'RELEASE_ID_REQUIRED',
+          });
+          return;
+        }
         const repository = r.repository as { id?: unknown; full_name?: unknown; name?: unknown } | undefined;
         const id = r.id;
         const repoId = r.repo_id ?? repository?.id;
@@ -253,22 +264,30 @@ router.post('/api/sync/import', (req, res) => {
 
     // 多账号导入前校验 account_workspaces 内的 releases（同上规则）
     const accountWorkspacesRaw = data.account_workspaces as
-      | Array<Record<string, unknown>>
-      | Record<string, Record<string, unknown>>
+      | Array<unknown>
+      | Record<string, unknown>
       | undefined;
     const workspaceEntries: Array<{ accountId: string; workspace: Record<string, unknown>; unverifiedOwner: boolean }> = [];
     if (Array.isArray(accountWorkspacesRaw)) {
       for (const ws of accountWorkspacesRaw) {
-        const id = typeof ws.account_id === 'string' ? ws.account_id : '';
+        if (!ws || typeof ws !== 'object' || Array.isArray(ws)) {
+          res.status(400).json({ error: 'Invalid account workspace entry', code: 'INVALID_ACCOUNT_WORKSPACE' });
+          return;
+        }
+        const wsObj = ws as Record<string, unknown>;
+        const id = typeof wsObj.account_id === 'string' ? wsObj.account_id : '';
         if (!id || !/^\d+$|^(default)$/.test(id)) continue;
         // 'default' 分区在目标服务器可被首个登录账号自动认领：请求本身不在
         // default 分区时，来源归属无法核验，数据一律不写入（数字账号工作区
         // 仍原样恢复）。仍保留条目，避免顶层兼容副本被误判为「无工作区」。
-        workspaceEntries.push({ accountId: id, workspace: ws, unverifiedOwner: id === 'default' && accountId !== 'default' });
+        workspaceEntries.push({ accountId: id, workspace: wsObj, unverifiedOwner: id === 'default' && accountId !== 'default' });
       }
     } else if (accountWorkspacesRaw && typeof accountWorkspacesRaw === 'object') {
       for (const [id, ws] of Object.entries(accountWorkspacesRaw)) {
-        if (!ws || typeof ws !== 'object') continue;
+        if (!ws || typeof ws !== 'object' || Array.isArray(ws)) {
+          res.status(400).json({ error: 'Invalid account workspace entry', code: 'INVALID_ACCOUNT_WORKSPACE' });
+          return;
+        }
         if (!/^\d+$|^(default)$/.test(id)) continue;
         workspaceEntries.push({
           accountId: id,
@@ -277,10 +296,18 @@ router.post('/api/sync/import', (req, res) => {
         });
       }
     }
-    for (const { workspace } of workspaceEntries) {
+    for (const { workspace, unverifiedOwner } of workspaceEntries) {
+      if (unverifiedOwner) continue;
       const rels = workspace.releases as Record<string, unknown>[] | undefined;
       if (!Array.isArray(rels)) continue;
       for (const r of rels) {
+        if (!r || typeof r !== 'object' || Array.isArray(r)) {
+          res.status(400).json({
+            error: 'Each release must be an object',
+            code: 'RELEASE_ID_REQUIRED',
+          });
+          return;
+        }
         const repository = r.repository as { id?: unknown; full_name?: unknown; name?: unknown } | undefined;
         const repoId = r.repo_id ?? repository?.id;
         if (typeof r.id !== 'number' || !Number.isInteger(r.id) || r.id <= 0
@@ -690,7 +717,9 @@ router.post('/api/sync/import', (req, res) => {
               // 仓库表 name/full_name/html_url 均为 NOT NULL，缺任一必填字段
               // 直接跳过该条，合法的仓库/Release/分类继续导入。
               if (
-                typeof r.id !== 'number'
+                !r
+                || typeof r !== 'object'
+                || typeof r.id !== 'number'
                 || !Number.isInteger(r.id)
                 || r.id <= 0
                 || typeof r.name !== 'string'

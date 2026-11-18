@@ -28,6 +28,8 @@ vi.mock('../../../services/githubApi', () => ({
 
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
+  markPendingAccountSync: vi.fn(),
+  withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
 const repository = (id: number, overrides: Partial<Repository> = {}): Repository => ({

@@ -6,7 +6,10 @@ import { config } from '../config.js';
 import { logger } from '../services/logger.js';
 import {
   resolveAccountScope,
+  resolveWritableAccountScope,
   getLegacyDefaultClaimedBy,
+  getLegacyDefaultVerifiedToken,
+  snapshotLegacyDefaultTokenBeforeOverwrite,
   ACCOUNT_SCOPED_SETTING_KEYS,
   INTERNAL_SETTING_KEYS,
 } from '../db/accountScope.js';
@@ -539,6 +542,9 @@ router.get('/api/settings', (req, res) => {
     const accountId = resolveAccountScope(req, db);
     const inheritLegacyScopedSettings = accountId === 'default'
       || getLegacyDefaultClaimedBy(db) === accountId;
+    const verifiedLegacyToken = accountId !== 'default' && inheritLegacyScopedSettings
+      ? getLegacyDefaultVerifiedToken(db)
+      : null;
     const rows = db.prepare('SELECT * FROM settings').all() as Record<string, unknown>[];
     const settings: Record<string, unknown> = {};
 
@@ -551,6 +557,11 @@ router.get('/api/settings', (req, res) => {
       let value = row.value as string | null;
 
       if (key === 'github_token' && value) {
+        if (accountId !== 'default' && (!verifiedLegacyToken || value !== verifiedLegacyToken)) {
+          // 认领跳过 Token 复制或全局 Token 已轮换/换绑：与 /api/sync/auth 保持一致，
+          // 不把来源不匹配的全局 Token 报告为当前账号可用凭据。
+          continue;
+        }
         const { decryptedValue, status } = getMaskedSecretResult({
           encryptedValue: value,
           encryptionKey: config.encryptionKey,
@@ -603,9 +614,25 @@ router.get('/api/settings', (req, res) => {
 router.put('/api/settings', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
-    const isRealAccount = accountId !== 'default';
     const updates = req.body as Record<string, unknown>;
+    const hasScopedWrite = Object.keys(updates).some(
+      (k) => ACCOUNT_SCOPED_SETTING_KEYS.has(k) || k === 'user_profile',
+    );
+    let accountId: string;
+    if (hasScopedWrite) {
+      const scope = resolveWritableAccountScope(req, db);
+      if (!scope.ok) {
+        res.status(409).json({
+          error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+          code: 'ACCOUNT_SCOPE_REQUIRED',
+        });
+        return;
+      }
+      accountId = scope.accountId;
+    } else {
+      accountId = resolveAccountScope(req, db);
+    }
+    const isRealAccount = accountId !== 'default';
 
     const globalStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     const accountStmt = db.prepare(
@@ -642,6 +669,16 @@ router.put('/api/settings', (req, res) => {
 
         if (key === 'user_profile') {
           // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时携带）
+          if (rawValue && typeof rawValue === 'object' && 'id' in rawValue) {
+            const profileId = (rawValue as { id?: unknown }).id;
+            if (isRealAccount && profileId !== undefined && profileId !== null && String(profileId) !== accountId) {
+              res.status(400).json({
+                error: 'user_profile.id does not match target account',
+                code: 'INVALID_USER_PROFILE',
+              });
+              return;
+            }
+          }
           accountPayload.userProfile = rawValue;
           continue;
         }
@@ -658,6 +695,9 @@ router.put('/api/settings', (req, res) => {
         if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && isRealAccount) {
           accountStmt.run(accountId, key, serialized);
         } else {
+          if (key === 'github_token' && !isRealAccount) {
+            snapshotLegacyDefaultTokenBeforeOverwrite(db);
+          }
           globalStmt.run(key, serialized);
           // 无头请求下账号级键镜像写入全局表已覆盖；真实账号下账号级键不写全局。
         }
@@ -728,7 +768,7 @@ function upsertAccountRow(
         ELSE COALESCE(excluded.github_token_encrypted, accounts.github_token_encrypted) END,
       last_used_at = excluded.last_used_at
   `).run(accountId, effectiveUserJson, tokenEncrypted, {
-    userJsonProvided: userJson !== null ? 1 : 0,
+    userJsonProvided: userProfileRaw !== undefined ? 1 : 0,
     clearToken: clearToken ? 1 : 0,
   });
 }

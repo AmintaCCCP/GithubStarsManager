@@ -6,7 +6,6 @@ import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
-  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
@@ -316,6 +315,7 @@ export const useRepositoryCardActions = ({
     // 账号代次校验（Issue #611）：相似搜索等待期间切号后，结果绝不写入新账号
     // 的全局相似视图（与分析流程同一账号代次边界）
     const requestAccountId = peekCurrentAccountId();
+    const requestGeneration = getAccountSessionGeneration();
     setIsFindingSimilar(true);
     try {
       const embeddingClient = new EmbeddingClient({
@@ -370,7 +370,7 @@ export const useRepositoryCardActions = ({
       if (
         controller.signal.aborted
         || similarityAbortRef.current !== controller
-        || !isCurrentAccount(requestAccountId)
+        || !isCurrentAccountSession(requestAccountId, requestGeneration)
       ) {
         throw new DOMException('Similar search superseded', 'AbortError');
       }
@@ -382,6 +382,7 @@ export const useRepositoryCardActions = ({
       }
     } catch (error) {
       if (isAbortError(error) || controller.signal.aborted) return;
+      if (!isCurrentAccountSession(requestAccountId, requestGeneration)) return;
       console.error('Find similar repositories failed:', error);
       const errorMessage = error instanceof Error && error.message
         ? error.message

@@ -293,6 +293,7 @@ export const useRepositoryAnalysisJob = ({
       if (syncOnComplete) {
         await forceSyncToBackend();
       }
+      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
 
       if (scope === 'selected') {
         toast(
@@ -310,6 +311,7 @@ export const useRepositoryAnalysisJob = ({
       return true;
     } catch (error) {
       console.error(scope === 'selected' ? 'Bulk AI analysis failed:' : 'AI analysis failed:', error);
+      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return false;
       toast(
         scope === 'selected'
           ? (t('useRepositoryAnalysisJob.bulk-ai-analysis-failed'))

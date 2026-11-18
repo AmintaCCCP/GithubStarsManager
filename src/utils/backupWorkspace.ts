@@ -64,10 +64,16 @@ export const mergeWorkspacesById = (
 ): AccountWorkspace => {
   const mergeList = <T extends { id: unknown }>(localList: T[], incomingList: T[]): T[] => {
     const existingIds = new Set(localList.map(item => String(item?.id)));
-    return [...localList, ...incomingList.filter(item => !existingIds.has(String(item?.id)))];
+    const added: T[] = [];
+    for (const item of incomingList) {
+      const id = String(item?.id);
+      if (existingIds.has(id)) continue;
+      existingIds.add(id);
+      added.push(item);
+    }
+    return [...localList, ...added];
   };
   const unionIds = <T>(localIds: T[], incomingIds: T[]): T[] => Array.from(new Set([...localIds, ...incomingIds]));
-  const categoryLocalIds = new Set(local.customCategories.map(item => String(item?.id)));
   return {
     ...local,
     repositories: mergeList(local.repositories, incoming.repositories),
@@ -75,10 +81,7 @@ export const mergeWorkspacesById = (
     starredGists: mergeList(local.starredGists, incoming.starredGists),
     releases: mergeList(local.releases, incoming.releases),
     forks: mergeList(local.forks, incoming.forks),
-    customCategories: [
-      ...local.customCategories,
-      ...incoming.customCategories.filter(item => !categoryLocalIds.has(String(item?.id))),
-    ],
+    customCategories: mergeList(local.customCategories, incoming.customCategories),
     readForks: unionIds(local.readForks, incoming.readForks),
     releaseSubscriptions: unionIds(local.releaseSubscriptions, incoming.releaseSubscriptions),
     readReleases: unionIds(local.readReleases, incoming.readReleases),

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope } from '../db/accountScope.js';
+import { resolveAccountScope, resolveWritableAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -41,7 +41,15 @@ router.get('/api/categories', (req, res) => {
 router.post('/api/categories', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const { name, description, keywords, color, icon, sort_order } = req.body as Record<string, unknown>;
 
     // v4 后 id TEXT 是复合主键 (account_id, id) 的组成部分，POST 必须显式生成 id。
@@ -68,7 +76,15 @@ router.post('/api/categories', (req, res) => {
 router.put('/api/categories/:id', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const id = req.params.id;
     const { name, description, keywords, color, icon, sort_order } = req.body as Record<string, unknown>;
 
@@ -96,7 +112,15 @@ router.put('/api/categories/:id', (req, res) => {
 router.delete('/api/categories/:id', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const id = req.params.id;
     const result = db.prepare('DELETE FROM categories WHERE account_id = ? AND id = ?').run(accountId, id);
     if (result.changes === 0) {

@@ -290,6 +290,11 @@ export const useVectorSearchActions = (): VectorSearchActions => {
               ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
             ])];
             try {
+              if (onAccountChanged() || controller.signal.aborted) {
+                const abortErr = new Error('Aborted');
+                abortErr.name = 'AbortError';
+                throw abortErr;
+              }
               const cleanup = await clients.vectorService.cleanup(cleanupKeepIds, {
                 accountPrefix: jobAccountId,
                 // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机

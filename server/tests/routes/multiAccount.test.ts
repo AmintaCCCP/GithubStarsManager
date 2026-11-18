@@ -247,10 +247,10 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(list.body.repositories.map((r: { id: number }) => r.id)).toEqual([1]);
 
     // default 行全部迁移到 111 分区，default 无残留
-    const releaseRows = db.prepare('SELECT account_id FROM releases').all() as Array<{ account_id: string }>;
-    expect(releaseRows.every((r) => r.account_id === '111')).toBe(true);
-    const categoryRows = db.prepare('SELECT account_id FROM categories').all() as Array<{ account_id: string }>;
-    expect(categoryRows.every((r) => r.account_id === '111')).toBe(true);
+    const releaseRows = db.prepare('SELECT id, account_id FROM releases').all() as Array<{ id: number; account_id: string }>;
+    expect(releaseRows).toEqual([{ id: 50, account_id: '111' }]);
+    const categoryRows = db.prepare('SELECT id, account_id FROM categories').all() as Array<{ id: string; account_id: string }>;
+    expect(categoryRows).toEqual([{ id: 'custom-legacy', account_id: '111' }]);
 
     const claimedBy = db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_claimed_by'").get() as { value: string };
     expect(claimedBy.value).toBe('111');
@@ -326,13 +326,15 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     const second = request(app).get('/api/repositories').set(authHeaders('111'))
       .expect(200).then((r) => r, (e) => { throw e; });
 
-    // 两个并发请求共享同一次进行中的 /user 校验
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    // 等第二个请求也抵达中间件：期间 fetch 绝不能被再次调用（共享进行中 Promise）
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    for (const release of releaseFetches) release({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+    try {
+      // 两个并发请求共享同一次进行中的 /user 校验
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      await Promise.resolve();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const release of releaseFetches) release({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      await Promise.allSettled([first, second]);
+    }
     await Promise.all([first, second]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -452,8 +454,17 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .expect(200);
     expect(proxyRequestMock.mock.calls[1][0].headers.Authorization).toBe('Bearer token-b');
 
-    // 缺省账号（headless）：回退全局 settings
+    // 多账号共存时无头代理请求不得擅自回退全局/其他账号 Token，必须拒绝 409
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('global-token', encryptionKey));
+    await request(app)
+      .post('/api/proxy/github/user')
+      .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
+      .send({ method: 'GET' })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+
+    // 单账号/纯 default 库时无头代理请求可回退全局 settings
+    db.prepare('DELETE FROM account_settings').run();
     await request(app)
       .post('/api/proxy/github/user')
       .set({ Authorization: `Bearer ${process.env.API_SECRET}` })
@@ -554,8 +565,9 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // 内部账号状态键 + 全局 Token：导出的 settings 绝不包含前者
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', '222')").run();
+    const legacyOwnerCiphertext = encrypt('legacy-owner-ciphertext', encryptionKey);
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_owner_id', ?)")
-      .run(JSON.stringify({ ownerId: '222', token: encrypt('legacy-owner-ciphertext', encryptionKey) }));
+      .run(JSON.stringify({ ownerId: '222', token: legacyOwnerCiphertext }));
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('plain-global-token', encryptionKey));
 
     // 账号 A 有自己的分区凭据（导出包含其 workspace account_settings）
@@ -573,6 +585,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // 普通键与脱敏后的 github_token 照常导出
     expect(settings.github_token).toMatch(/^\*\*\*/);
     // legacy_default_owner_id 内的全局 Token 密文绝不随备份带出
+    expect(JSON.stringify(exported.body)).not.toContain(legacyOwnerCiphertext);
     expect(JSON.stringify(exported.body)).not.toContain('legacy-owner-ciphertext');
     // workspace account_settings 只存账号级键：内部键不会出现在任何工作区中
     for (const ws of exported.body.account_workspaces as Array<Record<string, unknown>>) {

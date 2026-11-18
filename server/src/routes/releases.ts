@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope, hasAmbiguousAccountScope } from '../db/accountScope.js';
+import { resolveAccountScope, resolveWritableAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -83,7 +83,15 @@ router.get('/api/releases', (req, res) => {
 router.put('/api/releases', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const { releases } = req.body as { releases: Record<string, unknown>[] };
     if (!Array.isArray(releases)) {
       res.status(400).json({ error: 'releases array required', code: 'RELEASES_ARRAY_REQUIRED' });
@@ -191,7 +199,15 @@ router.put('/api/releases', (req, res) => {
 router.patch('/api/releases/:id', (req, res) => {
   try {
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const id = parseInt(req.params.id);
     const { is_read } = req.body as { is_read?: boolean };
 
@@ -218,11 +234,12 @@ router.patch('/api/releases/:id', (req, res) => {
 router.post('/api/releases/mark-all-read', (req, res) => {
   try {
     const db = getDb();
-    if (hasAmbiguousAccountScope(db, req)) {
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
       res.status(400).json({ error: 'Account id required', code: 'ACCOUNT_SCOPE_REQUIRED' });
       return;
     }
-    const accountId = resolveAccountScope(req, db);
+    const accountId = scope.accountId;
     const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
     res.json({ updated: result.changes });
   } catch (err) {
@@ -247,7 +264,15 @@ router.delete('/api/releases/:id', (req, res) => {
     }
 
     const db = getDb();
-    const accountId = resolveAccountScope(req, db);
+    const scope = resolveWritableAccountScope(req, db);
+    if (!scope.ok) {
+      res.status(409).json({
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    const accountId = scope.accountId;
     const result = db.prepare('DELETE FROM releases WHERE account_id = ? AND id = ?').run(accountId, id);
 
     if (result.changes === 0) {

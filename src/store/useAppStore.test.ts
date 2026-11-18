@@ -1115,23 +1115,30 @@ describe('useAppStore logout and per-account workspaces', () => {
       },
     });
 
-    const switched = useAppStore.getState().switchAccount('2');
-    expect(switched).toBe(true);
-    const state = useAppStore.getState();
-    expect(state.user?.login).toBe('bob');
-    expect(state.githubToken).toBe('ghp_b');
-    expect(state.isAuthenticated).toBe(true);
-    // 账号 A 的数据被快照保留
-    expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
-    // 账号 B 的工作区被恢复
-    expect(state.repositories[0].ai_summary).toBe('bob-ai');
-    // 会话级瞬态 UI 状态被重置
-    expect(state.selectedCategory).toBe('all');
-    expect(state.currentView).toBe('repositories');
-    expect(state.releaseSearchQuery).toBe('');
-    // savedAccounts 双向刷新 lastUsedAt
-    expect(state.savedAccounts['2']?.lastUsedAt).toBeTruthy();
-    expect(state.savedAccounts['1']?.lastUsedAt).toBeTruthy();
+    vi.useFakeTimers();
+    try {
+      const fixedNow = new Date('2026-11-18T12:00:00.000Z');
+      vi.setSystemTime(fixedNow);
+      const switched = useAppStore.getState().switchAccount('2');
+      expect(switched).toBe(true);
+      const state = useAppStore.getState();
+      expect(state.user?.login).toBe('bob');
+      expect(state.githubToken).toBe('ghp_b');
+      expect(state.isAuthenticated).toBe(true);
+      // 账号 A 的数据被快照保留
+      expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
+      // 账号 B 的工作区被恢复
+      expect(state.repositories[0].ai_summary).toBe('bob-ai');
+      // 会话级瞬态 UI 状态被重置
+      expect(state.selectedCategory).toBe('all');
+      expect(state.currentView).toBe('repositories');
+      expect(state.releaseSearchQuery).toBe('');
+      // savedAccounts 双向刷新 lastUsedAt
+      expect(state.savedAccounts['2']?.lastUsedAt).toBe(fixedNow.toISOString());
+      expect(state.savedAccounts['1']?.lastUsedAt).toBe(fixedNow.toISOString());
+    } finally {
+      vi.useRealTimers();
+    }
 
     // 切回账号 A 数据完好
     expect(useAppStore.getState().switchAccount('1')).toBe(true);

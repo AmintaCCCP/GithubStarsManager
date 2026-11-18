@@ -112,6 +112,7 @@ export const INTERNAL_SETTING_KEYS: ReadonlySet<string> = new Set([
   'active_account_id',
   CLAIMED_BY_KEY,
   LEGACY_OWNER_CACHE_KEY,
+  'legacy_default_github_token',
 ]);
 
 /** 从请求头提取合法的账号 ID；非法/缺失格式一律视为未传（防垃圾字符串污染分区名）。 */
@@ -158,6 +159,59 @@ export function resolveActiveAccountScope(db: Database.Database): string {
 }
 
 /**
+ * 收集所有非 'default' 分区的账号 ID（覆盖 accounts / repositories / releases /
+ * categories / account_settings）。逐表查询以兼容单元测试的轻量 DB stub。
+ */
+function collectNonDefaultPartitionIds(db: Database.Database): Set<string> {
+  const ids = new Set<string>();
+  const queries = [
+    "SELECT account_id FROM accounts WHERE account_id != 'default'",
+    "SELECT DISTINCT account_id FROM repositories WHERE account_id != 'default'",
+    "SELECT DISTINCT account_id FROM releases WHERE account_id != 'default'",
+    "SELECT DISTINCT account_id FROM categories WHERE account_id != 'default'",
+    "SELECT DISTINCT account_id FROM account_settings WHERE account_id != 'default'",
+  ];
+  for (const sql of queries) {
+    try {
+      const rows = db.prepare(sql).all() as Array<{ account_id: string | null }>;
+      for (const row of rows) {
+        if (typeof row.account_id === 'string' && row.account_id && row.account_id !== DEFAULT_SCOPE) {
+          ids.add(row.account_id);
+        }
+      }
+    } catch {
+      // 轻量 stub 缺表时跳过该表，不影响其余表的统计。
+    }
+  }
+  return ids;
+}
+
+/**
+ * 无账号头的写入解析：显式账号头直接放行；无头请求仅在能唯一确定目标分区时
+ * 返回 `{ ok: true, accountId }`（唯一真实分区 / 活跃账号 / default），
+ * 多分区共存或活跃账号与唯一分区冲突时返回 `{ ok: false }`。
+ */
+export function resolveWritableAccountScope(
+  req: Request,
+  db: Database.Database,
+): { ok: true; accountId: string } | { ok: false } {
+  const headerId = extractRequestedAccountId(req);
+  if (headerId) return { ok: true, accountId: headerId };
+
+  const partitionIds = collectNonDefaultPartitionIds(db);
+  if (partitionIds.size > 1) return { ok: false };
+
+  const active = readSetting(db, 'active_account_id');
+  const validActive = active && ACCOUNT_ID_PATTERN.test(active) ? active : null;
+  if (partitionIds.size === 1) {
+    const sole = partitionIds.values().next().value as string;
+    if (validActive && validActive !== sole) return { ok: false };
+    return { ok: true, accountId: sole };
+  }
+  return { ok: true, accountId: validActive ?? DEFAULT_SCOPE };
+}
+
+/**
  * 无账号头的全量写入是否可安全落到解析出的分区（Issue #611 审计修复）。
  *
  * 无头请求（旧版客户端）无法证明自身身份：多账号分区共存时，回退到全局
@@ -166,10 +220,7 @@ export function resolveActiveAccountScope(db: Database.Database): string {
  * 归属账号、或单账号部署保持旧行为；其余情况必须拒绝破坏性全量写入。
  */
 export function isHeaderlessFullSyncSafe(db: Database.Database, req: Request): boolean {
-  if (extractRequestedAccountId(req)) return true;
-  const accountId = computeAccountScope(db, req);
-  if (accountId === DEFAULT_SCOPE) return true;
-  return !hasAmbiguousAccountScope(db, req);
+  return resolveWritableAccountScope(req, db).ok;
 }
 
 /**
@@ -177,25 +228,26 @@ export function isHeaderlessFullSyncSafe(db: Database.Database, req: Request): b
  * active_account_id 可能命中其他账号）。显式账号头永远不歧义。
  */
 export function hasAmbiguousAccountScope(db: Database.Database, req: Request): boolean {
-  if (extractRequestedAccountId(req)) return false;
+  return !resolveWritableAccountScope(req, db).ok;
+}
+
+/**
+ * 在无头客户端覆写全局 settings.github_token 之前固化存量归属凭据：
+ * 若库中已有 default 分区数据且尚未记录 legacy_default_github_token，
+ * 则保存覆写前的全局 Token（或空哨兵），防止新写入的 Token 冒充存量数据所有者。
+ */
+export function snapshotLegacyDefaultTokenBeforeOverwrite(db: Database.Database): void {
   try {
-    // accounts 元数据可能缺失（工作区导入可先落仓库/Release 分区），同时统计
-    // 数据分区，避免「多分区但无 accounts 行」时误判为单账号。
-    const row = db
-      .prepare(`
-        SELECT COUNT(*) AS total FROM (
-          SELECT account_id FROM accounts WHERE account_id != 'default'
-          UNION
-          SELECT DISTINCT account_id FROM repositories WHERE account_id != 'default'
-          UNION
-          SELECT DISTINCT account_id FROM releases WHERE account_id != 'default'
-        )
-      `)
-      .get() as { total: number } | undefined;
-    return (row?.total ?? 0) > 1;
+    const existingSnapshot = db
+      .prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'")
+      .get() as { value: string | null } | undefined;
+    if (existingSnapshot !== undefined) return;
+    if (!hasDefaultPartitionRows(db)) return;
+    const currentGlobal = readSetting(db, 'github_token') ?? '';
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('legacy_default_github_token', ?)")
+      .run(currentGlobal);
   } catch {
-    // 单元测试的轻量 DB stub 可能没有 accounts 表；无法计数时保持旧行为。
-    return false;
+    // 轻量 stub 缺表时忽略
   }
 }
 
@@ -394,8 +446,8 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
     }
   }
 
-  // default 分区无任何待认领数据：无需身份校验，直接返回（不发起网络请求）。
-  if (!hasDefaultPartitionRows(db)) {
+  // default 分区无任何待认领数据且无 v4 迁移固化的存量 Token：无需身份校验，直接返回（不发起网络请求）。
+  if (!hasDefaultPartitionRows(db) && !readSetting(db, 'legacy_default_github_token')) {
     return { ownerId: null, verifiedToken: null };
   }
 
@@ -404,7 +456,19 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
     return { ownerId: null, verifiedToken: null };
   }
 
-  const encrypted = readSetting(db, 'github_token');
+  let encrypted: string | null = null;
+  try {
+    const snapshotRow = db
+      .prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'")
+      .get() as { value: string | null } | undefined;
+    if (snapshotRow !== undefined) {
+      encrypted = typeof snapshotRow.value === 'string' && snapshotRow.value.length > 0 ? snapshotRow.value : null;
+    } else {
+      encrypted = readSetting(db, 'github_token');
+    }
+  } catch {
+    encrypted = readSetting(db, 'github_token');
+  }
   if (!encrypted) return { ownerId: null, verifiedToken: null };
   let token: string;
   try {

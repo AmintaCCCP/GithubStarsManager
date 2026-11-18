@@ -252,6 +252,7 @@ export const switchAccountWorkspace = (
   current: AccountWorkspaceSource & { accountWorkspaces: Record<string, AccountWorkspace> },
   previousAccountId: string | null,
   nextAccountId: string,
+  options: { forceLoadTarget?: boolean } = {},
 ): { accountWorkspaces: Record<string, AccountWorkspace>; workspace: AccountWorkspaceRuntime | null } => {
   const accountWorkspaces = { ...current.accountWorkspaces };
   if (previousAccountId && previousAccountId !== nextAccountId) {
@@ -261,8 +262,9 @@ export const switchAccountWorkspace = (
     return { accountWorkspaces, workspace: null };
   }
   // Logged-out login: keep live lists if they already hold data (backend
-  // restore wrote first). Otherwise restore a parked snapshot for this id.
-  if (!previousAccountId && workspaceHasData(current)) {
+  // restore wrote first). Direct switchAccount passes forceLoadTarget=true so
+  // it never inherits leftover top-level data from another session.
+  if (!options.forceLoadTarget && !previousAccountId && workspaceHasData(current)) {
     return { accountWorkspaces, workspace: null };
   }
   return {

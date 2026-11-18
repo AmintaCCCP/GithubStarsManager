@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   prepareForAccountSwitch: vi.fn(),
   syncFromBackend: vi.fn(),
   withAccountSwitchGuard: vi.fn(),
-  consumePendingAccountSync: vi.fn(),
+  hasPendingAccountSync: vi.fn(),
   syncToBackend: vi.fn(),
   backend: {
     isAvailable: true,
@@ -21,11 +21,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../services/autoSync', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../services/autoSync')>();
+  mocks.hasPendingAccountSync.mockImplementation((accountId?: string | null) =>
+    actual.hasPendingAccountSync(accountId),
+  );
   return {
     ...actual,
     prepareForAccountSwitch: mocks.prepareForAccountSwitch,
     syncFromBackend: mocks.syncFromBackend,
-    consumePendingAccountSync: mocks.consumePendingAccountSync,
+    hasPendingAccountSync: mocks.hasPendingAccountSync,
     syncToBackend: mocks.syncToBackend,
     // 透传真实守卫（保留退出时的待推冲刷语义）并记录调用次数
     withAccountSwitchGuard: async <T>(fn: () => Promise<T>) => {
@@ -108,7 +111,6 @@ describe('useAccountSwitchActions', () => {
     mocks.backend.backendUrl = null;
     mocks.syncFromBackend.mockResolvedValue(undefined);
     mocks.prepareForAccountSwitch.mockResolvedValue(undefined);
-    mocks.consumePendingAccountSync.mockReturnValue(false);
     mocks.syncToBackend.mockResolvedValue(true);
     useAppStore.setState({
       user: null,
@@ -375,7 +377,6 @@ describe('useAccountSwitchActions audit fixes', () => {
     mocks.backend.backendUrl = null;
     mocks.syncFromBackend.mockResolvedValue(undefined);
     mocks.prepareForAccountSwitch.mockResolvedValue(undefined);
-    mocks.consumePendingAccountSync.mockReturnValue(false);
     mocks.syncToBackend.mockResolvedValue(true);
     useAppStore.setState({
       user: null,
@@ -626,7 +627,7 @@ describe('useAccountSwitchActions audit fixes', () => {
       expect(hasPendingAccountSync('2')).toBe(false);
 
       // 切回账号 A：先补推（A 的上下文）再拉取——顺序绝不能颠倒
-      mocks.consumePendingAccountSync.mockReturnValueOnce(true);
+      mocks.hasPendingAccountSync.mockReturnValueOnce(true);
       await act(async () => {
         await result.current.switchToAccount('1');
       });
@@ -767,7 +768,7 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
     mocks.backend.isAvailable = true;
     // 切换前冲刷失败遗留的账号级待推状态：切回该账号时先补推再拉取
-    mocks.consumePendingAccountSync.mockImplementation((accountId: string) => accountId === '2');
+    mocks.hasPendingAccountSync.mockImplementation((accountId: string) => accountId === '2');
     const callOrder: string[] = [];
     mocks.syncToBackend.mockImplementation(async () => {
       callOrder.push('push');

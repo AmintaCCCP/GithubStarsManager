@@ -157,16 +157,17 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       toast(t('useBackendSettingsActions.backend-not-available'), 'error');
       return;
     }
+    // 账号代次校验（Issue #611）：确认弹窗打开前固定目标会话，弹窗与拉取期间切号后中止
+    const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     const confirmed = await confirm(
       t('useBackendSettingsActions.sync-from-backend'),
       t('useBackendSettingsActions.syncing-from-backend-will-overwrite-local-data-c'),
       { type: 'warning' },
     );
     if (!confirmed) return;
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
     setIsSyncingFromBackend(true);
-    // 账号代次校验（Issue #611）：确认弹窗与拉取期间切号后丢弃结果
-    const startedAccountId = peekCurrentAccountId();
-    const startedGeneration = getAccountSessionGeneration();
     try {
       const [repoData, releaseData, aiConfigData, webdavConfigData, settingsData] = await Promise.all([
         backend.fetchRepositories(),

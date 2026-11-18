@@ -183,11 +183,56 @@ export interface VectorAccountIdScope {
   /** 当前活跃账号（GitHub 数值 ID 字符串） */
   accountId: string;
   /**
-   * 会话中是否保存了多个账号。legacy 无归属向量（账号隔离上线前索引、无
-   * accountId 元数据）无法判定归属：单账号会话视为本账号数据继续可见
-   * （存量索引不失效）；多账号会话一律隐藏，防止串号。
+   * 保留兼容字段（不再据此推断 legacy 归属）。
    */
   multiAccount: boolean;
+  /**
+   * 仅当独立确认旧无前缀索引专属于当前账号时才传 true；
+   * 否则 hydrateMatches 与未就绪索引的降级查询均拒绝无归属 legacy 向量。
+   */
+  allowLegacyUnscoped?: boolean;
+}
+
+export interface DenseQueryScopeResolution {
+  skip: boolean;
+  accountId?: string;
+}
+
+/**
+ * 解析稠密向量查询的账号隔离策略：
+ * - 无 accountIdScope（旧调用方/测试）时不过滤；
+ * - 若 vectorService 提供 getStatus，必须确认 accountScopedCleanup===true（即
+ *   Worker 已建立 accountId 元数据索引并回填）后才下发 accountId 过滤；
+ * - 索引未就绪时：若未明确确认 allowLegacyUnscoped，则跳过稠密召回（避免
+ *   Worker 400 或无过滤召回串入其他账号），否则走无 accountId 的兼容查询。
+ */
+export async function resolveDenseQueryAccountScope(
+  vectorService: Pick<VectorSearchService, 'query'> & Partial<Pick<VectorSearchService, 'getStatus'>>,
+  accountIdScope: VectorAccountIdScope | undefined,
+  signal: AbortSignal,
+): Promise<DenseQueryScopeResolution> {
+  if (!accountIdScope) return { skip: false };
+  if (typeof vectorService.getStatus !== 'function') {
+    return { skip: false, accountId: accountIdScope.accountId };
+  }
+  try {
+    const status = await withBudget<{ accountScopedCleanup?: boolean } | null>(
+      (stageSignal) => vectorService.getStatus!(stageSignal),
+      WORKER_TIMEOUT_MS,
+      signal,
+      null,
+    );
+    if (status?.accountScopedCleanup === true) {
+      return { skip: false, accountId: accountIdScope.accountId };
+    }
+    if (accountIdScope.allowLegacyUnscoped) {
+      return { skip: false };
+    }
+    return { skip: true };
+  } catch (error) {
+    if (isAbortError(error)) throw error;
+    return accountIdScope.allowLegacyUnscoped ? { skip: false } : { skip: true };
+  }
 }
 
 export function hydrateMatches(
@@ -203,21 +248,20 @@ export function hydrateMatches(
   const sourceId = options.excludeSource ? String(options.excludeSource.id) : '';
   const sourceFullName = options.excludeSource?.full_name.trim().toLowerCase() || '';
   matches.forEach((match) => {
-    // 账号隔离过滤（R4 审计修复）：带归属元数据的向量只对所属账号可见；
-    // legacy 无归属向量仅在单账号会话可见。未提供 scope（旧调用方/测试）
-    // 时保持既有行为不过滤。
+    // 向量 ID 带账号前缀（accountId:repoId）：剥离前缀前先核对归属与元数据一致性。
+    const { accountId: prefixAccountId, repoId } = parseAccountScopedVectorId(String(match.id));
     const scope = options.accountIdScope;
     if (scope) {
       const matchAccountId = match.metadata?.accountId;
-      if (matchAccountId) {
+      if (prefixAccountId) {
+        if (prefixAccountId !== scope.accountId) return;
+        if (matchAccountId && matchAccountId !== prefixAccountId) return;
+      } else if (matchAccountId) {
         if (matchAccountId !== scope.accountId) return;
-      } else if (scope.multiAccount) {
+      } else if (!scope.allowLegacyUnscoped) {
         return;
       }
     }
-    // 向量 ID 带账号前缀（accountId:repoId）：水合前剥离前缀，legacy 无前缀
-    // ID 原样使用
-    const { repoId } = parseAccountScopedVectorId(String(match.id));
     const repo = repoById.get(repoId);
     if (!repo || !Number.isFinite(match.score) || match.score <= 0) return;
     const id = String(repo.id);
@@ -700,10 +744,12 @@ export async function runVectorSearchPipeline(
     timingsMs.rawEmbedding = Date.now() - rawEmbeddingStarted;
   });
 
+  const denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
+
   let rawDenseStarted = 0;
-  const rawDensePromise = rawEmbeddingPromise
-    .then(vectors => {
-      if (!vectors[0]) return [];
+  const rawDensePromise = Promise.all([rawEmbeddingPromise, denseScopePromise])
+    .then(([vectors, denseScope]) => {
+      if (!vectors[0] || denseScope.skip) return [];
       rawDenseStarted = Date.now();
       return withBudget(
         stageSignal => options.vectorService.query(
@@ -711,8 +757,7 @@ export async function runVectorSearchPipeline(
           {
             topK: RECALL_TOP_K,
             threshold,
-            // 仅多账号模式下发账号范围：单账号模式的存量向量可能没有归属元数据。
-            ...(options.accountIdScope?.multiAccount ? { accountId: options.accountIdScope.accountId } : {}),
+            ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
           },
           stageSignal,
         ),
@@ -752,8 +797,10 @@ export async function runVectorSearchPipeline(
           timingsMs.idealEmbedding = Date.now() - idealEmbeddingStarted;
         });
       })()
-        .then(vectors => {
+        .then(async (vectors) => {
           if (!vectors[0]) return [];
+          const denseScope = await denseScopePromise;
+          if (denseScope.skip) return [];
           const started = Date.now();
           return withBudget(
             stageSignal => options.vectorService.query(
@@ -761,7 +808,7 @@ export async function runVectorSearchPipeline(
               {
                 topK: RECALL_TOP_K,
                 threshold,
-                ...(options.accountIdScope?.multiAccount ? { accountId: options.accountIdScope.accountId } : {}),
+                ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
               },
               stageSignal,
             ),
