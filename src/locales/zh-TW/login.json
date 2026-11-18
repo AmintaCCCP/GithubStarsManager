@@ -61,7 +61,7 @@
     "token-permissions-classic-fork-workflows": "`repo`",
     "token-permissions-local-storage": "Token 僅儲存在本機與你設定的後端，不會上傳到應用方伺服器。",
     "saved-accounts": "已儲存的帳號",
-    "click-to-sign-in": "點擊直接登入",
+    "click-to-sign-in": "點擊登入",
     "token-required": "需補充 Token"
   }
 }

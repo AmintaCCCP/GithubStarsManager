@@ -3,7 +3,7 @@ import { GITHUB_TOKEN_INVALID_ERROR } from '../../../services/githubApi';
 import { useAppStore } from '../../../store/useAppStore';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { backend, isValidBackendRestoreAccount, type BackendAuthRestoreAccount } from '../../../services/backendAdapter';
-import { syncFromBackend, withAccountSwitchFrozen } from '../../../services/autoSync';
+import { drainInFlightBackendPulls as drainInFlightBackendPullsImpl, syncFromBackend, withAccountSwitchFrozen } from '../../../services/autoSync';
 import { accountIdKey } from '../../../store/helpers/accountWorkspace';
 import type { GitHubUser } from '../../../types';
 
@@ -29,16 +29,32 @@ export interface LoginActions {
    * X-GitHub-Account-Id 请求头（addAccountFromBackend 在本机仍登录旧账号时
    * 必须省略——否则服务端优先选择本机旧账号分区，候选后端活跃账号 B 的
    * 有效凭证会被误判为 github-token-required；R4 审计修复）。
+   * options.apiSecret（审计修复 C64）：候选 API Key 在候选 URL 提交后才写入
+   * Store——/health 探测不使用密钥，提交前的请求仍读原密钥，绝不把候选 Key
+   * 发给尚未切换的原后端。
    */
-  restoreBackendSession: (url: string, options?: { omitAccountHeader?: boolean }) => Promise<BackendLoginResult>;
+  restoreBackendSession: (url: string, options?: { omitAccountHeader?: boolean; apiSecret?: string }) => Promise<BackendLoginResult>;
   setupBackendGitHubToken: (token: string) => Promise<GitHubUser>;
-  syncBackendData: () => Promise<void>;
+  /**
+   * 拉取后端数据。options.targetAccountId 为审计修复 B13 的显式账号恢复：
+   * 恢复拉取以已验证账号 ID 构造请求头（不依赖提前 setUser 落登录态），
+   * 拉取成功后由调用方统一提交工作区与登录态；恢复失败时登录页保持在
+   * 当前页面并可见错误。autoSync 侧支持见 HANDOFF-B-TO-C.md。
+   */
+  syncBackendData: (options?: { targetAccountId?: string }) => Promise<void>;
   /** 当前后端 URL：候选连接失败时用于成对恢复 URL 与 API 密钥。 */
   getBackendUrl: () => string | null;
   /** 把后端 URL 复原到候选连接之前的值（密钥由调用方成对恢复）。 */
   rollbackBackendConnection: (url: string | null) => Promise<void>;
   /** 在候选后端恢复期间冻结自动同步与推送窗口。 */
   runWithBackendRestoreFrozen?: <T>(fn: () => Promise<T>) => Promise<T>;
+  /**
+   * B14（见 HANDOFF-B-TO-C.md）：归档账号前暂停新拉取并排空该账号的在途
+   * 后端拉取，防止旧账号 A 的在途拉取把数据写进归档后的无主顶层。
+   * autoSync 侧实现（drainInFlightBackendPulls）由 Agent C 承担；落地前为
+   * no-op，由 C8 的「拉取结果应用前校验会话代次」兜底。
+   */
+  drainInFlightBackendPulls: (accountId: string | null) => Promise<void>;
 }
 
 export const useLoginActions = (): LoginActions => {
@@ -68,11 +84,16 @@ export const useLoginActions = (): LoginActions => {
   }, []);
   const restoreBackendSession = useCallback(async (
     url: string,
-    options?: { omitAccountHeader?: boolean },
+    options?: { omitAccountHeader?: boolean; apiSecret?: string },
   ): Promise<BackendLoginResult> => {
     const previousUrl = backend.backendUrl;
     await backend.init(url);
     if (!backend.isAvailable) return { status: 'backend-unavailable' };
+    // 审计修复（C64）：候选密钥仅在候选 URL 提交后才对请求可见——/health
+    // 探测不使用密钥，提交前的任何请求继续读取原密钥。
+    if (options?.apiSecret !== undefined) {
+      useAppStore.getState().setBackendApiSecret(options.apiSecret);
+    }
     if (!await backend.verifyAuth()) {
       // Wrong key: drop the candidate and fall back to whatever backend was
       // active before (or auto-detect), so a failed candidate is never kept.
@@ -126,19 +147,42 @@ export const useLoginActions = (): LoginActions => {
     backend.rememberActiveUrl();
     return user;
   }, [authenticateWithGitHub]);
-  const syncBackendData = useCallback(async () => {
-    await syncFromBackend({ force: true, throwOnRepoFailure: true });
+  const syncBackendData = useCallback(async (options?: { targetAccountId?: string }) => {
+    // B13（HANDOFF-B-TO-C.md 已落地）：targetAccountId 为显式账号恢复——
+    // 恢复拉取以已验证账号 ID 构造请求头，不依赖提前 setUser 生成请求头，
+    // 登录态由调用方在拉取成功后统一提交。
+    await syncFromBackend({
+      force: true,
+      throwOnRepoFailure: true,
+      ...(options?.targetAccountId ? { targetAccountId: options.targetAccountId } : {}),
+    });
   }, []);
 
   const getBackendUrl = useCallback(() => backend.backendUrl, []);
   const rollbackBackendConnection = useCallback(async (url: string | null) => {
     if ((backend.backendUrl ?? null) === (url ?? null)) return;
+    // 审计修复（C63）：原连接为 null（本地/自动探测）时显式断开，绝不经
+    // backend.init(undefined) 触发候选后端自动探测读取刚保存的候选 URL。
+    if (url === null) {
+      try {
+        backend.disconnect();
+      } catch {
+        // 断开失败时保持现有连接，不叠加新错误
+      }
+      return;
+    }
     try {
-      await backend.init(url ?? undefined);
+      await backend.init(url);
     } catch {
       // 复原探测失败时保持现有连接，不叠加新错误
     }
   }, []);
+  // B14（HANDOFF-B-TO-C.md 已落地）：归档账号前暂停新拉取并排空该账号的
+  // 在途后端拉取，防止旧账号 A 的在途拉取把数据写进归档后的无主顶层。
+  const drainInFlightBackendPulls = useCallback(
+    (accountId: string | null) => drainInFlightBackendPullsImpl(accountId),
+    [],
+  );
 
   return {
     authenticateWithGitHub,
@@ -150,5 +194,6 @@ export const useLoginActions = (): LoginActions => {
     getBackendUrl,
     rollbackBackendConnection,
     runWithBackendRestoreFrozen: withAccountSwitchFrozen,
+    drainInFlightBackendPulls,
   };
 };

@@ -14,6 +14,7 @@ import {
 } from '../helpers/accountWorkspace';
 import { initialGistSearchFilters, initialSearchFilters } from '../schema';
 import { clearAuthMirror, writeAuthMirror, writeSessionBackendSecret } from '../persistence/authStorage';
+import { syncGhAccountTokensFromState } from '../persistence/ghAccountSecrets';
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -33,7 +34,7 @@ const excludeSavedAccount = (
 export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
   'setUser' | 'setGitHubToken' | 'setBackendApiSecret' | 'logout'
   | 'upsertSavedAccount' | 'switchAccount' | 'removeSavedAccount' | 'parkCurrentAccountForRestore'
-  | 'discardPartialLoginWorkspace'
+  | 'discardPartialLoginWorkspace' | 'restorePersistedAccountTokens'
 >> = (set, get) => ({
       setUser: (user) => {
         logger.info('store.setUser', 'Setting user', { hasUser: !!user, userId: user?.id ?? null });
@@ -70,6 +71,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
               },
             },
           });
+          syncGhAccountTokensFromState(get());
         }
         writeAuthMirror({ user, githubToken, backendApiSecret });
       },
@@ -77,18 +79,27 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         logger.info('store.setGitHubToken', 'Setting GitHub token', { hasToken: !!token });
         set({ githubToken: token });
         // 已有登录用户且 Token 非空时，同步刷新 savedAccounts 中该账号的 Token。
+        // 审计修复（B3）：savedAccounts 尚无当前账号条目时（如 setUser(A) 先落、
+        // Token 后到）也必须一并登记已验证用户与新 PAT，不能以旧条目存在为前提，
+        // 否则 setUser(A) → setGitHubToken(A_PAT) 后 switchAccount(A) 拿不到凭证。
         const { user, backendApiSecret, savedAccounts } = get();
         const accountId = accountIdKey(user);
         if (user && accountId && token) {
           const existing = savedAccounts[accountId];
-          if (existing) {
-            set({
-              savedAccounts: {
-                ...savedAccounts,
-                [accountId]: { ...existing, user, githubToken: token },
+          const now = nowIso();
+          set({
+            savedAccounts: {
+              ...savedAccounts,
+              [accountId]: {
+                accountId,
+                user,
+                githubToken: token,
+                addedAt: existing?.addedAt ?? now,
+                lastUsedAt: existing?.lastUsedAt ?? now,
               },
-            });
-          }
+            },
+          });
+          syncGhAccountTokensFromState(get());
         }
         writeAuthMirror({ user, githubToken: token, backendApiSecret });
       },
@@ -98,12 +109,23 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         const { user, githubToken } = get();
         writeAuthMirror({ user, githubToken, backendApiSecret });
       },
-      logout: () => {
+      logout: (expectedAccountId) => {
+        // 审计修复（B9）：退出确认绑定打开确认框时的账号——编排层在获取切换锁后
+        // 传入期望账号标识；期间账号已被切换/变更时拒绝执行（返回 false），
+        // 调用方提示用户对当前账号重新发起退出。
+        const current = get();
+        const currentAccountId = accountIdKey(current.user);
+        if (expectedAccountId !== undefined && currentAccountId !== expectedAccountId) {
+          logger.warn('store.logout', 'Refusing logout: session account changed since confirmation', {
+            expectedAccountId,
+            currentAccountId,
+          });
+          return false;
+        }
         // Credential teardown only. Snapshot the GitHub-id workspace first, then
         // park the live lists so the login screen cannot inherit another account.
-        const current = get();
         bumpAccountSessionGeneration();
-        const accountId = accountIdKey(current.user);
+        const accountId = currentAccountId;
         const accountWorkspaces = accountId
           ? { ...current.accountWorkspaces, [accountId]: captureAccountWorkspace(current) }
           : current.accountWorkspaces;
@@ -123,6 +145,8 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           backendApiSecret: null,
           isAuthenticated: false,
           accountWorkspaces,
+          // 会话级刷新状态随会话拆除重置（B4）
+          releaseIsRefreshing: false,
           // 退出即清除当前账号已保存的 PAT：登录页不能凭旧记录一键恢复会话。
           savedAccounts: accountId && current.savedAccounts[accountId]
             ? {
@@ -133,6 +157,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           ...applyAccountWorkspace(undefined),
         }));
         // logout 保留其他账号的记录；当前账号仅保留资料与工作区，凭据已清除。
+        // 被清除的当前账号 Token 也要从桌面端加密存储移除（B7）。
+        syncGhAccountTokensFromState(get());
+        return true;
       },
       upsertSavedAccount: (user, githubToken) => {
         const accountId = accountIdKey(user);
@@ -152,18 +179,20 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             },
           },
         });
+        syncGhAccountTokensFromState(get());
       },
       switchAccount: (targetAccountId) => {
         const current = get();
         const target = current.savedAccounts[targetAccountId];
         if (!target || !target.githubToken.trim()) return false;
-        bumpAccountSessionGeneration();
         const currentAccountId = accountIdKey(current.user);
         if (currentAccountId === targetAccountId) {
           // 同账号：仅当当前会话已使用目标凭证且已认证时直接返回（刷新 lastUsedAt）。
           // 水化后可能出现 user 保留但顶层 githubToken 丢失/未认证的破损会话：
           // 此时同账号切换必须从 savedAccounts 恢复认证字段并同步认证镜像，
           // 否则调用方拿到 true 但登录态依旧是坏的（审计：Functional Correctness）。
+          // 审计修复（B2）：同账号同凭证只刷新 lastUsedAt，不递增会话代次——
+          // 递增会作废当前会话在途刷新的结果；仅恢复/使用不同凭证时才递增。
           const sessionUsesTargetCredentials = current.isAuthenticated
             && current.githubToken === target.githubToken;
           const now = nowIso();
@@ -178,6 +207,7 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             }),
           });
           if (!sessionUsesTargetCredentials) {
+            bumpAccountSessionGeneration();
             writeAuthMirror({
               user: target.user,
               githubToken: target.githubToken,
@@ -186,6 +216,8 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           }
           return true;
         }
+        // 切换到不同账号：递增会话代次，作废旧账号会话的在途任务。
+        bumpAccountSessionGeneration();
         const previousAccountId = currentAccountId;
         // Issue #611：切换会整体替换工作区。旧会话的待推防抖若在切换后触发，
         // 会把旧账号的（可能陈旧/为空的）快照以新账号请求头 isFullSync 推送，
@@ -231,6 +263,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           releaseSearchQuery: '',
           forkSelectedFilters: [],
           forkSearchQuery: '',
+          // 审计修复（B4）：Release 刷新状态随账号会话重置——旧账号的在途刷新
+          // 不得禁用新账号的刷新入口；其 finally 清理由
+          // setReleaseIsRefreshing(false) 的归属会话校验拦截（preferenceSlice）。
+          releaseIsRefreshing: false,
           analysisProgress: { current: 0, total: 0 },
           vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
           similarView: null,
@@ -260,10 +296,13 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         if (next) {
           get().switchAccount(next.accountId);
           set({ savedAccounts: excludeSavedAccount(get().savedAccounts, accountId) });
+          // 被移除账号的 Token 同步从桌面端加密存储移除（B7）。
+          syncGhAccountTokensFromState(get());
           return;
         }
         get().logout();
         set({ savedAccounts: excludeSavedAccount(get().savedAccounts, accountId) });
+        syncGhAccountTokensFromState(get());
       },
       parkCurrentAccountForRestore: () => {
         const current = get();
@@ -290,6 +329,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           },
           // 索引任务随账号切换中止；不复位会让新账号设置面板永久显示「索引中」
           vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
+          // Release 刷新状态随归档中止（B4）：被归档账号的在途刷新不再禁用
+          // 恢复后新会话的刷新入口
+          releaseIsRefreshing: false,
           ...applyAccountWorkspace(undefined),
         }));
         writeAuthMirror({ user: null, githubToken: null, backendApiSecret: current.backendApiSecret });
@@ -315,6 +357,47 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         resetSyncHashes();
         withAccountSwitchGuardSync(() => set({ ...applyAccountWorkspace(undefined) }));
         logger.info('store.discardPartialLoginWorkspace', 'Discarded partially synced top-level workspace after failed login');
+      },
+
+      /**
+       * 水化后从桌面端安全存储回填账号 Token（审计修复 B7）：持久化分片只含
+       * savedAccounts 非敏感元数据，PAT 存于 gh-accounts.enc。仅补全缺失 Token
+       * 的既有条目；当前登录会话缺 Token 且安全存储有其凭证时一并恢复登录态。
+       * Web 构建（无 IPC 桥）不会走到这里——PAT 不持久化，要求重新授权。
+       */
+      restorePersistedAccountTokens: (tokens) => {
+        const current = get();
+        const savedAccounts = { ...current.savedAccounts };
+        let touched = false;
+        for (const [accountId, token] of Object.entries(tokens)) {
+          if (!/^\d{1,20}$/.test(accountId)) continue;
+          if (typeof token !== 'string' || !token.trim()) continue;
+          const existing = savedAccounts[accountId];
+          if (existing && !existing.githubToken) {
+            savedAccounts[accountId] = { ...existing, githubToken: token };
+            touched = true;
+          }
+        }
+        const currentAccountId = accountIdKey(current.user);
+        const currentToken = currentAccountId ? tokens[currentAccountId] : undefined;
+        const sessionNeedsToken = !!currentAccountId
+          && !current.githubToken
+          && typeof currentToken === 'string'
+          && !!currentToken.trim();
+        if (!touched && !sessionNeedsToken) return;
+        set({
+          savedAccounts,
+          ...(sessionNeedsToken ? { githubToken: currentToken, isAuthenticated: true } : {}),
+        });
+        writeAuthMirror({
+          user: current.user,
+          githubToken: sessionNeedsToken ? currentToken : current.githubToken,
+          backendApiSecret: current.backendApiSecret,
+        });
+        logger.info('store.restorePersistedAccountTokens', 'Restored account tokens from desktop secure storage', {
+          restored: Object.keys(savedAccounts).filter((id) => savedAccounts[id]?.githubToken).length,
+          sessionRestored: sessionNeedsToken,
+        });
       },
 
 });

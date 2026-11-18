@@ -147,6 +147,12 @@ interface ElectronAPI {
     get: () => Promise<{ authToken: string; ct0: string } | null>;
     clear: () => Promise<{ success: boolean; error?: string }>;
   };
+  /** 已保存 GitHub 账号加密凭证（gh-accounts.enc，safeStorage；桌面版专用） */
+  ghAccounts?: {
+    save: (tokens: Record<string, string>) => Promise<{ success: boolean; error?: string }>;
+    get: () => Promise<Record<string, string> | null>;
+    clear: () => Promise<{ success: boolean; error?: string }>;
+  };
   desktop?: DesktopElectronAPI;
   mcp?: McpElectronAPI;
   /** Diagnostics bridge (desktop only; absent in web builds). */
@@ -250,6 +256,15 @@ export const clearEncryptedXAuthViaDesktop = async (): Promise<void> => {
   const result = await window.electronAPI.xAuth.clear();
   if (result && !result.success) {
     throw new Error(result.error || 'failed to clear X authentication');
+  }
+};
+
+/** 已保存 GitHub 账号加密凭证文件（gh-accounts.enc）本地安全清理。 */
+export const clearEncryptedGhAccountsViaDesktop = async (): Promise<void> => {
+  if (!window.electronAPI?.ghAccounts?.clear) return;
+  const result = await window.electronAPI.ghAccounts.clear();
+  if (result && !result.success) {
+    throw new Error(result.error || 'failed to clear saved GitHub account credentials');
   }
 };
 

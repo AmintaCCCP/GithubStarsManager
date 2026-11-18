@@ -251,18 +251,24 @@ export function hydrateMatches(
     // 向量 ID 带账号前缀（accountId:repoId）：剥离前缀前先核对归属与元数据一致性。
     const { accountId: prefixAccountId, repoId } = parseAccountScopedVectorId(String(match.id));
     const scope = options.accountIdScope;
+    let lookupId = String(match.id);
     if (scope) {
       const matchAccountId = match.metadata?.accountId;
       if (prefixAccountId) {
         if (prefixAccountId !== scope.accountId) return;
         if (matchAccountId && matchAccountId !== prefixAccountId) return;
+        // 归属已确认：剥离前缀后按本地仓库 ID 查找
+        lookupId = repoId;
       } else if (matchAccountId) {
         if (matchAccountId !== scope.accountId) return;
       } else if (!scope.allowLegacyUnscoped) {
         return;
       }
     }
-    const repo = repoById.get(repoId);
+    // 审计修复（C13）：无 accountIdScope 时保留原始向量 ID 查找——绝不能先剥
+    // 前缀再跳过归属检查，否则账号 8 的「8:42」向量会命中本地仓库 42 并影响
+    // 其排名（带前缀的原始 ID 不在本地索引中，自然无法水合）。
+    const repo = repoById.get(lookupId);
     if (!repo || !Number.isFinite(match.score) || match.score <= 0) return;
     const id = String(repo.id);
     if (
@@ -744,27 +750,40 @@ export async function runVectorSearchPipeline(
     timingsMs.rawEmbedding = Date.now() - rawEmbeddingStarted;
   });
 
-  const denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
+  // 审计修复（C14）：共享 /status 检查仅在任一路取得有效查询向量后才启动并
+  // 等待（惰性 memo，每次搜索最多决议一次，exact 与 ideal 两路共享结果）；
+  // 两路嵌入皆空（关 HyDE 且原始嵌入为空）时直接继续本地召回，绝不等待
+  // 最长 4 秒的 Worker 状态超时。
+  let denseScopePromise: Promise<DenseQueryScopeResolution> | null = null;
+  const ensureDenseScope = (): Promise<DenseQueryScopeResolution> => {
+    if (!denseScopePromise) {
+      denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
+    }
+    return denseScopePromise;
+  };
 
   let rawDenseStarted = 0;
-  const rawDensePromise = Promise.all([rawEmbeddingPromise, denseScopePromise])
-    .then(([vectors, denseScope]) => {
-      if (!vectors[0] || denseScope.skip) return [];
-      rawDenseStarted = Date.now();
-      return withBudget(
-        stageSignal => options.vectorService.query(
-          vectors[0],
-          {
-            topK: RECALL_TOP_K,
-            threshold,
-            ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
-          },
-          stageSignal,
-        ),
-        WORKER_TIMEOUT_MS,
-        signal,
-        [],
-      );
+  const rawDensePromise = rawEmbeddingPromise
+    .then((vectors) => {
+      if (!vectors[0]) return [];
+      return ensureDenseScope().then((denseScope) => {
+        if (denseScope.skip) return [];
+        rawDenseStarted = Date.now();
+        return withBudget(
+          stageSignal => options.vectorService.query(
+            vectors[0],
+            {
+              topK: RECALL_TOP_K,
+              threshold,
+              ...(denseScope.accountId ? { accountId: denseScope.accountId } : {}),
+            },
+            stageSignal,
+          ),
+          WORKER_TIMEOUT_MS,
+          signal,
+          [],
+        );
+      });
     })
     .finally(() => {
       if (rawDenseStarted) timingsMs.rawDense = Date.now() - rawDenseStarted;
@@ -799,7 +818,8 @@ export async function runVectorSearchPipeline(
       })()
         .then(async (vectors) => {
           if (!vectors[0]) return [];
-          const denseScope = await denseScopePromise;
+          // C14：仅在该路取得有效查询向量后才启动/等待共享 /status 检查
+          const denseScope = await ensureDenseScope();
           if (denseScope.skip) return [];
           const started = Date.now();
           return withBudget(

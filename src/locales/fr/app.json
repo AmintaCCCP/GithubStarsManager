@@ -241,6 +241,8 @@
     "add-account": "Ajouter un compte",
     "current-account": "Compte actuel",
     "remove-account": "Supprimer le compte",
+    "remove-account-with-login": "Supprimer @{{login}}",
+    "logout-account-changed": "Le compte a changé. Veuillez vous déconnecter à nouveau pour le compte actuel.",
     "switch-in-progress": "Un changement de compte est en cours. Veuillez réessayer dans un instant.",
     "remove-account-confirm-title": "Supprimer le compte enregistré",
     "remove-account-confirm-desc": "Cela supprime uniquement les identifiants de connexion enregistrés pour ce compte. Les dépôts et catégories en cache seront conservés. Continuer ?",

@@ -54,7 +54,11 @@ export interface AppActions {
   // Auth actions
   setUser: (user: GitHubUser | null) => void;
   setGitHubToken: (token: string | null) => void;
-  logout: () => void;
+  /**
+   * 清除当前会话凭证并归档工作区。expectedAccountId 为审计修复 B9 的期望账号
+   * 标识（退出确认框打开时的账号）；当前账号与之不一致时拒绝执行并返回 false。
+   */
+  logout: (expectedAccountId?: string) => boolean;
 
   // Auth & Multi-account actions (Issue #611)
   /** 保存或更新某个账号的凭证与用户信息到 savedAccounts */
@@ -67,6 +71,8 @@ export interface AppActions {
   parkCurrentAccountForRestore: () => string | null;
   /** 丢弃一次未完成登录残留在顶层工作区的部分同步数据（重置为空工作区，绝不归档为账号快照） */
   discardPartialLoginWorkspace: () => void;
+  /** 水化后从桌面端安全存储回填账号 Token（B7；Web 构建无持久化 PAT，不会调用） */
+  restorePersistedAccountTokens: (tokens: Record<string, string>) => void;
 
   // Repository actions
   setRepositories: (repos: Repository[], options?: { allowEmpty?: boolean }) => void;
@@ -234,7 +240,13 @@ export interface AppActions {
   setReleaseSearchQuery: (query: string) => void;
   toggleReleaseExpandedRepository: (repoId: number) => void;
   setReleaseExpandedRepositories: (repoIds: Set<number>) => void;
-  setReleaseIsRefreshing: (refreshing: boolean) => void;
+  /**
+   * Release 刷新状态（审计修复 B4）：发起时传 owner（发起账号 ID + 会话代次）；
+   * finally 清理时传同一身份——仅当该身份仍是标志持有者才清除（跨账号/跨会话
+   * 的过期 finally 不清除新账号已重新发起的刷新状态）；不传 owner 保持既有
+   * 布尔语义。
+   */
+  setReleaseIsRefreshing: (refreshing: boolean, owner?: { accountId: string | null; generation: number }) => void;
   setIncludePreRelease: (include: boolean) => void;
 
   // Backup/Export key inclusion preference

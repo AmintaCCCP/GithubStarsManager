@@ -67,15 +67,40 @@ wrangler secret put AUTH_TOKEN
 npm run deploy
 ```
 
-> **多账号（Issue #611）**：若多个 GitHub 账号共享同一个 Vectorize 索引，
+> **多账号（Issue #611 / #612）**：若多个 GitHub 账号共享同一个 Vectorize 索引，
 > 请按顺序完成以下步骤：
 >
 > 1. 创建 `accountId` 元数据索引：
 >    ```bash
 >    npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
 >    ```
-> 2. 等待元数据索引生效后，在客户端为每个已登录账号重新生成/上传向量（回填 `accountId` 元数据；索引建立前写入的存量向量不会被该索引收录）。
-> 3. 将 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED` 改为 `"true"`，并重新执行 `npm run deploy` 部署 Worker 使配置生效。
+> 2. 等待元数据索引生效后，在客户端为每个已登录账号重新生成/上传向量（回填 `accountId` 元数据；**索引建立前写入的存量向量不会被该索引收录**，必须重写）。
+>    - **全量重建跳过的存量向量如何处理**：元数据索引创建前上传、后来分析失败
+>      （或已不再被分析）的仓库会被客户端的全量重建跳过——这类向量有两种处理方式：
+>      **重新分析后重建**（恢复分析状态后再次执行"重建向量索引"），或
+>      **确认归属后重新上传原向量**（确认该向量属于当前账号后，由客户端携带
+>      `accountId` 元数据原样重传）。跳过任一步骤都会让这些仓库在账号过滤查询中
+>      永久失召。
+> 3. **启用账号过滤标志前，用「账号过滤查询」验证回填结果**，而不是只测 Worker
+>    连通性：
+>    ```bash
+>    curl -X POST "$WORKER_URL/query" -H "Authorization: Bearer $AUTH_TOKEN" \
+>      -H "Content-Type: application/json" \
+>      -d '{"vector": [...], "topK": 5, "accountId": "<你的数字账号ID>"}'
+>    ```
+>    请求被拒（`ACCOUNT_METADATA_NOT_INDEXED`）说明索引未生效；返回结果为空但
+>    `/status` 有向量数，说明该账号的回填未完成。
+> 4. 不要直接把 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED` 默认值改成 `"true"`
+>    （默认值保持 `"false"`，否则单账号部署会失去稠密向量召回）。使用部署向导在
+>    **部署时写入显式标记**：
+>    ```bash
+>    npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:true
+>    # 或使用交互向导（cloudflare-worker/deploy.mjs）：确认索引归属与回填完成后，
+>    # 向导会以 --var 写入 true 并持久化到 .deploy-config.json。
+>    # CLI 跳过交互：node deploy.mjs --account-metadata-indexed=true
+>    ```
+>    ⚠️ **绝不能按客户端本机账号数量推断索引归属**——索引是否由当前账号独占、
+>    回填是否完成，只有部署方通过上述验证才能确认。
 >
 > 在 `accountId` 元数据索引就绪并启用 `ACCOUNT_METADATA_INDEXED = "true"` 之前，按账号过滤的向量查询会被 Worker 拒绝（客户端会降级为本地关键词/词法检索，且会跳过按账号范围清理），以避免在缺少索引时漏召回或混入其他账号的向量。
 

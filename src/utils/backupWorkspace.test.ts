@@ -38,10 +38,13 @@ const workspaceOf = (repos: Repository[]): AccountWorkspace => ({
   selectedGistCategory: 'all',
   releases: [],
   releaseSubscriptions: [],
+  // 审计修复（C58）：夹具使用真实 ReleaseSourceSettings 结构
+  //（watchCustomReleaseRepos + customReleaseRepos），不再双重断言/强转。
   releaseSourceSettings: {
-    customRepos: [],
     enabledSourceIds: [],
-  } as unknown as AccountWorkspace['releaseSourceSettings'],
+    watchCustomReleaseRepos: [],
+    customReleaseRepos: [],
+  },
   readReleases: [],
   forks: [],
   readForks: [],
@@ -145,23 +148,42 @@ describe('multi-account backup helpers (Issue #611)', () => {
   });
 
   it('trims workspace fields to the selected export types (privacy boundary)', () => {
-    const full = workspaceOf([repo(1, 'private-summary')]);
+    // 审计修复（C58）：夹具填入非空 Gist/Release/Fork/自定义分类，使「保留」
+    // 与「移除」断言都有实际分辨力（空数组夹具下两类断言恒等、双重无效）。
+    const full: AccountWorkspace = {
+      ...workspaceOf([repo(1, 'private-summary')]),
+      gists: [{ id: 'gist-1' } as never],
+      starredGists: [{ id: 'star-1' } as never],
+      releases: [{ id: 900, repository: { id: 1 } } as never],
+      forks: [{ id: 800 } as never],
+      readForks: [800],
+      customCategories: [{ id: 'cat-1', name: 'Custom', icon: 'folder', keywords: [], isCustom: true }],
+      categoryOrder: ['cat-1'],
+      categoryListIdMap: { 'cat-1': 'list-1' },
+    };
     const workspaces = { '1': full, '2': { ...workspaceOf([repo(2, 'other-account')]) } };
 
-    // 只选 customCategories：其他账号的仓库/Release/Gist/Fork 绝不导出
+    // 只选 customCategories：分类保留；其余类型（含其他账号的仓库/Gist/Fork）绝不导出
     const trimmed = trimWorkspacesForSelectedTypes(workspaces, ['customCategories']);
     expect(trimmed['1'].customCategories).toEqual(full.customCategories);
     expect(trimmed['1'].categoryOrder).toEqual(full.categoryOrder);
     expect(trimmed['1'].repositories).toEqual([]);
     expect(trimmed['1'].releases).toEqual([]);
     expect(trimmed['1'].gists).toEqual([]);
+    expect(trimmed['1'].starredGists).toEqual([]);
     expect(trimmed['1'].forks).toEqual([]);
+    expect(trimmed['1'].readForks).toEqual([]);
     expect(trimmed['2'].repositories).toEqual([]);
 
-    // 选 repositories + releases：对应字段保留，分类字段不导出
+    // 选 repositories + releases：对应字段保留（Gist/Fork/同步范围随 repositories
+    // 类型导出），分类字段不导出
     const repoTrimmed = trimWorkspacesForSelectedTypes(workspaces, ['repositories', 'releases']);
     expect(repoTrimmed['1'].repositories).toEqual(full.repositories);
     expect(repoTrimmed['1'].releases).toEqual(full.releases);
+    expect(repoTrimmed['1'].gists).toEqual(full.gists);
+    expect(repoTrimmed['1'].starredGists).toEqual(full.starredGists);
+    expect(repoTrimmed['1'].forks).toEqual(full.forks);
+    expect(repoTrimmed['1'].readForks).toEqual(full.readForks);
     expect(repoTrimmed['1'].syncMode).toBe(full.syncMode);
     expect(repoTrimmed['1'].customCategories).toEqual([]);
     expect(repoTrimmed['1'].categoryListIdMap).toEqual({});

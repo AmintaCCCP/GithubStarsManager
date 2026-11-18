@@ -264,12 +264,33 @@ export interface VectorCleanupOptions {
    */
   accountPrefix?: string | null;
   /**
-   * 是否同时清理 legacy 无前缀向量。legacy 向量属于单租户时代的唯一所有者，
-   * 仅在本机单账号（归属明确）时才允许传 true。
+   * 是否同时清理 legacy 无前缀向量（审计修复 C17）。
+   * 仅在独立确认旧无前缀向量归属后才可为 true——例如通过旧部署记录/迁移
+   * 清单确认该索引的 legacy 向量专属当前账号。本机仅有一个已保存账号不能
+   * 作为归属已确认的依据：共享索引中可能仍有其他设备/旧客户端上传的
+   * legacy 向量，无法由本机账号数证明其归属。
    */
   includeLegacy?: boolean;
   signal?: AbortSignal;
 }
+
+/**
+ * 识别 AbortSignal（审计修复 C18）：`instanceof` 只认当前窗口的构造函数——
+ * 跨窗口（iframe/弹窗）传来的 signal 不通过该检查，会被误当作选项对象。
+ * 在 instanceof 之外叠加 duck-typing（aborted 布尔 + add/removeEventListener
+ * 函数）识别跨窗口 AbortSignal。
+ */
+const isAbortSignalLike = (value: unknown): value is AbortSignal => (
+  value instanceof AbortSignal
+  || (
+    typeof value === 'object'
+    && value !== null
+    && typeof (value as AbortSignal).aborted === 'boolean'
+    && typeof (value as AbortSignal).addEventListener === 'function'
+    && typeof (value as AbortSignal).removeEventListener === 'function'
+    && typeof (value as AbortSignal).dispatchEvent === 'function'
+  )
+);
 
 type VectorSearchServiceConfig = Pick<VectorSearchConfig, 'workerUrl' | 'authToken'>;
 
@@ -353,7 +374,9 @@ export class VectorSearchService {
    * 兼容旧签名 cleanup(keepIds, signal)。
    */
   async cleanup(keepIds: string[], options: VectorCleanupOptions | AbortSignal = {}): Promise<{ deleted: number; partial?: boolean }> {
-    const normalized: VectorCleanupOptions = options instanceof AbortSignal
+    // 审计修复（C18）：跨窗口 AbortSignal 不依赖当前窗口构造函数识别，
+    // 兼容旧签名 cleanup(keepIds, signal) 并转发给清理请求。
+    const normalized: VectorCleanupOptions = isAbortSignalLike(options)
       ? { signal: options }
       : options ?? {};
     const { accountPrefix, includeLegacy, signal } = normalized;

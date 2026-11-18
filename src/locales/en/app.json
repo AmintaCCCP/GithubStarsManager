@@ -241,6 +241,8 @@
     "add-account": "Add Account",
     "current-account": "Current Account",
     "remove-account": "Remove Account",
+    "remove-account-with-login": "Remove @{{login}}",
+    "logout-account-changed": "The account has changed. Please log out again for the current account.",
     "switch-in-progress": "An account switch is in progress. Please try again shortly.",
     "remove-account-confirm-title": "Remove Saved Account",
     "remove-account-confirm-desc": "This only removes the saved sign-in credential for this account. Cached repositories and categories will be kept. Continue?",

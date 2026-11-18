@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope, resolveWritableAccountScope } from '../db/accountScope.js';
+import { resolveAccountScope, resolveWritableAccountScope, bumpAccountRevision } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -184,6 +184,8 @@ router.put('/api/releases', (req, res) => {
         );
         count++;
       }
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      if (count > 0) bumpAccountRevision(db, accountId);
       return count;
     });
 
@@ -223,6 +225,8 @@ router.patch('/api/releases/:id', (req, res) => {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }
+    // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+    bumpAccountRevision(db, accountId);
     res.json(transformRelease(row));
   } catch (err) {
     console.error('PATCH /api/releases error:', err);
@@ -241,6 +245,8 @@ router.post('/api/releases/mark-all-read', (req, res) => {
     }
     const accountId = scope.accountId;
     const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
+    // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+    if (result.changes > 0) bumpAccountRevision(db, accountId);
     res.json({ updated: result.changes });
   } catch (err) {
     console.error('POST /api/releases/mark-all-read error:', err);
@@ -279,6 +285,9 @@ router.delete('/api/releases/:id', (req, res) => {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }
+
+    // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+    bumpAccountRevision(db, accountId);
 
     res.json({ deleted: true, id });
   } catch (err) {

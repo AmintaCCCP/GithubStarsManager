@@ -159,7 +159,13 @@ export const useRepositoryAnalysisJob = ({
     scope,
     syncOnComplete,
   }: RunRepositoryAnalysisOptions) => {
-    if (isRunningRef.current) return false;
+    if (isRunningRef.current) {
+      // 审计修复（C33）：运行锁被占用时给出明确提示而非静默 return false——
+      // 典型场景是切号后旧任务尚未结束（清理路径会中止并复位运行状态），
+      // 新账号立即重试即可启动。
+      toast(t('app:header.switch-in-progress'), 'error');
+      return false;
+    }
 
     if (!githubToken) {
       toast(t('useRepositoryAnalysisJob.github-token-not-found-please-login-again'), 'error');
@@ -239,6 +245,11 @@ export const useRepositoryAnalysisJob = ({
         // 账号已切换：丢弃本条结果并中止后续分析队列，绝不写入新账号的活跃列表
         if (!isCurrentAccountSession(jobAccountId, jobGeneration)) {
           stopRequestedRef.current = true;
+          // 审计修复（C33）：唤醒 + 中止——暂停等待中的优化器必须先 resume
+          // 再 abort（abort 本身也会退出 waitWhilePaused 循环，resume 确保等待
+          // 立即结束且不留下 paused 残留），否则旧任务可能卡在暂停等待，
+          // isRunningRef 无法复位，新账号无法立即 run()。
+          optimizer.resume();
           optimizer.abort();
           return;
         }
@@ -320,11 +331,22 @@ export const useRepositoryAnalysisJob = ({
       );
       return false;
     } finally {
+      // 审计修复（C32）：任务自身引用始终释放（仅当仍指向该任务）；共享状态
+      // （loading/进度）只在任务仍归属当前会话时清理——切号后共享状态归新
+      // 会话（switchAccount 已重置 analysisProgress），旧任务不得清掉新任务
+      // 的状态。hook 本地的运行/暂停标记始终复位，使新账号可立即 run()。
       if (optimizerRef.current === optimizer) {
         optimizerRef.current = null;
         isRunningRef.current = false;
         stopRequestedRef.current = false;
+      }
+      if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
         resetVisibleState();
+      } else if (mountedRef.current) {
+        setIsRunning(false);
+        isPausedRef.current = false;
+        setIsPaused(false);
+        setProgress({ current: 0, total: 0 });
       }
     }
   }, [aiConfigs, activeAIConfig, allCategories, confirm, githubToken, language, resetVisibleState, setAnalysisProgress, setLoading, t, toast, updateRepository]);

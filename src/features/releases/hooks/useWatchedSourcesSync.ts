@@ -63,7 +63,11 @@ export const useWatchedSourcesSync = () => {
       );
     } catch (error) {
       console.error('Failed to sync watched repositories:', error);
-      toast(t('useWatchedSourcesSync.failed-to-sync-watch-repositories-check-network'), 'error');
+      // 审计修复（C43）：失败 toast 前校验发起会话（账号 ID + 会话代次）——
+      // 仅发起会话仍是当前会话时提示；finally 的加载状态清理保持不变。
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(t('useWatchedSourcesSync.failed-to-sync-watch-repositories-check-network'), 'error');
+      }
     } finally {
       setIsSyncingWatchedSources(false);
     }

@@ -204,8 +204,37 @@ describe('Header account switcher', () => {
     unmount();
   });
 
-  it('logs out through the destructive item after confirmation', async () => {
+  it('logs out via the standalone icon button when only one account exists (B21)', async () => {
     baseState.savedAccounts = { '1': savedAccount('1', userA, 'ghp_a') };
+    const { unmount } = render(<Header />);
+
+    // 单账号：退出登录保留原独立图标入口
+    expect(screen.getByRole('button', { name: 'header.logout' })).toBeInTheDocument();
+    // 菜单内不再出现退出项（多账号才菜单化）
+    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
+    expect(screen.queryByText('header.logout')).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    // 菜单关闭后（aria-hidden 解除）独立退出按钮可触发确认与登出
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'header.logout' })).toBeInTheDocument();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'header.logout' }));
+
+    await waitFor(() => {
+      expect(mocks.confirm).toHaveBeenCalled();
+    });
+    // 审计修复（B9）：退出确认绑定打开确认框时的账号标识
+    await waitFor(() => {
+      expect(mocks.logoutCurrentAccount).toHaveBeenCalledWith('1');
+    });
+    unmount();
+  });
+
+  it('logs out through the destructive menu item when multiple accounts exist', async () => {
+    baseState.savedAccounts = {
+      '1': savedAccount('1', userA, 'ghp_a'),
+      '2': savedAccount('2', userB, 'ghp_b'),
+    };
     const { unmount } = render(<Header />);
 
     await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
@@ -215,7 +244,7 @@ describe('Header account switcher', () => {
       expect(mocks.confirm).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(mocks.logoutCurrentAccount).toHaveBeenCalled();
+      expect(mocks.logoutCurrentAccount).toHaveBeenCalledWith('1');
     });
     unmount();
   });

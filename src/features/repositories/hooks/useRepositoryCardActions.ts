@@ -6,6 +6,7 @@ import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
+  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
@@ -15,7 +16,8 @@ import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
 import { runSimilarRepositoryPipeline } from '../../../services/similarRepositoryPipeline';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { analyzeRepository, createFailedAnalysisResult } from '../../../services/aiAnalysisHelper';
-import { forceSyncToBackend } from '../../../services/autoSync';
+import { forceSyncToBackend, markPendingAccountSync, withAccountSwitchGuardSync } from '../../../services/autoSync';
+import { backend } from '../../../services/backendAdapter';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
 import { applyAnalysisFailure, applyAnalysisSuccess } from '../application/repositoryPatches';
@@ -427,6 +429,9 @@ export const useRepositoryCardActions = ({
     // 当前工作区中同 ID 的仓库并同步该删除。
     const startedAccountId = peekCurrentAccountId();
     const startedGeneration = getAccountSessionGeneration();
+    // 审计修复（C29）：发起时保存目标后端地址，供切号完成路径登记 (账号, 后端)
+    // 待补推删除标记。
+    const startedBackendUrl = backend.backendUrl ?? '';
 
     const confirmMessage = t('useRepositoryCardActions.are-you-sure-you-want-to-unstar-v1-this-will-rem', { v1: repository.full_name });
 
@@ -447,9 +452,45 @@ export const useRepositoryCardActions = ({
       const githubApi = createGitHubApiService(githubToken);
       const [owner, repo] = repository.full_name.split('/');
       await githubApi.unstarRepository(owner, repo);
-      // 远端取消星标已按发起账号完成；账号已切换时跳过本地删除与同步，
-      // 避免删除新账号工作区中的同 ID 仓库（原账号记录留待下次同步收敛）
-      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+      // 远端取消星标已按发起账号完成；账号已切换时跳过当前账号的本地删除与
+      // 同步，但必须为发起账号保留删除状态（审计修复 C29）：发起账号已重新
+      // 激活 → 在其当前实时工作区应用删除；仍停放 → 更新其归档快照（列表与
+      // release 归档一致）；同时登记发起账号 (账号, 后端) 的待同步删除标记，
+      // 切回后先补推删除再拉取，保证该仓库不再显示为已 Star。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        if (startedAccountId && typeof useAppStore.setState === 'function') {
+          const unstarredRepoId = repository.id;
+          const parkedAccountId: string = startedAccountId;
+          if (isCurrentAccount(startedAccountId)) {
+            withAccountSwitchGuardSync(() => {
+              useAppStore.setState((state) => ({
+                repositories: state.repositories.filter((r) => r.id !== unstarredRepoId),
+                releases: state.releases.filter((rel) => rel.repository.id !== unstarredRepoId),
+              }));
+            });
+          }
+          withAccountSwitchGuardSync(() => {
+            useAppStore.setState((state) => {
+              const parked = state.accountWorkspaces[parkedAccountId];
+              if (!parked) return state;
+              return {
+                accountWorkspaces: {
+                  ...state.accountWorkspaces,
+                  [parkedAccountId]: {
+                    ...parked,
+                    repositories: parked.repositories.filter((r) => r.id !== unstarredRepoId),
+                    releases: parked.releases.filter((rel) => rel.repository.id !== unstarredRepoId),
+                  },
+                },
+              };
+            });
+          });
+        }
+        if (startedAccountId) {
+          markPendingAccountSync(startedAccountId, startedBackendUrl);
+        }
+        return;
+      }
       deleteRepository(repository.id);
       await forceSyncToBackend();
       // 同步也是一次等待：切号后旧会话的提示不应出现在新账号。
@@ -458,10 +499,13 @@ export const useRepositoryCardActions = ({
       }
     } catch (error) {
       console.error('Failed to unstar repository:', error);
-      toast(
-        t('useRepositoryCardActions.failed-to-unstar-repository-please-check-your-ne'),
-        'error',
-      );
+      // 审计修复（C30）：失败提示绑定发起会话——会话已切则跳过提示。
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(
+          t('useRepositoryCardActions.failed-to-unstar-repository-please-check-your-ne'),
+          'error',
+        );
+      }
     } finally {
       setIsUnstarring(false);
     }

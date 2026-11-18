@@ -906,7 +906,8 @@ describe('useAppStore auth localStorage mirror (Issue #259)', () => {
 
     const raw = window.localStorage.getItem(AUTH_MIRROR_KEY);
     const mirror = JSON.parse(raw || '{}');
-    expect(mirror.githubToken).toBe('ghp_xxx');
+    // 审计修复（B7/CWE-922）：镜像不再持久化明文 PAT（仅用户与后端密钥）。
+    expect(mirror.githubToken).toBeNull();
     expect(mirror.user.login).toBe('test-user');
   });
 
@@ -924,9 +925,11 @@ describe('useAppStore auth localStorage mirror (Issue #259)', () => {
     expect(window.sessionStorage.getItem('github-stars-manager-backend-secret')).toBeNull();
   });
 
-  it('restores auth from the mirror when the persisted snapshot lacks credentials', () => {
+  it('restores the mirror user but never the mirror token when the persisted snapshot lacks credentials', () => {
     // Simulate the reported bug: async IndexedDB write never landed, so the
     // persisted snapshot has empty auth while the mirror holds the real values.
+    // 审计修复（B7/CWE-922）：镜像里的历史明文 PAT 一律不再回读——用户身份
+    // 仍从镜像恢复，Token 视为 null（桌面端经 safeStorage 回填 / 重新授权）。
     window.localStorage.setItem(
       AUTH_MIRROR_KEY,
       JSON.stringify({ user, githubToken: 'ghp_restored', backendApiSecret: null })
@@ -934,8 +937,8 @@ describe('useAppStore auth localStorage mirror (Issue #259)', () => {
 
     const normalized = normalizePersistedState({}, useAppStore.getState());
     expect(normalized.user).toEqual(user);
-    expect(normalized.githubToken).toBe('ghp_restored');
-    expect(normalized.isAuthenticated).toBe(true);
+    expect(normalized.githubToken).toBeNull();
+    expect(normalized.isAuthenticated).toBe(false);
   });
 
   it('prefers persisted credentials over the mirror when both exist', () => {
@@ -1210,14 +1213,20 @@ describe('useAppStore logout and per-account workspaces', () => {
   });
 
   it('removing the current account switches to the most recent saved account with both workspaces intact', () => {
+    const userC = { id: 3, login: 'carol', name: 'Carol', avatar_url: 'https://x/c.png', email: null };
+    const userD = { id: 4, login: 'dave', name: 'Dave', avatar_url: 'https://x/d.png', email: null };
     const aliceRepos = [createRepository(1, { ai_summary: 'alice-ai' })];
     useAppStore.setState({
       user: userA,
       githubToken: 'ghp_a',
       isAuthenticated: true,
       savedAccounts: {
-        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
-        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+        // 审计修复（B23）候选强度：bob（较新、有 Token）、carol（更早、有 Token）、
+        // dave（最新但无 Token——必须被跳过，不得因最近使用而当选）
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't1' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't3' },
+        '3': { accountId: '3', user: userC, githubToken: 'ghp_c', addedAt: 't', lastUsedAt: 't2' },
+        '4': { accountId: '4', user: userD, githubToken: '', addedAt: 't', lastUsedAt: 't4' },
       },
       repositories: aliceRepos,
       searchResults: aliceRepos,
@@ -1247,7 +1256,7 @@ describe('useAppStore logout and per-account workspaces', () => {
 
     useAppStore.getState().removeSavedAccount('1');
     const state = useAppStore.getState();
-    // 被移除的是当前账号：自动切换到下一个已保存账号
+    // 被移除的是当前账号：自动切换到「最近使用的有效账号」（无 Token 的账号被跳过）
     expect(state.savedAccounts['1']).toBeUndefined();
     expect(state.user?.login).toBe('bob');
     expect(state.githubToken).toBe('ghp_b');
@@ -1295,12 +1304,12 @@ describe('useAppStore logout and per-account workspaces', () => {
     expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
   });
 
-  it('backfills the signed-in account into savedAccounts during the v17→v18 migration', async () => {
+  it('backfills the signed-in account into savedAccounts and scrubs plaintext tokens during the v17→v19 migration', async () => {
     const options = useAppStore.persist.getOptions() as unknown as {
       version: number;
       migrate: (snapshot: unknown, version: number) => Promise<Record<string, unknown>>;
     };
-    expect(options.version).toBe(18);
+    expect(options.version).toBe(19);
 
     const migrated = await options.migrate({
       user: { id: 7, login: 'legacy', name: 'Legacy', avatar_url: 'https://x/l.png', email: null },
@@ -1309,8 +1318,11 @@ describe('useAppStore logout and per-account workspaces', () => {
     }, 17);
 
     const saved = migrated.savedAccounts as Record<string, { accountId: string; githubToken: string }>;
-    expect(saved['7']).toMatchObject({ accountId: '7', githubToken: 'ghp_legacy' });
+    // 审计修复（B7）：v18 回填后 v19 迁移把明文 PAT 清出分片——账号条目保留
+    // 非敏感元数据（githubToken 置空），顶层 githubToken 置 null。
+    expect(saved['7']).toMatchObject({ accountId: '7', githubToken: '' });
     expect(saved.broken).toBeUndefined();
+    expect(migrated.githubToken).toBeNull();
   });
 });
 

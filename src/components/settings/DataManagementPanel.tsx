@@ -9,7 +9,7 @@ import { xTweetStorage } from '../../services/xTweetStorage';
 import { telegramStorage } from '../../services/telegramStorage';
 import { abortXTweetSync } from '../../services/xTweetService';
 import { abortTelegramSync } from '../../services/telegramService';
-import { clearEncryptedXAuthViaDesktop } from '../../services/electronProxy';
+import { clearEncryptedXAuthViaDesktop, clearEncryptedGhAccountsViaDesktop } from '../../services/electronProxy';
 import { normalizeAssetFilters } from '../../utils/assetFilters';
 import {
   AlertDialog,
@@ -56,6 +56,7 @@ import {
 import { Github } from '../ui/brand-icons';
 import { useAppStore } from '../../store/useAppStore';
 import { removePersistedSnapshot } from '../../store/persistence/storage';
+import { useDataResetActions } from '../../features/settings/hooks/useDataResetActions';
 import { normalizePluginCustomIcons } from '../../store/normalizers/persistedState';
 import {
   accountIdKey,
@@ -364,6 +365,9 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
     setShowErrorMessage(message);
     setTimeout(() => setShowErrorMessage(null), 5000);
   }, []);
+
+  // 审计修复（C51）：账号级待推状态清理经 features hook 转出口（分层守则）。
+  const { clearPendingSyncState } = useDataResetActions();
 
   const clearAllStorage = async () => {
     // App-owned localStorage keys and prefixes
@@ -817,6 +821,28 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       // Legacy compatibility: treat missing flag as true (older exports contained keys)
       const wasIncluded = importedData.includeKeysInBackup ?? true;
 
+      // 审计修复（C54）：activeAccountId 用于决定恢复目标/写 store 前先验证
+      // 类型与有效性（字符串、数值 ID 形态；拒绝数值 2 等）——无效载荷整体
+      // 拒绝导入，避免恢复目标错位；旧文件缺该字段的兼容路径保留。
+      const rawActiveAccountId = importedData.activeAccountId;
+      if (
+        rawActiveAccountId !== undefined
+        && rawActiveAccountId !== null
+        && (typeof rawActiveAccountId !== 'string' || !/^\d+$/.test(rawActiveAccountId))
+      ) {
+        addLog(t('dataManagementPanel.import-data'), false, 'invalid activeAccountId');
+        showError(t('dataManagementPanel.invalid-backup-file-format'));
+        return;
+      }
+      // 审计修复（C52）：releaseSubscriptions 必须是数组（接受 [] 显式清空）。
+      // 非数组载荷直接拒绝导入——归档路径的 Set 构造会抛错且不回滚，绝不把
+      // 部分归档写入 store。
+      if (importedData.releaseSubscriptions !== undefined && !Array.isArray(importedData.releaseSubscriptions)) {
+        addLog(t('dataManagementPanel.import-data'), false, 'invalid releaseSubscriptions');
+        showError(t('dataManagementPanel.invalid-backup-file-format'));
+        return;
+      }
+
       // ── 多账号恢复（Issue #611）───────────────────────────────────────
       // 绝不丢失其他账号工作区：备份中的工作区合并进本机 accountWorkspaces，
       // 本机独有的其他账号快照原样保留。
@@ -1241,6 +1267,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
             const filteredIncoming: AccountWorkspace = {
               ...empty,
               repositories: includeRepos ? incoming.repositories : [],
+              // 审计修复（C55）：合并导入时新工作区从 incoming 复制 lastSync 与
+              // selectedGistCategory（与裁剪导出时两字段随 repositories 类型
+              // 一同导出的语义一致）；已有工作区在 mergeWorkspacesById 的
+              // 本机基座展开下保留本机这两字段值。
+              ...(includeRepos ? { lastSync: incoming.lastSync, selectedGistCategory: incoming.selectedGistCategory } : {}),
               releases: includeReleases ? incoming.releases : [],
               gists: includeRepos ? incoming.gists : [],
               starredGists: includeRepos ? incoming.starredGists : [],
@@ -1533,7 +1564,11 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         // 以恢复后的实时状态为准（旧版单账号备份路径保持原有行为）。
         const backupWorkspace = importedWorkspaces[currentAccountId];
         if (hasImportedWorkspaces && backupWorkspace) {
-          useAppStore.setState(applyAccountWorkspaceForTypes(backupWorkspace, selectedTypes));
+          // 审计修复（C57）：实时应用与目标账号快照替换共用同一补丁语义——
+          // 依据原始备份工作区实际存在的字段生成补丁（缺失字段保留实时值，
+          // 显式 [] 清空），区分「未导出字段」与「导出为空」。
+          const rawCurrentAccountWorkspace = (importedData.accountWorkspaces as Record<string, Record<string, unknown>> | undefined)?.[currentAccountId];
+          useAppStore.setState(applyAccountWorkspaceForTypes(backupWorkspace, selectedTypes, rawCurrentAccountWorkspace));
         } else if (!hasImportedWorkspaces) {
           // 旧版单账号备份没有工作区快照：顶层 syncMode 是唯一来源。
           if (importedData.syncMode === 'stars' || importedData.syncMode === 'stars-and-lists') {
@@ -1750,6 +1785,20 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         // 忽略桌面端清理失败
       }
 
+      // 审计修复（自审计补充）：同步清除桌面端加密保存的 GitHub 账号凭证文件
+      // （gh-accounts.enc），保证「清空全部数据」语义覆盖所有持久化凭据。
+      try {
+        await clearEncryptedGhAccountsViaDesktop();
+      } catch {
+        // 忽略桌面端清理失败
+      }
+
+      // 审计修复（C51）：清除账号级待推状态——gsm.pendingSyncAccounts /
+      // gsm.pushedRepoIds 的持久化与内存记录、会话删除集合、在途退避重试与
+      // 待推防抖。这些键不属于 clearAllStorage 的清理前缀，只清空 savedAccounts
+      // 会残留待推标记并在重启后触发对已清空分区的补推。
+      clearPendingSyncState();
+
       // 存储清除成功后，重置所有状态到初始值
       useAppStore.setState({
         // 用户和认证
@@ -1768,10 +1817,18 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         searchResults: [],
         lastSync: null,
 
+        // Gist / Fork 数据（审计修复 C53：同一补丁清空实时工作区数据，
+        // 避免被持久化层写回）
+        gists: [],
+        starredGists: [],
+        forks: [],
+        readForks: new Set<number>(),
+
         // Release 数据
         releases: [],
         releaseSubscriptions: new Set<number>(),
         readReleases: new Set<number>(),
+        releaseSourceSettings: normalizeReleaseSourceSettings(null),
 
         // AI 配置
         aiConfigs: [],

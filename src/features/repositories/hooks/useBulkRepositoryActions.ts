@@ -16,6 +16,7 @@ import {
 } from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { forceSyncToBackend, markPendingAccountSync, withAccountSwitchGuardSync } from '../../../services/autoSync';
+import { backend } from '../../../services/backendAdapter';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { computeCustomCategory, getAICategory, getDefaultCategory } from '../../../utils/categoryUtils';
 import {
@@ -89,6 +90,9 @@ export const useBulkRepositoryActions = ({
     const startedAccountId = peekCurrentAccountId();
     // A→B→A：账号 ID 与确认前相同，只有会话代次能识别这次切号。
     const startedGeneration = getAccountSessionGeneration();
+    // 审计修复（C26）：操作发起时保存目标后端地址——完成时即使后端已切换，
+    // 待补推标记也登记到发起时的 (账号, 后端) 复合键，绝不推到切换后的后端。
+    const startedBackendUrl = backend.backendUrl ?? '';
     if (!githubToken) {
       toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
       return false;
@@ -122,14 +126,27 @@ export const useBulkRepositoryActions = ({
     }
 
     // 等待 GitHub API 期间已切号：远端取消星标按发起账号完成（保留），
-    // 将已确认结果写回发起账号的归档工作区并标记待补推，绝不污染新账号工作区
+    // 审计修复（C25）：按结果归属处理——发起账号已重新激活时在其当前实时
+    // 工作区对账（列表与 release 归档一致），仍停放时更新其归档快照；
+    // 两条路径都只作用于发起账号自己的数据，绝不影响其他账号中 ID 相同的
+    // 仓库（代次不匹配后也不再发起新的远端请求，循环已在会话失效时 break）。
     if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
       if (startedAccountId && successIds.length > 0 && typeof useAppStore.setState === 'function') {
         const unstarredSet = new Set(successIds);
+        if (isCurrentAccount(startedAccountId)) {
+          // 已重新激活：在其当前实时工作区应用删除
+          withAccountSwitchGuardSync(() => {
+            useAppStore.setState((state) => ({
+              repositories: state.repositories.filter((r) => !unstarredSet.has(r.id)),
+              releases: state.releases.filter((rel) => !unstarredSet.has(rel.repository.id)),
+            }));
+          });
+        }
         withAccountSwitchGuardSync(() => {
           useAppStore.setState((state) => {
             const parked = state.accountWorkspaces[startedAccountId];
             if (!parked) return state;
+            // 归档快照同样应用删除，保持列表/归档一致（仅限发起账号条目）
             return {
               accountWorkspaces: {
                 ...state.accountWorkspaces,
@@ -142,7 +159,8 @@ export const useBulkRepositoryActions = ({
             };
           });
         });
-        markPendingAccountSync(startedAccountId);
+        // 审计修复（C26）：登记到发起时的 (账号, 后端)，切回后先补推删除再拉取。
+        markPendingAccountSync(startedAccountId, startedBackendUrl);
       }
       return false;
     }

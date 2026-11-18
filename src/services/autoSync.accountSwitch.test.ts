@@ -326,17 +326,29 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     expect(hasPendingAccountSync('2')).toBe(false);
   });
 
-  it('delivers a buffered frozen-window edit to the original backend partition on re-push (R4 failure path)', async () => {
-    // 恢复失败（回滚原后端）后的调用方补推：缓冲编辑所在的工作区在原后端、
-    // 以发起账号 A 的上下文落盘（syncSettings 携带 A 的 categoryOrder）。
+  it('delivers a buffered frozen-window edit to the original backend partition on re-push (R4 failure path, C60a)', async () => {
+    // 审计修复（C60a）：为冻结窗口配置不同 backendUrl——原后端进入冻结窗口，
+    // 窗口内切到候选后端（模拟 backend.init 提交候选 URL）。缓冲编辑按原后端
+    // 登记：候选后端上无 A 待推标记，切回原后端才可见；成功补推后仅清除
+    // 原后端标记并核对写入目标。
     seedTwoAccounts([]);
     cancelPendingAccountSwitchPush();
+    const adapter = backend as unknown as { backendUrl?: string };
+    adapter.backendUrl = 'http://origin';
     vi.mocked(backend.syncRepositories).mockClear();
     vi.mocked(backend.syncSettings).mockClear();
 
     await withAccountSwitchFrozen(async () => {
       useAppStore.setState({ categoryOrder: ['restored-edit'] });
+      // 候选后端连接提交（窗口内）
+      adapter.backendUrl = 'http://candidate';
     });
+
+    // 候选后端上无 A 待推标记（标记归属原后端）
+    expect(hasPendingAccountSync('1')).toBe(false);
+
+    // 切回原后端：标记才可见
+    adapter.backendUrl = 'http://origin';
     expect(hasPendingAccountSync('1')).toBe(true);
 
     // 模拟调用方失败收尾：连接已复原、发起账号仍活跃——立即补推
@@ -348,6 +360,26 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     // 补推成功即清除账号级标记（审计修复：仅在确认对账成功后清除）；
     // 失败路径由 pushToBackend 保留标记，重启后仍会补推。
     expect(hasPendingAccountSync('1')).toBe(false);
+    delete adapter.backendUrl;
+  });
+
+  it('replacing into a non-empty B workspace does not schedule a push (C60b)', async () => {
+    // 审计修复（C60b）：退场测试升级——B 的本地工作区非空时，工作区替换
+    // 同样不得调度推送（B 的快照在其后端分区被对齐拉取观察前绝不能外发）；
+    // 空工作区用例保留为独立回归。
+    seedTwoAccounts([createRepository(2)]);
+    cancelPendingAccountSwitchPush();
+    vi.mocked(backend.syncRepositories).mockClear();
+    vi.mocked(backend.syncSettings).mockClear();
+
+    useAppStore.getState().removeSavedAccount('1');
+
+    expect(useAppStore.getState().user?.id).toBe(2);
+    expect(useAppStore.getState().repositories[0]?.id).toBe(2);
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+    expect(backend.syncSettings).not.toHaveBeenCalled();
+    expect(backend.syncReleases).not.toHaveBeenCalled();
   });
 });
 

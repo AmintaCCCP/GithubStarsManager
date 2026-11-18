@@ -11,6 +11,13 @@ if (process.isMainFrame) contextBridge.exposeInMainWorld('electronAPI', {
     get: () => ipcRenderer.invoke('x-auth:get'),
     clear: () => ipcRenderer.invoke('x-auth:clear'),
   },
+  // 审计修复（B7）：GitHub 账号 Token 经主进程 safeStorage 加密文件
+  //（gh-accounts.enc）持久化；Web 构建无此桥，PAT 不持久化。
+  ghAccounts: {
+    save: (tokens) => ipcRenderer.invoke('gh-accounts:save', tokens),
+    get: () => ipcRenderer.invoke('gh-accounts:get'),
+    clear: () => ipcRenderer.invoke('gh-accounts:clear'),
+  },
   telegramFetchChannel: (channel, before) => ipcRenderer.invoke('telegram-fetch-channel', channel, before),
   // WebDAV：主进程代发 DAV 请求，绕开渲染进程的 CORS 限制
   webdavRequest: (params) => ipcRenderer.invoke('webdav-request', params),

@@ -140,8 +140,8 @@ describe('useVectorSearchActions', () => {
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
     const expectedCleanupOptions = { accountPrefix: '1', includeLegacy: false, signal: expect.any(AbortSignal) };
-    expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1:1', '2', '1:2'], expectedCleanupOptions);
-    expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1:1', '2', '1:2'], expectedCleanupOptions);
+    expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1', '2', '1:1', '1:2'], expectedCleanupOptions);
+    expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1', '2', '1:1', '1:2'], expectedCleanupOptions);
     expect(mocks.updateRepositoriesMetadata).not.toHaveBeenCalledWith(expect.arrayContaining([
       expect.objectContaining({ id: 2 }),
     ]));
@@ -237,7 +237,7 @@ describe('useVectorSearchActions account switch guards', () => {
     // R5 审计修复：新版 Worker 按账号前缀删除——本机多账号也不再跳过 cleanup，
     // 但只允许删除当前账号（id=1）前缀的向量；legacy 向量归属不明，绝不删除
     expect(mocks.vectorGetStatus).toHaveBeenCalledTimes(1);
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '1:1'], {
       accountPrefix: '1',
       includeLegacy: false,
       signal: expect.any(AbortSignal),
@@ -255,7 +255,7 @@ describe('useVectorSearchActions account switch guards', () => {
 
     // 本机只有一个账号不能证明共享索引中的无前缀向量都属于它（另一台设备
     // 可能仍在上传 legacy 形态），保留。
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '1:1'], {
       accountPrefix: '1',
       includeLegacy: false,
       signal: expect.any(AbortSignal),
@@ -312,7 +312,7 @@ describe('useVectorSearchActions account switch guards', () => {
 
     // R4 审计修复：keepIds 与索引中的实际向量 ID 形态一致——账号前缀形态
     //（发起账号 id=1 → '1:1'）
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '1:1'], {
       accountPrefix: '1',
       includeLegacy: false,
       signal: expect.any(AbortSignal),
@@ -346,7 +346,7 @@ describe('useVectorSearchActions account switch guards', () => {
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    expect(mocks.cleanup).toHaveBeenCalledWith(['1:1', '2', '1:2'], {
+    expect(mocks.cleanup).toHaveBeenCalledWith(['1', '2', '1:1', '1:2'], {
       accountPrefix: '1',
       includeLegacy: false,
       signal: expect.any(AbortSignal),
@@ -429,13 +429,18 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
   });
 
-  it('writes connection status for the current account after a successful worker test', async () => {
+  it('keeps the existing account vector count on a successful worker test (C50)', async () => {
+    // 审计修复（C50）：连接测试的 Worker 总向量数（含所有账号分区的向量）
+    // 不写入 vectorSearchStatus.vectorCount——已有账号计数保留，总向量数仅在
+    // workerTestResult（测试结果）中可见。
     mocks.vectorTestConnection.mockResolvedValue({ success: true, vectorCount: 5, dimensions: 1536 });
+    (storeState as { vectorSearchStatus?: { connected: boolean; vectorCount: number; dimensions: number } }).vectorSearchStatus = { connected: false, vectorCount: 3, dimensions: 1536 };
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.testWorker({ workerUrl: 'https://worker.example.com', authToken: 'worker-token' }); });
 
-    expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 5, dimensions: 1536 });
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 3, dimensions: 1536 });
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalledWith({ connected: true, vectorCount: 5, dimensions: 1536 });
   });
 
   it('skips the connection status write when the account switched during the worker test', async () => {

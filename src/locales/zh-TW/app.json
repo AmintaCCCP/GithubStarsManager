@@ -241,6 +241,8 @@
     "add-account": "新增帳號",
     "current-account": "目前帳號",
     "remove-account": "移除帳號",
+    "remove-account-with-login": "移除 @{{login}}",
+    "logout-account-changed": "帳號已切換，請對目前帳號重新執行登出。",
     "switch-in-progress": "正在切換帳號，請稍後再試。",
     "remove-account-confirm-title": "移除已儲存的帳號",
     "remove-account-confirm-desc": "僅會移除該帳號的快速登入憑證，本機快取的儲存庫與分類仍會保留。確定要繼續嗎？",

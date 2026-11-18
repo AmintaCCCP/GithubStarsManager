@@ -70,6 +70,11 @@ const {
   clearEncryptedXAuth,
 } = require('./xAuthStorage');
 const {
+  saveEncryptedGhAccounts,
+  loadEncryptedGhAccounts,
+  clearEncryptedGhAccounts,
+} = require('./ghAccountsStorage');
+const {
   scheduleMinimizeToTray,
   hideWindowToTray,
   restoreWindowFromTray,
@@ -887,6 +892,26 @@ ipcMain.handle('x-auth:get', async () => {
 ipcMain.handle('x-auth:clear', async () => {
   const result = clearEncryptedXAuth({ fs, pathModule: path, userDataPath: app.getPath('userData') });
   console.log('[x-auth:clear] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
+  return result;
+});
+
+// 审计修复（B7/CWE-922）：GitHub 账号 Token 只经 safeStorage 加密文件
+//（gh-accounts.enc）持久化，浏览器持久化分片不再保存明文 PAT。
+ipcMain.handle('gh-accounts:save', async (_event, tokens) => {
+  const result = saveEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage }, tokens);
+  console.log('[gh-accounts:save] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
+  return result;
+});
+
+ipcMain.handle('gh-accounts:get', async () => {
+  const result = loadEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage });
+  console.log('[gh-accounts:get] result:', result ? `found ${Object.keys(result).length} account tokens` : 'no account tokens on disk');
+  return result;
+});
+
+ipcMain.handle('gh-accounts:clear', async () => {
+  const result = clearEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData') });
+  console.log('[gh-accounts:clear] result:', result.success ? 'OK' : `FAIL: ${result.error}`);
   return result;
 });
 

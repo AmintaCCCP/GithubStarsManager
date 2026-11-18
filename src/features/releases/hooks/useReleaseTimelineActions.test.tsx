@@ -133,7 +133,28 @@ describe('useReleaseTimelineActions account switch guards', () => {
   });
 
   const switchToB = () => {
+    // 审计修复（C42）：切号桩升级为真实 switchAccount 语义——归档 A 的当前
+    // 集合进其工作区快照，并为 B 装载独立集合（Release [202] / 已读 {205}），
+    // 使「B 不被修改、A 归档仅撤销本次操作」可被精确断言。
+    const stateWithArchives = storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> };
+    stateWithArchives.accountWorkspaces = {
+      ...stateWithArchives.accountWorkspaces,
+      '1': {
+        repositories: [...storeState.repositories],
+        releases: [...storeState.releases],
+        readReleases: [...storeState.readReleases],
+      },
+    };
     (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+    storeState.releases = [{ id: 202, repository: { id: 20, name: 'other-repo', full_name: 'other/repo' }, name: 'v2' } as unknown as Release];
+    storeState.readReleases = new Set<number>([205]);
+  };
+
+  // 不归档的切号（模拟发起账号从未有过快照的全新会话）
+  const switchToBWithoutArchive = () => {
+    (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+    storeState.releases = [{ id: 202, repository: { id: 20, name: 'other-repo', full_name: 'other/repo' }, name: 'v2' } as unknown as Release];
+    storeState.readReleases = new Set<number>([205]);
   };
 
   it('rolls back readReleases into the originating account when no switch happened', async () => {
@@ -157,8 +178,11 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // 切号后回滚被丢弃：绝不以账号 A 的已读快照覆盖账号 B 的工作区
-    expect(storeState.readReleases).toEqual(new Set([7, 8, 101]));
+    // 切号后回滚被丢弃：B 的独立已读集合不被 A 的回滚改写（B 不被修改）
+    expect(storeState.readReleases).toEqual(new Set([205]));
+    // A 的归档快照只回滚本次操作：乐观新增的 101 被撤销，操作前的 7/8 保留
+    const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
+    expect(parked?.readReleases).toEqual([7, 8]);
   });
 
   it('writes the read-state rollback into the originating account snapshot after a switch', async () => {
@@ -177,8 +201,8 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // 当前账号 B 的 live 已读集合没有被 A 的回滚改写
-    expect(storeState.readReleases).toEqual(new Set([7, 8, 101]));
+    // 当前账号 B 的 live 已读集合（B 自己的 {205}）没有被 A 的回滚改写
+    expect(storeState.readReleases).toEqual(new Set([205]));
     // 发起账号 A 的快照已回写为操作前的已读集合，下次激活时不再显示
     // 服务端已失败的「全部已读」状态
     const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
@@ -188,7 +212,7 @@ describe('useReleaseTimelineActions account switch guards', () => {
 
   it('does not create a workspace snapshot when the originating account has none', async () => {
     mocks.markAllReleasesAsRead.mockImplementation(async () => {
-      switchToB();
+      switchToBWithoutArchive();
       throw new Error('backend down');
     });
     // 发起账号没有归档快照（如从未切过号的全新会话）：不得凭空创建
@@ -197,7 +221,7 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    expect(storeState.readReleases).toEqual(new Set([7, 8, 101]));
+    expect(storeState.readReleases).toEqual(new Set([205]));
     expect((storeState as { accountWorkspaces?: Record<string, unknown> }).accountWorkspaces).toBeUndefined();
   });
 

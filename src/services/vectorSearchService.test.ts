@@ -215,7 +215,7 @@ describe('indexAllRepos partial embedding failure reporting (R5 finding 4)', () 
 
     // 只有 repo2/repo3 被上传并报告；失败的 repo1 绝不能出现在已索引列表
     const upsertedVectorIds = (vectorService.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0].map((v: { id: string }) => v.id);
-    expect(upsertedVectorIds).toHaveLength(2);
+    expect(upsertedVectorIds).toEqual(['2', '3']);
     expect(indexedIds).toEqual([2, 3]);
     expect(result.indexedRepoIds).toEqual([2, 3]);
     expect(result.indexed).toBe(2);

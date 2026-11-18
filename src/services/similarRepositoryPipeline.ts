@@ -41,7 +41,16 @@ interface DenseOutcome {
   matches: VectorQueryResult[];
   success: boolean;
   error?: string;
+  /** 账号隔离范围未就绪（Worker 未建立 accountId 元数据索引）：稠密召回被跳过（C15）。 */
+  indexUnavailable?: boolean;
 }
+
+/**
+ * C15：稠密召回因账号隔离范围未就绪被跳过时的失败语义——不得当作成功的空
+ * 结果返回。该消息经既有错误路径（结果为空时抛错 → 调用方 toast）单独报告
+ * 「索引不可用/需重建」，重建入口沿用现有的 VectorSearchSettings 重建按钮。
+ */
+const DENSE_INDEX_UNAVAILABLE_ERROR = 'Vector index is not ready for account-scoped recall; rebuild the index in Vector Search settings for the current account';
 
 export interface RunSimilarRepositoryPipelineOptions {
   source: Repository;
@@ -81,6 +90,8 @@ export interface SimilarRepositoryPipelineResult {
     profileSource: 'ai' | 'local';
     llmStatus: 'complete' | 'empty' | 'invalid' | 'skipped';
     fallback: 'none' | 'cross-encoder' | 'fusion' | 'empty-guard';
+    /** C15：稠密召回因账号隔离范围未就绪被跳过（索引不可用/需重建）。 */
+    denseIndexUnavailable: boolean;
     timingsMs: Record<string, number>;
   };
 }
@@ -365,9 +376,23 @@ export async function runSimilarRepositoryPipeline(
     readme,
     vectorConfig.readmeMaxChars ?? 6000,
   );
+  // 审计修复（C16）：账号隔离范围每次搜索只决议一次，exact 与 profile 两路共享
+  // 同一决议结果；决议在嵌入请求之前完成——判定跳过时两路都不发送 embedding
+  // 请求（旧实现把 skip 当作成功的空结果，还会白白消耗两次嵌入调用）；
+  // Worker 就绪时两路仍各自生成 embedding。
+  const denseScopePromise = resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
   const recallDense = async (text: string, prefix: 'exact' | 'profile'): Promise<DenseOutcome> => {
     if (!text.trim()) {
       return { matches: [], success: false, error: `${prefix} query text is empty` };
+    }
+    const denseScope = await denseScopePromise;
+    if (denseScope.skip) {
+      // 审计修复（C15）：索引对当前账号不可用（未确认归属/需重建）时按失败
+      // 语义单独报告，绝不当作成功的空结果；本地召回结果照常保留。
+      logger.warn('vector-search', `${prefix} dense recall skipped: account-scoped index not ready; rebuild the index for the current account`, {
+        accountId: options.accountIdScope?.accountId ?? null,
+      });
+      return { matches: [], success: false, error: DENSE_INDEX_UNAVAILABLE_ERROR, indexUnavailable: true };
     }
     let embeddingTimedOut = false;
     const embeddingStarted = Date.now();
@@ -387,10 +412,6 @@ export async function runSimilarRepositoryPipeline(
         return { matches: [], success: false, error: `${prefix} embedding returned no vector` };
       }
 
-      const denseScope = await resolveDenseQueryAccountScope(options.vectorService, options.accountIdScope, signal);
-      if (denseScope.skip) {
-        return { matches: [], success: true };
-      }
       let workerTimedOut = false;
       const workerStarted = Date.now();
       const matches = await withBudget(
@@ -551,6 +572,7 @@ export async function runSimilarRepositoryPipeline(
       profileSource: profileSource as 'ai' | 'local',
       llmStatus: finished.diagnostics.llmStatus,
       fallback: finished.diagnostics.fallback,
+      denseIndexUnavailable: !!(exactOutcome.indexUnavailable || profileOutcome.indexUnavailable),
       timingsMs,
     },
   };

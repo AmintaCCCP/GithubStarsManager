@@ -60,8 +60,12 @@ export interface AccountSwitchActions {
   addAccountFromBackend: (url: string, secret: string, expectedAccountId?: string) => Promise<AddAccountResult>;
   /** 从已保存账号列表移除指定账号（保留其本地工作区数据） */
   removeAccount: (targetAccountId: string) => Promise<void>;
-  /** 退出登录（含二次确认调用方） */
-  logoutCurrentAccount: () => Promise<boolean>;
+  /**
+   * 退出登录（含二次确认调用方）。expectedAccountId 为审计修复 B9 的期望
+   * 账号标识（确认框打开时的账号）：获取切换锁后与当前账号比较，不一致则
+   * 不执行退出并返回 false，由调用方提示用户对当前账号重新发起退出。
+   */
+  logoutCurrentAccount: (expectedAccountId?: string) => Promise<boolean>;
 }
 
 /**
@@ -287,6 +291,11 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     // restored-token-invalid / github-token-required 分支会保留候选后端的 URL，
     // 失败时只恢复密钥会让原账号拿着原密钥请求候选后端，原连接无法继续工作。
     const previousBackendUrl = backend.backendUrl;
+    // 审计修复（C63）：保存切换前持久化的后端 URL——restoreBackendSession 在
+    // 身份校验通过后经 rememberActiveUrl 持久化候选 URL，调用方（账号校验/
+    // 恢复结果）未接受即失败时必须还原，否则回滚后的 init 自动探测会读到
+    // 刚保存的候选 URL，把原会话悄悄连回候选后端。
+    const previousPersistedUrl = backend.persistedUrl;
     const currentAccountId = accountIdKey(useAppStore.getState().user);
     let parkedAccountId: string | null = null;
     let succeeded = false;
@@ -296,10 +305,10 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       // 发送到新后端（backend.init 提交新 URL 后，晚启动的推送会以旧密钥与
       // 旧账号请求头写入新后端分区——审计：Data Integrity）。
       await prepareForAccountSwitch(currentAccountId);
-      // 候选 API Key 必须在恢复/校验请求之前写入 Store：verifyAuth 与
-      // restoreAuth 通过 getBackendAuthHeaders() 读取 Store 密钥，不传入参。
-      // 否则目标后端使用不同 Key 时会以旧密钥校验并返回 unauthorized。
-      useAppStore.getState().setBackendApiSecret(secret);
+      // 审计修复（C64）：候选 API Key 不再在此处提前写入 Store——候选 URL
+      // 提交前请求仍读原密钥（/health 探测不使用密钥，prepareForAccountSwitch
+      // 已排空旧后端在途请求）；候选密钥经 restoreBackendSession 的 apiSecret
+      // 选项在候选 URL 提交后、verifyAuth 之前对请求可见。
       // 审计修复：backend.init 提交候选 URL 起到旧账号归档前的整个窗口内，
       // 后端连接处于「候选后端」状态。恢复守卫本身不冻结订阅簿记——窗口内的
       // 真实编辑会被订阅器记为待推，并在守卫退出时立即 syncToBackend，此时
@@ -316,7 +325,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 账号是 B 时返回 github_token: null，B 的有效凭证被误判为
         // github-token-required。显式省略账号头，让服务端回退到候选后端自己
         // 的 active_account_id 分区。
-        const result = await withAccountSwitchGuard(() => restoreBackendSession(url, { omitAccountHeader: true }));
+        const result = await withAccountSwitchGuard(() => restoreBackendSession(url, { omitAccountHeader: true, apiSecret: secret }));
         if (result.status === 'backend-unavailable') return { ok: false, error: 'backend-unavailable' };
         if (result.status === 'unauthorized') return { ok: false, error: 'unauthorized' };
         if (result.status === 'restore-failed') return { ok: false, error: 'restore-failed' };
@@ -372,13 +381,19 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 每个失败返回路径都必须恢复原密钥与原后端 URL：失败的候选密钥与
         // 候选 URL 绝不能残留（包括当前账号仍处于登录态、原有 !user 条件
         // 不成立的情况），否则原账号拿原密钥请求候选后端无法继续工作。
-        // 先复原 URL 再复原密钥：反过来会让原密钥在候选 URL 上短暂可用
-        // （候选后端的 /health 探测不需要密钥，故不会影响 init）。
+        // 先还原持久化 URL 再复原连接，最后复原密钥：还原持久化 URL 保证
+        // 复原连接的探测/自动探测不会读到刚保存的候选 URL；原连接为 null
+        // （本地/自动探测）时显式断开，绝不经 init(undefined) 触发候选后端
+        // 自动探测（审计修复 C63）。
+        if (backend.persistedUrl !== previousPersistedUrl) {
+          backend.persistUrl(previousPersistedUrl);
+        }
         if (backend.backendUrl !== previousBackendUrl) {
           try {
-            await backend.init(previousBackendUrl ?? undefined);
-            if (previousBackendUrl && backend.backendUrl === previousBackendUrl) {
-              backend.rememberActiveUrl();
+            if (previousBackendUrl) {
+              await backend.init(previousBackendUrl);
+            } else {
+              backend.disconnect();
             }
           } catch {
             // 复原连接探测失败时保持探测结果（本地模式或原 URL），不叠加新错误
@@ -435,14 +450,22 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     }
   }, [alignTargetAccountOnBackend]);
 
-  const logoutCurrentAccount = useCallback(async (): Promise<boolean> => {
+  const logoutCurrentAccount = useCallback(async (expectedAccountId?: string): Promise<boolean> => {
     // 切换流程占用锁时明确返回失败，由调用方提示用户（绝不静默忽略退出）。
     if (!acquireAccountSwitchLock()) return false;
     setIsSwitching(true);
     try {
       const currentAccountId = accountIdKey(useAppStore.getState().user);
+      // 审计修复（B9）：退出动作绑定打开确认框时的账号——期间账号已被切换
+      // 时不执行退出，返回失败交由调用方提示对当前账号重新发起退出。
+      if (expectedAccountId !== undefined && currentAccountId !== expectedAccountId) {
+        return false;
+      }
       await prepareForAccountSwitch(currentAccountId);
-      useAppStore.getState().logout();
+      // 冲刷在途同步期间账号仍可能被并发流程切换：store.logout 以期望账号做
+      // 最终校验（拒绝时返回 false），绝不登出另一个账号。
+      const loggedOut = useAppStore.getState().logout(expectedAccountId);
+      if (loggedOut === false) return false;
       refreshMcpElectronBridge();
       return true;
     } finally {

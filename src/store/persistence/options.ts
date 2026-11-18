@@ -19,20 +19,51 @@ import {
   PersistedAppState,
 } from '../schema';
 import { normalizePersistedState } from '../normalizers/persistedState';
+import { useAppStore } from '../useAppStore';
 import { writeAuthMirror } from './authStorage';
+import {
+  hasGhAccountsBridge,
+  loadGhAccountTokens,
+  saveGhAccountTokens,
+  type GhAccountTokenMap,
+} from './ghAccountSecrets';
 import { debouncedPersistStorage } from './storage';
+
+/**
+ * 审计修复（B7/CWE-922）：持久化分片只保留 savedAccounts 的非敏感元数据
+ * （accountId、user、addedAt、lastUsedAt），githubToken 一律剥除（置空串）。
+ * PAT 仅存桌面端 safeStorage 加密文件（经 ghAccounts IPC），Web 构建不持久化
+ * PAT——切换/恢复该账号时要求重新授权。
+ */
+const stripSavedAccountTokens = (
+  savedAccounts: Record<string, import('../../types').SavedAccount>,
+): Record<string, import('../../types').SavedAccount> => {
+  let changed = false;
+  const next: Record<string, import('../../types').SavedAccount> = {};
+  for (const [accountId, account] of Object.entries(savedAccounts ?? {})) {
+    if (!account?.githubToken) {
+      next[accountId] = account;
+      continue;
+    }
+    changed = true;
+    next[accountId] = { ...account, githubToken: '' };
+  }
+  return changed ? next : savedAccounts;
+};
 
 export const appPersistenceOptions: PersistOptions<AppStoreState, PersistedAppState> = {
   name: 'github-stars-manager',
-  version: 18,
+  version: 19,
   storage: debouncedPersistStorage as PersistStorage<PersistedAppState>,
 partialize: (state) => ({
-  // 持久化用户信息和认证状态
+  // 持久化用户信息和登录标识。审计修复（B7/CWE-922）：明文 PAT 不再进入
+  // 浏览器持久化分片——顶层 githubToken 与 savedAccounts[].githubToken 均剥除，
+  // PAT 由桌面端 safeStorage 文件（ghAccounts IPC）承载；isAuthenticated 在
+  // 水化时由 normalizePersistedState 按 user+token 重算。
   user: state.user,
-  githubToken: state.githubToken,
   isAuthenticated: state.isAuthenticated,
   accountWorkspaces: state.accountWorkspaces,
-  savedAccounts: state.savedAccounts,
+  savedAccounts: stripSavedAccountTokens(state.savedAccounts),
 
   // 持久化仓库数据
   repositories: state.repositories,
@@ -452,6 +483,31 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
     stateRecord.savedAccounts = normalizedSaved;
   }
 
+  // v18→v19（审计修复 B7/CWE-922，一次性迁移）：把已持久化的明文 PAT 清出
+  // 浏览器状态分片。桌面端先把剥除的 Token 立即迁入 safeStorage 加密文件
+  //（gh-accounts.enc，fire-and-forget；写失败则该账号按「需重新授权」处理）；
+  // Web 构建不持久化 PAT，重新授权即可恢复。partialize 此后也不再写出 Token，
+  // 清理后的分片随水化后的首次持久化自然重写。
+  if (state) {
+    const stateRecord = state as Record<string, unknown>;
+    const legacySaved = normalizeSavedAccounts(stateRecord.savedAccounts);
+    const legacyUser = stateRecord.user as GitHubUser | null | undefined;
+    const legacyTopToken = typeof stateRecord.githubToken === 'string' ? stateRecord.githubToken : '';
+    const legacyTopAccountId = accountIdKey(legacyUser);
+    const tokens: GhAccountTokenMap = {};
+    for (const [accountId, account] of Object.entries(legacySaved)) {
+      if (account?.githubToken?.trim()) tokens[accountId] = account.githubToken;
+    }
+    if (legacyTopAccountId && legacyTopToken.trim() && !tokens[legacyTopAccountId]) {
+      tokens[legacyTopAccountId] = legacyTopToken;
+    }
+    if (Object.keys(tokens).length > 0 && hasGhAccountsBridge()) {
+      void saveGhAccountTokens(tokens).catch(() => undefined);
+    }
+    stateRecord.githubToken = null;
+    stateRecord.savedAccounts = stripSavedAccountTokens(legacySaved);
+  }
+
   return state as PersistedAppState;
 },
 merge: (persistedState, currentState) => {
@@ -493,7 +549,24 @@ if (error) {
 } else {
   logger.info('store.hydrate', 'Store hydration complete', { elapsedMs });
 }
-state.setHasHydrated(true);
+// 审计修复（B7）：桌面端水化后先从 safeStorage 加密文件回填账号 Token，
+// 再宣布 hydration 完成——避免 isAuthenticated 短暂为 false 导致登录页闪现。
+// Web 构建（无 IPC 桥）直接完成：PAT 未持久化，按需重新授权。
+const finishHydration = () => state.setHasHydrated(true);
+if (error || !hasGhAccountsBridge()) {
+  finishHydration();
+  return;
+}
+loadGhAccountTokens()
+  .then((tokens) => {
+    if (tokens && Object.keys(tokens).length > 0) {
+      // 惰性访问 store（模块初始化环规避，同 accountWorkspace 的做法）
+      const { restorePersistedAccountTokens } = useAppStore.getState();
+      restorePersistedAccountTokens(tokens);
+    }
+  })
+  .catch(() => undefined)
+  .finally(() => finishHydration());
   };
 },
 };

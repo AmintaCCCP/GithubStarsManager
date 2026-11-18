@@ -30,6 +30,8 @@ const MENU_META: Record<HeaderMenuId, {
 export const Header: React.FC = () => {
   const {
     user,
+    githubToken,
+    isAuthenticated,
     themeMode,
     systemTheme,
     currentView,
@@ -41,6 +43,8 @@ export const Header: React.FC = () => {
     setCurrentView,
   } = useAppStore(useShallow((state) => ({
     user: state.user,
+    githubToken: state.githubToken,
+    isAuthenticated: state.isAuthenticated,
     themeMode: state.themeMode,
     systemTheme: state.systemTheme,
     currentView: state.currentView,
@@ -74,6 +78,9 @@ export const Header: React.FC = () => {
   const savedAccountList = useMemo(() => Object.values(savedAccounts ?? {})
     .filter(account => !!account?.user)
     .sort((a, b) => (a.lastUsedAt < b.lastUsedAt ? 1 : a.lastUsedAt > b.lastUsedAt ? -1 : 0)), [savedAccounts]);
+  // 审计修复（B21）：仅存在多个账号时才把「退出登录」菜单化；单账号保留
+  // 原独立退出入口。
+  const hasMultipleAccounts = savedAccountList.length > 1;
 
   const repoCountFor = (account: SavedAccount): number => (
     account.accountId === currentAccountId
@@ -83,7 +90,10 @@ export const Header: React.FC = () => {
 
   const handleSwitchAccount = async (account: SavedAccount) => {
     if (isSwitchingMenu) return;
-    if (account.accountId === currentAccountId) return;
+    // 审计修复（B8）：仅当当前会话已认证且正在使用目标凭证时跳过切换；
+    // 当前令牌缺失/破损时必须继续走 switchToAccount——switchAccount 的
+    // 同账号分支会从 savedAccounts 恢复有效令牌（复用已保存凭证）。
+    if (account.accountId === currentAccountId && isAuthenticated && !!githubToken?.trim()) return;
     setIsSwitchingMenu(true);
     try {
       const result = await switchToAccount(account.accountId);
@@ -114,14 +124,22 @@ export const Header: React.FC = () => {
   };
 
   const handleLogout = async () => {
+    // 审计修复（B9）：退出确认绑定打开确认框时的账号标识；确认后把该标识
+    // 传给退出流程——期间账号已被切换时不执行退出，提示对当前账号重新发起。
+    const targetAccountId = currentAccountId;
     const confirmed = await confirm(
       t('header.logout-confirmation'),
       t('header.logout-only-clears-credentials-repositories-ai-a'),
       { type: 'warning' },
     );
-    if (confirmed) {
-      const loggedOut = await logoutCurrentAccount();
-      if (!loggedOut) toast(t('header.switch-in-progress'), 'error');
+    if (!confirmed) return;
+    const loggedOut = await logoutCurrentAccount(targetAccountId ?? undefined);
+    if (!loggedOut) {
+      // 测试桩可能没有 getState；生产环境恒有。区分「账号已变更」与「切换锁占用」。
+      const state = useAppStore.getState?.() as { user?: { id?: number } } | undefined;
+      const sessionAccountId = state?.user?.id != null ? String(state.user.id) : null;
+      const sessionChanged = sessionAccountId !== targetAccountId;
+      toast(sessionChanged ? t('header.logout-account-changed') : t('header.switch-in-progress'), 'error');
     }
   };
 
@@ -289,6 +307,9 @@ export const Header: React.FC = () => {
                             className="pl-10 text-xs text-muted-foreground"
                             disabled={isSwitchingMenu}
                             onSelect={() => void handleRemoveAccount(account)}
+                            // 审计修复（B10）：可访问名称包含目标账号 login，
+                            // 屏幕阅读器可区分「移除哪一个账号」。
+                            aria-label={t('header.remove-account-with-login', { login: account.user.login })}
                           >
                             <Trash2 className="mr-2 h-3.5 w-3.5" />
                             {t('header.remove-account')}
@@ -302,16 +323,39 @@ export const Header: React.FC = () => {
                     <UserPlus className="mr-2 h-4 w-4" />
                     {t('header.add-account')}
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => void handleLogout()}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t('header.logout')}
-                  </DropdownMenuItem>
+                  {hasMultipleAccounts && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onSelect={() => void handleLogout()}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        {t('header.logout')}
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            {/* 审计修复（B21）：单账号时保留原独立退出入口（仅多账号才把退出
+                登录菜单化）；「添加新账号」始终经下拉菜单提供独立入口。 */}
+            {user && !hasMultipleAccounts && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void handleLogout()}
+                    disabled={isSwitchingMenu}
+                    aria-label={t('header.logout')}
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('header.logout')}</TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>

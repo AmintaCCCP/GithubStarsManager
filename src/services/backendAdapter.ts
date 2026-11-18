@@ -5,7 +5,7 @@ import { setBackendAvailability, setBackendProbed } from './scrapeSupport';
 
 import { Repository, Release, AIConfig, WebDAVConfig, EmbeddingConfig, VectorSearchConfig, GitHubUser } from '../types';
 import { useAppStore } from '../store/useAppStore';
-import { accountIdKey } from '../store/helpers/accountWorkspace';
+import { accountIdKey, getAccountSessionGeneration } from '../store/helpers/accountWorkspace';
 import { isReadmeCandidateItem, type GitHubReadmeCandidateItem } from '../utils/readmeVariants';
 
 interface GitHubContentResponse {
@@ -31,22 +31,47 @@ export interface BackendAuthRestoreAccount {
  * 后端返回的已保存账号条目有效性校验（Issue #611 审计修复）。
  * 所有登记 savedAccounts 的后端登录路径（tryRestoreAuthFromBackend /
  * 登录页 handleBackendConnect / addAccountFromBackend）必须共用同一过滤规则：
- * accountId 为字符串、Token 非空字符串、user 含数字 id 与非空 login。
+ * accountId 为字符串、Token 非空字符串、user 满足完整 GitHubUser 契约。
  * 返回类型同时收窄 user/githubToken 非空，调用方无需重复判空。
+ *
+ * user 字段校验/补齐策略（审计修复 C10，选定「补齐默认值」而非整条拒绝）：
+ * - id：数字且与 accountId 一致（不一致无法归一，整条拒绝）；
+ * - login：非空字符串（缺失/空串无法展示身份，整条拒绝）；
+ * - name：非字符串时补齐为 login（UI 均以 `name || login` 兜底展示）；
+ * - avatar_url：非字符串时补齐为 ''（头像渲染失败但不阻塞账号登记）；
+ * - email：字段缺失时补齐为 null（GitHubUser 契约允许值为 null，但键必须存在，
+ *   否则守卫收窄的 GitHubUser 类型与实际对象不一致）。
  */
 export const isValidBackendRestoreAccount = (
   account: unknown,
 ): account is BackendAuthRestoreAccount & { user: GitHubUser; githubToken: string } => {
   if (!account || typeof account !== 'object') return false;
   const record = account as Partial<BackendAuthRestoreAccount>;
-  return typeof record.accountId === 'string'
-    && typeof record.githubToken === 'string'
-    && record.githubToken.trim().length > 0
-    && !!record.user
-    && typeof record.user.id === 'number'
-    && String(record.user.id) === record.accountId
-    && typeof record.user.login === 'string'
-    && record.user.login.trim().length > 0;
+  if (
+    typeof record.accountId !== 'string'
+    || typeof record.githubToken !== 'string'
+    || record.githubToken.trim().length === 0
+    || !record.user
+    || typeof record.user !== 'object'
+  ) {
+    return false;
+  }
+  if (
+    typeof record.user.id !== 'number'
+    || !Number.isFinite(record.user.id)
+    || String(record.user.id) !== record.accountId
+    || typeof record.user.login !== 'string'
+    || record.user.login.trim().length === 0
+  ) {
+    return false;
+  }
+  // 类型收窄与实际校验一致：以下字段按「补齐默认值」策略规整为 GitHubUser
+  // 契约形状（name/avatar_url 字符串、email 键存在且值可为 null）。
+  const normalizedUser = record.user as GitHubUser & { email?: unknown };
+  if (typeof normalizedUser.name !== 'string') normalizedUser.name = normalizedUser.login;
+  if (typeof normalizedUser.avatar_url !== 'string') normalizedUser.avatar_url = '';
+  if (typeof normalizedUser.email === 'undefined') normalizedUser.email = null;
+  return true;
 };
 
 export interface BackendAuthRestore {
@@ -271,6 +296,38 @@ class BackendAdapter {
     } catch {
       // A restricted browser may block storage; keep this session connected.
     }
+  }
+
+  /** 读取持久化的后端 URL（登录页预填与 init 自动探测共用）。 */
+  get persistedUrl(): string | null {
+    return readStoredBackendUrl();
+  }
+
+  /**
+   * 显式写入/清除持久化的后端 URL（审计修复 C63：候选后端恢复失败回滚时，
+   * 把 rememberActiveUrl 保存的候选 URL 还原为恢复前的值，null 表示移除）。
+   */
+  persistUrl(url: string | null): void {
+    try {
+      if (url) {
+        localStorage.setItem(BACKEND_URL_STORAGE_KEY, url);
+      } else {
+        localStorage.removeItem(BACKEND_URL_STORAGE_KEY);
+      }
+    } catch {
+      // A restricted browser may block storage; ignore.
+    }
+  }
+
+  /**
+   * 显式断开连接、回到本地模式（审计修复 C63）：回滚原连接为 null 时使用，
+   * 绝不经 init(undefined) 触发候选后端自动探测——自动探测会读取刚保存的
+   * 候选 URL 并把回滚悄悄连回候选后端。
+   */
+  disconnect(): void {
+    this.commitBackendUrl(null);
+    setBackendProbed();
+    for (const listener of this._availabilityListeners) listener();
   }
 
   private getAuthHeaders(): Record<string, string> {
@@ -530,15 +587,37 @@ class BackendAdapter {
     const backendUrl = this._backendUrl;
     const headers = this.getAuthHeaders();
 
+    // 审计修复（C11）：账号切换（即使 backendUrl 不变）必须使在途候选请求失效。
+    // 记录发起时的账号 ID 与会话代次，每一步请求前与返回前复核；失效时中止
+    // 在途请求并返回空列表——调用方（ReadmeModal）拿到空候选不会应用旧账号的
+    // 分支结果，具体「过期标记」的消费属 UI 组件职责（见 HANDOFF-B-TO-C.md
+    // C 实现记录）。
+    const startedAccountId = accountIdKey(useAppStore.getState().user);
+    const startedGeneration = getAccountSessionGeneration();
+    const sessionController = new AbortController();
+    if (signal) {
+      if (signal.aborted) sessionController.abort();
+      else signal.addEventListener('abort', () => sessionController.abort(), { once: true });
+    }
+    const isSessionStale = (): boolean => {
+      if (sessionController.signal.aborted) return true;
+      try {
+        return accountIdKey(useAppStore.getState().user) !== startedAccountId
+          || getAccountSessionGeneration() !== startedGeneration;
+      } catch {
+        return false;
+      }
+    };
+
     const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
-      if (this._backendUrl !== backendUrl) return [];
+      if (isSessionStale() || this._backendUrl !== backendUrl) return [];
       const res = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}/contents`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ method: 'GET' }),
-        signal,
+        signal: sessionController.signal,
       });
-      if (!res.ok) return [];
+      if (!res.ok || isSessionStale()) return [];
       const data = await res.json() as GitHubReadmeCandidateItem[];
       return data.filter(isReadmeCandidateItem);
     };
@@ -546,18 +625,18 @@ class BackendAdapter {
     let branch = defaultBranch;
     if (!branch) {
       try {
-        if (this._backendUrl !== backendUrl) return [];
+        if (isSessionStale() || this._backendUrl !== backendUrl) return [];
         const repoRes = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ method: 'GET' }),
-          signal,
+          signal: sessionController.signal,
         });
-        if (repoRes.ok) {
-          const repoDetails = await repoRes.json() as { default_branch?: string };
-          branch = repoDetails.default_branch;
-        }
+        if (!repoRes.ok || isSessionStale()) return [];
+        const repoDetails = await repoRes.json() as { default_branch?: string };
+        branch = repoDetails.default_branch;
       } catch {
+        if (isSessionStale()) return [];
         // Fall back to root contents below
       }
     }
@@ -571,22 +650,24 @@ class BackendAdapter {
     }
 
     try {
-      if (this._backendUrl !== backendUrl) return [];
+      if (isSessionStale() || this._backendUrl !== backendUrl) return [];
       const res = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ method: 'GET' }),
-        signal,
+        signal: sessionController.signal,
       });
-      if (!res.ok) return await fetchRootContents();
+      if (!res.ok || isSessionStale()) return await fetchRootContents();
       const data = await res.json() as GitHubTreeResponse;
       const candidates = (data.tree || []).filter(isReadmeCandidateItem);
+      if (isSessionStale()) return [];
       if (data.truncated) {
         logger.warn('backendAdapter', 'README candidate tree was truncated', { owner, repo });
         if (candidates.length === 0) return await fetchRootContents();
       }
       return candidates;
     } catch {
+      if (isSessionStale()) return [];
       try {
         return await fetchRootContents();
       } catch {
@@ -754,25 +835,74 @@ class BackendAdapter {
 
   // === Data Sync ===
 
-  async syncRepositories(repos: Repository[]): Promise<void> {
+  async syncRepositories(repos: Repository[], options?: { expectedRevision?: number | null }): Promise<void> {
     if (!this._backendUrl) return;
 
+    // 跨端契约 A20x（Issue #612）：全量推送可携带 expectedRevision（来自
+    // GET /repositories 响应的 revision）。服务端校验失败时返回 409
+    // SNAPSHOT_CONFLICT，调用方（autoSync）负责重新拉取合并后重试。
     const res = await this.fetchWithRetry(`${this._backendUrl}/repositories`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ repositories: repos, isFullSync: true })
+      body: JSON.stringify({
+        repositories: repos,
+        isFullSync: true,
+        ...(options?.expectedRevision !== undefined && options.expectedRevision !== null
+          ? { expectedRevision: options.expectedRevision }
+          : {}),
+      }),
     }, 120000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Sync repositories error');
   }
 
-  async fetchRepositories(): Promise<{ repositories: Repository[]; total: number }> {
+  /**
+   * 拉取指定账号分区的仓库快照（Issue #612 A20x + 审计修复 C12）：
+   * - 返回值携带服务端分区 revision，供全量推送的 expectedRevision 冲突检测；
+   * - 分页补齐：后端 >10000 仓库场景按 page 依次读取全部页，完整空列表仍是
+   *   有效结果；任一页请求失败或页间 revision 变化导致无法取得完整快照时，
+   *   明确抛错（绝不把截断快照当作完整列表交给全量推送/恢复流程）。
+   * accountId 显式指定目标分区（登录页显式账号恢复），缺省读取 Store 当前用户。
+   */
+  async fetchRepositories(accountId?: string | null): Promise<{ repositories: Repository[]; total: number; revision?: number | null }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
-    const res = await this.fetchWithRetry(`${this._backendUrl}/repositories?limit=10000`, {
-      headers: this.getAuthHeaders()
-    }, 120000, 3);
-    if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
-    return res.json() as Promise<{ repositories: Repository[]; total: number }>;
+    const backendUrl = this._backendUrl;
+    const headers = getBackendAuthHeaders(accountId);
+    const collected: Repository[] = [];
+    let total = 0;
+    let revision: number | null = null;
+    const PAGE_SIZE = 10000;
+    for (let page = 1; ; page += 1) {
+      const res = await this.fetchWithRetry(`${backendUrl}/repositories?page=${page}&limit=${PAGE_SIZE}`, {
+        headers,
+      }, 120000, 3);
+      if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
+      const data = await res.json() as { repositories?: Repository[]; total?: number; revision?: unknown };
+      const pageRepos = Array.isArray(data.repositories) ? data.repositories : [];
+      const pageTotal = typeof data.total === 'number' ? data.total : pageRepos.length;
+      const pageRevision = typeof data.revision === 'number' ? data.revision : null;
+      if (page === 1) {
+        total = pageTotal;
+        revision = pageRevision;
+      } else if (pageRevision !== null && revision !== null && pageRevision !== revision) {
+        // 分页期间分区被其他设备写入：合并结果既非完整也非一致快照
+        throw new Error('Repository snapshot changed while paging (revision mismatch)');
+      }
+      collected.push(...pageRepos);
+      const morePages = collected.length < pageTotal;
+      if (!morePages) break;
+      if (pageRepos.length === 0) {
+        // 服务端声明还有更多但本页为空：无法取得完整列表
+        throw new Error('Backend reported more repositories than it returned');
+      }
+      if (page > 1000) {
+        throw new Error('Backend repository pagination did not converge');
+      }
+    }
+    if (collected.length < total) {
+      throw new Error('Incomplete repository snapshot: fetched fewer repositories than reported total');
+    }
+    return { repositories: collected, total, revision };
   }
 
   async syncReleases(releases: Release[]): Promise<void> {
@@ -797,11 +927,11 @@ class BackendAdapter {
     return res.json() as Promise<{ updated: number }>;
   }
 
-  async fetchReleases(): Promise<{ releases: Release[]; total: number }> {
+  async fetchReleases(accountId?: string | null): Promise<{ releases: Release[]; total: number }> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithRetry(`${this._backendUrl}/releases?limit=10000`, {
-      headers: this.getAuthHeaders()
+      headers: getBackendAuthHeaders(accountId)
     }, 120000, 3);
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
     return res.json() as Promise<{ releases: Release[]; total: number }>;
@@ -837,11 +967,11 @@ class BackendAdapter {
     }
   }
 
-  async fetchAIConfigs(): Promise<AIConfig[]> {
+  async fetchAIConfigs(accountId?: string | null): Promise<AIConfig[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/ai?decrypt=true`, {
-      headers: this.getAuthHeaders()
+      headers: getBackendAuthHeaders(accountId)
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch AI configs error');
     return res.json() as Promise<AIConfig[]>;
@@ -877,11 +1007,11 @@ class BackendAdapter {
     }
   }
 
-  async fetchWebDAVConfigs(): Promise<WebDAVConfig[]> {
+  async fetchWebDAVConfigs(accountId?: string | null): Promise<WebDAVConfig[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/webdav?decrypt=true`, {
-      headers: this.getAuthHeaders()
+      headers: getBackendAuthHeaders(accountId)
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch WebDAV configs error');
     return res.json() as Promise<WebDAVConfig[]>;
@@ -910,11 +1040,11 @@ class BackendAdapter {
     }
   }
 
-  async fetchEmbeddingConfigs(): Promise<EmbeddingConfig[]> {
+  async fetchEmbeddingConfigs(accountId?: string | null): Promise<EmbeddingConfig[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/embedding?decrypt=true`, {
-      headers: this.getAuthHeaders()
+      headers: getBackendAuthHeaders(accountId)
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch embedding configs error');
     return res.json() as Promise<EmbeddingConfig[]>;
@@ -933,11 +1063,11 @@ class BackendAdapter {
     if (!res.ok) await this.throwTranslatedError(res, 'Sync vector search config error');
   }
 
-  async fetchVectorSearchConfig(): Promise<VectorSearchConfig> {
+  async fetchVectorSearchConfig(accountId?: string | null): Promise<VectorSearchConfig> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/configs/vector-search?decrypt=true`, {
-      headers: this.getAuthHeaders()
+      headers: getBackendAuthHeaders(accountId)
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch vector search config error');
     return res.json() as Promise<VectorSearchConfig>;
@@ -973,12 +1103,13 @@ class BackendAdapter {
 
   /**
    * Fetch frontend settings from the backend and hydrate JSON TEXT values.
+   * accountId 显式指定目标分区（登录页显式账号恢复），缺省读取 Store 当前用户。
    */
-  async fetchSettings(): Promise<Record<string, unknown>> {
+  async fetchSettings(accountId?: string | null): Promise<Record<string, unknown>> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
     const res = await this.fetchWithTimeout(`${this._backendUrl}/settings`, {
-      headers: this.getAuthHeaders()
+      headers: getBackendAuthHeaders(accountId)
     });
     if (!res.ok) await this.throwTranslatedError(res, 'Fetch settings error');
     const settings = await res.json();
@@ -1057,17 +1188,30 @@ class BackendAdapter {
   async restoreAuth(options?: { omitAccountHeader?: boolean }): Promise<BackendAuthRestore | null> {
     if (!this._backendUrl) return null;
 
+    // 审计修复（C9）：恢复响应的正文读取必须与请求共享同一截止时间。
+    // fetchWithTimeout 的计时器在响应头返回后即清理，res.json() 若挂起会让
+    // tryRestoreAuthFromBackend 的恢复锁永久占用（不可重试）。这里改用调用方
+    // AbortController 承载同一 8s 截止时间：中止信号会传导给 fetchWithTimeout
+    // 的内部控制器，正文读取挂起时同样被中止；清理在读取结束或失败后进行。
+    // 保持不记录恢复正文（fetchWithTimeout 的 /sync/auth 正文跳过逻辑不变）。
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
       const res = await this.fetchWithTimeout(`${this._backendUrl}/sync/auth`, {
         method: 'POST',
         headers: options?.omitAccountHeader
           ? getBackendAuthHeaders(null)
           : this.getAuthHeaders(),
-      }, 8000);
+        signal: controller.signal,
+      });
       if (!res.ok) return null;
-      return res.json() as Promise<BackendAuthRestore>;
+      return await res.json() as BackendAuthRestore;
     } catch {
+      // 超时/网络失败统一返回 null：tryRestoreAuthFromBackend 捕获后释放恢复锁，
+      // 流程可重试。
       return null;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

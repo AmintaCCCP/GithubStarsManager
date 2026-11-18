@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Gist } from '../../../types';
-import { applyGistAnalysisFailure, applyGistAnalysisSuccess, useGistActions } from './useGistActions';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
+import { applyGistAnalysisFailure, applyGistAnalysisSuccess, GistDetailSessionSwitchedError, useGistActions } from './useGistActions';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -409,21 +410,57 @@ describe('useGistActions account switch guards', () => {
 
     expect(storeState.updateGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+    // 审计修复（C36a）：AI 发送边界——切号后绝不把旧账号 Gist 正文发给 AI
+    expect(mocks.analyzeGist).not.toHaveBeenCalled();
     // 分析标记作用于发起账号：切号后 finally 不清理当前账号工作区的标记
     expect(storeState.setAnalyzingGist).toHaveBeenCalledTimes(1);
     expect(storeState.setAnalyzingGist).toHaveBeenCalledWith('gist-1', true);
   });
 
-  it('fetchGistDetail returns null and skips updateGist after a switch', async () => {
+  it('drops the stale result after A→B→A with a pending gist request', async () => {
+    // 审计修复（C36b）：Gist 请求在 A 发起后保持 pending，用真实切号推进会话
+    // 代次（A→B→A 后账号 ID 复发），完成旧请求后断言未写入、未回调。
+    let resolveSearch!: (gists: Gist[]) => void;
+    mocks.searchGistsWithReranking.mockReturnValue(new Promise<Gist[]>(resolve => {
+      resolveSearch = resolve;
+    }));
+    const { result } = renderHook(() => useGistActions());
+    const onReranked = vi.fn();
+    let searchPromise!: Promise<void>;
+    await act(async () => {
+      searchPromise = result.current.aiSearch('query', [gist], onReranked);
+    });
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as unknown as { user: { id: number; login: string; avatar_url: string } }).user = { id: 1, login: 'me', avatar_url: 'https://example.com/me.png' };
+    await act(async () => {
+      resolveSearch([gist]);
+      await searchPromise;
+    });
+
+    expect(onReranked).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchFilters).not.toHaveBeenCalled();
+    expect(storeState.setGistSearchResults).not.toHaveBeenCalled();
+  });
+
+  it('fetchGistDetail throws the session-switch marker and skips updateGist after a switch', async () => {
     mocks.getGist.mockImplementation(async () => {
       switchToB();
       return gistDetail;
     });
     const { result } = renderHook(() => useGistActions());
-    let detail: Gist | null = gist;
-    await act(async () => { detail = await result.current.fetchGistDetail(gist); });
+    let caught: unknown = null;
+    await act(async () => {
+      try {
+        await result.current.fetchGistDetail(gist);
+      } catch (error) {
+        caught = error;
+      }
+    });
 
-    expect(detail).toBeNull();
+    // 审计修复（C35）：会话切换与普通失败可区分——抛出专用标记错误，调用方
+    // 据此清除旧账号 detailGist 并关闭详情面板；绝不返回/写入旧账号详情。
+    expect(caught).toBeInstanceOf(GistDetailSessionSwitchedError);
     expect(storeState.updateGist).not.toHaveBeenCalled();
   });
 

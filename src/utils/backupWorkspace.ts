@@ -1,4 +1,4 @@
-import type { AccountWorkspace, GitHubUser, SavedAccount } from '../types';
+import type { AccountWorkspace, GitHubUser, Repository, SavedAccount } from '../types';
 import {
   accountIdKey,
   captureAccountWorkspace,
@@ -19,6 +19,47 @@ export const BACKUP_MASKED_SECRET = '***';
 export const isRealBackupSecret = (value: unknown): value is string => (
   typeof value === 'string' && value.length > 0 && value !== BACKUP_MASKED_SECRET
 );
+
+/**
+ * 单条备份仓库记录的最小结构校验（审计修复 C47）：
+ * id（有限数字）、name/full_name（非空字符串）、owner.login（非空字符串）。
+ * null / 非对象 / 缺失关键字段一律拒绝。
+ */
+const isValidBackupRepository = (item: unknown): item is Repository => {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  const repo = item as Partial<Repository>;
+  return (
+    typeof repo.id === 'number'
+    && Number.isFinite(repo.id)
+    && typeof repo.name === 'string'
+    && repo.name.length > 0
+    && typeof repo.full_name === 'string'
+    && repo.full_name.length > 0
+    && typeof repo.owner?.login === 'string'
+    && repo.owner.login.length > 0
+  );
+};
+
+/**
+ * 备份/恢复路径在首次写入 store 前对 repositories 的逐项校验（审计修复 C47）。
+ * 返回值语义：
+ * - undefined：备份未提供该字段（保持既有「缺失字段保留本机值」的回退语义）；
+ * - Repository[]（可为空数组，显式 [] 仍表示清空）：校验通过的列表；
+ * - null：字段存在但含无效条目——调用方必须整体拒绝该工作区，绝不保存
+ *   部分有效数据。
+ */
+export const validateBackupRepositories = (
+  value: unknown,
+): Repository[] | null | undefined => {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) return null;
+  const validated: Repository[] = [];
+  for (const item of value) {
+    if (!isValidBackupRepository(item)) return null;
+    validated.push(item);
+  }
+  return validated;
+};
 
 
 /**
@@ -178,39 +219,50 @@ export const trimWorkspacesForSelectedTypes = (
  * 仅返回所选类型对应的工作区字段补丁，未选择的类型不影响当前状态。
  * 导入面板以备份实际包含的数据类型解析 selectedTypes，因此裁剪备份
  * 中的空字段不会回滚当前实时数据。
+ *
+ * rawFields（审计修复 C57）：提供原始备份工作区对象时按字段级区分
+ * 「未导出字段」与「导出为空」——原始备份缺失的字段不进入补丁（保留
+ * 实时值），显式 [] 清空语义保留；缺省时保持旧行为（所选类型的全部
+ * 字段都来自备份）。
  */
 export const applyAccountWorkspaceForTypes = (
   workspace: AccountWorkspace,
   selectedTypes: string[],
+  rawFields?: Record<string, unknown>,
 ): Partial<AccountWorkspaceRuntime> => {
+  const rawHas = (key: string): boolean => !rawFields || Object.prototype.hasOwnProperty.call(rawFields, key);
   const patch: Partial<AccountWorkspaceRuntime> = {};
   if (selectedTypes.includes('repositories')) {
-    patch.repositories = workspace.repositories;
-    patch.lastSync = workspace.lastSync;
-    patch.gists = workspace.gists;
-    patch.starredGists = workspace.starredGists;
-    patch.gistSearchResults = workspace.gists;
-    patch.selectedGistCategory = workspace.selectedGistCategory;
-    patch.searchResults = workspace.repositories;
-    patch.forks = workspace.forks;
-    patch.readForks = new Set(workspace.readForks);
-    patch.syncMode = workspace.syncMode;
-    patch.syncModeConfigured = workspace.syncModeConfigured;
+    if (rawHas('repositories')) {
+      patch.repositories = workspace.repositories;
+      patch.searchResults = workspace.repositories;
+    }
+    if (rawHas('lastSync')) patch.lastSync = workspace.lastSync;
+    if (rawHas('gists')) {
+      patch.gists = workspace.gists;
+      patch.gistSearchResults = workspace.gists;
+    }
+    if (rawHas('starredGists')) patch.starredGists = workspace.starredGists;
+    if (rawHas('selectedGistCategory')) patch.selectedGistCategory = workspace.selectedGistCategory;
+    if (rawHas('forks')) patch.forks = workspace.forks;
+    if (rawHas('readForks')) patch.readForks = new Set(workspace.readForks);
+    if (rawHas('syncMode')) patch.syncMode = workspace.syncMode;
+    if (rawHas('syncModeConfigured')) patch.syncModeConfigured = workspace.syncModeConfigured;
   }
-  if (selectedTypes.includes('releases')) {
+  if (selectedTypes.includes('releases') && rawHas('releases')) {
     patch.releases = workspace.releases;
   }
   if (selectedTypes.includes('releaseSubscriptions')) {
-    patch.releaseSubscriptions = new Set(workspace.releaseSubscriptions);
-    patch.releaseSourceSettings = workspace.releaseSourceSettings;
-    patch.readReleases = new Set(workspace.readReleases);
+    if (rawHas('releaseSubscriptions')) patch.releaseSubscriptions = new Set(workspace.releaseSubscriptions);
+    if (rawHas('releaseSourceSettings')) patch.releaseSourceSettings = workspace.releaseSourceSettings;
+    if (rawHas('readReleases')) patch.readReleases = new Set(workspace.readReleases);
   }
   if (selectedTypes.includes('customCategories')) {
-    patch.customCategories = workspace.customCategories;
-    patch.hiddenDefaultCategoryIds = workspace.hiddenDefaultCategoryIds;
-    patch.categoryOrder = workspace.categoryOrder;
-    patch.defaultCategoryOverrides = workspace.defaultCategoryOverrides;
-    patch.categoryListIdMap = workspace.categoryListIdMap;
+    if (rawHas('customCategories')) patch.customCategories = workspace.customCategories;
+    if (rawHas('hiddenDefaultCategoryIds')) patch.hiddenDefaultCategoryIds = workspace.hiddenDefaultCategoryIds;
+    if (rawHas('categoryOrder')) patch.categoryOrder = workspace.categoryOrder;
+    if (rawHas('defaultCategoryOverrides')) patch.defaultCategoryOverrides = workspace.defaultCategoryOverrides;
+    if (rawHas('categoryListIdMap')) patch.categoryListIdMap = workspace.categoryListIdMap;
   }
   return patch;
 };
@@ -220,12 +272,20 @@ export const applyAccountWorkspaceForTypes = (
  * 已选类型的字段以备份值为准；未选类型的字段保留本机快照——否则
  * 「单类型导出（如仅分类）→ replace 导入」往返会把裁剪备份中的空占位
  * 整体覆盖进工作区，清空非当前账号的仓库/Gist/Fork/订阅等未选数据。
+ *
+ * 审计修复（C57）：替换补丁依据原始备份中实际存在且有效的字段生成——
+ * normalizeAccountWorkspaces 的空默认值无法区分「未导出字段」与「导出为空」，
+ * 缺失字段必须保留本机值、显式 [] 才清空。该补丁同时用于更新目标账号快照
+ * 与当前账号实时应用（面板侧经 applyAccountWorkspaceForTypes 的 rawFields）。
  */
 export const replaceWorkspacesForSelectedTypes = (
   localWorkspaces: Record<string, AccountWorkspace>,
   backupWorkspaces: Record<string, unknown>,
   selectedTypes: string[],
 ): Record<string, AccountWorkspace> => {
+  const raw = (backupWorkspaces && typeof backupWorkspaces === 'object' && !Array.isArray(backupWorkspaces)
+    ? backupWorkspaces
+    : {}) as Record<string, Record<string, unknown> | undefined>;
   const normalized = normalizeAccountWorkspaces(backupWorkspaces);
   const merged = { ...localWorkspaces };
   const includeRepos = selectedTypes.includes('repositories');
@@ -233,39 +293,29 @@ export const replaceWorkspacesForSelectedTypes = (
   const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
   const includeCategories = selectedTypes.includes('customCategories');
   for (const [accountId, incoming] of Object.entries(normalized)) {
+    const rawAccount = raw[accountId] ?? {};
+    const rawHas = (key: string): boolean => Object.prototype.hasOwnProperty.call(rawAccount, key);
     const local = merged[accountId] ?? emptyAccountWorkspace();
     merged[accountId] = {
       ...local,
-      ...(includeRepos
-        ? {
-            repositories: incoming.repositories,
-            lastSync: incoming.lastSync,
-            gists: incoming.gists,
-            starredGists: incoming.starredGists,
-            selectedGistCategory: incoming.selectedGistCategory,
-            forks: incoming.forks,
-            readForks: incoming.readForks,
-            syncMode: incoming.syncMode,
-            syncModeConfigured: incoming.syncModeConfigured,
-          }
-        : {}),
-      ...(includeReleases ? { releases: incoming.releases } : {}),
-      ...(includeReleaseSubs
-        ? {
-            releaseSubscriptions: incoming.releaseSubscriptions,
-            releaseSourceSettings: incoming.releaseSourceSettings,
-            readReleases: incoming.readReleases,
-          }
-        : {}),
-      ...(includeCategories
-        ? {
-            customCategories: incoming.customCategories,
-            hiddenDefaultCategoryIds: incoming.hiddenDefaultCategoryIds,
-            defaultCategoryOverrides: incoming.defaultCategoryOverrides,
-            categoryOrder: incoming.categoryOrder,
-            categoryListIdMap: incoming.categoryListIdMap,
-          }
-        : {}),
+      ...(includeRepos && rawHas('repositories') ? { repositories: incoming.repositories } : {}),
+      ...(includeRepos && rawHas('lastSync') ? { lastSync: incoming.lastSync } : {}),
+      ...(includeRepos && rawHas('gists') ? { gists: incoming.gists } : {}),
+      ...(includeRepos && rawHas('starredGists') ? { starredGists: incoming.starredGists } : {}),
+      ...(includeRepos && rawHas('selectedGistCategory') ? { selectedGistCategory: incoming.selectedGistCategory } : {}),
+      ...(includeRepos && rawHas('forks') ? { forks: incoming.forks } : {}),
+      ...(includeRepos && rawHas('readForks') ? { readForks: incoming.readForks } : {}),
+      ...(includeRepos && rawHas('syncMode') ? { syncMode: incoming.syncMode } : {}),
+      ...(includeRepos && rawHas('syncModeConfigured') ? { syncModeConfigured: incoming.syncModeConfigured } : {}),
+      ...(includeReleases && rawHas('releases') ? { releases: incoming.releases } : {}),
+      ...(includeReleaseSubs && rawHas('releaseSubscriptions') ? { releaseSubscriptions: incoming.releaseSubscriptions } : {}),
+      ...(includeReleaseSubs && rawHas('releaseSourceSettings') ? { releaseSourceSettings: incoming.releaseSourceSettings } : {}),
+      ...(includeReleaseSubs && rawHas('readReleases') ? { readReleases: incoming.readReleases } : {}),
+      ...(includeCategories && rawHas('customCategories') ? { customCategories: incoming.customCategories } : {}),
+      ...(includeCategories && rawHas('hiddenDefaultCategoryIds') ? { hiddenDefaultCategoryIds: incoming.hiddenDefaultCategoryIds } : {}),
+      ...(includeCategories && rawHas('defaultCategoryOverrides') ? { defaultCategoryOverrides: incoming.defaultCategoryOverrides } : {}),
+      ...(includeCategories && rawHas('categoryOrder') ? { categoryOrder: incoming.categoryOrder } : {}),
+      ...(includeCategories && rawHas('categoryListIdMap') ? { categoryListIdMap: incoming.categoryListIdMap } : {}),
     } satisfies AccountWorkspace;
   }
   return merged;

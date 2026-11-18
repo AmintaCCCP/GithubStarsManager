@@ -200,6 +200,23 @@ const migrations: Record<number, (db: Database.Database) => void> = {
     // 复合主键 (account_id, id) 无法命中；补充独立索引避免全表扫描。
     db.exec('CREATE INDEX IF NOT EXISTS idx_repositories_repo_id ON repositories(id)');
   },
+  6: (db) => {
+    // Issue #612 A21：跨账号 AI 成果共享标记。写入 ai_* 的路由按账号的
+    // ai_result_sharing_enabled 设置置位；跨账号复用（冲突更新与批量回填）
+    // 只选择 ai_shared = 1 的来源记录，同账号内复用不受影响。
+    addColumnIfMissing(db, 'repositories', 'ai_shared', 'INTEGER DEFAULT 0');
+    // Issue #612 A20x：每账号分区的仓库快照版本（repo_revision）等服务端自身
+    // 的分区级元数据。独立于 account_settings 存储，避免被备份导出/导入或
+    // /api/settings 写路径覆盖而破坏单调性。
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS partition_meta (
+        account_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT,
+        PRIMARY KEY (account_id, key)
+      );
+    `);
+  },
 };
 
 export function runMigrations(db: Database.Database): void {

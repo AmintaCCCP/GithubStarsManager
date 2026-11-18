@@ -2,7 +2,7 @@
 import { useT } from '../../../i18n/useT';
 import { useCallback, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { AIConfig, WebDAVConfig } from '../../../types';
+import type { AIConfig, Repository, WebDAVConfig } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import {
   accountIdKey,
@@ -17,6 +17,7 @@ import {
   isRealBackupSecret,
   maskSavedAccountsForBackup,
   mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
+  validateBackupRepositories,
 } from '../../../utils/backupWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { normalizeReleaseSourceSettings } from '../../../utils/releaseSources';
@@ -29,7 +30,18 @@ export interface BackupActions {
   isBackingUp: boolean;
   isRestoring: boolean;
   backup: () => Promise<void>;
-  restore: () => Promise<void>;
+  /**
+   * 从指定备份文件恢复（审计修复 C46）。备份文件由 UI 先经 listBackups
+   * 列出供用户选择；不传 backupFile 时保持旧行为（下载排序后最新备份，
+   * 兼容既有程序化调用）。
+   */
+  restore: (backupFile?: string) => Promise<void>;
+  /**
+   * 列出 WebDAV 上可恢复的备份文件（审计修复 C46）。recommended 为包含
+   * 当前账号工作区的最新备份（文件名以 `-{当前账号ID}.json` 结尾；未登录
+   * 时推荐 `local` 标记的最新备份）；无匹配时推荐最新的其他备份。
+   */
+  listBackups: () => Promise<{ files: string[]; recommended: string | null }>;
 }
 
 /**
@@ -153,7 +165,20 @@ export const useBackupActions = (): BackupActions => {
     }
   }, [activeConfig, state, t, toast]);
 
-  const restore = useCallback(async () => {
+  const listBackups = useCallback(async (): Promise<{ files: string[]; recommended: string | null }> => {
+    if (!activeConfig) return { files: [], recommended: null };
+    const service = new WebDAVService(activeConfig);
+    const files = await service.listFiles();
+    const backupFiles = files.filter((file) => file.startsWith('github-stars-backup-')).sort();
+    // 审计修复（C46）：默认推荐包含当前账号工作区的最新备份——备份文件名
+    // 以 `-{账号ID}.json`（或未登录时的 `-local.json`）结尾。
+    const accountTag = accountIdKey(useAppStore.getState().user) ?? 'local';
+    const accountBackups = backupFiles.filter((file) => file.endsWith(`-${accountTag}.json`));
+    const recommended = accountBackups.at(-1) ?? backupFiles.at(-1) ?? null;
+    return { files: backupFiles, recommended };
+  }, [activeConfig]);
+
+  const restore = useCallback(async (backupFile?: string) => {
     if (!activeConfig) {
       toast(t('useBackupActions.please-configure-and-activate-webdav-service-fir'), 'error');
       return;
@@ -187,14 +212,21 @@ export const useBackupActions = (): BackupActions => {
     setIsRestoring(true);
     try {
       const service = new WebDAVService(activeConfig);
-      const files = await service.listFiles();
-      if (!ensureSameAccount()) return;
-      const backupFiles = files.filter((file) => file.startsWith('github-stars-backup-'));
-      if (backupFiles.length === 0) {
-        toast(t('useBackupActions.no-backup-files-found'), 'error');
-        return;
+      // 审计修复（C46）：不再始终下载排序后最新备份——UI 先经 listBackups
+      // 列出可恢复备份供用户选择（默认推荐包含当前账号工作区的最新备份），
+      // 选中的文件经 backupFile 显式传入；缺省时保持旧行为兼容程序化调用。
+      let fileName = backupFile;
+      if (!fileName) {
+        const files = await service.listFiles();
+        if (!ensureSameAccount()) return;
+        const backupFiles = files.filter((file) => file.startsWith('github-stars-backup-'));
+        if (backupFiles.length === 0) {
+          toast(t('useBackupActions.no-backup-files-found'), 'error');
+          return;
+        }
+        fileName = backupFiles.sort().reverse()[0];
       }
-      const content = await service.downloadFile(backupFiles.sort().reverse()[0]);
+      const content = await service.downloadFile(fileName);
       if (!ensureSameAccount()) return;
       if (!content) {
         toast(t('useBackupActions.backup-file-is-empty-cannot-restore'), 'error');
@@ -202,6 +234,19 @@ export const useBackupActions = (): BackupActions => {
       }
       const backupData = JSON.parse(content) as Record<string, unknown>;
       const backupIncludedKeys = backupData.includeKeysInBackup ?? true;
+
+      // 审计修复（C47）：repositories 在首次写入 store 前逐项校验 Repository
+      // 结构（null/无效字段拒绝）——字段存在但无效时整体拒绝该工作区并提示，
+      // 绝不保存部分有效数据；字段缺失保持既有回退语义，显式 [] 清空语义保留。
+      let backupRepositories: Repository[] | undefined;
+      if (backupData.repositories !== undefined && backupData.repositories !== null) {
+        const validatedRepositories = validateBackupRepositories(backupData.repositories);
+        if (validatedRepositories === null) {
+          toast(`${t('useBackupActions.restore-failed')}: invalid repositories payload`, 'error');
+          return;
+        }
+        backupRepositories = validatedRepositories;
+      }
 
       // ── 多账号恢复（Issue #611）────────────────────────────────────
       // 先合并工作区与账号元数据，再决定顶层恢复目标（防止跨账号错位）。
@@ -262,8 +307,8 @@ export const useBackupActions = (): BackupActions => {
         const previous = mergedWorkspaces[backupAccountId!];
         mergedWorkspaces[backupAccountId!] = {
           ...(previous ?? emptyAccountWorkspace()),
-          repositories: Array.isArray(backupData.repositories)
-            ? (backupData.repositories as import('../../../types').Repository[])
+          repositories: backupRepositories !== undefined
+            ? backupRepositories
             : (previous?.repositories ?? []),
           releases: Array.isArray(backupData.releases)
             ? (backupData.releases as import('../../../types').Release[])
@@ -332,7 +377,7 @@ export const useBackupActions = (): BackupActions => {
       }
 
       if (!restoreTargetsOtherAccount) {
-        if (Array.isArray(backupData.repositories)) state.setRepositories(backupData.repositories as typeof state.repositories, { allowEmpty: true });
+        if (backupRepositories !== undefined) state.setRepositories(backupRepositories, { allowEmpty: true });
         if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
         // 工作区级数据（Gist / Fork / 同步范围）随 1.3 备份恢复
         if (Array.isArray(backupData.gists)) useAppStore.setState({ gists: backupData.gists as import('../../../types').Gist[] });
@@ -498,7 +543,7 @@ export const useBackupActions = (): BackupActions => {
           },
         });
       }
-      toast(t('useBackupActions.data-restored-from-backup-repositories-v1-releas', { v1: (backupData.repositories as unknown[] | undefined)?.length ?? 0, v2: (backupData.releases as unknown[] | undefined)?.length ?? 0, v3: (backupData.customCategories as unknown[] | undefined)?.length ?? 0 }), 'success');
+      toast(t('useBackupActions.data-restored-from-backup-repositories-v1-releas', { v1: backupRepositories?.length ?? 0, v2: (backupData.releases as unknown[] | undefined)?.length ?? 0, v3: (backupData.customCategories as unknown[] | undefined)?.length ?? 0 }), 'success');
     } catch (error) {
       console.error('Restore failed:', error);
       toast(`${t('useBackupActions.restore-failed')}: ${(error as Error).message}`, 'error');
@@ -507,5 +552,5 @@ export const useBackupActions = (): BackupActions => {
     }
   }, [activeConfig, confirm, state, t, toast]);
 
-  return { activeConfig, isBackingUp, isRestoring, backup, restore };
+  return { activeConfig, isBackingUp, isRestoring, backup, restore, listBackups };
 };

@@ -18,7 +18,9 @@ export const readAuthMirror = (): AuthMirror | null => {
     const parsed = JSON.parse(raw) as Partial<AuthMirror>;
     return {
       user: parsed.user ?? null,
-      githubToken: typeof parsed.githubToken === 'string' ? parsed.githubToken : null,
+      // 审计修复（B7/CWE-922）：镜像不再回读明文 PAT——历史镜像里的
+      // githubToken 一律视为 null（PAT 只存桌面端 safeStorage 或内存）。
+      githubToken: null,
       backendApiSecret: typeof parsed.backendApiSecret === 'string' ? parsed.backendApiSecret : null,
     };
   } catch {
@@ -29,7 +31,13 @@ export const readAuthMirror = (): AuthMirror | null => {
 export const writeAuthMirror = (auth: AuthMirror): void => {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(AUTH_MIRROR_KEY, JSON.stringify(auth));
+    // 审计修复（B7/CWE-922）：githubToken 形参仅为保持调用方签名兼容，
+    // 镜像永远不落明文 PAT（桌面端经 ghAccounts IPC 写 safeStorage 文件）。
+    window.localStorage.setItem(AUTH_MIRROR_KEY, JSON.stringify({
+      user: auth.user,
+      githubToken: null,
+      backendApiSecret: auth.backendApiSecret,
+    }));
   } catch {
     // Quota/security errors are expected in constrained environments; the
     // IndexedDB persist path remains the fallback there.

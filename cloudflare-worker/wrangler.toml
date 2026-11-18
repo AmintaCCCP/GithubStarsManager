@@ -6,10 +6,17 @@ compatibility_date = "2024-01-01"
 
 [vars]
 # 多账号共享同一索引时，/cleanup 需要按 accountId 元数据过滤。
-# 先创建元数据索引（存量向量需重新写入后才会带上 accountId）：
-#   npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
-# 确认索引可用后再改为 "true"；否则客户端会跳过按账号范围的清理，
-# 避免在索引缺失时把其他账号的向量当成候选。
+# ⚠️ 默认值保持 "false"（Issue #612 A28）：直接改成 "true" 会让单账号部署失去
+# 稠密向量召回（/status 返回 accountScopedCleanup:false 时搜索管线跳过稠密召回）。
+# 启用必须走「部署/验证脚本确认」路径，而不是依赖本默认值：
+#   1. 创建元数据索引（存量向量需重新写入后才会带上 accountId）：
+#      npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string
+#   2. 回填存量向量（见 README「多账号」一节：重建或确认归属后重新上传原向量）。
+#   3. 用部署向导（cloudflare-worker/deploy.mjs）在部署时显式覆盖：
+#      `npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:true`
+#      （向导会在确认索引归属与回填完成后写入该显式标记并持久化到
+#      .deploy-config.json；绝不能按客户端本机账号数量推断归属）。
+#   4. 启用前用账号过滤查询验证回填结果（见 README）。
 ACCOUNT_METADATA_INDEXED = "false"
 
 [[vectorize]]

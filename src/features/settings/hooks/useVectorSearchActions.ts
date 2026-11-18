@@ -137,7 +137,12 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       if (workerTestRunRef.current !== runId) return;
       setWorkerTestResult(result);
       if (result.success && isCurrentAccountSession(startedAccountId, startedGeneration)) {
-        state.setVectorSearchStatus({ connected: true, vectorCount: result.vectorCount, dimensions: result.dimensions });
+        // 审计修复（C50）：连接测试的成功不把 Worker 全局总向量数写入
+        // vectorSearchStatus.vectorCount（该数字含所有账号分区的向量，会被
+        // 误当成当前账号计数）——保留已有账号计数，仅更新连接/维度。
+        // 总向量数仍在 workerTestResult（测试结果）中可见。
+        const previousVectorCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
+        state.setVectorSearchStatus({ connected: true, vectorCount: previousVectorCount, dimensions: result.dimensions });
       }
     } catch (reason) {
       if (workerTestRunRef.current !== runId) return;
@@ -279,15 +284,27 @@ export const useVectorSearchActions = (): VectorSearchActions => {
           if (!accountScopedCleanup) {
             logger.warn('vectorSearch.index', 'Skip vector cleanup: worker does not support account-scoped deletion; redeploy the bundled cloudflare-worker to enable it');
           } else {
-            // keepIds 必须与索引中的实际向量 ID 形态一致：本次上传使用账号前缀
-            // 形态（buildAccountScopedVectorId）；排除项（已索引但分析缺失/失败、
-            // 不参与本次重建的仓库）的存量向量可能是 legacy 无前缀形态或前缀
-            // 形态，两种形式都保留——cleanup 按 keepIds 之外的 ID 物理删除，
-            // 漏掉任一形态都会误删这些仓库的向量。
+            // 审计修复（C49）：cleanup 的删除授权必须可证明。keepIds 不再只含
+            // 「本次上传 + 排除项」——其语义是「keepIds 之外的当前账号向量全部
+            // 物理删除」，本地工作区不完整（拉取中途/部分恢复/陈旧快照）或
+            // 索引等待期间工作区已变化时，会把仍加星仓库的向量误删。改为：
+            // - keepIds 纳入运行开始时的完整本地列表（两种 ID 形态）；
+            // - 清理执行前重读实时仓库列表，仅当 ID 集合与运行开始时完全一致
+            //   （工作区在索引期间未被拉取/导入/退订改动，快照仍完整且有效）
+            //   时才执行删除；
+            // - 无法确认完整性/时效性时跳过删除并保留已上传结果（partial 语义，
+            //   冗余向量由后续重建收敛）。
+            const startRepoIds = new Set(repositories.map((repository) => String(repository.id)));
+            const liveRepoIds = new Set(useAppStore.getState().repositories.map((repository) => String(repository.id)));
+            const workspaceUnchanged = startRepoIds.size === liveRepoIds.size
+              && [...startRepoIds].every((id) => liveRepoIds.has(id))
+              && useAppStore.getState().repositories.length > 0;
             const cleanupKeepIds = [...new Set([
-              ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
+              ...repositories.map((repository) => String(repository.id)),
+              ...repositories.map((repository) => buildAccountScopedVectorId(jobAccountId, repository.id)),
               ...excludedVectorIds,
               ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
+              ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
             ])];
             try {
               if (onAccountChanged() || controller.signal.aborted) {
@@ -295,18 +312,26 @@ export const useVectorSearchActions = (): VectorSearchActions => {
                 abortErr.name = 'AbortError';
                 throw abortErr;
               }
-              const cleanup = await clients.vectorService.cleanup(cleanupKeepIds, {
-                accountPrefix: jobAccountId,
-                // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机
-                // 只有一个已保存账号并不能证明无前缀向量都属于它。
-                includeLegacy: false,
-                signal: controller.signal,
-              });
-              if (cleanup.partial) {
-                logger.warn('vectorSearch.index', 'Vector cleanup stopped before confirming completion; uploads are complete', {
+              if (!workspaceUnchanged) {
+                logger.warn('vectorSearch.index', 'Skip vector cleanup: the account workspace changed during indexing (or is empty); uploads are kept and stale vectors converge on the next rebuild', {
                   accountId: jobAccountId,
-                  deleted: cleanup.deleted,
+                  startCount: startRepoIds.size,
+                  liveCount: liveRepoIds.size,
                 });
+              } else {
+                const cleanup = await clients.vectorService.cleanup(cleanupKeepIds, {
+                  accountPrefix: jobAccountId,
+                  // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机
+                  // 只有一个已保存账号并不能证明无前缀向量都属于它。
+                  includeLegacy: false,
+                  signal: controller.signal,
+                });
+                if (cleanup.partial) {
+                  logger.warn('vectorSearch.index', 'Vector cleanup stopped before confirming completion; uploads are complete', {
+                    accountId: jobAccountId,
+                    deleted: cleanup.deleted,
+                  });
+                }
               }
             } catch (cleanupError) {
               // 上传与本地标记已完成：清理失败只记告警，绝不能把整次索引报告为

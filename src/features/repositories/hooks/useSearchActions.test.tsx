@@ -1046,6 +1046,10 @@ describe('useSearchActions account switch guards', () => {
     const { result } = renderHook(() => useSearchActions());
     await act(async () => { await result.current.syncStars('stars-and-lists'); });
 
+    // 审计修复（C24）：先确认确实到达了 Lists 请求（以当前登录名恰好调用一次），
+    // 再断言切号后的丢弃行为——否则用例可能在请求发出前就通过。
+    expect(mocks.getUserLists).toHaveBeenCalledTimes(1);
+    expect(mocks.getUserLists).toHaveBeenCalledWith('me');
     // 分类绝不能写入新账号；仓库写入与同步同样被丢弃
     expect(storeState.addCustomCategory).not.toHaveBeenCalled();
     expect(storeState.setRepositories).not.toHaveBeenCalled();

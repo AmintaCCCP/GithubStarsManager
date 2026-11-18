@@ -264,6 +264,13 @@ export function useBatchStarImport() {
           ));
         }
       }
+      // 审计修复（C28）：会话不匹配时直接退出整个导入任务——尾部同步绝不能
+      // 在切号后执行：forceSyncToBackend 会清除共享防抖计时器/待推标志，并以
+      // 新账号请求头推送新账号工作区。已完成的 A 远端操作保留（远端不可撤销）；
+      // A 的剩余工作只能在 A 的同步上下文中处理（切回后由补推/星标同步收敛）。
+      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) {
+        return;
+      }
       if (starredCount > 0) {
         try {
           await forceSyncToBackend({ reportFailures: true });

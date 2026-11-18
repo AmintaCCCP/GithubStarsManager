@@ -300,12 +300,23 @@ export const normalizeSavedAccounts = (value: unknown): Record<string, SavedAcco
       && typeof user.login === 'string'
       && user.login.length > 0
       && typeof user.avatar_url === 'string';
-    const githubToken = typeof record.githubToken === 'string' ? record.githubToken : null;
-    if (!validUser || githubToken === null) {
+    // 审计修复（B7）：持久化分片只保留 savedAccounts 非敏感元数据（githubToken
+    // 被剥为空串）——缺 Token 字段的条目按「需重新授权」的元数据条目保留，
+    // 不再整条丢弃；恢复会话时经桌面端安全存储或重新授权回填凭证。
+    const githubToken = typeof record.githubToken === 'string' ? record.githubToken : '';
+    if (!validUser) {
       changed = true;
       continue;
     }
     const accountId = String(userId);
+    // 审计修复（B6）：按 user.id 归一的规范键已存在时，非规范别名条目
+    // （如 "042" 指向 id 42）一律忽略——别名不得覆盖规范条目的凭证。
+    // 行为约定（已同步 HANDOFF-B-TO-C.md 供导入路径对齐）：保留规范条目、
+    // 丢弃别名条目，不抛错。
+    if (key !== accountId && result[accountId]) {
+      changed = true;
+      continue;
+    }
     const addedAt = typeof record.addedAt === 'string' && record.addedAt ? record.addedAt : '';
     const lastUsedAt = typeof record.lastUsedAt === 'string' && record.lastUsedAt ? record.lastUsedAt : '';
     const stable = key === accountId

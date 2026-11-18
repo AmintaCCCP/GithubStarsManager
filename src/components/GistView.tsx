@@ -25,7 +25,7 @@ import {
 import { GistCard } from './GistCard';
 import { GistDetailModal } from './GistDetailModal';
 import { GistEditorModal } from './GistEditorModal';
-import { useGistActions, type GistCreateInput, type GistUpdateInput } from '../features/gists/hooks/useGistActions';
+import { useGistActions, GistDetailSessionSwitchedError, type GistCreateInput, type GistUpdateInput } from '../features/gists/hooks/useGistActions';
 import { useAppStore } from '../store/useAppStore';
 import type { Gist, GistCategoryId } from '../types';
 import { filterAndSortGists, getGistCategoryItems, resolveGistAiSearchResults } from '../utils/gistUtils';
@@ -132,9 +132,23 @@ export const GistView: React.FC = () => {
     const requestSeq = ++detailRequestSeqRef.current;
     setDetailGist(gist);
     setIsDetailOpen(true);
-    const detail = await fetchGistDetail(gist);
-    if (requestSeq !== detailRequestSeqRef.current || !detail) return;
-    setDetailGist(detail);
+    try {
+      const detail = await fetchGistDetail(gist);
+      if (requestSeq !== detailRequestSeqRef.current || !detail) return;
+      setDetailGist(detail);
+    } catch (error) {
+      // 审计修复（C35 调用侧）：详情请求因账号会话切换结束时，清除旧账号的
+      // detailGist 并关闭详情面板，不得继续显示旧账号的数据；普通失败维持
+      // hook 内既有的降级显示。
+      if (error instanceof GistDetailSessionSwitchedError) {
+        if (requestSeq === detailRequestSeqRef.current) {
+          setDetailGist(null);
+          setIsDetailOpen(false);
+        }
+        return;
+      }
+      throw error;
+    }
   };
 
   const handleSubmitGist = async (input: GistCreateInput | GistUpdateInput) => {

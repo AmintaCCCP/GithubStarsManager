@@ -37,6 +37,7 @@ vi.mock('../../services/telegramService', () => ({
 }));
 vi.mock('../../services/electronProxy', () => ({
   clearEncryptedXAuthViaDesktop: vi.fn().mockResolvedValue(undefined),
+  clearEncryptedGhAccountsViaDesktop: vi.fn().mockResolvedValue(undefined),
 }));
 
 const t = (key: string) => key;
@@ -445,16 +446,31 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     const payload = JSON.parse(await blob.text());
     expect(payload.data.accountWorkspaces['2'].repositories).toEqual([]);
 
+    // 审计修复（C56a）：导出后先修改 Alice/Bob 本地分类，再替换导入——
+    // 断言分类恢复为备份值（而非导出后本地值），且 Bob 未选仓库未导入。
+    useAppStore.setState({ customCategories: [category('cat-alice-edited', 'Alice Edited')] });
+    useAppStore.setState((current) => ({
+      accountWorkspaces: {
+        ...current.accountWorkspaces,
+        '2': {
+          ...current.accountWorkspaces['2'],
+          customCategories: [category('cat-bob-edited', 'Bob Edited')],
+        },
+      },
+    }));
+
     await importBackupAndClick(user, payload.data, 'dataManagementPanel.replace-import');
 
     const state = useAppStore.getState();
-    // 分类恢复到当前账号
+    // Alice 分类恢复为备份值（cat-alice），导出后的本地修改被替换
     expect(state.customCategories.map((c: Category) => c.id)).toEqual(['cat-alice']);
-    // 非当前账号的仓库数据保留（未被空占位整体覆盖）
+    expect(state.customCategories[0].name).toBe('Alice Cat');
+    // Bob 未选仓库未导入（实时仍是 bob-ai），Bob 分类恢复为备份值
     expect(state.accountWorkspaces['2']?.repositories.map((r: Repository) => r.ai_summary))
       .toEqual(['bob-ai']);
     expect(state.accountWorkspaces['2']?.customCategories.map((c: Category) => c.id))
       .toEqual(['cat-bob-local']);
+    expect(state.accountWorkspaces['2']?.customCategories[0].name).toBe('Bob Local');
   });
 
   it('archives backup-account subscriptions to its workspace on cross-account replace import', async () => {
@@ -531,6 +547,10 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
 
     const state = useAppStore.getState();
     const summaries = state.repositories.map((r: Repository) => r.ai_summary);
+    // 审计修复（C56b）：合并结果按仓库 ID 完整断言 Alice 实时列表——
+    // 明确不含备份顶层的 bob-top-level（跨账号顶层数据归档进备份账号
+    // 工作区，绝不混入当前账号实时列表）。
+    expect(summaries).toEqual(['alice-live-1', 'alice-new-local', 'backup-only-alice']);
     // 实时数据保留（不被备份旧快照 [stale-alice] 回滚）
     expect(summaries).toContain('alice-live-1');
     expect(summaries).toContain('alice-new-local');

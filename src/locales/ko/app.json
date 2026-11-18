@@ -241,6 +241,8 @@
     "add-account": "계정 추가",
     "current-account": "현재 계정",
     "remove-account": "계정 삭제",
+    "remove-account-with-login": "@{{login}} 제거",
+    "logout-account-changed": "계정이 변경되었습니다. 현재 계정에 대해 다시 로그아웃해 주세요.",
     "switch-in-progress": "계정을 전환하는 중입니다. 잠시 후 다시 시도해 주세요.",
     "remove-account-confirm-title": "저장된 계정 삭제",
     "remove-account-confirm-desc": "이 계정의 저장된 로그인 자격 증명만 제거됩니다. 캐시된 저장소와 카테고리는 유지됩니다. 계속하시겠습니까?",

@@ -208,7 +208,8 @@ export default {
             returnMetadata: 'none',
             ...(accountFilter ? { filter: accountFilter } : {}),
           });
-          const staleIds = result.matches
+          const sampled = result.matches;
+          const staleIds = sampled
             .filter((m) => {
               if (keepSet.has(m.id) || deletedIds.has(m.id)) return false;
               // 无范围参数（旧客户端）只清理 legacy 无前缀向量：带账号前缀的
@@ -218,22 +219,24 @@ export default {
               return includeLegacy && isLegacyId(m.id);
             })
             .map((m) => m.id);
-          const unseen = result.matches.filter((m) => !seenIds.has(m.id));
+          const unseen = sampled.filter((m) => !seenIds.has(m.id));
           for (const match of unseen) seenIds.add(match.id);
-          if (staleIds.length === 0) {
-            if (unseen.length === 0) {
-              // 仅当已采样覆盖全索引向量数时才能证明清理完整；随机采样无法
-              // 穷尽未见向量时保持 sampledAll=false（返回 partial:true）。
-              if (seenIds.size >= (info.vectorCount ?? 0)) {
-                sampledAll = true;
-              }
-              break;
-            }
+          if (staleIds.length > 0) {
+            await env.VECTORIZE.deleteByIds(staleIds);
+            for (const id of staleIds) deletedIds.add(id);
+            totalDeleted += staleIds.length;
             continue;
           }
-          await env.VECTORIZE.deleteByIds(staleIds);
-          for (const id of staleIds) deletedIds.add(id);
-          totalDeleted += staleIds.length;
+          // Issue #612 A29：采样收敛判定——历史 seenIds 数量与 info.vectorCount
+          // 相等不能证明覆盖当前索引（数量不变但 ID 可被替换），该判定已移除；
+          // 本轮采样窗口小于 topK 同样不是完成证据（下一轮可能命中未见向量）。
+          // 唯一可靠的完成证据是候选池已被观察为空（0 条采样结果）——此时该
+          // 范围内已无任何可清理向量。覆盖未确认时保持 partial: true，并继续
+          // 用剩余采样轮次直到 MAX_ROUNDS。
+          if (sampled.length === 0) {
+            sampledAll = true;
+            break;
+          }
         }
         // 采样轮数耗尽仍可能有未处理的向量：明确返回 partial，不谎报完成。
         return jsonResponse({ success: true, deleted: totalDeleted, partial: !sampledAll });

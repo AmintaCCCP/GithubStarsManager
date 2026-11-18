@@ -46,7 +46,6 @@ const partialize = (overrides: Partial<ReturnType<AppStore['getState']>> = {}): 
 
 const currentPersistedKeys = [
   'user',
-  'githubToken',
   'isAuthenticated',
   'accountWorkspaces',
   'savedAccounts',
@@ -183,8 +182,15 @@ describe('PR-07 Store modularization compatibility', () => {
       rpcDownloadConfig: { enabled: true, host: 'rpc.example.com', port: 6800, secret: 'rpc-secret' },
     });
 
-    expect(options.version).toBe(18);
+    // 审计修复（B7）：v19 起明文 PAT 不再进入持久化分片（githubToken 键被移除，
+    // savedAccounts 仅保留非敏感元数据）。
+    expect(options.version).toBe(19);
     expect(Object.keys(persisted)).toEqual(currentPersistedKeys);
+    expect(persisted).not.toHaveProperty('githubToken');
+    const savedEntries = Object.values(persisted.savedAccounts ?? {}) as Array<{ githubToken?: string }>;
+    for (const entry of savedEntries) {
+      expect(entry.githubToken ?? '').toBe('');
+    }
     expect(persisted.analyzingGistIds).toEqual(['gist-1']);
     expect(persisted.proxyConfig).toMatchObject({ password: 'proxy-password' });
     expect(persisted.rpcDownloadConfig).toMatchObject({ secret: 'rpc-secret' });

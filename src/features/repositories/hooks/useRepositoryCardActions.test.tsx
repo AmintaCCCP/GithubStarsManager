@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
 import { useRepositoryCardActions } from './useRepositoryCardActions';
 import { useAppStore } from '../../../store/useAppStore';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     Boolean(error && typeof error === 'object' && 'name' in error && error.name === 'AbortError')
   )),
   forceSyncToBackend: vi.fn(),
+  markPendingAccountSync: vi.fn(),
   unstarRepository: vi.fn(),
   getRepositoryReadme: vi.fn(),
   loggerInfo: vi.fn(),
@@ -58,6 +60,8 @@ vi.mock('../../../services/similarRepositoryPipeline', () => ({
 
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
+  markPendingAccountSync: mocks.markPendingAccountSync,
+  withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
 vi.mock('../../../services/githubApi', () => ({
@@ -446,6 +450,63 @@ describe('useRepositoryCardActions account switch guards', () => {
     expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
     expect(storeState.deleteRepository).not.toHaveBeenCalled();
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('keeps the deletion state for the reactivated account after A→B→A (unstar)', async () => {
+    // 审计修复（C31）：取消星标请求在 A 发起后保持 pending，用实际切号操作
+    // 切 B 再切回 A（推进真实会话代次）后完成——旧请求绝不写进重新激活的 A
+    // 顶层工作区，但为发起账号保留删除状态（登记 (账号, 后端) 待补推标记），
+    // 且旧会话的失败/成功提示不再出现。
+    let releaseUnstar!: () => void;
+    mocks.unstarRepository.mockImplementation(() => new Promise<void>((resolve) => {
+      releaseUnstar = resolve;
+    }));
+    const { result } = renderActions();
+    let promise!: Promise<void>;
+    await act(async () => {
+      promise = result.current.unstar();
+    });
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    await act(async () => {
+      releaseUnstar();
+      await promise;
+    });
+
+    expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
+    // 重新激活的 A 工作区不被旧请求的同步路径写入（deleteRepository 未调用）
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.toast).not.toHaveBeenCalled();
+    // C29：为发起账号保留删除状态——登记 (发起账号, 发起时后端) 待补推标记
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', expect.any(String));
+  });
+
+  it('drops the stale similar result after A→B→A (generation advanced)', async () => {
+    // 审计修复（C31）：相似搜索在 A 发起后保持 pending，实际切号推进代次后
+    // 放行流水线结果——绝不进入相似视图，也不提示。
+    let releasePipeline!: () => void;
+    mocks.runSimilarRepositoryPipeline.mockImplementation(() => new Promise<void>((resolve) => {
+      releasePipeline = resolve;
+    }));
+    const { result } = renderActions();
+    let promise!: Promise<void>;
+    await act(async () => {
+      promise = result.current.findSimilar();
+    });
+    // 先断言流水线已执行，再放行结果
+    await waitFor(() => expect(mocks.runSimilarRepositoryPipeline).toHaveBeenCalledTimes(1));
+    switchToB();
+    bumpAccountSessionGeneration();
+    (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    await act(async () => {
+      releasePipeline();
+      await promise;
+    });
+
+    expect(storeState.enterSimilarView).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
   });
 });

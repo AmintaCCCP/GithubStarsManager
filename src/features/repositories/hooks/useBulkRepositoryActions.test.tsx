@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../../../types';
 import { useBulkRepositoryActions } from './useBulkRepositoryActions';
 import { useAppStore } from '../../../store/useAppStore';
+import { bumpAccountSessionGeneration } from '../../../store/helpers/accountWorkspace';
 
 const mocks = vi.hoisted(() => ({
   useAppStore: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   unstarRepository: vi.fn(),
   forceSyncToBackend: vi.fn(),
+  markPendingAccountSync: vi.fn(),
 }));
 
 vi.mock('../../../store/useAppStore', () => ({
@@ -28,7 +30,7 @@ vi.mock('../../../services/githubApi', () => ({
 
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
-  markPendingAccountSync: vi.fn(),
+  markPendingAccountSync: mocks.markPendingAccountSync,
   withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
@@ -258,6 +260,88 @@ describe('useBulkRepositoryActions account switch guards', () => {
     expect(storeState.deleteRepository).not.toHaveBeenCalled();
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it('stops without remote calls after A→B→A (session generation advanced)', async () => {
+    // 审计修复（C27a）：A→B→A 后账号 ID 与确认前相同，只有会话代次能识别
+    // 这次切号——确认返回前切 B 再切回 A 并推进实际代次，操作必须整体退出。
+    mocks.confirm.mockImplementation(async () => {
+      switchToB();
+      bumpAccountSessionGeneration();
+      (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+      return true;
+    });
+
+    const { result } = renderActions();
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.unstar([repository(1)]);
+    });
+
+    expect(outcome).toBe(false);
+    expect(mocks.unstarRepository).not.toHaveBeenCalled();
+    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalled();
+  });
+
+  it('writes completed remote unstars back to the parked account archive only (C27b)', async () => {
+    // 审计修复（C27b）：会话失效分支的已确认远端操作按结果归属写回发起账号
+    // 的归档快照——setState 应用到含 A/B 归档的夹具，断言首仓库及其 Release
+    // 从 A 归档移除、第二仓库保留、B 不变，且仅为 A 标记待补推。
+    const first = repository(1);
+    const second = repository(2);
+    const otherAccountRepo = repository(3, { full_name: 'other/repository-3' });
+    storeState = {
+      ...storeState,
+      accountWorkspaces: {
+        '1': {
+          repositories: [first, second],
+          releases: [
+            { repository: { id: 1 } } as unknown as import('../../../types').Release,
+            { repository: { id: 2 } } as unknown as import('../../../types').Release,
+          ],
+        },
+        '2': {
+          repositories: [otherAccountRepo],
+          releases: [],
+        },
+      },
+    } as typeof storeState;
+    const appliedPatches: Array<Record<string, unknown>> = [];
+    (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
+      const patch = typeof updater === 'function'
+        ? (updater as (state: typeof storeState) => Record<string, unknown>)(storeState)
+        : updater as Record<string, unknown>;
+      appliedPatches.push(patch);
+    });
+    let calls = 0;
+    mocks.unstarRepository.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) switchToB();
+      return undefined;
+    });
+
+    const { result } = renderActions();
+    let outcome: boolean | undefined;
+    await act(async () => {
+      outcome = await result.current.unstar([first, second]);
+    });
+
+    expect(calls).toBe(1);
+    expect(outcome).toBe(false);
+    expect(appliedPatches).toHaveLength(1);
+    const archivedA = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[]; releases: Array<{ repository: { id: number } }> }>)['1'];
+    const archivedB = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[] }>)['2'];
+    // 首仓库及其 Release 从 A 归档移除，第二仓库保留
+    expect(archivedA.repositories.map(r => r.id)).toEqual([2]);
+    expect(archivedA.releases.map(rel => rel.repository.id)).toEqual([2]);
+    // B 归档不变（ID 相同的仓库也绝不串号——本夹具用不同 ID 直接验证）
+    expect(archivedB.repositories.map(r => r.id)).toEqual([3]);
+    // 仅为发起账号 A 标记待补推
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledTimes(1);
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', expect.any(String));
+    expect(mocks.markPendingAccountSync).not.toHaveBeenCalledWith('2', expect.anything());
   });
 
   it('deletes locally and syncs when the account never changed (control)', async () => {

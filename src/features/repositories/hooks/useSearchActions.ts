@@ -61,6 +61,11 @@ export const cancelActiveAiSearch = () => {
   aiSearchAbortRef.current?.abort();
 };
 
+// 星标同步状态所有者标识（审计修复 C21）：setSyncingStars 是共享 Store 状态。
+// 同一时刻只认最新一次同步请求——新请求（含切号后新会话发起的请求）递增标识
+// 使旧请求失去所有权，仅标识匹配的请求可在 finally 中清除标记。
+let starSyncRunSeq = 0;
+
 /** 统计本次同步中真正新增的仓库数（与合并口径一致）。 */
 export const countNewStarredRepositories = (
   newRepos: Repository[],
@@ -310,11 +315,15 @@ export const useSearchActions = (): SearchActions => {
         const aiResults = await aiService.searchRepositoriesWithSelection(repositories, query, {
           signal: options?.signal,
           onPhase: (phase) => {
+            // 审计修复（C23）：回调先比较发起会话（账号 ID + 会话代次），
+            // 不一致立即返回——不更新阶段、不显示降级警告。
+            if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
             setSearchPhase(phase === 'selecting'
               ? t('useSearchActions.ai-selecting-relevant-repositories')
               : t('useSearchActions.ai-semantic-analysis'));
           },
           onFallback: (reason) => {
+            if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
             // 端点抖动/配置问题时用户看到的不能只是"空结果"：明确告知已降级
             if (reason === 'ai_failed') {
               toast(t('useSearchActions.ai-request-failed-fell-back-to-local-lexical-sea'), 'warning');
@@ -430,6 +439,9 @@ export const useSearchActions = (): SearchActions => {
             signal: controller.signal,
             accountIdScope,
             onPhase: (phase) => {
+              // 审计修复（C23）：回调先比较发起会话（账号 ID + 会话代次），
+              // 不一致立即返回，不更新新账号的搜索阶段。
+              if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
               setSearchPhase(
                 phase === 'analyzing'
                   ? t('useSearchActions.ai-analyzing-query')
@@ -515,6 +527,8 @@ export const useSearchActions = (): SearchActions => {
       return;
     }
 
+    // 审计修复（C21）：同步状态所有权标识——仅最新一次请求可清除共享标记。
+    const runId = ++starSyncRunSeq;
     setSyncingStars(true);
     // 账号代次校验（Issue #611）：全量拉取耗时期间切号后丢弃结果，绝不覆盖新账号
     const startedAccountId = peekCurrentAccountId();
@@ -586,7 +600,11 @@ export const useSearchActions = (): SearchActions => {
           }
         } catch (listError) {
           console.error('List sync failed:', listError);
-          toast(t('useSearchActions.list-sync-failed-starred-repositories-were-synce'), 'error');
+          // 审计修复（C22）：列表请求失败提示同样绑定发起会话——仅请求所属
+          // 会话仍是当前会话时显示；当前会话的列表失败保留已完成的星标同步结果。
+          if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+            toast(t('useSearchActions.list-sync-failed-starred-repositories-were-synce'), 'error');
+          }
           // 不中断：星标同步结果仍然生效
         }
       }
@@ -602,6 +620,12 @@ export const useSearchActions = (): SearchActions => {
       setRepositories(finalRepositories);
       await forceSyncToBackend();
 
+      // 审计修复（C20）：推送完成后再写 lastSync 与提示前重新校验会话——
+      // forceSyncToBackend 等待期间切号后，A 的同步结果绝不写进 B 的会话。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
+
       setLastSync(new Date().toISOString());
 
       if (newRepoCount > 0) {
@@ -612,13 +636,22 @@ export const useSearchActions = (): SearchActions => {
 
     } catch (error) {
       console.error('Sync failed:', error);
+      // 审计修复（C22）：星标请求失败提示复用成功路径的会话校验——仅请求
+      // 所属会话仍是当前会话时显示错误提示。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       if (error instanceof Error && error.message.includes('token')) {
         toast(t('useSearchActions.github-token-has-expired-or-is-invalid-please-lo'), 'error');
       } else {
         toast(t('useSearchActions.sync-failed-please-check-your-network-connection'), 'error');
       }
     } finally {
-      setSyncingStars(false);
+      // 审计修复（C21）：仅标识匹配（仍是最新一次同步请求）的请求可清除
+      // 共享的同步标记；切号后新会话发起的同步会递增标识使旧请求失去所有权。
+      if (starSyncRunSeq === runId) {
+        setSyncingStars(false);
+      }
     }
   }, [githubToken, setSyncingStars, syncMode, user, t, toast, addCustomCategory, customCategories, language, hiddenDefaultCategoryIds, defaultCategoryOverrides, setRepositories, setLastSync]);
 

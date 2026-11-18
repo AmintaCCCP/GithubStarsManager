@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Category } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import {
+  accountIdKey,
   getAccountSessionGeneration,
   isCurrentAccountSession,
   peekCurrentAccountId,
@@ -133,11 +134,20 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       toast(t('useBackendSettingsActions.backend-not-available'), 'error');
       return;
     }
+    // 审计修复（C45）：手动推送绑定发起会话（账号 ID + 会话代次）——推送等待
+    // 期间切号后，旧会话的推送结果与提示不得应用到新会话（autoSync 的推送
+    // 内部按发起时刻的账号与后端构造请求，这里复核结果归属）。
+    const startedAccountId = accountIdKey(useAppStore.getState().user);
+    const startedGeneration = getAccountSessionGeneration();
     setIsSyncingToBackend(true);
     try {
       // 复用 autoSync 的安全推送路径：先做非破坏性对账，且拒绝在分区未对齐
       // 时推送空仓库快照（手动同步绝不能绕过这两道防线）。
       const pushed = await forceSyncToBackend({ reportFailures: true });
+      // 推送等待期间切号：旧会话的结果绝不提交给新会话
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       // 推送被安全防线推迟（未对账/空快照等）时不能提示成功。
       if (!pushed) {
         toast(t('useBackendSettingsActions.sync-failed'), 'error');
@@ -146,6 +156,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       toast(t('useBackendSettingsActions.synced-to-backend-repos-v1-releases-v2-ai-config', { v1: state.repositories.length, v2: state.releases.length, v3: state.aiConfigs.length, v4: state.webdavConfigs.length }), 'success');
     } catch (error) {
       console.error('Sync to backend failed:', error);
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
       toast(`${t('useBackendSettingsActions.sync-failed')}: ${(error as Error).message}`, 'error');
     } finally {
       setIsSyncingToBackend(false);
@@ -167,6 +180,9 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     );
     if (!confirmed) return;
     if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
+    // 审计修复（C44）：拉取开始时记录当前后端地址——地址可被并行的
+    // testConnection 更换且不递增会话代次，仅靠会话校验识别不到。
+    const startedBackendUrl = backend.backendUrl ?? '';
     setIsSyncingFromBackend(true);
     try {
       const [repoData, releaseData, aiConfigData, webdavConfigData, settingsData] = await Promise.all([
@@ -178,6 +194,13 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
       ]);
       // 仅比较账号 ID 无法识别 A→B→A：旧响应会把重新激活的工作区整段替换。
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        return;
+      }
+      // 审计修复（C44）：后端地址在拉取等待期间被更换（如另一面板的
+      // testConnection）时丢弃响应并提示用户——响应可能来自另一个后端分区。
+      if ((backend.backendUrl ?? '') !== startedBackendUrl) {
+        console.warn('Sync from backend discarded: backend URL changed during fetch');
+        toast(t('useBackendSettingsActions.sync-failed'), 'error');
         return;
       }
       // 账号与分类状态必须同一快照（Issue #611 审计修复）：hook 渲染期捕获的

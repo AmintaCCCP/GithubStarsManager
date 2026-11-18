@@ -241,6 +241,8 @@
     "add-account": "Adicionar conta",
     "current-account": "Conta atual",
     "remove-account": "Remover conta",
+    "remove-account-with-login": "Remover @{{login}}",
+    "logout-account-changed": "A conta mudou. Saia novamente para a conta atual.",
     "switch-in-progress": "Uma troca de conta está em andamento. Tente novamente em instantes.",
     "remove-account-confirm-title": "Remover conta salva",
     "remove-account-confirm-desc": "Isso remove apenas a credencial de login salva desta conta. Os repositórios e categorias em cache serão mantidos. Continuar?",

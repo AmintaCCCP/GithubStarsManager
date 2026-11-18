@@ -149,6 +149,7 @@ export default {
             400,
           );
         }
+        const SAMPLE_TOPK = 100;
         for (let round = 0; round < 10; round++) {
           // 随机向量采样：固定向量可能每轮命中同一批 keepIds，无法覆盖候选池
           const queryVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
@@ -157,7 +158,8 @@ export default {
             returnMetadata: 'none',
             ...(accountFilter ? { filter: accountFilter } : {}),
           });
-          const staleIds = result.matches
+          const sampled = result.matches;
+          const staleIds = sampled
             .filter((m) => {
               if (keepSet.has(m.id) || deletedIds.has(m.id)) return false;
               // 无范围参数时只清理 legacy 无前缀向量，带账号前缀的向量必须
@@ -167,20 +169,23 @@ export default {
               return includeLegacy && isLegacyId(m.id);
             })
             .map((m) => m.id);
-          const unseen = result.matches.filter((m) => !seenIds.has(m.id));
+          const unseen = sampled.filter((m) => !seenIds.has(m.id));
           for (const match of unseen) seenIds.add(match.id);
-          if (staleIds.length === 0) {
-            if (unseen.length === 0) {
-              if (seenIds.size >= (info.vectorCount ?? 0)) {
-                sampledAll = true;
-              }
-              break;
-            }
+          if (staleIds.length > 0) {
+            await env.VECTORIZE.deleteByIds(staleIds);
+            for (const id of staleIds) deletedIds.add(id);
+            totalDeleted += staleIds.length;
             continue;
           }
-          await env.VECTORIZE.deleteByIds(staleIds);
-          for (const id of staleIds) deletedIds.add(id);
-          totalDeleted += staleIds.length;
+          // Issue #612 A30：采样收敛判定与 TS 入口保持一致——seenIds 数量与
+          // vectorCount 比较、以及「本轮窗口小于 topK」都不是清理完成依据
+          // （数量不变但 ID 可被替换，下一轮可能命中未见向量）。唯一可靠的
+          // 完成证据是候选池已被观察为空（0 条采样结果）；覆盖未确认时保持
+          // partial: true，继续采样直到轮数耗尽。
+          if (sampled.length === 0) {
+            sampledAll = true;
+            break;
+          }
         }
         return jsonResponse({ success: true, deleted: totalDeleted, partial: !sampledAll });
       }

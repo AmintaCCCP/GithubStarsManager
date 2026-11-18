@@ -494,16 +494,99 @@ describe('destructive push safeguards (Issue #611)', () => {
     expect(pushed.map((repo) => repo.id)).toEqual([1, 2]);
   });
 
-  it('rebinds a pending marker after a rollback to the original backend', () => {
-    const accountId = 'rebind-after-rollback';
-    adapter.backendUrl = 'http://candidate';
-    markPendingAccountSync(accountId);
+  it('rebinds only restore-window markers registered on the origin backend (C1)', () => {
+    const windowAccountId = 'rebind-after-rollback';
+    const otherAccountId = 'rebind-other-backend';
+    adapter.backendUrl = 'http://window-origin';
+    markPendingAccountSync(windowAccountId);
+    adapter.backendUrl = 'http://unrelated';
+    markPendingAccountSync(otherAccountId);
 
-    // 切换失败、连接回滚到原后端：标记必须跟着回到原后端，否则补推不执行。
+    // 切换失败、连接回滚到另一个后端：只有显式传入的恢复窗口原后端上的
+    // 记录被重绑；其他后端已有的待推记录保留原归属（绝不能被整体改绑到
+    // 当前 backendUrl，否则会把编辑推到错误后端）。
     adapter.backendUrl = 'http://original';
-    expect(hasPendingAccountSync(accountId)).toBe(false);
-    rebindPendingAccountSyncToCurrentBackend(accountId);
-    expect(hasPendingAccountSync(accountId)).toBe(true);
+    expect(hasPendingAccountSync(windowAccountId)).toBe(false);
+    rebindPendingAccountSyncToCurrentBackend(windowAccountId, 'http://window-origin');
+    expect(hasPendingAccountSync(windowAccountId)).toBe(true);
+    expect(hasPendingAccountSync(otherAccountId)).toBe(false);
+  });
+
+  // 审计修复（C2）：409 SNAPSHOT_CONFLICT 重试环路——冲突后重新 GET 对账，
+  // 第二次 PUT 携带服务端新 revision，载荷 = 服务端状态 ∪ 本地修改 − 本地明确删除。
+  it('re-reconciles with a fresh revision after a 409 snapshot conflict (C2 retry loop)', async () => {
+    vi.mocked(backend.syncRepositories).mockClear();
+    const conflict = Object.assign(new Error('Repository snapshot has changed'), {
+      statusCode: 409,
+      code: 'SNAPSHOT_CONFLICT',
+    });
+    // GET 序列（含 A20x 契约的 revision 字段）：
+    // 1) 基线推送观察空分区（rev 5）→ 基线 {1,2}；
+    // 2) 冲突尝试 1：其他设备已写入 repo 2/3，服务端快照 rev 7；
+    // 3) 冲突后重新 GET：服务端新 revision 8。
+    vi.mocked(backend.fetchRepositories)
+      .mockResolvedValueOnce({ repositories: [], total: 0, revision: 5 })
+      .mockResolvedValueOnce({ repositories: [createRepository(2), createRepository(3)], total: 2, revision: 7 })
+      .mockResolvedValueOnce({ repositories: [createRepository(2), createRepository(3)], total: 2, revision: 8 });
+    vi.mocked(backend.syncRepositories)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(conflict)
+      .mockResolvedValueOnce(undefined);
+
+    await forceSyncToBackend();
+    // 本地明确删除 repo 2（经推送基线记录；本 describe 无订阅器，会话删除集合不参与）
+    useAppStore.setState({ repositories: [createRepository(1)] });
+
+    // 冲突 → 重新对账 → 第二次 PUT 成功
+    await expect(forceSyncToBackend({ reportFailures: true })).resolves.toBe(true);
+
+    const calls = vi.mocked(backend.syncRepositories).mock.calls;
+    // 基线推送：载荷 [1,2]、expectedRevision = 首次 GET 的 rev 5
+    expect((calls[0][0] as Repository[]).map(repo => repo.id)).toEqual([1, 2]);
+    expect(calls[0][1]).toEqual({ expectedRevision: 5 });
+    // 冲突尝试：载荷 = 本地 [1] ∪ 服务端保留 [3]——repo 2 已本地删除绝不复活，
+    // 远端新增的 repo 3 在载荷中且未被删除
+    expect((calls[1][0] as Repository[]).map(repo => repo.id)).toEqual([1, 3]);
+    expect(calls[1][1]).toEqual({ expectedRevision: 7 });
+    // 重新对账后的第二次 PUT：expectedRevision = 服务端新 revision 8
+    expect((calls[2][0] as Repository[]).map(repo => repo.id)).toEqual([1, 3]);
+    expect(calls[2][1]).toEqual({ expectedRevision: 8 });
+    expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(3);
+  });
+
+  // 审计修复（C2）：409 重试有界——连续 3 次冲突后放弃：reportFailures 调用方
+  // 收到失败、不发第四次 PUT；待推状态保留，下一次推送重新对账成功送达完整载荷。
+  it('gives up after three 409 conflicts and keeps the edit retryable (C2 retry bound)', async () => {
+    vi.mocked(backend.syncRepositories).mockClear();
+    // 独立后端：不继承前序用例在 http://backend-a 上的推送基线
+    adapter.backendUrl = 'http://backend-conflict';
+    const conflict = Object.assign(new Error('Repository snapshot has changed'), {
+      statusCode: 409,
+      code: 'SNAPSHOT_CONFLICT',
+    });
+    // 服务端恒定 rev 9（含其他设备的 repo 3）；三次 PUT 全部冲突
+    vi.mocked(backend.fetchRepositories)
+      .mockResolvedValue({ repositories: [createRepository(3)], total: 1, revision: 9 });
+    vi.mocked(backend.syncRepositories).mockRejectedValue(conflict);
+
+    await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
+
+    const calls = vi.mocked(backend.syncRepositories).mock.calls;
+    // 有界重试：恰好 3 次 PUT（第三次后不再发第四次），全部携带
+    // expectedRevision = 9 与合并载荷（服务端保留的 repo 3 不被本地快照删除）
+    expect(calls).toHaveLength(3);
+    for (const [payload, options] of calls) {
+      expect((payload as Repository[]).map(repo => repo.id)).toEqual([1, 2, 3]);
+      expect(options).toEqual({ expectedRevision: 9 });
+    }
+
+    // 待推状态保留：下一次推送重新 GET 对账成功，送达完整合并载荷
+    vi.mocked(backend.syncRepositories).mockReset().mockResolvedValue(undefined);
+    await expect(forceSyncToBackend()).resolves.toBe(true);
+    const retryCalls = vi.mocked(backend.syncRepositories).mock.calls;
+    expect(retryCalls).toHaveLength(1);
+    expect((retryCalls[0][0] as Repository[]).map(repo => repo.id)).toEqual([1, 2, 3]);
+    expect(retryCalls[0][1]).toEqual({ expectedRevision: 9 });
   });
 });
 
@@ -584,7 +667,11 @@ describe('backend pushes requested during another sync', () => {
     await pull;
     expect(await outcome).toBe('Failed to sync to backend');
     expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
-    expect(backend.syncRepositories).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
+    // A20x：全量推送携带 GET 记录的 expectedRevision（测试桩无 revision → null）
+    expect(backend.syncRepositories).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]),
+      { expectedRevision: null },
+    );
     vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
     await expect(forceSyncToBackend()).resolves.toBe(true);
   });
@@ -604,6 +691,45 @@ describe('backend pushes requested during another sync', () => {
     expect(vi.mocked(backend.syncRepositories).mock.calls[0][0]).toEqual(
       expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]),
     );
+  });
+
+  // 审计修复（C59）：A20x 合并推送下「首份载荷已发出后新增的仓库」必须有
+  // 第二份载荷送达，绝不因快照去重丢失编辑。
+  it('sends the new repository in a second payload after the first snapshot already went out (C59)', async () => {
+    // 首份 PUT 在途：此刻 addRepository 尚未发生，首份载荷只含旧仓库
+    const putGate = deferred<void>();
+    vi.mocked(backend.syncRepositories).mockReturnValueOnce(putGate.promise);
+    const initialPush = syncToBackend();
+    await vi.waitFor(() => expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(1));
+    const firstPayload = vi.mocked(backend.syncRepositories).mock.calls[0][0] as Repository[];
+    expect(firstPayload.map(repo => repo.full_name)).toEqual(['owner/repo-1']);
+
+    // 首份载荷已收到后再编辑：放行首份写入，排空循环送出包含新仓库的第二份
+    useAppStore.getState().addRepository(createRepository(2));
+    putGate.resolve();
+    await initialPush;
+
+    await vi.waitFor(() => expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(2));
+    const secondPayload = vi.mocked(backend.syncRepositories).mock.calls[1][0] as Repository[];
+    expect(secondPayload.map(repo => repo.full_name)).toEqual(['owner/repo-1', 'owner/repo-2']);
+  });
+
+  it('rejects a strict caller and keeps the edit retryable when the second write fails (C59)', async () => {
+    vi.mocked(backend.syncRepositories).mockResolvedValueOnce(undefined);
+    const initialPush = syncToBackend();
+    await vi.waitFor(() => expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(1));
+    await initialPush;
+
+    // 首份载荷已发出后编辑，第二次写入失败：严格调用方收到失败
+    useAppStore.getState().addRepository(createRepository(2));
+    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
+    await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
+
+    // 编辑可重试：恢复写入后再次严格同步成功，且载荷包含此前丢失的新仓库
+    vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
+    await expect(forceSyncToBackend()).resolves.toBe(true);
+    const payloads = vi.mocked(backend.syncRepositories).mock.calls.map(call => call[0] as Repository[]);
+    expect(payloads.at(-1)!.map(repo => repo.full_name)).toEqual(['owner/repo-1', 'owner/repo-2']);
   });
 
   it('keeps remotely arrived repositories when local edits queue a push after the pull', async () => {

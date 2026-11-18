@@ -66,6 +66,7 @@ const MESSAGES = {
     help_opt_quick: '若已有本地配置，直接执行快速部署 (无交互)',
     help_opt_status: '仅测试现有配置的 Worker 连通性',
     help_opt_lang: '指定界面语言 (zh 或 en)',
+    help_opt_account_indexed: '显式指定 ACCOUNT_METADATA_INDEXED (true/false)，跳过交互确认',
     sigint_exit: '👋 部署操作已被用户中断，安全退出。',
     node_version_low: '❌ Node.js 版本过低 (当前: v{version})，请升级到 Node.js 18 或更高版本。',
     installing_deps: '📦 正在自动准备部署依赖环境 (wrangler CLI)...',
@@ -211,6 +212,25 @@ const MESSAGES = {
     prompt_yn_invalid: '⚠️ 请输入 y 或 n',
     worker_url_prompt: '请输入你的 Worker URL (例如: https://github-stars-vectorize.xxx.workers.dev)',
     worker_url_missing: 'ℹ️ 未能从输出中自动提取 Worker URL。',
+    // ── Issue #612 A28/A31：账号元数据索引显式确认 ──
+    acct_card_title: '💡 accountId 元数据索引（多账号共享索引时必读）',
+    acct_card_lines: [
+      '• 只有在部署方确认 accountId 元数据索引已建立、且存量向量已完成回填后，才应启用账号过滤。',
+      '• 创建元数据索引（存量向量需重新写入后才会带上 accountId）：',
+      '    npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string',
+      '• 回填存量向量：重新分析/重建（客户端重建向量索引），或确认归属后重新上传原向量。',
+      '  （索引创建前上传、后来分析失败的仓库会被全量重建跳过——需重新分析后重建，',
+      '   或确认归属后重新上传原向量；详见 cloudflare-worker/README.md 多账号一节。）',
+      '• 启用前请用「账号过滤查询」验证回填结果，不要只测 Worker 连通性。',
+      '• ⚠️ 绝不能按客户端本机账号数量推断索引归属；部署默认值保持 false。',
+    ],
+    acct_confirm_prompt: '是否已创建 accountId 元数据索引并完成存量向量回填（启用账号过滤）？',
+    acct_verify_running: '🔍 正在验证 accountId 元数据索引与回填状态...',
+    acct_verify_index_active: '✅ accountId 元数据过滤已生效（账号过滤查询未被拒绝）。',
+    acct_verify_index_missing: '⚠️ 账号过滤查询被拒（ACCOUNT_METADATA_NOT_INDEXED）：元数据索引尚未生效，请先完成创建与回填再启用。',
+    acct_verify_legacy: '   - 采样向量中缺少 accountId 元数据的 legacy 向量: {count} / {total} 条（>0 说明回填未完成）',
+    acct_verify_no_vectors: '   - 索引暂无向量可采样，回填状态待客户端上传后再次验证。',
+    acct_verify_failed: '⚠️ 回填验证请求失败: {err}',
   },
   en: {
     banner_title: 'GitHub Stars Manager — Vector Search One-Click Deploy Wizard (TUI)',
@@ -222,6 +242,7 @@ const MESSAGES = {
     help_opt_quick: 'Run quick redeploy if local config exists (non-interactive)',
     help_opt_status: 'Test connectivity of current configured Worker',
     help_opt_lang: 'Specify language (en or zh)',
+    help_opt_account_indexed: 'Explicitly set ACCOUNT_METADATA_INDEXED (true/false), skipping interactive confirmation',
     sigint_exit: '👋 Deployment interrupted by user, exiting safely.',
     node_version_low: '❌ Node.js version too low (current: v{version}), please upgrade to Node.js 18 or higher.',
     installing_deps: '📦 Automatically preparing deployment environment (wrangler CLI)...',
@@ -367,6 +388,25 @@ const MESSAGES = {
     prompt_yn_invalid: '⚠️ Please enter y or n',
     worker_url_prompt: 'Enter your Worker URL (e.g. https://github-stars-vectorize.xxx.workers.dev)',
     worker_url_missing: 'ℹ️ Unable to automatically extract Worker URL from output.',
+    // ── Issue #612 A28/A31: explicit accountId metadata index confirmation ──
+    acct_card_title: '💡 accountId metadata index (required reading when sharing one index across accounts)',
+    acct_card_lines: [
+      '• Enable account-scoped filtering only after confirming the accountId metadata index exists AND legacy vectors were backfilled.',
+      '• Create the metadata index (existing vectors only gain accountId after being re-written):',
+      '    npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string',
+      '• Backfill legacy vectors: rebuild via the client (re-analyze then rebuild), or re-upload the original vectors after confirming ownership.',
+      '  (Repos uploaded before index creation and later failed analysis are skipped by full rebuilds — re-analyze then rebuild,',
+      '   or re-upload the original vectors after confirming ownership; see README multi-account section.)',
+      '• Before enabling the flag, verify the backfill with an account-filtered query — not just a connectivity test.',
+      '• ⚠️ Never infer index ownership from the number of local client accounts; the deployment default stays false.',
+    ],
+    acct_confirm_prompt: 'Has the accountId metadata index been created AND legacy vectors backfilled (enable account filtering)?',
+    acct_verify_running: '🔍 Verifying accountId metadata index and backfill status...',
+    acct_verify_index_active: '✅ accountId metadata filtering is active (account-filtered query not rejected).',
+    acct_verify_index_missing: '⚠️ Account-filtered query rejected (ACCOUNT_METADATA_NOT_INDEXED): metadata index not active yet. Finish create + backfill before enabling.',
+    acct_verify_legacy: '   - Sampled vectors lacking accountId metadata (legacy): {count} / {total} (>0 means backfill incomplete)',
+    acct_verify_no_vectors: '   - No vectors sampled yet; re-verify backfill after the client uploads.',
+    acct_verify_failed: '⚠️ Backfill verification request failed: {err}',
   },
 };
 
@@ -1107,9 +1147,14 @@ function putWranglerSecret(authToken) {
   console.log(c.green(t('secret_set_success')));
 }
 
-function deployWorker() {
+function deployWorker(accountMetadataIndexed = false) {
   console.log(c.cyan(t('deploying_worker')));
-  const res = runWrangler(['deploy']);
+  // Issue #612 A28：ACCOUNT_METADATA_INDEXED 不依赖 wrangler.toml 默认值——
+  // 只有部署方显式确认（交互确认或 CLI 标记）后才以 --var 写入 true 的显式标记。
+  const deployArgs = accountMetadataIndexed
+    ? ['deploy', '--var', 'ACCOUNT_METADATA_INDEXED:true']
+    : ['deploy'];
+  const res = runWrangler(deployArgs);
   const rawOutput = (res.stdout || '') + (res.stderr || '');
   const cleanOutput = stripAnsi(rawOutput);
 
@@ -1126,6 +1171,79 @@ function deployWorker() {
     return urlMatch[0].trim();
   }
   return null;
+}
+
+/**
+ * Issue #612 A28/A31：部署后验证 accountId 元数据索引与回填状态。
+ * 1) 账号过滤探测查询：被拒（ACCOUNT_METADATA_NOT_INDEXED）说明索引未生效；
+ * 2) 无范围采样查询：统计缺少 accountId 元数据的 legacy 向量占比，>0 表示回填
+ *    未完成（启用标志前必须复验，而不是只测 Worker 连通性）。
+ */
+async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
+  if (!workerUrl || !authToken) return;
+  const base = normalizeUrl(workerUrl).replace(/\/+$/, '');
+  console.log(c.cyan(t('acct_verify_running')));
+  try {
+    const dim = Number(dimensions) > 0 ? Number(dimensions) : 1536;
+    const vector = Array.from({ length: dim }, () => Math.random() * 2 - 1);
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` };
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    let scopedOk = false;
+    try {
+      const scopedRes = await fetch(`${base}/query`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ vector, topK: 5, accountId: '0' }),
+        signal: controller.signal,
+      });
+      if (scopedRes.ok) {
+        scopedOk = true;
+        console.log(c.green(t('acct_verify_index_active')));
+      } else {
+        const text = await scopedRes.text().catch(() => '');
+        if (text.includes('ACCOUNT_METADATA_NOT_INDEXED') || scopedRes.status === 400) {
+          console.warn(c.yellow(t('acct_verify_index_missing')));
+        } else {
+          console.warn(c.yellow(t('acct_verify_failed', { err: `status ${scopedRes.status}` })));
+        }
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (scopedOk) {
+      const sampleRes = await fetch(`${base}/query`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ vector, topK: 50 }),
+      });
+      if (sampleRes.ok) {
+        const data = await sampleRes.json().catch(() => null);
+        const matches = Array.isArray(data?.matches) ? data.matches : [];
+        if (matches.length === 0) {
+          console.log(c.gray(t('acct_verify_no_vectors')));
+        } else {
+          const legacyCount = matches.filter((m) => !(m.metadata && typeof m.metadata.accountId === 'string' && m.metadata.accountId)).length;
+          console.log(c[legacyCount > 0 ? 'yellow' : 'gray'](t('acct_verify_legacy', { count: legacyCount, total: matches.length })));
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(c.yellow(t('acct_verify_failed', { err: err.message })));
+  }
+}
+
+/**
+ * Issue #612 A28：accountId 元数据索引的显式确认。这是一个「部署方确认」问题
+ * （索引归属与回填状态只有部署方知道），绝不按客户端本机账号数量推断；默认
+ * false。CLI --account-metadata-indexed=true|false 可跳过交互。
+ */
+async function handleAccountMetadataConfig(savedConfig, cliValue) {
+  if (cliValue !== undefined) return cliValue;
+  printCard(t('acct_card_title'), t('acct_card_lines'), 'yellow');
+  const saved = savedConfig?.accountMetadataIndexed === true;
+  return askConfirm(t('acct_confirm_prompt'), saved);
 }
 
 function normalizeUrl(url) {
@@ -1186,6 +1304,8 @@ ${c.bold(t('help_options'))}
   -q, --quick      ${t('help_opt_quick')}
   -s, --status     ${t('help_opt_status')}
   --lang=zh|en     ${t('help_opt_lang')}
+  --account-metadata-indexed=<true|false>
+                   ${t('help_opt_account_indexed')}
 `);
 }
 
@@ -1195,6 +1315,20 @@ async function main() {
   if (args.includes('-h') || args.includes('--help')) {
     printHelp();
     process.exit(0);
+  }
+
+  // Issue #612 A28：--account-metadata-indexed=true|false 显式指定（跳过交互确认）
+  const acctIndexedArg = args.find((a) => a.startsWith('--account-metadata-indexed='));
+  let cliAccountMetadataIndexed;
+  if (acctIndexedArg !== undefined) {
+    const raw = acctIndexedArg.slice('--account-metadata-indexed='.length).trim().toLowerCase();
+    if (raw !== 'true' && raw !== 'false') {
+      console.error(c.red(currentLocale === 'zh'
+        ? '❌ --account-metadata-indexed 仅接受 true 或 false。'
+        : '❌ --account-metadata-indexed accepts only true or false.'));
+      process.exit(1);
+    }
+    cliAccountMetadataIndexed = raw === 'true';
   }
 
   checkNodeEnvironment();
@@ -1209,6 +1343,11 @@ async function main() {
       process.exit(1);
     }
     const ok = await testWorkerConnectivity(savedConfig.workerUrl, savedConfig.authToken);
+    // Issue #612 A28/A31：状态检查同时报告账号元数据索引与回填状态（仅提示，
+    // 不改变退出码语义——连通性仍然是唯一的判定标准）。
+    if (savedConfig.accountMetadataIndexed === true || cliAccountMetadataIndexed === true) {
+      await verifyAccountMetadataIndex(savedConfig.workerUrl, savedConfig.authToken, savedConfig.dimensions);
+    }
     process.exit(ok ? 0 : 1);
   }
 
@@ -1225,11 +1364,17 @@ async function main() {
     if (savedConfig.authToken) {
       putWranglerSecret(savedConfig.authToken);
     }
-    const url = deployWorker() || savedConfig.workerUrl;
+    // Issue #612 A28：快速部署沿用本地持久化的显式标记（不依赖 wrangler.toml 默认值）。
+    const accountMetadataIndexed = cliAccountMetadataIndexed ?? savedConfig.accountMetadataIndexed === true;
+    const url = deployWorker(accountMetadataIndexed) || savedConfig.workerUrl;
     if (savedConfig.authToken) {
       await testWorkerConnectivity(url, savedConfig.authToken);
+      if (accountMetadataIndexed) {
+        await verifyAccountMetadataIndex(url, savedConfig.authToken, savedConfig.dimensions);
+      }
     }
     savedConfig.workerUrl = url;
+    savedConfig.accountMetadataIndexed = accountMetadataIndexed;
     savedConfig.lastDeployedAt = new Date().toISOString();
     saveLocalConfig(savedConfig);
     showFinalSuccessCard(url, savedConfig.authToken, savedConfig.dimensions);
@@ -1301,12 +1446,18 @@ async function main() {
       if (savedConfig.authToken) {
         putWranglerSecret(savedConfig.authToken);
       }
-      const url = deployWorker() || savedConfig.workerUrl;
+      // Issue #612 A28：快速部署沿用本地持久化的显式标记。
+      const accountMetadataIndexed = cliAccountMetadataIndexed ?? savedConfig.accountMetadataIndexed === true;
+      const url = deployWorker(accountMetadataIndexed) || savedConfig.workerUrl;
       if (savedConfig.authToken) {
         await testWorkerConnectivity(url, savedConfig.authToken);
+        if (accountMetadataIndexed) {
+          await verifyAccountMetadataIndex(url, savedConfig.authToken, savedConfig.dimensions);
+        }
       }
 
       savedConfig.workerUrl = url;
+      savedConfig.accountMetadataIndexed = accountMetadataIndexed;
       savedConfig.lastDeployedAt = new Date().toISOString();
       saveLocalConfig(savedConfig);
 
@@ -1370,45 +1521,50 @@ async function main() {
       return main();
     }
 
-    if (claimAction.value === 'claim_deploy' || claimAction.value === 'claim_only') {
-      console.log('');
-      console.log(c.cyan('📌 ' + t('remote_token_claim_prompt')));
-      const tokenInput = await askQuestion(t('step_3_title'), savedConfig?.authToken || '');
-      
-      let finalAuthToken = (tokenInput || '').trim() || savedConfig?.authToken || '';
-      let workerUrl = '';
+      if (claimAction.value === 'claim_deploy' || claimAction.value === 'claim_only') {
+        console.log('');
+        console.log(c.cyan('📌 ' + t('remote_token_claim_prompt')));
+        const tokenInput = await askQuestion(t('step_3_title'), savedConfig?.authToken || '');
 
-      if (claimAction.value === 'claim_deploy') {
-        syncWranglerToml(remoteProbe.defaultIndexName);
-        if (!finalAuthToken && !remoteProbe.secrets?.hasAuthToken) {
-          finalAuthToken = generateRandomToken();
+        let finalAuthToken = (tokenInput || '').trim() || savedConfig?.authToken || '';
+        let workerUrl = '';
+
+        if (claimAction.value === 'claim_deploy') {
+          syncWranglerToml(remoteProbe.defaultIndexName);
+          if (!finalAuthToken && !remoteProbe.secrets?.hasAuthToken) {
+            finalAuthToken = generateRandomToken();
+          }
+          if (finalAuthToken) {
+            putWranglerSecret(finalAuthToken);
+          }
+          // Issue #612 A28：认领部署沿用本地显式标记（默认 false，不靠默认值启用）。
+          const accountMetadataIndexed = cliAccountMetadataIndexed ?? savedConfig?.accountMetadataIndexed === true;
+          workerUrl = deployWorker(accountMetadataIndexed) || '';
+          if (finalAuthToken && workerUrl) {
+            await testWorkerConnectivity(workerUrl, finalAuthToken);
+            if (accountMetadataIndexed) {
+              await verifyAccountMetadataIndex(workerUrl, finalAuthToken, existingDim);
+            }
+          }
         }
-        if (finalAuthToken) {
-          putWranglerSecret(finalAuthToken);
+
+        if (!workerUrl) {
+          workerUrl = await askQuestion(t('worker_url_prompt'));
+          workerUrl = normalizeUrl(workerUrl);
         }
-        workerUrl = deployWorker() || '';
-      }
 
-      if (!workerUrl) {
-        workerUrl = await askQuestion(t('worker_url_prompt'));
-        workerUrl = normalizeUrl(workerUrl);
-      }
-
-      if (finalAuthToken) {
-        await testWorkerConnectivity(workerUrl, finalAuthToken);
-      }
-
-      const claimedConfig = {
-        workerName: remoteProbe.defaultWorkerName,
-        indexName: remoteProbe.defaultIndexName,
-        dimensions: existingDim,
-        metric: existingMetric,
-        authToken: finalAuthToken,
-        workerUrl,
-        claimedFromRemote: true,
-        lastDeployedAt: new Date().toISOString(),
-      };
-      saveLocalConfig(claimedConfig);
+        const claimedConfig = {
+          workerName: remoteProbe.defaultWorkerName,
+          indexName: remoteProbe.defaultIndexName,
+          dimensions: existingDim,
+          metric: existingMetric,
+          authToken: finalAuthToken,
+          workerUrl,
+          accountMetadataIndexed: cliAccountMetadataIndexed ?? savedConfig?.accountMetadataIndexed === true,
+          claimedFromRemote: true,
+          lastDeployedAt: new Date().toISOString(),
+        };
+        saveLocalConfig(claimedConfig);
 
       console.log(c.green('\n' + t('remote_claimed_saved', { file: 'cloudflare-worker/.deploy-config.json' })));
       showFinalSuccessCard(workerUrl, finalAuthToken, existingDim);
@@ -1419,14 +1575,17 @@ async function main() {
   // 4. 全新部署向导流程
   const vecConfig = await handleVectorizeConfig(savedConfig);
   const tokenConfig = await handleAuthTokenConfig(savedConfig, Boolean(remoteProbe.secrets?.hasAuthToken));
+  // Issue #612 A28：显式确认 accountId 元数据索引状态（默认 false，绝不依赖
+  // 默认值启用，也绝不按客户端本机账号数量推断归属）。
+  const accountMetadataIndexed = await handleAccountMetadataConfig(savedConfig, cliAccountMetadataIndexed);
 
   printStep(4, 4, t('step_4_title'));
   syncWranglerToml(vecConfig.indexName);
   if (!tokenConfig.keepRemote) {
     putWranglerSecret(tokenConfig.token);
   }
-  
-  let workerUrl = deployWorker();
+
+  let workerUrl = deployWorker(accountMetadataIndexed);
   if (!workerUrl) {
     if (savedConfig?.workerUrl) {
       workerUrl = savedConfig.workerUrl;
@@ -1439,6 +1598,10 @@ async function main() {
 
   if (tokenConfig.token) {
     await testWorkerConnectivity(workerUrl, tokenConfig.token);
+    // Issue #612 A28/A31：启用账号过滤时，用账号过滤查询验证索引与回填状态。
+    if (accountMetadataIndexed) {
+      await verifyAccountMetadataIndex(workerUrl, tokenConfig.token, vecConfig.dimensions);
+    }
   }
 
   const newConfig = {
@@ -1448,6 +1611,7 @@ async function main() {
     metric: vecConfig.metric,
     authToken: tokenConfig.token,
     workerUrl,
+    accountMetadataIndexed,
     modelName: vecConfig.modelName || savedConfig?.modelName || 'Custom',
     lastDeployedAt: new Date().toISOString(),
   };

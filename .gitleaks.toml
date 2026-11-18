@@ -5,10 +5,13 @@
 # (src/services/redact.ts and the server log sanitizer).
 #
 # `condition = "and"` (gitleaks >= 8.25.0) means a finding is exempted only when
-# BOTH the file is one of these fixtures AND the matched secret matches one of
-# the obviously-fake constants listed in `regexes`. A real-looking credential
-# committed to these files still fails the scan, and secrets anywhere else —
-# including any other test file — are never exempted.
+# BOTH the file is one of these fixtures AND the matched secret is exactly one
+# of the obviously-fake constants listed in `regexes`. Every regex is anchored
+# (^...$) to the complete fixture value — allowlist regexes are matched against
+# the captured secret, so a real-looking credential that merely CONTAINS a
+# fixture fragment (e.g. a key embedding "0123456789abcdef0123456789abcdef") is
+# still reported, including in server/tests/routes/multiAccount.test.ts
+# (Issue #612 A32: the exemption must never match credential fragments).
 [extend]
 useDefault = true
 
@@ -25,18 +28,22 @@ paths = [
   # multiAccount.test.ts (Issue #611) used the shared synthetic
   # ENCRYPTION_KEY/API_SECRET fixture constants in early branch commits; HEAD
   # builds both values at runtime (see config.apiSecret.test.ts). The path
-  # entry only exempts those known-fake constants in this file.
+  # entry only exempts the exact constants below in this file.
   '''^server/tests/routes/multiAccount\.test\.ts$''',
 ]
 regexes = [
-  # Each entry is an exact synthetic constant from the fixtures — not a
-  # pattern — so a real credential that merely looks like these shapes is
-  # still reported. Extend this list only when a fixture gains a new constant.
-  '''sk-abcdef123456789012345678|sk-xyz987654321098765432''',
-  '''value-token-123456|key-abcdef123456''',
-  '''0123456789abcdef0123456789abcdef''',         # repeated sequential hex (ENCRYPTION_KEY fixtures)
-  '''abcdef1234567890''',                          # sequential hex sha fixtures
-  '''dGhpcyBpcyBhIGJhc2U2NCBrZXkgMTIzNA==''',      # base64("this is a base64 key 1234")
-  '''hunter2password|abcdefghijklmnopqrst''',      # classic dummy passwords
-  '''test-api-secret''',                           # literal API secret fixture
+  # Each entry is one complete synthetic fixture constant, anchored (^...$) so
+  # fragments of these shapes inside a real credential are never exempted.
+  # Extend this list only when a fixture gains a new constant.
+  '''^sk-abcdef123456789012345678$''',
+  '''^sk-xyz987654321098765432$''',
+  '''^value-token-123456$''',
+  '''^key-abcdef123456$''',
+  '''^0123456789abcdef0123456789abcdef$''',                                  # 32-char sequential hex key-validation fixture
+  '''^0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef$''',  # 64-char ENCRYPTION_KEY fixtures
+  '''^abcdef1234567890$''',                                                  # sequential hex sha fixtures
+  '''^dGhpcyBpcyBhIGJhc2U2NCBrZXkgMTIzNA==$''',                              # base64("this is a base64 key 1234")
+  '''^hunter2password$''',                                                   # classic dummy password
+  '''^abcdefghijklmnopqrst$''',                                              # classic dummy password
+  '''^test-api-secret$''',                                                   # literal API secret fixture
 ]

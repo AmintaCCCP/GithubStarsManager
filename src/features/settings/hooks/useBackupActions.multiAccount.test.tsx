@@ -290,12 +290,14 @@ describe('useBackupActions multi-account (Issue #611)', () => {
     );
   });
 
-  it('aborts the restore when the account switches during file download (legacy backup included)', async () => {
-    const stateBefore = useAppStore.getState();
+  it('aborts the restore after a real A→B→A switch during download (legacy backup included)', async () => {
+    // 审计修复（C48）：下载等待期间用真实 switchAccount 执行 A→B→A（推进实际
+    // 会话代次，识别「切出又切回」），不再仅 setState 改 user——验证旧备份不
+    // 覆盖重新激活的 A 的工作区。
     mocks.listFiles.mockResolvedValue(['github-stars-backup-2026-01-01.json']);
     mocks.downloadFile.mockImplementation(async () => {
-      // 下载等待期间切换到账号 2（旧版备份没有 activeAccountId 也必须中止）
-      useAppStore.setState({ user: userB });
+      expect(useAppStore.getState().switchAccount('2')).toBe(true);
+      expect(useAppStore.getState().switchAccount('1')).toBe(true);
       return JSON.stringify({
         version: '1.2',
         repositories: [repo(2, 'bob-legacy-should-not-apply')],
@@ -310,10 +312,12 @@ describe('useBackupActions multi-account (Issue #611)', () => {
     });
 
     const state = useAppStore.getState();
-    // 下载完成后、任何写入前中止：仓库与已保存账号 Token 均未被改写
+    // 下载完成后、任何写入前中止：重新激活的 A 工作区与 Token 均未被改写
     expect(mocks.downloadFile).toHaveBeenCalledOnce();
-    expect(state.repositories).toEqual(stateBefore.repositories);
+    expect(state.user?.id).toBe(1);
+    expect(state.repositories[0].ai_summary).toBe('alice-ai');
     expect(state.savedAccounts['1']?.githubToken).toBe('ghp_a');
+    // 其他账号快照保留
     expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-ai');
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.stringContaining('account changed during restore'),

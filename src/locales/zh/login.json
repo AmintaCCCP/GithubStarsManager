@@ -61,7 +61,7 @@
     "token-permissions-classic-fork-workflows": "`repo`",
     "token-permissions-local-storage": "Token 仅保存在本机与你配置的后端，不会上传到应用方服务器。",
     "saved-accounts": "已保存的账号",
-    "click-to-sign-in": "点击直接登录",
+    "click-to-sign-in": "点击登录",
     "token-required": "需补充 Token"
   }
 }

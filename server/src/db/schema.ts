@@ -63,6 +63,7 @@ export function initializeSchema(db: Database.Database): void {
       vector_indexed_at TEXT,
       license TEXT,
       vector_indexed_license TEXT,
+      ai_shared INTEGER DEFAULT 0,
       PRIMARY KEY (account_id, id),
       UNIQUE (account_id, full_name)
     );
@@ -139,6 +140,15 @@ export function initializeSchema(db: Database.Database): void {
       value TEXT
     );
 
+    -- 每账号分区的服务端自身元数据（repo_revision 等内部状态）。
+    -- 独立于 account_settings：不会被备份导出/导入，也不会经 /api/settings 暴露。
+    CREATE TABLE IF NOT EXISTS partition_meta (
+      account_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      PRIMARY KEY (account_id, key)
+    );
+
     CREATE TABLE IF NOT EXISTS embedding_configs (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -198,6 +208,8 @@ export function initializeSchema(db: Database.Database): void {
   // 上一次向量索引时采用的 license 值（SPDX id / null）。用于增量谓词判断 license 是否
   // 变化：当期 license 与此值不一致时需重新索引，保证 license 变更能使向量元数据失效。
   addColumnIfMissing(db, 'repositories', 'vector_indexed_license', 'TEXT');
+  // 跨账号 AI 成果共享标记（Issue #612 A21）：写入 ai_* 的路由按账号设置置位。
+  addColumnIfMissing(db, 'repositories', 'ai_shared', 'INTEGER DEFAULT 0');
 
   // 跨账号 AI 成果回填子查询（repositories.ts / accountScope.ts）按 `id = ? AND
   // account_id != ?` 检索捐赠行；复合主键 (account_id, id) 无法命中纯 id 条件，

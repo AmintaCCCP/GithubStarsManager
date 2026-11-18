@@ -15,6 +15,8 @@ const repoRow = (overrides: Record<string, unknown> = {}) => ({
   id: 1,
   name: 'alpha',
   full_name: 'acme/alpha',
+  // A37：记录携带分区归属，get mock 按第一个绑定参数（accountId）校验
+  account_id: 'default',
   description: 'retrieval repository',
   html_url: 'https://github.com/acme/alpha',
   stargazers_count: 100,
@@ -55,6 +57,8 @@ function configureDb(options: {
   repos?: Record<string, unknown>[];
   releases?: Record<string, unknown>[];
   vectorEnabled?: boolean;
+  /** 模拟全局 settings.active_account_id（A37：活跃账号分区） */
+  activeAccountId?: string;
 } = {}) {
   const repos = options.repos ?? [repoRow()];
   const releases = options.releases ?? [];
@@ -75,26 +79,34 @@ function configureDb(options: {
   getDbMock.mockReturnValue({
     prepare(sql: string) {
       return {
-        all: () => {
-          if (sql.includes('FROM repositories')) return repos;
+        all: (accountId?: unknown) => {
+          if (sql.includes('FROM repositories')) {
+            // A37：列表查询同样按第一个绑定参数（account_id）过滤
+            return repos.filter((repo) => !repo.account_id || repo.account_id === accountId);
+          }
           return [];
         },
         // v4 多账号隔离后 SQL 均带 account_id 前导条件；第一个绑定参数是
         // account_id，实际查找值是第二个参数。
-        get: (first?: unknown, second?: unknown) => {
-          const value = second ?? first;
+        get: (accountId?: unknown, second?: unknown) => {
           if (sql.includes('FROM vector_search_configs')) return vectorConfig;
           if (sql.includes('FROM embedding_configs')) return embeddingConfig;
-          if (sql.includes('FROM settings')) return undefined;
+          if (sql.includes('FROM settings')) {
+            return options.activeAccountId && accountId === 'active_account_id'
+              ? { value: options.activeAccountId }
+              : undefined;
+          }
           if (sql.includes('FROM releases')) {
-            return releases.find((release) => Number(release.repo_id) === Number(value));
+            return releases.find((release) => Number(release.repo_id) === Number(second));
           }
           if (sql.includes('AND id = ?')) {
-            return repos.find((repo) => Number(repo.id) === Number(value));
+            return repos.find((repo) => repo.account_id === accountId
+              && Number(repo.id) === Number(second));
           }
           if (sql.includes('full_name = ?')) {
             return repos.find(
-              (repo) => String(repo.full_name).toLowerCase() === String(value).toLowerCase()
+              (repo) => repo.account_id === accountId
+                && String(repo.full_name).toLowerCase() === String(second).toLowerCase()
             );
           }
           return undefined;
@@ -296,5 +308,38 @@ describe('MCP provider discovery', () => {
 
     const result = await provider.vectorSearch('retrieval', {});
     expect(result).toEqual({ available: false, reason: 'worker_query_failed' });
+  });
+
+  it('returns only the active account record when two accounts hold the same repository id (A37)', () => {
+    // 两个账号分区各自持有 id=1 / acme/alpha 的仓库，内容不同：
+    // get mock 按第一个绑定参数校验 accountId，查询只命中活跃账号（222）的记录
+    configureDb({
+      activeAccountId: '222',
+      repos: [
+        repoRow({ id: 1, name: 'default-alpha', full_name: 'acme/alpha' }),
+        repoRow({ id: 1, name: 'beta-alpha', full_name: 'acme/alpha', account_id: '222' }),
+      ],
+    });
+    const byId = provider.getRepository(1);
+    expect(byId).not.toBeNull();
+    expect(byId?.name).toBe('beta-alpha');
+    const byName = provider.getRepository('acme/alpha');
+    expect(byName).not.toBeNull();
+    expect(byName?.name).toBe('beta-alpha');
+    const batch = provider.getRepositories(['acme/alpha']);
+    expect(batch.items[0]).toMatchObject({ status: 'found' });
+    expect((batch.items[0] as { repository: { name: string } | null }).repository?.name).toBe('beta-alpha');
+  });
+
+  it('falls back to the default partition when no active account is set (A37)', () => {
+    configureDb({
+      repos: [
+        repoRow({ id: 1, name: 'default-alpha', full_name: 'acme/alpha' }),
+        repoRow({ id: 1, name: 'beta-alpha', full_name: 'acme/alpha', account_id: '222' }),
+      ],
+    });
+    const byId = provider.getRepository(1);
+    expect(byId).not.toBeNull();
+    expect(byId?.name).toBe('default-alpha');
   });
 });

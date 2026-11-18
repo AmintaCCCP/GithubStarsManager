@@ -241,6 +241,8 @@
     "add-account": "添加新账号",
     "current-account": "当前账号",
     "remove-account": "移除账号",
+    "remove-account-with-login": "移除 @{{login}}",
+    "logout-account-changed": "账号已切换，请对当前账号重新发起退出登录。",
     "switch-in-progress": "正在切换账号，请稍后再试。",
     "remove-account-confirm-title": "移除已保存的账号",
     "remove-account-confirm-desc": "仅移除该账号的快捷登录凭证，本地缓存的仓库与分类数据仍会保留。确定继续吗？",

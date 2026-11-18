@@ -93,8 +93,13 @@ export const normalizePersistedState = (
   // back-fills when the IndexedDB snapshot lost them (asynchronous unload write).
   // Only pair persisted user with mirror token when both belong to the same account.
   const resolvedUser = safePersisted.user ?? authMirror?.user ?? null;
+  // 审计修复（B5）：组合回填要求两侧都有「有效账号 ID」且相等——任一侧缺
+  // 有效 ID 视为不匹配，不得把两个 null ID 当作同一账号（防止把镜像 Token
+  // 绑到无有效 ID 的持久化用户上）。
+  const persistedUserId = accountIdKey(safePersisted.user);
+  const mirrorUserId = accountIdKey(authMirror?.user ?? null);
   const mirrorMatchesPersistedUser = !safePersisted.user
-    || (!!authMirror?.user && accountIdKey(authMirror.user) === accountIdKey(safePersisted.user));
+    || (mirrorUserId !== null && mirrorUserId === persistedUserId);
   const resolvedGithubToken =
     typeof safePersisted.githubToken === 'string'
       ? safePersisted.githubToken

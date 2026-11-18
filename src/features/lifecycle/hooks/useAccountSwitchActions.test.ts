@@ -484,7 +484,7 @@ describe('useAccountSwitchActions audit fixes', () => {
     expect(retry).toEqual({ ok: false, error: 'invalid-github-user' });
   });
 
-  it('writes the candidate API secret before restoring and restores the previous secret on failure', async () => {
+  it('passes the candidate API secret via restore options and restores the previous secret on failure', async () => {
     useAppStore.setState({
       user: userA,
       githubToken: 'ghp_a',
@@ -493,7 +493,11 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
     useAppStore.getState().setBackendApiSecret('old-key');
     const secretsSeenDuringRestore: Array<string | null> = [];
-    mocks.restoreBackendSession.mockImplementation(async () => {
+    const optionsSeen: Array<{ omitAccountHeader?: boolean; apiSecret?: string } | undefined> = [];
+    mocks.restoreBackendSession.mockImplementation(async (_url: string, options?: { omitAccountHeader?: boolean; apiSecret?: string }) => {
+      optionsSeen.push(options);
+      // 审计修复（C64）：候选 URL 提交前 Store 仍是原密钥——候选密钥经
+      // apiSecret 选项传递，由 restoreBackendSession 在 URL 提交后写入。
       secretsSeenDuringRestore.push(useAppStore.getState().backendApiSecret);
       return { status: 'unauthorized' };
     });
@@ -505,8 +509,10 @@ describe('useAccountSwitchActions audit fixes', () => {
     });
 
     expect(outcome).toEqual({ ok: false, error: 'unauthorized' });
-    // 恢复/校验请求必须已携带候选密钥；失败后原密钥恢复（当前账号仍登录也必须恢复）
-    expect(secretsSeenDuringRestore).toEqual(['candidate-key']);
+    // 候选密钥经 apiSecret 选项显式传递；调用时刻 Store 仍是原密钥
+    expect(optionsSeen[0]?.apiSecret).toBe('candidate-key');
+    expect(secretsSeenDuringRestore).toEqual(['old-key']);
+    // 失败后原密钥恢复（当前账号仍登录也必须恢复）
     expect(useAppStore.getState().backendApiSecret).toBe('old-key');
     expect(useAppStore.getState().user?.login).toBe('alice');
   });
@@ -522,6 +528,11 @@ describe('useAccountSwitchActions audit fixes', () => {
     // 原连接：URL X + 密钥 Kx；候选后端 restoreBackendSession 提交了 Y 的 URL
     //（restored-token-invalid / github-token-required 分支会保留候选 URL）
     mocks.backend.backendUrl = 'https://old.example/api';
+    // 审计修复（C65a）：成功的 init 桩把目标 URL 写回连接状态，回滚后的
+    // 最终 URL 才能与旧密钥配对断言。
+    mocks.backend.init.mockImplementation(async (url?: string) => {
+      mocks.backend.backendUrl = url ?? null;
+    });
     mocks.restoreBackendSession.mockImplementation(async () => {
       mocks.backend.backendUrl = 'https://candidate.example/api';
       return { status: 'github-token-required' };
@@ -539,6 +550,9 @@ describe('useAccountSwitchActions audit fixes', () => {
     expect(useAppStore.getState().backendApiSecret).toBe('old-key');
     expect(mocks.backend.init).toHaveBeenCalledTimes(1);
     expect(mocks.backend.init).toHaveBeenCalledWith('https://old.example/api');
+    // 最终 URL 与旧密钥配对：连接回到 X，密钥回到 Kx
+    expect(mocks.backend.backendUrl).toBe('https://old.example/api');
+    expect(useAppStore.getState().backendApiSecret).toBe('old-key');
   });
 
   it('buffers edits made during the restore window and re-pushes them after a failed restore', async () => {
@@ -580,14 +594,63 @@ describe('useAccountSwitchActions audit fixes', () => {
       // 失败恢复：账号 A 保持登录态且数据完好（含窗口内编辑）
       expect(useAppStore.getState().user?.login).toBe('alice');
       expect(useAppStore.getState().categoryOrder).toEqual(['reordered-during-restore']);
-      // R4 审计修复（候选后端恢复）：恢复请求绝不携带本机旧账号头
-      expect(mocks.restoreBackendSession).toHaveBeenCalledWith('https://candidate.example', { omitAccountHeader: true });
+      // R4 审计修复（候选后端恢复）：恢复请求绝不携带本机旧账号头；
+      // C64：候选密钥经 apiSecret 选项在 URL 提交后才可见
+      expect(mocks.restoreBackendSession).toHaveBeenCalledWith('https://candidate.example', { omitAccountHeader: true, apiSecret: 'candidate-key' });
     } finally {
       stopAutoSync(unsubscribe);
     }
   });
 
-  it('keeps buffered edits local on a successful restore and pushes them before the pull when switching back', async () => {
+  it('keeps the buffered-edit marker bound to the origin backend while staying on the candidate (C65b-1)', async () => {
+    // 审计修复（C65b-1，跨后端归属）：原后端 X 进入冻结窗口 → 候选后端 Y
+    // 提交恢复。窗口内编辑按 (A, X) 真实登记——停留在 Y 上不可见也绝不
+    // 消费 X 记录；连接回到 X 后记录重新可见。
+    useAppStore.setState({
+      user: userA,
+      githubToken: 'ghp_a',
+      isAuthenticated: true,
+      savedAccounts: {
+        '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' },
+        '2': { accountId: '2', user: userB, githubToken: 'ghp_b', addedAt: 't', lastUsedAt: 't' },
+      },
+      accountWorkspaces: { '2': workspaceOf(2) },
+    });
+    mocks.backend.isAvailable = true;
+    mocks.backend.backendUrl = 'https://origin.example/api';
+    mocks.restoreBackendSession.mockImplementation(async () => {
+      // 候选后端 Y 提交 URL 后，恢复等待期间的真实编辑（归属发起账号 A）
+      mocks.backend.backendUrl = 'https://candidate.example/api';
+      useAppStore.setState({ categoryOrder: ['edited-during-restore'] });
+      return { status: 'connected', githubToken: 'ghp_b', user: userB, accounts: [] };
+    });
+
+    const unsubscribe = startAutoSync();
+    try {
+      const { result } = renderHook(() => useAccountSwitchActions());
+      let outcome;
+      await act(async () => {
+        outcome = await result.current.addAccountFromBackend('https://candidate.example', 'candidate-key');
+      });
+
+      expect(outcome).toEqual({ ok: true, user: userB });
+      expect(useAppStore.getState().user?.login).toBe('bob');
+      // 候选后端零推送：窗口内编辑绝不外发（整个恢复流程 syncToBackend 未被调用）
+      expect(mocks.syncToBackend).not.toHaveBeenCalled();
+      // 待推记录按原后端 X 登记：停留在候选后端 Y 上不可见、未被消费
+      expect(hasPendingAccountSync('1')).toBe(false);
+      expect(hasPendingAccountSync('2')).toBe(false);
+      // 连接回到 X：记录重新可见（切回 A 时先补推再拉取）
+      mocks.backend.backendUrl = 'https://origin.example/api';
+      expect(hasPendingAccountSync('1')).toBe(true);
+    } finally {
+      stopAutoSync(unsubscribe);
+    }
+  });
+
+  it('pushes the buffered edits before the pull when switching back on the same backend (C65b-2)', async () => {
+    // 审计修复（C65b-2，同后端先推后拉顺序）：恢复成功后切回账号 A——
+    // 先补推（A 的上下文）再拉取，顺序绝不能颠倒。
     useAppStore.setState({
       user: userA,
       githubToken: 'ghp_a',
@@ -620,14 +683,12 @@ describe('useAccountSwitchActions audit fixes', () => {
 
       expect(outcome).toEqual({ ok: true, user: userB });
       expect(useAppStore.getState().user?.login).toBe('bob');
-      // 候选后端零推送：窗口内编辑绝不外发（整个恢复流程 syncToBackend 未被调用）
+      // 候选后端零推送；编辑归属发起账号 A（真实待推记录）
       expect(mocks.syncToBackend).not.toHaveBeenCalled();
-      // 编辑归属发起账号 A：标记待补推，切回该账号时消费
       expect(hasPendingAccountSync('1')).toBe(true);
       expect(hasPendingAccountSync('2')).toBe(false);
 
-      // 切回账号 A：先补推（A 的上下文）再拉取——顺序绝不能颠倒
-      mocks.hasPendingAccountSync.mockReturnValueOnce(true);
+      // 切回账号 A（同一后端）：真实待推记录驱动先补推再拉取
       await act(async () => {
         await result.current.switchToAccount('1');
       });

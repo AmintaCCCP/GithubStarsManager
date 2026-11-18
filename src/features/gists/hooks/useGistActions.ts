@@ -33,6 +33,19 @@ export const applyGistAnalysisFailure = (gist: Gist, error: string, now: string)
   analysis_error: error,
 });
 
+/**
+ * 审计修复（C35）：详情请求因会话切换被丢弃时抛出的专用错误——调用方据此
+ * 区分「会话切换」与「普通失败」：捕获本错误时清除旧账号 detailGist 并关闭
+ * 详情面板（GistView 属主会话收尾，见 HANDOFF-B-TO-C.md C 实现记录）；
+ * 普通失败仍返回 null 走调用方现有的降级显示。
+ */
+export class GistDetailSessionSwitchedError extends Error {
+  constructor() {
+    super('gist-detail-session-switched');
+    this.name = 'GistDetailSessionSwitchedError';
+  }
+}
+
 export const useGistActions = () => {
   const state = useAppStore(useShallow(selectGistViewState));
   const { toast, confirm } = useDialog();
@@ -73,6 +86,9 @@ export const useGistActions = () => {
       state.setStarredGists(starred);
       toast(t('useGistActions.gists-synced'), 'success');
     } catch (error) {
+      // 审计修复（C34）：刷新请求失败提示先校验发起会话——已切换则不显示
+      // 旧请求错误；finally 的加载状态清理保持不变。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       toast(error instanceof Error ? error.message : t('useGistActions.failed-to-sync-gists'), 'error');
     } finally {
       setIsRefreshing(false);
@@ -200,11 +216,20 @@ export const useGistActions = () => {
     const startedGeneration = getAccountSessionGeneration();
     try {
       const detail = await createGitHubApiService(state.githubToken).getGist(gist.id, gist);
-      // 详情拉取切号后丢弃：不写入当前工作区，也不向调用方返回旧账号详情
-      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return null;
+      // 审计修复（C35）：详情拉取切号后抛出专用错误——调用方能区分「会话切换」
+      // 与「普通失败」（捕获 GistDetailSessionSwitchedError 时清除旧账号
+      // detailGist 并关闭详情面板）；绝不写入当前工作区，也绝不返回旧账号详情。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        throw new GistDetailSessionSwitchedError();
+      }
       state.updateGist(detail);
       return detail;
     } catch (error) {
+      // 会话切换信号必须穿透到调用方，不得被普通失败路径吞掉
+      if (error instanceof GistDetailSessionSwitchedError) throw error;
+      // 审计修复（C34）：详情请求失败提示先校验发起会话——已切换则不显示
+      // 旧请求错误；普通失败保留现有降级显示（返回 null）。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return null;
       const message = error instanceof Error ? error.message : '';
       if (/5\d{2}/.test(message)) {
         toast(t('useGistActions.github-gist-api-is-temporarily-unavailable-openi'), 'warning');

@@ -143,7 +143,7 @@ export interface SavedAccount {
        - 清空 `AUTH_MIRROR_KEY` 与 `sessionStorage` 中的 `backendApiSecret`；
        - 调用 `resetSyncHashes()`；
        - 置 `user: null, githubToken: null, backendApiSecret: null, isAuthenticated: false`，并将顶层工作区重置为 `applyAccountWorkspace(undefined)`。
-       - **注意**：`logout()` 保留 `savedAccounts` 中的历史账号记录（但用户停留在 `LoginScreen` 直到选择账号或输入新 Token），这样用户在登录页仍能看到已保存账号卡片一键重新进入，或者在下拉菜单中直接点击「切换账号」而无需走「退出登录」。
+       - **注意**：`logout()` 保留 `savedAccounts` 中的历史账号记录（但用户停留在 `LoginScreen` 直到选择账号或输入新 Token）。**必须明确区分两类账号**：本次退出的账号其 PAT 已被清除（`savedAccounts` 中该账号 `githubToken` 置空），**再次进入需要重新授权**（登录页点击该账号卡片会聚焦 Token 输入框补全，而非一键恢复会话）；**只有仍保存有效 PAT 的其他账号**才支持登录页卡片/下拉菜单一键登录，无需走「退出登录」。
 
 #### 1.4 持久化分片与版本迁移（`v17` → `v18`）
 1. `src/store/initialState.ts`：初始状态加入 `savedAccounts: {}`。
@@ -185,7 +185,8 @@ export interface SavedAccount {
 ### 模块 2：右上角头像下拉菜单与添加账号交互（`src/components/` & `src/features/lifecycle/`）
 
 #### 2.1 交互设计要求（对齐用户需求与 Issue #611）
-1. **将右上角头像旁的独立退出按钮改为下拉菜单**：
+0. **单账号兼容（多账号才菜单化）**：仅登录 1 个账号时，**必须保留升级前原有的独立退出入口**（头像旁的独立 `<LogOut />` 图标按钮，含原有 Tooltip 与二次确认弹窗），不得把「退出登录」移入下拉菜单；「添加新账号」始终通过下拉菜单提供独立入口。只有当已保存账号数 ≥ 2 时才将「退出登录」并入下拉菜单（菜单化）。
+1. **将右上角头像旁的独立退出按钮改为下拉菜单（仅多账号场景）**：
    - 在 `src/components/Header.tsx` 中，将原本独立的头像展示 + `<LogOut />` 按钮整合为一个统一的交互触发器（`DropdownMenuTrigger`）：
      - 触发器包含：用户头像（`w-7 h-7 rounded-full`）、用户名（`hidden sm:block`，显示 `user.name || user.login`）、以及右侧下拉箭头图标 `<ChevronDown className="h-4 w-4 text-muted-foreground" />`。
    - 点击触发器展开 `DropdownMenuContent`（`align="end" className="w-64"`），内部结构如下：
@@ -281,15 +282,15 @@ export interface AccountSwitchActions {
      - `src/features/releases/hooks/useReleaseTimelineActions.ts`
      - `src/features/releases/hooks/useWatchedSourcesSync.ts`
      - Star / Gist / Release / Fork 全量刷新流（`useLoginActions`、`useBackendLifecycle` 中的 `syncGitHubData` 等）
-2. **长任务显式校验（辅助防线）**：
+2. **长任务显式校验（辅助防线）**（异步提交验收条件：任务必须在**第一个 `await` 之前**同时捕获**账号 ID + 会话代次**（`getAccountSessionGeneration()`），并在**每次提交结果前同时校验两者**（`isCurrentAccountSession(startedAccountId, startedGeneration)`）。仅比较账号 ID 无法识别「切出后又切回同一账号」（A→B→A）的旧任务结算——会话代次在任何切换/登出/替换凭证时递增，代次不一致即视为过期任务）：
    - **`src/features/repositories/hooks/useRepositoryAnalysisJob.ts`（AI 批量分析）**：
-     - 任务启动时记录 `const jobAccountId = accountIdKey(useAppStore.getState().user)`；
-     - 每个仓库分析完成准备调用 `updateRepository(updatedRepo)` 前，检查 `isCurrentAccount(jobAccountId)`：
-       - 若仍为当前账号，正常调用 `updateRepository(updatedRepo)`；
-       - 若用户已切换到其他账号，要么中止后续分析队列，要么将已完成的那条分析结果写入 `accountWorkspaces[jobAccountId].repositories` 对应项中，**绝不写入当前活跃账号的 `state.repositories`**！
+     - 任务启动时（首个 `await` 前）记录 `const jobAccountId = accountIdKey(useAppStore.getState().user)` 与 `const jobGeneration = getAccountSessionGeneration()`；
+     - 每个仓库分析完成准备调用 `updateRepository(updatedRepo)` 前，检查 `isCurrentAccountSession(jobAccountId, jobGeneration)`：
+       - 若仍为当前会话，正常调用 `updateRepository(updatedRepo)`；
+       - 若用户已切换到其他账号（含 A→B→A 切回同账号的情况），要么中止后续分析队列，要么将已完成的那条分析结果写入 `accountWorkspaces[jobAccountId].repositories` 对应项中，**绝不写入当前活跃账号的 `state.repositories`**！
    - **Star / Gist / Release / Fork 刷新流**：
-     - 在发起全量拉取前记录 `const startedAccountId = accountIdKey(useAppStore.getState().user)`；
-     - 异步请求返回、准备调用 `setRepositories` / `setGists` / `setStarredGists` / `setReleases` / `setForks` 时，校验 `accountIdKey(useAppStore.getState().user) === startedAccountId`。若不一致（说明期间发生了切号或登出），直接丢弃或归档至 `accountWorkspaces[startedAccountId]`，不覆盖新账号的顶层列表。
+     - 在发起全量拉取前（首个 `await` 前）记录 `const startedAccountId = accountIdKey(useAppStore.getState().user)` 与 `const startedGeneration = getAccountSessionGeneration()`；
+     - 异步请求返回、准备调用 `setRepositories` / `setGists` / `setStarredGists` / `setReleases` / `setForks` 时，校验 `isCurrentAccountSession(startedAccountId, startedGeneration)`（账号 ID 与会话代次必须同时匹配）。若不一致（说明期间发生了切号、登出或 A→B→A 回切），直接丢弃或归档至 `accountWorkspaces[startedAccountId]`，不覆盖新账号的顶层列表。
    - **向量搜索跨账号可见性防护**：向量索引内容按 repo `id`/`full_name` 写入共享 worker（`vector_search_configs` 为实例共享配置），账号 B 的语义搜索可能命中只有账号 A 星标过的仓库。**语义搜索结果必须按当前活跃账号 `state.repositories` 的 id 集合过滤后再展示/写入**（在 `useVectorSearchActions` 的搜索结果处理处过滤），杜绝跨账号数据外泄。
 
 ---
@@ -578,6 +579,7 @@ export interface AccountSwitchActions {
        ...(currentAccountId ? { [currentAccountId]: captureAccountWorkspace(store) } : {}),
      };
      ```
+   - **类型筛选应用于顶层数据与每个账号工作区**：导出类型勾选（`repositories` / `releases` / `gists` / `forks` / `customCategories` 等）不仅过滤顶层活跃工作区，也必须以同一筛选集过滤 `accountWorkspaces` 中每个账号的快照字段——未勾选的字段**整体不写入导出包**（而不是写入空集合）。这样恢复端可以区分「未导出字段」（键缺失，保留本地现状）与「导出为空集合」（键存在且为空数组，用户明确清空）两种语义；恢复逻辑不得把「未导出字段」当作空集合覆盖本地数据。
    - 当勾选了 `repositories` / `releases` / `customCategories` 等核心数据时，一并导出 `activeAccountId: currentAccountId`、`accountWorkspaces: fullWorkspaces`，以及 `savedAccounts`（当 `includeKeysInBackup` 为 `false` 时，将每个 `SavedAccount.githubToken` 脱敏为 `MASKED_SECRET` `'***'`；为 `true` 时保留原值）。
    - `hasMaskedSecrets` 检查函数同步纳入 `data.savedAccounts` 中是否存在 `githubToken === MASKED_SECRET`。
 3. **导入逻辑（`importData`）**：
@@ -589,7 +591,7 @@ export interface AccountSwitchActions {
        - 遍历每个账号，若 `wasIncluded && isRealSecret(acc.githubToken)` 则采用导入的 Token，否则保留本机 `store.savedAccounts[id]?.githubToken ?? ''`。
      - **当前活跃账号状态同步**：
        - 若导入包带有 `importedData.accountWorkspaces` 且包含当前已登录的 `currentAccountId`（同时 `importedData.activeAccountId !== currentAccountId`），优先使用 `importedData.accountWorkspaces[currentAccountId]` 更新当前顶层视图，而将顶层 `importedData.repositories` 归档进 `importedData.activeAccountId` 对应的工作区，避免把账号 A 的备份直接塞进当前正登录的账号 B 顶层列表！
-       - 若导入的是旧版单账号备份（无 `accountWorkspaces`），则正常导入当前活跃账号，并同步更新 `accountWorkspaces[currentAccountId]`，其他账号在 `accountWorkspaces` 中的快照保持原样不动。
+       - 若导入的是旧版单账号备份（无 `accountWorkspaces`）：恢复前必须**要求用户明确确认**备份归属的账号与恢复目标（备份内数据属于哪个 GitHub 账号、写入本机哪个账号的工作区/顶层）；**未确认前不得写入任何数据**（防止旧版备份被误认领到错误账号，造成跨账号数据覆盖）。用户确认归属后，按确认结果导入当前活跃账号，并同步更新 `accountWorkspaces[currentAccountId]`，其他账号在 `accountWorkspaces` 中的快照保持原样不动。**新版带归属的备份（含 `activeAccountId` / `accountWorkspaces`）自动按归属匹配，无需再次确认。**
 
 #### 5.2 场景 B：WebDAV 备份与恢复（`src/features/settings/hooks/useBackupActions.ts`）
 
@@ -615,7 +617,7 @@ export interface AccountSwitchActions {
    - 新增顶层字段 `accounts`（导出 `accounts` 表，其中 `github_token_masked` 脱敏展示）与 `account_workspaces`（按 `account_id` 汇总库中所有账号的 `repositories`、`releases`、`categories`、`account_settings`，其中 `github_token` 同样脱敏为 `***` + 后 4 位）。
 2. **`POST /api/sync/import`**：
    - 兼容 v1 单账号导入：将顶层 `repositories`、`releases`、`categories`、`settings` 导入到当前 `resolveAccountScope(req, db)` 指定的 `account_id` 分区；
-   - 支持多账号全量导入：若请求体包含 `account_workspaces` 与 `accounts`，在事务中按各自的 `account_id` 分别导入 `repositories`、`releases`、`categories`、`account_settings` 及 `accounts`（跳过 `'***'` 掩码 Token，保留库中已有的 `github_token_encrypted`）。
+   - 支持多账号全量导入：若请求体包含 `account_workspaces` 与 `accounts`，在事务中按各自的 `account_id` 分别导入 `repositories`、`releases`、`categories`、`account_settings` 及 `accounts`。**掩码 Token 识别必须兼容后端导出的完整掩码格式（`***` + 尾四位，如 `***abcd`），不能只匹配 `'***'`**：凡命中掩码格式（前缀 `***`）的导入值一律视为脱敏 Token——保留库中该账号已有的有效 `github_token_encrypted`，不写入掩码值；导入行为与导出脱敏格式保持一致。
 
 ---
 
@@ -736,11 +738,11 @@ npm run build
 ## 六、验收标准 Checklist（Done Criteria）
 
 - [ ] **UI 交互**：右上角头像及用户名区域点击展开下拉菜单，包含「切换账号（显示所有已保存账号的头像、名称、`@login`、当前选中勾号）」、「添加新账号」、「退出登录」。
-- [ ] **单账号兼容**：仅登录 1 个账号时，首次登录及升级后自动回填至 `savedAccounts`，下拉菜单正常展示当前账号、「添加新账号」与「退出登录」。
+- [ ] **单账号兼容**：仅登录 1 个账号时，首次登录及升级后自动回填至 `savedAccounts`；下拉菜单正常展示当前账号与「添加新账号」（独立入口）；**退出登录保留原独立图标按钮入口（含二次确认），不得把「退出登录」移入菜单**；只有账号数 ≥ 2 时才把「退出登录」并入下拉菜单。
 - [ ] **纯客户端切换零丢失**：账号 A（含 AI 分析总结、自定义分类、Gist、Release 订阅、已读状态、Fork）切换到账号 B，再从账号 B 切回账号 A，所有数据 100% 完好无损。
 - [ ] **添加账号取消安全**：在已登录账号 A 时点击「添加新账号」并取消弹窗，账号 A 保持登录态且数据不受任何影响。
 - [ ] **有后端模式切换零丢失**：连接后端 Server 时，从账号 A 切到账号 B（无论账号 B 是空账号还是已有数据），后端 SQLite 中账号 A 的仓库、AI 总结、分类、Release 和 Token 100% 保留；切回账号 A 时前后端数据完全一致，代理请求使用当前活跃账号的 GitHub Token。
 - [ ] **备份恢复零丢失**：在有多个保存账号（A 与 B）时，执行本地 JSON 导出/导入、WebDAV 备份/恢复、后端 `/api/sync/export` 与 `/api/sync/import`，账号 A 与账号 B 的工作区数据及账号列表均完整保留，且未勾选「包含密钥」时 `githubToken` 被安全脱敏为 `***`，导入脱敏备份不会冲掉本地已有的有效 Token。
 - [ ] **升级兼容**：旧版单租户后端升级后，第一个已登录账号通过身份校验后零感知继承存量 `'default'` 数据；身份不符的账号获得干净分区，存量数据不被误认领；旧版客户端（无 `X-GitHub-Account-Id` 请求头）与无头请求行为完全不变（全局 `settings` 镜像语义）。
-- [ ] **在途任务防护**：AI 批量分析、批量导入、向量索引、Gist/Release/Fork 刷新等长任务进行中切换账号，结果不写穿到新账号活跃列表；语义搜索结果按当前账号过滤，无跨账号数据外泄。
+- [ ] **在途任务防护**：AI 批量分析、批量导入、向量索引、Gist/Release/Fork 刷新等长任务进行中切换账号，结果不写穿到新账号活跃列表；**验收用例必须覆盖 A→B→A（切出又切回同一账号）**：旧任务结算时代次不一致，结果丢弃或归档，不写进回切后账号的当前工作区；语义搜索结果按当前账号过滤，无跨账号数据外泄。
 - [ ] **测试契约**：前端 `accountWorkspace.test.ts` 的 `toEqual({})` 断言、后端 `releasesUpsert`/`syncUpsert` 的参数索引断言、`settings.test.ts` 无头全局表断言、`authRestore.test.ts` 响应断言、`mcp/provider.test.ts` mock 路由——全部与实现同步更新并通过。

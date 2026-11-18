@@ -241,6 +241,8 @@
     "add-account": "アカウントを追加",
     "current-account": "現在のアカウント",
     "remove-account": "アカウントを削除",
+    "remove-account-with-login": "@{{login}} を削除",
+    "logout-account-changed": "アカウントが変更されました。現在のアカウントでもう一度ログアウトしてください。",
     "switch-in-progress": "アカウントを切り替えています。しばらくしてから再度お試しください。",
     "remove-account-confirm-title": "保存済みアカウントの削除",
     "remove-account-confirm-desc": "このアカウントの保存されたサインイン情報のみを削除します。キャッシュされたリポジトリとカテゴリは保持されます。続行しますか？",

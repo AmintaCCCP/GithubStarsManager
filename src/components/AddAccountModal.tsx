@@ -139,7 +139,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
           <button
             type="button"
             onClick={() => { setMode('token'); setError(''); }}
-            className={`flex-1 rounded px-2 py-1.5 transition-colors ${mode === 'token' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            disabled={busy}
+            className={`flex-1 rounded px-2 py-1.5 transition-colors disabled:opacity-50 disabled:pointer-events-none ${mode === 'token' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             aria-pressed={mode === 'token'}
           >
             {t('app:accountModal.token-label')}
@@ -147,7 +148,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
           <button
             type="button"
             onClick={() => { setMode('backend'); setError(''); }}
-            className={`flex-1 rounded px-2 py-1.5 transition-colors ${mode === 'backend' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            disabled={busy}
+            className={`flex-1 rounded px-2 py-1.5 transition-colors disabled:opacity-50 disabled:pointer-events-none ${mode === 'backend' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             aria-pressed={mode === 'backend'}
           >
             {tLogin('loginScreen.connect-to-your-backend')}

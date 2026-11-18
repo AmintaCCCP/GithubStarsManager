@@ -79,7 +79,7 @@ function LoginCardPattern() {
 }
 
 export const LoginScreen: React.FC = () => {
-  const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend, getBackendUrl, rollbackBackendConnection, runWithBackendRestoreFrozen } = useLoginActions();
+  const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend, getBackendUrl, rollbackBackendConnection, runWithBackendRestoreFrozen, drainInFlightBackendPulls } = useLoginActions();
   const { switchToAccount, parkCurrentAccountForRestore } = useAccountSwitchActions();
   const githubTokenInputRef = useRef<HTMLInputElement | null>(null);
   const [loginMode, setLoginMode] = useState<'github' | 'backend'>('github');
@@ -98,6 +98,12 @@ export const LoginScreen: React.FC = () => {
   const [backendGithubToken, setBackendGithubToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  // 审计修复（B12）：候选后端连接仅供设置步骤使用。进入令牌配置步骤时记录
+  // 候选连接之前的后端 URL；离开设置步骤（返回 GitHub 模式）时先恢复原连接
+  // 再开放已保存账号快捷登录，防止把已保存账号的 PAT 发送给候选后端。
+  // undefined 表示当前没有活跃的候选连接；null 表示候选之前的连接为本地/自动探测。
+  const candidatePreviousUrlRef = useRef<string | null | undefined>(undefined);
+  const [isRestoringPreviousBackend, setIsRestoringPreviousBackend] = useState(false);
   // Data conflict dialog state for backend login
   const [conflictDialogOpen, setConflictDialogOpen] = useState(false);
   // Ref to resolve the conflict dialog promise
@@ -160,6 +166,9 @@ export const LoginScreen: React.FC = () => {
 
   const handleQuickSignIn = async (accountId: string, hasToken: boolean) => {
     if (backendStep === 'githubToken') return;
+    // B12：候选后端连接复原完成前不得开放快捷登录（避免把已保存账号的
+    // PAT 发给候选后端）。
+    if (isRestoringPreviousBackend) return;
     if (!hasToken) {
       // Token 缺失（如导入脱敏备份）：记录待补授权账号 ID，切到 GitHub 模式后聚焦输入框
       setReauthAccountId(accountId);
@@ -195,6 +204,18 @@ export const LoginScreen: React.FC = () => {
   };
 
   const switchLoginMode = (mode: 'github' | 'backend') => {
+    // 审计修复（B12）：离开候选后端令牌配置步骤返回 GitHub 模式时，先恢复
+    // 候选连接之前的原后端连接，再开放已保存账号快捷登录；继续停留在设置
+    // 步骤（未离开 backend 模式）时保留候选连接。
+    if (mode === 'github' && loginMode === 'backend' && backendStep === 'githubToken'
+      && candidatePreviousUrlRef.current !== undefined) {
+      const restoreUrl = candidatePreviousUrlRef.current;
+      candidatePreviousUrlRef.current = undefined;
+      setIsRestoringPreviousBackend(true);
+      void rollbackBackendConnection(restoreUrl).finally(() => {
+        setIsRestoringPreviousBackend(false);
+      });
+    }
     setReauthAccountId(null);
     setLoginMode(mode);
     setBackendStep('credentials');
@@ -248,6 +269,15 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  // 审计修复（B14）：归档前先排空当前账号的在途后端拉取（autoSync 侧能力，
+  // 见 HANDOFF-B-TO-C.md），防止旧账号 A 的在途拉取把数据写进归档后的无主
+  // 顶层；autoSync 落地前由 C8 的会话代次校验兜底丢弃迟到结果。
+  const parkForBackendRestore = async () => {
+    const parkedAccountId = accountIdKey(useAppStore.getState().user);
+    await drainInFlightBackendPulls(parkedAccountId);
+    parkCurrentAccountForRestore();
+  };
+
   const handleBackendConnect = async () => {
     const url = backendUrl.trim();
     const apiKey = backendApiKey.trim();
@@ -267,9 +297,10 @@ export const LoginScreen: React.FC = () => {
     // 被发往候选后端（轮询/诊断请求仍在运行）。
     const previousBackendUrl = getBackendUrl();
     setBackendApiSecret(apiKey);
-    // 拉取固定到已验证账号（Issue #611 审计修复）后，登录态必须先于拉取落地；
-    // 若随后的后端同步失败，回滚登录态以保持「同步失败不提交登录状态」契约
-    // （已归档的旧账号数据安全，重新登录即可恢复）。
+    // 审计修复（B13）：恢复流程重构——恢复拉取以显式账号 ID 固定请求头，
+    // 登录态（凭证 + 工作区归属）在拉取成功后统一提交；恢复完成前
+    // LoginScreen 保持挂载（isAuthenticated 不提前置 true），失败时错误
+    // 显示在当前登录页。
     let loginCommitted = false;
 
     const runConnect = async () => {
@@ -285,13 +316,11 @@ export const LoginScreen: React.FC = () => {
       if (result.status === 'restore-failed') {
         throw new Error(t('loginScreen.failed-to-read-login-data-from-the-backend'));
       }
-      if (result.status === 'restored-token-invalid') {
-        setTokenSetupReason('invalid');
-        setBackendStep('githubToken');
-        return;
-      }
-      if (result.status === 'github-token-required') {
-        setTokenSetupReason('missing');
+      if (result.status === 'restored-token-invalid' || result.status === 'github-token-required') {
+        // 进入令牌配置步骤：候选后端连接保留供设置使用（B12），记录候选之前
+        // 的连接以便离开设置步骤时复原。
+        candidatePreviousUrlRef.current = previousBackendUrl;
+        setTokenSetupReason(result.status === 'restored-token-invalid' ? 'invalid' : 'missing');
         setBackendStep('githubToken');
         return;
       }
@@ -324,29 +353,31 @@ export const LoginScreen: React.FC = () => {
           setIsLoading(false); // Let user interact with dialog
         });
         setIsLoading(true);
-        // R2 防护（Issue #611）：拉取后端数据写入 Store 前先把当前已登录账号
-        // 的工作区安全归档并清空顶层，防止被新账号数据污染后作为旧快照覆盖
-        parkCurrentAccountForRestore();
-        // 恢复拉取必须固定到已验证账号（Issue #611 审计修复）：先落新账号
-        // 凭证再拉取，使 syncFromBackend 的全部请求携带
-        // X-GitHub-Account-Id（已验证账号）。归档后 user 为 null 时请求头
-        // 缺失，服务端 computeAccountScope 会回退到全局 active_account_id，
-        // 可能读到其他账号的分区。
-        setGitHubToken(result.githubToken);
-        setUser(result.user);
-        loginCommitted = true;
+        await parkForBackendRestore();
         if (overwrite) {
-          await syncBackendData();
+          // 审计修复（B13）：以显式账号 ID 拉取（不提前 setUser 生成请求头），
+          // 拉取成功后统一提交工作区与登录态。
+          await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
+          setGitHubToken(result.githubToken);
+          setUser(result.user);
+          loginCommitted = true;
+        } else {
+          // 「保留本地」：跳过拉取并直接提交工作区与登录态；只保留 B 自己的
+          // 快照——park 无法归档的无主顶层残留不随登录提交给 B（B14）。
+          discardPartialLoginWorkspace();
+          setGitHubToken(result.githubToken);
+          setUser(result.user);
+          loginCommitted = true;
         }
         // Either way, complete login with backend credentials
       } else {
-        parkCurrentAccountForRestore();
-        // 同上：恢复拉取固定到已验证账号（显式登录态，而非服务端全局分区）
+        await parkForBackendRestore();
+        // 审计修复（B13）：恢复拉取固定到已验证账号（显式账号 ID，而非服务端
+        // 全局分区），拉取成功后统一提交登录态。
+        await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
         setGitHubToken(result.githubToken);
         setUser(result.user);
         loginCommitted = true;
-        // No conflict: sync backend data directly
-        await syncBackendData();
       }
 
       // 登记后端保存的全部有效账号（Issue #611 审计修复）：与
@@ -364,17 +395,14 @@ export const LoginScreen: React.FC = () => {
       await rollbackBackendConnection(previousBackendUrl);
       setBackendApiSecret(previousApiSecret);
       if (loginCommitted) {
-        // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。
-        // 已落地的凭证保留在 savedAccounts 中（下次一键恢复），归档数据不受影响。
+        // 拉取成功、登录提交之后仍可能失败（如登记账号环节抛错）：按
+        // 「同步失败不提交登录状态」契约回滚登录态。
         setUser(null);
         setGitHubToken(null);
-        // 审计修复：同步失败前已写入顶层的账号 B 部分同步结果必须一并丢弃——
-        // 只清 user/token 时，下一次登录的 park 因无当前用户返回 null、
-        // switchAccountWorkspace 在顶层已有数据时保留顶层，账号 B 的残留数据
-        // 会被账号 C 看到。重置顶层工作区为空，且绝不归档（未完成同步的数据
-        // 不能存为账号 B 的快照）。
-        discardPartialLoginWorkspace();
       }
+      // 审计修复（B13）：恢复拉取失败时登录态尚未提交，但拉取可能已把部分
+      // 数据写入无主顶层——必须丢弃（绝不归档），防止残留串到下一个账号。
+      discardPartialLoginWorkspace();
       setError(error instanceof Error ? error.message : t('loginScreen.sign-in-failed-please-try-again'));
     } finally {
       setIsLoading(false);
@@ -390,13 +418,17 @@ export const LoginScreen: React.FC = () => {
 
     setIsLoading(true);
     setError('');
+    // 审计修复（B13）：与 handleBackendConnect 相同的恢复时序——恢复拉取以
+    // 显式账号 ID 固定请求头，登录态在拉取成功后统一提交；失败时错误停留在
+    // 当前登录页。
     let loginCommitted = false;
     try {
       // R2 防护（Issue #611）：先归档当前已登录账号（边缘态：持久化了 user 但
       // 停留在登录页），再向后端写入新 Token——否则 setupBackendGitHubToken 的
       // settings 写入会携带旧账号请求头，把新账号的 Token 写进旧账号分区。
       // 归档失败无副作用：parked 快照会在该账号下次登录时自动恢复。
-      parkCurrentAccountForRestore();
+      // B14：归档前先排空该账号的在途后端拉取。
+      await parkForBackendRestore();
       const user = await setupBackendGitHubToken(githubToken);
       const nextAccountId = accountIdKey(user);
       const liveState = useAppStore.getState();
@@ -423,24 +455,26 @@ export const LoginScreen: React.FC = () => {
         });
         setIsLoading(true);
       }
-      // 恢复拉取固定到已验证账号（Issue #611 审计修复）：先落登录态再拉取，
-      // 全部拉取请求携带已验证账号的 X-GitHub-Account-Id，不回退到服务端全局
-      // active_account_id 分区。
+      if (overwrite) {
+        // 审计修复（B13）：以显式账号 ID 拉取（不提前 setUser 生成请求头），
+        // 拉取成功后统一提交工作区与登录态。
+        await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
+      } else {
+        // 「保留本地」：跳过拉取，只保留 B 自己的快照（丢弃无主顶层残留，B14）。
+        discardPartialLoginWorkspace();
+      }
       setGitHubToken(githubToken);
       setUser(user);
       loginCommitted = true;
-      if (overwrite) {
-        await syncBackendData();
-      }
     } catch (error) {
       if (loginCommitted) {
-        // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。
+        // 拉取成功、登录提交之后仍可能失败：按「同步失败不提交登录状态」契约回滚。
         setUser(null);
         setGitHubToken(null);
-        // 审计修复：与 handleBackendConnect 的回滚分支一致——同步失败前写入
-        // 顶层的部分同步结果一并丢弃（不归档），防止残留数据串到下一个账号。
-        discardPartialLoginWorkspace();
       }
+      // 审计修复（B13）：恢复拉取失败时登录态尚未提交，但拉取可能已把部分
+      // 数据写入无主顶层——必须丢弃（绝不归档），防止残留串到下一个账号。
+      discardPartialLoginWorkspace();
       setError(error instanceof Error ? error.message : t('loginScreen.setup-failed-please-try-again'));
     } finally {
       setIsLoading(false);
@@ -550,7 +584,7 @@ export const LoginScreen: React.FC = () => {
                 <button
                   key={account.accountId}
                   type="button"
-                  disabled={isLoading || backendStep === 'githubToken'}
+                  disabled={isLoading || backendStep === 'githubToken' || isRestoringPreviousBackend}
                   onClick={() => void handleQuickSignIn(account.accountId, !!account.githubToken.trim())}
                   className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
                 >

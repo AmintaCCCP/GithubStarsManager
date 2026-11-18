@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
+import { z } from 'zod';
 import { getDb } from '../db/connection.js';
 import { encrypt, decrypt } from '../services/crypto.js';
 import { config } from '../config.js';
@@ -10,6 +11,7 @@ import {
   getLegacyDefaultClaimedBy,
   getLegacyDefaultVerifiedToken,
   snapshotLegacyDefaultTokenBeforeOverwrite,
+  fetchGitHubUserId,
   ACCOUNT_SCOPED_SETTING_KEYS,
   INTERNAL_SETTING_KEYS,
 } from '../db/accountScope.js';
@@ -550,6 +552,10 @@ router.get('/api/settings', (req, res) => {
 
     for (const row of rows) {
       const key = row.key as string;
+      // Issue #612 A13：内部账号状态键（legacy_default_github_token 密文快照 /
+      // legacy_default_owner_id 内嵌密文 JSON / 认领标记等）绝不过序列化边界，
+      // 不得向任何账号返回凭据快照。
+      if (INTERNAL_SETTING_KEYS.has(key)) continue;
       if (!inheritLegacyScopedSettings && ACCOUNT_SCOPED_SETTING_KEYS.has(key)) {
         // 其他账号的账号级设置：对当前账号不可见。
         continue;
@@ -574,10 +580,16 @@ router.get('/api/settings', (req, res) => {
       settings[key] = value;
     }
 
+    // Issue #612 A13：客户端需要活跃账号 ID 时改用该公开字段返回（内部键
+    // active_account_id 已被过滤；此处为本次请求解析出的分区）。
+    settings.active_account_id = accountId;
+
     if (accountId !== 'default') {
       const accountRows = db.prepare('SELECT key, value FROM account_settings WHERE account_id = ?')
         .all(accountId) as Array<{ key: string; value: string | null }>;
       for (const row of accountRows) {
+        // Issue #612 A13：内部键不参与响应合并（公开的 active_account_id 已在上方返回）。
+        if (INTERNAL_SETTING_KEYS.has(row.key)) continue;
         if (row.key === 'github_token' && !row.value) {
           // 账号级记录存在但为空 = 显式清空：不能沿用全局 Token 的可用状态。
           settings.github_token = '';
@@ -611,7 +623,7 @@ router.get('/api/settings', (req, res) => {
 //   写入 account_settings(account_id, key, value)，并同步 accounts 表；
 // - 解析为 'default'（无头请求 / 旧客户端 / 无 active_account_id）时必须同时写入
 //   全局 settings 表，保证 settings.github_token 的旧语义不变。
-router.put('/api/settings', (req, res) => {
+router.put('/api/settings', async (req, res) => {
   try {
     const db = getDb();
     const updates = req.body as Record<string, unknown>;
@@ -633,6 +645,91 @@ router.put('/api/settings', (req, res) => {
       accountId = resolveAccountScope(req, db);
     }
     const isRealAccount = accountId !== 'default';
+
+    // Issue #612 A21：ai_result_sharing_enabled 必须是显式布尔值（zod 校验，
+    // 默认 false）；存储统一归一化为 '1' / '0'。
+    if ('ai_result_sharing_enabled' in updates) {
+      const parsed = z.boolean().safeParse(updates.ai_result_sharing_enabled);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: 'ai_result_sharing_enabled must be a boolean',
+          code: 'INVALID_AI_SHARING_SETTING',
+        });
+        return;
+      }
+    }
+
+    // Issue #612 A12：整个请求的校验（user_profile.id 与目标账号匹配等）必须在
+    // 任何设置写入和事务执行之前完成——不匹配只发一次 400 且不修改任何设置。
+    // Issue #612 A14：user_profile 先统一规范化（JSON 字符串解析为对象），再对
+    // 规范化结果执行同一 ID 校验；显式清空资料（null / ''）的用法保留。
+    let normalizedUserProfile: unknown;
+    if ('user_profile' in updates) {
+      const raw = updates.user_profile;
+      if (raw === null || raw === '') {
+        normalizedUserProfile = raw;
+      } else if (typeof raw === 'string') {
+        try {
+          normalizedUserProfile = JSON.parse(raw);
+        } catch {
+          res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
+          return;
+        }
+      } else if (typeof raw === 'object') {
+        normalizedUserProfile = raw;
+      } else {
+        res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
+        return;
+      }
+      if (normalizedUserProfile && typeof normalizedUserProfile === 'object' && 'id' in normalizedUserProfile) {
+        const profileId = (normalizedUserProfile as { id?: unknown }).id;
+        if (isRealAccount && profileId !== undefined && profileId !== null && String(profileId) !== accountId) {
+          res.status(400).json({
+            error: 'user_profile.id does not match target account',
+            code: 'INVALID_USER_PROFILE',
+          });
+          return;
+        }
+      }
+    }
+
+    // Issue #612 A11：把新 PAT 写入真实账号分区之前，在事务外用 GitHub /user
+    // 验证其身份。验证失败（网络错误 / 超时 / 401 / 身份不符）时保留该账号现有
+    // 凭据：跳过本次 Token 写入并在响应中报告，绝不保存归属不明的凭据。
+    // 「复用已验证凭据」路径：与该账号分区已存储的凭据完全一致的新 Token 免于
+    // 重复查询。同账号 Token 轮换（身份一致）与显式清空不受影响。
+    let tokenVerificationFailed = false;
+    const rawToken = updates.github_token;
+    if (isRealAccount && typeof rawToken === 'string' && rawToken && !rawToken.startsWith('***')) {
+      let storedEncrypted: string | null = null;
+      try {
+        const scoped = db
+          .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
+          .get(accountId) as { value: string | null } | undefined;
+        if (scoped !== undefined && scoped.value) {
+          storedEncrypted = scoped.value;
+        } else if (scoped === undefined) {
+          const accountRow = db
+            .prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?')
+            .get(accountId) as { github_token_encrypted: string | null } | undefined;
+          storedEncrypted = accountRow?.github_token_encrypted ?? null;
+        }
+      } catch { /* 轻量 stub 缺表时按无已存凭据处理 */ }
+      let matchesStored = false;
+      if (storedEncrypted) {
+        try {
+          matchesStored = decrypt(storedEncrypted, config.encryptionKey) === rawToken;
+        } catch {
+          matchesStored = false;
+        }
+      }
+      if (!matchesStored) {
+        const ownerId = await fetchGitHubUserId(rawToken);
+        if (ownerId !== accountId) {
+          tokenVerificationFailed = true;
+        }
+      }
+    }
 
     const globalStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     const accountStmt = db.prepare(
@@ -658,6 +755,8 @@ router.put('/api/settings', (req, res) => {
             continue;
           }
           if (value && typeof value === 'string') {
+            // Issue #612 A11：身份验证未通过的 Token 不写入（保留现有凭据）。
+            if (tokenVerificationFailed) continue;
             value = encrypt(value, config.encryptionKey);
             if (isRealAccount) accountPayload.tokenEncrypted = value;
           } else if (isRealAccount) {
@@ -668,29 +767,23 @@ router.put('/api/settings', (req, res) => {
         }
 
         if (key === 'user_profile') {
-          // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时携带）
-          if (rawValue && typeof rawValue === 'object' && 'id' in rawValue) {
-            const profileId = (rawValue as { id?: unknown }).id;
-            if (isRealAccount && profileId !== undefined && profileId !== null && String(profileId) !== accountId) {
-              res.status(400).json({
-                error: 'user_profile.id does not match target account',
-                code: 'INVALID_USER_PROFILE',
-              });
-              return;
-            }
-          }
-          accountPayload.userProfile = rawValue;
+          // user_profile 是 accounts.user_json 的唯一写入路径（客户端登录/切号时
+          // 携带）；归一化结果已在事务前完成校验，此处只记录载荷。
+          accountPayload.userProfile = normalizedUserProfile;
           continue;
         }
 
         // better-sqlite3 interprets objects/arrays as named parameter maps,
         // causing RangeError. Serialize non-primitive values to JSON strings.
+        // ai_result_sharing_enabled 已在事务前完成 zod 校验，统一存 '1' / '0'。
         const serialized =
-          value === null || value === undefined
-            ? null
-            : typeof value === 'object'
-              ? JSON.stringify(value)
-              : value;
+          key === 'ai_result_sharing_enabled'
+            ? (rawValue === true ? '1' : '0')
+            : value === null || value === undefined
+              ? null
+              : typeof value === 'object'
+                ? JSON.stringify(value)
+                : value;
 
         if (ACCOUNT_SCOPED_SETTING_KEYS.has(key) && isRealAccount) {
           accountStmt.run(accountId, key, serialized);
@@ -725,7 +818,8 @@ router.put('/api/settings', (req, res) => {
     });
 
     upsert();
-    res.json({ updated: true });
+    // Issue #612 A11：Token 验证失败时其余设置照常保存，但凭据写入被跳过。
+    res.json({ updated: true, ...(tokenVerificationFailed ? { token_update_skipped: true } : {}) });
   } catch (err) {
     logger.errorFromError('configs.updateSettings', 'PUT /api/settings error', err);
     res.status(500).json({ error: 'Failed to update settings', code: 'UPDATE_SETTINGS_FAILED' });

@@ -5,6 +5,9 @@ import { logger } from '../services/logger.js';
 import {
   resolveActiveAccountScope,
   getLegacyDefaultClaimedBy,
+  hasMultipleAccountPartitions,
+  getPartitionMeta,
+  setPartitionMeta,
 } from '../db/accountScope.js';
 import {
   type McpRepository,
@@ -276,6 +279,60 @@ export function getVectorAvailability(): VectorAvailability {
 
 const FETCH_TIMEOUT_MS = 15_000;
 
+/** partition_meta 标记：该账号分区的账号元数据回填探测已完成（避免重复探测）。 */
+const VECTOR_BACKFILL_CHECKED_KEY = 'vector_account_backfill_checked';
+
+/**
+ * Issue #612 A25：旧索引标记（v4 迁移 / 无冲突认领保留的 legacy 向量）触发账号
+ * 元数据回填。服务端无法对存量向量增量补写元数据（向量由客户端生成上传），
+ * 恢复路径是全量重建：探测到当前账号仍存在无 accountId 元数据的 legacy 向量时，
+ * 清除该分区所有 vector_indexed_at 标记，客户端下次同步将携带 accountId 元数据
+ * 重新上传。探测与重建以 partition_meta 标记保证只触发一次；探测失败不置位，
+ * 下次查询重试。无法探测时调用方保持按账号过滤被拒的现状。
+ */
+async function ensureAccountVectorMetadataBackfill(
+  db: ReturnType<typeof getDb>,
+  accountId: string,
+  sendUnscopedQuery: () => Promise<Response>,
+): Promise<void> {
+  if (accountId === 'default') return;
+  if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === '1') return;
+  try {
+    const probe = await sendUnscopedQuery();
+    if (!probe.ok) return; // Worker 不可用 / 被拒：不置位，下次重试
+    let payload: { matches?: Array<{ id: string; metadata?: Record<string, unknown> }> };
+    try {
+      payload = (await probe.json()) as typeof payload;
+    } catch {
+      return;
+    }
+    if (!payload || !Array.isArray(payload.matches)) return;
+    const repos = loadAllRepositories(accountId);
+    const byId = new Map(repos.map((r) => [String(r.id), r]));
+    const hasLegacyVectors = payload.matches.some((m) => {
+      const rawId = String(m.id);
+      if (!/^\d+$/.test(rawId)) return false; // 带账号前缀的向量已带元数据
+      const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
+      if (metaAccountId && metaAccountId !== accountId) return false;
+      return byId.has(rawId);
+    });
+    setPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY, '1');
+    if (hasLegacyVectors) {
+      // 全量重建作为恢复路径：标记被清除后由客户端重建并重新上传（带元数据）。
+      db.prepare(
+        'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
+      ).run(accountId);
+      logger.warn('mcp.vector', 'Legacy vectors without accountId metadata detected; repo index markers cleared for rebuild', {
+        accountId,
+      });
+    }
+  } catch (err) {
+    logger.warn('mcp.vector', 'Account metadata backfill probe failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
@@ -480,16 +537,12 @@ export async function vectorSearch(
     const text = await res.text().catch(() => '');
     const isMetadataNotIndexed = res.status === 400 && text.includes('ACCOUNT_METADATA_NOT_INDEXED');
     if (isMetadataNotIndexed && accountId !== 'default' && getLegacyDefaultClaimedBy(db) === accountId) {
-      // 已确认的单账号存量部署在回填前保留按仓库 ID 匹配的兼容查询路径。
-      let isSingleAccount = true;
-      try {
-        const countRow = db
-          .prepare("SELECT COUNT(DISTINCT account_id) AS total FROM repositories WHERE account_id != 'default'")
-          .get() as { total: number } | undefined;
-        isSingleAccount = (countRow?.total ?? 0) <= 1;
-      } catch {
-        isSingleAccount = false;
-      }
+      // Issue #612 A25：在启用 accountId 过滤前完成存量向量元数据回填——探测到
+      // 无 accountId 元数据的 legacy 向量时清除重建标记（全量重建恢复路径）。
+      await ensureAccountVectorMetadataBackfill(db, accountId, () => sendWorkerQuery(undefined));
+      // Issue #612 A26：无范围兼容查询仅当能确认 Worker 候选集属于单账号部署
+      // 时才允许——单账号判定纳入 accounts 与全部分区表，不再只看 repositories。
+      const isSingleAccount = !hasMultipleAccountPartitions(db);
       if (isSingleAccount) {
         try {
           res = await sendWorkerQuery(undefined);
@@ -527,27 +580,43 @@ export async function vectorSearch(
   const repos = loadAllRepositories(accountId);
   const byId = new Map(repos.map((r) => [String(r.id), r]));
 
-  const candidates = matches
-    .map((m) => {
-      // 向量 ID 可能是 `${accountId}:${repoId}`：先解析再核对归属与元数据一致性。
-      const rawId = String(m.id);
-      const separator = rawId.indexOf(':');
-      const prefix = separator > 0 ? rawId.slice(0, separator) : '';
-      const scopedAccountId = /^\d+$/.test(prefix) ? prefix : null;
-      if (scopedAccountId && scopedAccountId !== accountId) return null;
-      const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
-      if (metaAccountId && metaAccountId !== accountId) return null;
-      if (scopedAccountId && metaAccountId && metaAccountId !== scopedAccountId) return null;
-      const repoId = scopedAccountId ? rawId.slice(separator + 1) : rawId;
-      const repo = byId.get(repoId);
-      if (!repo) return null;
-      return {
-        id: repoId,
-        score: Number(m.score),
-        repository: repo,
-      };
-    })
-    .filter(Boolean) as Array<{ id: string; score: number; repository: McpRepository }>;
+  // Issue #612 A27：旧索引（迁移期）里同一仓库可能同时存在 legacy 无前缀向量
+  // 与 `${accountId}:${repoId}` 新向量。投影前先按规范化 repoId 去重，避免同一
+  // 仓库占用两个候选名额；两种候选并存时优先保留带账号前缀（scopedAccountId）
+  // 的新向量，等优先级时保留更高分。首次出现顺序保持稳定。
+  const dedupedCandidates = new Map<string, { id: string; score: number; repository: McpRepository; scoped: boolean }>();
+  for (const m of matches) {
+    // 向量 ID 可能是 `${accountId}:${repoId}`：先解析再核对归属与元数据一致性。
+    const rawId = String(m.id);
+    const separator = rawId.indexOf(':');
+    const prefix = separator > 0 ? rawId.slice(0, separator) : '';
+    const scopedAccountId = /^\d+$/.test(prefix) ? prefix : null;
+    if (scopedAccountId && scopedAccountId !== accountId) continue;
+    const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
+    if (metaAccountId && metaAccountId !== accountId) continue;
+    if (scopedAccountId && metaAccountId && metaAccountId !== scopedAccountId) continue;
+    const repoId = scopedAccountId ? rawId.slice(separator + 1) : rawId;
+    const repo = byId.get(repoId);
+    if (!repo) continue;
+    const score = Number(m.score);
+    const scoped = scopedAccountId !== null;
+    const existing = dedupedCandidates.get(repoId);
+    if (!existing) {
+      dedupedCandidates.set(repoId, { id: repoId, score, repository: repo, scoped });
+      continue;
+    }
+    const preferNew = scoped && !existing.scoped;
+    const preferHigherScore = scoped === existing.scoped && score > existing.score;
+    if (preferNew || preferHigherScore) {
+      // Map.set 对已存在键保持首次插入位置，稳定候选顺序。
+      dedupedCandidates.set(repoId, { id: repoId, score, repository: repo, scoped });
+    }
+  }
+
+  const candidates = Array.from(
+    dedupedCandidates.values(),
+    ({ id, score, repository }) => ({ id, score, repository }),
+  );
 
   if (!filtersActive) {
     const enriched = candidates.map((candidate) => ({

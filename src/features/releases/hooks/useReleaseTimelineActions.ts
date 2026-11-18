@@ -4,7 +4,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
-  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
@@ -63,11 +62,13 @@ export const useReleaseTimelineActions = () => {
       return;
     }
 
-    setReleaseIsRefreshing(true);
-    // 账号代次校验（Issue #611）：Release 批量刷新耗时期间切号后丢弃结果
+    // 账号代次校验（Issue #611）：Release 批量刷新耗时期间切号后丢弃结果。
+    // B4（HANDOFF-B-TO-C.md）：刷新状态按发起会话归属——身份必须在 set(true)
+    // 与 finally 的 set(false) 两处都传入。
     const startedAccountId = peekCurrentAccountId();
     // A→B→A 时账号 ID 与切号前相同，必须同时比较会话代次。
     const startedGeneration = getAccountSessionGeneration();
+    setReleaseIsRefreshing(true, { accountId: startedAccountId, generation: startedGeneration });
     try {
       const githubApi = createGitHubApiService(githubToken);
       const { releases: newReleases, latestReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
@@ -114,22 +115,35 @@ export const useReleaseTimelineActions = () => {
       toast(message, actuallyNewReleases.length > 0 || updatedReleases.length > 0 ? 'success' : 'info');
     } catch (error) {
       console.error('Refresh failed:', error);
-      toast(t('useReleaseTimelineActions.release-refresh-failed-please-check-your-network'), 'error');
+      // 审计修复（C37）：失败提示先校验发起会话——已切换则不显示旧请求错误；
+      // 同一会话失败仍提示。归属化刷新状态清理保持不变（B4）。
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(t('useReleaseTimelineActions.release-refresh-failed-please-check-your-network'), 'error');
+      }
     } finally {
-      setReleaseIsRefreshing(false);
+      setReleaseIsRefreshing(false, { accountId: startedAccountId, generation: startedGeneration });
     }
   }, [state, toast, t]);
 
   const handleMarkAllRead = useCallback(async () => {
     const readReleasesBeforeUpdate = new Set(useAppStore.getState().readReleases);
-    // 账号代次校验（Issue #611 审计修复）：请求发起前保存账号，失败回滚只在
-    // 发起账号仍是当前账号时执行——切号后把旧账号的已读快照写入新账号会
-    // 覆盖并污染新账号的已读状态
+    // 账号代次校验（Issue #611 审计修复）：请求发起前保存账号与代次，失败回滚
+    // 用 isCurrentAccountSession 约束（C39）——切号后把旧账号的已读快照写入
+    // 新账号会覆盖并污染新账号的已读状态；A→B→A 只有代次能识别。
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     let addedByAction = new Set<number>();
-    // 回滚保留并发新增的已读记录，并补回乐观更新整体替换时被吞掉的历史已读
-    const rollbackReadReleases = (current: Iterable<number>) => {
-      const next = new Set(Array.from(current).filter(id => !addedByAction.has(id)));
+    // 审计修复（C38）：乐观更新后的完整已读集合。撤销仅在当前已读状态仍包含
+    // 该集合（即乐观更新仍拥有当前状态、未被更晚的恢复/备份/回滚整体替换）
+    // 时执行；所有权已丢失时保留当前状态。
+    let optimisticReadReleases = new Set<number>();
+    const rollbackReadReleases = (current: Iterable<number>): Set<number> | null => {
+      const currentSet = new Set(Array.from(current));
+      for (const id of optimisticReadReleases) {
+        if (!currentSet.has(id)) return null;
+      }
+      // 回滚保留并发新增的已读记录，并补回乐观更新整体替换时被吞掉的历史已读
+      const next = new Set(Array.from(currentSet).filter(id => !addedByAction.has(id)));
       for (const id of readReleasesBeforeUpdate) next.add(id);
       return next;
     };
@@ -141,28 +155,33 @@ export const useReleaseTimelineActions = () => {
       addedByAction = new Set(
         Array.from(useAppStore.getState().readReleases).filter(id => !readReleasesBeforeUpdate.has(id)),
       );
+      optimisticReadReleases = new Set(useAppStore.getState().readReleases);
       await backend.markAllReleasesAsRead();
       toast(t('useReleaseTimelineActions.all-marked-as-read'), 'success');
     } catch {
-      if (isCurrentAccount(startedAccountId)) {
-        useAppStore.setState((current) => ({
-          readReleases: rollbackReadReleases(current.readReleases),
-        }));
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        const rolledBack = rollbackReadReleases(useAppStore.getState().readReleases);
+        // 乐观更新的所有权已被更晚的恢复/备份替换：保留当前状态
+        if (rolledBack) {
+          useAppStore.setState({ readReleases: rolledBack });
+        }
       } else if (startedAccountId) {
-        // 账号代次校验补充（审计修复）：切号时 switchAccountWorkspace 已把
-        // 包含乐观更新（全部已读）的 live 工作区写入发起账号的归档快照，
-        // 仅跳过 live 回滚会让服务端失败的已读状态留在该快照里，下次激活
-        // 原账号时被恢复。这里只把发起账号快照中的 readReleases 回写为
-        // 操作前集合，绝不创建/覆盖不存在的快照，也不触碰当前账号的工作区。
+        // 会话已切换（C39）：switchAccountWorkspace 已把包含乐观更新（全部已读）
+        // 的 live 工作区写入发起账号的归档快照，仅跳过 live 回滚会让服务端失败
+        // 的已读状态留在该快照里。这里只把发起账号快照中的 readReleases 回写，
+        // 且仅当快照仍包含本次乐观变更（所有权校验通过）时执行——绝不创建/
+        // 覆盖不存在的快照，也不触碰当前账号的工作区。
         useAppStore.setState((state) => {
           const parked = state.accountWorkspaces?.[startedAccountId];
           if (!parked) return state;
+          const rolledBack = rollbackReadReleases(parked.readReleases);
+          if (!rolledBack) return state;
           return {
             accountWorkspaces: {
               ...state.accountWorkspaces,
               [startedAccountId]: {
                 ...parked,
-                readReleases: [...rollbackReadReleases(parked.readReleases)],
+                readReleases: [...rolledBack],
               },
             },
           };
@@ -185,7 +204,10 @@ export const useReleaseTimelineActions = () => {
     // 账号代次校验（Issue #611 审计修复）：账号 ID 必须在 await confirm 之前
     // 保存——确认后再读取会拿到切号后的账号，比较恒通过；stateBeforeConfirm、
     // starredRepo 与 sourcesToRemove 都属于发起账号，账号已切换时必须整体退出。
+    // 审计修复（C40）：确认前记录会话代次，确认后守卫与失败回滚守卫都用
+    // isCurrentAccountSession(accountIdBeforeConfirm, generationBeforeConfirm)。
     const accountIdBeforeConfirm = peekCurrentAccountId();
+    const generationBeforeConfirm = getAccountSessionGeneration();
     const stateBeforeConfirm = useAppStore.getState();
     const repoKey = normalizeRepoKey(releaseRepo.full_name);
     const starredRepo = stateBeforeConfirm.repositories.find(item => normalizeRepoKey(item.full_name) === repoKey);
@@ -206,17 +228,9 @@ export const useReleaseTimelineActions = () => {
     const confirmed = await confirm(t('useReleaseTimelineActions.unsubscribe-confirmation'), confirmMessage, { type: 'warning' });
     if (!confirmed) return;
 
-    const rollbackState = {
-      repositories: stateBeforeConfirm.repositories,
-      searchResults: stateBeforeConfirm.searchResults,
-      releaseSubscriptions: new Set(stateBeforeConfirm.releaseSubscriptions),
-      releaseSourceSettings: stateBeforeConfirm.releaseSourceSettings,
-      releases: stateBeforeConfirm.releases,
-      readReleases: new Set(stateBeforeConfirm.readReleases),
-      releaseExpandedRepositories: new Set(stateBeforeConfirm.releaseExpandedRepositories),
-    };
-    // 账号代次校验（Issue #611）：确认弹窗等待期间可能已切号，回滚快照跨账号会污染
-    if (!isCurrentAccount(accountIdBeforeConfirm)) {
+    // 账号代次校验（Issue #611 / C40）：确认弹窗等待期间可能已切号（含 A→B→A），
+    // 守卫与失败回滚都用会话代次一并校验，回滚快照绝不跨账号污染。
+    if (!isCurrentAccountSession(accountIdBeforeConfirm, generationBeforeConfirm)) {
       return;
     }
     if (sourcesToRemove.includes(STARRED_RELEASE_SOURCE_ID) && starredRepo) {
@@ -232,9 +246,82 @@ export const useReleaseTimelineActions = () => {
       await forceSyncToBackend({ reportFailures: true });
     } catch (error) {
       console.error('Failed to unsubscribe release:', error);
-      // 同步等待期间可能已切号：发起账号的回滚快照绝不写入新账号工作区
-      if (isCurrentAccount(accountIdBeforeConfirm)) {
-        useAppStore.setState(rollbackState);
+      // 审计修复（C41）：按分片判断是否回滚——仓库与设置分片已成功写入时，
+      // 不因 AI 配置等辅助分片失败恢复确认前快照（后端已确认退订，本地回滚
+      // 会与之翻转不一致）；确需回滚时仅撤销本次操作实际变更，不回写整个
+      // 确认前快照（rollbackState 仅作回滚守卫保留语义参考）。
+      const failedShards = (error as { failedShards?: string[] }).failedShards;
+      const criticalShardFailed = !Array.isArray(failedShards)
+        || failedShards.length === 0
+        || failedShards.includes('repositories')
+        || failedShards.includes('settings');
+      // 同步等待期间可能已切号（含 A→B→A）：发起账号的回滚绝不写入新账号工作区
+      if (!isCurrentAccountSession(accountIdBeforeConfirm, generationBeforeConfirm)) {
+        return;
+      }
+      if (criticalShardFailed) {
+        useAppStore.setState((current) => {
+          const next: {
+            repositories?: typeof current.repositories;
+            searchResults?: typeof current.searchResults;
+            releaseSubscriptions?: typeof current.releaseSubscriptions;
+            releaseSourceSettings?: typeof current.releaseSourceSettings;
+            releases?: typeof current.releases;
+          } = {};
+          // 仅撤销本次操作实际变更 1/3：恢复 starredRepo 的订阅标记与订阅集合
+          if (starredRepo && sourcesToRemove.includes(STARRED_RELEASE_SOURCE_ID)) {
+            const restoreRepo = (repo: typeof starredRepo) => (
+              repo.id === starredRepo.id
+                ? { ...repo, subscribed_to_releases: starredRepo.subscribed_to_releases }
+                : repo
+            );
+            next.repositories = current.repositories.map(restoreRepo);
+            next.searchResults = current.searchResults.map(restoreRepo);
+            const releaseSubscriptions = new Set(current.releaseSubscriptions);
+            if (stateBeforeConfirm.releaseSubscriptions.has(starredRepo.id)) {
+              releaseSubscriptions.add(starredRepo.id);
+            } else {
+              releaseSubscriptions.delete(starredRepo.id);
+            }
+            next.releaseSubscriptions = releaseSubscriptions;
+          }
+          // 2/3：恢复本次被移除的 release 来源条目
+          if (sourcesToRemove.includes(WATCH_CUSTOM_RELEASE_SOURCE_ID)) {
+            const removed = stateBeforeConfirm.releaseSourceSettings.watchCustomReleaseRepos
+              .find(item => normalizeRepoKey(item.full_name) === repoKey);
+            const stillRemoved = !current.releaseSourceSettings.watchCustomReleaseRepos
+              .some(item => normalizeRepoKey(item.full_name) === repoKey);
+            if (removed && stillRemoved) {
+              next.releaseSourceSettings = {
+                ...current.releaseSourceSettings,
+                watchCustomReleaseRepos: [...current.releaseSourceSettings.watchCustomReleaseRepos, removed],
+              };
+            }
+          }
+          if (sourcesToRemove.includes(CUSTOM_RELEASE_SOURCE_ID)) {
+            const removed = stateBeforeConfirm.releaseSourceSettings.customReleaseRepos
+              .find(item => normalizeRepoKey(item.full_name) === repoKey);
+            const stillRemoved = !current.releaseSourceSettings.customReleaseRepos
+              .some(item => normalizeRepoKey(item.full_name) === repoKey);
+            if (removed && stillRemoved) {
+              next.releaseSourceSettings = {
+                ...current.releaseSourceSettings,
+                customReleaseRepos: [...current.releaseSourceSettings.customReleaseRepos, removed],
+              };
+            }
+          }
+          // 3/3：恢复本次因来源全部退出被移除的 release 记录
+          if (!stillActive) {
+            const removedReleases = stateBeforeConfirm.releases
+              .filter(item => normalizeRepoKey(item.repository.full_name) === repoKey);
+            const existingIds = new Set(current.releases.map(item => item.id));
+            const restoredReleases = removedReleases.filter(item => !existingIds.has(item.id));
+            if (restoredReleases.length > 0) {
+              next.releases = [...current.releases, ...restoredReleases];
+            }
+          }
+          return next;
+        });
       }
       toast(t('useReleaseTimelineActions.failed-to-unsubscribe-please-check-backend-conne'), 'error');
       return;

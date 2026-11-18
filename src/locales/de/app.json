@@ -241,6 +241,8 @@
     "add-account": "Konto hinzufügen",
     "current-account": "Aktuelles Konto",
     "remove-account": "Konto entfernen",
+    "remove-account-with-login": "Remove @{{login}}",
+    "logout-account-changed": "Das Konto hat sich geändert. Bitte melde dich für das aktuelle Konto erneut ab.",
     "switch-in-progress": "Ein Kontowechsel läuft. Bitte versuche es gleich erneut.",
     "remove-account-confirm-title": "Gespeichertes Konto entfernen",
     "remove-account-confirm-desc": "Dies entfernt nur die gespeicherten Anmeldedaten dieses Kontos. Zwischengespeicherte Repositories und Kategorien bleiben erhalten. Fortfahren?",
