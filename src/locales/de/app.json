@@ -241,7 +241,7 @@
     "add-account": "Konto hinzufügen",
     "current-account": "Aktuelles Konto",
     "remove-account": "Konto entfernen",
-    "remove-account-with-login": "Remove @{{login}}",
+    "remove-account-with-login": "@{{login}} entfernen",
     "logout-account-changed": "Das Konto hat sich geändert. Bitte melde dich für das aktuelle Konto erneut ab.",
     "switch-in-progress": "Ein Kontowechsel läuft. Bitte versuche es gleich erneut.",
     "remove-account-confirm-title": "Gespeichertes Konto entfernen",
