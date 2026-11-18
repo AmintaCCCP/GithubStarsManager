@@ -13,6 +13,7 @@ vi.mock('./githubApi', () => ({
   GitHubApiService: class {
     setBackendUrl = mocks.setBackendUrl;
     setBackendAuthToken = mocks.setBackendAuthToken;
+    setBackendAccountId = vi.fn();
   },
 }));
 
@@ -20,6 +21,7 @@ vi.mock('./githubListsApi', () => ({
   GitHubListsApiService: class {
     setBackendUrl = mocks.setBackendUrl;
     setBackendAuthToken = mocks.setBackendAuthToken;
+    setBackendAccountId = vi.fn();
   },
 }));
 

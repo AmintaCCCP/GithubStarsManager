@@ -20,7 +20,8 @@ import { useAppStore } from '../store/useAppStore';
 vi.mock('./backendAdapter', () => ({
   backend: {
     isAvailable: true,
-    fetchRepositories: vi.fn(),
+    // 破坏性推送前会先观察目标分区（非破坏性对账）；默认后端为空。
+    fetchRepositories: vi.fn(async () => ({ repositories: [], total: 0 })),
     fetchReleases: vi.fn(),
     fetchAIConfigs: vi.fn(),
     fetchWebDAVConfigs: vi.fn(),
@@ -197,6 +198,34 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     expect(vi.mocked(backend.syncRepositories).mock.calls[0][0].map(repo => repo.id)).toContain(5);
   });
 
+  it('merges remotely arrived repositories before a destructive full push (audit fix)', async () => {
+    // 本机陈旧快照（1,6）vs 后端分区（1,6,7）：全量推送前必须先并入 7，
+    // 否则 isFullSync 会删除另一台设备新增的仓库。
+    seedTwoAccounts([]);
+    useAppStore.getState().addRepository(createRepository(6));
+    vi.mocked(backend.fetchRepositories).mockResolvedValueOnce({
+      repositories: [createRepository(1), createRepository(6), createRepository(7)],
+      total: 3,
+    });
+    vi.mocked(backend.syncRepositories).mockClear();
+
+    await syncToBackend();
+
+    const pushed = vi.mocked(backend.syncRepositories).mock.calls.at(-1)?.[0] ?? [];
+    expect(pushed.map(repo => repo.id).sort()).toEqual([1, 6, 7]);
+  });
+
+  it('refuses a destructive full push when the backend partition cannot be observed', async () => {
+    seedTwoAccounts([]);
+    useAppStore.getState().addRepository(createRepository(6));
+    vi.mocked(backend.fetchRepositories).mockRejectedValueOnce(new Error('network down'));
+    vi.mocked(backend.syncRepositories).mockClear();
+
+    await syncToBackend();
+
+    expect(backend.syncRepositories).not.toHaveBeenCalled();
+  });
+
   it('identity writes inside the switch guard are bookkeeping and never schedule a push (addAccountWithToken R2)', async () => {
     // 审计修复回归（addAccountWithToken）：park 后落新账号的 setGitHubToken/setUser
     // 属于切换簿记，必须包入 withAccountSwitchGuardSync——否则订阅器把这两项写入
@@ -316,9 +345,9 @@ describe('account teardown never schedules an isFullSync push (Issue #611)', () 
     const lastPayload = settingsPayloads[settingsPayloads.length - 1][0] as { categoryOrder?: string[] };
     expect(lastPayload.categoryOrder).toEqual(['restored-edit']);
     expect(backend.syncRepositories).toHaveBeenCalledTimes(1);
-    // 标记不因本次补推被 autoSync 清除：补推失败时下次进入该账号仍会先补推
-    expect(hasPendingAccountSync('1')).toBe(true);
-    consumePendingAccountSync('1');
+    // 补推成功即清除账号级标记（审计修复：仅在确认对账成功后清除）；
+    // 失败路径由 pushToBackend 保留标记，重启后仍会补推。
+    expect(hasPendingAccountSync('1')).toBe(false);
   });
 });
 

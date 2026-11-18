@@ -653,6 +653,61 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
     expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-top-level');
   });
 
+  it('merge import unions non-active account release and category settings (audit fix)', async () => {
+    // 非活跃账号此前只走 mergeWorkspacesById：releaseSourceSettings 与分类
+    // 显示/映射设置会整段取本机基座，备份中的新增项被静默丢弃。
+    useAppStore.setState({
+      repositories: [repo(1, 'alice-live')],
+      accountWorkspaces: {
+        '3': workspaceOf({
+          releaseSourceSettings: {
+            enabledSourceIds: ['starred-release-subscription'],
+            watchCustomReleaseRepos: [],
+            customReleaseRepos: [{
+              id: 31,
+              name: 'local-3',
+              full_name: 'local/only-3',
+              html_url: 'https://github.com/local/only-3',
+              owner: { login: 'local', avatar_url: '' },
+            }],
+          },
+          hiddenDefaultCategoryIds: ['hidden-local-3'],
+        }),
+      },
+    });
+    const user = userEvent.setup();
+
+    await importBackupAndClick(user, {
+      activeAccountId: '2',
+      includeKeysInBackup: true,
+      releaseSubscriptions: [],
+      customCategories: [],
+      accountWorkspaces: {
+        '3': workspaceOf({
+          releaseSourceSettings: {
+            enabledSourceIds: ['starred-release-subscription', 'custom-release'],
+            watchCustomReleaseRepos: [],
+            customReleaseRepos: [{
+              id: 32,
+              name: 'backup-3',
+              full_name: 'backup/custom-3',
+              html_url: 'https://github.com/backup/custom-3',
+              owner: { login: 'backup', avatar_url: '' },
+            }],
+          },
+          hiddenDefaultCategoryIds: ['hidden-backup-3'],
+        }),
+      },
+      repositories: [repo(2, 'bob-top-level')],
+    }, 'dataManagementPanel.merge-import');
+
+    const merged = useAppStore.getState().accountWorkspaces['3'];
+    expect(merged?.releaseSourceSettings.customReleaseRepos.map((r) => r.full_name))
+      .toEqual(expect.arrayContaining(['local/only-3', 'backup/custom-3']));
+    expect(merged?.releaseSourceSettings.enabledSourceIds).toContain('custom-release');
+    expect(merged?.hiddenDefaultCategoryIds).toEqual(expect.arrayContaining(['hidden-local-3', 'hidden-backup-3']));
+  });
+
   it('same-account merge import restores backup-only gists into live state', async () => {
     const user = userEvent.setup();
 

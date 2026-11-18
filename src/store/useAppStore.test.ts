@@ -1259,6 +1259,7 @@ describe('useAppStore logout and per-account workspaces', () => {
       repositories: aliceRepos,
       searchResults: aliceRepos,
       lastSync: '2026-09-16T00:00:00.000Z',
+      vectorIndexingState: { isIndexing: true, phase: 'embedding', phaseDone: 1, phaseTotal: 2, result: null },
       savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
     });
 
@@ -1267,6 +1268,10 @@ describe('useAppStore logout and per-account workspaces', () => {
 
     let state = useAppStore.getState();
     expect(state.user).toBeNull();
+    // 凭证随 user 一起清空，不留无归属的在内存 Token
+    expect(state.githubToken).toBeNull();
+    // 索引任务随账号归档中止，新账号不会卡在「索引中」
+    expect(state.vectorIndexingState.isIndexing).toBe(false);
     expect(state.repositories).toEqual([]);
     expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-ai');
 

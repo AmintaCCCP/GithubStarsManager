@@ -141,6 +141,37 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(listBAfter.body.repositories.map((r: { id: number }) => r.id)).toEqual([2]);
   });
 
+  it('rejects headerless full syncs when multiple accounts exist (legacy client safety)', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] })
+      .expect(200);
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ isFullSync: true, repositories: [repoRow(2, 'owner/two')] })
+      .expect(200);
+    // 新客户端把全局活跃账号切到 B；旧客户端（无账号头）仍发送 A 的快照。
+    db.prepare("INSERT INTO accounts (account_id, user_json) VALUES (?, ?)")
+      .run(ACCOUNT_A, JSON.stringify({ id: 111 }));
+    db.prepare("INSERT INTO accounts (account_id, user_json) VALUES (?, ?)")
+      .run(ACCOUNT_B, JSON.stringify({ id: 222 }));
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', ?)")
+      .run(ACCOUNT_B);
+
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders())
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] })
+      .expect(409)
+      .expect((res) => expect(res.body.code).toBe('ACCOUNT_SCOPE_REQUIRED'));
+
+    const listB = await request(app).get('/api/repositories').set(authHeaders(ACCOUNT_B)).expect(200);
+    expect(listB.body.repositories.map((r: { id: number }) => r.id)).toEqual([2]);
+  });
+
   it('claims legacy default data for the verified owner and sets active_account_id', async () => {
     const db = getDb();
     // 存量 default 数据 + 加密的 github_token
@@ -180,6 +211,30 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(active.value).toBe('111');
     const scopedToken = db.prepare("SELECT value FROM account_settings WHERE account_id = '111' AND key = 'github_token'").get() as { value: string };
     expect(decrypt(scopedToken.value, encryptionKey)).toBe('legacy-token');
+  });
+
+  it('merges legacy default data into an existing account row by full_name (rebuilt repo id)', async () => {
+    const db = getDb();
+    // 存量 default 行（旧 id=1）与目标账号同 full_name 的新行（id=2，仓库重建）
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, ai_summary, custom_tags)
+      VALUES ('default', 1, 'legacy', 'owner/rebuilt', 'https://github.com/owner/rebuilt', 'owner', '[]', 'legacy-ai', '["legacy-tag"]')
+    `).run();
+    db.prepare(`
+      INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics)
+      VALUES ('222', 2, 'rebuilt', 'owner/rebuilt', 'https://github.com/owner/rebuilt', 'owner', '[]')
+    `).run();
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('legacy-token', encryptionKey));
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+
+    await request(app).get('/api/repositories').set(authHeaders('222')).expect(200);
+
+    const merged = db.prepare("SELECT ai_summary, custom_tags FROM repositories WHERE account_id = '222' AND id = 2")
+      .get() as { ai_summary: string | null; custom_tags: string | null };
+    expect(merged.ai_summary).toBe('legacy-ai');
+    expect(merged.custom_tags).toBe('["legacy-tag"]');
+    const leftover = db.prepare("SELECT COUNT(*) AS total FROM repositories WHERE account_id = 'default'").get() as { total: number };
+    expect(leftover.total).toBe(0);
   });
 
   it('refuses to claim legacy default data when the identity does not match', async () => {
@@ -427,6 +482,24 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // AI 成果（ai_summary）随工作区复原
     const summary = db.prepare('SELECT ai_summary FROM repositories WHERE account_id = ? AND id = 1').get(ACCOUNT_A) as { ai_summary: string };
     expect(summary.ai_summary).toBe('ai-one');
+  });
+
+  it('skips account entries without identity instead of aborting the whole import', async () => {
+    // 手工编辑/第三方备份可能缺少 user_json：NOT NULL 违约会让整个事务回滚，
+    // 同一 payload 里合法的仓库也一起丢失。该条目应被跳过。
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders())
+      .send({
+        accounts: [{ account_id: '42' }],
+        repositories: [repoRow(3, 'owner/three')],
+      })
+      .expect(200);
+
+    const rows = getDb()
+      .prepare("SELECT id FROM repositories WHERE account_id = 'default'")
+      .all() as Array<{ id: number }>;
+    expect(rows).toEqual([{ id: 3 }]);
   });
 
   it('excludes internal account-state keys from export settings (no token ciphertext leak)', async () => {

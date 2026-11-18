@@ -66,8 +66,10 @@ import {
 } from '../../store/helpers/accountWorkspace';
 import {
   applyAccountWorkspaceForTypes,
+  BACKUP_MASKED_SECRET,
   buildFullWorkspaces,
   hasMaskedBackupSecrets,
+  isRealBackupSecret,
   maskSavedAccountsForBackup,
   mergeWorkspacesById,
   mergeWorkspaceCategorySettings,
@@ -198,14 +200,10 @@ interface DataCleanupSuggestion {
   bgColor: string;
 }
 
-const MASKED_SECRET = '***';
-
-const isRealSecret = (value: unknown): value is string => (
-  typeof value === 'string' && value.length > 0 && value !== MASKED_SECRET
-);
-
-
-
+// 掩码/真实密钥的判定与导入路径共用同一份规则（backupWorkspace），避免两处
+// 规则漂移导致掩码 Token 覆盖可用凭据或真实 Token 被丢弃。
+const MASKED_SECRET = BACKUP_MASKED_SECRET;
+const isRealSecret = isRealBackupSecret;
 
 const UI_SETTINGS_DATA_KEYS = [
   'theme',
@@ -1202,7 +1200,19 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           const merged = { ...useAppStore.getState().accountWorkspaces };
           for (const [accountId, incoming] of Object.entries(importedWorkspaces)) {
             const local = merged[accountId];
-            merged[accountId] = local ? mergeWorkspacesById(local, incoming) : incoming;
+            // 非活跃账号同样合并 releaseSourceSettings / 分类显示与映射设置：
+            // mergeWorkspacesById 只合并列表与 ID 集合，其余字段取本机基座，
+            // 备份中的新增设置会被静默丢弃（与活跃账号分支同一规则）。
+            merged[accountId] = local
+              ? {
+                  ...mergeWorkspacesById(local, incoming),
+                  releaseSourceSettings: mergeReleaseSourceSettings(
+                    local.releaseSourceSettings,
+                    incoming.releaseSourceSettings,
+                  ),
+                  ...mergeWorkspaceCategorySettings(local, incoming),
+                }
+              : incoming;
           }
           useAppStore.setState({ accountWorkspaces: merged });
         }

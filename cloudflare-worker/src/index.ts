@@ -141,12 +141,24 @@ export default {
         // Vectorize binding 不支持 listVectors，topK 上限 100
         const dimensions = info.dimensions ?? 1536;
         let totalDeleted = 0;
-        const zeroVector = new Array(dimensions).fill(0);
+        // 采样收敛判定：query 只返回 topK 条，且无法 listVectors。若某轮采样
+        // 恰好没有当前账号前缀/legacy 的向量，旧逻辑直接 break 并返回
+        // deleted:0，客户端误以为清理完成。改为持续采样到没有新向量出现，
+        // 避免「采样未命中」被当成「清理完成」。
+        const seenIds = new Set<string>();
+        // 新写入的向量在 metadata 记录 accountId；按前缀清理时用 metadata
+        // filter 把候选池收窄到该账号，采样不再被其他账号的向量占满。
+        // includeLegacy 时不能过滤（legacy 向量没有 accountId）。
+        const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix as string } : undefined;
         // 最多迭代 10 轮（覆盖最多 1000 个向量）
         for (let round = 0; round < 10; round++) {
-          const result = await env.VECTORIZE.query(zeroVector, {
+          // 每轮用随机向量采样：固定零向量在无 listVectors 时可能每轮都命中
+          // 同一批 keepIds，随机向量让采样窗口在候选池内轮转。
+          const queryVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
+          const result = await env.VECTORIZE.query(queryVector, {
             topK: 100,
             returnMetadata: 'none',
+            ...(accountFilter ? { filter: accountFilter } : {}),
           });
           const staleIds = result.matches
             .filter((m) => {
@@ -156,7 +168,12 @@ export default {
               return includeLegacy && isLegacyId(m.id);
             })
             .map((m) => m.id);
-          if (staleIds.length === 0) break;
+          const unseen = result.matches.filter((m) => !seenIds.has(m.id));
+          for (const match of unseen) seenIds.add(match.id);
+          if (staleIds.length === 0) {
+            if (unseen.length === 0) break;
+            continue;
+          }
           await env.VECTORIZE.deleteByIds(staleIds);
           totalDeleted += staleIds.length;
         }

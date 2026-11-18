@@ -313,9 +313,16 @@ router.post('/api/sync/import', (req, res) => {
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const r of repos) {
-          // 验证必需的字段
-          if (!r.id || typeof r.id !== 'number') {
-            throw new Error(`Invalid repository data: missing or invalid id`);
+          // 单条脏数据不得回滚整个导入事务：缺必填字段的仓库直接跳过。
+          if (
+            typeof r.id !== 'number'
+            || !Number.isInteger(r.id)
+            || r.id <= 0
+            || typeof r.name !== 'string'
+            || typeof r.full_name !== 'string'
+            || typeof r.html_url !== 'string'
+          ) {
+            continue;
           }
           // license：兼容旧备份（无该列→null）、GitHub 对象形态、已规范化的 SPDX 字符串。
           // 候选字符串 trim 后，空白 / NOASSERTION / Other / none 统一落 null（与
@@ -666,8 +673,18 @@ router.post('/api/sync/import', (req, res) => {
           const wsRepos = workspace.repositories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsRepos)) {
             for (const r of wsRepos) {
-              if (!r.id || typeof r.id !== 'number') {
-                throw new Error('Invalid repository data: missing or invalid id');
+              // 单条脏数据不得回滚整个导入事务（手工编辑/第三方备份常见）：
+              // 仓库表 name/full_name/html_url 均为 NOT NULL，缺任一必填字段
+              // 直接跳过该条，合法的仓库/Release/分类继续导入。
+              if (
+                typeof r.id !== 'number'
+                || !Number.isInteger(r.id)
+                || r.id <= 0
+                || typeof r.name !== 'string'
+                || typeof r.full_name !== 'string'
+                || typeof r.html_url !== 'string'
+              ) {
+                continue;
               }
               const rawLicense = (r as Record<string, unknown>).license;
               let licenseValue: string | null = null;
@@ -797,6 +814,9 @@ router.post('/api/sync/import', (req, res) => {
           } else if (a.user && typeof a.user === 'object') {
             userJson = JSON.stringify(a.user);
           }
+          // accounts.user_json 是 NOT NULL：缺身份资料时跳过该条目，否则
+          // INSERT 触发约束错误、整个 importAll 事务回滚（合法数据一并丢失）。
+          if (userJson === null) continue;
           accountStmt.run(accountIdValue, userJson);
           accountCount++;
         }

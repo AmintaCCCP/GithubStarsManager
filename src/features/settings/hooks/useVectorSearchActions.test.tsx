@@ -139,7 +139,7 @@ describe('useVectorSearchActions', () => {
     await act(async () => { await result.current.rebuildIndex(draft); });
 
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
-    const expectedCleanupOptions = { accountPrefix: '1', includeLegacy: true, signal: expect.any(AbortSignal) };
+    const expectedCleanupOptions = { accountPrefix: '1', includeLegacy: false, signal: expect.any(AbortSignal) };
     expect(mocks.cleanup).toHaveBeenNthCalledWith(1, ['1:1', '2', '1:2'], expectedCleanupOptions);
     expect(mocks.cleanup).toHaveBeenNthCalledWith(2, ['1:1', '2', '1:2'], expectedCleanupOptions);
     expect(mocks.updateRepositoriesMetadata).not.toHaveBeenCalledWith(expect.arrayContaining([
@@ -247,16 +247,17 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.setVectorSearchStatus).toHaveBeenCalled();
   });
 
-  it('clears legacy vectors only for a single-account device (identity claim alignment)', async () => {
+  it('never deletes legacy vectors without ownership proof (single local account included)', async () => {
     mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
     const { result } = renderHook(() => useVectorSearchActions());
 
     await act(async () => { await result.current.rebuildIndex(draft); });
 
-    // 本机单账号：legacy 无前缀向量属于单租户时代的唯一所有者，随重建清理
+    // 本机只有一个账号不能证明共享索引中的无前缀向量都属于它（另一台设备
+    // 可能仍在上传 legacy 形态），保留。
     expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
       accountPrefix: '1',
-      includeLegacy: true,
+      includeLegacy: false,
       signal: expect.any(AbortSignal),
     });
   });
@@ -313,7 +314,7 @@ describe('useVectorSearchActions account switch guards', () => {
     //（发起账号 id=1 → '1:1'）
     expect(mocks.cleanup).toHaveBeenCalledWith(['1:1'], {
       accountPrefix: '1',
-      includeLegacy: true,
+      includeLegacy: false,
       signal: expect.any(AbortSignal),
     });
   });
@@ -347,7 +348,7 @@ describe('useVectorSearchActions account switch guards', () => {
 
     expect(mocks.cleanup).toHaveBeenCalledWith(['1:1', '2', '1:2'], {
       accountPrefix: '1',
-      includeLegacy: true,
+      includeLegacy: false,
       signal: expect.any(AbortSignal),
     });
   });

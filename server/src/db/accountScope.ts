@@ -36,6 +36,72 @@ const LEGACY_OWNER_CACHE_KEY = 'legacy_default_owner_id';
 const DEFAULT_SCOPE = 'default';
 
 /**
+ * legacy 认领时把 default 行合并进目标账号行的列规则（只补缺失，绝不覆盖目标）。
+ * 同 id 与同 full_name 两种冲突必须共用同一份清单：过去是两段逐列复制的 SQL，
+ * 新增合并列时漏改其中一段，该列就会在「仓库删除后以新 id 重建」的 full_name
+ * 冲突路径被静默丢弃。
+ */
+const LEGACY_REPOSITORY_MERGE_COLUMNS: ReadonlyArray<{
+  column: string;
+  expression: (source: string) => string;
+}> = [
+  {
+    column: 'ai_summary',
+    expression: (source) => `CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE(${source}, ai_summary) ELSE ai_summary END`,
+  },
+  {
+    column: 'ai_tags',
+    expression: (source) => `CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE(${source}, ai_tags) ELSE ai_tags END`,
+  },
+  {
+    column: 'ai_platforms',
+    expression: (source) => `CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE(${source}, ai_platforms) ELSE ai_platforms END`,
+  },
+  {
+    column: 'analyzed_at',
+    expression: (source) => `CASE WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE(${source}, analyzed_at) ELSE analyzed_at END`,
+  },
+  { column: 'custom_description', expression: (source) => `COALESCE(custom_description, ${source})` },
+  { column: 'custom_tags', expression: (source) => `COALESCE(custom_tags, ${source})` },
+  { column: 'custom_category', expression: (source) => `COALESCE(custom_category, ${source})` },
+  {
+    column: 'category_locked',
+    expression: (source) => `CASE WHEN category_locked = 1 THEN 1 ELSE COALESCE(${source}, category_locked) END`,
+  },
+  { column: 'description_display', expression: (source) => `COALESCE(description_display, ${source})` },
+  { column: 'tags_display', expression: (source) => `COALESCE(tags_display, ${source})` },
+  { column: 'last_edited', expression: (source) => `COALESCE(last_edited, ${source})` },
+  { column: 'starred_at', expression: (source) => `COALESCE(starred_at, ${source})` },
+  {
+    column: 'subscribed_to_releases',
+    expression: (source) => `CASE WHEN subscribed_to_releases = 1 THEN 1 ELSE COALESCE(${source}, subscribed_to_releases) END`,
+  },
+];
+
+function buildLegacyRepositoryMergeSql(matchColumn: 'id' | 'full_name'): string {
+  const source = (column: string) =>
+    `(SELECT d.${column} FROM repositories d WHERE d.account_id = 'default' AND d.${matchColumn} = repositories.${matchColumn})`;
+  const assignments = LEGACY_REPOSITORY_MERGE_COLUMNS
+    .map(({ column, expression }) => `${column} = ${expression(source(column))}`)
+    .join(',\n        ');
+  return `
+      UPDATE repositories SET
+        ${assignments}
+      WHERE account_id = ? AND EXISTS (
+        SELECT 1 FROM repositories d WHERE d.account_id = 'default' AND d.${matchColumn} = repositories.${matchColumn}
+      )
+    `;
+}
+
+function buildLegacyRepositoryDeleteSql(matchColumn: 'id' | 'full_name'): string {
+  return `
+      DELETE FROM repositories WHERE account_id = 'default' AND EXISTS (
+        SELECT 1 FROM repositories t WHERE t.account_id = ? AND t.${matchColumn} = repositories.${matchColumn}
+      )
+    `;
+}
+
+/**
  * 只存于全局 settings 的内部账号状态键（活跃账号 / 认领标记 / 已验证所有者）。
  * 绝不随 /api/sync 导出/导入迁移：legacy_default_owner_id 的 JSON 还绑定全局
  * Token 密文（github_token 本身在导出时已脱敏），且这些键描述的是「本服务器
@@ -89,6 +155,38 @@ export function resolveAccountScope(req: Request, db: Database.Database): string
 /** 无请求上下文入口（MCP / 后台任务）：全局 active_account_id → 'default'。 */
 export function resolveActiveAccountScope(db: Database.Database): string {
   return computeAccountScope(db);
+}
+
+/**
+ * 无账号头的全量写入是否可安全落到解析出的分区（Issue #611 审计修复）。
+ *
+ * 无头请求（旧版客户端）无法证明自身身份：多账号分区共存时，回退到全局
+ * 可变的 active_account_id 会把 A 的快照写进 B 分区，并以 isFullSync 物理
+ * 删除 B 分区中不在 A 快照里的数据。只有 default 分区、已验证的 legacy
+ * 归属账号、或单账号部署保持旧行为；其余情况必须拒绝破坏性全量写入。
+ */
+export function isHeaderlessFullSyncSafe(db: Database.Database, req: Request): boolean {
+  if (extractRequestedAccountId(req)) return true;
+  const accountId = computeAccountScope(db, req);
+  if (accountId === DEFAULT_SCOPE) return true;
+  if (getLegacyDefaultClaimedBy(db) === accountId) return true;
+  try {
+    // accounts 元数据可能缺失（工作区导入可先落仓库分区），同时统计仓库
+    // 分区，避免「多分区但无 accounts 行」时误判为单账号。
+    const row = db
+      .prepare(`
+        SELECT COUNT(*) AS total FROM (
+          SELECT account_id FROM accounts WHERE account_id != 'default'
+          UNION
+          SELECT DISTINCT account_id FROM repositories WHERE account_id != 'default'
+        )
+      `)
+      .get() as { total: number } | undefined;
+    return (row?.total ?? 0) <= 1;
+  } catch {
+    // 单元测试的轻量 DB stub 可能没有 accounts 表；无法计数时保持旧行为。
+    return true;
+  }
 }
 
 function isLegacyClaimPending(db: Database.Database): boolean {
@@ -348,68 +446,12 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
 
     // 同 id 冲突：目标行（账号自己的同步结果）保留，把 default 行独有的 AI 成果与
     // 用户自定义数据按「只补缺失」合并进目标行，然后删除 default 行。
-    db.prepare(`
-      UPDATE repositories SET
-        ai_summary = CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE(
-          (SELECT d.ai_summary FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), ai_summary) ELSE ai_summary END,
-        ai_tags = CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE(
-          (SELECT d.ai_tags FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), ai_tags) ELSE ai_tags END,
-        ai_platforms = CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE(
-          (SELECT d.ai_platforms FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), ai_platforms) ELSE ai_platforms END,
-        analyzed_at = CASE WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE(
-          (SELECT d.analyzed_at FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), analyzed_at) ELSE analyzed_at END,
-        custom_description = COALESCE(custom_description, (SELECT d.custom_description FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        custom_tags = COALESCE(custom_tags, (SELECT d.custom_tags FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        custom_category = COALESCE(custom_category, (SELECT d.custom_category FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        category_locked = CASE WHEN category_locked = 1 THEN 1 ELSE COALESCE(
-          (SELECT d.category_locked FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), category_locked) END,
-        description_display = COALESCE(description_display, (SELECT d.description_display FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        tags_display = COALESCE(tags_display, (SELECT d.tags_display FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        last_edited = COALESCE(last_edited, (SELECT d.last_edited FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        starred_at = COALESCE(starred_at, (SELECT d.starred_at FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id)),
-        subscribed_to_releases = CASE WHEN subscribed_to_releases = 1 THEN 1 ELSE COALESCE(
-          (SELECT d.subscribed_to_releases FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id), subscribed_to_releases) END
-      WHERE account_id = ? AND EXISTS (
-        SELECT 1 FROM repositories d WHERE d.account_id = 'default' AND d.id = repositories.id
-      )
-    `).run(accountId);
-    db.prepare(`
-      DELETE FROM repositories WHERE account_id = 'default' AND EXISTS (
-        SELECT 1 FROM repositories t WHERE t.account_id = ? AND t.id = repositories.id
-      )
-    `).run(accountId);
+    db.prepare(buildLegacyRepositoryMergeSql('id')).run(accountId);
+    db.prepare(buildLegacyRepositoryDeleteSql('id')).run(accountId);
 
     // 同 full_name 异 id 冲突（仓库删除后重建等）：同样补入后删除。
-    db.prepare(`
-      UPDATE repositories SET
-        ai_summary = CASE WHEN ai_summary IS NULL OR ai_summary = '' THEN COALESCE(
-          (SELECT d.ai_summary FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), ai_summary) ELSE ai_summary END,
-        ai_tags = CASE WHEN ai_tags IS NULL OR ai_tags = '[]' THEN COALESCE(
-          (SELECT d.ai_tags FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), ai_tags) ELSE ai_tags END,
-        ai_platforms = CASE WHEN ai_platforms IS NULL OR ai_platforms = '[]' THEN COALESCE(
-          (SELECT d.ai_platforms FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), ai_platforms) ELSE ai_platforms END,
-        analyzed_at = CASE WHEN analyzed_at IS NULL OR analyzed_at = '' THEN COALESCE(
-          (SELECT d.analyzed_at FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), analyzed_at) ELSE analyzed_at END,
-        custom_description = COALESCE(custom_description, (SELECT d.custom_description FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        custom_tags = COALESCE(custom_tags, (SELECT d.custom_tags FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        custom_category = COALESCE(custom_category, (SELECT d.custom_category FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        category_locked = CASE WHEN category_locked = 1 THEN 1 ELSE COALESCE(
-          (SELECT d.category_locked FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), category_locked) END,
-        description_display = COALESCE(description_display, (SELECT d.description_display FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        tags_display = COALESCE(tags_display, (SELECT d.tags_display FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        last_edited = COALESCE(last_edited, (SELECT d.last_edited FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        starred_at = COALESCE(starred_at, (SELECT d.starred_at FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name)),
-        subscribed_to_releases = CASE WHEN subscribed_to_releases = 1 THEN 1 ELSE COALESCE(
-          (SELECT d.subscribed_to_releases FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name), subscribed_to_releases) END
-      WHERE account_id = ? AND EXISTS (
-        SELECT 1 FROM repositories d WHERE d.account_id = 'default' AND d.full_name = repositories.full_name
-      )
-    `).run(accountId);
-    db.prepare(`
-      DELETE FROM repositories WHERE account_id = 'default' AND EXISTS (
-        SELECT 1 FROM repositories t WHERE t.account_id = ? AND t.full_name = repositories.full_name
-      )
-    `).run(accountId);
+    db.prepare(buildLegacyRepositoryMergeSql('full_name')).run(accountId);
+    db.prepare(buildLegacyRepositoryDeleteSql('full_name')).run(accountId);
 
     // ── releases：同 id 冲突时合并已读状态（并集），其余行直接迁移。──
     counts.releases = db.prepare(

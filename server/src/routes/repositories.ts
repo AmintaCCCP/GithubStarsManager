@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope } from '../db/accountScope.js';
+import { isHeaderlessFullSyncSafe, resolveAccountScope } from '../db/accountScope.js';
 
 const router = Router();
 
@@ -123,6 +123,17 @@ router.put('/api/repositories', (req, res) => {
     const { repositories } = req.body as { repositories: Record<string, unknown>[] };
     if (!Array.isArray(repositories)) {
       res.status(400).json({ error: 'repositories array required', code: 'REPOSITORIES_ARRAY_REQUIRED' });
+      return;
+    }
+    const isFullSync = Boolean(req.body?.isFullSync);
+    // 旧版客户端（无 X-GitHub-Account-Id）无法证明自身身份：多账号分区共存时
+    // 回退到全局 active_account_id 会把它账号的快照写进当前活跃分区，并以
+    // isFullSync 删除该分区中不在快照里的仓库/release。宁可拒绝写入。
+    if (isFullSync && !isHeaderlessFullSyncSafe(db, req)) {
+      res.status(409).json({
+        error: 'Full sync requires X-GitHub-Account-Id when multiple accounts exist',
+        code: 'ACCOUNT_SCOPE_REQUIRED',
+      });
       return;
     }
 
@@ -309,8 +320,6 @@ router.put('/api/repositories', (req, res) => {
     `);
 
     const upsert = db.transaction(() => {
-      const isFullSync = Boolean(req.body?.isFullSync);
-
       if (isFullSync) {
         const repoIds = repositories
           .map((repo) => repo.id)

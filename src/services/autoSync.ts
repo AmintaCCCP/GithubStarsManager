@@ -106,7 +106,7 @@ export async function withAccountSwitchFrozen<T>(fn: () => Promise<T>): Promise<
       const bufferedAccounts = _frozenWindowEditAccounts;
       _frozenWindowEditAccounts = previousBuffer;
       for (const accountId of bufferedAccounts) {
-        _pendingSyncAccounts.add(accountId);
+        markPendingAccountSync(accountId);
       }
     }
   }
@@ -278,7 +278,44 @@ const SWITCH_FLUSH_MAX_ATTEMPTS = 3;
 // 修改保留在其本地工作区，并记录到该集合。模块级待推标志是会话全局状态，
 // 绝不能带进新账号会话；切回该账号时由 consumePendingAccountSync 消费，
 // 先补推本地工作区再拉取后端，防止非强制拉取用后端旧快照覆盖未推修改。
-const _pendingSyncAccounts = new Set<string>();
+// 该集合必须跨重启保留（审计修复）：离线编辑后切走、重启再切回时，内存标记
+// 丢失会让普通拉取直接用后端旧快照覆盖未同步修改。
+const PENDING_SYNC_ACCOUNTS_KEY = 'gsm.pendingSyncAccounts';
+
+const loadPendingSyncAccounts = (): Set<string> => {
+  try {
+    const raw = localStorage.getItem(PENDING_SYNC_ACCOUNTS_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(
+      Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [],
+    );
+  } catch {
+    return new Set();
+  }
+};
+
+const persistPendingSyncAccounts = (): void => {
+  try {
+    localStorage.setItem(PENDING_SYNC_ACCOUNTS_KEY, JSON.stringify([..._pendingSyncAccounts]));
+  } catch {
+    // 存储不可用（隐私模式/配额）时退化为会话内标记
+  }
+};
+
+const _pendingSyncAccounts = loadPendingSyncAccounts();
+
+/** 记录账号级待推状态（补推成功前必须保留，跨重启持久化）。 */
+export function markPendingAccountSync(accountId: string): void {
+  if (_pendingSyncAccounts.has(accountId)) return;
+  _pendingSyncAccounts.add(accountId);
+  persistPendingSyncAccounts();
+}
+
+/** 补推确认成功后清除账号级待推标记（失败时保留，重启后仍会补推）。 */
+export function clearPendingAccountSync(accountId: string | null | undefined): void {
+  if (!accountId || !_pendingSyncAccounts.delete(accountId)) return;
+  persistPendingSyncAccounts();
+}
 
 /**
  * 是否存在指定账号尚未补推的本地修改（冲刷失败遗留）。
@@ -294,6 +331,7 @@ export function hasPendingAccountSync(accountId: string | null | undefined): boo
 export function consumePendingAccountSync(accountId: string | null | undefined): boolean {
   if (!accountId || !_pendingSyncAccounts.has(accountId)) return false;
   _pendingSyncAccounts.delete(accountId);
+  persistPendingSyncAccounts();
   return true;
 }
 
@@ -356,7 +394,7 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
   // 模块级标志仍统一清零（绝不把旧账号的待推语义带进新账号会话）
   if (_hasPendingLocalChanges) {
     if (previousAccountId) {
-      _pendingSyncAccounts.add(previousAccountId);
+      markPendingAccountSync(previousAccountId);
     }
     logger.warn('sync.switch', 'Backend flush incomplete before account switch; pending edits stay bound to the previous account partition', {
       accountId: previousAccountId ?? null,
@@ -366,7 +404,7 @@ export async function prepareForAccountSwitch(previousAccountId?: string | null)
     // 仅在本次调用观察到实际成功的推送后才清除标记（审计修复）：推送循环被
     // 跳过（上一次失败冲刷已把会话标志清零）时标志为空不代表补推成功，
     // 误删会让非强制拉取用后端旧快照覆盖未推送的本地修改
-    _pendingSyncAccounts.delete(previousAccountId);
+    clearPendingAccountSync(previousAccountId);
   }
   _hasPendingPush = false;
   _hasPendingLocalChanges = false;
@@ -605,6 +643,12 @@ export async function syncLocalGitHubTokenToBackend(
  */
 export async function syncFromBackend(options: { force?: boolean } = {}): Promise<void> {
   if (!backend.isAvailable) return;
+  const activeAccountId = accountIdKey(useAppStore.getState().user);
+  // 无活跃账号（登录页/归档窗口）时请求头缺失，服务端会回退全局
+  // active_account_id——拉回来的可能是任意账号的分区，写入顶层后会被下一次
+  // 快捷登录当成目标账号的工作区（串号）。登录流程都是先 setUser 再拉取。
+  // 强制拉取是调用方显式发起的恢复（调用方负责先落登录态），保持原有契约。
+  if (!activeAccountId && !options.force) return;
   if (!options.force && (
     _isSyncingFromBackendActive ||
     _isPushingToBackend ||
@@ -616,6 +660,11 @@ export async function syncFromBackend(options: { force?: boolean } = {}): Promis
     _debounceTimer
   )) {
     return;
+  }
+  // 重启后仍带待推标记的账号：走 doSync 的待推合并分支（只并入远端新到
+  // 仓库、绝不覆盖本地），随后补推——避免普通拉取用后端旧快照覆盖未同步修改。
+  if (hasPendingAccountSync(activeAccountId)) {
+    _hasPendingLocalChanges = true;
   }
   if (options.force) {
     if (_debounceTimer) {
@@ -967,11 +1016,19 @@ export async function syncToBackend(): Promise<boolean> {
   }
 
   const pushLatest = async (): Promise<boolean> => {
+    // 清除标记必须归属本次推送的账号：推送期间若会话已切走，不能误清新账号
+    // 的待推状态。
+    const pushAccountId = accountIdKey(useAppStore.getState().user);
     let succeeded = await pushToBackend();
     // Requests and edits arriving after the snapshot need a fresh push.
     // Failed writes stay pending for retry without an automatic retry loop.
     while (_hasPendingPush || (succeeded && _hasPendingLocalChanges)) {
       succeeded = await pushToBackend();
+    }
+    // 只有确认最新状态已全部落盘才清除账号级待推标记：推送期间的新编辑
+    // 会在循环里再推一次，最后一轮失败时标记必须保留。
+    if (succeeded && !_hasPendingLocalChanges && !_hasPendingPush) {
+      clearPendingAccountSync(pushAccountId);
     }
     return succeeded;
   };
@@ -981,6 +1038,33 @@ export async function syncToBackend(): Promise<boolean> {
     return await currentPromise;
   } finally {
     if (_pushPromise === currentPromise) _pushPromise = null;
+  }
+}
+
+/**
+ * 破坏性全量推送前的非破坏性对账（Issue #611 审计修复）：
+ * 本会话尚未观察过该账号的后端分区时，先把远端仓库并入本地再推送。否则
+ * 陈旧（但非空）快照的 isFullSync 会删除其他设备在该分区新增的仓库与 release。
+ * 拉取失败时无法确认分区事实，放弃本次推送并保留待推状态。
+ */
+async function reconcileBeforeDestructivePush(accountId: string): Promise<boolean> {
+  if (_accountsObservedBackendRepos.has(accountId)) return true;
+  try {
+    const remote = await backend.fetchRepositories();
+    markAccountBackendReposObserved(accountId);
+    const local = useAppStore.getState().repositories;
+    const localIds = new Set(local.map((repo) => repo.id));
+    const arrived = remote.repositories.filter((repo) => !localIds.has(repo.id));
+    if (arrived.length > 0) {
+      useAppStore.getState().setRepositories([...local, ...arrived]);
+    }
+    return true;
+  } catch (err) {
+    logger.warn('sync.pushToBackend', 'Deferred destructive push: backend partition could not be observed', {
+      accountId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
   }
 }
 
@@ -1016,6 +1100,14 @@ async function pushToBackend(): Promise<boolean> {
   setRepositorySyncVisualState(true);
   const pushStartTime = Date.now();
   try {
+    const pushAccountId = accountIdKey(useAppStore.getState().user);
+    // 无活跃账号时请求头缺失，服务端会回退全局 active_account_id——绝不能把
+    // 无归属会话的列表写进任意分区；分区未被观察时也不允许破坏性全量推送。
+    if (!pushAccountId || !(await reconcileBeforeDestructivePush(pushAccountId))) {
+      _hasPendingPush = false;
+      _hasPendingLocalChanges = true;
+      return false;
+    }
     const state = useAppStore.getState();
 
     const results = await Promise.allSettled([

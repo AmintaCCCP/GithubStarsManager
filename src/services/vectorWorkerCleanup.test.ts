@@ -126,6 +126,38 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     expect(env.deleted).toEqual(['43']);
   });
 
+  it('keeps sampling when a round misses the stale vector instead of reporting complete', async () => {
+    const worker = await loadWorker(path);
+    const indexIds = ['1:101', '1:102', '1:103', '1:104'];
+    const deleted: string[] = [];
+    let queries = 0;
+    const env = {
+      AUTH_TOKEN: 'worker-token',
+      VECTORIZE: {
+        describe: async () => ({ vectorCount: indexIds.length, dimensions: 3 }),
+        query: async () => {
+          queries += 1;
+          const remaining = indexIds.filter((id) => !deleted.includes(id));
+          // 第一轮采样故意漏掉陈旧向量 1:104：旧逻辑会直接 break 并返回 0
+          const window = queries === 1 ? remaining.filter((id) => id !== '1:104') : remaining;
+          return { matches: window.map((id) => ({ id, score: 0 })) };
+        },
+        deleteByIds: async (ids: string[]) => {
+          deleted.push(...ids);
+        },
+        upsert: async () => undefined,
+      },
+    } as CleanupEnv;
+
+    const result = await postCleanup(worker, env, {
+      keepIds: ['1:101', '1:102', '1:103'],
+      accountPrefix: '1',
+    });
+
+    expect(result.deleted).toBe(1);
+    expect(deleted).toEqual(['1:104']);
+  });
+
   it('keeps other accounts untouched even with includeLegacy=true', async () => {
     const worker = await loadWorker(path);
     const env = makeEnv(['1:101', '2:201', '2:202']);

@@ -267,6 +267,10 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         resetSyncHashes();
         withAccountSwitchGuardSync(() => set({
           user: null,
+          // 凭证必须随 user 一起清空（审计修复）：仅清 user 会留下「无归属用户
+          // 的在内存 Token」，mirror 与 Store 的登录态判断分裂；恢复流程中途
+          // 抛错时，以 githubToken 为守卫的逻辑会继续用被归档账号的凭据发请求。
+          githubToken: null,
           // 保持 isAuthenticated 原值：LoginScreen 恢复流程（未登录）停留在登录页，
           // AddAccountModal 后端恢复流程（已登录）保持主界面与弹窗挂载不被卸载。
           isAuthenticated: current.isAuthenticated,
@@ -274,6 +278,8 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
             ...current.accountWorkspaces,
             [previousAccountId]: parked,
           },
+          // 索引任务随账号切换中止；不复位会让新账号设置面板永久显示「索引中」
+          vectorIndexingState: { isIndexing: false, phase: null, phaseDone: 0, phaseTotal: 0, result: null },
           ...applyAccountWorkspace(undefined),
         }));
         writeAuthMirror({ user: null, githubToken: null, backendApiSecret: current.backendApiSecret });

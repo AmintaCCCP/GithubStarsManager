@@ -109,11 +109,18 @@ export default {
         // 使用 query + 零向量采样，循环删除不在 keepSet 中的向量
         const dimensions = info.dimensions ?? 1536;
         let totalDeleted = 0;
-        const zeroVector = new Array(dimensions).fill(0);
+        // 采样收敛判定：某轮没有待删向量时不能直接判定完成——采样可能恰好
+        // 没命中当前账号前缀。持续到没有新向量出现为止。
+        const seenIds = new Set();
+        // 按前缀清理时用 metadata filter 收窄候选池（includeLegacy 时不能过滤）
+        const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix } : undefined;
         for (let round = 0; round < 10; round++) {
-          const result = await env.VECTORIZE.query(zeroVector, {
+          // 随机向量采样：固定向量可能每轮命中同一批 keepIds，无法覆盖候选池
+          const queryVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
+          const result = await env.VECTORIZE.query(queryVector, {
             topK: 100,
             returnMetadata: 'none',
+            ...(accountFilter ? { filter: accountFilter } : {}),
           });
           const staleIds = result.matches
             .filter((m) => {
@@ -123,7 +130,12 @@ export default {
               return includeLegacy && isLegacyId(m.id);
             })
             .map((m) => m.id);
-          if (staleIds.length === 0) break;
+          const unseen = result.matches.filter((m) => !seenIds.has(m.id));
+          for (const match of unseen) seenIds.add(match.id);
+          if (staleIds.length === 0) {
+            if (unseen.length === 0) break;
+            continue;
+          }
           await env.VECTORIZE.deleteByIds(staleIds);
           totalDeleted += staleIds.length;
         }

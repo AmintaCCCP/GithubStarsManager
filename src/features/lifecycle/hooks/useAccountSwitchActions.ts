@@ -5,6 +5,7 @@ import { backend, isValidBackendRestoreAccount } from '../../../services/backend
 import {
   consumePendingAccountSync,
   hasPendingAccountSync,
+  markPendingAccountSync,
   prepareForAccountSwitch,
   syncFromBackend,
   syncToBackend,
@@ -125,7 +126,11 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       // 冲刷失败遗留：先补推本地工作区（推送失败时标志置回，非强制拉取会被
       // 跳过，后端旧快照无法覆盖本地修改），成功后再拉取后端。
       if (consumePendingAccountSync(accountId)) {
-        await syncToBackend();
+        // 推送本身会先做非破坏性对账（把远端新增仓库并入本地再全量推送）；
+        // 失败时恢复账号级标记，重启后仍会补推。
+        if (!await syncToBackend()) {
+          markPendingAccountSync(accountId);
+        }
       }
       // force=false：后端已有数据则合并；后端分区为空而本地有数据时，
       // autoSync 的空保护会自动把本地该账号数据补推到 targetAccountId 分区。

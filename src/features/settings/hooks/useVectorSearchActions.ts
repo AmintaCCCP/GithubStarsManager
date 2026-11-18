@@ -239,8 +239,8 @@ export const useVectorSearchActions = (): VectorSearchActions => {
         // 无法发现它们。与 Worker 的范围约定：
         // - 新版 Worker（/status 返回 accountScopedCleanup）支持 accountPrefix：
         //   只删除当前账号前缀的向量，其他设备/其他账号的向量一律保留；
-        //   legacy 无前缀向量（单租户时代产物，归属唯一所有者）仅在本机单账号
-        //   时随 includeLegacy=true 清理（与 server 侧 legacy identity claim 一致）；
+        //   legacy 无前缀向量归属无法由客户端证明（共享索引可能仍有其他设备/
+        //   旧客户端上传的向量），一律保留（includeLegacy=false）；
         // - 旧版 Worker 会把 keepIds 之外的全部采样向量物理删除（含其他账号），
         //   无法安全限定范围——一律跳过 cleanup：宁可保留冗余向量靠后续重建
         //   收敛，也绝不删除其他账号的数据（重新部署仓库内 Worker 即可恢复）；
@@ -260,7 +260,6 @@ export const useVectorSearchActions = (): VectorSearchActions => {
           if (!accountScopedCleanup) {
             logger.warn('vectorSearch.index', 'Skip vector cleanup: worker does not support account-scoped deletion; redeploy the bundled cloudflare-worker to enable it');
           } else {
-            const singleAccountOnDevice = Object.keys(useAppStore.getState().savedAccounts ?? {}).length <= 1;
             // keepIds 必须与索引中的实际向量 ID 形态一致：本次上传使用账号前缀
             // 形态（buildAccountScopedVectorId）；排除项（已索引但分析缺失/失败、
             // 不参与本次重建的仓库）的存量向量可能是 legacy 无前缀形态或前缀
@@ -273,7 +272,9 @@ export const useVectorSearchActions = (): VectorSearchActions => {
             ])];
             await clients.vectorService.cleanup(cleanupKeepIds, {
               accountPrefix: jobAccountId,
-              includeLegacy: singleAccountOnDevice,
+              // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机
+              // 只有一个已保存账号并不能证明无前缀向量都属于它。
+              includeLegacy: false,
               signal: controller.signal,
             });
           }

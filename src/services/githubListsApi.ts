@@ -159,6 +159,7 @@ export class GitHubListsApiService {
   private token: string;
   private backendUrl: string | null = null;
   private backendAuthToken: string | null = null;
+  private backendAccountId: string | null = null;
   /** 后端代理路径失败后置位，本实例剩余请求走直连（幂等切换，不重复尝试代理）。 */
   private proxyFailed = false;
 
@@ -174,10 +175,18 @@ export class GitHubListsApiService {
     this.backendAuthToken = token;
   }
 
+  /** 代理请求携带的账号分区（应与本实例 token 的归属账号一致）。 */
+  setBackendAccountId(accountId: string | null): void {
+    this.backendAccountId = accountId;
+  }
+
   private getBackendHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.backendAuthToken) {
       headers.Authorization = `Bearer ${this.backendAuthToken}`;
+    }
+    if (this.backendAccountId) {
+      headers['X-GitHub-Account-Id'] = this.backendAccountId;
     }
     return headers;
   }
