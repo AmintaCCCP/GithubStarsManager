@@ -7,6 +7,7 @@ import {
   hasPendingAccountSync,
   markPendingAccountSync,
   prepareForAccountSwitch,
+  rebindPendingAccountSyncToCurrentBackend,
   schedulePendingAccountSyncRetry,
   syncFromBackend,
   syncToBackend,
@@ -58,7 +59,7 @@ export interface AccountSwitchActions {
   /** 用 PAT 在线添加并切换到新账号（不登出当前账号；取消弹窗对当前账号零影响） */
   addAccountWithToken: (token: string, expectedAccountId?: string) => Promise<AddAccountResult>;
   /** AddAccountModal 后端恢复模式：连接后端并恢复其活跃账号（已登录时先安全归档当前账号） */
-  addAccountFromBackend: (url: string, secret: string) => Promise<AddAccountResult>;
+  addAccountFromBackend: (url: string, secret: string, expectedAccountId?: string) => Promise<AddAccountResult>;
   /** 从已保存账号列表移除指定账号（保留其本地工作区数据） */
   removeAccount: (targetAccountId: string) => Promise<void>;
   /** 退出登录（含二次确认调用方） */
@@ -280,7 +281,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     }
   }, [alignTargetAccountOnBackend, authenticateWithGitHub, recoverParkedAccount]);
 
-  const addAccountFromBackend = useCallback(async (url: string, secret: string): Promise<AddAccountResult> => {
+  const addAccountFromBackend = useCallback(async (url: string, secret: string, expectedAccountId?: string): Promise<AddAccountResult> => {
     if (!acquireAccountSwitchLock()) {
       return { ok: false, error: 'switch-in-progress' };
     }
@@ -328,6 +329,11 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         }
         const targetAccountId = accountIdKey(result.user);
         if (!targetAccountId) return { ok: false, error: 'invalid-github-user' };
+        // 补授权固定到被点名的账号：候选后端的活跃账号是别人时绝不能
+        // 借这次补授权把会话切到那个账号（B 仍然缺 Token）。
+        if (expectedAccountId && targetAccountId !== expectedAccountId) {
+          return { ok: false, error: 'account-mismatch' };
+        }
         if (currentAccountId && targetAccountId !== currentAccountId) {
           // R2 预防：拉取后端数据写入 Store 前先归档当前账号（仍在冻结窗口内：
           // 归档本身是簿记写入，且窗口内不存在会外发旧账号数据的推送）
@@ -380,6 +386,9 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           }
         }
         useAppStore.getState().setBackendApiSecret(previousSecret);
+        // 冻结窗口内的编辑在候选连接下记入待推集合（绑定候选 URL）；连接已
+        // 回滚，标记必须重新绑定到原后端，否则下方补推永远不会执行。
+        rebindPendingAccountSyncToCurrentBackend(currentAccountId);
         // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
         recoverParkedAccount(parkedAccountId);
         // R4 审计修复：冻结窗口内的真实编辑已按归属账号记入待推集合（或

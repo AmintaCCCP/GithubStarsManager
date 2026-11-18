@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { backend } from '../../../services/backendAdapter';
 import { normalizeBackendUrl } from '../../../utils/backendUrl';
@@ -133,7 +137,12 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     try {
       // 复用 autoSync 的安全推送路径：先做非破坏性对账，且拒绝在分区未对齐
       // 时推送空仓库快照（手动同步绝不能绕过这两道防线）。
-      await forceSyncToBackend({ reportFailures: true });
+      const pushed = await forceSyncToBackend({ reportFailures: true });
+      // 推送被安全防线推迟（未对账/空快照等）时不能提示成功。
+      if (!pushed) {
+        toast(t('useBackendSettingsActions.sync-failed'), 'error');
+        return;
+      }
       toast(t('useBackendSettingsActions.synced-to-backend-repos-v1-releases-v2-ai-config', { v1: state.repositories.length, v2: state.releases.length, v3: state.aiConfigs.length, v4: state.webdavConfigs.length }), 'success');
     } catch (error) {
       console.error('Sync to backend failed:', error);
@@ -157,6 +166,7 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
     setIsSyncingFromBackend(true);
     // 账号代次校验（Issue #611）：确认弹窗与拉取期间切号后丢弃结果
     const startedAccountId = peekCurrentAccountId();
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const [repoData, releaseData, aiConfigData, webdavConfigData, settingsData] = await Promise.all([
         backend.fetchRepositories(),
@@ -165,7 +175,8 @@ export const useBackendSettingsActions = (): BackendSettingsActions => {
         backend.fetchWebDAVConfigs(),
         backend.fetchSettings(),
       ]);
-      if (!isCurrentAccount(startedAccountId)) {
+      // 仅比较账号 ID 无法识别 A→B→A：旧响应会把重新激活的工作区整段替换。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       // 账号与分类状态必须同一快照（Issue #611 审计修复）：hook 渲染期捕获的

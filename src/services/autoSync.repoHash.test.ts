@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Repository } from '../types';
 import { mergeRepositoriesPreservingLocalMetadata, stripLocalRepositoryFields } from '../utils/repositoryMerge';
 import { hasActiveSearchFilters } from '../utils/repoSearch';
-import { consumePendingAccountSync, forceSyncToBackend, hasPendingAccountSync, markPendingAccountSync, repositoryPayloadHash, resetSyncHashes, startAutoSync, stopAutoSync, syncFromBackend, syncToBackend } from './autoSync';
+import { consumePendingAccountSync, forceSyncToBackend, hasPendingAccountSync, markPendingAccountSync, rebindPendingAccountSyncToCurrentBackend, repositoryPayloadHash, resetSyncHashes, startAutoSync, stopAutoSync, syncFromBackend, syncToBackend } from './autoSync';
 import { backend } from './backendAdapter';
 import { useAppStore } from '../store/useAppStore';
 
@@ -377,7 +377,7 @@ describe('explicit backend push error reporting', () => {
   });
 
   it('resolves when all backend writes succeed', async () => {
-    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    await expect(forceSyncToBackend()).resolves.toBe(true);
     expect(backend.syncRepositories).toHaveBeenCalled();
   });
 
@@ -385,23 +385,24 @@ describe('explicit backend push error reporting', () => {
     vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
     await expect(syncToBackend()).resolves.toBe(false);
     vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
-    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    await expect(forceSyncToBackend()).resolves.toBe(false);
     vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
     await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
     // Failure must release the push lock, allowing a subsequent successful retry.
-    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    await expect(forceSyncToBackend()).resolves.toBe(true);
   });
 
   it('reports synchronous adapter exceptions from the outer catch', async () => {
     vi.mocked(backend.syncRepositories).mockImplementationOnce(() => { throw new Error('adapter failed'); });
     await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
-    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    await expect(forceSyncToBackend()).resolves.toBe(true);
   });
 
   it('keeps standalone mode a no-op when no backend is configured', async () => {
     const available = vi.spyOn(backend, 'isAvailable', 'get').mockReturnValue(false);
     try {
-      await expect(forceSyncToBackend()).resolves.toBeUndefined();
+      // 无后端即无待推送：按成功返回（与 syncToBackend 的 no-op 语义一致）
+      await expect(forceSyncToBackend()).resolves.toBe(true);
     } finally {
       available.mockRestore();
     }
@@ -409,8 +410,12 @@ describe('explicit backend push error reporting', () => {
 });
 
 describe('destructive push safeguards (Issue #611)', () => {
+  const adapter = backend as unknown as { backendUrl?: string };
+
   beforeEach(() => {
     resetSyncHashes();
+    // 推送基线按「后端 + 账号」记录，没有后端上下文时不产生可证明的基线。
+    adapter.backendUrl = 'http://backend-a';
     useAppStore.setState({
       user: { id: 1, login: 'alice', name: 'Alice', avatar_url: 'https://x/a.png', email: null },
       githubToken: 'ghp_a',
@@ -422,6 +427,7 @@ describe('destructive push safeguards (Issue #611)', () => {
   afterEach(() => {
     resetSyncHashes();
     vi.mocked(backend.fetchRepositories).mockReset();
+    delete adapter.backendUrl;
   });
 
   it('does not resurrect repositories the user deleted locally', async () => {
@@ -455,22 +461,49 @@ describe('destructive push safeguards (Issue #611)', () => {
   });
 
   it('binds a pending account sync to the backend that queued it', () => {
-    const adapter = backend as unknown as { backendUrl?: string };
     const accountId = 'pending-backend-binding';
     adapter.backendUrl = 'http://backend-a';
-    try {
-      markPendingAccountSync(accountId);
-      expect(hasPendingAccountSync(accountId)).toBe(true);
+    markPendingAccountSync(accountId);
+    expect(hasPendingAccountSync(accountId)).toBe(true);
 
-      adapter.backendUrl = 'http://backend-b';
-      expect(hasPendingAccountSync(accountId)).toBe(false);
-      expect(consumePendingAccountSync(accountId)).toBe(false);
+    adapter.backendUrl = 'http://backend-b';
+    expect(hasPendingAccountSync(accountId)).toBe(false);
+    expect(consumePendingAccountSync(accountId)).toBe(false);
 
-      adapter.backendUrl = 'http://backend-a';
-      expect(consumePendingAccountSync(accountId)).toBe(true);
-    } finally {
-      delete adapter.backendUrl;
-    }
+    adapter.backendUrl = 'http://backend-a';
+    expect(consumePendingAccountSync(accountId)).toBe(true);
+  });
+
+  it('does not use another backend baseline to infer deletions', async () => {
+    vi.mocked(backend.fetchRepositories).mockResolvedValue({
+      repositories: [createRepository(1), createRepository(2)],
+      total: 2,
+    });
+    await forceSyncToBackend();
+
+    // Restart, then connect to a different backend that still has repo 2.
+    resetSyncHashes();
+    adapter.backendUrl = 'http://backend-b';
+    useAppStore.setState({ repositories: [createRepository(1)] });
+    vi.mocked(backend.syncRepositories).mockClear();
+
+    await forceSyncToBackend();
+
+    // X's baseline must not mark repo 2 as "deleted locally" on Y.
+    const pushed = vi.mocked(backend.syncRepositories).mock.calls.at(-1)?.[0] ?? [];
+    expect(pushed.map((repo) => repo.id)).toEqual([1, 2]);
+  });
+
+  it('rebinds a pending marker after a rollback to the original backend', () => {
+    const accountId = 'rebind-after-rollback';
+    adapter.backendUrl = 'http://candidate';
+    markPendingAccountSync(accountId);
+
+    // 切换失败、连接回滚到原后端：标记必须跟着回到原后端，否则补推不执行。
+    adapter.backendUrl = 'http://original';
+    expect(hasPendingAccountSync(accountId)).toBe(false);
+    rebindPendingAccountSyncToCurrentBackend(accountId);
+    expect(hasPendingAccountSync(accountId)).toBe(true);
   });
 });
 
@@ -553,7 +586,7 @@ describe('backend pushes requested during another sync', () => {
     expect(useAppStore.getState().repositories.map(repo => repo.full_name)).toContain('owner/repo-2');
     expect(backend.syncRepositories).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ full_name: 'owner/repo-2' })]));
     vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);
-    await expect(forceSyncToBackend()).resolves.toBeUndefined();
+    await expect(forceSyncToBackend()).resolves.toBe(true);
   });
 
   // 仓库分片未变化时不再重复发送 isFullSync 快照：在途快照已包含编辑时，

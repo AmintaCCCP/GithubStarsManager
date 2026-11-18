@@ -72,6 +72,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [embeddingTestResult, setEmbeddingTestResult] = useState<{ success: boolean; dimensions: number; error?: string } | null>(null);
   const [testingWorker, setTestingWorker] = useState(false);
+  const workerTestRunRef = useRef(0);
   const [workerTestResult, setWorkerTestResult] = useState<{ success: boolean; vectorCount: number; dimensions: number; error?: string } | null>(null);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const activeConfig = useMemo(
@@ -122,6 +123,8 @@ export const useVectorSearchActions = (): VectorSearchActions => {
   }, []);
 
   const testWorker = useCallback(async (draft: VectorWorkerDraft) => {
+    // 同一时刻只认最新一次连接测试：旧测试的结果/忙碌复位不得覆盖新测试。
+    const runId = ++workerTestRunRef.current;
     setTestingWorker(true);
     setWorkerTestResult(null);
     // 账号代次校验（审计修复）：连接测试等待期间切号后，发起账号 A 的连接
@@ -131,14 +134,16 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     const startedGeneration = getAccountSessionGeneration();
     try {
       const result = await new VectorSearchService(draft).testConnection();
+      if (workerTestRunRef.current !== runId) return;
       setWorkerTestResult(result);
       if (result.success && isCurrentAccountSession(startedAccountId, startedGeneration)) {
         state.setVectorSearchStatus({ connected: true, vectorCount: result.vectorCount, dimensions: result.dimensions });
       }
     } catch (reason) {
+      if (workerTestRunRef.current !== runId) return;
       setWorkerTestResult({ success: false, vectorCount: 0, dimensions: 0, error: reason instanceof Error ? reason.message : String(reason) });
     } finally {
-      setTestingWorker(false);
+      if (workerTestRunRef.current === runId) setTestingWorker(false);
     }
   }, [state]);
 
@@ -284,13 +289,29 @@ export const useVectorSearchActions = (): VectorSearchActions => {
               ...excludedVectorIds,
               ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
             ])];
-            await clients.vectorService.cleanup(cleanupKeepIds, {
-              accountPrefix: jobAccountId,
-              // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机
-              // 只有一个已保存账号并不能证明无前缀向量都属于它。
-              includeLegacy: false,
-              signal: controller.signal,
-            });
+            try {
+              const cleanup = await clients.vectorService.cleanup(cleanupKeepIds, {
+                accountPrefix: jobAccountId,
+                // 无明确归属证明时保留 legacy 向量：多设备共享同一索引时，本机
+                // 只有一个已保存账号并不能证明无前缀向量都属于它。
+                includeLegacy: false,
+                signal: controller.signal,
+              });
+              if (cleanup.partial) {
+                logger.warn('vectorSearch.index', 'Vector cleanup stopped before confirming completion; uploads are complete', {
+                  accountId: jobAccountId,
+                  deleted: cleanup.deleted,
+                });
+              }
+            } catch (cleanupError) {
+              // 上传与本地标记已完成：清理失败只记告警，绝不能把整次索引报告为
+              // 0 条——保留实际上传结果，冗余向量由下次清理收敛。
+              if (cleanupError instanceof Error && cleanupError.name === 'AbortError') throw cleanupError;
+              logger.warn('vectorSearch.index', 'Vector cleanup failed after a successful upload', {
+                accountId: jobAccountId,
+                error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+              });
+            }
           }
         }
       }

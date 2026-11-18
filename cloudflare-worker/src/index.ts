@@ -156,6 +156,9 @@ export default {
         // deleted:0，客户端误以为清理完成。改为持续采样到没有新向量出现，
         // 避免「采样未命中」被当成「清理完成」。
         const seenIds = new Set<string>();
+        // Vectorize 删除并非立即可见：刚删掉的 ID 可能在同一轮采样里再次出现，
+        // 必须跳过，避免重复提交删除和重复计数。
+        const deletedIds = new Set<string>();
         // 新写入的向量在 metadata 记录 accountId；按前缀清理时用 metadata
         // filter 把候选池收窄到该账号，采样不再被其他账号的向量占满。
         // includeLegacy 时不能过滤（legacy 向量没有 accountId）。
@@ -173,7 +176,7 @@ export default {
           });
           const staleIds = result.matches
             .filter((m) => {
-              if (keepSet.has(m.id)) return false;
+              if (keepSet.has(m.id) || deletedIds.has(m.id)) return false;
               // 无范围参数（旧客户端）只清理 legacy 无前缀向量：带账号前缀的
               // 向量只有在请求显式给出范围时才可删除。
               if (!scoped) return isLegacyId(m.id);
@@ -191,6 +194,7 @@ export default {
             continue;
           }
           await env.VECTORIZE.deleteByIds(staleIds);
+          for (const id of staleIds) deletedIds.add(id);
           totalDeleted += staleIds.length;
         }
         // 采样轮数耗尽仍可能有未处理的向量：明确返回 partial，不谎报完成。

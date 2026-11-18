@@ -347,10 +347,11 @@ export class VectorSearchService {
    * R5 审计修复：多账号共享同一 VECTORIZE 索引时必须携带账号范围——
    * `accountPrefix` 限定只删除当前账号前缀的向量（其他设备/其他账号的向量
    * 一律保留）；`includeLegacy` 仅在本机单账号、legacy 无前缀向量归属明确时
-   * 传 true。两者都缺省时请求体与旧版客户端一致，Worker 保持旧行为。
+   * 传 true。两者都缺省时请求体与旧版客户端一致，Worker 保持旧行为：只删除
+   * keepIds 之外的纯数字 legacy ID，带账号前缀的向量一律保留。
    * 兼容旧签名 cleanup(keepIds, signal)。
    */
-  async cleanup(keepIds: string[], options: VectorCleanupOptions | AbortSignal = {}): Promise<{ deleted: number }> {
+  async cleanup(keepIds: string[], options: VectorCleanupOptions | AbortSignal = {}): Promise<{ deleted: number; partial?: boolean }> {
     const normalized: VectorCleanupOptions = options instanceof AbortSignal
       ? { signal: options }
       : options ?? {};
@@ -359,7 +360,7 @@ export class VectorSearchService {
     if (accountPrefix) body.accountPrefix = accountPrefix;
     // 显式 false 也必须写入：省略会让 Worker 按旧版无范围请求处理。
     if (includeLegacy !== undefined) body.includeLegacy = includeLegacy;
-    return this.request<{ deleted: number }>('/cleanup', {
+    return this.request<{ deleted: number; partial?: boolean }>('/cleanup', {
       method: 'POST',
       body: JSON.stringify(body),
     }, signal);

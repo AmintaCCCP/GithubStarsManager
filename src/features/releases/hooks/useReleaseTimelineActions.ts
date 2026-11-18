@@ -2,7 +2,12 @@ import { useT } from "../../../i18n/useT";
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccount,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { selectReleaseTimelineState } from '../../../store/selectors';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { forceSyncToBackend } from '../../../services/autoSync';
@@ -61,13 +66,15 @@ export const useReleaseTimelineActions = () => {
     setReleaseIsRefreshing(true);
     // 账号代次校验（Issue #611）：Release 批量刷新耗时期间切号后丢弃结果
     const startedAccountId = peekCurrentAccountId();
+    // A→B→A 时账号 ID 与切号前相同，必须同时比较会话代次。
+    const startedGeneration = getAccountSessionGeneration();
     try {
       const githubApi = createGitHubApiService(githubToken);
       const { releases: newReleases, latestReleases, failedRepos } = await githubApi.getMultipleRepositoryReleases(
         subscribedRepos,
         { includePreRelease, refreshExistingAssets: true },
       );
-      if (!isCurrentAccount(startedAccountId)) {
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       const now = new Date().toISOString();
@@ -119,14 +126,28 @@ export const useReleaseTimelineActions = () => {
     // 发起账号仍是当前账号时执行——切号后把旧账号的已读快照写入新账号会
     // 覆盖并污染新账号的已读状态
     const startedAccountId = peekCurrentAccountId();
+    let addedByAction = new Set<number>();
+    // 回滚保留并发新增的已读记录，并补回乐观更新整体替换时被吞掉的历史已读
+    const rollbackReadReleases = (current: Iterable<number>) => {
+      const next = new Set(Array.from(current).filter(id => !addedByAction.has(id)));
+      for (const id of readReleasesBeforeUpdate) next.add(id);
+      return next;
+    };
     setIsMarkingAllRead(true);
     try {
       state.markAllReleasesAsRead();
+      // 本次操作新增的已读 ID：失败回滚只撤销它们，保留等待期间由其他
+      // 操作标为已读的记录（整体替换快照会吞掉那些独立更新）。
+      addedByAction = new Set(
+        Array.from(useAppStore.getState().readReleases).filter(id => !readReleasesBeforeUpdate.has(id)),
+      );
       await backend.markAllReleasesAsRead();
       toast(t('useReleaseTimelineActions.all-marked-as-read'), 'success');
     } catch {
       if (isCurrentAccount(startedAccountId)) {
-        useAppStore.setState({ readReleases: readReleasesBeforeUpdate });
+        useAppStore.setState((current) => ({
+          readReleases: rollbackReadReleases(current.readReleases),
+        }));
       } else if (startedAccountId) {
         // 账号代次校验补充（审计修复）：切号时 switchAccountWorkspace 已把
         // 包含乐观更新（全部已读）的 live 工作区写入发起账号的归档快照，
@@ -141,7 +162,7 @@ export const useReleaseTimelineActions = () => {
               ...state.accountWorkspaces,
               [startedAccountId]: {
                 ...parked,
-                readReleases: Array.from(readReleasesBeforeUpdate),
+                readReleases: [...rollbackReadReleases(parked.readReleases)],
               },
             },
           };

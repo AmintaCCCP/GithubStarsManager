@@ -166,7 +166,12 @@ const wireStoreMocks = () => {
     selector ? selector(storeState) : storeState) as unknown as typeof useAppStore);
   Object.assign(mockUseAppStore, {
     getState: vi.fn(() => storeState),
-    setState: vi.fn((update: Partial<typeof storeState>) => Object.assign(storeState, update)),
+    setState: vi.fn((update: unknown) => {
+      const patch = typeof update === 'function'
+        ? (update as (state: typeof storeState) => unknown)(storeState)
+        : update;
+      if (patch && typeof patch === 'object') Object.assign(storeState, patch);
+    }),
   });
 
   // 复刻真实 store 的 markReleaseAsRead 行为：标记已读并清空

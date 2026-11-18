@@ -19,6 +19,7 @@ import {
   mergeBackupWorkspaces as mergeAccountWorkspacesForBackup,
 } from '../../../utils/backupWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
+import { normalizeReleaseSourceSettings } from '../../../utils/releaseSources';
 import { WebDAVService } from '../../../services/webdavService';
 
 
@@ -290,7 +291,7 @@ export const useBackupActions = (): BackupActions => {
             ? { readReleases: backupData.readReleases as number[] }
             : {}),
           ...(backupData.releaseSourceSettings && typeof backupData.releaseSourceSettings === 'object'
-            ? { releaseSourceSettings: backupData.releaseSourceSettings as import('../../../types').AccountWorkspace['releaseSourceSettings'] }
+            ? { releaseSourceSettings: normalizeReleaseSourceSettings(backupData.releaseSourceSettings) }
             : {}),
           ...(backupData.categoryListIdMap && typeof backupData.categoryListIdMap === 'object'
             ? { categoryListIdMap: backupData.categoryListIdMap as Record<string, string> }
@@ -363,14 +364,21 @@ export const useBackupActions = (): BackupActions => {
           // 只有备份实际提供该字段时才清空既有数据：缺失字段必须保留已恢复
           // 的工作区状态（显式空数组仍表示清空）。
           if (Array.isArray(backupData.customCategories)) {
-            for (const category of useAppStore.getState().customCategories) {
-              if (category?.id) state.deleteCustomCategory(category.id);
-            }
-            for (const category of backupData.customCategories) {
-              if (category && typeof category === 'object' && 'id' in category && 'name' in category) {
-                state.addCustomCategory({ ...(category as Parameters<typeof state.addCustomCategory>[0]), isCustom: true });
-              }
-            }
+            // 整体替换分类定义，而不是 delete+add：deleteCustomCategory 会清除
+            // 仓库的 custom_category / category_locked，而仓库刚按备份写入，
+            // 逐个删除会把刚恢复的仓库分类抹掉。
+            const restoredCategories = backupData.customCategories
+              .filter((category) => category && typeof category === 'object' && 'id' in category && 'name' in category)
+              .map((category) => ({
+                ...(category as Parameters<typeof state.addCustomCategory>[0]),
+                isCustom: true,
+              }));
+            useAppStore.setState((current) => ({
+              customCategories: restoredCategories,
+              selectedCategory: restoredCategories.some((category) => category.id === current.selectedCategory)
+                ? current.selectedCategory
+                : 'all',
+            }));
           }
           if (Array.isArray(backupData.hiddenDefaultCategoryIds)) {
             for (const categoryId of useAppStore.getState().hiddenDefaultCategoryIds) {

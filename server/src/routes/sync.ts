@@ -833,6 +833,16 @@ router.post('/api/sync/import', (req, res) => {
           // accounts.user_json 是 NOT NULL：缺身份资料时跳过该条目，否则
           // INSERT 触发约束错误、整个 importAll 事务回滚（合法数据一并丢失）。
           if (userJson === null) continue;
+          // account_id 就是 GitHub user id：资料 id 与之不一致说明备份把两个
+          // 账号错配在一起，导入会把 A 的 PAT 登记到 B 名下。
+          if (/^\d+$/.test(accountIdValue)) {
+            try {
+              const profileId = (JSON.parse(userJson) as { id?: unknown })?.id;
+              if (typeof profileId !== 'number' || String(profileId) !== accountIdValue) continue;
+            } catch {
+              continue;
+            }
+          }
           accountStmt.run(accountIdValue, userJson);
           accountCount++;
         }

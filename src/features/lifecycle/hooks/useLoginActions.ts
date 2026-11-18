@@ -33,6 +33,10 @@ export interface LoginActions {
   restoreBackendSession: (url: string, options?: { omitAccountHeader?: boolean }) => Promise<BackendLoginResult>;
   setupBackendGitHubToken: (token: string) => Promise<GitHubUser>;
   syncBackendData: () => Promise<void>;
+  /** 当前后端 URL：候选连接失败时用于成对恢复 URL 与 API 密钥。 */
+  getBackendUrl: () => string | null;
+  /** 把后端 URL 复原到候选连接之前的值（密钥由调用方成对恢复）。 */
+  rollbackBackendConnection: (url: string | null) => Promise<void>;
 }
 
 export const useLoginActions = (): LoginActions => {
@@ -124,6 +128,16 @@ export const useLoginActions = (): LoginActions => {
     await syncFromBackend({ force: true });
   }, []);
 
+  const getBackendUrl = useCallback(() => backend.backendUrl, []);
+  const rollbackBackendConnection = useCallback(async (url: string | null) => {
+    if ((backend.backendUrl ?? null) === (url ?? null)) return;
+    try {
+      await backend.init(url ?? undefined);
+    } catch {
+      // 复原探测失败时保持现有连接，不叠加新错误
+    }
+  }, []);
+
   return {
     authenticateWithGitHub,
     syncTokenToBackend,
@@ -131,5 +145,7 @@ export const useLoginActions = (): LoginActions => {
     restoreBackendSession,
     setupBackendGitHubToken,
     syncBackendData,
+    getBackendUrl,
+    rollbackBackendConnection,
   };
 };

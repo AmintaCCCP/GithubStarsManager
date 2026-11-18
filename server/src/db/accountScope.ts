@@ -179,14 +179,16 @@ export function isHeaderlessFullSyncSafe(db: Database.Database, req: Request): b
 export function hasAmbiguousAccountScope(db: Database.Database, req: Request): boolean {
   if (extractRequestedAccountId(req)) return false;
   try {
-    // accounts 元数据可能缺失（工作区导入可先落仓库分区），同时统计仓库
-    // 分区，避免「多分区但无 accounts 行」时误判为单账号。
+    // accounts 元数据可能缺失（工作区导入可先落仓库/Release 分区），同时统计
+    // 数据分区，避免「多分区但无 accounts 行」时误判为单账号。
     const row = db
       .prepare(`
         SELECT COUNT(*) AS total FROM (
           SELECT account_id FROM accounts WHERE account_id != 'default'
           UNION
           SELECT DISTINCT account_id FROM repositories WHERE account_id != 'default'
+          UNION
+          SELECT DISTINCT account_id FROM releases WHERE account_id != 'default'
         )
       `)
       .get() as { total: number } | undefined;

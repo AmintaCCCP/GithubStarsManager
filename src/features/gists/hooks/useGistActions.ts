@@ -145,9 +145,10 @@ export const useGistActions = () => {
     // 切号后的账号，后续 isCurrentAccount 校验恒通过，旧账号的分析结果会写进
     // 新账号工作区。确认通过后用保存值复核一次，切号即整体退出。
     const jobAccountId = peekCurrentAccountId();
+    const jobGeneration = getAccountSessionGeneration();
     const confirmed = await confirm(t('useGistActions.batch-ai-analysis'), t('useGistActions.analyze-v1-gists-continue', { v1: targets.length }), { type: 'warning' });
     if (!confirmed) return;
-    if (!isCurrentAccount(jobAccountId)) return;
+    if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
 
     setIsAnalyzingAll(true);
     const api = createGitHubApiService(state.githubToken);
@@ -156,23 +157,25 @@ export const useGistActions = () => {
     let failed = 0;
     const concurrency = activeConfig.concurrency && activeConfig.concurrency > 1 ? activeConfig.concurrency : 1;
     const analyzeOne = async (gist: Gist) => {
-      if (!isCurrentAccount(jobAccountId)) return;
+      if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
       state.setAnalyzingGist(gist.id, true);
       try {
         const detail = await api.getGistForAnalysis(gist.id, gist);
+        // 发送内容给 AI 前复核：切号后绝不把旧账号的私有 Gist 正文发给 AI
+        if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
         const summary = await aiService.analyzeGist(detail, api.getGistContentPreview(detail));
-        if (!isCurrentAccount(jobAccountId)) return;
+        if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
         state.updateGist({ ...detail, ai_summary: summary.trim(), analyzed_at: new Date().toISOString(), analysis_failed: false, analysis_error: undefined });
         success++;
       } catch (error) {
-        if (!isCurrentAccount(jobAccountId)) return;
+        if (!isCurrentAccountSession(jobAccountId, jobGeneration)) return;
         state.updateGist({ ...gist, analyzed_at: new Date().toISOString(), analysis_failed: true, analysis_error: error instanceof Error ? error.message : String(error) });
         failed++;
       } finally {
         // 分析标记清理只作用于发起账号仍是当前账号的场景：切号后 setAnalyzingGist
         // 作用于新账号工作区，会误清新账号同 ID Gist 的分析标记（分析中标记不
         // 入工作区快照，无需对归档工作区做额外清理）。
-        if (isCurrentAccount(jobAccountId)) {
+        if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
           state.setAnalyzingGist(gist.id, false);
         }
       }
@@ -181,7 +184,9 @@ export const useGistActions = () => {
       for (let index = 0; index < targets.length; index += concurrency) {
         await Promise.all(targets.slice(index, index + concurrency).map(analyzeOne));
       }
-      toast(t('useGistActions.ai-analysis-done-success-succeeded-failed-failed', { success: success, failed: failed }), failed > 0 ? 'error' : 'success');
+      if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
+        toast(t('useGistActions.ai-analysis-done-success-succeeded-failed-failed', { success: success, failed: failed }), failed > 0 ? 'error' : 'success');
+      }
     } finally {
       setIsAnalyzingAll(false);
     }

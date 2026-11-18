@@ -674,7 +674,13 @@ router.put('/api/settings', (req, res) => {
           accountPayload.tokenCleared ? null : accountPayload.tokenEncrypted,
           accountPayload.tokenCleared,
         );
-        globalStmt.run('active_account_id', accountId);
+        // 后台 Token 补写（只有 github_token，没有 user_profile）绝不能改写
+        // 活跃账号：另一台设备刚切到 B 时，A 的迟到补写不能把新设备拽回 A。
+        const activeRow = db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'")
+          .get() as { value: string | null } | undefined;
+        if (accountPayload.userProfile !== undefined || !activeRow?.value) {
+          globalStmt.run('active_account_id', accountId);
+        }
       }
     });
 

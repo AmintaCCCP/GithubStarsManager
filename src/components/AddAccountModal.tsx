@@ -93,7 +93,8 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
       return;
     }
     setError('');
-    const result = await addAccountFromBackend(backendUrl.trim(), backendSecret.trim());
+    // 补授权入口把目标账号固定住：候选后端的活跃账号不匹配时不得切换会话。
+    const result = await addAccountFromBackend(backendUrl.trim(), backendSecret.trim(), reauthAccount?.accountId);
     if (!result.ok) {
       setError(describeError(result.error));
       return;

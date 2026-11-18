@@ -175,7 +175,9 @@ const migrations: Record<number, (db: Database.Database) => void> = {
         );
 
         INSERT INTO categories_v4 (account_id, id, name, description, icon, keywords, color, sort_order, is_custom)
-        SELECT 'default', id, name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
+        -- v3 的 id 是可空 TEXT PRIMARY KEY（旧 POST /api/categories 不写 id）：
+        -- NULL 原样复制会撞 v4 的 NOT NULL 并让整个迁移回滚、后端无法启动。
+        SELECT 'default', COALESCE(id, 'legacy-category-' || rowid), name, description, icon, keywords, color, COALESCE(sort_order, 0), COALESCE(is_custom, 1)
         FROM categories;
 
         DROP TABLE categories;

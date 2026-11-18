@@ -118,6 +118,9 @@ export default {
         // 采样收敛判定：某轮没有待删向量时不能直接判定完成——采样可能恰好
         // 没命中当前账号前缀。持续到没有新向量出现为止。
         const seenIds = new Set();
+        // Vectorize 删除并非立即可见：刚删掉的 ID 可能在同一轮采样里再次出现，
+        // 必须跳过，避免重复提交删除和重复计数。
+        const deletedIds = new Set();
         // 按前缀清理时用 metadata filter 收窄候选池（includeLegacy 时不能过滤）
         const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix } : undefined;
         for (let round = 0; round < 10; round++) {
@@ -130,7 +133,7 @@ export default {
           });
           const staleIds = result.matches
             .filter((m) => {
-              if (keepSet.has(m.id)) return false;
+              if (keepSet.has(m.id) || deletedIds.has(m.id)) return false;
               // 无范围参数时只清理 legacy 无前缀向量，带账号前缀的向量必须
               // 由显式范围请求才能删除。
               if (!scoped) return isLegacyId(m.id);
@@ -148,6 +151,7 @@ export default {
             continue;
           }
           await env.VECTORIZE.deleteByIds(staleIds);
+          for (const id of staleIds) deletedIds.add(id);
           totalDeleted += staleIds.length;
         }
         return jsonResponse({ success: true, deleted: totalDeleted, partial: !sampledAll });

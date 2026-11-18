@@ -161,6 +161,8 @@ export const useRepositoryCardActions = ({
     // 账号代次校验（Issue #611 审计修复）：确认框与分析请求之前保存账号 ID，
     // 确认后与提交前用保存值复核；请求完成后再读取当前账号会让检查恒通过
     const startedAccountId = peekCurrentAccountId();
+    // A→B→A：账号 ID 与确认前相同，只有会话代次能识别这次切号。
+    const startedGeneration = getAccountSessionGeneration();
 
     if (repository.analyzed_at) {
       const confirmMessage = t('useRepositoryCardActions.this-repository-was-analyzed-on-v1-do-you-want-t', { v1: new Date(repository.analyzed_at).toLocaleString() });
@@ -172,7 +174,7 @@ export const useRepositoryCardActions = ({
       )) {
         return;
       }
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
     }
 
     abortControllerRef.current?.abort();
@@ -215,7 +217,7 @@ export const useRepositoryCardActions = ({
 
       if (controller.signal.aborted) return;
       // 账号代次校验（Issue #611）：AI 分析耗时期间切号后，结果绝不写进新账号
-      if (!isCurrentAccount(startedAccountId)) return;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
 
       const updatedRepo = applyAnalysisSuccess(repository, {
         summary: result.summary,
@@ -242,7 +244,7 @@ export const useRepositoryCardActions = ({
         'success',
       );
     } catch (error) {
-      if (!controller.signal.aborted && !isCurrentAccount(startedAccountId)) {
+      if (!controller.signal.aborted && !isCurrentAccountSession(startedAccountId, startedGeneration)) {
         return;
       }
       if (!controller.signal.aborted) {
@@ -278,7 +280,7 @@ export const useRepositoryCardActions = ({
       }
       // 分析标记清理只作用于发起账号仍是当前账号的工作区：切号后清理会误清
       // 新账号同 ID 仓库的分析标记（发起账号的标记不入工作区快照，无需额外清理）
-      if (!controller.signal.aborted && isCurrentAccount(startedAccountId)) {
+      if (!controller.signal.aborted && isCurrentAccountSession(startedAccountId, startedGeneration)) {
         setAnalyzingRepository(repoId, false);
       }
     }
@@ -449,7 +451,10 @@ export const useRepositoryCardActions = ({
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       deleteRepository(repository.id);
       await forceSyncToBackend();
-      toast(t('useRepositoryCardActions.successfully-unstarred'), 'success');
+      // 同步也是一次等待：切号后旧会话的提示不应出现在新账号。
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        toast(t('useRepositoryCardActions.successfully-unstarred'), 'success');
+      }
     } catch (error) {
       console.error('Failed to unstar repository:', error);
       toast(

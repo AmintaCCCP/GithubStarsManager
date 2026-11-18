@@ -1123,6 +1123,76 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .toBeUndefined();
   });
 
+  it('background token writes do not rewrite the active account', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ user_profile: { id: Number(ACCOUNT_B), login: 'bob' } })
+      .expect(200);
+
+    // 设备 2 已切到 B；设备 1 迟到的后台 Token 补写（只有凭据）不得拽回 A
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_A))
+      .send({ github_token: '{{SECRET_5xe7lbqm}}' })
+      .expect(200);
+
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'").get())
+      .toMatchObject({ value: ACCOUNT_B });
+  });
+
+  it('rejects headerless incremental repository writes when partitions are ambiguous', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ user_profile: { id: Number(ACCOUNT_B), login: 'bob' } })
+      .expect(200);
+    await request(app).put('/api/repositories').set(authHeaders(ACCOUNT_A))
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] }).expect(200);
+    await request(app).put('/api/repositories').set(authHeaders(ACCOUNT_B))
+      .send({ isFullSync: true, repositories: [repoRow(1, 'owner/one')] }).expect(200);
+
+    // 增量写入同样带不上分区归属：拒绝覆盖另一个账号同 ID 仓库的自定义字段
+    await request(app)
+      .put('/api/repositories')
+      .set(authHeaders())
+      .send({ repositories: [repoRow(1, 'owner/one', { custom_description: 'hijack' })] })
+      .expect(409);
+    const rows = db.prepare('SELECT account_id, custom_description FROM repositories').all() as Array<{ account_id: string; custom_description: string | null }>;
+    expect(rows.every((row) => row.custom_description === null)).toBe(true);
+  });
+
+  it('counts release-only partitions when judging headerless ambiguity', async () => {
+    const db = getDb();
+    await request(app)
+      .put('/api/settings')
+      .set(authHeaders(ACCOUNT_B))
+      .send({ user_profile: { id: Number(ACCOUNT_B), login: 'bob' } })
+      .expect(200);
+    db.prepare(`
+      INSERT INTO releases (account_id, id, tag_name, repo_id, repo_full_name, repo_name)
+      VALUES (?, 50, 'v1', 1, 'owner/x', 'x')
+    `).run(ACCOUNT_A);
+
+    await request(app).post('/api/releases/mark-all-read').set(authHeaders()).expect(400);
+    await request(app).post('/api/releases/mark-all-read').set(authHeaders(ACCOUNT_A)).expect(200);
+  });
+
+  it('skips account metadata whose user id does not match account_id', async () => {
+    const db = getDb();
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_A))
+      .send({
+        accounts: [{ account_id: ACCOUNT_A, user_json: { id: Number(ACCOUNT_B), login: 'bob' } }],
+      })
+      .expect(200);
+
+    expect(db.prepare('SELECT account_id FROM accounts WHERE account_id = ?').get(ACCOUNT_A)).toBeUndefined();
+  });
+
   it('encrypts real workspace tokens on import', async () => {
     const payload = {
       account_workspaces: [{

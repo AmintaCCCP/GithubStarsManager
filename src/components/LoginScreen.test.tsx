@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   setupBackendGitHubToken: vi.fn(),
   syncBackendData: vi.fn(),
   configuredBackendUrl: null as string | null,
+  getBackendUrl: vi.fn(() => null as string | null),
+  rollbackBackendConnection: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../utils/clipboardUtils', () => ({ safeReadText: mocks.safeReadText }));
@@ -24,6 +26,8 @@ vi.mock('../features/lifecycle/hooks/useLoginActions', async (importOriginal) =>
       restoreBackendSession: mocks.restoreBackendSession,
       setupBackendGitHubToken: mocks.setupBackendGitHubToken,
       syncBackendData: mocks.syncBackendData,
+      getBackendUrl: mocks.getBackendUrl,
+      rollbackBackendConnection: mocks.rollbackBackendConnection,
     }),
   };
 });

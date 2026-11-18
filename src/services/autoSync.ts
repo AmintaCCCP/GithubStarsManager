@@ -193,6 +193,8 @@ const _accountsSeenNonEmptyRepos = new Set<string>();
 const _accountsObservedBackendRepos = new Set<string>();
 // 上次成功推送的仓库 ID 基线（按账号、跨重启持久化）：对账时据此区分
 // 「本地显式删除」与「远端新增」，绝不把用户删除过的仓库合并回来。
+// 键含后端 URL：X 上的基线不能用来推断 Y 上「被删除」的仓库。
+// shortcut: 升级前只有账号键的旧基线不匹配，首次对账按「无基线」多拉一次远端；下次成功推送即重建。
 const PUSHED_REPO_IDS_KEY = 'gsm.pushedRepoIds';
 
 const loadPushedRepoIds = (): Map<string, Set<number>> => {
@@ -224,6 +226,13 @@ const persistPushedRepoIds = (): void => {
 };
 
 const _lastPushedRepoIds = loadPushedRepoIds();
+
+/** 基线键：同一账号在不同后端上的分区是不同数据，必须分别记录。 */
+function pushedRepoBaselineKey(accountId: string): string | null {
+  const backendUrl = backend.backendUrl ?? '';
+  // 无后端上下文（本地模式/未连接）时没有可证明的推送基线。
+  return backendUrl ? `${backendUrl}|${accountId}` : null;
+}
 
 // 推送失败后的退避重试（只在账号仍匹配时重试一次链）。
 let _pushRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -372,6 +381,18 @@ export function hasPendingAccountSync(accountId: string | null | undefined): boo
   const pendingBackend = _pendingSyncAccounts.get(accountId) ?? '';
   // 旧版记录没有绑定后端：沿用旧语义，避免升级后丢失待推保护。
   return !pendingBackend || pendingBackend === (backend.backendUrl ?? '');
+}
+
+/**
+ * 连接回滚后，把冻结窗口内产生的待推标记重新绑定到恢复后的后端。
+ * 回滚意味着这些编辑属于原账号的原后端，绝不能在候选后端上补推。
+ */
+export function rebindPendingAccountSyncToCurrentBackend(accountId: string | null | undefined): void {
+  if (!accountId || !_pendingSyncAccounts.has(accountId)) return;
+  const backendUrl = backend.backendUrl ?? '';
+  if (_pendingSyncAccounts.get(accountId) === backendUrl) return;
+  _pendingSyncAccounts.set(accountId, backendUrl);
+  persistPendingSyncAccounts();
 }
 
 /**
@@ -1157,7 +1178,8 @@ async function reconcileBeforeDestructivePush(accountId: string): Promise<boolea
     const local = useAppStore.getState().repositories;
     const localIds = new Set(local.map((repo) => repo.id));
     // 上次成功推送后本地消失的仓库 = 用户显式删除，不得因远端仍有而复活。
-    const deletedLocally = _lastPushedRepoIds.get(accountId);
+    const baselineKey = pushedRepoBaselineKey(accountId);
+    const deletedLocally = baselineKey ? _lastPushedRepoIds.get(baselineKey) : undefined;
     const arrived = remote.repositories.filter((repo) => (
       !localIds.has(repo.id) && !deletedLocally?.has(repo.id)
     ));
@@ -1277,8 +1299,11 @@ async function pushToBackend(): Promise<boolean> {
     // projection and doesn't re-apply setRepositories after a push.
     if (reposSync.status === 'fulfilled' && reposSync.value !== skipped) {
       _lastHash.repos = reposHash;
-      _lastPushedRepoIds.set(pushAccountId, new Set(state.repositories.map((repo) => repo.id)));
-      persistPushedRepoIds();
+      const baselineKey = pushedRepoBaselineKey(pushAccountId);
+      if (baselineKey) {
+        _lastPushedRepoIds.set(baselineKey, new Set(state.repositories.map((repo) => repo.id)));
+        persistPushedRepoIds();
+      }
     }
     if (releasesSync.status === 'fulfilled') _lastHash.releases = quickHash(state.releases);
     if (aiSync.status === 'fulfilled') _lastHash.ai = quickHash(state.aiConfigs);
@@ -1318,15 +1343,17 @@ async function pushToBackend(): Promise<boolean> {
  * `reportFailures` to reject instead, so a caller can surface an explicit
  * synchronization warning (e.g. the batch star import dialog).
  */
-export async function forceSyncToBackend(options: { reportFailures?: boolean } = {}): Promise<void> {
+export async function forceSyncToBackend(options: { reportFailures?: boolean } = {}): Promise<boolean> {
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;
   }
   _hasPendingLocalChanges = true;
-  if (!await syncToBackend() && options.reportFailures) {
+  const pushed = await syncToBackend();
+  if (!pushed && options.reportFailures) {
     throw new Error('Failed to sync to backend');
   }
+  return pushed;
 }
 
 /**
@@ -1435,6 +1462,10 @@ export function startAutoSync(): () => void {
  * Stop auto-sync: clear debounce timer and unsubscribe from store.
  */
 export function stopAutoSync(unsubscribe: () => void): void {
+  if (_pushRetryTimer) {
+    clearTimeout(_pushRetryTimer);
+    _pushRetryTimer = null;
+  }
   if (_debounceTimer) {
     clearTimeout(_debounceTimer);
     _debounceTimer = null;

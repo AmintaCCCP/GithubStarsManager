@@ -523,10 +523,14 @@ class BackendAdapter {
   async listRepositoryReadmeCandidates(owner: string, repo: string, defaultBranch?: string, signal?: AbortSignal): Promise<GitHubReadmeCandidateItem[]> {
     if (!this._backendUrl) throw new Error('Backend not available');
 
+    // 一次操作内的多次代理读取必须固定同一个账号：默认分支/tree/根目录分别
+    // 读取 Store 会在切号后把 A 响应里的分支拿去问 B 的分区（私有库变空）。
+    const headers = this.getAuthHeaders();
+
     const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
       const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/contents`, {
         method: 'POST',
-        headers: this.getAuthHeaders(),
+        headers,
         body: JSON.stringify({ method: 'GET' }),
         signal,
       });
@@ -540,7 +544,7 @@ class BackendAdapter {
       try {
         const repoRes = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}`, {
           method: 'POST',
-          headers: this.getAuthHeaders(),
+          headers,
           body: JSON.stringify({ method: 'GET' }),
           signal,
         });
@@ -564,7 +568,7 @@ class BackendAdapter {
     try {
       const res = await this.fetchWithTimeout(`${this._backendUrl}/proxy/github/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
         method: 'POST',
-        headers: this.getAuthHeaders(),
+        headers,
         body: JSON.stringify({ method: 'GET' }),
         signal,
       });

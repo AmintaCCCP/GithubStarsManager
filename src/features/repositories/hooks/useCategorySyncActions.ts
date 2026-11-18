@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { forceSyncToBackend } from '../../../services/autoSync';
 
 export interface CategorySyncActions {
-  forceSyncToBackend: (options?: { reportFailures?: boolean }) => Promise<void>;
+  forceSyncToBackend: (options?: { reportFailures?: boolean }) => Promise<boolean>;
 }
 
 export const useCategorySyncActions = (): CategorySyncActions => {

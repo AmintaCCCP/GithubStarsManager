@@ -119,6 +119,10 @@ describe('useReleaseTimelineActions account switch guards', () => {
       if (patch && typeof patch === 'object') Object.assign(storeState, patch as Record<string, unknown>);
     });
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+    // 与真实 store 一致：乐观「全部已读」把当前 Release 全部并入已读集合
+    (storeState.markAllReleasesAsRead as unknown as () => void) = vi.fn(() => {
+      storeState.readReleases = new Set([...storeState.readReleases, ...storeState.releases.map((item) => item.id)]);
+    });
     mocks.confirm.mockResolvedValue(true);
     mocks.forceSyncToBackend.mockResolvedValue(undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -132,10 +136,6 @@ describe('useReleaseTimelineActions account switch guards', () => {
     (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
   };
 
-  const rollbackCalls = () => mocks.setState.mock.calls.filter(
-    (call) => call[0] && typeof call[0] === 'object' && 'readReleases' in (call[0] as object),
-  );
-
   it('rolls back readReleases into the originating account when no switch happened', async () => {
     mocks.markAllReleasesAsRead.mockRejectedValue(new Error('backend down'));
     const { result } = renderActions();
@@ -143,9 +143,8 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    const rollbacks = rollbackCalls();
-    expect(rollbacks).toHaveLength(1);
-    expect((rollbacks[0][0] as { readReleases: Set<number> }).readReleases).toEqual(new Set([7, 8]));
+    // 只撤销本次操作新增的已读（101），操作前的 7/8 保留
+    expect(storeState.readReleases).toEqual(new Set([7, 8]));
   });
 
   it('does not roll back into the new account when the backend call fails after a switch', async () => {
@@ -158,8 +157,8 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // 切号后回滚被丢弃：绝不以账号 A 的已读快照覆盖账号 B
-    expect(rollbackCalls()).toHaveLength(0);
+    // 切号后回滚被丢弃：绝不以账号 A 的已读快照覆盖账号 B 的工作区
+    expect(storeState.readReleases).toEqual(new Set([7, 8, 101]));
   });
 
   it('writes the read-state rollback into the originating account snapshot after a switch', async () => {
@@ -169,19 +168,21 @@ describe('useReleaseTimelineActions account switch guards', () => {
     });
     // 切换时 switchAccountWorkspace 已把包含乐观更新（全部已读）的 live 工作区
     // 写入账号 A 的归档快照——这里以「全部已读后的已读集合」模拟该快照
+    // 快照是切号瞬间的 live 工作区：含操作前的 7/8 与本次乐观新增的 101
     (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces = {
-      '1': { repositories: [], releases: [], readReleases: [101, 102] },
+      '1': { repositories: [], releases: [], readReleases: [7, 8, 101] },
     };
     const { result } = renderActions();
 
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // 当前账号 B 的 live 状态没有回滚写入
-    expect(rollbackCalls()).toHaveLength(0);
+    // 当前账号 B 的 live 已读集合没有被 A 的回滚改写
+    expect(storeState.readReleases).toEqual(new Set([7, 8, 101]));
     // 发起账号 A 的快照已回写为操作前的已读集合，下次激活时不再显示
     // 服务端已失败的「全部已读」状态
     const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
+    // 只移除本次操作新增的 101，操作前的 7/8 保留
     expect(parked?.readReleases).toEqual([7, 8]);
   });
 
@@ -196,7 +197,7 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    expect(rollbackCalls()).toHaveLength(0);
+    expect(storeState.readReleases).toEqual(new Set([7, 8, 101]));
     expect((storeState as { accountWorkspaces?: Record<string, unknown> }).accountWorkspaces).toBeUndefined();
   });
 

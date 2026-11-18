@@ -1493,6 +1493,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         const backupWorkspace = importedWorkspaces[currentAccountId];
         if (hasImportedWorkspaces && backupWorkspace) {
           useAppStore.setState(applyAccountWorkspaceForTypes(backupWorkspace, selectedTypes));
+        } else if (!hasImportedWorkspaces) {
+          // 旧版单账号备份没有工作区快照：顶层 syncMode 是唯一来源。
+          if (importedData.syncMode === 'stars' || importedData.syncMode === 'stars-and-lists') {
+            useAppStore.setState({ syncMode: importedData.syncMode });
+          }
+          if (typeof importedData.syncModeConfigured === 'boolean') {
+            useAppStore.setState({ syncModeConfigured: importedData.syncModeConfigured });
+          }
         }
         const live = useAppStore.getState();
         useAppStore.setState({

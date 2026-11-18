@@ -127,11 +127,12 @@ router.put('/api/repositories', (req, res) => {
     }
     const isFullSync = Boolean(req.body?.isFullSync);
     // 旧版客户端（无 X-GitHub-Account-Id）无法证明自身身份：多账号分区共存时
-    // 回退到全局 active_account_id 会把它账号的快照写进当前活跃分区，并以
-    // isFullSync 删除该分区中不在快照里的仓库/release。宁可拒绝写入。
-    if (isFullSync && !isHeaderlessFullSyncSafe(db, req)) {
+    // 回退到全局 active_account_id 会把它账号的快照写进当前活跃分区——全量写入
+    // 会物理删除缺项，增量 UPSERT 也会覆盖另一账号同 ID 仓库的自定义字段。
+    // 两种情况都必须拒绝。
+    if (!isHeaderlessFullSyncSafe(db, req)) {
       res.status(409).json({
-        error: 'Full sync requires X-GitHub-Account-Id when multiple accounts exist',
+        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;

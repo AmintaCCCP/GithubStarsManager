@@ -79,7 +79,7 @@ function LoginCardPattern() {
 }
 
 export const LoginScreen: React.FC = () => {
-  const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend } = useLoginActions();
+  const { authenticateWithGitHub, configuredBackendUrl, restoreBackendSession, setupBackendGitHubToken, syncBackendData, syncTokenToBackend, getBackendUrl, rollbackBackendConnection } = useLoginActions();
   const { switchToAccount, parkCurrentAccountForRestore } = useAccountSwitchActions();
   const githubTokenInputRef = useRef<HTMLInputElement | null>(null);
   const [loginMode, setLoginMode] = useState<'github' | 'backend'>('github');
@@ -240,6 +240,9 @@ export const LoginScreen: React.FC = () => {
     setIsLoading(true);
     setError('');
     const previousApiSecret = backendApiSecret;
+    // 候选连接作为一个整体：失败时 URL 与密钥必须成对恢复，否则原密钥会
+    // 被发往候选后端（轮询/诊断请求仍在运行）。
+    const previousBackendUrl = getBackendUrl();
     setBackendApiSecret(apiKey);
     // 拉取固定到已验证账号（Issue #611 审计修复）后，登录态必须先于拉取落地；
     // 若随后的后端同步失败，回滚登录态以保持「同步失败不提交登录状态」契约
@@ -331,6 +334,7 @@ export const LoginScreen: React.FC = () => {
         upsertSavedAccount(account.user, account.githubToken);
       }
     } catch (error) {
+      await rollbackBackendConnection(previousBackendUrl);
       setBackendApiSecret(previousApiSecret);
       if (loginCommitted) {
         // 后端同步失败：回滚登录态，保持「同步失败不提交登录状态」契约。

@@ -8,7 +8,12 @@ import { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Category, Repository } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
-import { isCurrentAccount, peekCurrentAccountId } from '../../../store/helpers/accountWorkspace';
+import {
+  getAccountSessionGeneration,
+  isCurrentAccount,
+  isCurrentAccountSession,
+  peekCurrentAccountId,
+} from '../../../store/helpers/accountWorkspace';
 import { useDialog } from '../../../hooks/useDialog';
 import { forceSyncToBackend } from '../../../services/autoSync';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
@@ -82,6 +87,8 @@ export const useBulkRepositoryActions = ({
     // 复核——两次即时读取（peekCurrentAccountId + isCurrentAccount 内部再读）
     // 比较的都是当前账号，识别不出等待期间发生的切号。
     const startedAccountId = peekCurrentAccountId();
+    // A→B→A：账号 ID 与确认前相同，只有会话代次能识别这次切号。
+    const startedGeneration = getAccountSessionGeneration();
     if (!githubToken) {
       toast(t('useBulkRepositoryActions.github-token-not-found-please-login-again'), 'error');
       return false;
@@ -93,7 +100,7 @@ export const useBulkRepositoryActions = ({
       { type: 'danger', confirmText: t('useBulkRepositoryActions.unstar') },
     );
     if (!confirmed) return false;
-    if (!isCurrentAccount(startedAccountId)) {
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
       return false;
     }
 
@@ -103,7 +110,7 @@ export const useBulkRepositoryActions = ({
 
     for (const repository of repositories) {
       // 切号后不再发起新的远端操作（已完成的远端取消星标不可撤销）
-      if (!isCurrentAccount(startedAccountId)) break;
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) break;
       try {
         const [owner, name] = repository.full_name.split('/');
         await githubApi.unstarRepository(owner, name);
@@ -116,7 +123,7 @@ export const useBulkRepositoryActions = ({
 
     // 等待 GitHub API 期间已切号：远端取消星标按发起账号完成（保留），
     // 但绝不把旧账号的删除动作写进新账号工作区，也不触发同步
-    if (!isCurrentAccount(startedAccountId)) {
+    if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
       return false;
     }
     for (const repositoryId of successIds) {
