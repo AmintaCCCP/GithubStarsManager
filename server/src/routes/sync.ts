@@ -256,18 +256,25 @@ router.post('/api/sync/import', (req, res) => {
       | Array<Record<string, unknown>>
       | Record<string, Record<string, unknown>>
       | undefined;
-    const workspaceEntries: Array<{ accountId: string; workspace: Record<string, unknown> }> = [];
+    const workspaceEntries: Array<{ accountId: string; workspace: Record<string, unknown>; unverifiedOwner: boolean }> = [];
     if (Array.isArray(accountWorkspacesRaw)) {
       for (const ws of accountWorkspacesRaw) {
         const id = typeof ws.account_id === 'string' ? ws.account_id : '';
         if (!id || !/^\d+$|^(default)$/.test(id)) continue;
-        workspaceEntries.push({ accountId: id, workspace: ws });
+        // 'default' 分区在目标服务器可被首个登录账号自动认领：请求本身不在
+        // default 分区时，来源归属无法核验，数据一律不写入（数字账号工作区
+        // 仍原样恢复）。仍保留条目，避免顶层兼容副本被误判为「无工作区」。
+        workspaceEntries.push({ accountId: id, workspace: ws, unverifiedOwner: id === 'default' && accountId !== 'default' });
       }
     } else if (accountWorkspacesRaw && typeof accountWorkspacesRaw === 'object') {
       for (const [id, ws] of Object.entries(accountWorkspacesRaw)) {
         if (!ws || typeof ws !== 'object') continue;
         if (!/^\d+$|^(default)$/.test(id)) continue;
-        workspaceEntries.push({ accountId: id, workspace: ws as Record<string, unknown> });
+        workspaceEntries.push({
+          accountId: id,
+          workspace: ws as Record<string, unknown>,
+          unverifiedOwner: id === 'default' && accountId !== 'default',
+        });
       }
     }
     for (const { workspace } of workspaceEntries) {
@@ -661,6 +668,9 @@ router.post('/api/sync/import', (req, res) => {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         const wsSettingsStmt = db.prepare('INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)');
+        // 'default' 分区的设置由 readSetting / 旧客户端 / 无头请求从全局 settings
+        // 表读取：写进 account_settings('default') 等于静默丢弃。
+        const wsGlobalSettingsStmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
         // 显式空 Token 时同步清空 accounts 的加密凭据副本（与 configs.ts 显式清空
         // 语义一致），否则 readScopedToken / readAccountRows / proxy 的 accounts
         // 回退会让已清空的 Token 复活。
@@ -671,7 +681,8 @@ router.post('/api/sync/import', (req, res) => {
         let workspaceCategoryCount = 0;
         let workspaceSettingsCount = 0;
 
-        for (const { accountId: wsAccountId, workspace } of workspaceEntries) {
+        for (const { accountId: wsAccountId, workspace, unverifiedOwner } of workspaceEntries) {
+          if (unverifiedOwner) continue;
           const wsRepos = workspace.repositories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsRepos)) {
             for (const r of wsRepos) {
@@ -766,6 +777,8 @@ router.post('/api/sync/import', (req, res) => {
           const wsSettings = workspace.account_settings as Record<string, unknown> | undefined;
           if (wsSettings && typeof wsSettings === 'object' && !Array.isArray(wsSettings)) {
             for (const [key, value] of Object.entries(wsSettings)) {
+              // 内部认领状态键只属于目标服务器自身，绝不随备份迁移。
+              if (wsAccountId === 'default' && INTERNAL_SETTING_KEYS.has(key)) continue;
               if (key === 'github_token' && typeof value === 'string' && value.startsWith('***')) {
                 continue; // 掩码 Token：保留库中已有的 github_token_encrypted
               }
@@ -781,7 +794,8 @@ router.post('/api/sync/import', (req, res) => {
                 // 避免已清空的 Token 经 accounts 回退复活。
                 wsClearAccountTokenStmt.run(wsAccountId);
               }
-              wsSettingsStmt.run(wsAccountId, key, serialized);
+              if (wsAccountId === 'default') wsGlobalSettingsStmt.run(key, serialized);
+              else wsSettingsStmt.run(wsAccountId, key, serialized);
               workspaceSettingsCount++;
             }
           }

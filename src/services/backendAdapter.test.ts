@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { backend } from './backendAdapter';
+import { logger } from './logger';
 
 // 可变共享桩：restoreAuth 账号头测试需要模拟「本机已登录账号 A」的会话状态
 const mockStoreState: { backendApiSecret: string; user: { id: number; login: string } | null } = {
@@ -270,6 +271,52 @@ describe('restoreAuth 账号头策略（R4 审计修复）', () => {
     // 候选后端恢复：绝不继承本机旧账号头（服务端回退后端自己的 active_account_id）
     expect(headers['X-GitHub-Account-Id']).toBeUndefined();
     expect(headers['Authorization']).toBe('Bearer api-secret');
+  });
+
+  it('/sync/auth 的响应正文不进入调试日志（多账号明文 Token）', async () => {
+    adapter._backendUrl = 'https://backend.example.com/api';
+    const token = 'synthetic-github-token-for-log-test';
+    const withBody = (payload: unknown): Response => {
+      const body = JSON.stringify(payload);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => JSON.parse(body),
+        headers: { forEach: () => {} },
+        clone: () => ({ text: async () => body }),
+      } as unknown as Response;
+    };
+    const isDebug = vi.spyOn(logger, 'isDebugMode').mockReturnValue(true);
+    const debug = vi.spyOn(logger, 'debug').mockImplementation(() => {});
+    let logged: string;
+    try {
+      // Control: a normal endpoint still logs its (redacted) body.
+      vi.mocked(window.fetch).mockResolvedValueOnce(withBody({ collapsedSidebarCategoryCount: 3 }));
+      await backend.fetchSettings();
+      expect(JSON.stringify(debug.mock.calls)).toContain('collapsedSidebarCategoryCount');
+
+      debug.mockClear();
+      // >4000 chars: the pre-fix code truncated first, then failed to parse the
+      // truncated JSON and fell back to a pass that only strips gsm_mcp_ tokens.
+      const accounts = Array.from({ length: 60 }, (_, index) => ({
+        accountId: String(index + 1),
+        user: { id: index + 1, login: `user-${index + 1}` },
+        githubToken: token,
+      }));
+      vi.mocked(window.fetch).mockResolvedValueOnce(withBody({
+        github_token: token,
+        accounts,
+      }));
+      expect(JSON.stringify({ github_token: token, accounts }).length).toBeGreaterThan(4000);
+      await backend.restoreAuth({ omitAccountHeader: true });
+      // Read before the finally block: mockRestore() clears recorded calls.
+      logged = JSON.stringify(debug.mock.calls);
+    } finally {
+      isDebug.mockRestore();
+      debug.mockRestore();
+    }
+    expect(logged).toContain('/sync/auth');
+    expect(logged).not.toContain(token);
   });
 });
 

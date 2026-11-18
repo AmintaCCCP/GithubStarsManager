@@ -334,26 +334,31 @@ class BackendAdapter {
         response.headers.forEach((v, k) => { responseHeaders[k] = v; });
         // Capture response body preview (clone to avoid consuming)
         let responseBody: string | undefined;
-        try {
-          const cloned = response.clone();
-          const text = await cloned.text();
-          if (text.length > 0) {
-            const preview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
-            // Redact secrets inside JSON (e.g. /mcp/status returns { token: "gsm_mcp_…" })
-            try {
-              const parsed = JSON.parse(preview.endsWith('...[truncated]') ? text.slice(0, 4000) : preview);
-              responseBody = JSON.stringify(parsed, (key, val) => {
-                if (/api[_-]?key|password|secret|token|authorization|mcp/i.test(key)) return '***';
-                if (typeof val === 'string' && val.startsWith('gsm_mcp_')) return '***';
-                return val;
-              }, 2);
-              if (text.length > 4000) responseBody += '\n...[truncated]';
-            } catch {
-              // Non-JSON: strip gsm_mcp_ tokens if present
-              responseBody = preview.replace(/gsm_mcp_[A-Za-z0-9_-]+/g, 'gsm_mcp_***');
+        // /sync/auth returns every saved account's plaintext GitHub token. Log
+        // only status/timing there: a truncated >4000-char JSON fails to parse
+        // and falls through to a redaction pass that cannot see those tokens.
+        if (!path.split('?')[0].endsWith('/sync/auth')) {
+          try {
+            const cloned = response.clone();
+            const text = await cloned.text();
+            if (text.length > 0) {
+              const preview = text.length > 4000 ? text.slice(0, 4000) + '...[truncated]' : text;
+              // Redact secrets inside JSON (e.g. /mcp/status returns { token: "gsm_mcp_…" })
+              try {
+                const parsed = JSON.parse(preview.endsWith('...[truncated]') ? text.slice(0, 4000) : preview);
+                responseBody = JSON.stringify(parsed, (key, val) => {
+                  if (/api[_-]?key|password|secret|token|authorization|mcp/i.test(key)) return '***';
+                  if (typeof val === 'string' && val.startsWith('gsm_mcp_')) return '***';
+                  return val;
+                }, 2);
+                if (text.length > 4000) responseBody += '\n...[truncated]';
+              } catch {
+                // Non-JSON: strip gsm_mcp_ tokens if present
+                responseBody = preview.replace(/gsm_mcp_[A-Za-z0-9_-]+/g, 'gsm_mcp_***');
+              }
             }
-          }
-        } catch { /* body not readable */ }
+          } catch { /* body not readable */ }
+        }
         logger.debug('backendAdapter', 'Backend request', {
           method, path, status: response.status, durationMs: Date.now() - startTime,
           requestHeaders, requestBody, responseHeaders, responseBody,

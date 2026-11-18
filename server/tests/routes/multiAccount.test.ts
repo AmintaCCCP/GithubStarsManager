@@ -1076,6 +1076,53 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     expect(fetched.body.customCategories).toBeUndefined();
   });
 
+  it('refuses to write an unverifiable default workspace into the target default partition', async () => {
+    const db = getDb();
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders(ACCOUNT_B))
+      .send({
+        account_workspaces: [{
+          account_id: 'default',
+          repositories: [repoRow(7, 'owner/legacy')],
+          categories: [{ id: 'legacy-cat', name: 'Legacy' }],
+          account_settings: { customCategories: '["legacy"]' },
+        }],
+      })
+      .expect(200);
+
+    // 目标服务器的 default 分区可被首个登录账号自动认领：来源归属无法核验时
+    // 绝不写入（否则会串号到其他账号）。
+    expect(db.prepare("SELECT COUNT(*) as total FROM repositories WHERE account_id = 'default'").get())
+      .toMatchObject({ total: 0 });
+    expect(db.prepare("SELECT COUNT(*) as total FROM categories WHERE account_id = 'default'").get())
+      .toMatchObject({ total: 0 });
+    expect(db.prepare("SELECT value FROM settings WHERE key = 'customCategories'").get()).toBeUndefined();
+    expect(db.prepare("SELECT value FROM account_settings WHERE account_id = 'default' AND key = 'customCategories'").get())
+      .toBeUndefined();
+  });
+
+  it('restores a default workspace settings into the global settings table', async () => {
+    const db = getDb();
+    // 无账号头且全局无 active_account_id：请求本身就在 default 分区，归属可核验。
+    await request(app)
+      .post('/api/sync/import')
+      .set(authHeaders())
+      .send({
+        account_workspaces: [{
+          account_id: 'default',
+          account_settings: { customCategories: '["legacy"]' },
+        }],
+      })
+      .expect(200);
+
+    const global = db.prepare("SELECT value FROM settings WHERE key = 'customCategories'").get() as { value: string };
+    expect(JSON.parse(global.value)).toEqual(['legacy']);
+    // default 分区的读取路径是全局 settings 表，account_settings 不得留下副本。
+    expect(db.prepare("SELECT value FROM account_settings WHERE account_id = 'default' AND key = 'customCategories'").get())
+      .toBeUndefined();
+  });
+
   it('encrypts real workspace tokens on import', async () => {
     const payload = {
       account_workspaces: [{
