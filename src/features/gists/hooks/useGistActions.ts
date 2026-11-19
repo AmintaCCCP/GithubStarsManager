@@ -227,9 +227,13 @@ export const useGistActions = () => {
     } catch (error) {
       // 会话切换信号必须穿透到调用方，不得被普通失败路径吞掉
       if (error instanceof GistDetailSessionSwitchedError) throw error;
-      // 审计修复（C34）：详情请求失败提示先校验发起会话——已切换则不显示
-      // 旧请求错误；普通失败保留现有降级显示（返回 null）。
-      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return null;
+      // 审计修复（C34/R2-C17）：详情请求失败提示先校验发起会话——已切换则
+      // 与成功路径一致抛出专用标记错误（调用方据此清理旧账号 detailGist 并
+      // 关闭详情面板），绝不把旧账号请求的失败当作当前会话的普通失败；
+      // 同会话失败保留现有降级显示（返回 null）。
+      if (!isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        throw new GistDetailSessionSwitchedError();
+      }
       const message = error instanceof Error ? error.message : '';
       if (/5\d{2}/.test(message)) {
         toast(t('useGistActions.github-gist-api-is-temporarily-unavailable-openi'), 'warning');

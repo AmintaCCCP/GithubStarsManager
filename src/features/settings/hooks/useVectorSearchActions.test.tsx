@@ -18,9 +18,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../store/useAppStore', () => ({
-  EMBEDDING_FORMAT_VERSION: 3,
+  EMBEDDING_FORMAT_VERSION: 4,
   LEGACY_EMBEDDING_FORMAT_VERSION: 1,
-  isKnownEmbeddingFormatVersion: (value: unknown) => value === 1 || value === 2 || value === 3,
+  isKnownEmbeddingFormatVersion: (value: unknown) => value === 1 || value === 2 || value === 3 || value === 4,
   useAppStore: mocks.useAppStore,
 }));
 vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
@@ -28,7 +28,7 @@ vi.mock('../../../services/vectorSearchService', async (importOriginal) => {
   return {
     // 保留真实的账号隔离向量 ID 编解码工具（runIndex 的 cleanup keepIds 依赖）
     ...actual,
-    EMBEDDING_FORMAT_VERSION: 3,
+    EMBEDDING_FORMAT_VERSION: 4,
     EmbeddingClient: class {},
     VectorSearchService: class {
       cleanup = mocks.cleanup;
@@ -86,6 +86,10 @@ const createStoreState = () => ({
   activeEmbeddingConfig: 'embedding',
   vectorSearchConfig: { embeddingFormatVersion: 1, enabled: true },
   repositories: [repository],
+  // R2-C24：清理删除的可验证依据（已完成同步、无加载/同步在途）
+  isLoading: false,
+  isSyncingStars: false,
+  lastSync: '2026-08-25T00:00:00.000Z' as string | null,
   githubToken: null,
   setVectorSearchStatus: mocks.setVectorSearchStatus,
   setVectorIndexingState: mocks.setVectorIndexingState,
@@ -155,7 +159,7 @@ describe('useVectorSearchActions', () => {
       { ...repository, id: 3, analyzed_at: undefined } as Repository,
       { ...repository, id: 4, analyzed_at: '2026-08-25T00:00:00.000Z', analysis_failed: true } as Repository,
     ];
-    // formatVersionChanged = true here (fixture embeddingFormatVersion 1 < 3):
+    // formatVersionChanged = true here (fixture embeddingFormatVersion 1 < 4):
     // eligible repos count regardless of per-repo predicate args.
     mocks.needsReindex.mockImplementation((repo: Repository) => repo.id !== 99);
     const { result } = renderHook(() => useVectorSearchActions());
@@ -164,7 +168,7 @@ describe('useVectorSearchActions', () => {
   });
 
   it('excludes up-to-date repositories when no migration is pending', () => {
-    storeState.vectorSearchConfig.embeddingFormatVersion = 3;
+    storeState.vectorSearchConfig.embeddingFormatVersion = 4;
     storeState.repositories = [repository, { ...repository, id: 2 } as Repository];
     mocks.needsReindex.mockImplementation((repo: Repository) => repo.id === 2);
     const { result } = renderHook(() => useVectorSearchActions());
@@ -317,6 +321,34 @@ describe('useVectorSearchActions account switch guards', () => {
       includeLegacy: false,
       signal: expect.any(AbortSignal),
     });
+  });
+
+  it('skips cleanup when the list has no authoritative sync basis (R2-C24)', async () => {
+    // 从未成功同步（lastSync 为空）或仍在加载的列表可能只是部分快照：即使
+    // 运行前后 ID 集合相等，也不能据此物理删除向量，上传结果必须保留。
+    storeState.lastSync = null;
+    mocks.indexAllRepos.mockResolvedValue({ indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).not.toHaveBeenCalled();
+    expect(mocks.setVectorIndexingState).toHaveBeenLastCalledWith(expect.objectContaining({
+      isIndexing: false,
+      result: expect.objectContaining({ indexed: 1 }),
+    }));
+  });
+
+  it('skips cleanup when a star sync is in flight during indexing (R2-C24)', async () => {
+    mocks.indexAllRepos.mockImplementation(async () => {
+      storeState.isSyncingStars = true;
+      return { indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] };
+    });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    expect(mocks.cleanup).not.toHaveBeenCalled();
   });
 
   it('passes the owning account to indexAllRepos for account-scoped vector IDs (R4)', async () => {

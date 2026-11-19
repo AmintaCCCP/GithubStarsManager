@@ -67,6 +67,12 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({ isOpen, onClos
     if (code === 'account-mismatch') {
       return tLogin('app:accountModal.account-mismatch', { login: reauthAccount?.user.login ?? '' });
     }
+    // 自审计补充：账号切换锁与后端凭据写入失败给出可读提示，不暴露原始错误码。
+    if (code === 'switch-in-progress') return t('app:header.switch-in-progress');
+    if (code === 'backend-credential-sync-failed') {
+      return t('app:accountModal.backend-credential-sync-failed');
+    }
+    if (code === 'invalid-github-user') return tLogin('loginScreen.sign-in-failed-please-try-again');
     const mapped = BACKEND_ERROR_KEYS[code];
     return mapped ? tLogin(mapped) : code;
   };

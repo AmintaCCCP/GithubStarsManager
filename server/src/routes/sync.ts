@@ -22,6 +22,21 @@ function isDeclaredAccountId(value: unknown): value is string {
 }
 
 /**
+ * Issue #612 R2-A19：导入分类的 id 归一化（顶层与工作区路径共用）。
+ * 旧版备份的分类条目可能缺失 id（旧 POST /api/categories 不写 id），直接入库
+ * 会撞 categories.id 的 NOT NULL 约束并回滚整个导入事务。缺失时分配基于名称
+ * 的确定性派生标识（`legacy-category-<名称>`）：同一备份重复导入生成同一 id
+ * （配合 INSERT OR REPLACE 幂等），前缀形态与客户端生成的显式 ID 区分；
+ * 显式 ID（含数字形态）原样保留。
+ */
+function normalizeImportedCategoryId(rawId: unknown, name: unknown): string | number {
+  if (typeof rawId === 'string' && rawId.trim()) return rawId;
+  if (typeof rawId === 'number' && Number.isFinite(rawId)) return rawId;
+  const rawName = typeof name === 'string' && name.trim() ? name.trim() : 'unnamed';
+  return `legacy-category-${rawName.replace(/\s+/g, '-')}`;
+}
+
+/**
  * 服务端导出（SELECT *）把 is_read 序列化为数字 0/1，客户端备份则是布尔值。
  * 两者都视为「显式已读状态」：按对应值恢复；缺省或无效值走保留分支，
  * 维持目标记录的现有已读状态。
@@ -246,15 +261,26 @@ router.post('/api/sync/import', async (req, res) => {
     // Issue #612 A1(b)：顶层备份声明的 account_id 必须与解析出的目标范围一致；
     // 不一致拒绝导入，除非调用方通过 allowAccountMigration 显式选择迁移（把
     // 顶层 v1 数据写入当前请求账号分区）。校验发生在任何写入之前。
+    // Issue #612 R2-A16：显式存在但格式不受支持的 account_id 直接拒绝导入——
+    // 绝不当作「未声明」跳过所有者比较；仅字段缺失时沿用旧备份兼容行为。
     const declaredAccountId = (data as { account_id?: unknown }).account_id;
-    if (isDeclaredAccountId(declaredAccountId)
-      && declaredAccountId !== accountId
-      && (data as { allowAccountMigration?: unknown }).allowAccountMigration !== true) {
-      res.status(409).json({
-        error: `Backup was exported from account ${declaredAccountId}; re-send with allowAccountMigration=true to migrate it into account ${accountId}`,
-        code: 'ACCOUNT_ID_MISMATCH',
-      });
-      return;
+    if (declaredAccountId !== undefined) {
+      if (!isDeclaredAccountId(declaredAccountId)) {
+        // null / 数字 / 任意字符串等非支持形态：显式存在但格式不受支持 → 拒绝。
+        res.status(400).json({
+          error: `Unsupported backup account_id: ${String(declaredAccountId)}`,
+          code: 'INVALID_BACKUP_ACCOUNT_ID',
+        });
+        return;
+      }
+      if (declaredAccountId !== accountId
+        && (data as { allowAccountMigration?: unknown }).allowAccountMigration !== true) {
+        res.status(409).json({
+          error: `Backup was exported from account ${declaredAccountId}; re-send with allowAccountMigration=true to migrate it into account ${accountId}`,
+          code: 'ACCOUNT_ID_MISMATCH',
+        });
+        return;
+      }
     }
 
     // Issue #612 A2(b)：github_token 必须是字符串（掩码跳过 / 有效值加密 /
@@ -354,7 +380,13 @@ router.post('/api/sync/import', async (req, res) => {
       | Array<unknown>
       | Record<string, unknown>
       | undefined;
-    const workspaceEntries: Array<{ accountId: string; workspace: Record<string, unknown>; unverifiedOwner: boolean }> = [];
+    const workspaceEntries: Array<{
+      accountId: string;
+      workspace: Record<string, unknown>;
+      unverifiedOwner: boolean;
+      /** Issue #612 R2-A23：凭据验证结果按工作区条目绑定（重复账号条目互不影响）。 */
+      tokenVerification?: { ok: boolean; reason?: string };
+    }> = [];
     if (Array.isArray(accountWorkspacesRaw)) {
       for (const ws of accountWorkspacesRaw) {
         if (!ws || typeof ws !== 'object' || Array.isArray(ws)) {
@@ -443,30 +475,63 @@ router.post('/api/sync/import', async (req, res) => {
     // 向 GitHub /user 验证身份；只有验证通过且属于该工作区账号的 PAT 才加密
     // 写入对应分区。掩码值与显式清除不需要身份查询；验证失败保留目标账号现有
     // 凭据并在响应中报告（降级处理，不得让整个导入失败）。
-    const tokenVerification = new Map<string, { ok: boolean; reason?: string }>();
-    for (const { accountId: wsAccountId, workspace, unverifiedOwner } of workspaceEntries) {
-      if (unverifiedOwner) continue;
-      const wsSettings = workspace.account_settings as Record<string, unknown> | undefined;
+    // Issue #612 R2-A23：验证结果绑定到具体工作区条目（不再按账号 ID 共享
+    // Map）——备份为同一账号提供多个工作区条目时，各条目的凭据独立验证、
+    // 独立取舍，单条验证结果不会被另一条目覆盖。
+    for (const entry of workspaceEntries) {
+      if (entry.unverifiedOwner) continue;
+      const wsSettings = entry.workspace.account_settings as Record<string, unknown> | undefined;
       if (!wsSettings || typeof wsSettings !== 'object' || Array.isArray(wsSettings)) continue;
       const token = wsSettings.github_token;
       if (typeof token !== 'string' || !token || token.startsWith('***')) continue;
       const ownerId = await fetchGitHubUserId(token);
-      if (ownerId && (ownerId === wsAccountId || wsAccountId === 'default')) {
+      if (ownerId && (ownerId === entry.accountId || entry.accountId === 'default')) {
         // default 分区无数字身份可绑定：只要求 PAT 本身有效（保持纯 default
         // 部署的旧版导入行为）；数字账号分区则必须与工作区账号一致。
-        tokenVerification.set(wsAccountId, { ok: true });
+        entry.tokenVerification = { ok: true };
       } else {
-        tokenVerification.set(wsAccountId, {
+        entry.tokenVerification = {
           ok: false,
           reason: ownerId
-            ? `PAT belongs to account ${ownerId}, not ${wsAccountId}`
+            ? `PAT belongs to account ${ownerId}, not ${entry.accountId}`
             : 'GitHub identity verification failed (network error, timeout or invalid token)',
-        });
+        };
       }
     }
 
     // Issue #612 A3：验证未通过而未恢复的工作区凭据报告（在响应中返回）。
     const skippedCredentials: Array<{ account_id: string; restored: boolean; reason?: string }> = [];
+
+    // Issue #612 R2-A17：顶层 settings.github_token 的真实 PAT 与工作区路径
+    // （A3）同语义：事务外用 GitHub /user 验证身份，且属于目标账号（default
+    // 分区只要求 PAT 本身有效）才写入；掩码跳过、显式空清除账号密文副本的
+    // 既有分支不变。验证失败保留目标凭据并经 skipped_credentials 报告。
+    // 仅在顶层 Token 可能被实际写回的路径（v1 无工作区导入 / default 分区请求）
+    // 发起验证；多账号工作区导入且请求不在 default 分区时顶层 Token 一律跳过
+    // （A2(a)），无需网络验证。
+    let topLevelTokenVerification: { ok: boolean; reason?: string } | null = null;
+    {
+      const topLevelTokenMayBeWritten = workspaceEntries.length === 0 || accountId === 'default';
+      const topTokenValue = topSettings && typeof topSettings === 'object' && !Array.isArray(topSettings)
+        ? (topSettings as Record<string, unknown>).github_token
+        : undefined;
+      if (topLevelTokenMayBeWritten
+        && typeof topTokenValue === 'string'
+        && topTokenValue
+        && !topTokenValue.startsWith('***')) {
+        const ownerId = await fetchGitHubUserId(topTokenValue);
+        if (ownerId && (ownerId === accountId || accountId === 'default')) {
+          topLevelTokenVerification = { ok: true };
+        } else {
+          topLevelTokenVerification = {
+            ok: false,
+            reason: ownerId
+              ? `PAT belongs to account ${ownerId}, not ${accountId}`
+              : 'GitHub identity verification failed (network error, timeout or invalid token)',
+          };
+        }
+      }
+    }
 
     const importAll = db.transaction(() => {
       // Issue #612 A10：workspaceEntries 非空时顶层 repositories/releases/
@@ -474,10 +539,16 @@ router.post('/api/sync/import', async (req, res) => {
       // （分区隔离约束由 A1 的目标范围校验保证：请求分区已明确且与备份声明
       // 一致，或调用方已显式确认迁移）。
       const hasAccountWorkspaces = workspaceEntries.length > 0;
+      // Issue #612 R2-A15/A18：顶层兼容副本复用未核验 default 工作区（A4）的
+      // 归属检查，并在事务内重新评估（不得仅凭等待 PAT 验证前记录的判断）：
+      // 目标 default 分区仍有待认领数据时，顶层 repositories/releases/
+      // categories 及账号级设置绝不得写入该分区；分区为空或已认领时照常恢复
+      // default 备份及账号设置。
+      const topLevelDefaultBlocked = accountId === 'default' && hasPendingDefaultPartitionData(db);
 
       // Repositories（导入到当前账号分区；account_id 占位参数末位追加）
       const repos = data.repositories as Record<string, unknown>[] | undefined;
-      if (Array.isArray(repos) && repos.length > 0) {
+      if (!topLevelDefaultBlocked && Array.isArray(repos) && repos.length > 0) {
         const repoStmt = db.prepare(`
           INSERT OR REPLACE INTO repositories (
             id, name, full_name, description, html_url, stargazers_count, language,
@@ -561,7 +632,7 @@ router.post('/api/sync/import', async (req, res) => {
       // 仅当快照显式携带 is_read 布尔值时才覆盖已读状态（stmtOverwriteIsRead）；
       // 否则走保留分支，避免导入/回退把已读状态误清空。
       const rels = data.releases as Record<string, unknown>[] | undefined;
-      if (Array.isArray(rels) && rels.length > 0) {
+      if (!topLevelDefaultBlocked && Array.isArray(rels) && rels.length > 0) {
         const relStmtPreserveIsRead = db.prepare(`
           INSERT INTO releases (
             id, tag_name, name, body, html_url, published_at,
@@ -635,7 +706,7 @@ router.post('/api/sync/import', async (req, res) => {
 
       // Categories（导入到当前账号分区）
       const cats = data.categories as Record<string, unknown>[] | undefined;
-      if (Array.isArray(cats) && cats.length > 0) {
+      if (!topLevelDefaultBlocked && Array.isArray(cats) && cats.length > 0) {
         const catStmt = db.prepare(`
           INSERT OR REPLACE INTO categories (id, name, description, icon, keywords, color, sort_order, is_custom, account_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -645,7 +716,9 @@ router.post('/api/sync/import', async (req, res) => {
           // 回滚整个导入。
           if (!c || typeof c !== 'object' || Array.isArray(c)) continue;
           catStmt.run(
-            c.id, c.name ?? '', c.description ?? null, c.icon ?? '📁',
+            // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定标识
+            // （顶层与工作区共用），显式 ID 原样保留，避免 NOT NULL 约束回滚。
+            normalizeImportedCategoryId(c.id, c.name), c.name ?? '', c.description ?? null, c.icon ?? '📁',
             typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
             c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0,
             accountId
@@ -748,8 +821,21 @@ router.post('/api/sync/import', async (req, res) => {
             // 不在 default 分区时，全局表中的账号级键归属无法核验，一律跳过，
             // 防止把归属未验证的设置写进认领来源分区。真正的全局设置（非账号级
             // 键）不受影响，仍独立恢复。
-            if (accountId !== 'default') continue;
+            // Issue #612 R2-A15：目标 default 分区仍有待认领数据时同样跳过
+            // （顶层兼容副本绝不得写进待认领的 default 分区）。
+            if (accountId !== 'default' || topLevelDefaultBlocked) continue;
             if (key === 'github_token' && value && typeof value === 'string') {
+              // Issue #612 R2-A17：顶层真实 PAT 必须先通过 /user 身份验证
+              // （与 A3 工作区路径同语义），失败保留目标凭据并报告。
+              if (!topLevelTokenVerification?.ok) {
+                skippedCredentials.push({
+                  account_id: accountId,
+                  restored: false,
+                  reason: topLevelTokenVerification?.reason
+                    ?? 'GitHub identity verification was not performed',
+                });
+                continue;
+              }
               globalSettingsStmt.run(key, encrypt(value, config.encryptionKey));
             } else {
               globalSettingsStmt.run(key, serializeSettingValue(value));
@@ -758,6 +844,17 @@ router.post('/api/sync/import', async (req, res) => {
             continue;
           }
           if (key === 'github_token' && value && typeof value === 'string') {
+            // Issue #612 R2-A17：v1 备份顶层真实 PAT 同样必须先通过 /user 身份
+            // 验证；失败保留目标账号现有凭据并在响应中报告。
+            if (!topLevelTokenVerification?.ok) {
+              skippedCredentials.push({
+                account_id: accountId,
+                restored: false,
+                reason: topLevelTokenVerification?.reason
+                  ?? 'GitHub identity verification was not performed',
+              });
+              continue;
+            }
             const encrypted = encrypt(value, config.encryptionKey);
             if (accountId !== 'default') {
               accountSettingsStmt.run(accountId, key, encrypted);
@@ -867,8 +964,12 @@ router.post('/api/sync/import', async (req, res) => {
         let workspaceCategoryCount = 0;
         let workspaceSettingsCount = 0;
 
-        for (const { accountId: wsAccountId, workspace, unverifiedOwner } of workspaceEntries) {
-          if (unverifiedOwner) continue;
+        for (const { accountId: wsAccountId, workspace, unverifiedOwner, tokenVerification: entryTokenVerification } of workspaceEntries) {
+          // Issue #612 R2-A18：在事务内重新检查 default 分区待认领状态——等待
+          // PAT 验证期间可能有并发写入使事务前记录的 unverifiedOwner 过期；
+          // 无并发写入时空白目标的恢复行为不变。
+          if (unverifiedOwner || (wsAccountId === 'default'
+            && (accountId !== 'default' || hasPendingDefaultPartitionData(db)))) continue;
           const wsRepos = workspace.repositories as Record<string, unknown>[] | undefined;
           if (Array.isArray(wsRepos)) {
             for (const r of wsRepos) {
@@ -956,7 +1057,10 @@ router.post('/api/sync/import', async (req, res) => {
           if (Array.isArray(wsCats)) {
             for (const c of wsCats) {
               wsCatStmt.run(
-                wsAccountId, c.id, c.name ?? '', c.description ?? null, c.icon ?? '📁',
+                // Issue #612 R2-A19：旧版分类 id 为 NULL/缺失时分配确定性稳定
+                // 标识（与顶层路径共用），显式 ID 原样保留，避免 NOT NULL 约束
+                // 导致整个导入事务回滚。
+                wsAccountId, normalizeImportedCategoryId(c.id, c.name), c.name ?? '', c.description ?? null, c.icon ?? '📁',
                 typeof c.keywords === 'string' ? c.keywords : JSON.stringify(c.keywords ?? []),
                 c.color ?? null, c.sort_order ?? 0, c.is_custom ? 1 : 0
               );
@@ -980,7 +1084,8 @@ router.post('/api/sync/import', async (req, res) => {
                 // Issue #612 A3：真实 Token（勾选「包含密钥」的备份）必须先通过
                 // 事务外的 /user 身份验证，且属于该工作区账号才写入；验证失败
                 // 保留目标账号现有凭据并在响应中报告，绝不把未验证的凭据加密入库。
-                const verification = tokenVerification.get(wsAccountId);
+                // Issue #612 R2-A23：验证结果取自本工作区条目（重复账号条目互不影响）。
+                const verification = entryTokenVerification;
                 if (!verification?.ok) {
                   skippedCredentials.push({
                     account_id: wsAccountId,
@@ -1077,10 +1182,11 @@ router.post('/api/sync/import', async (req, res) => {
 });
 
 // POST /api/sync/legacy-claim
-// Issue #612 A17：存量 default 数据无法通过身份校验确立归属时（旧 PAT 已失效且
-// 账号分区也没有可用凭据），由持有 API_SECRET 的管理员显式确认迁移目标。路由在
-// 全局 authMiddleware 之后挂载；归属已冻结为其他账号时拒绝（不得改变已冻结的
-// 归属）；认领事务与自动路径一致，且不复制任何凭据（不自动信任当前全局 Token）。
+// Issue #612 A17 / R2-A5：存量 default 数据无法通过身份校验确立归属时（存量快照
+// PAT 已失效；可轮换的账号分区凭据不再作为归属证据），由持有 API_SECRET 的管理
+// 员显式确认迁移目标。路由在全局 authMiddleware 之后挂载；归属已冻结为其他账号
+// 时拒绝（不得改变已冻结的归属）；认领事务与自动路径一致，且不复制任何凭据
+// （不自动信任当前全局 Token）。
 router.post('/api/sync/legacy-claim', (req, res) => {
   try {
     const db = getDb();

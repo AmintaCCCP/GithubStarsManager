@@ -1435,6 +1435,7 @@
     "cancel": "Annuler",
     "confirm": "Ajouter et basculer",
     "reauth-hint": "Veuillez saisir un jeton GitHub valide pour @{{login}}",
-    "account-mismatch": "Ce jeton appartient à un autre compte GitHub. Connectez-vous avec le jeton de @{{login}}."
+    "account-mismatch": "Ce jeton appartient à un autre compte GitHub. Connectez-vous avec le jeton de @{{login}}.",
+    "backend-credential-sync-failed": "Le compte a été ajouté, mais les identifiants du backend n'ont pas pu être mis à jour. Réessayez plus tard."
   }
 }

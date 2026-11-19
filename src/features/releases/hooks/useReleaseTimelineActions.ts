@@ -171,21 +171,31 @@ export const useReleaseTimelineActions = () => {
         // 的已读状态留在该快照里。这里只把发起账号快照中的 readReleases 回写，
         // 且仅当快照仍包含本次乐观变更（所有权校验通过）时执行——绝不创建/
         // 覆盖不存在的快照，也不触碰当前账号的工作区。
-        useAppStore.setState((state) => {
-          const parked = state.accountWorkspaces?.[startedAccountId];
-          if (!parked) return state;
-          const rolledBack = rollbackReadReleases(parked.readReleases);
-          if (!rolledBack) return state;
-          return {
-            accountWorkspaces: {
-              ...state.accountWorkspaces,
-              [startedAccountId]: {
-                ...parked,
-                readReleases: [...rolledBack],
+        if (peekCurrentAccountId() === startedAccountId) {
+          // R2-C21（A→B→A）：发起账号已重新激活，切回时其归档快照被换入实时
+          // 工作区，乐观更新现在位于实时集合——只修正实时集合（同样经所有权
+          // 校验，覆盖后续替换状态时不回滚），B 的工作区与归档均不触碰。
+          const rolledBack = rollbackReadReleases(useAppStore.getState().readReleases);
+          if (rolledBack) {
+            useAppStore.setState({ readReleases: rolledBack });
+          }
+        } else {
+          useAppStore.setState((state) => {
+            const parked = state.accountWorkspaces?.[startedAccountId];
+            if (!parked) return state;
+            const rolledBack = rollbackReadReleases(parked.readReleases);
+            if (!rolledBack) return state;
+            return {
+              accountWorkspaces: {
+                ...state.accountWorkspaces,
+                [startedAccountId]: {
+                  ...parked,
+                  readReleases: [...rolledBack],
+                },
               },
-            },
-          };
-        });
+            };
+          });
+        }
       }
       toast(t('useReleaseTimelineActions.failed-to-mark-all-as-read'), 'error');
     } finally {
@@ -251,7 +261,12 @@ export const useReleaseTimelineActions = () => {
       // 会与之翻转不一致）；确需回滚时仅撤销本次操作实际变更，不回写整个
       // 确认前快照（rollbackState 仅作回滚守卫保留语义参考）。
       const failedShards = (error as { failedShards?: string[] }).failedShards;
-      const criticalShardFailed = !Array.isArray(failedShards)
+      const pushAttempted = (error as { pushAttempted?: boolean }).pushAttempted !== false;
+      // R2-C5：只有本次推送确实执行了写入尝试、且关键分片（repositories /
+      // settings）未出现在失败清单时，才把失败视为辅助分片失败并跳过回滚；
+      // 未尝试写入（空工作区未对齐提前返回）按关键失败处理。
+      const criticalShardFailed = !pushAttempted
+        || !Array.isArray(failedShards)
         || failedShards.length === 0
         || failedShards.includes('repositories')
         || failedShards.includes('settings');
@@ -304,9 +319,13 @@ export const useReleaseTimelineActions = () => {
             const stillRemoved = !current.releaseSourceSettings.customReleaseRepos
               .some(item => normalizeRepoKey(item.full_name) === repoKey);
             if (removed && stillRemoved) {
+              // R2-C20：基于已累积的 next.releaseSourceSettings 合并——同一仓库
+              // 同时来自 watchCustom 与 custom 两个来源时，先前恢复的
+              // watchCustomReleaseRepos 不得被本分支覆盖。
+              const baseSettings = next.releaseSourceSettings ?? current.releaseSourceSettings;
               next.releaseSourceSettings = {
-                ...current.releaseSourceSettings,
-                customReleaseRepos: [...current.releaseSourceSettings.customReleaseRepos, removed],
+                ...baseSettings,
+                customReleaseRepos: [...baseSettings.customReleaseRepos, removed],
               };
             }
           }

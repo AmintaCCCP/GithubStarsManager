@@ -88,6 +88,13 @@ export const Header: React.FC = () => {
       : accountWorkspaces[account.accountId]?.repositories.length ?? 0
   );
 
+  // 审计修复（R2-B15）：切换失败的已知错误码映射为翻译文案；未知错误（动态
+  // 消息）显示原始文本。'switch-account-failed' 暂无对应翻译键，保留原文回退。
+  const switchErrorText = (error: string): string => {
+    if (error === 'switch-in-progress') return t('header.switch-in-progress');
+    return error;
+  };
+
   const handleSwitchAccount = async (account: SavedAccount) => {
     if (isSwitchingMenu) return;
     // 审计修复（B8）：仅当当前会话已认证且正在使用目标凭证时跳过切换；
@@ -103,7 +110,7 @@ export const Header: React.FC = () => {
           setReauthAccount(account);
           setAddAccountOpen(true);
         } else if (result.error) {
-          toast(`${t('header.switch-account')}: ${result.error}`, 'error');
+          toast(`${t('header.switch-account')}: ${switchErrorText(result.error)}`, 'error');
         }
         return;
       }
@@ -120,7 +127,11 @@ export const Header: React.FC = () => {
       { type: 'warning' },
     );
     if (!confirmed) return;
-    await removeAccount(account.accountId);
+    // R2-B13：removeAccount 失败（切换锁被占用）时明确提示等待重试。
+    const result = await removeAccount(account.accountId);
+    if (!result.ok) {
+      toast(t('header.switch-in-progress'), 'error');
+    }
   };
 
   const handleLogout = async () => {

@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   )),
   forceSyncToBackend: vi.fn(),
   markPendingAccountSync: vi.fn(),
+  markPendingRepositoryDeletion: vi.fn(),
   unstarRepository: vi.fn(),
   getRepositoryReadme: vi.fn(),
   loggerInfo: vi.fn(),
@@ -61,6 +62,7 @@ vi.mock('../../../services/similarRepositoryPipeline', () => ({
 vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
   markPendingAccountSync: mocks.markPendingAccountSync,
+  markPendingRepositoryDeletion: mocks.markPendingRepositoryDeletion,
   withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
 }));
 
@@ -383,7 +385,7 @@ describe('useRepositoryCardActions account switch guards', () => {
     (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
   };
 
-  it('drops the analysis result and skips the analyzing cleanup after a switch', async () => {
+  it('drops the analysis result but clears the old-generation analyzing marker after a switch', async () => {
     mocks.analyzeRepository.mockImplementation(async () => {
       switchToB();
       return { summary: 's', tags: [], platforms: [], custom_category: null, category_locked: false, analyzed_at: '2026-09-01T00:00:00.000Z' };
@@ -394,12 +396,14 @@ describe('useRepositoryCardActions account switch guards', () => {
 
     expect(storeState.updateRepository).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
-    // 分析标记清理只作用于发起账号仍是当前账号的工作区（切号后不再误清）
-    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(1);
-    expect(storeState.setAnalyzingRepository).toHaveBeenCalledWith(1, true);
+    // R2-C19：结果被丢弃，但本请求自己的忙标记必须清除——切号（同账号换
+    // 凭据只推进代次）后 isAnalyzing 不得永久残留 true。
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(2);
+    expect(storeState.setAnalyzingRepository).toHaveBeenNthCalledWith(1, 1, true);
+    expect(storeState.setAnalyzingRepository).toHaveBeenNthCalledWith(2, 1, false);
   });
 
-  it('drops the analysis failure patch after a switch', async () => {
+  it('drops the analysis failure patch but clears the old-generation marker after a switch', async () => {
     mocks.analyzeRepository.mockImplementation(async () => {
       switchToB();
       throw new Error('ai down');
@@ -409,7 +413,8 @@ describe('useRepositoryCardActions account switch guards', () => {
     await act(async () => { await result.current.analyze(); });
 
     expect(storeState.updateRepository).not.toHaveBeenCalled();
-    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(1);
+    expect(storeState.setAnalyzingRepository).toHaveBeenCalledTimes(2);
+    expect(storeState.setAnalyzingRepository).toHaveBeenLastCalledWith(1, false);
   });
 
   it('does not enter the similar view after a switch', async () => {
@@ -485,11 +490,12 @@ describe('useRepositoryCardActions account switch guards', () => {
   });
 
   it('drops the stale similar result after A→B→A (generation advanced)', async () => {
-    // 审计修复（C31）：相似搜索在 A 发起后保持 pending，实际切号推进代次后
-    // 放行流水线结果——绝不进入相似视图，也不提示。
+    // 审计修复（C31/R2-C27）：相似搜索在 A 发起后保持 pending，实际切号推进
+    // 代次后放行一条有效的非空结果——若成功路径缺少会话守卫，enterSimilarView
+    // 断言必然失败（旧 mock 解析 undefined 会让成功路径抛错，掩盖该缺陷）。
     let releasePipeline!: () => void;
-    mocks.runSimilarRepositoryPipeline.mockImplementation(() => new Promise<void>((resolve) => {
-      releasePipeline = resolve;
+    mocks.runSimilarRepositoryPipeline.mockImplementation(() => new Promise((resolve) => {
+      releasePipeline = () => resolve({ repositories: [repository] });
     }));
     const { result } = renderActions();
     let promise!: Promise<void>;

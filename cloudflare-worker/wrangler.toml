@@ -6,8 +6,11 @@ compatibility_date = "2024-01-01"
 
 [vars]
 # 多账号共享同一索引时，/cleanup 需要按 accountId 元数据过滤。
-# ⚠️ 默认值保持 "false"（Issue #612 A28）：直接改成 "true" 会让单账号部署失去
-# 稠密向量召回（/status 返回 accountScopedCleanup:false 时搜索管线跳过稠密召回）。
+# ⚠️ 默认值保持 "false"（Issue #612 R2-A29 注释更正）：
+#   - 默认 "false" 时 /status 返回 accountScopedCleanup:false，客户端会跳过
+#     账号范围的稠密向量召回（降级为无过滤兼容路径）；
+#   - 未回填存量向量就直接设 "true" 会启用账号过滤，但元数据索引外的存量
+#     旧向量仍可能无法命中（漏召回）。
 # 启用必须走「部署/验证脚本确认」路径，而不是依赖本默认值：
 #   1. 创建元数据索引（存量向量需重新写入后才会带上 accountId）：
 #      npx wrangler vectorize create-metadata-index github-stars --property-name=accountId --type=string

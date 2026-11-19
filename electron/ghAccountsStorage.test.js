@@ -18,13 +18,19 @@ describe('ghAccountsStorage path helper', () => {
 });
 
 describe('ghAccountsStorage save, load, clear', () => {
-  const makeCtx = ({ available = true } = {}) => {
+  const makeCtx = ({ available = true, fsOverrides = {} } = {}) => {
     const storage = new Map();
     const fakeFs = {
       existsSync: (p) => storage.has(p),
       writeFileSync: (p, data) => storage.set(p, data),
       readFileSync: (p) => storage.get(p),
       unlinkSync: (p) => storage.delete(p),
+      renameSync: (from, to) => {
+        if (!storage.has(from)) throw new Error('ENOENT: temp file missing');
+        storage.set(to, storage.get(from));
+        storage.delete(from);
+      },
+      ...fsOverrides,
     };
     const fakeSafeStorage = available
       ? {
@@ -43,18 +49,55 @@ describe('ghAccountsStorage save, load, clear', () => {
   it('saves and loads account tokens with safeStorage encryption', () => {
     const { ctx } = makeCtx();
 
-    // Initial load: missing file yields null
-    assert.equal(loadEncryptedGhAccounts(ctx), null);
+    // Initial load: missing file yields a structured "missing" result (R2-B1)
+    assert.deepEqual(loadEncryptedGhAccounts(ctx), { status: 'missing' });
 
     const saveRes = saveEncryptedGhAccounts(ctx, { '42': 'ghp_token_1', '1002': 'github_pat_x' });
     assert.deepEqual(saveRes, { success: true });
 
     const loaded = loadEncryptedGhAccounts(ctx);
-    assert.deepEqual(loaded, { '42': 'ghp_token_1', '1002': 'github_pat_x' });
+    assert.deepEqual(loaded, { status: 'loaded', tokens: { '42': 'ghp_token_1', '1002': 'github_pat_x' } });
 
     const clearRes = clearEncryptedGhAccounts(ctx);
     assert.deepEqual(clearRes, { success: true });
-    assert.equal(loadEncryptedGhAccounts(ctx), null);
+    assert.deepEqual(loadEncryptedGhAccounts(ctx), { status: 'missing' });
+  });
+
+  it('writes atomically via a same-directory temp file (R2-B4)', () => {
+    const { ctx, storage } = makeCtx();
+    const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
+    const tempPath = `${filePath}.tmp`;
+
+    const saveRes = saveEncryptedGhAccounts(ctx, { '42': 'ghp_token_1' });
+    assert.deepEqual(saveRes, { success: true });
+    // Temp file is gone after the rename; only the target remains.
+    assert.equal(storage.has(tempPath), false);
+    assert.ok(storage.has(filePath));
+  });
+
+  it('keeps the previous map intact when the write fails mid-way (R2-B4)', () => {
+    const { ctx, storage } = makeCtx();
+    const filePath = path.join('/test/data', GH_ACCOUNTS_FILENAME);
+
+    // First save establishes a known-good file.
+    assert.deepEqual(saveEncryptedGhAccounts(ctx, { '42': 'ghp_old_token' }), { success: true });
+    const previousPayload = storage.get(filePath);
+
+    // Rename fails: the old file must survive and the temp file must be cleaned up.
+    const failingCtx = {
+      ...ctx,
+      fs: {
+        ...ctx.fs,
+        renameSync: () => {
+          throw new Error('rename failed: device busy');
+        },
+      },
+    };
+    const saveRes = saveEncryptedGhAccounts(failingCtx, { '1002': 'github_pat_new' });
+    assert.equal(saveRes.success, false);
+    assert.match(saveRes.error, /rename failed/);
+    assert.equal(storage.get(filePath), previousPayload);
+    assert.equal(storage.has(`${filePath}.tmp`), false);
   });
 
   it('unlinks the file when saving an empty map (nothing to persist)', () => {
@@ -66,16 +109,42 @@ describe('ghAccountsStorage save, load, clear', () => {
     assert.deepEqual(saveEncryptedGhAccounts(ctx, null), { success: true });
   });
 
+  it('returns success when saving an empty map without an existing file (R2-B3)', () => {
+    const { ctx } = makeCtx();
+    assert.deepEqual(saveEncryptedGhAccounts(ctx, {}), { success: true });
+  });
+
+  it('reports failure when the empty-map unlink fails on an existing file (R2-B3)', () => {
+    const { ctx, storage } = makeCtx({
+      fsOverrides: {
+        unlinkSync: () => {
+          throw new Error('EACCES: file locked');
+        },
+      },
+    });
+    storage.set(path.join('/test/data', GH_ACCOUNTS_FILENAME), Buffer.from('existing', 'utf-8'));
+
+    const saveRes = saveEncryptedGhAccounts(ctx, {});
+    assert.equal(saveRes.success, false);
+    assert.match(saveRes.error, /EACCES/);
+    // The stale file survives: the caller knows the wipe did not happen.
+    assert.equal(storage.size, 1);
+  });
+
   it('returns error and does not write plaintext file when safeStorage is unavailable', () => {
     const { ctx, storage } = makeCtx({ available: false });
 
     const saveRes = saveEncryptedGhAccounts(ctx, { '42': 'ghp_token_1' });
     assert.equal(saveRes.success, false);
     assert.equal(storage.size, 0);
-    assert.equal(loadEncryptedGhAccounts(ctx), null);
+    // R2-B1: unreadable disk state (encryption unavailable) is an error, not "missing".
+    storage.set(path.join('/test/data', GH_ACCOUNTS_FILENAME), Buffer.from('existing', 'utf-8'));
+    const loadRes = loadEncryptedGhAccounts(ctx);
+    assert.equal(loadRes.status, 'error');
+    assert.equal(typeof loadRes.error, 'string');
   });
 
-  it('handles corrupted file gracefully returning null', () => {
+  it('handles corrupted file gracefully returning a structured error (R2-B1)', () => {
     const storage = new Map();
     storage.set(path.join('/test/data', GH_ACCOUNTS_FILENAME), Buffer.from('not-json-garbage', 'utf-8'));
     const fakeFs = {
@@ -83,7 +152,29 @@ describe('ghAccountsStorage save, load, clear', () => {
       readFileSync: (p) => storage.get(p),
     };
     const ctx = { fs: fakeFs, pathModule: path, userDataPath: '/test/data', safeStorage: null };
-    assert.equal(loadEncryptedGhAccounts(ctx), null);
+    // With safeStorage unavailable the file cannot be read: error, not "missing".
+    const loadRes = loadEncryptedGhAccounts(ctx);
+    assert.equal(loadRes.status, 'error');
+  });
+
+  it('treats a zero-byte file as missing so the next save can rewrite it', () => {
+    const storage = new Map();
+    storage.set(path.join('/test/data', GH_ACCOUNTS_FILENAME), Buffer.alloc(0));
+    const fakeFs = {
+      existsSync: (p) => storage.has(p),
+      readFileSync: (p) => storage.get(p),
+    };
+    const ctx = {
+      fs: fakeFs,
+      pathModule: path,
+      userDataPath: '/test/data',
+      safeStorage: {
+        isEncryptionAvailable: () => true,
+        encryptString: (str) => Buffer.from(`ENC:${str}`, 'utf-8'),
+        decryptString: (buf) => buf.toString('utf-8').slice(4),
+      },
+    };
+    assert.deepEqual(loadEncryptedGhAccounts(ctx), { status: 'missing' });
   });
 
   it('rejects invalid payloads: non-numeric ids, control chars, oversized tokens, wrong types', () => {

@@ -1435,6 +1435,7 @@
     "cancel": "取消",
     "confirm": "添加并切换",
     "reauth-hint": "请为账号 @{{login}} 重新输入有效的 GitHub Token",
-    "account-mismatch": "该 Token 属于另一个 GitHub 账号，请使用 @{{login}} 的 Token 登录。"
+    "account-mismatch": "该 Token 属于另一个 GitHub 账号，请使用 @{{login}} 的 Token 登录。",
+    "backend-credential-sync-failed": "账号已添加，但后端凭据未能更新。请稍后重试。"
   }
 }

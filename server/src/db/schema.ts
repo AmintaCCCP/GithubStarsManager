@@ -64,6 +64,10 @@ export function initializeSchema(db: Database.Database): void {
       license TEXT,
       vector_indexed_license TEXT,
       ai_shared INTEGER DEFAULT 0,
+      -- Issue #612 R2-A10：按字段的 AI 成果共享授权位（与 v7 迁移一致）。
+      ai_summary_shared INTEGER DEFAULT 0,
+      ai_tags_shared INTEGER DEFAULT 0,
+      ai_platforms_shared INTEGER DEFAULT 0,
       PRIMARY KEY (account_id, id),
       UNIQUE (account_id, full_name)
     );
@@ -210,6 +214,10 @@ export function initializeSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'repositories', 'vector_indexed_license', 'TEXT');
   // 跨账号 AI 成果共享标记（Issue #612 A21）：写入 ai_* 的路由按账号设置置位。
   addColumnIfMissing(db, 'repositories', 'ai_shared', 'INTEGER DEFAULT 0');
+  // 按字段的 AI 成果共享授权位（Issue #612 R2-A10，v7 迁移同样补列）。
+  addColumnIfMissing(db, 'repositories', 'ai_summary_shared', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'ai_tags_shared', 'INTEGER DEFAULT 0');
+  addColumnIfMissing(db, 'repositories', 'ai_platforms_shared', 'INTEGER DEFAULT 0');
 
   // 跨账号 AI 成果回填子查询（repositories.ts / accountScope.ts）按 `id = ? AND
   // account_id != ?` 检索捐赠行；复合主键 (account_id, id) 无法命中纯 id 条件，

@@ -66,21 +66,27 @@ function isAiResultSharingEnabled(db: ReturnType<typeof getDb>, accountId: strin
   }
 }
 
+/** 字段级非空判断（R2-A10）：文本字段（ai_summary）。 */
+function hasNonEmptyTextField(value: unknown): boolean {
+  return typeof value === 'string' ? value !== '' : value != null;
+}
+
+/** 字段级非空判断（R2-A10）：JSON 列表字段（ai_tags / ai_platforms），'[]' 视为空。 */
+function hasNonEmptyJsonListField(value: unknown): boolean {
+  return Array.isArray(value)
+    ? value.length > 0
+    : typeof value === 'string' ? value !== '' && value !== '[]' : value != null;
+}
+
 /** 该仓库载荷是否携带非空 AI 分析内容（ai_summary / ai_tags / ai_platforms 任一非空）。 */
 function hasAiContent(row: {
   ai_summary?: unknown;
   ai_tags?: unknown;
   ai_platforms?: unknown;
 }): boolean {
-  const summary = row.ai_summary;
-  const tags = row.ai_tags;
-  const platforms = row.ai_platforms;
-  const summaryFilled = typeof summary === 'string' ? summary !== '' : summary != null;
-  const tagsFilled = Array.isArray(tags) ? tags.length > 0 : typeof tags === 'string' ? tags !== '' && tags !== '[]' : tags != null;
-  const platformsFilled = Array.isArray(platforms)
-    ? platforms.length > 0
-    : typeof platforms === 'string' ? platforms !== '' && platforms !== '[]' : platforms != null;
-  return summaryFilled || tagsFilled || platformsFilled;
+  return hasNonEmptyTextField(row.ai_summary)
+    || hasNonEmptyJsonListField(row.ai_tags)
+    || hasNonEmptyJsonListField(row.ai_platforms);
 }
 
 /** Transform a database row into the API response shape, parsing JSON columns. */
@@ -140,7 +146,9 @@ router.get('/api/repositories', (req, res) => {
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
-    sql += ' ORDER BY stargazers_count DESC LIMIT ? OFFSET ?';
+    // Issue #612 R2-A20：次级排序键保证页边界并列记录的顺序唯一（与客户端
+    // 分页拼装的 backendAdapter 语义一致），避免翻页时同一仓库跨页重复/丢失。
+    sql += ' ORDER BY stargazers_count DESC, id ASC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
     const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
@@ -242,8 +250,10 @@ router.put('/api/repositories', (req, res) => {
     // 已分析过的同一仓库的成果（账号归属隔离，免去重复 AI Token 消耗）。
     // 已存储的 '[]'（普通同步对缺省字段的默认序列化）与 ''/NULL 一律视为
     // 「可回填」，当前账号已有非空值时保留其值。
-    // Issue #612 A21：跨账号复用只允许选择 ai_shared = 1 的来源记录——共享标记
-    // 由捐赠账号的 ai_result_sharing_enabled 设置在写入时置位（默认关闭）。
+    // Issue #612 A21：跨账号复用只允许选择已授权共享的来源记录。
+    // Issue #612 R2-A10：共享授权按字段记录（ai_summary_shared / ai_tags_shared /
+    // ai_platforms_shared，v7 迁移加列）——本次提交只授权本次提交的字段，
+    // 整行 ai_shared 标记保留为兼容标记，回填查询一律按字段授权过滤。
     const aiSharedFlag = isAiResultSharingEnabled(db, accountId) ? 1 : 0;
     if (expectedRevision !== null) {
       const currentRevision = getAccountRevision(db, accountId);
@@ -266,8 +276,9 @@ router.put('/api/repositories', (req, res) => {
         subscribed_to_releases, vector_indexed_at, license, vector_indexed_license,
         description_display, tags_display,
         ai_shared,
+        ai_summary_shared, ai_tags_shared, ai_platforms_shared,
         account_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(account_id, id) DO UPDATE SET
         name = excluded.name,
         full_name = excluded.full_name,
@@ -289,7 +300,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.ai_summary FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_summary_shared = 1
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             LIMIT 1
           ), repositories.ai_summary)
@@ -301,7 +312,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.ai_tags FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_tags_shared = 1
               AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
             LIMIT 1
           ), repositories.ai_tags)
@@ -313,7 +324,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.ai_platforms FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_platforms_shared = 1
               AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
             LIMIT 1
           ), repositories.ai_platforms)
@@ -325,19 +336,35 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_summary_shared = 1
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), repositories.analyzed_at)
         END,
         -- Issue #612 A21：写入 AI 内容的行按当前账号的共享设置置位 ai_shared；
         -- 不携带 AI 内容的载荷保留已存储标记（可能是回填得到的共享成果）。
+        -- Issue #612 R2-A10：整行 ai_shared 仅为兼容标记，回填查询按下方
+        -- ai_*_shared 字段授权过滤；本次提交只授权本次提交的 AI 字段。
         ai_shared = CASE
           WHEN (excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '')
             OR (excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]')
             OR (excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]')
           THEN @aiShared
           ELSE repositories.ai_shared
+        END,
+        -- R2-A10：按字段授权——载荷携带该字段（非空）且共享开启时置位，
+        -- 否则保留已存储的授权（先前未授权的字段绝不因其他字段的更新被共享）。
+        ai_summary_shared = CASE
+          WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN @aiShared
+          ELSE repositories.ai_summary_shared
+        END,
+        ai_tags_shared = CASE
+          WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN @aiShared
+          ELSE repositories.ai_tags_shared
+        END,
+        ai_platforms_shared = CASE
+          WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN @aiShared
+          ELSE repositories.ai_platforms_shared
         END,
         analysis_failed = excluded.analysis_failed,
         -- 同步只接收整仓快照：字段缺省即表示客户端已无自定义内容，须照实覆盖，
@@ -372,7 +399,10 @@ router.put('/api/repositories', (req, res) => {
     // （更新）路径；首次 INSERT 不进入该分支。这里对当前账号分区中仍缺 AI
     // 成果的仓库（含本次首次插入的行）统一补齐同库其他账号对同一仓库的
     // 已有分析成果，只补缺失字段、绝不覆盖当前账号已有非空值。
-    // Issue #612 A21：只允许选择 ai_shared = 1 的来源记录；
+    // Issue #612 A21：只允许选择已授权共享的来源记录。
+    // Issue #612 R2-A10：回填一律按字段授权过滤（ai_summary_shared /
+    // ai_tags_shared / ai_platforms_shared；analyzed_at 随 ai_summary 授权）——
+    // 先前未授权的字段绝不因其他字段的共享而进入回填同步。
     // Issue #612 A22：增量同步限定为本批新增/更新的仓库 ID（按 900 个一组
     // 分块以规避 SQLite 变量上限），不再每次扫描整个分区；整分区补齐如仍
     // 需要，作为独立维护任务传入 null 显式触发。
@@ -383,7 +413,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.ai_summary FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_summary_shared = 1
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             LIMIT 1
           ), ai_summary)
@@ -393,7 +423,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.ai_tags FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_tags_shared = 1
               AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
             LIMIT 1
           ), ai_tags)
@@ -403,7 +433,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.ai_platforms FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_platforms_shared = 1
               AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
             LIMIT 1
           ), ai_platforms)
@@ -413,7 +443,7 @@ router.put('/api/repositories', (req, res) => {
             SELECT other.analyzed_at FROM repositories AS other
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
-              AND other.ai_shared = 1
+              AND other.ai_summary_shared = 1
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), analyzed_at)
@@ -479,6 +509,11 @@ router.put('/api/repositories', (req, res) => {
           toDisplayPref(repo.description_display, DESCRIPTION_DISPLAY_VALUES),
           toDisplayPref(repo.tags_display, TAGS_DISPLAY_VALUES),
           aiSharedValue,
+          // Issue #612 R2-A10：首次 INSERT 的按字段授权只覆盖本载荷携带的
+          // 非空 AI 字段（更新路径由 ON CONFLICT 的 CASE 表达式按字段处理）。
+          hasNonEmptyTextField(repo.ai_summary) ? aiSharedFlag : 0,
+          hasNonEmptyJsonListField(repo.ai_tags) ? aiSharedFlag : 0,
+          hasNonEmptyJsonListField(repo.ai_platforms) ? aiSharedFlag : 0,
           accountId,
           { licenseProvided, aiShared: aiSharedFlag }
         );
@@ -574,8 +609,24 @@ router.patch('/api/repositories/:id', (req, res) => {
       }
     }
 
-    // Issue #612 A21：写入 AI 分析内容的请求按账号共享设置持久化 ai_shared 标记。
+    // Issue #612 A21：写入 AI 分析内容的请求按账号共享设置持久化共享标记。
+    // Issue #612 R2-A10：共享授权按本次提交控制——PATCH 只授权本次提交的
+    // AI 字段（ai_summary_shared / ai_tags_shared / ai_platforms_shared 分别
+    // 置位），先前未授权的字段绝不因本次更新被标记共享；整行 ai_shared 仅为
+    // 兼容标记，回填查询按字段授权过滤。
     const aiSharedFlag = isAiResultSharingEnabled(db, accountId) ? 1 : 0;
+    if ('ai_summary' in updates) {
+      setClauses.push('ai_summary_shared = ?');
+      values.push(aiSharedFlag);
+    }
+    if ('ai_tags' in updates) {
+      setClauses.push('ai_tags_shared = ?');
+      values.push(aiSharedFlag);
+    }
+    if ('ai_platforms' in updates) {
+      setClauses.push('ai_platforms_shared = ?');
+      values.push(aiSharedFlag);
+    }
     if (['ai_summary', 'ai_tags', 'ai_platforms'].some((key) => key in updates)) {
       setClauses.push('ai_shared = ?');
       values.push(aiSharedFlag);
@@ -633,8 +684,16 @@ router.delete('/api/repositories/:id', (req, res) => {
     const deleteRepo = db.prepare('DELETE FROM repositories WHERE account_id = ? AND id = ?');
 
     const deleteAll = db.transaction(() => {
+      // Issue #612 R2-A9：事务内先确认目标仓库存在——不存在时不改动任何数据
+      // （尤其不得提交已删除的关联发行版），按现有语义返回 REPOSITORY_NOT_FOUND；
+      // 存在时才删除关联发行版与仓库，并在提交前推进账号快照版本。
+      const existing = db.prepare('SELECT 1 AS one FROM repositories WHERE account_id = ? AND id = ?')
+        .get(accountId, id);
+      if (!existing) return null;
       const releaseResult = deleteReleases.run(accountId, id);
       const repoResult = deleteRepo.run(accountId, id);
+      // Issue #612 A20x：仓库写入成功后递增快照版本（提交前推进）。
+      bumpAccountRevision(db, accountId);
 
       return {
         releasesDeleted: releaseResult.changes,
@@ -644,13 +703,10 @@ router.delete('/api/repositories/:id', (req, res) => {
 
     const result = deleteAll();
 
-    if (result.repoDeleted === 0) {
+    if (result === null) {
       res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
       return;
     }
-
-    // Issue #612 A20x：仓库写入成功后递增快照版本。
-    bumpAccountRevision(db, accountId);
 
     res.json({
       deleted: true,

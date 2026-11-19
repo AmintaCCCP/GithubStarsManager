@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useAppStore } from '../../../store/useAppStore';
 
 const mocks = vi.hoisted(() => ({
   apiTokens: [] as string[],
@@ -8,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   backend: {
     configuredUrl: 'https://backend.example/api',
     backendUrl: null as string | null,
+    persistedUrl: null as string | null,
     init: vi.fn(),
     isAvailable: true,
     verifyAuth: vi.fn(),
     restoreAuth: vi.fn(),
     syncSettings: vi.fn(),
     rememberActiveUrl: vi.fn(),
+    persistUrl: vi.fn(),
   },
 }));
 
@@ -35,6 +38,13 @@ vi.mock('../../../services/autoSync', () => ({
   withAccountSwitchFrozen: (fn: () => Promise<unknown>) => fn(),
 }));
 
+// 恢复真实 Store：全局 setup.ts 将 ../store/useAppStore mock 成选择器桩，
+// 而 rollbackBackendConnection 的密钥成对恢复（R2-B11）需要驱动真实 Store。
+vi.mock('../../../store/useAppStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../store/useAppStore')>();
+  return actual;
+});
+
 import { useLoginActions } from './useLoginActions';
 
 const user = { id: 1, login: 'octocat' };
@@ -45,6 +55,11 @@ describe('useLoginActions', () => {
     mocks.apiTokens.splice(0);
     mocks.backend.isAvailable = true;
     mocks.backend.backendUrl = null;
+    mocks.backend.persistedUrl = null;
+    // 模拟真实适配器语义：init 成功提交后活跃 URL 随之切换。
+    mocks.backend.init.mockImplementation(async (url?: string) => {
+      mocks.backend.backendUrl = url ?? null;
+    });
     mocks.backend.verifyAuth.mockResolvedValue(true);
     mocks.backend.restoreAuth.mockResolvedValue({ github_token: 'ghp_restored', accounts: [] });
     mocks.getCurrentUser.mockResolvedValue(user);
@@ -76,6 +91,15 @@ describe('useLoginActions', () => {
       status: 'github-token-required',
     });
     expect(mocks.getCurrentUser).not.toHaveBeenCalled();
+    expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
+  });
+
+  it('defers URL persistence when the caller asks for it (R2-B12)', async () => {
+    const { result } = renderHook(() => useLoginActions());
+
+    await expect(result.current.restoreBackendSession('https://backend.example', { deferPersist: true }))
+      .resolves.toMatchObject({ status: 'connected' });
+    // 候选仅完成身份验证不持久化 URL：调用方接受恢复结果并提交登录后再保存。
     expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
   });
 
@@ -150,10 +174,50 @@ describe('useLoginActions', () => {
       undefined,
       '1',
     );
-    expect(mocks.backend.rememberActiveUrl).toHaveBeenCalledOnce();
+    // R2-B12：Token 设置完成不等于登录提交成功——持久化 URL 改由调用方在
+    // 登录提交后经 rememberActiveBackendUrl 执行，严格仓库拉取失败保留原值。
+    expect(mocks.backend.rememberActiveUrl).not.toHaveBeenCalled();
     expect(mocks.syncFromBackend).not.toHaveBeenCalled();
 
     await result.current.syncBackendData();
     expect(mocks.syncFromBackend).toHaveBeenCalledWith({ force: true, throwOnRepoFailure: true });
+  });
+
+  it('restores the persisted URL through the exposed wrappers (R2-B7)', async () => {
+    const { result } = renderHook(() => useLoginActions());
+    mocks.backend.persistedUrl = 'https://stored.example/api';
+    expect(result.current.getPersistedUrl()).toBe('https://stored.example/api');
+
+    result.current.persistUrl(null);
+    expect(mocks.backend.persistUrl).toHaveBeenLastCalledWith(null);
+    result.current.persistUrl('https://stored.example/api');
+    expect(mocks.backend.persistUrl).toHaveBeenLastCalledWith('https://stored.example/api');
+    mocks.backend.persistedUrl = null;
+    expect(result.current.getPersistedUrl()).toBeNull();
+  });
+
+  it('restores the API key together with the URL on rollback (R2-B11)', async () => {
+    const { result } = renderHook(() => useLoginActions());
+    useAppStore.setState({ backendApiSecret: 'candidate-secret' });
+
+    // URL 不同：先复原连接，再成对写回原密钥。
+    mocks.backend.backendUrl = 'https://candidate.example/api';
+    await result.current.rollbackBackendConnection('https://old.example/api', 'original-secret');
+    expect(mocks.backend.init).toHaveBeenLastCalledWith('https://old.example/api');
+    expect(useAppStore.getState().backendApiSecret).toBe('original-secret');
+
+    // URL 已一致时也要恢复密钥（候选连接被 restoreBackendSession 内部复原的
+    // 场景）：不再重复 init，但密钥必须成对复原。
+    useAppStore.setState({ backendApiSecret: 'candidate-secret' });
+    await result.current.rollbackBackendConnection('https://old.example/api', 'original-secret');
+    expect(mocks.backend.init).toHaveBeenCalledOnce();
+    expect(useAppStore.getState().backendApiSecret).toBe('original-secret');
+
+    // secret 为 undefined：不改动密钥。
+    useAppStore.setState({ backendApiSecret: 'keep-me' });
+    await result.current.rollbackBackendConnection(null);
+    expect(useAppStore.getState().backendApiSecret).toBe('keep-me');
+    // 原连接为 null：显式断开（C63），绝不经 init 触发候选后端自动探测。
+    expect(mocks.backend.init).toHaveBeenCalledOnce();
   });
 });

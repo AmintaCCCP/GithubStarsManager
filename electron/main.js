@@ -904,8 +904,17 @@ ipcMain.handle('gh-accounts:save', async (_event, tokens) => {
 });
 
 ipcMain.handle('gh-accounts:get', async () => {
+  // 审计修复（R2-B1）：加载结果结构化——missing（无文件）/ loaded（有效映射）/
+  // error（读取失败，渲染端不得据此覆写磁盘）。不再把读取失败折叠为
+  // 「磁盘上没有 Token」。
   const result = loadEncryptedGhAccounts({ fs, pathModule: path, userDataPath: app.getPath('userData'), safeStorage });
-  console.log('[gh-accounts:get] result:', result ? `found ${Object.keys(result).length} account tokens` : 'no account tokens on disk');
+  if (result.status === 'loaded') {
+    console.log('[gh-accounts:get] result: found', Object.keys(result.tokens).length, 'account tokens');
+  } else if (result.status === 'missing') {
+    console.log('[gh-accounts:get] result: no account tokens on disk');
+  } else {
+    console.log('[gh-accounts:get] result: FAIL:', result.error);
+  }
   return result;
 });
 

@@ -70,7 +70,7 @@ const makeEnv = (indexIds: string[]): CleanupEnv & { deleted: string[]; queries:
   } as CleanupEnv & { deleted: string[]; queries: number };
 };
 
-const postCleanup = async (worker: WorkerModule, env: CleanupEnv, body: unknown): Promise<{ deleted: number }> => {
+const postCleanup = async (worker: WorkerModule, env: CleanupEnv, body: unknown): Promise<{ deleted: number; partial?: boolean; verified?: boolean }> => {
   const request = new Request('https://worker.example.com/cleanup', {
     method: 'POST',
     headers: AUTHED_HEADERS,
@@ -78,7 +78,7 @@ const postCleanup = async (worker: WorkerModule, env: CleanupEnv, body: unknown)
   });
   const response = await worker.default.fetch(request, env);
   expect(response.status).toBe(200);
-  const payload = await response.json() as { success: boolean; deleted: number };
+  const payload = await response.json() as { success: boolean; deleted: number; partial?: boolean; verified?: boolean };
   expect(payload.success).toBe(true);
   return payload;
 };
@@ -227,5 +227,54 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     delete env.ACCOUNT_METADATA_INDEXED;
     const status = await getStatus(worker, env);
     expect(status.accountScopedCleanup).toBe(false);
+  });
+
+  it('verifies completion via the paginated vector list API when available (R2-A28)', async () => {
+    const worker = await loadWorker(path);
+    const deleted: string[] = [];
+    const listedPages: Array<Array<{ id: string }>> = [
+      [{ id: '1:101' }, { id: '1:102' }],
+      [{ id: '2:201' }],
+    ];
+    const env = {
+      AUTH_TOKEN: 'worker-token',
+      ACCOUNT_METADATA_INDEXED: 'true',
+      VECTORIZE: {
+        describe: async () => ({ vectorCount: 3, dimensions: 3 }),
+        // 分页列举：游标耗尽后 Worker 可验证「不存在待删向量」→ partial: false
+        list: async (options?: { cursor?: string }) => {
+          const page = listedPages[options?.cursor ? 1 : 0];
+          return { vectors: page, nextCursor: options?.cursor ? undefined : 'page-2' };
+        },
+        query: async () => {
+          throw new Error('sampling must not be used when the list API is available');
+        },
+        deleteByIds: async (ids: string[]) => {
+          deleted.push(...ids);
+        },
+        upsert: async () => undefined,
+      },
+    } as unknown as CleanupEnv;
+
+    const payload = await postCleanup(worker, env, {
+      keepIds: ['1:101'],        // 102 已被 unstar → 可删除；2:201 其他账号 → 保留
+      accountPrefix: '1',
+    });
+    expect(payload.deleted).toBe(1);
+    expect(payload.partial).toBe(false);
+    expect(deleted).toEqual(['1:102']);
+  });
+
+  it('marks the result unverified instead of complete when only sampling is available (R2-A28)', async () => {
+    const worker = await loadWorker(path);
+    const env = makeEnv(['1:101', '1:102']);
+    const payload = await postCleanup(worker, env, {
+      keepIds: ['1:101'],        // 102 已被 unstar → 可删除
+      accountPrefix: '1',
+    });
+    expect(payload.deleted).toBe(1);
+    // 采样无法证明「不存在待删向量」：保持 partial: true 并显式标注未验证
+    expect(payload.partial).toBe(true);
+    expect(payload.verified).toBe(false);
   });
 });

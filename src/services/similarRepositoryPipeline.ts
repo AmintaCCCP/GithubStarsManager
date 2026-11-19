@@ -51,6 +51,9 @@ interface DenseOutcome {
  * 「索引不可用/需重建」，重建入口沿用现有的 VectorSearchSettings 重建按钮。
  */
 const DENSE_INDEX_UNAVAILABLE_ERROR = 'Vector index is not ready for account-scoped recall; rebuild the index in Vector Search settings for the current account';
+// R2-C26：区分三种稠密召回不可用的情形，只有确认需要回填时才建议重建。
+const DENSE_INDEX_WORKER_UNSUPPORTED_ERROR = 'Vector worker does not support account-scoped recall; deploy the bundled cloudflare-worker and retry';
+const DENSE_INDEX_STATUS_FAILED_ERROR = 'Failed to verify the vector index status for account-scoped recall; retry later';
 
 export interface RunSimilarRepositoryPipelineOptions {
   source: Repository;
@@ -387,12 +390,19 @@ export async function runSimilarRepositoryPipeline(
     }
     const denseScope = await denseScopePromise;
     if (denseScope.skip) {
-      // 审计修复（C15）：索引对当前账号不可用（未确认归属/需重建）时按失败
-      // 语义单独报告，绝不当作成功的空结果；本地召回结果照常保留。
-      logger.warn('vector-search', `${prefix} dense recall skipped: account-scoped index not ready; rebuild the index for the current account`, {
+      // 审计修复（C15/R2-C26）：索引对当前账号不可用时按失败语义单独报告，
+      // 绝不当作成功的空结果；提示按原因细分——部署不支持账号筛选的新版
+      // Worker、状态请求暂时失败、或索引确实需要回填重建。
+      const message = denseScope.reason === 'worker-unsupported'
+        ? DENSE_INDEX_WORKER_UNSUPPORTED_ERROR
+        : denseScope.reason === 'status-failed'
+          ? DENSE_INDEX_STATUS_FAILED_ERROR
+          : DENSE_INDEX_UNAVAILABLE_ERROR;
+      logger.warn('vector-search', `${prefix} dense recall skipped: ${message}`, {
         accountId: options.accountIdScope?.accountId ?? null,
+        reason: denseScope.reason ?? 'needs-backfill',
       });
-      return { matches: [], success: false, error: DENSE_INDEX_UNAVAILABLE_ERROR, indexUnavailable: true };
+      return { matches: [], success: false, error: message, indexUnavailable: true };
     }
     let embeddingTimedOut = false;
     const embeddingStarted = Date.now();

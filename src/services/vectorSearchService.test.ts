@@ -558,6 +558,16 @@ describe('VectorSearchService.cleanup 账号范围参数（R5 发现 2）', () =
     expect(JSON.parse(capturedBody)).toEqual({ keepIds: ['1'], includeLegacy: false });
   });
 
+  it('rejects an explicit empty accountPrefix instead of silently sending an unscoped cleanup (R2-C25)', async () => {
+    const fetchMock = stubFetch(() => undefined);
+    const service = new VectorSearchService({ workerUrl: 'https://worker.example.com/', authToken: 't' });
+
+    await expect(service.cleanup(['1'], { accountPrefix: '' })).rejects.toThrow(
+      'accountPrefix must be a non-empty string',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('keeps the legacy (keepIds, signal) call signature working', async () => {
     let capturedBody = '';
     let capturedSignal: AbortSignal | null | undefined;

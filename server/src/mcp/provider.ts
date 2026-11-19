@@ -7,7 +7,7 @@ import {
   getLegacyDefaultClaimedBy,
   hasMultipleAccountPartitions,
   getPartitionMeta,
-  setPartitionMeta,
+  bumpAccountRevision,
 } from '../db/accountScope.js';
 import {
   type McpRepository,
@@ -282,53 +282,108 @@ const FETCH_TIMEOUT_MS = 15_000;
 /** partition_meta 标记：该账号分区的账号元数据回填探测已完成（避免重复探测）。 */
 const VECTOR_BACKFILL_CHECKED_KEY = 'vector_account_backfill_checked';
 
+/** 诊断探测查询的 topK 上限（与 Worker /query 的 QUERY_TOPK_LIMIT 一致）。 */
+const VECTOR_PROBE_TOPK = 50;
+
 /**
- * Issue #612 A25：旧索引标记（v4 迁移 / 无冲突认领保留的 legacy 向量）触发账号
- * 元数据回填。服务端无法对存量向量增量补写元数据（向量由客户端生成上传），
- * 恢复路径是全量重建：探测到当前账号仍存在无 accountId 元数据的 legacy 向量时，
- * 清除该分区所有 vector_indexed_at 标记，客户端下次同步将携带 accountId 元数据
- * 重新上传。探测与重建以 partition_meta 标记保证只触发一次；探测失败不置位，
- * 下次查询重试。无法探测时调用方保持按账号过滤被拒的现状。
+ * Issue #612 A25（R2-A11/A12/A13/A14 修订）：旧索引标记（v4 迁移 / 无冲突认领
+ * 保留的 legacy 向量）触发账号元数据回填。服务端无法对存量向量增量补写元数据
+ * （向量由客户端生成上传），恢复路径是全量重建。
+ *
+ * 探测流程（R2-A11）：
+ * - 使用独立于用户查询参数的诊断请求（topK=探针上限、threshold=0），不复用
+ *   用户查询的有限 topK/threshold；
+ * - 仅当 Worker /status 报告的向量数不超过单次探测窗口时，一次探测才能完整
+ *   确认索引归属——确认无 legacy 向量时只标记完成；
+ * - 无法完整确认（/status 不可用或向量数超出窗口）或探测到 legacy 向量时，
+ *   明确安排一次全量重建（清除该分区 vector_indexed_at，客户端下次同步携带
+ *   accountId 元数据重新上传）后再标记完成。
+ *
+ * 写入流程（R2-A13/A14）：
+ * - 完成标记的重查、索引标记清除与版本推进在同一写事务内执行；迟到的并发
+ *   探测不得再次清除已重建的索引状态；
+ * - 任一写入失败回滚事务并向外传播（不吞异常），失败可重试；
+ * - 仅当确实清除了索引标记才推进对应账号快照版本。
+ * 探测阶段的网络失败不标记、静默返回，下次查询重试。
  */
 async function ensureAccountVectorMetadataBackfill(
   db: ReturnType<typeof getDb>,
   accountId: string,
-  sendUnscopedQuery: () => Promise<Response>,
+  workerUrl: string,
+  queryHeaders: Record<string, string>,
+  queryVector: number[],
 ): Promise<void> {
   if (accountId === 'default') return;
   if (getPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY) === '1') return;
+
+  // ── 探测阶段（网络）：失败静默返回，不置位，下次查询重试 ──
+  let probeMatches: Array<{ id: string; metadata?: Record<string, unknown> }>;
+  let vectorCount: number | null = null;
   try {
-    const probe = await sendUnscopedQuery();
-    if (!probe.ok) return; // Worker 不可用 / 被拒：不置位，下次重试
-    let payload: { matches?: Array<{ id: string; metadata?: Record<string, unknown> }> };
-    try {
-      payload = (await probe.json()) as typeof payload;
-    } catch {
-      return;
-    }
-    if (!payload || !Array.isArray(payload.matches)) return;
-    const repos = loadAllRepositories(accountId);
-    const byId = new Map(repos.map((r) => [String(r.id), r]));
-    const hasLegacyVectors = payload.matches.some((m) => {
-      const rawId = String(m.id);
-      if (!/^\d+$/.test(rawId)) return false; // 带账号前缀的向量已带元数据
-      const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
-      if (metaAccountId && metaAccountId !== accountId) return false;
-      return byId.has(rawId);
+    const probe = await fetchWithTimeout(`${workerUrl}/query`, {
+      method: 'POST',
+      headers: queryHeaders,
+      body: JSON.stringify({ vector: queryVector, topK: VECTOR_PROBE_TOPK, threshold: 0 }),
     });
-    setPartitionMeta(db, accountId, VECTOR_BACKFILL_CHECKED_KEY, '1');
-    if (hasLegacyVectors) {
-      // 全量重建作为恢复路径：标记被清除后由客户端重建并重新上传（带元数据）。
-      db.prepare(
-        'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
-      ).run(accountId);
-      logger.warn('mcp.vector', 'Legacy vectors without accountId metadata detected; repo index markers cleared for rebuild', {
-        accountId,
-      });
+    if (!probe.ok) return; // Worker 不可用 / 被拒：不置位，下次重试
+    const payload = (await probe.json().catch(() => null)) as
+      | { matches?: Array<{ id: string; metadata?: Record<string, unknown> }> }
+      | null;
+    if (!payload || !Array.isArray(payload.matches)) return;
+    probeMatches = payload.matches;
+
+    const statusRes = await fetchWithTimeout(`${workerUrl}/status`, { headers: queryHeaders });
+    if (statusRes.ok) {
+      const status = (await statusRes.json().catch(() => null)) as { vectorCount?: unknown } | null;
+      if (status && typeof status.vectorCount === 'number' && Number.isFinite(status.vectorCount)) {
+        vectorCount = status.vectorCount;
+      }
     }
   } catch (err) {
     logger.warn('mcp.vector', 'Account metadata backfill probe failed', {
       error: err instanceof Error ? err.message : String(err),
+    });
+    return;
+  }
+
+  const repos = loadAllRepositories(accountId);
+  const byId = new Map(repos.map((r) => [String(r.id), r]));
+  const hasLegacyVectors = probeMatches.some((m) => {
+    const rawId = String(m.id);
+    if (!/^\d+$/.test(rawId)) return false; // 带账号前缀的向量已带元数据
+    const metaAccountId = typeof m.metadata?.accountId === 'string' ? m.metadata.accountId : null;
+    if (metaAccountId && metaAccountId !== accountId) return false;
+    return byId.has(rawId);
+  });
+  // 完整确认条件：索引规模不超出单次探测窗口（threshold=0 时窗口即全量）。
+  const canFullyConfirm = vectorCount !== null && vectorCount <= VECTOR_PROBE_TOPK;
+  // 无法可靠确认归属（窗口不足 / /status 不可用）或确认存在 legacy 向量时，
+  // 明确安排一次全量重建；完整确认无 legacy 向量时仅标记完成。
+  const scheduleRebuild = hasLegacyVectors || !canFullyConfirm;
+
+  // ── 写入阶段（R2-A13/A14）：单事务，失败回滚并向上传播 ──
+  const applyBackfillDecision = db.transaction((): boolean => {
+    // 重新检查完成标记：迟到的并发探测不得再次清除已重建的索引状态。
+    const claimedRow = db
+      .prepare('SELECT value FROM partition_meta WHERE account_id = ? AND key = ?')
+      .get(accountId, VECTOR_BACKFILL_CHECKED_KEY) as { value: string | null } | undefined;
+    if (claimedRow && claimedRow.value === '1') return false;
+    if (scheduleRebuild) {
+      const cleared = db.prepare(
+        'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
+      ).run(accountId).changes;
+      // 仅当确实清除了索引标记才推进对应账号快照版本。
+      if (cleared > 0) bumpAccountRevision(db, accountId);
+    }
+    db.prepare('INSERT OR REPLACE INTO partition_meta (account_id, key, value) VALUES (?, ?, ?)')
+      .run(accountId, VECTOR_BACKFILL_CHECKED_KEY, '1');
+    return scheduleRebuild;
+  });
+
+  const rebuilt = applyBackfillDecision();
+  if (rebuilt) {
+    logger.warn('mcp.vector', 'Account vector index rebuild scheduled (legacy vectors detected or ownership unverifiable)', {
+      accountId,
     });
   }
 }
@@ -522,9 +577,17 @@ export async function vectorSearch(
     }),
   });
 
+  // Issue #612 R2-A12：default（无活跃账号）查询同样要向 Worker 提供能隔离
+  // default 候选的范围（accountId='default' 过滤），避免其他账号候选占满
+  // topK 后被本地丢弃、共享索引中其他账号的 legacy 向量串入候选。仅当能确认
+  // 索引中无其他账号候选（本部署无其他账号分区——与 A26 的单账号判定一致）
+  // 时保留无范围兼容路径，保证单租户 legacy 索引的召回不受影响。
+  const workerScope = accountId !== 'default'
+    ? accountId
+    : (hasMultipleAccountPartitions(db) ? 'default' : undefined);
   let res: Response;
   try {
-    res = await sendWorkerQuery(accountId !== 'default' ? accountId : undefined);
+    res = await sendWorkerQuery(workerScope);
   } catch {
     // 连接失败 / 15s 超时 abort 都走这里；findSimilarRepositories 依赖本函数
     // 永不 throw，异常必须折叠进声明的 { available: false } 结果
@@ -537,9 +600,9 @@ export async function vectorSearch(
     const text = await res.text().catch(() => '');
     const isMetadataNotIndexed = res.status === 400 && text.includes('ACCOUNT_METADATA_NOT_INDEXED');
     if (isMetadataNotIndexed && accountId !== 'default' && getLegacyDefaultClaimedBy(db) === accountId) {
-      // Issue #612 A25：在启用 accountId 过滤前完成存量向量元数据回填——探测到
-      // 无 accountId 元数据的 legacy 向量时清除重建标记（全量重建恢复路径）。
-      await ensureAccountVectorMetadataBackfill(db, accountId, () => sendWorkerQuery(undefined));
+      // Issue #612 A25：在启用 accountId 过滤前完成存量向量元数据回填——探测
+      // 无法可靠确认索引归属时明确安排一次全量重建（R2-A11/A13/A14）。
+      await ensureAccountVectorMetadataBackfill(db, accountId, workerUrl, queryHeaders, vector);
       // Issue #612 A26：无范围兼容查询仅当能确认 Worker 候选集属于单账号部署
       // 时才允许——单账号判定纳入 accounts 与全部分区表，不再只看 repositories。
       const isSingleAccount = !hasMultipleAccountPartitions(db);
@@ -556,6 +619,9 @@ export async function vectorSearch(
       } else {
         return { available: false, reason: 'account_metadata_not_indexed' };
       }
+    } else if (isMetadataNotIndexed) {
+      // R2-A12：default 范围查询在元数据索引未就绪时同样声明语义化原因。
+      return { available: false, reason: 'account_metadata_not_indexed' };
     } else {
       return { available: false, reason: `worker_query_failed: ${res.status} ${text.slice(0, 120)}` };
     }

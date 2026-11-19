@@ -81,17 +81,25 @@ npm run deploy
 >      **确认归属后重新上传原向量**（确认该向量属于当前账号后，由客户端携带
 >      `accountId` 元数据原样重传）。跳过任一步骤都会让这些仓库在账号过滤查询中
 >      永久失召。
-> 3. **启用账号过滤标志前，用「账号过滤查询」验证回填结果**，而不是只测 Worker
->    连通性：
+> 3. **验证回填结果（R2-A30 步骤更正）**：`ACCOUNT_METADATA_INDEXED` 默认为
+>    `"false"` 时，带 `accountId` 的 `/query` 会**无条件**返回
+>    `ACCOUNT_METADATA_NOT_INDEXED`（开关门控），因此「请求被拒」不能作为
+>    索引未生效的证据。正确流程是**临时启用 → 验证已知账号向量 → 失败回滚**：
 >    ```bash
+>    # 1) 临时以显式标记部署（不影响 wrangler.toml 默认值）
+>    npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:true
+>    # 2) 用一个已知属于该账号的仓库向量做账号过滤查询，验证能命中
 >    curl -X POST "$WORKER_URL/query" -H "Authorization: Bearer $AUTH_TOKEN" \
 >      -H "Content-Type: application/json" \
->      -d '{"vector": [...], "topK": 5, "accountId": "<你的数字账号ID>"}'
+>      -d '{"vector": [...], "topK": 5, "threshold": 0, "accountId": "<你的数字账号ID>"}'
 >    ```
->    请求被拒（`ACCOUNT_METADATA_NOT_INDEXED`）说明索引未生效；返回结果为空但
->    `/status` 有向量数，说明该账号的回填未完成。
+>    临时启用后请求**仍被拒**说明元数据索引未创建；返回结果为空但 `/status`
+>    有向量数，说明该账号的回填未完成——此时**回滚**为默认 `"false"`
+>    （重新 `npx wrangler deploy`），补完回填后重试。
 > 4. 不要直接把 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED` 默认值改成 `"true"`
->    （默认值保持 `"false"`，否则单账号部署会失去稠密向量召回）。使用部署向导在
+>    （默认值保持 `"false"`：默认 false 时 /status 返回 accountScopedCleanup:false，
+>    客户端跳过账号范围稠密召回；未回填存量向量就设 true 会启用过滤，但旧向量
+>    仍可能无法命中）。使用部署向导在
 >    **部署时写入显式标记**：
 >    ```bash
 >    npx wrangler deploy --var ACCOUNT_METADATA_INDEXED:true

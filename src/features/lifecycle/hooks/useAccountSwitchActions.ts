@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useAppStore } from '../../../store/useAppStore';
 import { accountIdKey, applyAccountWorkspace } from '../../../store/helpers/accountWorkspace';
-import { backend, isValidBackendRestoreAccount } from '../../../services/backendAdapter';
+import { backend, normalizeBackendRestoreAccount } from '../../../services/backendAdapter';
 import {
   hasPendingAccountSync,
   markPendingAccountSync,
@@ -59,7 +59,7 @@ export interface AccountSwitchActions {
   /** AddAccountModal 后端恢复模式：连接后端并恢复其活跃账号（已登录时先安全归档当前账号） */
   addAccountFromBackend: (url: string, secret: string, expectedAccountId?: string) => Promise<AddAccountResult>;
   /** 从已保存账号列表移除指定账号（保留其本地工作区数据） */
-  removeAccount: (targetAccountId: string) => Promise<void>;
+  removeAccount: (targetAccountId: string) => Promise<AccountSwitchResult>;
   /**
    * 退出登录（含二次确认调用方）。expectedAccountId 为审计修复 B9 的期望
    * 账号标识（确认框打开时的账号）：获取切换锁后与当前账号比较，不一致则
@@ -87,13 +87,34 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
   const [isSwitching, setIsSwitching] = useState(false);
   const { restoreBackendSession, authenticateWithGitHub } = useLoginActions();
 
-  /** 外部恢复失败/取消时，把被归档的当前账号工作区与凭证原样恢复（零丢失）。 */
-  const recoverParkedAccount = useCallback((parkedAccountId: string | null): void => {
+  /**
+   * 外部恢复失败/取消时，把被归档的当前账号工作区与凭证原样恢复（零丢失）。
+   * R2-B14：`failedAccountId` 用于「身份已提交但流程失败」——仅当当前顶层身份
+   * 正是本次失败流程提交的目标账号时，先做与 park 对称的身份回滚
+   *（setGitHubToken(null)/setUser(null) + 清空工作区），再恢复归档账号。正常
+   * 成功路径（state.user 为其他账号或未传失败账号）保持早退，绝不误伤。
+   */
+  const recoverParkedAccount = useCallback((
+    parkedAccountId: string | null,
+    failedAccountId?: string | null,
+  ): void => {
     if (!parkedAccountId) return;
     const state = useAppStore.getState();
-    if (state.user) return; // 已成功登录另一账号，无需恢复
-    const saved = state.savedAccounts[parkedAccountId];
-    const workspace = state.accountWorkspaces[parkedAccountId];
+    if (state.user) {
+      if (!failedAccountId || accountIdKey(state.user) !== failedAccountId) {
+        return; // 已成功登录另一账号，无需恢复
+      }
+      // 失败流程提交的身份仍留在顶层：先回滚身份与工作区，使后续恢复写入
+      // 与 park 前状态对称（user 为 null 时才算回到可恢复状态）。
+      withAccountSwitchGuardSync(() => {
+        useAppStore.getState().setGitHubToken(null);
+        useAppStore.getState().setUser(null);
+        useAppStore.setState(applyAccountWorkspace(undefined));
+      });
+    }
+    const recoverable = useAppStore.getState();
+    const saved = recoverable.savedAccounts[parkedAccountId];
+    const workspace = recoverable.accountWorkspaces[parkedAccountId];
     // 恢复写入同样属于切换簿记：静音订阅，避免工作区回放在无账号上下文下
     // 触发 isFullSync 推送（失败且无 savedAccount 时 user 仍为 null）。
     withAccountSwitchGuardSync(() => {
@@ -101,10 +122,19 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         useAppStore.setState(applyAccountWorkspace(workspace));
       }
       if (saved) {
-        state.setGitHubToken(saved.githubToken);
-        state.setUser(saved.user);
+        recoverable.setGitHubToken(saved.githubToken);
+        recoverable.setUser(saved.user);
       }
     });
+  }, []);
+
+  /** 桌面端 MCP 桥接刷新失败不得让已提交的登录/切换失败（R2-B14）。 */
+  const refreshMcpBridgeSafely = useCallback((): void => {
+    try {
+      refreshMcpElectronBridge();
+    } catch (error) {
+      console.warn('Failed to refresh MCP bridge after account change:', error);
+    }
   }, []);
 
   /**
@@ -115,8 +145,11 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
    * （含未推修改），再拉取后端——顺序绝不能颠倒，否则非强制拉取会用后端旧
    * 快照覆盖未推送的本地修改（数据丢失红线）。
    */
-  const alignTargetAccountOnBackend = useCallback(async (accountId: string, token: string, user: GitHubUser): Promise<void> => {
-    if (!backend.isAvailable) return;
+  const alignTargetAccountOnBackend = useCallback(async (accountId: string, token: string, user: GitHubUser): Promise<boolean> => {
+    if (!backend.isAvailable) return true;
+    // R2-C11：凭据写入失败必须回报调用方（addAccountWithToken）——静默吞错会让
+    // 代理继续使用旧 PAT，用户看到「添加成功」但后续 GitHub 请求持续失败。
+    let credentialsAligned = true;
     try {
       await backend.syncSettings({
         github_token: token,
@@ -124,6 +157,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         user_profile: user,
       });
     } catch (error) {
+      credentialsAligned = false;
       console.warn('Failed to align account settings on backend:', error);
     }
     try {
@@ -141,6 +175,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     } catch (error) {
       console.warn('Failed to pull target account data from backend:', error);
     }
+    return credentialsAligned;
   }, []);
 
   const parkCurrentAccountForRestore = useCallback((): string | null => {
@@ -190,7 +225,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           target.user,
         );
       });
-      refreshMcpElectronBridge();
+      refreshMcpBridgeSafely();
       return { ok: true };
     } catch (error) {
       console.error('Account switch failed:', error);
@@ -199,7 +234,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, [alignTargetAccountOnBackend]);
+  }, [alignTargetAccountOnBackend, refreshMcpBridgeSafely]);
 
   const addAccountWithToken = useCallback(async (
     token: string,
@@ -245,8 +280,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         // 凭据对齐到后端目标分区（syncSettings 携带 github_token/账号头），否则
         // 后端代理继续读取旧 Token，后续 GitHub 请求反复失败。当前账号工作区
         // 保持不变（不归档、不切换）。
-        await alignTargetAccountOnBackend(targetAccountId, token, user);
-        refreshMcpElectronBridge();
+        const aligned = await alignTargetAccountOnBackend(targetAccountId, token, user);
+        if (!aligned) {
+          // R2-C11：已验证的本地 PAT 已保留（上面 setGitHubToken），但后端凭据
+          // 尚未更新——明确失败并允许用户重试补授权。
+          return { ok: false, error: 'backend-credential-sync-failed' };
+        }
+        refreshMcpBridgeSafely();
         return { ok: true, user };
       }
 
@@ -264,8 +304,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           useAppStore.getState().setUser(user);
         });
       });
-      await alignTargetAccountOnBackend(targetAccountId, token, user);
-      refreshMcpElectronBridge();
+      const aligned = await alignTargetAccountOnBackend(targetAccountId, token, user);
+      if (!aligned) {
+        // R2-C11：本地 PAT 已随身份切换保留；后端凭据尚未更新，重试补授权
+        //（此时目标已是当前账号，走同账号分支）即可修复。
+        return { ok: false, error: 'backend-credential-sync-failed' };
+      }
+      refreshMcpBridgeSafely();
       return { ok: true, user };
     } catch (error) {
       console.error('Add account failed:', error);
@@ -279,7 +324,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, [alignTargetAccountOnBackend, authenticateWithGitHub, recoverParkedAccount]);
+  }, [alignTargetAccountOnBackend, authenticateWithGitHub, recoverParkedAccount, refreshMcpBridgeSafely]);
 
   const addAccountFromBackend = useCallback(async (url: string, secret: string, expectedAccountId?: string): Promise<AddAccountResult> => {
     if (!acquireAccountSwitchLock()) {
@@ -299,6 +344,9 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
     const currentAccountId = accountIdKey(useAppStore.getState().user);
     let parkedAccountId: string | null = null;
     let succeeded = false;
+    // R2-B14：身份已提交的目标账号（仅当确实提交后流程失败才可用于复原，
+    // recoverParkedAccount 内部还会核对顶层当前身份，正常成功路径不受影响）。
+    let committedAccountId: string | null = null;
     try {
       // 切换后端前先在旧 URL/旧密钥上下文下排空旧后端的推送与在途同步；
       // 恢复期间由 withAccountSwitchGuard 静音订阅，阻止新推送把旧账号数据
@@ -344,6 +392,15 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           // 归档本身是簿记写入，且窗口内不存在会外发旧账号数据的推送）
           parkedAccountId = parkCurrentAccountForRestore();
         }
+        // R2-B14：可能同步抛错的登记循环放在身份提交之前——此时顶层仍无
+        // 账号（park 后 user 为 null），失败走 recoverParkedAccount 能完整
+        // 恢复归档账号；登记使用恢复响应中的凭证，不依赖即将提交的身份。
+        for (const account of result.accounts) {
+          // R2-C12：user:null 条目先用其分区 PAT 核对 GitHub 身份再登记。
+          const normalizedAccount = await normalizeBackendRestoreAccount(account);
+          if (!normalizedAccount) continue;
+          useAppStore.getState().upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
+        }
         // 审计修复：身份与工作区提交纳入恢复守卫覆盖，并以同步簿记守卫包裹
         // setGitHubToken/setUser——否则订阅器把这两项写入记为待推，守卫释放时
         // 以（本地尚无快照、可能为空的）新账号工作区 isFullSync 推送到候选后端，
@@ -361,16 +418,11 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         return { ok: false, error: restoreOutcome.error };
       }
       const { result, targetAccountId } = restoreOutcome;
+      committedAccountId = targetAccountId;
 
-      // 登记后端保存的全部有效账号（与 tryRestoreAuthFromBackend / 登录页
-      // handleBackendConnect 共用同一过滤规则），否则新设备连接后端后
-      // 账号下拉菜单只显示当前账号。
-      for (const account of result.accounts) {
-        if (!isValidBackendRestoreAccount(account)) continue;
-        useAppStore.getState().upsertSavedAccount(account.user, account.githubToken);
-      }
+      // 后端保存的有效账号已在上面的冻结窗口内（身份提交前）登记完毕。
       await alignTargetAccountOnBackend(targetAccountId, result.githubToken, result.user);
-      refreshMcpElectronBridge();
+      refreshMcpBridgeSafely();
       succeeded = true;
       return { ok: true, user: result.user };
     } catch (error) {
@@ -401,7 +453,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         }
         useAppStore.getState().setBackendApiSecret(previousSecret);
         // 恢复失败/取消：归档的原账号原样恢复，当前会话毫发无损
-        recoverParkedAccount(parkedAccountId);
+        recoverParkedAccount(parkedAccountId, committedAccountId);
         // R4 审计修复：冻结窗口内的真实编辑已按原后端绑定记入待推集合（或
         // 此前冲刷失败遗留的标记）。只有连接已成功复原到原后端时才立即补推；
         // 若复原失败，标记仍保留绑定在原后端，绝不推往候选后端。
@@ -412,10 +464,14 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, [recoverParkedAccount, restoreBackendSession, alignTargetAccountOnBackend, parkCurrentAccountForRestore]);
+  }, [recoverParkedAccount, restoreBackendSession, alignTargetAccountOnBackend, parkCurrentAccountForRestore, refreshMcpBridgeSafely]);
 
-  const removeAccount = useCallback(async (targetAccountId: string): Promise<void> => {
-    if (!acquireAccountSwitchLock()) return;
+  const removeAccount = useCallback(async (targetAccountId: string): Promise<AccountSwitchResult> => {
+    // R2-B13：切换锁被占用时返回明确失败（不再静默 void），由 Header 提示
+    // 用户等待切换完成后重试；与 logoutCurrentAccount 的失败语义一致。
+    if (!acquireAccountSwitchLock()) {
+      return { ok: false, error: 'switch-in-progress' };
+    }
     setIsSwitching(true);
     try {
       const current = useAppStore.getState();
@@ -443,12 +499,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
           nextUser,
         );
       }
-      refreshMcpElectronBridge();
+      refreshMcpBridgeSafely();
+      return { ok: true };
     } finally {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, [alignTargetAccountOnBackend]);
+  }, [alignTargetAccountOnBackend, refreshMcpBridgeSafely]);
 
   const logoutCurrentAccount = useCallback(async (expectedAccountId?: string): Promise<boolean> => {
     // 切换流程占用锁时明确返回失败，由调用方提示用户（绝不静默忽略退出）。
@@ -466,13 +523,13 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       // 最终校验（拒绝时返回 false），绝不登出另一个账号。
       const loggedOut = useAppStore.getState().logout(expectedAccountId);
       if (loggedOut === false) return false;
-      refreshMcpElectronBridge();
+      refreshMcpBridgeSafely();
       return true;
     } finally {
       releaseAccountSwitchLock();
       setIsSwitching(false);
     }
-  }, []);
+  }, [refreshMcpBridgeSafely]);
 
   return {
     isSwitching,

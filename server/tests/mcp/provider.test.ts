@@ -342,4 +342,126 @@ describe('MCP provider discovery', () => {
     expect(byId).not.toBeNull();
     expect(byId?.name).toBe('default-alpha');
   });
+
+  it('reads release evidence only from the active account partition (R2-A26)', async () => {
+    // R2-A26：用小型内存库执行实际 SQL——两个账号持有同一 repo_id 的仓库与
+    // 发行版（不同 tag_name），最新发行版与发行版历史（health 事实）都必须
+    // 只含活跃账号数据；筛选由真实 SQL 完成，不在替身中复制。
+    const Database = (await import('better-sqlite3')).default;
+    const { initializeSchema } = await import('../../src/db/schema.js');
+    const db = new Database(':memory:');
+    try {
+      initializeSchema(db);
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+      const insertRepo = db.prepare(
+        'INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      );
+      insertRepo.run('default', 1, 'default-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+      insertRepo.run('222', 1, 'beta-alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]');
+      const insertRelease = db.prepare(
+        'INSERT INTO releases (account_id, id, tag_name, name, published_at, prerelease, draft, repo_id, repo_full_name, repo_name) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?)',
+      );
+      // default 分区两条更早的发行版；活跃账号（222）一条更新的发行版
+      insertRelease.run('default', 10, 'v0.9.0-legacy', 'Legacy release', '2026-03-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+      insertRelease.run('default', 11, 'v0.8.0-legacy', 'Legacy release two', '2026-02-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+      insertRelease.run('222', 12, 'v2.0.0-beta', 'Beta release', '2026-04-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+
+      getDbMock.mockReturnValue(db);
+      const result = provider.getRepoEvidence('acme/alpha');
+      expect(result).not.toHaveProperty('error');
+      const evidence = (result as { evidence: { latest_release: { id: number; tag_name: string } | null; health: { release_count: number | null; latest_release_at: string | null } } }).evidence;
+      // 最新发行版只取活跃账号（222）的数据
+      expect(evidence.latest_release).toMatchObject({ id: 12, tag_name: 'v2.0.0-beta' });
+      // 发行版历史只统计活跃账号的发行版（default 分区的两条不参与）
+      expect(evidence.health).toMatchObject({
+        release_count: 1,
+        latest_release_at: '2026-04-01T00:00:00.000Z',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  describe('account metadata backfill probe (R2-A11/A13/A14)', () => {
+    const setupVectorDb = async () => {
+      const Database = (await import('better-sqlite3')).default;
+      const { initializeSchema } = await import('../../src/db/schema.js');
+      const db = new Database(':memory:');
+      initializeSchema(db);
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_account_id', '222')").run();
+      db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('legacy_default_claimed_by', '222')").run();
+      db.prepare(
+        "INSERT INTO repositories (account_id, id, name, full_name, html_url, owner_login, topics, vector_indexed_at) VALUES ('222', 1, 'alpha', 'acme/alpha', 'https://github.com/acme/alpha', 'acme', '[]', '2025-01-01T00:00:00Z')",
+      ).run();
+      db.prepare(
+        "INSERT INTO vector_search_configs (id, enabled, worker_url, auth_token_encrypted, embedding_config_id) VALUES ('default', 1, 'https://worker.example', 'worker-token', 'embedding-1')",
+      ).run();
+      db.prepare(
+        "INSERT INTO embedding_configs (id, name, api_type, model, api_key_encrypted, base_url) VALUES ('embedding-1', 'embedding', 'ollama', 'bge-m3', '', 'http://127.0.0.1:11434')",
+      ).run();
+      return db;
+    };
+
+    it('schedules a rebuild when the probe cannot fully confirm index ownership (R2-A11)', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // 诊断探测的 topK/threshold 不复用用户查询；/status 报告的向量数超出
+        // 探测窗口 → 无法完整确认归属 → 明确安排一次全量重建。
+        const fetchMockLocal = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }))
+          .mockResolvedValueOnce(jsonResponse({ vectorCount: 400 }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchMockLocal);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toMatchObject({ available: true });
+
+        // 探测请求独立于用户查询：topK=50、threshold=0
+        const probeBody = JSON.parse(fetchMockLocal.mock.calls[2][1].body as string);
+        expect(probeBody).toMatchObject({ topK: 50, threshold: 0 });
+
+        // 重建已安排：索引标记清除、快照版本推进、完成标记写入（同一事务）
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBeNull();
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
+          .toMatchObject({ value: '1' });
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
+          .toMatchObject({ value: '1' });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('marks the probe complete without clearing markers when full confirmation finds no legacy vectors', async () => {
+      const db = await setupVectorDb();
+      try {
+        getDbMock.mockReturnValue(db);
+        // /status 报告向量数在探测窗口内（threshold=0 即全量），且候选都带
+        // 账号前缀（无 legacy 向量）→ 仅标记完成，不清除重建标记。
+        const fetchMockLocal = vi.fn()
+          .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2]] }))
+          .mockResolvedValueOnce(jsonResponse({ success: false, code: 'ACCOUNT_METADATA_NOT_INDEXED' }, 400))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '222:1', score: 0.9, metadata: { accountId: '222' } }] }))
+          .mockResolvedValueOnce(jsonResponse({ vectorCount: 1 }))
+          .mockResolvedValueOnce(jsonResponse({ matches: [{ id: '1', score: 0.9 }] }));
+        vi.stubGlobal('fetch', fetchMockLocal);
+
+        const result = await provider.vectorSearch('retrieval', {});
+        expect(result).toMatchObject({ available: true });
+
+        const row = db.prepare("SELECT vector_indexed_at FROM repositories WHERE account_id = '222' AND id = 1").get() as { vector_indexed_at: string | null };
+        expect(row.vector_indexed_at).toBe('2025-01-01T00:00:00Z');
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'vector_account_backfill_checked'").get())
+          .toMatchObject({ value: '1' });
+        // 未清除标记 → 不推进快照版本（R2-A14）
+        expect(db.prepare("SELECT value FROM partition_meta WHERE account_id = '222' AND key = 'repo_revision'").get())
+          .toBeUndefined();
+      } finally {
+        db.close();
+      }
+    });
+  });
 });

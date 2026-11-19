@@ -196,6 +196,12 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     try {
       const currentState = useAppStore.getState();
       const repositories = currentState.repositories;
+      // R2-C24：清理删除的可验证依据——运行开始时列表不在加载/同步中，且该
+      // 账号完成过至少一次同步（lastSync）。仅有「运行前后 ID 集合相等」不能
+      // 证明列表完整：部分恢复/陈旧快照同样可以相等。
+      const startedWithAuthoritativeList = !currentState.isLoading
+        && !currentState.isSyncingStars
+        && !!currentState.lastSync;
       const excludedVectorIds = repositories
         .filter((repository) => Boolean(repository.vector_indexed_at) && (!repository.analyzed_at || repository.analysis_failed))
         .map((repository) => String(repository.id));
@@ -290,15 +296,21 @@ export const useVectorSearchActions = (): VectorSearchActions => {
             // 索引等待期间工作区已变化时，会把仍加星仓库的向量误删。改为：
             // - keepIds 纳入运行开始时的完整本地列表（两种 ID 形态）；
             // - 清理执行前重读实时仓库列表，仅当 ID 集合与运行开始时完全一致
-            //   （工作区在索引期间未被拉取/导入/退订改动，快照仍完整且有效）
-            //   时才执行删除；
+            //   且运行开始/清理执行时列表都处于「已同步且无加载/同步在途」的
+            //   可验证状态时才执行删除（R2-C24：相等本身不能证明完整）；
             // - 无法确认完整性/时效性时跳过删除并保留已上传结果（partial 语义，
             //   冗余向量由后续重建收敛）。
+            const liveState = useAppStore.getState();
             const startRepoIds = new Set(repositories.map((repository) => String(repository.id)));
-            const liveRepoIds = new Set(useAppStore.getState().repositories.map((repository) => String(repository.id)));
-            const workspaceUnchanged = startRepoIds.size === liveRepoIds.size
+            const liveRepoIds = new Set(liveState.repositories.map((repository) => String(repository.id)));
+            const listBasisValid = startedWithAuthoritativeList
+              && !liveState.isLoading
+              && !liveState.isSyncingStars
+              && !!liveState.lastSync;
+            const workspaceUnchanged = listBasisValid
+              && startRepoIds.size === liveRepoIds.size
               && [...startRepoIds].every((id) => liveRepoIds.has(id))
-              && useAppStore.getState().repositories.length > 0;
+              && liveState.repositories.length > 0;
             const cleanupKeepIds = [...new Set([
               ...repositories.map((repository) => String(repository.id)),
               ...repositories.map((repository) => buildAccountScopedVectorId(jobAccountId, repository.id)),

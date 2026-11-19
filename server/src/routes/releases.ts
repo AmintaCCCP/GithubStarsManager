@@ -218,15 +218,22 @@ router.patch('/api/releases/:id', (req, res) => {
       return;
     }
 
-    db.prepare('UPDATE releases SET is_read = ? WHERE account_id = ? AND id = ?').run(is_read ? 1 : 0, accountId, id);
+    // Issue #612 R2-A21：PATCH 写入与快照版本递增纳入同一事务——版本写入失败
+    // 时数据写入一并回滚（PUT 路径 159-190 行方式）。
+    const applyReadState = db.transaction((): Record<string, unknown> | null => {
+      db.prepare('UPDATE releases SET is_read = ? WHERE account_id = ? AND id = ?').run(is_read ? 1 : 0, accountId, id);
+      const row = db.prepare('SELECT * FROM releases WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
+      if (!row) return null;
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      bumpAccountRevision(db, accountId);
+      return row;
+    });
 
-    const row = db.prepare('SELECT * FROM releases WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
-    if (!row) {
+    const row = applyReadState();
+    if (row === null) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }
-    // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
-    bumpAccountRevision(db, accountId);
     res.json(transformRelease(row));
   } catch (err) {
     console.error('PATCH /api/releases error:', err);
@@ -244,10 +251,15 @@ router.post('/api/releases/mark-all-read', (req, res) => {
       return;
     }
     const accountId = scope.accountId;
-    const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
-    // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
-    if (result.changes > 0) bumpAccountRevision(db, accountId);
-    res.json({ updated: result.changes });
+    // Issue #612 R2-A21：写入与快照版本递增纳入同一事务——版本写入失败时
+    // 数据写入一并回滚（PUT 路径 159-190 行方式）。
+    const markAll = db.transaction((): number => {
+      const result = db.prepare('UPDATE releases SET is_read = 1 WHERE account_id = ?').run(accountId);
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      if (result.changes > 0) bumpAccountRevision(db, accountId);
+      return result.changes;
+    });
+    res.json({ updated: markAll() });
   } catch (err) {
     console.error('POST /api/releases/mark-all-read error:', err);
     res.status(500).json({ error: 'Failed to mark all as read', code: 'MARK_ALL_READ_FAILED' });
@@ -279,15 +291,20 @@ router.delete('/api/releases/:id', (req, res) => {
       return;
     }
     const accountId = scope.accountId;
-    const result = db.prepare('DELETE FROM releases WHERE account_id = ? AND id = ?').run(accountId, id);
+    // Issue #612 R2-A21：删除与快照版本递增纳入同一事务——版本写入失败时
+    // 删除一并回滚（PUT 路径 159-190 行方式）。
+    const remove = db.transaction((): boolean => {
+      const result = db.prepare('DELETE FROM releases WHERE account_id = ? AND id = ?').run(accountId, id);
+      if (result.changes === 0) return false;
+      // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
+      bumpAccountRevision(db, accountId);
+      return true;
+    });
 
-    if (result.changes === 0) {
+    if (!remove()) {
       res.status(404).json({ error: 'Release not found', code: 'RELEASE_NOT_FOUND' });
       return;
     }
-
-    // Issue #612 A20x：发行版写入成功后递增账号分区的仓库快照版本。
-    bumpAccountRevision(db, accountId);
 
     res.json({ deleted: true, id });
   } catch (err) {

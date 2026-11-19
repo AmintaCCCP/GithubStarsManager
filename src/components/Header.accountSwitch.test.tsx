@@ -38,7 +38,7 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   confirm: vi.fn(),
   switchToAccount: vi.fn(),
-  removeAccount: vi.fn(),
+  removeAccount: vi.fn(async (): Promise<{ ok: boolean; error?: string }> => ({ ok: true })),
   logoutCurrentAccount: vi.fn(),
   addAccountWithToken: vi.fn(),
   addAccountFromBackend: vi.fn(),
@@ -200,6 +200,23 @@ describe('Header account switcher', () => {
     });
     await waitFor(() => {
       expect(mocks.removeAccount).toHaveBeenCalledWith('2');
+    });
+    unmount();
+  });
+
+  it('shows a wait-and-retry toast when removeAccount is rejected by the switch lock (R2-B13)', async () => {
+    baseState.savedAccounts = {
+      '1': savedAccount('1', userA, 'ghp_a'),
+      '2': savedAccount('2', userB, 'ghp_b'),
+    };
+    mocks.removeAccount.mockResolvedValueOnce({ ok: false, error: 'switch-in-progress' });
+    const { unmount } = render(<Header />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'header.switch-account' }));
+    fireEvent.click(screen.getByText('header.remove-account'));
+
+    await waitFor(() => {
+      expect(mocks.toast).toHaveBeenCalledWith('header.switch-in-progress', 'error');
     });
     unmount();
   });

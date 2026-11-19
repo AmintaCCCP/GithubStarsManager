@@ -80,7 +80,11 @@ export interface SavedAccount {
   /** GitHub 数值 ID 字符串，与 accountIdKey(user) 一致 */
   accountId: string;
   user: GitHubUser;
-  /** 该账号的 GitHub PAT；仅当用户主动移除账号或未包含密钥导入时为空字符串 */
+  /**
+   * 该账号的 GitHub PAT；退出登录、用户主动移除账号、未包含密钥导入，或
+   * 非桌面端重载后（v19 起持久化分片不再保存明文 PAT）为空字符串。
+   * 桌面端可经 safeStorage 加密文件（gh-accounts.enc）自动恢复。
+   */
   githubToken: string;
   addedAt: string;
   lastUsedAt: string;
@@ -143,9 +147,9 @@ export interface SavedAccount {
        - 清空 `AUTH_MIRROR_KEY` 与 `sessionStorage` 中的 `backendApiSecret`；
        - 调用 `resetSyncHashes()`；
        - 置 `user: null, githubToken: null, backendApiSecret: null, isAuthenticated: false`，并将顶层工作区重置为 `applyAccountWorkspace(undefined)`。
-       - **注意**：`logout()` 保留 `savedAccounts` 中的历史账号记录（但用户停留在 `LoginScreen` 直到选择账号或输入新 Token）。**必须明确区分两类账号**：本次退出的账号其 PAT 已被清除（`savedAccounts` 中该账号 `githubToken` 置空），**再次进入需要重新授权**（登录页点击该账号卡片会聚焦 Token 输入框补全，而非一键恢复会话）；**只有仍保存有效 PAT 的其他账号**才支持登录页卡片/下拉菜单一键登录，无需走「退出登录」。
+       - **注意**：`logout()` 保留 `savedAccounts` 中的历史账号记录（但用户停留在 `LoginScreen` 直到选择账号或输入新 Token）。**必须明确区分两类账号**：本次退出的账号其 PAT 已被清除（`savedAccounts` 中该账号 `githubToken` 置空），**再次进入需要重新授权**（登录页点击该账号卡片会聚焦 Token 输入框补全，而非一键恢复会话）；**只有仍保存有效 PAT 的其他账号**才支持登录页卡片/下拉菜单一键登录，无需走「退出登录」。桌面端仍持有该账号 PAT 的（safeStorage 加密文件中未清除），水化时经 `restorePersistedAccountTokens` 自动回填，无需重新授权。
 
-#### 1.4 持久化分片与版本迁移（`v17` → `v18`）
+#### 1.4 持久化分片与版本迁移（`v17` → `v18` → `v19`）
 1. `src/store/initialState.ts`：初始状态加入 `savedAccounts: {}`。
 2. `src/store/schema.ts`：`PersistedAppState` Pick 列表加入 `'savedAccounts'`。
 3. `src/store/persistence/shards.ts`：
@@ -179,6 +183,12 @@ export interface SavedAccount {
    - 在 `normalizePersistedState` 中规整化 `savedAccounts: normalizeSavedAccounts(...)`，若 `resolvedUser && resolvedGithubToken` 存在，同样确保 `resolvedUser` 被同步登记在返回状态的 `savedAccounts` 中。
 6. `src/store/useAppStore.modularization.test.ts`：
    - 在 `currentPersistedKeys` 数组中加入 `'savedAccounts'`，并更新版本号断言（如有）。
+7. **v18 → v19（审计修复 B7/CWE-922 落地后的最终版本，已实施）**：
+   - `version` 从 `18` 递增为 `19`。
+   - **`partialize` 剥除全部明文 PAT**：顶层 `githubToken` 键整体移除；`savedAccounts` 经 `stripSavedAccountTokens` 把每条 `githubToken` 剥为空串——持久化分片（IndexedDB/localStorage）不再含任何明文 PAT。
+   - PAT 改由桌面端 safeStorage 加密文件（`<userData>/gh-accounts.enc`，经 `ghAccounts` IPC 读写）承载；水化时经 `loadGhAccountTokens` + `restorePersistedAccountTokens` 回填。**非桌面端（Web 构建，无 IPC 桥）重载后需重新授权**（PAT 不持久化，按「需补充 Token」处理）。
+   - 迁移（v18→v19 一次性）：把旧快照中的明文 PAT 立即迁入 safeStorage 加密文件（读取失败时按「未加载」处理，合并写入保留磁盘上其他账号的 PAT），随后清出浏览器分片。
+   - 由此，`savedAccounts[].githubToken` 为空的情形包括：退出登录、用户主动移除账号、未包含密钥导入、非桌面端重载——这些账号需重新授权；桌面端经 safeStorage 自动恢复（见 1.3 节 logout 注意项与 2.2 节登录页卡片说明）。
 
 ---
 
@@ -223,7 +233,7 @@ export interface SavedAccount {
 - 同时增强 `src/components/LoginScreen.tsx`：
   - 当用户处于未登录界面（例如刚点击了「退出登录」）且 `Object.keys(savedAccounts).length > 0` 时，在 `LoginScreen` 登录卡片上方展示「已保存的账号（Saved Accounts）」快捷列表（显示头像、名称、`@login`、缓存仓库数）：
     - 若该账号保存有有效 Token，点击即可一键恢复会话（并在连接后端时对齐后端数据）；
-    - 若 Token 已失效或为空，点击则聚焦到 Token 输入框重新授权。
+    - 若 Token 已失效或为空，点击则聚焦到 Token 输入框重新授权（v19 起持久化分片不含明文 PAT：非桌面端重载后一律需重新授权；桌面端经 safeStorage 加密文件自动回填，无需重新授权）。
 
 #### 2.3 账号切换与并发防护 Hook（`src/features/lifecycle/hooks/useAccountSwitchActions.ts`）
 遵循 `scripts/check-boundaries.cjs`，新建 `src/features/lifecycle/hooks/useAccountSwitchActions.ts`，封装所有涉及 `services/autoSync`、`services/backendAdapter`、`services/githubApiFactory` 的切换编排：
@@ -634,14 +644,18 @@ export interface AccountSwitchActions {
 | `header.remove-account` | `移除账号` | `Remove Account` |
 | `header.remove-account-confirm-title` | `移除已保存的账号` | `Remove Saved Account` |
 | `header.remove-account-confirm-desc` | `仅移除该账号的快捷登录凭证，本地缓存的仓库与分类数据仍会保留。确定继续吗？` | `This only removes the saved sign-in credential for this account. Cached repositories and categories will be kept. Continue?` |
-| `header.account-switched` | `已切换到账号 {{login}}` | `Switched to @{{login}}` |
+| `header.account-switched` | `已切换到账号 @{{login}}` | `Switched to @{{login}}` |
 | `header.account-repo-count` | `{{count}} 个仓库` | `{{count}} repos` |
+| `header.logout-account-changed` | `账号已切换，请对当前账号重新发起退出登录。` | `The account has changed. Please log out again for the current account.` |
+| `header.switch-in-progress` | `正在切换账号，请稍后再试。` | `An account switch is in progress. Please try again shortly.` |
+| `header.remove-account-with-login` | `移除 @{{login}}` | `Remove @{{login}}` |
 | `accountModal.title` | `添加 GitHub 账号` | `Add GitHub Account` |
 | `accountModal.description` | `输入新的 GitHub Personal Access Token 添加账号，当前账号的数据将被安全保留。` | `Enter a new GitHub Personal Access Token to add an account. Your current account data will be safely preserved.` |
 | `accountModal.token-label` | `GitHub Personal Access Token` | `GitHub Personal Access Token` |
 | `accountModal.cancel` | `取消` | `Cancel` |
 | `accountModal.confirm` | `添加并切换` | `Add & Switch` |
 | `accountModal.reauth-hint` | `请为账号 @{{login}} 重新输入有效的 GitHub Token` | `Please enter a valid GitHub token for @{{login}}` |
+| `accountModal.account-mismatch` | `该 Token 属于另一个 GitHub 账号，请使用 @{{login}} 的 Token 登录。` | `This token belongs to a different GitHub account. Please sign in with the token of @{{login}}.` |
 
 ### `login.json`（`loginScreen` 下）
 | Key | `zh` | `en` |
@@ -663,7 +677,7 @@ export interface AccountSwitchActions {
 2. 修改 `src/store/helpers/accountWorkspace.ts`：
    - 新增 `normalizeSavedAccounts`、`parkCurrentAccountWorkspace`、`isCurrentAccount`。
    - 保持 `switchAccountWorkspace` 对现有测试 100% 兼容，并支持在切换时同步维护 `accountWorkspaces`。
-3. 修改 `src/store/types.ts`、`src/store/initialState.ts`、`src/store/schema.ts`、`src/store/persistence/shards.ts`、`src/store/persistence/options.ts`（升至 `version: 18`）、`src/store/normalizers/persistedState.ts`。
+3. 修改 `src/store/types.ts`、`src/store/initialState.ts`、`src/store/schema.ts`、`src/store/persistence/shards.ts`、`src/store/persistence/options.ts`（升至 `version: 19`，含 B7 明文 PAT 剥除迁移）、`src/store/normalizers/persistedState.ts`。
 4. 修改 `src/store/slices/authSlice.ts`：实现 `upsertSavedAccount`、`switchAccount`、`removeSavedAccount`、`parkCurrentAccountForRestore`，并在 `setUser` / `setGitHubToken` 中自动同步 `savedAccounts`。
 5. 更新测试快照与契约测试：
    - `src/store/useAppStore.modularization.test.ts`（在 `currentPersistedKeys` 加入 `'savedAccounts'`）

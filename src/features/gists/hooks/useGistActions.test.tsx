@@ -491,6 +491,8 @@ describe('useGistActions account switch guards', () => {
     const onDeleted = vi.fn();
     await act(async () => { await result.current.deleteGist(gist, onDeleted); });
 
+    // R2-C28：远端删除请求确实已按发起账号发出（本地副作用被丢弃不改变该事实）
+    expect(mocks.deleteGist).toHaveBeenCalledWith(gist.id);
     expect(onDeleted).not.toHaveBeenCalled();
     expect(storeState.deleteGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
@@ -504,6 +506,8 @@ describe('useGistActions account switch guards', () => {
     const { result } = renderHook(() => useGistActions());
     await act(async () => { await result.current.submitGist({ description: 'x' } as never, gist); });
 
+    // R2-C28：远端更新请求确实已按发起账号发出
+    expect(mocks.updateGist).toHaveBeenCalledWith(gist.id, expect.anything(), expect.anything());
     expect(storeState.updateGist).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
   });

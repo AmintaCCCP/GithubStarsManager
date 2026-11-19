@@ -70,8 +70,71 @@ export const isValidBackendRestoreAccount = (
   const normalizedUser = record.user as GitHubUser & { email?: unknown };
   if (typeof normalizedUser.name !== 'string') normalizedUser.name = normalizedUser.login;
   if (typeof normalizedUser.avatar_url !== 'string') normalizedUser.avatar_url = '';
-  if (typeof normalizedUser.email === 'undefined') normalizedUser.email = null;
+  // R2-C16：email 是字符串时保留；缺失或非字符串（含数字）一律规范化为 null，
+  // 保证收窄后的 GitHubUser 契约与实际对象一致。
+  if (typeof normalizedUser.email !== 'string') normalizedUser.email = null;
   return true;
+};
+
+/**
+ * R2-C12：恢复条目的异步归一化（服务端 authRestore.ts 返回 user:null 的客户端
+ * 半边）。只有分区 PAT、没有 accounts 行的账号在新设备上 user 为 null，会被
+ * 同步守卫 isValidBackendRestoreAccount 拒绝，导致账号列表缺项。
+ *
+ * 处理：accountId、Token 有效且 user 缺失/null 时，用该 PAT 直连 GitHub /user
+ * 核对身份——返回的 user.id 必须等于 accountId，通过后构造完整 GitHubUser；
+ * 身份不一致、请求失败或 user 结构不合法一律拒绝（绝不把未核实条目登记）。
+ * 已经完整的条目直接复用同步守卫（含默认值补齐），存在但无效的 user 不回查。
+ */
+export const normalizeBackendRestoreAccount = async (
+  account: unknown,
+): Promise<(BackendAuthRestoreAccount & { user: GitHubUser; githubToken: string }) | null> => {
+  if (isValidBackendRestoreAccount(account)) return account;
+  if (!account || typeof account !== 'object') return null;
+  const record = account as Partial<BackendAuthRestoreAccount>;
+  if (
+    typeof record.accountId !== 'string'
+    || !/^\d+$/.test(record.accountId)
+    || typeof record.githubToken !== 'string'
+    || record.githubToken.trim().length === 0
+  ) {
+    return null;
+  }
+  // 只归一化「无 user」条目；存在但无效的 user 不回查覆盖。
+  if (record.user !== null && record.user !== undefined) return null;
+  // 直连 GitHub 核对分区 PAT 的真实身份（不能用后端代理：代理读到的是服务端
+  // 保存的 Token，可能属于另一个账号；这里必须验证条目自身携带的 PAT）。
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `token ${record.githubToken}`,
+        Accept: 'application/vnd.github+json',
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const user = await res.json() as GitHubUser;
+    if (!user || typeof user.id !== 'number' || !Number.isFinite(user.id)) return null;
+    if (String(user.id) !== record.accountId) return null;
+    if (typeof user.login !== 'string' || user.login.trim().length === 0) return null;
+    return {
+      ...record,
+      accountId: record.accountId,
+      githubToken: record.githubToken,
+      user: {
+        ...user,
+        name: typeof user.name === 'string' ? user.name : user.login,
+        avatar_url: typeof user.avatar_url === 'string' ? user.avatar_url : '',
+        email: typeof user.email === 'string' ? user.email : null,
+      },
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 export interface BackendAuthRestore {
@@ -608,35 +671,47 @@ class BackendAdapter {
         return false;
       }
     };
+    // R2-C14：根目录与递归 tree 两条路径共用同一有效性检查——账号、会话代次
+    // 或后端 URL 任一变化都必须丢弃结果（后端切换后旧地址的数据绝不混入）。
+    const isRequestStale = (): boolean => isSessionStale() || this._backendUrl !== backendUrl;
 
     const fetchRootContents = async (): Promise<GitHubReadmeCandidateItem[]> => {
-      if (isSessionStale() || this._backendUrl !== backendUrl) return [];
+      if (isRequestStale()) return [];
       const res = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}/contents`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ method: 'GET' }),
         signal: sessionController.signal,
       });
-      if (!res.ok || isSessionStale()) return [];
+      if (!res.ok || isRequestStale()) return [];
       const data = await res.json() as GitHubReadmeCandidateItem[];
+      // 正文解析完成后、返回前再复核：解析期间切号/切后端必须丢弃结果。
+      if (isRequestStale()) return [];
       return data.filter(isReadmeCandidateItem);
     };
 
     let branch = defaultBranch;
     if (!branch) {
       try {
-        if (isSessionStale() || this._backendUrl !== backendUrl) return [];
+        if (isRequestStale()) return [];
         const repoRes = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ method: 'GET' }),
           signal: sessionController.signal,
         });
-        if (!repoRes.ok || isSessionStale()) return [];
+        // R2-C15：会话仍有效时，详情读取失败只放弃默认分支探测，继续走
+        // fetchRootContents 兜底；仅会话失效才提前返回。
+        if (!repoRes.ok) {
+          if (isRequestStale()) return [];
+          throw new Error('Repository details unavailable; falling back to root contents');
+        }
+        if (isRequestStale()) return [];
         const repoDetails = await repoRes.json() as { default_branch?: string };
         branch = repoDetails.default_branch;
+        if (isRequestStale()) return [];
       } catch {
-        if (isSessionStale()) return [];
+        if (isRequestStale()) return [];
         // Fall back to root contents below
       }
     }
@@ -650,24 +725,25 @@ class BackendAdapter {
     }
 
     try {
-      if (isSessionStale() || this._backendUrl !== backendUrl) return [];
+      if (isRequestStale()) return [];
       const res = await this.fetchWithTimeout(`${backendUrl}/proxy/github/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ method: 'GET' }),
         signal: sessionController.signal,
       });
-      if (!res.ok || isSessionStale()) return await fetchRootContents();
+      if (!res.ok || isRequestStale()) return await fetchRootContents();
       const data = await res.json() as GitHubTreeResponse;
       const candidates = (data.tree || []).filter(isReadmeCandidateItem);
-      if (isSessionStale()) return [];
+      // R2-C14：正文解析完成后、返回前统一复核账号/会话代次/后端 URL。
+      if (isRequestStale()) return [];
       if (data.truncated) {
         logger.warn('backendAdapter', 'README candidate tree was truncated', { owner, repo });
         if (candidates.length === 0) return await fetchRootContents();
       }
       return candidates;
     } catch {
-      if (isSessionStale()) return [];
+      if (isRequestStale()) return [];
       try {
         return await fetchRootContents();
       } catch {
@@ -878,7 +954,13 @@ class BackendAdapter {
       }, 120000, 3);
       if (!res.ok) await this.throwTranslatedError(res, 'Fetch error');
       const data = await res.json() as { repositories?: Repository[]; total?: number; revision?: unknown };
-      const pageRepos = Array.isArray(data.repositories) ? data.repositories : [];
+      // R2-C13：分页累计前必须验证响应形状——缺失/非数组的 repositories 拒绝，
+      // 绝不默认成 []（会被上游当作「完整空分区」授权破坏性推送/恢复）。
+      // 显式 `repositories: []` + `total: 0` 仍是有效空分区。
+      if (!Array.isArray(data.repositories)) {
+        throw new Error('Invalid backend repositories response: repositories must be an array');
+      }
+      const pageRepos = data.repositories;
       const pageTotal = typeof data.total === 'number' ? data.total : pageRepos.length;
       const pageRevision = typeof data.revision === 'number' ? data.revision : null;
       if (page === 1) {

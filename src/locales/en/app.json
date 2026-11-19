@@ -1435,6 +1435,7 @@
     "cancel": "Cancel",
     "confirm": "Add & Switch",
     "reauth-hint": "Please enter a valid GitHub token for @{{login}}",
-    "account-mismatch": "This token belongs to a different GitHub account. Please sign in with the token of @{{login}}."
+    "account-mismatch": "This token belongs to a different GitHub account. Please sign in with the token of @{{login}}.",
+    "backend-credential-sync-failed": "The account was added, but the backend credential could not be updated. Please retry later."
   }
 }

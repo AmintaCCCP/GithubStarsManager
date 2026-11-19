@@ -69,8 +69,12 @@ export interface AppActions {
   removeSavedAccount: (accountId: string) => void;
   /** 在执行外部数据恢复（如后端恢复）前，预先将当前已登录账号的工作区安全归档并清空顶层工作区，防止 R2 污染 */
   parkCurrentAccountForRestore: () => string | null;
-  /** 丢弃一次未完成登录残留在顶层工作区的部分同步数据（重置为空工作区，绝不归档为账号快照） */
-  discardPartialLoginWorkspace: () => void;
+  /**
+   * 丢弃一次未完成登录残留在顶层工作区的部分同步数据（重置为空工作区，绝不归档为账号快照）。
+   * restoreWorkspace（R2-B10）为拉取发起前捕获的顶层快照：park 未能归档的无主
+   * 残留（如旧版顶层缓存）在丢弃拉取残留后原样恢复，防止误清不可再同步的数据。
+   */
+  discardPartialLoginWorkspace: (restoreWorkspace?: import('./helpers/accountWorkspace').AccountWorkspace | null) => void;
   /** 水化后从桌面端安全存储回填账号 Token（B7；Web 构建无持久化 PAT，不会调用） */
   restorePersistedAccountTokens: (tokens: Record<string, string>) => void;
 

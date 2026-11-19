@@ -196,6 +196,12 @@ export interface VectorAccountIdScope {
 export interface DenseQueryScopeResolution {
   skip: boolean;
   accountId?: string;
+  /**
+   * 跳过原因（R2-C26）：Worker 不支持账号筛选、状态请求失败、或索引确实需要
+   * 回填（账号元数据未建立）。调用方按原因给出不同提示，只有回填场景才建议
+   * 重建索引。
+   */
+  reason?: 'worker-unsupported' | 'status-failed' | 'needs-backfill';
 }
 
 /**
@@ -205,6 +211,12 @@ export interface DenseQueryScopeResolution {
  *   Worker 已建立 accountId 元数据索引并回填）后才下发 accountId 过滤；
  * - 索引未就绪时：若未明确确认 allowLegacyUnscoped，则跳过稠密召回（避免
  *   Worker 400 或无过滤召回串入其他账号），否则走无 accountId 的兼容查询。
+ *
+ * R2-C23 实现选择：绝不以「本机只有一个已保存账号」推断无范围 legacy 向量
+ * 的归属（共享索引可能仍有其他设备/旧客户端上传的向量）。单账号的稠密召回
+ * 兼容通过 EMBEDDING_FORMAT_VERSION 升级触发的完整重建满足（重建后向量携带
+ * accountId 元数据，/status 的 accountScopedCleanup 随之可用）；显式兼容
+ * 开关只在索引归属已被独立确认时由调用方传入 allowLegacyUnscoped=true。
  */
 export async function resolveDenseQueryAccountScope(
   vectorService: Pick<VectorSearchService, 'query'> & Partial<Pick<VectorSearchService, 'getStatus'>>,
@@ -228,10 +240,17 @@ export async function resolveDenseQueryAccountScope(
     if (accountIdScope.allowLegacyUnscoped) {
       return { skip: false };
     }
-    return { skip: true };
+    // R2-C26：状态探测本身失败（null）与 Worker 明确不支持账号筛选必须区分；
+    // 前者提示稍后重试，后者提示部署新版 Worker，只有确认需要回填才提示重建。
+    if (!status) {
+      return { skip: true, reason: 'status-failed' };
+    }
+    return { skip: true, reason: 'worker-unsupported' };
   } catch (error) {
     if (isAbortError(error)) throw error;
-    return accountIdScope.allowLegacyUnscoped ? { skip: false } : { skip: true };
+    if (accountIdScope.allowLegacyUnscoped) return { skip: false };
+    // R2-C26：状态请求失败是暂时性错误，不应提示用户重建索引。
+    return { skip: true, reason: 'status-failed' };
   }
 }
 

@@ -11,6 +11,7 @@ import {
   bumpAccountSessionGeneration,
   captureAccountWorkspace,
   switchAccountWorkspace,
+  workspaceHasData,
 } from '../helpers/accountWorkspace';
 import { initialGistSearchFilters, initialSearchFilters } from '../schema';
 import { clearAuthMirror, writeAuthMirror, writeSessionBackendSecret } from '../persistence/authStorage';
@@ -157,8 +158,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           ...applyAccountWorkspace(undefined),
         }));
         // logout 保留其他账号的记录；当前账号仅保留资料与工作区，凭据已清除。
-        // 被清除的当前账号 Token 也要从桌面端加密存储移除（B7）。
-        syncGhAccountTokensFromState(get());
+        // 被清除的当前账号 Token 也要从桌面端加密存储移除（B7）。显式移除列表
+        // 保证即使磁盘映射未完整加载，也会真正删除该账号的 PAT（自审计补充）。
+        syncGhAccountTokensFromState(get(), accountId ? [accountId] : []);
         return true;
       },
       upsertSavedAccount: (user, githubToken) => {
@@ -286,6 +288,9 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
         if (accountId !== currentAccountId) {
           // 移除非当前账号：仅删除保存的凭证，保留其 accountWorkspaces 数据
           set({ savedAccounts: excludeSavedAccount(current.savedAccounts, accountId) });
+          // 审计修复（R2-B2）：被移除账号的 Token 也要从桌面端加密存储移除
+          //（与当前账号移除分支一致），gh-accounts.enc 只保留剩余账号的 PAT。
+          syncGhAccountTokensFromState(get(), [accountId]);
           return;
         }
         // 移除当前账号：优先切换到最近使用的其他已保存账号；没有则登出
@@ -297,12 +302,12 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
           get().switchAccount(next.accountId);
           set({ savedAccounts: excludeSavedAccount(get().savedAccounts, accountId) });
           // 被移除账号的 Token 同步从桌面端加密存储移除（B7）。
-          syncGhAccountTokensFromState(get());
+          syncGhAccountTokensFromState(get(), [accountId]);
           return;
         }
         get().logout();
         set({ savedAccounts: excludeSavedAccount(get().savedAccounts, accountId) });
-        syncGhAccountTokensFromState(get());
+        syncGhAccountTokensFromState(get(), [accountId]);
       },
       parkCurrentAccountForRestore: () => {
         const current = get();
@@ -348,15 +353,23 @@ export const createAuthSlice: AppStoreSlice<Pick<import('../types').AppActions,
        * 数据时保留顶层——残留数据会串到下一个登录的账号。这里把顶层工作区
        * 重置为空；与 park 不同，绝不归档（未完成同步的数据不能存为任何账号
        * 的快照）。
+       * 审计修复（R2-B10）：restoreWorkspace 为拉取发起前捕获的顶层快照——
+       * park 未能归档的无主残留（如旧版顶层缓存）不属于本次拉取写入的数据，
+       * 丢弃拉取残留后原样恢复，防止误清无法从 GitHub 重同步的自定义分类/顺序。
        */
-      discardPartialLoginWorkspace: () => {
+      discardPartialLoginWorkspace: (restoreWorkspace?: import('../../types').AccountWorkspace | null) => {
         // 回滚时推送通道已失去账号上下文：取消旧会话的待推防抖并静音本次
-        // 重置，防止空快照以无账号请求头（服务端回退 active_account_id 分区）
-        // isFullSync 推送出去。
+        // 重置，防止空快照/无主快照以无账号请求头（服务端回退
+        // active_account_id 分区）isFullSync 推送出去。
         cancelPendingAccountSwitchPush();
         resetSyncHashes();
-        withAccountSwitchGuardSync(() => set({ ...applyAccountWorkspace(undefined) }));
-        logger.info('store.discardPartialLoginWorkspace', 'Discarded partially synced top-level workspace after failed login');
+        const restore = restoreWorkspace && workspaceHasData(restoreWorkspace) ? restoreWorkspace : undefined;
+        withAccountSwitchGuardSync(() => {
+          set({ ...applyAccountWorkspace(restore) });
+        });
+        logger.info('store.discardPartialLoginWorkspace', 'Discarded partially synced top-level workspace after failed login', {
+          restoredPrePullResidue: !!restore,
+        });
       },
 
       /**

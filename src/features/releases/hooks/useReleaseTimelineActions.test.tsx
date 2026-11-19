@@ -185,29 +185,23 @@ describe('useReleaseTimelineActions account switch guards', () => {
     expect(parked?.readReleases).toEqual([7, 8]);
   });
 
-  it('writes the read-state rollback into the originating account snapshot after a switch', async () => {
+  it('rolls back the live read set when A→B→A reactivates the originating account', async () => {
     mocks.markAllReleasesAsRead.mockImplementation(async () => {
+      // A→B→A：切到 B 后立即切回 A。switchAccountWorkspace 切回时把 A 的
+      // 归档快照（含本次乐观全部已读 7/8/101）换入实时工作区。
       switchToB();
+      (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+      storeState.readReleases = new Set<number>([7, 8, 101]);
       throw new Error('backend down');
     });
-    // 切换时 switchAccountWorkspace 已把包含乐观更新（全部已读）的 live 工作区
-    // 写入账号 A 的归档快照——这里以「全部已读后的已读集合」模拟该快照
-    // 快照是切号瞬间的 live 工作区：含操作前的 7/8 与本次乐观新增的 101
-    (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces = {
-      '1': { repositories: [], releases: [], readReleases: [7, 8, 101] },
-    };
     const { result } = renderActions();
 
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // 当前账号 B 的 live 已读集合（B 自己的 {205}）没有被 A 的回滚改写
-    expect(storeState.readReleases).toEqual(new Set([205]));
-    // 发起账号 A 的快照已回写为操作前的已读集合，下次激活时不再显示
-    // 服务端已失败的「全部已读」状态
-    const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
-    // 只移除本次操作新增的 101，操作前的 7/8 保留
-    expect(parked?.readReleases).toEqual([7, 8]);
+    // R2-C29：发起账号已重新激活——实时集合（不只是归档）必须撤销乐观更新：
+    // 只移除本次新增的 101，操作前的 7/8 保留。
+    expect(storeState.readReleases).toEqual(new Set([7, 8]));
   });
 
   it('does not create a workspace snapshot when the originating account has none', async () => {

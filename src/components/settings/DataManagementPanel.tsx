@@ -76,6 +76,7 @@ import {
   mergeWorkspaceCategorySettings,
   replaceWorkspacesForSelectedTypes,
   trimWorkspacesForSelectedTypes,
+  validateBackupRepositories,
 } from '../../utils/backupWorkspace';
 import { useShallow } from 'zustand/react/shallow';
 import { isThemePresetId } from '../../constants/themePresets';
@@ -821,6 +822,16 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       // Legacy compatibility: treat missing flag as true (older exports contained keys)
       const wasIncluded = importedData.includeKeysInBackup ?? true;
 
+      // R2-C7：本地 JSON 导入与备份恢复共用同一校验——repositories 缺失/null
+      // 视为未提供（保留本机值），非数组或含无效条目整体拒绝导入，绝不写入
+      // 部分有效数据；显式 [] 保留清空语义。
+      const validatedImportRepositories = validateBackupRepositories(importedData.repositories);
+      if (validatedImportRepositories === null) {
+        addLog(t('dataManagementPanel.import-data'), false, 'invalid repositories');
+        showError(t('dataManagementPanel.invalid-backup-file-format'));
+        return;
+      }
+
       // 审计修复（C54）：activeAccountId 用于决定恢复目标/写 store 前先验证
       // 类型与有效性（字符串、数值 ID 形态；拒绝数值 2 等）——无效载荷整体
       // 拒绝导入，避免恢复目标错位；旧文件缺该字段的兼容路径保留。
@@ -875,7 +886,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               // merge：只按本次恢复所选类型并入备份顶层数据，保留未选类型的本机数据
               ...mergeWorkspacesById(base, {
                 ...empty,
-                repositories: includeRepos ? (importedData.repositories ?? []) : [],
+                repositories: includeRepos ? (validatedImportRepositories ?? []) : [],
                 releases: includeReleases ? (importedData.releases ?? []) : [],
                 gists: includeRepos ? (importedData.gists ?? []) : [],
                 starredGists: includeRepos ? (importedData.starredGists ?? []) : [],
@@ -891,7 +902,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
               // replace：仅替换本次恢复所选类型的字段，未选类型保留本机快照值
               ...base,
               ...(includeRepos ? {
-                repositories: importedData.repositories ?? previous?.repositories ?? [],
+                repositories: validatedImportRepositories ?? previous?.repositories ?? [],
                 gists: importedData.gists ?? previous?.gists ?? [],
                 starredGists: importedData.starredGists ?? previous?.starredGists ?? [],
                 forks: importedData.forks ?? previous?.forks ?? [],
@@ -1059,12 +1070,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         if (nextReplacedWorkspaces) {
           useAppStore.setState({ accountWorkspaces: nextReplacedWorkspaces });
         }
-        if (selectedTypes.includes('repositories') && importedData.repositories) {
+        if (selectedTypes.includes('repositories') && validatedImportRepositories !== undefined) {
           if (backupTargetsOtherAccount) {
             // 顶层仓库属于备份账号：归档而非覆盖当前登录账号视图
             archiveTopLevelToBackupAccount('replace');
           } else {
-            store.setRepositories(importedData.repositories, { allowEmpty: true });
+            store.setRepositories(validatedImportRepositories, { allowEmpty: true });
           }
         }
         if (selectedTypes.includes('repositories') && !backupTargetsOtherAccount) {
@@ -1305,13 +1316,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
           }
           useAppStore.setState({ accountWorkspaces: merged });
         }
-        if (selectedTypes.includes('repositories') && importedData.repositories) {
+        if (selectedTypes.includes('repositories') && validatedImportRepositories !== undefined) {
           if (backupTargetsOtherAccount) {
             // merge：备份顶层按 id 并入备份账号工作区，保留已合并的本机条目
             archiveTopLevelToBackupAccount('merge');
           } else {
             const existingIds = new Set(store.repositories.map(r => r.id));
-            const newRepos = importedData.repositories.filter(r => !existingIds.has(r.id));
+            const newRepos = validatedImportRepositories.filter(r => !existingIds.has(r.id));
             store.setRepositories([...store.repositories, ...newRepos]);
           }
         }

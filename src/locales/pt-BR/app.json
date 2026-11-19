@@ -1435,6 +1435,7 @@
     "cancel": "Cancelar",
     "confirm": "Adicionar e trocar",
     "reauth-hint": "Insira um token do GitHub válido para @{{login}}",
-    "account-mismatch": "Este token pertence a outra conta do GitHub. Entre com o token de @{{login}}."
+    "account-mismatch": "Este token pertence a outra conta do GitHub. Entre com o token de @{{login}}.",
+    "backend-credential-sync-failed": "A conta foi adicionada, mas as credenciais do backend não puderam ser atualizadas. Tente novamente mais tarde."
   }
 }

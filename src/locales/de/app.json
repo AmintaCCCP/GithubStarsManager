@@ -1435,6 +1435,7 @@
     "cancel": "Abbrechen",
     "confirm": "Hinzufügen und wechseln",
     "reauth-hint": "Bitte gib ein gültiges GitHub-Token für @{{login}} ein",
-    "account-mismatch": "Dieses Token gehört zu einem anderen GitHub-Konto. Bitte melde dich mit dem Token von @{{login}} an."
+    "account-mismatch": "Dieses Token gehört zu einem anderen GitHub-Konto. Bitte melde dich mit dem Token von @{{login}} an.",
+    "backend-credential-sync-failed": "Das Konto wurde hinzugefügt, aber die Backend-Anmeldedaten konnten nicht aktualisiert werden. Bitte später erneut versuchen."
   }
 }

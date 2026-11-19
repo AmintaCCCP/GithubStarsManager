@@ -38,10 +38,10 @@ interface MockDbOptions {
   globalTokenRow?: { value: string };
   /** accounts 表列表（readAccountRows 的 .all） */
   accountsRows?: Array<Record<string, unknown>>;
-  /** accounts 表按 account_id 的定向 get（readScopedToken 的副本来源） */
-  accountRow?: Record<string, unknown>;
-  /** account_settings.github_token 定向行（账号设置来源）；undefined = 缺失 */
-  scopedTokenRow?: { value: string | null };
+  /** accounts 表按绑定账号 ID 的定向 get（readScopedToken 的副本来源） */
+  accountRows?: Record<string, Record<string, unknown> | undefined>;
+  /** account_settings.github_token 定向行，按绑定账号 ID 返回；键缺失 = 缺行 */
+  scopedTokenRows?: Record<string, { value: string | null } | undefined>;
   /** account_settings 凭据列表（A18 合并查询的 .all） */
   scopedCredentialRows?: Array<{ account_id: string; value: string | null }>;
 }
@@ -49,6 +49,8 @@ interface MockDbOptions {
 /**
  * 按 SQL 形态分发的轻量 DB mock：accounts 列表 / account_settings 定向 get /
  * account_settings 凭据列表（A18 合并）/ accounts 定向 get / 全局 settings。
+ * R2-A27：定向查询按第一个绑定参数（绑定账号 ID）返回数据——同一替身可为
+ * 多个账号分别配置缺行 / 显式 null / 有效凭据。
  */
 function makeMockDb(options: MockDbOptions = {}) {
   return {
@@ -60,10 +62,16 @@ function makeMockDb(options: MockDbOptions = {}) {
         return { all: () => options.scopedCredentialRows ?? [], get: () => undefined };
       }
       if (sql.includes('account_settings')) {
-        return { get: () => options.scopedTokenRow, all: () => [] };
+        return {
+          get: (accountId?: unknown) => (options.scopedTokenRows ?? {})[String(accountId)],
+          all: () => [],
+        };
       }
       if (sql.includes('FROM accounts WHERE')) {
-        return { get: () => options.accountRow, all: () => [] };
+        return {
+          get: (accountId?: unknown) => (options.accountRows ?? {})[String(accountId)],
+          all: () => [],
+        };
       }
       return {
         get: (key: string) => (key === 'github_token' ? options.globalTokenRow : undefined),
@@ -110,7 +118,7 @@ describe('authRestore route (POST /api/sync/auth)', () => {
         added_at: '2026-01-01T00:00:00Z',
         last_used_at: '2026-01-02T00:00:00Z',
       }],
-      accountRow: { github_token_encrypted: 'encrypted-account-copy' },
+      accountRows: { '1001': { github_token_encrypted: 'encrypted-account-copy' } },
     }));
 
     const res = await request(createTestApp()).post('/api/sync/auth').expect(200);
@@ -134,8 +142,8 @@ describe('authRestore route (POST /api/sync/auth)', () => {
         added_at: '2026-01-01T00:00:00Z',
         last_used_at: '2026-01-02T00:00:00Z',
       }],
-      accountRow: { github_token_encrypted: 'encrypted-account-copy' },
-      scopedTokenRow: { value: 'encrypted-scoped' },
+      accountRows: { '1001': { github_token_encrypted: 'encrypted-account-copy' } },
+      scopedTokenRows: { '1001': { value: 'encrypted-scoped' } },
     }));
 
     const res = await request(createTestApp())
@@ -156,8 +164,8 @@ describe('authRestore route (POST /api/sync/auth)', () => {
         added_at: '2026-01-01T00:00:00Z',
         last_used_at: '2026-01-02T00:00:00Z',
       }],
-      accountRow: { github_token_encrypted: 'encrypted-account-copy' },
-      // scopedTokenRow 缺失
+      accountRows: { '1001': { github_token_encrypted: 'encrypted-account-copy' } },
+      // scopedTokenRows 缺 '1001' 键 = account_settings 缺行
     }));
 
     const res = await request(createTestApp())
@@ -178,9 +186,9 @@ describe('authRestore route (POST /api/sync/auth)', () => {
         added_at: '2026-01-01T00:00:00Z',
         last_used_at: '2026-01-02T00:00:00Z',
       }],
-      accountRow: { github_token_encrypted: 'encrypted-account-copy' },
+      accountRows: { '1001': { github_token_encrypted: 'encrypted-account-copy' } },
       // 记录存在但值为空 = 显式清空：绝不回退 accounts 副本或全局 Token
-      scopedTokenRow: { value: null },
+      scopedTokenRows: { '1001': { value: null } },
     }));
 
     const res = await request(createTestApp())
@@ -197,7 +205,7 @@ describe('authRestore route (POST /api/sync/auth)', () => {
     getDbMock.mockReturnValue(makeMockDb({
       accountsRows: [],
       // 定向恢复与列表读取同源：account_settings 的凭据行
-      scopedTokenRow: { value: 'encrypted-scoped' },
+      scopedTokenRows: { '1001': { value: 'encrypted-scoped' } },
       scopedCredentialRows: [
         { account_id: '1001', value: 'encrypted-scoped' },
         { account_id: '1002', value: null },
@@ -220,5 +228,56 @@ describe('authRestore route (POST /api/sync/auth)', () => {
       .send({ account_id: '1001' })
       .expect(200);
     expect(targeted.body.github_token).toBe('plain-scoped-token');
+  });
+
+  it('resolves credentials per bound account when several accounts coexist (R2-A27)', async () => {
+    // R2-A27：定向查询替身按绑定账号 ID 返回数据——1001 显式 null（显式清空）、
+    // 1002 缺行（回退 accounts 副本），两者在同一替身中按账号分别配置。
+    getDbMock.mockReturnValue(makeMockDb({
+      globalTokenRow: { value: 'encrypted-global' },
+      accountsRows: [
+        {
+          account_id: '1001',
+          user_json: JSON.stringify({ id: 1001, login: 'alice' }),
+          github_token_encrypted: 'encrypted-account-copy',
+          added_at: '2026-01-01T00:00:00Z',
+          last_used_at: '2026-01-02T00:00:00Z',
+        },
+        {
+          account_id: '1002',
+          user_json: JSON.stringify({ id: 1002, login: 'bob' }),
+          github_token_encrypted: 'encrypted-account-copy',
+          added_at: '2026-01-01T00:00:00Z',
+          last_used_at: '2026-01-03T00:00:00Z',
+        },
+      ],
+      accountRows: {
+        '1001': { github_token_encrypted: 'encrypted-account-copy' },
+        '1002': { github_token_encrypted: 'encrypted-account-copy' },
+      },
+      scopedTokenRows: {
+        '1001': { value: null },
+        // '1002' 缺行：定向 get 返回 undefined，回退 accounts 副本
+      },
+    }));
+
+    // 1001：account_settings 记录存在但值为空 → 显式清空，绝不回退
+    const cleared = await request(createTestApp())
+      .post('/api/sync/auth')
+      .send({ account_id: '1001' })
+      .expect(200);
+    expect(cleared.body.github_token).toBeNull();
+
+    // 1002：account_settings 缺行 → 回退 accounts 副本
+    const fallback = await request(createTestApp())
+      .post('/api/sync/auth')
+      .send({ account_id: '1002' })
+      .expect(200);
+    expect(fallback.body.github_token).toBe('plain-account-token');
+
+    // 恢复列表按账号分别解析：显式清空 → null；缺行回退 → plain-account-token
+    const listed = fallback.body.accounts as Array<{ accountId: string; githubToken: string | null }>;
+    expect(listed.find((a) => a.accountId === '1001')?.githubToken).toBeNull();
+    expect(listed.find((a) => a.accountId === '1002')?.githubToken).toBe('plain-account-token');
   });
 });

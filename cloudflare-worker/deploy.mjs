@@ -1213,20 +1213,37 @@ async function verifyAccountMetadataIndex(workerUrl, authToken, dimensions) {
     }
 
     if (scopedOk) {
-      const sampleRes = await fetch(`${base}/query`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ vector, topK: 50 }),
-      });
-      if (sampleRes.ok) {
-        const data = await sampleRes.json().catch(() => null);
-        const matches = Array.isArray(data?.matches) ? data.matches : [];
-        if (matches.length === 0) {
-          console.log(c.gray(t('acct_verify_no_vectors')));
-        } else {
-          const legacyCount = matches.filter((m) => !(m.metadata && typeof m.metadata.accountId === 'string' && m.metadata.accountId)).length;
-          console.log(c[legacyCount > 0 ? 'yellow' : 'gray'](t('acct_verify_legacy', { count: legacyCount, total: matches.length })));
+      // Issue #612 R2-A32：第二次采样验证（fetch + 正文读取）使用独立的超时
+      // 控制器，signal 覆盖 sampleRes.json() 的正文读取；结束后清理计时器，
+      // 超时经 AbortError 走既有警告路径，部署流程继续。
+      const sampleController = new AbortController();
+      const sampleTimeout = setTimeout(() => sampleController.abort(), 8000);
+      try {
+        // Issue #612 R2-A31：诊断采样显式设置 threshold: 0（覆盖有效评分范围），
+        // 高分与低分样本都计入 legacy 统计——默认阈值会把低分 legacy 向量过滤
+        // 掉，回填统计被低估。
+        const sampleRes = await fetch(`${base}/query`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ vector, topK: 50, threshold: 0 }),
+          signal: sampleController.signal,
+        });
+        if (sampleRes.ok) {
+          const data = await sampleRes.json().catch((err) => {
+            // 超时中止必须向外传播走警告路径；普通解析失败保持静默降级。
+            if (sampleController.signal.aborted) throw err;
+            return null;
+          });
+          const matches = Array.isArray(data?.matches) ? data.matches : [];
+          if (matches.length === 0) {
+            console.log(c.gray(t('acct_verify_no_vectors')));
+          } else {
+            const legacyCount = matches.filter((m) => !(m.metadata && typeof m.metadata.accountId === 'string' && m.metadata.accountId)).length;
+            console.log(c[legacyCount > 0 ? 'yellow' : 'gray'](t('acct_verify_legacy', { count: legacyCount, total: matches.length })));
+          }
         }
+      } finally {
+        clearTimeout(sampleTimeout);
       }
     }
   } catch (err) {

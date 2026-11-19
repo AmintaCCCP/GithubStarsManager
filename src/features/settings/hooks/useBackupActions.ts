@@ -264,6 +264,12 @@ export const useBackupActions = (): BackupActions => {
       const backupAccountId = typeof rawActiveAccountId === 'string' ? rawActiveAccountId : null;
       // 备份显式声明了归属账号即以其为准（包括当前未登录 liveAccountId=null）。
       const restoreTargetsOtherAccount = !!backupAccountId && backupAccountId !== liveAccountId;
+      // R2-C9：区分备份显式的 `activeAccountId: null`（新版未登录导出）与旧版
+      // 缺省字段。显式 null 的顶层数据没有归属账号，不得自动应用到当前已
+      // 登录账号；缺省字段保留旧版兼容行为（应用到当前账号）。
+      const skipUnboundTopLevelApply = Object.prototype.hasOwnProperty.call(backupData, 'activeAccountId')
+        && rawActiveAccountId === null
+        && !!liveAccountId;
 
       // 备份实际携带的工作区（规整化后）：判断是否应用当前账号工作区必须以它
       // 为准，不能用合并结果——合并结果含本机旧快照，备份不含当前账号时会
@@ -271,6 +277,32 @@ export const useBackupActions = (): BackupActions => {
       const normalizedBackupWorkspaces = backupData.accountWorkspaces
         ? normalizeAccountWorkspaces(backupData.accountWorkspaces)
         : {};
+      // R2-C8：登记账号/写入工作区前逐份校验各账号工作区的仓库数据（与顶层
+      // 恢复和本地 JSON 导入共用 validateBackupRepositories）。非数组或含无效
+      // 条目时整体拒绝恢复，绝不用损坏/部分数据覆盖本机工作区；显式 [] 的
+      // 清空语义保留（validated === [] 仍会写入）。
+      if (backupData.accountWorkspaces && typeof backupData.accountWorkspaces === 'object'
+        && !Array.isArray(backupData.accountWorkspaces)) {
+        for (const [workspaceAccountId, rawWorkspace] of Object.entries(
+          backupData.accountWorkspaces as Record<string, unknown>,
+        )) {
+          if (!rawWorkspace || typeof rawWorkspace !== 'object' || Array.isArray(rawWorkspace)) continue;
+          const validatedWorkspaceRepositories = validateBackupRepositories(
+            (rawWorkspace as Record<string, unknown>).repositories,
+          );
+          if (validatedWorkspaceRepositories === null) {
+            toast(
+              `${t('useBackupActions.restore-failed')}: invalid repositories payload for account ${workspaceAccountId}`,
+              'error',
+            );
+            return;
+          }
+          if (validatedWorkspaceRepositories !== undefined) {
+            const normalizedWorkspace = normalizedBackupWorkspaces[workspaceAccountId];
+            if (normalizedWorkspace) normalizedWorkspace.repositories = validatedWorkspaceRepositories;
+          }
+        }
+      }
       // 防御性复制：备份未携带工作区时避免归档写原地改写当前 state 字典
       const mergedWorkspaces = backupData.accountWorkspaces
         ? mergeAccountWorkspacesForBackup(
@@ -376,7 +408,7 @@ export const useBackupActions = (): BackupActions => {
         }
       }
 
-      if (!restoreTargetsOtherAccount) {
+      if (!restoreTargetsOtherAccount && !skipUnboundTopLevelApply) {
         if (backupRepositories !== undefined) state.setRepositories(backupRepositories, { allowEmpty: true });
         if (Array.isArray(backupData.releases)) state.setReleases(backupData.releases as typeof state.releases, { allowEmpty: true });
         // 工作区级数据（Gist / Fork / 同步范围）随 1.3 备份恢复
@@ -399,7 +431,7 @@ export const useBackupActions = (): BackupActions => {
 
       // 跨账号恢复时，备份顶层的订阅/已读/分类属于被恢复账号，已随顶层归档进
       // 其工作区；绝不能写入恢复者当前账号的顶层状态（串号防线）。
-      if (!restoreTargetsOtherAccount) {
+      if (!restoreTargetsOtherAccount && !skipUnboundTopLevelApply) {
         try {
           if (Array.isArray(backupData.releaseSubscriptions)) {
             const values = backupData.releaseSubscriptions.filter((id): id is number => typeof id === 'number');
@@ -492,9 +524,20 @@ export const useBackupActions = (): BackupActions => {
       try {
         if (backupData.proxyConfig && typeof backupData.proxyConfig === 'object') {
           const backupConfig = backupData.proxyConfig as typeof state.proxyConfig;
+          const currentProxy = useAppStore.getState().proxyConfig;
+          // R2-C10：仅当备份的代理类型/地址/端口/用户名与当前配置完全一致时
+          // 才沿用当前密码（同一连接的脱敏备份）；任一不同说明是另一个代理，
+          // 沿用旧密码会把错误凭据发给新代理——选择清空。
+          const sameProxyConnection = backupConfig.type === currentProxy.type
+            && backupConfig.host === currentProxy.host
+            && backupConfig.port === currentProxy.port
+            && (backupConfig.username ?? '') === (currentProxy.username ?? '');
           state.setProxyConfig({
             ...backupConfig,
-            password: backupIncludedKeys && isRealBackupSecret(backupConfig.password) ? backupConfig.password : useAppStore.getState().proxyConfig.password,
+            // 备份携带有效密钥时优先使用备份密码；否则仅在连接身份一致时复用。
+            password: backupIncludedKeys && isRealBackupSecret(backupConfig.password)
+              ? backupConfig.password
+              : (sameProxyConnection ? currentProxy.password ?? '' : ''),
           });
         }
       } catch (error) {

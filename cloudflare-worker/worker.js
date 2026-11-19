@@ -127,16 +127,17 @@ export default {
         if ((info.vectorCount ?? 0) === 0) {
           return jsonResponse({ success: true, deleted: 0 });
         }
-        // 使用 query + 零向量采样，循环删除不在 keepSet 中的向量
         const dimensions = info.dimensions ?? 1536;
-        let totalDeleted = 0;
-        let sampledAll = false;
-        // 采样收敛判定：某轮没有待删向量时不能直接判定完成——采样可能恰好
-        // 没命中当前账号前缀。持续到没有新向量出现为止。
-        const seenIds = new Set();
-        // Vectorize 删除并非立即可见：刚删掉的 ID 可能在同一轮采样里再次出现，
-        // 必须跳过，避免重复提交删除和重复计数。
-        const deletedIds = new Set();
+        // 待删判定（R2-A28）：应用范围与 keepIds 条件——keepSet 中的向量、
+        // 已提交删除的向量与范围外的向量一律不算待删。
+        const isDeletableId = (id) => {
+          if (!id || keepSet.has(id)) return false;
+          // 无范围参数时只清理 legacy 无前缀向量，带账号前缀的向量必须
+          // 由显式范围请求才能删除。
+          if (!scoped) return isLegacyId(id);
+          if (prefix && id.startsWith(prefix)) return true;
+          return includeLegacy && isLegacyId(id);
+        };
         // 按前缀清理时用 metadata filter 收窄候选池（includeLegacy 时不能过滤）
         const accountFilter = prefix && !includeLegacy ? { accountId: accountPrefix } : undefined;
         if (accountFilter && env.ACCOUNT_METADATA_INDEXED !== 'true') {
@@ -149,7 +150,59 @@ export default {
             400,
           );
         }
-        const SAMPLE_TOPK = 100;
+
+        // Issue #612 R2-A28：可验证的待删集合判断——优先用 Vectorize 分页列举
+        // 接口完整枚举向量 ID，应用范围与 keepIds 条件，游标耗尽（枚举完成）
+        // 才报告完成。采样只能观察有限窗口：keepSet 全保留时永远采样不到
+        // 待删向量，跑满轮次也无法与「清理完成」区分——只能采样时结果一律
+        // 标「未验证」（partial: true + verified: false），绝不谎报 partial: false。
+        if (typeof env.VECTORIZE.list === 'function') {
+          try {
+            let cursor;
+            let totalDeleted = 0;
+            let listedAll = false;
+            // 分页安全上限（1000/页 × 500 页）：超出按未验证处理，避免游标异常导致死循环。
+            const MAX_LIST_PAGES = 500;
+            for (let page = 0; page < MAX_LIST_PAGES; page++) {
+              const pageResult = await env.VECTORIZE.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
+              const vectors = Array.isArray(pageResult?.vectors) ? pageResult.vectors : [];
+              const staleIds = vectors
+                .map((v) => (typeof v === 'string' ? v : String((v && v.id) ?? '')))
+                .filter((id) => isDeletableId(id));
+              // deleteByIds 分批提交（与采样路径的单批上限一致）
+              for (let i = 0; i < staleIds.length; i += 100) {
+                await env.VECTORIZE.deleteByIds(staleIds.slice(i, i + 100));
+              }
+              totalDeleted += staleIds.length;
+              const rawNext = pageResult && (pageResult.nextCursor ?? pageResult.cursor);
+              const next = typeof rawNext === 'string' && rawNext ? rawNext : undefined;
+              if (!next) {
+                // 游标耗尽：快照范围内待删向量已全部提交删除 → 可验证完成。
+                listedAll = true;
+                break;
+              }
+              // 异常分页（带游标却无向量）：按未验证处理，避免空页死循环。
+              if (vectors.length === 0) break;
+              cursor = next;
+            }
+            if (listedAll) {
+              return jsonResponse({ success: true, deleted: totalDeleted, partial: false });
+            }
+            // 超出分页上限仍未枚举完：覆盖未确认 → 明确标注未验证。
+            return jsonResponse({ success: true, deleted: totalDeleted, partial: true, verified: false });
+          } catch {
+            // list 运行时不可用 / 调用失败：回退采样路径（结果标未验证）。
+          }
+        }
+
+        // 采样回退路径：使用 query + 随机向量采样，循环删除不在 keepSet 中的向量。
+        let totalDeleted = 0;
+        // 采样收敛判定：某轮没有待删向量时不能直接判定完成——采样可能恰好
+        // 没命中当前账号前缀。持续到没有新向量出现为止。
+        const seenIds = new Set();
+        // Vectorize 删除并非立即可见：刚删掉的 ID 可能在同一轮采样里再次出现，
+        // 必须跳过，避免重复提交删除和重复计数。
+        const deletedIds = new Set();
         for (let round = 0; round < 10; round++) {
           // 随机向量采样：固定向量可能每轮命中同一批 keepIds，无法覆盖候选池
           const queryVector = Array.from({ length: dimensions }, () => Math.random() * 2 - 1);
@@ -159,16 +212,7 @@ export default {
             ...(accountFilter ? { filter: accountFilter } : {}),
           });
           const sampled = result.matches;
-          const staleIds = sampled
-            .filter((m) => {
-              if (keepSet.has(m.id) || deletedIds.has(m.id)) return false;
-              // 无范围参数时只清理 legacy 无前缀向量，带账号前缀的向量必须
-              // 由显式范围请求才能删除。
-              if (!scoped) return isLegacyId(m.id);
-              if (prefix && m.id.startsWith(prefix)) return true;
-              return includeLegacy && isLegacyId(m.id);
-            })
-            .map((m) => m.id);
+          const staleIds = sampled.filter((m) => isDeletableId(m.id) && !deletedIds.has(m.id)).map((m) => m.id);
           const unseen = sampled.filter((m) => !seenIds.has(m.id));
           for (const match of unseen) seenIds.add(match.id);
           if (staleIds.length > 0) {
@@ -177,17 +221,16 @@ export default {
             totalDeleted += staleIds.length;
             continue;
           }
-          // Issue #612 A30：采样收敛判定与 TS 入口保持一致——seenIds 数量与
-          // vectorCount 比较、以及「本轮窗口小于 topK」都不是清理完成依据
-          // （数量不变但 ID 可被替换，下一轮可能命中未见向量）。唯一可靠的
-          // 完成证据是候选池已被观察为空（0 条采样结果）；覆盖未确认时保持
-          // partial: true，继续采样直到轮数耗尽。
+          // 候选池被观察为空（0 条采样结果）：无更多可采样向量，提前结束。
+          // 但采样无法证明范围覆盖——完成与否交给统一「未验证」结果，
+          // 不再据此谎报 partial: false。
           if (sampled.length === 0) {
-            sampledAll = true;
             break;
           }
         }
-        return jsonResponse({ success: true, deleted: totalDeleted, partial: !sampledAll });
+        // R2-A28：采样只能观察有限窗口，无法验证「不存在待删向量」——
+        // 明确标注未验证（partial: true），绝不返回 partial: false。
+        return jsonResponse({ success: true, deleted: totalDeleted, partial: true, verified: false });
       }
 
       // GET /status — 返回索引信息

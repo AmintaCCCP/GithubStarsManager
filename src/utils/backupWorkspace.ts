@@ -296,9 +296,15 @@ export const replaceWorkspacesForSelectedTypes = (
     const rawAccount = raw[accountId] ?? {};
     const rawHas = (key: string): boolean => Object.prototype.hasOwnProperty.call(rawAccount, key);
     const local = merged[accountId] ?? emptyAccountWorkspace();
+    // R2-C7：写入 repositories 前逐项校验原始备份值——缺失/null 视为未提供
+    //（保留本机值），非数组或含无效条目的数组整体不写入，绝不用损坏数据
+    // 覆盖本机仓库列表；显式 [] 仍是有效的清空语义。
+    const validatedRepositories = includeRepos && rawHas('repositories')
+      ? validateBackupRepositories(rawAccount.repositories)
+      : undefined;
     merged[accountId] = {
       ...local,
-      ...(includeRepos && rawHas('repositories') ? { repositories: incoming.repositories } : {}),
+      ...(Array.isArray(validatedRepositories) ? { repositories: validatedRepositories } : {}),
       ...(includeRepos && rawHas('lastSync') ? { lastSync: incoming.lastSync } : {}),
       ...(includeRepos && rawHas('gists') ? { gists: incoming.gists } : {}),
       ...(includeRepos && rawHas('starredGists') ? { starredGists: incoming.starredGists } : {}),

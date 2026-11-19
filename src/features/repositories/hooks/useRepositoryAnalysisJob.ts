@@ -116,6 +116,34 @@ export const useRepositoryAnalysisJob = ({
     };
   }, [setAnalysisProgress, setLoading]);
 
+  // R2-C18：账号/凭据变化时主动释放旧优化器。切号后旧任务可能停在暂停/等待
+  // 状态（不再收到 onResult），isRunningRef 残留 true 会阻塞新账号任务——不能
+  // 等后续回调或用户手动恢复。订阅在切换的 Store 写入中同步触发（早于新账号
+  // 启动任务），因此只清理旧任务，不影响新账号任务。
+  useEffect(() => {
+    // 测试桩（store 被整体 mock）可能没有 subscribe：保持旧契约，不监听切号。
+    if (typeof useAppStore.subscribe !== 'function') return;
+    let lastAccountId = peekCurrentAccountId();
+    let lastGeneration = getAccountSessionGeneration();
+    return useAppStore.subscribe(() => {
+      const accountId = peekCurrentAccountId();
+      const generation = getAccountSessionGeneration();
+      if (accountId === lastAccountId && generation === lastGeneration) return;
+      lastAccountId = accountId;
+      lastGeneration = generation;
+      optimizerRef.current?.abort();
+      optimizerRef.current = null;
+      isRunningRef.current = false;
+      isPausedRef.current = false;
+      stopRequestedRef.current = false;
+      if (mountedRef.current) {
+        setIsPaused(false);
+        setLoading(false);
+        setAnalysisProgress({ current: 0, total: 0 });
+      }
+    });
+  }, [setAnalysisProgress, setLoading]);
+
   const pause = useCallback(() => {
     const optimizer = optimizerRef.current;
     if (!isRunningRef.current || !optimizer || isPausedRef.current) return;

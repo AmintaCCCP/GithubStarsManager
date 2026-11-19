@@ -166,11 +166,15 @@ const wireStoreMocks = () => {
     selector ? selector(storeState) : storeState) as unknown as typeof useAppStore);
   Object.assign(mockUseAppStore, {
     getState: vi.fn(() => storeState),
+    // 审计修复（R2-B18）：setState 创建新的 storeState 对象（与真实 zustand 一致，
+    // getState/selector 读取的始终是最新快照），支持对象补丁与函数更新。
     setState: vi.fn((update: unknown) => {
       const patch = typeof update === 'function'
-        ? (update as (state: typeof storeState) => unknown)(storeState)
+        ? (update as (state: typeof storeState) => Partial<typeof storeState>)(storeState)
         : update;
-      if (patch && typeof patch === 'object') Object.assign(storeState, patch);
+      if (patch && typeof patch === 'object') {
+        storeState = { ...storeState, ...(patch as Partial<typeof storeState>) };
+      }
     }),
   });
 

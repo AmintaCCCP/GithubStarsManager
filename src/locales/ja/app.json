@@ -1435,6 +1435,7 @@
     "cancel": "キャンセル",
     "confirm": "追加して切り替え",
     "reauth-hint": "@{{login}} の有効な GitHub トークンを再入力してください",
-    "account-mismatch": "このトークンは別の GitHub アカウントのものです。@{{login}} のトークンでサインインしてください。"
+    "account-mismatch": "このトークンは別の GitHub アカウントのものです。@{{login}} のトークンでサインインしてください。",
+    "backend-credential-sync-failed": "アカウントは追加されましたが、バックエンドの認証情報を更新できませんでした。後でもう一度お試しください。"
   }
 }

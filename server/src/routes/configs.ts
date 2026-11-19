@@ -12,6 +12,8 @@ import {
   getLegacyDefaultVerifiedToken,
   snapshotLegacyDefaultTokenBeforeOverwrite,
   fetchGitHubUserId,
+  getAccountCredentialVersion,
+  bumpAccountCredentialVersion,
   ACCOUNT_SCOPED_SETTING_KEYS,
   INTERNAL_SETTING_KEYS,
 } from '../db/accountScope.js';
@@ -681,6 +683,14 @@ router.put('/api/settings', async (req, res) => {
         res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
         return;
       }
+      // Issue #612 R2-A22：归一化结果必须仍是资料对象——数组与其他标量
+      // （JSON 字符串形态的 '"abc"' / '42' 等）在账号 ID 校验前直接拒绝；
+      // 显式 null / '' 清空路径保留。
+      if (normalizedUserProfile !== null && normalizedUserProfile !== ''
+        && (typeof normalizedUserProfile !== 'object' || Array.isArray(normalizedUserProfile))) {
+        res.status(400).json({ error: 'user_profile must be an object or a JSON object string', code: 'INVALID_USER_PROFILE' });
+        return;
+      }
       if (normalizedUserProfile && typeof normalizedUserProfile === 'object' && 'id' in normalizedUserProfile) {
         const profileId = (normalizedUserProfile as { id?: unknown }).id;
         if (isRealAccount && profileId !== undefined && profileId !== null && String(profileId) !== accountId) {
@@ -698,7 +708,12 @@ router.put('/api/settings', async (req, res) => {
     // 凭据：跳过本次 Token 写入并在响应中报告，绝不保存归属不明的凭据。
     // 「复用已验证凭据」路径：与该账号分区已存储的凭据完全一致的新 Token 免于
     // 重复查询。同账号 Token 轮换（身份一致）与显式清空不受影响。
+    // Issue #612 R2-A1：校验前记录该账号的凭据版本——GitHub 校验等待期间
+    // （最长 8s）另一设备可能清空/轮换同账号凭据；写入事务内复核版本，已变化
+    // 时放弃本次 PAT 写回（绝不把校验时的 PAT 写回两个已变化的位置）。
     let tokenVerificationFailed = false;
+    let tokenWriteSuperseded = false;
+    const credentialVersionBefore = isRealAccount ? getAccountCredentialVersion(db, accountId) : 0;
     const rawToken = updates.github_token;
     if (isRealAccount && typeof rawToken === 'string' && rawToken && !rawToken.startsWith('***')) {
       let storedEncrypted: string | null = null;
@@ -757,12 +772,24 @@ router.put('/api/settings', async (req, res) => {
           if (value && typeof value === 'string') {
             // Issue #612 A11：身份验证未通过的 Token 不写入（保留现有凭据）。
             if (tokenVerificationFailed) continue;
+            // Issue #612 R2-A1：事务内复核凭据版本——校验等待期间被并发变更
+            // （另一设备显式清空 / 轮换）时放弃本次写入，两个存储位置都不动。
+            if (isRealAccount && getAccountCredentialVersion(db, accountId) !== credentialVersionBefore) {
+              tokenWriteSuperseded = true;
+              continue;
+            }
             value = encrypt(value, config.encryptionKey);
-            if (isRealAccount) accountPayload.tokenEncrypted = value;
+            if (isRealAccount) {
+              accountPayload.tokenEncrypted = value;
+              bumpAccountCredentialVersion(db, accountId);
+            }
           } else if (isRealAccount) {
             // 显式清空（'' / null）：除 account_settings 外，accounts 表的加密
             // 凭据副本必须一并清空，否则代理会继续复用旧 Token。
+            // Issue #612 R2-A1：显式清空无论当前值是否为空都推进凭据版本，
+            // 使等待校验的其他设备的迟到写回失效。
             accountPayload.tokenCleared = true;
+            bumpAccountCredentialVersion(db, accountId);
           }
         }
 
@@ -819,7 +846,12 @@ router.put('/api/settings', async (req, res) => {
 
     upsert();
     // Issue #612 A11：Token 验证失败时其余设置照常保存，但凭据写入被跳过。
-    res.json({ updated: true, ...(tokenVerificationFailed ? { token_update_skipped: true } : {}) });
+    // Issue #612 R2-A1：校验等待期间凭据被并发变更时，本次 PAT 写回被放弃。
+    res.json({
+      updated: true,
+      ...(tokenVerificationFailed ? { token_update_skipped: true } : {}),
+      ...(tokenWriteSuperseded ? { token_update_superseded: true } : {}),
+    });
   } catch (err) {
     logger.errorFromError('configs.updateSettings', 'PUT /api/settings error', err);
     res.status(500).json({ error: 'Failed to update settings', code: 'UPDATE_SETTINGS_FAILED' });

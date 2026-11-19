@@ -502,6 +502,8 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
       tokens[legacyTopAccountId] = legacyTopToken;
     }
     if (Object.keys(tokens).length > 0 && hasGhAccountsBridge()) {
+      // R2-B1：迁移时磁盘完整映射尚未加载，saveGhAccountTokens 自动先读后写
+      // 合并更新——迁移写入的 Token 不会抹掉 gh-accounts.enc 中其他账号已有的 PAT。
       void saveGhAccountTokens(tokens).catch(() => undefined);
     }
     stateRecord.githubToken = null;
@@ -552,17 +554,26 @@ if (error) {
 // 审计修复（B7）：桌面端水化后先从 safeStorage 加密文件回填账号 Token，
 // 再宣布 hydration 完成——避免 isAuthenticated 短暂为 false 导致登录页闪现。
 // Web 构建（无 IPC 桥）直接完成：PAT 未持久化，按需重新授权。
+// 审计修复（R2-B1）：读取失败（桥异常/主进程 error）与「磁盘上没有 Token」
+// 是两回事——失败时保持「未加载」状态（saveGhAccountTokens 此后自动合并
+// 写入，绝不覆写磁盘上其他账号的 PAT），只有确认加载到完整映射才回填。
 const finishHydration = () => state.setHasHydrated(true);
 if (error || !hasGhAccountsBridge()) {
   finishHydration();
   return;
 }
 loadGhAccountTokens()
-  .then((tokens) => {
-    if (tokens && Object.keys(tokens).length > 0) {
+  .then((result) => {
+    if (result.status === 'error') {
+      logger.warn('store.hydrate', 'gh-accounts secure storage read failed; tokens not restored', {
+        error: result.error,
+      });
+      return;
+    }
+    if (result.status === 'loaded' && Object.keys(result.tokens).length > 0) {
       // 惰性访问 store（模块初始化环规避，同 accountWorkspace 的做法）
       const { restorePersistedAccountTokens } = useAppStore.getState();
-      restorePersistedAccountTokens(tokens);
+      restorePersistedAccountTokens(result.tokens);
     }
   })
   .catch(() => undefined)

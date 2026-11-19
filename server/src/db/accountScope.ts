@@ -134,6 +134,16 @@ export function extractRequestedAccountId(req: Request): string | null {
   return raw && ACCOUNT_ID_PATTERN.test(raw) ? raw : null;
 }
 
+/**
+ * Issue #612 R2-A3：请求是否显式携带了格式无效的账号头（有值但不匹配数字 ID
+ * 形态，如 `abc`）。这类请求与「真正无头请求」必须区分处理：解析写入范围时
+ * 直接拒绝，绝不回退到可变的活跃账号 / default 分区。
+ */
+export function hasInvalidAccountHeader(req: Request): boolean {
+  const raw = req.header('x-github-account-id')?.trim() ?? req.header('X-GitHub-Account-Id')?.trim() ?? '';
+  return raw !== '' && !ACCOUNT_ID_PATTERN.test(raw);
+}
+
 function readSetting(db: Database.Database, key: string): string | null {
   try {
     const row = db
@@ -210,6 +220,9 @@ export function resolveWritableAccountScope(
 ): { ok: true; accountId: string } | { ok: false } {
   const headerId = extractRequestedAccountId(req);
   if (headerId) return { ok: true, accountId: headerId };
+  // Issue #612 R2-A3：显式携带但格式无效的账号头（如 `abc`）绝不当作无头请求
+  // 回退到活跃账号分区——回退会把身份不明的写入路由到错误分区。
+  if (hasInvalidAccountHeader(req)) return { ok: false };
 
   const partitionIds = collectNonDefaultPartitionIds(db);
   if (partitionIds.size > 1) return { ok: false };
@@ -326,10 +339,6 @@ interface LegacyOwnerCheckRuntime {
   lastFailureAt: number;
   /** 进行中的 /user 校验：并发请求共享同一次网络调用。 */
   inFlight: Promise<LegacyOwnerResolution> | null;
-  /** A17 恢复路径（分区凭据校验）最近一次失败的时间戳；独立于存量快照的负缓存。 */
-  lastPartitionFailureAt: number;
-  /** 进行中的分区凭据 /user 校验：并发请求共享同一次网络调用。 */
-  partitionInFlight: Promise<string | null> | null;
 }
 
 const legacyCheckRuntimeByDb = new WeakMap<Database.Database, LegacyOwnerCheckRuntime>();
@@ -337,7 +346,7 @@ const legacyCheckRuntimeByDb = new WeakMap<Database.Database, LegacyOwnerCheckRu
 function getLegacyOwnerCheckRuntime(db: Database.Database): LegacyOwnerCheckRuntime {
   let runtime = legacyCheckRuntimeByDb.get(db);
   if (!runtime) {
-    runtime = { lastFailureAt: 0, inFlight: null, lastPartitionFailureAt: 0, partitionInFlight: null };
+    runtime = { lastFailureAt: 0, inFlight: null };
     legacyCheckRuntimeByDb.set(db, runtime);
   }
   return runtime;
@@ -353,8 +362,6 @@ export function resetLegacyOwnerResolutionState(db: Database.Database): void {
   if (runtime) {
     runtime.lastFailureAt = 0;
     runtime.inFlight = null;
-    runtime.lastPartitionFailureAt = 0;
-    runtime.partitionInFlight = null;
   }
 }
 
@@ -430,6 +437,11 @@ export function getAccountRevision(db: Database.Database, accountId: string): nu
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
 }
 
+/** 轻量 DB stub 缺 partition_meta 表的错误（R2-A21：这是版本写入唯一容忍的失败）。 */
+function isMissingPartitionMetaTableError(err: unknown): boolean {
+  return err instanceof Error && /no such table: partition_meta/.test(err.message);
+}
+
 /** 仓库/发行版写入成功后递增快照版本，返回新版本号。 */
 export function bumpAccountRevision(db: Database.Database, accountId: string): number {
   try {
@@ -437,10 +449,37 @@ export function bumpAccountRevision(db: Database.Database, accountId: string): n
       INSERT INTO partition_meta (account_id, key, value) VALUES (?, 'repo_revision', '1')
       ON CONFLICT(account_id, key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
     `).run(accountId);
-  } catch {
-    // 轻量 stub 缺表时忽略：版本保持 0，expectedRevision 校验随之降级为兼容路径
+  } catch (err) {
+    // Issue #612 R2-A21：仅容忍轻量 stub 缺 partition_meta 表的错误（版本保持 0，
+    // expectedRevision 校验随之降级为兼容路径）；其他写入错误向上抛出——
+    // 事务内调用时随事务回滚，绝不吞掉真实的版本写入失败。
+    if (!isMissingPartitionMetaTableError(err)) throw err;
   }
   return getAccountRevision(db, accountId);
+}
+
+/**
+ * 账号分区凭据版本（Issue #612 R2-A1：并发凭据变更检测）。
+ * 新 PAT 写入与显式清空都会推进版本；PUT /api/settings 在 GitHub 校验等待
+ * 前记录版本、写入事务内复核，版本已变化时放弃本次 PAT 写回。
+ */
+export function getAccountCredentialVersion(db: Database.Database, accountId: string): number {
+  const raw = getPartitionMeta(db, accountId, 'credential_revision');
+  const parsed = Number.parseInt(raw ?? '', 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/** 凭据实际变更（新 PAT 写入 / 显式清空）后递增凭据版本。 */
+export function bumpAccountCredentialVersion(db: Database.Database, accountId: string): void {
+  try {
+    db.prepare(`
+      INSERT INTO partition_meta (account_id, key, value) VALUES (?, 'credential_revision', '1')
+      ON CONFLICT(account_id, key) DO UPDATE SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+    `).run(accountId);
+  } catch (err) {
+    // 与 bumpAccountRevision 相同的容忍范围：仅轻量 stub 缺表，其余向上抛出。
+    if (!isMissingPartitionMetaTableError(err)) throw err;
+  }
 }
 
 /** 执行一次 GitHub /user 身份查询（8s 超时），返回数字用户 id 字符串或 null。 */
@@ -591,63 +630,19 @@ async function resolveLegacyDefaultOwner(db: Database.Database): Promise<LegacyO
 }
 
 /**
- * 读取账号分区自身保存的加密凭据（Issue #612 A17 恢复路径专用）。
- * 与 authRestore.readScopedToken 相同的来源顺序：account_settings.github_token
- * 优先（显式清空的空值记录视为「无凭据」），缺失再回退 accounts 副本。
- * 绝不读取全局 settings.github_token——恢复路径不得信任可能已被换绑的当前
- * 全局 Token。
+ * Issue #612 R2-A5（修订第一轮 A17 方案）：分区凭据恢复路径已移除。
+ *
+ * 可轮换的账号分区 PAT（account_settings / accounts 副本）不能作为存量数据
+ * 的归属证据——用「目标账号当前持有的凭据」通过 /user 校验只能证明请求者
+ * 现在控制该账号，不能证明存量 default 数据历史上属于它；据此自动认领并
+ * 写入认领标记，会让任何拿到目标账号控制权的凭据冒充存量数据所有者。
+ * 因此归属确立只保留两条独立于可轮换 PAT 的证据：
+ * 1. 存量快照 PAT（legacy_default_github_token / 认领时刻的全局 Token）经
+ *    /user 校验确立的已冻结归属（resolveLegacyDefaultOwner）；
+ * 2. 管理员显式确认（POST /api/sync/legacy-claim →
+ *    claimLegacyDefaultWithAdminConfirmation）。
+ * 无上述证据时存量数据原地保留，等待真正的归属账号登录或管理员确认。
  */
-function readPartitionCredential(db: Database.Database, accountId: string): string | null {
-  try {
-    const scoped = db
-      .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
-      .get(accountId) as { value: string | null } | undefined;
-    if (scoped !== undefined) {
-      return typeof scoped.value === 'string' && scoped.value ? scoped.value : null;
-    }
-    const row = db
-      .prepare('SELECT github_token_encrypted FROM accounts WHERE account_id = ?')
-      .get(accountId) as { github_token_encrypted: string | null } | undefined;
-    return typeof row?.github_token_encrypted === 'string' && row.github_token_encrypted
-      ? row.github_token_encrypted
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * A17 恢复路径：存量快照 PAT 已失效时，用「目标账号分区中的有效凭据」完成
- * 身份校验——/user 返回的 id 必须等于该账号 ID 才算验证通过。失败写入独立的
- * 负缓存（与存量快照校验的负缓存互不影响），进行中 Promise 去重。
- */
-async function resolveOwnerFromPartitionCredential(db: Database.Database, accountId: string): Promise<string | null> {
-  const runtime = getLegacyOwnerCheckRuntime(db);
-  if (runtime.lastPartitionFailureAt > 0
-    && Date.now() - runtime.lastPartitionFailureAt < LEGACY_CHECK_FAILURE_TTL_MS) {
-    return null;
-  }
-  if (runtime.partitionInFlight) return runtime.partitionInFlight;
-  runtime.partitionInFlight = (async () => {
-    try {
-      const encrypted = readPartitionCredential(db, accountId);
-      if (!encrypted) return null;
-      let token: string;
-      try {
-        token = decrypt(encrypted, config.encryptionKey);
-      } catch {
-        logger.warn('db.accountScope', 'Failed to decrypt partition credential for default-claim recovery');
-        return null;
-      }
-      const ownerId = await fetchGitHubUserId(token);
-      if (!ownerId) runtime.lastPartitionFailureAt = Date.now();
-      return ownerId;
-    } finally {
-      runtime.partitionInFlight = null;
-    }
-  })();
-  return runtime.partitionInFlight;
-}
 
 /** 读取已冻结（缓存）的 legacy 归属账号；兼容旧版裸 id 与 JSON 两种缓存形态。 */
 function readFrozenLegacyOwner(db: Database.Database): string | null {
@@ -693,6 +688,9 @@ function runLegacyDefaultClaimTransaction(
     // A16 的 ID 配对记录表：在删除旧行之前固化「已按 ID 配对」的目标行集合。
     db.exec('CREATE TEMP TABLE IF NOT EXISTS legacy_claim_id_matched (id INTEGER PRIMARY KEY)');
     db.prepare('DELETE FROM legacy_claim_id_matched').run();
+    // R2-A2 的同名归并映射表：旧仓库 ID → 目标仓库 ID（发行版 repo_id 重映射用）。
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS legacy_claim_full_name_matched (old_id INTEGER PRIMARY KEY, target_id INTEGER NOT NULL)');
+    db.prepare('DELETE FROM legacy_claim_full_name_matched').run();
 
     // ── repositories：先迁移无冲突行；再按记录合并冲突行（同 id / 同 full_name），
     // 目标分区已有数据时绝不整表跳过，避免存量行永久滞留 default。──
@@ -715,6 +713,19 @@ function runLegacyDefaultClaimTransaction(
     // 同 full_name 异 id 冲突（仓库删除后重建等）：仅对无 ID 配对且对应关系
     // 无歧义的旧行补入后删除（A16）。
     db.prepare(buildLegacyRepositoryMergeSql('full_name')).run(accountId);
+    // Issue #612 R2-A2：同名归并删除旧仓库前，固化「已确认的旧仓库 ID→目标 ID」
+    // 映射（排除已被 ID 配对的目标行；旧 ID 与目标 ID 相同时无需重映射），随后把
+    // 引用旧 ID 的发行版 repo_id 重映射到目标 ID——否则重建仓库的发行版会因
+    // repo_id 指向已删除的旧 ID 而永久失联。
+    db.prepare(`
+      INSERT INTO legacy_claim_full_name_matched (old_id, target_id)
+      SELECT d.id, t.id
+      FROM repositories d
+      JOIN repositories t
+        ON t.account_id = ? AND t.full_name = d.full_name
+       AND t.id NOT IN (SELECT id FROM legacy_claim_id_matched)
+      WHERE d.account_id = 'default' AND d.id != t.id
+    `).run(accountId);
     db.prepare(buildLegacyRepositoryDeleteSql('full_name')).run(accountId);
 
     // ── releases：同 id 冲突时合并已读状态（并集），其余行直接迁移。──
@@ -733,6 +744,14 @@ function runLegacyDefaultClaimTransaction(
       DELETE FROM releases WHERE account_id = 'default' AND EXISTS (
         SELECT 1 FROM releases t WHERE t.account_id = ? AND t.id = releases.id
       )
+    `).run(accountId);
+    // Issue #612 R2-A2：同名归并迁移完成后，把账号分区中仍引用旧仓库 ID 的
+    // 发行版 repo_id 重映射到目标 ID（重建仓库保持发行版关联）。
+    db.prepare(`
+      UPDATE releases SET repo_id = (
+        SELECT m.target_id FROM legacy_claim_full_name_matched m WHERE m.old_id = releases.repo_id
+      )
+      WHERE account_id = ? AND repo_id IN (SELECT old_id FROM legacy_claim_full_name_matched)
     `).run(accountId);
 
     // ── categories：同 id 冲突时补入目标缺失的分类字段，其余行直接迁移。──
@@ -781,6 +800,16 @@ function runLegacyDefaultClaimTransaction(
       db.prepare('INSERT OR IGNORE INTO account_settings (account_id, key, value) VALUES (?, ?, ?)')
         .run(accountId, key, value);
     }
+    // Issue #612 R2-A7：迁移进来的存量仓库在多账号索引中仍是 legacy 无前缀向量
+    //（没有 accountId 元数据），按账号过滤的查询永远无法召回——清除全部索引
+    // 标记（与 mcp/provider.ts 的重建恢复路径一致），客户端下次同步携带账号
+    // 元数据重新上传。
+    db.prepare(
+      'UPDATE repositories SET vector_indexed_at = NULL WHERE account_id = ? AND vector_indexed_at IS NOT NULL',
+    ).run(accountId);
+    // Issue #612 R2-A6：认领迁移了仓库/发行版数据，在写入认领标记前推进目标
+    // 账号快照版本——认领前快照的全量 PUT 会因版本过期返回 409，避免覆盖。
+    bumpAccountRevision(db, accountId);
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(CLAIMED_BY_KEY, accountId);
     // 认领只补「尚无有效活跃账号」的缺口：用户可能已在设置里显式切到其他账号，
     // 认领不得把它改回存量归属账号。
@@ -800,18 +829,21 @@ function runLegacyDefaultClaimTransaction(
  * 仅当同时满足以下条件时才执行认领，否则 'default' 数据原地不动：
  * 1. settings 中尚未记录 legacy_default_claimed_by；
  * 2. 存量数据的「已验证所有者」（resolveLegacyDefaultOwner 冻结的身份，一经
- *    校验确立便不再随 Token 轮换改变）=== 请求账号 ID；
- * 3. A17 恢复路径：已验证所有者尚未确立、且存量快照 PAT 已失效（401/网络
- *    失败）时，改用请求账号分区自身保存的有效凭据（account_settings /
- *    accounts 副本）通过 GitHub /user 校验身份后认领——绝不信任当前全局
- *    Token，也不改变已冻结的归属（缓存命中时走第 2 条，不会进入本路径）。
+ *    校验确立便不再随 Token 轮换改变）=== 请求账号 ID。
+ *
+ * Issue #612 R2-A5（修订第一轮 A17 方案）：归属确立只接受独立于可轮换 PAT 的
+ * 证据——存量快照 PAT 校验确立的已冻结归属。账号分区自身保存的凭据
+ * （account_settings / accounts 副本）可随时轮换，不能证明存量数据的历史归属，
+ * 不再用于自动认领；身份校验无法确立归属时存量数据原地保留，等待真正的归属
+ * 账号登录，或由管理员经 POST /api/sync/legacy-claim 显式确认迁移目标。
  *
  * 认领在单个事务中完成：repositories / releases / categories 的 default 行
  * 「逐条」迁移为请求账号 ID（目标分区已有数据时按记录合并而非整表跳过），
  * 账号级设置键以「只补缺失」方式复制进 account_settings（不覆盖账号已保存的
  * 新值；其中全局 github_token 仅当仍是当初通过身份校验的那份加密 Token 时才
  * 复制，Token 已换绑其他账号或同账号轮换时一律跳过，绝不把来源无法证明的
- * 凭据迁移进账号分区），最后写入 legacy_default_claimed_by 与 active_account_id。
+ * 凭据迁移进账号分区），最后清除重建标记、推进快照版本并写入
+ * legacy_default_claimed_by 与 active_account_id。
  * 若仍有 default 残留行（意外冲突），整体回滚并保持可重试状态，绝不写认领标记。
  */
 export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountId: string): Promise<void> {
@@ -819,21 +851,13 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
   if (!isLegacyClaimPending(db)) return;
 
   const resolution = await resolveLegacyDefaultOwner(db);
-  let ownerId = resolution.ownerId;
-  let verifiedToken = resolution.verifiedToken;
+  const ownerId = resolution.ownerId;
+  const verifiedToken = resolution.verifiedToken;
   if (!ownerId) {
-    // A17 恢复路径：旧 PAT 已失效的原账号用其分区中的有效凭据恢复认领。
-    ownerId = await resolveOwnerFromPartitionCredential(db, accountId);
-    if (ownerId && ownerId !== accountId) {
-      logger.info('db.accountScope', 'Skipping legacy default claim: partition credential belongs to another account', {
-        credentialOwner: ownerId,
-        requested: accountId,
-      });
-      return;
-    }
-    verifiedToken = null;
+    // R2-A5：归属未确立（无已冻结归属、存量快照 PAT 也校验失败）→ 不认领。
+    // 可轮换的分区凭据不能作为归属证据；管理员显式确认路径保持可用。
+    return;
   }
-  if (!ownerId) return;
   if (ownerId !== accountId) {
     // 身份不符：绝不认领。'default' 存量数据原地保留，等待已验证的归属账号登录；
     // 全局 Token 被换成其他账号不得改变已验证的归属。
@@ -861,7 +885,8 @@ export async function claimLegacyDefaultIfNeeded(db: Database.Database, accountI
 
 /**
  * A17 管理员显式确认的迁移目标认领：身份校验无法确立归属（存量快照 PAT 已
- * 失效且分区凭据也不可用）时，由持有 API_SECRET 的管理员显式指定迁移目标。
+ * 失效，且可轮换的分区凭据按 R2-A5 不再作为归属证据）时，由持有 API_SECRET
+ * 的管理员显式指定迁移目标。
  * 约束：归属已冻结为其他账号时拒绝（不得改变已冻结的归属）；认领事务与自动
  * 路径完全一致，且不复制任何凭据（不自动信任当前全局 Token）。
  */

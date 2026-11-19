@@ -1435,6 +1435,7 @@
     "cancel": "취소",
     "confirm": "추가 후 전환",
     "reauth-hint": "@{{login}} 계정의 유효한 GitHub 토큰을 다시 입력해 주세요",
-    "account-mismatch": "이 토큰은 다른 GitHub 계정의 것입니다. @{{login}} 계정의 토큰으로 로그인해 주세요."
+    "account-mismatch": "이 토큰은 다른 GitHub 계정의 것입니다. @{{login}} 계정의 토큰으로 로그인해 주세요.",
+    "backend-credential-sync-failed": "계정이 추가되었지만 백엔드 자격 증명을 업데이트하지 못했습니다. 나중에 다시 시도하세요."
   }
 }

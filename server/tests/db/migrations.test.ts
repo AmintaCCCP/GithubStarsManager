@@ -83,3 +83,65 @@ describe('migrations', () => {
     }
   });
 });
+
+describe('v4 legacy default PAT snapshot gating (Issue #612 R2-A8)', () => {
+  // 与上方 v6 测试相同的完整 v3 形态（迁移重建按列复制，缺列会失败）
+  const v3Schema = (db: import('better-sqlite3').Database): void => {
+    db.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')));
+      INSERT INTO schema_version (version) VALUES (3);
+      CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
+      CREATE TABLE repositories (id INTEGER PRIMARY KEY, name TEXT, full_name TEXT, description TEXT, html_url TEXT, stargazers_count INTEGER DEFAULT 0, language TEXT, created_at TEXT, updated_at TEXT, pushed_at TEXT, starred_at TEXT, owner_login TEXT, owner_avatar_url TEXT, topics TEXT, ai_summary TEXT, ai_tags TEXT, ai_platforms TEXT, analyzed_at TEXT, analysis_failed INTEGER DEFAULT 0, custom_description TEXT, custom_tags TEXT, custom_category TEXT, category_locked INTEGER DEFAULT 0, last_edited TEXT, subscribed_to_releases INTEGER DEFAULT 0, vector_indexed_at TEXT, license TEXT, vector_indexed_license TEXT, description_display TEXT, tags_display TEXT);
+      CREATE TABLE releases (id INTEGER PRIMARY KEY, tag_name TEXT, name TEXT, body TEXT, html_url TEXT, published_at TEXT, assets TEXT, repo_id INTEGER, repo_full_name TEXT, repo_name TEXT, prerelease INTEGER DEFAULT 0, draft INTEGER DEFAULT 0, is_read INTEGER DEFAULT 0, zipball_url TEXT, tarball_url TEXT);
+      CREATE TABLE categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, icon TEXT NOT NULL DEFAULT '📁', keywords TEXT, color TEXT, sort_order INTEGER DEFAULT 0, is_custom INTEGER DEFAULT 1);
+    `);
+  };
+
+  it('does not freeze the PAT when the database holds no pending legacy data', () => {
+    const db = new Database(':memory:');
+    try {
+      v3Schema(db);
+      // 仅配置了全局 Token：无仓库/发行版/分类/旧账号级设置 → 不冻结
+      db.prepare("INSERT INTO settings (key, value) VALUES ('github_token', 'legacy-token')").run();
+
+      runMigrations(db);
+
+      expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'").get()).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('freezes the PAT when legacy account-level settings exist even without repository rows', () => {
+    const db = new Database(':memory:');
+    try {
+      v3Schema(db);
+      db.prepare("INSERT INTO settings (key, value) VALUES ('github_token', 'legacy-token')").run();
+      // 旧账号级设置（v4 之前存放在全局 settings 表）属于待认领旧数据
+      db.prepare("INSERT INTO settings (key, value) VALUES ('customCategories', ?)").run('["legacy"]');
+
+      runMigrations(db);
+
+      expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'").get())
+        .toMatchObject({ value: 'legacy-token' });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('freezes the PAT when legacy repository rows exist', () => {
+    const db = new Database(':memory:');
+    try {
+      v3Schema(db);
+      db.prepare("INSERT INTO settings (key, value) VALUES ('github_token', 'legacy-token')").run();
+      db.prepare("INSERT INTO repositories (id, name, full_name, html_url, owner_login) VALUES (1, 'repo', 'owner/repo', 'https://github.com/owner/repo', 'owner')").run();
+
+      runMigrations(db);
+
+      expect(db.prepare("SELECT value FROM settings WHERE key = 'legacy_default_github_token'").get())
+        .toMatchObject({ value: 'legacy-token' });
+    } finally {
+      db.close();
+    }
+  });
+});

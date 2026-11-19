@@ -16,7 +16,7 @@ import { CrossEncoderReranker } from '../../../services/crossEncoderReranker';
 import { runSimilarRepositoryPipeline } from '../../../services/similarRepositoryPipeline';
 import { EmbeddingClient, VectorSearchService } from '../../../services/vectorSearchService';
 import { analyzeRepository, createFailedAnalysisResult } from '../../../services/aiAnalysisHelper';
-import { forceSyncToBackend, markPendingAccountSync, withAccountSwitchGuardSync } from '../../../services/autoSync';
+import { forceSyncToBackend, markPendingAccountSync, markPendingRepositoryDeletion, withAccountSwitchGuardSync } from '../../../services/autoSync';
 import { backend } from '../../../services/backendAdapter';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
 import { logger } from '../../../services/logger';
@@ -96,6 +96,9 @@ export const useRepositoryCardActions = ({
   const { toast, confirm } = useDialog();
   const abortControllerRef = useRef<AbortController | null>(null);
   const similarityAbortRef = useRef<AbortController | null>(null);
+  // R2-C19：分析请求身份。只有仍是最新请求时才允许清除 store 忙标记，避免
+  // 旧请求的结算清掉新请求的标记（也允许会话失效时清理旧代次自己的标记）。
+  const analyzeRequestTokenRef = useRef(0);
   const [isLocallyAnalyzing, setIsLocallyAnalyzing] = useState(false);
   const [isFindingSimilar, setIsFindingSimilar] = useState(false);
   const [isUnstarring, setIsUnstarring] = useState(false);
@@ -181,6 +184,8 @@ export const useRepositoryCardActions = ({
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    const requestToken = analyzeRequestTokenRef.current + 1;
+    analyzeRequestTokenRef.current = requestToken;
 
     const analysisStartedAt = performance.now();
     setIsLocallyAnalyzing(true);
@@ -279,9 +284,10 @@ export const useRepositoryCardActions = ({
         abortControllerRef.current = null;
         setIsLocallyAnalyzing(false);
       }
-      // 分析标记清理只作用于发起账号仍是当前账号的工作区：切号后清理会误清
-      // 新账号同 ID 仓库的分析标记（发起账号的标记不入工作区快照，无需额外清理）
-      if (!controller.signal.aborted && isCurrentAccountSession(startedAccountId, startedGeneration)) {
+      // 分析标记清理按请求身份（R2-C19）：本请求仍是该卡片最新请求时清除，
+      // 即使会话已失效（同账号换凭据/切号）也必须清掉旧代次自己的忙标记，
+      // 否则 isAnalyzing 永久为 true；已有新请求接管时绝不清除其标记。
+      if (analyzeRequestTokenRef.current === requestToken) {
         setAnalyzingRepository(repoId, false);
       }
     }
@@ -487,6 +493,9 @@ export const useRepositoryCardActions = ({
           });
         }
         if (startedAccountId) {
+          // R2-C3：即使发起账号没有任何推送基线，也要按 (账号, 发起时后端)
+          // 持久化登记已确认的删除，切回后的拉取/推送合并据此排除该仓库。
+          markPendingRepositoryDeletion(startedAccountId, repository.id, startedBackendUrl);
           markPendingAccountSync(startedAccountId, startedBackendUrl);
         }
         return;
