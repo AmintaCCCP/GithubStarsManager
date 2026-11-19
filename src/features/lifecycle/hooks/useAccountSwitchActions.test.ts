@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
     isAvailable: true,
     syncSettings: vi.fn(),
     backendUrl: null as string | null,
-    init: vi.fn(async (_url?: string) => undefined),
+    init: vi.fn<(url?: string) => Promise<void>>(async () => undefined),
   },
   restoreBackendSession: vi.fn(),
   authenticateWithGitHub: vi.fn(),
