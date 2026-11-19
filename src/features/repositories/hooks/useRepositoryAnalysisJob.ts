@@ -163,17 +163,18 @@ export const useRepositoryAnalysisJob = ({
   }, []);
 
   const requestStop = useCallback(async () => {
-    if (!isRunningRef.current) return false;
+    const targetOptimizer = optimizerRef.current;
+    if (!isRunningRef.current || !targetOptimizer) return false;
 
     const confirmed = await confirm(
       t('useRepositoryAnalysisJob.stop-ai-analysis'),
       t('useRepositoryAnalysisJob.are-you-sure-you-want-to-stop-ai-analysis-analyz'),
       { type: 'warning' },
     );
-    if (!confirmed || !isRunningRef.current) return false;
+    if (!confirmed || !isRunningRef.current || optimizerRef.current !== targetOptimizer) return false;
 
     stopRequestedRef.current = true;
-    optimizerRef.current?.abort();
+    targetOptimizer.abort();
     isPausedRef.current = false;
     if (mountedRef.current) {
       setIsPaused(false);
@@ -370,7 +371,7 @@ export const useRepositoryAnalysisJob = ({
       }
       if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
         resetVisibleState();
-      } else if (mountedRef.current) {
+      } else if (mountedRef.current && !isRunningRef.current) {
         setIsRunning(false);
         isPausedRef.current = false;
         setIsPaused(false);

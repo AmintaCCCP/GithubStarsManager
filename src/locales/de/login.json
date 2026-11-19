@@ -59,7 +59,7 @@
     "token-permissions-classic-gists": "`gist`",
     "token-permissions-classic-star-lists": "`user`",
     "token-permissions-classic-fork-workflows": "`repo`",
-    "token-permissions-local-storage": "Ihr Token wird nur auf diesem Gerät und Ihrem eigenen Backend gespeichert – niemals auf den Servern der App.",
+    "token-permissions-local-storage": "Ihr Token wird nur auf diesem Gerät und Ihrem eigenen Backend gespeichert (es sei denn, Sie aktivieren „Schlüssel in Backup/Export einbeziehen“ für WebDAV-/Datei-Backups) – niemals auf den Servern der App.",
     "saved-accounts": "Gespeicherte Konten",
     "click-to-sign-in": "Zum Anmelden klicken",
     "token-required": "Token erforderlich"

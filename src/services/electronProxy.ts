@@ -150,7 +150,7 @@ interface ElectronAPI {
   /** 已保存 GitHub 账号加密凭证（gh-accounts.enc，safeStorage；桌面版专用） */
   ghAccounts?: {
     save: (tokens: Record<string, string>) => Promise<{ success: boolean; error?: string }>;
-    get: () => Promise<Record<string, string> | null>;
+    get: () => Promise<import('../store/persistence/ghAccountSecrets').GhAccountsGetPayload>;
     clear: () => Promise<{ success: boolean; error?: string }>;
   };
   desktop?: DesktopElectronAPI;

@@ -183,6 +183,14 @@ describe('useBackupActions multi-account (Issue #611)', () => {
       customCategories: [],
     }));
 
+    // 预置仅存在于本机的账号 3 工作区，验证合并保留而非直接替换本机字典
+    useAppStore.setState((current) => ({
+      accountWorkspaces: {
+        ...current.accountWorkspaces,
+        '3': workspaceOf([repo(3, 'local-only-charlie')]),
+      },
+    }));
+
     const { result } = renderHook(() => useBackupActions());
     await act(async () => {
       await result.current.restore();
@@ -191,6 +199,7 @@ describe('useBackupActions multi-account (Issue #611)', () => {
     const state = useAppStore.getState();
     // 工作区恢复：备份内容优先，本机独有的其他账号快照保留
     expect(state.accountWorkspaces['2']?.repositories[0].ai_summary).toBe('bob-restored');
+    expect(state.accountWorkspaces['3']?.repositories[0].ai_summary).toBe('local-only-charlie');
     // 当前账号按备份内容恢复到顶层并同步工作区快照
     expect(state.accountWorkspaces['1']?.repositories[0].ai_summary).toBe('alice-from-backup');
     // 掩码 Token 不覆盖本机有效 Token

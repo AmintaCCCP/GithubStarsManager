@@ -15,6 +15,8 @@ vi.mock('../../src/services/crypto.js', () => ({
     const known: Record<string, string> = {
       'encrypted-global': 'plain-global-token',
       'encrypted-account-copy': 'plain-account-token',
+      'encrypted-account-1001': 'plain-account-1001',
+      'encrypted-account-1002': 'plain-account-1002',
       'encrypted-scoped': 'plain-scoped-token',
       'encrypted-token': 'github-token',
     };
@@ -239,21 +241,21 @@ describe('authRestore route (POST /api/sync/auth)', () => {
         {
           account_id: '1001',
           user_json: JSON.stringify({ id: 1001, login: 'alice' }),
-          github_token_encrypted: 'encrypted-account-copy',
+          github_token_encrypted: 'encrypted-account-1001',
           added_at: '2026-01-01T00:00:00Z',
           last_used_at: '2026-01-02T00:00:00Z',
         },
         {
           account_id: '1002',
           user_json: JSON.stringify({ id: 1002, login: 'bob' }),
-          github_token_encrypted: 'encrypted-account-copy',
+          github_token_encrypted: 'encrypted-account-1002',
           added_at: '2026-01-01T00:00:00Z',
           last_used_at: '2026-01-03T00:00:00Z',
         },
       ],
       accountRows: {
-        '1001': { github_token_encrypted: 'encrypted-account-copy' },
-        '1002': { github_token_encrypted: 'encrypted-account-copy' },
+        '1001': { github_token_encrypted: 'encrypted-account-1001' },
+        '1002': { github_token_encrypted: 'encrypted-account-1002' },
       },
       scopedTokenRows: {
         '1001': { value: null },
@@ -268,16 +270,16 @@ describe('authRestore route (POST /api/sync/auth)', () => {
       .expect(200);
     expect(cleared.body.github_token).toBeNull();
 
-    // 1002：account_settings 缺行 → 回退 accounts 副本
+    // 1002：account_settings 缺行 → 回退 accounts 副本（区分账号密文，防错绑）
     const fallback = await request(createTestApp())
       .post('/api/sync/auth')
       .send({ account_id: '1002' })
       .expect(200);
-    expect(fallback.body.github_token).toBe('plain-account-token');
+    expect(fallback.body.github_token).toBe('plain-account-1002');
 
-    // 恢复列表按账号分别解析：显式清空 → null；缺行回退 → plain-account-token
+    // 恢复列表按账号分别解析：显式清空 → null；缺行回退 → plain-account-1002
     const listed = fallback.body.accounts as Array<{ accountId: string; githubToken: string | null }>;
     expect(listed.find((a) => a.accountId === '1001')?.githubToken).toBeNull();
-    expect(listed.find((a) => a.accountId === '1002')?.githubToken).toBe('plain-account-token');
+    expect(listed.find((a) => a.accountId === '1002')?.githubToken).toBe('plain-account-1002');
   });
 });

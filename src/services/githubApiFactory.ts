@@ -40,13 +40,24 @@ export function createGitHubApiService(
   return api;
 }
 
-export function createGitHubListsApiService(token: string): GitHubListsApiService {
+export interface CreateGitHubListsApiServiceOptions {
+  /** 显式绑定代理请求账号分区（与 token 来自同一次快照，防止切号串分区）。 */
+  accountId?: string | null;
+}
+
+export function createGitHubListsApiService(
+  token: string,
+  options: CreateGitHubListsApiServiceOptions = {},
+): GitHubListsApiService {
   const api = new GitHubListsApiService(token);
 
   if (shouldAttachBackend()) {
     api.setBackendUrl(backend.backendUrl);
     api.setBackendAuthToken(useAppStore.getState().backendApiSecret || null);
-    api.setBackendAccountId(accountIdKey(useAppStore.getState().user));
+    const resolvedAccountId = options.accountId !== undefined
+      ? options.accountId
+      : accountIdKey(useAppStore.getState().user);
+    api.setBackendAccountId(resolvedAccountId);
   }
 
   return api;

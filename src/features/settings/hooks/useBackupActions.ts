@@ -22,8 +22,19 @@ import {
 import { useDialog } from '../../../hooks/useDialog';
 import { normalizeReleaseSourceSettings } from '../../../utils/releaseSources';
 import { WebDAVService } from '../../../services/webdavService';
+import {
+  hasGhAccountsBridge,
+  syncGhAccountTokensFromState,
+} from '../../../store/persistence/ghAccountSecrets';
 
-
+export interface RestoreBackupOptions {
+  /** 列举备份时绑定的账号 ID（用于检测 listBackups 期间切号）。 */
+  expectedAccountId?: string | null;
+  /** 列举备份时绑定的会话代次（用于检测切出又切回同一账号）。 */
+  expectedGeneration?: number;
+  /** 列举备份时使用的 WebDAV 配置（固定从同一配置下载，防止配置切换下载同名文件）。 */
+  config?: WebDAVConfig;
+}
 
 export interface BackupActions {
   activeConfig: WebDAVConfig | undefined;
@@ -35,7 +46,7 @@ export interface BackupActions {
    * 列出供用户选择；不传 backupFile 时保持旧行为（下载排序后最新备份，
    * 兼容既有程序化调用）。
    */
-  restore: (backupFile?: string) => Promise<void>;
+  restore: (backupFile?: string, options?: RestoreBackupOptions) => Promise<void>;
   /**
    * 列出 WebDAV 上可恢复的备份文件（审计修复 C46）。recommended 为包含
    * 当前账号工作区的最新备份（文件名以 `-{当前账号ID}.json` 结尾；未登录
@@ -178,17 +189,21 @@ export const useBackupActions = (): BackupActions => {
     return { files: backupFiles, recommended };
   }, [activeConfig]);
 
-  const restore = useCallback(async (backupFile?: string) => {
-    if (!activeConfig) {
+  const restore = useCallback(async (backupFile?: string, options?: RestoreBackupOptions) => {
+    const targetConfig = options?.config ?? activeConfig;
+    if (!targetConfig) {
       toast(t('useBackupActions.please-configure-and-activate-webdav-service-fir'), 'error');
       return;
     }
-    // 恢复流程在 confirm()/listFiles()/downloadFile() 处异步等待，期间账号可能
-    // 被切换（switchAccount 不检查恢复状态）。先记录发起恢复的账号 ID，
-    // 每个 await 之后、任何 Store/WebDAV 写入之前校验一致性，不一致立即中止，
-    // 确保旧版（无 activeAccountId）备份也不会把数据写进切换后的新账号。
-    const restoreAccountId = accountIdKey(useAppStore.getState().user);
-    const restoreGeneration = getAccountSessionGeneration();
+    // 恢复流程在 listBackups()/confirm()/listFiles()/downloadFile() 处异步等待，
+    // 期间账号可能被切换。优先使用列举时传入的账号与会话代次快照，确保 listBackups
+    // 期间切号（包括切出又切回同一账号）也会中止恢复。
+    const restoreAccountId = options?.expectedAccountId !== undefined
+      ? options.expectedAccountId
+      : accountIdKey(useAppStore.getState().user);
+    const restoreGeneration = options?.expectedGeneration !== undefined
+      ? options.expectedGeneration
+      : getAccountSessionGeneration();
     const ensureSameAccount = (): boolean => {
       const currentAccountId = accountIdKey(useAppStore.getState().user);
       // 仅比较账号 ID 无法识别「切出后又切回」：会话代次同时校验。
@@ -201,6 +216,7 @@ export const useBackupActions = (): BackupActions => {
       }
       return true;
     };
+    if (!ensureSameAccount()) return;
     const confirmed = await confirm(
       t('useBackupActions.restore-data'),
       t('useBackupActions.restoring-data-will-overwrite-all-current-data-c'),
@@ -211,7 +227,7 @@ export const useBackupActions = (): BackupActions => {
 
     setIsRestoring(true);
     try {
-      const service = new WebDAVService(activeConfig);
+      const service = new WebDAVService(targetConfig);
       // 审计修复（C46）：不再始终下载排序后最新备份——UI 先经 listBackups
       // 列出可恢复备份供用户选择（默认推荐包含当前账号工作区的最新备份），
       // 选中的文件经 backupFile 显式传入；缺省时保持旧行为兼容程序化调用。
@@ -331,6 +347,10 @@ export const useBackupActions = (): BackupActions => {
           };
         }
         useAppStore.setState({ savedAccounts: mergedSaved });
+        // 桌面端将备份恢复出的真实 GitHub Token 立即持久化到 safeStorage，避免仅留内存重启丢失
+        if (hasGhAccountsBridge()) {
+          void syncGhAccountTokensFromState(useAppStore.getState());
+        }
       }
 
       if (restoreTargetsOtherAccount) {
@@ -586,7 +606,34 @@ export const useBackupActions = (): BackupActions => {
           },
         });
       }
-      toast(t('useBackupActions.data-restored-from-backup-repositories-v1-releas', { v1: backupRepositories?.length ?? 0, v2: (backupData.releases as unknown[] | undefined)?.length ?? 0, v3: (backupData.customCategories as unknown[] | undefined)?.length ?? 0 }), 'success');
+      const workspaceList = Object.values(normalizedBackupWorkspaces);
+      const restoredRepoCount = skipUnboundTopLevelApply
+        ? workspaceList.reduce((sum, ws) => sum + ws.repositories.length, 0)
+        : (backupRepositories?.length ?? 0);
+      const restoredReleaseCount = skipUnboundTopLevelApply
+        ? workspaceList.reduce((sum, ws) => sum + ws.releases.length, 0)
+        : ((backupData.releases as unknown[] | undefined)?.length ?? 0);
+      const restoredCategoryCount = skipUnboundTopLevelApply
+        ? workspaceList.reduce((sum, ws) => sum + ws.customCategories.length, 0)
+        : ((backupData.customCategories as unknown[] | undefined)?.length ?? 0);
+      const skippedUnboundTopLevelCount = skipUnboundTopLevelApply
+        ? (backupRepositories?.length ?? 0)
+          + ((backupData.releases as unknown[] | undefined)?.length ?? 0)
+          + ((backupData.customCategories as unknown[] | undefined)?.length ?? 0)
+        : 0;
+      const summaryMessage = t('useBackupActions.data-restored-from-backup-repositories-v1-releas', {
+        v1: restoredRepoCount,
+        v2: restoredReleaseCount,
+        v3: restoredCategoryCount,
+      });
+      if (skippedUnboundTopLevelCount > 0) {
+        toast(
+          `${summaryMessage} (skipped unbound top-level backup data with activeAccountId=null)`,
+          'info',
+        );
+      } else {
+        toast(summaryMessage, 'success');
+      }
     } catch (error) {
       console.error('Restore failed:', error);
       toast(`${t('useBackupActions.restore-failed')}: ${(error as Error).message}`, 'error');

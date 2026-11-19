@@ -39,7 +39,7 @@ const mocks = vi.hoisted(() => ({
   confirm: vi.fn(),
   switchToAccount: vi.fn(),
   removeAccount: vi.fn(async (): Promise<{ ok: boolean; error?: string }> => ({ ok: true })),
-  logoutCurrentAccount: vi.fn(),
+  logoutCurrentAccount: vi.fn(async () => true),
   addAccountWithToken: vi.fn(),
   addAccountFromBackend: vi.fn(),
 }));
@@ -244,6 +244,7 @@ describe('Header account switcher', () => {
     await waitFor(() => {
       expect(mocks.logoutCurrentAccount).toHaveBeenCalledWith('1');
     });
+    expect(mocks.toast).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -263,6 +264,7 @@ describe('Header account switcher', () => {
     await waitFor(() => {
       expect(mocks.logoutCurrentAccount).toHaveBeenCalledWith('1');
     });
+    expect(mocks.toast).not.toHaveBeenCalled();
     unmount();
   });
 

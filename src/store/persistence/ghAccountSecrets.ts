@@ -37,7 +37,7 @@ export type GhAccountsLoadResult =
   | { status: 'loaded'; tokens: GhAccountTokenMap };
 
 /** 主进程 gh-accounts:get 的结构化返回（missing = 磁盘无 Token 文件）。 */
-type GhAccountsGetPayload =
+export type GhAccountsGetPayload =
   | { status: 'missing' }
   | { status: 'loaded'; tokens: GhAccountTokenMap }
   | { status: 'error'; error: string };
@@ -75,8 +75,29 @@ let ghAccountTokensFullyLoaded = false;
  */
 let knownDiskTokens: GhAccountTokenMap | null = null;
 
+/**
+ * 待提交的删除列表：保存失败时保留待删除账号，直到后续保存成功才清除，
+ * 避免删除请求因单次 I/O 失败而永久丢失、导致已登出/已移除账号的 PAT 残留在磁盘。
+ */
+const pendingRemovedAccountIds = new Set<string>();
+
+/**
+ * 串行队列：把 load / save / clear 的读取基底、合并、删除、写入与镜像更新
+ * 纳入同一顺序，避免并发保存基于过期的 knownDiskTokens 恢复已删除的 PAT。
+ */
+let ghAccountsQueue: Promise<void> = Promise.resolve();
+
+const enqueueGhAccountsOp = <T>(op: () => Promise<T>): Promise<T> => {
+  const next = ghAccountsQueue.then(op, op);
+  ghAccountsQueue = next.then(() => undefined, () => undefined);
+  return next;
+};
+
 /** 仅供测试观察：磁盘完整映射是否已确认加载。 */
 export const isGhAccountTokensFullyLoaded = (): boolean => ghAccountTokensFullyLoaded;
+
+/** 供调用方/测试检查是否存在尚未落盘的账号凭据删除请求（可用于重试提示）。 */
+export const hasPendingGhAccountSecretRemovals = (): boolean => pendingRemovedAccountIds.size > 0;
 
 /** 丢弃非法键（非数字 ID）与非法值（空/超长/含控制字符）的条目。 */
 const sanitizeTokenMap = (tokens: GhAccountTokenMap | null | undefined): GhAccountTokenMap => {
@@ -90,13 +111,7 @@ const sanitizeTokenMap = (tokens: GhAccountTokenMap | null | undefined): GhAccou
   return result;
 };
 
-/**
- * 读取桌面端安全存储中的全部账号 Token（R2-B1 语义）。
- * 成功加载（含「文件不存在 ⇒ 空映射」）会标记完整映射已确认；
- * 读取失败返回 { status: 'error' } 且不改变加载状态——调用方不得把
- * 失败当作「磁盘上没有 Token」。
- */
-export const loadGhAccountTokens = async (): Promise<GhAccountsLoadResult> => {
+const loadGhAccountTokensUnlocked = async (): Promise<GhAccountsLoadResult> => {
   const bridge = getBridge();
   if (!bridge) return { status: 'unavailable' };
   let payload: GhAccountsGetPayload;
@@ -125,70 +140,91 @@ export const loadGhAccountTokens = async (): Promise<GhAccountsLoadResult> => {
 };
 
 /**
- * 写入桌面端安全存储（R2-B1 + 自审计补充）：
+ * 读取桌面端安全存储中的全部账号 Token（R2-B1 语义）。
+ * 成功加载（含「文件不存在 ⇒ 空映射」）会标记完整映射已确认；
+ * 读取失败返回 { status: 'error' } 且不改变加载状态——调用方不得把
+ * 失败当作「磁盘上没有 Token」。
+ */
+export const loadGhAccountTokens = (): Promise<GhAccountsLoadResult> =>
+  enqueueGhAccountsOp(loadGhAccountTokensUnlocked);
+
+/**
+ * 写入桌面端安全存储（R2-B1 + 串行队列 + 失败删除保留）：
+ * - 全流程在 ghAccountsQueue 内串行执行，避免并发写入从过期镜像恢复已删除 PAT；
  * - 以最近一次确认的磁盘映射（knownDiskTokens）为基底，叠加本次提供的条目，
- *   再删除显式移除列表中的账号——合并写入后 Store 可能并不含磁盘上的其他
- *   账号 Token，基底保证它们不会被后续整表覆写抹掉；
+ *   再删除显式移除列表及之前保存失败残留的 pendingRemovedAccountIds；
  * - 磁盘镜像未知（尚未成功读取）⇒ 先读后写；读取失败则中止写入，绝不以
  *   部分映射覆写磁盘；
- * - removedAccountIds 用于登出/移除账号等需要真正从磁盘删除 PAT 的场景。
- * 抛错时磁盘保持原状。
+ * - 保存成功后才清除已应用的 pendingRemovedAccountIds；抛错时磁盘与待删列表均保留。
  */
-export const saveGhAccountTokens = async (
+export const saveGhAccountTokens = (
   tokens: GhAccountTokenMap,
   removedAccountIds: string[] = [],
-): Promise<void> => {
+): Promise<void> => enqueueGhAccountsOp(async () => {
   const bridge = getBridge();
   if (!bridge) return;
   const sanitized = sanitizeTokenMap(tokens);
+  // 记录本次显式删除；若本次又为同一账号写入了有效 Token，则取消其待删标记。
+  for (const accountId of Object.keys(sanitized)) {
+    pendingRemovedAccountIds.delete(accountId);
+  }
+  for (const accountId of removedAccountIds) {
+    if (GH_ACCOUNT_ID_PATTERN.test(accountId)) {
+      pendingRemovedAccountIds.add(accountId);
+    }
+  }
   let base: GhAccountTokenMap;
   if (knownDiskTokens) {
     base = { ...knownDiskTokens };
   } else {
-    const disk = await loadGhAccountTokens();
+    const disk = await loadGhAccountTokensUnlocked();
     if (disk.status === 'error') {
-      // 读取失败：磁盘状态未知，拒绝写入（绝不以部分映射覆写磁盘）。
+      // 读取失败：磁盘状态未知，拒绝写入（绝不以部分映射覆写磁盘），并保留 pendingRemovedAccountIds。
       throw new Error(disk.error || 'gh-accounts load failed; refusing to overwrite');
     }
     base = disk.status === 'loaded' ? { ...disk.tokens } : {};
   }
   const payload: GhAccountTokenMap = { ...base, ...sanitized };
-  for (const accountId of removedAccountIds) {
+  const appliedRemovals = Array.from(pendingRemovedAccountIds);
+  for (const accountId of appliedRemovals) {
     delete payload[accountId];
   }
   const result = await bridge.save(payload);
   if (!result.success) {
     throw new Error(result.error ?? 'gh-accounts save failed');
   }
+  for (const accountId of appliedRemovals) {
+    pendingRemovedAccountIds.delete(accountId);
+  }
   knownDiskTokens = { ...payload };
   ghAccountTokensFullyLoaded = true;
-};
+});
 
 /** 清除桌面端安全存储中的全部账号 Token（成功后磁盘状态已知为空）。 */
-export const clearGhAccountTokens = async (): Promise<void> => {
+export const clearGhAccountTokens = (): Promise<void> => enqueueGhAccountsOp(async () => {
   const bridge = getBridge();
   if (!bridge) return;
   const result = await bridge.clear();
   if (!result.success) {
     throw new Error(result.error ?? 'gh-accounts clear failed');
   }
+  pendingRemovedAccountIds.clear();
   ghAccountTokensFullyLoaded = true;
   knownDiskTokens = {};
-};
+});
 
 /**
- * 把当前 Store 会话的全部账号 Token 幂等同步到桌面端安全存储（fire-and-forget）。
- * savedAccounts 的 githubToken 是唯一来源；顶层 githubToken 兜底并入当前账号，
- * 防止登记时序竞态把当前会话 Token 漏出加密文件。Web 构建（无桥）为 no-op。
- * removedAccountIds：登出 / 移除账号时需真正从磁盘删除 PAT 的账号（显式移除，
- * 与「磁盘未知账号」区分开——后者一律保留）。写入基底见 saveGhAccountTokens。
+ * 把当前 Store 会话的全部账号 Token 幂等同步到桌面端安全存储。
+ * 返回 Promise<boolean> 表示本次落盘是否成功（不向外抛未捕获异常，同时允许
+ * 需要重试语义的调用方检查结果；失败的删除请求会保留至下次保存自动重试）。
+ * Web 构建（无桥）返回 Promise<true>。
  */
 export const syncGhAccountTokensFromState = (state: {
   user: { id: number } | null;
   githubToken: string | null;
   savedAccounts: Record<string, { githubToken: string }>;
-}, removedAccountIds: string[] = []): void => {
-  if (!hasGhAccountsBridge()) return;
+}, removedAccountIds: string[] = []): Promise<boolean> => {
+  if (!hasGhAccountsBridge()) return Promise.resolve(true);
   const tokens: GhAccountTokenMap = {};
   for (const [accountId, account] of Object.entries(state.savedAccounts ?? {})) {
     const token = account?.githubToken;
@@ -201,8 +237,7 @@ export const syncGhAccountTokensFromState = (state: {
   if (currentAccountId && currentToken && !tokens[currentAccountId]) {
     tokens[currentAccountId] = currentToken;
   }
-  saveGhAccountTokens(tokens, removedAccountIds).catch(() => {
-    // 加密文件写失败不阻断会话：下次 Token 变更时重试；期间重启丢失 Token
-    // 的账号按「需重新授权」处理。
-  });
+  return saveGhAccountTokens(tokens, removedAccountIds)
+    .then(() => true)
+    .catch(() => false);
 };

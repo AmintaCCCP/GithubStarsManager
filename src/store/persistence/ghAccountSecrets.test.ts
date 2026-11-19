@@ -245,4 +245,78 @@ describe('syncGhAccountTokensFromState (R2-B1)', () => {
 
     expect(getBridgeMock().save).toHaveBeenLastCalledWith({ '7': 'ghp_other_account' });
   });
+
+  it('serializes concurrent saves so a second sync never resurrects a deleted PAT', async () => {
+    let releaseFirstSave: ((value: { success: boolean }) => void) | null = null;
+    const saveMock = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseFirstSave = resolve; }))
+      .mockResolvedValue({ success: true });
+    setBridge({
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_42', '7': 'ghp_7' },
+      }),
+      save: saveMock,
+    });
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+
+    // 首次同步删除账号 42（bridge.save 尚未返回）
+    const first = secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7',
+      savedAccounts: { '7': { githubToken: 'ghp_7' } },
+    }, ['42']);
+
+    // 在首次保存未完成期间触发第二次同步更新账号 7
+    const second = secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7_updated',
+      savedAccounts: { '7': { githubToken: 'ghp_7_updated' } },
+    });
+
+    await vi.waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    expect(saveMock).toHaveBeenNthCalledWith(1, { '7': 'ghp_7' });
+
+    releaseFirstSave?.({ success: true });
+    await expect(first).resolves.toBe(true);
+    await expect(second).resolves.toBe(true);
+
+    // 最终保存绝不能从过期的 knownDiskTokens 基底恢复已删除的账号 42
+    expect(saveMock).toHaveBeenCalledTimes(2);
+    expect(saveMock).toHaveBeenNthCalledWith(2, { '7': 'ghp_7_updated' });
+  });
+
+  it('retains pending removals when a save fails and applies them on the next save', async () => {
+    const saveMock = vi.fn()
+      .mockResolvedValueOnce({ success: false, error: 'disk busy' })
+      .mockResolvedValueOnce({ success: true });
+    setBridge({
+      get: vi.fn().mockResolvedValue({
+        status: 'loaded',
+        tokens: { '42': 'ghp_42', '7': 'ghp_7' },
+      }),
+      save: saveMock,
+    });
+    const secrets = await importFresh();
+    await secrets.loadGhAccountTokens();
+
+    const firstOk = await secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7',
+      savedAccounts: { '7': { githubToken: 'ghp_7' } },
+    }, ['42']);
+    expect(firstOk).toBe(false);
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(true);
+
+    // 下一次同步即使未重复传 removedAccountIds，也会继续应用先前失败的删除
+    const secondOk = await secrets.syncGhAccountTokensFromState({
+      user: { id: 7 },
+      githubToken: 'ghp_7_next',
+      savedAccounts: { '7': { githubToken: 'ghp_7_next' } },
+    });
+    expect(secondOk).toBe(true);
+    expect(secrets.hasPendingGhAccountSecretRemovals()).toBe(false);
+    expect(saveMock).toHaveBeenLastCalledWith({ '7': 'ghp_7_next' });
+  });
 });

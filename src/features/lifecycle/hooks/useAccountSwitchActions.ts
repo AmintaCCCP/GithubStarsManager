@@ -83,6 +83,20 @@ export interface AccountSwitchActions {
  *    对齐目标账号分区，再 syncFromBackend 合并/补推；
  * 6. 释放切换锁并刷新桌面端 MCP 桥接。
  */
+/**
+ * 记录后端凭据（PAT / active_account_id）尚未对齐成功的账号集合。
+ * 对齐失败时同账号路径与 Header 菜单不得提前短路，允许用户再次点击重试对齐。
+ */
+const pendingBackendCredentialAlignAccounts = new Set<string>();
+
+export function hasPendingBackendCredentialAlign(accountId: string | null | undefined): boolean {
+  return Boolean(accountId && pendingBackendCredentialAlignAccounts.has(accountId));
+}
+
+export function resetPendingBackendCredentialAlignForTest(): void {
+  pendingBackendCredentialAlignAccounts.clear();
+}
+
 export const useAccountSwitchActions = (): AccountSwitchActions => {
   const [isSwitching, setIsSwitching] = useState(false);
   const { restoreBackendSession, authenticateWithGitHub } = useLoginActions();
@@ -156,8 +170,10 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
         active_account_id: accountId,
         user_profile: user,
       });
+      pendingBackendCredentialAlignAccounts.delete(accountId);
     } catch (error) {
       credentialsAligned = false;
+      pendingBackendCredentialAlignAccounts.add(accountId);
       console.warn('Failed to align account settings on backend:', error);
     }
     try {
@@ -196,6 +212,7 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       accountIdKey(current.user) === targetAccountId
       && current.isAuthenticated
       && !!current.githubToken?.trim()
+      && !pendingBackendCredentialAlignAccounts.has(targetAccountId)
     ) {
       return { ok: true };
     }
@@ -213,19 +230,23 @@ export const useAccountSwitchActions = (): AccountSwitchActions => {
       // 步骤 3：冲刷并冻结旧账号在途同步（R3/R4 推送半程）
       await prepareForAccountSwitch(previousAccountId);
       // 步骤 4-6：原子切换 + 后端对齐（切换期间抑制 Store 订阅误推送）
+      let credentialsAligned = true;
       await withAccountSwitchGuard(async () => {
         const applied = useAppStore.getState().switchAccount(targetAccountId);
         if (!applied) {
           throw new Error('switch-account-failed');
         }
         const switched = useAppStore.getState();
-        await alignTargetAccountOnBackend(
+        credentialsAligned = await alignTargetAccountOnBackend(
           targetAccountId,
           switched.githubToken ?? target.githubToken,
           target.user,
         );
       });
       refreshMcpBridgeSafely();
+      if (!credentialsAligned) {
+        return { ok: false, error: 'backend-credential-sync-failed' };
+      }
       return { ok: true };
     } catch (error) {
       console.error('Account switch failed:', error);

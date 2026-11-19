@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     backendUrl: null as string | null,
     persistedUrl: null as string | null,
     init: vi.fn(),
+    disconnect: vi.fn(),
     isAvailable: true,
     verifyAuth: vi.fn(),
     restoreAuth: vi.fn(),
@@ -214,10 +215,16 @@ describe('useLoginActions', () => {
     expect(useAppStore.getState().backendApiSecret).toBe('original-secret');
 
     // secret 为 undefined：不改动密钥。
+    mocks.backend.disconnect.mockImplementation(() => {
+      mocks.backend.backendUrl = null;
+      mocks.backend.isAvailable = false;
+    });
     useAppStore.setState({ backendApiSecret: 'keep-me' });
     await result.current.rollbackBackendConnection(null);
     expect(useAppStore.getState().backendApiSecret).toBe('keep-me');
     // 原连接为 null：显式断开（C63），绝不经 init 触发候选后端自动探测。
+    expect(mocks.backend.disconnect).toHaveBeenCalledOnce();
+    expect(result.current.getBackendUrl()).toBeNull();
     expect(mocks.backend.init).toHaveBeenCalledOnce();
   });
 });

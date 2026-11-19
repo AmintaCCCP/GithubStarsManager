@@ -692,13 +692,21 @@ router.put('/api/settings', async (req, res) => {
         return;
       }
       if (normalizedUserProfile && typeof normalizedUserProfile === 'object' && 'id' in normalizedUserProfile) {
-        const profileId = (normalizedUserProfile as { id?: unknown }).id;
+        const profileObj = normalizedUserProfile as Record<string, unknown>;
+        const profileId = profileObj.id;
         if (isRealAccount && profileId !== undefined && profileId !== null && String(profileId) !== accountId) {
           res.status(400).json({
             error: 'user_profile.id does not match target account',
             code: 'INVALID_USER_PROFILE',
           });
           return;
+        }
+        // 统一将数字字符串 id 规范化为 number，与备份导出/恢复校验规则一致
+        if (typeof profileId === 'string' && /^\d+$/.test(profileId)) {
+          const parsedId = Number(profileId);
+          if (Number.isSafeInteger(parsedId)) {
+            normalizedUserProfile = { ...profileObj, id: parsedId };
+          }
         }
       }
     }

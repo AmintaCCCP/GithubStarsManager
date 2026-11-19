@@ -715,15 +715,22 @@ describe('backend pushes requested during another sync', () => {
   });
 
   it('rejects a strict caller and keeps the edit retryable when the second write fails (C59)', async () => {
-    vi.mocked(backend.syncRepositories).mockResolvedValueOnce(undefined);
+    const firstPutGate = deferred<void>();
+    vi.mocked(backend.syncRepositories)
+      .mockReturnValueOnce(firstPutGate.promise)
+      .mockRejectedValueOnce(new Error('offline'));
     const initialPush = syncToBackend();
     await vi.waitFor(() => expect(vi.mocked(backend.syncRepositories)).toHaveBeenCalledTimes(1));
-    await initialPush;
 
-    // 首份载荷已发出后编辑，第二次写入失败：严格调用方收到失败
+    // 首份载荷仍在途时编辑并启动严格推送：排队等待第二份写入
     useAppStore.getState().addRepository(createRepository(2));
-    vi.mocked(backend.syncRepositories).mockRejectedValueOnce(new Error('offline'));
-    await expect(forceSyncToBackend({ reportFailures: true })).rejects.toThrow('Failed to sync to backend');
+    const strictPush = forceSyncToBackend({ reportFailures: true });
+    const strictOutcome = expect(strictPush).rejects.toThrow('Failed to sync to backend');
+
+    // 放行首份 PUT、拒绝第二份 PUT：严格调用方必须收到拒绝而非首份写入的成功
+    firstPutGate.resolve();
+    await initialPush;
+    await strictOutcome;
 
     // 编辑可重试：恢复写入后再次严格同步成功，且载荷包含此前丢失的新仓库
     vi.mocked(backend.syncRepositories).mockResolvedValue(undefined);

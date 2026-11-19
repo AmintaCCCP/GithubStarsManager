@@ -1,5 +1,5 @@
 import { makeT, useT } from "../../../i18n/useT";
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import type { Gist } from '../../../types';
 import type { GistCreateInput, GistUpdateInput } from '../../../services/githubApi';
@@ -53,6 +53,11 @@ export const useGistActions = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isAnalyzingAll, setIsAnalyzingAll] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
+  const currentUserId = useAppStore((s) => s.user?.id ?? null);
+  // 切换账号时立即清除旧会话残留的刷新状态，避免新账号的刷新按钮被禁用
+  useEffect(() => {
+    setIsRefreshing(false);
+  }, [currentUserId]);
   // isAnalyzingGist(id) 的渲染值恒等于 store 集合值：原 GistCard 的本地 isAnalyzingLocal
   // 与 setAnalyzingGist 同置同清，渲染上与集合值等价，故本 hook 只操作 store 集合、
   // 不再设本地 flag（勿"修复"回双 flag 写法）。
@@ -91,7 +96,9 @@ export const useGistActions = () => {
       if (!isCurrentAccountSession(startedAccountId, startedGeneration)) return;
       toast(error instanceof Error ? error.message : t('useGistActions.failed-to-sync-gists'), 'error');
     } finally {
-      setIsRefreshing(false);
+      if (isCurrentAccountSession(startedAccountId, startedGeneration)) {
+        setIsRefreshing(false);
+      }
     }
   }, [state, t, toast]);
 

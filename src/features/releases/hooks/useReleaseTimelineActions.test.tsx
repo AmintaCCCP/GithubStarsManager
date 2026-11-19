@@ -119,9 +119,21 @@ describe('useReleaseTimelineActions account switch guards', () => {
       if (patch && typeof patch === 'object') Object.assign(storeState, patch as Record<string, unknown>);
     });
     (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
-    // 与真实 store 一致：乐观「全部已读」把当前 Release 全部并入已读集合
+    storeState.releases = [{
+      id: 101,
+      repository: { id: 1, name: 'repo', full_name: 'owner/repo' },
+      name: 'v1',
+      is_read: false,
+      updated_asset_ids: [10],
+    } as unknown as Release];
+    // 与真实 timelineSlice 一致：用当前 release ID 替换 readReleases，并更新 is_read 与资产更新标记
     (storeState.markAllReleasesAsRead as unknown as () => void) = vi.fn(() => {
-      storeState.readReleases = new Set([...storeState.readReleases, ...storeState.releases.map((item) => item.id)]);
+      storeState.readReleases = new Set(storeState.releases.map((item) => item.id));
+      storeState.releases = storeState.releases.map((item) => ({
+        ...item,
+        is_read: true,
+        updated_asset_ids: [],
+      }));
     });
     mocks.confirm.mockResolvedValue(true);
     mocks.forceSyncToBackend.mockResolvedValue(undefined);
@@ -164,8 +176,9 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // 只撤销本次操作新增的已读（101），操作前的 7/8 保留
+    // 只撤销本次操作新增的已读（101），补回操作前的 7/8，并恢复 release 字段
     expect(storeState.readReleases).toEqual(new Set([7, 8]));
+    expect(storeState.releases[0]).toMatchObject({ id: 101, is_read: false, updated_asset_ids: [10] });
   });
 
   it('does not roll back into the new account when the backend call fails after a switch', async () => {
@@ -180,18 +193,32 @@ describe('useReleaseTimelineActions account switch guards', () => {
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
     // 切号后回滚被丢弃：B 的独立已读集合不被 A 的回滚改写（B 不被修改）
     expect(storeState.readReleases).toEqual(new Set([205]));
-    // A 的归档快照只回滚本次操作：乐观新增的 101 被撤销，操作前的 7/8 保留
+    // A 的归档快照只回滚本次操作：乐观新增的 101 被撤销，操作前的 7/8 保留，release 字段也恢复
     const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
     expect(parked?.readReleases).toEqual([7, 8]);
+    expect((parked?.releases as Array<Record<string, unknown>>)?.[0]).toMatchObject({
+      id: 101,
+      is_read: false,
+      updated_asset_ids: [10],
+    });
   });
 
   it('rolls back the live read set when A→B→A reactivates the originating account', async () => {
+    const { bumpAccountSessionGeneration } = await import('../../../store/helpers/accountWorkspace');
     mocks.markAllReleasesAsRead.mockImplementation(async () => {
-      // A→B→A：切到 B 后立即切回 A。switchAccountWorkspace 切回时把 A 的
-      // 归档快照（含本次乐观全部已读 7/8/101）换入实时工作区。
+      // A→B→A：切到 B 后立即切回 A，且推进会话代次以进入重新激活分支（非同会话回滚）。
       switchToB();
+      bumpAccountSessionGeneration();
       (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
-      storeState.readReleases = new Set<number>([7, 8, 101]);
+      storeState.readReleases = new Set<number>([101]);
+      storeState.releases = [{
+        id: 101,
+        repository: { id: 10, name: 'repo', full_name: 'me/repo' },
+        name: 'v1',
+        is_read: true,
+        updated_asset_ids: [],
+      } as unknown as Release];
+      bumpAccountSessionGeneration();
       throw new Error('backend down');
     });
     const { result } = renderActions();
@@ -199,9 +226,11 @@ describe('useReleaseTimelineActions account switch guards', () => {
     await act(async () => { await result.current.handleMarkAllRead(); });
 
     expect(mocks.toast).toHaveBeenCalledWith('标记全部已读失败', 'error');
-    // R2-C29：发起账号已重新激活——实时集合（不只是归档）必须撤销乐观更新：
-    // 只移除本次新增的 101，操作前的 7/8 保留。
+    // R2-C29：发起账号已重新激活——实时集合与 release 字段必须撤销乐观更新，归档未被改写
     expect(storeState.readReleases).toEqual(new Set([7, 8]));
+    expect(storeState.releases[0]).toMatchObject({ id: 101, is_read: false, updated_asset_ids: [10] });
+    const parked = (storeState as { accountWorkspaces?: Record<string, Record<string, unknown>> }).accountWorkspaces?.['1'];
+    expect(parked?.readReleases).toEqual([101]);
   });
 
   it('does not create a workspace snapshot when the originating account has none', async () => {

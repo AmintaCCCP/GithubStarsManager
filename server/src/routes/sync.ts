@@ -412,11 +412,19 @@ router.post('/api/sync/import', async (req, res) => {
           return;
         }
         if (!/^\d+$|^(default)$/.test(id)) continue;
+        const wsObj = ws as Record<string, unknown>;
+        if (wsObj.account_id !== undefined && wsObj.account_id !== null && String(wsObj.account_id) !== id) {
+          res.status(400).json({
+            error: `Account workspace account_id (${String(wsObj.account_id)}) does not match key (${id})`,
+            code: 'INVALID_ACCOUNT_WORKSPACE',
+          });
+          return;
+        }
         const unverifiedDefault = id === 'default'
           && (accountId !== 'default' || hasPendingDefaultPartitionData(db));
         workspaceEntries.push({
           accountId: id,
-          workspace: ws as Record<string, unknown>,
+          workspace: wsObj,
           unverifiedOwner: unverifiedDefault,
         });
       }
@@ -478,48 +486,41 @@ router.post('/api/sync/import', async (req, res) => {
     // Issue #612 R2-A23：验证结果绑定到具体工作区条目（不再按账号 ID 共享
     // Map）——备份为同一账号提供多个工作区条目时，各条目的凭据独立验证、
     // 独立取舍，单条验证结果不会被另一条目覆盖。
-    for (const entry of workspaceEntries) {
-      if (entry.unverifiedOwner) continue;
-      const wsSettings = entry.workspace.account_settings as Record<string, unknown> | undefined;
-      if (!wsSettings || typeof wsSettings !== 'object' || Array.isArray(wsSettings)) continue;
-      const token = wsSettings.github_token;
-      if (typeof token !== 'string' || !token || token.startsWith('***')) continue;
-      const ownerId = await fetchGitHubUserId(token);
-      if (ownerId && (ownerId === entry.accountId || entry.accountId === 'default')) {
-        // default 分区无数字身份可绑定：只要求 PAT 本身有效（保持纯 default
-        // 部署的旧版导入行为）；数字账号分区则必须与工作区账号一致。
-        entry.tokenVerification = { ok: true };
-      } else {
-        entry.tokenVerification = {
-          ok: false,
-          reason: ownerId
-            ? `PAT belongs to account ${ownerId}, not ${entry.accountId}`
-            : 'GitHub identity verification failed (network error, timeout or invalid token)',
-        };
-      }
-    }
+    // 并行校验所有工作区及顶层真实 PAT，使总校验耗时受限于单次 8s 超时上限，
+    // 不会因多工作区串行校验超过客户端 30s 请求超时而导致响应与提交状态不一致。
+    const topLevelTokenMayBeWritten = workspaceEntries.length === 0 || accountId === 'default';
+    const topTokenValue = topSettings && typeof topSettings === 'object' && !Array.isArray(topSettings)
+      ? (topSettings as Record<string, unknown>).github_token
+      : undefined;
+    const shouldVerifyTopToken = topLevelTokenMayBeWritten
+      && typeof topTokenValue === 'string'
+      && Boolean(topTokenValue)
+      && !topTokenValue.startsWith('***');
 
-    // Issue #612 A3：验证未通过而未恢复的工作区凭据报告（在响应中返回）。
-    const skippedCredentials: Array<{ account_id: string; restored: boolean; reason?: string }> = [];
-
-    // Issue #612 R2-A17：顶层 settings.github_token 的真实 PAT 与工作区路径
-    // （A3）同语义：事务外用 GitHub /user 验证身份，且属于目标账号（default
-    // 分区只要求 PAT 本身有效）才写入；掩码跳过、显式空清除账号密文副本的
-    // 既有分支不变。验证失败保留目标凭据并经 skipped_credentials 报告。
-    // 仅在顶层 Token 可能被实际写回的路径（v1 无工作区导入 / default 分区请求）
-    // 发起验证；多账号工作区导入且请求不在 default 分区时顶层 Token 一律跳过
-    // （A2(a)），无需网络验证。
     let topLevelTokenVerification: { ok: boolean; reason?: string } | null = null;
-    {
-      const topLevelTokenMayBeWritten = workspaceEntries.length === 0 || accountId === 'default';
-      const topTokenValue = topSettings && typeof topSettings === 'object' && !Array.isArray(topSettings)
-        ? (topSettings as Record<string, unknown>).github_token
-        : undefined;
-      if (topLevelTokenMayBeWritten
-        && typeof topTokenValue === 'string'
-        && topTokenValue
-        && !topTokenValue.startsWith('***')) {
-        const ownerId = await fetchGitHubUserId(topTokenValue);
+    await Promise.all([
+      ...workspaceEntries.map(async (entry) => {
+        if (entry.unverifiedOwner) return;
+        const wsSettings = entry.workspace.account_settings as Record<string, unknown> | undefined;
+        if (!wsSettings || typeof wsSettings !== 'object' || Array.isArray(wsSettings)) return;
+        const token = wsSettings.github_token;
+        if (typeof token !== 'string' || !token || token.startsWith('***')) return;
+        const ownerId = await fetchGitHubUserId(token);
+        if (ownerId && (ownerId === entry.accountId || entry.accountId === 'default')) {
+          // default 分区无数字身份可绑定：只要求 PAT 本身有效（保持纯 default
+          // 部署的旧版导入行为）；数字账号分区则必须与工作区账号一致。
+          entry.tokenVerification = { ok: true };
+        } else {
+          entry.tokenVerification = {
+            ok: false,
+            reason: ownerId
+              ? `PAT belongs to account ${ownerId}, not ${entry.accountId}`
+              : 'GitHub identity verification failed (network error, timeout or invalid token)',
+          };
+        }
+      }),
+      ...(shouldVerifyTopToken ? [(async () => {
+        const ownerId = await fetchGitHubUserId(topTokenValue as string);
         if (ownerId && (ownerId === accountId || accountId === 'default')) {
           topLevelTokenVerification = { ok: true };
         } else {
@@ -530,8 +531,11 @@ router.post('/api/sync/import', async (req, res) => {
               : 'GitHub identity verification failed (network error, timeout or invalid token)',
           };
         }
-      }
-    }
+      })()] : []),
+    ]);
+
+    // Issue #612 A3：验证未通过而未恢复的工作区凭据报告（在响应中返回）。
+    const skippedCredentials: Array<{ account_id: string; restored: boolean; reason?: string }> = [];
 
     const importAll = db.transaction(() => {
       // Issue #612 A10：workspaceEntries 非空时顶层 repositories/releases/
@@ -1148,8 +1152,17 @@ router.post('/api/sync/import', async (req, res) => {
           // 账号错配在一起，导入会把 A 的 PAT 登记到 B 名下。
           if (/^\d+$/.test(accountIdValue)) {
             try {
-              const profileId = (JSON.parse(userJson) as { id?: unknown })?.id;
-              if (typeof profileId !== 'number' || String(profileId) !== accountIdValue) continue;
+              const parsedProfile = JSON.parse(userJson) as Record<string, unknown> | null;
+              const profileId = parsedProfile && typeof parsedProfile === 'object' ? parsedProfile.id : undefined;
+              const isValidNumericId = (typeof profileId === 'number' && Number.isInteger(profileId))
+                || (typeof profileId === 'string' && /^\d+$/.test(profileId));
+              if (!isValidNumericId || String(profileId) !== accountIdValue) continue;
+              if (typeof profileId === 'string') {
+                const numericId = Number(profileId);
+                if (Number.isSafeInteger(numericId)) {
+                  userJson = JSON.stringify({ ...parsedProfile, id: numericId });
+                }
+              }
             } catch {
               continue;
             }

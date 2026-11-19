@@ -12,6 +12,7 @@ import { normalizeBackendUrl } from '../utils/backendUrl';
 import {
   accountIdKey,
   captureAccountWorkspace,
+  getAccountSessionGeneration,
   workspaceHasData,
   type AccountWorkspace,
 } from '../store/helpers/accountWorkspace';
@@ -189,8 +190,12 @@ export const LoginScreen: React.FC = () => {
       const result = await switchToAccount(accountId);
       if (!result.ok) {
         if (result.needsToken) {
+          setReauthAccountId(accountId);
+          setLoginMode('github');
+          setBackendStep('credentials');
+          setTokenSetupReason('missing');
           setError(t('loginScreen.token-required'));
-          githubTokenInputRef.current?.focus();
+          setPendingFocusGithubToken(true);
         } else {
           setError(result.error ?? t('loginScreen.sign-in-failed-please-try-again'));
         }
@@ -380,6 +385,17 @@ export const LoginScreen: React.FC = () => {
         // 审计修复（B13）：以显式账号 ID 拉取（不提前 setUser 生成请求头），
         // 拉取成功后统一提交工作区与登录态。
         await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
+        // 同步更新目标账号归档为刚拉取的快照：即使后端返回空快照，随后 setUser
+        // 切换工作区时也不会回退到该账号的旧归档。
+        if (nextAccountId) {
+          const pulledWorkspace = captureAccountWorkspace(useAppStore.getState());
+          useAppStore.setState((state) => ({
+            accountWorkspaces: {
+              ...state.accountWorkspaces,
+              [nextAccountId]: pulledWorkspace,
+            },
+          }));
+        }
         setGitHubToken(result.githubToken);
         setUser(result.user);
         loginCommitted = true;
@@ -417,8 +433,12 @@ export const LoginScreen: React.FC = () => {
       // 否则新设备经登录页连接后端后，账号下拉菜单只显示当前账号。
       // R2-C12：user:null 的条目用其分区 PAT 向 GitHub /user 核对归属后补齐
       // 完整身份，核对失败/不一致的条目拒绝登记。
+      // 登记循环进入前记录会话代次：等待 GitHub /user 校验期间若用户退出或切换账号，
+      // 必须立即停止登记剩余条目，防止已清除的 PAT 被重新写入 Store 和安全存储。
+      const registerSessionGeneration = getAccountSessionGeneration();
       for (const account of result.accounts ?? []) {
         const normalizedAccount = await normalizeBackendRestoreAccount(account);
+        if (getAccountSessionGeneration() !== registerSessionGeneration) break;
         if (!normalizedAccount) continue;
         upsertSavedAccount(normalizedAccount.user, normalizedAccount.githubToken);
       }
@@ -503,7 +523,11 @@ export const LoginScreen: React.FC = () => {
         defaultCategoryOverrides: liveState.defaultCategoryOverrides,
         categoryListIdMap: liveState.categoryListIdMap,
       };
-      const localHasData = workspaceHasData(currentWorkspace) || workspaceHasData(parkedWorkspace);
+      const liveBelongsToTarget = !!nextAccountId
+        && accountIdKey(liveState.user) === nextAccountId
+        && workspaceHasData(currentWorkspace);
+      const targetHasParkedData = workspaceHasData(parkedWorkspace);
+      const localHasData = liveBelongsToTarget || targetHasParkedData;
       let overwrite = true;
       if (localHasData) {
         overwrite = await new Promise<boolean>((resolve) => {
@@ -519,8 +543,17 @@ export const LoginScreen: React.FC = () => {
         prePullWorkspace = captureAccountWorkspace(useAppStore.getState());
         pullStarted = true;
         await syncBackendData({ targetAccountId: nextAccountId ?? undefined });
-      } else {
-        // 「保留本地」：跳过拉取，只保留 B 自己的快照（丢弃无主顶层残留，B14）。
+        if (nextAccountId) {
+          const pulledWorkspace = captureAccountWorkspace(useAppStore.getState());
+          useAppStore.setState((state) => ({
+            accountWorkspaces: {
+              ...state.accountWorkspaces,
+              [nextAccountId]: pulledWorkspace,
+            },
+          }));
+        }
+      } else if (!liveBelongsToTarget) {
+        // 「保留本地」：跳过拉取，仅在顶层不属于目标账号时清理无主残留，让 setUser 恢复目标归档。
         discardPartialLoginWorkspace();
       }
       setGitHubToken(githubToken);

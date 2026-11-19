@@ -11,7 +11,10 @@ import { resolveTheme } from '../store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import { useDialog } from '../hooks/useDialog';
 import { HeaderMenuId, AppState, SavedAccount } from '../types';
-import { useAccountSwitchActions } from '../features/lifecycle/hooks/useAccountSwitchActions';
+import {
+  hasPendingBackendCredentialAlign,
+  useAccountSwitchActions,
+} from '../features/lifecycle/hooks/useAccountSwitchActions';
 import { AddAccountModal } from './AddAccountModal';
 
 const MENU_META: Record<HeaderMenuId, {
@@ -100,7 +103,12 @@ export const Header: React.FC = () => {
     // 审计修复（B8）：仅当当前会话已认证且正在使用目标凭证时跳过切换；
     // 当前令牌缺失/破损时必须继续走 switchToAccount——switchAccount 的
     // 同账号分支会从 savedAccounts 恢复有效令牌（复用已保存凭证）。
-    if (account.accountId === currentAccountId && isAuthenticated && !!githubToken?.trim()) return;
+    if (
+      account.accountId === currentAccountId
+      && isAuthenticated
+      && !!githubToken?.trim()
+      && !hasPendingBackendCredentialAlign?.(account.accountId)
+    ) return;
     setIsSwitchingMenu(true);
     try {
       const result = await switchToAccount(account.accountId);

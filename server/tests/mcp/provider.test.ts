@@ -361,8 +361,8 @@ describe('MCP provider discovery', () => {
       const insertRelease = db.prepare(
         'INSERT INTO releases (account_id, id, tag_name, name, published_at, prerelease, draft, repo_id, repo_full_name, repo_name) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?)',
       );
-      // default 分区两条更早的发行版；活跃账号（222）一条更新的发行版
-      insertRelease.run('default', 10, 'v0.9.0-legacy', 'Legacy release', '2026-03-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
+      // default 分区包含一条时间晚于活跃账号（222）的发行版，确保最新发行版查询也严格按 account_id 过滤
+      insertRelease.run('default', 10, 'v9.9.9-legacy-newer', 'Legacy newer release', '2026-05-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
       insertRelease.run('default', 11, 'v0.8.0-legacy', 'Legacy release two', '2026-02-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
       insertRelease.run('222', 12, 'v2.0.0-beta', 'Beta release', '2026-04-01T00:00:00.000Z', 1, 'acme/alpha', 'alpha');
 

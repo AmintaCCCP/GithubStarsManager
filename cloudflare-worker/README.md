@@ -93,9 +93,12 @@ npm run deploy
 >      -H "Content-Type: application/json" \
 >      -d '{"vector": [...], "topK": 5, "threshold": 0, "accountId": "<你的数字账号ID>"}'
 >    ```
->    临时启用后请求**仍被拒**说明元数据索引未创建；返回结果为空但 `/status`
->    有向量数，说明该账号的回填未完成——此时**回滚**为默认 `"false"`
->    （重新 `npx wrangler deploy`），补完回填后重试。
+>    临时启用后，先执行 `npx wrangler vectorize list-metadata-index github-stars`
+>    确认 `accountId` 元数据索引已存在。若上述账号过滤查询返回空结果，可能是
+>    **元数据索引尚未创建/未生效**，也可能是**该账号的存量向量回填未完成**
+>    （Vectorize 在缺少元数据索引时带过滤条件查询会直接返回空 `matches`，不会报错）——
+>    请先通过 `list-metadata-index` 确认 `accountId` 索引存在，再判断是否需要补完回填；
+>    在问题未解决前请**回滚**为默认 `"false"`（重新 `npx wrangler deploy`），修复后重试。
 > 4. 不要直接把 `wrangler.toml` 中的 `ACCOUNT_METADATA_INDEXED` 默认值改成 `"true"`
 >    （默认值保持 `"false"`：默认 false 时 /status 返回 accountScopedCleanup:false，
 >    客户端跳过账号范围稠密召回；未回填存量向量就设 true 会启用过滤，但旧向量

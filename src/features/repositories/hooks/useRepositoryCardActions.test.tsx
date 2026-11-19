@@ -460,9 +460,37 @@ describe('useRepositoryCardActions account switch guards', () => {
 
   it('keeps the deletion state for the reactivated account after A→B→A (unstar)', async () => {
     // 审计修复（C31）：取消星标请求在 A 发起后保持 pending，用实际切号操作
-    // 切 B 再切回 A（推进真实会话代次）后完成——旧请求绝不写进重新激活的 A
-    // 顶层工作区，但为发起账号保留删除状态（登记 (账号, 后端) 待补推标记），
-    // 且旧会话的失败/成功提示不再出现。
+    // 切 B 再切回 A（推进真实会话代次）后完成——执行真实的 setState 工作区删除，
+    // 验证重新激活的 A 已移除该仓库及 release，且 B 中同 ID 仓库保持不变。
+    const stateWithWorkspaces = storeState as unknown as {
+      repositories: Repository[];
+      searchResults: Repository[];
+      releases: Array<{ id: number; repository: { id: number } }>;
+      accountWorkspaces: Record<string, {
+        repositories: Repository[];
+        releases: Array<{ id: number; repository: { id: number } }>;
+      }>;
+    };
+    stateWithWorkspaces.repositories = [repository];
+    stateWithWorkspaces.searchResults = [repository];
+    stateWithWorkspaces.releases = [{ id: 101, repository: { id: repository.id } }];
+    stateWithWorkspaces.accountWorkspaces = {
+      '1': {
+        repositories: [repository],
+        releases: [{ id: 101, repository: { id: repository.id } }],
+      },
+      '2': {
+        repositories: [{ ...repository, full_name: 'other/example-repository' }],
+        releases: [{ id: 202, repository: { id: repository.id } }],
+      },
+    };
+    (mockUseAppStore as unknown as { setState: (updater: unknown) => void }).setState = vi.fn((updater: unknown) => {
+      const patch = typeof updater === 'function'
+        ? (updater as (state: typeof storeState) => Record<string, unknown>)(storeState)
+        : updater as Record<string, unknown>;
+      if (patch && typeof patch === 'object') Object.assign(storeState, patch);
+    });
+
     let releaseUnstar!: () => void;
     mocks.unstarRepository.mockImplementation(() => new Promise<void>((resolve) => {
       releaseUnstar = resolve;
@@ -481,8 +509,11 @@ describe('useRepositoryCardActions account switch guards', () => {
     });
 
     expect(mocks.unstarRepository).toHaveBeenCalledWith('owner', 'example-repository');
-    // 重新激活的 A 工作区不被旧请求的同步路径写入（deleteRepository 未调用）
-    expect(storeState.deleteRepository).not.toHaveBeenCalled();
+    // 重新激活的 A 已移除该仓库与 release，同时不触碰 B 中同 ID 的仓库与 release
+    expect(stateWithWorkspaces.repositories).toEqual([]);
+    expect(stateWithWorkspaces.releases).toEqual([]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].repositories.map(r => r.id)).toEqual([repository.id]);
+    expect(stateWithWorkspaces.accountWorkspaces['2'].releases.map(rel => rel.id)).toEqual([202]);
     expect(mocks.forceSyncToBackend).not.toHaveBeenCalled();
     expect(mocks.toast).not.toHaveBeenCalled();
     // C29：为发起账号保留删除状态——登记 (发起账号, 发起时后端) 待补推标记

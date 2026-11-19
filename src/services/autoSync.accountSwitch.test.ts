@@ -520,12 +520,16 @@ describe('prepareForAccountSwitch flush semantics (audit fix)', () => {
     const pull = syncFromBackend({ force: true });
     // 等待 doSync 实际进入 fetch 等待窗口（force 路径先 await waitForInFlightSync）
     await new Promise((resolve) => setTimeout(resolve, 0));
-    // 拉取在途窗口内的本地编辑：订阅器记录待推 → 拉取 finally 启动未等待的推送
+    // 先在没有待处理编辑、且拉取仍挂起时启动准备流程，确保前置冲刷循环未运行
+    let prepared = false;
+    const preparePromise = prepareForAccountSwitch('1').then(() => { prepared = true; });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(prepared).toBe(false);
+    // 确认准备流程正在等待拉取后再添加本地编辑并放行 fetchSettings：
+    // 此时只有拉取后的排空逻辑会继续等待推送完成
     useAppStore.getState().addRepository(createRepository(99, { full_name: 'owner/repo-99' }));
     releaseSettings({});
 
-    let prepared = false;
-    const preparePromise = prepareForAccountSwitch('1').then(() => { prepared = true; });
     await pull;
     // 推送通道已被启动但仍未完成：prepare 必须等待而不是提前返回
     expect(backend.syncRepositories).toHaveBeenCalledTimes(1);

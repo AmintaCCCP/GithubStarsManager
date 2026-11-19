@@ -278,6 +278,60 @@ export const applyAccountWorkspaceForTypes = (
  * 缺失字段必须保留本机值、显式 [] 才清空。该补丁同时用于更新目标账号快照
  * 与当前账号实时应用（面板侧经 applyAccountWorkspaceForTypes 的 rawFields）。
  */
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const applyValidatedWorkspaceFields = (
+  local: AccountWorkspace,
+  rawAccount: Record<string, unknown>,
+  incoming: AccountWorkspace,
+  selectedTypes: string[],
+): AccountWorkspace => {
+  const rawHas = (key: string): boolean => Object.prototype.hasOwnProperty.call(rawAccount, key);
+  const rawIsArray = (key: string): boolean => rawHas(key) && Array.isArray(rawAccount[key]);
+  const rawIsObject = (key: string): boolean => rawHas(key) && isPlainObject(rawAccount[key]);
+  const includeRepos = selectedTypes.includes('repositories');
+  const includeReleases = selectedTypes.includes('releases');
+  const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
+  const includeCategories = selectedTypes.includes('customCategories');
+  // R2-C7：写入 repositories 前逐项校验原始备份值——缺失/null 视为未提供
+  //（保留本机值），非数组或含无效条目的数组整体不写入，绝不用损坏数据
+  // 覆盖本机仓库列表；显式 [] 仍是有效的清空语义。
+  const validatedRepositories = includeRepos && rawHas('repositories')
+    ? validateBackupRepositories(rawAccount.repositories)
+    : undefined;
+  return {
+    ...local,
+    ...(Array.isArray(validatedRepositories) ? { repositories: validatedRepositories } : {}),
+    ...(includeRepos && rawHas('lastSync') && (rawAccount.lastSync === null || typeof rawAccount.lastSync === 'string')
+      ? { lastSync: incoming.lastSync }
+      : {}),
+    ...(includeRepos && rawIsArray('gists') ? { gists: incoming.gists } : {}),
+    ...(includeRepos && rawIsArray('starredGists') ? { starredGists: incoming.starredGists } : {}),
+    ...(includeRepos && rawHas('selectedGistCategory') && typeof rawAccount.selectedGistCategory === 'string'
+      ? { selectedGistCategory: incoming.selectedGistCategory }
+      : {}),
+    ...(includeRepos && rawIsArray('forks') ? { forks: incoming.forks } : {}),
+    ...(includeRepos && rawIsArray('readForks') ? { readForks: incoming.readForks } : {}),
+    ...(includeRepos && rawHas('syncMode') && (rawAccount.syncMode === 'auto' || rawAccount.syncMode === 'manual')
+      ? { syncMode: incoming.syncMode }
+      : {}),
+    ...(includeRepos && rawHas('syncModeConfigured') && typeof rawAccount.syncModeConfigured === 'boolean'
+      ? { syncModeConfigured: incoming.syncModeConfigured }
+      : {}),
+    ...(includeReleases && rawIsArray('releases') ? { releases: incoming.releases } : {}),
+    ...(includeReleaseSubs && rawIsArray('releaseSubscriptions') ? { releaseSubscriptions: incoming.releaseSubscriptions } : {}),
+    ...(includeReleaseSubs && rawIsObject('releaseSourceSettings') ? { releaseSourceSettings: incoming.releaseSourceSettings } : {}),
+    ...(includeReleaseSubs && rawIsArray('readReleases') ? { readReleases: incoming.readReleases } : {}),
+    ...(includeCategories && rawIsArray('customCategories') ? { customCategories: incoming.customCategories } : {}),
+    ...(includeCategories && rawIsArray('hiddenDefaultCategoryIds') ? { hiddenDefaultCategoryIds: incoming.hiddenDefaultCategoryIds } : {}),
+    ...(includeCategories && rawIsObject('defaultCategoryOverrides') ? { defaultCategoryOverrides: incoming.defaultCategoryOverrides } : {}),
+    ...(includeCategories && rawIsArray('categoryOrder') ? { categoryOrder: incoming.categoryOrder } : {}),
+    ...(includeCategories && rawIsObject('categoryListIdMap') ? { categoryListIdMap: incoming.categoryListIdMap } : {}),
+  } satisfies AccountWorkspace;
+};
+
 export const replaceWorkspacesForSelectedTypes = (
   localWorkspaces: Record<string, AccountWorkspace>,
   backupWorkspaces: Record<string, unknown>,
@@ -288,49 +342,21 @@ export const replaceWorkspacesForSelectedTypes = (
     : {}) as Record<string, Record<string, unknown> | undefined>;
   const normalized = normalizeAccountWorkspaces(backupWorkspaces);
   const merged = { ...localWorkspaces };
-  const includeRepos = selectedTypes.includes('repositories');
-  const includeReleases = selectedTypes.includes('releases');
-  const includeReleaseSubs = selectedTypes.includes('releaseSubscriptions');
-  const includeCategories = selectedTypes.includes('customCategories');
   for (const [accountId, incoming] of Object.entries(normalized)) {
     const rawAccount = raw[accountId] ?? {};
-    const rawHas = (key: string): boolean => Object.prototype.hasOwnProperty.call(rawAccount, key);
     const local = merged[accountId] ?? emptyAccountWorkspace();
-    // R2-C7：写入 repositories 前逐项校验原始备份值——缺失/null 视为未提供
-    //（保留本机值），非数组或含无效条目的数组整体不写入，绝不用损坏数据
-    // 覆盖本机仓库列表；显式 [] 仍是有效的清空语义。
-    const validatedRepositories = includeRepos && rawHas('repositories')
-      ? validateBackupRepositories(rawAccount.repositories)
-      : undefined;
-    merged[accountId] = {
-      ...local,
-      ...(Array.isArray(validatedRepositories) ? { repositories: validatedRepositories } : {}),
-      ...(includeRepos && rawHas('lastSync') ? { lastSync: incoming.lastSync } : {}),
-      ...(includeRepos && rawHas('gists') ? { gists: incoming.gists } : {}),
-      ...(includeRepos && rawHas('starredGists') ? { starredGists: incoming.starredGists } : {}),
-      ...(includeRepos && rawHas('selectedGistCategory') ? { selectedGistCategory: incoming.selectedGistCategory } : {}),
-      ...(includeRepos && rawHas('forks') ? { forks: incoming.forks } : {}),
-      ...(includeRepos && rawHas('readForks') ? { readForks: incoming.readForks } : {}),
-      ...(includeRepos && rawHas('syncMode') ? { syncMode: incoming.syncMode } : {}),
-      ...(includeRepos && rawHas('syncModeConfigured') ? { syncModeConfigured: incoming.syncModeConfigured } : {}),
-      ...(includeReleases && rawHas('releases') ? { releases: incoming.releases } : {}),
-      ...(includeReleaseSubs && rawHas('releaseSubscriptions') ? { releaseSubscriptions: incoming.releaseSubscriptions } : {}),
-      ...(includeReleaseSubs && rawHas('releaseSourceSettings') ? { releaseSourceSettings: incoming.releaseSourceSettings } : {}),
-      ...(includeReleaseSubs && rawHas('readReleases') ? { readReleases: incoming.readReleases } : {}),
-      ...(includeCategories && rawHas('customCategories') ? { customCategories: incoming.customCategories } : {}),
-      ...(includeCategories && rawHas('hiddenDefaultCategoryIds') ? { hiddenDefaultCategoryIds: incoming.hiddenDefaultCategoryIds } : {}),
-      ...(includeCategories && rawHas('defaultCategoryOverrides') ? { defaultCategoryOverrides: incoming.defaultCategoryOverrides } : {}),
-      ...(includeCategories && rawHas('categoryOrder') ? { categoryOrder: incoming.categoryOrder } : {}),
-      ...(includeCategories && rawHas('categoryListIdMap') ? { categoryListIdMap: incoming.categoryListIdMap } : {}),
-    } satisfies AccountWorkspace;
+    merged[accountId] = applyValidatedWorkspaceFields(local, rawAccount, incoming, selectedTypes);
   }
   return merged;
 };
 
+const ALL_WORKSPACE_BACKUP_TYPES = ['repositories', 'releases', 'releaseSubscriptions', 'customCategories'];
+
 /**
  * 合并备份工作区：更新备份中存在的账号，保留本机独有的其他账号工作区。
  * preferLive=true（备份创建）：活跃账号的实时状态优先于可能过期的快照；
- * preferLive=false（恢复）：备份内容优先，本机独有的其他账号快照保留。
+ * preferLive=false（恢复）：按备份中实际提供的有效字段覆盖对应账号（未提供的字段保留本机值，
+ * 显式 [] 仍清空），本机独有的其他账号快照保留。
  */
 export const mergeBackupWorkspaces = (
   localWorkspaces: Record<string, AccountWorkspace>,
@@ -339,8 +365,24 @@ export const mergeBackupWorkspaces = (
   liveSnapshot: AccountWorkspace | null,
   preferLive: boolean,
 ): Record<string, AccountWorkspace> => {
+  const raw = (backupWorkspaces && typeof backupWorkspaces === 'object' && !Array.isArray(backupWorkspaces)
+    ? backupWorkspaces
+    : {}) as Record<string, Record<string, unknown> | undefined>;
   const normalized = normalizeAccountWorkspaces(backupWorkspaces);
-  const merged = { ...localWorkspaces, ...normalized };
+  const merged: Record<string, AccountWorkspace> = { ...localWorkspaces };
+  for (const [accountId, incoming] of Object.entries(normalized)) {
+    const existing = merged[accountId];
+    if (!existing) {
+      merged[accountId] = incoming;
+    } else {
+      merged[accountId] = applyValidatedWorkspaceFields(
+        existing,
+        raw[accountId] ?? {},
+        incoming,
+        ALL_WORKSPACE_BACKUP_TYPES,
+      );
+    }
+  }
   if (preferLive && liveAccountId && liveSnapshot) {
     merged[liveAccountId] = liveSnapshot;
   }

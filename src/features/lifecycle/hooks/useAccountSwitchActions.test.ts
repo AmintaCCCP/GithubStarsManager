@@ -563,14 +563,24 @@ describe('useAccountSwitchActions audit fixes', () => {
       savedAccounts: { '1': { accountId: '1', user: userA, githubToken: 'ghp_a', addedAt: 't', lastUsedAt: 't' } },
     });
     mocks.backend.isAvailable = true;
-    const usersAtPush: Array<string | null> = [];
+    mocks.backend.backendUrl = 'https://old.example/api';
+    mocks.backend.init.mockImplementation(async (url: string) => {
+      mocks.backend.backendUrl = url;
+      mocks.backend.isAvailable = true;
+      return true;
+    });
+    const pushes: Array<{ login: string | null; url: string | null }> = [];
     mocks.syncToBackend.mockImplementation(async () => {
-      usersAtPush.push(useAppStore.getState().user?.login ?? null);
+      pushes.push({
+        login: useAppStore.getState().user?.login ?? null,
+        url: mocks.backend.backendUrl,
+      });
       return true;
     });
     mocks.restoreBackendSession.mockImplementation(async () => {
-      // 模拟 backend.init 已提交候选 URL 后、身份验证等待期间的用户编辑
+      // 模拟 backend.init 已将活跃 URL 从 X 切到候选后端 Y 后、身份验证等待期间的用户编辑
       //（categoryOrder 是订阅器跟踪的字段；此时旧账号尚未归档）
+      mocks.backend.backendUrl = 'https://candidate.example/api';
       useAppStore.setState({ categoryOrder: ['reordered-during-restore'] });
       return { status: 'github-token-required' };
     });
@@ -585,9 +595,10 @@ describe('useAccountSwitchActions audit fixes', () => {
 
       expect(outcome).toEqual({ ok: false, error: 'github-token-required' });
       // R4 审计修复：窗口内编辑被缓冲，绝不推给候选后端（守卫退出零推送）；
-      // 连接复原到原后端后按发起账号立即补推一次（此刻仍以 A 的身份请求）
+      // 连接复原到原后端 X 后按发起账号 A 立即补推一次
       expect(mocks.syncToBackend).toHaveBeenCalledTimes(1);
-      expect(usersAtPush[0]).toBe('alice');
+      expect(pushes[0]).toEqual({ login: 'alice', url: 'https://old.example/api' });
+      expect(mocks.backend.backendUrl).toBe('https://old.example/api');
       expect(mocks.backend.syncSettings).not.toHaveBeenCalled();
       // 账号级待推标记保留：本次补推失败时，下次进入该账号仍先补推再拉取
       expect(hasPendingAccountSync('1')).toBe(true);

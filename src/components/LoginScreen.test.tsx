@@ -334,10 +334,8 @@ describe('LoginScreen 后端登录', () => {
     await waitFor(() => expect(useAppStore.getState().user?.login).toBe('octocat'));
     expect(mocks.syncBackendData).toHaveBeenCalledOnce();
     expect(useAppStore.getState().githubToken).toBe('ghp_restored');
-    // 覆盖确认后登录态落地：归档的自定义分类经工作区恢复进入当前会话
-    expect(useAppStore.getState().customCategories).toEqual([
-      { id: 'cat-1', name: 'Cat', icon: '', isCustom: true, keywords: [] },
-    ]);
+    // 覆盖确认后后端返回空快照：提交登录态时不得回退到目标账号旧归档
+    expect(useAppStore.getState().customCategories).toEqual([]);
   });
 
   // 审计修复（R2-B9）：候选 API Key 在候选 URL 提交后才写入 Store
@@ -374,27 +372,111 @@ describe('LoginScreen 后端登录', () => {
 
   // 审计修复（R2-B5/B11）：取消候选后端设置时成对恢复原 URL 与原 API Key。
   it('取消令牌配置时成对恢复候选之前的 URL 与 API Key', async () => {
-    mocks.getBackendUrl.mockReturnValue('https://candidate.example/api');
+    let activeBackendUrl: string | null = 'https://original.example/api';
+    mocks.getBackendUrl.mockImplementation(() => activeBackendUrl);
     useAppStore.setState({ backendApiSecret: 'original-secret' });
-    mocks.restoreBackendSession.mockResolvedValue({ status: 'github-token-required' });
+    mocks.restoreBackendSession.mockImplementation(async (url: string, options?: { apiSecret?: string }) => {
+      activeBackendUrl = `${url.replace(/\/+$/, '')}/api`;
+      if (options?.apiSecret !== undefined) {
+        useAppStore.setState({ backendApiSecret: options.apiSecret });
+      }
+      return { status: 'github-token-required' };
+    });
+    mocks.rollbackBackendConnection.mockImplementation(async (url: string | null, secret?: string | null) => {
+      activeBackendUrl = url;
+      if (secret !== undefined) {
+        useAppStore.setState({ backendApiSecret: secret });
+      }
+    });
     const { urlInput, apiKeyInput } = await enterBackendMode();
 
     fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
     fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
     fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
 
-    // 进入令牌配置步骤：候选连接与候选密钥保留供设置使用
+    // 进入令牌配置步骤：候选连接与候选密钥均已写入供设置使用
     await screen.findByLabelText('GitHub Personal Access Token');
-    expect(useAppStore.getState().backendApiSecret).toBe('original-secret');
+    expect(mocks.getBackendUrl()).toBe('https://backend.example.com/api');
+    expect(useAppStore.getState().backendApiSecret).toBe('secret');
 
-    // 回到 GitHub 模式 = 取消候选设置：URL 与密钥必须成对恢复
+    // 回到 GitHub 模式 = 取消候选设置：URL 与密钥必须成对恢复为原值
     fireEvent.click(screen.getByRole('button', { name: '使用 GitHub Token 登录' }));
     await waitFor(() => expect(mocks.rollbackBackendConnection).toHaveBeenCalledWith(
-      'https://candidate.example/api',
+      'https://original.example/api',
       'original-secret',
     ));
-    // 候选 Key（'secret'）绝不能残留在 Store
-    await waitFor(() => expect(useAppStore.getState().backendApiSecret).toBe('original-secret'));
+    expect(mocks.getBackendUrl()).toBe('https://original.example/api');
+    expect(useAppStore.getState().backendApiSecret).toBe('original-secret');
+  });
+
+  it('目标账号已有旧归档但后端返回空快照时，覆盖确认后最终工作区为空', async () => {
+    const parkedRepo = {
+      id: 901,
+      name: 'stale-repo',
+      full_name: 'octo-3/stale-repo',
+      description: null,
+      html_url: 'https://github.com/octo-3/stale-repo',
+      stargazers_count: 1,
+      language: 'TypeScript',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      pushed_at: '2026-01-01T00:00:00Z',
+      owner: { login: 'octo-3', avatar_url: 'https://avatars.example.com/3' },
+      topics: [],
+    };
+    useAppStore.setState({
+      user: null,
+      repositories: [],
+      accountWorkspaces: {
+        '3': {
+          repositories: [parkedRepo],
+          lastSync: '2026-01-01T00:00:00Z',
+          gists: [],
+          starredGists: [],
+          selectedGistCategory: 'all',
+          releases: [],
+          releaseSubscriptions: [],
+          releaseSourceSettings: {
+            trackedStarredRepoIds: [],
+            customRepos: [],
+            includePrereleases: false,
+            includeDrafts: false,
+          },
+          readReleases: [],
+          forks: [],
+          readForks: [],
+          customCategories: [],
+          hiddenDefaultCategoryIds: [],
+          defaultCategoryOverrides: {},
+          categoryOrder: [],
+          categoryListIdMap: {},
+          syncMode: 'manual',
+          syncModeConfigured: true,
+        },
+      },
+    });
+    mocks.restoreBackendSession.mockResolvedValue({
+      status: 'connected',
+      githubToken: 'ghp_empty_snapshot',
+      user: { id: 3, login: 'octo-3', name: 'Octo 3', avatar_url: 'https://avatars.example.com/3', email: null },
+    });
+    // 后端成功返回空快照（repositories 为空）
+    mocks.syncBackendData.mockImplementation(async () => {
+      useAppStore.setState({ repositories: [] });
+    });
+
+    const { urlInput, apiKeyInput } = await enterBackendMode();
+    fireEvent.change(urlInput, { target: { value: 'https://backend.example.com' } });
+    fireEvent.change(apiKeyInput, { target: { value: 'secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '连接并恢复数据' }));
+
+    // 触发覆盖确认弹窗并选择使用后端数据
+    const confirmBtn = await screen.findByRole('button', { name: '使用后端数据' });
+    fireEvent.click(confirmBtn);
+
+    await waitFor(() => expect(useAppStore.getState().user?.login).toBe('octo-3'));
+    expect(useAppStore.getState().repositories).toEqual([]);
+    expect(useAppStore.getState().accountWorkspaces['3']?.repositories).toEqual([]);
   });
 
   // 审计修复（R2-B8）：回滚完成前阻止 PAT 提交（按钮、Enter 全部纳入约束）。

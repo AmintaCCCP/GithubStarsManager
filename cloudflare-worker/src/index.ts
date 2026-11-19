@@ -215,8 +215,7 @@ export default {
         // 待删向量，跑满轮次也无法与「清理完成」区分——只能采样时结果一律
         // 标「未验证」（partial: true + verified: false），绝不谎报 partial: false。
         const listBinding = env.VECTORIZE as ListCapableVectorize;
-        const listVectors = listBinding.list;
-        if (typeof listVectors === 'function') {
+        if (typeof listBinding.list === 'function') {
           try {
             let cursor: string | undefined;
             let totalDeleted = 0;
@@ -224,7 +223,7 @@ export default {
             // 分页安全上限（1000/页 × 500 页）：超出按未验证处理，避免游标异常导致死循环。
             const MAX_LIST_PAGES = 500;
             for (let page = 0; page < MAX_LIST_PAGES; page++) {
-              const pageResult = await listVectors({ limit: 1000, ...(cursor ? { cursor } : {}) });
+              const pageResult = await listBinding.list({ limit: 1000, ...(cursor ? { cursor } : {}) });
               const vectors = Array.isArray(pageResult?.vectors) ? pageResult.vectors : [];
               const staleIds = vectors
                 .map((v) => (typeof v === 'string' ? v : String((v as { id?: unknown }).id ?? '')))

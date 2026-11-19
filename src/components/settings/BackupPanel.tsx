@@ -1,9 +1,11 @@
 
 import { TranslateFn } from '../../i18n/useT';
 import { Button } from '../ui/button';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Download, Upload, RefreshCw, Cloud, AlertCircle } from 'lucide-react';
+import type { WebDAVConfig } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
+import { accountIdKey, getAccountSessionGeneration } from '../../store/helpers/accountWorkspace';
 import { IncludeKeysToggle } from './IncludeKeysToggle';
 import { useBackupActions } from '../../features/settings/hooks/useBackupActions';
 import {
@@ -35,17 +37,44 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
     files: string[];
     recommended: string | null;
     selected: string | null;
-  }>({ open: false, files: [], recommended: null, selected: null });
+    listedConfig: WebDAVConfig | null;
+    listedAccountId: string | null;
+    listedGeneration: number | null;
+  }>({
+    open: false,
+    files: [],
+    recommended: null,
+    selected: null,
+    listedConfig: null,
+    listedAccountId: null,
+    listedGeneration: null,
+  });
   const [listError, setListError] = useState<string | null>(null);
 
+  // WebDAV 活跃配置变化时作废旧的备份列表选择，防止用新配置下载旧列表的同名文件
+  useEffect(() => {
+    setBackupSelection((current) => (
+      current.open && current.listedConfig && current.listedConfig.id !== activeConfig?.id
+        ? { ...current, open: false, selected: null, listedConfig: null }
+        : current
+    ));
+  }, [activeConfig?.id]);
+
   const handleRestoreClick = async () => {
+    const listedConfig = activeConfig ?? null;
+    const listedAccountId = accountIdKey(useAppStore.getState().user);
+    const listedGeneration = getAccountSessionGeneration();
     setIsListingBackups(true);
     setListError(null);
     try {
       const { files, recommended } = await listBackups();
       if (files.length === 0) {
         // 无备份文件：走恢复流程给出既有的 no-backup-files-found 提示
-        await restore();
+        await restore(undefined, {
+          expectedAccountId: listedAccountId,
+          expectedGeneration: listedGeneration,
+          ...(listedConfig ? { config: listedConfig } : {}),
+        });
         return;
       }
       setBackupSelection({
@@ -53,6 +82,9 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
         files,
         recommended,
         selected: recommended ?? files[files.length - 1],
+        listedConfig,
+        listedAccountId,
+        listedGeneration,
       });
     } catch (error) {
       setListError(error instanceof Error ? error.message : String(error));
@@ -62,10 +94,14 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
   };
 
   const confirmRestoreSelection = async () => {
-    const selected = backupSelection.selected;
+    const { selected, listedConfig, listedAccountId, listedGeneration } = backupSelection;
     setBackupSelection((current) => ({ ...current, open: false }));
     if (selected) {
-      await restore(selected);
+      await restore(selected, {
+        expectedAccountId: listedAccountId,
+        ...(listedGeneration !== null ? { expectedGeneration: listedGeneration } : {}),
+        ...(listedConfig ? { config: listedConfig } : {}),
+      });
     }
   };
 
@@ -193,6 +229,7 @@ export const BackupPanel: React.FC<BackupPanelProps> = ({ t }) => {
                 <button
                   key={file}
                   type="button"
+                  aria-pressed={backupSelection.selected === file}
                   onClick={() => setBackupSelection((current) => ({ ...current, selected: file }))}
                   className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
                     backupSelection.selected === file

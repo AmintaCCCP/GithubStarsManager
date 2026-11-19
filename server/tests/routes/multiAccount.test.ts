@@ -343,10 +343,12 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // GitHub 响应保持挂起，随后断言 fetch 次数。
     const firstClaim = claimLegacyDefaultIfNeeded(db, '111');
     const secondClaim = claimLegacyDefaultIfNeeded(db, '111');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
-    for (const release of releaseFetches) release({ ok: true, status: 200, json: async () => ({ id: 111 }) });
-    await Promise.allSettled([firstClaim, secondClaim]);
+    try {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const release of releaseFetches) release({ ok: true, status: 200, json: async () => ({ id: 111 }) });
+      await Promise.allSettled([firstClaim, secondClaim]);
+    }
     await Promise.all([firstClaim, secondClaim]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -598,6 +600,16 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .send({ github_token: 'token-a', user_profile: { id: 111, login: 'alice', avatar_url: 'https://x/a.png' } })
       .expect(200);
 
+    // 同时向 A 的 account_settings 写入普通设置与内部键，验证工作区导出保留普通设置并过滤内部键
+    db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, 'customCategories', ?)")
+      .run(ACCOUNT_A, JSON.stringify(['keep-me']));
+    db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, 'active_account_id', ?)")
+      .run(ACCOUNT_A, ACCOUNT_A);
+    db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, 'legacy_default_claimed_by', ?)")
+      .run(ACCOUNT_A, ACCOUNT_A);
+    db.prepare("INSERT OR REPLACE INTO account_settings (account_id, key, value) VALUES (?, 'legacy_default_owner_id', ?)")
+      .run(ACCOUNT_A, JSON.stringify({ ownerId: ACCOUNT_A, token: 'legacy-owner-ciphertext' }));
+
     const exported = await request(app).post('/api/sync/export').set(authHeaders(ACCOUNT_A)).expect(200);
     const settings = exported.body.settings as Record<string, unknown>;
     expect(settings.active_account_id).toBeUndefined();
@@ -608,8 +620,12 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // legacy_default_owner_id 内的全局 Token 密文绝不随备份带出
     expect(JSON.stringify(exported.body)).not.toContain(legacyOwnerCiphertext);
     expect(JSON.stringify(exported.body)).not.toContain('legacy-owner-ciphertext');
-    // workspace account_settings 只存账号级键：内部键不会出现在任何工作区中
-    for (const ws of exported.body.account_workspaces as Array<Record<string, unknown>>) {
+    // workspace account_settings 保留普通设置且过滤全部内部键
+    const workspaces = exported.body.account_workspaces as Array<Record<string, unknown>>;
+    const wsA = workspaces.find((ws) => ws.account_id === ACCOUNT_A);
+    expect(wsA).toBeDefined();
+    expect(JSON.parse(String((wsA?.account_settings as Record<string, unknown>)?.customCategories))).toEqual(['keep-me']);
+    for (const ws of workspaces) {
       const wsSettings = ws.account_settings as Record<string, unknown>;
       expect(wsSettings.active_account_id).toBeUndefined();
       expect(wsSettings.legacy_default_claimed_by).toBeUndefined();
@@ -938,6 +954,11 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       INSERT INTO categories (account_id, id, name, icon, keywords)
       VALUES ('default', 'shared-cat', 'Legacy', '📁', '["legacy-kw"]')
     `).run();
+    // 目标账号分区也存在同 ID 分类（名称不同、省略待补 keywords），用于验证冲突合并
+    db.prepare(`
+      INSERT INTO categories (account_id, id, name, icon, keywords)
+      VALUES ('111', 'shared-cat', 'TargetName', '📁', NULL)
+    `).run();
     // 全局账号级设置（认领时只补账号缺失的键）
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('github_token', ?)").run(encrypt('token-of-111', encryptionKey));
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('customCategories', ?)").run('["legacy"]');
@@ -978,7 +999,7 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     const release = db.prepare("SELECT is_read FROM releases WHERE account_id = '111' AND id = 50").get() as { is_read: number };
     expect(release.is_read).toBe(1);
     const category = db.prepare("SELECT name, keywords FROM categories WHERE account_id = '111' AND id = 'shared-cat'").get() as { name: string; keywords: string };
-    expect(category.name).toBe('Legacy');
+    expect(category.name).toBe('TargetName');
     expect(JSON.parse(category.keywords)).toEqual(['legacy-kw']);
 
     // 认领标记与设置合并：账号已保存的 customCategories 绝不被全局旧值覆盖
@@ -1358,6 +1379,12 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
       .send({ github_token: '{{SECRET_5xe7lbqm}}' })
       .expect(200);
 
+    // 先核对账号 A 的 PAT 确实写入成功，再断言活跃账号仍保持为 ACCOUNT_B
+    const savedTokenRow = db
+      .prepare("SELECT value FROM account_settings WHERE account_id = ? AND key = 'github_token'")
+      .get(ACCOUNT_A) as { value: string } | undefined;
+    expect(savedTokenRow?.value).toBeTruthy();
+    expect(decrypt(savedTokenRow!.value, encryptionKey)).toBe('{{SECRET_5xe7lbqm}}');
     expect(db.prepare("SELECT value FROM settings WHERE key = 'active_account_id'").get())
       .toMatchObject({ value: ACCOUNT_B });
   });
@@ -1926,17 +1953,30 @@ describeIfDb('multi-account isolation (Issue #611)', () => {
     // 立即触发请求分发（不等待完成），使校验等待与设备 2 的清空交错
     void rotated.then(() => undefined, () => undefined);
 
-    // 校验等待期间设备 2 显式清空同账号凭据（推进凭据版本）
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    await request(app)
-      .put('/api/settings')
-      .set(authHeaders(ACCOUNT_B))
-      .send({ github_token: '' })
-      .expect(200);
+    let res: Awaited<typeof rotated>;
+    let released = false;
+    const releaseOnce = () => {
+      if (!released) {
+        released = true;
+        releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
+      }
+    };
+    try {
+      // 校验等待期间设备 2 显式清空同账号凭据（推进凭据版本）
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await request(app)
+        .put('/api/settings')
+        .set(authHeaders(ACCOUNT_B))
+        .send({ github_token: '' })
+        .expect(200);
 
-    // 释放校验（身份匹配 222）：校验成功，但凭据版本已变化
-    releaseVerification({ ok: true, status: 200, json: async () => ({ id: 222 }) });
-    const res = await rotated;
+      // 释放校验（身份匹配 222）：校验成功，但凭据版本已变化
+      releaseOnce();
+      res = await rotated;
+    } finally {
+      releaseOnce();
+      await rotated.then(() => undefined, () => undefined);
+    }
 
     // 迟到的写回被放弃：两个存储位置都保持清空后的状态，绝不写回旧校验的 PAT
     expect(res.body).toMatchObject({ updated: true, token_update_superseded: true });

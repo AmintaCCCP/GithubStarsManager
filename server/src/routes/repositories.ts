@@ -301,6 +301,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_summary_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             LIMIT 1
           ), repositories.ai_summary)
@@ -313,6 +319,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_tags_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
             LIMIT 1
           ), repositories.ai_tags)
@@ -325,6 +337,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_platforms_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
             LIMIT 1
           ), repositories.ai_platforms)
@@ -337,6 +355,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = excluded.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default' AND repositories.account_id != 'default'
               AND other.ai_summary_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), repositories.analyzed_at)
@@ -344,26 +368,33 @@ router.put('/api/repositories', (req, res) => {
         -- Issue #612 A21：写入 AI 内容的行按当前账号的共享设置置位 ai_shared；
         -- 不携带 AI 内容的载荷保留已存储标记（可能是回填得到的共享成果）。
         -- Issue #612 R2-A10：整行 ai_shared 仅为兼容标记，回填查询按下方
-        -- ai_*_shared 字段授权过滤；本次提交只授权本次提交的 AI 字段。
+        -- ai_*_shared 字段授权过滤；普通同步原样回写已有/继承内容不触发新授权，
+        -- 仅在字段值确实新增或变化时才按当前账号共享设置更新授权标记。
         ai_shared = CASE
-          WHEN (excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '')
-            OR (excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]')
-            OR (excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]')
+          WHEN (excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' AND excluded.ai_summary != COALESCE(repositories.ai_summary, ''))
+            OR (excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' AND excluded.ai_tags != COALESCE(repositories.ai_tags, '[]'))
+            OR (excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' AND excluded.ai_platforms != COALESCE(repositories.ai_platforms, '[]'))
           THEN @aiShared
           ELSE repositories.ai_shared
         END,
-        -- R2-A10：按字段授权——载荷携带该字段（非空）且共享开启时置位，
-        -- 否则保留已存储的授权（先前未授权的字段绝不因其他字段的更新被共享）。
+        -- R2-A10：按字段授权——仅当载荷携带了新增/修改后的非空字段时按 @aiShared 置位，
+        -- 原样写回服务端返回的继承内容时保持原有授权（避免把他人回填的总结转为接收方共享）。
         ai_summary_shared = CASE
-          WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != '' THEN @aiShared
+          WHEN excluded.ai_summary IS NOT NULL AND excluded.ai_summary != ''
+            AND excluded.ai_summary != COALESCE(repositories.ai_summary, '')
+          THEN @aiShared
           ELSE repositories.ai_summary_shared
         END,
         ai_tags_shared = CASE
-          WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]' THEN @aiShared
+          WHEN excluded.ai_tags IS NOT NULL AND excluded.ai_tags != '[]'
+            AND excluded.ai_tags != COALESCE(repositories.ai_tags, '[]')
+          THEN @aiShared
           ELSE repositories.ai_tags_shared
         END,
         ai_platforms_shared = CASE
-          WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]' THEN @aiShared
+          WHEN excluded.ai_platforms IS NOT NULL AND excluded.ai_platforms != '[]'
+            AND excluded.ai_platforms != COALESCE(repositories.ai_platforms, '[]')
+          THEN @aiShared
           ELSE repositories.ai_platforms_shared
         END,
         analysis_failed = excluded.analysis_failed,
@@ -414,6 +445,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
               AND other.ai_summary_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.ai_summary IS NOT NULL AND other.ai_summary != ''
             LIMIT 1
           ), ai_summary)
@@ -424,6 +461,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
               AND other.ai_tags_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.ai_tags IS NOT NULL AND other.ai_tags != '[]'
             LIMIT 1
           ), ai_tags)
@@ -434,6 +477,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
               AND other.ai_platforms_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.ai_platforms IS NOT NULL AND other.ai_platforms != '[]'
             LIMIT 1
           ), ai_platforms)
@@ -444,6 +493,12 @@ router.put('/api/repositories', (req, res) => {
             WHERE other.id = repositories.id AND other.account_id != repositories.account_id
               AND other.account_id != 'default'
               AND other.ai_summary_shared = 1
+              AND EXISTS (
+                SELECT 1 FROM account_settings AS other_cfg
+                WHERE other_cfg.account_id = other.account_id
+                  AND other_cfg.key = 'ai_result_sharing_enabled'
+                  AND other_cfg.value IN ('1', 'true')
+              )
               AND other.analyzed_at IS NOT NULL AND other.analyzed_at != ''
             LIMIT 1
           ), analyzed_at)
@@ -638,16 +693,21 @@ router.patch('/api/repositories/:id', (req, res) => {
     }
 
     // account_id 条件防跨账号改写（WHERE account_id = ? AND id = ?）
+    // 将 UPDATE、结果读取与版本推进放入同一事务，版本推进失败时自动回滚仓库修改。
     values.push(accountId, id);
-    db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE account_id = ? AND id = ?`).run(...values);
-
-    const row = db.prepare('SELECT * FROM repositories WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
+    const updateRepoAndBumpRevision = db.transaction(() => {
+      db.prepare(`UPDATE repositories SET ${setClauses.join(', ')} WHERE account_id = ? AND id = ?`).run(...values);
+      const updated = db.prepare('SELECT * FROM repositories WHERE account_id = ? AND id = ?').get(accountId, id) as Record<string, unknown> | undefined;
+      if (!updated) return null;
+      // Issue #612 A20x：仓库写入成功后递增快照版本。
+      bumpAccountRevision(db, accountId);
+      return updated;
+    });
+    const row = updateRepoAndBumpRevision();
     if (!row) {
       res.status(404).json({ error: 'Repository not found', code: 'REPOSITORY_NOT_FOUND' });
       return;
     }
-    // Issue #612 A20x：仓库写入成功后递增快照版本。
-    bumpAccountRevision(db, accountId);
     res.json(transformRepo(row));
   } catch (err) {
     console.error('PATCH /api/repositories error:', err);

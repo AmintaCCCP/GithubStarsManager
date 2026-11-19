@@ -53,9 +53,12 @@ function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }, 
   // renderer believe tokens were wiped when they are not.
   if (accountIds.length === 0) {
     try {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      fs.unlinkSync(filePath);
       return { success: true };
     } catch (error) {
+      if (error && error.code === 'ENOENT') {
+        return { success: true };
+      }
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
@@ -90,21 +93,22 @@ function saveEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }, 
  */
 function loadEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }) {
   const filePath = getGhAccountsPath(userDataPath, pathModule);
-  let exists = false;
+  let buf;
   try {
-    exists = fs.existsSync(filePath);
+    buf = fs.readFileSync(filePath);
   } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return { status: 'missing' };
+    }
     return { status: 'error', error: error instanceof Error ? error.message : String(error) };
   }
-  if (!exists) return { status: 'missing' };
   try {
-    if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
-      return { status: 'error', error: 'SafeStorage encryption is unavailable; gh-accounts.enc cannot be read.' };
-    }
-    const buf = fs.readFileSync(filePath);
     // A zero-byte file holds no tokens: treat like an absent file so the next
     // successful save can rewrite it.
     if (!buf || buf.length === 0) return { status: 'missing' };
+    if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' || !safeStorage.isEncryptionAvailable()) {
+      return { status: 'error', error: 'SafeStorage encryption is unavailable; gh-accounts.enc cannot be read.' };
+    }
 
     const payloadStr = safeStorage.decryptString(buf);
     const data = JSON.parse(payloadStr);
@@ -134,9 +138,12 @@ function loadEncryptedGhAccounts({ fs, pathModule, userDataPath, safeStorage }) 
 function clearEncryptedGhAccounts({ fs, pathModule, userDataPath }) {
   try {
     const filePath = getGhAccountsPath(userDataPath, pathModule);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    fs.unlinkSync(filePath);
     return { success: true };
   } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return { success: true };
+    }
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

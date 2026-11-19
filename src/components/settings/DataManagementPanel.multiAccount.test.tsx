@@ -459,7 +459,12 @@ describe('DataManagementPanel multi-account import/export (Issue #611 audit fixe
       },
     }));
 
-    await importBackupAndClick(user, payload.data, 'dataManagementPanel.replace-import');
+    const exportedText = await blob.text();
+    const exportedFile = new File([exportedText], 'exported-categories.json', { type: 'application/json' });
+    const fileInput = screen.getByLabelText('dataManagementPanel.select-file') as HTMLInputElement;
+    await user.upload(fileInput, exportedFile);
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: 'dataManagementPanel.replace-import' }));
 
     const state = useAppStore.getState();
     // Alice 分类恢复为备份值（cat-alice），导出后的本地修改被替换

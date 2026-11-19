@@ -201,7 +201,7 @@ export interface DenseQueryScopeResolution {
    * 回填（账号元数据未建立）。调用方按原因给出不同提示，只有回填场景才建议
    * 重建索引。
    */
-  reason?: 'worker-unsupported' | 'status-failed' | 'needs-backfill';
+  reason?: 'worker-unsupported' | 'metadata-index-not-ready' | 'status-failed' | 'needs-backfill';
 }
 
 /**
@@ -244,6 +244,9 @@ export async function resolveDenseQueryAccountScope(
     // 前者提示稍后重试，后者提示部署新版 Worker，只有确认需要回填才提示重建。
     if (!status) {
       return { skip: true, reason: 'status-failed' };
+    }
+    if (status.accountScopedCleanup === false) {
+      return { skip: true, reason: 'metadata-index-not-ready' };
     }
     return { skip: true, reason: 'worker-unsupported' };
   } catch (error) {

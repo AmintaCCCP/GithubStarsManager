@@ -30,6 +30,12 @@ import {
 import { debouncedPersistStorage } from './storage';
 
 /**
+ * 记录 v18→v19 迁移阶段发起的桌面端加密凭据保存，供 onRehydrateStorage 等待
+ * 落盘完成后再读取 gh-accounts.enc，避免首次升级时读取早于写入导致会话丢失。
+ */
+let pendingMigrationTokenSave: Promise<{ ok: boolean; tokens: GhAccountTokenMap; error?: unknown }> | null = null;
+
+/**
  * 审计修复（B7/CWE-922）：持久化分片只保留 savedAccounts 的非敏感元数据
  * （accountId、user、addedAt、lastUsedAt），githubToken 一律剥除（置空串）。
  * PAT 仅存桌面端 safeStorage 加密文件（经 ghAccounts IPC），Web 构建不持久化
@@ -504,7 +510,11 @@ stateRecord.mcpConfig = normalizeMcpConfig(stateRecord.mcpConfig);
     if (Object.keys(tokens).length > 0 && hasGhAccountsBridge()) {
       // R2-B1：迁移时磁盘完整映射尚未加载，saveGhAccountTokens 自动先读后写
       // 合并更新——迁移写入的 Token 不会抹掉 gh-accounts.enc 中其他账号已有的 PAT。
-      void saveGhAccountTokens(tokens).catch(() => undefined);
+      // 保存 Promise 交给 onRehydrateStorage 等待完成后再读盘，防止读早于写。
+      const tokensSnapshot = { ...tokens };
+      pendingMigrationTokenSave = saveGhAccountTokens(tokensSnapshot)
+        .then(() => ({ ok: true as const, tokens: tokensSnapshot }))
+        .catch((err) => ({ ok: false as const, tokens: tokensSnapshot, error: err }));
     }
     stateRecord.githubToken = null;
     stateRecord.savedAccounts = stripSavedAccountTokens(legacySaved);
@@ -562,8 +572,22 @@ if (error || !hasGhAccountsBridge()) {
   finishHydration();
   return;
 }
-loadGhAccountTokens()
-  .then((result) => {
+const migrationSave = pendingMigrationTokenSave;
+pendingMigrationTokenSave = null;
+(migrationSave ?? Promise.resolve(null))
+  .then(async (migrationResult) => {
+    if (migrationResult && !migrationResult.ok) {
+      logger.warn('store.hydrate', 'v19 gh-accounts migration save failed; restoring migrated tokens in memory', {
+        error: migrationResult.error instanceof Error ? migrationResult.error.message : String(migrationResult.error),
+      });
+      // 显式恢复分支：迁移落盘失败时不按成功路径读盘，先把迁移出的 Token 回填到内存保持本次会话可用
+      if (Object.keys(migrationResult.tokens).length > 0) {
+        const { restorePersistedAccountTokens } = useAppStore.getState();
+        restorePersistedAccountTokens(migrationResult.tokens);
+      }
+      return;
+    }
+    const result = await loadGhAccountTokens();
     if (result.status === 'error') {
       logger.warn('store.hydrate', 'gh-accounts secure storage read failed; tokens not restored', {
         error: result.error,

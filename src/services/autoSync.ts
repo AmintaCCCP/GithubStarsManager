@@ -819,7 +819,10 @@ export async function drainInFlightBackendPulls(accountId: string | null): Promi
  * 集合，并取消在途退避重试与待推防抖。「清空全部数据」若只清空 savedAccounts，
  * 账号级待推标记会残留并在重启后触发对已清空分区的补推。
  */
+let _resetGeneration = 0;
+
 export function clearPendingSyncState(): void {
+  _resetGeneration += 1;
   _pendingSyncAccounts.clear();
   try {
     localStorage.removeItem(PENDING_SYNC_ACCOUNTS_KEY);
@@ -1276,18 +1279,24 @@ export async function syncFromBackend(options: {
     ]);
 
     if ((backend.backendUrl ?? '') !== fetchedBackendUrl) {
+      if (options.throwOnRepoFailure) {
+        throw new Error('Backend connection changed during pull');
+      }
       return;
     }
 
     // 审计修复（C8）：提交结果（更新 Store、同步哈希、待推状态）前同时校验
-    // 账号 ID、会话代次与后端 URL；任一不匹配丢弃结果（按现有风格静默记录）。
-    // 同会话校验通过的拉取正常提交。显式账号恢复按 (targetAccountId, 代次) 校验
-    //（账号已显式固定，期间任何登录/切换都会递增代次）。
+    // 账号 ID、会话代次与后端 URL；任一不匹配丢弃结果。显式账号恢复按
+    // (targetAccountId, 代次) 校验；当调用方要求严格结果（throwOnRepoFailure）
+    // 时必须显式抛错，防止登录恢复流程在拉取被丢弃后继续提交目标账号身份与 PAT。
     if (options.targetAccountId) {
       if (getAccountSessionGeneration() !== startedGeneration) {
         logger.warn('sync.pullFromBackend', 'Discarded target-account pull: session generation changed during fetch', {
           targetAccountId: options.targetAccountId,
         });
+        if (options.throwOnRepoFailure) {
+          throw new Error('Target-account pull discarded: session changed during fetch');
+        }
         return;
       }
     } else {
@@ -1297,6 +1306,9 @@ export async function syncFromBackend(options: {
           fetchedAccountId: fetchedAccountId ?? null,
           currentAccountId: currentAccountId ?? null,
         });
+        if (options.throwOnRepoFailure) {
+          throw new Error('Pull discarded: session changed during fetch');
+        }
         return;
       }
     }
@@ -1672,6 +1684,8 @@ function isSnapshotConflictError(error: unknown): boolean {
 
 async function syncRepositoriesWithServerMerge(localRepos: Repository[], accountId: string): Promise<void> {
   let lastConflictError: unknown = null;
+  const pushSessionGeneration = getAccountSessionGeneration();
+  const pushResetGeneration = _resetGeneration;
   for (let attempt = 1; attempt <= SNAPSHOT_CONFLICT_MAX_ATTEMPTS; attempt += 1) {
     const remote = await backend.fetchRepositories();
     // 分页截断/不完整的响应不是完整快照：据此推送会物理删除未读到的远端仓库。
@@ -1702,15 +1716,19 @@ async function syncRepositoriesWithServerMerge(localRepos: Repository[], account
     const payload = [...localRepos, ...serverKept];
     try {
       await backend.syncRepositories(payload, { expectedRevision: remote.revision ?? null });
-      // 推送成功：后端确认了本载荷（含删除）。R2-C4：基线只记录本地实际持有的
-      // ID——为对齐远端而保留的远端仓库绝不能进入「本地已拥有」基线，否则下次
-      // 推送会把它误判为本地删除。R2-C3：待确认删除记录在此确认清除。
-      if (baselineKey) {
-        _lastPushedRepoIds.set(baselineKey, new Set(localIds));
-        _sessionDeletedRepoIds.delete(baselineKey);
-        persistPushedRepoIds();
+      // 推送成功：写入已推送基线前校验会话代次与重置代次——若期间发生清空全部数据
+      // 或切换账号，绝不用旧 localIds 重建 gsm.pushedRepoIdsV2。
+      const sessionStillValid = _resetGeneration === pushResetGeneration
+        && getAccountSessionGeneration() === pushSessionGeneration
+        && accountIdKey(useAppStore.getState().user) === accountId;
+      if (sessionStillValid) {
+        if (baselineKey) {
+          _lastPushedRepoIds.set(baselineKey, new Set(localIds));
+          _sessionDeletedRepoIds.delete(baselineKey);
+          persistPushedRepoIds();
+        }
+        clearPendingRepositoryDeletions(accountId, backend.backendUrl ?? '');
       }
-      clearPendingRepositoryDeletions(accountId, backend.backendUrl ?? '');
       return;
     } catch (err) {
       if (!isSnapshotConflictError(err) || attempt === SNAPSHOT_CONFLICT_MAX_ATTEMPTS) {
@@ -1959,20 +1977,8 @@ export async function forceSyncToBackend(options: { reportFailures?: boolean } =
  */
 function collectDirtySettingKeys(next: Record<string, unknown>, prev: Record<string, unknown>): string[] {
   const dirty: string[] = [];
-  const fields: Array<[string, string]> = [
-    ['activeAIConfig', 'activeAIConfig'],
-    ['activeWebDAVConfig', 'activeWebDAVConfig'],
-    ['activeEmbeddingConfig', 'activeEmbeddingConfig'],
-    ['hiddenDefaultCategoryIds', 'hiddenDefaultCategoryIds'],
-    ['categoryOrder', 'categoryOrder'],
-    ['customCategories', 'customCategories'],
-    ['assetFilters', 'assetFilters'],
-    ['defaultCategoryOverrides', 'defaultCategoryOverrides'],
-    ['releaseSourceSettings', 'releaseSourceSettings'],
-    ['collapsedSidebarCategoryCount', 'collapsedSidebarCategoryCount'],
-  ];
-  for (const [key, field] of fields) {
-    if (next[field] !== prev[field]) dirty.push(key);
+  for (const key of SETTING_DIRTY_KEYS) {
+    if (next[key] !== prev[key]) dirty.push(key);
   }
   return dirty;
 }
@@ -2111,18 +2117,11 @@ export function startAutoSync(): () => void {
         if (pendingChanged) persistPendingRepoDeletions();
       }
     }
-    // R2-C2：正常路径的脏键同样带编辑版本记录，迟到成功响应无法误清。
-    const dirtySettingKeys: string[] = [];
-    if (state.activeAIConfig !== prevState.activeAIConfig) dirtySettingKeys.push('activeAIConfig');
-    if (state.activeWebDAVConfig !== prevState.activeWebDAVConfig) dirtySettingKeys.push('activeWebDAVConfig');
-    if (state.activeEmbeddingConfig !== prevState.activeEmbeddingConfig) dirtySettingKeys.push('activeEmbeddingConfig');
-    if (state.hiddenDefaultCategoryIds !== prevState.hiddenDefaultCategoryIds) dirtySettingKeys.push('hiddenDefaultCategoryIds');
-    if (state.categoryOrder !== prevState.categoryOrder) dirtySettingKeys.push('categoryOrder');
-    if (state.customCategories !== prevState.customCategories) dirtySettingKeys.push('customCategories');
-    if (state.assetFilters !== prevState.assetFilters) dirtySettingKeys.push('assetFilters');
-    if (state.defaultCategoryOverrides !== prevState.defaultCategoryOverrides) dirtySettingKeys.push('defaultCategoryOverrides');
-    if (state.releaseSourceSettings !== prevState.releaseSourceSettings) dirtySettingKeys.push('releaseSourceSettings');
-    if (state.collapsedSidebarCategoryCount !== prevState.collapsedSidebarCategoryCount) dirtySettingKeys.push('collapsedSidebarCategoryCount');
+    // R2-C2：正常路径的脏键同样复用 SETTING_DIRTY_KEYS 清单并带编辑版本记录，迟到成功响应无法误清。
+    const dirtySettingKeys = collectDirtySettingKeys(
+      state as unknown as Record<string, unknown>,
+      prevState as unknown as Record<string, unknown>,
+    );
     markDirtySettingKeys(dirtySettingKeys);
 
     _hasPendingLocalChanges = true;

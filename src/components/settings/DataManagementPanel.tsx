@@ -987,6 +987,13 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         });
       };
 
+      let hasArchivedTopLevel = false;
+      const archiveTopLevelToBackupAccountOnce = (archiveMode: 'merge' | 'replace'): void => {
+        if (hasArchivedTopLevel) return;
+        hasArchivedTopLevel = true;
+        archiveTopLevelToBackupAccount(archiveMode);
+      };
+
       // 跨账号恢复订阅/已读状态：这组账号字段属于备份账号（如 A 导入 B 的
       // 备份，B 的订阅/来源设置/已读状态归档进 B 的工作区），绝不写入当前
       // 账号实时状态——否则收尾的实时快照会把它们保存进当前账号工作区。
@@ -1072,8 +1079,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('repositories') && validatedImportRepositories !== undefined) {
           if (backupTargetsOtherAccount) {
-            // 顶层仓库属于备份账号：归档而非覆盖当前登录账号视图
-            archiveTopLevelToBackupAccount('replace');
+            // 顶层仓库属于备份账号：归档而非覆盖当前登录账号视图（每个目标账号仅提交一次）
+            archiveTopLevelToBackupAccountOnce('replace');
           } else {
             store.setRepositories(validatedImportRepositories, { allowEmpty: true });
           }
@@ -1096,7 +1103,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('releases') && importedData.releases) {
           if (backupTargetsOtherAccount) {
-            archiveTopLevelToBackupAccount('replace');
+            archiveTopLevelToBackupAccountOnce('replace');
           } else {
             store.setReleases(importedData.releases, { allowEmpty: true });
           }
@@ -1117,7 +1124,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('customCategories')) {
           if (backupTargetsOtherAccount) {
-            archiveTopLevelToBackupAccount('replace');
+            archiveTopLevelToBackupAccountOnce('replace');
           } else {
             if (importedData.customCategories) {
               useAppStore.setState({ customCategories: importedData.customCategories });
@@ -1318,8 +1325,8 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('repositories') && validatedImportRepositories !== undefined) {
           if (backupTargetsOtherAccount) {
-            // merge：备份顶层按 id 并入备份账号工作区，保留已合并的本机条目
-            archiveTopLevelToBackupAccount('merge');
+            // merge：备份顶层按 id 并入备份账号工作区，保留已合并的本机条目（每个目标账号仅合并一次）
+            archiveTopLevelToBackupAccountOnce('merge');
           } else {
             const existingIds = new Set(store.repositories.map(r => r.id));
             const newRepos = validatedImportRepositories.filter(r => !existingIds.has(r.id));
@@ -1328,7 +1335,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('releases') && importedData.releases) {
           if (backupTargetsOtherAccount) {
-            archiveTopLevelToBackupAccount('merge');
+            archiveTopLevelToBackupAccountOnce('merge');
           } else {
             const existingIds = new Set(store.releases.map(r => r.id));
             const newReleases = importedData.releases.filter(r => !existingIds.has(r.id));
@@ -1357,7 +1364,7 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         }
         if (selectedTypes.includes('customCategories')) {
           if (backupTargetsOtherAccount) {
-            archiveTopLevelToBackupAccount('merge');
+            archiveTopLevelToBackupAccountOnce('merge');
           } else if (importedData.customCategories) {
             const existingIds = new Set(store.customCategories.map(c => c.id));
             const newCategories = importedData.customCategories.filter(c => !existingIds.has(c.id));
@@ -1602,10 +1609,14 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
         // 等仅存在于工作区字段中的备份新增条目若不在此落回实时状态，下一次
         // 导出的 buildFullWorkspaces 会用实时状态覆盖工作区，刚导入的条目
         // 随之丢失。本地同 ID 条目保留，备份新增条目并入。
-        const effective = mergeWorkspacesById(
-          captureAccountWorkspace(useAppStore.getState()),
-          importedWorkspaces[currentAccountId],
-        );
+        const liveWorkspace = captureAccountWorkspace(useAppStore.getState());
+        const importedWorkspace = importedWorkspaces[currentAccountId];
+        const effective = {
+          ...mergeWorkspacesById(liveWorkspace, importedWorkspace),
+          ...(selectedTypes.includes('customCategories')
+            ? mergeWorkspaceCategorySettings(liveWorkspace, importedWorkspace)
+            : {}),
+        };
         useAppStore.setState(applyAccountWorkspaceForTypes(effective, selectedTypes));
         const live = useAppStore.getState();
         useAppStore.setState({
@@ -1797,11 +1808,12 @@ export const DataManagementPanel: React.FC<DataManagementPanelProps> = ({ t }) =
       }
 
       // 审计修复（自审计补充）：同步清除桌面端加密保存的 GitHub 账号凭证文件
-      // （gh-accounts.enc），保证「清空全部数据」语义覆盖所有持久化凭据。
+      // （gh-accounts.enc），失败时纳入 pendingStorages 允许用户重试，绝不报告全部数据已删除。
       try {
         await clearEncryptedGhAccountsViaDesktop();
-      } catch {
-        // 忽略桌面端清理失败
+      } catch (e) {
+        pendingStorages.push('GitHub account credentials');
+        throw e;
       }
 
       // 审计修复（C51）：清除账号级待推状态——gsm.pendingSyncAccounts /

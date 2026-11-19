@@ -53,6 +53,7 @@ interface DenseOutcome {
 const DENSE_INDEX_UNAVAILABLE_ERROR = 'Vector index is not ready for account-scoped recall; rebuild the index in Vector Search settings for the current account';
 // R2-C26：区分三种稠密召回不可用的情形，只有确认需要回填时才建议重建。
 const DENSE_INDEX_WORKER_UNSUPPORTED_ERROR = 'Vector worker does not support account-scoped recall; deploy the bundled cloudflare-worker and retry';
+const DENSE_INDEX_METADATA_NOT_READY_ERROR = 'Vector accountId metadata index is not ready; create and verify the accountId metadata index, backfill vectors, and enable ACCOUNT_METADATA_INDEXED';
 const DENSE_INDEX_STATUS_FAILED_ERROR = 'Failed to verify the vector index status for account-scoped recall; retry later';
 
 export interface RunSimilarRepositoryPipelineOptions {
@@ -395,9 +396,11 @@ export async function runSimilarRepositoryPipeline(
       // Worker、状态请求暂时失败、或索引确实需要回填重建。
       const message = denseScope.reason === 'worker-unsupported'
         ? DENSE_INDEX_WORKER_UNSUPPORTED_ERROR
-        : denseScope.reason === 'status-failed'
-          ? DENSE_INDEX_STATUS_FAILED_ERROR
-          : DENSE_INDEX_UNAVAILABLE_ERROR;
+        : denseScope.reason === 'metadata-index-not-ready'
+          ? DENSE_INDEX_METADATA_NOT_READY_ERROR
+          : denseScope.reason === 'status-failed'
+            ? DENSE_INDEX_STATUS_FAILED_ERROR
+            : DENSE_INDEX_UNAVAILABLE_ERROR;
       logger.warn('vector-search', `${prefix} dense recall skipped: ${message}`, {
         accountId: options.accountIdScope?.accountId ?? null,
         reason: denseScope.reason ?? 'needs-backfill',

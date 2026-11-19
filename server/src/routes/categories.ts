@@ -1,9 +1,15 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { getDb } from '../db/connection.js';
-import { resolveAccountScope, resolveWritableAccountScope } from '../db/accountScope.js';
+import { hasInvalidAccountHeader, resolveAccountScope, resolveWritableAccountScope } from '../db/accountScope.js';
 
 const router = Router();
+
+function getAccountScopeErrorMessage(req: Parameters<typeof hasInvalidAccountHeader>[0]): string {
+  return hasInvalidAccountHeader(req)
+    ? 'X-GitHub-Account-Id must be a numeric account ID'
+    : 'X-GitHub-Account-Id header is required because the target account scope is ambiguous';
+}
 
 function parseJsonColumn(value: unknown): unknown[] {
   if (typeof value !== 'string' || !value) return [];
@@ -44,7 +50,7 @@ router.post('/api/categories', (req, res) => {
     const scope = resolveWritableAccountScope(req, db);
     if (!scope.ok) {
       res.status(409).json({
-        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        error: getAccountScopeErrorMessage(req),
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
@@ -79,7 +85,7 @@ router.put('/api/categories/:id', (req, res) => {
     const scope = resolveWritableAccountScope(req, db);
     if (!scope.ok) {
       res.status(409).json({
-        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        error: getAccountScopeErrorMessage(req),
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;
@@ -115,7 +121,7 @@ router.delete('/api/categories/:id', (req, res) => {
     const scope = resolveWritableAccountScope(req, db);
     if (!scope.ok) {
       res.status(409).json({
-        error: 'X-GitHub-Account-Id is required when multiple accounts exist',
+        error: getAccountScopeErrorMessage(req),
         code: 'ACCOUNT_SCOPE_REQUIRED',
       });
       return;

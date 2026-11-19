@@ -11,11 +11,11 @@ import {
   VectorSearchService,
 } from '../../../services/vectorSearchService';
 import { createGitHubApiService } from '../../../services/githubApiFactory';
+import { backend } from '../../../services/backendAdapter';
 import { logger } from '../../../services/logger';
 import { LEGACY_EMBEDDING_FORMAT_VERSION, isKnownEmbeddingFormatVersion, useAppStore } from '../../../store/useAppStore';
 import {
   getAccountSessionGeneration,
-  isCurrentAccount,
   isCurrentAccountSession,
   peekCurrentAccountId,
 } from '../../../store/helpers/accountWorkspace';
@@ -137,11 +137,14 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       if (workerTestRunRef.current !== runId) return;
       setWorkerTestResult(result);
       if (result.success && isCurrentAccountSession(startedAccountId, startedGeneration)) {
-        // 审计修复（C50）：连接测试的成功不把 Worker 全局总向量数写入
-        // vectorSearchStatus.vectorCount（该数字含所有账号分区的向量，会被
-        // 误当成当前账号计数）——保留已有账号计数，仅更新连接/维度。
-        // 总向量数仍在 workerTestResult（测试结果）中可见。
-        const previousVectorCount = useAppStore.getState().vectorSearchStatus?.vectorCount ?? 0;
+        // 审计修复（C50）：连接测试不把 Worker 全局总向量数写入 vectorSearchStatus.vectorCount；
+        // 仅当被测 Worker 与当前已配置的 Worker 地址一致（同一账号且同一索引）时沿用已有计数，
+        // 否则清空计数（0）避免把旧 Worker 的向量计数带入新 Worker 的连接状态。
+        const currentStore = useAppStore.getState();
+        const normalizeUrl = (url: string | undefined): string => (url ?? '').trim().replace(/\/+$/, '');
+        const sameWorkerIndex = normalizeUrl(draft.workerUrl) !== ''
+          && normalizeUrl(draft.workerUrl) === normalizeUrl(currentStore.vectorSearchConfig?.workerUrl);
+        const previousVectorCount = sameWorkerIndex ? (currentStore.vectorSearchStatus?.vectorCount ?? 0) : 0;
         state.setVectorSearchStatus({ connected: true, vectorCount: previousVectorCount, dimensions: result.dimensions });
       }
     } catch (reason) {
@@ -181,13 +184,15 @@ export const useVectorSearchActions = (): VectorSearchActions => {
     setAbortController(controller);
     state.setVectorIndexingState({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
     let currentFormatVersion = LEGACY_EMBEDDING_FORMAT_VERSION;
-    // 账号代次校验（Issue #611）：索引可达分钟级；切号后中止任务并停止打戳
+    // 账号代次校验（Issue #611）：索引可达分钟级；同时保存账号 ID 与会话代次，
+    // 确保 A→B→A 切回且未启动新任务时旧任务也会在检查点中止且不写入共享状态。
     const jobAccountId = peekCurrentAccountId();
+    const jobGeneration = getAccountSessionGeneration();
     const isCurrentJob = (): boolean => (
       indexJobRef.current?.id === jobId && indexJobRef.current.controller === controller
     );
     const onAccountChanged = (): boolean => {
-      if (!isCurrentJob() || !isCurrentAccount(jobAccountId)) {
+      if (!isCurrentJob() || !isCurrentAccountSession(jobAccountId, jobGeneration)) {
         controller.abort();
         return true;
       }
@@ -318,14 +323,29 @@ export const useVectorSearchActions = (): VectorSearchActions => {
               ...excludedVectorIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
               ...result.indexedRepoIds.map((id) => buildAccountScopedVectorId(jobAccountId, id)),
             ])];
+            let authoritativeSnapshotMatches = workspaceUnchanged;
+            if (authoritativeSnapshotMatches && backend.isAvailable) {
+              // 多设备共享后端时，本地列表未变不能证明另一设备未新增仓库：
+              // 清理前必须核对后端当前账号的权威快照，核对失败或不一致则仅保留上传、跳过删除。
+              try {
+                const remote = await backend.fetchRepositories(jobAccountId);
+                const remoteComplete = remote.repositories.length >= (remote.total ?? remote.repositories.length);
+                const remoteIds = new Set(remote.repositories.map((repository) => String(repository.id)));
+                authoritativeSnapshotMatches = remoteComplete
+                  && remoteIds.size === liveRepoIds.size
+                  && [...remoteIds].every((id) => liveRepoIds.has(id));
+              } catch {
+                authoritativeSnapshotMatches = false;
+              }
+            }
             try {
               if (onAccountChanged() || controller.signal.aborted) {
                 const abortErr = new Error('Aborted');
                 abortErr.name = 'AbortError';
                 throw abortErr;
               }
-              if (!workspaceUnchanged) {
-                logger.warn('vectorSearch.index', 'Skip vector cleanup: the account workspace changed during indexing (or is empty); uploads are kept and stale vectors converge on the next rebuild', {
+              if (!authoritativeSnapshotMatches) {
+                logger.warn('vectorSearch.index', 'Skip vector cleanup: the account workspace changed during indexing (or could not be verified against the authoritative snapshot); uploads are kept and stale vectors converge on the next rebuild', {
                   accountId: jobAccountId,
                   startCount: startRepoIds.size,
                   liveCount: liveRepoIds.size,
@@ -379,7 +399,7 @@ export const useVectorSearchActions = (): VectorSearchActions => {
       // 切号后旧任务的收尾状态不得写入当前账号：包括 isIndexing=false，
       // 否则会覆盖新账号已启动任务的运行状态。被新任务取代的旧任务
       //（身份已失效）同样跳过全部收尾写入
-      if (!isCurrentJob() || !isCurrentAccount(jobAccountId)) return;
+      if (!isCurrentJob() || !isCurrentAccountSession(jobAccountId, jobGeneration)) return;
       const isCancelled = controller.signal.aborted
         || (reason instanceof Error && (reason.name === 'AbortError' || reason.message === 'Aborted'));
       if (isCancelled) {

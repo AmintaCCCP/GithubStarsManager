@@ -233,17 +233,19 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     const worker = await loadWorker(path);
     const deleted: string[] = [];
     const listedPages: Array<Array<{ id: string }>> = [
-      [{ id: '1:101' }, { id: '1:102' }],
-      [{ id: '2:201' }],
+      [{ id: '1:101' }, { id: '2:201' }],
+      [{ id: '1:102' }],
     ];
+    const listCursors: Array<string | undefined> = [];
     const env = {
       AUTH_TOKEN: 'worker-token',
       ACCOUNT_METADATA_INDEXED: 'true',
       VECTORIZE: {
         describe: async () => ({ vectorCount: 3, dimensions: 3 }),
-        // 分页列举：游标耗尽后 Worker 可验证「不存在待删向量」→ partial: false
+        // 分页列举：把待删向量 1:102 放在第二页，确保跳过第二页会导致测试失败
         list: async (options?: { cursor?: string }) => {
-          const page = listedPages[options?.cursor ? 1 : 0];
+          listCursors.push(options?.cursor);
+          const page = listedPages[options?.cursor === 'page-2' ? 1 : 0];
           return { vectors: page, nextCursor: options?.cursor ? undefined : 'page-2' };
         },
         query: async () => {
@@ -263,6 +265,7 @@ describe.each(workerEntrypoints)('vector worker /cleanup account scoping — $na
     expect(payload.deleted).toBe(1);
     expect(payload.partial).toBe(false);
     expect(deleted).toEqual(['1:102']);
+    expect(listCursors).toEqual([undefined, 'page-2']);
   });
 
   it('marks the result unverified instead of complete when only sampling is available (R2-A28)', async () => {

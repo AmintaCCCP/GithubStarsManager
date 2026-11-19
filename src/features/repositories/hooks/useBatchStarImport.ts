@@ -256,6 +256,7 @@ export function useBatchStarImport() {
             itemIndex === index ? { ...item, status: 'starred', selected: false } : item
           ));
         } catch (error) {
+          if (!isCurrentAccountSession(jobAccountId, jobGeneration)) break;
           setRows(current => current.map((item, itemIndex) => itemIndex === index
             ? { ...item, status: 'failed', selected: false, error: error instanceof GitHubTokenPermissionError
               ? makeT(language, 'repositories')('batchStar.token-permission-error')
@@ -275,7 +276,9 @@ export function useBatchStarImport() {
         try {
           await forceSyncToBackend({ reportFailures: true });
         } catch (error) {
-          setSyncError(error instanceof Error ? error.message : String(error));
+          if (isCurrentAccountSession(jobAccountId, jobGeneration)) {
+            setSyncError(error instanceof Error ? error.message : String(error));
+          }
         }
       }
     } finally {

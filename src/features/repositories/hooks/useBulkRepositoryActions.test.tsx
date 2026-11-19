@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   unstarRepository: vi.fn(),
   forceSyncToBackend: vi.fn(),
   markPendingAccountSync: vi.fn(),
+  backend: { backendUrl: null as string | null },
 }));
 
 vi.mock('../../../store/useAppStore', () => ({
@@ -24,7 +25,12 @@ vi.mock('../../../hooks/useDialog', () => ({
 
 vi.mock('../../../services/githubApi', () => ({
   GitHubApiService: vi.fn(function GitHubApiService() {
-    return { unstarRepository: mocks.unstarRepository };
+    return {
+      unstarRepository: mocks.unstarRepository,
+      setBackendUrl: vi.fn(),
+      setBackendAuthToken: vi.fn(),
+      setBackendAccountId: vi.fn(),
+    };
   }),
 }));
 
@@ -32,6 +38,10 @@ vi.mock('../../../services/autoSync', () => ({
   forceSyncToBackend: mocks.forceSyncToBackend,
   markPendingAccountSync: mocks.markPendingAccountSync,
   withAccountSwitchGuardSync: (fn: () => unknown) => fn(),
+}));
+
+vi.mock('../../../services/backendAdapter', () => ({
+  backend: mocks.backend,
 }));
 
 const repository = (id: number, overrides: Partial<Repository> = {}): Repository => ({
@@ -291,7 +301,9 @@ describe('useBulkRepositoryActions account switch guards', () => {
     // 从 A 归档移除、第二仓库保留、B 不变，且仅为 A 标记待补推。
     const first = repository(1);
     const second = repository(2);
+    const otherAccountSameIdRepo = repository(1, { full_name: 'other/repository-1' });
     const otherAccountRepo = repository(3, { full_name: 'other/repository-3' });
+    mocks.backend.backendUrl = 'https://backend-x.example/api';
     storeState = {
       ...storeState,
       accountWorkspaces: {
@@ -303,8 +315,10 @@ describe('useBulkRepositoryActions account switch guards', () => {
           ],
         },
         '2': {
-          repositories: [otherAccountRepo],
-          releases: [],
+          repositories: [otherAccountSameIdRepo, otherAccountRepo],
+          releases: [
+            { repository: { id: 1 } } as unknown as import('../../../types').Release,
+          ],
         },
       },
     } as typeof storeState;
@@ -318,7 +332,11 @@ describe('useBulkRepositoryActions account switch guards', () => {
     let calls = 0;
     mocks.unstarRepository.mockImplementation(async () => {
       calls += 1;
-      if (calls === 1) switchToB();
+      if (calls === 1) {
+        switchToB();
+        // 模拟等待期间后端从 X 切到 Y：待推记录仍必须绑定发起时的 X
+        mocks.backend.backendUrl = 'https://backend-y.example/api';
+      }
       return undefined;
     });
 
@@ -332,16 +350,18 @@ describe('useBulkRepositoryActions account switch guards', () => {
     expect(outcome).toBe(false);
     expect(appliedPatches).toHaveLength(1);
     const archivedA = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[]; releases: Array<{ repository: { id: number } }> }>)['1'];
-    const archivedB = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[] }>)['2'];
+    const archivedB = (appliedPatches[0].accountWorkspaces as Record<string, { repositories: Repository[]; releases: Array<{ repository: { id: number } }> }>)['2'];
     // 首仓库及其 Release 从 A 归档移除，第二仓库保留
     expect(archivedA.repositories.map(r => r.id)).toEqual([2]);
     expect(archivedA.releases.map(rel => rel.repository.id)).toEqual([2]);
-    // B 归档不变（ID 相同的仓库也绝不串号——本夹具用不同 ID 直接验证）
-    expect(archivedB.repositories.map(r => r.id)).toEqual([3]);
-    // 仅为发起账号 A 标记待补推
+    // B 归档中与 A 同 ID 的仓库 1 及其 Release 均完整保留
+    expect(archivedB.repositories.map(r => r.id)).toEqual([1, 3]);
+    expect(archivedB.releases.map(rel => rel.repository.id)).toEqual([1]);
+    // 仅为发起账号 A 标记待补推，且绑定发起时的后端 URL X
     expect(mocks.markPendingAccountSync).toHaveBeenCalledTimes(1);
-    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', expect.any(String));
+    expect(mocks.markPendingAccountSync).toHaveBeenCalledWith('1', 'https://backend-x.example/api');
     expect(mocks.markPendingAccountSync).not.toHaveBeenCalledWith('2', expect.anything());
+    mocks.backend.backendUrl = null;
   });
 
   it('deletes locally and syncs when the account never changed (control)', async () => {

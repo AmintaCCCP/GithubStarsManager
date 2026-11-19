@@ -402,6 +402,27 @@ describe('useVectorSearchActions account switch guards', () => {
     expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
   });
 
+  it('aborts and writes nothing when A→B→A happens without starting a new index task', async () => {
+    const { bumpAccountSessionGeneration } = await import('../../../store/helpers/accountWorkspace');
+    mocks.indexAllRepos.mockImplementation(async () => {
+      // 模拟 A→B→A 切换（推进会话代次），且期间未启动新索引任务
+      (storeState as { user?: unknown }).user = { id: 2, login: 'other', avatar_url: '' };
+      bumpAccountSessionGeneration();
+      (storeState as { user?: unknown }).user = { id: 1, login: 'me', avatar_url: '' };
+      bumpAccountSessionGeneration();
+      return { indexed: 1, skipped: 0, errors: 0, indexedRepoIds: [1] };
+    });
+    const { result } = renderHook(() => useVectorSearchActions());
+
+    await act(async () => { await result.current.rebuildIndex(draft); });
+
+    // 旧任务在收尾检查点因代次变化中止，仅初始 isIndexing:true 写入过一次
+    expect(mocks.setVectorIndexingState).toHaveBeenCalledTimes(1);
+    expect(mocks.setVectorIndexingState).toHaveBeenCalledWith({ isIndexing: true, phase: null, phaseDone: 0, phaseTotal: 0, result: null });
+    expect(mocks.setVectorSearchStatus).not.toHaveBeenCalled();
+    expect(mocks.setVectorSearchConfig).not.toHaveBeenCalled();
+  });
+
   it('supersedes an in-flight index task when a new one starts; the old task writes nothing', async () => {
     // 审计修复回归：仅靠账号 ID 判过期在 A→B→A 切回后会重新匹配，旧任务
     // 得以通过检查并覆盖新任务的运行状态/结果。这里以同账号连续两次
@@ -466,6 +487,10 @@ describe('useVectorSearchActions account switch guards', () => {
     // 不写入 vectorSearchStatus.vectorCount——已有账号计数保留，总向量数仅在
     // workerTestResult（测试结果）中可见。
     mocks.vectorTestConnection.mockResolvedValue({ success: true, vectorCount: 5, dimensions: 1536 });
+    (storeState as { vectorSearchConfig: { workerUrl?: string; embeddingFormatVersion?: number } }).vectorSearchConfig = {
+      ...storeState.vectorSearchConfig,
+      workerUrl: 'https://worker.example.com',
+    };
     (storeState as { vectorSearchStatus?: { connected: boolean; vectorCount: number; dimensions: number } }).vectorSearchStatus = { connected: false, vectorCount: 3, dimensions: 1536 };
     const { result } = renderHook(() => useVectorSearchActions());
 
@@ -473,6 +498,11 @@ describe('useVectorSearchActions account switch guards', () => {
 
     expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 3, dimensions: 1536 });
     expect(mocks.setVectorSearchStatus).not.toHaveBeenCalledWith({ connected: true, vectorCount: 5, dimensions: 1536 });
+
+    // 测试不同 Worker 地址时不得沿用旧 Worker 的向量计数
+    mocks.setVectorSearchStatus.mockClear();
+    await act(async () => { await result.current.testWorker({ workerUrl: 'https://other-worker.example.com', authToken: 'worker-token' }); });
+    expect(mocks.setVectorSearchStatus).toHaveBeenCalledWith({ connected: true, vectorCount: 0, dimensions: 1536 });
   });
 
   it('skips the connection status write when the account switched during the worker test', async () => {
